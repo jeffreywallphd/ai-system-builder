@@ -1,4 +1,4 @@
-import type { INodePortValueType } from "../WorkflowPortValueTypes";
+import type { NodePortValueType } from "../../nodes/interfaces/INodePort";
 import type { IModelCompatibility } from "../../models/interfaces/IModelCompatibility";
 
 /**
@@ -60,7 +60,7 @@ export interface IWorkflowConnectionCompatibilitySnapshot {
    * Optional resolved value types at the time the connection is created or validated.
    * Useful for caching analysis, debugging, and adapter planning.
    */
-  readonly valueTypes?: ReadonlyArray<INodePortValueType>;
+  readonly valueTypes?: ReadonlyArray<NodePortValueType>;
 
   /**
    * Optional resolved model compatibility at the time of validation.
