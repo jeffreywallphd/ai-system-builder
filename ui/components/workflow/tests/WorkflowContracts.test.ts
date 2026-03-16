@@ -2,12 +2,16 @@ import { describe, expect, it } from "bun:test";
 import { readSource } from "../../../tests/testUtils";
 
 describe("ui/components/workflow contract adherence", () => {
-  it("workflow canvas and drag hook expose declared exports", () => {
+  it("workflow canvas and reactflow canvas expose declared exports", () => {
     const canvasSource = readSource("ui/components/workflow/WorkflowCanvas.tsx");
-    const dragSource = readSource("ui/components/workflow/useNodeDrag.ts");
+    const reactFlowCanvasSource = readSource(
+      "ui/components/workflow/reactflow/ReactFlowCanvas.tsx"
+    );
 
     expect(canvasSource).toContain("export default function WorkflowCanvas");
-    expect(dragSource).toContain("export function useNodeDrag");
+    expect(reactFlowCanvasSource).toContain(
+      "export default function ReactFlowCanvas"
+    );
   });
 
   it("new workflow panel modules define default React components", () => {

@@ -8,15 +8,21 @@ describe("ui/components/nodes unit coverage", () => {
     const propertyField = readSource("ui/components/nodes/NodePropertyField.tsx");
     const propertyEditor = readSource("ui/components/nodes/NodePropertyEditor.tsx");
     const inspector = readSource("ui/components/nodes/NodeInspector.tsx");
-    const nodePort = readSource("ui/components/nodes/NodePort.tsx");
-    const canvasNode = readSource("ui/components/nodes/NodeCanvasNode.tsx");
 
     expect(palette).toContain("export default function NodePalette");
     expect(paletteItem).toContain("export default function NodePaletteItem");
     expect(propertyField).toContain("export default function NodePropertyField");
     expect(propertyEditor).toContain("export default function NodePropertyEditor");
     expect(inspector).toContain("export default function NodeInspector");
-    expect(nodePort).toContain("export default function NodePort");
-    expect(canvasNode).toContain("export default function NodeCanvasNode");
+  });
+
+  it("keeps retired custom canvas components marked as placeholders", () => {
+    const nodePort = readSource("ui/components/nodes/NodePort.tsx");
+    const canvasNode = readSource("ui/components/nodes/NodeCanvasNode.tsx");
+
+    expect(nodePort).toContain("Retired");
+    expect(nodePort).toContain("export {}");
+    expect(canvasNode).toContain("Retired");
+    expect(canvasNode).toContain("export {}");
   });
 });
