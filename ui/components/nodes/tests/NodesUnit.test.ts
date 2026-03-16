@@ -1,8 +1,18 @@
-import { describe, it } from "bun:test";
-import { expectPlaceholderModule } from "../../../tests/testUtils";
+import { describe, expect, it } from "bun:test";
+import { readSource } from "../../../tests/testUtils";
 
 describe("ui/components/nodes unit coverage", () => {
-  it("NodeComponent.tsx is currently a placeholder module", () => expectPlaceholderModule("ui/components/nodes/NodeComponent.tsx"));
-  it("NodePortView.tsx is currently a placeholder module", () => expectPlaceholderModule("ui/components/nodes/NodePortView.tsx"));
-  it("NodePropertyEditor.tsx is currently a placeholder module", () => expectPlaceholderModule("ui/components/nodes/NodePropertyEditor.tsx"));
+  it("defines node palette and inspector component modules", () => {
+    const palette = readSource("ui/components/nodes/NodePalette.tsx");
+    const paletteItem = readSource("ui/components/nodes/NodePaletteItem.tsx");
+    const propertyField = readSource("ui/components/nodes/NodePropertyField.tsx");
+    const propertyEditor = readSource("ui/components/nodes/NodePropertyEditor.tsx");
+    const inspector = readSource("ui/components/nodes/NodeInspector.tsx");
+
+    expect(palette).toContain("export default function NodePalette");
+    expect(paletteItem).toContain("export default function NodePaletteItem");
+    expect(propertyField).toContain("export default function NodePropertyField");
+    expect(propertyEditor).toContain("export default function NodePropertyEditor");
+    expect(inspector).toContain("export default function NodeInspector");
+  });
 });
