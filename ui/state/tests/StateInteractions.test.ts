@@ -1,9 +1,20 @@
 import { describe, expect, it } from "bun:test";
-import { readSource } from "../../tests/testUtils";
+import { WorkflowStore } from "../WorkflowStore";
 
 describe("ui/state interactions", () => {
-  it("keeps placeholder modules consistent for NodeStore.ts, ModelStore.ts, WorkflowStore.ts", () => {
-    const sources = [readSource("ui/state/NodeStore.ts"), readSource("ui/state/ModelStore.ts"), readSource("ui/state/WorkflowStore.ts")];
-    expect(sources.every((source) => source.trim() === "")).toBeTrue();
+  it("createWorkflow updates current workflow and dirty flag", async () => {
+    const created = { id: "w1" } as any;
+    const store = new WorkflowStore({
+      workflowService: {
+        createWorkflow: async () => ({ workflow: created }),
+      } as any,
+      nodeService: {} as any,
+    });
+
+    await store.createWorkflow({ name: "Test" } as any);
+
+    expect(store.getState().currentWorkflow).toBe(created);
+    expect(store.getState().isDirty).toBeTrue();
+    expect(store.getState().isLoading).toBeFalse();
   });
 });

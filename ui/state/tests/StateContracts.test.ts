@@ -2,9 +2,13 @@ import { describe, expect, it } from "bun:test";
 import { importModule } from "../../tests/testUtils";
 
 describe("ui/state contract adherence", () => {
-  it("placeholder modules expose no runtime exports yet", async () => {
-    expect(Object.keys(await importModule("ui/state/NodeStore.ts"))).toEqual([]);
-    expect(Object.keys(await importModule("ui/state/ModelStore.ts"))).toEqual([]);
-    expect(Object.keys(await importModule("ui/state/WorkflowStore.ts"))).toEqual([]);
+  it("exports store classes at runtime", async () => {
+    const nodeModule = await importModule("ui/state/NodeStore.ts");
+    const modelModule = await importModule("ui/state/ModelStore.ts");
+    const workflowModule = await importModule("ui/state/WorkflowStore.ts");
+
+    expect(Object.keys(nodeModule)).toContain("NodeStore");
+    expect(Object.keys(modelModule)).toContain("ModelStore");
+    expect(Object.keys(workflowModule)).toContain("WorkflowStore");
   });
 });
