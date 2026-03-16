@@ -225,9 +225,9 @@ ai-loom-studio
 │   │       ├── ComfyQueueClient.ts ⚪
 │   │       └── ComfyWorkflowExecutor.ts ⚪
 │   ├── composition
-│   │   ├── ApplicationBootstrap.ts ⚪
-│   │   ├── DependencyContainer.ts ⚪
-│   │   └── InfrastructureRegistry.ts ⚪
+│   │   ├── ApplicationBootstrap.ts ✅
+│   │   ├── DependencyContainer.ts ✅
+│   │   └── InfrastructureRegistry.ts ✅
 │   ├── config
 │   │   ├── EnvironmentConfig.ts ✅
 │   │   └── EnvironmentConfigProvider.ts ✅
