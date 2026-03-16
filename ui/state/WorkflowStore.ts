@@ -396,6 +396,31 @@ export class WorkflowStore {
     });
   }
 
+  public renameCurrentWorkflow(name: string): void {
+    const workflow = this.requireCurrentWorkflow();
+    const updatedWorkflow = this.workflowService.renameWorkflow(workflow, name);
+
+    this.setState({
+      currentWorkflow: updatedWorkflow,
+      isDirty: true,
+      error: undefined,
+    });
+  }
+
+  public updateCurrentWorkflowDescription(description: string | undefined): void {
+    const workflow = this.requireCurrentWorkflow();
+    const updatedWorkflow = this.workflowService.setWorkflowDescription(
+      workflow,
+      description
+    );
+
+    this.setState({
+      currentWorkflow: updatedWorkflow,
+      isDirty: true,
+      error: undefined,
+    });
+  }
+
   private requireCurrentWorkflow(): IWorkflow {
     const workflow = this.state.currentWorkflow;
 
