@@ -1,0 +1,19 @@
+import { describe, expect, it } from "bun:test";
+import { ApplicationBootstrap, APPLICATION_TOKENS } from "../ApplicationBootstrap";
+import { TOKENS } from "../InfrastructureRegistry";
+
+describe("ApplicationBootstrap", () => {
+  it("creates a container with infrastructure and application registrations", () => {
+    const c = ApplicationBootstrap.createContainer({
+      paths: {
+        assetsDirectory: "/tmp/assets",
+        modelsDirectory: "/tmp/models",
+        workflowsDirectory: "/tmp/workflows",
+      },
+    });
+
+    expect(c.isRegistered(TOKENS.FileStorage)).toBe(true);
+    expect(c.isRegistered(APPLICATION_TOKENS.WorkflowValidator)).toBe(true);
+    expect(c.isRegistered(APPLICATION_TOKENS.InstallModelUseCase)).toBe(true);
+  });
+});
