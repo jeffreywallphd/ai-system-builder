@@ -6,225 +6,227 @@ An AI platform to weave together AI capabilities for powerful automation workflo
 
 ```text
 ai-loom-studio
-├── .gitignore (implemented)
-├── README.md (implemented)
+├── .gitignore
+├── README.md
 ├── application
 │   ├── assets
-│   │   ├── DeleteAssetUseCase.ts (not yet implemented)
-│   │   ├── ListAssetsUseCase.ts (not yet implemented)
-│   │   ├── LoadAssetUseCase.ts (not yet implemented)
-│   │   └── SaveAssetUseCase.ts (not yet implemented)
+│   │   ├── DeleteAssetUseCase.ts
+│   │   ├── ListAssetsUseCase.ts
+│   │   ├── LoadAssetUseCase.ts
+│   │   └── SaveAssetUseCase.ts
 │   ├── dto
-│   │   ├── AssetResponse.ts (not yet implemented)
-│   │   ├── CreateWorkflowRequest.ts (not yet implemented)
-│   │   ├── ExecuteWorkflowRequest.ts (not yet implemented)
-│   │   ├── InstallModelRequest.ts (not yet implemented)
-│   │   ├── ModelResponse.ts (not yet implemented)
-│   │   ├── SaveWorkflowRequest.ts (not yet implemented)
-│   │   └── WorkflowResponse.ts (not yet implemented)
+│   │   ├── AssetResponse.ts
+│   │   ├── CreateWorkflowRequest.ts
+│   │   ├── ExecuteWorkflowRequest.ts
+│   │   ├── InstallModelRequest.ts
+│   │   ├── ModelResponse.ts
+│   │   ├── SaveWorkflowRequest.ts
+│   │   └── WorkflowResponse.ts
 │   ├── models
-│   │   ├── InstallModelUseCase.ts (not yet implemented)
-│   │   ├── ListInstalledModelsUseCase.ts (not yet implemented)
-│   │   ├── RemoveModelUseCase.ts (not yet implemented)
-│   │   ├── ResolveModelCompatibilityUseCase.ts (not yet implemented)
-│   │   └── SearchRemoteModelsUseCase.ts (not yet implemented)
+│   │   ├── InstallModelUseCase.ts
+│   │   ├── ListInstalledModelsUseCase.ts
+│   │   ├── RemoveModelUseCase.ts
+│   │   ├── ResolveModelCompatibilityUseCase.ts
+│   │   └── SearchRemoteModelsUseCase.ts
 │   ├── nodes
-│   │   ├── ConnectNodesUseCase.ts (implemented)
-│   │   ├── CreateNodeUseCase.ts (implemented)
-│   │   ├── ListAvailableNodesUseCase.ts (implemented)
-│   │   ├── RemoveNodeUseCase.ts (implemented)
-│   │   └── UpdateNodePropertyUseCase.ts (implemented)
+│   │   ├── ConnectNodesUseCase.ts
+│   │   ├── CreateNodeUseCase.ts
+│   │   ├── ListAvailableNodesUseCase.ts
+│   │   ├── RemoveNodeUseCase.ts
+│   │   └── UpdateNodePropertyUseCase.ts
 │   ├── ports
-│   │   ├── EnvironmentConfigProvider.ts (implemented)
-│   │   ├── FileStorage.ts (implemented)
-│   │   ├── ModelDownloader.ts (implemented)
-│   │   ├── ModelInstaller.ts (implemented)
-│   │   ├── NodeCatalogProvider.ts (implemented)
-│   │   ├── RemoteModelCatalog.ts (implemented)
-│   │   ├── WorkflowExecutor.ts (implemented)
-│   │   ├── WorkflowRepository.ts (implemented)
-│   │   ├── WorkflowSerializer.ts (implemented)
 │   │   ├── interfaces
-│   │   │   ├── IEnvironmentConfigProvider.ts (implemented)
-│   │   │   ├── IFileStorage.ts (implemented)
-│   │   │   ├── IModelDownloader.ts (implemented)
-│   │   │   ├── IModelInstaller.ts (implemented)
-│   │   │   ├── INodeCatalogProvider.ts (implemented)
-│   │   │   ├── IRemoteModelCatalog.ts (implemented)
-│   │   │   ├── IWorkflowExecutor.ts (implemented)
-│   │   │   ├── IWorkflowRepository.ts (implemented)
-│   │   │   └── IWorkflowSerializer.ts (implemented)
-│   │   └── tests
-│   │       ├── EnvironmentConfigProvider.test.ts (implemented)
-│   │       ├── FileStorage.test.ts (implemented)
-│   │       ├── ModelDownloader.test.ts (implemented)
-│   │       ├── ModelInstaller.test.ts (implemented)
-│   │       ├── NodeCatalogProvider.test.ts (implemented)
-│   │       ├── PortsContracts.test.ts (implemented)
-│   │       ├── PortsInteractions.test.ts (implemented)
-│   │       ├── RemoteModelCatalog.test.ts (implemented)
-│   │       ├── WorkflowExecutor.test.ts (implemented)
-│   │       ├── WorkflowSerializer.test.ts (implemented)
-│   │       └── testUtils.ts (implemented)
+│   │   │   ├── IEnvironmentConfigProvider.ts
+│   │   │   ├── IFileStorage.ts
+│   │   │   ├── IInstalledModelCatalog.ts
+│   │   │   ├── IModelDownloader.ts
+│   │   │   ├── IModelInstaller.ts
+│   │   │   ├── INodeCatalogProvider.ts
+│   │   │   ├── IRemoteModelCatalog.ts
+│   │   │   ├── IWorkflowExecutor.ts
+│   │   │   ├── IWorkflowRepository.ts
+│   │   │   └── IWorkflowSerializer.ts
+│   │   ├── tests
+│   │   │   ├── EnvironmentConfigProvider.test.ts
+│   │   │   ├── FileStorage.test.ts
+│   │   │   ├── ModelDownloader.test.ts
+│   │   │   ├── ModelInstaller.test.ts
+│   │   │   ├── NodeCatalogProvider.test.ts
+│   │   │   ├── PortsContracts.test.ts
+│   │   │   ├── PortsInteractions.test.ts
+│   │   │   ├── RemoteModelCatalog.test.ts
+│   │   │   ├── WorkflowExecutor.test.ts
+│   │   │   ├── WorkflowSerializer.test.ts
+│   │   │   └── testUtils.ts
+│   │   ├── EnvironmentConfigProvider.ts
+│   │   ├── FileStorage.ts
+│   │   ├── InstalledModelCatalog.ts
+│   │   ├── ModelDownloader.ts
+│   │   ├── ModelInstaller.ts
+│   │   ├── NodeCatalogProvider.ts
+│   │   ├── RemoteModelCatalog.ts
+│   │   ├── WorkflowExecutor.ts
+│   │   ├── WorkflowRepository.ts
+│   │   └── WorkflowSerializer.ts
 │   └── workflows
-│       ├── CreateWorkflowUseCase.ts (implemented)
-│       ├── ExecuteWorkflowUseCase.ts (not yet implemented)
-│       ├── LoadWorkflowUseCase.ts (implemented)
-│       ├── SaveWorkflowUseCase.ts (implemented)
-│       └── ValidateWorkflowUseCase.ts (implemented)
+│       ├── CreateWorkflowUseCase.ts
+│       ├── ExecuteWorkflowUseCase.ts
+│       ├── LoadWorkflowUseCase.ts
+│       ├── SaveWorkflowUseCase.ts
+│       └── ValidateWorkflowUseCase.ts
 ├── domain
 │   ├── assets
-│   │   ├── Asset.ts (implemented)
-│   │   ├── AssetMetadata.ts (implemented)
-│   │   ├── GeneratedAsset.ts (implemented)
 │   │   ├── interfaces
-│   │   │   └── IAsset.ts (implemented)
-│   │   └── tests
-│   │       ├── Asset.test.ts (implemented)
-│   │       ├── AssetContracts.test.ts (implemented)
-│   │       ├── AssetInteractions.test.ts (implemented)
-│   │       ├── AssetMetadata.test.ts (implemented)
-│   │       └── GeneratedAsset.test.ts (implemented)
+│   │   │   └── IAsset.ts
+│   │   ├── tests
+│   │   │   ├── Asset.test.ts
+│   │   │   ├── AssetContracts.test.ts
+│   │   │   ├── AssetInteractions.test.ts
+│   │   │   ├── AssetMetadata.test.ts
+│   │   │   └── GeneratedAsset.test.ts
+│   │   ├── Asset.ts
+│   │   ├── AssetMetadata.ts
+│   │   └── GeneratedAsset.ts
 │   ├── models
-│   │   ├── Model.ts (implemented)
-│   │   ├── ModelCompatibility.ts (implemented)
-│   │   ├── ModelDependency.ts (implemented)
-│   │   ├── ModelFamily.ts (implemented)
-│   │   ├── ModelRequirement.ts (implemented)
-│   │   ├── ModelType.ts (implemented)
 │   │   ├── interfaces
-│   │   │   ├── IModel.ts (implemented)
-│   │   │   ├── IModelCompatibility.ts (implemented)
-│   │   │   ├── IModelDependency.ts (implemented)
-│   │   │   └── IModelRequirement.ts (implemented)
-│   │   └── tests
-│   │       ├── Model.test.ts (implemented)
-│   │       ├── ModelCompatibility.test.ts (implemented)
-│   │       ├── ModelContracts.test.ts (implemented)
-│   │       ├── ModelDependency.test.ts (implemented)
-│   │       ├── ModelFamily.test.ts (implemented)
-│   │       ├── ModelInteractions.test.ts (implemented)
-│   │       ├── ModelRequirement.test.ts (implemented)
-│   │       └── ModelType.test.ts (implemented)
+│   │   │   ├── IModel.ts
+│   │   │   ├── IModelCompatibility.ts
+│   │   │   ├── IModelDependency.ts
+│   │   │   └── IModelRequirement.ts
+│   │   ├── tests
+│   │   │   ├── Model.test.ts
+│   │   │   ├── ModelCompatibility.test.ts
+│   │   │   ├── ModelContracts.test.ts
+│   │   │   ├── ModelDependency.test.ts
+│   │   │   ├── ModelFamily.test.ts
+│   │   │   ├── ModelInteractions.test.ts
+│   │   │   ├── ModelRequirement.test.ts
+│   │   │   └── ModelType.test.ts
+│   │   ├── Model.ts
+│   │   ├── ModelCompatibility.ts
+│   │   ├── ModelDependency.ts
+│   │   ├── ModelFamily.ts
+│   │   ├── ModelRequirement.ts
+│   │   └── ModelType.ts
 │   ├── nodes
-│   │   ├── Node.ts (implemented)
-│   │   ├── NodeCategory.ts (implemented)
-│   │   ├── NodeCompatibilityProfile.ts (implemented)
-│   │   ├── NodeDefinition.ts (implemented)
-│   │   ├── NodePort.ts (implemented)
-│   │   ├── NodeProperty.ts (implemented)
 │   │   ├── interfaces
-│   │   │   ├── INode.ts (implemented)
-│   │   │   ├── INodeDefinition.ts (implemented)
-│   │   │   ├── INodePort.ts (implemented)
-│   │   │   └── INodeProperty.ts (implemented)
-│   │   └── tests
-│   │       ├── Node.test.ts (implemented)
-│   │       ├── NodeCategory.test.ts (implemented)
-│   │       ├── NodeCompatibilityProfile.test.ts (implemented)
-│   │       ├── NodeContracts.test.ts (implemented)
-│   │       ├── NodeDefinition.test.ts (implemented)
-│   │       ├── NodePort.test.ts (implemented)
-│   │       └── NodeProperty.test.ts (implemented)
+│   │   │   ├── INode.ts
+│   │   │   ├── INodeDefinition.ts
+│   │   │   ├── INodePort.ts
+│   │   │   └── INodeProperty.ts
+│   │   ├── tests
+│   │   │   ├── Node.test.ts
+│   │   │   ├── NodeCategory.test.ts
+│   │   │   ├── NodeCompatibilityProfile.test.ts
+│   │   │   ├── NodeContracts.test.ts
+│   │   │   ├── NodeDefinition.test.ts
+│   │   │   ├── NodePort.test.ts
+│   │   │   └── NodeProperty.test.ts
+│   │   ├── Node.ts
+│   │   ├── NodeCategory.ts
+│   │   ├── NodeCompatibilityProfile.ts
+│   │   ├── NodeDefinition.ts
+│   │   ├── NodePort.ts
+│   │   └── NodeProperty.ts
 │   ├── services
-│   │   ├── ConnectionValidationService.ts (implemented)
-│   │   ├── ModelCompatibilityService.ts (implemented)
-│   │   ├── NodeCompatibilityService.ts (implemented)
-│   │   ├── WorkflowGraphService.ts (implemented)
-│   │   ├── WorkflowValidator.ts (implemented)
 │   │   ├── interfaces
-│   │   │   ├── IModelCompatibilityService.ts (implemented)
-│   │   │   ├── INodeCompatibilityService.ts (implemented)
-│   │   │   └── IWorkflowValidator.ts (implemented)
-│   │   └── tests
-│   │       ├── ConnectionValidationService.test.ts (implemented)
-│   │       ├── ModelCompatibilityService.test.ts (implemented)
-│   │       ├── NodeCompatibilityService.test.ts (implemented)
-│   │       ├── ServiceContracts.test.ts (implemented)
-│   │       ├── ServiceInteractions.test.ts (implemented)
-│   │       ├── WorkflowGraphService.test.ts (implemented)
-│   │       ├── WorkflowValidator.test.ts (implemented)
-│   │       └── testUtils.ts (implemented)
+│   │   │   ├── IModelCompatibilityService.ts
+│   │   │   ├── INodeCompatibilityService.ts
+│   │   │   └── IWorkflowValidator.ts
+│   │   ├── tests
+│   │   │   ├── ConnectionValidationService.test.ts
+│   │   │   ├── ModelCompatibilityService.test.ts
+│   │   │   ├── NodeCompatibilityService.test.ts
+│   │   │   ├── ServiceContracts.test.ts
+│   │   │   ├── ServiceInteractions.test.ts
+│   │   │   ├── WorkflowGraphService.test.ts
+│   │   │   ├── WorkflowValidator.test.ts
+│   │   │   └── testUtils.ts
+│   │   ├── ConnectionValidationService.ts
+│   │   ├── ModelCompatibilityService.ts
+│   │   ├── NodeCompatibilityService.ts
+│   │   ├── WorkflowGraphService.ts
+│   │   └── WorkflowValidator.ts
 │   └── workflows
-│       ├── Workflow.ts (implemented)
-│       ├── WorkflowConnection.ts (implemented)
-│       ├── WorkflowGraph.ts (implemented)
-│       ├── WorkflowMetadata.ts (implemented)
 │       ├── interfaces
-│       │   ├── IWorkflow.ts (implemented)
-│       │   ├── IWorkflowConnection.ts (implemented)
-│       │   └── IWorkflowGraph.ts (implemented)
-│       └── tests
-│           ├── Workflow.test.ts (implemented)
-│           ├── WorkflowConnection.test.ts (implemented)
-│           ├── WorkflowContracts.test.ts (implemented)
-│           ├── WorkflowGraph.test.ts (implemented)
-│           ├── WorkflowInteractions.test.ts (implemented)
-│           ├── WorkflowMetadata.test.ts (implemented)
-│           └── testUtils.ts (implemented)
+│       │   ├── IWorkflow.ts
+│       │   ├── IWorkflowConnection.ts
+│       │   └── IWorkflowGraph.ts
+│       ├── tests
+│       │   ├── Workflow.test.ts
+│       │   ├── WorkflowConnection.test.ts
+│       │   ├── WorkflowContracts.test.ts
+│       │   ├── WorkflowGraph.test.ts
+│       │   ├── WorkflowInteractions.test.ts
+│       │   ├── WorkflowMetadata.test.ts
+│       │   └── testUtils.ts
+│       ├── Workflow.ts
+│       ├── WorkflowConnection.ts
+│       ├── WorkflowGraph.ts
+│       └── WorkflowMetadata.ts
 ├── infrastructure
 │   ├── comfyui
 │   │   ├── adapters
-│   │   │   ├── ComfyNodeAdapter.ts (not yet implemented)
-│   │   │   ├── ComfyPropertyAdapter.ts (not yet implemented)
-│   │   │   └── ComfyWorkflowAdapter.ts (not yet implemented)
+│   │   │   ├── ComfyNodeAdapter.ts
+│   │   │   ├── ComfyPropertyAdapter.ts
+│   │   │   └── ComfyWorkflowAdapter.ts
 │   │   ├── catalog
-│   │   │   └── ComfyNodeCatalogProvider.ts (not yet implemented)
+│   │   │   └── ComfyNodeCatalogProvider.ts
 │   │   ├── dto
-│   │   │   ├── ComfyNodeDto.ts (not yet implemented)
-│   │   │   ├── ComfyPropertyDto.ts (not yet implemented)
-│   │   │   └── ComfyWorkflowDto.ts (not yet implemented)
+│   │   │   ├── ComfyNodeDto.ts
+│   │   │   ├── ComfyPropertyDto.ts
+│   │   │   └── ComfyWorkflowDto.ts
 │   │   └── execution
-│   │       ├── ComfyApiClient.ts (not yet implemented)
-│   │       ├── ComfyQueueClient.ts (not yet implemented)
-│   │       └── ComfyWorkflowExecutor.ts (not yet implemented)
+│   │       ├── ComfyApiClient.ts
+│   │       ├── ComfyQueueClient.ts
+│   │       └── ComfyWorkflowExecutor.ts
 │   ├── composition
-│   │   ├── ApplicationBootstrap.ts (not yet implemented)
-│   │   ├── DependencyContainer.ts (not yet implemented)
-│   │   └── InfrastructureRegistry.ts (not yet implemented)
+│   │   ├── ApplicationBootstrap.ts
+│   │   ├── DependencyContainer.ts
+│   │   └── InfrastructureRegistry.ts
 │   ├── config
-│   │   ├── EnvironmentConfig.ts (not yet implemented)
-│   │   └── EnvironmentConfigProvider.ts (not yet implemented)
+│   │   ├── EnvironmentConfig.ts
+│   │   └── EnvironmentConfigProvider.ts
 │   ├── filesystem
-│   │   ├── LocalAssetRepository.ts (not yet implemented)
-│   │   ├── LocalFileStorage.ts (not yet implemented)
-│   │   ├── LocalModelRepository.ts (not yet implemented)
-│   │   └── LocalWorkflowRepository.ts (not yet implemented)
+│   │   ├── LocalAssetRepository.ts
+│   │   ├── LocalFileStorage.ts
+│   │   ├── LocalModelRepository.ts
+│   │   └── LocalWorkflowRepository.ts
 │   └── huggingface
-│       ├── HuggingFaceApiClient.ts (not yet implemented)
-│       ├── HuggingFaceModelCatalog.ts (not yet implemented)
-│       └── HuggingFaceModelDownloader.ts (not yet implemented)
+│       ├── HuggingFaceApiClient.ts
+│       ├── HuggingFaceModelCatalog.ts
+│       └── HuggingFaceModelDownloader.ts
 └── ui
     ├── components
     │   ├── models
-    │   │   ├── ModelBrowser.tsx (not yet implemented)
-    │   │   └── ModelInstaller.tsx (not yet implemented)
+    │   │   ├── ModelBrowser.tsx
+    │   │   └── ModelInstaller.tsx
     │   ├── nodes
-    │   │   ├── NodeComponent.tsx (not yet implemented)
-    │   │   ├── NodePortView.tsx (not yet implemented)
-    │   │   └── NodePropertyEditor.tsx (not yet implemented)
+    │   │   ├── NodeComponent.tsx
+    │   │   ├── NodePortView.tsx
+    │   │   └── NodePropertyEditor.tsx
     │   └── workflow
-    │       ├── WorkflowCanvas.tsx (not yet implemented)
-    │       ├── WorkflowInspector.tsx (not yet implemented)
-    │       └── WorkflowToolbar.tsx (not yet implemented)
+    │       ├── WorkflowCanvas.tsx
+    │       ├── WorkflowInspector.tsx
+    │       └── WorkflowToolbar.tsx
     ├── pages
-    │   ├── AssetsPage.tsx (not yet implemented)
-    │   ├── ModelsPage.tsx (not yet implemented)
-    │   └── WorkflowEditorPage.tsx (not yet implemented)
+    │   ├── AssetsPage.tsx
+    │   ├── ModelsPage.tsx
+    │   └── WorkflowEditorPage.tsx
     ├── presenters
-    │   ├── AssetPresenter.ts (not yet implemented)
-    │   ├── ModelPresenter.ts (not yet implemented)
-    │   └── WorkflowPresenter.ts (not yet implemented)
+    │   ├── AssetPresenter.ts
+    │   ├── ModelPresenter.ts
+    │   └── WorkflowPresenter.ts
     ├── routes
-    │   ├── AppRouter.tsx (not yet implemented)
-    │   ├── ProtectedRoute.tsx (not yet implemented)
-    │   └── RouteConfig.ts (not yet implemented)
+    │   ├── AppRouter.tsx
+    │   ├── ProtectedRoute.tsx
+    │   └── RouteConfig.ts
     ├── services
-    │   ├── ModelService.ts (not yet implemented)
-    │   ├── NodeService.ts (not yet implemented)
-    │   └── WorkflowService.ts (not yet implemented)
+    │   ├── ModelService.ts
+    │   ├── NodeService.ts
+    │   └── WorkflowService.ts
     └── state
-        ├── ModelStore.ts (not yet implemented)
-        ├── NodeStore.ts (not yet implemented)
-        └── WorkflowStore.ts (not yet implemented)
+        ├── ModelStore.ts
+        ├── NodeStore.ts
+        └── WorkflowStore.ts
 ```
