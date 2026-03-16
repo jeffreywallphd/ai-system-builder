@@ -237,9 +237,12 @@ ai-loom-studio
 │   │   ├── LocalModelRepository.ts ✅
 │   │   └── LocalWorkflowRepository.ts ✅
 │   └── huggingface
-│       ├── HuggingFaceApiClient.ts ⚪
-│       ├── HuggingFaceModelCatalog.ts ⚪
-│       └── HuggingFaceModelDownloader.ts ⚪
+│       ├── tests
+│       │   ├── HuggingFaceApiClient.test.ts ✅
+│       │   └── HuggingFaceModelDownloader.test.ts ✅
+│       ├── HuggingFaceApiClient.ts ✅
+│       ├── HuggingFaceModelCatalog.ts ✅
+│       └── HuggingFaceModelDownloader.ts ✅
 └── ui
     ├── components
     │   ├── models
