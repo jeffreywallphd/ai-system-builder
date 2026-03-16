@@ -89,20 +89,33 @@ describe("ModelInstaller", () => {
     expect(progressStates.length).toBeGreaterThan(0);
   });
 
-  it("captures current startInstall initialization regression", async () => {
+  it("startInstall resolves completion without initialization errors", async () => {
     const downloader: IModelDownloader = {
       canDownload: () => true,
-      download: async () => new ModelDownloadResult({ modelId: model.id, destination: request.destination, status: "cancelled" }),
+      download: async () =>
+        new ModelDownloadResult({
+          modelId: model.id,
+          destination: "/models/model-cancelled",
+          status: "cancelled",
+        }),
       startDownload: async () =>
         new ModelDownloadHandle({
           operationId: "d2",
           request: { model, destination: request.destination },
-          completionPromise: Promise.resolve(new ModelDownloadResult({ modelId: model.id, destination: request.destination, status: "cancelled" })),
+          completionPromise: Promise.resolve(
+            new ModelDownloadResult({
+              modelId: model.id,
+              destination: "/models/model-cancelled",
+              status: "cancelled",
+            })
+          ),
         }),
     };
 
     const installer = new ModelInstaller({ downloader });
-    const handle = await installer.startInstall(request);
-    expect(handle.waitForCompletion()).rejects.toThrow("Cannot access 'handle' before initialization");
+    const cancelRequest: IModelInstallRequest = { ...request, destination: "/models/model-cancelled" };
+    const handle = await installer.startInstall(cancelRequest);
+    const result = await handle.waitForCompletion();
+    expect(result.status).toBe("cancelled");
   });
 });

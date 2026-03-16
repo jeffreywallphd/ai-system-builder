@@ -84,6 +84,12 @@ export interface IModelInstallHandle {
   cancel(): Promise<void>;
 }
 
+export interface IModelUninstallRequest {
+  readonly model: IModel;
+  readonly destination?: string;
+  readonly removeArtifacts?: boolean;
+}
+
 export interface IModelInstaller {
   /**
    * Starts an installation operation and returns a handle.
@@ -107,4 +113,15 @@ export interface IModelInstaller {
    * Returns true when the model already appears installed at the target destination.
    */
   isInstalled(model: IModel, destination?: string): Promise<boolean>;
+
+  /**
+   * Removes a previously installed model.
+   * Implementations may ignore destination when the model identity is sufficient.
+   */
+  uninstall(request: IModelUninstallRequest): Promise<void>;
+
+  /**
+   * Returns true when this installer can uninstall the model.
+   */
+  canUninstall(model: IModel): boolean;
 }
