@@ -509,3 +509,46 @@ All discovered test files in the repository are currently marked as `✅ impleme
 - ✅ `infrastructure/mocks/tests/PreviewWorkflowExecutor.test.ts`
 - ✅ `infrastructure/mocks/tests/MockCatalogInteractions.test.ts`
 - ✅ `ui/composition/tests/UiCompositionInteractions.test.ts`
+
+## Newly added placeholders (not implemented)
+
+The following files were added to match the updated structure and are intentionally blank (`⚪ not implemented`):
+
+- `application/execution/InterpretedWorkflowExecutionStrategy.ts` ⚪
+- `application/execution/WorkflowExecutionContextResolver.ts` ⚪
+- `application/execution/WorkflowRuntimeSelector.ts` ⚪
+- `application/execution/tests/ExecutionContracts.test.ts` ⚪
+- `application/execution/tests/ExecutionInteractions.test.ts` ⚪
+- `application/execution/tests/InterpretedWorkflowExecutionStrategy.test.ts` ⚪
+- `application/execution/tests/WorkflowExecutionContextResolver.test.ts` ⚪
+- `application/execution/tests/WorkflowRuntimeSelector.test.ts` ⚪
+- `application/ports/interfaces/IModelExecutor.ts` ⚪
+- `application/ports/interfaces/INodeExecutionContextResolver.ts` ⚪
+- `application/ports/interfaces/INodeExecutor.ts` ⚪
+- `application/ports/interfaces/INodeOutputStore.ts` ⚪
+- `application/ports/interfaces/IWorkflowExecutionStrategy.ts` ⚪
+- `application/ports/interfaces/IWorkflowRuntimeSelector.ts` ⚪
+- `application/ports/tests/ModelExecutor.test.ts` ⚪
+- `application/ports/tests/NodeExecutionContextResolver.test.ts` ⚪
+- `application/ports/tests/NodeExecutor.test.ts` ⚪
+- `application/ports/tests/NodeOutputStore.test.ts` ⚪
+- `application/ports/tests/WorkflowExecutionStrategy.test.ts` ⚪
+- `application/ports/tests/WorkflowRuntimeSelector.test.ts` ⚪
+- `infrastructure/comfyui/execution/ComfyModelExecutor.ts` ⚪
+- `infrastructure/comfyui/execution/DelegatedWorkflowExecutionStrategy.ts` ⚪
+- `infrastructure/comfyui/execution/tests/ComfyModelExecutor.test.ts` ⚪
+- `infrastructure/comfyui/execution/tests/DelegatedWorkflowExecutionStrategy.test.ts` ⚪
+- `infrastructure/interpreted/execution/DefaultNodeExecutionContextResolver.ts` ⚪
+- `infrastructure/interpreted/execution/DefaultNodeOutputStore.ts` ⚪
+- `infrastructure/interpreted/execution/InterpretedWorkflowExecutionStrategy.ts` ⚪
+- `infrastructure/interpreted/execution/LangChainNodeExecutor.ts` ⚪
+- `infrastructure/interpreted/execution/tests/DefaultNodeExecutionContextResolver.test.ts` ⚪
+- `infrastructure/interpreted/execution/tests/DefaultNodeOutputStore.test.ts` ⚪
+- `infrastructure/interpreted/execution/tests/InterpretedWorkflowExecutionStrategy.test.ts` ⚪
+- `infrastructure/interpreted/execution/tests/LangChainNodeExecutor.test.ts` ⚪
+- `infrastructure/interpreted/execution/tests/RuntimeSelectorInteractions.test.ts` ⚪
+- `ui/components/execution/WorkflowExecutionStatusPanel.tsx` ⚪
+- `ui/components/execution/tests/ConnectionInspector.test.ts` ⚪
+- `ui/components/execution/tests/ExecutionContracts.test.ts` ⚪
+- `ui/components/execution/tests/WorkflowCanvasToolbar.test.ts` ⚪
+- `ui/components/execution/tests/WorkflowExecutionStatusPanel.test.ts` ⚪
