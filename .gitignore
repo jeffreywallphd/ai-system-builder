@@ -70,6 +70,16 @@ web_modules/
 .env.*
 !.env.example
 
+# Secrets and local credentials
+*.pem
+*.key
+*.p12
+*.cer
+*.crt
+*.jks
+*.kdbx
+secrets/
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache

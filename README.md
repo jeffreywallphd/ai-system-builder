@@ -1,2 +1,511 @@
 # ai-loom-studio
-An AI platforms to weave together AI capabilities for powerful automation workflows using no-code user interfaces 
+
+An AI platform to weave together AI capabilities for powerful automation workflows using no-code user interfaces.
+
+## Resume
+
+- Bootstrapped Node.js project configuration with `package.json`, TypeScript (`tsconfig*.json`), Vite (`vite.config.ts`), and Node version pinning via `.nvmrc`.
+- Added secure environment/config scaffolding with `.env.example` and expanded `.gitignore` secret patterns to reduce accidental credential leakage.
+- Migrated the UI shell and page scaffolding to the shared `ui-*` design-system classes in `ui/styles/app.css`.
+- Updated the application entrypoint to load global app styles from `ui/styles/app.css`.
+- Refactored layout and page components to use card/panel/button/text utility primitives for consistent styling and responsiveness.
+- Implemented the Models UI browser flow with search controls, model cards, details/compatibility side panels, and page wiring in `ui/components/models/*` and `ui/pages/ModelsPage.tsx`.
+- Added dedicated model-browser styling and integrated it into global app styles via `ui/styles/components/model-browser.css` and `ui/styles/app.css`.
+- Implemented the Workflow Editor experience with metadata editing, validation summaries, node listing, and store-backed action wiring in `ui/pages/WorkflowEditorPage.tsx` and new workflow panel components under `ui/components/workflow/*`.
+- Retired the custom-canvas drag/node implementation placeholders and migrated the workflow canvas to React Flow adapters/wrappers in `ui/components/workflow/reactflow/*`, wired through `ui/components/workflow/WorkflowCanvas.tsx`.
+- Added runtime-scoped UI dependency composition with app providers and configurable mock infrastructure in `ui/composition/*`, `infrastructure/config/AppRuntimeConfig.ts`, and `infrastructure/mocks/*`.
+- Added a development sync workflow with a local pull agent (`dev/sync-agent.js`), runtime flags in `infrastructure/config/AppRuntimeConfig.ts`, and a `Sync PC` control in `ui/dev/DevSyncButton.tsx` wired through `ui/layout/AppLayout.tsx`.
+
+## Runtime/configuration setup
+
+- ✅ `package.json` (Node scripts, runtime/dev dependencies, engine constraints)
+- ✅ `tsconfig.json` and `tsconfig.node.json` (TypeScript compiler configuration for app + Node tooling)
+- ✅ `vite.config.ts` (React plugin and local dev server settings)
+- ✅ `.env.example` (safe baseline environment variables)
+- ✅ `.nvmrc` (consistent Node.js major version)
+- ✅ `.gitignore` hardening for environment files and common secret/certificate artifacts
+
+## Project structure
+
+Status legend: `✅ implemented (contains logic/content)` · `⚪ not implemented (blank or whitespace-only file)`
+
+```text
+ai-loom-studio
+├── application
+│   ├── assets
+│   │   ├── tests
+│   │   │   ├── AssetsContracts.test.ts ✅
+│   │   │   ├── AssetsInteractions.test.ts ✅
+│   │   │   ├── DeleteAssetUseCase.test.ts ✅
+│   │   │   ├── ListAssetsUseCase.test.ts ✅
+│   │   │   ├── LoadAssetUseCase.test.ts ✅
+│   │   │   ├── SaveAssetUseCase.test.ts ✅
+│   │   │   └── testUtils.ts ✅
+│   │   ├── DeleteAssetUseCase.ts ✅
+│   │   ├── ListAssetsUseCase.ts ✅
+│   │   ├── LoadAssetUseCase.ts ✅
+│   │   └── SaveAssetUseCase.ts ✅
+│   ├── dto
+│   │   ├── tests
+│   │   │   ├── DtoContracts.test.ts ✅
+│   │   │   ├── DtoInteractions.test.ts ✅
+│   │   │   └── DtoUnit.test.ts ✅
+│   │   ├── AssetResponse.ts ✅
+│   │   ├── CreateWorkflowRequest.ts ✅
+│   │   ├── ExecuteWorkflowRequest.ts ✅
+│   │   ├── InstallModelRequest.ts ✅
+│   │   ├── ModelResponse.ts ✅
+│   │   ├── SaveWorkflowRequest.ts ✅
+│   │   └── WorkflowResponse.ts ✅
+│   ├── models
+│   │   ├── tests
+│   │   │   ├── InstallModelUseCase.test.ts ✅
+│   │   │   ├── ListInstalledModelsUseCase.test.ts ✅
+│   │   │   ├── ModelsContracts.test.ts ✅
+│   │   │   ├── ModelsInteractions.test.ts ✅
+│   │   │   ├── RemoveModelUseCase.test.ts ✅
+│   │   │   ├── ResolveModelCompatibilityUseCase.test.ts ✅
+│   │   │   ├── SearchRemoteModelsUseCase.test.ts ✅
+│   │   │   └── testUtils.ts ✅
+│   │   ├── InstallModelUseCase.ts ✅
+│   │   ├── ListInstalledModelsUseCase.ts ✅
+│   │   ├── RemoveModelUseCase.ts ✅
+│   │   ├── ResolveModelCompatibilityUseCase.ts ✅
+│   │   └── SearchRemoteModelsUseCase.ts ✅
+│   ├── nodes
+│   │   ├── tests
+│   │   │   ├── ConnectNodesUseCase.test.ts ✅
+│   │   │   ├── CreateNodeUseCase.test.ts ✅
+│   │   │   ├── ListAvailableNodesUseCase.test.ts ✅
+│   │   │   ├── NodesContracts.test.ts ✅
+│   │   │   ├── NodesInteractions.test.ts ✅
+│   │   │   ├── RemoveNodeUseCase.test.ts ✅
+│   │   │   ├── UpdateNodePropertyUseCase.test.ts ✅
+│   │   │   └── testUtils.ts ✅
+│   │   ├── ConnectNodesUseCase.ts ✅
+│   │   ├── CreateNodeUseCase.ts ✅
+│   │   ├── ListAvailableNodesUseCase.ts ✅
+│   │   ├── RemoveNodeUseCase.ts ✅
+│   │   └── UpdateNodePropertyUseCase.ts ✅
+│   ├── ports
+│   │   ├── interfaces
+│   │   │   ├── IAssetCatalog.ts ✅
+│   │   │   ├── IEnvironmentConfigProvider.ts ✅
+│   │   │   ├── IFileStorage.ts ✅
+│   │   │   ├── IInstalledModelCatalog.ts ✅
+│   │   │   ├── IModelDownloader.ts ✅
+│   │   │   ├── IModelInstaller.ts ✅
+│   │   │   ├── INodeCatalogProvider.ts ✅
+│   │   │   ├── IRemoteModelCatalog.ts ✅
+│   │   │   ├── IWorkflowExecutor.ts ✅
+│   │   │   ├── IWorkflowRepository.ts ✅
+│   │   │   └── IWorkflowSerializer.ts ✅
+│   │   ├── tests
+│   │   │   ├── EnvironmentConfigProvider.test.ts ✅
+│   │   │   ├── FileStorage.test.ts ✅
+│   │   │   ├── ModelDownloader.test.ts ✅
+│   │   │   ├── ModelInstaller.test.ts ✅
+│   │   │   ├── NodeCatalogProvider.test.ts ✅
+│   │   │   ├── PortsContracts.test.ts ✅
+│   │   │   ├── PortsInteractions.test.ts ✅
+│   │   │   ├── RemoteModelCatalog.test.ts ✅
+│   │   │   ├── WorkflowExecutor.test.ts ✅
+│   │   │   ├── WorkflowSerializer.test.ts ✅
+│   │   │   └── testUtils.ts ✅
+│   │   ├── AssetCatalog.ts ✅
+│   │   ├── EnvironmentConfigProvider.ts ✅
+│   │   ├── FileStorage.ts ✅
+│   │   ├── InstalledModelCatalog.ts ✅
+│   │   ├── ModelDownloader.ts ✅
+│   │   ├── ModelInstaller.ts ✅
+│   │   ├── NodeCatalogProvider.ts ✅
+│   │   ├── RemoteModelCatalog.ts ✅
+│   │   ├── WorkflowExecutor.ts ✅
+│   │   ├── WorkflowRepository.ts ✅
+│   │   └── WorkflowSerializer.ts ✅
+│   ├── tests
+│   │   └── CrossSubfolderInteractions.test.ts ✅
+│   └── workflows
+│       ├── tests
+│       │   ├── CreateWorkflowUseCase.test.ts ✅
+│       │   ├── ExecuteWorkflowUseCase.test.ts ✅
+│       │   ├── LoadWorkflowUseCase.test.ts ✅
+│       │   ├── SaveWorkflowUseCase.test.ts ✅
+│       │   ├── ValidateWorkflowUseCase.test.ts ✅
+│       │   ├── WorkflowsContracts.test.ts ✅
+│       │   ├── WorkflowsInteractions.test.ts ✅
+│       │   └── testUtils.ts ✅
+│       ├── CreateWorkflowUseCase.ts ✅
+│       ├── ExecuteWorkflowUseCase.ts ✅
+│       ├── LoadWorkflowUseCase.ts ✅
+│       ├── SaveWorkflowUseCase.ts ✅
+│       └── ValidateWorkflowUseCase.ts ✅
+├── dev
+│   ├── tests
+│   │   └── SyncAgent.test.ts ✅
+│   └── sync-agent.js ✅
+├── domain
+│   ├── assets
+│   │   ├── interfaces
+│   │   │   └── IAsset.ts ✅
+│   │   ├── tests
+│   │   │   ├── Asset.test.ts ✅
+│   │   │   ├── AssetContracts.test.ts ✅
+│   │   │   ├── AssetInteractions.test.ts ✅
+│   │   │   ├── AssetMetadata.test.ts ✅
+│   │   │   └── GeneratedAsset.test.ts ✅
+│   │   ├── Asset.ts ✅
+│   │   ├── AssetMetadata.ts ✅
+│   │   └── GeneratedAsset.ts ✅
+│   ├── models
+│   │   ├── interfaces
+│   │   │   ├── IModel.ts ✅
+│   │   │   ├── IModelCompatibility.ts ✅
+│   │   │   ├── IModelDependency.ts ✅
+│   │   │   └── IModelRequirement.ts ✅
+│   │   ├── tests
+│   │   │   ├── Model.test.ts ✅
+│   │   │   ├── ModelCompatibility.test.ts ✅
+│   │   │   ├── ModelContracts.test.ts ✅
+│   │   │   ├── ModelDependency.test.ts ✅
+│   │   │   ├── ModelFamily.test.ts ✅
+│   │   │   ├── ModelInteractions.test.ts ✅
+│   │   │   ├── ModelRequirement.test.ts ✅
+│   │   │   └── ModelType.test.ts ✅
+│   │   ├── Model.ts ✅
+│   │   ├── ModelCompatibility.ts ✅
+│   │   ├── ModelDependency.ts ✅
+│   │   ├── ModelFamily.ts ✅
+│   │   ├── ModelRequirement.ts ✅
+│   │   └── ModelType.ts ✅
+│   ├── nodes
+│   │   ├── interfaces
+│   │   │   ├── INode.ts ✅
+│   │   │   ├── INodeDefinition.ts ✅
+│   │   │   ├── INodePort.ts ✅
+│   │   │   └── INodeProperty.ts ✅
+│   │   ├── tests
+│   │   │   ├── Node.test.ts ✅
+│   │   │   ├── NodeCategory.test.ts ✅
+│   │   │   ├── NodeCompatibilityProfile.test.ts ✅
+│   │   │   ├── NodeContracts.test.ts ✅
+│   │   │   ├── NodeDefinition.test.ts ✅
+│   │   │   ├── NodeInteractions.test.ts ✅
+│   │   │   ├── NodePort.test.ts ✅
+│   │   │   └── NodeProperty.test.ts ✅
+│   │   ├── Node.ts ✅
+│   │   ├── NodeCategory.ts ✅
+│   │   ├── NodeCompatibilityProfile.ts ✅
+│   │   ├── NodeDefinition.ts ✅
+│   │   ├── NodePort.ts ✅
+│   │   └── NodeProperty.ts ✅
+│   ├── services
+│   │   ├── interfaces
+│   │   │   ├── IModelCompatibilityService.ts ✅
+│   │   │   ├── INodeCompatibilityService.ts ✅
+│   │   │   └── IWorkflowValidator.ts ✅
+│   │   ├── tests
+│   │   │   ├── ConnectionValidationService.test.ts ✅
+│   │   │   ├── ModelCompatibilityService.test.ts ✅
+│   │   │   ├── NodeCompatibilityService.test.ts ✅
+│   │   │   ├── ServiceContracts.test.ts ✅
+│   │   │   ├── ServiceInteractions.test.ts ✅
+│   │   │   ├── WorkflowGraphService.test.ts ✅
+│   │   │   ├── WorkflowValidator.test.ts ✅
+│   │   │   └── testUtils.ts ✅
+│   │   ├── ConnectionValidationService.ts ✅
+│   │   ├── ModelCompatibilityService.ts ✅
+│   │   ├── NodeCompatibilityService.ts ✅
+│   │   ├── WorkflowGraphService.ts ✅
+│   │   └── WorkflowValidator.ts ✅
+│   ├── tests
+│   │   └── CrossSubfolderInteractions.test.ts ✅
+│   └── workflows
+│       ├── interfaces
+│       │   ├── IWorkflow.ts ✅
+│       │   ├── IWorkflowConnection.ts ✅
+│       │   └── IWorkflowGraph.ts ✅
+│       ├── tests
+│       │   ├── Workflow.test.ts ✅
+│       │   ├── WorkflowConnection.test.ts ✅
+│       │   ├── WorkflowContracts.test.ts ✅
+│       │   ├── WorkflowGraph.test.ts ✅
+│       │   ├── WorkflowInteractions.test.ts ✅
+│       │   ├── WorkflowMetadata.test.ts ✅
+│       │   └── testUtils.ts ✅
+│       ├── Workflow.ts ✅
+│       ├── WorkflowConnection.ts ✅
+│       ├── WorkflowGraph.ts ✅
+│       └── WorkflowMetadata.ts ✅
+├── infrastructure
+│   ├── comfyui
+│   │   ├── adapters
+│   │   │   ├── tests
+│   │   │   │   ├── AdaptersContracts.test.ts ✅
+│   │   │   │   ├── AdaptersInteractions.test.ts ✅
+│   │   │   │   ├── ComfyNodeAdapter.test.ts ✅
+│   │   │   │   ├── ComfyPropertyAdapter.test.ts ✅
+│   │   │   │   └── ComfyWorkflowAdapter.test.ts ✅
+│   │   │   ├── ComfyNodeAdapter.ts ✅
+│   │   │   ├── ComfyPropertyAdapter.ts ✅
+│   │   │   └── ComfyWorkflowAdapter.ts ✅
+│   │   ├── catalog
+│   │   │   ├── tests
+│   │   │   │   ├── CatalogContracts.test.ts ✅
+│   │   │   │   ├── CatalogInteractions.test.ts ✅
+│   │   │   │   └── ComfyNodeCatalogProvider.test.ts ✅
+│   │   │   └── ComfyNodeCatalogProvider.ts ✅
+│   │   ├── dto
+│   │   │   ├── tests
+│   │   │   │   ├── ComfyNodeDto.test.ts ✅
+│   │   │   │   ├── ComfyPropertyDto.test.ts ✅
+│   │   │   │   ├── ComfyWorkflowDto.test.ts ✅
+│   │   │   │   └── DtoContracts.test.ts ✅
+│   │   │   ├── ComfyNodeDto.ts ✅
+│   │   │   ├── ComfyPropertyDto.ts ✅
+│   │   │   └── ComfyWorkflowDto.ts ✅
+│   │   ├── execution
+│   │   │   ├── tests
+│   │   │   │   ├── ComfyApiClient.test.ts ✅
+│   │   │   │   ├── ComfyQueueClient.test.ts ✅
+│   │   │   │   ├── ComfyWorkflowExecutor.test.ts ✅
+│   │   │   │   ├── ExecutionContracts.test.ts ✅
+│   │   │   │   └── ExecutionInteractions.test.ts ✅
+│   │   │   ├── ComfyApiClient.ts ✅
+│   │   │   ├── ComfyQueueClient.ts ✅
+│   │   │   └── ComfyWorkflowExecutor.ts ✅
+│   │   └── tests
+│   │       └── CrossSubfolderInteractions.test.ts ✅
+│   ├── composition
+│   │   ├── tests
+│   │   │   ├── ApplicationBootstrap.test.ts ✅
+│   │   │   ├── CompositionContracts.test.ts ✅
+│   │   │   ├── CompositionInteractions.test.ts ✅
+│   │   │   ├── DependencyContainer.test.ts ✅
+│   │   │   └── InfrastructureRegistry.test.ts ✅
+│   │   ├── ApplicationBootstrap.ts ✅
+│   │   ├── DependencyContainer.ts ✅
+│   │   └── InfrastructureRegistry.ts ✅
+│   ├── config
+│   │   ├── tests
+│   │   │   ├── AppRuntimeConfig.test.ts ✅
+│   │   │   ├── ConfigContracts.test.ts ✅
+│   │   │   ├── ConfigInteractions.test.ts ✅
+│   │   │   ├── EnvironmentConfig.test.ts ✅
+│   │   │   └── EnvironmentConfigProvider.test.ts ✅
+│   │   ├── AppRuntimeConfig.ts ✅
+│   │   ├── EnvironmentConfig.ts ✅
+│   │   └── EnvironmentConfigProvider.ts ✅
+│   ├── filesystem
+│   │   ├── tests
+│   │   │   ├── FilesystemContracts.test.ts ✅
+│   │   │   ├── FilesystemInteractions.test.ts ✅
+│   │   │   ├── LocalAssetRepository.test.ts ✅
+│   │   │   ├── LocalFileStorage.test.ts ✅
+│   │   │   ├── LocalModelRepository.test.ts ✅
+│   │   │   └── LocalWorkflowRepository.test.ts ✅
+│   │   ├── LocalAssetRepository.ts ✅
+│   │   ├── LocalFileStorage.ts ✅
+│   │   ├── LocalModelRepository.ts ✅
+│   │   └── LocalWorkflowRepository.ts ✅
+│   ├── huggingface
+│   │   ├── tests
+│   │   │   ├── HuggingFaceApiClient.test.ts ✅
+│   │   │   ├── HuggingFaceContracts.test.ts ✅
+│   │   │   ├── HuggingFaceInteractions.test.ts ✅
+│   │   │   ├── HuggingFaceModelCatalog.test.ts ✅
+│   │   │   └── HuggingFaceModelDownloader.test.ts ✅
+│   │   ├── HuggingFaceApiClient.ts ✅
+│   │   ├── HuggingFaceModelCatalog.ts ✅
+│   │   └── HuggingFaceModelDownloader.ts ✅
+│   ├── mocks
+│   │   ├── catalog
+│   │   │   ├── MockNodeCatalogProvider.ts ✅
+│   │   │   └── seedNodeCatalog.ts ✅
+│   │   ├── execution
+│   │   │   └── PreviewWorkflowExecutor.ts ✅
+│   │   ├── repositories
+│   │   │   └── InMemoryWorkflowRepository.ts ✅
+│   │   └── tests
+│   │       ├── InMemoryWorkflowRepository.test.ts ✅
+│   │       ├── MockCatalogInteractions.test.ts ✅
+│   │       └── PreviewWorkflowExecutor.test.ts ✅
+│   └── tests
+│       └── CrossSubfolderInteractions.test.ts ✅
+├── ui
+│   ├── components
+│   │   ├── models
+│   │   │   ├── tests
+│   │   │   │   ├── ModelsContracts.test.ts ✅
+│   │   │   │   ├── ModelsInteractions.test.ts ✅
+│   │   │   │   └── ModelsUnit.test.ts ✅
+│   │   │   ├── ModelBrowser.tsx ✅
+│   │   │   ├── ModelCard.tsx ✅
+│   │   │   ├── ModelCompatibilityPanel.tsx ✅
+│   │   │   ├── ModelDetailsPanel.tsx ✅
+│   │   │   ├── ModelInstaller.tsx ⚪
+│   │   │   └── ModelSearchBar.tsx ✅
+│   │   ├── nodes
+│   │   │   ├── tests
+│   │   │   │   ├── NodesContracts.test.ts ✅
+│   │   │   │   ├── NodesInteractions.test.ts ✅
+│   │   │   │   └── NodesUnit.test.ts ✅
+│   │   │   ├── NodeCanvasNode.tsx ✅
+│   │   │   ├── NodeComponent.tsx ⚪
+│   │   │   ├── NodeInspector.tsx ✅
+│   │   │   ├── NodePalette.tsx ✅
+│   │   │   ├── NodePaletteItem.tsx ✅
+│   │   │   ├── NodePort.tsx ✅
+│   │   │   ├── NodePortView.tsx ⚪
+│   │   │   ├── NodePropertyEditor.tsx ✅
+│   │   │   └── NodePropertyField.tsx ✅
+│   │   ├── tests
+│   │   │   └── CrossSubfolderInteractions.test.ts ✅
+│   │   └── workflow
+│   │       ├── reactflow
+│   │       │   ├── EdgeAdapter.ts ✅
+│   │       │   ├── NodeAdapter.ts ✅
+│   │       │   ├── ReactFlowCanvas.tsx ✅
+│   │       │   └── ReactFlowNodeWrapper.tsx ✅
+│   │       ├── tests
+│   │       │   ├── WorkflowContracts.test.ts ✅
+│   │       │   ├── WorkflowInteractions.test.ts ✅
+│   │       │   └── WorkflowUnit.test.ts ✅
+│   │       ├── ConnectionInspector.tsx ✅
+│   │       ├── WorkflowCanvas.tsx ✅
+│   │       ├── WorkflowCanvasToolbar.tsx ✅
+│   │       ├── WorkflowInspector.tsx ⚪
+│   │       ├── WorkflowMetadataPanel.tsx ✅
+│   │       ├── WorkflowNodeList.tsx ✅
+│   │       ├── WorkflowToolbar.tsx ⚪
+│   │       ├── WorkflowValidationPanel.tsx ✅
+│   │       └── useNodeDrag.ts ✅
+│   ├── composition
+│   │   ├── tests
+│   │   │   └── UiCompositionInteractions.test.ts ✅
+│   │   ├── AppProviders.tsx ✅
+│   │   └── createUiDependencies.ts ✅
+│   ├── dev
+│   │   ├── tests
+│   │   │   └── DevSyncButton.test.ts ✅
+│   │   └── DevSyncButton.tsx ✅
+│   ├── layout
+│   │   ├── tests
+│   │   │   └── LayoutUnit.test.ts ✅
+│   │   ├── AppLayout.css ✅
+│   │   └── AppLayout.tsx ✅
+│   ├── pages
+│   │   ├── tests
+│   │   │   ├── PagesContracts.test.ts ✅
+│   │   │   ├── PagesInteractions.test.ts ✅
+│   │   │   └── PagesUnit.test.ts ✅
+│   │   ├── AssetsPage.tsx ✅
+│   │   ├── HomePage.tsx ✅
+│   │   ├── ModelsPage.tsx ✅
+│   │   ├── NotFoundPage.tsx ✅
+│   │   ├── PageStyles.css ✅
+│   │   ├── WorkflowEditorPage.tsx ✅
+│   │   └── WorkflowsPage.tsx ✅
+│   ├── presenters
+│   │   ├── tests
+│   │   │   ├── PresentersContracts.test.ts ✅
+│   │   │   ├── PresentersInteractions.test.ts ✅
+│   │   │   └── PresentersUnit.test.ts ✅
+│   │   ├── AssetPresenter.ts ✅
+│   │   ├── ModelPresenter.ts ✅
+│   │   ├── NodePresenter.ts ✅
+│   │   ├── PresenterFormatting.ts ✅
+│   │   ├── ValidationPresenter.ts ✅
+│   │   └── WorkflowPresenter.ts ✅
+│   ├── routes
+│   │   ├── tests
+│   │   │   ├── RoutesContracts.test.ts ✅
+│   │   │   ├── RoutesInteractions.test.ts ✅
+│   │   │   └── RoutesUnit.test.ts ✅
+│   │   ├── AppRouter.tsx ✅
+│   │   ├── ProtectedRoute.tsx ✅
+│   │   └── RouteConfig.ts ✅
+│   ├── services
+│   │   ├── tests
+│   │   │   ├── ServicesContracts.test.ts ✅
+│   │   │   ├── ServicesInteractions.test.ts ✅
+│   │   │   └── ServicesUnit.test.ts ✅
+│   │   ├── ModelService.ts ✅
+│   │   ├── NodeService.ts ✅
+│   │   └── WorkflowService.ts ✅
+│   ├── state
+│   │   ├── tests
+│   │   │   ├── StateContracts.test.ts ✅
+│   │   │   ├── StateInteractions.test.ts ✅
+│   │   │   └── StateUnit.test.ts ✅
+│   │   ├── ModelStore.ts ✅
+│   │   ├── NodeStore.ts ✅
+│   │   └── WorkflowStore.ts ✅
+│   ├── styles
+│   │   ├── components
+│   │   │   ├── badges.css ✅
+│   │   │   ├── buttons.css ✅
+│   │   │   ├── cards.css ✅
+│   │   │   ├── inputs.css ✅
+│   │   │   ├── model-browser.css ✅
+│   │   │   ├── panels.css ✅
+│   │   │   └── toolbar.css ✅
+│   │   ├── layout
+│   │   │   ├── container.css ✅
+│   │   │   ├── grid.css ✅
+│   │   │   └── stack.css ✅
+│   │   ├── app.css ✅
+│   │   ├── reset.css ✅
+│   │   ├── tokens.css ✅
+│   │   └── typography.css ✅
+│   ├── tests
+│   │   ├── AppEntryInteractions.test.ts ✅
+│   │   ├── CrossSubfolderInteractions.test.ts ✅
+│   │   └── testUtils.ts ✅
+│   ├── App.tsx ✅
+│   └── main.tsx ✅
+├── .env.example ✅
+├── .gitignore ✅
+├── .nvmrc ✅
+├── README.md ✅
+├── index.html ✅
+├── package.json ✅
+├── tsconfig.json ✅
+├── tsconfig.node.json ✅
+└── vite.config.ts ✅
+```
+
+Implementation status is based on file content:
+
+- `✅ implemented`: file contains non-whitespace content.
+- `⚪ not implemented`: file is blank or whitespace-only.
+
+
+All discovered test files in the repository are currently marked as `✅ implemented`.
+
+## Recent workflow editor implementation
+
+- ✅ `ui/components/workflow/WorkflowMetadataPanel.tsx`
+- ✅ `ui/components/workflow/WorkflowValidationPanel.tsx`
+- ✅ `ui/components/workflow/WorkflowNodeList.tsx`
+- ✅ `ui/components/workflow/WorkflowCanvasToolbar.tsx`
+- ✅ `ui/components/workflow/ConnectionInspector.tsx`
+- ✅ `ui/pages/WorkflowEditorPage.tsx`
+- ✅ `ui/state/WorkflowStore.ts` (workflow rename/description update state APIs)
+- ✅ `ui/services/WorkflowService.ts` (workflow metadata update helpers used by store/page wiring)
+
+
+## Newly implemented files
+
+- ✅ `infrastructure/config/AppRuntimeConfig.ts`
+- ✅ `infrastructure/mocks/catalog/seedNodeCatalog.ts`
+- ✅ `infrastructure/mocks/catalog/MockNodeCatalogProvider.ts`
+- ✅ `infrastructure/mocks/repositories/InMemoryWorkflowRepository.ts`
+- ✅ `infrastructure/mocks/execution/PreviewWorkflowExecutor.ts`
+- ✅ `ui/composition/createUiDependencies.ts`
+- ✅ `ui/composition/AppProviders.tsx`
+- ✅ `infrastructure/config/tests/AppRuntimeConfig.test.ts`
+- ✅ `infrastructure/mocks/tests/InMemoryWorkflowRepository.test.ts`
+- ✅ `infrastructure/mocks/tests/PreviewWorkflowExecutor.test.ts`
+- ✅ `infrastructure/mocks/tests/MockCatalogInteractions.test.ts`
+- ✅ `ui/composition/tests/UiCompositionInteractions.test.ts`

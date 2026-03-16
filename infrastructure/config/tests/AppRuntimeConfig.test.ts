@@ -1,0 +1,46 @@
+import { describe, expect, it } from "bun:test";
+import { AppRuntimeConfig } from "../AppRuntimeConfig";
+
+describe("AppRuntimeConfig", () => {
+  it("returns development defaults", () => {
+    const config = AppRuntimeConfig.forDevelopment();
+
+    expect(config.workflowRepositoryMode).toBe("memory");
+    expect(config.workflowExecutorMode).toBe("preview");
+    expect(config.nodeCatalogMode).toBe("mock");
+    expect(config.seedStarterNode).toBe(true);
+    expect(config.isProductionMode).toBe(false);
+    expect(config.devSyncBaseUrl).toBe("http://192.168.1.100:8787");
+    expect(config.devSyncToken).toBe("ai-loom-dev-sync");
+    expect(config.isDevSyncEnabled).toBe(true);
+  });
+
+  it("normalizes optional dev sync values", () => {
+    const config = new AppRuntimeConfig({
+      workflowRepositoryMode: "memory",
+      workflowExecutorMode: "preview",
+      nodeCatalogMode: "mock",
+      seedStarterNode: false,
+      isProductionMode: false,
+      devSyncBaseUrl: "   ",
+      devSyncToken: "  token-123  ",
+    });
+
+    expect(config.devSyncBaseUrl).toBeUndefined();
+    expect(config.devSyncToken).toBe("token-123");
+    expect(config.isDevSyncEnabled).toBe(false);
+  });
+
+  it("disables dev sync in production even when base url is present", () => {
+    const config = new AppRuntimeConfig({
+      workflowRepositoryMode: "memory",
+      workflowExecutorMode: "preview",
+      nodeCatalogMode: "mock",
+      seedStarterNode: false,
+      isProductionMode: true,
+      devSyncBaseUrl: "http://localhost:8787",
+    });
+
+    expect(config.isDevSyncEnabled).toBe(false);
+  });
+});

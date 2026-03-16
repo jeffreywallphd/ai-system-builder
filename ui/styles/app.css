@@ -1,0 +1,409 @@
+
+@import "./tokens.css";
+@import "./reset.css";
+@import "./typography.css";
+
+@import "./components/buttons.css";
+@import "./components/cards.css";
+@import "./components/badges.css";
+@import "./components/inputs.css";
+@import "./components/panels.css";
+@import "./components/toolbar.css";
+@import "./components/model-browser.css";
+
+@import "./layout/container.css";
+@import "./layout/grid.css";
+@import "./layout/stack.css";
+
+body {
+  background:
+    radial-gradient(circle at top, rgba(79, 156, 249, 0.08), transparent 28%),
+    var(--color-bg-primary);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.ui-surface-app {
+  background: transparent;
+  color: var(--color-text-primary);
+}
+
+.ui-divider {
+  border-top: 1px solid var(--color-border-soft);
+}
+
+.ui-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong) transparent;
+}
+
+.ui-scrollbar::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.ui-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ui-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.ui-app {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+}
+
+.ui-app__header {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  border-bottom: 1px solid var(--color-border);
+  background: rgba(11, 15, 22, 0.88);
+  backdrop-filter: blur(10px);
+}
+
+.ui-app__header-inner,
+.ui-app__footer-inner,
+.ui-app__main-inner {
+  width: min(var(--container-width), calc(100% - 2rem));
+  margin-inline: auto;
+}
+
+.ui-app__header-inner {
+  min-height: 4rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.ui-app__brand {
+  color: var(--color-text-inverse);
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  transition: color var(--transition-fast);
+}
+
+.ui-app__brand:hover {
+  color: var(--color-accent);
+}
+
+.ui-app__nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+}
+
+.ui-app__nav-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--control-height-sm);
+  padding: 0 var(--space-sm);
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.ui-app__nav-link:hover {
+  background: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+}
+
+.ui-app__nav-link--active {
+  background: var(--color-accent-soft);
+  border-color: rgba(79, 156, 249, 0.35);
+  color: var(--color-accent);
+}
+
+.ui-app__main {
+  padding: var(--space-lg) 0 var(--space-xl);
+}
+
+.ui-app__footer {
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg-panel);
+  color: var(--color-text-secondary);
+}
+
+.ui-app__footer-inner {
+  min-height: 3.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  font-size: var(--font-size-sm);
+}
+
+.ui-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.ui-page__hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.ui-page__hero-copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.ui-page__actions {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.ui-page__title {
+  font-size: clamp(1.8rem, 2.2vw, var(--font-size-3xl));
+  line-height: var(--line-height-tight);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.ui-page__subtitle {
+  color: var(--color-text-secondary);
+  max-width: 72ch;
+}
+
+.ui-empty-state {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  align-items: flex-start;
+}
+
+.ui-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-sm);
+}
+
+.ui-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+}
+
+.ui-meta-label {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ui-meta-value {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
+}
+
+.ui-chips {
+  display: flex;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+}
+
+.ui-muted {
+  color: var(--color-text-secondary);
+}
+
+.ui-subtle {
+  color: var(--color-text-muted);
+}
+
+.ui-glow-accent {
+  box-shadow:
+    var(--shadow-panel),
+    0 0 0 1px rgba(79, 156, 249, 0.08),
+    0 0 22px rgba(79, 156, 249, 0.08);
+}
+
+/* React Flow integration */
+
+.ui-rf-canvas {
+  height: 560px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background:
+    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    rgba(255, 255, 255, 0.01);
+  background-size: 24px 24px;
+}
+
+.ui-rf-node {
+  width: 340px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-panel);
+  box-shadow: var(--shadow-panel);
+  overflow: hidden;
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    opacity var(--transition-fast);
+}
+
+.ui-rf-node--selected {
+  border-color: rgba(79, 156, 249, 0.45);
+  box-shadow:
+    var(--shadow-panel),
+    0 0 0 1px rgba(79, 156, 249, 0.12),
+    0 0 24px rgba(79, 156, 249, 0.08);
+}
+
+.ui-rf-node--disabled {
+  opacity: 0.72;
+}
+
+.ui-rf-node__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--color-border-soft);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.ui-rf-node__title {
+  font-size: var(--font-size-md);
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.ui-rf-node__body {
+  padding: var(--space-sm) var(--space-md) var(--space-md);
+}
+
+.ui-rf-node__ports {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+}
+
+.ui-rf-node__port-row {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  min-height: 28px;
+}
+
+.ui-rf-node__port-row--input {
+  justify-content: flex-start;
+}
+
+.ui-rf-node__port-row--output {
+  justify-content: flex-end;
+}
+
+.ui-rf-node__port-label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  min-width: 0;
+}
+
+.ui-rf-node__port-label--right {
+  text-align: right;
+  align-items: flex-end;
+}
+
+.ui-rf-node__handle {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--color-text-inverse);
+  background: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(79, 156, 249, 0.14);
+}
+
+.react-flow__node {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  width: auto;
+}
+
+.react-flow__edge-path {
+  stroke: var(--color-accent);
+  stroke-width: 2;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: var(--color-warning);
+  stroke-width: 3;
+}
+
+.react-flow__controls {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-panel);
+  box-shadow: var(--shadow-panel);
+}
+
+.react-flow__controls button {
+  background: var(--color-bg-panel);
+  border-bottom: 1px solid var(--color-border-soft);
+  color: var(--color-text-primary);
+}
+
+.react-flow__minimap {
+  background: var(--color-bg-panel);
+  border: 1px solid var(--color-border);
+}
+
+@media (max-width: 720px) {
+  .ui-app__header-inner {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: var(--space-sm) 0;
+  }
+
+  .ui-app__footer-inner {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    padding: var(--space-sm) 0;
+  }
+
+  .ui-meta-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ui-rf-node {
+    width: min(320px, calc(100vw - 5rem));
+  }
+
+  .ui-rf-node__ports {
+    grid-template-columns: 1fr;
+  }
+
+  .ui-rf-canvas {
+    height: 500px;
+  }
+}
