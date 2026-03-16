@@ -336,6 +336,22 @@ export class WorkflowStore {
     });
   }
 
+  public moveNode(
+    nodeId: string,
+    position: { readonly x: number; readonly y: number }
+  ): void {
+    const workflow = this.requireCurrentWorkflow();
+    const updatedWorkflow = this.nodeService.moveNode(workflow, nodeId, position);
+
+    this.setState({
+      currentWorkflow: updatedWorkflow,
+      selectedNodeId: nodeId.trim(),
+      isDirty: true,
+      validation: undefined,
+      error: undefined,
+    });
+  }
+
   public removeNode(nodeId: string): void {
     const workflow = this.requireCurrentWorkflow();
     const updatedWorkflow = this.nodeService.removeNode(workflow, nodeId);

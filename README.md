@@ -12,6 +12,7 @@ An AI platform to weave together AI capabilities for powerful automation workflo
 - Implemented the Models UI browser flow with search controls, model cards, details/compatibility side panels, and page wiring in `ui/components/models/*` and `ui/pages/ModelsPage.tsx`.
 - Added dedicated model-browser styling and integrated it into global app styles via `ui/styles/components/model-browser.css` and `ui/styles/app.css`.
 - Implemented the Workflow Editor experience with metadata editing, validation summaries, node listing, and store-backed action wiring in `ui/pages/WorkflowEditorPage.tsx` and new workflow panel components under `ui/components/workflow/*`.
+- Added draggable workflow canvas nodes with reusable drag behavior in `ui/components/workflow/useNodeDrag.ts`, `ui/components/nodes/NodeCanvasNode.tsx`, and `ui/components/workflow/WorkflowCanvas.tsx`.
 
 ## Runtime/configuration setup
 
@@ -334,6 +335,8 @@ ai-loom-studio
 │   │   │   ├── NodeInspector.tsx ✅
 │   │   │   ├── NodePalette.tsx ✅
 │   │   │   ├── NodePaletteItem.tsx ✅
+│   │   │   ├── NodeCanvasNode.tsx ✅
+│   │   │   ├── NodePort.tsx ✅
 │   │   │   ├── NodePortView.tsx ⚪
 │   │   │   ├── NodePropertyEditor.tsx ✅
 │   │   │   └── NodePropertyField.tsx ✅
@@ -344,8 +347,9 @@ ai-loom-studio
 │   │       │   ├── WorkflowContracts.test.ts ✅
 │   │       │   ├── WorkflowInteractions.test.ts ✅
 │   │       │   └── WorkflowUnit.test.ts ✅
-│   │       ├── WorkflowCanvas.tsx ⚪
+│   │       ├── WorkflowCanvas.tsx ✅
 │   │       ├── WorkflowInspector.tsx ⚪
+│   │       ├── useNodeDrag.ts ✅
 │   │       └── WorkflowToolbar.tsx ⚪
 │   ├── layout
 │   │   ├── tests
