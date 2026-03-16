@@ -1,7 +1,9 @@
 import type { IWorkflow } from "../../../domain/workflows/interfaces/IWorkflow";
-import { ComfyNodeAdapter, type IComfyPromptNode } from "./ComfyNodeAdapter";
+import type { ComfyNodeDto } from "../dto/ComfyNodeDto";
+import type { ComfyWorkflowDto } from "../dto/ComfyWorkflowDto";
+import { ComfyNodeAdapter } from "./ComfyNodeAdapter";
 
-export type ComfyPromptWorkflow = Readonly<Record<string, IComfyPromptNode>>;
+export type ComfyPromptWorkflow = Readonly<Record<string, ComfyNodeDto>>;
 
 type MutableComfyPromptNode = {
   class_type: string;
@@ -87,10 +89,7 @@ export class ComfyWorkflowAdapter {
     return Object.freeze(frozenPrompt);
   }
 
-  public adaptWorkflowEnvelope(workflow: IWorkflow): Readonly<{
-    prompt: ComfyPromptWorkflow;
-    client_id: string;
-  }> {
+  public adaptWorkflowEnvelope(workflow: IWorkflow): ComfyWorkflowDto {
     return Object.freeze({
       prompt: this.adaptWorkflow(workflow),
       client_id: workflow.id,
