@@ -211,11 +211,11 @@ ai-loom-studio
 ├── infrastructure
 │   ├── comfyui
 │   │   ├── adapters
-│   │   │   ├── ComfyNodeAdapter.ts ⚪
-│   │   │   ├── ComfyPropertyAdapter.ts ⚪
-│   │   │   └── ComfyWorkflowAdapter.ts ⚪
+│   │   │   ├── ComfyNodeAdapter.ts ✅
+│   │   │   ├── ComfyPropertyAdapter.ts ✅
+│   │   │   └── ComfyWorkflowAdapter.ts ✅
 │   │   ├── catalog
-│   │   │   └── ComfyNodeCatalogProvider.ts ⚪
+│   │   │   └── ComfyNodeCatalogProvider.ts ✅
 │   │   ├── dto
 │   │   │   ├── ComfyNodeDto.ts ⚪
 │   │   │   ├── ComfyPropertyDto.ts ⚪
