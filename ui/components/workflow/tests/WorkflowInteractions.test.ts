@@ -2,20 +2,21 @@ import { describe, expect, it } from "bun:test";
 import { readSource } from "../../../tests/testUtils";
 
 describe("ui/components/workflow interactions", () => {
-  it("wires WorkflowCanvas to NodeCanvasNode callbacks", () => {
+  it("wires WorkflowCanvas to ReactFlowCanvas callbacks", () => {
     const canvas = readSource("ui/components/workflow/WorkflowCanvas.tsx");
 
-    expect(canvas).toContain("import NodeCanvasNode");
-    expect(canvas).toContain("onPositionChange={onMoveNode}");
-    expect(canvas).toContain("onPositionCommit={onMoveNodeCommit}");
-    expect(canvas).toContain("onSelect={onSelectNode}");
+    expect(canvas).toContain("import ReactFlowCanvas");
+    expect(canvas).toContain("onMoveNodeCommit={onMoveNodeCommit}");
+    expect(canvas).toContain("onSelectConnection={onSelectConnection}");
+    expect(canvas).toContain("onConnectNodes={onConnectNodes}");
   });
 
-  it("supports drag cancellation and grid snapping", () => {
-    const dragSource = readSource("ui/components/workflow/useNodeDrag.ts");
+  it("wires reactflow events to selection, movement, and connection callbacks", () => {
+    const flowCanvas = readSource("ui/components/workflow/reactflow/ReactFlowCanvas.tsx");
 
-    expect(dragSource).toContain("handlePointerCancel");
-    expect(dragSource).toContain("applyGrid(");
-    expect(dragSource).toContain("onDragEnd");
+    expect(flowCanvas).toContain("onMoveNodeCommit(change.id");
+    expect(flowCanvas).toContain("onConnectNodes?.({");
+    expect(flowCanvas).toContain("onSelectNode?.(node.id)");
+    expect(flowCanvas).toContain("onSelectConnection?.(edge.id)");
   });
 });

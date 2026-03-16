@@ -19,17 +19,21 @@ describe("ui/components/nodes interactions", () => {
     const palette = readSource("ui/components/nodes/NodePalette.tsx");
 
     expect(palette).toContain("onSearch?.(query.trim(), categoryFilter || undefined)");
-    expect(palette).toContain("onSearch?.(\"\", undefined)");
+    expect(palette).toContain('onSearch?.("", undefined)');
     expect(palette).toContain("All Categories");
     expect(palette).toContain("No node definitions match the current filters.");
   });
 
-  it("wires node canvas rendering to NodePort and useNodeDrag", () => {
+  it("marks retired custom canvas files and keeps reactflow wrapper active", () => {
     const canvasNode = readSource("ui/components/nodes/NodeCanvasNode.tsx");
+    const nodePort = readSource("ui/components/nodes/NodePort.tsx");
+    const flowWrapper = readSource(
+      "ui/components/workflow/reactflow/ReactFlowNodeWrapper.tsx"
+    );
 
-    expect(canvasNode).toContain("import NodePort");
-    expect(canvasNode).toContain("useNodeDrag");
-    expect(canvasNode).toContain("onDragEnd: onPositionCommit");
+    expect(canvasNode).toContain("Retired");
+    expect(nodePort).toContain("Retired");
+    expect(flowWrapper).toContain("function ReactFlowNodeWrapper");
+    expect(flowWrapper).toContain("<Handle");
   });
-
 });

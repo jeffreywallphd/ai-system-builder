@@ -243,12 +243,29 @@ export default function WorkflowEditorPage({
 
           <WorkflowCanvas
             nodes={nodeViewModels}
+            workflow={editorViewModel?.workflow}
             selectedNodeId={workflowState.selectedNodeId}
+            selectedConnectionId={workflowState.selectedConnectionId}
             onSelectNode={(nodeId) => {
               workflowStore?.selectNode(nodeId);
             }}
+            onSelectConnection={(connectionId) => {
+              workflowStore?.selectConnection(connectionId);
+            }}
             onMoveNodeCommit={(nodeId, position) => {
               workflowStore?.moveNode(nodeId, position);
+            }}
+            onConnectNodes={(request) => {
+              if (!workflowStore) {
+                return;
+              }
+
+              workflowStore.connectNodes({
+                sourceNodeId: request.sourceNodeId,
+                sourcePortId: request.sourcePortId,
+                targetNodeId: request.targetNodeId,
+                targetPortId: request.targetPortId,
+              });
             }}
           />
 

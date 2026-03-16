@@ -1,21 +1,35 @@
-import NodeCanvasNode from "../nodes/NodeCanvasNode";
 import type { NodeDetailViewModel } from "../../presenters/NodePresenter";
-import type { NodeDragPosition } from "./useNodeDrag";
+import type { WorkflowResponse } from "../../../application/dto/WorkflowResponse";
+import ReactFlowCanvas from "./reactflow/ReactFlowCanvas";
 
 export interface WorkflowCanvasProps {
   readonly nodes: ReadonlyArray<NodeDetailViewModel>;
+  readonly workflow?: WorkflowResponse;
   readonly selectedNodeId?: string;
+  readonly selectedConnectionId?: string;
   readonly onSelectNode?: (nodeId: string) => void;
-  readonly onMoveNode?: (nodeId: string, position: NodeDragPosition) => void;
-  readonly onMoveNodeCommit?: (nodeId: string, position: NodeDragPosition) => void;
+  readonly onSelectConnection?: (connectionId: string) => void;
+  readonly onMoveNodeCommit?: (
+    nodeId: string,
+    position: { readonly x: number; readonly y: number }
+  ) => void;
+  readonly onConnectNodes?: (request: {
+    readonly sourceNodeId: string;
+    readonly sourcePortId: string;
+    readonly targetNodeId: string;
+    readonly targetPortId: string;
+  }) => void;
 }
 
 export default function WorkflowCanvas({
   nodes,
+  workflow,
   selectedNodeId,
+  selectedConnectionId,
   onSelectNode,
-  onMoveNode,
+  onSelectConnection,
   onMoveNodeCommit,
+  onConnectNodes,
 }: WorkflowCanvasProps): JSX.Element {
   return (
     <section className="ui-panel ui-panel--accent ui-glow-accent">
@@ -23,7 +37,7 @@ export default function WorkflowCanvas({
         <div>
           <div className="ui-panel__title">Canvas</div>
           <div className="ui-panel__subtitle">
-            Place, inspect, and reposition workflow nodes.
+            Place, connect, and reposition workflow nodes.
           </div>
         </div>
       </div>
@@ -36,18 +50,16 @@ export default function WorkflowCanvas({
             </p>
           </div>
         ) : (
-          <div className="ui-workflow-canvas ui-scrollbar">
-            {nodes.map((node) => (
-              <NodeCanvasNode
-                key={node.id}
-                node={node}
-                isSelected={selectedNodeId === node.id}
-                onSelect={onSelectNode}
-                onPositionChange={onMoveNode}
-                onPositionCommit={onMoveNodeCommit}
-              />
-            ))}
-          </div>
+          <ReactFlowCanvas
+            nodes={nodes}
+            workflow={workflow}
+            selectedNodeId={selectedNodeId}
+            selectedConnectionId={selectedConnectionId}
+            onSelectNode={onSelectNode}
+            onSelectConnection={onSelectConnection}
+            onMoveNodeCommit={onMoveNodeCommit}
+            onConnectNodes={onConnectNodes}
+          />
         )}
       </div>
     </section>
