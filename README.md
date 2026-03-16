@@ -2,6 +2,12 @@
 
 An AI platform to weave together AI capabilities for powerful automation workflows using no-code user interfaces.
 
+## Resume
+
+- Migrated the UI shell and page scaffolding to the shared `ui-*` design-system classes in `ui/styles/app.css`.
+- Updated the application entrypoint to load global app styles from `ui/styles/app.css`.
+- Refactored layout and page components to use card/panel/button/text utility primitives for consistent styling and responsiveness.
+
 ## Project structure
 
 Status legend: `✅ implemented (contains logic/content)` · `⚪ not implemented (blank or whitespace-only file)`
