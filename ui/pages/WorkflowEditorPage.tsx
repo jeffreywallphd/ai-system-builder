@@ -8,6 +8,7 @@ import WorkflowCanvasToolbar from "../components/workflow/WorkflowCanvasToolbar"
 import WorkflowMetadataPanel from "../components/workflow/WorkflowMetadataPanel";
 import WorkflowNodeList from "../components/workflow/WorkflowNodeList";
 import WorkflowValidationPanel from "../components/workflow/WorkflowValidationPanel";
+import { useUiDependencies } from "../composition/AppProviders";
 import { NodePresenter } from "../presenters/NodePresenter";
 import { WorkflowPresenter } from "../presenters/WorkflowPresenter";
 import { ValidationPresenter } from "../presenters/ValidationPresenter";
@@ -43,9 +44,18 @@ const fallbackNodeState: INodeStoreState = Object.freeze({
 });
 
 export default function WorkflowEditorPage({
-  workflowStore,
-  nodeStore,
+  workflowStore: workflowStoreProp,
+  nodeStore: nodeStoreProp,
 }: WorkflowEditorPageProps): JSX.Element {
+  const {
+    config,
+    workflowStore: injectedWorkflowStore,
+    nodeStore: injectedNodeStore,
+  } = useUiDependencies();
+
+  const workflowStore = workflowStoreProp ?? injectedWorkflowStore;
+  const nodeStore = nodeStoreProp ?? injectedNodeStore;
+
   const { workflowId } = useParams<{ workflowId: string }>();
 
   const [workflowState, setWorkflowState] =
@@ -58,44 +68,32 @@ export default function WorkflowEditorPage({
   const validationPresenter = useMemo(() => new ValidationPresenter(), []);
 
   const createdNewWorkflowRef = useRef(false);
+  const seededStarterNodeRef = useRef(false);
 
   useEffect(() => {
-    if (!workflowStore) {
-      return;
-    }
-
     return workflowStore.subscribe(setWorkflowState);
   }, [workflowStore]);
 
   useEffect(() => {
-    if (!nodeStore) {
-      return;
-    }
-
     return nodeStore.subscribe(setNodeState);
   }, [nodeStore]);
 
   useEffect(() => {
-    if (!nodeStore) {
-      return;
-    }
-
     void nodeStore.refreshCatalog();
   }, [nodeStore]);
 
   useEffect(() => {
-    if (!workflowStore) {
-      return;
-    }
-
     if (workflowId && workflowId !== "new") {
       createdNewWorkflowRef.current = false;
+      seededStarterNodeRef.current = false;
       void workflowStore.loadWorkflow(workflowId);
       return;
     }
 
     if (workflowId === "new" && !createdNewWorkflowRef.current) {
       createdNewWorkflowRef.current = true;
+      seededStarterNodeRef.current = false;
+
       void workflowStore.createWorkflow({
         metadata: {
           name: "Untitled Workflow",
@@ -106,6 +104,39 @@ export default function WorkflowEditorPage({
       });
     }
   }, [workflowId, workflowStore]);
+
+  useEffect(() => {
+    const currentWorkflow = workflowStore.getState().currentWorkflow;
+
+    if (
+      !config.seedStarterNode ||
+      !currentWorkflow ||
+      seededStarterNodeRef.current ||
+      currentWorkflow.nodes.length > 0 ||
+      nodeState.definitions.length === 0
+    ) {
+      return;
+    }
+
+    const starterDefinition = nodeState.definitions[0];
+    if (!starterDefinition) {
+      return;
+    }
+
+    seededStarterNodeRef.current = true;
+
+    void workflowStore
+      .createNode({
+        definitionId: starterDefinition.id,
+        position: {
+          x: 80,
+          y: 80,
+        },
+      })
+      .then(() => {
+        setFitViewNonce((value) => value + 1);
+      });
+  }, [config.seedStarterNode, nodeState.definitions, workflowStore]);
 
   const paletteItems = useMemo(
     () => nodePresenter.presentPalette(nodeState.definitions),
@@ -148,17 +179,13 @@ export default function WorkflowEditorPage({
   const validationSummary = validationPresenter.present(workflowState.validation);
 
   const addNode = async (definitionId: string): Promise<void> => {
-    if (!workflowStore) {
-      return;
-    }
-
     const nextIndex = currentWorkflow?.nodes.length ?? 0;
 
     await workflowStore.createNode({
       definitionId,
       position: {
-        x: 40 + nextIndex * 24,
-        y: 40 + nextIndex * 24,
+        x: 80 + nextIndex * 48,
+        y: 80 + nextIndex * 48,
       },
       title: undefined,
     });
@@ -202,26 +229,18 @@ export default function WorkflowEditorPage({
             isSaving={workflowState.isSaving}
             isExecuting={workflowState.isExecuting}
             onRenameWorkflow={(name) => {
-              workflowStore?.renameCurrentWorkflow(name);
+              workflowStore.renameCurrentWorkflow(name);
             }}
             onUpdateDescription={(description) => {
-              workflowStore?.updateCurrentWorkflowDescription(description);
+              workflowStore.updateCurrentWorkflowDescription(description);
             }}
             onSaveWorkflow={() => {
-              if (!workflowStore) {
-                return;
-              }
-
               void workflowStore.saveCurrentWorkflow();
             }}
             onValidateWorkflow={() => {
-              workflowStore?.validateCurrentWorkflow();
+              workflowStore.validateCurrentWorkflow();
             }}
             onExecuteWorkflow={() => {
-              if (!workflowStore) {
-                return;
-              }
-
               void workflowStore.executeCurrentWorkflow();
             }}
           />
@@ -236,20 +255,12 @@ export default function WorkflowEditorPage({
             selectedDefinitionId={nodeState.selectedDefinitionId}
             isLoading={nodeState.isLoading}
             onSelect={(definitionId) => {
-              if (!nodeStore) {
-                return;
-              }
-
               void nodeStore.selectDefinition(definitionId);
             }}
             onAdd={(definitionId) => {
               void addNode(definitionId);
             }}
             onSearch={(query, category) => {
-              if (!nodeStore) {
-                return;
-              }
-
               void nodeStore.refreshCatalog({
                 query: query || undefined,
                 categories: category ? [category] : undefined,
@@ -261,8 +272,8 @@ export default function WorkflowEditorPage({
             hasSelection={hasSelection}
             canFitView={nodeViewModels.length > 0}
             onFitView={() => setFitViewNonce((value) => value + 1)}
-            onClearSelection={() => workflowStore?.clearSelection()}
-            onValidateWorkflow={() => workflowStore?.validateCurrentWorkflow()}
+            onClearSelection={() => workflowStore.clearSelection()}
+            onValidateWorkflow={() => workflowStore.validateCurrentWorkflow()}
           />
 
           <WorkflowCanvas
@@ -272,22 +283,18 @@ export default function WorkflowEditorPage({
             selectedConnectionId={workflowState.selectedConnectionId}
             fitViewNonce={fitViewNonce}
             onSelectNode={(nodeId) => {
-              workflowStore?.selectNode(nodeId);
+              workflowStore.selectNode(nodeId);
             }}
             onSelectConnection={(connectionId) => {
-              workflowStore?.selectConnection(connectionId);
+              workflowStore.selectConnection(connectionId);
             }}
             onClearSelection={() => {
-              workflowStore?.clearSelection();
+              workflowStore.clearSelection();
             }}
             onMoveNodeCommit={(nodeId, position) => {
-              workflowStore?.moveNode(nodeId, position);
+              workflowStore.moveNode(nodeId, position);
             }}
             onConnectNodes={(request) => {
-              if (!workflowStore) {
-                return;
-              }
-
               workflowStore.connectNodes({
                 sourceNodeId: request.sourceNodeId,
                 sourcePortId: request.sourcePortId,
@@ -301,10 +308,10 @@ export default function WorkflowEditorPage({
             nodes={nodeViewModels}
             selectedNodeId={workflowState.selectedNodeId}
             onSelectNode={(nodeId) => {
-              workflowStore?.selectNode(nodeId);
+              workflowStore.selectNode(nodeId);
             }}
             onRemoveNode={(nodeId) => {
-              workflowStore?.removeNode(nodeId);
+              workflowStore.removeNode(nodeId);
             }}
           />
         </div>
@@ -313,7 +320,7 @@ export default function WorkflowEditorPage({
           <NodeInspector
             node={selectedNode}
             onPropertyChange={(propertyId, value) => {
-              if (!workflowStore || !workflowState.selectedNodeId) {
+              if (!workflowState.selectedNodeId) {
                 return;
               }
 
@@ -328,7 +335,7 @@ export default function WorkflowEditorPage({
           <ConnectionInspector
             connection={selectedConnection}
             onRemoveConnection={(connectionId) => {
-              workflowStore?.removeConnection(connectionId);
+              workflowStore.removeConnection(connectionId);
             }}
           />
         </div>
