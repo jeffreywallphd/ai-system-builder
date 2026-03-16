@@ -21,10 +21,11 @@ describe("ui/pages interactions", () => {
     expect(editor).toContain("WorkflowCanvasToolbar");
     expect(editor).toContain("ConnectionInspector");
     expect(editor).toContain("WorkflowNodeList");
-    expect(editor).toContain("workflowStore?.renameCurrentWorkflow");
-    expect(editor).toContain("workflowStore?.updateCurrentWorkflowDescription");
-    expect(editor).toContain("workflowStore?.clearSelection()");
-    expect(editor).toContain("workflowStore?.removeConnection(connectionId)");
+    expect(editor).toContain("useUiDependencies");
+    expect(editor).toContain("workflowStore.renameCurrentWorkflow");
+    expect(editor).toContain("workflowStore.updateCurrentWorkflowDescription");
+    expect(editor).toContain("workflowStore.clearSelection()");
+    expect(editor).toContain("workflowStore.removeConnection(connectionId)");
     expect(editor).toContain("workflowStore.executeCurrentWorkflow");
   });
 });

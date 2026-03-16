@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { readSource } from "../../tests/testUtils";
 
 describe("ui/pages contract adherence", () => {
-  it("imports shared page stylesheet across all pages", () => {
+  it("uses shared ui-page classes across all pages", () => {
     const pages = [
       "ui/pages/HomePage.tsx",
       "ui/pages/WorkflowsPage.tsx",
@@ -13,7 +13,7 @@ describe("ui/pages contract adherence", () => {
     ];
 
     for (const page of pages) {
-      expect(readSource(page)).toContain('import "./PageStyles.css"');
+      expect(readSource(page)).toContain('className="ui-page"');
     }
   });
 

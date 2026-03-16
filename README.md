@@ -13,6 +13,7 @@ An AI platform to weave together AI capabilities for powerful automation workflo
 - Added dedicated model-browser styling and integrated it into global app styles via `ui/styles/components/model-browser.css` and `ui/styles/app.css`.
 - Implemented the Workflow Editor experience with metadata editing, validation summaries, node listing, and store-backed action wiring in `ui/pages/WorkflowEditorPage.tsx` and new workflow panel components under `ui/components/workflow/*`.
 - Retired the custom-canvas drag/node implementation placeholders and migrated the workflow canvas to React Flow adapters/wrappers in `ui/components/workflow/reactflow/*`, wired through `ui/components/workflow/WorkflowCanvas.tsx`.
+- Added runtime-scoped UI dependency composition with app providers and configurable mock infrastructure in `ui/composition/*`, `infrastructure/config/AppRuntimeConfig.ts`, and `infrastructure/mocks/*`.
 
 ## Runtime/configuration setup
 
@@ -454,3 +455,19 @@ All discovered test files in the repository are currently marked as `✅ impleme
 - ✅ `ui/pages/WorkflowEditorPage.tsx`
 - ✅ `ui/state/WorkflowStore.ts` (workflow rename/description update state APIs)
 - ✅ `ui/services/WorkflowService.ts` (workflow metadata update helpers used by store/page wiring)
+
+
+## Newly implemented files
+
+- ✅ `infrastructure/config/AppRuntimeConfig.ts`
+- ✅ `infrastructure/mocks/catalog/seedNodeCatalog.ts`
+- ✅ `infrastructure/mocks/catalog/MockNodeCatalogProvider.ts`
+- ✅ `infrastructure/mocks/repositories/InMemoryWorkflowRepository.ts`
+- ✅ `infrastructure/mocks/execution/PreviewWorkflowExecutor.ts`
+- ✅ `ui/composition/createUiDependencies.ts`
+- ✅ `ui/composition/AppProviders.tsx`
+- ✅ `infrastructure/config/tests/AppRuntimeConfig.test.ts`
+- ✅ `infrastructure/mocks/tests/InMemoryWorkflowRepository.test.ts`
+- ✅ `infrastructure/mocks/tests/PreviewWorkflowExecutor.test.ts`
+- ✅ `infrastructure/mocks/tests/MockCatalogInteractions.test.ts`
+- ✅ `ui/composition/tests/UiCompositionInteractions.test.ts`
