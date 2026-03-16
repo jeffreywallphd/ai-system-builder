@@ -4,11 +4,22 @@ An AI platform to weave together AI capabilities for powerful automation workflo
 
 ## Resume
 
+- Bootstrapped Node.js project configuration with `package.json`, TypeScript (`tsconfig*.json`), Vite (`vite.config.ts`), and Node version pinning via `.nvmrc`.
+- Added secure environment/config scaffolding with `.env.example` and expanded `.gitignore` secret patterns to reduce accidental credential leakage.
 - Migrated the UI shell and page scaffolding to the shared `ui-*` design-system classes in `ui/styles/app.css`.
 - Updated the application entrypoint to load global app styles from `ui/styles/app.css`.
 - Refactored layout and page components to use card/panel/button/text utility primitives for consistent styling and responsiveness.
 - Implemented the Models UI browser flow with search controls, model cards, details/compatibility side panels, and page wiring in `ui/components/models/*` and `ui/pages/ModelsPage.tsx`.
 - Added dedicated model-browser styling and integrated it into global app styles via `ui/styles/components/model-browser.css` and `ui/styles/app.css`.
+
+## Runtime/configuration setup
+
+- ✅ `package.json` (Node scripts, runtime/dev dependencies, engine constraints)
+- ✅ `tsconfig.json` and `tsconfig.node.json` (TypeScript compiler configuration for app + Node tooling)
+- ✅ `vite.config.ts` (React plugin and local dev server settings)
+- ✅ `.env.example` (safe baseline environment variables)
+- ✅ `.nvmrc` (consistent Node.js major version)
+- ✅ `.gitignore` hardening for environment files and common secret/certificate artifacts
 
 ## Project structure
 
