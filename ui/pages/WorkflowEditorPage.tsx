@@ -2,11 +2,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import NodePalette from "../components/nodes/NodePalette";
 import NodeInspector from "../components/nodes/NodeInspector";
+import WorkflowCanvas from "../components/workflow/WorkflowCanvas";
 import WorkflowMetadataPanel from "../components/workflow/WorkflowMetadataPanel";
 import WorkflowNodeList from "../components/workflow/WorkflowNodeList";
 import WorkflowValidationPanel from "../components/workflow/WorkflowValidationPanel";
 import { NodePresenter } from "../presenters/NodePresenter";
 import { WorkflowPresenter } from "../presenters/WorkflowPresenter";
+import { ValidationPresenter } from "../presenters/ValidationPresenter";
 import { NodeStore, type INodeStoreState } from "../state/NodeStore";
 import { WorkflowStore, type IWorkflowStoreState } from "../state/WorkflowStore";
 
@@ -50,6 +52,7 @@ export default function WorkflowEditorPage({
 
   const nodePresenter = useMemo(() => new NodePresenter(), []);
   const workflowPresenter = useMemo(() => new WorkflowPresenter(), []);
+  const validationPresenter = useMemo(() => new ValidationPresenter(), []);
 
   const createdNewWorkflowRef = useRef(false);
 
@@ -131,36 +134,7 @@ export default function WorkflowEditorPage({
   }, [currentWorkflow, workflowPresenter, workflowState]);
 
   const selectedNode = editorViewModel?.selectedNode;
-  const validationSummary =
-    editorViewModel?.validation ??
-    workflowPresenter.present({
-      id: "empty",
-      metadata: {
-        name: "Empty",
-      },
-      status: "draft",
-      isEnabled: false,
-      executionPolicy: "acyclic-only",
-      nodes: [],
-      connections: [],
-      validate: () => ({
-        isValid: true,
-        messages: [],
-        errors: [],
-        warnings: [],
-        info: [],
-        invalidNodeIds: [],
-        invalidConnectionIds: [],
-      }),
-      toGraph: () =>
-        ({
-          getEntryNodes: () => [],
-          getExitNodes: () => [],
-          hasCycles: () => false,
-        }) as never,
-      isExecutable: () => false,
-      getNode: () => undefined,
-    } as never).validation;
+  const validationSummary = validationPresenter.present(workflowState.validation);
 
   const addNode = async (definitionId: string): Promise<void> => {
     if (!workflowStore) {
@@ -172,8 +146,8 @@ export default function WorkflowEditorPage({
     await workflowStore.createNode({
       definitionId,
       position: {
-        x: 40 + nextIndex * 20,
-        y: 40 + nextIndex * 20,
+        x: 40 + nextIndex * 24,
+        y: 40 + nextIndex * 24,
       },
       title: undefined,
     });
@@ -212,18 +186,10 @@ export default function WorkflowEditorPage({
             isSaving={workflowState.isSaving}
             isExecuting={workflowState.isExecuting}
             onRenameWorkflow={(name) => {
-              if (!workflowStore || !currentWorkflow) {
-                return;
-              }
-
-              workflowStore.renameCurrentWorkflow(name);
+              workflowStore?.renameCurrentWorkflow(name);
             }}
             onUpdateDescription={(description) => {
-              if (!workflowStore || !currentWorkflow) {
-                return;
-              }
-
-              workflowStore.updateCurrentWorkflowDescription(description);
+              workflowStore?.updateCurrentWorkflowDescription(description);
             }}
             onSaveWorkflow={() => {
               if (!workflowStore) {
@@ -233,11 +199,7 @@ export default function WorkflowEditorPage({
               void workflowStore.saveCurrentWorkflow();
             }}
             onValidateWorkflow={() => {
-              if (!workflowStore) {
-                return;
-              }
-
-              workflowStore.validateCurrentWorkflow();
+              workflowStore?.validateCurrentWorkflow();
             }}
             onExecuteWorkflow={() => {
               if (!workflowStore) {
@@ -279,22 +241,25 @@ export default function WorkflowEditorPage({
             }}
           />
 
+          <WorkflowCanvas
+            nodes={nodeViewModels}
+            selectedNodeId={workflowState.selectedNodeId}
+            onSelectNode={(nodeId) => {
+              workflowStore?.selectNode(nodeId);
+            }}
+            onMoveNodeCommit={(nodeId, position) => {
+              workflowStore?.moveNode(nodeId, position);
+            }}
+          />
+
           <WorkflowNodeList
             nodes={nodeViewModels}
             selectedNodeId={workflowState.selectedNodeId}
             onSelectNode={(nodeId) => {
-              if (!workflowStore) {
-                return;
-              }
-
-              workflowStore.selectNode(nodeId);
+              workflowStore?.selectNode(nodeId);
             }}
             onRemoveNode={(nodeId) => {
-              if (!workflowStore) {
-                return;
-              }
-
-              workflowStore.removeNode(nodeId);
+              workflowStore?.removeNode(nodeId);
             }}
           />
         </div>

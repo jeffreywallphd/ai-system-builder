@@ -23,4 +23,13 @@ describe("ui/components/nodes interactions", () => {
     expect(palette).toContain("All Categories");
     expect(palette).toContain("No node definitions match the current filters.");
   });
+
+  it("wires node canvas rendering to NodePort and useNodeDrag", () => {
+    const canvasNode = readSource("ui/components/nodes/NodeCanvasNode.tsx");
+
+    expect(canvasNode).toContain("import NodePort");
+    expect(canvasNode).toContain("useNodeDrag");
+    expect(canvasNode).toContain("onDragEnd: onPositionCommit");
+  });
+
 });

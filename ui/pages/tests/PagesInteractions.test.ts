@@ -19,8 +19,8 @@ describe("ui/pages interactions", () => {
     expect(editor).toContain("WorkflowMetadataPanel");
     expect(editor).toContain("WorkflowValidationPanel");
     expect(editor).toContain("WorkflowNodeList");
-    expect(editor).toContain("workflowStore.renameCurrentWorkflow");
-    expect(editor).toContain("workflowStore.updateCurrentWorkflowDescription");
+    expect(editor).toContain("workflowStore?.renameCurrentWorkflow");
+    expect(editor).toContain("workflowStore?.updateCurrentWorkflowDescription");
     expect(editor).toContain("workflowStore.executeCurrentWorkflow");
   });
 });
