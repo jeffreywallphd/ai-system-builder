@@ -1,10 +1,17 @@
 import { describe, expect, it } from "bun:test";
-import { importModule } from "../../tests/testUtils";
 
-describe("ui/presenters contract adherence", () => {
-  it("placeholder modules expose no runtime exports yet", async () => {
-    expect(Object.keys(await importModule("ui/presenters/AssetPresenter.ts"))).toEqual([]);
-    expect(Object.keys(await importModule("ui/presenters/ModelPresenter.ts"))).toEqual([]);
-    expect(Object.keys(await importModule("ui/presenters/WorkflowPresenter.ts"))).toEqual([]);
+import * as AssetPresenterModule from "../AssetPresenter";
+import * as ModelPresenterModule from "../ModelPresenter";
+import * as NodePresenterModule from "../NodePresenter";
+import * as ValidationPresenterModule from "../ValidationPresenter";
+import * as WorkflowPresenterModule from "../WorkflowPresenter";
+
+describe("ui/presenters contracts", () => {
+  it("exports presenter classes", () => {
+    expect(typeof AssetPresenterModule.AssetPresenter).toBe("function");
+    expect(typeof ModelPresenterModule.ModelPresenter).toBe("function");
+    expect(typeof NodePresenterModule.NodePresenter).toBe("function");
+    expect(typeof ValidationPresenterModule.ValidationPresenter).toBe("function");
+    expect(typeof WorkflowPresenterModule.WorkflowPresenter).toBe("function");
   });
 });
