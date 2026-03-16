@@ -23,8 +23,10 @@ body {
   min-height: 100vh;
 }
 
+/* Global surfaces */
+
 .ui-surface-app {
-  background: var(--color-bg-primary);
+  background: transparent;
   color: var(--color-text-primary);
 }
 
@@ -51,4 +53,208 @@ body {
   border-radius: var(--radius-pill);
   border: 2px solid transparent;
   background-clip: padding-box;
+}
+
+/* App shell */
+
+.ui-app {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+}
+
+.ui-app__header {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  border-bottom: 1px solid var(--color-border);
+  background: rgba(11, 15, 22, 0.88);
+  backdrop-filter: blur(10px);
+}
+
+.ui-app__header-inner,
+.ui-app__footer-inner,
+.ui-app__main-inner {
+  width: min(var(--container-width), calc(100% - 2rem));
+  margin-inline: auto;
+}
+
+.ui-app__header-inner {
+  min-height: 4rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.ui-app__brand {
+  color: var(--color-text-inverse);
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  transition: color var(--transition-fast);
+}
+
+.ui-app__brand:hover {
+  color: var(--color-accent);
+}
+
+.ui-app__nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+}
+
+.ui-app__nav-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--control-height-sm);
+  padding: 0 var(--space-sm);
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.ui-app__nav-link:hover {
+  background: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+}
+
+.ui-app__nav-link--active {
+  background: var(--color-accent-soft);
+  border-color: rgba(79, 156, 249, 0.35);
+  color: var(--color-accent);
+}
+
+.ui-app__main {
+  padding: var(--space-lg) 0 var(--space-xl);
+}
+
+.ui-app__footer {
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg-panel);
+  color: var(--color-text-secondary);
+}
+
+.ui-app__footer-inner {
+  min-height: 3.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  font-size: var(--font-size-sm);
+}
+
+/* Page-level semantic primitives */
+
+.ui-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.ui-page__hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.ui-page__hero-copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.ui-page__actions {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.ui-page__title {
+  font-size: clamp(1.8rem, 2.2vw, var(--font-size-3xl));
+  line-height: var(--line-height-tight);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.ui-page__subtitle {
+  color: var(--color-text-secondary);
+  max-width: 72ch;
+}
+
+.ui-empty-state {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  align-items: flex-start;
+}
+
+.ui-page-grid {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.ui-page-grid--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.ui-page-grid--editor {
+  grid-template-columns: 280px minmax(0, 1fr) 320px;
+}
+
+/* Utility helpers for common composition */
+
+.ui-muted {
+  color: var(--color-text-secondary);
+}
+
+.ui-subtle {
+  color: var(--color-text-muted);
+}
+
+.ui-glow-accent {
+  box-shadow:
+    var(--shadow-panel),
+    0 0 0 1px rgba(79, 156, 249, 0.08),
+    0 0 22px rgba(79, 156, 249, 0.08);
+}
+
+@media (max-width: 1100px) {
+  .ui-page-grid--3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ui-page-grid--editor {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .ui-app__header-inner {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: var(--space-sm) 0;
+  }
+
+  .ui-app__footer-inner {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    padding: var(--space-sm) 0;
+  }
+
+  .ui-page-grid--3 {
+    grid-template-columns: 1fr;
+  }
 }

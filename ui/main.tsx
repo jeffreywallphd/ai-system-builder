@@ -1,7 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
-import "./layout/AppLayout.css";
+import "./styles/app.css";
 
 const rootElement = document.getElementById("root");
 
@@ -12,5 +12,5 @@ if (!rootElement) {
 ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
     <App isAuthenticated={true} />
-  </React.StrictMode>,
+  </React.StrictMode>
 );

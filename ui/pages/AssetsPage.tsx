@@ -1,21 +1,21 @@
-import "./PageStyles.css";
-
 export default function AssetsPage(): JSX.Element {
   return (
-    <section className="page-shell">
-      <div className="page-hero">
-        <div>
-          <h1 className="page-title">Assets</h1>
-          <p className="page-subtitle">
+    <section className="ui-page">
+      <div className="ui-page__hero">
+        <div className="ui-page__hero-copy">
+          <h1 className="ui-page__title">Assets</h1>
+          <p className="ui-page__subtitle">
             Browse generated and stored workflow assets.
           </p>
         </div>
       </div>
 
-      <div className="page-card">
-        <p>
-          This page will host asset listings, previews, and metadata inspection.
-        </p>
+      <div className="ui-card">
+        <div className="ui-card__body">
+          <p className="ui-text-secondary">
+            This page will host asset listings, previews, and metadata inspection.
+          </p>
+        </div>
       </div>
     </section>
   );
