@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import {
   addEdge,
   Background,
@@ -8,6 +8,7 @@ import {
   ReactFlowProvider,
   applyNodeChanges,
   applyEdgeChanges,
+  useReactFlow,
   type Connection,
   type Edge,
   type EdgeChange,
@@ -18,7 +19,7 @@ import {
   type OnConnect,
 } from "@xyflow/react";
 import type { NodeDetailViewModel } from "../../../presenters/NodePresenter";
-import type { WorkflowResponse } from "../../../../application/dto/WorkflowResponse";
+import type { WorkflowResponse } from "../../../application/dto/WorkflowResponse";
 import { NodeAdapter, type ReactFlowNodeData } from "./NodeAdapter";
 import { EdgeAdapter } from "./EdgeAdapter";
 import ReactFlowNodeWrapper from "./ReactFlowNodeWrapper";
@@ -28,8 +29,10 @@ export interface ReactFlowCanvasProps {
   readonly workflow?: WorkflowResponse;
   readonly selectedNodeId?: string;
   readonly selectedConnectionId?: string;
+  readonly fitViewNonce?: number;
   readonly onSelectNode?: (nodeId: string) => void;
   readonly onSelectConnection?: (connectionId: string) => void;
+  readonly onClearSelection?: () => void;
   readonly onMoveNodeCommit?: (
     nodeId: string,
     position: { readonly x: number; readonly y: number }
@@ -51,13 +54,16 @@ function InnerReactFlowCanvas({
   workflow,
   selectedNodeId,
   selectedConnectionId,
+  fitViewNonce,
   onSelectNode,
   onSelectConnection,
+  onClearSelection,
   onMoveNodeCommit,
   onConnectNodes,
 }: ReactFlowCanvasProps): JSX.Element {
   const nodeAdapter = useMemo(() => new NodeAdapter(), []);
   const edgeAdapter = useMemo(() => new EdgeAdapter(), []);
+  const reactFlow = useReactFlow();
 
   const flowNodes = useMemo(
     () => nodeAdapter.toReactFlowNodes(nodes),
@@ -92,6 +98,17 @@ function InnerReactFlowCanvas({
       ),
     [flowEdges, selectedConnectionId]
   );
+
+  useEffect(() => {
+    if (fitViewNonce === undefined) {
+      return;
+    }
+
+    void reactFlow.fitView({
+      padding: 0.18,
+      duration: 250,
+    });
+  }, [fitViewNonce, reactFlow]);
 
   const onNodesChange = useCallback(
     (changes: NodeChange<Node<ReactFlowNodeData>>[]) => {
@@ -169,6 +186,7 @@ function InnerReactFlowCanvas({
         onConnect={onConnect}
         onNodeClick={onNodeClick}
         onEdgeClick={onEdgeClick}
+        onPaneClick={() => onClearSelection?.()}
         fitView
         snapToGrid
         snapGrid={[8, 8]}

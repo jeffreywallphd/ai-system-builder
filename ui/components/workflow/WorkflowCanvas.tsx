@@ -1,5 +1,5 @@
 import type { NodeDetailViewModel } from "../../presenters/NodePresenter";
-import type { WorkflowResponse } from "../../../application/dto/WorkflowResponse";
+import type { WorkflowResponse } from "../../application/dto/WorkflowResponse";
 import ReactFlowCanvas from "./reactflow/ReactFlowCanvas";
 
 export interface WorkflowCanvasProps {
@@ -7,8 +7,10 @@ export interface WorkflowCanvasProps {
   readonly workflow?: WorkflowResponse;
   readonly selectedNodeId?: string;
   readonly selectedConnectionId?: string;
+  readonly fitViewNonce?: number;
   readonly onSelectNode?: (nodeId: string) => void;
   readonly onSelectConnection?: (connectionId: string) => void;
+  readonly onClearSelection?: () => void;
   readonly onMoveNodeCommit?: (
     nodeId: string,
     position: { readonly x: number; readonly y: number }
@@ -26,8 +28,10 @@ export default function WorkflowCanvas({
   workflow,
   selectedNodeId,
   selectedConnectionId,
+  fitViewNonce,
   onSelectNode,
   onSelectConnection,
+  onClearSelection,
   onMoveNodeCommit,
   onConnectNodes,
 }: WorkflowCanvasProps): JSX.Element {
@@ -55,8 +59,10 @@ export default function WorkflowCanvas({
             workflow={workflow}
             selectedNodeId={selectedNodeId}
             selectedConnectionId={selectedConnectionId}
+            fitViewNonce={fitViewNonce}
             onSelectNode={onSelectNode}
             onSelectConnection={onSelectConnection}
+            onClearSelection={onClearSelection}
             onMoveNodeCommit={onMoveNodeCommit}
             onConnectNodes={onConnectNodes}
           />

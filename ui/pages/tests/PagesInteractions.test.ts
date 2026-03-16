@@ -9,7 +9,7 @@ describe("ui/pages interactions", () => {
 
     expect(home).toContain('import { ROUTE_PATHS } from "../routes/RouteConfig"');
     expect(home).toContain("to={ROUTE_PATHS.workflows}");
-    expect(workflows).toContain("to=\"/workflows/new\"");
+    expect(workflows).toContain('to="/workflows/new"');
     expect(notFound).toContain("to={ROUTE_PATHS.home}");
   });
 
@@ -18,9 +18,13 @@ describe("ui/pages interactions", () => {
 
     expect(editor).toContain("WorkflowMetadataPanel");
     expect(editor).toContain("WorkflowValidationPanel");
+    expect(editor).toContain("WorkflowCanvasToolbar");
+    expect(editor).toContain("ConnectionInspector");
     expect(editor).toContain("WorkflowNodeList");
     expect(editor).toContain("workflowStore?.renameCurrentWorkflow");
     expect(editor).toContain("workflowStore?.updateCurrentWorkflowDescription");
+    expect(editor).toContain("workflowStore?.clearSelection()");
+    expect(editor).toContain("workflowStore?.removeConnection(connectionId)");
     expect(editor).toContain("workflowStore.executeCurrentWorkflow");
   });
 });
