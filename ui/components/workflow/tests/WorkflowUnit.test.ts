@@ -2,8 +2,14 @@ import { describe, expect, it } from "bun:test";
 import { readSource } from "../../../tests/testUtils";
 
 describe("ui/components/workflow unit coverage", () => {
-  it("defines canvas, metadata, validation, node-list, and reactflow modules", () => {
+  it("defines canvas, toolbar, metadata, validation, node-list, and inspector modules", () => {
     const canvas = readSource("ui/components/workflow/WorkflowCanvas.tsx");
+    const toolbar = readSource(
+      "ui/components/workflow/WorkflowCanvasToolbar.tsx"
+    );
+    const connectionInspector = readSource(
+      "ui/components/workflow/ConnectionInspector.tsx"
+    );
     const metadataPanel = readSource(
       "ui/components/workflow/WorkflowMetadataPanel.tsx"
     );
@@ -16,7 +22,13 @@ describe("ui/components/workflow unit coverage", () => {
     );
 
     expect(canvas).toContain("export default function WorkflowCanvas");
-    expect(canvas).toContain("import ReactFlowCanvas");
+    expect(canvas).toContain("fitViewNonce={fitViewNonce}");
+    expect(toolbar).toContain("export default function WorkflowCanvasToolbar");
+    expect(toolbar).toContain("Clear Selection");
+    expect(connectionInspector).toContain(
+      "export default function ConnectionInspector"
+    );
+    expect(connectionInspector).toContain("Remove Connection");
     expect(metadataPanel).toContain("Workflow Metadata");
     expect(validationPanel).toContain("Review workflow errors, warnings");
     expect(nodeList).toContain("Workflow Nodes");
@@ -28,8 +40,8 @@ describe("ui/components/workflow unit coverage", () => {
     const edgeAdapter = readSource("ui/components/workflow/reactflow/EdgeAdapter.ts");
 
     expect(nodeAdapter).toContain("export class NodeAdapter");
-    expect(nodeAdapter).toContain("type: \"aiLoomNode\"");
+    expect(nodeAdapter).toContain('type: "aiLoomNode"');
     expect(edgeAdapter).toContain("export class EdgeAdapter");
-    expect(edgeAdapter).toContain("type: \"smoothstep\"");
+    expect(edgeAdapter).toContain('type: "smoothstep"');
   });
 });

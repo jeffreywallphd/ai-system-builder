@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import NodePalette from "../components/nodes/NodePalette";
 import NodeInspector from "../components/nodes/NodeInspector";
+import ConnectionInspector from "../components/workflow/ConnectionInspector";
 import WorkflowCanvas from "../components/workflow/WorkflowCanvas";
+import WorkflowCanvasToolbar from "../components/workflow/WorkflowCanvasToolbar";
 import WorkflowMetadataPanel from "../components/workflow/WorkflowMetadataPanel";
 import WorkflowNodeList from "../components/workflow/WorkflowNodeList";
 import WorkflowValidationPanel from "../components/workflow/WorkflowValidationPanel";
@@ -49,6 +51,7 @@ export default function WorkflowEditorPage({
   const [workflowState, setWorkflowState] =
     useState<IWorkflowStoreState>(fallbackWorkflowState);
   const [nodeState, setNodeState] = useState<INodeStoreState>(fallbackNodeState);
+  const [fitViewNonce, setFitViewNonce] = useState(0);
 
   const nodePresenter = useMemo(() => new NodePresenter(), []);
   const workflowPresenter = useMemo(() => new WorkflowPresenter(), []);
@@ -134,6 +137,14 @@ export default function WorkflowEditorPage({
   }, [currentWorkflow, workflowPresenter, workflowState]);
 
   const selectedNode = editorViewModel?.selectedNode;
+  const selectedConnection = useMemo(
+    () =>
+      editorViewModel?.workflow.connections.find(
+        (connection) => connection.id === workflowState.selectedConnectionId
+      ),
+    [editorViewModel?.workflow.connections, workflowState.selectedConnectionId]
+  );
+
   const validationSummary = validationPresenter.present(workflowState.validation);
 
   const addNode = async (definitionId: string): Promise<void> => {
@@ -151,7 +162,12 @@ export default function WorkflowEditorPage({
       },
       title: undefined,
     });
+
+    setFitViewNonce((value) => value + 1);
   };
+
+  const hasSelection =
+    !!workflowState.selectedNodeId || !!workflowState.selectedConnectionId;
 
   return (
     <section className="ui-page">
@@ -241,16 +257,28 @@ export default function WorkflowEditorPage({
             }}
           />
 
+          <WorkflowCanvasToolbar
+            hasSelection={hasSelection}
+            canFitView={nodeViewModels.length > 0}
+            onFitView={() => setFitViewNonce((value) => value + 1)}
+            onClearSelection={() => workflowStore?.clearSelection()}
+            onValidateWorkflow={() => workflowStore?.validateCurrentWorkflow()}
+          />
+
           <WorkflowCanvas
             nodes={nodeViewModels}
             workflow={editorViewModel?.workflow}
             selectedNodeId={workflowState.selectedNodeId}
             selectedConnectionId={workflowState.selectedConnectionId}
+            fitViewNonce={fitViewNonce}
             onSelectNode={(nodeId) => {
               workflowStore?.selectNode(nodeId);
             }}
             onSelectConnection={(connectionId) => {
               workflowStore?.selectConnection(connectionId);
+            }}
+            onClearSelection={() => {
+              workflowStore?.clearSelection();
             }}
             onMoveNodeCommit={(nodeId, position) => {
               workflowStore?.moveNode(nodeId, position);
@@ -294,6 +322,13 @@ export default function WorkflowEditorPage({
                 propertyId,
                 value
               );
+            }}
+          />
+
+          <ConnectionInspector
+            connection={selectedConnection}
+            onRemoveConnection={(connectionId) => {
+              workflowStore?.removeConnection(connectionId);
             }}
           />
         </div>

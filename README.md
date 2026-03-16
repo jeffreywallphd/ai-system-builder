@@ -353,6 +353,8 @@ ai-loom-studio
 │   │       │   ├── ReactFlowCanvas.tsx ✅
 │   │       │   └── ReactFlowNodeWrapper.tsx ✅
 │   │       ├── WorkflowCanvas.tsx ✅
+│   │       ├── WorkflowCanvasToolbar.tsx ✅
+│   │       ├── ConnectionInspector.tsx ✅
 │   │       ├── WorkflowInspector.tsx ⚪
 │   │       ├── useNodeDrag.ts ✅ (retired placeholder)
 │   │       └── WorkflowToolbar.tsx ⚪
@@ -447,6 +449,8 @@ All discovered test files in the repository are currently marked as `✅ impleme
 - ✅ `ui/components/workflow/WorkflowMetadataPanel.tsx`
 - ✅ `ui/components/workflow/WorkflowValidationPanel.tsx`
 - ✅ `ui/components/workflow/WorkflowNodeList.tsx`
+- ✅ `ui/components/workflow/WorkflowCanvasToolbar.tsx`
+- ✅ `ui/components/workflow/ConnectionInspector.tsx`
 - ✅ `ui/pages/WorkflowEditorPage.tsx`
 - ✅ `ui/state/WorkflowStore.ts` (workflow rename/description update state APIs)
 - ✅ `ui/services/WorkflowService.ts` (workflow metadata update helpers used by store/page wiring)
