@@ -1,10 +1,24 @@
 import { describe, expect, it } from "bun:test";
-import { importModule } from "../../tests/testUtils";
+import { readSource } from "../../tests/testUtils";
 
 describe("ui/routes contract adherence", () => {
-  it("placeholder modules expose no runtime exports yet", async () => {
-    expect(Object.keys(await importModule("ui/routes/AppRouter.tsx"))).toEqual([]);
-    expect(Object.keys(await importModule("ui/routes/ProtectedRoute.tsx"))).toEqual([]);
-    expect(Object.keys(await importModule("ui/routes/RouteConfig.ts"))).toEqual([]);
+  it("keeps route modules implemented as non-placeholder files", () => {
+    const sources = [
+      readSource("ui/routes/AppRouter.tsx"),
+      readSource("ui/routes/ProtectedRoute.tsx"),
+      readSource("ui/routes/RouteConfig.ts"),
+    ];
+
+    expect(sources.every((source) => source.trim().length > 0)).toBeTrue();
+  });
+
+  it("ensures canonical path contract is consistent", () => {
+    const source = readSource("ui/routes/RouteConfig.ts");
+
+    expect(source).toContain('home: "/"');
+    expect(source).toContain('workflows: "/workflows"');
+    expect(source).toContain('models: "/models"');
+    expect(source).toContain('assets: "/assets"');
+    expect(source).toContain('notFound: "*"');
   });
 });

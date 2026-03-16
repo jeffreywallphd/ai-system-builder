@@ -1,10 +1,27 @@
 import { describe, expect, it } from "bun:test";
-import { importModule } from "../../tests/testUtils";
+import { readSource } from "../../tests/testUtils";
 
 describe("ui/pages contract adherence", () => {
-  it("placeholder modules expose no runtime exports yet", async () => {
-    expect(Object.keys(await importModule("ui/pages/AssetsPage.tsx"))).toEqual([]);
-    expect(Object.keys(await importModule("ui/pages/ModelsPage.tsx"))).toEqual([]);
-    expect(Object.keys(await importModule("ui/pages/WorkflowEditorPage.tsx"))).toEqual([]);
+  it("imports shared page stylesheet across all pages", () => {
+    const pages = [
+      "ui/pages/HomePage.tsx",
+      "ui/pages/WorkflowsPage.tsx",
+      "ui/pages/WorkflowEditorPage.tsx",
+      "ui/pages/ModelsPage.tsx",
+      "ui/pages/AssetsPage.tsx",
+      "ui/pages/NotFoundPage.tsx",
+    ];
+
+    for (const page of pages) {
+      expect(readSource(page)).toContain('import "./PageStyles.css"');
+    }
+  });
+
+  it("keeps shared style definitions implemented", () => {
+    const source = readSource("ui/pages/PageStyles.css");
+
+    expect(source).toContain(".page-shell");
+    expect(source).toContain(".page-grid--editor");
+    expect(source).toContain("@media (max-width: 980px)");
   });
 });
