@@ -11,12 +11,22 @@ import type {
   IModelInstallRequest,
   IModelInstallResult,
   IModelInstaller,
+  IModelUninstallRequest,
 } from "./interfaces/IModelInstaller";
 
 function createOperationId(prefix: string = "install"): string {
   const random = Math.random().toString(36).slice(2, 10);
   const timestamp = Date.now().toString(36);
   return `${prefix}_${timestamp}_${random}`;
+}
+
+type ModelInstallerParams = {
+  providers?: ReadonlyArray<IModelInstaller>;
+  downloader?: IModelDownloader;
+};
+
+function isParams(value: unknown): value is ModelInstallerParams {
+  return !!value && !Array.isArray(value) && typeof value === "object";
 }
 
 export class ModelInstallProgress implements IModelInstallProgress {
@@ -149,7 +159,7 @@ export class ModelInstallHandle implements IModelInstallHandle {
   public updateProgress(progress: IModelInstallProgress): void {
     if (progress.modelId !== this.request.model.id) {
       throw new Error(
-        `Progress model '${progress.modelId}' does not match request model '${this.request.model.id}'.`
+        `Install progress model '${progress.modelId}' does not match request model '${this.request.model.id}'.`
       );
     }
 
@@ -158,34 +168,39 @@ export class ModelInstallHandle implements IModelInstallHandle {
 }
 
 export class ModelInstaller implements IModelInstaller {
-  private readonly providers: ReadonlyArray<IModelInstaller>;
+  private readonly installers: ReadonlyArray<IModelInstaller>;
   private readonly downloader?: IModelDownloader;
 
-  constructor(params: {
-    providers?: ReadonlyArray<IModelInstaller>;
-    downloader?: IModelDownloader;
-  } = {}) {
-    this.providers = Object.freeze([...(params.providers ?? [])]);
-    this.downloader = params.downloader;
+  constructor(params: ReadonlyArray<IModelInstaller> | ModelInstallerParams = []) {
+    if (isParams(params)) {
+      this.installers = Object.freeze([...(params.providers ?? [])]);
+      this.downloader = params.downloader;
+      return;
+    }
+
+    this.installers = Object.freeze([...(params ?? [])]);
   }
 
   public async startInstall(
     request: IModelInstallRequest
   ): Promise<IModelInstallHandle> {
-    const delegatedProvider = this.findDelegatedProvider(request);
+    const delegatedInstaller = this.findDelegatedInstaller(request);
 
-    if (delegatedProvider) {
-      return delegatedProvider.startInstall(request);
+    if (delegatedInstaller) {
+      return delegatedInstaller.startInstall(request);
     }
 
     const operationId = createOperationId();
     const modelId = request.model.id;
-
     const downloadHandleRef: { current?: { cancel(): Promise<void> } } = {};
 
-    const completionPromise = this.performInstall(request, (progress) => {
-      handle.updateProgress(progress);
-    }, downloadHandleRef);
+    let resolveCompletion: (result: IModelInstallResult) => void;
+    let rejectCompletion: (reason?: unknown) => void;
+
+    const completionPromise = new Promise<IModelInstallResult>((resolve, reject) => {
+      resolveCompletion = resolve;
+      rejectCompletion = reject;
+    });
 
     const handle = new ModelInstallHandle({
       operationId,
@@ -200,6 +215,14 @@ export class ModelInstaller implements IModelInstaller {
       },
     });
 
+    void this.performInstall(
+      request,
+      (progress) => {
+        handle.updateProgress(progress);
+      },
+      downloadHandleRef
+    ).then(resolveCompletion!, rejectCompletion!);
+
     return handle;
   }
 
@@ -207,17 +230,17 @@ export class ModelInstaller implements IModelInstaller {
     request: IModelInstallRequest,
     onProgress?: (progress: IModelInstallProgress) => void
   ): Promise<IModelInstallResult> {
-    const delegatedProvider = this.findDelegatedProvider(request);
+    const delegatedInstaller = this.findDelegatedInstaller(request);
 
-    if (delegatedProvider) {
-      return delegatedProvider.install(request, onProgress);
+    if (delegatedInstaller) {
+      return delegatedInstaller.install(request, onProgress);
     }
 
     return this.performInstall(request, onProgress);
   }
 
   public canInstall(request: IModelInstallRequest): boolean {
-    if (this.findDelegatedProvider(request)) {
+    if (this.findDelegatedInstaller(request)) {
       return true;
     }
 
@@ -230,35 +253,69 @@ export class ModelInstaller implements IModelInstaller {
     return !!this.downloader;
   }
 
-  public async isInstalled(
-    model: IModel,
-    destination?: string
-  ): Promise<boolean> {
-    const resolvedDestination = (destination ?? "").trim();
+  public async isInstalled(model: IModel, destination?: string): Promise<boolean> {
+    const resolvedDestination = destination?.trim();
 
     if (!resolvedDestination) {
       return false;
     }
 
-    const matchingProvider = this.providers.find((provider) =>
-      provider.canInstall({
+    const delegatedInstaller = this.installers.find((installer) => {
+      const candidate = {
         model,
         destination: resolvedDestination,
-      })
-    );
+      } satisfies IModelInstallRequest;
 
-    if (matchingProvider) {
-      return matchingProvider.isInstalled(model, resolvedDestination);
+      if (installer.canInstall(candidate)) {
+        return true;
+      }
+
+      return typeof installer.canUninstall === "function"
+        ? installer.canUninstall(model)
+        : false;
+    });
+
+    if (delegatedInstaller) {
+      return delegatedInstaller.isInstalled(model, resolvedDestination);
     }
 
     const modelLocation = model.artifact.location?.trim();
     return !!modelLocation && modelLocation === resolvedDestination;
   }
 
-  private findDelegatedProvider(
+  public async uninstall(request: IModelUninstallRequest): Promise<void> {
+    const installer = this.resolveUninstaller(request.model);
+    await installer.uninstall(request);
+  }
+
+  public canUninstall(model: IModel): boolean {
+    return this.installers.some((installer) =>
+      typeof installer.canUninstall === "function"
+        ? installer.canUninstall(model)
+        : false
+    );
+  }
+
+  private findDelegatedInstaller(
     request: IModelInstallRequest
   ): IModelInstaller | undefined {
-    return this.providers.find((provider) => provider.canInstall(request));
+    return this.installers.find((installer) => installer.canInstall(request));
+  }
+
+  private resolveUninstaller(model: IModel): IModelInstaller {
+    const installer = this.installers.find((candidate) =>
+      typeof candidate.canUninstall === "function"
+        ? candidate.canUninstall(model)
+        : false
+    );
+
+    if (!installer) {
+      throw new Error(
+        `No model installer is available to uninstall model '${model.id}'.`
+      );
+    }
+
+    return installer;
   }
 
   private async performInstall(
@@ -388,8 +445,7 @@ export class ModelInstaller implements IModelInstaller {
     })();
 
     try {
-      const downloadResult: IModelDownloadResult =
-        await downloadHandle.waitForCompletion();
+      const downloadResult: IModelDownloadResult = await downloadHandle.waitForCompletion();
 
       active = false;
       await poll.catch(() => undefined);
