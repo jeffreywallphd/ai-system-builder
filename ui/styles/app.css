@@ -1,0 +1,54 @@
+@import "./tokens.css";
+@import "./reset.css";
+@import "./typography.css";
+
+@import "./components/buttons.css";
+@import "./components/cards.css";
+@import "./components/badges.css";
+@import "./components/inputs.css";
+@import "./components/panels.css";
+@import "./components/toolbar.css";
+
+@import "./layout/container.css";
+@import "./layout/grid.css";
+@import "./layout/stack.css";
+
+body {
+  background:
+    radial-gradient(circle at top, rgba(79, 156, 249, 0.08), transparent 28%),
+    var(--color-bg-primary);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.ui-surface-app {
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+}
+
+.ui-divider {
+  border-top: 1px solid var(--color-border-soft);
+}
+
+.ui-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong) transparent;
+}
+
+.ui-scrollbar::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.ui-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ui-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
