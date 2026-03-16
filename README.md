@@ -11,6 +11,7 @@ An AI platform to weave together AI capabilities for powerful automation workflo
 - Refactored layout and page components to use card/panel/button/text utility primitives for consistent styling and responsiveness.
 - Implemented the Models UI browser flow with search controls, model cards, details/compatibility side panels, and page wiring in `ui/components/models/*` and `ui/pages/ModelsPage.tsx`.
 - Added dedicated model-browser styling and integrated it into global app styles via `ui/styles/components/model-browser.css` and `ui/styles/app.css`.
+- Implemented the Workflow Editor experience with metadata editing, validation summaries, node listing, and store-backed action wiring in `ui/pages/WorkflowEditorPage.tsx` and new workflow panel components under `ui/components/workflow/*`.
 
 ## Runtime/configuration setup
 
@@ -431,3 +432,12 @@ Implementation status is based on file content:
 
 
 All discovered test files in the repository are currently marked as `✅ implemented`.
+
+## Recent workflow editor implementation
+
+- ✅ `ui/components/workflow/WorkflowMetadataPanel.tsx`
+- ✅ `ui/components/workflow/WorkflowValidationPanel.tsx`
+- ✅ `ui/components/workflow/WorkflowNodeList.tsx`
+- ✅ `ui/pages/WorkflowEditorPage.tsx`
+- ✅ `ui/state/WorkflowStore.ts` (workflow rename/description update state APIs)
+- ✅ `ui/services/WorkflowService.ts` (workflow metadata update helpers used by store/page wiring)
