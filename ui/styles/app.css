@@ -8,6 +8,7 @@
 @import "./components/inputs.css";
 @import "./components/panels.css";
 @import "./components/toolbar.css";
+@import "./components/model-browser.css";
 
 @import "./layout/container.css";
 @import "./layout/grid.css";
@@ -22,8 +23,6 @@ body {
 #root {
   min-height: 100vh;
 }
-
-/* Global surfaces */
 
 .ui-surface-app {
   background: transparent;
@@ -153,7 +152,7 @@ body {
   font-size: var(--font-size-sm);
 }
 
-/* Page-level semantic primitives */
+/* Page-level primitives */
 
 .ui-page {
   display: flex;
@@ -193,6 +192,8 @@ body {
   max-width: 72ch;
 }
 
+/* Small generic helpers */
+
 .ui-empty-state {
   display: flex;
   flex-direction: column;
@@ -200,20 +201,37 @@ body {
   align-items: flex-start;
 }
 
-.ui-page-grid {
+.ui-meta-grid {
   display: grid;
-  gap: var(--space-md);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-sm);
 }
 
-.ui-page-grid--3 {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+.ui-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
 }
 
-.ui-page-grid--editor {
-  grid-template-columns: 280px minmax(0, 1fr) 320px;
+.ui-meta-label {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
-/* Utility helpers for common composition */
+.ui-meta-value {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
+}
+
+.ui-chips {
+  display: flex;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+}
 
 .ui-muted {
   color: var(--color-text-secondary);
@@ -230,16 +248,6 @@ body {
     0 0 22px rgba(79, 156, 249, 0.08);
 }
 
-@media (max-width: 1100px) {
-  .ui-page-grid--3 {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .ui-page-grid--editor {
-    grid-template-columns: 1fr;
-  }
-}
-
 @media (max-width: 720px) {
   .ui-app__header-inner {
     align-items: flex-start;
@@ -254,7 +262,7 @@ body {
     padding: var(--space-sm) 0;
   }
 
-  .ui-page-grid--3 {
+  .ui-meta-grid {
     grid-template-columns: 1fr;
   }
 }

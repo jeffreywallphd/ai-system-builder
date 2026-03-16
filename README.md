@@ -7,6 +7,8 @@ An AI platform to weave together AI capabilities for powerful automation workflo
 - Migrated the UI shell and page scaffolding to the shared `ui-*` design-system classes in `ui/styles/app.css`.
 - Updated the application entrypoint to load global app styles from `ui/styles/app.css`.
 - Refactored layout and page components to use card/panel/button/text utility primitives for consistent styling and responsiveness.
+- Implemented the Models UI browser flow with search controls, model cards, details/compatibility side panels, and page wiring in `ui/components/models/*` and `ui/pages/ModelsPage.tsx`.
+- Added dedicated model-browser styling and integrated it into global app styles via `ui/styles/components/model-browser.css` and `ui/styles/app.css`.
 
 ## Project structure
 
@@ -305,8 +307,12 @@ ai-loom-studio
 │   │   │   │   ├── ModelsContracts.test.ts ✅
 │   │   │   │   ├── ModelsInteractions.test.ts ✅
 │   │   │   │   └── ModelsUnit.test.ts ✅
-│   │   │   ├── ModelBrowser.tsx ⚪
-│   │   │   └── ModelInstaller.tsx ⚪
+│   │   │   ├── ModelBrowser.tsx ✅
+│   │   │   ├── ModelCard.tsx ✅
+│   │   │   ├── ModelCompatibilityPanel.tsx ✅
+│   │   │   ├── ModelDetailsPanel.tsx ✅
+│   │   │   ├── ModelInstaller.tsx ⚪
+│   │   │   └── ModelSearchBar.tsx ✅
 │   │   ├── nodes
 │   │   │   ├── tests
 │   │   │   │   ├── NodesContracts.test.ts ✅
@@ -376,6 +382,7 @@ ai-loom-studio
 │   │   │   ├── buttons.css ✅
 │   │   │   ├── cards.css ✅
 │   │   │   ├── inputs.css ✅
+│   │   │   ├── model-browser.css ✅
 │   │   │   ├── panels.css ✅
 │   │   │   └── toolbar.css ✅
 │   │   ├── layout
