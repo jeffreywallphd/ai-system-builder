@@ -14,6 +14,7 @@ An AI platform to weave together AI capabilities for powerful automation workflo
 - Implemented the Workflow Editor experience with metadata editing, validation summaries, node listing, and store-backed action wiring in `ui/pages/WorkflowEditorPage.tsx` and new workflow panel components under `ui/components/workflow/*`.
 - Retired the custom-canvas drag/node implementation placeholders and migrated the workflow canvas to React Flow adapters/wrappers in `ui/components/workflow/reactflow/*`, wired through `ui/components/workflow/WorkflowCanvas.tsx`.
 - Added runtime-scoped UI dependency composition with app providers and configurable mock infrastructure in `ui/composition/*`, `infrastructure/config/AppRuntimeConfig.ts`, and `infrastructure/mocks/*`.
+- Added a development sync workflow with a local pull agent (`dev/sync-agent.js`), runtime flags in `infrastructure/config/AppRuntimeConfig.ts`, and a `Sync PC` control in `ui/dev/DevSyncButton.tsx` wired through `ui/layout/AppLayout.tsx`.
 
 ## Runtime/configuration setup
 
