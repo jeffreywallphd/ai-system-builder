@@ -1,11 +1,7 @@
 import type { INode } from "../../../domain/nodes/interfaces/INode";
 import type { INodePort } from "../../../domain/nodes/interfaces/INodePort";
+import type { ComfyNodeDto } from "../dto/ComfyNodeDto";
 import { ComfyPropertyAdapter } from "./ComfyPropertyAdapter";
-
-export interface IComfyPromptNode {
-  readonly class_type: string;
-  readonly inputs: Readonly<Record<string, unknown>>;
-}
 
 export class ComfyNodeAdapter {
   private readonly propertyAdapter: ComfyPropertyAdapter;
@@ -14,7 +10,7 @@ export class ComfyNodeAdapter {
     this.propertyAdapter = propertyAdapter ?? new ComfyPropertyAdapter();
   }
 
-  public adaptNode(node: INode): IComfyPromptNode {
+  public adaptNode(node: INode): ComfyNodeDto {
     const classType = node.definition.type.trim();
 
     if (!classType) {

@@ -1,12 +1,8 @@
 import type { INodeProperty } from "../../../domain/nodes/interfaces/INodeProperty";
-
-export interface IComfyWidgetInputValue {
-  readonly name: string;
-  readonly value: unknown;
-}
+import type { ComfyPropertyDto } from "../dto/ComfyPropertyDto";
 
 export class ComfyPropertyAdapter {
-  public adaptProperty(property: INodeProperty): IComfyWidgetInputValue | undefined {
+  public adaptProperty(property: INodeProperty): ComfyPropertyDto | undefined {
     if (!property.isPersisted) {
       return undefined;
     }
