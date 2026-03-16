@@ -2,9 +2,13 @@ import { describe, expect, it } from "bun:test";
 import { importModule } from "../../tests/testUtils";
 
 describe("ui/services contract adherence", () => {
-  it("placeholder modules expose no runtime exports yet", async () => {
-    expect(Object.keys(await importModule("ui/services/NodeService.ts"))).toEqual([]);
-    expect(Object.keys(await importModule("ui/services/ModelService.ts"))).toEqual([]);
-    expect(Object.keys(await importModule("ui/services/WorkflowService.ts"))).toEqual([]);
+  it("exports service classes and options types at runtime", async () => {
+    const nodeModule = await importModule("ui/services/NodeService.ts");
+    const modelModule = await importModule("ui/services/ModelService.ts");
+    const workflowModule = await importModule("ui/services/WorkflowService.ts");
+
+    expect(Object.keys(nodeModule)).toContain("NodeService");
+    expect(Object.keys(modelModule)).toContain("ModelService");
+    expect(Object.keys(workflowModule)).toContain("WorkflowService");
   });
 });
