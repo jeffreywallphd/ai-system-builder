@@ -1,5 +1,7 @@
 import { Link, NavLink, Outlet } from "react-router-dom";
 import { getNavigationRoutes } from "../routes/RouteConfig";
+import DevSyncButton from "../dev/DevSyncButton";
+import { useUiDependencies } from "../composition/AppProviders";
 
 function navLinkClassName(isActive: boolean): string {
   return isActive
@@ -9,6 +11,7 @@ function navLinkClassName(isActive: boolean): string {
 
 export default function AppLayout(): JSX.Element {
   const routes = getNavigationRoutes();
+  const { config } = useUiDependencies();
 
   return (
     <div className="ui-app ui-surface-app">
@@ -18,18 +21,22 @@ export default function AppLayout(): JSX.Element {
             AI Loom Studio
           </Link>
 
-          <nav className="ui-app__nav" aria-label="Primary">
-            {routes.map((route) => (
-              <NavLink
-                key={route.key}
-                to={route.path}
-                className={({ isActive }) => navLinkClassName(isActive)}
-                end={route.path === "/"}
-              >
-                {route.title}
-              </NavLink>
-            ))}
-          </nav>
+          <div className="ui-row ui-row--wrap" style={{ justifyContent: "flex-end", flex: 1 }}>
+            {!config.isProductionMode ? <DevSyncButton /> : null}
+
+            <nav className="ui-app__nav" aria-label="Primary">
+              {routes.map((route) => (
+                <NavLink
+                  key={route.key}
+                  to={route.path}
+                  className={({ isActive }) => navLinkClassName(isActive)}
+                  end={route.path === "/"}
+                >
+                  {route.title}
+                </NavLink>
+              ))}
+            </nav>
+          </div>
         </div>
       </header>
 
