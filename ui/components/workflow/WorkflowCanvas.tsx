@@ -28,6 +28,7 @@ export interface WorkflowCanvasProps {
     propertyId: string,
     value: unknown
   ) => void;
+  readonly onRemoveNode?: (nodeId: string) => void;
   readonly nodeExecutionOutputs?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 }
 
@@ -45,6 +46,7 @@ export default function WorkflowCanvas({
   onConnectNodes,
   onOpenNodeProperties,
   onNodePropertyChange,
+  onRemoveNode,
   nodeExecutionOutputs,
 }: WorkflowCanvasProps): JSX.Element {
   return (
@@ -63,6 +65,7 @@ export default function WorkflowCanvas({
         onConnectNodes={onConnectNodes}
         onOpenNodeProperties={onOpenNodeProperties}
         onNodePropertyChange={onNodePropertyChange}
+        onRemoveNode={onRemoveNode}
         nodeExecutionOutputs={nodeExecutionOutputs}
       />
 

@@ -11,6 +11,7 @@ export interface ReactFlowNodeData {
     propertyId: string,
     value: unknown
   ) => void;
+  readonly onRemoveNode?: (nodeId: string) => void;
 }
 
 export interface NodeAdapterOptions {
@@ -22,6 +23,7 @@ export interface NodeAdapterOptions {
     propertyId: string,
     value: unknown
   ) => void;
+  readonly onRemoveNode?: (nodeId: string) => void;
 }
 
 export class NodeAdapter {
@@ -42,6 +44,7 @@ export class NodeAdapter {
         executionOutput: options.nodeExecutionOutputs?.[node.id],
         onOpenProperties: options.onOpenProperties,
         onPropertyChange: options.onPropertyChange,
+        onRemoveNode: options.onRemoveNode,
       }),
       draggable: true,
       selectable: true,

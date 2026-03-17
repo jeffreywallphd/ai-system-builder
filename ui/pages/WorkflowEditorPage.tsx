@@ -397,6 +397,9 @@ export default function WorkflowEditorPage({
                   onNodePropertyChange={(nodeId, propertyId, value) => {
                     workflowStore.updateNodeProperty(nodeId, propertyId, value);
                   }}
+                  onRemoveNode={(nodeId) => {
+                    workflowStore.removeNode(nodeId);
+                  }}
                   nodeExecutionOutputs={workflowState.nodeExecutionOutputs}
                 />
               </div>
