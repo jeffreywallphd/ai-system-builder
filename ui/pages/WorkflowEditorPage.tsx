@@ -4,6 +4,7 @@ import NodePalette from "../components/nodes/NodePalette";
 import NodeInspector from "../components/nodes/NodeInspector";
 import NodePropertyEditor from "../components/nodes/NodePropertyEditor";
 import ConnectionInspector from "../components/workflow/ConnectionInspector";
+import WorkflowExecutionStatusPanel from "../components/execution/WorkflowExecutionStatusPanel";
 import WorkflowCanvas from "../components/workflow/WorkflowCanvas";
 import WorkflowCanvasToolbar from "../components/workflow/WorkflowCanvasToolbar";
 import WorkflowMetadataPanel from "../components/workflow/WorkflowMetadataPanel";
@@ -445,6 +446,17 @@ export default function WorkflowEditorPage({
                     />
 
                     <WorkflowValidationPanel validation={validationSummary} />
+
+                    <WorkflowExecutionStatusPanel
+                      status={workflowState.lastExecutionEvent?.status ?? "queued"}
+                      executionId={workflowState.lastExecutionEvent?.executionId}
+                      currentNodeId={workflowState.lastExecutionEvent?.nodeId}
+                      progressPercent={workflowState.lastExecutionEvent?.progress?.percent}
+                      message={
+                        workflowState.lastExecutionEvent?.message ??
+                        (workflowState.isExecuting ? "Execution is in progress." : undefined)
+                      }
+                    />
 
                     <NodePalette
                       items={paletteItems}
