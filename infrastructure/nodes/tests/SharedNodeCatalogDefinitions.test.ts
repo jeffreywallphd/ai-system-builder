@@ -17,4 +17,16 @@ describe("Shared node catalog definitions", () => {
     expect(uploader?.outputPorts.find((port) => port.id === "document")?.compatibility.valueTypes).toContain("document");
     expect(displayer?.inputPorts.find((port) => port.id === "chunks")?.compatibility.valueTypes).toContain("chunks");
   });
+
+  it("keeps the uploader document property marked as required", async () => {
+    const provider = new ImplementationRegistryNodeCatalogProvider(
+      new LocalNodeImplementationRegistry()
+    );
+
+    const uploader = await provider.getDefinitionByType("shared.document-uploader");
+    const documentProperty = uploader?.getProperty("document");
+
+    expect(documentProperty?.constraints?.required).toBeTrue();
+  });
+
 });

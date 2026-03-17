@@ -141,6 +141,14 @@ function ReactFlowNodeWrapper({
           {node.isCollapsed ? (
             <span className="ui-badge ui-badge--info">Collapsed</span>
           ) : null}
+
+          <button
+            type="button"
+            className="ui-button ui-button--ghost ui-button--sm nodrag"
+            onClick={() => data.onRemoveNode?.(node.id)}
+          >
+            Remove
+          </button>
         </div>
 
         {chunkDisplayItems ? (

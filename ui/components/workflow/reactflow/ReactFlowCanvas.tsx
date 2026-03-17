@@ -50,6 +50,7 @@ export interface ReactFlowCanvasProps {
     propertyId: string,
     value: unknown
   ) => void;
+  readonly onRemoveNode?: (nodeId: string) => void;
   readonly nodeExecutionOutputs?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 }
 
@@ -114,6 +115,7 @@ function InnerReactFlowCanvas({
   onConnectNodes,
   onOpenNodeProperties,
   onNodePropertyChange,
+  onRemoveNode,
   nodeExecutionOutputs,
 }: ReactFlowCanvasProps): JSX.Element {
   const nodeAdapter = useMemo(() => new NodeAdapter(), []);
@@ -127,6 +129,7 @@ function InnerReactFlowCanvas({
         isCompactViewport,
         onOpenProperties: onOpenNodeProperties,
         onPropertyChange: onNodePropertyChange,
+        onRemoveNode,
         nodeExecutionOutputs,
       }),
     [
@@ -135,6 +138,7 @@ function InnerReactFlowCanvas({
       nodes,
       onNodePropertyChange,
       onOpenNodeProperties,
+      onRemoveNode,
       nodeExecutionOutputs,
     ]
   );
