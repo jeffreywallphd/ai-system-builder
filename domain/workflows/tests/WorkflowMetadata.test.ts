@@ -13,6 +13,11 @@ describe("Workflow metadata primitives", () => {
       author: "  author  ",
       tags: [" alpha ", "", " beta "],
       version: " 1.0.0 ",
+      isPublishedAsTool: true,
+      toolTitle: " Tool ",
+      toolDescription: " desc ",
+      toolCategory: " cat ",
+      toolSlug: " tool-slug ",
     });
 
     expect(metadata.name).toBe("Demo Workflow");
@@ -21,6 +26,11 @@ describe("Workflow metadata primitives", () => {
     expect(metadata.tags).toEqual(["alpha", "beta"]);
     expect(() => (metadata.tags as string[]).push("x")).toThrow();
     expect(metadata.version).toBe("1.0.0");
+    expect(metadata.isPublishedAsTool).toBeTrue();
+    expect(metadata.toolTitle).toBe("Tool");
+    expect(metadata.toolDescription).toBe("desc");
+    expect(metadata.toolCategory).toBe("cat");
+    expect(metadata.toolSlug).toBe("tool-slug");
   });
 
   it("rejects empty names", () => {

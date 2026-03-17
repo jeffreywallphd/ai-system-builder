@@ -107,4 +107,18 @@ describe("NodeProperty*", () => {
     ).toBe(true);
     expect(new NodeProperty({ id: "m5", name: "M5", type: "text", value: "x" }).isModelBound()).toBe(false);
   });
+
+  it("stores projection metadata", () => {
+    const property = new NodeProperty({
+      id: "p",
+      name: "Prompt",
+      type: "text",
+      value: "x",
+      projection: { label: "Prompt Label", exposeInTool: true, authorVisibility: "basic" },
+    });
+
+    expect(property.projection?.label).toBe("Prompt Label");
+    expect(property.withValue("y").projection?.exposeInTool).toBeTrue();
+  });
+
 });

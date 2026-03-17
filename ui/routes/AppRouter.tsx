@@ -6,6 +6,8 @@ import ModelsPage from "../pages/ModelsPage";
 import NotFoundPage from "../pages/NotFoundPage";
 import WorkflowEditorPage from "../pages/WorkflowEditorPage";
 import WorkflowsPage from "../pages/WorkflowsPage";
+import ToolsPage from "../pages/ToolsPage";
+import ToolRunPage from "../pages/ToolRunPage";
 import ProtectedRoute from "./ProtectedRoute";
 import { ROUTE_PATHS } from "./RouteConfig";
 
@@ -30,6 +32,8 @@ export default function AppRouter({
           )}
         >
           <Route path={ROUTE_PATHS.home} element={<HomePage />} />
+          <Route path={ROUTE_PATHS.tools} element={<ToolsPage />} />
+          <Route path={ROUTE_PATHS.toolRun} element={<ToolRunPage />} />
           <Route path={ROUTE_PATHS.workflows} element={<WorkflowsPage />} />
           <Route
             path={ROUTE_PATHS.workflowEditor}

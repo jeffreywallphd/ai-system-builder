@@ -3,6 +3,7 @@ import type {
   INodePropertyBindingProfile,
   INodePropertyConstraint,
   INodePropertyOption,
+  INodePropertyProjectionMetadata,
   INodePropertyValidationResult,
   NodePropertyType,
   NodePropertyValue,
@@ -81,6 +82,7 @@ export class NodeProperty<TValue = NodePropertyValue>
   public readonly constraints?: INodePropertyConstraint;
   public readonly options?: ReadonlyArray<INodePropertyOption<TValue>>;
   public readonly bindingProfile?: INodePropertyBindingProfile;
+  public readonly projection?: INodePropertyProjectionMetadata;
 
   constructor(params: {
     id: string;
@@ -96,6 +98,7 @@ export class NodeProperty<TValue = NodePropertyValue>
     constraints?: INodePropertyConstraint;
     options?: ReadonlyArray<INodePropertyOption<TValue>>;
     bindingProfile?: INodePropertyBindingProfile;
+    projection?: INodePropertyProjectionMetadata;
   }) {
     this.id = params.id;
     this.name = params.name;
@@ -112,6 +115,7 @@ export class NodeProperty<TValue = NodePropertyValue>
       : undefined;
     this.options = params.options ? Object.freeze([...params.options]) : undefined;
     this.bindingProfile = params.bindingProfile;
+    this.projection = params.projection ? Object.freeze({ ...params.projection }) : undefined;
   }
 
   public withValue(value: TValue): INodeProperty<TValue> {
@@ -129,6 +133,7 @@ export class NodeProperty<TValue = NodePropertyValue>
       constraints: this.constraints,
       options: this.options,
       bindingProfile: this.bindingProfile,
+      projection: this.projection,
     });
   }
 
