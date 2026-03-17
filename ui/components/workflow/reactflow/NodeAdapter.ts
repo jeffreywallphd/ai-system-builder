@@ -3,10 +3,30 @@ import type { NodeDetailViewModel } from "../../../presenters/NodePresenter";
 
 export interface ReactFlowNodeData {
   readonly node: NodeDetailViewModel;
+  readonly isCompactViewport: boolean;
+  readonly onOpenProperties?: (nodeId: string) => void;
+  readonly onPropertyChange?: (
+    nodeId: string,
+    propertyId: string,
+    value: unknown
+  ) => void;
+}
+
+export interface NodeAdapterOptions {
+  readonly isCompactViewport?: boolean;
+  readonly onOpenProperties?: (nodeId: string) => void;
+  readonly onPropertyChange?: (
+    nodeId: string,
+    propertyId: string,
+    value: unknown
+  ) => void;
 }
 
 export class NodeAdapter {
-  public toReactFlowNode(node: NodeDetailViewModel): Node<ReactFlowNodeData> {
+  public toReactFlowNode(
+    node: NodeDetailViewModel,
+    options: NodeAdapterOptions = {}
+  ): Node<ReactFlowNodeData> {
     return Object.freeze({
       id: node.id,
       type: "aiLoomNode",
@@ -16,15 +36,22 @@ export class NodeAdapter {
       },
       data: Object.freeze({
         node,
+        isCompactViewport: options.isCompactViewport ?? false,
+        onOpenProperties: options.onOpenProperties,
+        onPropertyChange: options.onPropertyChange,
       }),
       draggable: true,
       selectable: true,
+      dragHandle: ".ui-rf-node__header",
     });
   }
 
   public toReactFlowNodes(
-    nodes: ReadonlyArray<NodeDetailViewModel>
+    nodes: ReadonlyArray<NodeDetailViewModel>,
+    options: NodeAdapterOptions = {}
   ): ReadonlyArray<Node<ReactFlowNodeData>> {
-    return Object.freeze(nodes.map((node) => this.toReactFlowNode(node)));
+    return Object.freeze(
+      nodes.map((node) => this.toReactFlowNode(node, options))
+    );
   }
 }

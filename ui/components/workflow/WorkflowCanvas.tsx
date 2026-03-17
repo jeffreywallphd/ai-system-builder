@@ -8,6 +8,7 @@ export interface WorkflowCanvasProps {
   readonly selectedNodeId?: string;
   readonly selectedConnectionId?: string;
   readonly fitViewNonce?: number;
+  readonly isCompactViewport?: boolean;
   readonly onSelectNode?: (nodeId: string) => void;
   readonly onSelectConnection?: (connectionId: string) => void;
   readonly onClearSelection?: () => void;
@@ -21,6 +22,12 @@ export interface WorkflowCanvasProps {
     readonly targetNodeId: string;
     readonly targetPortId: string;
   }) => void;
+  readonly onOpenNodeProperties?: (nodeId: string) => void;
+  readonly onNodePropertyChange?: (
+    nodeId: string,
+    propertyId: string,
+    value: unknown
+  ) => void;
 }
 
 export default function WorkflowCanvas({
@@ -29,45 +36,43 @@ export default function WorkflowCanvas({
   selectedNodeId,
   selectedConnectionId,
   fitViewNonce,
+  isCompactViewport,
   onSelectNode,
   onSelectConnection,
   onClearSelection,
   onMoveNodeCommit,
   onConnectNodes,
+  onOpenNodeProperties,
+  onNodePropertyChange,
 }: WorkflowCanvasProps): JSX.Element {
   return (
-    <section className="ui-panel ui-panel--accent ui-glow-accent">
-      <div className="ui-panel__header">
-        <div>
-          <div className="ui-panel__title">Canvas</div>
-          <div className="ui-panel__subtitle">
-            Place, connect, and reposition workflow nodes.
-          </div>
-        </div>
-      </div>
+    <section className="ui-canvas-surface">
+      <ReactFlowCanvas
+        nodes={nodes}
+        workflow={workflow}
+        selectedNodeId={selectedNodeId}
+        selectedConnectionId={selectedConnectionId}
+        fitViewNonce={fitViewNonce}
+        isCompactViewport={isCompactViewport}
+        onSelectNode={onSelectNode}
+        onSelectConnection={onSelectConnection}
+        onClearSelection={onClearSelection}
+        onMoveNodeCommit={onMoveNodeCommit}
+        onConnectNodes={onConnectNodes}
+        onOpenNodeProperties={onOpenNodeProperties}
+        onNodePropertyChange={onNodePropertyChange}
+      />
 
-      <div className="ui-panel__body">
-        {nodes.length === 0 ? (
+      {nodes.length === 0 ? (
+        <div className="ui-canvas-empty">
           <div className="ui-empty-state">
+            <div className="ui-heading-4">Canvas Ready</div>
             <p className="ui-text-secondary">
-              Add a node from the palette to begin building the workflow canvas.
+              Open the menu and add a node from the palette to start building.
             </p>
           </div>
-        ) : (
-          <ReactFlowCanvas
-            nodes={nodes}
-            workflow={workflow}
-            selectedNodeId={selectedNodeId}
-            selectedConnectionId={selectedConnectionId}
-            fitViewNonce={fitViewNonce}
-            onSelectNode={onSelectNode}
-            onSelectConnection={onSelectConnection}
-            onClearSelection={onClearSelection}
-            onMoveNodeCommit={onMoveNodeCommit}
-            onConnectNodes={onConnectNodes}
-          />
-        )}
-      </div>
+        </div>
+      ) : null}
     </section>
   );
 }
