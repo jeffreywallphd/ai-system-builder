@@ -1,0 +1,17 @@
+{
+  "id": "sample-text-analysis",
+  "metadata": {
+    "name": "Sample Text Analysis",
+    "description": "Example workflow for chunking and summarizing text.",
+    "tags": ["sample", "text"]
+  },
+  "status": "draft",
+  "isEnabled": true,
+  "executionPolicy": "acyclic-only",
+  "audit": {
+    "createdAt": "2026-01-01T00:00:00.000Z",
+    "updatedAt": "2026-01-01T00:00:00.000Z"
+  },
+  "nodes": [],
+  "connections": []
+}

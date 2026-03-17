@@ -1,0 +1,17 @@
+{
+  "id": "sample-image-pipeline",
+  "metadata": {
+    "name": "Sample Image Pipeline",
+    "description": "Example workflow for image generation and post-processing.",
+    "tags": ["sample", "image"]
+  },
+  "status": "draft",
+  "isEnabled": true,
+  "executionPolicy": "acyclic-only",
+  "audit": {
+    "createdAt": "2026-01-01T00:00:00.000Z",
+    "updatedAt": "2026-01-01T00:00:00.000Z"
+  },
+  "nodes": [],
+  "connections": []
+}
