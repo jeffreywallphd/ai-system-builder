@@ -1,19 +1,49 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import ModelBrowser from "../components/models/ModelBrowser";
 import type { ModelSearchBarValue } from "../components/models/ModelSearchBar";
+import { useUiDependencies } from "../composition/AppProviders";
 import { ModelPresenter } from "../presenters/ModelPresenter";
+import type { IModelStoreState, ModelStore } from "../state/ModelStore";
+import type { IModel } from "../../domain/models/interfaces/IModel";
+import type { RuntimeEngine } from "../../domain/models/interfaces/IModelCompatibility";
+
+const fallbackState: IModelStoreState = Object.freeze({
+  installedModels: Object.freeze([]),
+  remoteModels: Object.freeze([]),
+  selectedInstalledModelId: undefined,
+  selectedRemoteModelId: undefined,
+  installedSearchCriteria: undefined,
+  remoteSearchCriteria: undefined,
+  installProgressByModelId: Object.freeze({}),
+  isLoadingInstalled: false,
+  isSearchingRemote: false,
+  isInstalling: false,
+  isRemoving: false,
+  error: undefined,
+});
 
 export default function ModelsPage(): JSX.Element {
   const presenter = useMemo(() => new ModelPresenter(), []);
-  const [selectedInstalledModelId, setSelectedInstalledModelId] = useState<string>();
-  const [selectedRemoteModelId, setSelectedRemoteModelId] = useState<string>();
-  const [lastSearch, setLastSearch] = useState<ModelSearchBarValue>({
-    query: "",
-    mode: "all",
-  });
+  const { modelStore } = useUiDependencies();
+  const [state, setState] = useState<IModelStoreState>(fallbackState);
 
-  const installedModels = useMemo(() => presenter.presentList([]), [presenter]);
-  const remoteModels = useMemo(() => presenter.presentRemoteList([]), [presenter]);
+  useEffect(() => {
+    return modelStore.subscribe(setState);
+  }, [modelStore]);
+
+  useEffect(() => {
+    void modelStore.refreshInstalled();
+    void modelStore.searchRemote({ limit: 16 });
+  }, [modelStore]);
+
+  const installedModels = useMemo(
+    () => presenter.presentList(state.installedModels),
+    [presenter, state.installedModels]
+  );
+  const remoteModels = useMemo(
+    () => presenter.presentRemoteList(state.remoteModels),
+    [presenter, state.remoteModels]
+  );
 
   const selectedModel = undefined;
   const compatibility = undefined;
@@ -32,34 +62,29 @@ export default function ModelsPage(): JSX.Element {
       <ModelBrowser
         installedModels={installedModels}
         remoteModels={remoteModels}
-        selectedInstalledModelId={selectedInstalledModelId}
-        selectedRemoteModelId={selectedRemoteModelId}
+        selectedInstalledModelId={state.selectedInstalledModelId}
+        selectedRemoteModelId={state.selectedRemoteModelId}
         selectedModel={selectedModel}
         compatibility={compatibility}
-        isLoadingInstalled={false}
-        isSearchingRemote={false}
-        isInstalling={false}
+        isLoadingInstalled={state.isLoadingInstalled}
+        isSearchingRemote={state.isSearchingRemote}
+        isInstalling={state.isInstalling}
         onSearch={(value) => {
-          setLastSearch(value);
-          console.log("Model search requested", value);
+          void searchModels(modelStore, value);
         }}
         onClearSearch={() => {
-          setLastSearch({
-            query: "",
-            mode: "all",
-          });
-          console.log("Model search cleared");
+          void modelStore.searchRemote({ limit: 16 });
         }}
         onSelectInstalled={(modelId) => {
-          setSelectedInstalledModelId(modelId);
-          setSelectedRemoteModelId(undefined);
+          modelStore.selectInstalledModel(modelId);
+          modelStore.selectRemoteModel(undefined);
         }}
         onSelectRemote={(modelId) => {
-          setSelectedRemoteModelId(modelId);
-          setSelectedInstalledModelId(undefined);
+          modelStore.selectRemoteModel(modelId);
+          modelStore.selectInstalledModel(undefined);
         }}
-        onInspectModel={(modelId) => {
-          console.log("Inspect model", modelId, lastSearch);
+        onInspectModel={() => {
+          // TODO: wire details panel to selected model state.
         }}
         onInstallRemote={(modelId) => {
           console.log("Install remote model", modelId);
@@ -70,4 +95,34 @@ export default function ModelsPage(): JSX.Element {
       />
     </section>
   );
+}
+
+async function searchModels(
+  modelStore: ModelStore,
+  value: ModelSearchBarValue
+): Promise<void> {
+  if (value.mode === "installed") {
+    await modelStore.refreshInstalled({
+      query: value.query || undefined,
+      kinds: value.kind ? [value.kind as IModel["kind"]] : undefined,
+    });
+
+    return;
+  }
+
+  await modelStore.searchRemote({
+    query: value.query || undefined,
+    providers: value.provider ? [value.provider] : undefined,
+    kinds: value.kind ? [value.kind as IModel["kind"]] : undefined,
+    runtimes: value.runtime ? [value.runtime as RuntimeEngine] : undefined,
+    limit: 24,
+  });
+
+  if (value.mode === "all") {
+    await modelStore.refreshInstalled({
+      query: value.query || undefined,
+      kinds: value.kind ? [value.kind as IModel["kind"]] : undefined,
+      runtimes: value.runtime ? [value.runtime as RuntimeEngine] : undefined,
+    });
+  }
 }

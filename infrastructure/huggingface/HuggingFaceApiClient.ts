@@ -71,6 +71,7 @@ export class HuggingFaceApiClient {
   private readonly authToken?: string;
   private readonly timeoutMs: number;
   private readonly userAgent: string;
+  private hubModulePromise?: Promise<IHuggingFaceHubModule | undefined>;
 
   constructor(options: IHuggingFaceApiClientOptions = {}) {
     this.baseUrl = (options.baseUrl ?? "https://huggingface.co").replace(/\/+$/, "");
@@ -89,6 +90,30 @@ export class HuggingFaceApiClient {
     readonly full?: boolean;
     readonly gated?: boolean;
   } = {}): Promise<ReadonlyArray<IHuggingFaceModelSearchItem>> {
+    const hubModule = await this.loadHubModule();
+
+    if (hubModule?.listModels) {
+      try {
+        return await this.searchModelsWithHubModule(hubModule, params);
+      } catch {
+        // If the hub module cannot satisfy the request (version mismatch, unsupported
+        // options, etc.), gracefully fall back to the direct HTTP API implementation.
+      }
+    }
+
+    return this.searchModelsWithHttpApi(params);
+  }
+
+  private async searchModelsWithHttpApi(params: {
+    readonly query?: string;
+    readonly limit?: number;
+    readonly cursor?: string;
+    readonly pipelineTag?: string;
+    readonly author?: string;
+    readonly tags?: ReadonlyArray<string>;
+    readonly full?: boolean;
+    readonly gated?: boolean;
+  }): Promise<ReadonlyArray<IHuggingFaceModelSearchItem>> {
     const searchParams = new URLSearchParams();
 
     if (params.query?.trim()) {
@@ -132,6 +157,39 @@ export class HuggingFaceApiClient {
     );
 
     return Object.freeze([...(response ?? [])]);
+  }
+
+  private async searchModelsWithHubModule(
+    hubModule: IHuggingFaceHubModule,
+    params: {
+      readonly query?: string;
+      readonly limit?: number;
+      readonly cursor?: string;
+      readonly pipelineTag?: string;
+      readonly author?: string;
+      readonly tags?: ReadonlyArray<string>;
+      readonly full?: boolean;
+      readonly gated?: boolean;
+    }
+  ): Promise<ReadonlyArray<IHuggingFaceModelSearchItem>> {
+    const items: IHuggingFaceModelSearchItem[] = [];
+
+    const iterator = hubModule.listModels({
+      search: params.query?.trim() || undefined,
+      limit: params.limit,
+      author: params.author?.trim() || undefined,
+      task: params.pipelineTag?.trim() || undefined,
+      filter: params.tags && params.tags.length > 0 ? [...params.tags] : undefined,
+      full: params.full ?? true,
+      gated: params.gated,
+      accessToken: this.authToken,
+    });
+
+    for await (const model of iterator) {
+      items.push(model as IHuggingFaceModelSearchItem);
+    }
+
+    return Object.freeze(items);
   }
 
   public async getModelInfo(modelId: string): Promise<IHuggingFaceModelInfo | undefined> {
@@ -319,7 +377,34 @@ export class HuggingFaceApiClient {
     return headers;
   }
 
+  private async loadHubModule(): Promise<IHuggingFaceHubModule | undefined> {
+    if (!this.hubModulePromise) {
+      this.hubModulePromise = (async () => {
+        try {
+          const moduleName = "@huggingface/hub";
+          const hubModule = (await import(/* @vite-ignore */ moduleName)) as Partial<IHuggingFaceHubModule>;
+
+          if (typeof hubModule.listModels === "function") {
+            return {
+              listModels: hubModule.listModels,
+            };
+          }
+
+          return undefined;
+        } catch {
+          return undefined;
+        }
+      })();
+    }
+
+    return this.hubModulePromise;
+  }
+
   private isHttpStatus(error: unknown, status: number): boolean {
     return !!error && typeof error === "object" && "status" in error && error.status === status;
   }
+}
+
+interface IHuggingFaceHubModule {
+  readonly listModels: (params: Readonly<Record<string, unknown>>) => AsyncIterable<unknown>;
 }
