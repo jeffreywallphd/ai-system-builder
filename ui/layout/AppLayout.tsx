@@ -1,7 +1,10 @@
+import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { getNavigationRoutes } from "../routes/RouteConfig";
 import DevSyncButton from "../dev/DevSyncButton";
 import { useUiDependencies } from "../composition/AppProviders";
+import type { RuntimeConsoleState } from "../state/RuntimeConsoleStore";
+import RuntimeConsoleDrawer from "../components/execution/RuntimeConsoleDrawer";
 
 function navLinkClassName(isActive: boolean): string {
   return isActive
@@ -9,10 +12,20 @@ function navLinkClassName(isActive: boolean): string {
     : "ui-app__nav-link";
 }
 
+const fallbackConsoleState: RuntimeConsoleState = Object.freeze({
+  isExpanded: false,
+  events: Object.freeze([]),
+});
+
 export default function AppLayout(): JSX.Element {
   const routes = getNavigationRoutes();
-  const { config } = useUiDependencies();
+  const { config, runtimeConsoleStore } = useUiDependencies();
   const location = useLocation();
+  const [runtimeConsoleState, setRuntimeConsoleState] = useState<RuntimeConsoleState>(fallbackConsoleState);
+
+  useEffect(() => {
+    return runtimeConsoleStore.subscribe(setRuntimeConsoleState);
+  }, [runtimeConsoleStore]);
 
   const isWideWorkspace =
     location.pathname.startsWith("/workflows/") ||
@@ -57,6 +70,13 @@ export default function AppLayout(): JSX.Element {
           <Outlet />
         </div>
       </main>
+
+      <RuntimeConsoleDrawer
+        isExpanded={runtimeConsoleState.isExpanded}
+        events={runtimeConsoleState.events}
+        onToggleExpanded={() => runtimeConsoleStore.toggleExpanded()}
+        onClearEvents={() => runtimeConsoleStore.clearEvents()}
+      />
 
       <footer className="ui-app__footer">
         <div className="ui-app__footer-inner">

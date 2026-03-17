@@ -10,6 +10,7 @@ describe("ui/layout unit coverage", () => {
     expect(source).toContain("<Outlet />");
     expect(source).toContain("DevSyncButton");
     expect(source).toContain("config.isProductionMode");
+    expect(source).toContain("RuntimeConsoleDrawer");
     expect(source).toContain("Composable AI workflows for non-technical users");
   });
 
@@ -19,5 +20,6 @@ describe("ui/layout unit coverage", () => {
     expect(source).toContain(".ui-app__header");
     expect(source).toContain(".ui-app__footer");
     expect(source).toContain(".ui-app__nav-link");
+    expect(source).toContain("runtime-console.css");
   });
 });

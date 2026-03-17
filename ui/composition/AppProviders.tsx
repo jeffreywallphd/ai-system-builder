@@ -1,6 +1,7 @@
 import {
   createContext,
   useContext,
+  useEffect,
   useMemo,
   type PropsWithChildren,
 } from "react";
@@ -19,6 +20,14 @@ export function AppProviders({
   config,
 }: AppProvidersProps): JSX.Element {
   const dependencies = useMemo(() => createUiDependencies({ config }), [config]);
+
+  useEffect(() => {
+    void dependencies.runtimeConsoleStore.initializeRuntime();
+
+    return () => {
+      dependencies.runtimeConsoleStore.dispose();
+    };
+  }, [dependencies]);
 
   return (
     <UiDependenciesContext.Provider value={dependencies}>

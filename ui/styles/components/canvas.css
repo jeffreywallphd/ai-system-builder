@@ -155,10 +155,11 @@ body.ui-canvas-locked .ui-page--editor-canvas-locked .ui-canvas-shell {
   padding: var(--space-sm) var(--space-md) var(--space-md);
 }
 
-.ui-rf-node__ports {
+.ui-rf-node__layout {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 1.2fr) minmax(0, 1fr);
   gap: var(--space-md);
+  align-items: start;
 }
 
 .ui-rf-node__port-row {
@@ -196,29 +197,26 @@ body.ui-canvas-locked .ui-page--editor-canvas-locked .ui-canvas-shell {
   box-shadow: 0 0 0 3px rgba(79, 156, 249, 0.14);
 }
 
-.ui-rf-node__details {
-  margin-top: var(--space-sm);
-  border-top: 1px solid var(--color-border-soft);
-  padding-top: var(--space-sm);
+.ui-rf-node__properties {
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm);
+  background: rgba(255, 255, 255, 0.02);
 }
 
-.ui-rf-node__details-summary {
+.ui-rf-node__properties-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-sm);
-  cursor: pointer;
-  list-style: none;
+  margin-bottom: var(--space-sm);
   font-size: var(--font-size-sm);
   font-weight: 600;
 }
 
-.ui-rf-node__details-summary::-webkit-details-marker {
-  display: none;
-}
-
-.ui-rf-node__details-body {
-  margin-top: var(--space-sm);
+.ui-rf-node__properties-body {
+  display: grid;
+  gap: var(--space-sm);
 }
 
 .react-flow__node {
@@ -280,8 +278,13 @@ body.ui-canvas-locked .ui-page--editor-canvas-locked .ui-canvas-shell {
     width: min(320px, calc(100vw - 5rem));
   }
 
-  .ui-rf-node__ports {
+  .ui-rf-node__layout {
     grid-template-columns: 1fr;
+    gap: var(--space-sm);
+  }
+
+  .ui-rf-node__properties {
+    display: none;
   }
 
   .ui-rf-canvas {

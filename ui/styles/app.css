@@ -10,6 +10,7 @@
 @import "./components/toolbar.css";
 @import "./components/model-browser.css";
 @import "./components/canvas.css";
+@import "./components/runtime-console.css";
 
 @import "./layout/container.css";
 @import "./layout/grid.css";

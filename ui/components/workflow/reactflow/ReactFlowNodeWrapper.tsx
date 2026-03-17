@@ -45,7 +45,7 @@ function ReactFlowNodeWrapper({
       </div>
 
       <div className="ui-rf-node__body nodrag">
-        <div className="ui-rf-node__ports">
+        <div className="ui-rf-node__layout">
           <div className="ui-stack ui-stack--xs">
             {node.inputPorts.length > 0 ? (
               node.inputPorts.map((port, index) => (
@@ -73,6 +73,25 @@ function ReactFlowNodeWrapper({
               <span className="ui-subtle ui-text-small">No inputs</span>
             )}
           </div>
+
+          {hasProperties ? (
+            <div className="ui-rf-node__properties ui-tablet-up-only">
+              <div className="ui-rf-node__properties-header">
+                <span>Properties</span>
+                <span className="ui-badge ui-badge--neutral">{node.properties.length}</span>
+              </div>
+
+              <div className="ui-rf-node__properties-body nodrag">
+                <NodePropertyEditor
+                  fields={node.properties}
+                  disabled={!node.isEnabled}
+                  onPropertyChange={(propertyId, value) =>
+                    data.onPropertyChange?.(node.id, propertyId, value)
+                  }
+                />
+              </div>
+            </div>
+          ) : null}
 
           <div className="ui-stack ui-stack--xs">
             {node.outputPorts.length > 0 ? (
@@ -131,24 +150,6 @@ function ReactFlowNodeWrapper({
               </button>
             </div>
 
-            <details className="ui-rf-node__details ui-tablet-up-only">
-              <summary className="ui-rf-node__details-summary">
-                <span>Properties</span>
-                <span className="ui-badge ui-badge--neutral">
-                  {node.properties.length}
-                </span>
-              </summary>
-
-              <div className="ui-rf-node__details-body nodrag">
-                <NodePropertyEditor
-                  fields={node.properties}
-                  disabled={!node.isEnabled}
-                  onPropertyChange={(propertyId, value) =>
-                    data.onPropertyChange?.(node.id, propertyId, value)
-                  }
-                />
-              </div>
-            </details>
           </>
         ) : null}
       </div>

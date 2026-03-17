@@ -30,6 +30,13 @@ import type {
   IInstalledModelCatalog,
   IInstalledModelSearchCriteria,
 } from "../../application/ports/interfaces/IInstalledModelCatalog";
+import { RuntimeEventBuffer } from "../../application/runtime/RuntimeEventBuffer";
+import { HttpPythonRuntimeClient } from "../../infrastructure/python/client/HttpPythonRuntimeClient";
+import { PythonRuntimeConfig } from "../../infrastructure/config/PythonRuntimeConfig";
+import { NodeProcessRuntimeEventSink } from "../../infrastructure/python/runtime/NodeProcessRuntimeEventSink";
+import { PythonRuntimeLauncher } from "../../infrastructure/python/runtime/PythonRuntimeLauncher";
+import { PythonRuntimeProcessManager } from "../../infrastructure/python/runtime/PythonRuntimeProcessManager";
+import { RuntimeConsoleStore } from "../state/RuntimeConsoleStore";
 
 export interface UiDependencies {
   readonly config: AppRuntimeConfig;
@@ -39,6 +46,7 @@ export interface UiDependencies {
   readonly workflowService: WorkflowService;
   readonly nodeService: NodeService;
   readonly modelService: ModelService;
+  readonly runtimeConsoleStore: RuntimeConsoleStore;
 }
 
 export interface ICreateUiDependenciesOptions {
@@ -123,6 +131,29 @@ export function createUiDependencies(
     modelService,
   });
 
+  const pythonRuntimeConfig = new PythonRuntimeConfig({
+    mode: "local-http",
+    baseUrl: "http://127.0.0.1:8000",
+  });
+  const runtimeEventStore = new RuntimeEventBuffer({ capacity: 500 });
+  const runtimeEventSink = new NodeProcessRuntimeEventSink(runtimeEventStore);
+  const runtimeClient = new HttpPythonRuntimeClient(pythonRuntimeConfig);
+  const pythonRuntimeManager = new PythonRuntimeProcessManager({
+    client: runtimeClient,
+    launcher: new PythonRuntimeLauncher({
+      spawn: () => {
+        throw new Error("Node child process spawning is unavailable in browser composition.");
+      },
+    }),
+    eventSink: runtimeEventSink,
+    config: pythonRuntimeConfig,
+    autoStartEnabled: true,
+  });
+  const runtimeConsoleStore = new RuntimeConsoleStore({
+    runtimeEventStore,
+    pythonRuntimeManager,
+  });
+
   return Object.freeze({
     config,
     workflowStore,
@@ -131,6 +162,7 @@ export function createUiDependencies(
     workflowService,
     nodeService,
     modelService,
+    runtimeConsoleStore,
   });
 }
 

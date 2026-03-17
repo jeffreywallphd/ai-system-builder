@@ -26,6 +26,9 @@ import type { IRemoteModelCatalog } from "../../application/ports/interfaces/IRe
 import type { IModelInstaller } from "../../application/ports/interfaces/IModelInstaller";
 import type { IWorkflowExecutor } from "../../application/ports/interfaces/IWorkflowExecutor";
 import type { IWorkflowSerializer } from "../../application/ports/interfaces/IWorkflowSerializer";
+import type { INodeImplementationRegistry } from "../nodes/shared/INodeImplementationRegistry";
+import { CompositeNodeImplementationRegistry } from "../nodes/CompositeNodeImplementationRegistry";
+import { createCompositeNodeImplementationRegistry } from "../nodes/NodeProviderRegistryIndex";
 
 export const TOKENS = Object.freeze({
   EnvironmentConfig: Symbol("EnvironmentConfig"),
@@ -42,6 +45,7 @@ export const TOKENS = Object.freeze({
   WorkflowRepository: Symbol("WorkflowRepository"),
   AssetRepository: Symbol("AssetRepository"),
   ModelRepository: Symbol("ModelRepository"),
+  NodeImplementationRegistry: Symbol("NodeImplementationRegistry"),
 }) satisfies Record<string, DependencyToken>;
 
 export interface IInfrastructureRegistryPaths {
@@ -59,6 +63,7 @@ export interface IInfrastructureRegistryOptions {
   readonly modelInstallers?: ReadonlyArray<IModelInstaller>;
   readonly workflowExecutors?: ReadonlyArray<IWorkflowExecutor>;
   readonly workflowSerializers?: ReadonlyArray<IWorkflowSerializer>;
+  readonly nodeImplementationRegistries?: ReadonlyArray<INodeImplementationRegistry>;
 }
 
 export class InfrastructureRegistry {
@@ -131,6 +136,22 @@ export class InfrastructureRegistry {
         return new NodeCatalogProvider({
           providers: options.nodeCatalogProviders ?? [],
         });
+      }
+    );
+
+    container.registerSingleton<INodeImplementationRegistry>(
+      TOKENS.NodeImplementationRegistry,
+      () => {
+        if (
+          options.nodeImplementationRegistries &&
+          options.nodeImplementationRegistries.length > 0
+        ) {
+          return new CompositeNodeImplementationRegistry(
+            options.nodeImplementationRegistries
+          );
+        }
+
+        return createCompositeNodeImplementationRegistry();
       }
     );
 

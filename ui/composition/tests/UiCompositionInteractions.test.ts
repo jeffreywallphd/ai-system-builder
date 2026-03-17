@@ -15,5 +15,6 @@ describe("ui composition interactions", () => {
     expect(dependencies.nodeService).toBeDefined();
     expect(dependencies.modelStore).toBeDefined();
     expect(dependencies.modelService).toBeDefined();
+    expect(dependencies.runtimeConsoleStore).toBeDefined();
   });
 });
