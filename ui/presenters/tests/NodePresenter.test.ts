@@ -27,5 +27,7 @@ describe("NodePresenter", () => {
     expect(item.properties.length).toBe(1);
     expect(item.properties[0]?.name).toBe("Template");
     expect(item.properties[0]?.isRequired).toBeTrue();
+    expect(item.inputPorts.length).toBeGreaterThanOrEqual(0);
+    expect(item.outputPorts.length).toBeGreaterThanOrEqual(0);
   });
 });

@@ -127,13 +127,31 @@ export class WorkflowStore {
   }
 
   public async loadWorkflow(id: string): Promise<IWorkflow | undefined> {
+    const normalizedId = id.trim();
+
+    if (!normalizedId) {
+      throw new Error("WorkflowStore.loadWorkflow requires an id.");
+    }
+
     this.setState({
       isLoading: true,
       error: undefined,
     });
 
     try {
-      const workflow = await this.workflowService.loadWorkflow(id);
+      const workflow = await this.workflowService.loadWorkflow(normalizedId);
+
+      const currentWorkflow = this.state.currentWorkflow;
+      const hasConcurrentEdits =
+        currentWorkflow?.id === normalizedId && this.state.isDirty;
+
+      if (hasConcurrentEdits) {
+        this.setState({
+          isLoading: false,
+        });
+
+        return currentWorkflow;
+      }
 
       this.setState({
         currentWorkflow: workflow,

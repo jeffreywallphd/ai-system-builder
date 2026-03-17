@@ -16,6 +16,15 @@ export default function NodePaletteItem({
 }: NodePaletteItemProps): JSX.Element {
   const [arePropertiesExpanded, setArePropertiesExpanded] = useState(false);
 
+  const hasDetails =
+    item.properties.length > 0 ||
+    item.inputPorts.length > 0 ||
+    item.outputPorts.length > 0;
+
+  const toggleLabel = arePropertiesExpanded
+    ? "Hide Details"
+    : `Show Details (${item.properties.length} properties, ${item.inputPorts.length} inputs, ${item.outputPorts.length} outputs)`;
+
   return (
     <article className={`ui-card ui-card--interactive${isSelected ? " ui-glow-accent" : ""}`}>
       <div className="ui-card__body ui-stack ui-stack--sm">
@@ -60,26 +69,53 @@ export default function NodePaletteItem({
           </button>
         </div>
 
-        {item.properties.length > 0 ? (
+        {hasDetails ? (
           <div className="ui-expandable-section">
             <button
               type="button"
               className="ui-button ui-button--ghost ui-button--sm"
               onClick={() => setArePropertiesExpanded((value) => !value)}
             >
-              {arePropertiesExpanded ? "Hide Properties" : `Show Properties (${item.properties.length})`}
+              {toggleLabel}
             </button>
 
             {arePropertiesExpanded ? (
-              <ul className="ui-expandable-section__list ui-text-small" aria-label="Node properties summary">
-                {item.properties.map((property) => (
-                  <li key={property.id} className="ui-expandable-section__item">
-                    <span>{property.name}</span>
-                    <span className="ui-text-secondary">{property.type}</span>
-                    {property.isRequired ? <span className="ui-badge ui-badge--danger">Required</span> : null}
-                  </li>
-                ))}
-              </ul>
+              <>
+                {item.properties.length > 0 ? (
+                  <ul className="ui-expandable-section__list ui-text-small" aria-label="Node properties summary">
+                    {item.properties.map((property) => (
+                      <li key={property.id} className="ui-expandable-section__item">
+                        <span>{property.name}</span>
+                        <span className="ui-text-secondary">{property.type}</span>
+                        {property.isRequired ? <span className="ui-badge ui-badge--danger">Required</span> : null}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+
+                {item.inputPorts.length > 0 ? (
+                  <ul className="ui-expandable-section__list ui-text-small" aria-label="Node input ports summary">
+                    {item.inputPorts.map((port) => (
+                      <li key={port.id} className="ui-expandable-section__item">
+                        <span>{port.name}</span>
+                        <span className="ui-text-secondary">{port.valueTypes.join(", ") || "any"}</span>
+                        {port.isOptional ? <span className="ui-badge ui-badge--neutral">Optional</span> : null}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+
+                {item.outputPorts.length > 0 ? (
+                  <ul className="ui-expandable-section__list ui-text-small" aria-label="Node output ports summary">
+                    {item.outputPorts.map((port) => (
+                      <li key={port.id} className="ui-expandable-section__item">
+                        <span>{port.name}</span>
+                        <span className="ui-text-secondary">{port.valueTypes.join(", ") || "any"}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </>
             ) : null}
           </div>
         ) : null}
