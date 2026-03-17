@@ -28,6 +28,8 @@ describe("ui/pages interactions", () => {
     expect(editor).toContain("workflowStore.clearSelection()");
     expect(editor).toContain("workflowStore.removeConnection(connectionId)");
     expect(editor).toContain("workflowStore.executeCurrentWorkflow");
+    expect(editor).toContain("ui-canvas-shell__view--active");
+    expect(editor).toContain("onViewModeChange={setViewMode}");
   });
 
   it("keeps validation UI dismissible within the canvas experience", () => {
