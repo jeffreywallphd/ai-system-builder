@@ -1,21 +1,20 @@
 import { useCallback, useEffect, useMemo } from "react";
 import {
-  addEdge,
   Background,
   Controls,
   MiniMap,
   ReactFlow,
   ReactFlowProvider,
-  applyNodeChanges,
   applyEdgeChanges,
+  applyNodeChanges,
   useReactFlow,
   type Connection,
   type Edge,
   type EdgeChange,
+  type EdgeMouseHandler,
   type Node,
   type NodeChange,
   type NodeMouseHandler,
-  type EdgeMouseHandler,
   type OnConnect,
 } from "@xyflow/react";
 import type { NodeDetailViewModel } from "../../../presenters/NodePresenter";
@@ -30,6 +29,7 @@ export interface ReactFlowCanvasProps {
   readonly selectedNodeId?: string;
   readonly selectedConnectionId?: string;
   readonly fitViewNonce?: number;
+  readonly isCompactViewport?: boolean;
   readonly onSelectNode?: (nodeId: string) => void;
   readonly onSelectConnection?: (connectionId: string) => void;
   readonly onClearSelection?: () => void;
@@ -43,6 +43,12 @@ export interface ReactFlowCanvasProps {
     readonly targetNodeId: string;
     readonly targetPortId: string;
   }) => void;
+  readonly onOpenNodeProperties?: (nodeId: string) => void;
+  readonly onNodePropertyChange?: (
+    nodeId: string,
+    propertyId: string,
+    value: unknown
+  ) => void;
 }
 
 const nodeTypes = Object.freeze({
@@ -55,19 +61,33 @@ function InnerReactFlowCanvas({
   selectedNodeId,
   selectedConnectionId,
   fitViewNonce,
+  isCompactViewport,
   onSelectNode,
   onSelectConnection,
   onClearSelection,
   onMoveNodeCommit,
   onConnectNodes,
+  onOpenNodeProperties,
+  onNodePropertyChange,
 }: ReactFlowCanvasProps): JSX.Element {
   const nodeAdapter = useMemo(() => new NodeAdapter(), []);
   const edgeAdapter = useMemo(() => new EdgeAdapter(), []);
   const reactFlow = useReactFlow();
 
   const flowNodes = useMemo(
-    () => nodeAdapter.toReactFlowNodes(nodes),
-    [nodeAdapter, nodes]
+    () =>
+      nodeAdapter.toReactFlowNodes(nodes, {
+        isCompactViewport,
+        onOpenProperties: onOpenNodeProperties,
+        onPropertyChange: onNodePropertyChange,
+      }),
+    [
+      isCompactViewport,
+      nodeAdapter,
+      nodes,
+      onNodePropertyChange,
+      onOpenNodeProperties,
+    ]
   );
 
   const flowEdges = useMemo(
@@ -155,10 +175,8 @@ function InnerReactFlowCanvas({
         targetNodeId: connection.target,
         targetPortId: connection.targetHandle,
       });
-
-      addEdge(connection, [...renderedEdges]);
     },
-    [onConnectNodes, renderedEdges]
+    [onConnectNodes]
   );
 
   const onNodeClick = useCallback<NodeMouseHandler<Node<ReactFlowNodeData>>>(
