@@ -29,4 +29,14 @@ describe("ui/pages interactions", () => {
     expect(editor).toContain("workflowStore.removeConnection(connectionId)");
     expect(editor).toContain("workflowStore.executeCurrentWorkflow");
   });
+
+  it("keeps validation UI dismissible within the canvas experience", () => {
+    const editor = readSource("ui/pages/WorkflowEditorPage.tsx");
+
+    expect(editor).toContain("dismissedValidationMessages");
+    expect(editor).toContain("visibleValidationMessages");
+    expect(editor).toContain("ui-validation-overlay--locked");
+    expect(editor).toContain("Close");
+  });
+
 });

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { NodePaletteItemViewModel } from "../../presenters/NodePresenter";
 
 export interface NodePaletteItemProps {
@@ -13,6 +14,8 @@ export default function NodePaletteItem({
   onSelect,
   onAdd,
 }: NodePaletteItemProps): JSX.Element {
+  const [arePropertiesExpanded, setArePropertiesExpanded] = useState(false);
+
   return (
     <article className={`ui-card ui-card--interactive${isSelected ? " ui-glow-accent" : ""}`}>
       <div className="ui-card__body ui-stack ui-stack--sm">
@@ -56,6 +59,30 @@ export default function NodePaletteItem({
             Add Node
           </button>
         </div>
+
+        {item.properties.length > 0 ? (
+          <div className="ui-expandable-section">
+            <button
+              type="button"
+              className="ui-button ui-button--ghost ui-button--sm"
+              onClick={() => setArePropertiesExpanded((value) => !value)}
+            >
+              {arePropertiesExpanded ? "Hide Properties" : `Show Properties (${item.properties.length})`}
+            </button>
+
+            {arePropertiesExpanded ? (
+              <ul className="ui-expandable-section__list ui-text-small" aria-label="Node properties summary">
+                {item.properties.map((property) => (
+                  <li key={property.id} className="ui-expandable-section__item">
+                    <span>{property.name}</span>
+                    <span className="ui-text-secondary">{property.type}</span>
+                    {property.isRequired ? <span className="ui-badge ui-badge--danger">Required</span> : null}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </article>
   );

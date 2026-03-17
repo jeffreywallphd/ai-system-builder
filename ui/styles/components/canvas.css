@@ -299,3 +299,26 @@ body.ui-canvas-locked .ui-page--editor-canvas-locked .ui-canvas-shell {
     min-height: 420px;
   }
 }
+
+.ui-validation-overlay {
+  position: absolute;
+  inset: var(--space-sm) var(--space-sm) auto auto;
+  z-index: 5;
+  width: min(32rem, calc(100% - (var(--space-sm) * 2)));
+  pointer-events: none;
+}
+
+.ui-validation-overlay--locked {
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+  width: min(38rem, calc(100% - (var(--space-sm) * 2)));
+}
+
+.ui-validation-overlay__stack {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.ui-validation-overlay__item {
+  pointer-events: auto;
+}

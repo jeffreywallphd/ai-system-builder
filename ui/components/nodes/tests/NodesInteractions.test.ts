@@ -39,4 +39,14 @@ describe("ui/components/nodes interactions", () => {
     expect(flowWrapper).toContain("ui-rf-node__properties");
     expect(flowWrapper).not.toContain(`<details className="ui-rf-node__details`);
   });
+
+  it("renders a toggleable properties summary for each palette item", () => {
+    const paletteItem = readSource("ui/components/nodes/NodePaletteItem.tsx");
+
+    expect(paletteItem).toContain("useState(false)");
+    expect(paletteItem).toContain("Show Properties");
+    expect(paletteItem).toContain("Hide Properties");
+    expect(paletteItem).toContain("Node properties summary");
+  });
+
 });
