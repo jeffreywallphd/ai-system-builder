@@ -15,6 +15,7 @@ export type NodePortValueType =
   | "tensor"
   | "embedding"
   | "document"
+  | "chunks"
   | "dataset"
   | "model"
   | "model-reference"

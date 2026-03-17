@@ -65,6 +65,7 @@ export const LANGCHAIN_NODE_CATALOG_METADATA: Readonly<
       new NodeProperty({
         id: "chunk-size",
         name: "Chunk Size",
+        description: "Maximum characters per chunk.",
         type: "integer",
         value: 500,
         constraints: { required: true, min: 1 },
@@ -73,8 +74,8 @@ export const LANGCHAIN_NODE_CATALOG_METADATA: Readonly<
   }),
   "langchain.document-to-chunks": Object.freeze({
     description: "Converts a document payload into chunked text segments and document metadata.",
-    inputPorts: Object.freeze([inputPort("document", "Document", ["json"])]),
-    outputPorts: Object.freeze([outputPort("chunks", "Chunks", ["json"])]),
+    inputPorts: Object.freeze([inputPort("document", "Document", ["document"])]),
+    outputPorts: Object.freeze([outputPort("chunks", "Chunks", ["chunks"])]),
     properties: Object.freeze([
       new NodeProperty({
         id: "chunk-size",
@@ -86,6 +87,7 @@ export const LANGCHAIN_NODE_CATALOG_METADATA: Readonly<
       new NodeProperty({
         id: "chunk-overlap",
         name: "Chunk Overlap",
+        description: "Number of characters shared between adjacent chunks.",
         type: "integer",
         value: 50,
         constraints: { required: true, min: 0 },

@@ -28,6 +28,7 @@ export interface WorkflowCanvasProps {
     propertyId: string,
     value: unknown
   ) => void;
+  readonly nodeExecutionOutputs?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 }
 
 export default function WorkflowCanvas({
@@ -44,6 +45,7 @@ export default function WorkflowCanvas({
   onConnectNodes,
   onOpenNodeProperties,
   onNodePropertyChange,
+  nodeExecutionOutputs,
 }: WorkflowCanvasProps): JSX.Element {
   return (
     <section className="ui-canvas-surface">
@@ -61,6 +63,7 @@ export default function WorkflowCanvas({
         onConnectNodes={onConnectNodes}
         onOpenNodeProperties={onOpenNodeProperties}
         onNodePropertyChange={onNodePropertyChange}
+        nodeExecutionOutputs={nodeExecutionOutputs}
       />
 
       {nodes.length === 0 ? (

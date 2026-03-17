@@ -134,9 +134,48 @@ export default function NodePropertyField({
           />
         );
 
+      case "file":
+        return (
+          <div className="ui-stack ui-stack--xs">
+            <input
+              className="ui-input"
+              type="file"
+              disabled={isDisabled}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (!file) {
+                  emit(undefined);
+                  return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = () => {
+                  emit({
+                    name: file.name,
+                    type: file.type,
+                    size: file.size,
+                    text: typeof reader.result === "string" ? reader.result : "",
+                  });
+                };
+                reader.onerror = () => {
+                  emit({
+                    name: file.name,
+                    type: file.type,
+                    size: file.size,
+                    error: "Failed to read file contents.",
+                  });
+                };
+                reader.readAsText(file);
+              }}
+            />
+            {field.value ? (
+              <div className="ui-text-small ui-subtle">Selected: {stringifyValue((field.value as { name?: string }).name ?? "document")}</div>
+            ) : null}
+          </div>
+        );
+
       case "text":
       case "template":
-      case "file":
       case "directory":
       case "model-reference":
       case "secret":

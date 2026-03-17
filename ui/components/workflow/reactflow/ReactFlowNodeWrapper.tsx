@@ -21,6 +21,11 @@ function ReactFlowNodeWrapper({
 }: NodeProps<ReactFlowNodeData>): JSX.Element {
   const node = data.node;
   const hasProperties = node.properties.length > 0;
+  const executionOutput = data.executionOutput;
+  const chunkDisplayItems =
+    node.definitionType === "shared.chunk-displayer" && Array.isArray(executionOutput?.display)
+      ? (executionOutput.display as ReadonlyArray<{ index?: number; text?: string }> )
+      : undefined;
 
   return (
     <div
@@ -137,6 +142,19 @@ function ReactFlowNodeWrapper({
             <span className="ui-badge ui-badge--info">Collapsed</span>
           ) : null}
         </div>
+
+        {chunkDisplayItems ? (
+          <div className="ui-card" style={{ marginTop: "var(--space-sm)", maxHeight: 180, overflow: "auto" }}>
+            <div className="ui-card__body ui-stack ui-stack--xs">
+              <div className="ui-heading-4">Chunks</div>
+              {chunkDisplayItems.map((chunk, index) => (
+                <div key={`chunk-${index}`} className="ui-text-small">
+                  <strong>#{chunk.index ?? index}</strong> {chunk.text ?? ""}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         {hasProperties ? (
           <>

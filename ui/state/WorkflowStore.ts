@@ -22,6 +22,7 @@ export interface IWorkflowStoreState {
   readonly isSaving: boolean;
   readonly isExecuting: boolean;
   readonly lastExecutionEvent?: IWorkflowExecutionEvent;
+  readonly nodeExecutionOutputs: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
   readonly error?: string;
 }
 
@@ -44,6 +45,7 @@ const defaultState: IWorkflowStoreState = Object.freeze({
   isSaving: false,
   isExecuting: false,
   lastExecutionEvent: undefined,
+  nodeExecutionOutputs: Object.freeze({}),
   error: undefined,
 });
 
@@ -252,6 +254,7 @@ export class WorkflowStore {
       isExecuting: true,
       error: undefined,
       lastExecutionEvent: undefined,
+      nodeExecutionOutputs: Object.freeze({}),
     });
 
     try {
@@ -261,8 +264,14 @@ export class WorkflowStore {
           ...request,
         },
         (event) => {
+          const payloadOutputs =
+            event.payload && "nodeOutputs" in event.payload
+              ? (event.payload.nodeOutputs as Readonly<Record<string, Readonly<Record<string, unknown>>>>)
+              : undefined;
+
           this.setState({
             lastExecutionEvent: event,
+            nodeExecutionOutputs: payloadOutputs ?? this.state.nodeExecutionOutputs,
           });
 
           onEvent?.(event);
