@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Background,
   Controls,
@@ -55,6 +55,49 @@ export interface ReactFlowCanvasProps {
 const nodeTypes = Object.freeze({
   aiLoomNode: ReactFlowNodeWrapper,
 });
+
+function syncInteractiveNodes(
+  currentNodes: ReadonlyArray<Node<ReactFlowNodeData>>,
+  nextNodes: ReadonlyArray<Node<ReactFlowNodeData>>
+): ReadonlyArray<Node<ReactFlowNodeData>> {
+  const currentNodesById = new Map(currentNodes.map((node) => [node.id, node]));
+
+  return nextNodes.map((node) => {
+    const existingNode = currentNodesById.get(node.id);
+    if (!existingNode) {
+      return node;
+    }
+
+    return {
+      ...existingNode,
+      ...node,
+      data: node.data,
+      position: node.position,
+      selected: node.selected,
+    };
+  });
+}
+
+function syncInteractiveEdges(
+  currentEdges: ReadonlyArray<Edge>,
+  nextEdges: ReadonlyArray<Edge>
+): ReadonlyArray<Edge> {
+  const currentEdgesById = new Map(currentEdges.map((edge) => [edge.id, edge]));
+
+  return nextEdges.map((edge) => {
+    const existingEdge = currentEdgesById.get(edge.id);
+    if (!existingEdge) {
+      return edge;
+    }
+
+    return {
+      ...existingEdge,
+      ...edge,
+      selected: edge.selected,
+      animated: edge.animated,
+    };
+  });
+}
 
 function InnerReactFlowCanvas({
   nodes,
@@ -121,6 +164,21 @@ function InnerReactFlowCanvas({
     [flowEdges, selectedConnectionId]
   );
 
+  const [interactiveNodes, setInteractiveNodes] = useState<ReadonlyArray<Node<ReactFlowNodeData>>>(renderedNodes);
+  const [interactiveEdges, setInteractiveEdges] = useState<ReadonlyArray<Edge>>(renderedEdges);
+
+  useEffect(() => {
+    setInteractiveNodes((currentNodes) =>
+      syncInteractiveNodes(currentNodes, renderedNodes)
+    );
+  }, [renderedNodes]);
+
+  useEffect(() => {
+    setInteractiveEdges((currentEdges) =>
+      syncInteractiveEdges(currentEdges, renderedEdges)
+    );
+  }, [renderedEdges]);
+
   useEffect(() => {
     if (!nodesInitialized || nodes.length === 0) {
       return;
@@ -165,16 +223,16 @@ function InnerReactFlowCanvas({
         }
       }
 
-      applyNodeChanges(changes, [...renderedNodes]);
+      setInteractiveNodes((currentNodes) => applyNodeChanges(changes, [...currentNodes]));
     },
-    [onMoveNodeCommit, renderedNodes]
+    [onMoveNodeCommit]
   );
 
   const onEdgesChange = useCallback(
     (changes: EdgeChange<Edge>[]) => {
-      applyEdgeChanges(changes, [...renderedEdges]);
+      setInteractiveEdges((currentEdges) => applyEdgeChanges(changes, [...currentEdges]));
     },
-    [renderedEdges]
+    []
   );
 
   const onConnect = useCallback<OnConnect>(
@@ -217,8 +275,8 @@ function InnerReactFlowCanvas({
       <ReactFlow
         className="ui-rf-root"
         style={{ width: "100%", height: "100%" }}
-        nodes={renderedNodes as Node<ReactFlowNodeData>[]}
-        edges={renderedEdges as Edge[]}
+        nodes={interactiveNodes as Node<ReactFlowNodeData>[]}
+        edges={interactiveEdges as Edge[]}
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}

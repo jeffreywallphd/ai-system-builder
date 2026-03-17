@@ -82,38 +82,47 @@ export default function NodePaletteItem({
             {arePropertiesExpanded ? (
               <>
                 {item.properties.length > 0 ? (
-                  <ul className="ui-expandable-section__list ui-text-small" aria-label="Node properties summary">
-                    {item.properties.map((property) => (
-                      <li key={property.id} className="ui-expandable-section__item">
-                        <span>{property.name}</span>
-                        <span className="ui-text-secondary">{property.type}</span>
-                        {property.isRequired ? <span className="ui-badge ui-badge--danger">Required</span> : null}
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="ui-stack ui-stack--2xs">
+                    <h5 className="ui-text-small">Properties</h5>
+                    <ul className="ui-expandable-section__list ui-text-small" aria-label="Node properties summary">
+                      {item.properties.map((property) => (
+                        <li key={property.id} className="ui-expandable-section__item">
+                          <span>{property.name}</span>
+                          <span className="ui-text-secondary">{property.type}</span>
+                          {property.isRequired ? <span className="ui-badge ui-badge--danger">Required</span> : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 ) : null}
 
                 {item.inputPorts.length > 0 ? (
-                  <ul className="ui-expandable-section__list ui-text-small" aria-label="Node input ports summary">
-                    {item.inputPorts.map((port) => (
-                      <li key={port.id} className="ui-expandable-section__item">
-                        <span>{port.name}</span>
-                        <span className="ui-text-secondary">{port.valueTypes.join(", ") || "any"}</span>
-                        {port.isOptional ? <span className="ui-badge ui-badge--neutral">Optional</span> : null}
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="ui-stack ui-stack--2xs">
+                    <h5 className="ui-text-small">Inputs</h5>
+                    <ul className="ui-expandable-section__list ui-text-small" aria-label="Node input ports summary">
+                      {item.inputPorts.map((port) => (
+                        <li key={port.id} className="ui-expandable-section__item">
+                          <span>{port.name}</span>
+                          <span className="ui-text-secondary">{port.valueTypes.join(", ") || "any"}</span>
+                          {port.isOptional ? <span className="ui-badge ui-badge--neutral">Optional</span> : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 ) : null}
 
                 {item.outputPorts.length > 0 ? (
-                  <ul className="ui-expandable-section__list ui-text-small" aria-label="Node output ports summary">
-                    {item.outputPorts.map((port) => (
-                      <li key={port.id} className="ui-expandable-section__item">
-                        <span>{port.name}</span>
-                        <span className="ui-text-secondary">{port.valueTypes.join(", ") || "any"}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="ui-stack ui-stack--2xs">
+                    <h5 className="ui-text-small">Outputs</h5>
+                    <ul className="ui-expandable-section__list ui-text-small" aria-label="Node output ports summary">
+                      {item.outputPorts.map((port) => (
+                        <li key={port.id} className="ui-expandable-section__item">
+                          <span>{port.name}</span>
+                          <span className="ui-text-secondary">{port.valueTypes.join(", ") || "any"}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 ) : null}
               </>
             ) : null}
