@@ -2,6 +2,7 @@ export interface WorkflowCanvasToolbarProps {
   readonly hasSelection?: boolean;
   readonly canFitView?: boolean;
   readonly canOpenProperties?: boolean;
+  readonly isMenuOpen?: boolean;
   readonly onOpenMenu?: () => void;
   readonly onOpenProperties?: () => void;
   readonly onFitView?: () => void;
@@ -13,6 +14,7 @@ export default function WorkflowCanvasToolbar({
   hasSelection,
   canFitView = true,
   canOpenProperties,
+  isMenuOpen,
   onOpenMenu,
   onOpenProperties,
   onFitView,
@@ -27,7 +29,7 @@ export default function WorkflowCanvasToolbar({
           className="ui-button ui-button--secondary ui-button--sm"
           onClick={() => onOpenMenu?.()}
         >
-          Menu
+          {isMenuOpen ? "Close Menu" : "Menu"}
         </button>
 
         <button
