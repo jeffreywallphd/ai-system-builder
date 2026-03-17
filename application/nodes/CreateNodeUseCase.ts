@@ -17,6 +17,11 @@ export interface ICreateNodeRequest {
   readonly executionProfile?: INodeExecutionProfile;
   readonly isEnabled?: boolean;
   readonly isCollapsed?: boolean;
+  /**
+   * Whether to validate the node before adding it to the workflow.
+   * Defaults to false so users can place nodes and fix required fields later.
+   */
+  readonly validateNode?: boolean;
 }
 
 export interface ICreateNodeResult {
@@ -88,12 +93,14 @@ export class CreateNodeUseCase {
       }
     }
 
-    const validation = node.validate();
+    if (request.validateNode ?? false) {
+      const validation = node.validate();
 
-    if (!validation.isValid) {
-      throw new Error(
-        `Created node '${node.id}' is invalid: ${validation.messages.join(" | ")}`
-      );
+      if (!validation.isValid) {
+        throw new Error(
+          `Created node '${node.id}' is invalid: ${validation.messages.join(" | ")}`
+        );
+      }
     }
 
     const workflow = request.workflow.addNode(node);
