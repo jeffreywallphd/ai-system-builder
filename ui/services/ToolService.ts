@@ -2,6 +2,7 @@ import { ListPublishedToolsUseCase } from "../../application/tools/ListPublished
 import { LoadToolDefinitionUseCase } from "../../application/tools/LoadToolDefinitionUseCase";
 import { RunToolUseCase } from "../../application/tools/RunToolUseCase";
 import type { ToolRunRequest } from "../../application/projection/models/ToolRunRequest";
+import type { ToolSearchCriteria } from "../../application/dto/ToolSearchCriteria";
 
 export class ToolService {
   constructor(
@@ -10,8 +11,8 @@ export class ToolService {
     private readonly runToolUseCase: RunToolUseCase
   ) {}
 
-  public async listPublishedTools() {
-    return this.listPublishedToolsUseCase.execute();
+  public async listPublishedTools(criteria?: ToolSearchCriteria) {
+    return this.listPublishedToolsUseCase.execute(criteria);
   }
 
   public async loadToolDefinition(toolId: string) {

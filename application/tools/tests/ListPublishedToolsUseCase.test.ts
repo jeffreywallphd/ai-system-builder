@@ -2,10 +2,71 @@ import { describe, expect, it } from "bun:test";
 import { ListPublishedToolsUseCase } from "../ListPublishedToolsUseCase";
 import { InMemoryWorkflowRepository } from "../../../infrastructure/mocks/repositories/InMemoryWorkflowRepository";
 import { WorkflowToolProjectionService } from "../../projection/WorkflowToolProjectionService";
+import { makeNode, makeWorkflow } from "../../../domain/services/tests/testUtils";
+import { WorkflowMetadata } from "../../../domain/workflows/WorkflowMetadata";
 
 describe("ListPublishedToolsUseCase", () => {
-  it("returns tool summaries", async () => {
-    const result = await new ListPublishedToolsUseCase(new InMemoryWorkflowRepository(), new WorkflowToolProjectionService()).execute();
-    expect(result.tools).toBeDefined();
+  it("returns tool summaries with classified types", async () => {
+    const workflowRepository = new InMemoryWorkflowRepository();
+    const node = makeNode({ id: "n1" });
+
+    await workflowRepository.save(
+      makeWorkflow({ id: "wf-image", nodes: [node] }).withMetadata(
+        new WorkflowMetadata({
+          name: "Image Creator",
+          isPublishedAsTool: true,
+          toolTitle: "Image Creator",
+          toolDescription: "Generate social media images",
+        })
+      )
+    );
+
+    const result = await new ListPublishedToolsUseCase(
+      workflowRepository,
+      new WorkflowToolProjectionService()
+    ).execute();
+
+    expect(result.tools.length).toBe(1);
+    expect(result.tools[0]?.typeLabel).toBe("Image Creation");
+    expect(result.availableTypes.length).toBeGreaterThan(0);
+  });
+
+  it("filters published tools by query and type", async () => {
+    const workflowRepository = new InMemoryWorkflowRepository();
+    const node = makeNode({ id: "n1" });
+
+    await workflowRepository.save(
+      makeWorkflow({ id: "wf-video", nodes: [node] }).withMetadata(
+        new WorkflowMetadata({
+          name: "Video",
+          isPublishedAsTool: true,
+          toolTitle: "Video Clip Maker",
+          toolDescription: "Create short video clips",
+        })
+      )
+    );
+
+    await workflowRepository.save(
+      makeWorkflow({ id: "wf-summary", nodes: [node] }).withMetadata(
+        new WorkflowMetadata({
+          name: "Summary",
+          isPublishedAsTool: true,
+          toolTitle: "Meeting Summary",
+          toolDescription: "Summarize transcripts",
+        })
+      )
+    );
+
+    const useCase = new ListPublishedToolsUseCase(
+      workflowRepository,
+      new WorkflowToolProjectionService()
+    );
+
+    const byQuery = await useCase.execute({ query: "video" });
+    expect(byQuery.tools.length).toBe(1);
+
+    const byType = await useCase.execute({ typeIds: ["summarization"] });
+    expect(byType.tools.length).toBe(1);
+    expect(byType.tools[0]?.title).toContain("Summary");
   });
 });
