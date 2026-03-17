@@ -73,6 +73,9 @@ export default function WorkflowEditorPage({
   const [isLeftMenuOpen, setIsLeftMenuOpen] = useState(false);
   const [isPropertiesOpen, setIsPropertiesOpen] = useState(false);
   const [isCanvasLocked, setIsCanvasLocked] = useState(false);
+  const [dismissedValidationMessages, setDismissedValidationMessages] = useState<
+    ReadonlyArray<string>
+  >([]);
   const [mobilePropertiesNodeId, setMobilePropertiesNodeId] = useState<string>();
   const [isMobile, setIsMobile] = useState<boolean>(() => {
     if (typeof window === "undefined") {
@@ -246,6 +249,35 @@ export default function WorkflowEditorPage({
 
   const validationSummary = validationPresenter.present(workflowState.validation);
 
+
+  const visibleValidationMessages = useMemo(() => {
+    const messages = validationSummary.groups.flatMap((group) =>
+      group.messages.map((message) => ({
+        key: `${message.code}:${message.message}:${message.targetLabel ?? ""}`,
+        severity: message.severity,
+        scope: message.scope,
+        message: message.message,
+        targetLabel: message.targetLabel,
+      }))
+    );
+
+    return messages.filter((message) => !dismissedValidationMessages.includes(message.key));
+  }, [dismissedValidationMessages, validationSummary.groups]);
+
+  useEffect(() => {
+    setDismissedValidationMessages((current) =>
+      current.filter((messageKey) =>
+        validationSummary.groups.some((group) =>
+          group.messages.some(
+            (message) =>
+              `${message.code}:${message.message}:${message.targetLabel ?? ""}` ===
+              messageKey
+          )
+        )
+      )
+    );
+  }, [validationSummary.groups]);
+
   useEffect(() => {
     if (!workflowState.selectedNodeId) {
       setIsPropertiesOpen(false);
@@ -405,6 +437,56 @@ export default function WorkflowEditorPage({
                     workflowStore.updateNodeProperty(nodeId, propertyId, value);
                   }}
                 />
+              ) : null}
+
+
+              {visibleValidationMessages.length > 0 ? (
+                <div
+                  className={`ui-validation-overlay${
+                    isCanvasLocked ? " ui-validation-overlay--locked" : ""
+                  }`}
+                >
+                  <div className="ui-validation-overlay__stack">
+                    {visibleValidationMessages.map((validationMessage) => (
+                      <article key={validationMessage.key} className="ui-card ui-validation-overlay__item">
+                        <div className="ui-card__body ui-stack ui-stack--xs">
+                          <div className="ui-row ui-row--between ui-row--wrap">
+                            <span
+                              className={`ui-badge ${
+                                validationMessage.severity === "error"
+                                  ? "ui-badge--danger"
+                                  : validationMessage.severity === "warning"
+                                    ? "ui-badge--warning"
+                                    : "ui-badge--neutral"
+                              }`}
+                            >
+                              {validationMessage.scope}
+                            </span>
+                            <button
+                              type="button"
+                              className="ui-button ui-button--ghost ui-button--sm"
+                              onClick={() =>
+                                setDismissedValidationMessages((current) =>
+                                  current.includes(validationMessage.key)
+                                    ? current
+                                    : [...current, validationMessage.key]
+                                )
+                              }
+                            >
+                              Close
+                            </button>
+                          </div>
+                          <div>{validationMessage.message}</div>
+                          {validationMessage.targetLabel ? (
+                            <div className="ui-text-secondary ui-text-small">
+                              {validationMessage.targetLabel}
+                            </div>
+                          ) : null}
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </div>
               ) : null}
 
               <div

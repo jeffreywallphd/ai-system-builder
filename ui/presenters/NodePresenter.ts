@@ -12,6 +12,12 @@ export interface NodePaletteItemViewModel {
   readonly executionKind: string;
   readonly isModelAware: boolean;
   readonly isVisibleInBasicMode: boolean;
+  readonly properties: ReadonlyArray<{
+    readonly id: string;
+    readonly name: string;
+    readonly type: string;
+    readonly isRequired: boolean;
+  }>;
 }
 
 export interface NodePropertyFieldViewModel {
@@ -75,6 +81,18 @@ export class NodePresenter {
       executionKind: definition.executionKind,
       isModelAware: definition.isModelAware(),
       isVisibleInBasicMode: definition.isVisibleInBasicMode,
+      properties: Object.freeze(
+        [...definition.properties]
+          .sort((left, right) => left.order - right.order)
+          .map((property) =>
+            Object.freeze({
+              id: property.id,
+              name: property.name,
+              type: property.type,
+              isRequired: property.constraints?.required ?? false,
+            })
+          )
+      ),
     });
   }
 
