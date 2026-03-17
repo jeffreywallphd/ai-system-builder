@@ -233,6 +233,11 @@ function InnerReactFlowCanvas({
         }}
         minZoom={0.1}
         maxZoom={2}
+        panOnDrag
+        panOnScroll={false}
+        zoomOnScroll={!isCompactViewport}
+        zoomOnPinch
+        zoomOnDoubleClick={!isCompactViewport}
         snapToGrid
         snapGrid={[8, 8]}
         proOptions={{ hideAttribution: true }}

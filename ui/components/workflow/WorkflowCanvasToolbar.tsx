@@ -3,6 +3,7 @@ export interface WorkflowCanvasToolbarProps {
   readonly canFitView?: boolean;
   readonly canOpenProperties?: boolean;
   readonly isMenuOpen?: boolean;
+  readonly isPropertiesOpen?: boolean;
   readonly onOpenMenu?: () => void;
   readonly onOpenProperties?: () => void;
   readonly onFitView?: () => void;
@@ -15,6 +16,7 @@ export default function WorkflowCanvasToolbar({
   canFitView = true,
   canOpenProperties,
   isMenuOpen,
+  isPropertiesOpen,
   onOpenMenu,
   onOpenProperties,
   onFitView,
@@ -38,7 +40,7 @@ export default function WorkflowCanvasToolbar({
           onClick={() => onOpenProperties?.()}
           disabled={!canOpenProperties}
         >
-          Properties
+          {isPropertiesOpen ? "Close Properties" : "Properties"}
         </button>
 
         <button

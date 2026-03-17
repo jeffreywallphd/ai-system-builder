@@ -302,10 +302,11 @@ export default function WorkflowEditorPage({
               canFitView={nodeViewModels.length > 0}
               canOpenProperties={!!selectedNode}
               isMenuOpen={isLeftMenuOpen}
+              isPropertiesOpen={isPropertiesOpen}
               onOpenMenu={() => setIsLeftMenuOpen((value) => !value)}
               onOpenProperties={() => {
                 if (selectedNode) {
-                  setIsPropertiesOpen(true);
+                  setIsPropertiesOpen((value) => !value);
                 }
               }}
               onFitView={() => setFitViewNonce((value) => value + 1)}
