@@ -7,6 +7,7 @@ import {
   ReactFlowProvider,
   applyEdgeChanges,
   applyNodeChanges,
+  useNodesInitialized,
   useReactFlow,
   type Connection,
   type Edge,
@@ -73,6 +74,7 @@ function InnerReactFlowCanvas({
   const nodeAdapter = useMemo(() => new NodeAdapter(), []);
   const edgeAdapter = useMemo(() => new EdgeAdapter(), []);
   const reactFlow = useReactFlow();
+  const nodesInitialized = useNodesInitialized();
 
   const flowNodes = useMemo(
     () =>
@@ -120,15 +122,32 @@ function InnerReactFlowCanvas({
   );
 
   useEffect(() => {
-    if (fitViewNonce === undefined) {
+    if (!nodesInitialized || nodes.length === 0) {
       return;
     }
 
-    void reactFlow.fitView({
-      padding: 0.18,
-      duration: 250,
+    const fit = (): void => {
+      void reactFlow.fitView({
+        padding: isCompactViewport ? 0.3 : 0.18,
+        duration: 250,
+        includeHiddenNodes: true,
+        minZoom: 0.1,
+        maxZoom: 1.5,
+      });
+    };
+
+    const frameId = window.requestAnimationFrame(() => {
+      fit();
+
+      window.setTimeout(() => {
+        fit();
+      }, 120);
     });
-  }, [fitViewNonce, reactFlow]);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [fitViewNonce, isCompactViewport, nodes.length, nodesInitialized, reactFlow]);
 
   const onNodesChange = useCallback(
     (changes: NodeChange<Node<ReactFlowNodeData>>[]) => {
@@ -206,6 +225,14 @@ function InnerReactFlowCanvas({
         onEdgeClick={onEdgeClick}
         onPaneClick={() => onClearSelection?.()}
         fitView
+        fitViewOptions={{
+          padding: isCompactViewport ? 0.3 : 0.18,
+          includeHiddenNodes: true,
+          minZoom: 0.1,
+          maxZoom: 1.5,
+        }}
+        minZoom={0.1}
+        maxZoom={2}
         snapToGrid
         snapGrid={[8, 8]}
         proOptions={{ hideAttribution: true }}
@@ -215,7 +242,7 @@ function InnerReactFlowCanvas({
         }}
       >
         <Background gap={24} size={1} />
-        <MiniMap pannable zoomable />
+        {!isCompactViewport ? <MiniMap pannable zoomable /> : null}
         <Controls />
       </ReactFlow>
     </div>

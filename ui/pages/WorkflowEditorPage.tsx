@@ -301,7 +301,8 @@ export default function WorkflowEditorPage({
               hasSelection={hasSelection}
               canFitView={nodeViewModels.length > 0}
               canOpenProperties={!!selectedNode}
-              onOpenMenu={() => setIsLeftMenuOpen(true)}
+              isMenuOpen={isLeftMenuOpen}
+              onOpenMenu={() => setIsLeftMenuOpen((value) => !value)}
               onOpenProperties={() => {
                 if (selectedNode) {
                   setIsPropertiesOpen(true);
