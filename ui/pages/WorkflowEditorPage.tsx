@@ -90,6 +90,7 @@ export default function WorkflowEditorPage({
     const mediaQueryList = window.matchMedia(mobileQuery);
     const listener = (event: MediaQueryListEvent): void => {
       setIsMobile(event.matches);
+
       if (!event.matches) {
         setMobilePropertiesNodeId(undefined);
       }
@@ -116,25 +117,39 @@ export default function WorkflowEditorPage({
   }, [nodeStore]);
 
   useEffect(() => {
+    const existingWorkflow = workflowStore.getState().currentWorkflow;
+
     if (workflowId && workflowId !== "new") {
       createdNewWorkflowRef.current = false;
       seededStarterNodeRef.current = false;
+
+      if (existingWorkflow?.id === workflowId) {
+        return;
+      }
+
       void workflowStore.loadWorkflow(workflowId);
       return;
     }
 
-    if (workflowId === "new" && !createdNewWorkflowRef.current) {
-      createdNewWorkflowRef.current = true;
-      seededStarterNodeRef.current = false;
+    if (workflowId === "new") {
+      if (existingWorkflow) {
+        createdNewWorkflowRef.current = true;
+        return;
+      }
 
-      void workflowStore.createWorkflow({
-        metadata: {
-          name: "Untitled Workflow",
-          description: "",
-          tags: [],
-        },
-        validateOnCreate: false,
-      });
+      if (!createdNewWorkflowRef.current) {
+        createdNewWorkflowRef.current = true;
+        seededStarterNodeRef.current = false;
+
+        void workflowStore.createWorkflow({
+          metadata: {
+            name: "Untitled Workflow",
+            description: "",
+            tags: [],
+          },
+          validateOnCreate: false,
+        });
+      }
     }
   }, [workflowId, workflowStore]);
 
@@ -330,180 +345,180 @@ export default function WorkflowEditorPage({
                   workflowStore.updateNodeProperty(nodeId, propertyId, value);
                 }}
               />
-            </div>
-          </div>
-        </div>
 
-        <div
-          className={`ui-overlay-panel ui-overlay-panel--left${
-            isLeftMenuOpen ? " ui-overlay-panel--open" : ""
-          }`}
-        >
-          <button
-            type="button"
-            className="ui-overlay-panel__scrim"
-            aria-label="Close menu"
-            onClick={() => setIsLeftMenuOpen(false)}
-          />
-
-          <aside className="ui-overlay-panel__surface">
-            <div className="ui-overlay-panel__header">
-              <div className="ui-stack ui-stack--2xs">
-                <div className="ui-heading-4">Workflow Menu</div>
-                <div className="ui-text-secondary ui-text-small">
-                  Workflow tools, validation, palette, and connection details.
-                </div>
-              </div>
-
-              <button
-                type="button"
-                className="ui-button ui-button--ghost ui-button--sm"
-                onClick={() => setIsLeftMenuOpen(false)}
+              <div
+                className={`ui-overlay-panel ui-overlay-panel--left${
+                  isLeftMenuOpen ? " ui-overlay-panel--open" : ""
+                }`}
               >
-                Close
-              </button>
+                <button
+                  type="button"
+                  className="ui-overlay-panel__scrim"
+                  aria-label="Close menu"
+                  onClick={() => setIsLeftMenuOpen(false)}
+                />
+
+                <aside className="ui-overlay-panel__surface">
+                  <div className="ui-overlay-panel__header">
+                    <div className="ui-stack ui-stack--2xs">
+                      <div className="ui-heading-4">Workflow Menu</div>
+                      <div className="ui-text-secondary ui-text-small">
+                        Workflow tools, validation, palette, and connection details.
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="ui-button ui-button--ghost ui-button--sm"
+                      onClick={() => setIsLeftMenuOpen(false)}
+                    >
+                      Close
+                    </button>
+                  </div>
+
+                  <div className="ui-overlay-panel__body ui-stack ui-stack--md ui-scrollbar">
+                    <WorkflowMetadataPanel
+                      workflow={editorViewModel?.header}
+                      isSaving={workflowState.isSaving}
+                      isExecuting={workflowState.isExecuting}
+                      onRenameWorkflow={(name) => {
+                        workflowStore.renameCurrentWorkflow(name);
+                      }}
+                      onUpdateDescription={(description) => {
+                        workflowStore.updateCurrentWorkflowDescription(description);
+                      }}
+                      onSaveWorkflow={() => {
+                        void workflowStore.saveCurrentWorkflow();
+                      }}
+                      onValidateWorkflow={() => {
+                        workflowStore.validateCurrentWorkflow();
+                      }}
+                      onExecuteWorkflow={() => {
+                        void workflowStore.executeCurrentWorkflow();
+                      }}
+                    />
+
+                    <WorkflowValidationPanel validation={validationSummary} />
+
+                    <NodePalette
+                      items={paletteItems}
+                      categories={nodeState.categories}
+                      selectedDefinitionId={nodeState.selectedDefinitionId}
+                      isLoading={nodeState.isLoading}
+                      onSelect={(definitionId) => {
+                        void nodeStore.selectDefinition(definitionId);
+                      }}
+                      onAdd={(definitionId) => {
+                        void addNode(definitionId);
+                      }}
+                      onSearch={(query, category) => {
+                        void nodeStore.refreshCatalog({
+                          query: query || undefined,
+                          categories: category ? [category] : undefined,
+                        });
+                      }}
+                    />
+
+                    <ConnectionInspector
+                      connection={selectedConnection}
+                      onRemoveConnection={(connectionId) => {
+                        workflowStore.removeConnection(connectionId);
+                      }}
+                    />
+                  </div>
+                </aside>
+              </div>
+
+              {!isMobile ? (
+                <div
+                  className={`ui-overlay-panel ui-overlay-panel--right${
+                    isPropertiesOpen ? " ui-overlay-panel--open" : ""
+                  }`}
+                >
+                  <button
+                    type="button"
+                    className="ui-overlay-panel__scrim"
+                    aria-label="Close properties"
+                    onClick={() => setIsPropertiesOpen(false)}
+                  />
+
+                  <aside className="ui-overlay-panel__surface">
+                    <div className="ui-overlay-panel__header">
+                      <div className="ui-stack ui-stack--2xs">
+                        <div className="ui-heading-4">Properties</div>
+                        <div className="ui-text-secondary ui-text-small">
+                          Selected node details and editable properties.
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="ui-button ui-button--ghost ui-button--sm"
+                        onClick={() => setIsPropertiesOpen(false)}
+                      >
+                        Close
+                      </button>
+                    </div>
+
+                    <div className="ui-overlay-panel__body ui-scrollbar">
+                      <NodeInspector
+                        node={selectedNode}
+                        onPropertyChange={(propertyId, value) => {
+                          if (!workflowState.selectedNodeId) {
+                            return;
+                          }
+
+                          workflowStore.updateNodeProperty(
+                            workflowState.selectedNodeId,
+                            propertyId,
+                            value
+                          );
+                        }}
+                      />
+                    </div>
+                  </aside>
+                </div>
+              ) : null}
+
+              {isMobile && mobilePropertiesNode ? (
+                <div className="ui-overlay-panel ui-overlay-panel--fullscreen ui-overlay-panel--open">
+                  <div className="ui-overlay-panel__surface">
+                    <div className="ui-overlay-panel__header">
+                      <div className="ui-stack ui-stack--2xs">
+                        <div className="ui-heading-4">{mobilePropertiesNode.title}</div>
+                        <div className="ui-text-secondary ui-text-small">
+                          Set properties for the selected node.
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="ui-button ui-button--ghost ui-button--sm"
+                        onClick={() => setMobilePropertiesNodeId(undefined)}
+                      >
+                        Close
+                      </button>
+                    </div>
+
+                    <div className="ui-overlay-panel__body ui-scrollbar">
+                      <NodePropertyEditor
+                        fields={mobilePropertiesNode.properties}
+                        disabled={!mobilePropertiesNode.isEnabled}
+                        onPropertyChange={(propertyId, value) => {
+                          workflowStore.updateNodeProperty(
+                            mobilePropertiesNode.id,
+                            propertyId,
+                            value
+                          );
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </div>
-
-            <div className="ui-overlay-panel__body ui-stack ui-stack--md ui-scrollbar">
-              <WorkflowMetadataPanel
-                workflow={editorViewModel?.header}
-                isSaving={workflowState.isSaving}
-                isExecuting={workflowState.isExecuting}
-                onRenameWorkflow={(name) => {
-                  workflowStore.renameCurrentWorkflow(name);
-                }}
-                onUpdateDescription={(description) => {
-                  workflowStore.updateCurrentWorkflowDescription(description);
-                }}
-                onSaveWorkflow={() => {
-                  void workflowStore.saveCurrentWorkflow();
-                }}
-                onValidateWorkflow={() => {
-                  workflowStore.validateCurrentWorkflow();
-                }}
-                onExecuteWorkflow={() => {
-                  void workflowStore.executeCurrentWorkflow();
-                }}
-              />
-
-              <WorkflowValidationPanel validation={validationSummary} />
-
-              <NodePalette
-                items={paletteItems}
-                categories={nodeState.categories}
-                selectedDefinitionId={nodeState.selectedDefinitionId}
-                isLoading={nodeState.isLoading}
-                onSelect={(definitionId) => {
-                  void nodeStore.selectDefinition(definitionId);
-                }}
-                onAdd={(definitionId) => {
-                  void addNode(definitionId);
-                }}
-                onSearch={(query, category) => {
-                  void nodeStore.refreshCatalog({
-                    query: query || undefined,
-                    categories: category ? [category] : undefined,
-                  });
-                }}
-              />
-
-              <ConnectionInspector
-                connection={selectedConnection}
-                onRemoveConnection={(connectionId) => {
-                  workflowStore.removeConnection(connectionId);
-                }}
-              />
-            </div>
-          </aside>
+          </div>
         </div>
-
-        {!isMobile ? (
-          <div
-            className={`ui-overlay-panel ui-overlay-panel--right${
-              isPropertiesOpen ? " ui-overlay-panel--open" : ""
-            }`}
-          >
-            <button
-              type="button"
-              className="ui-overlay-panel__scrim"
-              aria-label="Close properties"
-              onClick={() => setIsPropertiesOpen(false)}
-            />
-
-            <aside className="ui-overlay-panel__surface">
-              <div className="ui-overlay-panel__header">
-                <div className="ui-stack ui-stack--2xs">
-                  <div className="ui-heading-4">Properties</div>
-                  <div className="ui-text-secondary ui-text-small">
-                    Selected node details and editable properties.
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  className="ui-button ui-button--ghost ui-button--sm"
-                  onClick={() => setIsPropertiesOpen(false)}
-                >
-                  Close
-                </button>
-              </div>
-
-              <div className="ui-overlay-panel__body ui-scrollbar">
-                <NodeInspector
-                  node={selectedNode}
-                  onPropertyChange={(propertyId, value) => {
-                    if (!workflowState.selectedNodeId) {
-                      return;
-                    }
-
-                    workflowStore.updateNodeProperty(
-                      workflowState.selectedNodeId,
-                      propertyId,
-                      value
-                    );
-                  }}
-                />
-              </div>
-            </aside>
-          </div>
-        ) : null}
-
-        {isMobile && mobilePropertiesNode ? (
-          <div className="ui-overlay-panel ui-overlay-panel--fullscreen ui-overlay-panel--open">
-            <div className="ui-overlay-panel__surface">
-              <div className="ui-overlay-panel__header">
-                <div className="ui-stack ui-stack--2xs">
-                  <div className="ui-heading-4">{mobilePropertiesNode.title}</div>
-                  <div className="ui-text-secondary ui-text-small">
-                    Set properties for the selected node.
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  className="ui-button ui-button--ghost ui-button--sm"
-                  onClick={() => setMobilePropertiesNodeId(undefined)}
-                >
-                  Close
-                </button>
-              </div>
-
-              <div className="ui-overlay-panel__body ui-scrollbar">
-                <NodePropertyEditor
-                  fields={mobilePropertiesNode.properties}
-                  disabled={!mobilePropertiesNode.isEnabled}
-                  onPropertyChange={(propertyId, value) => {
-                    workflowStore.updateNodeProperty(
-                      mobilePropertiesNode.id,
-                      propertyId,
-                      value
-                    );
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-        ) : null}
       </div>
     </section>
   );
