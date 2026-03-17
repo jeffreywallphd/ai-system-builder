@@ -50,6 +50,7 @@ export interface ReactFlowCanvasProps {
     propertyId: string,
     value: unknown
   ) => void;
+  readonly nodeExecutionOutputs?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 }
 
 const nodeTypes = Object.freeze({
@@ -113,6 +114,7 @@ function InnerReactFlowCanvas({
   onConnectNodes,
   onOpenNodeProperties,
   onNodePropertyChange,
+  nodeExecutionOutputs,
 }: ReactFlowCanvasProps): JSX.Element {
   const nodeAdapter = useMemo(() => new NodeAdapter(), []);
   const edgeAdapter = useMemo(() => new EdgeAdapter(), []);
@@ -125,6 +127,7 @@ function InnerReactFlowCanvas({
         isCompactViewport,
         onOpenProperties: onOpenNodeProperties,
         onPropertyChange: onNodePropertyChange,
+        nodeExecutionOutputs,
       }),
     [
       isCompactViewport,
@@ -132,6 +135,7 @@ function InnerReactFlowCanvas({
       nodes,
       onNodePropertyChange,
       onOpenNodeProperties,
+      nodeExecutionOutputs,
     ]
   );
 

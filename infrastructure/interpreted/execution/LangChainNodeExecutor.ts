@@ -3,6 +3,18 @@ import type { INodeExecutor, INodeExecutionResult } from "../../../application/p
 import type { INodeExecutionContext } from "../../../application/ports/interfaces/INodeExecutionContextResolver";
 import type { INode } from "../../../domain/nodes/interfaces/INode";
 
+interface UploadedDocument {
+  readonly name?: string;
+  readonly text?: string;
+  readonly type?: string;
+  readonly size?: number;
+  readonly error?: string;
+}
+
+function readProperty(node: INode, propertyId: string): unknown {
+  return node.properties.find((property) => property.id === propertyId)?.value;
+}
+
 export class LangChainNodeExecutor implements INodeExecutor {
   private readonly modelExecutor?: IModelExecutor;
 
@@ -51,6 +63,114 @@ export class LangChainNodeExecutor implements INodeExecutor {
     const properties = Object.fromEntries(
       context.node.properties.map((property) => [property.id, property.value])
     );
+
+    if (nodeType === "shared.document-uploader") {
+      const document = readProperty(context.node, "document") as UploadedDocument | undefined;
+      if (!document) {
+        return {
+          nodeId: context.node.id,
+          status: "failed",
+          outputs: {},
+          messages: ["No file uploaded. Select a document in node properties."],
+          errorMessage: "No file uploaded.",
+        };
+      }
+
+      if (document.error) {
+        return {
+          nodeId: context.node.id,
+          status: "failed",
+          outputs: {},
+          messages: [document.error],
+          errorMessage: document.error,
+        };
+      }
+
+      return {
+        nodeId: context.node.id,
+        status: "completed",
+        outputs: {
+          document: {
+            name: document.name ?? "document",
+            text: document.text ?? "",
+            mimeType: document.type ?? "text/plain",
+            size: document.size ?? 0,
+          },
+        },
+        messages: ["Document uploaded successfully."],
+      };
+    }
+
+    if (nodeType === "langchain.document-to-chunks") {
+      const document = inputs.document as UploadedDocument | undefined;
+      if (!document || typeof document.text !== "string") {
+        return {
+          nodeId: context.node.id,
+          status: "failed",
+          outputs: {},
+          messages: ["Chunker received no readable document input."],
+          errorMessage: "Missing document input.",
+        };
+      }
+
+      const chunkSize = Math.max(1, Number(properties["chunk-size"] ?? 500));
+      const chunkOverlap = Math.max(0, Number(properties["chunk-overlap"] ?? 50));
+      const step = Math.max(1, chunkSize - chunkOverlap);
+      const text = document.text;
+      const chunks: Array<{ index: number; text: string }> = [];
+
+      for (let cursor = 0, index = 0; cursor < text.length; cursor += step, index += 1) {
+        const content = text.slice(cursor, cursor + chunkSize).trim();
+        if (!content) {
+          continue;
+        }
+        chunks.push({ index, text: content });
+      }
+
+      if (chunks.length === 0) {
+        return {
+          nodeId: context.node.id,
+          status: "failed",
+          outputs: {},
+          messages: ["Chunker produced no chunks from the provided document."],
+          errorMessage: "No chunks produced.",
+        };
+      }
+
+      return {
+        nodeId: context.node.id,
+        status: "completed",
+        outputs: {
+          chunks,
+        },
+        messages: [`Generated ${chunks.length} chunk(s).`],
+      };
+    }
+
+    if (nodeType === "shared.chunk-displayer") {
+      const chunks = inputs.chunks;
+      if (!Array.isArray(chunks) || chunks.length === 0) {
+        return {
+          nodeId: context.node.id,
+          status: "failed",
+          outputs: {
+            display: "No chunks received.",
+          },
+          messages: ["Chunk displayer received no chunks."],
+          errorMessage: "No chunks received.",
+        };
+      }
+
+      return {
+        nodeId: context.node.id,
+        status: "completed",
+        outputs: {
+          display: chunks,
+          chunks,
+        },
+        messages: [`Displaying ${chunks.length} chunk(s).`],
+      };
+    }
 
     if (nodeType === "langchain.context-merger") {
       const blocks = ((inputs.context_blocks as ReadonlyArray<unknown> | undefined) ??

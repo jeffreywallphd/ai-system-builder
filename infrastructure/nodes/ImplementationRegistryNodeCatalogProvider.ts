@@ -3,6 +3,7 @@ import { NodeDefinition, NodeDefinitionCapabilityProfile } from "../../domain/no
 import type { INodeDefinition } from "../../domain/nodes/interfaces/INodeDefinition";
 import type { INodeImplementationRegistry } from "./shared/INodeImplementationRegistry";
 import { getLangChainNodeCatalogMetadata } from "./langchain/LangChainNodeCatalogMetadata";
+import { getSharedNodeCatalogMetadata } from "./shared/SharedNodeCatalogMetadata";
 
 export class ImplementationRegistryNodeCatalogProvider extends NodeCatalogProvider {
   constructor(registry: INodeImplementationRegistry) {
@@ -18,22 +19,22 @@ function toNodeDefinitions(
   return Object.freeze(
     registry.listImplementations().map((implementation) => {
       const descriptor = implementation.descriptor;
+      const metadata =
+        getLangChainNodeCatalogMetadata(descriptor.nodeTypeId) ??
+        getSharedNodeCatalogMetadata(descriptor.nodeTypeId);
 
       return new NodeDefinition({
         id: descriptor.nodeTypeId,
         type: descriptor.nodeTypeId,
         title: descriptor.title,
         description:
-          getLangChainNodeCatalogMetadata(descriptor.nodeTypeId)?.description ??
+          metadata?.description ??
           `Registered runtime node from ${descriptor.providerId}.`,
-        category: toCategoryLabel(descriptor.providerId),
+        category: (descriptor.metadata?.category as string | undefined) ?? toCategoryLabel(descriptor.providerId),
         executionKind: "generic",
-        inputPorts:
-          getLangChainNodeCatalogMetadata(descriptor.nodeTypeId)?.inputPorts ?? [],
-        outputPorts:
-          getLangChainNodeCatalogMetadata(descriptor.nodeTypeId)?.outputPorts ?? [],
-        properties:
-          getLangChainNodeCatalogMetadata(descriptor.nodeTypeId)?.properties ?? [],
+        inputPorts: metadata?.inputPorts ?? [],
+        outputPorts: metadata?.outputPorts ?? [],
+        properties: metadata?.properties ?? [],
         capabilities: new NodeDefinitionCapabilityProfile({
           tasks: ["generic"],
           runtimes: ["generic"],
