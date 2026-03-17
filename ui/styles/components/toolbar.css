@@ -13,6 +13,10 @@
   flex-wrap: wrap;
 }
 
+.ui-toolbar__group--center {
+  justify-content: center;
+}
+
 .ui-toolbar__spacer {
   flex: 1 1 auto;
 }
