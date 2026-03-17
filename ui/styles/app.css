@@ -266,6 +266,7 @@ body {
 
 .ui-workspace__main {
   min-height: inherit;
+  height: 100%;
 }
 
 .ui-canvas-shell {
@@ -273,16 +274,20 @@ body {
   flex-direction: column;
   gap: var(--space-sm);
   min-height: inherit;
+  height: 100%;
 }
 
 .ui-canvas-shell__body {
+  position: relative;
   flex: 1 1 auto;
   min-height: 0;
+  height: 100%;
 }
 
 .ui-canvas-surface {
   position: relative;
   min-height: inherit;
+  height: 100%;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   overflow: hidden;
@@ -338,6 +343,7 @@ body {
   box-shadow: var(--shadow-elevated);
   display: flex;
   flex-direction: column;
+  min-height: 0;
   transition: transform var(--transition-slow);
 }
 
@@ -372,6 +378,7 @@ body {
   gap: var(--space-sm);
   padding: var(--space-md);
   border-bottom: 1px solid var(--color-border-soft);
+  flex: 0 0 auto;
 }
 
 .ui-overlay-panel__body {
@@ -379,6 +386,14 @@ body {
   min-height: 0;
   overflow: auto;
   padding: var(--space-md);
+}
+
+.ui-overlay-panel__body > * {
+  flex: 0 0 auto;
+}
+
+.ui-overlay-panel__body .ui-panel {
+  min-height: 0;
 }
 
 /* React Flow integration */
