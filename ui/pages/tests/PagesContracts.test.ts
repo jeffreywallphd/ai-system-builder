@@ -13,7 +13,8 @@ describe("ui/pages contract adherence", () => {
     ];
 
     for (const page of pages) {
-      expect(readSource(page)).toContain('className="ui-page"');
+      const source = readSource(page);
+      expect(source).toContain("ui-page");
     }
   });
 

@@ -18,9 +18,10 @@ describe("ui/pages interactions", () => {
 
     expect(editor).toContain("WorkflowMetadataPanel");
     expect(editor).toContain("WorkflowValidationPanel");
+    expect(editor).toContain("WorkflowExecutionStatusPanel");
     expect(editor).toContain("WorkflowCanvasToolbar");
     expect(editor).toContain("ConnectionInspector");
-    expect(editor).toContain("WorkflowNodeList");
+    expect(editor).toContain("NodePalette");
     expect(editor).toContain("useUiDependencies");
     expect(editor).toContain("workflowStore.renameCurrentWorkflow");
     expect(editor).toContain("workflowStore.updateCurrentWorkflowDescription");
