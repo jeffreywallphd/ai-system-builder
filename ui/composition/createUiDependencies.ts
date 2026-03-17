@@ -48,6 +48,9 @@ import { LoadToolDefinitionUseCase } from "../../application/tools/LoadToolDefin
 import { RunToolUseCase } from "../../application/tools/RunToolUseCase";
 import { ToolService } from "../services/ToolService";
 import { ToolStore } from "../state/ToolStore";
+import { Workflow } from "../../domain/workflows/Workflow";
+import sampleImagePipelineRecord from "../../dev/workflow-data/workflows/sample-image-pipeline.json";
+import sampleTextAnalysisRecord from "../../dev/workflow-data/workflows/sample-text-analysis.json";
 
 export interface UiDependencies {
   readonly config: AppRuntimeConfig;
@@ -204,8 +207,46 @@ function createWorkflowRepository(config: AppRuntimeConfig) {
   switch (config.workflowRepositoryMode) {
     case "memory":
     default:
-      return new InMemoryWorkflowRepository();
+      return new InMemoryWorkflowRepository(createSeedWorkflows());
   }
+}
+
+interface WorkflowSeedRecord {
+  readonly id: string;
+  readonly metadata: {
+    readonly name: string;
+    readonly description?: string;
+    readonly author?: string;
+    readonly tags?: ReadonlyArray<string>;
+    readonly version?: string;
+  };
+  readonly status?: "draft" | "ready" | "invalid" | "disabled" | "archived";
+  readonly isEnabled?: boolean;
+  readonly executionPolicy?: "acyclic-only" | "allow-cycles" | "engine-defined";
+}
+
+function createSeedWorkflows(): ReadonlyArray<Workflow> {
+  const seeds = [sampleImagePipelineRecord, sampleTextAnalysisRecord] as const;
+
+  return Object.freeze(seeds.map((record) => hydrateSeedWorkflow(record)));
+}
+
+function hydrateSeedWorkflow(record: WorkflowSeedRecord): Workflow {
+  return new Workflow({
+    id: record.id,
+    metadata: {
+      name: record.metadata.name,
+      description: record.metadata.description,
+      author: record.metadata.author,
+      tags: record.metadata.tags,
+      version: record.metadata.version,
+    },
+    status: record.status,
+    isEnabled: record.isEnabled,
+    executionPolicy: record.executionPolicy,
+    nodes: [],
+    connections: [],
+  });
 }
 
 function createWorkflowExecutor(config: AppRuntimeConfig) {
