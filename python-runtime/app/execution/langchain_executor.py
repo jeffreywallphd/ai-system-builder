@@ -66,4 +66,24 @@ class LangChainExecutor:
                 "result": f"deterministic-chain-output::{rendered}",
             }
 
+        if node_type == "langchain.context_merger":
+            context_blocks: List[str] = list(inputs.get("context_blocks") or properties.get("context_blocks") or [])
+            separator = str(properties.get("separator") or inputs.get("separator") or "\n\n")
+            merged_context = separator.join([str(block) for block in context_blocks])
+            return {
+                "merged_context": merged_context,
+                "block_count": len(context_blocks),
+            }
+
+        if node_type == "langchain.output_parser":
+            output_text = str(inputs.get("output_text") or properties.get("output_text") or "")
+            prefix = str(properties.get("prefix") or inputs.get("prefix") or "")
+            normalized = output_text.strip()
+            if prefix and normalized.startswith(prefix):
+                normalized = normalized[len(prefix):].strip()
+            return {
+                "parsed_output": normalized,
+                "raw_output": output_text,
+            }
+
         raise ValueError(f"Unsupported langchain node type: {node_type}")

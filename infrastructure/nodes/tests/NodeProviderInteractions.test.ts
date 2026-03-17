@@ -22,4 +22,14 @@ describe("Node provider interactions", () => {
     const comfy = new ComfyNodeImplementationRegistry();
     expect(comfy.findByNodeType("KSampler")?.descriptor.runtimeId).toBe("comfyui");
   });
+
+  it("registers newly added langchain runtime nodes across providers", () => {
+    const langchain = new LangChainNodeImplementationRegistry();
+    const python = new PythonNodeImplementationRegistry();
+
+    expect(langchain.findByNodeType("langchain.output-parser")?.descriptor.title).toContain("Output Parser");
+    expect(langchain.findByNodeType("langchain.context-merger")?.descriptor.title).toContain("Context Merger");
+    expect(python.findByNodeType("langchain.output-parser")?.descriptor.providerId).toBe("python");
+    expect(python.findByNodeType("langchain.context-merger")?.descriptor.providerId).toBe("python");
+  });
 });

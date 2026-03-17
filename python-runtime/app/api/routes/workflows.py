@@ -13,5 +13,7 @@ def get_capabilities() -> dict[str, object]:
             "langchain.document_to_chunks",
             "langchain.chat_prompt",
             "langchain.simple_chain",
+            "langchain.context_merger",
+            "langchain.output_parser",
         ],
     }

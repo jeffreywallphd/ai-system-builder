@@ -22,4 +22,17 @@ describe("PythonRuntimeLauncher", () => {
       args: ["-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8123"],
     });
   });
+
+  it("uses a browser-safe default runtime working directory", () => {
+    const calls: unknown[] = [];
+    const launcher = new PythonRuntimeLauncher({
+      spawn: (command, args, options) => {
+        calls.push({ command, args, options });
+        return { on: () => undefined, kill: () => true };
+      },
+    });
+
+    launcher.launch();
+    expect((calls[0] as { options: { cwd: string } }).options.cwd.endsWith("python-runtime")).toBeTrue();
+  });
 });

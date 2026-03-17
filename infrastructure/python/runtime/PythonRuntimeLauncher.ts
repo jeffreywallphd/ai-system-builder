@@ -1,5 +1,3 @@
-import { resolve } from "node:path";
-
 export interface RuntimeProcessLike {
   readonly pid?: number;
   readonly stdout?: { on(event: "data", listener: (chunk: unknown) => void): void };
@@ -30,6 +28,18 @@ export interface PythonRuntimeLauncherOptions {
   readonly spawn: RuntimeSpawn;
 }
 
+function resolveDefaultRuntimeWorkingDirectory(): string {
+  if (typeof window !== "undefined") {
+    return "python-runtime";
+  }
+
+  const cwd = typeof process !== "undefined" && typeof process.cwd === "function"
+    ? process.cwd()
+    : ".";
+
+  return `${cwd}/python-runtime`;
+}
+
 export class PythonRuntimeLauncher {
   private readonly options: Required<Omit<PythonRuntimeLauncherOptions, "spawn" | "env">> & {
     readonly env?: Readonly<Record<string, string | undefined>>;
@@ -42,7 +52,7 @@ export class PythonRuntimeLauncher {
     this.options = {
       pythonExecutable: options.pythonExecutable?.trim() || "python",
       runtimeWorkingDirectory:
-        options.runtimeWorkingDirectory?.trim() || resolve(process.cwd(), "python-runtime"),
+        options.runtimeWorkingDirectory?.trim() || resolveDefaultRuntimeWorkingDirectory(),
       entryModule: options.entryModule?.trim() || "app.main:app",
       host: options.host?.trim() || "127.0.0.1",
       port: options.port && options.port > 0 ? options.port : 8000,

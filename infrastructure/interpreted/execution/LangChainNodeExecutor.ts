@@ -46,6 +46,46 @@ export class LangChainNodeExecutor implements INodeExecutor {
       };
     }
 
+    const nodeType = context.node.definition.type.toLowerCase();
+    const inputs = context.resolvedInputs as Record<string, unknown>;
+    const properties = Object.fromEntries(
+      context.node.properties.map((property) => [property.id, property.value])
+    );
+
+    if (nodeType === "langchain.context-merger") {
+      const blocks = ((inputs.context_blocks as ReadonlyArray<unknown> | undefined) ??
+        (properties.context_blocks as ReadonlyArray<unknown> | undefined) ??
+        [])
+        .map((value) => String(value));
+      const separator = String(inputs.separator ?? properties.separator ?? "\n\n");
+      return {
+        nodeId: context.node.id,
+        status: "completed",
+        outputs: {
+          merged_context: blocks.join(separator),
+          block_count: blocks.length,
+        },
+        messages: ["LangChain context merger executed with interpreter."],
+      };
+    }
+
+    if (nodeType === "langchain.output-parser") {
+      const outputText = String(inputs.output_text ?? properties.output_text ?? "");
+      const prefix = String(inputs.prefix ?? properties.prefix ?? "");
+      const parsedOutput = prefix && outputText.startsWith(prefix)
+        ? outputText.slice(prefix.length).trim()
+        : outputText.trim();
+      return {
+        nodeId: context.node.id,
+        status: "completed",
+        outputs: {
+          parsed_output: parsedOutput,
+          raw_output: outputText,
+        },
+        messages: ["LangChain output parser executed with interpreter."],
+      };
+    }
+
     return {
       nodeId: context.node.id,
       status: "completed",

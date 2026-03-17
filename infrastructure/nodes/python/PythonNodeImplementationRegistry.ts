@@ -53,6 +53,26 @@ const PYTHON_IMPLEMENTATIONS: ReadonlyArray<INodeRuntimeImplementation> = Object
       metadata: { bridgeProvider: "langchain" },
     }),
   },
+  {
+    descriptor: new NodeImplementationDescriptor({
+      providerId: "python",
+      runtimeId: "python",
+      nodeTypeId: "langchain.context-merger",
+      title: "Python Context Merger Adapter",
+      executionStyles: ["python-node", "hybrid"],
+      metadata: { bridgeProvider: "langchain" },
+    }),
+  },
+  {
+    descriptor: new NodeImplementationDescriptor({
+      providerId: "python",
+      runtimeId: "python",
+      nodeTypeId: "langchain.output-parser",
+      title: "Python Output Parser Adapter",
+      executionStyles: ["python-node", "hybrid"],
+      metadata: { bridgeProvider: "langchain" },
+    }),
+  },
 ]);
 
 export class PythonNodeImplementationRegistry extends NodeImplementationRegistry {
