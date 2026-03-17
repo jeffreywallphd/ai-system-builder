@@ -215,6 +215,8 @@ function InnerReactFlowCanvas({
   return (
     <div className="ui-rf-canvas">
       <ReactFlow
+        className="ui-rf-root"
+        style={{ width: "100%", height: "100%" }}
         nodes={renderedNodes as Node<ReactFlowNodeData>[]}
         edges={renderedEdges as Edge[]}
         nodeTypes={nodeTypes}
