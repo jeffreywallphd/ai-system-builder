@@ -66,6 +66,7 @@ export default function WorkflowEditorPage({
   const [fitViewNonce, setFitViewNonce] = useState(0);
   const [isLeftMenuOpen, setIsLeftMenuOpen] = useState(false);
   const [isPropertiesOpen, setIsPropertiesOpen] = useState(false);
+  const [isCanvasLocked, setIsCanvasLocked] = useState(false);
   const [mobilePropertiesNodeId, setMobilePropertiesNodeId] = useState<string>();
   const [isMobile, setIsMobile] = useState<boolean>(() => {
     if (typeof window === "undefined") {
@@ -238,6 +239,24 @@ export default function WorkflowEditorPage({
     }
   }, [workflowState.selectedNodeId]);
 
+  useEffect(() => {
+    if (typeof document === "undefined") {
+      return;
+    }
+
+    const className = "ui-canvas-locked";
+
+    if (isCanvasLocked) {
+      document.body.classList.add(className);
+    } else {
+      document.body.classList.remove(className);
+    }
+
+    return () => {
+      document.body.classList.remove(className);
+    };
+  }, [isCanvasLocked]);
+
   const addNode = async (definitionId: string): Promise<void> => {
     const nextIndex = currentWorkflow?.nodes.length ?? 0;
 
@@ -268,20 +287,40 @@ export default function WorkflowEditorPage({
   const hasSelection =
     !!workflowState.selectedNodeId || !!workflowState.selectedConnectionId;
 
-  return (
-    <section className="ui-page ui-page--editor">
-      <div className="ui-page__hero">
-        <div className="ui-page__hero-copy">
-          <h1 className="ui-page__title">Workflow Editor</h1>
-          <p className="ui-page__subtitle">
-            {workflowId && workflowId !== "new"
-              ? `Editing workflow: ${workflowId}`
-              : "Create and edit workflow graphs."}
-          </p>
-        </div>
-      </div>
+  const toggleCanvasLock = (): void => {
+    setIsCanvasLocked((current) => {
+      const next = !current;
 
-      {(workflowState.error || nodeState.error) && (
+      if (next) {
+        setIsLeftMenuOpen(false);
+        setIsPropertiesOpen(false);
+        setMobilePropertiesNodeId(undefined);
+      }
+
+      return next;
+    });
+  };
+
+  return (
+    <section
+      className={`ui-page ui-page--editor${
+        isCanvasLocked ? " ui-page--editor-canvas-locked" : ""
+      }`}
+    >
+      {!isCanvasLocked ? (
+        <div className="ui-page__hero">
+          <div className="ui-page__hero-copy">
+            <h1 className="ui-page__title">Workflow Editor</h1>
+            <p className="ui-page__subtitle">
+              {workflowId && workflowId !== "new"
+                ? `Editing workflow: ${workflowId}`
+                : "Create and edit workflow graphs."}
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      {!isCanvasLocked && (workflowState.error || nodeState.error) ? (
         <div className="ui-card">
           <div className="ui-card__body ui-stack ui-stack--xs">
             <div className="ui-row ui-row--wrap">
@@ -292,24 +331,29 @@ export default function WorkflowEditorPage({
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
       <div className="ui-workspace">
         <div className="ui-workspace__main">
           <div className="ui-canvas-shell">
             <WorkflowCanvasToolbar
+              isMobile={isMobile}
               hasSelection={hasSelection}
-              canFitView={nodeViewModels.length > 0}
               canOpenProperties={!!selectedNode}
+              isCanvasLocked={isCanvasLocked}
               isMenuOpen={isLeftMenuOpen}
               isPropertiesOpen={isPropertiesOpen}
-              onOpenMenu={() => setIsLeftMenuOpen((value) => !value)}
+              onToggleCanvasLock={toggleCanvasLock}
+              onOpenMenu={() => {
+                if (!isCanvasLocked) {
+                  setIsLeftMenuOpen((value) => !value);
+                }
+              }}
               onOpenProperties={() => {
-                if (selectedNode) {
+                if (!isCanvasLocked && selectedNode) {
                   setIsPropertiesOpen((value) => !value);
                 }
               }}
-              onFitView={() => setFitViewNonce((value) => value + 1)}
               onClearSelection={() => workflowStore.clearSelection()}
               onValidateWorkflow={() => workflowStore.validateCurrentWorkflow()}
             />

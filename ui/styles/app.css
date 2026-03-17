@@ -9,6 +9,7 @@
 @import "./components/panels.css";
 @import "./components/toolbar.css";
 @import "./components/model-browser.css";
+@import "./components/canvas.css";
 
 @import "./layout/container.css";
 @import "./layout/grid.css";
@@ -269,47 +270,6 @@ body {
   height: 100%;
 }
 
-.ui-canvas-shell {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-  min-height: inherit;
-  height: 100%;
-}
-
-.ui-canvas-shell__body {
-  position: relative;
-  flex: 1 1 auto;
-  min-height: 0;
-  height: 100%;
-  overflow: hidden;
-}
-
-.ui-canvas-surface {
-  position: relative;
-  min-height: clamp(28rem, 62vh, 56rem);
-  height: 100%;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  background: var(--color-bg-panel);
-  box-shadow: var(--shadow-panel);
-}
-
-.ui-canvas-empty {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-lg);
-  pointer-events: none;
-  background: linear-gradient(
-    rgba(11, 15, 22, 0.1),
-    rgba(11, 15, 22, 0.3)
-  );
-}
-
 .ui-overlay-panel {
   position: absolute;
   inset: 0;
@@ -397,170 +357,6 @@ body {
   min-height: 0;
 }
 
-/* React Flow integration */
-
-.ui-rf-canvas {
-  height: 100%;
-  min-height: inherit;
-  background:
-    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    rgba(255, 255, 255, 0.01);
-  background-size: 24px 24px;
-}
-
-.ui-rf-root {
-  width: 100%;
-  height: 100%;
-  min-height: inherit;
-}
-
-.ui-rf-node {
-  width: 360px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-bg-panel);
-  box-shadow: var(--shadow-panel);
-  overflow: hidden;
-  transition:
-    border-color var(--transition-fast),
-    box-shadow var(--transition-fast),
-    opacity var(--transition-fast);
-}
-
-.ui-rf-node--selected {
-  border-color: rgba(79, 156, 249, 0.45);
-  box-shadow:
-    var(--shadow-panel),
-    0 0 0 1px rgba(79, 156, 249, 0.12),
-    0 0 24px rgba(79, 156, 249, 0.08);
-}
-
-.ui-rf-node--disabled {
-  opacity: 0.72;
-}
-
-.ui-rf-node__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-sm);
-  padding: var(--space-sm) var(--space-md);
-  border-bottom: 1px solid var(--color-border-soft);
-  background: rgba(255, 255, 255, 0.02);
-  cursor: grab;
-}
-
-.ui-rf-node__title {
-  font-size: var(--font-size-md);
-  font-weight: 650;
-  line-height: 1.25;
-}
-
-.ui-rf-node__body {
-  padding: var(--space-sm) var(--space-md) var(--space-md);
-}
-
-.ui-rf-node__ports {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-md);
-}
-
-.ui-rf-node__port-row {
-  position: relative;
-  display: flex;
-  align-items: flex-start;
-  min-height: 28px;
-}
-
-.ui-rf-node__port-row--input {
-  justify-content: flex-start;
-}
-
-.ui-rf-node__port-row--output {
-  justify-content: flex-end;
-}
-
-.ui-rf-node__port-label {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2xs);
-  min-width: 0;
-}
-
-.ui-rf-node__port-label--right {
-  text-align: right;
-  align-items: flex-end;
-}
-
-.ui-rf-node__handle {
-  width: 12px;
-  height: 12px;
-  border: 2px solid var(--color-text-inverse);
-  background: var(--color-accent);
-  box-shadow: 0 0 0 3px rgba(79, 156, 249, 0.14);
-}
-
-.ui-rf-node__details {
-  margin-top: var(--space-sm);
-  border-top: 1px solid var(--color-border-soft);
-  padding-top: var(--space-sm);
-}
-
-.ui-rf-node__details-summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-sm);
-  cursor: pointer;
-  list-style: none;
-  font-size: var(--font-size-sm);
-  font-weight: 600;
-}
-
-.ui-rf-node__details-summary::-webkit-details-marker {
-  display: none;
-}
-
-.ui-rf-node__details-body {
-  margin-top: var(--space-sm);
-}
-
-.react-flow__node {
-  background: transparent;
-  border: 0;
-  padding: 0;
-  width: auto;
-}
-
-.react-flow__edge-path {
-  stroke: var(--color-accent);
-  stroke-width: 2;
-}
-
-.react-flow__edge.selected .react-flow__edge-path {
-  stroke: var(--color-warning);
-  stroke-width: 3;
-}
-
-.react-flow__controls {
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-panel);
-  box-shadow: var(--shadow-panel);
-}
-
-.react-flow__controls button {
-  background: var(--color-bg-panel);
-  border-bottom: 1px solid var(--color-border-soft);
-  color: var(--color-text-primary);
-}
-
-.react-flow__minimap {
-  background: var(--color-bg-panel);
-  border: 1px solid var(--color-border);
-}
-
 @media (max-width: 767px) {
   .ui-mobile-only {
     display: block;
@@ -602,19 +398,4 @@ body {
     transform: translateX(100%);
   }
 
-  .ui-rf-node {
-    width: min(320px, calc(100vw - 5rem));
-  }
-
-  .ui-rf-node__ports {
-    grid-template-columns: 1fr;
-  }
-
-  .ui-rf-canvas {
-    min-height: 420px;
-  }
-
-  .ui-rf-root {
-    min-height: 420px;
-  }
 }

@@ -1,30 +1,40 @@
 export interface WorkflowCanvasToolbarProps {
+  readonly isMobile?: boolean;
   readonly hasSelection?: boolean;
-  readonly canFitView?: boolean;
   readonly canOpenProperties?: boolean;
+  readonly isCanvasLocked?: boolean;
   readonly isMenuOpen?: boolean;
   readonly isPropertiesOpen?: boolean;
+  readonly onToggleCanvasLock?: () => void;
   readonly onOpenMenu?: () => void;
   readonly onOpenProperties?: () => void;
-  readonly onFitView?: () => void;
   readonly onClearSelection?: () => void;
   readonly onValidateWorkflow?: () => void;
 }
 
 export default function WorkflowCanvasToolbar({
+  isMobile,
   hasSelection,
-  canFitView = true,
   canOpenProperties,
+  isCanvasLocked,
   isMenuOpen,
   isPropertiesOpen,
+  onToggleCanvasLock,
   onOpenMenu,
   onOpenProperties,
-  onFitView,
   onClearSelection,
   onValidateWorkflow,
 }: WorkflowCanvasToolbarProps): JSX.Element {
+  const lockButtonLabel = isCanvasLocked
+    ? isMobile
+      ? "Unlock"
+      : "Unlock Canvas"
+    : isMobile
+      ? "Lock"
+      : "Lock Canvas";
+
   return (
-    <section className="ui-toolbar ui-toolbar--panel">
+    <section className="ui-toolbar ui-toolbar--panel ui-workflow-toolbar">
       <div className="ui-toolbar__group">
         <button
           type="button"
@@ -36,24 +46,6 @@ export default function WorkflowCanvasToolbar({
 
         <button
           type="button"
-          className="ui-button ui-button--secondary ui-button--sm ui-tablet-up-only"
-          onClick={() => onOpenProperties?.()}
-          disabled={!canOpenProperties}
-        >
-          {isPropertiesOpen ? "Close Properties" : "Properties"}
-        </button>
-
-        <button
-          type="button"
-          className="ui-button ui-button--secondary ui-button--sm"
-          onClick={() => onFitView?.()}
-          disabled={!canFitView}
-        >
-          Fit View
-        </button>
-
-        <button
-          type="button"
           className="ui-button ui-button--secondary ui-button--sm"
           onClick={() => onValidateWorkflow?.()}
         >
@@ -61,16 +53,37 @@ export default function WorkflowCanvasToolbar({
         </button>
       </div>
 
-      <div className="ui-toolbar__group">
+      <div className="ui-toolbar__group ui-toolbar__group--center">
         <button
           type="button"
-          className="ui-button ui-button--ghost ui-button--sm"
-          onClick={() => onClearSelection?.()}
-          disabled={!hasSelection}
+          className="ui-button ui-button--secondary ui-button--sm"
+          onClick={() => onToggleCanvasLock?.()}
         >
-          Clear Selection
+          {lockButtonLabel}
         </button>
       </div>
+
+      {!isMobile ? (
+        <div className="ui-toolbar__group ui-toolbar__group--end">
+          <button
+            type="button"
+            className="ui-button ui-button--ghost ui-button--sm"
+            onClick={() => onClearSelection?.()}
+            disabled={!hasSelection}
+          >
+            Clear Selection
+          </button>
+
+          <button
+            type="button"
+            className="ui-button ui-button--secondary ui-button--sm ui-tablet-up-only"
+            onClick={() => onOpenProperties?.()}
+            disabled={!canOpenProperties}
+          >
+            {isPropertiesOpen ? "Close Properties" : "Properties"}
+          </button>
+        </div>
+      ) : null}
     </section>
   );
 }
