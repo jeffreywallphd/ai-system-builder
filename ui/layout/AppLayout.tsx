@@ -1,4 +1,4 @@
-import { Link, NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { getNavigationRoutes } from "../routes/RouteConfig";
 import DevSyncButton from "../dev/DevSyncButton";
 import { useUiDependencies } from "../composition/AppProviders";
@@ -12,6 +12,11 @@ function navLinkClassName(isActive: boolean): string {
 export default function AppLayout(): JSX.Element {
   const routes = getNavigationRoutes();
   const { config } = useUiDependencies();
+  const location = useLocation();
+
+  const isWideWorkspace =
+    location.pathname.startsWith("/workflows/") ||
+    location.pathname === "/workflows";
 
   return (
     <div className="ui-app ui-surface-app">
@@ -21,7 +26,10 @@ export default function AppLayout(): JSX.Element {
             AI Loom Studio
           </Link>
 
-          <div className="ui-row ui-row--wrap" style={{ justifyContent: "flex-end", flex: 1 }}>
+          <div
+            className="ui-row ui-row--wrap"
+            style={{ justifyContent: "flex-end", flex: 1 }}
+          >
             {!config.isProductionMode ? <DevSyncButton /> : null}
 
             <nav className="ui-app__nav" aria-label="Primary">
@@ -41,7 +49,11 @@ export default function AppLayout(): JSX.Element {
       </header>
 
       <main className="ui-app__main">
-        <div className="ui-app__main-inner">
+        <div
+          className={`ui-app__main-inner${
+            isWideWorkspace ? " ui-app__main-inner--wide" : ""
+          }`}
+        >
           <Outlet />
         </div>
       </main>

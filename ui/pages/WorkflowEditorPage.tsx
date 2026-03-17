@@ -2,11 +2,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import NodePalette from "../components/nodes/NodePalette";
 import NodeInspector from "../components/nodes/NodeInspector";
+import NodePropertyEditor from "../components/nodes/NodePropertyEditor";
 import ConnectionInspector from "../components/workflow/ConnectionInspector";
 import WorkflowCanvas from "../components/workflow/WorkflowCanvas";
 import WorkflowCanvasToolbar from "../components/workflow/WorkflowCanvasToolbar";
 import WorkflowMetadataPanel from "../components/workflow/WorkflowMetadataPanel";
-import WorkflowNodeList from "../components/workflow/WorkflowNodeList";
 import WorkflowValidationPanel from "../components/workflow/WorkflowValidationPanel";
 import { useUiDependencies } from "../composition/AppProviders";
 import { NodePresenter } from "../presenters/NodePresenter";
@@ -43,6 +43,8 @@ const fallbackNodeState: INodeStoreState = Object.freeze({
   error: undefined,
 });
 
+const mobileQuery = "(max-width: 767px)";
+
 export default function WorkflowEditorPage({
   workflowStore: workflowStoreProp,
   nodeStore: nodeStoreProp,
@@ -62,6 +64,16 @@ export default function WorkflowEditorPage({
     useState<IWorkflowStoreState>(fallbackWorkflowState);
   const [nodeState, setNodeState] = useState<INodeStoreState>(fallbackNodeState);
   const [fitViewNonce, setFitViewNonce] = useState(0);
+  const [isLeftMenuOpen, setIsLeftMenuOpen] = useState(false);
+  const [isPropertiesOpen, setIsPropertiesOpen] = useState(false);
+  const [mobilePropertiesNodeId, setMobilePropertiesNodeId] = useState<string>();
+  const [isMobile, setIsMobile] = useState<boolean>(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+
+    return window.matchMedia(mobileQuery).matches;
+  });
 
   const nodePresenter = useMemo(() => new NodePresenter(), []);
   const workflowPresenter = useMemo(() => new WorkflowPresenter(), []);
@@ -69,6 +81,27 @@ export default function WorkflowEditorPage({
 
   const createdNewWorkflowRef = useRef(false);
   const seededStarterNodeRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const mediaQueryList = window.matchMedia(mobileQuery);
+    const listener = (event: MediaQueryListEvent): void => {
+      setIsMobile(event.matches);
+      if (!event.matches) {
+        setMobilePropertiesNodeId(undefined);
+      }
+    };
+
+    setIsMobile(mediaQueryList.matches);
+    mediaQueryList.addEventListener("change", listener);
+
+    return () => {
+      mediaQueryList.removeEventListener("change", listener);
+    };
+  }, []);
 
   useEffect(() => {
     return workflowStore.subscribe(setWorkflowState);
@@ -168,6 +201,7 @@ export default function WorkflowEditorPage({
   }, [currentWorkflow, workflowPresenter, workflowState]);
 
   const selectedNode = editorViewModel?.selectedNode;
+
   const selectedConnection = useMemo(
     () =>
       editorViewModel?.workflow.connections.find(
@@ -176,7 +210,18 @@ export default function WorkflowEditorPage({
     [editorViewModel?.workflow.connections, workflowState.selectedConnectionId]
   );
 
+  const mobilePropertiesNode = useMemo(
+    () => nodeViewModels.find((node) => node.id === mobilePropertiesNodeId),
+    [mobilePropertiesNodeId, nodeViewModels]
+  );
+
   const validationSummary = validationPresenter.present(workflowState.validation);
+
+  useEffect(() => {
+    if (!workflowState.selectedNodeId) {
+      setIsPropertiesOpen(false);
+    }
+  }, [workflowState.selectedNodeId]);
 
   const addNode = async (definitionId: string): Promise<void> => {
     const nextIndex = currentWorkflow?.nodes.length ?? 0;
@@ -191,13 +236,25 @@ export default function WorkflowEditorPage({
     });
 
     setFitViewNonce((value) => value + 1);
+    setIsLeftMenuOpen(false);
+  };
+
+  const openNodeProperties = (nodeId: string): void => {
+    workflowStore.selectNode(nodeId);
+
+    if (isMobile) {
+      setMobilePropertiesNodeId(nodeId);
+      return;
+    }
+
+    setIsPropertiesOpen(true);
   };
 
   const hasSelection =
     !!workflowState.selectedNodeId || !!workflowState.selectedConnectionId;
 
   return (
-    <section className="ui-page">
+    <section className="ui-page ui-page--editor">
       <div className="ui-page__hero">
         <div className="ui-page__hero-copy">
           <h1 className="ui-page__title">Workflow Editor</h1>
@@ -222,123 +279,231 @@ export default function WorkflowEditorPage({
         </div>
       )}
 
-      <div className="ui-page-grid ui-page-grid--editor">
-        <div className="ui-stack ui-stack--md">
-          <WorkflowMetadataPanel
-            workflow={editorViewModel?.header}
-            isSaving={workflowState.isSaving}
-            isExecuting={workflowState.isExecuting}
-            onRenameWorkflow={(name) => {
-              workflowStore.renameCurrentWorkflow(name);
-            }}
-            onUpdateDescription={(description) => {
-              workflowStore.updateCurrentWorkflowDescription(description);
-            }}
-            onSaveWorkflow={() => {
-              void workflowStore.saveCurrentWorkflow();
-            }}
-            onValidateWorkflow={() => {
-              workflowStore.validateCurrentWorkflow();
-            }}
-            onExecuteWorkflow={() => {
-              void workflowStore.executeCurrentWorkflow();
-            }}
-          />
+      <div className="ui-workspace">
+        <div className="ui-workspace__main">
+          <div className="ui-canvas-shell">
+            <WorkflowCanvasToolbar
+              hasSelection={hasSelection}
+              canFitView={nodeViewModels.length > 0}
+              canOpenProperties={!!selectedNode}
+              onOpenMenu={() => setIsLeftMenuOpen(true)}
+              onOpenProperties={() => {
+                if (selectedNode) {
+                  setIsPropertiesOpen(true);
+                }
+              }}
+              onFitView={() => setFitViewNonce((value) => value + 1)}
+              onClearSelection={() => workflowStore.clearSelection()}
+              onValidateWorkflow={() => workflowStore.validateCurrentWorkflow()}
+            />
 
-          <WorkflowValidationPanel validation={validationSummary} />
+            <div className="ui-canvas-shell__body">
+              <WorkflowCanvas
+                nodes={nodeViewModels}
+                workflow={editorViewModel?.workflow}
+                selectedNodeId={workflowState.selectedNodeId}
+                selectedConnectionId={workflowState.selectedConnectionId}
+                fitViewNonce={fitViewNonce}
+                isCompactViewport={isMobile}
+                onSelectNode={(nodeId) => {
+                  workflowStore.selectNode(nodeId);
+                }}
+                onSelectConnection={(connectionId) => {
+                  workflowStore.selectConnection(connectionId);
+                }}
+                onClearSelection={() => {
+                  workflowStore.clearSelection();
+                }}
+                onMoveNodeCommit={(nodeId, position) => {
+                  workflowStore.moveNode(nodeId, position);
+                }}
+                onConnectNodes={(request) => {
+                  workflowStore.connectNodes({
+                    sourceNodeId: request.sourceNodeId,
+                    sourcePortId: request.sourcePortId,
+                    targetNodeId: request.targetNodeId,
+                    targetPortId: request.targetPortId,
+                  });
+                }}
+                onOpenNodeProperties={openNodeProperties}
+                onNodePropertyChange={(nodeId, propertyId, value) => {
+                  workflowStore.updateNodeProperty(nodeId, propertyId, value);
+                }}
+              />
+            </div>
+          </div>
         </div>
 
-        <div className="ui-stack ui-stack--md">
-          <NodePalette
-            items={paletteItems}
-            categories={nodeState.categories}
-            selectedDefinitionId={nodeState.selectedDefinitionId}
-            isLoading={nodeState.isLoading}
-            onSelect={(definitionId) => {
-              void nodeStore.selectDefinition(definitionId);
-            }}
-            onAdd={(definitionId) => {
-              void addNode(definitionId);
-            }}
-            onSearch={(query, category) => {
-              void nodeStore.refreshCatalog({
-                query: query || undefined,
-                categories: category ? [category] : undefined,
-              });
-            }}
+        <div
+          className={`ui-overlay-panel ui-overlay-panel--left${
+            isLeftMenuOpen ? " ui-overlay-panel--open" : ""
+          }`}
+        >
+          <button
+            type="button"
+            className="ui-overlay-panel__scrim"
+            aria-label="Close menu"
+            onClick={() => setIsLeftMenuOpen(false)}
           />
 
-          <WorkflowCanvasToolbar
-            hasSelection={hasSelection}
-            canFitView={nodeViewModels.length > 0}
-            onFitView={() => setFitViewNonce((value) => value + 1)}
-            onClearSelection={() => workflowStore.clearSelection()}
-            onValidateWorkflow={() => workflowStore.validateCurrentWorkflow()}
-          />
+          <aside className="ui-overlay-panel__surface">
+            <div className="ui-overlay-panel__header">
+              <div className="ui-stack ui-stack--2xs">
+                <div className="ui-heading-4">Workflow Menu</div>
+                <div className="ui-text-secondary ui-text-small">
+                  Workflow tools, validation, palette, and connection details.
+                </div>
+              </div>
 
-          <WorkflowCanvas
-            nodes={nodeViewModels}
-            workflow={editorViewModel?.workflow}
-            selectedNodeId={workflowState.selectedNodeId}
-            selectedConnectionId={workflowState.selectedConnectionId}
-            fitViewNonce={fitViewNonce}
-            onSelectNode={(nodeId) => {
-              workflowStore.selectNode(nodeId);
-            }}
-            onSelectConnection={(connectionId) => {
-              workflowStore.selectConnection(connectionId);
-            }}
-            onClearSelection={() => {
-              workflowStore.clearSelection();
-            }}
-            onMoveNodeCommit={(nodeId, position) => {
-              workflowStore.moveNode(nodeId, position);
-            }}
-            onConnectNodes={(request) => {
-              workflowStore.connectNodes({
-                sourceNodeId: request.sourceNodeId,
-                sourcePortId: request.sourcePortId,
-                targetNodeId: request.targetNodeId,
-                targetPortId: request.targetPortId,
-              });
-            }}
-          />
+              <button
+                type="button"
+                className="ui-button ui-button--ghost ui-button--sm"
+                onClick={() => setIsLeftMenuOpen(false)}
+              >
+                Close
+              </button>
+            </div>
 
-          <WorkflowNodeList
-            nodes={nodeViewModels}
-            selectedNodeId={workflowState.selectedNodeId}
-            onSelectNode={(nodeId) => {
-              workflowStore.selectNode(nodeId);
-            }}
-            onRemoveNode={(nodeId) => {
-              workflowStore.removeNode(nodeId);
-            }}
-          />
+            <div className="ui-overlay-panel__body ui-stack ui-stack--md ui-scrollbar">
+              <WorkflowMetadataPanel
+                workflow={editorViewModel?.header}
+                isSaving={workflowState.isSaving}
+                isExecuting={workflowState.isExecuting}
+                onRenameWorkflow={(name) => {
+                  workflowStore.renameCurrentWorkflow(name);
+                }}
+                onUpdateDescription={(description) => {
+                  workflowStore.updateCurrentWorkflowDescription(description);
+                }}
+                onSaveWorkflow={() => {
+                  void workflowStore.saveCurrentWorkflow();
+                }}
+                onValidateWorkflow={() => {
+                  workflowStore.validateCurrentWorkflow();
+                }}
+                onExecuteWorkflow={() => {
+                  void workflowStore.executeCurrentWorkflow();
+                }}
+              />
+
+              <WorkflowValidationPanel validation={validationSummary} />
+
+              <NodePalette
+                items={paletteItems}
+                categories={nodeState.categories}
+                selectedDefinitionId={nodeState.selectedDefinitionId}
+                isLoading={nodeState.isLoading}
+                onSelect={(definitionId) => {
+                  void nodeStore.selectDefinition(definitionId);
+                }}
+                onAdd={(definitionId) => {
+                  void addNode(definitionId);
+                }}
+                onSearch={(query, category) => {
+                  void nodeStore.refreshCatalog({
+                    query: query || undefined,
+                    categories: category ? [category] : undefined,
+                  });
+                }}
+              />
+
+              <ConnectionInspector
+                connection={selectedConnection}
+                onRemoveConnection={(connectionId) => {
+                  workflowStore.removeConnection(connectionId);
+                }}
+              />
+            </div>
+          </aside>
         </div>
 
-        <div className="ui-stack ui-stack--md">
-          <NodeInspector
-            node={selectedNode}
-            onPropertyChange={(propertyId, value) => {
-              if (!workflowState.selectedNodeId) {
-                return;
-              }
+        {!isMobile ? (
+          <div
+            className={`ui-overlay-panel ui-overlay-panel--right${
+              isPropertiesOpen ? " ui-overlay-panel--open" : ""
+            }`}
+          >
+            <button
+              type="button"
+              className="ui-overlay-panel__scrim"
+              aria-label="Close properties"
+              onClick={() => setIsPropertiesOpen(false)}
+            />
 
-              workflowStore.updateNodeProperty(
-                workflowState.selectedNodeId,
-                propertyId,
-                value
-              );
-            }}
-          />
+            <aside className="ui-overlay-panel__surface">
+              <div className="ui-overlay-panel__header">
+                <div className="ui-stack ui-stack--2xs">
+                  <div className="ui-heading-4">Properties</div>
+                  <div className="ui-text-secondary ui-text-small">
+                    Selected node details and editable properties.
+                  </div>
+                </div>
 
-          <ConnectionInspector
-            connection={selectedConnection}
-            onRemoveConnection={(connectionId) => {
-              workflowStore.removeConnection(connectionId);
-            }}
-          />
-        </div>
+                <button
+                  type="button"
+                  className="ui-button ui-button--ghost ui-button--sm"
+                  onClick={() => setIsPropertiesOpen(false)}
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="ui-overlay-panel__body ui-scrollbar">
+                <NodeInspector
+                  node={selectedNode}
+                  onPropertyChange={(propertyId, value) => {
+                    if (!workflowState.selectedNodeId) {
+                      return;
+                    }
+
+                    workflowStore.updateNodeProperty(
+                      workflowState.selectedNodeId,
+                      propertyId,
+                      value
+                    );
+                  }}
+                />
+              </div>
+            </aside>
+          </div>
+        ) : null}
+
+        {isMobile && mobilePropertiesNode ? (
+          <div className="ui-overlay-panel ui-overlay-panel--fullscreen ui-overlay-panel--open">
+            <div className="ui-overlay-panel__surface">
+              <div className="ui-overlay-panel__header">
+                <div className="ui-stack ui-stack--2xs">
+                  <div className="ui-heading-4">{mobilePropertiesNode.title}</div>
+                  <div className="ui-text-secondary ui-text-small">
+                    Set properties for the selected node.
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  className="ui-button ui-button--ghost ui-button--sm"
+                  onClick={() => setMobilePropertiesNodeId(undefined)}
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="ui-overlay-panel__body ui-scrollbar">
+                <NodePropertyEditor
+                  fields={mobilePropertiesNode.properties}
+                  disabled={!mobilePropertiesNode.isEnabled}
+                  onPropertyChange={(propertyId, value) => {
+                    workflowStore.updateNodeProperty(
+                      mobilePropertiesNode.id,
+                      propertyId,
+                      value
+                    );
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </section>
   );
