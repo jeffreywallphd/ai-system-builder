@@ -9,6 +9,9 @@ import WorkflowCanvas from "../components/workflow/WorkflowCanvas";
 import WorkflowCanvasToolbar from "../components/workflow/WorkflowCanvasToolbar";
 import WorkflowMetadataPanel from "../components/workflow/WorkflowMetadataPanel";
 import WorkflowValidationPanel from "../components/workflow/WorkflowValidationPanel";
+import WorkflowViewModeToggle from "../components/workflow/WorkflowViewModeToggle";
+import WorkflowFormView from "../components/workflow/WorkflowFormView";
+import type { WorkflowViewMode } from "../state/WorkflowViewMode";
 import { useUiDependencies } from "../composition/AppProviders";
 import { NodePresenter } from "../presenters/NodePresenter";
 import { WorkflowPresenter } from "../presenters/WorkflowPresenter";
@@ -54,6 +57,7 @@ export default function WorkflowEditorPage({
     config,
     workflowStore: injectedWorkflowStore,
     nodeStore: injectedNodeStore,
+    workflowProjectionService,
   } = useUiDependencies();
 
   const workflowStore = workflowStoreProp ?? injectedWorkflowStore;
@@ -65,6 +69,7 @@ export default function WorkflowEditorPage({
     useState<IWorkflowStoreState>(fallbackWorkflowState);
   const [nodeState, setNodeState] = useState<INodeStoreState>(fallbackNodeState);
   const [fitViewNonce, setFitViewNonce] = useState(0);
+  const [viewMode, setViewMode] = useState<WorkflowViewMode>("canvas");
   const [isLeftMenuOpen, setIsLeftMenuOpen] = useState(false);
   const [isPropertiesOpen, setIsPropertiesOpen] = useState(false);
   const [isCanvasLocked, setIsCanvasLocked] = useState(false);
@@ -217,6 +222,13 @@ export default function WorkflowEditorPage({
     });
   }, [currentWorkflow, workflowPresenter, workflowState]);
 
+  const formSchema = useMemo(() => {
+    if (!currentWorkflow) {
+      return undefined;
+    }
+    return workflowProjectionService.projectToForm(currentWorkflow);
+  }, [currentWorkflow, workflowProjectionService]);
+
   const selectedNode = editorViewModel?.selectedNode;
 
   const selectedConnection = useMemo(
@@ -301,6 +313,7 @@ export default function WorkflowEditorPage({
       {!isCanvasLocked ? (
         <div className="ui-page__hero">
           <div className="ui-page__hero-copy">
+            <WorkflowViewModeToggle mode={viewMode} onModeChange={setViewMode} />
             <h1 className="ui-page__title">Workflow Editor</h1>
             <p className="ui-page__subtitle">
               {workflowId && workflowId !== "new"
@@ -348,38 +361,51 @@ export default function WorkflowEditorPage({
             />
 
             <div className="ui-canvas-shell__body">
-              <WorkflowCanvas
-                nodes={nodeViewModels}
-                workflow={editorViewModel?.workflow}
-                selectedNodeId={workflowState.selectedNodeId}
-                selectedConnectionId={workflowState.selectedConnectionId}
-                fitViewNonce={fitViewNonce}
-                isCompactViewport={isMobile}
-                onSelectNode={(nodeId) => {
-                  workflowStore.selectNode(nodeId);
-                }}
-                onSelectConnection={(connectionId) => {
-                  workflowStore.selectConnection(connectionId);
-                }}
-                onClearSelection={() => {
-                  workflowStore.clearSelection();
-                }}
-                onMoveNodeCommit={(nodeId, position) => {
-                  workflowStore.moveNode(nodeId, position);
-                }}
-                onConnectNodes={(request) => {
-                  workflowStore.connectNodes({
-                    sourceNodeId: request.sourceNodeId,
-                    sourcePortId: request.sourcePortId,
-                    targetNodeId: request.targetNodeId,
-                    targetPortId: request.targetPortId,
-                  });
-                }}
-                onOpenNodeProperties={openNodeProperties}
-                onNodePropertyChange={(nodeId, propertyId, value) => {
-                  workflowStore.updateNodeProperty(nodeId, propertyId, value);
-                }}
-              />
+              {viewMode === "canvas" ? (
+                <WorkflowCanvas
+                  nodes={nodeViewModels}
+                  workflow={editorViewModel?.workflow}
+                  selectedNodeId={workflowState.selectedNodeId}
+                  selectedConnectionId={workflowState.selectedConnectionId}
+                  fitViewNonce={fitViewNonce}
+                  isCompactViewport={isMobile}
+                  onSelectNode={(nodeId) => {
+                    workflowStore.selectNode(nodeId);
+                  }}
+                  onSelectConnection={(connectionId) => {
+                    workflowStore.selectConnection(connectionId);
+                  }}
+                  onClearSelection={() => {
+                    workflowStore.clearSelection();
+                  }}
+                  onMoveNodeCommit={(nodeId, position) => {
+                    workflowStore.moveNode(nodeId, position);
+                  }}
+                  onConnectNodes={(request) => {
+                    workflowStore.connectNodes({
+                      sourceNodeId: request.sourceNodeId,
+                      sourcePortId: request.sourcePortId,
+                      targetNodeId: request.targetNodeId,
+                      targetPortId: request.targetPortId,
+                    });
+                  }}
+                  onOpenNodeProperties={openNodeProperties}
+                  onNodePropertyChange={(nodeId, propertyId, value) => {
+                    workflowStore.updateNodeProperty(nodeId, propertyId, value);
+                  }}
+                />
+              ) : formSchema ? (
+                <WorkflowFormView
+                  schema={formSchema}
+                  onChange={(fieldId, value) => {
+                    const [nodeId, propertyId] = fieldId.split(".");
+                    if (!nodeId || !propertyId) {
+                      return;
+                    }
+                    workflowStore.updateNodeProperty(nodeId, propertyId, value);
+                  }}
+                />
+              ) : null}
 
               <div
                 className={`ui-overlay-panel ui-overlay-panel--left${

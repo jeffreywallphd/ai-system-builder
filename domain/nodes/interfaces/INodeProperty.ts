@@ -80,6 +80,21 @@ export interface INodePropertyBindingProfile {
   readonly dependencyConstraints?: ReadonlyArray<IModelDependency>;
 }
 
+
+export type PropertyVisibilityLevel = "basic" | "advanced" | "hidden";
+
+export interface INodePropertyProjectionMetadata {
+  readonly label?: string;
+  readonly description?: string;
+  readonly group?: string;
+  readonly order?: number;
+  readonly authorVisibility?: PropertyVisibilityLevel;
+  readonly toolVisibility?: PropertyVisibilityLevel;
+  readonly exposeInAuthorForm?: boolean;
+  readonly exposeInTool?: boolean;
+  readonly fieldTypeHint?: string;
+}
+
 export interface INodeProperty<TValue = NodePropertyValue> {
   /**
    * Stable property identifier within a node definition.
@@ -145,6 +160,11 @@ export interface INodeProperty<TValue = NodePropertyValue> {
    * Optional compatibility/binding profile for model-aware properties.
    */
   readonly bindingProfile?: INodePropertyBindingProfile;
+
+  /**
+   * Optional metadata for projecting this property into author and tool forms.
+   */
+  readonly projection?: INodePropertyProjectionMetadata;
 
   /**
    * Returns a new property with an updated value.

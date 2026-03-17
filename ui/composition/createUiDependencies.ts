@@ -41,6 +41,14 @@ import { PythonRuntimeLauncher } from "../../infrastructure/python/runtime/Pytho
 import { PythonRuntimeProcessManager } from "../../infrastructure/python/runtime/PythonRuntimeProcessManager";
 import { RuntimeConsoleStore } from "../state/RuntimeConsoleStore";
 
+import { WorkflowProjectionService } from "../../application/projection/WorkflowProjectionService";
+import { WorkflowToolProjectionService } from "../../application/projection/WorkflowToolProjectionService";
+import { ListPublishedToolsUseCase } from "../../application/tools/ListPublishedToolsUseCase";
+import { LoadToolDefinitionUseCase } from "../../application/tools/LoadToolDefinitionUseCase";
+import { RunToolUseCase } from "../../application/tools/RunToolUseCase";
+import { ToolService } from "../services/ToolService";
+import { ToolStore } from "../state/ToolStore";
+
 export interface UiDependencies {
   readonly config: AppRuntimeConfig;
   readonly workflowStore: WorkflowStore;
@@ -50,6 +58,9 @@ export interface UiDependencies {
   readonly nodeService: NodeService;
   readonly modelService: ModelService;
   readonly runtimeConsoleStore: RuntimeConsoleStore;
+  readonly toolService: ToolService;
+  readonly toolStore: ToolStore;
+  readonly workflowProjectionService: WorkflowProjectionService;
 }
 
 export interface ICreateUiDependenciesOptions {
@@ -97,6 +108,23 @@ export function createUiDependencies(
     listAvailableNodesUseCase,
     nodeCatalogProvider,
   });
+
+  const workflowProjectionService = new WorkflowProjectionService();
+  const workflowToolProjectionService = new WorkflowToolProjectionService();
+  const loadToolDefinitionUseCase = new LoadToolDefinitionUseCase(
+    workflowRepository,
+    workflowToolProjectionService
+  );
+  const toolService = new ToolService(
+    new ListPublishedToolsUseCase(workflowRepository, workflowToolProjectionService),
+    loadToolDefinitionUseCase,
+    new RunToolUseCase(
+      workflowRepository,
+      workflowToolProjectionService,
+      workflowExecutor,
+      loadToolDefinitionUseCase
+    )
+  );
 
   const workflowStore = new WorkflowStore({
     workflowService,
@@ -166,6 +194,9 @@ export function createUiDependencies(
     nodeService,
     modelService,
     runtimeConsoleStore,
+    toolService,
+    toolStore: new ToolStore(toolService),
+    workflowProjectionService,
   });
 }
 
