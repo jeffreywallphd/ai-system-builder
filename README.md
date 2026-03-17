@@ -2,6 +2,134 @@
 
 An AI platform to weave together AI capabilities for powerful automation workflows using no-code user interfaces.
 
+## Table of Contents
+
+- [Install](#install)
+  - [Quick install (for technical users)](#quick-install-for-technical-users)
+  - [Detailed install (for beginners)](#detailed-install-for-beginners)
+  - [Start the Python FastAPI runtime (required for workflow execution)](#start-the-python-fastapi-runtime-required-for-workflow-execution)
+- [Resume](#resume)
+- [Runtime/configuration setup](#runtimeconfiguration-setup)
+- [Project structure](#project-structure)
+- [Recent workflow editor implementation](#recent-workflow-editor-implementation)
+- [Newly implemented files](#newly-implemented-files)
+- [Newly added placeholders (not implemented)](#newly-added-placeholders-not-implemented)
+
+## Install
+
+### Quick install (for technical users)
+
+```bash
+# 1) Clone
+git clone https://github.com/<your-org>/ai-loom-studio.git
+cd ai-loom-studio
+
+# 2) Use the project's Node version
+nvm use
+
+# 3) Install dependencies
+npm install
+
+# 4) Create local env file
+cp .env.example .env
+
+# 5) Start dev server
+npm run dev
+
+# 6) In a second terminal, start the Python runtime
+cd python-runtime
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8100 --reload
+```
+
+Open the URL printed by Vite (typically `http://localhost:5173`).
+
+### Detailed install (for beginners)
+
+1. **Install required software**
+   - **Node.js 20+ and npm**
+     - Recommended installer (LTS): [Node.js download page](https://nodejs.org/en/download).
+     - Optional version manager: [nvm](https://github.com/nvm-sh/nvm), then run `nvm install 20`.
+   - **Python 3.10+ and pip**
+     - Official installer: [Python download page](https://www.python.org/downloads/).
+   - **Git** (if you plan to clone from terminal)
+     - Official installer: [Git downloads](https://git-scm.com/downloads).
+
+2. **Download this project**
+   - Option A: Download ZIP from GitHub and extract it.
+   - Option B: Use Git in a terminal:
+     ```bash
+     git clone https://github.com/<your-org>/ai-loom-studio.git
+     cd ai-loom-studio
+     ```
+
+3. **Use the correct Node version**
+   - In the project folder, run:
+     ```bash
+     nvm use
+     ```
+   - If this is your first time using nvm with this project, run:
+     ```bash
+     nvm install
+     nvm use
+     ```
+
+4. **Install project dependencies**
+   ```bash
+   npm install
+   ```
+
+5. **Create your local environment file**
+   ```bash
+   cp .env.example .env
+   ```
+   - This creates your private local config file from the safe template.
+
+6. **Run the app**
+   ```bash
+   npm run dev
+   ```
+   - Wait for the terminal to show the local URL (usually `http://localhost:5173`).
+   - Open that URL in your browser.
+
+7. **Start the Python FastAPI runtime** (needed for workflow execution endpoints)
+   - Open a **second terminal window**.
+   - From the project root, run:
+   ```bash
+   cd python-runtime
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install -r requirements.txt
+   uvicorn app.main:app --host 0.0.0.0 --port 8100 --reload
+   ```
+   - Keep this terminal running while you use the app.
+
+8. **(Optional) Run tests**
+   ```bash
+   npm test
+   ```
+
+### Start the Python FastAPI runtime (required for workflow execution)
+
+The UI uses a local Python service for workflow execution and runtime capabilities.
+
+```bash
+cd python-runtime
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8100 --reload
+```
+
+Runtime endpoints:
+
+- `GET /health`
+- `POST /execute/node`
+- `POST /execute/workflow`
+- `GET /workflows/capabilities`
+
 ## Resume
 
 - Bootstrapped Node.js project configuration with `package.json`, TypeScript (`tsconfig*.json`), Vite (`vite.config.ts`), and Node version pinning via `.nvmrc`.
