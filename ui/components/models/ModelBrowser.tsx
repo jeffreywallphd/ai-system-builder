@@ -1,20 +1,17 @@
+import { useState } from "react";
 import type {
   ModelCompatibilityViewModel,
-  ModelDetailViewModel,
+  ModelDownloadFileViewModel,
   ModelListItemViewModel,
   RemoteModelListItemViewModel,
 } from "../../presenters/ModelPresenter";
 import ModelCard from "./ModelCard";
 import ModelCompatibilityPanel from "./ModelCompatibilityPanel";
-import ModelDetailsPanel from "./ModelDetailsPanel";
 import ModelSearchBar, { type ModelSearchBarValue } from "./ModelSearchBar";
 
 export interface ModelBrowserProps {
   readonly installedModels: ReadonlyArray<ModelListItemViewModel>;
   readonly remoteModels: ReadonlyArray<RemoteModelListItemViewModel>;
-  readonly selectedInstalledModelId?: string;
-  readonly selectedRemoteModelId?: string;
-  readonly selectedModel?: ModelDetailViewModel;
   readonly compatibility?: ModelCompatibilityViewModel;
   readonly installProgressByModelId?: Readonly<Record<string, string>>;
   readonly isLoadingInstalled?: boolean;
@@ -22,19 +19,16 @@ export interface ModelBrowserProps {
   readonly isInstalling?: boolean;
   readonly onSearch: (value: ModelSearchBarValue) => void;
   readonly onClearSearch?: () => void;
-  readonly onSelectInstalled?: (modelId: string) => void;
-  readonly onSelectRemote?: (modelId: string) => void;
-  readonly onInstallRemote?: (modelId: string) => void;
+  readonly onInstallRemoteFiles?: (
+    modelId: string,
+    files: ReadonlyArray<ModelDownloadFileViewModel>
+  ) => void;
   readonly onRemoveInstalled?: (modelId: string) => void;
-  readonly onInspectModel?: (modelId: string) => void;
 }
 
 export default function ModelBrowser({
   installedModels,
   remoteModels,
-  selectedInstalledModelId,
-  selectedRemoteModelId,
-  selectedModel,
   compatibility,
   installProgressByModelId,
   isLoadingInstalled,
@@ -42,12 +36,36 @@ export default function ModelBrowser({
   isInstalling,
   onSearch,
   onClearSearch,
-  onSelectInstalled,
-  onSelectRemote,
-  onInstallRemote,
+  onInstallRemoteFiles,
   onRemoveInstalled,
-  onInspectModel,
 }: ModelBrowserProps): JSX.Element {
+  const [expandedModelIds, setExpandedModelIds] = useState<ReadonlyArray<string>>([]);
+  const [selectedFilesByModelId, setSelectedFilesByModelId] = useState<
+    Readonly<Record<string, ReadonlyArray<string>>>
+  >({});
+
+  const toggleExpanded = (modelId: string) => {
+    setExpandedModelIds((current) =>
+      current.includes(modelId)
+        ? current.filter((id) => id !== modelId)
+        : [...current, modelId]
+    );
+  };
+
+  const toggleFileSelection = (modelId: string, fileId: string) => {
+    setSelectedFilesByModelId((current) => {
+      const modelSelections = current[modelId] ?? [];
+      const updatedSelections = modelSelections.includes(fileId)
+        ? modelSelections.filter((id) => id !== fileId)
+        : [...modelSelections, fileId];
+
+      return {
+        ...current,
+        [modelId]: updatedSelections,
+      };
+    });
+  };
+
   return (
     <section className="ui-model-browser">
       <ModelSearchBar
@@ -83,9 +101,6 @@ export default function ModelBrowser({
                       key={model.id}
                       model={model}
                       mode="installed"
-                      isSelected={selectedInstalledModelId === model.id}
-                      onSelect={onSelectInstalled}
-                      onInspect={onInspectModel}
                       onRemove={onRemoveInstalled}
                     />
                   ))}
@@ -123,11 +138,15 @@ export default function ModelBrowser({
                       key={model.remoteId ?? model.id}
                       model={model}
                       mode="remote"
-                      isSelected={selectedRemoteModelId === (model.remoteId ?? model.id)}
+                      isDetailsExpanded={expandedModelIds.includes(model.id)}
+                      selectedFileIds={selectedFilesByModelId[model.id] ?? []}
                       installProgressLabel={installProgressByModelId?.[model.remoteId ?? model.id]}
-                      onSelect={onSelectRemote}
-                      onInspect={onInspectModel}
-                      onInstall={onInstallRemote}
+                      onToggleDetails={toggleExpanded}
+                      onToggleFileSelection={toggleFileSelection}
+                      onInstallFile={(modelId, file) => {
+                        onInstallRemoteFiles?.(modelId, [file]);
+                      }}
+                      onInstallFiles={onInstallRemoteFiles}
                     />
                   ))}
                 </div>
@@ -137,7 +156,6 @@ export default function ModelBrowser({
         </div>
 
         <div className="ui-stack ui-stack--md">
-          <ModelDetailsPanel model={selectedModel} />
           <ModelCompatibilityPanel compatibility={compatibility} />
         </div>
       </div>

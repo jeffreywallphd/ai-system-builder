@@ -13,6 +13,7 @@ describe("AppRuntimeConfig", () => {
     expect(config.devSyncBaseUrl).toBe("http://192.168.1.100:8787");
     expect(config.devSyncToken).toBe("ai-loom-dev-sync");
     expect(config.isDevSyncEnabled).toBe(true);
+    expect(config.modelInstallDirectory).toBe("dev/model-files");
   });
 
   it("normalizes optional dev sync values", () => {
@@ -24,11 +25,13 @@ describe("AppRuntimeConfig", () => {
       isProductionMode: false,
       devSyncBaseUrl: "   ",
       devSyncToken: "  token-123  ",
+      modelInstallDirectory: "  dev/test-models  ",
     });
 
     expect(config.devSyncBaseUrl).toBeUndefined();
     expect(config.devSyncToken).toBe("token-123");
     expect(config.isDevSyncEnabled).toBe(false);
+    expect(config.modelInstallDirectory).toBe("dev/test-models");
   });
 
   it("disables dev sync in production even when base url is present", () => {
@@ -39,6 +42,7 @@ describe("AppRuntimeConfig", () => {
       seedStarterNode: false,
       isProductionMode: true,
       devSyncBaseUrl: "http://localhost:8787",
+      modelInstallDirectory: "dev/prod-models",
     });
 
     expect(config.isDevSyncEnabled).toBe(false);

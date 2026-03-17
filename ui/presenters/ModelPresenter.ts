@@ -4,6 +4,15 @@ import type { IRemoteModelCatalogItem } from "../../application/ports/interfaces
 import type { ModelResponse } from "../../application/dto/ModelResponse";
 import { formatBytes, toTitleCase } from "./PresenterFormatting";
 
+export interface ModelDownloadFileViewModel {
+  readonly id: string;
+  readonly name: string;
+  readonly format: string;
+  readonly sizeBytes?: number;
+  readonly sizeLabel?: string;
+  readonly isPrimary: boolean;
+}
+
 export interface ModelListItemViewModel {
   readonly id: string;
   readonly title: string;
@@ -20,6 +29,7 @@ export interface ModelListItemViewModel {
   readonly isAvailable: boolean;
   readonly requiresAuth: boolean;
   readonly reference: string;
+  readonly downloadFiles: ReadonlyArray<ModelDownloadFileViewModel>;
 }
 
 export interface RemoteModelListItemViewModel extends ModelListItemViewModel {
@@ -79,6 +89,7 @@ export class ModelPresenter {
       isAvailable: model.isAvailable(),
       requiresAuth: model.requiresAuth,
       reference: model.toReferenceString(),
+      downloadFiles: this.buildDownloadFiles(model),
     });
   }
 
@@ -117,6 +128,24 @@ export class ModelPresenter {
         )
       ),
     });
+  }
+
+
+  private buildDownloadFiles(model: IModel): ReadonlyArray<ModelDownloadFileViewModel> {
+    const files = [model.artifact, ...model.additionalArtifacts];
+
+    return Object.freeze(
+      files.map((artifact, index) =>
+        Object.freeze({
+          id: `${model.id}::${index}::${artifact.name}`,
+          name: artifact.name,
+          format: artifact.format,
+          sizeBytes: artifact.sizeBytes,
+          sizeLabel: formatBytes(artifact.sizeBytes),
+          isPrimary: index === 0,
+        })
+      )
+    );
   }
 
   public toResponse(model: IModel): ModelResponse {
@@ -251,6 +280,7 @@ export class ModelPresenter {
       isSupportingAsset: model.isSupportingAsset(),
       satisfiesRequirements: model.satisfiesRequirements(),
       reference: model.toReferenceString(),
+      downloadFiles: this.buildDownloadFiles(model),
     });
   }
 

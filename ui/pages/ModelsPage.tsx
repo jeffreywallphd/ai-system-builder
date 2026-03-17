@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import ModelBrowser from "../components/models/ModelBrowser";
 import type { ModelSearchBarValue } from "../components/models/ModelSearchBar";
 import { useUiDependencies } from "../composition/AppProviders";
-import { ModelPresenter } from "../presenters/ModelPresenter";
+import { ModelPresenter, type ModelDownloadFileViewModel } from "../presenters/ModelPresenter";
 import type { IModelStoreState, ModelStore } from "../state/ModelStore";
 import type { IModel } from "../../domain/models/interfaces/IModel";
 import type { RuntimeEngine } from "../../domain/models/interfaces/IModelCompatibility";
@@ -24,7 +24,7 @@ const fallbackState: IModelStoreState = Object.freeze({
 
 export default function ModelsPage(): JSX.Element {
   const presenter = useMemo(() => new ModelPresenter(), []);
-  const { modelStore } = useUiDependencies();
+  const { modelStore, config } = useUiDependencies();
   const [state, setState] = useState<IModelStoreState>(fallbackState);
 
   useEffect(() => {
@@ -45,7 +45,6 @@ export default function ModelsPage(): JSX.Element {
     [presenter, state.remoteModels]
   );
 
-  const selectedModel = undefined;
   const compatibility = undefined;
 
   return (
@@ -62,9 +61,6 @@ export default function ModelsPage(): JSX.Element {
       <ModelBrowser
         installedModels={installedModels}
         remoteModels={remoteModels}
-        selectedInstalledModelId={state.selectedInstalledModelId}
-        selectedRemoteModelId={state.selectedRemoteModelId}
-        selectedModel={selectedModel}
         compatibility={compatibility}
         isLoadingInstalled={state.isLoadingInstalled}
         isSearchingRemote={state.isSearchingRemote}
@@ -75,19 +71,8 @@ export default function ModelsPage(): JSX.Element {
         onClearSearch={() => {
           void modelStore.searchRemote({ limit: 16 });
         }}
-        onSelectInstalled={(modelId) => {
-          modelStore.selectInstalledModel(modelId);
-          modelStore.selectRemoteModel(undefined);
-        }}
-        onSelectRemote={(modelId) => {
-          modelStore.selectRemoteModel(modelId);
-          modelStore.selectInstalledModel(undefined);
-        }}
-        onInspectModel={() => {
-          // TODO: wire details panel to selected model state.
-        }}
-        onInstallRemote={(modelId) => {
-          console.log("Install remote model", modelId);
+        onInstallRemoteFiles={(modelId, files) => {
+          void installRemoteFiles(modelStore, config.modelInstallDirectory, modelId, files);
         }}
         onRemoveInstalled={(modelId) => {
           console.log("Remove installed model", modelId);
@@ -95,6 +80,29 @@ export default function ModelsPage(): JSX.Element {
       />
     </section>
   );
+}
+
+async function installRemoteFiles(
+  modelStore: ModelStore,
+  installBaseDirectory: string,
+  modelId: string,
+  files: ReadonlyArray<ModelDownloadFileViewModel>
+): Promise<void> {
+  const installTargets = files.length > 0 ? files : [{ name: modelId } as ModelDownloadFileViewModel];
+
+  for (const file of installTargets) {
+    await modelStore.installModel({
+      remoteId: modelId,
+      destination: `${installBaseDirectory}/${sanitizePathSegment(modelId)}/${sanitizePathSegment(file.name)}`,
+      overwrite: false,
+      verifyIntegrity: true,
+      registerInstalled: true,
+    });
+  }
+}
+
+function sanitizePathSegment(value: string): string {
+  return value.trim().replace(/[^a-zA-Z0-9._-]/g, "_") || "model";
 }
 
 async function searchModels(
