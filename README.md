@@ -44,7 +44,7 @@ pip install -r requirements.txt
 uvicorn app.main:app --host 0.0.0.0 --port 8100 --reload
 ```
 
-Open the URL printed by Vite (typically `http://localhost:5173`).
+Open the URL printed by Vite (typically `http://localhost:5174`).
 
 ### Detailed install (for beginners)
 
@@ -91,7 +91,7 @@ Open the URL printed by Vite (typically `http://localhost:5173`).
    ```bash
    npm run dev
    ```
-   - Wait for the terminal to show the local URL (usually `http://localhost:5173`).
+   - Wait for the terminal to show the local URL (usually `http://localhost:5174`).
    - Open that URL in your browser.
 
 7. **Start the Python FastAPI runtime** (needed for workflow execution endpoints)
