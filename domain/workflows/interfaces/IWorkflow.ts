@@ -53,6 +53,31 @@ export interface IWorkflowMetadata {
    * Optional version label or semantic version.
    */
   readonly version?: string;
+
+  /**
+   * Whether this workflow is exposed as an end-user tool.
+   */
+  readonly isPublishedAsTool?: boolean;
+
+  /**
+   * Optional user-facing title for the tool experience.
+   */
+  readonly toolTitle?: string;
+
+  /**
+   * Optional user-facing description for the tool experience.
+   */
+  readonly toolDescription?: string;
+
+  /**
+   * Optional category used when browsing tools.
+   */
+  readonly toolCategory?: string;
+
+  /**
+   * Optional stable slug/URL key used in tool routes.
+   */
+  readonly toolSlug?: string;
 }
 
 export interface IWorkflowAuditInfo {

@@ -15,6 +15,11 @@ export class WorkflowMetadata implements IWorkflowMetadata {
   public readonly author?: string;
   public readonly tags?: ReadonlyArray<string>;
   public readonly version?: string;
+  public readonly isPublishedAsTool?: boolean;
+  public readonly toolTitle?: string;
+  public readonly toolDescription?: string;
+  public readonly toolCategory?: string;
+  public readonly toolSlug?: string;
 
   constructor(params: {
     name: string;
@@ -22,6 +27,11 @@ export class WorkflowMetadata implements IWorkflowMetadata {
     author?: string;
     tags?: ReadonlyArray<string>;
     version?: string;
+    isPublishedAsTool?: boolean;
+    toolTitle?: string;
+    toolDescription?: string;
+    toolCategory?: string;
+    toolSlug?: string;
   }) {
     const normalizedName = params.name.trim();
 
@@ -36,6 +46,11 @@ export class WorkflowMetadata implements IWorkflowMetadata {
       params.tags?.map((tag) => tag.trim()).filter(Boolean)
     );
     this.version = params.version?.trim() || undefined;
+    this.isPublishedAsTool = params.isPublishedAsTool ?? false;
+    this.toolTitle = params.toolTitle?.trim() || undefined;
+    this.toolDescription = params.toolDescription?.trim() || undefined;
+    this.toolCategory = params.toolCategory?.trim() || undefined;
+    this.toolSlug = params.toolSlug?.trim() || undefined;
   }
 
   public static from(metadata: IWorkflowMetadata): WorkflowMetadata {
@@ -45,6 +60,11 @@ export class WorkflowMetadata implements IWorkflowMetadata {
       author: metadata.author,
       tags: metadata.tags,
       version: metadata.version,
+      isPublishedAsTool: metadata.isPublishedAsTool,
+      toolTitle: metadata.toolTitle,
+      toolDescription: metadata.toolDescription,
+      toolCategory: metadata.toolCategory,
+      toolSlug: metadata.toolSlug,
     });
   }
 }
