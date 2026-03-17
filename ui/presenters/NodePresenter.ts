@@ -18,6 +18,8 @@ export interface NodePaletteItemViewModel {
     readonly type: string;
     readonly isRequired: boolean;
   }>;
+  readonly inputPorts: ReadonlyArray<NodePortViewModel>;
+  readonly outputPorts: ReadonlyArray<NodePortViewModel>;
 }
 
 export interface NodePropertyFieldViewModel {
@@ -92,6 +94,16 @@ export class NodePresenter {
               isRequired: property.constraints?.required ?? false,
             })
           )
+      ),
+      inputPorts: Object.freeze(
+        [...definition.inputPorts]
+          .sort((left, right) => left.order - right.order)
+          .map((port) => this.presentPort(port))
+      ),
+      outputPorts: Object.freeze(
+        [...definition.outputPorts]
+          .sort((left, right) => left.order - right.order)
+          .map((port) => this.presentPort(port))
       ),
     });
   }

@@ -38,4 +38,25 @@ describe("LangChain node catalog definitions", () => {
     expect(parser?.inputPorts.length).toBeGreaterThan(0);
     expect(parser?.outputPorts.length).toBeGreaterThan(0);
   });
+  it("adds configurable properties for key langchain workflow nodes", async () => {
+    const provider = new ImplementationRegistryNodeCatalogProvider(
+      new LangChainNodeImplementationRegistry()
+    );
+
+    const definitions = await provider.getAllDefinitions();
+
+    const expectsPropertiesFor = [
+      "langchain.document-to-chunks",
+      "langchain.chat-prompt",
+      "langchain.simple-chain",
+      "langchain.context-merger",
+    ];
+
+    for (const type of expectsPropertiesFor) {
+      const definition = definitions.find((item) => item.type === type);
+      expect(definition).toBeDefined();
+      expect(definition?.properties.length ?? 0).toBeGreaterThan(0);
+    }
+  });
+
 });
