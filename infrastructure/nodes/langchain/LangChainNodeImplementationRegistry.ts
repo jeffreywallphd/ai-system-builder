@@ -48,6 +48,24 @@ const LANGCHAIN_IMPLEMENTATIONS: ReadonlyArray<INodeRuntimeImplementation> = Obj
       executionStyles: ["interpreted-node", "python-node", "hybrid"],
     }),
   },
+  {
+    descriptor: new NodeImplementationDescriptor({
+      providerId: "langchain",
+      runtimeId: "langchain",
+      nodeTypeId: "langchain.output-parser",
+      title: "LangChain Output Parser",
+      executionStyles: ["interpreted-node", "python-node"],
+    }),
+  },
+  {
+    descriptor: new NodeImplementationDescriptor({
+      providerId: "langchain",
+      runtimeId: "langchain",
+      nodeTypeId: "langchain.context-merger",
+      title: "LangChain Context Merger",
+      executionStyles: ["interpreted-node", "python-node"],
+    }),
+  },
 ]);
 
 export class LangChainNodeImplementationRegistry extends NodeImplementationRegistry {

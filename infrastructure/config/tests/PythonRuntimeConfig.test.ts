@@ -14,6 +14,11 @@ describe("PythonRuntimeConfig", () => {
     expect(() => new PythonRuntimeConfig({ mode: "local-http" })).toThrow();
   });
 
+  it("uses a browser-safe default runtime working directory", () => {
+    const config = new PythonRuntimeConfig();
+    expect(config.runtimeWorkingDirectory.endsWith("python-runtime")).toBeTrue();
+  });
+
   it("loads from env", () => {
     const config = PythonRuntimeConfig.fromEnv({
       PYTHON_RUNTIME_MODE: "local-http",

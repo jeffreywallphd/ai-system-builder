@@ -19,3 +19,15 @@ def test_simple_chain_is_deterministic() -> None:
         properties={'template': 'Say {input_text}'},
     )
     assert result['result'] == 'deterministic-chain-output::Say hello'
+
+
+
+def test_output_parser_removes_prefix() -> None:
+    executor = LangChainExecutor()
+    result = executor.execute(
+        'langchain.output_parser',
+        inputs={'output_text': 'Final: normalized value'},
+        properties={'prefix': 'Final:'},
+    )
+    assert result['parsed_output'] == 'normalized value'
+    assert result['raw_output'] == 'Final: normalized value'

@@ -35,5 +35,8 @@ describe("ui/components/nodes interactions", () => {
     expect(nodePort).toContain("Retired");
     expect(flowWrapper).toContain("function ReactFlowNodeWrapper");
     expect(flowWrapper).toContain("<Handle");
+    expect(flowWrapper).toContain("ui-rf-node__layout");
+    expect(flowWrapper).toContain("ui-rf-node__properties");
+    expect(flowWrapper).not.toContain(`<details className="ui-rf-node__details`);
   });
 });

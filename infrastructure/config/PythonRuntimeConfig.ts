@@ -1,4 +1,3 @@
-import { resolve } from "node:path";
 import { PythonRuntimeMode, parsePythonRuntimeMode, type PythonRuntimeMode as PythonRuntimeModeValue } from "./PythonRuntimeMode";
 
 export interface PythonRuntimeConfigValues {
@@ -11,6 +10,17 @@ export interface PythonRuntimeConfigValues {
   readonly startupTimeoutMs?: number;
   readonly healthPollIntervalMs?: number;
   readonly autoStartEnabled?: boolean;
+}
+
+function resolveDefaultRuntimeWorkingDirectory(): string {
+  if (typeof window !== "undefined") {
+    return "python-runtime";
+  }
+
+  const cwd = typeof process !== "undefined" && typeof process.cwd === "function"
+    ? process.cwd()
+    : ".";
+  return `${cwd}/python-runtime`;
 }
 
 export class PythonRuntimeConfig {
@@ -30,7 +40,7 @@ export class PythonRuntimeConfig {
     this.timeoutMs = values.timeoutMs && values.timeoutMs > 0 ? values.timeoutMs : 15_000;
     this.authToken = values.authToken?.trim() || undefined;
     this.pythonExecutable = values.pythonExecutable?.trim() || "python";
-    this.runtimeWorkingDirectory = values.runtimeWorkingDirectory?.trim() || resolve(process.cwd(), "python-runtime");
+    this.runtimeWorkingDirectory = values.runtimeWorkingDirectory?.trim() || resolveDefaultRuntimeWorkingDirectory();
     this.startupTimeoutMs = values.startupTimeoutMs && values.startupTimeoutMs > 0 ? values.startupTimeoutMs : 20_000;
     this.healthPollIntervalMs =
       values.healthPollIntervalMs && values.healthPollIntervalMs > 0 ? values.healthPollIntervalMs : 500;
