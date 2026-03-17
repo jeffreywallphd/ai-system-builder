@@ -17,5 +17,6 @@ describe("InfrastructureRegistry", () => {
     expect(c.isRegistered(TOKENS.FileStorage)).toBe(true);
     expect(c.isRegistered(TOKENS.AssetCatalog)).toBe(true);
     expect(c.isRegistered(TOKENS.WorkflowRepository)).toBe(true);
+    expect(c.isRegistered(TOKENS.NodeImplementationRegistry)).toBe(true);
   });
 });
