@@ -1,0 +1,35 @@
+{
+  "name": "Document Upload → Chunker → Chunk Display",
+  "description": "Example graph for end-to-end document chunk testing.",
+  "nodes": [
+    {
+      "definitionId": "shared.document-uploader",
+      "title": "Document Uploader",
+      "position": { "x": 80, "y": 120 }
+    },
+    {
+      "definitionId": "langchain.document-to-chunks",
+      "title": "LangChain Document Chunker",
+      "position": { "x": 420, "y": 120 },
+      "properties": {
+        "chunk-size": 500,
+        "chunk-overlap": 50
+      }
+    },
+    {
+      "definitionId": "shared.chunk-displayer",
+      "title": "Chunk Displayer",
+      "position": { "x": 760, "y": 120 }
+    }
+  ],
+  "connections": [
+    {
+      "from": { "node": "Document Uploader", "port": "document" },
+      "to": { "node": "LangChain Document Chunker", "port": "document" }
+    },
+    {
+      "from": { "node": "LangChain Document Chunker", "port": "chunks" },
+      "to": { "node": "Chunk Displayer", "port": "chunks" }
+    }
+  ]
+}

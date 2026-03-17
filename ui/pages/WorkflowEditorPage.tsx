@@ -34,6 +34,7 @@ const fallbackWorkflowState: IWorkflowStoreState = Object.freeze({
   isSaving: false,
   isExecuting: false,
   lastExecutionEvent: undefined,
+  nodeExecutionOutputs: Object.freeze({}),
   error: undefined,
 });
 
@@ -433,6 +434,7 @@ export default function WorkflowEditorPage({
                   onNodePropertyChange={(nodeId, propertyId, value) => {
                     workflowStore.updateNodeProperty(nodeId, propertyId, value);
                   }}
+                  nodeExecutionOutputs={workflowState.nodeExecutionOutputs}
                 />
               </div>
 

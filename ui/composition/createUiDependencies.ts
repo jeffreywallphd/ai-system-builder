@@ -20,7 +20,7 @@ import { NodeStore } from "../state/NodeStore";
 import { ModelStore } from "../state/ModelStore";
 import { AppRuntimeConfig } from "../../infrastructure/config/AppRuntimeConfig";
 import { InMemoryWorkflowRepository } from "../../infrastructure/mocks/repositories/InMemoryWorkflowRepository";
-import { PreviewWorkflowExecutor } from "../../infrastructure/mocks/execution/PreviewWorkflowExecutor";
+import { InterpretedWorkflowExecutor } from "../../infrastructure/interpreted/execution/InterpretedWorkflowExecutor";
 import { MockNodeCatalogProvider } from "../../infrastructure/mocks/catalog/MockNodeCatalogProvider";
 import { NodeCatalogProvider } from "../../application/ports/NodeCatalogProvider";
 import { createCompositeNodeImplementationRegistry } from "../../infrastructure/nodes/NodeProviderRegistryIndex";
@@ -212,7 +212,7 @@ function createWorkflowExecutor(config: AppRuntimeConfig) {
   switch (config.workflowExecutorMode) {
     case "preview":
     default:
-      return new PreviewWorkflowExecutor();
+      return new InterpretedWorkflowExecutor();
   }
 }
 

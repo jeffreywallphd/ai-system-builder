@@ -4,6 +4,7 @@ import type { NodeDetailViewModel } from "../../../presenters/NodePresenter";
 export interface ReactFlowNodeData {
   readonly node: NodeDetailViewModel;
   readonly isCompactViewport: boolean;
+  readonly executionOutput?: Readonly<Record<string, unknown>>;
   readonly onOpenProperties?: (nodeId: string) => void;
   readonly onPropertyChange?: (
     nodeId: string,
@@ -14,6 +15,7 @@ export interface ReactFlowNodeData {
 
 export interface NodeAdapterOptions {
   readonly isCompactViewport?: boolean;
+  readonly nodeExecutionOutputs?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
   readonly onOpenProperties?: (nodeId: string) => void;
   readonly onPropertyChange?: (
     nodeId: string,
@@ -37,6 +39,7 @@ export class NodeAdapter {
       data: Object.freeze({
         node,
         isCompactViewport: options.isCompactViewport ?? false,
+        executionOutput: options.nodeExecutionOutputs?.[node.id],
         onOpenProperties: options.onOpenProperties,
         onPropertyChange: options.onPropertyChange,
       }),
