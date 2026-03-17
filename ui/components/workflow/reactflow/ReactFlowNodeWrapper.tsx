@@ -3,17 +3,17 @@ import { Handle, Position, type NodeProps } from "@xyflow/react";
 import type { ReactFlowNodeData } from "./NodeAdapter";
 import NodePropertyEditor from "../../nodes/NodePropertyEditor";
 
-function inputHandlePosition(index: number): React.CSSProperties {
-  return {
-    top: 48 + index * 34,
-  };
-}
+const inputHandleStyle: React.CSSProperties = {
+  top: "50%",
+  left: 0,
+  transform: "translate(-60%, -50%)",
+};
 
-function outputHandlePosition(index: number): React.CSSProperties {
-  return {
-    top: 48 + index * 34,
-  };
-}
+const outputHandleStyle: React.CSSProperties = {
+  top: "50%",
+  right: 0,
+  transform: "translate(60%, -50%)",
+};
 
 function ReactFlowNodeWrapper({
   data,
@@ -48,14 +48,14 @@ function ReactFlowNodeWrapper({
         <div className="ui-rf-node__layout">
           <div className="ui-stack ui-stack--xs">
             {node.inputPorts.length > 0 ? (
-              node.inputPorts.map((port, index) => (
+              node.inputPorts.map((port) => (
                 <div key={port.id} className="ui-rf-node__port-row ui-rf-node__port-row--input">
                   <Handle
                     id={port.id}
                     type="target"
                     position={Position.Left}
                     className="ui-rf-node__handle"
-                    style={inputHandlePosition(index)}
+                    style={inputHandleStyle}
                   />
                   <div className="ui-rf-node__port-label">
                     <span className="ui-text-small">{port.name}</span>
@@ -95,7 +95,7 @@ function ReactFlowNodeWrapper({
 
           <div className="ui-stack ui-stack--xs">
             {node.outputPorts.length > 0 ? (
-              node.outputPorts.map((port, index) => (
+              node.outputPorts.map((port) => (
                 <div key={port.id} className="ui-rf-node__port-row ui-rf-node__port-row--output">
                   <div className="ui-rf-node__port-label ui-rf-node__port-label--right">
                     <span className="ui-text-small">{port.name}</span>
@@ -112,7 +112,7 @@ function ReactFlowNodeWrapper({
                     type="source"
                     position={Position.Right}
                     className="ui-rf-node__handle"
-                    style={outputHandlePosition(index)}
+                    style={outputHandleStyle}
                   />
                 </div>
               ))

@@ -16,9 +16,9 @@ describe("NodeCatalogProvider", () => {
     isVisibleInBasicMode: false,
   });
 
-  it("currently throws when sorting deduped frozen definitions (regression coverage)", async () => {
+  it("returns sorted definitions without mutating frozen arrays", async () => {
     const catalog = new NodeCatalogProvider({ definitions: [text2img, modelAware] });
-    expect(catalog.getAllDefinitions()).rejects.toThrow("readonly property");
+    await expect(catalog.getAllDefinitions()).resolves.toEqual([modelAware, text2img]);
   });
 
   it("supports rich criteria filtering for single-definition catalogs", async () => {

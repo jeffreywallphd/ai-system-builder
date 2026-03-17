@@ -90,16 +90,6 @@ export class WorkflowValidator implements IWorkflowValidator {
     const invalidNodeIds = new Set<string>();
     const invalidConnectionIds = new Set<string>();
 
-    if (workflow.nodes.length === 0) {
-      addMessage(messages, {
-        code: "workflow-empty",
-        severity: "error",
-        scope: "workflow",
-        message: "Workflow must contain at least one node.",
-        target: { workflowId: workflow.id },
-      });
-    }
-
     if (!workflow.isEnabled) {
       addMessage(messages, {
         code: "workflow-disabled",

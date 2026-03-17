@@ -153,6 +153,7 @@ body.ui-canvas-locked .ui-page--editor-canvas-locked .ui-canvas-shell {
 
 .ui-rf-node__body {
   padding: var(--space-sm) var(--space-md) var(--space-md);
+  overflow: visible;
 }
 
 .ui-rf-node__layout {
@@ -166,15 +167,17 @@ body.ui-canvas-locked .ui-page--editor-canvas-locked .ui-canvas-shell {
   position: relative;
   display: flex;
   align-items: flex-start;
-  min-height: 28px;
+  min-height: 34px;
 }
 
 .ui-rf-node__port-row--input {
   justify-content: flex-start;
+  padding-right: var(--space-xs);
 }
 
 .ui-rf-node__port-row--output {
   justify-content: flex-end;
+  padding-left: var(--space-xs);
 }
 
 .ui-rf-node__port-label {
@@ -190,8 +193,8 @@ body.ui-canvas-locked .ui-page--editor-canvas-locked .ui-canvas-shell {
 }
 
 .ui-rf-node__handle {
-  width: 12px;
-  height: 12px;
+  width: 16px;
+  height: 16px;
   border: 2px solid var(--color-text-inverse);
   background: var(--color-accent);
   box-shadow: 0 0 0 3px rgba(79, 156, 249, 0.14);
@@ -202,6 +205,7 @@ body.ui-canvas-locked .ui-page--editor-canvas-locked .ui-canvas-shell {
   border-radius: var(--radius-md);
   padding: var(--space-sm);
   background: rgba(255, 255, 255, 0.02);
+  min-width: 240px;
 }
 
 .ui-rf-node__properties-header {
