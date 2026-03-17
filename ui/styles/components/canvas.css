@@ -56,6 +56,27 @@ body.ui-canvas-locked .ui-page--editor-canvas-locked .ui-canvas-shell {
   overflow: hidden;
 }
 
+.ui-canvas-shell__view {
+  position: absolute;
+  inset: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: auto;
+}
+
+.ui-canvas-shell__view--active {
+  visibility: visible;
+  opacity: 1;
+  z-index: 1;
+}
+
+.ui-canvas-shell__view--inactive {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
 .ui-canvas-surface {
   position: relative;
   min-height: clamp(28rem, 62vh, 56rem);

@@ -1,4 +1,7 @@
+import type { WorkflowViewMode } from "../../state/WorkflowViewMode";
+
 export interface WorkflowCanvasToolbarProps {
+  readonly viewMode?: WorkflowViewMode;
   readonly isMobile?: boolean;
   readonly hasSelection?: boolean;
   readonly canOpenProperties?: boolean;
@@ -10,9 +13,11 @@ export interface WorkflowCanvasToolbarProps {
   readonly onOpenProperties?: () => void;
   readonly onClearSelection?: () => void;
   readonly onValidateWorkflow?: () => void;
+  readonly onViewModeChange?: (mode: WorkflowViewMode) => void;
 }
 
 export default function WorkflowCanvasToolbar({
+  viewMode,
   isMobile,
   hasSelection,
   canOpenProperties,
@@ -24,6 +29,7 @@ export default function WorkflowCanvasToolbar({
   onOpenProperties,
   onClearSelection,
   onValidateWorkflow,
+  onViewModeChange,
 }: WorkflowCanvasToolbarProps): JSX.Element {
   const lockButtonLabel = isCanvasLocked
     ? isMobile
@@ -54,6 +60,23 @@ export default function WorkflowCanvasToolbar({
       </div>
 
       <div className="ui-toolbar__group ui-toolbar__group--center">
+        <div className="ui-button-group" role="group" aria-label="Workflow view mode">
+          <button
+            type="button"
+            className={`ui-button ui-button--sm ${viewMode === "canvas" ? "ui-button--primary" : "ui-button--ghost"}`}
+            onClick={() => onViewModeChange?.("canvas")}
+          >
+            Canvas
+          </button>
+          <button
+            type="button"
+            className={`ui-button ui-button--sm ${viewMode === "form" ? "ui-button--primary" : "ui-button--ghost"}`}
+            onClick={() => onViewModeChange?.("form")}
+          >
+            Form
+          </button>
+        </div>
+
         <button
           type="button"
           className="ui-button ui-button--secondary ui-button--sm"

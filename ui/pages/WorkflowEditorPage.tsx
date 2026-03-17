@@ -9,7 +9,6 @@ import WorkflowCanvas from "../components/workflow/WorkflowCanvas";
 import WorkflowCanvasToolbar from "../components/workflow/WorkflowCanvasToolbar";
 import WorkflowMetadataPanel from "../components/workflow/WorkflowMetadataPanel";
 import WorkflowValidationPanel from "../components/workflow/WorkflowValidationPanel";
-import WorkflowViewModeToggle from "../components/workflow/WorkflowViewModeToggle";
 import WorkflowFormView from "../components/workflow/WorkflowFormView";
 import type { WorkflowViewMode } from "../state/WorkflowViewMode";
 import { useUiDependencies } from "../composition/AppProviders";
@@ -349,7 +348,6 @@ export default function WorkflowEditorPage({
       {!isCanvasLocked ? (
         <div className="ui-page__hero">
           <div className="ui-page__hero-copy">
-            <WorkflowViewModeToggle mode={viewMode} onModeChange={setViewMode} />
             <h1 className="ui-page__title">Workflow Editor</h1>
             <p className="ui-page__subtitle">
               {workflowId && workflowId !== "new"
@@ -377,6 +375,7 @@ export default function WorkflowEditorPage({
         <div className="ui-workspace__main">
           <div className="ui-canvas-shell">
             <WorkflowCanvasToolbar
+              viewMode={viewMode}
               isMobile={isMobile}
               hasSelection={hasSelection}
               canOpenProperties={!!selectedNode}
@@ -394,10 +393,15 @@ export default function WorkflowEditorPage({
               }}
               onClearSelection={() => workflowStore.clearSelection()}
               onValidateWorkflow={() => workflowStore.validateCurrentWorkflow()}
+              onViewModeChange={setViewMode}
             />
 
             <div className="ui-canvas-shell__body">
-              {viewMode === "canvas" ? (
+              <div
+                className={`ui-canvas-shell__view ${
+                  viewMode === "canvas" ? "ui-canvas-shell__view--active" : "ui-canvas-shell__view--inactive"
+                }`}
+              >
                 <WorkflowCanvas
                   nodes={nodeViewModels}
                   workflow={editorViewModel?.workflow}
@@ -430,18 +434,26 @@ export default function WorkflowEditorPage({
                     workflowStore.updateNodeProperty(nodeId, propertyId, value);
                   }}
                 />
-              ) : formSchema ? (
-                <WorkflowFormView
-                  schema={formSchema}
-                  onChange={(fieldId, value) => {
-                    const [nodeId, propertyId] = fieldId.split(".");
-                    if (!nodeId || !propertyId) {
-                      return;
-                    }
-                    workflowStore.updateNodeProperty(nodeId, propertyId, value);
-                  }}
-                />
-              ) : null}
+              </div>
+
+              <div
+                className={`ui-canvas-shell__view ${
+                  viewMode === "form" ? "ui-canvas-shell__view--active" : "ui-canvas-shell__view--inactive"
+                }`}
+              >
+                {formSchema ? (
+                  <WorkflowFormView
+                    schema={formSchema}
+                    onChange={(fieldId, value) => {
+                      const [nodeId, propertyId] = fieldId.split(".");
+                      if (!nodeId || !propertyId) {
+                        return;
+                      }
+                      workflowStore.updateNodeProperty(nodeId, propertyId, value);
+                    }}
+                  />
+                ) : null}
+              </div>
 
 
               {visibleValidationMessages.length > 0 ? (

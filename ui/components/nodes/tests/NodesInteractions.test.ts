@@ -49,6 +49,9 @@ describe("ui/components/nodes interactions", () => {
     expect(paletteItem).toContain("Node properties summary");
     expect(paletteItem).toContain("Node input ports summary");
     expect(paletteItem).toContain("Node output ports summary");
+    expect(paletteItem).toContain(">Properties<");
+    expect(paletteItem).toContain(">Inputs<");
+    expect(paletteItem).toContain(">Outputs<");
   });
 
 });
