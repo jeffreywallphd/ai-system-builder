@@ -213,11 +213,10 @@ export class NodeCatalogProvider implements INodeCatalogProvider {
       this.providers.map((provider) => provider.getAllDefinitions())
     );
 
-    return dedupeDefinitions([
-      ...this.localDefinitions,
-      ...providerResults.flat(),
-    ]).sort((left, right) =>
-      normalize(left.title).localeCompare(normalize(right.title))
+    return Object.freeze(
+      [...dedupeDefinitions([...this.localDefinitions, ...providerResults.flat()])].sort(
+        (left, right) => normalize(left.title).localeCompare(normalize(right.title))
+      )
     );
   }
 

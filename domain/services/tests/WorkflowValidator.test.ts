@@ -4,6 +4,17 @@ import { NodeProperty } from "../../nodes/NodeProperty";
 import { makeConnection, makeNode, makeNodePort, makeWorkflow } from "./testUtils";
 
 describe("WorkflowValidator", () => {
+  it("does not report an error for an empty workflow canvas", () => {
+    const validator = new WorkflowValidator();
+    const emptyWorkflow = makeWorkflow({ nodes: [], connections: [] });
+
+    const result = validator.validateWorkflow(emptyWorkflow);
+
+    expect(result.hasMessage("workflow-empty")).toBeFalse();
+    expect(result.errors).toHaveLength(0);
+    expect(result.isValid).toBeTrue();
+  });
+
   it("validates workflows with global, graph, node and connection level errors", () => {
     const validator = new WorkflowValidator();
     const brokenNode = makeNode({

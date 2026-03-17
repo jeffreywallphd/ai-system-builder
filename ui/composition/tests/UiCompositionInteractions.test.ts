@@ -17,4 +17,16 @@ describe("ui composition interactions", () => {
     expect(dependencies.modelService).toBeDefined();
     expect(dependencies.runtimeConsoleStore).toBeDefined();
   });
+
+  it("exposes registry-backed node definitions in the UI catalog", async () => {
+    const dependencies = createUiDependencies({
+      config: AppRuntimeConfig.forDevelopment(),
+    });
+
+    const definitions = await dependencies.nodeService.listAvailableNodes();
+    const nodeTypeIds = definitions.map((definition) => definition.type);
+
+    expect(nodeTypeIds).toContain("langchain.output-parser");
+    expect(nodeTypeIds).toContain("langchain.context-merger");
+  });
 });
