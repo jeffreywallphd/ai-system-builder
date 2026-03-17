@@ -16,6 +16,41 @@ describe("AppRuntimeConfig", () => {
     expect(config.modelInstallDirectory).toBe("dev/model-files");
   });
 
+
+  it("reads development defaults from environment variables when available", () => {
+    const originalBaseUrl = process.env.VITE_DEV_SYNC_BASE_URL;
+    const originalToken = process.env.VITE_DEV_SYNC_TOKEN;
+    const originalModelDirectory = process.env.VITE_MODEL_INSTALL_DIRECTORY;
+
+    process.env.VITE_DEV_SYNC_BASE_URL = "http://localhost:9999";
+    process.env.VITE_DEV_SYNC_TOKEN = "custom-token";
+    process.env.VITE_MODEL_INSTALL_DIRECTORY = "dev/custom-model-files";
+
+    const config = AppRuntimeConfig.forDevelopment();
+
+    expect(config.devSyncBaseUrl).toBe("http://localhost:9999");
+    expect(config.devSyncToken).toBe("custom-token");
+    expect(config.modelInstallDirectory).toBe("dev/custom-model-files");
+
+    if (typeof originalBaseUrl === "undefined") {
+      delete process.env.VITE_DEV_SYNC_BASE_URL;
+    } else {
+      process.env.VITE_DEV_SYNC_BASE_URL = originalBaseUrl;
+    }
+
+    if (typeof originalToken === "undefined") {
+      delete process.env.VITE_DEV_SYNC_TOKEN;
+    } else {
+      process.env.VITE_DEV_SYNC_TOKEN = originalToken;
+    }
+
+    if (typeof originalModelDirectory === "undefined") {
+      delete process.env.VITE_MODEL_INSTALL_DIRECTORY;
+    } else {
+      process.env.VITE_MODEL_INSTALL_DIRECTORY = originalModelDirectory;
+    }
+  });
+
   it("normalizes optional dev sync values", () => {
     const config = new AppRuntimeConfig({
       workflowRepositoryMode: "memory",

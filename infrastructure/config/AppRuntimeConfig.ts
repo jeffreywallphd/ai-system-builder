@@ -38,16 +38,33 @@ export class AppRuntimeConfig {
     return !this.isProductionMode && !!this.devSyncBaseUrl;
   }
 
+  private static readEnvVariable(key: string): string | undefined {
+    if (typeof process !== "undefined" && process?.env?.[key]) {
+      return process.env[key];
+    }
+
+    return import.meta.env?.[key];
+  }
+
   public static forDevelopment(): AppRuntimeConfig {
+    const devSyncBaseUrl =
+      AppRuntimeConfig.readEnvVariable("VITE_DEV_SYNC_BASE_URL") ||
+      "http://192.168.1.100:8787";
+    const devSyncToken =
+      AppRuntimeConfig.readEnvVariable("VITE_DEV_SYNC_TOKEN") || "ai-loom-dev-sync";
+    const modelInstallDirectory =
+      AppRuntimeConfig.readEnvVariable("VITE_MODEL_INSTALL_DIRECTORY") ||
+      "dev/model-files";
+
     return new AppRuntimeConfig({
       workflowRepositoryMode: "memory",
       workflowExecutorMode: "preview",
       nodeCatalogMode: "mock",
       seedStarterNode: true,
       isProductionMode: false,
-      devSyncBaseUrl: "http://192.168.1.100:8787",
-      devSyncToken: "ai-loom-dev-sync",
-      modelInstallDirectory: "dev/model-files",
+      devSyncBaseUrl,
+      devSyncToken,
+      modelInstallDirectory,
     });
   }
 }
