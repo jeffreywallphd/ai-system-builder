@@ -333,6 +333,10 @@ export default function WorkflowEditorPage({
     !!workflowState.selectedNodeId || !!workflowState.selectedConnectionId;
 
   const toggleCanvasLock = (): void => {
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "auto" });
+    }
+
     setIsCanvasLocked((current) => !current);
   };
 

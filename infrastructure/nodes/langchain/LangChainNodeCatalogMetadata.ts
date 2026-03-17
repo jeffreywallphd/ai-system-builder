@@ -75,7 +75,22 @@ export const LANGCHAIN_NODE_CATALOG_METADATA: Readonly<
     description: "Converts a document payload into chunked text segments and document metadata.",
     inputPorts: Object.freeze([inputPort("document", "Document", ["json"])]),
     outputPorts: Object.freeze([outputPort("chunks", "Chunks", ["json"])]),
-    properties: Object.freeze([]),
+    properties: Object.freeze([
+      new NodeProperty({
+        id: "chunk-size",
+        name: "Chunk Size",
+        type: "integer",
+        value: 500,
+        constraints: { required: true, min: 1 },
+      }),
+      new NodeProperty({
+        id: "chunk-overlap",
+        name: "Chunk Overlap",
+        type: "integer",
+        value: 50,
+        constraints: { required: true, min: 0 },
+      }),
+    ]),
   }),
   "langchain.chat-prompt": Object.freeze({
     description: "Builds a structured chat prompt from system instructions and user content.",
@@ -85,7 +100,14 @@ export const LANGCHAIN_NODE_CATALOG_METADATA: Readonly<
       inputPort("context", "Context", ["json"], true),
     ]),
     outputPorts: Object.freeze([outputPort("messages", "Messages", ["json"])]),
-    properties: Object.freeze([]),
+    properties: Object.freeze([
+      new NodeProperty({
+        id: "include-history",
+        name: "Include Conversation History",
+        type: "boolean",
+        value: true,
+      }),
+    ]),
   }),
   "langchain.simple-chain": Object.freeze({
     description: "Runs a prompt and context through a simple chain step and emits generated output.",
@@ -94,7 +116,22 @@ export const LANGCHAIN_NODE_CATALOG_METADATA: Readonly<
       inputPort("context", "Context", ["json"], true),
     ]),
     outputPorts: Object.freeze([outputPort("result", "Result", ["text", "json"])]),
-    properties: Object.freeze([]),
+    properties: Object.freeze([
+      new NodeProperty({
+        id: "temperature",
+        name: "Temperature",
+        type: "number",
+        value: 0.7,
+        constraints: { min: 0, max: 2 },
+      }),
+      new NodeProperty({
+        id: "max-tokens",
+        name: "Max Tokens",
+        type: "integer",
+        value: 512,
+        constraints: { min: 1 },
+      }),
+    ]),
   }),
   "langchain.output-parser": Object.freeze({
     description: "Parses model output text into structured data for downstream workflow nodes.",
@@ -120,7 +157,18 @@ export const LANGCHAIN_NODE_CATALOG_METADATA: Readonly<
       inputPort("secondary", "Secondary Context", ["json", "text"], true),
     ]),
     outputPorts: Object.freeze([outputPort("merged", "Merged Context", ["json"])]),
-    properties: Object.freeze([]),
+    properties: Object.freeze([
+      new NodeProperty({
+        id: "merge-strategy",
+        name: "Merge Strategy",
+        type: "select",
+        value: "json-merge",
+        options: [
+          { label: "JSON Merge", value: "json-merge" },
+          { label: "Concatenate Text", value: "concat-text" },
+        ],
+      }),
+    ]),
   }),
 });
 

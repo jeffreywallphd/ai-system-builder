@@ -44,9 +44,11 @@ describe("ui/components/nodes interactions", () => {
     const paletteItem = readSource("ui/components/nodes/NodePaletteItem.tsx");
 
     expect(paletteItem).toContain("useState(false)");
-    expect(paletteItem).toContain("Show Properties");
-    expect(paletteItem).toContain("Hide Properties");
+    expect(paletteItem).toContain("Show Details");
+    expect(paletteItem).toContain("Hide Details");
     expect(paletteItem).toContain("Node properties summary");
+    expect(paletteItem).toContain("Node input ports summary");
+    expect(paletteItem).toContain("Node output ports summary");
   });
 
 });
