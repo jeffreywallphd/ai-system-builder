@@ -10,6 +10,7 @@ export interface AppRuntimeConfigValues {
   readonly isProductionMode: boolean;
   readonly devSyncBaseUrl?: string;
   readonly devSyncToken?: string;
+  readonly modelInstallDirectory: string;
 }
 
 export class AppRuntimeConfig {
@@ -20,6 +21,7 @@ export class AppRuntimeConfig {
   public readonly isProductionMode: boolean;
   public readonly devSyncBaseUrl?: string;
   public readonly devSyncToken?: string;
+  public readonly modelInstallDirectory: string;
 
   constructor(values: AppRuntimeConfigValues) {
     this.workflowRepositoryMode = values.workflowRepositoryMode;
@@ -29,6 +31,7 @@ export class AppRuntimeConfig {
     this.isProductionMode = values.isProductionMode;
     this.devSyncBaseUrl = values.devSyncBaseUrl?.trim() || undefined;
     this.devSyncToken = values.devSyncToken?.trim() || undefined;
+    this.modelInstallDirectory = values.modelInstallDirectory.trim();
   }
 
   public get isDevSyncEnabled(): boolean {
@@ -44,6 +47,7 @@ export class AppRuntimeConfig {
       isProductionMode: false,
       devSyncBaseUrl: "http://192.168.1.100:8787",
       devSyncToken: "ai-loom-dev-sync",
+      modelInstallDirectory: "dev/model-files",
     });
   }
 }

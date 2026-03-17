@@ -7,10 +7,10 @@ describe("ui/components/models interactions", () => {
     const page = readSource("ui/pages/ModelsPage.tsx");
 
     expect(browser).toContain("<ModelSearchBar");
-    expect(browser).toContain("<ModelDetailsPanel");
     expect(browser).toContain("<ModelCompatibilityPanel");
+    expect(browser).toContain("onInstallRemoteFiles");
     expect(page).toContain("import ModelBrowser");
     expect(page).toContain("onSearch={(value) => {");
-    expect(page).toContain("onInspectModel={(modelId) => {");
+    expect(page).toContain("installRemoteFiles(modelStore, config.modelInstallDirectory, modelId, files)");
   });
 });

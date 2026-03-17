@@ -6,13 +6,11 @@ describe("ui/components/models contract adherence", () => {
     const browser = readSource("ui/components/models/ModelBrowser.tsx");
     const card = readSource("ui/components/models/ModelCard.tsx");
     const search = readSource("ui/components/models/ModelSearchBar.tsx");
-    const details = readSource("ui/components/models/ModelDetailsPanel.tsx");
     const compatibility = readSource("ui/components/models/ModelCompatibilityPanel.tsx");
 
     expect(browser).toContain("export default function ModelBrowser");
     expect(card).toContain("export default function ModelCard");
     expect(search).toContain("export default function ModelSearchBar");
-    expect(details).toContain("export default function ModelDetailsPanel");
     expect(compatibility).toContain("export default function ModelCompatibilityPanel");
   });
 
