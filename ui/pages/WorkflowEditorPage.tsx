@@ -289,17 +289,7 @@ export default function WorkflowEditorPage({
     !!workflowState.selectedNodeId || !!workflowState.selectedConnectionId;
 
   const toggleCanvasLock = (): void => {
-    setIsCanvasLocked((current) => {
-      const next = !current;
-
-      if (next) {
-        setIsLeftMenuOpen(false);
-        setIsPropertiesOpen(false);
-        setMobilePropertiesNodeId(undefined);
-      }
-
-      return next;
-    });
+    setIsCanvasLocked((current) => !current);
   };
 
   return (
@@ -346,12 +336,10 @@ export default function WorkflowEditorPage({
               isPropertiesOpen={isPropertiesOpen}
               onToggleCanvasLock={toggleCanvasLock}
               onOpenMenu={() => {
-                if (!isCanvasLocked) {
-                  setIsLeftMenuOpen((value) => !value);
-                }
+                setIsLeftMenuOpen((value) => !value);
               }}
               onOpenProperties={() => {
-                if (!isCanvasLocked && selectedNode) {
+                if (selectedNode) {
                   setIsPropertiesOpen((value) => !value);
                 }
               }}
