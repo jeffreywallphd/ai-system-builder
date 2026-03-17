@@ -54,7 +54,6 @@ export default function WorkflowEditorPage({
   nodeStore: nodeStoreProp,
 }: WorkflowEditorPageProps): JSX.Element {
   const {
-    config,
     workflowStore: injectedWorkflowStore,
     nodeStore: injectedNodeStore,
     workflowProjectionService,
@@ -90,7 +89,6 @@ export default function WorkflowEditorPage({
   const validationPresenter = useMemo(() => new ValidationPresenter(), []);
 
   const createdNewWorkflowRef = useRef(false);
-  const seededStarterNodeRef = useRef(false);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -131,7 +129,6 @@ export default function WorkflowEditorPage({
 
     if (workflowId && workflowId !== "new") {
       createdNewWorkflowRef.current = false;
-      seededStarterNodeRef.current = false;
 
       if (existingWorkflow?.id === workflowId) {
         return;
@@ -149,7 +146,6 @@ export default function WorkflowEditorPage({
 
       if (!createdNewWorkflowRef.current) {
         createdNewWorkflowRef.current = true;
-        seededStarterNodeRef.current = false;
 
         void workflowStore.createWorkflow({
           metadata: {
@@ -162,39 +158,6 @@ export default function WorkflowEditorPage({
       }
     }
   }, [workflowId, workflowStore]);
-
-  useEffect(() => {
-    const currentWorkflow = workflowStore.getState().currentWorkflow;
-
-    if (
-      !config.seedStarterNode ||
-      !currentWorkflow ||
-      seededStarterNodeRef.current ||
-      currentWorkflow.nodes.length > 0 ||
-      nodeState.definitions.length === 0
-    ) {
-      return;
-    }
-
-    const starterDefinition = nodeState.definitions[0];
-    if (!starterDefinition) {
-      return;
-    }
-
-    seededStarterNodeRef.current = true;
-
-    void workflowStore
-      .createNode({
-        definitionId: starterDefinition.id,
-        position: {
-          x: 80,
-          y: 80,
-        },
-      })
-      .then(() => {
-        setFitViewNonce((value) => value + 1);
-      });
-  }, [config.seedStarterNode, nodeState.definitions, workflowStore]);
 
   const paletteItems = useMemo(
     () => nodePresenter.presentPalette(nodeState.definitions),

@@ -29,4 +29,16 @@ describe("ui composition interactions", () => {
     expect(nodeTypeIds).toContain("langchain.output-parser");
     expect(nodeTypeIds).toContain("langchain.context-merger");
   });
+
+  it("seeds sample workflows into the default in-memory repository", async () => {
+    const dependencies = createUiDependencies({
+      config: AppRuntimeConfig.forDevelopment(),
+    });
+
+    const workflows = await dependencies.workflowService.listWorkflows();
+    const workflowIds = workflows.map((workflow) => workflow.id);
+
+    expect(workflowIds).toContain("sample-image-pipeline");
+    expect(workflowIds).toContain("sample-text-analysis");
+  });
 });
