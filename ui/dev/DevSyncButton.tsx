@@ -27,12 +27,12 @@ export default function DevSyncButton(): JSX.Element | null {
   }
 
   const requestSync = async (stashFiles?: readonly string[]): Promise<DevSyncResponse> => {
-    const response = await fetch(`${config.devSyncBaseUrl}/sync/pull`, {
+    const response = await fetch(`${devSyncBaseUrl}/sync/pull`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(config.devSyncToken
-          ? { "X-Dev-Sync-Token": config.devSyncToken }
+        ...(devSyncToken
+          ? { "X-Dev-Sync-Token": devSyncToken }
           : {}),
       },
       body: JSON.stringify({
@@ -55,18 +55,6 @@ export default function DevSyncButton(): JSX.Element | null {
     setLastMessage(undefined);
 
     try {
-      const response = await fetch(`${devSyncBaseUrl}/sync/pull`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(devSyncToken
-            ? { "X-Dev-Sync-Token": devSyncToken }
-            : {}),
-        },
-        body: JSON.stringify({
-          triggeredAt: new Date().toISOString(),
-        }),
-      });
       const payload = await requestSync();
       const summary = payload.stdout?.trim() || "Sync complete.";
       setLastMessage(summary);
