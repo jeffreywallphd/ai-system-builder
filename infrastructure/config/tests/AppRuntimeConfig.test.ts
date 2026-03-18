@@ -13,7 +13,7 @@ describe("AppRuntimeConfig", () => {
     expect(config.devSyncBaseUrl).toBe("http://192.168.1.100:8787");
     expect(config.devSyncToken).toBe("ai-loom-dev-sync");
     expect(config.isDevSyncEnabled).toBe(true);
-    expect(config.modelInstallDirectory).toBe("dev/model-files");
+    expect(config.modelInstallDirectory).toBe("dev/models");
   });
 
 

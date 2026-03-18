@@ -66,6 +66,20 @@ export interface IHuggingFaceModelFileInfo {
   readonly downloadUrl: string;
 }
 
+function buildDownloadUrl(baseUrl: string, modelId: string, revision: string, filePath: string): string {
+  const encodedModelId = modelId
+    .split("/")
+    .map((part) => encodeURIComponent(part))
+    .join("/");
+  const encodedRevision = encodeURIComponent(revision);
+  const encodedFilePath = filePath
+    .split("/")
+    .map((part) => encodeURIComponent(part))
+    .join("/");
+
+  return `${baseUrl}/${encodedModelId}/resolve/${encodedRevision}/${encodedFilePath}`;
+}
+
 export class HuggingFaceApiClient {
   private readonly baseUrl: string;
   private readonly authToken?: string;
@@ -217,6 +231,38 @@ export class HuggingFaceApiClient {
     }
   }
 
+  public async listModelFiles(params: {
+    readonly modelId: string;
+    readonly revision?: string;
+  }): Promise<ReadonlyArray<IHuggingFaceModelFileInfo>> {
+    const modelId = params.modelId.trim();
+
+    if (!modelId) {
+      throw new Error("HuggingFaceApiClient.listModelFiles requires a non-empty modelId.");
+    }
+
+    const info = await this.getModelInfo(modelId);
+
+    if (!info) {
+      return Object.freeze([]);
+    }
+
+    const revision = params.revision?.trim() || info.sha || "main";
+
+    return Object.freeze(
+      (info.siblings ?? [])
+        .filter((sibling) => !!sibling.rfilename)
+        .map((sibling) =>
+          Object.freeze({
+            path: sibling.rfilename!,
+            sizeBytes: sibling.lfs?.size ?? sibling.size,
+            sha256: sibling.lfs?.sha256,
+            downloadUrl: buildDownloadUrl(this.baseUrl, modelId, revision, sibling.rfilename!),
+          })
+        )
+    );
+  }
+
   public async resolveDownloadFile(params: {
     readonly modelId: string;
     readonly revision?: string;
@@ -228,14 +274,12 @@ export class HuggingFaceApiClient {
       throw new Error("HuggingFaceApiClient.resolveDownloadFile requires a non-empty modelId.");
     }
 
-    const info = await this.getModelInfo(modelId);
+    const files = await this.listModelFiles({
+      modelId,
+      revision: params.revision,
+    });
 
-    if (!info) {
-      return undefined;
-    }
-
-    const siblings = [...(info.siblings ?? [])];
-    if (siblings.length === 0) {
+    if (files.length === 0) {
       return undefined;
     }
 
@@ -246,11 +290,9 @@ export class HuggingFaceApiClient {
       value.trim().toLowerCase()
     );
 
-    const scored = siblings
-      .filter((sibling) => !!sibling.rfilename)
-      .map((sibling) => {
-        const fileName = sibling.rfilename!;
-        const lower = fileName.toLowerCase();
+    const scored = files
+      .map((file) => {
+        const lower = file.path.toLowerCase();
 
         let score = 0;
 
@@ -277,38 +319,13 @@ export class HuggingFaceApiClient {
         if (lower.includes("adapter_model")) score += 12;
 
         return {
-          sibling,
+          file,
           score,
         };
       })
       .sort((left, right) => right.score - left.score);
 
-    const selected = scored[0]?.sibling;
-
-    if (!selected?.rfilename) {
-      return undefined;
-    }
-
-    const revision = params.revision?.trim() || "main";
-    const encodedModelId = modelId
-      .split("/")
-      .map((part) => encodeURIComponent(part))
-      .join("/");
-
-    const encodedRevision = encodeURIComponent(revision);
-    const encodedFilePath = selected.rfilename
-      .split("/")
-      .map((part) => encodeURIComponent(part))
-      .join("/");
-
-    const downloadUrl = `${this.baseUrl}/${encodedModelId}/resolve/${encodedRevision}/${encodedFilePath}`;
-
-    return Object.freeze({
-      path: selected.rfilename,
-      sizeBytes: selected.lfs?.size ?? selected.size,
-      sha256: selected.lfs?.sha256,
-      downloadUrl,
-    });
+    return scored[0]?.file;
   }
 
   public async downloadToBuffer(url: string): Promise<Uint8Array> {
