@@ -13,8 +13,8 @@ describe("ui/routes interactions", () => {
   it("keeps navigation and 404 route interactions intact", () => {
     const appRouterSource = readSource("ui/routes/AppRouter.tsx");
 
-    expect(appRouterSource).toContain('element={<NotFoundPage />}');
-    expect(appRouterSource).toContain('element={<Navigate to={ROUTE_PATHS.home} replace />}');
-    expect(appRouterSource).toContain('element={<SettingsPage />}');
+    expect(appRouterSource).toContain("element: <NotFoundPage />");
+    expect(appRouterSource).toContain("element: <Navigate to={ROUTE_PATHS.home} replace />");
+    expect(appRouterSource).toContain("element: <SettingsPage />");
   });
 });

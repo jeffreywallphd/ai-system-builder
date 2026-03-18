@@ -1,4 +1,10 @@
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { useMemo } from "react";
+import {
+  createBrowserRouter,
+  Navigate,
+  RouterProvider,
+  type RouteObject,
+} from "react-router-dom";
 import AppLayout from "../layout/AppLayout";
 import AssetsPage from "../pages/AssetsPage";
 import HomePage from "../pages/HomePage";
@@ -19,38 +25,42 @@ export interface AppRouterProps {
 export default function AppRouter({
   isAuthenticated = true,
 }: AppRouterProps): JSX.Element {
-  return (
-    <BrowserRouter>
-      <Routes>
-        <Route
-          element={(
-            <ProtectedRoute
-              isAllowed={isAuthenticated}
-              redirectTo={ROUTE_PATHS.home}
-            >
-              <AppLayout />
-            </ProtectedRoute>
-          )}
-        >
-          <Route path={ROUTE_PATHS.home} element={<HomePage />} />
-          <Route path={ROUTE_PATHS.tools} element={<ToolsPage />} />
-          <Route path={ROUTE_PATHS.toolRun} element={<ToolRunPage />} />
-          <Route path={ROUTE_PATHS.workflows} element={<WorkflowsPage />} />
-          <Route
-            path={ROUTE_PATHS.workflowEditor}
-            element={<WorkflowEditorPage />}
-          />
-          <Route path={ROUTE_PATHS.models} element={<ModelsPage />} />
-          <Route path={ROUTE_PATHS.assets} element={<AssetsPage />} />
-          <Route path={ROUTE_PATHS.settings} element={<SettingsPage />} />
-        </Route>
+  const routes = useMemo<ReadonlyArray<RouteObject>>(
+    () => [
+      {
+        element: (
+          <ProtectedRoute
+            isAllowed={isAuthenticated}
+            redirectTo={ROUTE_PATHS.home}
+          >
+            <AppLayout />
+          </ProtectedRoute>
+        ),
+        children: [
+          { path: ROUTE_PATHS.home, element: <HomePage /> },
+          { path: ROUTE_PATHS.tools, element: <ToolsPage /> },
+          { path: ROUTE_PATHS.toolRun, element: <ToolRunPage /> },
+          { path: ROUTE_PATHS.workflows, element: <WorkflowsPage /> },
+          {
+            path: ROUTE_PATHS.workflowEditor,
+            element: <WorkflowEditorPage />,
+          },
+          { path: ROUTE_PATHS.models, element: <ModelsPage /> },
+          { path: ROUTE_PATHS.assets, element: <AssetsPage /> },
+          { path: ROUTE_PATHS.settings, element: <SettingsPage /> },
+        ],
+      },
+      {
+        path: "/index.html",
+        element: <Navigate to={ROUTE_PATHS.home} replace />,
+      },
+      { path: ROUTE_PATHS.notFound, element: <NotFoundPage /> },
+    ],
+    [isAuthenticated]
+  );
+  const router = useMemo(() => createBrowserRouter([...routes]), [routes]);
 
-        <Route
-          path="/index.html"
-          element={<Navigate to={ROUTE_PATHS.home} replace />}
-        />
-        <Route path={ROUTE_PATHS.notFound} element={<NotFoundPage />} />
-      </Routes>
-    </BrowserRouter>
+  return (
+    <RouterProvider router={router} />
   );
 }

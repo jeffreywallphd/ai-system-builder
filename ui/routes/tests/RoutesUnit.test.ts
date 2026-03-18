@@ -25,10 +25,11 @@ describe("ui/routes unit coverage", () => {
   it("wires route tree to layout and pages", () => {
     const source = readSource("ui/routes/AppRouter.tsx");
 
-    expect(source).toContain("<BrowserRouter>");
+    expect(source).toContain("createBrowserRouter");
+    expect(source).toContain("<RouterProvider router={router} />");
     expect(source).toContain("<ProtectedRoute");
-    expect(source).toContain('path={ROUTE_PATHS.notFound}');
-    expect(source).toContain('path="/index.html"');
-    expect(source).toContain('path={ROUTE_PATHS.settings}');
+    expect(source).toContain("path: ROUTE_PATHS.notFound");
+    expect(source).toContain('path: "/index.html"');
+    expect(source).toContain("path: ROUTE_PATHS.settings");
   });
 });
