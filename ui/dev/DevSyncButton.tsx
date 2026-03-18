@@ -6,6 +6,8 @@ interface DevSyncResponse {
   readonly stdout?: string;
   readonly stderr?: string;
   readonly message?: string;
+  readonly canStashAndRetry?: boolean;
+  readonly overwrittenFiles?: readonly string[];
 }
 
 export default function DevSyncButton(): JSX.Element | null {
@@ -17,37 +19,70 @@ export default function DevSyncButton(): JSX.Element | null {
     return null;
   }
 
+  const requestSync = async (stashFiles?: readonly string[]): Promise<DevSyncResponse> => {
+    const response = await fetch(`${config.devSyncBaseUrl}/sync/pull`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(config.devSyncToken
+          ? { "X-Dev-Sync-Token": config.devSyncToken }
+          : {}),
+      },
+      body: JSON.stringify({
+        triggeredAt: new Date().toISOString(),
+        ...(stashFiles && stashFiles.length > 0 ? { stashFiles } : {}),
+      }),
+    });
+
+    const payload = (await response.json()) as DevSyncResponse;
+
+    if (!response.ok || !payload.ok) {
+      throw payload;
+    }
+
+    return payload;
+  };
+
   const syncNow = async (): Promise<void> => {
     setIsSyncing(true);
     setLastMessage(undefined);
 
     try {
-      const response = await fetch(`${config.devSyncBaseUrl}/sync/pull`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(config.devSyncToken
-            ? { "X-Dev-Sync-Token": config.devSyncToken }
-            : {}),
-        },
-        body: JSON.stringify({
-          triggeredAt: new Date().toISOString(),
-        }),
-      });
-
-      const payload = (await response.json()) as DevSyncResponse;
-
-      if (!response.ok || !payload.ok) {
-        setLastMessage(payload.stderr || payload.message || "Sync failed.");
-        return;
-      }
-
+      const payload = await requestSync();
       const summary = payload.stdout?.trim() || "Sync complete.";
       setLastMessage(summary);
     } catch (error) {
-      setLastMessage(
-        error instanceof Error ? error.message : "Unable to reach sync agent."
-      );
+      const payload = error as DevSyncResponse;
+      const overwrittenFiles = payload.overwrittenFiles ?? [];
+      const shouldPromptForStash =
+        payload.canStashAndRetry === true && overwrittenFiles.length > 0;
+
+      if (shouldPromptForStash) {
+        const shouldStash = window.confirm(
+          `Git pull would overwrite your local changes in:\n\n${overwrittenFiles.join(
+            "\n"
+          )}\n\nWould you like AI Loom to stash these files and try the pull again?`
+        );
+
+        if (shouldStash) {
+          try {
+            const retryPayload = await requestSync(overwrittenFiles);
+            const retrySummary = retryPayload.stdout?.trim() || "Sync complete.";
+            setLastMessage(
+              `Stashed ${overwrittenFiles.join(", ")} and synced successfully. ${retrySummary}`
+            );
+            return;
+          } catch (retryError) {
+            const retryPayload = retryError as DevSyncResponse;
+            setLastMessage(
+              retryPayload.stderr || retryPayload.message || "Stash retry failed."
+            );
+            return;
+          }
+        }
+      }
+
+      setLastMessage(payload.stderr || payload.message || "Sync failed.");
     } finally {
       setIsSyncing(false);
     }
