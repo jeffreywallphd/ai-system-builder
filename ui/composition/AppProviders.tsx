@@ -5,7 +5,7 @@ import {
   useMemo,
   type PropsWithChildren,
 } from "react";
-import type { UiDependencies } from "./createUiDependencies";
+import type { UiDependencies } from "./types";
 import { createUiDependencies } from "./createUiDependencies";
 import { AppRuntimeConfig } from "../../infrastructure/config/AppRuntimeConfig";
 

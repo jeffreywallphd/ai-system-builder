@@ -160,3 +160,17 @@ vite.config.ts.timestamp-*
 !/dev/workflow-data/inputs/.gitkeep
 /dev/workflow-data/outputs/*
 !/dev/workflow-data/outputs/.gitkeep
+
+# Local per-user workflow data
+/user/workflow-data/workflows/*
+!/user/workflow-data/workflows/.gitkeep
+/user/workflow-data/inputs/*
+!/user/workflow-data/inputs/.gitkeep
+/user/workflow-data/outputs/*
+!/user/workflow-data/outputs/.gitkeep
+/user/*/workflow-data/workflows/*
+!/user/*/workflow-data/workflows/.gitkeep
+/user/*/workflow-data/inputs/*
+!/user/*/workflow-data/inputs/.gitkeep
+/user/*/workflow-data/outputs/*
+!/user/*/workflow-data/outputs/.gitkeep
