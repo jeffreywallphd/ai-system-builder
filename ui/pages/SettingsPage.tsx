@@ -377,6 +377,7 @@ function FolderPathField({ id, label, hint, value, onChange }: FolderPathFieldPr
           fileInputRef.current = node;
           node?.setAttribute("webkitdirectory", "");
           node?.setAttribute("directory", "");
+          node?.setAttribute("multiple", "");
         }}
         className="ui-settings-page__folder-input"
         type="file"
@@ -385,21 +386,21 @@ function FolderPathField({ id, label, hint, value, onChange }: FolderPathFieldPr
         onChange={handleInputChange}
       />
 
-      <span className="ui-field__hint">Uses the full selected folder path whenever the host environment exposes it.</span>
+      <span className="ui-field__hint">Uses the full selected folder path whenever the host environment exposes it. Folder names alone are not saved.</span>
       {pickerError ? <span className="ui-field__hint">{pickerError}</span> : null}
     </div>
   );
 }
 
 async function pickDirectoryPath(): Promise<string | undefined> {
-  const picker = windowWithDirectoryPicker.showDirectoryPicker;
+  const picker = globalDirectoryPickerHost.showDirectoryPicker;
 
   if (typeof picker !== "function") {
     return undefined;
   }
 
   try {
-    const handle = await picker.call(windowWithDirectoryPicker);
+    const handle = await picker.call(globalDirectoryPickerHost);
     return resolveDirectoryPathFromHandle(handle);
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
@@ -435,10 +436,6 @@ function resolveDirectoryPathFromHandle(handle: unknown): string | undefined {
     return normalizeDirectoryPath(candidate.path);
   }
 
-  if (typeof candidate.name === "string" && candidate.name.trim().length > 0) {
-    return normalizeDirectoryPath(candidate.name);
-  }
-
   return undefined;
 }
 
@@ -461,7 +458,7 @@ function dirname(value: string): string {
   return value.slice(0, lastSeparatorIndex);
 }
 
-const windowWithDirectoryPicker = window as Window & {
+const globalDirectoryPickerHost = globalThis as typeof globalThis & {
   showDirectoryPicker?: () => Promise<unknown>;
 };
 

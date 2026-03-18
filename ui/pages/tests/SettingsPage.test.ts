@@ -29,7 +29,10 @@ describe("SettingsPage", () => {
     expect(source).toContain("function FolderPathField");
     expect(source).toContain("showDirectoryPicker");
     expect(source).toContain('node?.setAttribute("webkitdirectory", "")');
+    expect(source).toContain('node?.setAttribute("multiple", "")');
     expect(source).toContain("firstFile.path");
+    expect(source).toContain("Folder names alone are not saved.");
+    expect(source).not.toContain("return normalizeDirectoryPath(candidate.name)");
     expect(source).toContain("Browse…");
   });
 });
