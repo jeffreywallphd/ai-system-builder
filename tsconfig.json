@@ -18,8 +18,7 @@
     "domain/**/*.ts",
     "infrastructure/**/*.ts",
     "ui/**/*.ts",
-    "ui/**/*.tsx",
-    "vite.config.ts"
+    "ui/**/*.tsx"
   ],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

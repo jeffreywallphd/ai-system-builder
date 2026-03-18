@@ -46,7 +46,8 @@ describe("ui/pages interactions", () => {
     const layout = readSource("ui/layout/AppLayout.tsx");
     const store = readSource("ui/state/WorkflowStore.ts");
 
-    expect(layout).toContain("unstable_useBlocker as useBlocker");
+    expect(layout).toContain("useBlocker");
+    expect(layout).not.toContain("unstable_useBlocker");
     expect(layout).toContain("useBeforeUnload");
     expect(layout).toContain("workflowStore.clearEditorSession()");
     expect(layout).toContain("workflowStore.saveCurrentWorkflow()");
