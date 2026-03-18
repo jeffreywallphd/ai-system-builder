@@ -105,23 +105,18 @@ function createInstalledModel(
   model: IModel,
   installResult: IModelInstallResult
 ): IModel {
-  const installedLocation =
-    installResult.installedLocation ??
-    installResult.destination ??
-    model.artifact.location;
+  const installedArtifactsBySource = new Map(
+    (installResult.installedArtifacts ?? []).map((artifact) => [
+      artifact.sourceLocation ?? artifact.name,
+      artifact,
+    ])
+  );
 
-  const artifact = new ModelArtifact({
-    name: model.artifact.name,
-    accessMethod:
-      installedLocation && installedLocation !== model.artifact.location
-        ? "local-file"
-        : model.artifact.accessMethod,
-    location: installedLocation,
-    format: model.artifact.format,
-    sizeBytes: model.artifact.sizeBytes,
-    sha256: model.artifact.sha256,
-    contentType: model.artifact.contentType,
-  });
+  const installedPrimaryArtifact = createInstalledArtifact(
+    model.artifact,
+    installResult.installedLocation ?? installResult.destination,
+    installedArtifactsBySource
+  );
 
   return new Model({
     id: model.id,
@@ -140,8 +135,10 @@ function createInstalledModel(
       url: model.source.url,
       providerMetadata: model.source.providerMetadata,
     }),
-    artifact,
-    additionalArtifacts: model.additionalArtifacts,
+    artifact: installedPrimaryArtifact,
+    additionalArtifacts: model.additionalArtifacts.map((artifact) =>
+      createInstalledArtifact(artifact, installResult.destination, installedArtifactsBySource)
+    ),
     dependencies: model.dependencies,
     precision: model.precision,
     architectureFamily: model.architectureFamily,
@@ -154,5 +151,32 @@ function createInstalledModel(
     license: model.license,
     languageCodes: model.languageCodes,
     requiresAuth: model.requiresAuth,
+  });
+}
+
+function createInstalledArtifact(
+  artifact: IModel["artifact"],
+  fallbackLocation: string,
+  installedArtifactsBySource: ReadonlyMap<
+    string,
+    NonNullable<IModelInstallResult["installedArtifacts"]>[number]
+  >
+): ModelArtifact {
+  const installedArtifact = installedArtifactsBySource.get(
+    artifact.location ?? artifact.name
+  );
+  const installedLocation = installedArtifact?.installedLocation ?? fallbackLocation;
+
+  return new ModelArtifact({
+    name: artifact.name,
+    accessMethod:
+      installedLocation && installedLocation !== artifact.location
+        ? "local-file"
+        : artifact.accessMethod,
+    location: installedLocation,
+    format: artifact.format,
+    sizeBytes: artifact.sizeBytes,
+    sha256: artifact.sha256,
+    contentType: artifact.contentType,
   });
 }

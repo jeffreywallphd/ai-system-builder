@@ -1,4 +1,5 @@
 import type { IModel } from "../../domain/models/interfaces/IModel";
+import { Model, ModelArtifact } from "../../domain/models/Model";
 import type {
   IModelDownloadProgress,
   IModelDownloadRequest,
@@ -6,6 +7,7 @@ import type {
   IModelDownloader,
 } from "./interfaces/IModelDownloader";
 import type {
+  IInstalledArtifactResult,
   IModelInstallHandle,
   IModelInstallProgress,
   IModelInstallRequest,
@@ -27,6 +29,40 @@ type ModelInstallerParams = {
 
 function isParams(value: unknown): value is ModelInstallerParams {
   return !!value && !Array.isArray(value) && typeof value === "object";
+}
+
+function resolveArtifacts(model: IModel): ReadonlyArray<IModel["artifact"]> {
+  return Object.freeze([model.artifact, ...(model.additionalArtifacts ?? [])]);
+}
+
+function buildArtifactDownloadModel(model: IModel, artifact: IModel["artifact"]): IModel {
+  const cloned = Model.from(model);
+
+  return new Model({
+    id: cloned.id,
+    name: cloned.name,
+    version: cloned.version,
+    variant: cloned.variant,
+    publisher: cloned.publisher,
+    kind: cloned.kind,
+    isRunnable: cloned.isRunnable,
+    status: cloned.status,
+    source: cloned.source,
+    artifact,
+    additionalArtifacts: [],
+    dependencies: cloned.dependencies,
+    precision: cloned.precision,
+    architectureFamily: cloned.architectureFamily,
+    architecture: cloned.architecture,
+    compatibility: cloned.compatibility,
+    requirements: cloned.requirements,
+    resourceProfile: cloned.resourceProfile,
+    description: cloned.description,
+    tags: cloned.tags,
+    license: cloned.license,
+    languageCodes: cloned.languageCodes,
+    requiresAuth: cloned.requiresAuth,
+  });
 }
 
 export class ModelInstallProgress implements IModelInstallProgress {
@@ -68,6 +104,7 @@ export class ModelInstallResult implements IModelInstallResult {
   public readonly destination: string;
   public readonly status: IModelInstallResult["status"];
   public readonly installedLocation?: string;
+  public readonly installedArtifacts?: ReadonlyArray<IInstalledArtifactResult>;
   public readonly message?: string;
 
   constructor(params: {
@@ -75,6 +112,7 @@ export class ModelInstallResult implements IModelInstallResult {
     destination: string;
     status: IModelInstallResult["status"];
     installedLocation?: string;
+    installedArtifacts?: ReadonlyArray<IInstalledArtifactResult>;
     message?: string;
   }) {
     const destination = params.destination.trim();
@@ -87,6 +125,17 @@ export class ModelInstallResult implements IModelInstallResult {
     this.destination = destination;
     this.status = params.status;
     this.installedLocation = params.installedLocation?.trim() || undefined;
+    this.installedArtifacts = params.installedArtifacts
+      ? Object.freeze(
+          params.installedArtifacts.map((artifact) =>
+            Object.freeze({
+              name: artifact.name,
+              sourceLocation: artifact.sourceLocation?.trim() || undefined,
+              installedLocation: artifact.installedLocation.trim(),
+            })
+          )
+        )
+      : undefined;
     this.message = params.message?.trim() || undefined;
   }
 
@@ -96,6 +145,7 @@ export class ModelInstallResult implements IModelInstallResult {
       destination: result.destination,
       status: result.status,
       installedLocation: result.installedLocation,
+      installedArtifacts: result.installedArtifacts,
       message: result.message,
     });
   }
@@ -383,89 +433,108 @@ export class ModelInstaller implements IModelInstaller {
       });
     }
 
-    const downloadRequest: IModelDownloadRequest = {
-      model: request.model,
-      destination: request.destination,
-      overwrite: request.overwrite,
-      verifyIntegrity: request.verifyIntegrity,
-      source: {
-        provider: request.provider ?? request.model.source.type,
-        sourceId: request.model.source.sourceId,
-        repository: request.model.source.repository,
-        revision: request.model.source.revision,
-        url: request.model.source.url,
-        authToken: request.authToken,
-        metadata: request.model.source.providerMetadata,
-      },
-    };
-
-    const downloadHandle = await this.downloader.startDownload(downloadRequest);
-    if (downloadHandleRef) {
-      downloadHandleRef.current = downloadHandle;
-    }
-
+    const artifacts = resolveArtifacts(request.model);
+    const installedArtifacts: IInstalledArtifactResult[] = [];
     let lastDownloadProgress: IModelDownloadProgress | undefined;
-    let active = true;
-
-    const poll = (async () => {
-      while (active) {
-        const progress = await downloadHandle.getProgress();
-        lastDownloadProgress = progress;
-
-        emit(
-          new ModelInstallProgress({
-            modelId: request.model.id,
-            status:
-              progress.status === "queued" || progress.status === "resolving"
-                ? "preparing"
-                : progress.status === "downloading"
-                ? "downloading"
-                : progress.status === "verifying"
-                ? "verifying"
-                : progress.status === "failed"
-                ? "failed"
-                : progress.status === "cancelled"
-                ? "cancelled"
-                : "installing",
-            downloadProgress: progress,
-            message: progress.message,
-          })
-        );
-
-        if (
-          progress.status === "completed" ||
-          progress.status === "failed" ||
-          progress.status === "cancelled"
-        ) {
-          break;
-        }
-
-        await new Promise((resolve) => setTimeout(resolve, 250));
-      }
-    })();
 
     try {
-      const downloadResult: IModelDownloadResult = await downloadHandle.waitForCompletion();
-
-      active = false;
-      await poll.catch(() => undefined);
-
-      if (downloadResult.status === "failed") {
-        return new ModelInstallResult({
-          model: request.model,
+      for (let index = 0; index < artifacts.length; index += 1) {
+        const artifact = artifacts[index];
+        const artifactModel = buildArtifactDownloadModel(request.model, artifact);
+        const downloadRequest: IModelDownloadRequest = {
+          model: artifactModel,
           destination: request.destination,
-          status: "failed",
-          message: downloadResult.message ?? "Model download failed.",
-        });
-      }
+          overwrite: request.overwrite,
+          verifyIntegrity: request.verifyIntegrity,
+          source: {
+            provider: request.provider ?? request.model.source.type,
+            sourceId: request.model.source.sourceId,
+            repository: request.model.source.repository,
+            revision: request.model.source.revision,
+            url: request.model.source.url,
+            authToken: request.authToken,
+            metadata: request.model.source.providerMetadata,
+          },
+        };
 
-      if (downloadResult.status === "cancelled") {
-        return new ModelInstallResult({
-          model: request.model,
-          destination: request.destination,
-          status: "cancelled",
-          message: downloadResult.message ?? "Model installation was cancelled.",
-        });
+        const downloadHandle = await this.downloader.startDownload(downloadRequest);
+        if (downloadHandleRef) {
+          downloadHandleRef.current = downloadHandle;
+        }
+
+        let active = true;
+        const poll = (async () => {
+          while (active) {
+            const progress = await downloadHandle.getProgress();
+            lastDownloadProgress = progress;
+
+            emit(
+              new ModelInstallProgress({
+                modelId: request.model.id,
+                status:
+                  progress.status === "queued" || progress.status === "resolving"
+                    ? "preparing"
+                    : progress.status === "downloading"
+                    ? "downloading"
+                    : progress.status === "verifying"
+                    ? "verifying"
+                    : progress.status === "failed"
+                    ? "failed"
+                    : progress.status === "cancelled"
+                    ? "cancelled"
+                    : "installing",
+                downloadProgress: progress,
+                message:
+                  artifacts.length > 1
+                    ? `Downloading file ${index + 1} of ${artifacts.length}: ${artifact.name}.`
+                    : progress.message,
+              })
+            );
+
+            if (
+              progress.status === "completed" ||
+              progress.status === "failed" ||
+              progress.status === "cancelled"
+            ) {
+              break;
+            }
+
+            await new Promise((resolve) => setTimeout(resolve, 250));
+          }
+        })();
+
+        const downloadResult: IModelDownloadResult = await downloadHandle.waitForCompletion();
+
+        active = false;
+        await poll.catch(() => undefined);
+
+        if (downloadResult.status === "failed") {
+          return new ModelInstallResult({
+            model: request.model,
+            destination: request.destination,
+            status: "failed",
+            installedArtifacts,
+            message: downloadResult.message ?? "Model download failed.",
+          });
+        }
+
+        if (downloadResult.status === "cancelled") {
+          return new ModelInstallResult({
+            model: request.model,
+            destination: request.destination,
+            status: "cancelled",
+            installedArtifacts,
+            message: downloadResult.message ?? "Model installation was cancelled.",
+          });
+        }
+
+        installedArtifacts.push(
+          Object.freeze({
+            name: artifact.name,
+            sourceLocation: artifact.location,
+            installedLocation: downloadResult.destination,
+          })
+        );
       }
 
       emit(
@@ -489,20 +558,18 @@ export class ModelInstaller implements IModelInstaller {
       return new ModelInstallResult({
         model: request.model,
         destination: request.destination,
-        installedLocation: downloadResult.destination,
+        installedLocation: installedArtifacts[0]?.installedLocation,
+        installedArtifacts,
         status: "completed",
         message: "Model installation completed.",
       });
     } catch (error) {
-      active = false;
-      await poll.catch(() => undefined);
-
       return new ModelInstallResult({
         model: request.model,
         destination: request.destination,
         status: "failed",
-        message:
-          error instanceof Error ? error.message : "Model installation failed.",
+        installedArtifacts,
+        message: error instanceof Error ? error.message : "Model installation failed.",
       });
     }
   }

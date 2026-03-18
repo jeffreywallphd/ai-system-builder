@@ -1,3 +1,5 @@
+import { useMemo, useState } from "react";
+import { formatBytes } from "../../presenters/PresenterFormatting";
 import type {
   ModelDownloadFileViewModel,
   ModelListItemViewModel,
@@ -39,9 +41,25 @@ export default function ModelCard({
   onRemove,
 }: ModelCardProps): JSX.Element {
   const effectiveMode = mode ?? (isRemoteModel(model) ? "remote" : "installed");
-  const selectedFiles = model.downloadFiles.filter((file) =>
-    selectedFileIds?.includes(file.id)
+  const [selectedExtension, setSelectedExtension] = useState<string>("all");
+  const selectedFiles = model.downloadFiles.filter((file) => selectedFileIds?.includes(file.id));
+  const selectedTotalSizeBytes = selectedFiles.reduce(
+    (sum, file) => sum + (file.sizeBytes ?? 0),
+    0
   );
+  const fileExtensions = useMemo(
+    () =>
+      Object.freeze(
+        [...new Set(model.downloadFiles.map((file) => file.extension))].sort((left, right) =>
+          left.localeCompare(right)
+        )
+      ),
+    [model.downloadFiles]
+  );
+  const filteredFiles =
+    selectedExtension === "all"
+      ? model.downloadFiles
+      : model.downloadFiles.filter((file) => file.extension === selectedExtension);
 
   return (
     <article className="ui-card ui-model-card">
@@ -122,20 +140,55 @@ export default function ModelCard({
 
             {isDetailsExpanded ? (
               <section className="ui-model-card__details ui-stack ui-stack--sm">
-                <div className="ui-text-small ui-text-secondary">Download files</div>
-                {model.downloadFiles.map((file) => {
+                <div className="ui-row ui-row--between ui-row--wrap" style={{ alignItems: "center" }}>
+                  <div>
+                    <div className="ui-text-small ui-text-secondary">Download files</div>
+                    <div className="ui-subtle ui-text-small">
+                      {selectedFiles.length} selected • {formatBytes(selectedTotalSizeBytes) ?? "Unknown"}
+                    </div>
+                  </div>
+
+                  <label className="ui-model-card__filter">
+                    <span className="ui-subtle ui-text-small">File type</span>
+                    <select
+                      className="ui-input"
+                      value={selectedExtension}
+                      onChange={(event) => setSelectedExtension(event.target.value)}
+                    >
+                      <option value="all">All</option>
+                      {fileExtensions.map((extension) => (
+                        <option key={extension} value={extension}>
+                          .{extension}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                {filteredFiles.map((file) => {
                   const isChecked = selectedFileIds?.includes(file.id) ?? false;
 
                   return (
                     <div key={file.id} className="ui-model-card__file-row">
-                      <label className="ui-row ui-row--sm" style={{ alignItems: "center" }}>
+                      <label className="ui-model-card__file-select">
                         <input
                           type="checkbox"
                           checked={isChecked}
                           onChange={() => onToggleFileSelection?.(model.id, file.id)}
                         />
-                        <span className="ui-text-small">
-                          {file.name} {file.sizeLabel ? `(${file.sizeLabel})` : ""}
+                        <span className="ui-stack ui-stack--2xs">
+                          <span className="ui-text-small ui-model-card__file-name">
+                            {file.name}
+                            {file.isPrimary ? (
+                              <span className="ui-badge ui-badge--neutral ui-model-card__primary-badge">
+                                Primary
+                              </span>
+                            ) : null}
+                          </span>
+                          <span className="ui-subtle ui-text-small">
+                            .{file.extension}
+                            {file.sizeLabel ? ` • ${file.sizeLabel}` : ""}
+                          </span>
                         </span>
                       </label>
                       <button
@@ -153,7 +206,7 @@ export default function ModelCard({
                   <button
                     className="ui-button ui-button--primary ui-button--sm"
                     type="button"
-                    disabled={!model.isInstallable || selectedFiles.length === 0}
+                    disabled={!(isRemoteModel(model) && model.isInstallable) || selectedFiles.length === 0}
                     onClick={() => onInstallFiles?.(model.id, selectedFiles)}
                   >
                     Install Selected
@@ -161,7 +214,7 @@ export default function ModelCard({
                   <button
                     className="ui-button ui-button--secondary ui-button--sm"
                     type="button"
-                    disabled={!model.isInstallable || selectedFiles.length > 0}
+                    disabled={!(isRemoteModel(model) && model.isInstallable) || model.downloadFiles.length === 0}
                     onClick={() => onInstallFiles?.(model.id, model.downloadFiles)}
                   >
                     Install All

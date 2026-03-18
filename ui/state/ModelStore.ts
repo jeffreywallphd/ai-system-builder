@@ -129,6 +129,7 @@ export class ModelStore {
 
   public async installModel(
     request: {
+      readonly model?: IModel;
       readonly modelId?: string;
       readonly remoteId?: string;
       readonly provider?: string;
