@@ -3,7 +3,7 @@ import {
   Link,
   NavLink,
   Outlet,
-  unstable_useBlocker as useBlocker,
+  useBlocker,
   useBeforeUnload,
   useLocation,
 } from "react-router-dom";
