@@ -5,7 +5,8 @@ describe("DevSyncButton", () => {
   it("implements dev sync request flow with auth token support", () => {
     const source = readSource("ui/dev/DevSyncButton.tsx");
 
-    expect(source).toContain("config.isDevSyncEnabled");
+    expect(source).toContain("settingsStore.subscribe");
+    expect(source).toContain("config.isProductionMode");
     expect(source).toContain("/sync/pull");
     expect(source).toContain("X-Dev-Sync-Token");
     expect(source).toContain("Sync PC");

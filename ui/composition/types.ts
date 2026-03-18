@@ -9,6 +9,8 @@ import { RuntimeConsoleStore } from "../state/RuntimeConsoleStore";
 import { ToolService } from "../services/ToolService";
 import { ToolStore } from "../state/ToolStore";
 import { WorkflowProjectionService } from "../../application/projection/WorkflowProjectionService";
+import type { UiSettingsStorage } from "../settings/UiSettingsStore";
+import { UiSettingsStore } from "../settings/UiSettingsStore";
 
 export interface UiDependencies {
   readonly config: AppRuntimeConfig;
@@ -22,8 +24,10 @@ export interface UiDependencies {
   readonly toolService: ToolService;
   readonly toolStore: ToolStore;
   readonly workflowProjectionService: WorkflowProjectionService;
+  readonly settingsStore: UiSettingsStore;
 }
 
 export interface CreateUiDependenciesOptions {
   readonly config?: AppRuntimeConfig;
+  readonly settingsStorage?: UiSettingsStorage;
 }

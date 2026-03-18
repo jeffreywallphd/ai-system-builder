@@ -17,6 +17,7 @@ export const ROUTE_PATHS = Object.freeze({
   toolRun: "/tools/:toolId",
   models: "/models",
   assets: "/assets",
+  settings: "/settings",
   notFound: "*",
 });
 
@@ -61,6 +62,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteDefinition> = Object.freeze([
     key: "assets",
     path: ROUTE_PATHS.assets,
     title: "Assets",
+    showInNavigation: true,
+  }),
+  Object.freeze({
+    key: "settings",
+    path: ROUTE_PATHS.settings,
+    title: "Settings",
     showInNavigation: true,
   }),
 ]);

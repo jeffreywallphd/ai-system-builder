@@ -696,3 +696,65 @@ body {
     flex-direction: column;
   }
 }
+
+.ui-settings-page__grid {
+  display: grid;
+  gap: var(--space-lg);
+}
+
+.ui-settings-page__section {
+  overflow: hidden;
+}
+
+.ui-settings-page__field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-md);
+}
+
+.ui-settings-page__advanced {
+  padding-top: var(--space-sm);
+  border-top: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.ui-settings-page__advanced-panel {
+  padding: var(--space-md);
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(15, 23, 42, 0.38);
+}
+
+.ui-settings-page__advanced-toggle {
+  justify-content: flex-start;
+}
+
+.ui-settings-page__checkbox {
+  align-items: flex-start;
+}
+
+.ui-settings-page__status-card {
+  margin-bottom: var(--space-lg);
+}
+
+.ui-settings-page__path-summary {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.ui-settings-page__folder-picker {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: stretch;
+}
+
+.ui-settings-page__folder-picker > .ui-input {
+  flex: 1;
+}
+
+.ui-settings-page__folder-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}

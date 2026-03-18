@@ -9,6 +9,7 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain('workflowEditor: "/workflows/:workflowId"');
     expect(source).toContain("export const APP_ROUTES");
     expect(source).toContain('key: "workflow-editor"');
+    expect(source).toContain('key: "settings"');
   });
 
   it("provides navigation helper and protected route behavior", () => {
@@ -28,5 +29,6 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain("<ProtectedRoute");
     expect(source).toContain('path={ROUTE_PATHS.notFound}');
     expect(source).toContain('path="/index.html"');
+    expect(source).toContain('path={ROUTE_PATHS.settings}');
   });
 });
