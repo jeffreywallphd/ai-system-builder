@@ -302,6 +302,309 @@ describe("LangChainNodeExecutor", () => {
     ]);
   });
 
+  it("chunks structured documents while preserving metadata", async () => {
+    const node = makeLangChainNode("n-doc-chunks", "langchain.document_to_chunks", [
+      new NodeProperty({ id: "chunkSize", name: "Chunk Size", type: "integer", value: 8 }),
+      new NodeProperty({ id: "chunkOverlap", name: "Chunk Overlap", type: "integer", value: 2 }),
+      new NodeProperty({
+        id: "preserveMetadata",
+        name: "Preserve Metadata",
+        type: "boolean",
+        value: true,
+      }),
+    ]);
+    const executor = new LangChainNodeExecutor();
+    const result = await executor.executeNode({
+      workflow: {} as never,
+      node,
+      inputAssets: [],
+      workflowInputs: {},
+      upstreamOutputs: {},
+      resolvedInputs: {
+        documents: [
+          {
+            id: "doc-1",
+            text: "abcdefghijk",
+            metadata: { source: "kb", title: "Guide" },
+          },
+        ],
+      },
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.outputs.chunks).toEqual([
+      {
+        id: "doc-1-chunk-1",
+        text: "abcdefgh",
+        metadata: { source: "kb", title: "Guide", sourceDocumentId: "doc-1", chunkIndex: 0 },
+      },
+      {
+        id: "doc-1-chunk-2",
+        text: "ghijk",
+        metadata: { source: "kb", title: "Guide", sourceDocumentId: "doc-1", chunkIndex: 1 },
+      },
+    ]);
+  });
+
+  it("formats retrieved documents into prompt-ready context", async () => {
+    const node = makeLangChainNode("n-format-context", "langchain.context_formatter", [
+      new NodeProperty({ id: "template", name: "Template", type: "multiline-text", value: "Doc {index}: {text}" }),
+      new NodeProperty({ id: "separator", name: "Separator", type: "text", value: "\n---\n" }),
+      new NodeProperty({ id: "includeMetadata", name: "Include Metadata", type: "boolean", value: false }),
+      new NodeProperty({ id: "maxItems", name: "Max Items", type: "integer", value: 2 }),
+    ]);
+    const executor = new LangChainNodeExecutor();
+    const result = await executor.executeNode({
+      workflow: {} as never,
+      node,
+      inputAssets: [],
+      workflowInputs: {},
+      upstreamOutputs: {},
+      resolvedInputs: {
+        documents: [
+          { id: "d1", text: "Alpha" },
+          { id: "d2", text: "Beta" },
+          { id: "d3", text: "Gamma" },
+        ],
+      },
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.outputs.context).toBe("Doc 1: Alpha\n---\nDoc 2: Beta");
+  });
+
+  it("supports vector upsert and similarity search scaffolds", async () => {
+    const upsertNode = makeLangChainNode("n-upsert", "langchain.vector_store_upsert", [
+      new NodeProperty({ id: "collection", name: "Collection", type: "text", value: "kb" }),
+      new NodeProperty({ id: "upsertMode", name: "Upsert Mode", type: "select", value: "append" }),
+      new NodeProperty({ id: "batchSize", name: "Batch Size", type: "integer", value: 10 }),
+    ]);
+    const searchNode = makeLangChainNode("n-search", "langchain.similarity_search", [
+      new NodeProperty({ id: "topK", name: "Top K", type: "integer", value: 1 }),
+      new NodeProperty({ id: "scoreThreshold", name: "Score Threshold", type: "number", value: 0 }),
+    ]);
+    const executor = new LangChainNodeExecutor();
+
+    const upsertResult = await executor.executeNode({
+      workflow: {} as never,
+      node: upsertNode,
+      inputAssets: [],
+      workflowInputs: {},
+      upstreamOutputs: {},
+      resolvedInputs: {
+        documents: [
+          { id: "d1", text: "workflow canvas editor", metadata: { source: "kb" } },
+          { id: "d2", text: "vector database basics", metadata: { source: "kb" } },
+        ],
+        embeddings: [
+          [0.1, 0.2],
+          [0.2, 0.3],
+        ],
+        vectorStore: { provider: "memory" },
+      },
+    });
+
+    const searchResult = await executor.executeNode({
+      workflow: {} as never,
+      node: searchNode,
+      inputAssets: [],
+      workflowInputs: {},
+      upstreamOutputs: {},
+      resolvedInputs: {
+        query: "workflow canvas",
+        vectorStore: upsertResult.outputs.vectorStore,
+      },
+    });
+
+    expect(upsertResult.status).toBe("completed");
+    expect(upsertResult.outputs.upsertResult).toEqual({
+      collection: "kb",
+      upsertMode: "append",
+      batchSize: 10,
+      documentCount: 2,
+      embeddingCount: 2,
+      recordCount: 2,
+    });
+    expect(searchResult.status).toBe("completed");
+    expect(searchResult.outputs.documents).toEqual([
+      {
+        id: "d1",
+        text: "workflow canvas editor",
+        metadata: { source: "kb", score: 1 },
+      },
+    ]);
+  });
+
+  it("defines and executes tools deterministically", async () => {
+    const toolNode = makeLangChainNode("n-tool", "langchain.tool_definition", [
+      new NodeProperty({ id: "toolName", name: "Tool Name", type: "text", value: "search_docs" }),
+      new NodeProperty({
+        id: "description",
+        name: "Description",
+        type: "multiline-text",
+        value: "Search project documents.",
+      }),
+      new NodeProperty({ id: "strictSchema", name: "Strict Schema", type: "boolean", value: true }),
+    ]);
+    const executorNode = makeLangChainNode("n-tool-run", "langchain.tool_call_executor", [
+      new NodeProperty({
+        id: "failOnMissingArgs",
+        name: "Fail On Missing Arguments",
+        type: "boolean",
+        value: true,
+      }),
+      new NodeProperty({ id: "stringifyResult", name: "Stringify Result", type: "boolean", value: true }),
+    ]);
+    const executor = new LangChainNodeExecutor();
+
+    const toolResult = await executor.executeNode({
+      workflow: {} as never,
+      node: toolNode,
+      inputAssets: [],
+      workflowInputs: {},
+      upstreamOutputs: {},
+      resolvedInputs: {
+        inputSchema: {
+          type: "object",
+          properties: { query: { type: "string" } },
+        },
+      },
+    });
+
+    const runResult = await executor.executeNode({
+      workflow: {} as never,
+      node: executorNode,
+      inputAssets: [],
+      workflowInputs: {},
+      upstreamOutputs: {},
+      resolvedInputs: {
+        tool: toolResult.outputs.tool,
+        arguments: { query: "nodes" },
+      },
+    });
+
+    expect(toolResult.status).toBe("completed");
+    expect(toolResult.outputs.tool).toEqual({
+      name: "search_docs",
+      description: "Search project documents.",
+      inputSchema: {
+        type: "object",
+        properties: { query: { type: "string" } },
+      },
+      strictSchema: true,
+      handler: undefined,
+    });
+    expect(runResult.status).toBe("completed");
+    expect(runResult.outputs.toolResult).toEqual({
+      toolName: "search_docs",
+      arguments: { query: "nodes" },
+      status: "completed",
+    });
+    expect(runResult.outputs.resultText).toContain("\"toolName\": \"search_docs\"");
+  });
+
+  it("runs agent and summarization tier 2 nodes with bounded outputs", async () => {
+    const agentNode = makeLangChainNode("n-agent", "langchain.agent", [
+      new NodeProperty({ id: "model", name: "Model", type: "text", value: "agent-model" }),
+      new NodeProperty({ id: "systemPrompt", name: "System Prompt", type: "multiline-text", value: "Be helpful." }),
+      new NodeProperty({ id: "temperature", name: "Temperature", type: "slider", value: 0.3 }),
+      new NodeProperty({ id: "maxIterations", name: "Max Iterations", type: "integer", value: 5 }),
+      new NodeProperty({ id: "useMemory", name: "Use Memory", type: "boolean", value: true }),
+      new NodeProperty({ id: "verbose", name: "Verbose", type: "boolean", value: false }),
+    ]);
+    const summaryNode = makeLangChainNode("n-summary", "langchain.summarization", [
+      new NodeProperty({ id: "model", name: "Model", type: "text", value: "summary-model" }),
+      new NodeProperty({ id: "style", name: "Style", type: "select", value: "brief" }),
+      new NodeProperty({ id: "maxLength", name: "Max Length", type: "integer", value: 30 }),
+    ]);
+    const combineNode = makeLangChainNode("n-combine", "langchain.combine_summaries", [
+      new NodeProperty({ id: "separator", name: "Separator", type: "text", value: " | " }),
+      new NodeProperty({ id: "strategy", name: "Strategy", type: "select", value: "concatenate" }),
+      new NodeProperty({ id: "model", name: "Model", type: "text", value: "combiner-model" }),
+    ]);
+    const knowledgeBaseNode = makeLangChainNode("n-kb", "langchain.knowledge_base_retriever", [
+      new NodeProperty({ id: "topK", name: "Top K", type: "integer", value: 1 }),
+      new NodeProperty({ id: "scoreThreshold", name: "Score Threshold", type: "number", value: 0 }),
+    ]);
+    const executor = new LangChainNodeExecutor();
+
+    const agentResult = await executor.executeNode({
+      workflow: {} as never,
+      node: agentNode,
+      inputAssets: [],
+      workflowInputs: {},
+      upstreamOutputs: {},
+      resolvedInputs: {
+        input: "Find workflow help.",
+        tools: [{ name: "search_docs", description: "Search documents." }],
+        history: [{ role: "user", content: "Hello" }],
+      },
+    });
+
+    const summaryResult = await executor.executeNode({
+      workflow: {} as never,
+      node: summaryNode,
+      inputAssets: [],
+      workflowInputs: {},
+      upstreamOutputs: {},
+      resolvedInputs: {
+        documents: [{ id: "d1", text: "A long workflow explanation for new users." }],
+      },
+    });
+
+    const combineResult = await executor.executeNode({
+      workflow: {} as never,
+      node: combineNode,
+      inputAssets: [],
+      workflowInputs: {},
+      upstreamOutputs: {},
+      resolvedInputs: {
+        summaries: ["First summary", "Second summary"],
+      },
+    });
+
+    const knowledgeBaseResult = await executor.executeNode({
+      workflow: {} as never,
+      node: knowledgeBaseNode,
+      inputAssets: [],
+      workflowInputs: {},
+      upstreamOutputs: {},
+      resolvedInputs: {
+        query: "workflow",
+        knowledgeBase: {
+          documents: [
+            { id: "kb-1", text: "workflow editor help", metadata: { source: "kb" } },
+            { id: "kb-2", text: "image tools", metadata: { source: "kb" } },
+          ],
+        },
+      },
+    });
+
+    expect(agentResult.status).toBe("completed");
+    expect(agentResult.outputs.response).toContain("[agent-model] Find workflow help.");
+    expect(agentResult.outputs.toolCalls).toEqual([
+      {
+        name: "search_docs",
+        arguments: { input: "Find workflow help." },
+      },
+    ]);
+
+    expect(summaryResult.status).toBe("completed");
+    expect(summaryResult.outputs.summary).toBe("[summary-model] Summary: A long workflow explanation fo");
+
+    expect(combineResult.status).toBe("completed");
+    expect(combineResult.outputs.summary).toBe("First summary | Second summary");
+
+    expect(knowledgeBaseResult.status).toBe("completed");
+    expect(knowledgeBaseResult.outputs.documents).toEqual([
+      {
+        id: "kb-1",
+        text: "workflow editor help",
+        metadata: { source: "kb", score: 1 },
+      },
+    ]);
+  });
+
   it("executes answer synthesis nodes and emits citations", async () => {
     const node = makeLangChainNode("n-answer", "langchain.answer-synthesizer", [
       new NodeProperty({ id: "response-style", name: "Response Style", type: "select", value: "concise" }),

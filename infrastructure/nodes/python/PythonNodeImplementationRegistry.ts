@@ -29,6 +29,19 @@ const PYTHON_IMPLEMENTATIONS: ReadonlyArray<INodeRuntimeImplementation> = Object
   pythonImplementation("langchain.output_parser", "Python Output Parser Adapter"),
   pythonImplementation("langchain.memory", "Python Message History Adapter"),
   pythonImplementation("langchain.document_loader", "Python Document Loader Adapter"),
+  pythonImplementation("langchain.document_to_chunks", "Python Document To Chunks Adapter"),
+  pythonImplementation("langchain.vector_store_upsert", "Python Vector Store Upsert Adapter"),
+  pythonImplementation("langchain.similarity_search", "Python Similarity Search Adapter"),
+  pythonImplementation("langchain.context_formatter", "Python Context Formatter Adapter"),
+  pythonImplementation("langchain.tool_definition", "Python Tool Definition Adapter"),
+  pythonImplementation("langchain.tool_call_executor", "Python Tool Call Executor Adapter"),
+  pythonImplementation("langchain.agent", "Python Agent Adapter"),
+  pythonImplementation("langchain.summarization", "Python Summarization Adapter"),
+  pythonImplementation("langchain.combine_summaries", "Python Combine Summaries Adapter"),
+  pythonImplementation(
+    "langchain.knowledge_base_retriever",
+    "Python Knowledge Base Retriever Adapter"
+  ),
 
   pythonImplementation("langchain.prompt-template", "Python Prompt Template Adapter"),
   pythonImplementation("langchain.text-splitter", "Python Text Splitter Adapter"),
