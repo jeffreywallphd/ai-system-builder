@@ -80,7 +80,7 @@ function syncInteractiveNodes(
   });
 }
 
-function syncInteractiveEdges(
+export function syncInteractiveEdges(
   currentEdges: ReadonlyArray<Edge>,
   nextEdges: ReadonlyArray<Edge>
 ): ReadonlyArray<Edge> {
@@ -98,6 +98,34 @@ function syncInteractiveEdges(
       selected: edge.selected,
       animated: edge.animated,
     };
+  });
+}
+
+export function createOptimisticEdgeFromConnection(
+  connection: Connection
+): Edge | undefined {
+  if (
+    !connection.source ||
+    !connection.sourceHandle ||
+    !connection.target ||
+    !connection.targetHandle
+  ) {
+    return undefined;
+  }
+
+  return Object.freeze({
+    id: `pending:${connection.source}:${connection.sourceHandle}:${connection.target}:${connection.targetHandle}`,
+    source: connection.source,
+    sourceHandle: connection.sourceHandle,
+    target: connection.target,
+    targetHandle: connection.targetHandle,
+    type: "smoothstep",
+    animated: true,
+    selectable: false,
+    data: Object.freeze({
+      state: "pending",
+      isOptimistic: true,
+    }),
   });
 }
 
@@ -245,20 +273,32 @@ function InnerReactFlowCanvas({
 
   const onConnect = useCallback<OnConnect>(
     (connection: Connection) => {
-      if (
-        !connection.source ||
-        !connection.sourceHandle ||
-        !connection.target ||
-        !connection.targetHandle
-      ) {
+      const optimisticEdge = createOptimisticEdgeFromConnection(connection);
+      if (!optimisticEdge) {
         return;
       }
 
+      setInteractiveEdges((currentEdges) => {
+        const duplicateEdge = currentEdges.find(
+          (edge) =>
+            edge.source === optimisticEdge.source &&
+            edge.sourceHandle === optimisticEdge.sourceHandle &&
+            edge.target === optimisticEdge.target &&
+            edge.targetHandle === optimisticEdge.targetHandle
+        );
+
+        if (duplicateEdge) {
+          return currentEdges;
+        }
+
+        return [...currentEdges, optimisticEdge];
+      });
+
       onConnectNodes?.({
-        sourceNodeId: connection.source,
-        sourcePortId: connection.sourceHandle,
-        targetNodeId: connection.target,
-        targetPortId: connection.targetHandle,
+        sourceNodeId: optimisticEdge.source,
+        sourcePortId: optimisticEdge.sourceHandle ?? "",
+        targetNodeId: optimisticEdge.target,
+        targetPortId: optimisticEdge.targetHandle ?? "",
       });
     },
     [onConnectNodes]
