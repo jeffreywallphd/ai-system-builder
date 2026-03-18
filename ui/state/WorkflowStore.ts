@@ -1,4 +1,5 @@
 import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
+import type { IAsset } from "../../domain/assets/interfaces/IAsset";
 import type { IWorkflowExecutionEvent } from "../../application/ports/interfaces/IWorkflowExecutor";
 import type {
   IWorkflowValidationOptions,
@@ -23,6 +24,7 @@ export interface IWorkflowStoreState {
   readonly isExecuting: boolean;
   readonly lastExecutionEvent?: IWorkflowExecutionEvent;
   readonly nodeExecutionOutputs: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+  readonly outputAssets: ReadonlyArray<IAsset>;
   readonly error?: string;
 }
 
@@ -46,6 +48,7 @@ const defaultState: IWorkflowStoreState = Object.freeze({
   isExecuting: false,
   lastExecutionEvent: undefined,
   nodeExecutionOutputs: Object.freeze({}),
+  outputAssets: Object.freeze([]),
   error: undefined,
 });
 
@@ -116,6 +119,7 @@ export class WorkflowStore {
         validation: undefined,
         isDirty: true,
         isLoading: false,
+        outputAssets: Object.freeze([]),
       });
 
       return result.workflow;
@@ -162,6 +166,7 @@ export class WorkflowStore {
         validation: undefined,
         isDirty: false,
         isLoading: false,
+        outputAssets: Object.freeze([]),
       });
 
       return workflow;
@@ -255,6 +260,7 @@ export class WorkflowStore {
       error: undefined,
       lastExecutionEvent: undefined,
       nodeExecutionOutputs: Object.freeze({}),
+      outputAssets: Object.freeze([]),
     });
 
     try {
@@ -272,6 +278,9 @@ export class WorkflowStore {
           this.setState({
             lastExecutionEvent: event,
             nodeExecutionOutputs: payloadOutputs ?? this.state.nodeExecutionOutputs,
+            outputAssets: event.asset
+              ? Object.freeze([...this.state.outputAssets, event.asset])
+              : this.state.outputAssets,
           });
 
           onEvent?.(event);
@@ -281,6 +290,7 @@ export class WorkflowStore {
       this.setState({
         currentWorkflow: result.effectiveWorkflow,
         isExecuting: false,
+        outputAssets: Object.freeze([...(result.result.outputAssets ?? this.state.outputAssets)]),
       });
     } catch (error: unknown) {
       this.setState({
@@ -436,6 +446,7 @@ export class WorkflowStore {
       selectedConnectionId: undefined,
       validation: undefined,
       isDirty: false,
+      outputAssets: Object.freeze([]),
     });
   }
 
@@ -481,6 +492,9 @@ export class WorkflowStore {
       workflows: patch.workflows
         ? Object.freeze([...patch.workflows])
         : this.state.workflows,
+      outputAssets: patch.outputAssets
+        ? Object.freeze([...patch.outputAssets])
+        : this.state.outputAssets,
     });
 
     for (const listener of this.listeners) {

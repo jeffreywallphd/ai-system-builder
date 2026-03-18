@@ -3,6 +3,7 @@ import { AssetPresenter } from "../AssetPresenter";
 import { ModelPresenter } from "../ModelPresenter";
 import { NodePresenter } from "../NodePresenter";
 import { ValidationPresenter } from "../ValidationPresenter";
+import { WorkflowOutputPresenter } from "../WorkflowOutputPresenter";
 
 describe("ui/presenters unit", () => {
   it("AssetPresenter formats and derives detail fields", () => {
@@ -85,6 +86,46 @@ describe("ui/presenters unit", () => {
 
     expect(summary.groups[0]?.scope).toBe("workflow");
     expect(summary.groups[1]?.scope).toBe("custom");
+  });
+
+  it("WorkflowOutputPresenter infers expected output types and previews text outputs", () => {
+    const presenter = new WorkflowOutputPresenter();
+    const workflow = {
+      id: "wf-1",
+      metadata: { name: "Workflow" },
+      nodes: [
+        {
+          id: "n1",
+          outputPorts: [
+            {
+              id: "image",
+              compatibility: { valueTypes: ["image"] },
+            },
+          ],
+        },
+      ],
+      connections: [],
+    };
+    const output = presenter.present(workflow as never, [
+      {
+        id: "asset-1",
+        name: "Transcript",
+        kind: "text",
+        status: "available",
+        source: { type: "generated", provider: "comfyui" },
+        location: { accessMethod: "virtual", format: "txt", contentType: "text/plain" },
+        semanticMetadata: { description: "Hello from the workflow." },
+        relationships: [],
+        isAvailable: () => true,
+        isGenerated: () => true,
+        isDerived: () => false,
+        toReferenceString: () => "asset:asset-1",
+      },
+    ] as never);
+
+    expect(output.expectedOutputTypes).toContain("Image output");
+    expect(output.primaryAsset?.viewerType).toBe("text");
+    expect(output.primaryAsset?.previewText).toBe("Hello from the workflow.");
   });
 
   it("NodePresenter sorts properties and ports by order", () => {

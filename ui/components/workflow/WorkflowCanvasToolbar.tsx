@@ -6,11 +6,17 @@ export interface WorkflowCanvasToolbarProps {
   readonly hasSelection?: boolean;
   readonly canOpenProperties?: boolean;
   readonly isCanvasLocked?: boolean;
+  readonly canExecuteWorkflow?: boolean;
+  readonly isExecutingWorkflow?: boolean;
   readonly isMenuOpen?: boolean;
   readonly isPropertiesOpen?: boolean;
+  readonly canToggleOutput?: boolean;
+  readonly isOutputOpen?: boolean;
   readonly onToggleCanvasLock?: () => void;
+  readonly onExecuteWorkflow?: () => void;
   readonly onOpenMenu?: () => void;
   readonly onOpenProperties?: () => void;
+  readonly onToggleOutput?: () => void;
   readonly onClearSelection?: () => void;
   readonly onValidateWorkflow?: () => void;
   readonly onViewModeChange?: (mode: WorkflowViewMode) => void;
@@ -22,11 +28,17 @@ export default function WorkflowCanvasToolbar({
   hasSelection,
   canOpenProperties,
   isCanvasLocked,
+  canExecuteWorkflow,
+  isExecutingWorkflow,
   isMenuOpen,
   isPropertiesOpen,
+  canToggleOutput,
+  isOutputOpen,
   onToggleCanvasLock,
+  onExecuteWorkflow,
   onOpenMenu,
   onOpenProperties,
+  onToggleOutput,
   onClearSelection,
   onValidateWorkflow,
   onViewModeChange,
@@ -52,8 +64,23 @@ export default function WorkflowCanvasToolbar({
 
         <button
           type="button"
+          className={`ui-button ui-button--secondary ui-button--sm${
+            isExecutingWorkflow ? " ui-button--loading" : ""
+          }`}
+          onClick={() => onExecuteWorkflow?.()}
+          disabled={!canExecuteWorkflow || isExecutingWorkflow}
+        >
+          <span className="ui-button__label">
+            {isExecutingWorkflow ? <span className="ui-button__spinner" aria-hidden="true" /> : null}
+            Execute
+          </span>
+        </button>
+
+        <button
+          type="button"
           className="ui-button ui-button--secondary ui-button--sm"
           onClick={() => onValidateWorkflow?.()}
+          disabled={isExecutingWorkflow}
         >
           Validate
         </button>
@@ -96,6 +123,17 @@ export default function WorkflowCanvasToolbar({
           >
             Clear Selection
           </button>
+
+          {viewMode === "canvas" ? (
+            <button
+              type="button"
+              className="ui-button ui-button--secondary ui-button--sm ui-tablet-up-only"
+              onClick={() => onToggleOutput?.()}
+              disabled={!canToggleOutput}
+            >
+              {isOutputOpen ? "Hide Output" : "View Output"}
+            </button>
+          ) : null}
 
           <button
             type="button"

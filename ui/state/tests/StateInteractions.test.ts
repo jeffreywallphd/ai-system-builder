@@ -45,4 +45,39 @@ describe("ui/state interactions", () => {
     expect(store.getState().isDirty).toBeTrue();
   });
 
+  it("captures workflow output assets from execution events and results", async () => {
+    const workflow = { id: "wf-1" } as any;
+    const outputAsset = { id: "asset-1", name: "Result", kind: "image" } as any;
+    const store = new WorkflowStore({
+      workflowService: {
+        executeWorkflow: async (_request: any, onEvent?: (event: any) => void) => {
+          onEvent?.({
+            executionId: "exec-1",
+            kind: "asset-produced",
+            status: "running",
+            asset: outputAsset,
+          });
+
+          return {
+            effectiveWorkflow: workflow,
+            result: {
+              executionId: "exec-1",
+              status: "completed",
+              outputAssets: [outputAsset],
+            },
+          };
+        },
+      } as any,
+      nodeService: {} as any,
+      initialState: {
+        currentWorkflow: workflow,
+      },
+    });
+
+    await store.executeCurrentWorkflow();
+
+    expect(store.getState().outputAssets).toEqual([outputAsset]);
+    expect(store.getState().isExecuting).toBeFalse();
+  });
+
 });
