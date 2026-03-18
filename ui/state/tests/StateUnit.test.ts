@@ -54,4 +54,40 @@ describe("ui/state unit coverage", () => {
     expect(store.getState().currentWorkflow?.metadata.description).toBe("Updated");
     expect(store.getState().isDirty).toBeTrue();
   });
+  it("WorkflowStore clears editor session state when leaving the editor", () => {
+    const store = new WorkflowStore({
+      workflowService: {} as any,
+      nodeService: {} as any,
+      initialState: {
+        currentWorkflow: { id: "wf-1" } as any,
+        validation: { isValid: false } as any,
+        selectedNodeId: "n-1",
+        selectedConnectionId: "c-1",
+        isDirty: true,
+        isLoading: true,
+        isSaving: true,
+        isExecuting: true,
+        lastExecutionEvent: { executionId: "exec-1" } as any,
+        nodeExecutionOutputs: { "n-1": { value: 1 } },
+        outputAssets: [{ id: "asset-1" } as any],
+        error: "boom",
+      },
+    });
+
+    store.clearEditorSession();
+
+    expect(store.getState().currentWorkflow).toBeUndefined();
+    expect(store.getState().validation).toBeUndefined();
+    expect(store.getState().selectedNodeId).toBeUndefined();
+    expect(store.getState().selectedConnectionId).toBeUndefined();
+    expect(store.getState().isDirty).toBeFalse();
+    expect(store.getState().isLoading).toBeFalse();
+    expect(store.getState().isSaving).toBeFalse();
+    expect(store.getState().isExecuting).toBeFalse();
+    expect(store.getState().lastExecutionEvent).toBeUndefined();
+    expect(store.getState().nodeExecutionOutputs).toEqual({});
+    expect(store.getState().outputAssets).toEqual([]);
+    expect(store.getState().error).toBeUndefined();
+  });
+
 });

@@ -439,6 +439,23 @@ export class WorkflowStore {
     });
   }
 
+  public clearEditorSession(): void {
+    this.setState({
+      currentWorkflow: undefined,
+      validation: undefined,
+      selectedNodeId: undefined,
+      selectedConnectionId: undefined,
+      isDirty: false,
+      isLoading: false,
+      isSaving: false,
+      isExecuting: false,
+      lastExecutionEvent: undefined,
+      nodeExecutionOutputs: Object.freeze({}),
+      outputAssets: Object.freeze([]),
+      error: undefined,
+    });
+  }
+
   public setCurrentWorkflow(workflow: IWorkflow | undefined): void {
     this.setState({
       currentWorkflow: workflow,

@@ -38,6 +38,19 @@ describe("ui/pages interactions", () => {
     expect(editor).not.toContain("seedStarterNode");
     expect(editor).toContain("ui-canvas-shell__view--active");
     expect(editor).toContain("onViewModeChange={setViewMode}");
+    expect(editor).toContain('if (workflowId === "new")');
+    expect(editor).toContain("if (!createdNewWorkflowRef.current)");
+  });
+
+  it("guards workflow editor navigation and clears stale editor state outside the tool", () => {
+    const layout = readSource("ui/layout/AppLayout.tsx");
+    const store = readSource("ui/state/WorkflowStore.ts");
+
+    expect(layout).toContain("unstable_useBlocker as useBlocker");
+    expect(layout).toContain("useBeforeUnload");
+    expect(layout).toContain("workflowStore.clearEditorSession()");
+    expect(layout).toContain("workflowStore.saveCurrentWorkflow()");
+    expect(store).toContain("public clearEditorSession(): void");
   });
 
   it("keeps validation UI dismissible within the canvas experience", () => {
