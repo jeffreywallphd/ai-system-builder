@@ -86,9 +86,8 @@ export default function ModelsPage(): JSX.Element {
         onInstallRemoteFiles={(modelId, files) => {
           void installRemoteFiles(
             modelStore,
-            settingsState.settings.models.installDirectory,
             state.remoteModels,
-            config.modelInstallDirectory,
+            settingsState.settings.models.installDirectory,
             modelId,
             files
           );

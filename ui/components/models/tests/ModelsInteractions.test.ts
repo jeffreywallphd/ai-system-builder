@@ -18,6 +18,6 @@ describe("ui/components/models interactions", () => {
     expect(page).toContain("settingsState.settings.models.installDirectory");
     expect(page).toContain("createInstallationModel(remoteModel.model, installTargets)");
     expect(page).toContain("state.remoteModels");
-    expect(page).toContain("config.modelInstallDirectory");
+    expect(page).toContain("destination: `${installBaseDirectory}/");
   });
 });
