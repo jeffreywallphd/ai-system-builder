@@ -27,8 +27,9 @@ describe("ui composition interactions", () => {
     const definitions = await dependencies.nodeService.listAvailableNodes();
     const nodeTypeIds = definitions.map((definition) => definition.type);
 
-    expect(nodeTypeIds).toContain("langchain.output-parser");
-    expect(nodeTypeIds).toContain("langchain.context-merger");
+    expect(nodeTypeIds).toContain("langchain.output_parser");
+    expect(nodeTypeIds).toContain("langchain.document_loader");
+    expect(nodeTypeIds).toContain("langchain.llm_chat");
   });
 
   it("seeds sample workflows with implemented nodes into the default in-memory repository", async () => {

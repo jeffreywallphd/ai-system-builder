@@ -1,5 +1,12 @@
-import { useEffect, useState } from "react";
-import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import {
+  Link,
+  NavLink,
+  Outlet,
+  unstable_useBlocker as useBlocker,
+  useBeforeUnload,
+  useLocation,
+} from "react-router-dom";
 import { getNavigationRoutes } from "../routes/RouteConfig";
 import DevSyncButton from "../dev/DevSyncButton";
 import { useUiDependencies } from "../composition/AppProviders";
@@ -18,15 +25,100 @@ const fallbackConsoleState: RuntimeConsoleState = Object.freeze({
   events: Object.freeze([]),
 });
 
+function isWorkflowEditorPath(pathname: string): boolean {
+  return pathname.startsWith("/workflows/");
+}
+
+function getWorkflowEditorExitPrompt(workflowName?: string): string {
+  const normalizedName = workflowName?.trim();
+  const label = normalizedName ? `\"${normalizedName}\"` : "this workflow";
+  return `You have unsaved changes in ${label}. Click OK to save before leaving, or Cancel to discard those changes.`;
+}
+
 export default function AppLayout(): JSX.Element {
   const routes = getNavigationRoutes();
-  const { config, runtimeConsoleStore } = useUiDependencies();
+  const { config, runtimeConsoleStore, workflowStore } = useUiDependencies();
   const location = useLocation();
   const [runtimeConsoleState, setRuntimeConsoleState] = useState<RuntimeConsoleState>(fallbackConsoleState);
+  const previousPathnameRef = useRef(location.pathname);
 
   useEffect(() => {
     return runtimeConsoleStore.subscribe(setRuntimeConsoleState);
   }, [runtimeConsoleStore]);
+
+  const blocker = useBlocker(({ currentLocation, nextLocation }) => {
+    const { currentWorkflow, isDirty } = workflowStore.getState();
+
+    if (!currentWorkflow || !isDirty) {
+      return false;
+    }
+
+    if (!isWorkflowEditorPath(currentLocation.pathname)) {
+      return false;
+    }
+
+    return currentLocation.pathname !== nextLocation.pathname;
+  });
+
+  useEffect(() => {
+    if (blocker.state !== "blocked") {
+      return;
+    }
+
+    let isCancelled = false;
+
+    const resolveNavigation = async (): Promise<void> => {
+      const { currentWorkflow } = workflowStore.getState();
+      const shouldSave = window.confirm(
+        getWorkflowEditorExitPrompt(currentWorkflow?.metadata.name)
+      );
+
+      if (isCancelled) {
+        return;
+      }
+
+      if (shouldSave) {
+        try {
+          await workflowStore.saveCurrentWorkflow();
+        } catch {
+          blocker.reset();
+          return;
+        }
+      }
+
+      workflowStore.clearEditorSession();
+      blocker.proceed();
+    };
+
+    void resolveNavigation();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [blocker, workflowStore]);
+
+  useBeforeUnload((event) => {
+    const { currentWorkflow, isDirty } = workflowStore.getState();
+
+    if (!currentWorkflow || !isDirty || !isWorkflowEditorPath(location.pathname)) {
+      return;
+    }
+
+    event.preventDefault();
+    event.returnValue = getWorkflowEditorExitPrompt(currentWorkflow.metadata.name);
+  });
+
+  useEffect(() => {
+    const previousPathname = previousPathnameRef.current;
+    previousPathnameRef.current = location.pathname;
+
+    if (
+      isWorkflowEditorPath(previousPathname) &&
+      !isWorkflowEditorPath(location.pathname)
+    ) {
+      workflowStore.clearEditorSession();
+    }
+  }, [location.pathname, workflowStore]);
 
   const isWideWorkspace =
     location.pathname.startsWith("/workflows/") ||

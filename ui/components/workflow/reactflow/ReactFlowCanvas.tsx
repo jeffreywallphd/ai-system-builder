@@ -21,7 +21,7 @@ import {
 import type { NodeDetailViewModel } from "../../../presenters/NodePresenter";
 import type { WorkflowResponse } from "../../../application/dto/WorkflowResponse";
 import { NodeAdapter, type ReactFlowNodeData } from "./NodeAdapter";
-import { EdgeAdapter } from "./EdgeAdapter";
+import { createReactFlowEdgeId, EdgeAdapter } from "./EdgeAdapter";
 import ReactFlowNodeWrapper from "./ReactFlowNodeWrapper";
 
 export interface ReactFlowCanvasProps {
@@ -114,7 +114,12 @@ export function createOptimisticEdgeFromConnection(
   }
 
   return Object.freeze({
-    id: `pending:${connection.source}:${connection.sourceHandle}:${connection.target}:${connection.targetHandle}`,
+    id: createReactFlowEdgeId({
+      sourceNodeId: connection.source,
+      sourcePortId: connection.sourceHandle,
+      targetNodeId: connection.target,
+      targetPortId: connection.targetHandle,
+    }),
     source: connection.source,
     sourceHandle: connection.sourceHandle,
     target: connection.target,
@@ -123,6 +128,7 @@ export function createOptimisticEdgeFromConnection(
     animated: true,
     selectable: false,
     data: Object.freeze({
+      connectionId: undefined,
       state: "pending",
       isOptimistic: true,
     }),
@@ -189,7 +195,7 @@ function InnerReactFlowCanvas({
   const renderedEdges = useMemo<ReadonlyArray<Edge>>(
     () =>
       flowEdges.map((edge) =>
-        edge.id === selectedConnectionId
+        edge.data?.connectionId === selectedConnectionId
           ? Object.freeze({
               ...edge,
               selected: true,
@@ -313,7 +319,12 @@ function InnerReactFlowCanvas({
 
   const onEdgeClick = useCallback<EdgeMouseHandler<Edge>>(
     (_event, edge) => {
-      onSelectConnection?.(edge.id);
+      const connectionId =
+        typeof edge.data?.connectionId === "string"
+          ? edge.data.connectionId
+          : edge.id;
+
+      onSelectConnection?.(connectionId);
     },
     [onSelectConnection]
   );

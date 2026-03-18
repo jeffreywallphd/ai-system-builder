@@ -20,6 +20,12 @@ function ReactFlowNodeWrapper({
   selected,
 }: NodeProps<ReactFlowNodeData>): JSX.Element {
   const node = data.node;
+  const nodeWidth = data.isCompactViewport
+    ? undefined
+    : node.size?.width ?? 360;
+  const nodeMinHeight = data.isCompactViewport
+    ? undefined
+    : node.size?.height;
   const hasProperties = node.properties.length > 0;
   const executionOutput = data.executionOutput;
   const chunkDisplayItems =
@@ -32,6 +38,10 @@ function ReactFlowNodeWrapper({
       className={`ui-rf-node${selected ? " ui-rf-node--selected" : ""}${
         !node.isEnabled ? " ui-rf-node--disabled" : ""
       }`}
+      style={{
+        width: nodeWidth,
+        minHeight: nodeMinHeight,
+      }}
     >
       <div className="ui-rf-node__header">
         <div className="ui-stack ui-stack--2xs" style={{ minWidth: 0 }}>

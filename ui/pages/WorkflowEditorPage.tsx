@@ -144,11 +144,6 @@ export default function WorkflowEditorPage({
     }
 
     if (workflowId === "new") {
-      if (existingWorkflow) {
-        createdNewWorkflowRef.current = true;
-        return;
-      }
-
       if (!createdNewWorkflowRef.current) {
         createdNewWorkflowRef.current = true;
 

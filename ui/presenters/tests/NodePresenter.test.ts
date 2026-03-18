@@ -30,4 +30,31 @@ describe("NodePresenter", () => {
     expect(item.inputPorts.length).toBeGreaterThanOrEqual(0);
     expect(item.outputPorts.length).toBeGreaterThanOrEqual(0);
   });
+
+  it("surfaces range metadata for property editors", () => {
+    const presenter = new NodePresenter();
+    const field = presenter.presentProperty(
+      new NodeProperty({
+        id: "temperature",
+        name: "Temperature",
+        type: "slider",
+        value: 0.7,
+        defaultValue: 0.7,
+        constraints: {
+          range: {
+            min: 0,
+            max: 2,
+            step: 0.1,
+            defaultValue: 0.7,
+          },
+        },
+      })
+    );
+
+    expect(field.defaultValue).toBe(0.7);
+    expect(field.min).toBe(0);
+    expect(field.max).toBe(2);
+    expect(field.step).toBe(0.1);
+    expect(field.shouldClampToRange).toBeTrue();
+  });
 });
