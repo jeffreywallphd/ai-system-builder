@@ -2,7 +2,12 @@ import type { IModelExecutor } from "../../../application/ports/interfaces/IMode
 import type { INodeExecutor, INodeExecutionResult } from "../../../application/ports/interfaces/INodeExecutor";
 import type { INodeExecutionContext } from "../../../application/ports/interfaces/INodeExecutionContextResolver";
 import type { INode } from "../../../domain/nodes/interfaces/INode";
-import type { ChatMessage, Document } from "../../../domain/nodes/WorkflowDataTypes";
+import type {
+  ChatMessage,
+  Document,
+  ToolCall,
+  ToolDefinition,
+} from "../../../domain/nodes/WorkflowDataTypes";
 
 interface UploadedDocument {
   readonly name?: string;
@@ -16,6 +21,11 @@ interface ChunkRecord {
   readonly index?: number;
   readonly text: string;
   readonly score?: number;
+}
+
+interface ToolRuntimeDefinition extends ToolDefinition {
+  readonly strictSchema?: boolean;
+  readonly handler?: unknown;
 }
 
 const messageHistoryStore = new Map<string, ChatMessage[]>();
@@ -96,7 +106,16 @@ function toDocuments(value: unknown): Document[] {
     }
 
     const record = item as Record<string, unknown>;
-    const text = typeof record.text === "string" ? record.text : normalizeText(record);
+    const nestedDocument =
+      record.document && typeof record.document === "object"
+        ? (record.document as Record<string, unknown>)
+        : undefined;
+    const text =
+      typeof record.text === "string"
+        ? record.text
+        : typeof nestedDocument?.text === "string"
+          ? (nestedDocument.text as string)
+          : normalizeText(record);
     if (!text.trim()) {
       return [];
     }
@@ -104,11 +123,18 @@ function toDocuments(value: unknown): Document[] {
     const metadata =
       record.metadata && typeof record.metadata === "object"
         ? (record.metadata as Record<string, unknown>)
+        : nestedDocument?.metadata && typeof nestedDocument.metadata === "object"
+          ? (nestedDocument.metadata as Record<string, unknown>)
         : undefined;
 
     return [
       {
-        id: typeof record.id === "string" ? record.id : `doc-${index + 1}`,
+        id:
+          typeof record.id === "string"
+            ? record.id
+            : typeof nestedDocument?.id === "string"
+              ? (nestedDocument.id as string)
+              : `doc-${index + 1}`,
         text,
         metadata,
       } satisfies Document,
@@ -139,6 +165,60 @@ function toChatMessages(value: unknown): ChatMessage[] {
 
     return [];
   });
+}
+
+function toToolDefinitions(value: unknown): ToolRuntimeDefinition[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") {
+      return [];
+    }
+
+    const record = item as Record<string, unknown>;
+    const name = record.name;
+    const description = record.description;
+
+    if (typeof name !== "string" || typeof description !== "string") {
+      return [];
+    }
+
+    return [
+      {
+        name,
+        description,
+        inputSchema:
+          record.inputSchema && typeof record.inputSchema === "object"
+            ? (record.inputSchema as Record<string, unknown>)
+            : undefined,
+        strictSchema:
+          typeof record.strictSchema === "boolean" ? record.strictSchema : undefined,
+        handler: record.handler,
+      } satisfies ToolRuntimeDefinition,
+    ];
+  });
+}
+
+function ensureObjectRecord(value: unknown): Record<string, unknown> {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+
+  return {};
+}
+
+function stringifyValue(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
 }
 
 function tokenize(value: string): string[] {
@@ -311,6 +391,46 @@ export class LangChainNodeExecutor implements INodeExecutor {
       };
     }
 
+    if (supportsNodeType(nodeType, "langchain.document_to_chunks")) {
+      const documents = toDocuments(inputs.documents);
+      const chunkSize = Math.max(1, Number(properties.chunkSize ?? 500));
+      const chunkOverlap = Math.max(0, Number(properties.chunkOverlap ?? 50));
+      const preserveMetadata = Boolean(properties.preserveMetadata ?? true);
+      const chunks = documents.flatMap((document, documentIndex) =>
+        splitTextIntoChunks(document.text, chunkSize, chunkOverlap).map((text, chunkIndex) => ({
+          id: document.id ? `${document.id}-chunk-${chunkIndex + 1}` : `doc-${documentIndex + 1}-chunk-${chunkIndex + 1}`,
+          text,
+          metadata: preserveMetadata
+            ? {
+                ...(document.metadata ?? {}),
+                sourceDocumentId: document.id,
+                chunkIndex,
+              }
+            : {
+                sourceDocumentId: document.id,
+                chunkIndex,
+              },
+        }))
+      );
+
+      return {
+        nodeId: context.node.id,
+        status: chunks.length > 0 ? "completed" : "failed",
+        outputs: {
+          chunks,
+        },
+        messages: [
+          chunks.length > 0
+            ? `Prepared ${chunks.length} chunk document(s).`
+            : "Document chunking requires at least one readable document.",
+        ],
+        errorMessage:
+          chunks.length > 0
+            ? undefined
+            : "Document chunking requires at least one readable document.",
+      };
+    }
+
     if (supportsNodeType(nodeType, "langchain.document-to-chunks")) {
       const document = inputs.document as UploadedDocument | undefined;
       if (!document || typeof document.text !== "string") {
@@ -368,6 +488,56 @@ export class LangChainNodeExecutor implements INodeExecutor {
         outputs: { chunks },
         messages: [chunks.length > 0 ? `Split text into ${chunks.length} chunk(s).` : "No text received for splitting."],
         errorMessage: chunks.length > 0 ? undefined : "No text received for splitting.",
+      };
+    }
+
+    if (supportsNodeType(nodeType, "langchain.context_formatter")) {
+      const documents = toDocuments(inputs.documents);
+      const chunkValues = Array.isArray(inputs.chunks) ? inputs.chunks : [];
+      const chunkTexts = chunkValues
+        .map((item) => normalizeText(item))
+        .filter((item) => item.trim().length > 0);
+      const template = String(properties.template ?? "");
+      const separator = String(properties.separator ?? "\n\n");
+      const includeMetadata = Boolean(properties.includeMetadata ?? false);
+      const maxItems = Math.max(
+        1,
+        Number(properties.maxItems ?? (documents.length + chunkTexts.length || 1))
+      );
+      const renderedItems = [
+        ...documents.map((document, index) => {
+          const metadataText =
+            includeMetadata && document.metadata
+              ? `\nMetadata: ${stringifyValue(document.metadata)}`
+              : "";
+          const fallback = `${document.text}${metadataText}`;
+          if (!template.trim()) {
+            return fallback;
+          }
+
+          return template
+            .replace(/\{index\}/g, String(index + 1))
+            .replace(/\{text\}/g, document.text)
+            .replace(/\{metadata\}/g, metadataText ? stringifyValue(document.metadata) : "");
+        }),
+        ...chunkTexts,
+      ]
+        .filter((item) => item.trim().length > 0)
+        .slice(0, maxItems);
+      const contextText = renderedItems.join(separator);
+
+      return {
+        nodeId: context.node.id,
+        status: contextText ? "completed" : "failed",
+        outputs: {
+          context: contextText,
+        },
+        messages: [
+          contextText
+            ? `Formatted ${renderedItems.length} context item(s).`
+            : "Context formatter received no documents or chunks.",
+        ],
+        errorMessage: contextText ? undefined : "Context formatter received no documents or chunks.",
       };
     }
 
@@ -593,6 +763,55 @@ export class LangChainNodeExecutor implements INodeExecutor {
       };
     }
 
+    if (supportsNodeType(nodeType, "langchain.vector_store_upsert")) {
+      const documents = toDocuments(inputs.documents);
+      const embeddings = Array.isArray(inputs.embeddings)
+        ? inputs.embeddings.filter(Array.isArray)
+        : [];
+      const vectorStore = ensureObjectRecord(inputs.vectorStore);
+      const collection = String(properties.collection ?? vectorStore.collection ?? "default");
+      const upsertMode = String(properties.upsertMode ?? "append");
+      const batchSize = Math.max(1, Number(properties.batchSize ?? 100));
+      const recordCount = Math.max(documents.length, embeddings.length);
+      const records = Array.from({ length: recordCount }, (_unused, index) => ({
+        id: documents[index]?.id ?? `${collection}-${index + 1}`,
+        document: documents[index],
+        embedding: embeddings[index],
+      }));
+
+      return {
+        nodeId: context.node.id,
+        status: vectorStore && recordCount > 0 ? "completed" : "failed",
+        outputs: {
+          vectorStore: {
+            ...vectorStore,
+            collection,
+            upsertMode,
+            batchSize,
+            recordCount,
+            records,
+          },
+          upsertResult: {
+            collection,
+            upsertMode,
+            batchSize,
+            documentCount: documents.length,
+            embeddingCount: embeddings.length,
+            recordCount,
+          },
+        },
+        messages: [
+          recordCount > 0
+            ? `Prepared ${recordCount} vector store upsert record(s).`
+            : "Vector store upsert requires documents and/or embeddings.",
+        ],
+        errorMessage:
+          recordCount > 0
+            ? undefined
+            : "Vector store upsert requires documents and/or embeddings.",
+      };
+    }
+
     if (nodeType === "langchain.vector-store-upsert") {
       const embedding = inputs.embedding as Record<string, unknown> | undefined;
       const metadata = inputs.metadata;
@@ -620,6 +839,58 @@ export class LangChainNodeExecutor implements INodeExecutor {
         },
         messages: [records.length > 0 ? `Prepared ${records.length} vector store record(s).` : "No embeddings were available to store."],
         errorMessage: records.length > 0 ? undefined : "No embeddings were available to store.",
+      };
+    }
+
+    if (supportsNodeType(nodeType, "langchain.similarity_search")) {
+      const query = normalizeText(inputs.query);
+      const queryEmbedding = Array.isArray(inputs.queryEmbedding)
+        ? (inputs.queryEmbedding as number[])
+        : undefined;
+      const topK = Math.max(1, Number(properties.topK ?? 5));
+      const minimumScore = Number(properties.scoreThreshold ?? 0);
+      const vectorStore = inputs.vectorStore as Record<string, unknown> | unknown[] | undefined;
+      const candidateDocuments = [
+        ...toDocuments((vectorStore as Record<string, unknown> | undefined)?.records),
+        ...toDocuments(vectorStore),
+      ];
+      const scored = candidateDocuments
+        .map((document, index) => {
+          const lexicalScore = query ? scoreText(query, document.text) : 0;
+          const embeddingScore =
+            queryEmbedding && Array.isArray((vectorStore as Record<string, unknown> | undefined)?.records)
+              ? 0.75
+              : 0;
+          const score = Number(Math.max(lexicalScore, embeddingScore).toFixed(3));
+
+          return {
+            id: document.id ?? `doc-${index + 1}`,
+            text: document.text,
+            metadata: {
+              ...(document.metadata ?? {}),
+              score,
+            },
+          } satisfies Document;
+        })
+        .filter((document) => Number(document.metadata?.score ?? 0) >= minimumScore)
+        .sort((left, right) => Number(right.metadata?.score ?? 0) - Number(left.metadata?.score ?? 0))
+        .slice(0, topK);
+
+      return {
+        nodeId: context.node.id,
+        status: scored.length > 0 ? "completed" : "failed",
+        outputs: {
+          documents: scored,
+        },
+        messages: [
+          scored.length > 0
+            ? `Found ${scored.length} similar document(s).`
+            : "Similarity search requires a query or query embedding and searchable records.",
+        ],
+        errorMessage:
+          scored.length > 0
+            ? undefined
+            : "Similarity search requires a query or query embedding and searchable records.",
       };
     }
 
@@ -665,6 +936,46 @@ export class LangChainNodeExecutor implements INodeExecutor {
           scores: scored.map((document, index) => ({ index, score: document.metadata?.score })),
         },
         messages: [`Retrieved ${scored.length} matching document(s).`],
+      };
+    }
+
+    if (supportsNodeType(nodeType, "langchain.knowledge_base_retriever")) {
+      const query = normalizeText(inputs.query);
+      const topK = Math.max(1, Number(properties.topK ?? 5));
+      const minimumScore = Number(properties.scoreThreshold ?? 0);
+      const knowledgeBase = inputs.knowledgeBase as Record<string, unknown> | unknown[] | undefined;
+      const candidateDocuments = [
+        ...toDocuments((knowledgeBase as Record<string, unknown> | undefined)?.documents),
+        ...toDocuments((knowledgeBase as Record<string, unknown> | undefined)?.entries),
+        ...toDocuments(knowledgeBase),
+      ];
+      const documents = candidateDocuments
+        .map((document) => ({
+          ...document,
+          metadata: {
+            ...(document.metadata ?? {}),
+            score: Number(scoreText(query, document.text).toFixed(3)),
+          },
+        }))
+        .filter((document) => Number(document.metadata?.score ?? 0) >= minimumScore)
+        .sort((left, right) => Number(right.metadata?.score ?? 0) - Number(left.metadata?.score ?? 0))
+        .slice(0, topK);
+
+      return {
+        nodeId: context.node.id,
+        status: documents.length > 0 ? "completed" : "failed",
+        outputs: {
+          documents,
+        },
+        messages: [
+          documents.length > 0
+            ? `Retrieved ${documents.length} knowledge base document(s).`
+            : "Knowledge base retriever found no matching entries.",
+        ],
+        errorMessage:
+          documents.length > 0
+            ? undefined
+            : "Knowledge base retriever found no matching entries.",
       };
     }
 
@@ -717,6 +1028,201 @@ export class LangChainNodeExecutor implements INodeExecutor {
         },
         messages: [sessionId ? `Stored ${history.length} message(s) for session ${sessionId}.` : "Message history requires a session ID."],
         errorMessage: sessionId ? undefined : "Message history requires a session ID.",
+      };
+    }
+
+    if (supportsNodeType(nodeType, "langchain.tool_definition")) {
+      const toolName = String(properties.toolName ?? "");
+      const description = String(properties.description ?? "");
+      const strictSchema = Boolean(properties.strictSchema ?? true);
+      const inputSchema = ensureObjectRecord(inputs.inputSchema);
+      const handler = inputs.toolHandler;
+      const tool = {
+        name: toolName,
+        description,
+        inputSchema: Object.keys(inputSchema).length > 0 ? inputSchema : undefined,
+        strictSchema,
+        handler,
+      };
+
+      return {
+        nodeId: context.node.id,
+        status: toolName && description ? "completed" : "failed",
+        outputs: {
+          tool,
+        },
+        messages: [
+          toolName && description
+            ? `Created tool definition '${toolName}'.`
+            : "Tool definition requires both a tool name and description.",
+        ],
+        errorMessage:
+          toolName && description
+            ? undefined
+            : "Tool definition requires both a tool name and description.",
+      };
+    }
+
+    if (supportsNodeType(nodeType, "langchain.tool_call_executor")) {
+      const tool = ensureObjectRecord(inputs.tool);
+      const argumentsRecord = ensureObjectRecord(inputs.arguments);
+      const failOnMissingArgs = Boolean(properties.failOnMissingArgs ?? true);
+      const stringifyResult = Boolean(properties.stringifyResult ?? true);
+      const missingArgs = failOnMissingArgs && Object.keys(argumentsRecord).length === 0;
+      const toolName = typeof tool.name === "string" ? tool.name : "unnamed-tool";
+      const toolResult = {
+        toolName,
+        arguments: argumentsRecord,
+        status: missingArgs ? "missing-arguments" : "completed",
+      };
+
+      return {
+        nodeId: context.node.id,
+        status: missingArgs ? "failed" : "completed",
+        outputs: {
+          toolResult,
+          resultText: stringifyResult ? stringifyValue(toolResult) : undefined,
+        },
+        messages: [
+          missingArgs
+            ? `Tool '${toolName}' could not run because no arguments were provided.`
+            : `Executed tool '${toolName}' with ${Object.keys(argumentsRecord).length} argument field(s).`,
+        ],
+        errorMessage:
+          missingArgs
+            ? `Tool '${toolName}' could not run because no arguments were provided.`
+            : undefined,
+      };
+    }
+
+    if (supportsNodeType(nodeType, "langchain.agent")) {
+      const model = String(properties.model ?? "");
+      const systemPrompt = normalizeText(properties.systemPrompt);
+      const temperature = Number(properties.temperature ?? 0.7);
+      const maxIterations = Math.max(1, Number(properties.maxIterations ?? 5));
+      const useMemory = Boolean(properties.useMemory ?? true);
+      const verbose = Boolean(properties.verbose ?? false);
+      const history = useMemory ? toChatMessages(inputs.history) : [];
+      const incomingMessages = toChatMessages(inputs.messages);
+      const directInput = normalizeText(inputs.input);
+      const tools = toToolDefinitions(inputs.tools);
+      const assembledMessages: ChatMessage[] = [];
+
+      if (systemPrompt) {
+        assembledMessages.push({ role: "system", content: systemPrompt });
+      }
+      if (history.length > 0) {
+        assembledMessages.push(...history);
+      }
+      if (incomingMessages.length > 0) {
+        assembledMessages.push(...incomingMessages);
+      } else if (directInput) {
+        assembledMessages.push({ role: "user", content: directInput });
+      }
+
+      const latestUserInput =
+        assembledMessages.filter((message) => message.role === "user").at(-1)?.content ?? directInput;
+      const toolCalls: ToolCall[] =
+        tools.length > 0 && latestUserInput
+          ? [
+              {
+                name: tools[0].name,
+                arguments: { input: latestUserInput },
+              },
+            ]
+          : [];
+      const response = latestUserInput
+        ? `[${model || "agent-model"}] ${latestUserInput}${
+            tools.length > 0 ? `\n\nTools available: ${tools.map((tool) => tool.name).join(", ")}.` : ""
+          }`
+        : "";
+
+      return {
+        nodeId: context.node.id,
+        status: response ? "completed" : "failed",
+        outputs: {
+          response,
+          messages: response
+            ? [...assembledMessages, { role: "assistant", content: response }]
+            : assembledMessages,
+          toolCalls,
+          trace: verbose
+            ? {
+                temperature,
+                maxIterations,
+                toolCount: tools.length,
+              }
+            : undefined,
+        },
+        messages: [
+          response
+            ? `Agent completed a bounded run with ${Math.min(maxIterations, 1)} iteration(s).`
+            : "Agent requires messages or input text.",
+        ],
+        errorMessage: response ? undefined : "Agent requires messages or input text.",
+      };
+    }
+
+    if (supportsNodeType(nodeType, "langchain.summarization")) {
+      const model = String(properties.model ?? "");
+      const style = String(properties.style ?? "brief");
+      const maxLength = Number(properties.maxLength ?? 300);
+      const text = normalizeText(inputs.text);
+      const documents = toDocuments(inputs.documents);
+      const sourceText =
+        text || documents.map((document) => document.text).join("\n\n");
+      const clippedText = sourceText.slice(0, Math.max(1, maxLength));
+      const summary =
+        style === "bullet"
+          ? `- ${clippedText}`
+          : style === "detailed"
+            ? `[${model || "summary-model"}] Detailed summary: ${clippedText}`
+            : `[${model || "summary-model"}] Summary: ${clippedText}`;
+
+      return {
+        nodeId: context.node.id,
+        status: sourceText ? "completed" : "failed",
+        outputs: {
+          summary,
+        },
+        messages: [
+          sourceText
+            ? "Summarization node generated a deterministic summary."
+            : "Summarization requires text or documents.",
+        ],
+        errorMessage: sourceText ? undefined : "Summarization requires text or documents.",
+      };
+    }
+
+    if (supportsNodeType(nodeType, "langchain.combine_summaries")) {
+      const summaryInput = Array.isArray(inputs.summaries)
+        ? inputs.summaries.map((item) => normalizeText(item)).filter(Boolean)
+        : [];
+      const separator = String(properties.separator ?? "\n\n");
+      const strategy = String(properties.strategy ?? "reduce");
+      const model = String(properties.model ?? "");
+      const summary =
+        strategy === "concatenate"
+          ? summaryInput.join(separator)
+          : strategy === "outline"
+            ? summaryInput.map((item, index) => `${index + 1}. ${item}`).join("\n")
+            : `[${model || "summary-combiner"}] ${summaryInput.join(separator)}`;
+
+      return {
+        nodeId: context.node.id,
+        status: summaryInput.length > 0 ? "completed" : "failed",
+        outputs: {
+          summary,
+        },
+        messages: [
+          summaryInput.length > 0
+            ? `Combined ${summaryInput.length} summary item(s).`
+            : "Combine summaries requires at least one summary input.",
+        ],
+        errorMessage:
+          summaryInput.length > 0
+            ? undefined
+            : "Combine summaries requires at least one summary input.",
       };
     }
 
