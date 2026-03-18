@@ -5,6 +5,7 @@ import DevSyncButton from "../dev/DevSyncButton";
 import { useUiDependencies } from "../composition/AppProviders";
 import type { RuntimeConsoleState } from "../state/RuntimeConsoleStore";
 import RuntimeConsoleDrawer from "../components/execution/RuntimeConsoleDrawer";
+import logo from "../images/ai-loom-studio-logo.svg";
 
 function navLinkClassName(isActive: boolean): string {
   return isActive
@@ -35,8 +36,12 @@ export default function AppLayout(): JSX.Element {
     <div className="ui-app ui-surface-app">
       <header className="ui-app__header">
         <div className="ui-app__header-inner">
-          <Link to="/" className="ui-app__brand">
-            AI Loom Studio
+          <Link to="/" className="ui-app__brand" aria-label="AI Loom Studio home">
+            <img
+              src={logo}
+              alt="AI Loom Studio"
+              className="ui-app__brand-logo"
+            />
           </Link>
 
           <div
