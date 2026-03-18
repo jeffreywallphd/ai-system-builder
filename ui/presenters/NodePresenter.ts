@@ -27,10 +27,15 @@ export interface NodePropertyFieldViewModel {
   readonly name: string;
   readonly type: string;
   readonly value: unknown;
+  readonly defaultValue?: unknown;
   readonly description?: string;
   readonly isEditable: boolean;
   readonly isAdvanced: boolean;
   readonly isEmpty: boolean;
+  readonly min?: number;
+  readonly max?: number;
+  readonly step?: number;
+  readonly shouldClampToRange: boolean;
   readonly options?: ReadonlyArray<{
     readonly label: string;
     readonly value: unknown;
@@ -163,10 +168,15 @@ export class NodePresenter {
       name: property.name,
       type: property.type,
       value: property.value,
+      defaultValue: property.defaultValue,
       description: property.description,
       isEditable: property.isEditable,
       isAdvanced: property.isAdvanced,
       isEmpty: property.isEmpty(),
+      min: property.constraints?.range?.min ?? property.constraints?.min,
+      max: property.constraints?.range?.max ?? property.constraints?.max,
+      step: property.constraints?.range?.step,
+      shouldClampToRange: property.constraints?.range?.clamp ?? false,
       options: property.options
         ? Object.freeze(
             property.options.map((option) =>

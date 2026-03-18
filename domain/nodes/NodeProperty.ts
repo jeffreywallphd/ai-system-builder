@@ -5,6 +5,7 @@ import type {
   INodePropertyOption,
   INodePropertyProjectionMetadata,
   INodePropertyValidationResult,
+  INodePropertyValueRange,
   NodePropertyType,
   NodePropertyValue,
 } from "./interfaces/INodeProperty";
@@ -30,6 +31,92 @@ function asReadonlyArray<T>(value?: ReadonlyArray<T>): ReadonlyArray<T> | undefi
 
 function deepEquals(left: unknown, right: unknown): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function sanitizeRange(
+  range?: INodePropertyValueRange
+): INodePropertyValueRange | undefined {
+  if (!range) {
+    return undefined;
+  }
+
+  const min = Math.min(range.min, range.max);
+  const max = Math.max(range.min, range.max);
+
+  return Object.freeze({
+    min,
+    max,
+    step: range.step,
+    defaultValue: clamp(range.defaultValue, min, max),
+    clamp: range.clamp ?? true,
+  });
+}
+
+function sanitizeConstraints(
+  constraints?: INodePropertyConstraint
+): INodePropertyConstraint | undefined {
+  if (!constraints) {
+    return undefined;
+  }
+
+  const range = sanitizeRange(constraints.range);
+
+  return Object.freeze({
+    ...constraints,
+    min:
+      range?.min !== undefined
+        ? constraints.min !== undefined
+          ? Math.max(constraints.min, range.min)
+          : range.min
+        : constraints.min,
+    max:
+      range?.max !== undefined
+        ? constraints.max !== undefined
+          ? Math.min(constraints.max, range.max)
+          : range.max
+        : constraints.max,
+    range,
+  });
+}
+
+function countStepDecimals(step: number): number {
+  const parts = step.toString().split(".");
+  return parts[1]?.length ?? 0;
+}
+
+function normalizeNumberToRange(
+  value: number,
+  type: NodePropertyType,
+  constraints?: INodePropertyConstraint
+): number {
+  const range = constraints?.range;
+  let normalized = value;
+
+  if (range) {
+    normalized = range.clamp === false
+      ? normalized
+      : clamp(normalized, range.min, range.max);
+
+    if (range.step && range.step > 0) {
+      const stepCount = Math.round((normalized - range.min) / range.step);
+      normalized = range.min + stepCount * range.step;
+      normalized = Number(normalized.toFixed(countStepDecimals(range.step)));
+
+      if (range.clamp !== false) {
+        normalized = clamp(normalized, range.min, range.max);
+      }
+    }
+  }
+
+  if (type === "integer") {
+    normalized = Math.trunc(normalized);
+  }
+
+  return normalized;
 }
 
 export class NodePropertyValidationResult
@@ -100,31 +187,51 @@ export class NodeProperty<TValue = NodePropertyValue>
     bindingProfile?: INodePropertyBindingProfile;
     projection?: INodePropertyProjectionMetadata;
   }) {
+    const constraints = sanitizeConstraints(params.constraints);
+    const value =
+      typeof params.value === "number"
+        ? (normalizeNumberToRange(params.value, params.type, constraints) as TValue)
+        : params.value;
+    const defaultValue =
+      typeof params.defaultValue === "number"
+        ? (normalizeNumberToRange(
+            params.defaultValue,
+            params.type,
+            constraints
+          ) as TValue)
+        : params.defaultValue;
+
     this.id = params.id;
     this.name = params.name;
     this.description = params.description;
     this.type = params.type;
-    this.value = params.value;
-    this.defaultValue = params.defaultValue;
+    this.value = value;
+    this.defaultValue =
+      defaultValue !== undefined
+        ? defaultValue
+        : (constraints?.range?.defaultValue as TValue | undefined);
     this.isEditable = params.isEditable ?? true;
     this.isPersisted = params.isPersisted ?? true;
     this.isAdvanced = params.isAdvanced ?? false;
     this.order = params.order ?? 0;
-    this.constraints = params.constraints
-      ? Object.freeze({ ...params.constraints })
-      : undefined;
+    this.constraints = constraints;
     this.options = params.options ? Object.freeze([...params.options]) : undefined;
     this.bindingProfile = params.bindingProfile;
     this.projection = params.projection ? Object.freeze({ ...params.projection }) : undefined;
   }
 
   public withValue(value: TValue): INodeProperty<TValue> {
+    const normalizedValue =
+      typeof value === "number"
+        ? (normalizeNumberToRange(value, this.type, this.constraints) as TValue)
+        : value;
+
     return new NodeProperty<TValue>({
       id: this.id,
       name: this.name,
       description: this.description,
       type: this.type,
-      value,
+      value: normalizedValue,
       defaultValue: this.defaultValue,
       isEditable: this.isEditable,
       isPersisted: this.isPersisted,

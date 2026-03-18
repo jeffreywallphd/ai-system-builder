@@ -11,8 +11,111 @@ interface UploadedDocument {
   readonly error?: string;
 }
 
+interface ChunkRecord {
+  readonly index?: number;
+  readonly text: string;
+  readonly score?: number;
+}
+
 function readProperty(node: INode, propertyId: string): unknown {
   return node.properties.find((property) => property.id === propertyId)?.value;
+}
+
+function normalizeText(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (value && typeof value === "object" && "text" in (value as Record<string, unknown>)) {
+    const text = (value as Record<string, unknown>).text;
+    return typeof text === "string" ? text : JSON.stringify(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeText(item)).join("\n\n");
+  }
+
+  if (value === undefined || value === null) {
+    return "";
+  }
+
+  return String(value);
+}
+
+function toChunkRecords(value: unknown): ChunkRecord[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const chunks: ChunkRecord[] = [];
+
+  value.forEach((item, index) => {
+    if (typeof item === "string") {
+      if (item.trim().length > 0) {
+        chunks.push({ index, text: item });
+      }
+      return;
+    }
+
+    if (item && typeof item === "object") {
+      const record = item as Record<string, unknown>;
+      const directText = record.text;
+      const nestedMetadata = record.metadata as Record<string, unknown> | undefined;
+      const nestedText = nestedMetadata?.text;
+      const text = typeof directText === "string" ? directText : nestedText;
+      if (typeof text === "string" && text.trim().length > 0) {
+        chunks.push({
+          index: typeof record.index === "number" ? (record.index as number) : index,
+          text,
+        });
+      }
+    }
+  });
+
+  return chunks;
+}
+
+function tokenize(value: string): string[] {
+  return value
+    .toLowerCase()
+    .split(/[^a-z0-9]+/i)
+    .map((token) => token.trim())
+    .filter(Boolean);
+}
+
+function scoreText(query: string, candidate: string): number {
+  const queryTokens = tokenize(query);
+  const candidateTokens = new Set(tokenize(candidate));
+
+  if (queryTokens.length === 0 || candidateTokens.size === 0) {
+    return 0;
+  }
+
+  let matches = 0;
+  for (const token of queryTokens) {
+    if (candidateTokens.has(token)) {
+      matches += 1;
+    }
+  }
+
+  return matches / queryTokens.length;
+}
+
+function buildEmbeddingVector(text: string, dimensions: number, normalizeVectors: boolean): number[] {
+  const vector = Array.from({ length: dimensions }, () => 0);
+  const source = text || " ";
+
+  for (let index = 0; index < source.length; index += 1) {
+    const code = source.charCodeAt(index);
+    vector[index % dimensions] += (code % 97) / 100;
+  }
+
+  if (!normalizeVectors) {
+    return vector;
+  }
+
+  const magnitude = Math.sqrt(vector.reduce((sum, value) => sum + value * value, 0)) || 1;
+  return vector.map((value) => Number((value / magnitude).toFixed(6)));
 }
 
 export class LangChainNodeExecutor implements INodeExecutor {
@@ -113,8 +216,8 @@ export class LangChainNodeExecutor implements INodeExecutor {
         };
       }
 
-      const chunkSize = Math.max(1, Number(properties["chunk-size"] ?? 500));
-      const chunkOverlap = Math.max(0, Number(properties["chunk-overlap"] ?? 50));
+      const chunkSize = Math.max(1, Number(properties["chunk-size"] ?? 1000));
+      const chunkOverlap = Math.max(0, Number(properties["chunk-overlap"] ?? 200));
       const step = Math.max(1, chunkSize - chunkOverlap);
       const text = document.text;
       const chunks: Array<{ index: number; text: string }> = [];
@@ -173,36 +276,212 @@ export class LangChainNodeExecutor implements INodeExecutor {
     }
 
     if (nodeType === "langchain.context-merger") {
-      const blocks = ((inputs.context_blocks as ReadonlyArray<unknown> | undefined) ??
-        (properties.context_blocks as ReadonlyArray<unknown> | undefined) ??
-        [])
-        .map((value) => String(value));
-      const separator = String(inputs.separator ?? properties.separator ?? "\n\n");
+      const primary = inputs.primary ?? inputs.context_blocks ?? properties.primary;
+      const secondary = inputs.secondary ?? properties.secondary;
+      const mergeStrategy = String(properties["merge-strategy"] ?? "json-merge");
+      const sources = [primary, secondary].filter((value) => value !== undefined);
+
+      if (mergeStrategy === "concat-text") {
+        const mergedText = sources.map((value) => normalizeText(value)).filter(Boolean).join("\n\n");
+        return {
+          nodeId: context.node.id,
+          status: "completed",
+          outputs: {
+            merged: { text: mergedText },
+            merged_context: mergedText,
+            block_count: sources.length,
+          },
+          messages: ["LangChain context merger concatenated text sources."],
+        };
+      }
+
+      const merged = sources.reduce<Record<string, unknown>>((accumulator, value, index) => {
+        if (value && typeof value === "object" && !Array.isArray(value)) {
+          return { ...accumulator, ...(value as Record<string, unknown>) };
+        }
+
+        accumulator[`context_${index + 1}`] = normalizeText(value);
+        return accumulator;
+      }, {});
+
       return {
         nodeId: context.node.id,
         status: "completed",
         outputs: {
-          merged_context: blocks.join(separator),
-          block_count: blocks.length,
+          merged,
+          merged_context: merged,
+          block_count: sources.length,
         },
         messages: ["LangChain context merger executed with interpreter."],
       };
     }
 
     if (nodeType === "langchain.output-parser") {
-      const outputText = String(inputs.output_text ?? properties.output_text ?? "");
+      const format = String(properties.format ?? "json");
+      const outputValue = inputs.output ?? inputs.output_text ?? properties.output_text ?? "";
+      const outputText = normalizeText(outputValue);
       const prefix = String(inputs.prefix ?? properties.prefix ?? "");
-      const parsedOutput = prefix && outputText.startsWith(prefix)
+      const parsedText = prefix && outputText.startsWith(prefix)
         ? outputText.slice(prefix.length).trim()
         : outputText.trim();
+
+      let parsed: unknown = parsedText;
+      if (format === "json") {
+        try {
+          parsed = JSON.parse(parsedText);
+        } catch {
+          parsed = { text: parsedText };
+        }
+      }
+
       return {
         nodeId: context.node.id,
         status: "completed",
         outputs: {
-          parsed_output: parsedOutput,
+          parsed,
+          parsed_output: parsed,
           raw_output: outputText,
         },
         messages: ["LangChain output parser executed with interpreter."],
+      };
+    }
+
+    if (nodeType === "langchain.embedding-generator") {
+      const dimensions = Math.max(1, Number(properties.dimensions ?? 1536));
+      const normalizeVectors = Boolean(properties["normalize-vectors"] ?? true);
+      const text = normalizeText(inputs.text);
+      const chunks = toChunkRecords(inputs.text);
+      const sourceItems = chunks.length > 0 ? chunks.map((chunk) => chunk.text) : [text];
+      const vectors = sourceItems
+        .filter((item) => item.trim().length > 0)
+        .map((item) => buildEmbeddingVector(item, dimensions, normalizeVectors));
+
+      return {
+        nodeId: context.node.id,
+        status: vectors.length > 0 ? "completed" : "failed",
+        outputs: {
+          embedding: {
+            dimensions,
+            count: vectors.length,
+            vectors,
+          },
+        },
+        messages: [vectors.length > 0 ? `Generated ${vectors.length} embedding vector(s).` : "No text received for embedding generation."],
+        errorMessage: vectors.length > 0 ? undefined : "No text received for embedding generation.",
+      };
+    }
+
+    if (nodeType === "langchain.vector-store-upsert") {
+      const embedding = inputs.embedding as Record<string, unknown> | undefined;
+      const metadata = inputs.metadata;
+      const namespace = String(properties.namespace ?? "default");
+      const batchSize = Math.max(1, Number(properties["batch-size"] ?? 100));
+      const vectors = Array.isArray(embedding?.vectors) ? embedding.vectors : [];
+      const sourceChunks = toChunkRecords(metadata);
+      const records = vectors.map((vector, index) => ({
+        id: `${namespace}-${index + 1}`,
+        namespace,
+        vector,
+        metadata: sourceChunks[index] ?? metadata ?? null,
+      }));
+
+      return {
+        nodeId: context.node.id,
+        status: records.length > 0 ? "completed" : "failed",
+        outputs: {
+          dataset: {
+            namespace,
+            batchSize,
+            recordCount: records.length,
+            records,
+          },
+        },
+        messages: [records.length > 0 ? `Prepared ${records.length} vector store record(s).` : "No embeddings were available to store."],
+        errorMessage: records.length > 0 ? undefined : "No embeddings were available to store.",
+      };
+    }
+
+    if (nodeType === "langchain.retrieval-query") {
+      const query = normalizeText(inputs.query);
+      const topK = Math.max(1, Number(properties["top-k"] ?? 5));
+      const minimumScore = Number(properties["min-score"] ?? 0.2);
+      const dataset = inputs.dataset as Record<string, unknown> | undefined;
+      const candidateChunks = [
+        ...toChunkRecords(dataset?.records),
+        ...toChunkRecords(inputs.dataset),
+      ];
+      const scored = candidateChunks
+        .map((chunk, index) => ({
+          index: chunk.index ?? index,
+          text: chunk.text,
+          score: Number(scoreText(query, chunk.text).toFixed(3)),
+        }))
+        .filter((chunk) => chunk.score >= minimumScore)
+        .sort((left, right) => right.score - left.score)
+        .slice(0, topK);
+
+      return {
+        nodeId: context.node.id,
+        status: "completed",
+        outputs: {
+          matches: scored,
+          scores: scored.map(({ index, score }) => ({ index, score })),
+        },
+        messages: [`Retrieved ${scored.length} matching chunk(s).`],
+      };
+    }
+
+    if (nodeType === "langchain.reranker") {
+      const query = normalizeText(inputs.query);
+      const topN = Math.max(1, Number(properties["top-n"] ?? 3));
+      const candidates = toChunkRecords(inputs.candidates);
+      const reranked = candidates
+        .map((chunk, index) => ({
+          index: chunk.index ?? index,
+          text: chunk.text,
+          score: Number(scoreText(query, chunk.text).toFixed(3)),
+        }))
+        .sort((left, right) => right.score - left.score)
+        .slice(0, topN);
+
+      return {
+        nodeId: context.node.id,
+        status: "completed",
+        outputs: {
+          reranked,
+          scores: reranked.map(({ index, score }) => ({ index, score })),
+        },
+        messages: [`Reranked ${reranked.length} candidate chunk(s).`],
+      };
+    }
+
+    if (nodeType === "langchain.answer-synthesizer") {
+      const question = normalizeText(inputs.question);
+      const contextChunks = [
+        ...toChunkRecords(inputs.context),
+        ...toChunkRecords((inputs.context as Record<string, unknown> | undefined)?.matches),
+      ];
+      const contextText =
+        contextChunks.length > 0
+          ? contextChunks.map((chunk) => chunk.text).join("\n")
+          : normalizeText(inputs.context);
+      const style = String(properties["response-style"] ?? "concise");
+      const maxSources = Math.max(1, Number(properties["max-sources"] ?? 4));
+      const selectedSources = contextChunks.slice(0, maxSources);
+      const answerPrefix =
+        style === "bulleted" ? "- " : style === "detailed" ? "Detailed answer: " : "Answer: ";
+      const answerBody = contextText
+        ? `${question}\n\nBased on context: ${contextText.slice(0, 400)}`
+        : question;
+
+      return {
+        nodeId: context.node.id,
+        status: "completed",
+        outputs: {
+          answer: `${answerPrefix}${answerBody}`,
+          citations: selectedSources.map((chunk) => ({ index: chunk.index, text: chunk.text })),
+        },
+        messages: [`Synthesized an answer with ${selectedSources.length} citation source(s).`],
       };
     }
 

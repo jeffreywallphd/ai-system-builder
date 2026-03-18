@@ -66,6 +66,51 @@ const LANGCHAIN_IMPLEMENTATIONS: ReadonlyArray<INodeRuntimeImplementation> = Obj
       executionStyles: ["interpreted-node", "python-node"],
     }),
   },
+  {
+    descriptor: new NodeImplementationDescriptor({
+      providerId: "langchain",
+      runtimeId: "langchain",
+      nodeTypeId: "langchain.embedding-generator",
+      title: "LangChain Embedding Generator",
+      executionStyles: ["interpreted-node", "python-node", "hybrid"],
+    }),
+  },
+  {
+    descriptor: new NodeImplementationDescriptor({
+      providerId: "langchain",
+      runtimeId: "langchain",
+      nodeTypeId: "langchain.vector-store-upsert",
+      title: "LangChain Vector Store Upsert",
+      executionStyles: ["interpreted-node", "python-node", "hybrid"],
+    }),
+  },
+  {
+    descriptor: new NodeImplementationDescriptor({
+      providerId: "langchain",
+      runtimeId: "langchain",
+      nodeTypeId: "langchain.retrieval-query",
+      title: "LangChain Retrieval Query",
+      executionStyles: ["interpreted-node", "python-node", "hybrid"],
+    }),
+  },
+  {
+    descriptor: new NodeImplementationDescriptor({
+      providerId: "langchain",
+      runtimeId: "langchain",
+      nodeTypeId: "langchain.reranker",
+      title: "LangChain Reranker",
+      executionStyles: ["interpreted-node", "python-node", "hybrid"],
+    }),
+  },
+  {
+    descriptor: new NodeImplementationDescriptor({
+      providerId: "langchain",
+      runtimeId: "langchain",
+      nodeTypeId: "langchain.answer-synthesizer",
+      title: "LangChain Answer Synthesizer",
+      executionStyles: ["interpreted-node", "python-node", "hybrid"],
+    }),
+  },
 ]);
 
 export class LangChainNodeImplementationRegistry extends NodeImplementationRegistry {

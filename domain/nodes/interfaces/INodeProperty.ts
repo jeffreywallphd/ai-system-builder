@@ -52,11 +52,20 @@ export interface INodePropertyConstraint {
   readonly required?: boolean;
   readonly min?: number;
   readonly max?: number;
+  readonly range?: INodePropertyValueRange;
   readonly minLength?: number;
   readonly maxLength?: number;
   readonly pattern?: string;
   readonly allowedValues?: ReadonlyArray<unknown>;
   readonly acceptedFileExtensions?: ReadonlyArray<string>;
+}
+
+export interface INodePropertyValueRange {
+  readonly min: number;
+  readonly max: number;
+  readonly step?: number;
+  readonly defaultValue: number;
+  readonly clamp?: boolean;
 }
 
 export interface INodePropertyBindingProfile {

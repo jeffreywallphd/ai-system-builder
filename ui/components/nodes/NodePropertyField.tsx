@@ -26,6 +26,42 @@ function stringifyValue(value: unknown): string {
   }
 }
 
+function sliderValue(field: NodePropertyFieldViewModel): number {
+  if (typeof field.value === "number") {
+    return field.value;
+  }
+
+  if (typeof field.defaultValue === "number") {
+    return field.defaultValue;
+  }
+
+  if (typeof field.min === "number") {
+    return field.min;
+  }
+
+  return 0;
+}
+
+function clampNumber(field: NodePropertyFieldViewModel, value: number): number {
+  if (!field.shouldClampToRange) {
+    return field.type === "integer" ? Math.trunc(value) : value;
+  }
+
+  const min = field.min ?? value;
+  const max = field.max ?? value;
+  const bounded = Math.min(max, Math.max(min, value));
+
+  if (field.step && field.step > 0 && field.min !== undefined) {
+    const stepCount = Math.round((bounded - field.min) / field.step);
+    const stepped = field.min + stepCount * field.step;
+    return field.type === "integer"
+      ? Math.trunc(Math.min(max, Math.max(min, stepped)))
+      : Math.min(max, Math.max(min, stepped));
+  }
+
+  return field.type === "integer" ? Math.trunc(bounded) : bounded;
+}
+
 export default function NodePropertyField({
   field,
   disabled,
@@ -58,27 +94,59 @@ export default function NodePropertyField({
           <input
             className="ui-input"
             type="number"
-            step={1}
-            value={field.value ?? ""}
+            step={field.step ?? 1}
+            min={field.min}
+            max={field.max}
+            value={typeof field.value === "number" ? field.value : ""}
             disabled={isDisabled}
             onChange={(event) => {
               const raw = event.target.value;
-              emit(raw === "" ? undefined : Math.trunc(Number(raw)));
+              emit(raw === "" ? undefined : clampNumber(field, Number(raw)));
             }}
           />
         );
 
-      case "number":
       case "slider":
+        return (
+          <div className="ui-stack ui-stack--xs">
+            <input
+              type="range"
+              min={field.min}
+              max={field.max}
+              step={field.step ?? 1}
+              value={sliderValue(field)}
+              disabled={isDisabled}
+              onChange={(event) => emit(clampNumber(field, Number(event.target.value)))}
+            />
+            <input
+              className="ui-input"
+              type="number"
+              min={field.min}
+              max={field.max}
+              step={field.step ?? 1}
+              value={typeof field.value === "number" ? field.value : ""}
+              disabled={isDisabled}
+              onChange={(event) => {
+                const raw = event.target.value;
+                emit(raw === "" ? undefined : clampNumber(field, Number(raw)));
+              }}
+            />
+          </div>
+        );
+
+      case "number":
         return (
           <input
             className="ui-input"
             type="number"
-            value={field.value ?? ""}
+            min={field.min}
+            max={field.max}
+            step={field.step ?? "any"}
+            value={typeof field.value === "number" ? field.value : ""}
             disabled={isDisabled}
             onChange={(event) => {
               const raw = event.target.value;
-              emit(raw === "" ? undefined : Number(raw));
+              emit(raw === "" ? undefined : clampNumber(field, Number(raw)));
             }}
           />
         );
@@ -203,6 +271,12 @@ export default function NodePropertyField({
           <div className="ui-stack ui-stack--2xs" style={{ minWidth: 0 }}>
             <label className="ui-field__label">{field.name}</label>
             {field.description ? <div className="ui-field__hint">{field.description}</div> : null}
+            {field.min !== undefined || field.max !== undefined ? (
+              <div className="ui-text-small ui-text-secondary">
+                Range: {field.min ?? "-∞"} to {field.max ?? "∞"}
+                {field.defaultValue !== undefined ? ` · Default: ${String(field.defaultValue)}` : ""}
+              </div>
+            ) : null}
           </div>
 
           <div className="ui-chips">
@@ -210,6 +284,7 @@ export default function NodePropertyField({
             {field.isAdvanced ? <span className="ui-badge ui-badge--warning">Advanced</span> : null}
             {!field.isEditable ? <span className="ui-badge ui-badge--danger">Read Only</span> : null}
             {field.isEmpty ? <span className="ui-badge ui-badge--info">Empty</span> : null}
+            {field.shouldClampToRange ? <span className="ui-badge ui-badge--neutral">Clamped</span> : null}
           </div>
         </div>
 
