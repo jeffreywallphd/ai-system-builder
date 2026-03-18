@@ -8,6 +8,7 @@ import WorkflowEditorPage from "../pages/WorkflowEditorPage";
 import WorkflowsPage from "../pages/WorkflowsPage";
 import ToolsPage from "../pages/ToolsPage";
 import ToolRunPage from "../pages/ToolRunPage";
+import SettingsPage from "../pages/SettingsPage";
 import ProtectedRoute from "./ProtectedRoute";
 import { ROUTE_PATHS } from "./RouteConfig";
 
@@ -41,6 +42,7 @@ export default function AppRouter({
           />
           <Route path={ROUTE_PATHS.models} element={<ModelsPage />} />
           <Route path={ROUTE_PATHS.assets} element={<AssetsPage />} />
+          <Route path={ROUTE_PATHS.settings} element={<SettingsPage />} />
         </Route>
 
         <Route

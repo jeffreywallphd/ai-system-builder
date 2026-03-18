@@ -11,6 +11,7 @@ describe("ui/components/models interactions", () => {
     expect(browser).toContain("onInstallRemoteFiles");
     expect(page).toContain("import ModelBrowser");
     expect(page).toContain("onSearch={(value) => {");
-    expect(page).toContain("installRemoteFiles(modelStore, config.modelInstallDirectory, modelId, files)");
+    expect(page).toContain("settingsStore.subscribe");
+    expect(page).toContain("settingsState.settings.models.installDirectory");
   });
 });
