@@ -5,6 +5,8 @@ describe("ui/pages interactions", () => {
   it("uses route config for key navigation links", () => {
     const home = readSource("ui/pages/HomePage.tsx");
     const workflows = readSource("ui/pages/WorkflowsPage.tsx");
+    const models = readSource("ui/pages/ModelsPage.tsx");
+    const settings = readSource("ui/pages/SettingsPage.tsx");
     const notFound = readSource("ui/pages/NotFoundPage.tsx");
 
     expect(home).toContain('import { ROUTE_PATHS } from "../routes/RouteConfig"');
@@ -12,6 +14,9 @@ describe("ui/pages interactions", () => {
     expect(workflows).toContain("ROUTE_PATHS.workflows");
     expect(workflows).toContain("WorkflowBrowser");
     expect(workflows).toContain("workflowStore.refreshWorkflows");
+    expect(models).toContain("to={ROUTE_PATHS.settings}");
+    expect(settings).toContain("Auto-save is enabled");
+    expect(settings).toContain("Advanced runtime settings");
     expect(notFound).toContain("to={ROUTE_PATHS.home}");
   });
 

@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useUiDependencies } from "../composition/AppProviders";
+import type { UiSettingsState } from "../settings/UiSettingsStore";
 
 interface DevSyncResponse {
   readonly ok: boolean;
@@ -11,11 +12,17 @@ interface DevSyncResponse {
 }
 
 export default function DevSyncButton(): JSX.Element | null {
-  const { config } = useUiDependencies();
+  const { config, settingsStore } = useUiDependencies();
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastMessage, setLastMessage] = useState<string>();
+  const [settingsState, setSettingsState] = useState<UiSettingsState>(() => settingsStore.getState());
 
-  if (!config.isDevSyncEnabled) {
+  useEffect(() => settingsStore.subscribe(setSettingsState), [settingsStore]);
+
+  const devSyncBaseUrl = settingsState.settings.development.devSyncBaseUrl.trim();
+  const devSyncToken = settingsState.settings.development.devSyncToken.trim();
+
+  if (config.isProductionMode || !devSyncBaseUrl) {
     return null;
   }
 
@@ -48,6 +55,18 @@ export default function DevSyncButton(): JSX.Element | null {
     setLastMessage(undefined);
 
     try {
+      const response = await fetch(`${devSyncBaseUrl}/sync/pull`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(devSyncToken
+            ? { "X-Dev-Sync-Token": devSyncToken }
+            : {}),
+        },
+        body: JSON.stringify({
+          triggeredAt: new Date().toISOString(),
+        }),
+      });
       const payload = await requestSync();
       const summary = payload.stdout?.trim() || "Sync complete.";
       setLastMessage(summary);

@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import ModelBrowser from "../components/models/ModelBrowser";
 import type { ModelSearchBarValue } from "../components/models/ModelSearchBar";
 import { useUiDependencies } from "../composition/AppProviders";
 import { Model, ModelArtifact } from "../../domain/models/Model";
 import { ModelPresenter, type ModelDownloadFileViewModel } from "../presenters/ModelPresenter";
+import { ROUTE_PATHS } from "../routes/RouteConfig";
 import type { IModelStoreState, ModelStore } from "../state/ModelStore";
 import type { IModel } from "../../domain/models/interfaces/IModel";
 import type { RuntimeEngine } from "../../domain/models/interfaces/IModelCompatibility";
+import type { UiSettingsState } from "../settings/UiSettingsStore";
 import type { IRemoteModelCatalogItem } from "../../application/ports/interfaces/IRemoteModelCatalog";
 
 const fallbackState: IModelStoreState = Object.freeze({
@@ -26,12 +29,15 @@ const fallbackState: IModelStoreState = Object.freeze({
 
 export default function ModelsPage(): JSX.Element {
   const presenter = useMemo(() => new ModelPresenter(), []);
-  const { modelStore, config } = useUiDependencies();
+  const { modelStore, settingsStore } = useUiDependencies();
   const [state, setState] = useState<IModelStoreState>(fallbackState);
+  const [settingsState, setSettingsState] = useState<UiSettingsState>(() => settingsStore.getState());
 
   useEffect(() => {
     return modelStore.subscribe(setState);
   }, [modelStore]);
+
+  useEffect(() => settingsStore.subscribe(setSettingsState), [settingsStore]);
 
   useEffect(() => {
     void modelStore.refreshInstalled();
@@ -57,6 +63,10 @@ export default function ModelsPage(): JSX.Element {
           <p className="ui-page__subtitle">
             Search remote models, manage installed assets, and inspect compatibility.
           </p>
+          <p className="ui-text-secondary ui-text-small">
+            New downloads currently install to <strong>{settingsState.settings.models.installDirectory}</strong>. Update this in{" "}
+            <Link to={ROUTE_PATHS.settings}>Settings</Link> whenever you want AI Loom Studio to share a library with other tools.
+          </p>
         </div>
       </div>
 
@@ -76,6 +86,7 @@ export default function ModelsPage(): JSX.Element {
         onInstallRemoteFiles={(modelId, files) => {
           void installRemoteFiles(
             modelStore,
+            settingsState.settings.models.installDirectory,
             state.remoteModels,
             config.modelInstallDirectory,
             modelId,

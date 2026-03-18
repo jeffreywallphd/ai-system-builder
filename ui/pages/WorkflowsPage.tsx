@@ -4,6 +4,7 @@ import WorkflowBrowser from "../components/workflow/WorkflowBrowser";
 import { useUiDependencies } from "../composition/AppProviders";
 import { WorkflowBrowserPresenter } from "../presenters/WorkflowBrowserPresenter";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
+import type { UiSettingsState } from "../settings/UiSettingsStore";
 import type { IWorkflowStoreState } from "../state/WorkflowStore";
 
 const fallbackWorkflowState: IWorkflowStoreState = Object.freeze({
@@ -23,13 +24,14 @@ const fallbackWorkflowState: IWorkflowStoreState = Object.freeze({
 });
 
 export default function WorkflowsPage(): JSX.Element {
-  const { workflowStore } = useUiDependencies();
-  const [workflowState, setWorkflowState] =
-    useState<IWorkflowStoreState>(fallbackWorkflowState);
+  const { workflowStore, settingsStore } = useUiDependencies();
+  const [workflowState, setWorkflowState] = useState<IWorkflowStoreState>(fallbackWorkflowState);
+  const [settingsState, setSettingsState] = useState<UiSettingsState>(() => settingsStore.getState());
   const [query, setQuery] = useState("");
   const browserPresenter = useMemo(() => new WorkflowBrowserPresenter(), []);
 
   useEffect(() => workflowStore.subscribe(setWorkflowState), [workflowStore]);
+  useEffect(() => settingsStore.subscribe(setSettingsState), [settingsStore]);
 
   useEffect(() => {
     void workflowStore.refreshWorkflows();
@@ -46,6 +48,10 @@ export default function WorkflowsPage(): JSX.Element {
         <div className="ui-page__hero-copy">
           <h1 className="ui-page__title">Workflows</h1>
           <p className="ui-page__subtitle">Manage and open saved workflows.</p>
+          <p className="ui-text-secondary ui-text-small">
+            Workflow definitions are organized under <strong>{settingsState.settings.workspace.workflowsDirectory}</strong>. Update the path in{" "}
+            <Link to={ROUTE_PATHS.settings}>Settings</Link> if your team stores projects elsewhere.
+          </p>
         </div>
 
         <div className="ui-page__actions">

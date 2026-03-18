@@ -29,6 +29,7 @@ import { HuggingFaceApiClient } from "../../infrastructure/huggingface/HuggingFa
 import { HuggingFaceModelCatalog } from "../../infrastructure/huggingface/HuggingFaceModelCatalog";
 import type { IModel } from "../../domain/models/interfaces/IModel";
 import type { IModelInstaller } from "../../application/ports/interfaces/IModelInstaller";
+import type { IPythonRuntimeClient } from "../../application/ports/interfaces/IPythonRuntimeClient";
 import type {
   IInstalledModelCatalog,
   IInstalledModelSearchCriteria,
@@ -40,6 +41,7 @@ import { NodeProcessRuntimeEventSink } from "../../infrastructure/python/runtime
 import { PythonRuntimeLauncher } from "../../infrastructure/python/runtime/PythonRuntimeLauncher";
 import { PythonRuntimeProcessManager } from "../../infrastructure/python/runtime/PythonRuntimeProcessManager";
 import { RuntimeConsoleStore } from "../state/RuntimeConsoleStore";
+import { LocalStorageUiSettingsStorage, UiSettingsStore } from "../settings/UiSettingsStore";
 
 import { WorkflowProjectionService } from "../../application/projection/WorkflowProjectionService";
 import { WorkflowToolProjectionService } from "../../application/projection/WorkflowToolProjectionService";
@@ -55,6 +57,11 @@ export function createUiDependencies(
   options: CreateUiDependenciesOptions = {}
 ): UiDependencies {
   const config = options.config ?? AppRuntimeConfig.forDevelopment();
+  const settingsStore = new UiSettingsStore({
+    config,
+    storage: options.settingsStorage ?? new LocalStorageUiSettingsStorage(),
+  });
+  const settings = settingsStore.getSettings();
 
   const workflowRepository = createWorkflowRepository(config);
   const workflowExecutor = createWorkflowExecutor(config);
@@ -147,12 +154,19 @@ export function createUiDependencies(
   });
 
   const pythonRuntimeConfig = new PythonRuntimeConfig({
-    mode: "local-http",
-    baseUrl: "http://127.0.0.1:8000",
+    mode: settings.runtime.mode,
+    baseUrl: settings.runtime.mode === "disabled" ? undefined : settings.runtime.baseUrl,
+    timeoutMs: settings.runtime.requestTimeoutMs,
+    runtimeWorkingDirectory: settings.runtime.workingDirectory,
+    startupTimeoutMs: settings.runtime.startupTimeoutMs,
+    healthPollIntervalMs: settings.runtime.healthPollIntervalMs,
+    autoStartEnabled: settings.runtime.autoStartEnabled,
   });
   const runtimeEventStore = new RuntimeEventBuffer({ capacity: 500 });
   const runtimeEventSink = new NodeProcessRuntimeEventSink(runtimeEventStore);
-  const runtimeClient = new HttpPythonRuntimeClient(pythonRuntimeConfig);
+  const runtimeClient = settings.runtime.mode === "disabled"
+    ? createDisabledRuntimeClient()
+    : new HttpPythonRuntimeClient(pythonRuntimeConfig);
   const pythonRuntimeManager = new PythonRuntimeProcessManager({
     client: runtimeClient,
     launcher: new PythonRuntimeLauncher({
@@ -162,7 +176,7 @@ export function createUiDependencies(
     }),
     eventSink: runtimeEventSink,
     config: pythonRuntimeConfig,
-    autoStartEnabled: true,
+    autoStartEnabled: settings.runtime.mode === "disabled" ? false : settings.runtime.autoStartEnabled,
   });
   const runtimeConsoleStore = new RuntimeConsoleStore({
     runtimeEventStore,
@@ -181,7 +195,22 @@ export function createUiDependencies(
     toolService,
     toolStore: new ToolStore(toolService),
     workflowProjectionService,
+    settingsStore,
   });
+}
+
+function createDisabledRuntimeClient(): IPythonRuntimeClient {
+  return {
+    async health() {
+      return { status: "unavailable", runtime: "python" } as const;
+    },
+    async executeNode() {
+      throw new Error("Python runtime is disabled in settings.");
+    },
+    async executeWorkflow() {
+      throw new Error("Python runtime is disabled in settings.");
+    },
+  };
 }
 
 function createWorkflowRepository(config: AppRuntimeConfig) {

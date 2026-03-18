@@ -16,6 +16,7 @@ describe("ui composition interactions", () => {
     expect(dependencies.modelStore).toBeDefined();
     expect(dependencies.modelService).toBeDefined();
     expect(dependencies.runtimeConsoleStore).toBeDefined();
+    expect(dependencies.settingsStore).toBeDefined();
   });
 
   it("exposes registry-backed node definitions in the UI catalog", async () => {
