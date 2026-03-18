@@ -7,16 +7,17 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 class LangChainExecutor:
     def execute(self, node_type: str, *, inputs: Dict[str, Any], properties: Dict[str, Any]) -> Dict[str, Any]:
-        if node_type == "langchain.prompt_template":
+        if node_type in {"langchain.prompt_template", "langchain.prompt-template"}:
             template = str(properties.get("template") or inputs.get("template") or "{input}")
-            variables = dict(inputs.get("variables") or properties.get("variables") or {})
+            variables = dict(inputs.get("variables") or inputs.get("template-input") or properties.get("variables") or {})
             prompt = PromptTemplate.from_template(template)
-            return {"formatted_prompt": prompt.format(**variables)}
+            formatted = prompt.format(**variables)
+            return {"prompt": formatted, "formatted_prompt": formatted}
 
-        if node_type == "langchain.text_splitter":
+        if node_type in {"langchain.text_splitter", "langchain.text-splitter"}:
             text = str(inputs.get("text") or properties.get("text") or "")
-            chunk_size = int(properties.get("chunk_size") or inputs.get("chunk_size") or 500)
-            chunk_overlap = int(properties.get("chunk_overlap") or inputs.get("chunk_overlap") or 50)
+            chunk_size = int(properties.get("chunkSize") or properties.get("chunk-size") or inputs.get("chunk_size") or 500)
+            chunk_overlap = int(properties.get("chunkOverlap") or properties.get("chunk-overlap") or inputs.get("chunk_overlap") or 50)
             splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
             chunks = splitter.split_text(text)
             return {"chunks": chunks}
@@ -35,25 +36,40 @@ class LangChainExecutor:
                 ]
             }
 
-        if node_type == "langchain.chat_prompt":
-            system_prompt = str(inputs.get("system_prompt") or properties.get("system_prompt") or "")
-            user_prompt = str(inputs.get("user_prompt") or properties.get("user_prompt") or "")
-            context_blocks: List[str] = list(inputs.get("context_blocks") or properties.get("context_blocks") or [])
-            context_text = "\n\n".join(context_blocks)
+        if node_type in {"langchain.chat_prompt", "langchain.chat-prompt"}:
+            system_prompt = str(inputs.get("system") or properties.get("system") or "")
+            user_prompt = str(inputs.get("user") or properties.get("user") or "")
+            context_value = inputs.get("context") or properties.get("context") or ""
+            history = list(inputs.get("history") or []) if bool(properties.get("includeHistory", properties.get("include-history", True))) else []
+            include_context = bool(properties.get("includeContext", True))
+            context_text = str(context_value) if include_context else ""
             chat_prompt = ChatPromptTemplate.from_messages([
                 ("system", "{system_prompt}"),
-                ("human", "{user_prompt}\n\nContext:\n{context_text}"),
+                ("human", "{user_prompt}{context_suffix}"),
             ])
             messages = chat_prompt.format_messages(
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
-                context_text=context_text,
+                context_suffix=f"\n\nContext:\n{context_text}" if context_text else "",
             )
+            rendered = [{"role": message.type if message.type != "human" else "user", "content": str(message.content)} for message in messages]
+            rendered[1:1] = history
+            return {"messages": rendered}
+
+        if node_type == "langchain.llm_chat":
+            prompt = str(inputs.get("prompt") or "")
+            messages = list(inputs.get("messages") or [])
+            model = str(properties.get("model") or "deterministic-model")
+            source = "\n".join(f"{message.get('role', 'user')}: {message.get('content', '')}" for message in messages) if messages else prompt
             return {
-                "messages": [
-                    {"type": message.type, "content": str(message.content)}
-                    for message in messages
-                ]
+                "response": f"[{model}] {source}" if source else "",
+                "raw": {
+                    "model": model,
+                    "temperature": float(properties.get("temperature", 0.7)),
+                    "maxTokens": properties.get("maxTokens"),
+                    "topP": properties.get("topP"),
+                    "inputMode": "messages" if messages else "prompt",
+                },
             }
 
         if node_type == "langchain.simple_chain":
@@ -75,14 +91,23 @@ class LangChainExecutor:
                 "block_count": len(context_blocks),
             }
 
-        if node_type == "langchain.output_parser":
-            output_text = str(inputs.get("output_text") or properties.get("output_text") or "")
+        if node_type in {"langchain.output_parser", "langchain.output-parser"}:
+            output_text = str(inputs.get("text") or inputs.get("output_text") or properties.get("output_text") or "")
             prefix = str(properties.get("prefix") or inputs.get("prefix") or "")
             normalized = output_text.strip()
             if prefix and normalized.startswith(prefix):
                 normalized = normalized[len(prefix):].strip()
+            if str(properties.get("format") or "json") == "json":
+                try:
+                    import json
+                    parsed: Any = json.loads(normalized)
+                except Exception:
+                    parsed = {"text": normalized}
+            else:
+                parsed = normalized
             return {
-                "parsed_output": normalized,
+                "parsed": parsed,
+                "parsed_output": parsed,
                 "raw_output": output_text,
             }
 

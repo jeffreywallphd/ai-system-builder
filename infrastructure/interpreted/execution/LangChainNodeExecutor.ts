@@ -2,6 +2,7 @@ import type { IModelExecutor } from "../../../application/ports/interfaces/IMode
 import type { INodeExecutor, INodeExecutionResult } from "../../../application/ports/interfaces/INodeExecutor";
 import type { INodeExecutionContext } from "../../../application/ports/interfaces/INodeExecutionContextResolver";
 import type { INode } from "../../../domain/nodes/interfaces/INode";
+import type { ChatMessage, Document } from "../../../domain/nodes/WorkflowDataTypes";
 
 interface UploadedDocument {
   readonly name?: string;
@@ -16,6 +17,8 @@ interface ChunkRecord {
   readonly text: string;
   readonly score?: number;
 }
+
+const messageHistoryStore = new Map<string, ChatMessage[]>();
 
 function readProperty(node: INode, propertyId: string): unknown {
   return node.properties.find((property) => property.id === propertyId)?.value;
@@ -67,12 +70,75 @@ function toChunkRecords(value: unknown): ChunkRecord[] {
         chunks.push({
           index: typeof record.index === "number" ? (record.index as number) : index,
           text,
+          score: typeof record.score === "number" ? record.score : undefined,
         });
       }
     }
   });
 
   return chunks;
+}
+
+function toDocuments(value: unknown): Document[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((item, index) => {
+    if (typeof item === "string") {
+      return item.trim().length > 0
+        ? [{ id: `doc-${index + 1}`, text: item, metadata: {} } satisfies Document]
+        : [];
+    }
+
+    if (!item || typeof item !== "object") {
+      return [];
+    }
+
+    const record = item as Record<string, unknown>;
+    const text = typeof record.text === "string" ? record.text : normalizeText(record);
+    if (!text.trim()) {
+      return [];
+    }
+
+    const metadata =
+      record.metadata && typeof record.metadata === "object"
+        ? (record.metadata as Record<string, unknown>)
+        : undefined;
+
+    return [
+      {
+        id: typeof record.id === "string" ? record.id : `doc-${index + 1}`,
+        text,
+        metadata,
+      } satisfies Document,
+    ];
+  });
+}
+
+function toChatMessages(value: unknown): ChatMessage[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") {
+      return [];
+    }
+
+    const record = item as Record<string, unknown>;
+    const role = record.role;
+    const content = record.content;
+    if (
+      (role === "system" || role === "user" || role === "assistant") &&
+      typeof content === "string" &&
+      content.trim().length > 0
+    ) {
+      return [{ role, content } satisfies ChatMessage];
+    }
+
+    return [];
+  });
 }
 
 function tokenize(value: string): string[] {
@@ -116,6 +182,26 @@ function buildEmbeddingVector(text: string, dimensions: number, normalizeVectors
 
   const magnitude = Math.sqrt(vector.reduce((sum, value) => sum + value * value, 0)) || 1;
   return vector.map((value) => Number((value / magnitude).toFixed(6)));
+}
+
+function splitTextIntoChunks(text: string, chunkSize: number, chunkOverlap: number): string[] {
+  const safeChunkSize = Math.max(1, chunkSize);
+  const safeChunkOverlap = Math.max(0, Math.min(chunkOverlap, safeChunkSize - 1));
+  const step = Math.max(1, safeChunkSize - safeChunkOverlap);
+  const chunks: string[] = [];
+
+  for (let cursor = 0; cursor < text.length; cursor += step) {
+    const chunk = text.slice(cursor, cursor + safeChunkSize).trim();
+    if (chunk) {
+      chunks.push(chunk);
+    }
+  }
+
+  return chunks;
+}
+
+function supportsNodeType(nodeType: string, ...types: string[]): boolean {
+  return types.includes(nodeType);
 }
 
 export class LangChainNodeExecutor implements INodeExecutor {
@@ -204,7 +290,28 @@ export class LangChainNodeExecutor implements INodeExecutor {
       };
     }
 
-    if (nodeType === "langchain.document-to-chunks") {
+    if (supportsNodeType(nodeType, "langchain.document_loader")) {
+      const source = normalizeText(inputs.source ?? properties.source);
+      const sourceType = String(properties.type ?? "text");
+      const encoding = String(properties.encoding ?? "utf-8");
+      const document: Document = {
+        id: `${sourceType}-document`,
+        text: source,
+        metadata: { type: sourceType, encoding },
+      };
+
+      return {
+        nodeId: context.node.id,
+        status: source ? "completed" : "failed",
+        outputs: {
+          documents: source ? [document] : [],
+        },
+        messages: [source ? "Document loader produced 1 document." : "Document loader received no source."],
+        errorMessage: source ? undefined : "Document loader received no source.",
+      };
+    }
+
+    if (supportsNodeType(nodeType, "langchain.document-to-chunks")) {
       const document = inputs.document as UploadedDocument | undefined;
       if (!document || typeof document.text !== "string") {
         return {
@@ -218,17 +325,10 @@ export class LangChainNodeExecutor implements INodeExecutor {
 
       const chunkSize = Math.max(1, Number(properties["chunk-size"] ?? 1000));
       const chunkOverlap = Math.max(0, Number(properties["chunk-overlap"] ?? 200));
-      const step = Math.max(1, chunkSize - chunkOverlap);
-      const text = document.text;
-      const chunks: Array<{ index: number; text: string }> = [];
-
-      for (let cursor = 0, index = 0; cursor < text.length; cursor += step, index += 1) {
-        const content = text.slice(cursor, cursor + chunkSize).trim();
-        if (!content) {
-          continue;
-        }
-        chunks.push({ index, text: content });
-      }
+      const chunks = splitTextIntoChunks(document.text, chunkSize, chunkOverlap).map((text, index) => ({
+        index,
+        text,
+      }));
 
       if (chunks.length === 0) {
         return {
@@ -247,6 +347,27 @@ export class LangChainNodeExecutor implements INodeExecutor {
           chunks,
         },
         messages: [`Generated ${chunks.length} chunk(s).`],
+      };
+    }
+
+    if (supportsNodeType(nodeType, "langchain.text_splitter", "langchain.text-splitter")) {
+      const text = normalizeText(inputs.text);
+      const chunkSize = Math.max(
+        1,
+        Number(properties.chunkSize ?? properties["chunk-size"] ?? 500)
+      );
+      const chunkOverlap = Math.max(
+        0,
+        Number(properties.chunkOverlap ?? properties["chunk-overlap"] ?? 50)
+      );
+      const chunks = splitTextIntoChunks(text, chunkSize, chunkOverlap);
+
+      return {
+        nodeId: context.node.id,
+        status: chunks.length > 0 ? "completed" : "failed",
+        outputs: { chunks },
+        messages: [chunks.length > 0 ? `Split text into ${chunks.length} chunk(s).` : "No text received for splitting."],
+        errorMessage: chunks.length > 0 ? undefined : "No text received for splitting.",
       };
     }
 
@@ -272,6 +393,99 @@ export class LangChainNodeExecutor implements INodeExecutor {
           chunks,
         },
         messages: [`Displaying ${chunks.length} chunk(s).`],
+      };
+    }
+
+    if (supportsNodeType(nodeType, "langchain.prompt_template", "langchain.prompt-template")) {
+      const template = String(properties.template ?? "");
+      const variablesInput = inputs.variables ?? inputs["template-input"] ?? {};
+      const variables =
+        variablesInput && typeof variablesInput === "object" && !Array.isArray(variablesInput)
+          ? (variablesInput as Record<string, unknown>)
+          : {};
+      const prompt = template.replace(/\{([^}]+)\}/g, (_match, key) => {
+        const value = variables[key.trim()];
+        return value === undefined || value === null ? "" : normalizeText(value);
+      });
+
+      return {
+        nodeId: context.node.id,
+        status: prompt ? "completed" : "failed",
+        outputs: {
+          prompt,
+          formatted_prompt: prompt,
+        },
+        messages: [prompt ? "Prompt template formatted successfully." : "Prompt template is empty."],
+        errorMessage: prompt ? undefined : "Prompt template is empty.",
+      };
+    }
+
+    if (supportsNodeType(nodeType, "langchain.chat_prompt", "langchain.chat-prompt")) {
+      const includeContext = Boolean(properties.includeContext ?? true);
+      const includeHistory = Boolean(properties.includeHistory ?? properties["include-history"] ?? true);
+      const history = includeHistory ? toChatMessages(inputs.history) : [];
+      const system = normalizeText(inputs.system);
+      const user = normalizeText(inputs.user);
+      const contextText = includeContext ? normalizeText(inputs.context) : "";
+      const messages: ChatMessage[] = [];
+
+      if (system) {
+        messages.push({ role: "system", content: system });
+      }
+
+      if (history.length > 0) {
+        messages.push(...history);
+      }
+
+      if (contextText) {
+        messages.push({ role: "system", content: `Context:\n${contextText}` });
+      }
+
+      if (user) {
+        messages.push({ role: "user", content: user });
+      }
+
+      return {
+        nodeId: context.node.id,
+        status: user ? "completed" : "failed",
+        outputs: {
+          messages,
+        },
+        messages: [user ? `Chat prompt assembled ${messages.length} message(s).` : "Chat prompt requires a user message."],
+        errorMessage: user ? undefined : "Chat prompt requires a user message.",
+      };
+    }
+
+    if (supportsNodeType(nodeType, "langchain.llm_chat")) {
+      const prompt = normalizeText(inputs.prompt);
+      const messages = toChatMessages(inputs.messages);
+      const model = String(properties.model ?? "");
+      const temperature = Number(properties.temperature ?? 0.7);
+      const maxTokens = properties.maxTokens !== undefined ? Number(properties.maxTokens) : undefined;
+      const topP = properties.topP !== undefined ? Number(properties.topP) : undefined;
+      const renderedInput = messages.length > 0
+        ? messages.map((message) => `${message.role}: ${message.content}`).join("\n")
+        : prompt;
+      const response = renderedInput
+        ? `[${model || "deterministic-model"}] ${renderedInput}`
+        : "";
+
+      return {
+        nodeId: context.node.id,
+        status: response ? "completed" : "failed",
+        outputs: {
+          response,
+          raw: {
+            model,
+            temperature,
+            maxTokens,
+            topP,
+            inputMode: messages.length > 0 ? "messages" : "prompt",
+            messageCount: messages.length,
+          },
+        },
+        messages: [response ? "LLM chat node generated a deterministic response." : "LLM chat requires messages or prompt input."],
+        errorMessage: response ? undefined : "LLM chat requires messages or prompt input.",
       };
     }
 
@@ -316,9 +530,9 @@ export class LangChainNodeExecutor implements INodeExecutor {
       };
     }
 
-    if (nodeType === "langchain.output-parser") {
+    if (supportsNodeType(nodeType, "langchain.output_parser", "langchain.output-parser")) {
       const format = String(properties.format ?? "json");
-      const outputValue = inputs.output ?? inputs.output_text ?? properties.output_text ?? "";
+      const outputValue = inputs.text ?? inputs.output ?? inputs.output_text ?? properties.output_text ?? "";
       const outputText = normalizeText(outputValue);
       const prefix = String(inputs.prefix ?? properties.prefix ?? "");
       const parsedText = prefix && outputText.startsWith(prefix)
@@ -346,20 +560,28 @@ export class LangChainNodeExecutor implements INodeExecutor {
       };
     }
 
-    if (nodeType === "langchain.embedding-generator") {
+    if (supportsNodeType(nodeType, "langchain.embeddings", "langchain.embedding-generator")) {
       const dimensions = Math.max(1, Number(properties.dimensions ?? 1536));
-      const normalizeVectors = Boolean(properties["normalize-vectors"] ?? true);
-      const text = normalizeText(inputs.text);
-      const chunks = toChunkRecords(inputs.text);
-      const sourceItems = chunks.length > 0 ? chunks.map((chunk) => chunk.text) : [text];
-      const vectors = sourceItems
-        .filter((item) => item.trim().length > 0)
-        .map((item) => buildEmbeddingVector(item, dimensions, normalizeVectors));
+      const normalizeVectors = Boolean(properties.normalize ?? properties["normalize-vectors"] ?? true);
+      const textItems = Array.isArray(inputs.texts)
+        ? inputs.texts.map((item) => normalizeText(item)).filter(Boolean)
+        : [];
+      const legacyText = normalizeText(inputs.text);
+      const legacyChunks = toChunkRecords(inputs.text).map((chunk) => chunk.text);
+      const sourceItems = textItems.length > 0
+        ? textItems
+        : legacyChunks.length > 0
+          ? legacyChunks
+          : legacyText
+            ? [legacyText]
+            : [];
+      const vectors = sourceItems.map((item) => buildEmbeddingVector(item, dimensions, normalizeVectors));
 
       return {
         nodeId: context.node.id,
         status: vectors.length > 0 ? "completed" : "failed",
         outputs: {
+          embeddings: vectors,
           embedding: {
             dimensions,
             count: vectors.length,
@@ -401,57 +623,100 @@ export class LangChainNodeExecutor implements INodeExecutor {
       };
     }
 
-    if (nodeType === "langchain.retrieval-query") {
+    if (supportsNodeType(nodeType, "langchain.retriever", "langchain.retrieval-query")) {
       const query = normalizeText(inputs.query);
-      const topK = Math.max(1, Number(properties["top-k"] ?? 5));
-      const minimumScore = Number(properties["min-score"] ?? 0.2);
-      const dataset = inputs.dataset as Record<string, unknown> | undefined;
-      const candidateChunks = [
-        ...toChunkRecords(dataset?.records),
-        ...toChunkRecords(inputs.dataset),
+      const topK = Math.max(1, Number(properties.topK ?? properties["top-k"] ?? 5));
+      const minimumScore = Number(properties["min-score"] ?? 0);
+      const dataset = (inputs.vectorStore ?? inputs.dataset) as Record<string, unknown> | unknown[] | undefined;
+      const candidateDocuments = [
+        ...toDocuments((dataset as Record<string, unknown> | undefined)?.records),
+        ...toDocuments(dataset),
+        ...toDocuments(inputs.documents),
       ];
+      const candidateChunks = candidateDocuments.length > 0
+        ? candidateDocuments.map((document, index) => ({
+            index,
+            text: document.text,
+            metadata: document.metadata,
+          }))
+        : [
+            ...toChunkRecords((dataset as Record<string, unknown> | undefined)?.records),
+            ...toChunkRecords(dataset),
+          ];
       const scored = candidateChunks
         .map((chunk, index) => ({
-          index: chunk.index ?? index,
+          id: `doc-${index + 1}`,
           text: chunk.text,
-          score: Number(scoreText(query, chunk.text).toFixed(3)),
+          metadata: {
+            ...(typeof chunk === "object" && "metadata" in chunk ? (chunk as Record<string, unknown>).metadata as Record<string, unknown> : {}),
+            score: Number(scoreText(query, chunk.text).toFixed(3)),
+          },
         }))
-        .filter((chunk) => chunk.score >= minimumScore)
-        .sort((left, right) => right.score - left.score)
+        .filter((document) => Number(document.metadata?.score ?? 0) >= minimumScore)
+        .sort((left, right) => Number(right.metadata?.score ?? 0) - Number(left.metadata?.score ?? 0))
         .slice(0, topK);
 
       return {
         nodeId: context.node.id,
         status: "completed",
         outputs: {
-          matches: scored,
-          scores: scored.map(({ index, score }) => ({ index, score })),
+          documents: scored,
+          matches: scored.map((document, index) => ({ index, text: document.text, score: document.metadata?.score })),
+          scores: scored.map((document, index) => ({ index, score: document.metadata?.score })),
         },
-        messages: [`Retrieved ${scored.length} matching chunk(s).`],
+        messages: [`Retrieved ${scored.length} matching document(s).`],
       };
     }
 
     if (nodeType === "langchain.reranker") {
       const query = normalizeText(inputs.query);
-      const topN = Math.max(1, Number(properties["top-n"] ?? 3));
-      const candidates = toChunkRecords(inputs.candidates);
-      const reranked = candidates
-        .map((chunk, index) => ({
-          index: chunk.index ?? index,
-          text: chunk.text,
-          score: Number(scoreText(query, chunk.text).toFixed(3)),
+      const topK = Math.max(1, Number(properties.topK ?? properties["top-n"] ?? 3));
+      const documents = toDocuments(inputs.documents);
+      const candidates = documents.length > 0
+        ? documents.map((document) => ({ text: document.text, metadata: document.metadata }))
+        : toChunkRecords(inputs.candidates);
+      const rerankedDocuments = candidates
+        .map((candidate, index) => ({
+          id: `doc-${index + 1}`,
+          text: candidate.text,
+          metadata: {
+            ...(typeof candidate === "object" && "metadata" in candidate ? (candidate as Record<string, unknown>).metadata as Record<string, unknown> : {}),
+            score: Number(scoreText(query, candidate.text).toFixed(3)),
+          },
         }))
-        .sort((left, right) => right.score - left.score)
-        .slice(0, topN);
+        .sort((left, right) => Number(right.metadata?.score ?? 0) - Number(left.metadata?.score ?? 0))
+        .slice(0, topK);
 
       return {
         nodeId: context.node.id,
         status: "completed",
         outputs: {
-          reranked,
-          scores: reranked.map(({ index, score }) => ({ index, score })),
+          documents: rerankedDocuments,
+          reranked: rerankedDocuments.map((document, index) => ({ index, text: document.text, score: document.metadata?.score })),
+          scores: rerankedDocuments.map((document, index) => ({ index, score: document.metadata?.score })),
         },
-        messages: [`Reranked ${reranked.length} candidate chunk(s).`],
+        messages: [`Reranked ${rerankedDocuments.length} candidate document(s).`],
+      };
+    }
+
+    if (supportsNodeType(nodeType, "langchain.memory")) {
+      const sessionId = normalizeText(inputs.sessionId);
+      const newMessages = toChatMessages(inputs.messages);
+      const maxMessages = Math.max(1, Number(properties.maxMessages ?? 10));
+      const existingHistory = messageHistoryStore.get(sessionId) ?? [];
+      const history = [...existingHistory, ...newMessages].slice(-maxMessages);
+      if (sessionId) {
+        messageHistoryStore.set(sessionId, history);
+      }
+
+      return {
+        nodeId: context.node.id,
+        status: sessionId ? "completed" : "failed",
+        outputs: {
+          history,
+        },
+        messages: [sessionId ? `Stored ${history.length} message(s) for session ${sessionId}.` : "Message history requires a session ID."],
+        errorMessage: sessionId ? undefined : "Message history requires a session ID.",
       };
     }
 
