@@ -10,10 +10,12 @@ import WorkflowCanvasToolbar from "../components/workflow/WorkflowCanvasToolbar"
 import WorkflowMetadataPanel from "../components/workflow/WorkflowMetadataPanel";
 import WorkflowValidationPanel from "../components/workflow/WorkflowValidationPanel";
 import WorkflowFormView from "../components/workflow/WorkflowFormView";
+import WorkflowOutputViewer from "../components/workflow/WorkflowOutputViewer";
 import type { WorkflowViewMode } from "../state/WorkflowViewMode";
 import { useUiDependencies } from "../composition/AppProviders";
 import { NodePresenter } from "../presenters/NodePresenter";
 import { WorkflowPresenter } from "../presenters/WorkflowPresenter";
+import { WorkflowOutputPresenter } from "../presenters/WorkflowOutputPresenter";
 import { ValidationPresenter } from "../presenters/ValidationPresenter";
 import { NodeStore, type INodeStoreState } from "../state/NodeStore";
 import { WorkflowStore, type IWorkflowStoreState } from "../state/WorkflowStore";
@@ -35,6 +37,7 @@ const fallbackWorkflowState: IWorkflowStoreState = Object.freeze({
   isExecuting: false,
   lastExecutionEvent: undefined,
   nodeExecutionOutputs: Object.freeze({}),
+  outputAssets: Object.freeze([]),
   error: undefined,
 });
 
@@ -72,6 +75,7 @@ export default function WorkflowEditorPage({
   const [isLeftMenuOpen, setIsLeftMenuOpen] = useState(false);
   const [isPropertiesOpen, setIsPropertiesOpen] = useState(false);
   const [isCanvasLocked, setIsCanvasLocked] = useState(false);
+  const [isOutputOpen, setIsOutputOpen] = useState(false);
   const [dismissedValidationMessages, setDismissedValidationMessages] = useState<
     ReadonlyArray<string>
   >([]);
@@ -86,6 +90,7 @@ export default function WorkflowEditorPage({
 
   const nodePresenter = useMemo(() => new NodePresenter(), []);
   const workflowPresenter = useMemo(() => new WorkflowPresenter(), []);
+  const workflowOutputPresenter = useMemo(() => new WorkflowOutputPresenter(), []);
   const validationPresenter = useMemo(() => new ValidationPresenter(), []);
 
   const createdNewWorkflowRef = useRef(false);
@@ -196,6 +201,14 @@ export default function WorkflowEditorPage({
   }, [currentWorkflow, workflowProjectionService]);
 
   const selectedNode = editorViewModel?.selectedNode;
+
+  const workflowOutput = useMemo(() => {
+    if (!currentWorkflow) {
+      return undefined;
+    }
+
+    return workflowOutputPresenter.present(currentWorkflow, workflowState.outputAssets);
+  }, [currentWorkflow, workflowOutputPresenter, workflowState.outputAssets]);
 
   const selectedConnection = useMemo(
     () =>
@@ -344,9 +357,16 @@ export default function WorkflowEditorPage({
               hasSelection={hasSelection}
               canOpenProperties={!!selectedNode}
               isCanvasLocked={isCanvasLocked}
+              canExecuteWorkflow={editorViewModel?.header.isExecutable}
+              isExecutingWorkflow={workflowState.isExecuting}
               isMenuOpen={isLeftMenuOpen}
               isPropertiesOpen={isPropertiesOpen}
+              canToggleOutput={!!workflowOutput}
+              isOutputOpen={isOutputOpen}
               onToggleCanvasLock={toggleCanvasLock}
+              onExecuteWorkflow={() => {
+                void workflowStore.executeCurrentWorkflow();
+              }}
               onOpenMenu={() => {
                 setIsLeftMenuOpen((value) => !value);
               }}
@@ -354,6 +374,9 @@ export default function WorkflowEditorPage({
                 if (selectedNode) {
                   setIsPropertiesOpen((value) => !value);
                 }
+              }}
+              onToggleOutput={() => {
+                setIsOutputOpen((value) => !value);
               }}
               onClearSelection={() => workflowStore.clearSelection()}
               onValidateWorkflow={() => workflowStore.validateCurrentWorkflow()}
@@ -409,9 +432,10 @@ export default function WorkflowEditorPage({
                   viewMode === "form" ? "ui-canvas-shell__view--active" : "ui-canvas-shell__view--inactive"
                 }`}
               >
-                {formSchema ? (
+                {formSchema && workflowOutput ? (
                   <WorkflowFormView
                     schema={formSchema}
+                    output={workflowOutput}
                     onChange={(fieldId, value) => {
                       const [nodeId, propertyId] = fieldId.split(".");
                       if (!nodeId || !propertyId) {
@@ -423,6 +447,40 @@ export default function WorkflowEditorPage({
                 ) : null}
               </div>
 
+
+              {viewMode === "canvas" && isOutputOpen && workflowOutput ? (
+                <div className="ui-overlay-panel ui-overlay-panel--bottom ui-overlay-panel--open">
+                  <button
+                    type="button"
+                    className="ui-overlay-panel__scrim"
+                    aria-label="Hide output"
+                    onClick={() => setIsOutputOpen(false)}
+                  />
+
+                  <aside className="ui-overlay-panel__surface">
+                    <div className="ui-overlay-panel__header">
+                      <div className="ui-stack ui-stack--2xs">
+                        <div className="ui-heading-4">Workflow Output</div>
+                        <div className="ui-text-secondary ui-text-small">
+                          Latest generated outputs and expected output types.
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="ui-button ui-button--ghost ui-button--sm"
+                        onClick={() => setIsOutputOpen(false)}
+                      >
+                        Hide Output
+                      </button>
+                    </div>
+
+                    <div className="ui-overlay-panel__body ui-scrollbar">
+                      <WorkflowOutputViewer output={workflowOutput} mode="canvas" />
+                    </div>
+                  </aside>
+                </div>
+              ) : null}
 
               {visibleValidationMessages.length > 0 ? (
                 <div
