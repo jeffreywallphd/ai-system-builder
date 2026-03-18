@@ -29,7 +29,15 @@ describe("Node provider interactions", () => {
 
     expect(langchain.findByNodeType("langchain.output_parser")?.descriptor.title).toContain("Format AI Output");
     expect(langchain.findByNodeType("langchain.document_loader")?.descriptor.title).toContain("Load Document");
+    expect(langchain.findByNodeType("langchain.agent")?.descriptor.title).toContain("AI Agent");
+    expect(langchain.findByNodeType("langchain.vector_store_upsert")?.descriptor.title).toContain(
+      "Save Knowledge to Search Index"
+    );
     expect(python.findByNodeType("langchain.output_parser")?.descriptor.providerId).toBe("python");
     expect(python.findByNodeType("langchain.document_loader")?.descriptor.providerId).toBe("python");
+    expect(python.findByNodeType("langchain.agent")?.descriptor.providerId).toBe("python");
+    expect(python.findByNodeType("langchain.vector_store_upsert")?.descriptor.providerId).toBe(
+      "python"
+    );
   });
 });

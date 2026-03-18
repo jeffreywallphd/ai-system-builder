@@ -82,6 +82,79 @@ const requiredTierOneNodes = [
   },
 ] as const;
 
+const requiredTierTwoNodes = [
+  {
+    type: "langchain.document_to_chunks",
+    title: "Prepare Document Chunks",
+    requiredInputs: ["documents"],
+    requiredOutputs: ["chunks"],
+    expectedProperties: ["chunkSize", "chunkOverlap", "preserveMetadata"],
+  },
+  {
+    type: "langchain.vector_store_upsert",
+    title: "Save Knowledge to Search Index",
+    requiredInputs: ["documents", "embeddings", "vectorStore"],
+    requiredOutputs: ["vectorStore", "upsertResult"],
+    expectedProperties: ["collection", "upsertMode", "batchSize"],
+  },
+  {
+    type: "langchain.similarity_search",
+    title: "Search Similar Content",
+    requiredInputs: ["query", "queryEmbedding", "vectorStore"],
+    requiredOutputs: ["documents"],
+    expectedProperties: ["topK", "scoreThreshold"],
+  },
+  {
+    type: "langchain.context_formatter",
+    title: "Build Context for AI",
+    requiredInputs: ["documents", "chunks"],
+    requiredOutputs: ["context"],
+    expectedProperties: ["template", "separator", "includeMetadata", "maxItems"],
+  },
+  {
+    type: "langchain.tool_definition",
+    title: "Create AI Tool",
+    requiredInputs: ["inputSchema", "toolHandler"],
+    requiredOutputs: ["tool"],
+    expectedProperties: ["toolName", "description", "strictSchema"],
+  },
+  {
+    type: "langchain.tool_call_executor",
+    title: "Run AI Tool",
+    requiredInputs: ["tool", "arguments"],
+    requiredOutputs: ["toolResult", "resultText"],
+    expectedProperties: ["failOnMissingArgs", "stringifyResult"],
+  },
+  {
+    type: "langchain.agent",
+    title: "AI Agent",
+    requiredInputs: ["messages", "input", "tools", "history"],
+    requiredOutputs: ["response", "messages", "toolCalls"],
+    expectedProperties: ["model", "systemPrompt", "temperature", "maxIterations", "useMemory", "verbose"],
+  },
+  {
+    type: "langchain.summarization",
+    title: "Summarize Text",
+    requiredInputs: ["text", "documents"],
+    requiredOutputs: ["summary"],
+    expectedProperties: ["model", "style", "maxLength"],
+  },
+  {
+    type: "langchain.combine_summaries",
+    title: "Combine Summaries",
+    requiredInputs: ["summaries"],
+    requiredOutputs: ["summary"],
+    expectedProperties: ["separator", "strategy", "model"],
+  },
+  {
+    type: "langchain.knowledge_base_retriever",
+    title: "Search Knowledge Base",
+    requiredInputs: ["query", "knowledgeBase"],
+    requiredOutputs: ["documents"],
+    expectedProperties: ["topK", "scoreThreshold"],
+  },
+] as const;
+
 describe("LangChain node catalog definitions", () => {
   it("provides meaningful descriptions and workflow ports", async () => {
     const provider = createProvider();
@@ -113,9 +186,25 @@ describe("LangChain node catalog definitions", () => {
     }
   });
 
+  it("registers every Tier 2 node with the required non-technical title and ports", async () => {
+    const provider = createProvider();
+    const definitions = await provider.getAllDefinitions();
+
+    for (const expected of requiredTierTwoNodes) {
+      const definition = definitions.find((item) => item.type === expected.type);
+      expect(definition).toBeDefined();
+      expect(definition?.title).toBe(expected.title);
+      expect(definition?.description).toBeTruthy();
+      expect(definition?.inputPorts.map((port) => port.id)).toEqual(expected.requiredInputs);
+      expect(definition?.outputPorts.map((port) => port.id)).toEqual(expected.requiredOutputs);
+      expect(definition?.properties.map((property) => property.id)).toEqual(expected.expectedProperties);
+    }
+  });
+
   it("stores technical and projection metadata for Tier 1 nodes", () => {
     const llmNode = getLangChainNodeCatalogMetadata("langchain.llm_chat");
     const documentLoader = getLangChainNodeCatalogMetadata("langchain.document_loader");
+    const agent = getLangChainNodeCatalogMetadata("langchain.agent");
 
     expect(llmNode?.technicalName).toBe("langchain.llm_chat");
     expect(llmNode?.technicalDescription).toContain("Invokes a language model");
@@ -124,6 +213,9 @@ describe("LangChain node catalog definitions", () => {
     expect(llmNode?.projection.supportsAuthoringView).toBeTrue();
     expect(llmNode?.projection.supportsToolView).toBeTrue();
     expect(documentLoader?.projection.keywords).toContain("documents");
+    expect(agent?.technicalDescription).toContain("Uses an LLM with tools");
+    expect(agent?.description).toContain("tools and memory");
+    expect(agent?.projection.group).toBe("Tier 2 LLM");
   });
 
   it("adds projection-friendly property metadata, defaults, and data types", async () => {
@@ -134,12 +226,27 @@ describe("LangChain node catalog definitions", () => {
     const llmChat = definitions.find((definition) => definition.type === "langchain.llm_chat");
     const outputParser = definitions.find((definition) => definition.type === "langchain.output_parser");
     const memory = definitions.find((definition) => definition.type === "langchain.memory");
+    const toolDefinition = definitions.find((definition) => definition.type === "langchain.tool_definition");
+    const similaritySearch = definitions.find(
+      (definition) => definition.type === "langchain.similarity_search"
+    );
+    const combineSummaries = definitions.find(
+      (definition) => definition.type === "langchain.combine_summaries"
+    );
 
     const template = promptTemplate?.properties.find((property) => property.id === "template");
     const temperature = llmChat?.properties.find((property) => property.id === "temperature");
     const format = outputParser?.properties.find((property) => property.id === "format");
     const schema = outputParser?.properties.find((property) => property.id === "schema");
     const maxMessages = memory?.properties.find((property) => property.id === "maxMessages");
+    const toolName = toolDefinition?.properties.find((property) => property.id === "toolName");
+    const strictSchema = toolDefinition?.properties.find(
+      (property) => property.id === "strictSchema"
+    );
+    const scoreThreshold = similaritySearch?.properties.find(
+      (property) => property.id === "scoreThreshold"
+    );
+    const strategy = combineSummaries?.properties.find((property) => property.id === "strategy");
 
     expect(template?.type).toBe("multiline-text");
     expect(template?.projection?.label).toBe("Prompt template");
@@ -161,15 +268,42 @@ describe("LangChain node catalog definitions", () => {
 
     expect(maxMessages?.defaultValue).toBe(10);
     expect(maxMessages?.constraints?.range?.max).toBe(100);
+
+    expect(toolName?.constraints?.required).toBeTrue();
+    expect(toolName?.projection?.group).toBe("Definition");
+    expect(strictSchema?.defaultValue).toBeTrue();
+
+    expect(scoreThreshold?.type).toBe("number");
+    expect(scoreThreshold?.projection?.authorVisibility).toBe("advanced");
+    expect(scoreThreshold?.constraints?.range).toEqual({
+      min: 0,
+      max: 1,
+      step: 0.01,
+      defaultValue: 0,
+      clamp: true,
+    });
+
+    expect(strategy?.options?.map((option) => option.value)).toEqual([
+      "concatenate",
+      "reduce",
+      "outline",
+    ]);
   });
 
-  it("marks optional ports correctly for flexible Tier 1 nodes", async () => {
+  it("marks optional ports correctly for flexible Tier 1 and Tier 2 nodes", async () => {
     const provider = createProvider();
     const definitions = await provider.getAllDefinitions();
 
     const chatPrompt = definitions.find((definition) => definition.type === "langchain.chat_prompt");
     const llmChat = definitions.find((definition) => definition.type === "langchain.llm_chat");
     const retriever = definitions.find((definition) => definition.type === "langchain.retriever");
+    const similaritySearch = definitions.find(
+      (definition) => definition.type === "langchain.similarity_search"
+    );
+    const agent = definitions.find((definition) => definition.type === "langchain.agent");
+    const summarization = definitions.find(
+      (definition) => definition.type === "langchain.summarization"
+    );
 
     expect(chatPrompt?.getInputPort("system")?.compatibility.isOptional).toBeTrue();
     expect(chatPrompt?.getInputPort("user")?.compatibility.isOptional).toBeFalse();
@@ -180,5 +314,16 @@ describe("LangChain node catalog definitions", () => {
 
     expect(retriever?.getInputPort("embeddings")?.compatibility.isOptional).toBeTrue();
     expect(retriever?.getInputPort("vectorStore")?.compatibility.isOptional).toBeFalse();
+
+    expect(similaritySearch?.getInputPort("query")?.compatibility.isOptional).toBeTrue();
+    expect(similaritySearch?.getInputPort("queryEmbedding")?.compatibility.isOptional).toBeTrue();
+    expect(similaritySearch?.getInputPort("vectorStore")?.compatibility.isOptional).toBeFalse();
+
+    expect(agent?.getInputPort("messages")?.compatibility.isOptional).toBeTrue();
+    expect(agent?.getInputPort("input")?.compatibility.isOptional).toBeTrue();
+    expect(agent?.getInputPort("history")?.compatibility.isOptional).toBeTrue();
+
+    expect(summarization?.getInputPort("text")?.compatibility.isOptional).toBeTrue();
+    expect(summarization?.getInputPort("documents")?.compatibility.isOptional).toBeTrue();
   });
 });

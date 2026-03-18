@@ -52,6 +52,44 @@ const LANGCHAIN_IMPLEMENTATIONS: ReadonlyArray<INodeRuntimeImplementation> = Obj
   langChainImplementation("langchain.output_parser", "Format AI Output"),
   langChainImplementation("langchain.memory", "Remember Conversation"),
   langChainImplementation("langchain.document_loader", "Load Document"),
+  langChainImplementation("langchain.document_to_chunks", "Prepare Document Chunks"),
+  langChainImplementation("langchain.vector_store_upsert", "Save Knowledge to Search Index", [
+    "interpreted-node",
+    "python-node",
+    "hybrid",
+  ]),
+  langChainImplementation("langchain.similarity_search", "Search Similar Content", [
+    "interpreted-node",
+    "python-node",
+    "hybrid",
+  ]),
+  langChainImplementation("langchain.context_formatter", "Build Context for AI"),
+  langChainImplementation("langchain.tool_definition", "Create AI Tool"),
+  langChainImplementation("langchain.tool_call_executor", "Run AI Tool", [
+    "interpreted-node",
+    "python-node",
+    "hybrid",
+  ]),
+  langChainImplementation("langchain.agent", "AI Agent", [
+    "interpreted-node",
+    "python-node",
+    "hybrid",
+  ]),
+  langChainImplementation("langchain.summarization", "Summarize Text", [
+    "interpreted-node",
+    "python-node",
+    "hybrid",
+  ]),
+  langChainImplementation("langchain.combine_summaries", "Combine Summaries", [
+    "interpreted-node",
+    "python-node",
+    "hybrid",
+  ]),
+  langChainImplementation(
+    "langchain.knowledge_base_retriever",
+    "Search Knowledge Base",
+    ["interpreted-node", "python-node", "hybrid"]
+  ),
 
   langChainImplementation("langchain.prompt-template", "Build Prompt"),
   langChainImplementation("langchain.text-splitter", "Split Text into Chunks"),

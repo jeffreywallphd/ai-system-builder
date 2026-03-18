@@ -149,6 +149,7 @@ function metadata(params: {
 }
 
 const tierOneProjectionGroup = "Tier 1 LLM";
+const tierTwoProjectionGroup = "Tier 2 LLM";
 
 export const LANGCHAIN_NODE_CATALOG_METADATA: Readonly<
   Record<string, ILangChainNodeCatalogMetadata>
@@ -726,6 +727,769 @@ export const LANGCHAIN_NODE_CATALOG_METADATA: Readonly<
     group: tierOneProjectionGroup,
     tags: ["documents", "loading", "ingestion"],
     keywords: ["load", "documents", "file", "url", "text"],
+  }),
+  "langchain.document_to_chunks": metadata({
+    technicalName: "langchain.document_to_chunks",
+    nonTechnicalName: "Prepare Document Chunks",
+    technicalDescription:
+      "Converts document objects into chunked document objects, preserving metadata where practical.",
+    nonTechnicalDescription:
+      "Break documents into smaller AI-ready pieces while keeping useful document details attached.",
+    inputPorts: Object.freeze([
+      inputPort(
+        "documents",
+        "Documents",
+        ["document", "json"],
+        false,
+        "Structured documents to split into smaller document chunks."
+      ),
+    ]),
+    outputPorts: Object.freeze([
+      outputPort(
+        "chunks",
+        "Chunks",
+        ["document", "json"],
+        "Chunked document records that remain compatible with retrieval and summarization nodes."
+      ),
+    ]),
+    properties: Object.freeze([
+      property({
+        id: "chunkSize",
+        name: "Chunk Size",
+        type: "integer",
+        value: 500,
+        defaultValue: 500,
+        description: "Maximum characters or tokens targeted per chunked document.",
+        required: true,
+        min: 1,
+        max: 4000,
+        step: 1,
+        projectionGroup: "Chunking",
+        order: 0,
+      }),
+      property({
+        id: "chunkOverlap",
+        name: "Chunk Overlap",
+        type: "integer",
+        value: 50,
+        defaultValue: 50,
+        description: "How much neighboring content to repeat across chunk boundaries.",
+        required: true,
+        min: 0,
+        max: 1000,
+        step: 1,
+        projectionGroup: "Chunking",
+        order: 1,
+      }),
+      property({
+        id: "preserveMetadata",
+        name: "Preserve Metadata",
+        type: "boolean",
+        value: true,
+        defaultValue: true,
+        description: "Carry document metadata forward onto each generated chunk when practical.",
+        projectionLabel: "Keep document details",
+        projectionGroup: "Chunking",
+        order: 2,
+      }),
+    ]),
+    group: tierTwoProjectionGroup,
+    tags: ["documents", "chunking", "rag"],
+    keywords: ["document chunks", "split documents", "metadata preservation"],
+  }),
+  "langchain.vector_store_upsert": metadata({
+    technicalName: "langchain.vector_store_upsert",
+    nonTechnicalName: "Save Knowledge to Search Index",
+    technicalDescription:
+      "Writes documents and/or embeddings into a vector store for later semantic retrieval.",
+    nonTechnicalDescription:
+      "Save information into a searchable memory so the AI can find it later.",
+    inputPorts: Object.freeze([
+      inputPort(
+        "documents",
+        "Documents",
+        ["document", "json"],
+        true,
+        "Optional documents to index into the vector store."
+      ),
+      inputPort(
+        "embeddings",
+        "Embeddings",
+        ["embedding", "json"],
+        true,
+        "Optional embedding vectors aligned with the incoming documents."
+      ),
+      inputPort(
+        "vectorStore",
+        "Vector Store",
+        ["dataset", "json", "generic"],
+        false,
+        "The vector store or managed index connection that will receive the upsert."
+      ),
+    ]),
+    outputPorts: Object.freeze([
+      outputPort(
+        "vectorStore",
+        "Vector Store",
+        ["dataset", "json", "generic"],
+        "The updated vector store handle for downstream retrieval nodes."
+      ),
+      outputPort(
+        "upsertResult",
+        "Upsert Result",
+        ["json", "generic"],
+        "Optional indexing summary describing what was written."
+      ),
+    ]),
+    properties: Object.freeze([
+      property({
+        id: "collection",
+        name: "Collection",
+        type: "text",
+        value: "",
+        description: "Optional target collection, namespace, or index segment name.",
+        projectionGroup: "Storage",
+        order: 0,
+      }),
+      property({
+        id: "upsertMode",
+        name: "Upsert Mode",
+        type: "select",
+        value: "append",
+        defaultValue: "append",
+        description: "Controls whether incoming records append, replace, or merge into existing content.",
+        options: [
+          { label: "Append", value: "append", description: "Add new records without clearing existing content." },
+          { label: "Replace", value: "replace", description: "Replace the existing indexed content for the target collection." },
+          { label: "Merge", value: "merge", description: "Merge incoming records with existing records when supported." },
+        ],
+        projectionGroup: "Storage",
+        order: 1,
+      }),
+      property({
+        id: "batchSize",
+        name: "Batch Size",
+        type: "integer",
+        value: 100,
+        description: "Optional maximum number of records to process per write batch.",
+        min: 1,
+        max: 1000,
+        step: 1,
+        isAdvanced: true,
+        projectionGroup: "Storage",
+        order: 2,
+      }),
+    ]),
+    group: tierTwoProjectionGroup,
+    tags: ["vector store", "indexing", "rag"],
+    keywords: ["upsert", "index content", "semantic memory", "collection"],
+  }),
+  "langchain.similarity_search": metadata({
+    technicalName: "langchain.similarity_search",
+    nonTechnicalName: "Search Similar Content",
+    technicalDescription:
+      "Queries a vector store for semantically similar documents using a query string or query embedding.",
+    nonTechnicalDescription:
+      "Find content that is meaningfully similar to a question or piece of text.",
+    inputPorts: Object.freeze([
+      inputPort(
+        "query",
+        "Query",
+        ["text"],
+        true,
+        "Optional text query used to search for similar content."
+      ),
+      inputPort(
+        "queryEmbedding",
+        "Query Embedding",
+        ["embedding", "json"],
+        true,
+        "Optional precomputed query embedding for direct vector similarity search."
+      ),
+      inputPort(
+        "vectorStore",
+        "Vector Store",
+        ["dataset", "json", "generic"],
+        false,
+        "The vector store connection or retrieval-ready semantic index to search."
+      ),
+    ]),
+    outputPorts: Object.freeze([
+      outputPort(
+        "documents",
+        "Documents",
+        ["document", "json"],
+        "The most semantically similar documents returned from the vector store."
+      ),
+    ]),
+    properties: Object.freeze([
+      property({
+        id: "topK",
+        name: "Top K",
+        type: "integer",
+        value: 5,
+        defaultValue: 5,
+        description: "How many similar documents to return.",
+        required: true,
+        min: 1,
+        max: 50,
+        step: 1,
+        projectionGroup: "Search",
+        order: 0,
+      }),
+      property({
+        id: "scoreThreshold",
+        name: "Score Threshold",
+        type: "number",
+        value: 0,
+        description: "Optional minimum similarity score required for a result to be included.",
+        min: 0,
+        max: 1,
+        step: 0.01,
+        isAdvanced: true,
+        projectionGroup: "Search",
+        order: 1,
+      }),
+    ]),
+    group: tierTwoProjectionGroup,
+    tags: ["search", "similarity", "vector store"],
+    keywords: ["similarity search", "semantic search", "query embedding"],
+  }),
+  "langchain.context_formatter": metadata({
+    technicalName: "langchain.context_formatter",
+    nonTechnicalName: "Build Context for AI",
+    technicalDescription:
+      "Formats retrieved documents or text chunks into a prompt-ready context block.",
+    nonTechnicalDescription:
+      "Turn search results into a clean context section the AI can use.",
+    inputPorts: Object.freeze([
+      inputPort(
+        "documents",
+        "Documents",
+        ["document", "json"],
+        true,
+        "Optional retrieved documents to render into the final context block."
+      ),
+      inputPort(
+        "chunks",
+        "Chunks",
+        ["text", "json"],
+        true,
+        "Optional text chunks to join into the final context block."
+      ),
+    ]),
+    outputPorts: Object.freeze([
+      outputPort(
+        "context",
+        "Context",
+        ["text", "prompt"],
+        "Prompt-ready context text assembled from the provided documents or chunks."
+      ),
+    ]),
+    properties: Object.freeze([
+      property({
+        id: "template",
+        name: "Template",
+        type: "multiline-text",
+        value: "",
+        description: "Optional template used to format each item before the context is joined.",
+        projectionLabel: "Formatting template",
+        projectionGroup: "Formatting",
+        fieldTypeHint: "textarea",
+        order: 0,
+      }),
+      property({
+        id: "separator",
+        name: "Separator",
+        type: "text",
+        value: "\n\n",
+        defaultValue: "\n\n",
+        description: "Text inserted between formatted context items.",
+        projectionGroup: "Formatting",
+        order: 1,
+      }),
+      property({
+        id: "includeMetadata",
+        name: "Include Metadata",
+        type: "boolean",
+        value: false,
+        defaultValue: false,
+        description: "Append document metadata to each rendered item when available.",
+        projectionGroup: "Formatting",
+        order: 2,
+      }),
+      property({
+        id: "maxItems",
+        name: "Max Items",
+        type: "integer",
+        value: 10,
+        description: "Optional maximum number of documents or chunks to include in the context block.",
+        min: 1,
+        max: 100,
+        step: 1,
+        isAdvanced: true,
+        projectionGroup: "Formatting",
+        order: 3,
+      }),
+    ]),
+    group: tierTwoProjectionGroup,
+    tags: ["context", "prompting", "rag"],
+    keywords: ["format context", "join chunks", "prompt context"],
+  }),
+  "langchain.tool_definition": metadata({
+    technicalName: "langchain.tool_definition",
+    nonTechnicalName: "Create AI Tool",
+    technicalDescription:
+      "Defines a callable tool with name, description, and input schema that can be supplied to an agent or tool-calling model.",
+    nonTechnicalDescription:
+      "Describe a tool the AI is allowed to use.",
+    inputPorts: Object.freeze([
+      inputPort(
+        "inputSchema",
+        "Input Schema",
+        ["json", "generic"],
+        true,
+        "Optional schema object describing the arguments accepted by the tool."
+      ),
+      inputPort(
+        "toolHandler",
+        "Tool Handler",
+        ["generic", "json"],
+        true,
+        "Optional runtime handler reference or implementation payload for the tool."
+      ),
+    ]),
+    outputPorts: Object.freeze([
+      outputPort(
+        "tool",
+        "Tool",
+        ["generic", "json"],
+        "A tool definition object that can be supplied to an agent or executor node."
+      ),
+    ]),
+    properties: Object.freeze([
+      property({
+        id: "toolName",
+        name: "Tool Name",
+        type: "text",
+        value: "",
+        description: "Stable tool identifier exposed to the model.",
+        required: true,
+        projectionGroup: "Definition",
+        order: 0,
+      }),
+      property({
+        id: "description",
+        name: "Description",
+        type: "multiline-text",
+        value: "",
+        description: "Clear instruction telling the model what the tool does and when to use it.",
+        required: true,
+        projectionLabel: "Tool description",
+        projectionGroup: "Definition",
+        fieldTypeHint: "textarea",
+        order: 1,
+      }),
+      property({
+        id: "strictSchema",
+        name: "Strict Schema",
+        type: "boolean",
+        value: true,
+        defaultValue: true,
+        description: "Require tool calls to match the provided schema closely when the runtime supports it.",
+        projectionGroup: "Definition",
+        order: 2,
+      }),
+    ]),
+    group: tierTwoProjectionGroup,
+    tags: ["tools", "agent", "function calling"],
+    keywords: ["tool definition", "tool schema", "callable tool"],
+  }),
+  "langchain.tool_call_executor": metadata({
+    technicalName: "langchain.tool_call_executor",
+    nonTechnicalName: "Run AI Tool",
+    technicalDescription:
+      "Executes a requested tool call using the provided tool definition and arguments.",
+    nonTechnicalDescription:
+      "Run a tool the AI selected and return the result.",
+    inputPorts: Object.freeze([
+      inputPort(
+        "tool",
+        "Tool",
+        ["generic", "json"],
+        false,
+        "The tool definition or callable tool payload to execute."
+      ),
+      inputPort(
+        "arguments",
+        "Arguments",
+        ["json", "generic"],
+        false,
+        "Structured arguments to pass into the selected tool."
+      ),
+    ]),
+    outputPorts: Object.freeze([
+      outputPort(
+        "toolResult",
+        "Tool Result",
+        ["tool-result", "json", "generic"],
+        "Structured result returned by the executed tool."
+      ),
+      outputPort(
+        "resultText",
+        "Result Text",
+        ["text"],
+        "Optional text form of the tool result for prompt assembly or display."
+      ),
+    ]),
+    properties: Object.freeze([
+      property({
+        id: "failOnMissingArgs",
+        name: "Fail On Missing Arguments",
+        type: "boolean",
+        value: true,
+        defaultValue: true,
+        description: "Stop execution when required arguments are missing or the arguments payload is empty.",
+        projectionGroup: "Execution",
+        order: 0,
+      }),
+      property({
+        id: "stringifyResult",
+        name: "Stringify Result",
+        type: "boolean",
+        value: true,
+        defaultValue: true,
+        description: "Also expose a text version of the tool result for downstream prompt-oriented nodes.",
+        projectionGroup: "Execution",
+        order: 1,
+      }),
+    ]),
+    group: tierTwoProjectionGroup,
+    tags: ["tools", "execution", "agent"],
+    keywords: ["tool execution", "run tool", "tool result"],
+  }),
+  "langchain.agent": metadata({
+    technicalName: "langchain.agent",
+    nonTechnicalName: "AI Agent",
+    technicalDescription:
+      "Uses an LLM with tools and optional memory to reason over input and produce a response.",
+    nonTechnicalDescription:
+      "Give the AI tools and memory so it can solve more complex tasks.",
+    inputPorts: Object.freeze([
+      inputPort(
+        "messages",
+        "Messages",
+        ["messages", "json"],
+        true,
+        "Optional structured chat messages to seed the agent turn."
+      ),
+      inputPort(
+        "input",
+        "Input",
+        ["text"],
+        true,
+        "Optional plain text task or instruction for the agent."
+      ),
+      inputPort(
+        "tools",
+        "Tools",
+        ["generic", "json"],
+        true,
+        "Optional tool definition list available to the agent."
+      ),
+      inputPort(
+        "history",
+        "History",
+        ["messages", "json"],
+        true,
+        "Optional prior conversation history to provide memory or continuity."
+      ),
+    ]),
+    outputPorts: Object.freeze([
+      outputPort("response", "Response", ["text"], "The agent's final natural-language response."),
+      outputPort(
+        "messages",
+        "Messages",
+        ["messages", "json"],
+        "Optional message trace produced by the bounded agent execution."
+      ),
+      outputPort(
+        "toolCalls",
+        "Tool Calls",
+        ["tool-call", "json"],
+        "Optional structured tool calls proposed or used by the agent."
+      ),
+    ]),
+    properties: Object.freeze([
+      property({
+        id: "model",
+        name: "Model",
+        type: "text",
+        value: "",
+        description: "The model identifier used for agent reasoning and response generation.",
+        required: true,
+        projectionGroup: "Model",
+        fieldTypeHint: "model",
+        order: 0,
+      }),
+      property({
+        id: "systemPrompt",
+        name: "System Prompt",
+        type: "multiline-text",
+        value: "",
+        description: "Optional agent instructions describing behavior, role, and constraints.",
+        projectionGroup: "Behavior",
+        fieldTypeHint: "textarea",
+        order: 1,
+      }),
+      property({
+        id: "temperature",
+        name: "Temperature",
+        type: "slider",
+        value: 0.7,
+        defaultValue: 0.7,
+        description: "Controls how exploratory or deterministic the agent should be.",
+        min: 0,
+        max: 2,
+        step: 0.1,
+        projectionGroup: "Behavior",
+        order: 2,
+      }),
+      property({
+        id: "maxIterations",
+        name: "Max Iterations",
+        type: "integer",
+        value: 5,
+        defaultValue: 5,
+        description: "Upper bound on the number of internal reasoning or tool-use iterations.",
+        required: true,
+        min: 1,
+        max: 20,
+        step: 1,
+        projectionGroup: "Behavior",
+        order: 3,
+      }),
+      property({
+        id: "useMemory",
+        name: "Use Memory",
+        type: "boolean",
+        value: true,
+        defaultValue: true,
+        description: "Include the history input in the bounded agent run when it is available.",
+        projectionGroup: "Behavior",
+        order: 4,
+      }),
+      property({
+        id: "verbose",
+        name: "Verbose",
+        type: "boolean",
+        value: false,
+        defaultValue: false,
+        description: "Expose extra execution detail in the agent trace payload when supported.",
+        isAdvanced: true,
+        projectionGroup: "Behavior",
+        order: 5,
+      }),
+    ]),
+    group: tierTwoProjectionGroup,
+    tags: ["agent", "tools", "memory"],
+    keywords: ["agent", "tool use", "reasoning", "multi-step ai"],
+  }),
+  "langchain.summarization": metadata({
+    technicalName: "langchain.summarization",
+    nonTechnicalName: "Summarize Text",
+    technicalDescription:
+      "Uses an LLM to summarize text or document content.",
+    nonTechnicalDescription:
+      "Create a shorter version of long content.",
+    inputPorts: Object.freeze([
+      inputPort(
+        "text",
+        "Text",
+        ["text"],
+        true,
+        "Optional plain text to summarize directly."
+      ),
+      inputPort(
+        "documents",
+        "Documents",
+        ["document", "json"],
+        true,
+        "Optional structured documents to summarize together."
+      ),
+    ]),
+    outputPorts: Object.freeze([
+      outputPort("summary", "Summary", ["text"], "The generated summary text."),
+    ]),
+    properties: Object.freeze([
+      property({
+        id: "model",
+        name: "Model",
+        type: "text",
+        value: "",
+        description: "The model identifier used to produce the summary.",
+        required: true,
+        projectionGroup: "Model",
+        fieldTypeHint: "model",
+        order: 0,
+      }),
+      property({
+        id: "style",
+        name: "Style",
+        type: "select",
+        value: "brief",
+        defaultValue: "brief",
+        description: "Preferred output style for the generated summary.",
+        options: [
+          { label: "Brief", value: "brief", description: "Return a short compact summary." },
+          { label: "Detailed", value: "detailed", description: "Return a fuller, more explanatory summary." },
+          { label: "Bullet", value: "bullet", description: "Return the summary as a bulleted list." },
+        ],
+        projectionGroup: "Summary",
+        order: 1,
+      }),
+      property({
+        id: "maxLength",
+        name: "Max Length",
+        type: "integer",
+        value: 300,
+        description: "Optional soft target for summary length in characters or tokens depending on runtime.",
+        min: 1,
+        max: 8000,
+        step: 1,
+        isAdvanced: true,
+        projectionGroup: "Summary",
+        order: 2,
+      }),
+    ]),
+    group: tierTwoProjectionGroup,
+    tags: ["summary", "llm", "documents"],
+    keywords: ["summarize", "summary", "shorten text", "document summary"],
+  }),
+  "langchain.combine_summaries": metadata({
+    technicalName: "langchain.combine_summaries",
+    nonTechnicalName: "Combine Summaries",
+    technicalDescription:
+      "Combines multiple summary strings into a single consolidated summary.",
+    nonTechnicalDescription:
+      "Merge several short summaries into one final summary.",
+    inputPorts: Object.freeze([
+      inputPort(
+        "summaries",
+        "Summaries",
+        ["text", "json"],
+        false,
+        "One or more summary strings to consolidate."
+      ),
+    ]),
+    outputPorts: Object.freeze([
+      outputPort("summary", "Summary", ["text"], "The combined summary output."),
+    ]),
+    properties: Object.freeze([
+      property({
+        id: "separator",
+        name: "Separator",
+        type: "text",
+        value: "\n\n",
+        defaultValue: "\n\n",
+        description: "Text inserted between summary items before combination.",
+        projectionGroup: "Combination",
+        order: 0,
+      }),
+      property({
+        id: "strategy",
+        name: "Strategy",
+        type: "select",
+        value: "reduce",
+        defaultValue: "reduce",
+        description: "How multiple summaries should be combined into one final output.",
+        options: [
+          { label: "Concatenate", value: "concatenate", description: "Join summaries in order with minimal rewriting." },
+          { label: "Reduce", value: "reduce", description: "Compress the set of summaries into a tighter combined answer." },
+          { label: "Outline", value: "outline", description: "Reframe the summaries into an outline-style result." },
+        ],
+        projectionGroup: "Combination",
+        order: 1,
+      }),
+      property({
+        id: "model",
+        name: "Model",
+        type: "text",
+        value: "",
+        description: "Optional model identifier used when the combination strategy performs synthesis.",
+        isAdvanced: true,
+        projectionGroup: "Combination",
+        fieldTypeHint: "model",
+        order: 2,
+      }),
+    ]),
+    group: tierTwoProjectionGroup,
+    tags: ["summary", "map-reduce", "aggregation"],
+    keywords: ["combine summaries", "reduce summaries", "outline summary"],
+  }),
+  "langchain.knowledge_base_retriever": metadata({
+    technicalName: "langchain.knowledge_base_retriever",
+    nonTechnicalName: "Search Knowledge Base",
+    technicalDescription:
+      "Retrieves relevant entries from an existing knowledge base or managed semantic store.",
+    nonTechnicalDescription:
+      "Search your saved knowledge for the most useful information.",
+    inputPorts: Object.freeze([
+      inputPort(
+        "query",
+        "Query",
+        ["text"],
+        false,
+        "The search question or prompt used to retrieve knowledge base entries."
+      ),
+      inputPort(
+        "knowledgeBase",
+        "Knowledge Base",
+        ["dataset", "json", "generic"],
+        false,
+        "Managed knowledge base connection or semantic store handle."
+      ),
+    ]),
+    outputPorts: Object.freeze([
+      outputPort(
+        "documents",
+        "Documents",
+        ["document", "json"],
+        "Relevant knowledge base entries returned as structured documents."
+      ),
+    ]),
+    properties: Object.freeze([
+      property({
+        id: "topK",
+        name: "Top K",
+        type: "integer",
+        value: 5,
+        defaultValue: 5,
+        description: "How many knowledge base results to return.",
+        required: true,
+        min: 1,
+        max: 50,
+        step: 1,
+        projectionGroup: "Retrieval",
+        order: 0,
+      }),
+      property({
+        id: "scoreThreshold",
+        name: "Score Threshold",
+        type: "number",
+        value: 0,
+        description: "Optional minimum retrieval score required for a result to be included.",
+        min: 0,
+        max: 1,
+        step: 0.01,
+        isAdvanced: true,
+        projectionGroup: "Retrieval",
+        order: 1,
+      }),
+    ]),
+    group: tierTwoProjectionGroup,
+    tags: ["knowledge base", "retrieval", "rag"],
+    keywords: ["knowledge base", "search knowledge", "managed retriever"],
   }),
 
   "langchain.prompt-template": metadata({
