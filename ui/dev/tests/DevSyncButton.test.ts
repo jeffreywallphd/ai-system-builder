@@ -12,4 +12,13 @@ describe("DevSyncButton", () => {
     expect(source).toContain("Sync PC");
     expect(source).toContain("ui-button__spinner");
   });
+
+  it("prompts for stash-and-retry when git pull would overwrite local files", () => {
+    const source = readSource("ui/dev/DevSyncButton.tsx");
+
+    expect(source).toContain("window.confirm");
+    expect(source).toContain("overwrittenFiles");
+    expect(source).toContain("stashFiles");
+    expect(source).toContain("stash these files and try the pull again");
+  });
 });

@@ -43,6 +43,7 @@ export default function ModelBrowser({
   const [selectedFilesByModelId, setSelectedFilesByModelId] = useState<
     Readonly<Record<string, ReadonlyArray<string>>>
   >({});
+  const [isInstalledExpanded, setInstalledExpanded] = useState<boolean>(false);
 
   const toggleExpanded = (modelId: string) => {
     setExpandedModelIds((current) =>
@@ -75,27 +76,38 @@ export default function ModelBrowser({
       />
 
       <div className="ui-model-browser__sections">
-        <div className="ui-stack ui-stack--md">
-          <section className="ui-panel ui-model-browser__list">
-            <div className="ui-panel__header">
-              <div className="ui-row ui-row--between ui-row--wrap" style={{ width: "100%" }}>
-                <div>
-                  <div className="ui-panel__title">Installed Models</div>
+        <section className="ui-panel ui-model-browser__list">
+          <div className="ui-panel__header">
+            <div className="ui-row ui-row--between ui-row--wrap" style={{ width: "100%" }}>
+              <div>
+                <div className="ui-panel__title">Installed Models</div>
+                {isInstalledExpanded ? (
                   <div className="ui-panel__subtitle">Local models available to workflows.</div>
-                </div>
+                ) : null}
+              </div>
+              <div className="ui-row ui-row--sm ui-row--wrap" style={{ alignItems: "center" }}>
                 <div className="ui-subtle ui-text-small">
                   {isLoadingInstalled ? "Loading…" : `${installedModels.length} models`}
                 </div>
+                <button
+                  className="ui-button ui-button--secondary ui-button--sm"
+                  type="button"
+                  onClick={() => setInstalledExpanded((current) => !current)}
+                >
+                  {isInstalledExpanded ? "Hide" : "Show"}
+                </button>
               </div>
             </div>
+          </div>
 
+          {isInstalledExpanded ? (
             <div className="ui-panel__body">
               {installedModels.length === 0 ? (
                 <div className="ui-empty-state">
                   <p className="ui-text-secondary">No installed models are currently available.</p>
                 </div>
               ) : (
-                <div className="ui-grid ui-grid--2">
+                <div className="ui-stack ui-stack--sm">
                   {installedModels.map((model) => (
                     <ModelCard
                       key={model.id}
@@ -107,57 +119,55 @@ export default function ModelBrowser({
                 </div>
               )}
             </div>
-          </section>
+          ) : null}
+        </section>
 
-          <section className="ui-panel ui-model-browser__list">
-            <div className="ui-panel__header">
-              <div className="ui-row ui-row--between ui-row--wrap" style={{ width: "100%" }}>
-                <div>
-                  <div className="ui-panel__title">Remote Catalog</div>
-                  <div className="ui-panel__subtitle">
-                    Search and install supported remote models.
-                  </div>
-                </div>
-                <div className="ui-subtle ui-text-small">
-                  {isSearchingRemote ? "Searching…" : `${remoteModels.length} results`}
+        <ModelCompatibilityPanel compatibility={compatibility} />
+
+        <section className="ui-panel ui-model-browser__list ui-model-browser__list--remote">
+          <div className="ui-panel__header">
+            <div className="ui-row ui-row--between ui-row--wrap" style={{ width: "100%" }}>
+              <div>
+                <div className="ui-panel__title">Remote Catalog</div>
+                <div className="ui-panel__subtitle">
+                  Search and install supported remote models.
                 </div>
               </div>
+              <div className="ui-subtle ui-text-small">
+                {isSearchingRemote ? "Searching…" : `${remoteModels.length} results`}
+              </div>
             </div>
+          </div>
 
-            <div className="ui-panel__body">
-              {remoteModels.length === 0 ? (
-                <div className="ui-empty-state">
-                  <p className="ui-text-secondary">
-                    No remote models match the current search criteria.
-                  </p>
-                </div>
-              ) : (
-                <div className="ui-grid ui-grid--2">
-                  {remoteModels.map((model) => (
-                    <ModelCard
-                      key={model.remoteId ?? model.id}
-                      model={model}
-                      mode="remote"
-                      isDetailsExpanded={expandedModelIds.includes(model.id)}
-                      selectedFileIds={selectedFilesByModelId[model.id] ?? []}
-                      installProgressLabel={installProgressByModelId?.[model.remoteId ?? model.id]}
-                      onToggleDetails={toggleExpanded}
-                      onToggleFileSelection={toggleFileSelection}
-                      onInstallFile={(modelId, file) => {
-                        onInstallRemoteFiles?.(modelId, [file]);
-                      }}
-                      onInstallFiles={onInstallRemoteFiles}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          </section>
-        </div>
-
-        <div className="ui-stack ui-stack--md">
-          <ModelCompatibilityPanel compatibility={compatibility} />
-        </div>
+          <div className="ui-panel__body">
+            {remoteModels.length === 0 ? (
+              <div className="ui-empty-state">
+                <p className="ui-text-secondary">
+                  No remote models match the current search criteria.
+                </p>
+              </div>
+            ) : (
+              <div className="ui-stack ui-stack--md">
+                {remoteModels.map((model) => (
+                  <ModelCard
+                    key={model.remoteId ?? model.id}
+                    model={model}
+                    mode="remote"
+                    isDetailsExpanded={expandedModelIds.includes(model.id)}
+                    selectedFileIds={selectedFilesByModelId[model.id] ?? []}
+                    installProgressLabel={installProgressByModelId?.[model.remoteId ?? model.id]}
+                    onToggleDetails={toggleExpanded}
+                    onToggleFileSelection={toggleFileSelection}
+                    onInstallFile={(modelId, file) => {
+                      onInstallRemoteFiles?.(modelId, [file]);
+                    }}
+                    onInstallFiles={onInstallRemoteFiles}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
       </div>
     </section>
   );

@@ -20,6 +20,8 @@ describe("ui/components/workflow interactions", () => {
     expect(flowCanvas).toContain("reactFlow.fitView");
     expect(flowCanvas).toContain("onPaneClick={() => onClearSelection?.()}");
     expect(flowCanvas).toContain("onMoveNodeCommit(change.id");
+    expect(flowCanvas).toContain("createOptimisticEdgeFromConnection(connection)");
+    expect(flowCanvas).toContain("setInteractiveEdges((currentEdges) => {");
     expect(flowCanvas).toContain("onConnectNodes?.({");
     expect(flowCanvas).toContain("onSelectNode?.(node.id)");
     expect(flowCanvas).toContain("onSelectConnection?.(edge.id)");

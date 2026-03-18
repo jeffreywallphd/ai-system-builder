@@ -9,6 +9,7 @@
 @import "./components/panels.css";
 @import "./components/toolbar.css";
 @import "./components/model-browser.css";
+@import "./components/assets.css";
 @import "./components/canvas.css";
 @import "./components/runtime-console.css";
 
@@ -325,6 +326,23 @@ body {
   inset: 0;
   width: 100%;
   transform: translateY(100%);
+}
+
+.ui-overlay-panel--bottom .ui-overlay-panel__surface {
+  top: auto;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  max-height: min(36rem, 62vh);
+  transform: translateY(100%);
+  border-left: 0;
+  border-right: 0;
+  border-bottom: 0;
+}
+
+.ui-overlay-panel--open.ui-overlay-panel--bottom .ui-overlay-panel__surface {
+  transform: translateY(0);
 }
 
 .ui-overlay-panel--open.ui-overlay-panel--left .ui-overlay-panel__surface,

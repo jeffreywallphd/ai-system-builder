@@ -19,6 +19,7 @@ import {
 } from "../../application/ports/RemoteModelCatalog";
 import {
   HuggingFaceApiClient,
+  type IHuggingFaceModelFileInfo,
   type IHuggingFaceModelInfo,
   type IHuggingFaceModelSearchItem,
 } from "./HuggingFaceApiClient";
@@ -242,6 +243,77 @@ function determineArtifactFormat(filePath?: string): IModel["artifact"]["format"
   return "unknown";
 }
 
+function scoreFile(filePath: string, preferredExtensions: ReadonlyArray<string>): number {
+  const lower = normalize(filePath);
+
+  let score = 0;
+
+  for (const extension of preferredExtensions) {
+    if (lower.endsWith(extension)) {
+      score += 200;
+    }
+  }
+
+  if (lower.endsWith(".safetensors")) score += 100;
+  if (lower.endsWith(".gguf")) score += 95;
+  if (lower.endsWith(".onnx")) score += 90;
+  if (lower.endsWith(".bin")) score += 50;
+  if (lower.endsWith(".pt")) score += 40;
+  if (lower.endsWith(".pth")) score += 35;
+  if (lower.endsWith(".ckpt")) score += 25;
+  if (lower.includes("model")) score += 10;
+  if (lower.includes("pytorch_model")) score += 15;
+  if (lower.includes("adapter_model")) score += 12;
+
+  return score;
+}
+
+function toArtifacts(
+  files: ReadonlyArray<IHuggingFaceModelFileInfo>,
+  preferredExtensions: ReadonlyArray<string>
+): {
+  readonly artifact: ModelArtifact;
+  readonly additionalArtifacts: ReadonlyArray<ModelArtifact>;
+} {
+  const sorted = [...files].sort((left, right) => {
+    const scoreDelta = scoreFile(right.path, preferredExtensions) - scoreFile(left.path, preferredExtensions);
+
+    if (scoreDelta !== 0) {
+      return scoreDelta;
+    }
+
+    return left.path.localeCompare(right.path);
+  });
+
+  const [primary, ...rest] = sorted;
+  const toArtifact = (file: IHuggingFaceModelFileInfo): ModelArtifact =>
+    new ModelArtifact({
+      name: file.path,
+      accessMethod: "remote-download",
+      location: file.path,
+      format: determineArtifactFormat(file.path),
+      sizeBytes: file.sizeBytes,
+      sha256: file.sha256,
+      contentType: undefined,
+    });
+
+  if (!primary) {
+    return {
+      artifact: new ModelArtifact({
+        name: "unknown",
+        accessMethod: "remote-api",
+        format: "unknown",
+      }),
+      additionalArtifacts: [],
+    };
+  }
+
+  return {
+    artifact: toArtifact(primary),
+    additionalArtifacts: Object.freeze(rest.map(toArtifact)),
+  };
+}
+
 function buildDescription(info: IHuggingFaceModelInfo | IHuggingFaceModelSearchItem): string | undefined {
   const cardData = "cardData" in info ? info.cardData : undefined;
   const rawDescription =
@@ -256,16 +328,15 @@ function buildDescription(info: IHuggingFaceModelInfo | IHuggingFaceModelSearchI
 
 function createDomainModel(
   info: IHuggingFaceModelInfo | IHuggingFaceModelSearchItem,
-  selectedFilePath?: string,
-  selectedSizeBytes?: number,
-  selectedSha256?: string
+  files: ReadonlyArray<IHuggingFaceModelFileInfo> = []
 ): IModel {
   const kind = determineKind(info.pipeline_tag, info.tags);
   const architectureFamily = determineArchitectureFamily(info.id, info.tags);
   const inputModalities = determineInputModalities(info.pipeline_tag, kind);
   const outputModalities = determineOutputModalities(info.pipeline_tag, kind);
   const tasks = determineTasks(info.pipeline_tag, kind);
-  const artifactFormat = determineArtifactFormat(selectedFilePath);
+  const preferredExtensions = determinePreferredExtensions(kind);
+  const artifacts = toArtifacts(files, preferredExtensions);
 
   return new Model({
     id: info.id,
@@ -284,16 +355,8 @@ function createDomainModel(
         provider: "huggingface",
       },
     }),
-    artifact: new ModelArtifact({
-      name: selectedFilePath?.split("/").slice(-1)[0] || info.id,
-      accessMethod: selectedFilePath ? "remote-download" : "remote-api",
-      location: selectedFilePath,
-      format: artifactFormat,
-      sizeBytes: selectedSizeBytes,
-      sha256: selectedSha256,
-      contentType: undefined,
-    }),
-    additionalArtifacts: [],
+    artifact: artifacts.artifact,
+    additionalArtifacts: artifacts.additionalArtifacts,
     dependencies: [],
     architectureFamily,
     architecture: architectureFamily,
@@ -368,21 +431,20 @@ export class HuggingFaceModelCatalog implements IRemoteModelCatalog {
 
     const catalogItems = await Promise.all(
       searchItems.map(async (item) => {
-        const kind = determineKind(item.pipeline_tag, item.tags);
-        const preferredExtensions = determinePreferredExtensions(kind);
-        const file = await this.apiClient.resolveDownloadFile({
+        const info = await this.apiClient.getModelInfo(item.id);
+        const source = info ?? item;
+        const files = await this.apiClient.listModelFiles({
           modelId: item.id,
-          preferredExtensions,
+          revision: info?.sha,
         });
-
-        const model = createDomainModel(item, file?.path, file?.sizeBytes, file?.sha256);
+        const model = createDomainModel(source, files);
 
         return new RemoteModelCatalogItem({
           model,
           remoteId: item.id,
           provider: "huggingface",
-          isInstallable: !!file,
-          requiresAuth: !!item.private || !!item.gated,
+          isInstallable: files.length > 0,
+          requiresAuth: !!source.private || !!source.gated,
         });
       })
     );
@@ -407,21 +469,18 @@ export class HuggingFaceModelCatalog implements IRemoteModelCatalog {
       return undefined;
     }
 
-    const kind = determineKind(info.pipeline_tag, info.tags);
-    const preferredExtensions = determinePreferredExtensions(kind);
-    const file = await this.apiClient.resolveDownloadFile({
+    const files = await this.apiClient.listModelFiles({
       modelId: info.id,
       revision: info.sha,
-      preferredExtensions,
     });
 
-    const model = createDomainModel(info, file?.path, file?.sizeBytes, file?.sha256);
+    const model = createDomainModel(info, files);
 
     return new RemoteModelCatalogItem({
       model,
       remoteId: info.id,
       provider: "huggingface",
-      isInstallable: !!file,
+      isInstallable: files.length > 0,
       requiresAuth: !!info.private || !!info.gated,
     });
   }

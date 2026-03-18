@@ -3,12 +3,14 @@ import { Link } from "react-router-dom";
 import ModelBrowser from "../components/models/ModelBrowser";
 import type { ModelSearchBarValue } from "../components/models/ModelSearchBar";
 import { useUiDependencies } from "../composition/AppProviders";
+import { Model, ModelArtifact } from "../../domain/models/Model";
 import { ModelPresenter, type ModelDownloadFileViewModel } from "../presenters/ModelPresenter";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import type { IModelStoreState, ModelStore } from "../state/ModelStore";
 import type { IModel } from "../../domain/models/interfaces/IModel";
 import type { RuntimeEngine } from "../../domain/models/interfaces/IModelCompatibility";
 import type { UiSettingsState } from "../settings/UiSettingsStore";
+import type { IRemoteModelCatalogItem } from "../../application/ports/interfaces/IRemoteModelCatalog";
 
 const fallbackState: IModelStoreState = Object.freeze({
   installedModels: Object.freeze([]),
@@ -85,6 +87,8 @@ export default function ModelsPage(): JSX.Element {
           void installRemoteFiles(
             modelStore,
             settingsState.settings.models.installDirectory,
+            state.remoteModels,
+            config.modelInstallDirectory,
             modelId,
             files
           );
@@ -99,21 +103,101 @@ export default function ModelsPage(): JSX.Element {
 
 async function installRemoteFiles(
   modelStore: ModelStore,
+  remoteModels: ReadonlyArray<IRemoteModelCatalogItem>,
   installBaseDirectory: string,
   modelId: string,
   files: ReadonlyArray<ModelDownloadFileViewModel>
 ): Promise<void> {
-  const installTargets = files.length > 0 ? files : [{ name: modelId } as ModelDownloadFileViewModel];
+  const remoteModel = remoteModels.find(
+    (item) => item.remoteId === modelId || item.model.id === modelId
+  );
 
-  for (const file of installTargets) {
-    await modelStore.installModel({
-      remoteId: modelId,
-      destination: `${installBaseDirectory}/${sanitizePathSegment(modelId)}/${sanitizePathSegment(file.name)}`,
-      overwrite: false,
-      verifyIntegrity: true,
-      registerInstalled: true,
-    });
+  if (!remoteModel) {
+    throw new Error(`Remote model '${modelId}' could not be found in the current catalog results.`);
   }
+
+  const installTargets =
+    files.length > 0
+      ? files
+      : [
+          {
+            name: remoteModel.model.artifact.name,
+            id: `${remoteModel.model.id}::artifact`,
+          } as ModelDownloadFileViewModel,
+        ];
+
+  const modelForInstallation = createInstallationModel(remoteModel.model, installTargets);
+
+  await modelStore.installModel({
+    model: modelForInstallation,
+    provider: remoteModel.provider,
+    destination: `${installBaseDirectory}/${sanitizePathSegment(remoteModel.remoteId ?? remoteModel.model.id)}`,
+    overwrite: false,
+    verifyIntegrity: true,
+    registerInstalled: true,
+  });
+}
+
+function createInstallationModel(
+  model: IModel,
+  files: ReadonlyArray<ModelDownloadFileViewModel>
+): IModel {
+  const selectedLocations = new Set(files.map((file) => file.name));
+  const selectedArtifacts = [model.artifact, ...model.additionalArtifacts].filter((artifact) =>
+    selectedLocations.has(artifact.name)
+  );
+  const [primaryArtifact, ...additionalArtifacts] = selectedArtifacts;
+
+  if (!primaryArtifact) {
+    throw new Error(`No downloadable files were selected for '${model.id}'.`);
+  }
+
+  const cloned = Model.from(model);
+
+  return new Model({
+    id: cloned.id,
+    name: cloned.name,
+    version: cloned.version,
+    variant: cloned.variant,
+    publisher: cloned.publisher,
+    kind: cloned.kind,
+    isRunnable: cloned.isRunnable,
+    status: cloned.status,
+    source: cloned.source,
+    artifact: new ModelArtifact({
+      name: primaryArtifact.name,
+      accessMethod: primaryArtifact.accessMethod,
+      location: primaryArtifact.location,
+      format: primaryArtifact.format,
+      sizeBytes: primaryArtifact.sizeBytes,
+      sha256: primaryArtifact.sha256,
+      contentType: primaryArtifact.contentType,
+    }),
+    additionalArtifacts: additionalArtifacts.map(
+      (artifact) =>
+        new ModelArtifact({
+          name: artifact.name,
+          accessMethod: artifact.accessMethod,
+          location: artifact.location,
+          format: artifact.format,
+          sizeBytes: artifact.sizeBytes,
+          sha256: artifact.sha256,
+          contentType: artifact.contentType,
+        })
+    ),
+    dependencies: cloned.dependencies,
+    precision: cloned.precision,
+    architectureFamily: cloned.architectureFamily,
+    architecture: cloned.architecture,
+    compatibility: cloned.compatibility,
+    requirements: cloned.requirements,
+    resourceProfile: cloned.resourceProfile,
+    description: cloned.description,
+    tags: cloned.tags,
+    license: cloned.license,
+    languageCodes: cloned.languageCodes,
+    requiresAuth: cloned.requiresAuth,
+  });
 }
 
 function sanitizePathSegment(value: string): string {
