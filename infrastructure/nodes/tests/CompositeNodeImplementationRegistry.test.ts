@@ -12,7 +12,7 @@ describe("CompositeNodeImplementationRegistry", () => {
 
     expect(composite.listImplementations().length).toBeGreaterThan(5);
     expect(
-      composite.findByNodeType("langchain.prompt-template", { providerId: "python" })
+      composite.findByNodeType("langchain.prompt_template", { providerId: "python" })
         ?.descriptor.providerId
     ).toBe("python");
   });
@@ -23,7 +23,7 @@ describe("CompositeNodeImplementationRegistry", () => {
       new LangChainNodeImplementationRegistry(),
     ]);
 
-    const resolved = composite.findByNodeType("langchain.simple-chain");
+    const resolved = composite.findByNodeType("langchain.llm_chat");
     expect(resolved?.descriptor.providerId).toBe("python");
   });
 });

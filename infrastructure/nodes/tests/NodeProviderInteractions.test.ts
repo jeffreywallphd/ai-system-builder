@@ -8,7 +8,7 @@ describe("Node provider interactions", () => {
     const langchain = new LangChainNodeImplementationRegistry();
     const python = new PythonNodeImplementationRegistry();
 
-    const type = "langchain.prompt-template";
+    const type = "langchain.prompt_template";
     const langchainImpl = langchain.findByNodeType(type);
     const pythonImpl = python.findByNodeType(type);
 
@@ -27,9 +27,9 @@ describe("Node provider interactions", () => {
     const langchain = new LangChainNodeImplementationRegistry();
     const python = new PythonNodeImplementationRegistry();
 
-    expect(langchain.findByNodeType("langchain.output-parser")?.descriptor.title).toContain("Output Parser");
-    expect(langchain.findByNodeType("langchain.context-merger")?.descriptor.title).toContain("Context Merger");
-    expect(python.findByNodeType("langchain.output-parser")?.descriptor.providerId).toBe("python");
-    expect(python.findByNodeType("langchain.context-merger")?.descriptor.providerId).toBe("python");
+    expect(langchain.findByNodeType("langchain.output_parser")?.descriptor.title).toContain("Format AI Output");
+    expect(langchain.findByNodeType("langchain.document_loader")?.descriptor.title).toContain("Load Document");
+    expect(python.findByNodeType("langchain.output_parser")?.descriptor.providerId).toBe("python");
+    expect(python.findByNodeType("langchain.document_loader")?.descriptor.providerId).toBe("python");
   });
 });
