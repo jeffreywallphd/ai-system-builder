@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import type { Connection, Edge } from "@xyflow/react";
+import { createReactFlowEdgeId } from "../reactflow/EdgeAdapter";
 import {
   createOptimisticEdgeFromConnection,
   syncInteractiveEdges,
@@ -15,7 +16,7 @@ describe("ui/components/workflow/reactflow/ReactFlowCanvas helpers", () => {
     };
 
     expect(createOptimisticEdgeFromConnection(connection)).toEqual({
-      id: "pending:source-node:output-port:target-node:input-port",
+      id: "edge:source-node:output-port:target-node:input-port",
       source: "source-node",
       sourceHandle: "output-port",
       target: "target-node",
@@ -24,6 +25,7 @@ describe("ui/components/workflow/reactflow/ReactFlowCanvas helpers", () => {
       animated: true,
       selectable: false,
       data: {
+        connectionId: undefined,
         state: "pending",
         isOptimistic: true,
       },
@@ -50,7 +52,12 @@ describe("ui/components/workflow/reactflow/ReactFlowCanvas helpers", () => {
     });
 
     const renderedEdge: Edge = {
-      id: "connection-1",
+      id: createReactFlowEdgeId({
+        sourceNodeId: "source-node",
+        sourcePortId: "output-port",
+        targetNodeId: "target-node",
+        targetPortId: "input-port",
+      }),
       source: "source-node",
       sourceHandle: "output-port",
       target: "target-node",
@@ -60,6 +67,7 @@ describe("ui/components/workflow/reactflow/ReactFlowCanvas helpers", () => {
       selectable: true,
       selected: true,
       data: {
+        connectionId: "connection-1",
         state: "active",
       },
     };

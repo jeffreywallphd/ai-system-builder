@@ -38,10 +38,14 @@ describe("ui/components/workflow unit coverage", () => {
   it("implements node and edge adapters for reactflow", () => {
     const nodeAdapter = readSource("ui/components/workflow/reactflow/NodeAdapter.ts");
     const edgeAdapter = readSource("ui/components/workflow/reactflow/EdgeAdapter.ts");
+    const nodeWrapper = readSource(
+      "ui/components/workflow/reactflow/ReactFlowNodeWrapper.tsx"
+    );
 
     expect(nodeAdapter).toContain("export class NodeAdapter");
     expect(nodeAdapter).toContain('type: "aiLoomNode"');
     expect(edgeAdapter).toContain("export class EdgeAdapter");
     expect(edgeAdapter).toContain('type: "smoothstep"');
+    expect(nodeWrapper).toContain("node.size?.width ?? 360");
   });
 });
