@@ -5,7 +5,7 @@ import type { IFileStorage } from "../../../application/ports/interfaces/IFileSt
 import { HuggingFaceModelDownloader } from "../HuggingFaceModelDownloader";
 
 class InMemoryFileStorage implements IFileStorage {
-  public lastWrite?: { path: string; size: number; overwrite?: boolean; createDirectories?: boolean };
+  public writes: Array<{ path: string; size: number; overwrite?: boolean; createDirectories?: boolean }> = [];
 
   public async exists(): Promise<boolean> { return false; }
   public async stat() { return { path: "", kind: "missing" as const }; }
@@ -13,7 +13,7 @@ class InMemoryFileStorage implements IFileStorage {
   public async readText() { throw new Error("not needed"); }
   public async write(request: { path: string; content: Uint8Array | string; createDirectories?: boolean; overwrite?: boolean; }): Promise<void> {
     const size = typeof request.content === "string" ? request.content.length : request.content.byteLength;
-    this.lastWrite = { path: request.path, size, overwrite: request.overwrite, createDirectories: request.createDirectories };
+    this.writes.push({ path: request.path, size, overwrite: request.overwrite, createDirectories: request.createDirectories });
   }
   public async delete(): Promise<void> {}
   public async createDirectory(): Promise<void> {}
@@ -62,9 +62,9 @@ describe("HuggingFaceModelDownloader", () => {
     const result = await handle.waitForCompletion();
 
     expect(result.status).toBe("completed");
-    expect(fileStorage.lastWrite?.path).toBe("/tmp/models/model.safetensors");
-    expect(fileStorage.lastWrite?.size).toBe(3);
-    expect(fileStorage.lastWrite?.overwrite).toBeTrue();
-    expect(fileStorage.lastWrite?.createDirectories).toBeTrue();
+    expect(fileStorage.writes[0]?.path).toBe("/tmp/models/model.safetensors");
+    expect(fileStorage.writes[0]?.size).toBe(3);
+    expect(fileStorage.writes[0]?.overwrite).toBeTrue();
+    expect(fileStorage.writes[0]?.createDirectories).toBeTrue();
   });
 });

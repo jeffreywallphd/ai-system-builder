@@ -8,6 +8,7 @@ export interface ModelDownloadFileViewModel {
   readonly id: string;
   readonly name: string;
   readonly format: string;
+  readonly extension: string;
   readonly sizeBytes?: number;
   readonly sizeLabel?: string;
   readonly isPrimary: boolean;
@@ -53,6 +54,20 @@ export interface ModelDetailViewModel extends ModelResponse {
   readonly statusLabel: string;
   readonly sizeLabel?: string;
   readonly availableLabel: string;
+}
+
+function extractExtension(fileName: string, format: string): string {
+  const normalizedName = fileName.trim();
+  const extension = normalizedName.includes(".")
+    ? normalizedName.slice(normalizedName.lastIndexOf(".") + 1).trim()
+    : "";
+
+  if (extension) {
+    return extension.toLowerCase();
+  }
+
+  const normalizedFormat = format.trim().toLowerCase();
+  return normalizedFormat && normalizedFormat !== "unknown" ? normalizedFormat : "other";
 }
 
 export class ModelPresenter {
@@ -130,7 +145,6 @@ export class ModelPresenter {
     });
   }
 
-
   private buildDownloadFiles(model: IModel): ReadonlyArray<ModelDownloadFileViewModel> {
     const files = [model.artifact, ...model.additionalArtifacts];
 
@@ -140,6 +154,7 @@ export class ModelPresenter {
           id: `${model.id}::${index}::${artifact.name}`,
           name: artifact.name,
           format: artifact.format,
+          extension: extractExtension(artifact.name, artifact.format),
           sizeBytes: artifact.sizeBytes,
           sizeLabel: formatBytes(artifact.sizeBytes),
           isPrimary: index === 0,
@@ -263,8 +278,7 @@ export class ModelPresenter {
             parameterCount: model.resourceProfile.parameterCount,
             contextWindowTokens: model.resourceProfile.contextWindowTokens,
             maxOutputTokens: model.resourceProfile.maxOutputTokens,
-            estimatedMinMemoryBytes:
-              model.resourceProfile.estimatedMinMemoryBytes,
+            estimatedMinMemoryBytes: model.resourceProfile.estimatedMinMemoryBytes,
             estimatedRecommendedMemoryBytes:
               model.resourceProfile.estimatedRecommendedMemoryBytes,
             maxBatchSize: model.resourceProfile.maxBatchSize,
@@ -280,22 +294,13 @@ export class ModelPresenter {
       isSupportingAsset: model.isSupportingAsset(),
       satisfiesRequirements: model.satisfiesRequirements(),
       reference: model.toReferenceString(),
-      downloadFiles: this.buildDownloadFiles(model),
     });
   }
 
   private buildSubtitle(model: IModel): string | undefined {
-    const parts: string[] = [];
-
-    if (model.publisher?.trim()) {
-      parts.push(model.publisher.trim());
-    }
-    if (model.architectureFamily?.trim()) {
-      parts.push(model.architectureFamily.trim());
-    }
-    if (model.artifact.format?.trim()) {
-      parts.push(model.artifact.format.toUpperCase());
-    }
+    const parts = [model.publisher, model.source.repository].filter(
+      (value): value is string => !!value?.trim()
+    );
 
     return parts.length > 0 ? parts.join(" • ") : undefined;
   }

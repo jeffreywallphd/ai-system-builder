@@ -40,4 +40,42 @@ describe("HuggingFaceApiClient", () => {
       globalThis.fetch = previousFetch;
     }
   });
+
+  it("lists repository files with sizes and download urls", async () => {
+    const fetchMock = mock(async () => {
+      return new Response(
+        JSON.stringify({
+          id: "org/model",
+          sha: "rev-123",
+          siblings: [
+            { rfilename: "weights/model.safetensors", lfs: { size: 12, sha256: "abc" } },
+            { rfilename: "preview.PNG", size: 4 },
+          ],
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    });
+
+    const previousFetch = globalThis.fetch;
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    try {
+      const client = new HuggingFaceApiClient({ baseUrl: "https://huggingface.co" });
+      const files = await client.listModelFiles({ modelId: "org/model" });
+
+      expect(files).toHaveLength(2);
+      expect(files[0]).toEqual({
+        path: "weights/model.safetensors",
+        sizeBytes: 12,
+        sha256: "abc",
+        downloadUrl: "https://huggingface.co/org/model/resolve/rev-123/weights/model.safetensors",
+      });
+      expect(files[1]?.downloadUrl).toContain("preview.PNG");
+    } finally {
+      globalThis.fetch = previousFetch;
+    }
+  });
 });

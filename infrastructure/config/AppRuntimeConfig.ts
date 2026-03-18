@@ -54,7 +54,7 @@ export class AppRuntimeConfig {
       AppRuntimeConfig.readEnvVariable("VITE_DEV_SYNC_TOKEN") || "ai-loom-dev-sync";
     const modelInstallDirectory =
       AppRuntimeConfig.readEnvVariable("VITE_MODEL_INSTALL_DIRECTORY") ||
-      "dev/model-files";
+      "dev/models";
 
     return new AppRuntimeConfig({
       workflowRepositoryMode: "memory",

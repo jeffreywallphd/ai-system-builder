@@ -59,6 +59,12 @@ export interface IModelInstallProgress {
   readonly message?: string;
 }
 
+export interface IInstalledArtifactResult {
+  readonly name: string;
+  readonly sourceLocation?: string;
+  readonly installedLocation: string;
+}
+
 export interface IModelInstallResult {
   readonly model: IModel;
   readonly destination: string;
@@ -68,6 +74,11 @@ export interface IModelInstallResult {
    * Optional resolved installed artifact location/path.
    */
   readonly installedLocation?: string;
+
+  /**
+   * Optional resolved installed artifact locations when multiple files were downloaded.
+   */
+  readonly installedArtifacts?: ReadonlyArray<IInstalledArtifactResult>;
 
   /**
    * Optional failure/cancellation reason.
