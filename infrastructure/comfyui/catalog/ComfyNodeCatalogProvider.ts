@@ -506,6 +506,22 @@ export class ComfyNodeCatalogProvider implements INodeCatalogProvider {
       const defaultValue = toPropertyDefault(inputSpec);
       const options = toPropertyOptions(inputSpec);
 
+      const minimum = getNumericConfig(inputSpec, "min");
+      const maximum = getNumericConfig(inputSpec, "max");
+      const defaultNumber = typeof defaultValue === "number" ? defaultValue : undefined;
+      const range =
+        (propertyType === "integer" || propertyType === "number") &&
+        minimum !== undefined &&
+        maximum !== undefined &&
+        defaultNumber !== undefined
+          ? Object.freeze({
+              min: minimum,
+              max: maximum,
+              defaultValue: defaultNumber,
+              step: propertyType === "integer" ? 1 : undefined,
+            })
+          : undefined;
+
       result.push(
         new NodeProperty({
           id: inputName,
@@ -520,8 +536,9 @@ export class ComfyNodeCatalogProvider implements INodeCatalogProvider {
           order: order++,
           constraints: Object.freeze({
             required: !isOptional,
-            min: getNumericConfig(inputSpec, "min"),
-            max: getNumericConfig(inputSpec, "max"),
+            min: minimum,
+            max: maximum,
+            range,
             minLength: getNumericConfig(inputSpec, "min_length"),
             maxLength: getNumericConfig(inputSpec, "max_length"),
           }),

@@ -73,6 +73,32 @@ describe("NodeProperty*", () => {
     expect(high.validate().isValid).toBe(false);
   });
 
+  it("stores normalized range metadata and clamps numeric values", () => {
+    const property = new NodeProperty({
+      id: "temperature",
+      name: "Temperature",
+      type: "slider",
+      value: 4,
+      constraints: {
+        range: {
+          min: 0,
+          max: 2,
+          step: 0.1,
+          defaultValue: 0.7,
+        },
+      },
+    });
+
+    const updated = property.withValue(-2);
+
+    expect(property.value).toBe(2);
+    expect(property.defaultValue).toBe(0.7);
+    expect(property.constraints?.min).toBe(0);
+    expect(property.constraints?.max).toBe(2);
+    expect(property.constraints?.range?.clamp).toBeTrue();
+    expect(updated.value).toBe(0);
+  });
+
   it("evaluates emptiness for null/string/array/object", () => {
     expect(new NodeProperty({ id: "a", name: "A", type: "text", value: null }).isEmpty()).toBe(true);
     expect(new NodeProperty({ id: "b", name: "B", type: "text", value: "   " }).isEmpty()).toBe(true);
@@ -120,5 +146,4 @@ describe("NodeProperty*", () => {
     expect(property.projection?.label).toBe("Prompt Label");
     expect(property.withValue("y").projection?.exposeInTool).toBeTrue();
   });
-
 });
