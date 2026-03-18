@@ -18,6 +18,7 @@ const fallbackWorkflowState: IWorkflowStoreState = Object.freeze({
   isExecuting: false,
   lastExecutionEvent: undefined,
   nodeExecutionOutputs: Object.freeze({}),
+  outputAssets: Object.freeze([]),
   error: undefined,
 });
 
