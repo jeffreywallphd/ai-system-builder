@@ -30,15 +30,31 @@ describe("ui composition interactions", () => {
     expect(nodeTypeIds).toContain("langchain.context-merger");
   });
 
-  it("seeds sample workflows into the default in-memory repository", async () => {
+  it("seeds sample workflows with implemented nodes into the default in-memory repository", async () => {
     const dependencies = createUiDependencies({
       config: AppRuntimeConfig.forDevelopment(),
     });
 
     const workflows = await dependencies.workflowService.listWorkflows();
-    const workflowIds = workflows.map((workflow) => workflow.id);
+    const imageWorkflow = workflows.find((workflow) => workflow.id === "sample-image-pipeline");
+    const textWorkflow = workflows.find((workflow) => workflow.id === "sample-text-analysis");
 
-    expect(workflowIds).toContain("sample-image-pipeline");
-    expect(workflowIds).toContain("sample-text-analysis");
+    expect(imageWorkflow).toBeDefined();
+    expect(textWorkflow).toBeDefined();
+
+    expect(imageWorkflow?.nodes.map((node) => node.definition.id)).toEqual([
+      "langchain.prompt-template",
+      "langchain.context-merger",
+      "langchain.simple-chain",
+      "langchain.output-parser",
+    ]);
+    expect(imageWorkflow?.connections).toHaveLength(4);
+
+    expect(textWorkflow?.nodes.map((node) => node.definition.id)).toEqual([
+      "shared.document-uploader",
+      "langchain.document-to-chunks",
+      "shared.chunk-displayer",
+    ]);
+    expect(textWorkflow?.connections).toHaveLength(2);
   });
 });
