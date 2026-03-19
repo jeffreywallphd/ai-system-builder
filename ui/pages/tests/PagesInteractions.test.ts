@@ -7,6 +7,7 @@ describe("ui/pages interactions", () => {
     const workflows = readSource("ui/pages/WorkflowsPage.tsx");
     const models = readSource("ui/pages/ModelsPage.tsx");
     const settings = readSource("ui/pages/SettingsPage.tsx");
+    const context = readSource("ui/pages/ContextPage.tsx");
     const mcp = readSource("ui/pages/McpPage.tsx");
     const notFound = readSource("ui/pages/NotFoundPage.tsx");
 
@@ -16,6 +17,8 @@ describe("ui/pages interactions", () => {
     expect(workflows).toContain("WorkflowBrowser");
     expect(workflows).toContain("workflowStore.refreshWorkflows");
     expect(models).toContain("to={ROUTE_PATHS.settings}");
+    expect(context).toContain("ContextPackageBrowser");
+    expect(context).toContain("contextStore.search");
     expect(settings).toContain("Auto-save is enabled");
     expect(mcp).toContain("McpServerBrowser");
     expect(mcp).toContain("mcpStore.addConfiguredServer");

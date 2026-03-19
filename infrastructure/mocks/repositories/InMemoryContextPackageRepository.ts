@@ -37,8 +37,6 @@ function matchesCriteria(
       contextPackage.description,
       contextPackage.version,
       ...contextPackage.tags,
-      ...contextPackage.fragments.map((fragment) => fragment.title),
-      ...contextPackage.fragments.map((fragment) => fragment.content),
     ]
       .filter(Boolean)
       .map((value) => normalize(String(value)));

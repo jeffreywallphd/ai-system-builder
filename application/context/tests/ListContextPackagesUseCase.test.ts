@@ -37,7 +37,8 @@ describe("ListContextPackagesUseCase", () => {
       new ContextPackage({
         id: "retrieval-pack",
         name: "Retrieval Notes",
-        fragments: [{ id: "chunk", kind: "retrieved-context", content: "Vector store notes", order: 0 }],
+        description: "Vector store notes",
+        fragments: [{ id: "chunk", kind: "retrieved-context", content: "Chunk", order: 0 }],
       }),
       new ContextPackage({
         id: "memory-pack",

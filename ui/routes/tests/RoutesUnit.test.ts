@@ -11,6 +11,7 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain('key: "workflow-editor"');
     expect(source).toContain('key: "settings"');
     expect(source).toContain('key: "mcp"');
+    expect(source).toContain('key: "context"');
   });
 
   it("provides navigation helper and protected route behavior", () => {
@@ -33,5 +34,6 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain('path: "/index.html"');
     expect(source).toContain("path: ROUTE_PATHS.settings");
     expect(source).toContain("path: ROUTE_PATHS.mcp");
+    expect(source).toContain("path: ROUTE_PATHS.context");
   });
 });

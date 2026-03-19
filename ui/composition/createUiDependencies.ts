@@ -62,7 +62,13 @@ import { ConnectMcpServerUseCase } from "../../application/mcp/ConnectMcpServerU
 import { DisconnectMcpServerUseCase } from "../../application/mcp/DisconnectMcpServerUseCase";
 import { ReconnectMcpServerUseCase } from "../../application/mcp/ReconnectMcpServerUseCase";
 import { WorkflowContextService } from "../../application/context/WorkflowContextService";
-import { InMemoryContextPackageRepository } from "../../infrastructure/mocks/repositories/InMemoryContextPackageRepository";
+import { CreateContextPackageUseCase } from "../../application/context/CreateContextPackageUseCase";
+import { UpdateContextPackageUseCase } from "../../application/context/UpdateContextPackageUseCase";
+import { DeleteContextPackageUseCase } from "../../application/context/DeleteContextPackageUseCase";
+import { ListContextPackagesUseCase } from "../../application/context/ListContextPackagesUseCase";
+import { LoadContextPackageUseCase } from "../../application/context/LoadContextPackageUseCase";
+import { SearchContextPackagesUseCase } from "../../application/context/SearchContextPackagesUseCase";
+import { LocalStorageContextPackageRepository } from "../../infrastructure/browser/context/LocalStorageContextPackageRepository";
 
 import { WorkflowProjectionService } from "../../application/projection/WorkflowProjectionService";
 import { WorkflowToolProjectionService } from "../../application/projection/WorkflowToolProjectionService";
@@ -74,6 +80,8 @@ import { InvokeToolCapabilityUseCase } from "../../application/tools/InvokeToolC
 import { SearchCapabilitiesUseCase } from "../../application/research/SearchCapabilitiesUseCase";
 import { ToolService } from "../services/ToolService";
 import { ToolStore } from "../state/ToolStore";
+import { ContextService } from "../services/ContextService";
+import { ContextStore } from "../state/ContextStore";
 import type { CreateUiDependenciesOptions, UiDependencies } from "./types";
 import { createSeedWorkflows } from "./seedWorkflows";
 import { CompositeToolCapabilityCatalog } from "../../infrastructure/tools/CompositeToolCapabilityCatalog";
@@ -98,7 +106,7 @@ export function createUiDependencies(
   const workflowRepository = createWorkflowRepository(config);
   const workflowExecutor = createWorkflowExecutor(config);
   const nodeCatalogProvider = createNodeCatalogProvider(config);
-  const contextPackageRepository = new InMemoryContextPackageRepository();
+  const contextPackageRepository = new LocalStorageContextPackageRepository();
   const workflowContextService = new WorkflowContextService(contextPackageRepository);
 
   const modelCompatibilityService = new ModelCompatibilityService();
@@ -270,6 +278,19 @@ export function createUiDependencies(
     mcpToolCallAuthoringService,
   });
   const mcpStore = new McpStore(mcpService);
+  const contextService = new ContextService({
+    createContextPackageUseCase: new CreateContextPackageUseCase({
+      contextPackageRepository,
+    }),
+    updateContextPackageUseCase: new UpdateContextPackageUseCase({
+      contextPackageRepository,
+    }),
+    deleteContextPackageUseCase: new DeleteContextPackageUseCase(contextPackageRepository),
+    listContextPackagesUseCase: new ListContextPackagesUseCase(contextPackageRepository),
+    loadContextPackageUseCase: new LoadContextPackageUseCase(contextPackageRepository),
+    searchContextPackagesUseCase: new SearchContextPackagesUseCase(contextPackageRepository),
+  });
+  const contextStore = new ContextStore(contextService);
 
   return Object.freeze({
     config,
@@ -284,6 +305,8 @@ export function createUiDependencies(
     toolStore: new ToolStore(toolService),
     mcpService,
     mcpStore,
+    contextService,
+    contextStore,
     workflowProjectionService,
     settingsStore,
   });
