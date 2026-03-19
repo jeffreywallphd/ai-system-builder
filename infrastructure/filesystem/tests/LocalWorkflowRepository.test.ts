@@ -34,4 +34,82 @@ describe("LocalWorkflowRepository", () => {
       await rm(root, { recursive: true, force: true });
     }
   });
+
+  it("persists workflow context package bindings with ordering and fragment filters", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "loom-workflows-"));
+    try {
+      const node = makeNode({ id: "n1" });
+      const wf = new Workflow({
+        id: "wf-context",
+        metadata: new WorkflowMetadata({
+          name: "WF Context",
+          contextConfiguration: {
+            packageReferences: [
+              {
+                packageId: "pkg-style",
+                alias: "Style guide",
+                includeFragmentIds: ["tone", "examples"],
+                excludeFragmentIds: ["legacy"],
+                isEnabled: true,
+              },
+              {
+                packageId: "pkg-faq",
+                alias: "FAQ",
+                isEnabled: false,
+              },
+            ],
+            selectedPackageIds: ["pkg-faq", "pkg-style"],
+            visibilityMode: "basic",
+            maxTokens: 500,
+            trimPartialFragments: false,
+          },
+        }),
+        nodes: [node],
+      });
+      const repo = new LocalWorkflowRepository({
+        fileStorage: new LocalFileStorage(),
+        rootDirectory: root,
+        nodeCatalogProvider: {
+          getAllDefinitions: async () => [node.definition],
+          searchDefinitions: async () => [node.definition],
+          getDefinitionById: async () => node.definition,
+          getDefinitionByType: async () => node.definition,
+          getCategories: async () => ["utility"],
+        },
+      });
+
+      await repo.save(wf);
+      const loaded = await repo.load("wf-context");
+
+      expect(loaded?.metadata.contextConfiguration).toEqual({
+        packageReferences: [
+          {
+            packageId: "pkg-style",
+            alias: "Style guide",
+            version: undefined,
+            includeFragmentIds: ["tone", "examples"],
+            excludeFragmentIds: ["legacy"],
+            isEnabled: true,
+          },
+          {
+            packageId: "pkg-faq",
+            alias: "FAQ",
+            version: undefined,
+            includeFragmentIds: undefined,
+            excludeFragmentIds: undefined,
+            isEnabled: false,
+          },
+        ],
+        selectedPackageIds: ["pkg-style"],
+        visibilityMode: "basic",
+        maxCharacters: undefined,
+        maxTokens: 500,
+        trimPartialFragments: false,
+        includeKinds: undefined,
+        excludeKinds: undefined,
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 });

@@ -276,6 +276,7 @@ export function createUiDependencies(
     workflowService,
     nodeService,
     mcpToolCallAuthoringService,
+    workflowProjectionService,
   });
   const mcpStore = new McpStore(mcpService);
   const contextService = new ContextService({

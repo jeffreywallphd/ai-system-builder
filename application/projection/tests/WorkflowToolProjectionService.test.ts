@@ -111,5 +111,25 @@ describe("WorkflowToolProjectionService", () => {
     expect(contextSection?.title).toBe("Knowledge & Context");
     expect(contextSection?.fields.map((field) => field.label)).toEqual(["Knowledge to use", "Context detail"]);
     expect(contextSection?.fields.some((field) => field.label === "Token budget")).toBeFalse();
+    expect(contextSection?.fields.some((field) => field.id === "workflow.context.packageReferences")).toBeFalse();
+  });
+
+  it("keeps tools bounded to safe context controls when only one package is attached", () => {
+    const workflow = makeWorkflow({ id: "wf-context" }).withMetadata(
+      new WorkflowMetadata({
+        name: "Workflow Name",
+        isPublishedAsTool: true,
+        contextConfiguration: {
+          packageReferences: [{ packageId: "pkg-style", alias: "Style guide" }],
+          selectedPackageIds: ["pkg-style"],
+          visibilityMode: "advanced",
+        },
+      })
+    );
+
+    const tool = new WorkflowToolProjectionService().projectToTool(workflow);
+    const contextSection = tool.sections.find((section) => section.id === "workflow-context");
+
+    expect(contextSection?.fields.map((field) => field.id)).toEqual(["workflow.context.visibilityMode"]);
   });
 });

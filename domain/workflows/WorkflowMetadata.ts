@@ -41,25 +41,28 @@ function freezeContextPackageReferences(
     return undefined;
   }
 
-  const normalized = references
-    .map((reference) => {
-      const packageId = reference.packageId.trim();
-      if (!packageId) {
-        return undefined;
-      }
+  const deduped = new Map<string, IWorkflowContextPackageReference>();
 
-      return Object.freeze({
+  for (const reference of references) {
+    const packageId = reference.packageId.trim();
+    if (!packageId || deduped.has(packageId)) {
+      continue;
+    }
+
+    deduped.set(
+      packageId,
+      Object.freeze({
         packageId,
         alias: normalizeOptional(reference.alias),
         version: normalizeOptional(reference.version),
         includeFragmentIds: normalizeOptionalArray(reference.includeFragmentIds),
         excludeFragmentIds: normalizeOptionalArray(reference.excludeFragmentIds),
         isEnabled: reference.isEnabled ?? true,
-      });
-    })
-    .filter((reference): reference is IWorkflowContextPackageReference => Boolean(reference));
+      })
+    );
+  }
 
-  return normalized.length > 0 ? Object.freeze(normalized) : undefined;
+  return deduped.size > 0 ? Object.freeze([...deduped.values()]) : undefined;
 }
 
 function freezeContextConfiguration(
@@ -87,9 +90,17 @@ function freezeContextConfiguration(
     throw new Error("WorkflowMetadata.contextConfiguration.selectedPackageIds must reference configured context packages.");
   }
 
+  const enabledSelectedPackageIds = selectedPackageIds && packageReferences
+    ? Object.freeze(
+        packageReferences
+          .filter((reference) => reference.isEnabled !== false && selectedPackageIds.includes(reference.packageId))
+          .map((reference) => reference.packageId)
+      )
+    : selectedPackageIds;
+
   const normalized: IWorkflowContextConfiguration = Object.freeze({
     packageReferences,
-    selectedPackageIds,
+    selectedPackageIds: enabledSelectedPackageIds,
     visibilityMode: visibilityMode as WorkflowContextVisibilityMode | undefined,
     maxCharacters: normalizeOptionalInteger(configuration.maxCharacters),
     maxTokens: normalizeOptionalInteger(configuration.maxTokens),

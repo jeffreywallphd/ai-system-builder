@@ -1,5 +1,9 @@
 import type { INodeProperty, PropertyVisibilityLevel } from "../../domain/nodes/interfaces/INodeProperty";
-import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
+import type {
+  IWorkflow,
+  IWorkflowContextConfiguration,
+  IWorkflowContextPackageReference,
+} from "../../domain/workflows/interfaces/IWorkflow";
 import type { ProjectedField } from "./models/ProjectedField";
 import type { ProjectedSection } from "./models/ProjectedSection";
 
@@ -55,16 +59,111 @@ function toProjectedField(
   });
 }
 
-function normalizeSelectedPackageIds(
-  values: unknown,
-  fallback: ReadonlyArray<string>
-): ReadonlyArray<string> {
-  if (!Array.isArray(values)) {
-    return fallback;
+function normalizeContextPackageReferences(
+  references: unknown
+): ReadonlyArray<IWorkflowContextPackageReference> {
+  if (!Array.isArray(references)) {
+    return Object.freeze([]);
   }
 
-  const normalized = [...new Set(values.map((value) => (typeof value === "string" ? value.trim() : "")).filter(Boolean))];
-  return Object.freeze(normalized);
+  const deduped = new Map<string, IWorkflowContextPackageReference>();
+
+  for (const entry of references) {
+    if (!entry || typeof entry !== "object") {
+      continue;
+    }
+
+    const record = entry as Record<string, unknown>;
+    const packageId = typeof record.packageId === "string" ? record.packageId.trim() : "";
+    if (!packageId || deduped.has(packageId)) {
+      continue;
+    }
+
+    const normalizeArray = (candidate: unknown): ReadonlyArray<string> | undefined => {
+      if (!Array.isArray(candidate)) {
+        return undefined;
+      }
+
+      const values = [
+        ...new Set(candidate.map((item) => (typeof item === "string" ? item.trim() : "")).filter(Boolean)),
+      ];
+      return values.length > 0 ? Object.freeze(values) : undefined;
+    };
+
+    deduped.set(
+      packageId,
+      Object.freeze({
+        packageId,
+        alias: typeof record.alias === "string" && record.alias.trim() ? record.alias.trim() : undefined,
+        version: typeof record.version === "string" && record.version.trim() ? record.version.trim() : undefined,
+        includeFragmentIds: normalizeArray(record.includeFragmentIds),
+        excludeFragmentIds: normalizeArray(record.excludeFragmentIds),
+        isEnabled: typeof record.isEnabled === "boolean" ? record.isEnabled : true,
+      })
+    );
+  }
+
+  return Object.freeze([...deduped.values()]);
+}
+
+function normalizeSelectedPackageIds(
+  values: unknown,
+  packageReferences: ReadonlyArray<IWorkflowContextPackageReference>
+): ReadonlyArray<string> {
+  const requestedIds = Array.isArray(values)
+    ? [...new Set(values.map((value) => (typeof value === "string" ? value.trim() : "")).filter(Boolean))]
+    : packageReferences
+        .filter((reference) => reference.isEnabled !== false)
+        .map((reference) => reference.packageId);
+
+  const enabledReferences = packageReferences.filter((reference) => reference.isEnabled !== false);
+  return Object.freeze(
+    enabledReferences
+      .filter((reference) => requestedIds.includes(reference.packageId))
+      .map((reference) => reference.packageId)
+  );
+}
+
+function parseStringArray(value: unknown): ReadonlyArray<string> | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const normalized = [...new Set(value.map((item) => (typeof item === "string" ? item.trim() : "")).filter(Boolean))];
+  return normalized.length > 0 ? Object.freeze(normalized) : undefined;
+}
+
+function parseInteger(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.max(0, Math.trunc(value));
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? Math.max(0, Math.trunc(parsed)) : undefined;
+  }
+
+  return undefined;
+}
+
+function createNextContextConfiguration(
+  existing: IWorkflowContextConfiguration | undefined,
+  patch: Partial<IWorkflowContextConfiguration>
+): IWorkflowContextConfiguration {
+  const nextPackageReferences = patch.packageReferences
+    ? normalizeContextPackageReferences(patch.packageReferences)
+    : existing?.packageReferences ?? Object.freeze([]);
+  const selectedPackageIds = normalizeSelectedPackageIds(
+    patch.selectedPackageIds ?? existing?.selectedPackageIds,
+    nextPackageReferences
+  );
+
+  return {
+    ...existing,
+    ...patch,
+    packageReferences: nextPackageReferences,
+    selectedPackageIds,
+  };
 }
 
 function appendContextSection(
@@ -73,20 +172,20 @@ function appendContextSection(
   surface: WorkflowProjectionSurface
 ): void {
   const contextConfiguration = workflow.metadata.contextConfiguration;
-  const packageReferences = contextConfiguration?.packageReferences ?? [];
+  const packageReferences = normalizeContextPackageReferences(contextConfiguration?.packageReferences);
 
   if (!contextConfiguration && packageReferences.length === 0) {
     return;
   }
 
-  const packageOptions = packageReferences.map((reference) => ({
+  const enabledPackageReferences = packageReferences.filter((reference) => reference.isEnabled !== false);
+  const packageOptions = enabledPackageReferences.map((reference) => ({
     label: reference.alias ?? reference.packageId,
     value: reference.packageId,
   }));
-  const availablePackageIds = packageReferences.map((reference) => reference.packageId);
   const selectedPackageIds = normalizeSelectedPackageIds(
     contextConfiguration?.selectedPackageIds,
-    availablePackageIds
+    packageReferences
   );
   const contextFields: ProjectedField[] = [];
 
@@ -97,7 +196,7 @@ function appendContextSection(
         nodeId: "workflow",
         propertyId: "context.packageReferences",
         label: "Context packages",
-        description: "Reusable context packages available to this workflow, including aliases and fragment filters.",
+        description: "Attach reusable context packages in the exact order they should be assembled, with aliases and fragment filters.",
         type: "generic",
         required: false,
         isEditable: true,
@@ -113,7 +212,7 @@ function appendContextSection(
         nodeId: "workflow",
         propertyId: "context.selectedPackageIds",
         label: "Default package selection",
-        description: "Choose which configured packages are enabled by default during execution.",
+        description: "Choose which enabled packages are selected by default when authors or tools run this workflow.",
         type: "multi-select",
         required: false,
         isEditable: true,
@@ -198,46 +297,53 @@ function appendContextSection(
         presentation: "default",
       })
     );
-  } else if (packageOptions.length > 0) {
-    contextFields.push(
-      Object.freeze({
-        id: "workflow.context.selectedPackageIds",
-        nodeId: "workflow",
-        propertyId: "context.selectedPackageIds",
-        label: "Knowledge to use",
-        description: "Pick which saved knowledge packs should guide this run.",
-        type: "multi-select",
-        required: false,
-        isEditable: true,
-        order: 0,
-        sectionId: "workflow-context",
-        value: selectedPackageIds,
-        options: packageOptions,
-        visibility: "basic",
-        shouldClampToRange: false,
-        presentation: "context-package-selection",
-      }),
-      Object.freeze({
-        id: "workflow.context.visibilityMode",
-        nodeId: "workflow",
-        propertyId: "context.visibilityMode",
-        label: "Context detail",
-        description: "Choose whether the run uses only reader-safe context or the fuller authoring set.",
-        type: "select",
-        required: false,
-        isEditable: true,
-        order: 1,
-        sectionId: "workflow-context",
-        value: contextConfiguration?.visibilityMode ?? "advanced",
-        options: Object.freeze([
-          { label: "Reader-safe", value: "basic" },
-          { label: "Full detail", value: "advanced" },
-        ]),
-        visibility: "basic",
-        shouldClampToRange: false,
-        presentation: "context-visibility",
-      })
-    );
+  } else {
+    if (packageOptions.length > 1) {
+      contextFields.push(
+        Object.freeze({
+          id: "workflow.context.selectedPackageIds",
+          nodeId: "workflow",
+          propertyId: "context.selectedPackageIds",
+          label: "Knowledge to use",
+          description: "Pick which saved knowledge packs should guide this run.",
+          type: "multi-select",
+          required: false,
+          isEditable: true,
+          order: 0,
+          sectionId: "workflow-context",
+          value: selectedPackageIds,
+          options: packageOptions,
+          visibility: "basic",
+          shouldClampToRange: false,
+          presentation: "context-package-selection",
+        })
+      );
+    }
+
+    if (packageOptions.length > 0) {
+      contextFields.push(
+        Object.freeze({
+          id: "workflow.context.visibilityMode",
+          nodeId: "workflow",
+          propertyId: "context.visibilityMode",
+          label: "Context detail",
+          description: "Choose whether the run uses only reader-safe context or the fuller authoring set.",
+          type: "select",
+          required: false,
+          isEditable: true,
+          order: packageOptions.length > 1 ? 1 : 0,
+          sectionId: "workflow-context",
+          value: contextConfiguration?.visibilityMode ?? "advanced",
+          options: Object.freeze([
+            { label: "Reader-safe", value: "basic" },
+            { label: "Full detail", value: "advanced" },
+          ]),
+          visibility: "basic",
+          shouldClampToRange: false,
+          presentation: "context-visibility",
+        })
+      );
+    }
   }
 
   if (contextFields.length === 0) {
@@ -249,80 +355,11 @@ function appendContextSection(
     title: surface === "author" ? "Workflow Context" : "Knowledge & Context",
     description:
       surface === "author"
-        ? "Authoring controls for reusable context packages, assembly defaults, and budgeting."
+        ? "Authoring controls for reusable context packages, package ordering, default selection, and budgeting."
         : "Simple controls for choosing which saved knowledge guides this tool run.",
     order: Number.MAX_SAFE_INTEGER - 100,
     fields: contextFields,
   });
-}
-
-function parseContextPackageReferences(value: unknown): ReadonlyArray<{
-  readonly packageId: string;
-  readonly alias?: string;
-  readonly version?: string;
-  readonly includeFragmentIds?: ReadonlyArray<string>;
-  readonly excludeFragmentIds?: ReadonlyArray<string>;
-  readonly isEnabled?: boolean;
-}> {
-  if (!Array.isArray(value)) {
-    return Object.freeze([]);
-  }
-
-  return Object.freeze(
-    value.flatMap((entry) => {
-      if (!entry || typeof entry !== "object") {
-        return [];
-      }
-
-      const record = entry as Record<string, unknown>;
-      const packageId = typeof record.packageId === "string" ? record.packageId.trim() : "";
-      if (!packageId) {
-        return [];
-      }
-
-      const normalizeArray = (candidate: unknown): ReadonlyArray<string> | undefined => {
-        if (!Array.isArray(candidate)) {
-          return undefined;
-        }
-
-        const values = [...new Set(candidate.map((item) => (typeof item === "string" ? item.trim() : "")).filter(Boolean))];
-        return values.length > 0 ? Object.freeze(values) : undefined;
-      };
-
-      return [
-        Object.freeze({
-          packageId,
-          alias: typeof record.alias === "string" && record.alias.trim() ? record.alias.trim() : undefined,
-          version: typeof record.version === "string" && record.version.trim() ? record.version.trim() : undefined,
-          includeFragmentIds: normalizeArray(record.includeFragmentIds),
-          excludeFragmentIds: normalizeArray(record.excludeFragmentIds),
-          isEnabled: typeof record.isEnabled === "boolean" ? record.isEnabled : true,
-        }),
-      ];
-    })
-  );
-}
-
-function parseStringArray(value: unknown): ReadonlyArray<string> | undefined {
-  if (!Array.isArray(value)) {
-    return undefined;
-  }
-
-  const normalized = [...new Set(value.map((item) => (typeof item === "string" ? item.trim() : "")).filter(Boolean))];
-  return normalized.length > 0 ? Object.freeze(normalized) : undefined;
-}
-
-function parseInteger(value: unknown): number | undefined {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return Math.max(0, Math.trunc(value));
-  }
-
-  if (typeof value === "string" && value.trim()) {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? Math.max(0, Math.trunc(parsed)) : undefined;
-  }
-
-  return undefined;
 }
 
 export class WorkflowApplicationProjectionService {
@@ -371,44 +408,37 @@ export class WorkflowApplicationProjectionService {
     for (const [key, value] of Object.entries(values)) {
       if (key.startsWith("workflow.context.")) {
         const field = key.slice("workflow.context.".length);
-        const existing = nextContextConfiguration ?? {};
 
         switch (field) {
           case "packageReferences":
-            nextContextConfiguration = {
-              ...existing,
-              packageReferences: parseContextPackageReferences(value),
-            };
+            nextContextConfiguration = createNextContextConfiguration(nextContextConfiguration, {
+              packageReferences: value as ReadonlyArray<IWorkflowContextPackageReference>,
+            });
             break;
           case "selectedPackageIds":
-            nextContextConfiguration = {
-              ...existing,
+            nextContextConfiguration = createNextContextConfiguration(nextContextConfiguration, {
               selectedPackageIds: parseStringArray(value),
-            };
+            });
             break;
           case "visibilityMode":
-            nextContextConfiguration = {
-              ...existing,
+            nextContextConfiguration = createNextContextConfiguration(nextContextConfiguration, {
               visibilityMode: value === "basic" ? "basic" : value === "advanced" ? "advanced" : undefined,
-            };
+            });
             break;
           case "maxCharacters":
-            nextContextConfiguration = {
-              ...existing,
+            nextContextConfiguration = createNextContextConfiguration(nextContextConfiguration, {
               maxCharacters: parseInteger(value),
-            };
+            });
             break;
           case "maxTokens":
-            nextContextConfiguration = {
-              ...existing,
+            nextContextConfiguration = createNextContextConfiguration(nextContextConfiguration, {
               maxTokens: parseInteger(value),
-            };
+            });
             break;
           case "trimPartialFragments":
-            nextContextConfiguration = {
-              ...existing,
+            nextContextConfiguration = createNextContextConfiguration(nextContextConfiguration, {
               trimPartialFragments: value !== false,
-            };
+            });
             break;
           default:
             break;
