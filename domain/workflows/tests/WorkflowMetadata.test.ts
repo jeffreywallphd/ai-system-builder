@@ -39,7 +39,14 @@ describe("Workflow metadata primitives", () => {
     expect(metadata.toolCategory).toBe("cat");
     expect(metadata.toolSlug).toBe("tool-slug");
     expect(metadata.contextConfiguration?.packageReferences).toEqual([
-      { packageId: "pkg-1", alias: "Style Guide", isEnabled: true },
+      {
+        packageId: "pkg-1",
+        alias: "Style Guide",
+        version: undefined,
+        includeFragmentIds: undefined,
+        excludeFragmentIds: undefined,
+        isEnabled: true,
+      },
     ]);
     expect(metadata.contextConfiguration?.selectedPackageIds).toEqual(["pkg-1"]);
     expect(metadata.contextConfiguration?.maxCharacters).toBe(1200);
@@ -63,6 +70,30 @@ describe("Workflow metadata primitives", () => {
         })
     ).toThrow("selectedPackageIds");
   });
+
+
+  it("deduplicates package references and aligns selected packages to enabled reference order", () => {
+    const metadata = new WorkflowMetadata({
+      name: "Context Workflow",
+      contextConfiguration: {
+        packageReferences: [
+          { packageId: "pkg-b", alias: "B" },
+          { packageId: "pkg-a", alias: "A", isEnabled: false },
+          { packageId: "pkg-b", alias: "duplicate" },
+          { packageId: "pkg-c", alias: "C" },
+        ],
+        selectedPackageIds: ["pkg-c", "pkg-a", "pkg-b"],
+      },
+    });
+
+    expect(metadata.contextConfiguration?.packageReferences?.map((reference) => reference.packageId)).toEqual([
+      "pkg-b",
+      "pkg-a",
+      "pkg-c",
+    ]);
+    expect(metadata.contextConfiguration?.selectedPackageIds).toEqual(["pkg-b", "pkg-c"]);
+  });
+
 
   it("clones metadata via from", () => {
     const original = new WorkflowMetadata({ name: "A", tags: ["x"] });

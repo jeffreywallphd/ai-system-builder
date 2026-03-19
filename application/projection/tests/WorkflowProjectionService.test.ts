@@ -102,4 +102,36 @@ describe("WorkflowProjectionService", () => {
     ]);
   });
 
+  it("keeps context package ordering deterministic for author forms and default selection", () => {
+    const workflow = makeWorkflow({ id: "wf-context" }).withMetadata(
+      new WorkflowMetadata({
+        name: "WF",
+        contextConfiguration: {
+          packageReferences: [
+            { packageId: "pkg-zeta", alias: "Zeta" },
+            { packageId: "pkg-alpha", alias: "Alpha", isEnabled: false },
+            { packageId: "pkg-beta", alias: "Beta" },
+          ],
+          selectedPackageIds: ["pkg-beta", "pkg-alpha", "pkg-zeta"],
+          visibilityMode: "advanced",
+        },
+      })
+    );
+
+    const schema = new WorkflowProjectionService().projectToForm(workflow);
+    const contextSection = schema.sections.find((section) => section.id === "workflow-context");
+    const referenceField = contextSection?.fields.find((field) => field.id === "workflow.context.packageReferences");
+    const selectionField = contextSection?.fields.find((field) => field.id === "workflow.context.selectedPackageIds");
+
+    expect((referenceField?.value as Array<{ packageId: string }>).map((reference) => reference.packageId)).toEqual([
+      "pkg-zeta",
+      "pkg-alpha",
+      "pkg-beta",
+    ]);
+    expect(selectionField?.options).toEqual([
+      { label: "Zeta", value: "pkg-zeta" },
+      { label: "Beta", value: "pkg-beta" },
+    ]);
+    expect(selectionField?.value).toEqual(["pkg-zeta", "pkg-beta"]);
+  });
 });

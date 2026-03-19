@@ -11,6 +11,7 @@ import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
 import { NodeService } from "../services/NodeService";
 import { McpToolCallAuthoringService } from "../services/McpToolCallAuthoringService";
 import { WorkflowService } from "../services/WorkflowService";
+import { WorkflowProjectionService } from "../../application/projection/WorkflowProjectionService";
 import {
   WorkflowExecutionStore,
   type IWorkflowExecutionState,
@@ -38,6 +39,7 @@ export interface IWorkflowStoreOptions {
   readonly mcpToolCallAuthoringService?: McpToolCallAuthoringService;
   readonly initialState?: Partial<IWorkflowStoreState>;
   readonly executionStore?: WorkflowExecutionStore;
+  readonly workflowProjectionService?: WorkflowProjectionService;
 }
 
 const defaultEditorState: IWorkflowEditorState = Object.freeze({
@@ -57,6 +59,7 @@ export class WorkflowStore {
   private readonly nodeService: NodeService;
   private readonly mcpToolCallAuthoringService?: McpToolCallAuthoringService;
   private readonly executionStore: WorkflowExecutionStore;
+  private readonly workflowProjectionService: WorkflowProjectionService;
   private readonly listeners = new Set<WorkflowStoreListener>();
   private editorState: IWorkflowEditorState;
   private state: IWorkflowStoreState;
@@ -69,6 +72,8 @@ export class WorkflowStore {
     const initialState = options.initialState ?? {};
     this.executionStore =
       options.executionStore ?? new WorkflowExecutionStore({ initialState });
+    this.workflowProjectionService =
+      options.workflowProjectionService ?? new WorkflowProjectionService();
     this.editorState = freezeEditorState({
       ...defaultEditorState,
       ...toEditorState(initialState),
@@ -351,6 +356,18 @@ export class WorkflowStore {
       });
       throw error;
     }
+  }
+
+  public applyFormInput(values: Readonly<Record<string, unknown>>): void {
+    const workflow = this.requireCurrentWorkflow();
+    const updatedWorkflow = this.workflowProjectionService.applyFormInput(workflow, values);
+
+    this.setEditorState({
+      currentWorkflow: updatedWorkflow,
+      isDirty: true,
+      validation: undefined,
+      error: undefined,
+    });
   }
 
   public updateNodeProperty(

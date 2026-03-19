@@ -1,3 +1,4 @@
+import type { IContextPackageSummary } from "../../../application/ports/interfaces/IContextPackageRepository";
 import type { ProjectedField } from "../../../application/projection/models/ProjectedField";
 import NodePropertyField from "../nodes/NodePropertyField";
 import type { NodePropertyFieldViewModel } from "../../presenters/NodePresenter";
@@ -26,12 +27,20 @@ function toNodePropertyField(field: ProjectedField): NodePropertyFieldViewModel 
 export default function ProjectedFieldEditor({
   field,
   onChange,
+  availableContextPackages,
 }: {
   readonly field: ProjectedField;
   readonly onChange: (id: string, value: unknown) => void;
+  readonly availableContextPackages?: ReadonlyArray<IContextPackageSummary>;
 }): JSX.Element {
   if (field.presentation === "context-package-references") {
-    return <ContextPackageReferenceFieldEditor field={field} onChange={onChange} />;
+    return (
+      <ContextPackageReferenceFieldEditor
+        field={field}
+        onChange={onChange}
+        availableContextPackages={availableContextPackages}
+      />
+    );
   }
 
   return (
