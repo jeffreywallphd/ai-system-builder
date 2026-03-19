@@ -3,8 +3,11 @@ import { NodeProperty } from "../../../domain/nodes/NodeProperty";
 import type { INodeDefinition } from "../../../domain/nodes/interfaces/INodeDefinition";
 import type { NodePortValueType } from "../../../domain/nodes/interfaces/INodePort";
 import type { NodePropertyType, NodePropertyValue } from "../../../domain/nodes/interfaces/INodeProperty";
+import { CHAT_PROMPT_BUILDER_NODE_DEFINITION } from "./ChatPromptBuilderNodeDefinition";
 import { COMBINE_SUMMARIES_NODE_DEFINITION } from "./CombineSummariesNodeDefinition";
 import { CONTEXT_FORMATTER_NODE_DEFINITION } from "./ContextFormatterNodeDefinition";
+import { KNOWLEDGE_BASE_RETRIEVER_NODE_DEFINITION } from "./KnowledgeBaseRetrieverNodeDefinition";
+import { RETRIEVAL_QA_NODE_DEFINITION } from "./RetrievalQaNodeDefinition";
 import { SIMILARITY_SEARCH_NODE_DEFINITION } from "./SimilaritySearchNodeDefinition";
 import { SUMMARIZATION_NODE_DEFINITION } from "./SummarizationNodeDefinition";
 import { VECTOR_STORE_UPSERT_NODE_DEFINITION } from "./VectorStoreUpsertNodeDefinition";
@@ -1066,71 +1069,9 @@ export const LANGCHAIN_NODE_CATALOG_METADATA: Readonly<
   }),
   "langchain.summarization": SUMMARIZATION_NODE_DEFINITION,
   "langchain.combine_summaries": COMBINE_SUMMARIES_NODE_DEFINITION,
-  "langchain.knowledge_base_retriever": metadata({
-    technicalName: "langchain.knowledge_base_retriever",
-    nonTechnicalName: "Search Knowledge Base",
-    technicalDescription:
-      "Retrieves relevant entries from an existing knowledge base or managed semantic store.",
-    nonTechnicalDescription:
-      "Search your saved knowledge for the most useful information.",
-    inputPorts: Object.freeze([
-      inputPort(
-        "query",
-        "Query",
-        ["text"],
-        false,
-        "The search question or prompt used to retrieve knowledge base entries."
-      ),
-      inputPort(
-        "knowledgeBase",
-        "Knowledge Base",
-        ["dataset", "json", "generic"],
-        false,
-        "Managed knowledge base connection or semantic store handle."
-      ),
-    ]),
-    outputPorts: Object.freeze([
-      outputPort(
-        "documents",
-        "Documents",
-        ["document", "json"],
-        "Relevant knowledge base entries returned as structured documents."
-      ),
-    ]),
-    properties: Object.freeze([
-      property({
-        id: "topK",
-        name: "Top K",
-        type: "integer",
-        value: 5,
-        defaultValue: 5,
-        description: "How many knowledge base results to return.",
-        required: true,
-        min: 1,
-        max: 50,
-        step: 1,
-        projectionGroup: "Retrieval",
-        order: 0,
-      }),
-      property({
-        id: "scoreThreshold",
-        name: "Score Threshold",
-        type: "number",
-        value: 0,
-        description: "Optional minimum retrieval score required for a result to be included.",
-        min: 0,
-        max: 1,
-        step: 0.01,
-        isAdvanced: true,
-        projectionGroup: "Retrieval",
-        order: 1,
-      }),
-    ]),
-    group: tierTwoProjectionGroup,
-    tags: ["knowledge base", "retrieval", "rag"],
-    keywords: ["knowledge base", "search knowledge", "managed retriever"],
-  }),
-
+  "langchain.knowledge_base_retriever": KNOWLEDGE_BASE_RETRIEVER_NODE_DEFINITION,
+  "langchain.retrieval_qa": RETRIEVAL_QA_NODE_DEFINITION,
+  "langchain.chat_prompt_builder": CHAT_PROMPT_BUILDER_NODE_DEFINITION,
   "langchain.prompt-template": metadata({
     technicalName: "langchain.prompt-template",
     nonTechnicalName: "Build Prompt",

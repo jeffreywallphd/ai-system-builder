@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from math import sqrt
 from typing import Any, Dict, List
 
 from langchain_core.documents import Document as LangChainDocument
@@ -51,6 +50,146 @@ def _normalize_documents(value: Any) -> List[Dict[str, Any]]:
     if not isinstance(value, list):
         return []
     return [_normalize_document(item, f"doc-{index + 1}") for index, item in enumerate(value)]
+
+
+def _serialize_document(
+    *,
+    document_id: str,
+    text: str,
+    metadata: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
+    normalized_metadata = dict(metadata or {})
+    return {
+        "id": document_id,
+        "text": text,
+        "content": text,
+        "metadata": normalized_metadata,
+    }
+
+
+def _normalize_knowledge_base_handle(value: Any) -> Dict[str, Any]:
+    if isinstance(value, dict):
+        records = value.get("records")
+        if isinstance(records, list):
+            return {
+                "id": value.get("id"),
+                "storeType": value.get("storeType") or value.get("store_type") or "memory",
+                "collectionName": value.get("collectionName") or value.get("collection_name") or "default",
+                "records": _normalize_documents(records),
+                "metadata": value.get("metadata") if isinstance(value.get("metadata"), dict) else {},
+            }
+
+        documents = value.get("documents")
+        if isinstance(documents, list):
+            return {
+                "id": value.get("id"),
+                "storeType": value.get("storeType") or "memory",
+                "collectionName": value.get("collectionName") or "default",
+                "records": _normalize_documents(documents),
+                "metadata": value.get("metadata") if isinstance(value.get("metadata"), dict) else {},
+            }
+
+    if isinstance(value, list):
+        return {
+            "id": None,
+            "storeType": "memory",
+            "collectionName": "default",
+            "records": _normalize_documents(value),
+            "metadata": {},
+        }
+
+    return {
+        "id": None,
+        "storeType": "memory",
+        "collectionName": "default",
+        "records": [],
+        "metadata": {},
+    }
+
+
+def _score_text(query: str, text: str) -> float:
+    query_tokens = {token for token in query.lower().split() if token}
+    candidate_tokens = {token for token in text.lower().split() if token}
+    if not query_tokens:
+        return 0.0
+    return len(query_tokens & candidate_tokens) / len(query_tokens)
+
+
+def _select_documents_by_mmr(
+    query: str, documents: List[Dict[str, Any]], k: int
+) -> List[Dict[str, Any]]:
+    if len(documents) <= 1:
+        return documents[:k]
+
+    selected: List[Dict[str, Any]] = []
+    remaining = documents[:]
+    while remaining and len(selected) < k:
+        best_document = None
+        best_score = float("-inf")
+        for candidate in remaining:
+            relevance = float(candidate["metadata"].get("score", _score_text(query, candidate["text"])))
+            diversity_penalty = 0.0
+            if selected:
+                diversity_penalty = max(
+                    _score_text(candidate["text"], chosen["text"]) for chosen in selected
+                )
+            mmr_score = (0.7 * relevance) - (0.3 * diversity_penalty)
+            if mmr_score > best_score:
+                best_score = mmr_score
+                best_document = candidate
+        if best_document is None:
+            break
+        selected.append(best_document)
+        remaining.remove(best_document)
+    return selected
+
+
+def _retrieve_documents(
+    *,
+    query: str,
+    handle: Any,
+    top_k: int,
+    search_type: str = "similarity",
+    score_threshold: float | None = None,
+) -> List[Dict[str, Any]]:
+    normalized_handle = _normalize_knowledge_base_handle(handle)
+    scored_documents: List[Dict[str, Any]] = []
+    for index, record in enumerate(normalized_handle["records"]):
+        score = _score_text(query, record["content"])
+        metadata = {**record["metadata"], "score": score}
+        scored_documents.append(
+            _serialize_document(
+                document_id=str(record.get("id") or f"doc-{index + 1}"),
+                text=record["content"],
+                metadata=metadata,
+            )
+        )
+
+    filtered_documents = [
+        document
+        for document in sorted(
+            scored_documents,
+            key=lambda item: float(item["metadata"].get("score", 0)),
+            reverse=True,
+        )
+        if score_threshold is None or float(document["metadata"].get("score", 0)) >= score_threshold
+    ]
+
+    if search_type == "mmr":
+        return _select_documents_by_mmr(query, filtered_documents, top_k)
+
+    return filtered_documents[:top_k]
+
+
+def _resolve_model_label(model: Any) -> str:
+    if isinstance(model, str) and model.strip():
+        return model
+    if isinstance(model, dict):
+        for key in ("id", "name", "model", "identifier"):
+            value = model.get(key)
+            if isinstance(value, str) and value.strip():
+                return value
+    return "retrieval-qa-model"
 
 
 class _DeterministicLlm:
@@ -122,6 +261,47 @@ class LangChainExecutor:
             rendered[1:1] = history
             return {"messages": rendered}
 
+        if node_type == "langchain.chat_prompt_builder":
+            system_message = str(inputs.get("systemMessage") or properties.get("systemMessage") or "")
+            user_message = str(inputs.get("userMessage") or properties.get("userMessage") or "")
+            include_context = bool(properties.get("includeContext", True))
+            context_value = inputs.get("context") or properties.get("context") or ""
+            context_text = str(context_value) if include_context and context_value else ""
+            context_label = str(properties.get("contextLabel") or "Context")
+            user_label = str(properties.get("userLabel") or "User")
+            template = str(properties.get("template") or "")
+
+            if template:
+                user_content = (
+                    template
+                    .replace("{contextLabel}", context_label)
+                    .replace("{context}", context_text)
+                    .replace("{userLabel}", user_label)
+                    .replace("{userMessage}", user_message)
+                    .replace("{systemMessage}", system_message)
+                ).strip()
+            elif context_text:
+                user_content = f"{context_label}:\n{context_text}\n\n{user_label}:\n{user_message}"
+            else:
+                user_content = f"{user_label}:\n{user_message}"
+
+            messages: List[Dict[str, str]] = []
+            if system_message:
+                messages.append({"role": "system", "content": system_message})
+            messages.append({"role": "user", "content": user_content})
+
+            prompt = {
+                "type": "chat_prompt_builder",
+                "systemMessage": system_message,
+                "userMessage": user_message,
+                "context": context_text,
+                "messages": messages,
+                "renderedPrompt": "\n\n".join(
+                    [message["content"] for message in messages if message["content"].strip()]
+                ),
+            }
+            return {"prompt": prompt, "messages": messages}
+
         if node_type == "langchain.llm_chat":
             prompt = str(inputs.get("prompt") or "")
             messages = list(inputs.get("messages") or [])
@@ -191,11 +371,11 @@ class LangChainExecutor:
                     "storeType": store_type,
                     "collectionName": collection_name,
                     "records": [
-                        {
-                            "id": document["id"],
-                            "content": document["content"],
-                            "metadata": document["metadata"],
-                        }
+                        _serialize_document(
+                            document_id=document["id"],
+                            text=document["content"],
+                            metadata=document["metadata"],
+                        )
                         for document in documents
                     ],
                 }
@@ -204,25 +384,65 @@ class LangChainExecutor:
         if node_type == "langchain.similarity_search":
             query = str(inputs.get("query") or "")
             handle = inputs.get("vectorStore") or {}
-            records = list(handle.get("records") or []) if isinstance(handle, dict) else []
-            store = _DeterministicVectorStore()
-            store.add_documents([
-                LangChainDocument(page_content=str(record.get("content") or ""), metadata=record.get("metadata") or {})
-                for record in records
-            ])
-            threshold = float(properties.get("scoreThreshold") or 0)
-            matches = store.similarity_search(query, k=max(1, int(properties.get("k") or 4)))
-            normalized = []
-            query_tokens = {token for token in query.lower().split() if token}
-            for document in matches:
-                candidate_tokens = {token for token in document.page_content.lower().split() if token}
-                score = 0.0 if not query_tokens else len(query_tokens & candidate_tokens) / len(query_tokens)
-                if score >= threshold:
-                    normalized.append({
-                        "content": document.page_content,
-                        "metadata": {**(document.metadata or {}), "score": score},
-                    })
-            return {"documents": normalized}
+            threshold_value = properties.get("scoreThreshold")
+            threshold = float(threshold_value) if threshold_value not in (None, "") else 0.0
+            matches = _retrieve_documents(
+                query=query,
+                handle=handle,
+                top_k=max(1, int(properties.get("k") or 4)),
+                score_threshold=threshold,
+            )
+            return {"documents": matches}
+
+        if node_type == "langchain.knowledge_base_retriever":
+            query = str(inputs.get("query") or "")
+            threshold_value = properties.get("scoreThreshold")
+            score_threshold = (
+                float(threshold_value)
+                if threshold_value not in (None, "")
+                else None
+            )
+            documents = _retrieve_documents(
+                query=query,
+                handle=inputs.get("knowledgeBase"),
+                top_k=max(1, int(properties.get("topK") or 5)),
+                search_type=str(properties.get("searchType") or "similarity"),
+                score_threshold=score_threshold,
+            )
+            return {"documents": documents}
+
+        if node_type == "langchain.retrieval_qa":
+            query = str(inputs.get("query") or "")
+            model_label = _resolve_model_label(inputs.get("model"))
+            strategy = str(properties.get("strategy") or "stuff")
+            documents = _retrieve_documents(
+                query=query,
+                handle=inputs.get("knowledgeBase"),
+                top_k=max(1, int(properties.get("topK") or 4)),
+                search_type="similarity",
+                score_threshold=None,
+            )
+            context = "\n\n".join(
+                f"[Source {index + 1}] {document['text']}"
+                for index, document in enumerate(documents)
+            )
+            system_prompt = str(
+                properties.get("systemPrompt")
+                or "Answer the question using only the retrieved knowledge when possible."
+            )
+            qa_prompt = (
+                f"{system_prompt}\n\n"
+                f"Strategy: {strategy}\n"
+                f"Question: {query}\n\n"
+                f"Retrieved Context:\n{context}\n\n"
+                "Answer:"
+            )
+            answer = _DeterministicLlm(model_label).invoke(qa_prompt)
+            include_sources = bool(properties.get("includeSources", True))
+            return {
+                "answer": answer,
+                "sources": documents if include_sources else [],
+            }
 
         if node_type == "langchain.context_formatter":
             documents = _normalize_documents(inputs.get("documents") or [])

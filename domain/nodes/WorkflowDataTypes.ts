@@ -9,6 +9,14 @@ export interface Document {
   readonly metadata?: Readonly<Record<string, unknown>>;
 }
 
+export interface KnowledgeBaseHandle {
+  readonly id?: string;
+  readonly storeType?: string;
+  readonly collectionName?: string;
+  readonly records?: ReadonlyArray<Document>;
+  readonly metadata?: Readonly<Record<string, unknown>>;
+}
+
 export interface ToolCall {
   readonly name: string;
   readonly arguments: Readonly<Record<string, unknown>>;

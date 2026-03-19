@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import type {
   ChatMessage,
   Document,
+  KnowledgeBaseHandle,
   ToolCall,
   ToolDefinition,
 } from "../WorkflowDataTypes";
@@ -27,6 +28,21 @@ describe("WorkflowDataTypes", () => {
     expect(document.id).toBe("doc-1");
     expect(document.text).toContain("source");
     expect(document.metadata).toEqual({ source: "knowledge-base" });
+  });
+
+
+  it("defines serializable knowledge base handles for workflow routing", () => {
+    const handle: KnowledgeBaseHandle = {
+      id: "kb-1",
+      storeType: "memory",
+      collectionName: "studio-notes",
+      records: [{ id: "doc-1", text: "Knowledge text." }],
+      metadata: { provider: "langchain" },
+    };
+
+    expect(handle.id).toBe("kb-1");
+    expect(handle.records?.[0]?.text).toBe("Knowledge text.");
+    expect(handle.metadata).toEqual({ provider: "langchain" });
   });
 
   it("defines tool calls with a name and structured arguments", () => {

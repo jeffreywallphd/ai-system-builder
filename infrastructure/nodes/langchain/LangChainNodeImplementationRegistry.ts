@@ -92,8 +92,21 @@ const LANGCHAIN_IMPLEMENTATIONS: ReadonlyArray<INodeRuntimeImplementation> = Obj
   ], "LangChain / Text"),
   langChainImplementation(
     "langchain.knowledge_base_retriever",
-    "Search Knowledge Base",
-    ["interpreted-node", "python-node", "hybrid"]
+    "Find Relevant Information",
+    ["interpreted-node", "python-node", "hybrid"],
+    "LangChain / Knowledge"
+  ),
+  langChainImplementation(
+    "langchain.retrieval_qa",
+    "Answer from Knowledge Base",
+    ["interpreted-node", "python-node", "hybrid"],
+    "LangChain / Knowledge"
+  ),
+  langChainImplementation(
+    "langchain.chat_prompt_builder",
+    "Build AI Prompt",
+    ["interpreted-node", "python-node", "hybrid"],
+    "LangChain / Prompting"
   ),
 
   langChainImplementation("langchain.prompt-template", "Build Prompt"),
