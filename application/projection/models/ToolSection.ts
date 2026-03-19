@@ -1,9 +1,4 @@
 import type { ToolField } from "./ToolField";
+import type { ProjectedSection } from "./ProjectedSection";
 
-export interface ToolSection {
-  readonly id: string;
-  readonly title: string;
-  readonly description?: string;
-  readonly order: number;
-  readonly fields: ReadonlyArray<ToolField>;
-}
+export type ToolSection = ProjectedSection<ToolField>;
