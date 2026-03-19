@@ -2,15 +2,19 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode 
 import { useUiDependencies } from "../composition/AppProviders";
 import { WorkspaceDataMode, type UiSettings } from "../settings/UiSettings";
 import type { UiSettingsState } from "../settings/UiSettingsStore";
+import type { McpStoreState } from "../state/McpStore";
+import McpRuntimeStatusPanel from "../components/execution/McpRuntimeStatusPanel";
 
 export default function SettingsPage(): JSX.Element {
-  const { settingsStore } = useUiDependencies();
+  const { settingsStore, mcpStore } = useUiDependencies();
   const [state, setState] = useState<UiSettingsState>(() => settingsStore.getState());
+  const [mcpState, setMcpState] = useState<McpStoreState>(() => mcpStore.getState());
   const [expandedAdvancedSections, setExpandedAdvancedSections] = useState<ReadonlyArray<string>>(
     Object.freeze(["runtime", "development"])
   );
 
   useEffect(() => settingsStore.subscribe(setState), [settingsStore]);
+  useEffect(() => mcpStore.subscribe(setMcpState), [mcpStore]);
 
   const saveStatus = useMemo(() => {
     if (state.saveError) {
@@ -198,6 +202,13 @@ export default function SettingsPage(): JSX.Element {
               placeholder="Optional token"
             />
           </div>
+
+          <McpRuntimeStatusPanel
+            status={mcpState.status}
+            tools={mcpState.tools}
+            isLoading={mcpState.isLoading}
+            error={mcpState.error}
+          />
 
           <AdvancedSection
             title="Advanced runtime settings"

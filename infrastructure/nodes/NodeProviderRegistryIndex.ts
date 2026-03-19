@@ -1,6 +1,7 @@
 import { ComfyNodeImplementationRegistry } from "./comfyui/ComfyNodeImplementationRegistry";
 import { LangChainNodeImplementationRegistry } from "./langchain/LangChainNodeImplementationRegistry";
 import { LocalNodeImplementationRegistry } from "./local/LocalNodeImplementationRegistry";
+import { McpNodeImplementationRegistry } from "./mcp/McpNodeImplementationRegistry";
 import { PythonNodeImplementationRegistry } from "./python/PythonNodeImplementationRegistry";
 import {
   CompositeNodeImplementationRegistry,
@@ -11,6 +12,7 @@ import type { INodeImplementationRegistry } from "./shared/INodeImplementationRe
 const DEFAULT_NODE_PROVIDER_REGISTRIES = Object.freeze([
   () => new ComfyNodeImplementationRegistry(),
   () => new LangChainNodeImplementationRegistry(),
+  () => new McpNodeImplementationRegistry(),
   () => new PythonNodeImplementationRegistry(),
   () => new LocalNodeImplementationRegistry(),
 ]);
@@ -19,6 +21,7 @@ const DEFAULT_NODE_PROVIDER_REGISTRIES = Object.freeze([
 const DEFAULT_COMPOSITE_NODE_PROVIDER_ENTRIES = Object.freeze([
   { createRegistry: () => new ComfyNodeImplementationRegistry(), precedence: 400 },
   { createRegistry: () => new LangChainNodeImplementationRegistry(), precedence: 300 },
+  { createRegistry: () => new McpNodeImplementationRegistry(), precedence: 250 },
   { createRegistry: () => new PythonNodeImplementationRegistry(), precedence: 200 },
   { createRegistry: () => new LocalNodeImplementationRegistry(), precedence: 100 },
 ]);

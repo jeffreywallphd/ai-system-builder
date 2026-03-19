@@ -29,7 +29,8 @@ export class PythonBackedNodeExecutor implements INodeExecutor {
     }
 
     if (this.supportedNodeTypes.size === 0) {
-      return node.definition.type.toLowerCase().startsWith("langchain.");
+      const nodeType = node.definition.type.toLowerCase();
+      return nodeType.startsWith("langchain.") || nodeType.startsWith("mcp.");
     }
 
     return this.supportedNodeTypes.has(node.definition.type.toLowerCase());

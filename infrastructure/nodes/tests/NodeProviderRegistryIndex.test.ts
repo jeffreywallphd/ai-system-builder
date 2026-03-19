@@ -10,6 +10,7 @@ describe("NodeProviderRegistryIndex", () => {
     expect(registries.map((registry) => registry.getProviderId())).toEqual([
       "comfyui",
       "langchain",
+      "mcp",
       "python",
       "local",
     ]);
@@ -21,5 +22,6 @@ describe("NodeProviderRegistryIndex", () => {
     expect(composite.findByNodeType("langchain.llm_chat")?.descriptor.providerId).toBe(
       "langchain"
     );
+    expect(composite.findByNodeType("mcp.tool_call")?.descriptor.providerId).toBe("mcp");
   });
 });
