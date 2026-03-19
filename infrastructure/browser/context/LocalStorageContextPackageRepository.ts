@@ -1,13 +1,11 @@
-import path from "node:path";
-import { ContextPackage } from "../../application/context/models/ContextPackage";
-import { ContextFragment } from "../../application/context/models/ContextFragment";
-import { ContextPackageReference } from "../../application/context/models/ContextPackageReference";
+import { ContextPackage } from "../../../application/context/models/ContextPackage";
+import { ContextFragment } from "../../../application/context/models/ContextFragment";
+import { ContextPackageReference } from "../../../application/context/models/ContextPackageReference";
 import type {
   IContextPackageListCriteria,
   IContextPackageRepository,
   IContextPackageSummary,
-} from "../../application/ports/interfaces/IContextPackageRepository";
-import type { IFileStorage } from "../../application/ports/interfaces/IFileStorage";
+} from "../../../application/ports/interfaces/IContextPackageRepository";
 
 interface ContextPackageRecord {
   readonly id: string;
@@ -35,6 +33,8 @@ interface ContextPackageRecord {
   };
 }
 
+const defaultStorageKey = "ai-loom-studio.context-packages";
+
 function normalize(value: string): string {
   return value.trim().toLowerCase();
 }
@@ -55,13 +55,7 @@ function matchesCriteria(record: ContextPackageRecord, criteria?: IContextPackag
 
   if (criteria.query) {
     const query = normalize(criteria.query);
-    const haystack = [
-      record.id,
-      record.name,
-      record.description,
-      record.version,
-      ...(record.tags ?? []),
-    ]
+    const haystack = [record.id, record.name, record.description, record.version, ...(record.tags ?? [])]
       .filter(Boolean)
       .map((value) => normalize(String(value)));
 
@@ -73,100 +67,65 @@ function matchesCriteria(record: ContextPackageRecord, criteria?: IContextPackag
   return includesAny(record.tags ?? [], criteria.tags);
 }
 
-export class LocalContextPackageRepository implements IContextPackageRepository {
-  private readonly fileStorage: IFileStorage;
-  private readonly rootDirectory: string;
-
-  constructor(params: { fileStorage: IFileStorage; rootDirectory: string }) {
-    this.fileStorage = params.fileStorage;
-    this.rootDirectory = params.rootDirectory.trim();
-  }
+export class LocalStorageContextPackageRepository implements IContextPackageRepository {
+  constructor(
+    private readonly storageKey = defaultStorageKey,
+    private readonly storage = typeof window !== "undefined" ? window.localStorage : undefined,
+  ) {}
 
   public async save(contextPackage: ContextPackage): Promise<ContextPackage> {
-    const filePath = this.resolveContextPackagePath(contextPackage.id);
-    const record = this.toRecord(contextPackage);
-
-    await this.fileStorage.write({
-      path: filePath,
-      content: JSON.stringify(record, null, 2),
-      createDirectories: true,
-      overwrite: true,
-    });
-
+    const records = await this.readRecords();
+    records.set(contextPackage.id, this.toRecord(contextPackage));
+    this.writeRecords(records);
     return ContextPackage.from(contextPackage);
   }
 
   public async load(id: string): Promise<ContextPackage | undefined> {
-    const filePath = this.resolveContextPackagePath(id);
-
-    if (!(await this.fileStorage.exists(filePath))) {
-      return undefined;
-    }
-
-    const content = await this.fileStorage.readText(filePath, "utf-8");
-    return this.toDomain(JSON.parse(content) as ContextPackageRecord);
+    const record = (await this.readRecords()).get(id.trim());
+    return record ? this.toDomain(record) : undefined;
   }
 
   public async list(
     criteria?: IContextPackageListCriteria
   ): Promise<ReadonlyArray<IContextPackageSummary>> {
-    const info = await this.fileStorage.stat(this.rootDirectory);
+    const summaries = [...(await this.readRecords()).values()]
+      .filter((record) => matchesCriteria(record, criteria))
+      .sort((left, right) => left.name.localeCompare(right.name))
+      .map((record) => this.toSummary(record));
 
-    if (info.kind === "missing") {
-      return Object.freeze([]);
-    }
-
-    const entries = await this.fileStorage.list(this.rootDirectory, {
-      recursive: false,
-      includeHidden: false,
-    });
-
-    const summaries: IContextPackageSummary[] = [];
-
-    for (const entry of entries) {
-      if (entry.kind !== "file" || !entry.path.endsWith(".json")) {
-        continue;
-      }
-
-      const record = JSON.parse(
-        await this.fileStorage.readText(entry.path, "utf-8")
-      ) as ContextPackageRecord;
-
-      if (!matchesCriteria(record, criteria)) {
-        continue;
-      }
-
-      summaries.push(this.toSummary(record));
-    }
-
-    const sorted = summaries.sort((left, right) => left.name.localeCompare(right.name));
     return Object.freeze(
-      criteria?.limit && criteria.limit > 0 ? sorted.slice(0, criteria.limit) : sorted
+      criteria?.limit && criteria.limit > 0 ? summaries.slice(0, criteria.limit) : summaries,
     );
   }
 
   public async exists(id: string): Promise<boolean> {
-    return this.fileStorage.exists(this.resolveContextPackagePath(id));
+    return (await this.readRecords()).has(id.trim());
   }
 
   public async delete(id: string): Promise<void> {
-    const filePath = this.resolveContextPackagePath(id);
-
-    if (!(await this.fileStorage.exists(filePath))) {
-      return;
-    }
-
-    await this.fileStorage.delete(filePath);
+    const records = await this.readRecords();
+    records.delete(id.trim());
+    this.writeRecords(records);
   }
 
-  private resolveContextPackagePath(id: string): string {
-    const contextPackageId = id.trim();
+  private async readRecords(): Promise<Map<string, ContextPackageRecord>> {
+    const raw = this.storage?.getItem(this.storageKey);
 
-    if (!contextPackageId) {
-      throw new Error("Context package ID cannot be empty.");
+    if (!raw) {
+      return new Map<string, ContextPackageRecord>();
     }
 
-    return path.join(this.rootDirectory, `${contextPackageId}.json`);
+    try {
+      const parsed = JSON.parse(raw) as ReadonlyArray<ContextPackageRecord>;
+      return new Map(parsed.map((record) => [record.id, record]));
+    } catch {
+      return new Map<string, ContextPackageRecord>();
+    }
+  }
+
+  private writeRecords(records: Map<string, ContextPackageRecord>): void {
+    const serialized = JSON.stringify([...records.values()], null, 2);
+    this.storage?.setItem(this.storageKey, serialized);
   }
 
   private toSummary(record: ContextPackageRecord): IContextPackageSummary {
@@ -227,10 +186,10 @@ export class LocalContextPackageRepository implements IContextPackageRepository 
             content: fragment.content,
             order: fragment.order,
             metadata: fragment.metadata,
-          })
+          }),
       ),
       references: (record.references ?? []).map(
-        (reference) => new ContextPackageReference(reference)
+        (reference) => new ContextPackageReference(reference),
       ),
       audit: {
         createdAt: record.audit?.createdAt ? new Date(record.audit.createdAt) : undefined,
