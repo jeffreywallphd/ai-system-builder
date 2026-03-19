@@ -22,7 +22,7 @@ import { AppRuntimeConfig } from "../../infrastructure/config/AppRuntimeConfig";
 import { InMemoryWorkflowRepository } from "../../infrastructure/mocks/repositories/InMemoryWorkflowRepository";
 import { InterpretedWorkflowExecutor } from "../../infrastructure/interpreted/execution/InterpretedWorkflowExecutor";
 import { MockNodeCatalogProvider } from "../../infrastructure/mocks/catalog/MockNodeCatalogProvider";
-import { NodeCatalogProvider } from "../../application/ports/NodeCatalogProvider";
+import { CompositeNodeCatalogProvider } from "../../application/nodes/CompositeNodeCatalogProvider";
 import { createCompositeNodeImplementationRegistry } from "../../infrastructure/nodes/NodeProviderRegistryIndex";
 import { ImplementationRegistryNodeCatalogProvider } from "../../infrastructure/nodes/ImplementationRegistryNodeCatalogProvider";
 import { HuggingFaceApiClient } from "../../infrastructure/huggingface/HuggingFaceApiClient";
@@ -230,7 +230,7 @@ function createNodeCatalogProvider(config: AppRuntimeConfig) {
   switch (config.nodeCatalogMode) {
     case "mock":
     default:
-      return new NodeCatalogProvider({
+      return new CompositeNodeCatalogProvider({
         providers: [new MockNodeCatalogProvider(), implementationRegistryProvider],
       });
   }
