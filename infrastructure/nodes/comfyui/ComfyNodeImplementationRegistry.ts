@@ -1,48 +1,59 @@
 import { NodeImplementationDescriptor } from "../shared/NodeImplementationDescriptor";
 import { NodeImplementationRegistry } from "../shared/NodeImplementationRegistry";
 import type { INodeRuntimeImplementation } from "../shared/INodeRuntimeImplementation";
+import { toNodeCatalogDefinitionDescriptor } from "../shared/NodeCatalogDefinitionDescriptor";
+
+function comfyImplementation(
+  nodeTypeId: string,
+  title: string,
+  category: string,
+  description: string
+): INodeRuntimeImplementation {
+  return {
+    descriptor: new NodeImplementationDescriptor({
+      providerId: "comfyui",
+      runtimeId: "comfyui",
+      nodeTypeId,
+      title,
+      executionStyles: ["delegated-workflow"],
+      metadata: { category },
+      nodeDefinition: toNodeCatalogDefinitionDescriptor({
+        title,
+        description,
+        category,
+        inputPorts: [],
+        outputPorts: [],
+        properties: [],
+      }),
+    }),
+  };
+}
 
 const COMFY_IMPLEMENTATIONS: ReadonlyArray<INodeRuntimeImplementation> = Object.freeze([
-  {
-    descriptor: new NodeImplementationDescriptor({
-      providerId: "comfyui",
-      runtimeId: "comfyui",
-      nodeTypeId: "PromptText",
-      title: "Comfy Prompt Text",
-      executionStyles: ["delegated-workflow"],
-      metadata: { category: "text/input" },
-    }),
-  },
-  {
-    descriptor: new NodeImplementationDescriptor({
-      providerId: "comfyui",
-      runtimeId: "comfyui",
-      nodeTypeId: "CheckpointLoaderSimple",
-      title: "Comfy Checkpoint Loader",
-      executionStyles: ["delegated-workflow"],
-      metadata: { category: "models/loaders" },
-    }),
-  },
-  {
-    descriptor: new NodeImplementationDescriptor({
-      providerId: "comfyui",
-      runtimeId: "comfyui",
-      nodeTypeId: "KSampler",
-      title: "Comfy KSampler",
-      executionStyles: ["delegated-workflow"],
-      metadata: { category: "sampling/core" },
-    }),
-  },
-  {
-    descriptor: new NodeImplementationDescriptor({
-      providerId: "comfyui",
-      runtimeId: "comfyui",
-      nodeTypeId: "SaveImage",
-      title: "Comfy Save Image",
-      executionStyles: ["delegated-workflow"],
-      metadata: { category: "image/output" },
-    }),
-  },
+  comfyImplementation(
+    "PromptText",
+    "Comfy Prompt Text",
+    "text/input",
+    "Provides text input to a delegated ComfyUI workflow."
+  ),
+  comfyImplementation(
+    "CheckpointLoaderSimple",
+    "Comfy Checkpoint Loader",
+    "models/loaders",
+    "Loads a checkpoint model inside a delegated ComfyUI workflow."
+  ),
+  comfyImplementation(
+    "KSampler",
+    "Comfy KSampler",
+    "sampling/core",
+    "Runs the core sampler step for a delegated ComfyUI workflow."
+  ),
+  comfyImplementation(
+    "SaveImage",
+    "Comfy Save Image",
+    "image/output",
+    "Writes generated images from a delegated ComfyUI workflow."
+  ),
 ]);
 
 export class ComfyNodeImplementationRegistry extends NodeImplementationRegistry {
