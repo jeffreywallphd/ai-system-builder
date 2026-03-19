@@ -4,6 +4,10 @@ import type { ContextFragmentKind } from "./ContextFragment";
 export interface IContextAssemblyDecision {
   readonly id: string;
   readonly kind: ContextFragmentKind;
+  readonly title?: string;
+  readonly content: string;
+  readonly order: number;
+  readonly precedence: number;
   readonly assemblyKey: string;
   readonly reason:
     | "included"

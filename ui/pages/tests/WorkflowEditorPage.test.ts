@@ -8,5 +8,6 @@ describe("WorkflowEditorPage", () => {
     expect(source).toContain('viewMode === "form" ? "ui-canvas-shell__view--active" : "ui-canvas-shell__view--inactive"');
     expect(source).toContain("<WorkflowCanvas");
     expect(source).toContain("<WorkflowFormView");
+    expect(source).toContain("contextInspection={selectedContextInspection}");
   });
 });

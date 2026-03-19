@@ -53,6 +53,16 @@ const fallbackNodeState: INodeStoreState = Object.freeze({
 
 const mobileQuery = "(max-width: 767px)";
 
+function getContextInspection(output: Readonly<Record<string, unknown>> | undefined) {
+  const inspection = output?.inspection;
+
+  if (!inspection || typeof inspection !== "object") {
+    return undefined;
+  }
+
+  return inspection as import("../../application/context/models/ContextInspectionResult").ContextInspectionResult;
+}
+
 export default function WorkflowEditorPage({
   workflowStore: workflowStoreProp,
   nodeStore: nodeStoreProp,
@@ -210,6 +220,15 @@ export default function WorkflowEditorPage({
 
     return workflowOutputPresenter.present(currentWorkflow, workflowState.outputAssets);
   }, [currentWorkflow, workflowOutputPresenter, workflowState.outputAssets]);
+
+  const selectedNodeExecutionOutput = selectedNode
+    ? workflowState.nodeExecutionOutputs[selectedNode.id]
+    : undefined;
+
+  const selectedContextInspection = useMemo(
+    () => getContextInspection(selectedNodeExecutionOutput),
+    [selectedNodeExecutionOutput]
+  );
 
   const selectedConnection = useMemo(
     () =>
@@ -660,6 +679,7 @@ export default function WorkflowEditorPage({
                     <div className="ui-overlay-panel__body ui-scrollbar">
                       <NodeInspector
                         node={selectedNode}
+                        contextInspection={selectedContextInspection}
                         onPropertyChange={(propertyId, value) => {
                           if (!workflowState.selectedNodeId) {
                             return;

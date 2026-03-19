@@ -107,6 +107,10 @@ function createDecision(
   return Object.freeze({
     id: candidate.fragment.id,
     kind: candidate.fragment.kind,
+    title: candidate.fragment.title,
+    content: candidate.fragment.content,
+    order: candidate.fragment.order,
+    precedence: candidate.precedence,
     assemblyKey: candidate.assemblyKey,
     reason,
     provenance: candidate.provenance,

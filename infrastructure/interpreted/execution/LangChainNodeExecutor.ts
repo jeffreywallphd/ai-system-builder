@@ -2,8 +2,7 @@ import type { IModelExecutor } from "../../../application/ports/interfaces/IMode
 import type { INodeExecutor, INodeExecutionResult } from "../../../application/ports/interfaces/INodeExecutor";
 import type { INodeExecutionContext } from "../../../application/ports/interfaces/INodeExecutionContextResolver";
 import type { IPythonRuntimeClient } from "../../../application/ports/interfaces/IPythonRuntimeClient";
-import { ContextBudgetingService } from "../../../application/context/ContextBudgetingService";
-import { ContextTrimmingService } from "../../../application/context/ContextTrimmingService";
+import { InspectContextAssemblyUseCase } from "../../../application/context/InspectContextAssemblyUseCase";
 import type { IAssembledContextFragment } from "../../../application/context/models/AssembledContext";
 import type { ContextFragmentKind } from "../../../application/context/models/ContextFragment";
 import type { IContextBudget } from "../../../application/context/models/ContextBudget";
@@ -36,8 +35,7 @@ interface ToolRuntimeDefinition extends ToolDefinition {
 }
 
 const messageHistoryStore = new Map<string, ChatMessage[]>();
-const contextTrimmingService = new ContextTrimmingService();
-const contextBudgetingService = new ContextBudgetingService();
+const inspectContextAssemblyUseCase = new InspectContextAssemblyUseCase();
 
 interface ContextControlSettings {
   readonly trimmingPolicy: IContextTrimmingPolicy;
@@ -84,30 +82,27 @@ function resolveContextControlSettings(properties: Record<string, unknown>): Con
 function createContextFragmentsFromDocuments(
   documents: ReadonlyArray<Document>,
   template: string
-): ReadonlyArray<IAssembledContextFragment> {
+): ReadonlyArray<{
+  readonly id: string;
+  readonly kind: "retrieved-context";
+  readonly title?: string;
+  readonly content: string;
+  readonly order: number;
+  readonly metadata?: Readonly<Record<string, unknown>>;
+}> {
   return Object.freeze(
-    documents.map((document, index) =>
-      Object.freeze({
-        id: document.id || `doc-${index + 1}`,
-        kind: "retrieved-context" as const,
-        title: typeof document.metadata?.title === "string" ? document.metadata.title : undefined,
-        content: template
-          .replace(/\{index\}/g, String(index + 1))
-          .replace(/\{content\}/g, document.text)
-          .replace(/\{text\}/g, document.text)
-          .replace(/\{metadata\}/g, document.metadata ? stringifyValue(document.metadata) : "{}"),
-        order: index,
-        assemblyKey: `retrieved-context:${document.id || `doc-${index + 1}`}`,
-        precedence: 0,
-        provenance: Object.freeze([
-          Object.freeze({
-            sourceType: "direct" as const,
-            fragmentId: document.id || `doc-${index + 1}`,
-          }),
-        ]),
-        metadata: document.metadata ? Object.freeze({ ...document.metadata }) : undefined,
-      })
-    )
+    documents.map((document, index) => ({
+      id: document.id || `doc-${index + 1}`,
+      kind: "retrieved-context" as const,
+      title: typeof document.metadata?.title === "string" ? document.metadata.title : undefined,
+      content: template
+        .replace(/\{index\}/g, String(index + 1))
+        .replace(/\{content\}/g, document.text)
+        .replace(/\{text\}/g, document.text)
+        .replace(/\{metadata\}/g, document.metadata ? stringifyValue(document.metadata) : "{}"),
+      order: index,
+      metadata: document.metadata ? Object.freeze({ ...document.metadata }) : undefined,
+    }))
   );
 }
 
@@ -834,31 +829,38 @@ export class LangChainNodeExecutor implements INodeExecutor {
       const template = String(properties.template ?? "[{index}] {content}");
       const settings = resolveContextControlSettings(properties);
       const contextFragments = createContextFragmentsFromDocuments(documents, template);
-      const trimmedContext = contextTrimmingService.trim(contextFragments, settings.trimmingPolicy, "\n\n");
-      const budgetedContext = contextBudgetingService.enforceBudget(trimmedContext.fragments, settings.budget);
-      const contextText = budgetedContext.promptText;
+      const inspection = inspectContextAssemblyUseCase.execute({
+        assembly: {
+          fragments: contextFragments,
+          separator: "\n\n",
+        },
+        trimmingPolicy: settings.trimmingPolicy,
+        budget: settings.budget,
+      });
+      const contextText = inspection.finalPromptText;
 
       return {
         nodeId: context.node.id,
         status: contextText ? "completed" : "failed",
         outputs: {
           context: contextText,
-          fragments: budgetedContext.fragments,
+          fragments: inspection.finalFragments,
+          inspection,
           budget: {
-            totalCharacterCount: budgetedContext.totalCharacterCount,
-            includedCharacterCount: budgetedContext.includedCharacterCount,
-            totalTokenCount: budgetedContext.totalTokenCount,
-            includedTokenCount: budgetedContext.includedTokenCount,
-            wasTrimmed: budgetedContext.wasTrimmed,
+            totalCharacterCount: inspection.budgeting.totalCharacterCount,
+            includedCharacterCount: inspection.budgeting.includedCharacterCount,
+            totalTokenCount: inspection.budgeting.totalTokenCount,
+            includedTokenCount: inspection.budgeting.includedTokenCount,
+            wasTrimmed: inspection.budgeting.wasTrimmed,
           },
           filtering: {
             visibilityMode: settings.trimmingPolicy.visibilityMode ?? "advanced",
-            decisions: trimmedContext.decisions,
+            decisions: inspection.trimming.decisions,
           },
         },
         messages: [
           contextText
-            ? `Formatted ${documents.length} context item(s); retained ${budgetedContext.fragments.length} after filtering and budgeting.`
+            ? `Formatted ${documents.length} context item(s); retained ${inspection.finalFragments.length} after filtering and budgeting.`
             : "Context formatter received no documents.",
         ],
         errorMessage: contextText ? undefined : "Context formatter received no documents.",
