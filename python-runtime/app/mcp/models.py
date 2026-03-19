@@ -45,6 +45,38 @@ class McpConnectionStatus(McpModel):
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
+class McpServerSearchRequest(McpModel):
+    query: str = ""
+    status: List[Literal["connected", "connecting", "disconnected", "error"]] = Field(default_factory=list)
+    transport: List[Literal["stdio", "http", "sse", "inmemory"]] = Field(default_factory=list)
+    limit: int = 20
+
+
+class McpServerSearchResponse(McpModel):
+    query: str = ""
+    total_count: int = 0
+    limit: int = 20
+    servers: List[McpServerDescriptor] = Field(default_factory=list)
+    status: McpConnectionStatus
+
+
+class McpServerConnectionRequest(McpModel):
+    server_id: str
+    reconnect: bool = False
+
+
+class McpServerDisconnectRequest(McpModel):
+    server_id: str
+
+
+class McpServerConnectionResult(McpModel):
+    action: Literal["connect", "reconnect", "disconnect"]
+    server: McpServerDescriptor
+    status: McpConnectionStatus
+    checked_at: str
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
 class ListMcpToolsResponse(McpModel):
     status: McpConnectionStatus
     tools: List[McpToolDescriptor] = Field(default_factory=list)

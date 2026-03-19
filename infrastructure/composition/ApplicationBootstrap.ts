@@ -24,6 +24,10 @@ import { LoadAssetUseCase } from "../../application/assets/LoadAssetUseCase";
 import { ListAssetsUseCase } from "../../application/assets/ListAssetsUseCase";
 import { DeleteAssetUseCase } from "../../application/assets/DeleteAssetUseCase";
 import { ListMcpToolsUseCase } from "../../application/mcp/ListMcpToolsUseCase";
+import { SearchMcpServersUseCase } from "../../application/mcp/SearchMcpServersUseCase";
+import { GetMcpServerStatusUseCase } from "../../application/mcp/GetMcpServerStatusUseCase";
+import { ConnectMcpServerUseCase } from "../../application/mcp/ConnectMcpServerUseCase";
+import { DisconnectMcpServerUseCase } from "../../application/mcp/DisconnectMcpServerUseCase";
 import { ExecuteMcpToolUseCase } from "../../application/mcp/ExecuteMcpToolUseCase";
 import { ListToolCapabilitiesUseCase } from "../../application/tools/ListToolCapabilitiesUseCase";
 import { InvokeToolCapabilityUseCase } from "../../application/tools/InvokeToolCapabilityUseCase";
@@ -69,6 +73,10 @@ export const APPLICATION_TOKENS = Object.freeze({
   DeleteAssetUseCase: Symbol("DeleteAssetUseCase"),
 
   ListMcpToolsUseCase: Symbol("ListMcpToolsUseCase"),
+  SearchMcpServersUseCase: Symbol("SearchMcpServersUseCase"),
+  GetMcpServerStatusUseCase: Symbol("GetMcpServerStatusUseCase"),
+  ConnectMcpServerUseCase: Symbol("ConnectMcpServerUseCase"),
+  DisconnectMcpServerUseCase: Symbol("DisconnectMcpServerUseCase"),
   ExecuteMcpToolUseCase: Symbol("ExecuteMcpToolUseCase"),
   ListToolCapabilitiesUseCase: Symbol("ListToolCapabilitiesUseCase"),
   InvokeToolCapabilityUseCase: Symbol("InvokeToolCapabilityUseCase"),
@@ -257,6 +265,26 @@ export class ApplicationBootstrap {
         new ListMcpToolsUseCase(
           c.resolve<IMcpToolCatalog>(TOKENS.McpToolCatalog)
         )
+    );
+
+    container.registerSingleton(
+      APPLICATION_TOKENS.SearchMcpServersUseCase,
+      (c) => new SearchMcpServersUseCase(c.resolve(TOKENS.McpRuntimeClient))
+    );
+
+    container.registerSingleton(
+      APPLICATION_TOKENS.GetMcpServerStatusUseCase,
+      (c) => new GetMcpServerStatusUseCase(c.resolve(TOKENS.McpRuntimeClient))
+    );
+
+    container.registerSingleton(
+      APPLICATION_TOKENS.ConnectMcpServerUseCase,
+      (c) => new ConnectMcpServerUseCase(c.resolve(TOKENS.McpRuntimeClient))
+    );
+
+    container.registerSingleton(
+      APPLICATION_TOKENS.DisconnectMcpServerUseCase,
+      (c) => new DisconnectMcpServerUseCase(c.resolve(TOKENS.McpRuntimeClient))
     );
 
     container.registerSingleton(
