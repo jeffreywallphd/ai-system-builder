@@ -40,9 +40,11 @@ describe("ui composition interactions", () => {
     const workflows = await dependencies.workflowService.listWorkflows();
     const imageWorkflow = workflows.find((workflow) => workflow.id === "sample-image-pipeline");
     const textWorkflow = workflows.find((workflow) => workflow.id === "sample-text-analysis");
+    const ragWorkflow = workflows.find((workflow) => workflow.id === "basic-rag-pipeline");
 
     expect(imageWorkflow).toBeDefined();
     expect(textWorkflow).toBeDefined();
+    expect(ragWorkflow).toBeDefined();
 
     expect(imageWorkflow?.nodes.map((node) => node.definition.id)).toEqual([
       "langchain.prompt-template",
@@ -58,5 +60,16 @@ describe("ui composition interactions", () => {
       "shared.chunk-displayer",
     ]);
     expect(textWorkflow?.connections).toHaveLength(2);
+
+    expect(ragWorkflow?.nodes.map((node) => node.definition.id)).toEqual([
+      "langchain.document_loader",
+      "langchain.document_to_chunks",
+      "langchain.embeddings",
+      "langchain.vector_store_upsert",
+      "langchain.similarity_search",
+      "langchain.context_formatter",
+      "langchain.llm_chat",
+    ]);
+    expect(ragWorkflow?.connections).toHaveLength(7);
   });
 });
