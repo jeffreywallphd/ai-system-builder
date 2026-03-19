@@ -47,6 +47,10 @@ import { HttpMcpRuntimeClient } from "../../infrastructure/python/mcp/HttpMcpRun
 import { PythonBackedMcpToolCatalog } from "../../infrastructure/python/mcp/PythonBackedMcpToolCatalog";
 import { PythonBackedMcpToolExecutor } from "../../infrastructure/python/mcp/PythonBackedMcpToolExecutor";
 import { ListMcpToolsUseCase } from "../../application/mcp/ListMcpToolsUseCase";
+import { SearchMcpServersUseCase } from "../../application/mcp/SearchMcpServersUseCase";
+import { GetMcpServerStatusUseCase } from "../../application/mcp/GetMcpServerStatusUseCase";
+import { ConnectMcpServerUseCase } from "../../application/mcp/ConnectMcpServerUseCase";
+import { DisconnectMcpServerUseCase } from "../../application/mcp/DisconnectMcpServerUseCase";
 
 import { WorkflowProjectionService } from "../../application/projection/WorkflowProjectionService";
 import { WorkflowToolProjectionService } from "../../application/projection/WorkflowToolProjectionService";
@@ -214,9 +218,11 @@ export function createUiDependencies(
     new InvokeToolCapabilityUseCase(toolCapabilityExecutor)
   );
   const mcpService = new McpService(
-    new ListMcpToolsUseCase(
-      pythonBackedMcpToolCatalog,
-    ),
+    new ListMcpToolsUseCase(pythonBackedMcpToolCatalog),
+    new SearchMcpServersUseCase(mcpClient),
+    new GetMcpServerStatusUseCase(mcpClient),
+    new ConnectMcpServerUseCase(mcpClient),
+    new DisconnectMcpServerUseCase(mcpClient),
   );
   const mcpStore = new McpStore(mcpService);
 
@@ -353,15 +359,63 @@ class InMemoryInstalledModelCatalog implements IInstalledModelCatalog {
 
 
 function createDisabledMcpRuntimeClient() {
+  const disabledStatus = () => ({
+    enabled: false,
+    state: "disabled" as const,
+    checkedAt: new Date().toISOString(),
+    servers: [],
+    capabilities: { tools: false, resources: false, toolExecution: false },
+    metadata: { reason: "python-runtime-disabled" },
+  });
+
   return {
     async getConnectionStatus() {
+      return disabledStatus();
+    },
+    async listServers() {
+      return { query: "", totalCount: 0, limit: 20, servers: [], status: disabledStatus() };
+    },
+    async searchServers(criteria?: { query?: string; limit?: number }) {
       return {
-        enabled: false,
-        state: "disabled" as const,
-        checkedAt: new Date().toISOString(),
+        query: criteria?.query?.trim() || "",
+        totalCount: 0,
+        limit: criteria?.limit ?? 20,
         servers: [],
-        capabilities: { tools: false, resources: false, toolExecution: false },
-        metadata: { reason: "python-runtime-disabled" },
+        status: disabledStatus(),
+      };
+    },
+    async connectServer(request: { serverId: string; reconnect?: boolean }) {
+      return {
+        action: request.reconnect ? "reconnect" as const : "connect" as const,
+        checkedAt: new Date().toISOString(),
+        server: {
+          id: request.serverId,
+          name: request.serverId,
+          transport: "inmemory" as const,
+          status: "error" as const,
+          toolCount: 0,
+          resourceCount: 0,
+          capabilities: { tools: false, resources: false, toolExecution: false },
+          errorMessage: "Python runtime is disabled.",
+        },
+        status: disabledStatus(),
+      };
+    },
+    async disconnectServer(serverId: string) {
+      return {
+        action: "disconnect" as const,
+        checkedAt: new Date().toISOString(),
+        server: {
+          id: serverId,
+          name: serverId,
+          transport: "inmemory" as const,
+          status: "disconnected" as const,
+          toolCount: 0,
+          resourceCount: 0,
+          capabilities: { tools: false, resources: false, toolExecution: false },
+          errorMessage: "Python runtime is disabled.",
+        },
+        status: disabledStatus(),
       };
     },
     async listTools() {

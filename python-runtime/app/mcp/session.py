@@ -1,5 +1,5 @@
 from app.mcp.client import BoundedMcpClient, McpConnectionError
-from app.mcp.models import McpServerSnapshot
+from app.mcp.models import McpServerDescriptor, McpServerSnapshot
 from app.mcp.registry import McpRegistry
 
 
@@ -14,7 +14,7 @@ class McpSessionManager:
 
         for server in self._registry.list_servers():
             try:
-                self.get_client(server.id).connect()
+                self.connect_server(server.id)
             except McpConnectionError:
                 continue
 
@@ -27,12 +27,29 @@ class McpSessionManager:
             self._clients[normalized] = BoundedMcpClient(server)
         return self._clients[normalized]
 
-    def snapshot_server(self, server_id: str) -> McpServerSnapshot:
+    def list_servers(self) -> list[McpServerDescriptor]:
+        return [self.describe_server(server.id) for server in self._registry.list_servers()]
+
+    def describe_server(self, server_id: str) -> McpServerDescriptor:
+        client = self.get_client(server_id)
+        return client.describe()
+
+    def connect_server(self, server_id: str, reconnect: bool = False) -> McpServerDescriptor:
+        client = self.get_client(server_id)
+        if reconnect and client.is_connected:
+            client.disconnect()
+        return client.connect(force=reconnect)
+
+    def disconnect_server(self, server_id: str) -> McpServerDescriptor:
+        client = self.get_client(server_id)
+        return client.disconnect()
+
+    def snapshot_server(self, server_id: str, connect: bool = False) -> McpServerSnapshot:
         client = self.get_client(server_id)
         try:
-            descriptor = client.connect()
-            tools = client.list_tools(allow_disconnected=True)
-            resources = client.list_resources()
+            descriptor = client.connect() if connect else client.describe()
+            tools = client.list_tools(allow_disconnected=not connect)
+            resources = client.list_resources() if connect or client.is_connected else []
         except McpConnectionError as error:
             descriptor = client.describe(status="error", error_message=str(error))
             tools = client.list_tools(allow_disconnected=True)

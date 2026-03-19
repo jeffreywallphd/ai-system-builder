@@ -13,22 +13,41 @@ class BoundedMcpClient:
     def __init__(self, server: McpServerConfig) -> None:
         self._server = server
         self._connected = False
+        self._last_error: str | None = None
 
-    def connect(self) -> McpServerDescriptor:
+    @property
+    def is_connected(self) -> bool:
+        return self._connected
+
+    def connect(self, force: bool = False) -> McpServerDescriptor:
+        if force:
+            self._connected = False
+            self._last_error = None
+
         if self._server.fail_connect:
-            raise McpConnectionError(f"Unable to connect to MCP server '{self._server.id}'.")
+            self._connected = False
+            self._last_error = f"Unable to connect to MCP server '{self._server.id}'."
+            raise McpConnectionError(self._last_error)
 
         self._connected = True
+        self._last_error = None
         return self.describe(status="connected")
+
+    def disconnect(self) -> McpServerDescriptor:
+        self._connected = False
+        self._last_error = None
+        return self.describe(status="disconnected")
 
     def describe(self, status: str | None = None, error_message: str | None = None) -> McpServerDescriptor:
         tools = self.list_tools(allow_disconnected=True)
         resources = list(self._server.mock_resources)
+        effective_error = error_message or self._last_error
+        derived_status = status or ("error" if effective_error else ("connected" if self._connected else "disconnected"))
         return McpServerDescriptor(
             id=self._server.id,
             name=self._server.name,
             transport=self._server.transport,
-            status=status or ("connected" if self._connected else "disconnected"),
+            status=derived_status,
             tool_count=len(tools),
             resource_count=len(resources),
             capabilities={
@@ -37,7 +56,7 @@ class BoundedMcpClient:
                 "toolExecution": bool(tools),
             },
             metadata={**self._server.metadata},
-            error_message=error_message,
+            error_message=effective_error,
         )
 
     def list_tools(self, allow_disconnected: bool = False) -> list[McpToolDescriptor]:

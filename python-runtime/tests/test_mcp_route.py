@@ -11,7 +11,10 @@ from app.mcp.session import McpSessionManager
 def override_service() -> McpService:
     config = McpRuntimeConfig(
         enabled=True,
-        servers_json='[{"id": "local", "name": "Local MCP", "transport": "inmemory", "mock_tools": [{"name": "echo", "inputSchema": {"type": "object"}}, {"name": "sum_numbers", "inputSchema": {"type": "object"}}], "mock_resources": [{"uri": "memory://resource/1", "name": "Example Resource"}]}]'
+        servers_json='['
+        '{"id": "local", "name": "Local MCP", "transport": "inmemory", "mock_tools": [{"name": "echo", "inputSchema": {"type": "object"}}, {"name": "sum_numbers", "inputSchema": {"type": "object"}}], "mock_resources": [{"uri": "memory://resource/1", "name": "Example Resource"}], "metadata": {"scope": "workspace"}},'
+        '{"id": "remote", "name": "Remote MCP", "transport": "http", "metadata": {"scope": "cloud"}}'
+        ']'
     )
     registry = McpRegistry(config)
     return McpService(registry=registry, sessions=McpSessionManager(registry))
@@ -29,6 +32,48 @@ def test_mcp_status_route() -> None:
     assert payload["enabled"] is True
     assert payload["state"] == "ready"
     assert payload["servers"][0]["toolCount"] == 2
+    assert payload["servers"][0]["status"] == "disconnected"
+
+
+def test_mcp_servers_route_lists_configured_servers() -> None:
+    app.dependency_overrides[get_mcp_service] = override_service
+    client = TestClient(app)
+
+    response = client.get("/mcp/servers")
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["totalCount"] == 2
+    assert payload["servers"][0]["id"] == "local"
+
+
+def test_mcp_server_search_route_filters_by_query() -> None:
+    app.dependency_overrides[get_mcp_service] = override_service
+    client = TestClient(app)
+
+    response = client.get("/mcp/servers/search", params={"query": "remote", "transport": "http", "limit": 10})
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["query"] == "remote"
+    assert payload["totalCount"] == 1
+    assert payload["servers"][0]["id"] == "remote"
+
+
+def test_mcp_connect_and_disconnect_routes_manage_lifecycle() -> None:
+    app.dependency_overrides[get_mcp_service] = override_service
+    client = TestClient(app)
+
+    connect_response = client.post("/mcp/servers/connect", json={"serverId": "local"})
+    disconnect_response = client.post("/mcp/servers/disconnect", json={"serverId": "local"})
+
+    app.dependency_overrides.clear()
+    assert connect_response.status_code == 200
+    assert disconnect_response.status_code == 200
+    assert connect_response.json()["server"]["status"] == "connected"
+    assert disconnect_response.json()["server"]["status"] == "disconnected"
 
 
 def test_mcp_tools_route_lists_tools_and_resources() -> None:

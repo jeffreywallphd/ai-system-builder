@@ -2,6 +2,10 @@ import type { IMcpRuntimeClient } from "../../../application/ports/interfaces/IM
 import type { IRuntimeEventSink } from "../../../application/ports/interfaces/IRuntimeEventSink";
 import { RuntimeEventSources } from "../../../application/runtime/RuntimeEvent";
 import type { McpConnectionStatus } from "../../../application/mcp/models/McpConnectionStatus";
+import type { McpServerConnectionRequest } from "../../../application/mcp/models/McpServerConnectionRequest";
+import type { McpServerConnectionResult } from "../../../application/mcp/models/McpServerConnectionResult";
+import type { McpServerSearchCriteria } from "../../../application/mcp/models/McpServerSearchCriteria";
+import type { McpServerSearchResult } from "../../../application/mcp/models/McpServerSearchResult";
 import type { McpToolDescriptor } from "../../../application/mcp/models/McpToolDescriptor";
 import type { McpToolExecutionRequest } from "../../../application/mcp/models/McpToolExecutionRequest";
 import type { McpToolExecutionResult } from "../../../application/mcp/models/McpToolExecutionResult";
@@ -44,6 +48,106 @@ export class HttpMcpRuntimeClient implements IMcpRuntimeClient {
       return status;
     } catch (error) {
       this.emitError("MCP status check failed.", error, "mcp-connection-failure");
+      throw error;
+    }
+  }
+
+  public async listServers(): Promise<McpServerSearchResult> {
+    this.emit("info", "MCP server discovery started.", { eventType: "mcp-server-discovery" });
+
+    try {
+      const payload = await this.request<McpServerSearchResult>("GET", "/mcp/servers");
+      this.emit("success", "MCP server discovery completed.", {
+        eventType: "mcp-server-discovery",
+        serverCount: payload.servers.length,
+      });
+      return payload;
+    } catch (error) {
+      this.emitError("MCP server discovery failed.", error, "mcp-server-discovery");
+      throw error;
+    }
+  }
+
+  public async searchServers(criteria: McpServerSearchCriteria = {}): Promise<McpServerSearchResult> {
+    this.emit("info", "MCP server search started.", {
+      eventType: "mcp-server-search",
+      query: criteria.query ?? "",
+    });
+
+    try {
+      const params = new URLSearchParams();
+      if (criteria.query?.trim()) {
+        params.set("query", criteria.query.trim());
+      }
+      if (criteria.limit !== undefined) {
+        params.set("limit", String(criteria.limit));
+      }
+      for (const status of criteria.statuses ?? []) {
+        params.append("status", status);
+      }
+      for (const transport of criteria.transports ?? []) {
+        params.append("transport", transport);
+      }
+
+      const suffix = params.size > 0 ? `?${params.toString()}` : "";
+      const payload = await this.request<McpServerSearchResult>("GET", `/mcp/servers/search${suffix}`);
+      this.emit("success", "MCP server search completed.", {
+        eventType: "mcp-server-search",
+        query: payload.query,
+        serverCount: payload.servers.length,
+      });
+      return payload;
+    } catch (error) {
+      this.emitError("MCP server search failed.", error, "mcp-server-search", {
+        query: criteria.query ?? "",
+      });
+      throw error;
+    }
+  }
+
+  public async connectServer(request: McpServerConnectionRequest): Promise<McpServerConnectionResult> {
+    const action = request.reconnect ? "reconnect" : "connect";
+    this.emit("info", `MCP server ${action} started.`, {
+      eventType: "mcp-server-connect",
+      serverId: request.serverId,
+      reconnect: request.reconnect === true,
+    });
+
+    try {
+      const payload = await this.request<McpServerConnectionResult>("POST", "/mcp/servers/connect", request);
+      this.emit("success", `MCP server ${payload.action} completed.`, {
+        eventType: "mcp-server-connect",
+        serverId: payload.server.id,
+        serverStatus: payload.server.status,
+      });
+      return payload;
+    } catch (error) {
+      this.emitError("MCP server connect request failed.", error, "mcp-server-connect", {
+        serverId: request.serverId,
+        reconnect: request.reconnect === true,
+      });
+      throw error;
+    }
+  }
+
+  public async disconnectServer(serverId: string): Promise<McpServerConnectionResult> {
+    this.emit("info", "MCP server disconnect started.", {
+      eventType: "mcp-server-disconnect",
+      serverId,
+    });
+
+    try {
+      const payload = await this.request<McpServerConnectionResult>("POST", "/mcp/servers/disconnect", { serverId });
+      this.emit("success", "MCP server disconnect completed.", {
+        eventType: "mcp-server-disconnect",
+        serverId: payload.server.id,
+        serverStatus: payload.server.status,
+      });
+      return payload;
+    } catch (error) {
+      this.emitError("MCP server disconnect request failed.", error, "mcp-server-disconnect", {
+        serverId,
+      });
       throw error;
     }
   }

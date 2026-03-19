@@ -26,5 +26,6 @@ describe("InfrastructureRegistry", () => {
 
     const mcpClient = c.resolve<IMcpRuntimeClient>(TOKENS.McpRuntimeClient);
     expect((await mcpClient.getConnectionStatus()).state).toBe("disabled");
+    expect((await mcpClient.listServers()).totalCount).toBe(0);
   });
 });
