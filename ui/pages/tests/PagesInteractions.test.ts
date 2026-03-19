@@ -7,6 +7,7 @@ describe("ui/pages interactions", () => {
     const workflows = readSource("ui/pages/WorkflowsPage.tsx");
     const models = readSource("ui/pages/ModelsPage.tsx");
     const settings = readSource("ui/pages/SettingsPage.tsx");
+    const mcp = readSource("ui/pages/McpPage.tsx");
     const notFound = readSource("ui/pages/NotFoundPage.tsx");
 
     expect(home).toContain('import { ROUTE_PATHS } from "../routes/RouteConfig"');
@@ -16,6 +17,8 @@ describe("ui/pages interactions", () => {
     expect(workflows).toContain("workflowStore.refreshWorkflows");
     expect(models).toContain("to={ROUTE_PATHS.settings}");
     expect(settings).toContain("Auto-save is enabled");
+    expect(mcp).toContain("McpServerBrowser");
+    expect(mcp).toContain("mcpStore.addConfiguredServer");
     expect(settings).toContain("Advanced runtime settings");
     expect(notFound).toContain("to={ROUTE_PATHS.home}");
   });

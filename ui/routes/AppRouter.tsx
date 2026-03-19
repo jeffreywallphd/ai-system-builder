@@ -9,6 +9,7 @@ import AppLayout from "../layout/AppLayout";
 import AssetsPage from "../pages/AssetsPage";
 import HomePage from "../pages/HomePage";
 import ModelsPage from "../pages/ModelsPage";
+import McpPage from "../pages/McpPage";
 import NotFoundPage from "../pages/NotFoundPage";
 import WorkflowEditorPage from "../pages/WorkflowEditorPage";
 import WorkflowsPage from "../pages/WorkflowsPage";
@@ -46,6 +47,7 @@ export default function AppRouter({
             element: <WorkflowEditorPage />,
           },
           { path: ROUTE_PATHS.models, element: <ModelsPage /> },
+          { path: ROUTE_PATHS.mcp, element: <McpPage /> },
           { path: ROUTE_PATHS.assets, element: <AssetsPage /> },
           { path: ROUTE_PATHS.settings, element: <SettingsPage /> },
         ],

@@ -1,4 +1,4 @@
-import type { IMcpRuntimeClient } from "../ports/interfaces/IMcpRuntimeClient";
+import type { IMcpServerManager } from "../ports/interfaces/IMcpServerManager";
 import type { McpServerConnectionResult } from "./models/McpServerConnectionResult";
 
 export interface IDisconnectMcpServerRequest {
@@ -6,7 +6,7 @@ export interface IDisconnectMcpServerRequest {
 }
 
 export class DisconnectMcpServerUseCase {
-  constructor(private readonly runtimeClient: IMcpRuntimeClient) {}
+  constructor(private readonly serverManager: IMcpServerManager) {}
 
   public async execute(request: IDisconnectMcpServerRequest): Promise<McpServerConnectionResult> {
     const serverId = request.serverId.trim();
@@ -14,6 +14,6 @@ export class DisconnectMcpServerUseCase {
       throw new Error("Disconnecting an MCP server requires a serverId.");
     }
 
-    return this.runtimeClient.disconnectServer(serverId);
+    return this.serverManager.disconnectServer(serverId);
   }
 }
