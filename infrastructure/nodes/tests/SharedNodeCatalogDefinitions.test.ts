@@ -29,4 +29,16 @@ describe("Shared node catalog definitions", () => {
     expect(documentProperty?.constraints?.required).toBeTrue();
   });
 
+  it("retains inherited search and category listing behavior for registry-backed catalogs", async () => {
+    const provider = new ImplementationRegistryNodeCatalogProvider(
+      new LocalNodeImplementationRegistry()
+    );
+
+    const searchResults = await provider.searchDefinitions({ query: "document" });
+    const categories = await provider.getCategories();
+
+    expect(searchResults.some((definition) => definition.type === "shared.document-uploader")).toBeTrue();
+    expect(categories).toEqual(["input", "output", "utility"]);
+  });
+
 });

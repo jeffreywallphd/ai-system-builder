@@ -1,11 +1,11 @@
-import { NodeCatalogProvider } from "../../application/ports/NodeCatalogProvider";
+import { CompositeNodeCatalogProvider } from "../../application/nodes/CompositeNodeCatalogProvider";
 import { NodeDefinition, NodeDefinitionCapabilityProfile } from "../../domain/nodes/NodeDefinition";
 import type { INodeDefinition } from "../../domain/nodes/interfaces/INodeDefinition";
 import type { INodeImplementationRegistry } from "./shared/INodeImplementationRegistry";
 import { getLangChainNodeCatalogMetadata } from "./langchain/LangChainNodeCatalogMetadata";
 import { getSharedNodeCatalogMetadata } from "./shared/SharedNodeCatalogMetadata";
 
-export class ImplementationRegistryNodeCatalogProvider extends NodeCatalogProvider {
+export class ImplementationRegistryNodeCatalogProvider extends CompositeNodeCatalogProvider {
   constructor(registry: INodeImplementationRegistry) {
     super({
       definitions: toNodeDefinitions(registry),
