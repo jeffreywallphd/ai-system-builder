@@ -24,10 +24,12 @@ import { LoadAssetUseCase } from "../../application/assets/LoadAssetUseCase";
 import { ListAssetsUseCase } from "../../application/assets/ListAssetsUseCase";
 import { DeleteAssetUseCase } from "../../application/assets/DeleteAssetUseCase";
 import { ListMcpToolsUseCase } from "../../application/mcp/ListMcpToolsUseCase";
+import { ListConfiguredMcpServersUseCase } from "../../application/mcp/ListConfiguredMcpServersUseCase";
 import { SearchMcpServersUseCase } from "../../application/mcp/SearchMcpServersUseCase";
 import { GetMcpServerStatusUseCase } from "../../application/mcp/GetMcpServerStatusUseCase";
 import { ConnectMcpServerUseCase } from "../../application/mcp/ConnectMcpServerUseCase";
 import { DisconnectMcpServerUseCase } from "../../application/mcp/DisconnectMcpServerUseCase";
+import { ReconnectMcpServerUseCase } from "../../application/mcp/ReconnectMcpServerUseCase";
 import { ExecuteMcpToolUseCase } from "../../application/mcp/ExecuteMcpToolUseCase";
 import { ListToolCapabilitiesUseCase } from "../../application/tools/ListToolCapabilitiesUseCase";
 import { InvokeToolCapabilityUseCase } from "../../application/tools/InvokeToolCapabilityUseCase";
@@ -41,6 +43,8 @@ import type { IInstalledModelCatalog } from "../../application/ports/interfaces/
 import type { IRemoteModelCatalog } from "../../application/ports/interfaces/IRemoteModelCatalog";
 import type { IModelInstaller } from "../../application/ports/interfaces/IModelInstaller";
 import type { IFileStorage } from "../../application/ports/interfaces/IFileStorage";
+import type { IMcpServerCatalog } from "../../application/ports/interfaces/IMcpServerCatalog";
+import type { IMcpServerManager } from "../../application/ports/interfaces/IMcpServerManager";
 import type { IMcpToolCatalog } from "../../application/ports/interfaces/IMcpToolCatalog";
 import type { IMcpToolExecutor } from "../../application/ports/interfaces/IMcpToolExecutor";
 import type { IToolCapabilityCatalog } from "../../application/ports/interfaces/IToolCapabilityCatalog";
@@ -75,10 +79,12 @@ export const APPLICATION_TOKENS = Object.freeze({
   DeleteAssetUseCase: Symbol("DeleteAssetUseCase"),
 
   ListMcpToolsUseCase: Symbol("ListMcpToolsUseCase"),
+  ListConfiguredMcpServersUseCase: Symbol("ListConfiguredMcpServersUseCase"),
   SearchMcpServersUseCase: Symbol("SearchMcpServersUseCase"),
   GetMcpServerStatusUseCase: Symbol("GetMcpServerStatusUseCase"),
   ConnectMcpServerUseCase: Symbol("ConnectMcpServerUseCase"),
   DisconnectMcpServerUseCase: Symbol("DisconnectMcpServerUseCase"),
+  ReconnectMcpServerUseCase: Symbol("ReconnectMcpServerUseCase"),
   ExecuteMcpToolUseCase: Symbol("ExecuteMcpToolUseCase"),
   ListToolCapabilitiesUseCase: Symbol("ListToolCapabilitiesUseCase"),
   InvokeToolCapabilityUseCase: Symbol("InvokeToolCapabilityUseCase"),
@@ -273,23 +279,33 @@ export class ApplicationBootstrap {
     );
 
     container.registerSingleton(
+      APPLICATION_TOKENS.ListConfiguredMcpServersUseCase,
+      (c) => new ListConfiguredMcpServersUseCase(c.resolve<IMcpServerCatalog>(TOKENS.McpServerCatalog))
+    );
+
+    container.registerSingleton(
       APPLICATION_TOKENS.SearchMcpServersUseCase,
       (c) => new SearchMcpServersUseCase(c.resolve(TOKENS.McpRuntimeClient))
     );
 
     container.registerSingleton(
       APPLICATION_TOKENS.GetMcpServerStatusUseCase,
-      (c) => new GetMcpServerStatusUseCase(c.resolve(TOKENS.McpRuntimeClient))
+      (c) => new GetMcpServerStatusUseCase(c.resolve<IMcpServerCatalog>(TOKENS.McpServerCatalog))
     );
 
     container.registerSingleton(
       APPLICATION_TOKENS.ConnectMcpServerUseCase,
-      (c) => new ConnectMcpServerUseCase(c.resolve(TOKENS.McpRuntimeClient))
+      (c) => new ConnectMcpServerUseCase(c.resolve<IMcpServerManager>(TOKENS.McpServerManager))
     );
 
     container.registerSingleton(
       APPLICATION_TOKENS.DisconnectMcpServerUseCase,
-      (c) => new DisconnectMcpServerUseCase(c.resolve(TOKENS.McpRuntimeClient))
+      (c) => new DisconnectMcpServerUseCase(c.resolve<IMcpServerManager>(TOKENS.McpServerManager))
+    );
+
+    container.registerSingleton(
+      APPLICATION_TOKENS.ReconnectMcpServerUseCase,
+      (c) => new ReconnectMcpServerUseCase(c.resolve<IMcpServerManager>(TOKENS.McpServerManager))
     );
 
     container.registerSingleton(

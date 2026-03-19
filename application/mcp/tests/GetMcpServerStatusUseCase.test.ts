@@ -1,107 +1,59 @@
 import { describe, expect, it } from "bun:test";
 import { GetMcpServerStatusUseCase } from "../GetMcpServerStatusUseCase";
-import type { IMcpRuntimeClient } from "../../ports/interfaces/IMcpRuntimeClient";
+import type { IMcpServerCatalog } from "../../ports/interfaces/IMcpServerCatalog";
 
 describe("GetMcpServerStatusUseCase", () => {
-  it("returns the matching configured server descriptor", async () => {
-    const client: IMcpRuntimeClient = {
+  it("delegates a normalized server status lookup", async () => {
+    const requests: string[] = [];
+    const catalog: IMcpServerCatalog = {
       getConnectionStatus: async () => ({
         enabled: true,
         state: "ready",
         checkedAt: "2026-03-19T00:00:00.000Z",
         servers: [],
-        capabilities: { tools: true, resources: true, toolExecution: true },
+        capabilities: { tools: true, resources: false, toolExecution: true },
       }),
-      listServers: async () => ({
-        query: "",
-        totalCount: 2,
-        limit: 20,
-        servers: [
-          {
-            id: "local",
-            name: "Local MCP",
-            transport: "inmemory",
-            status: "connected",
-            toolCount: 2,
-            resourceCount: 0,
-            capabilities: { tools: true, resources: false, toolExecution: true },
-          },
-          {
-            id: "remote",
-            name: "Remote MCP",
-            transport: "http",
-            status: "disconnected",
-            toolCount: 0,
-            resourceCount: 0,
-            capabilities: { tools: false, resources: false, toolExecution: false },
-          },
-        ],
-        status: {
+      listConfiguredServers: async () => [],
+      getServerStatus: async (serverId) => {
+        requests.push(serverId);
+        return {
+          serverId,
+          name: "Local MCP",
+          transport: "stdio",
+          configured: true,
           enabled: true,
-          state: "ready",
+          state: "connected",
+          connected: true,
           checkedAt: "2026-03-19T00:00:00.000Z",
-          servers: [],
+          connectedAt: "2026-03-19T00:00:00.000Z",
+          toolCount: 2,
+          resourceCount: 0,
           capabilities: { tools: true, resources: false, toolExecution: true },
-        },
-      }),
-      searchServers: async () => {
-        throw new Error("unused");
-      },
-      connectServer: async () => {
-        throw new Error("unused");
-      },
-      disconnectServer: async () => {
-        throw new Error("unused");
-      },
-      listTools: async () => [],
-      executeTool: async () => {
-        throw new Error("unused");
+        };
       },
     };
 
-    const result = await new GetMcpServerStatusUseCase(client).execute({ serverId: " local " });
+    const result = await new GetMcpServerStatusUseCase(catalog).execute({ serverId: " local " });
 
-    expect(result.status).toBe("connected");
-    expect(result.name).toBe("Local MCP");
+    expect(result.serverId).toBe("local");
+    expect(requests).toEqual(["local"]);
   });
 
-  it("rejects unknown server identifiers", async () => {
-    const client: IMcpRuntimeClient = {
+  it("rejects blank server identifiers", async () => {
+    const catalog: IMcpServerCatalog = {
       getConnectionStatus: async () => ({
-        enabled: true,
-        state: "ready",
+        enabled: false,
+        state: "disabled",
         checkedAt: "2026-03-19T00:00:00.000Z",
         servers: [],
         capabilities: { tools: false, resources: false, toolExecution: false },
       }),
-      listServers: async () => ({
-        query: "",
-        totalCount: 0,
-        limit: 20,
-        servers: [],
-        status: {
-          enabled: true,
-          state: "ready",
-          checkedAt: "2026-03-19T00:00:00.000Z",
-          servers: [],
-          capabilities: { tools: false, resources: false, toolExecution: false },
-        },
-      }),
-      searchServers: async () => {
-        throw new Error("unused");
-      },
-      connectServer: async () => {
-        throw new Error("unused");
-      },
-      disconnectServer: async () => {
-        throw new Error("unused");
-      },
-      listTools: async () => [],
-      executeTool: async () => {
+      listConfiguredServers: async () => [],
+      getServerStatus: async () => {
         throw new Error("unused");
       },
     };
 
-    await expect(new GetMcpServerStatusUseCase(client).execute({ serverId: "missing" })).rejects.toThrow("Unknown MCP server");
+    await expect(new GetMcpServerStatusUseCase(catalog).execute({ serverId: "   " })).rejects.toThrow("serverId");
   });
 });

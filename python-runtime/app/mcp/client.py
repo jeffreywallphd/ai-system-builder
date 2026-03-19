@@ -2,7 +2,7 @@ import uuid
 from typing import Any
 
 from app.core.mcp_config import McpServerConfig
-from app.mcp.models import McpResourceDescriptor, McpServerDescriptor, McpToolDescriptor, McpToolExecutionRequest, McpToolExecutionResult
+from app.mcp.models import McpResourceDescriptor, McpServerDescriptor, McpServerStatus, McpToolDescriptor, McpToolExecutionRequest, McpToolExecutionResult, utc_timestamp
 
 
 class McpConnectionError(RuntimeError):
@@ -14,40 +14,54 @@ class BoundedMcpClient:
         self._server = server
         self._connected = False
         self._last_error: str | None = None
+        self._checked_at: str | None = None
+        self._connected_at: str | None = None
+        self._disconnected_at: str | None = None
 
     @property
     def is_connected(self) -> bool:
         return self._connected
 
-    def connect(self, force: bool = False) -> McpServerDescriptor:
-        if force:
-            self._connected = False
-            self._last_error = None
+    def connect(self, force: bool = False) -> McpServerStatus:
+        if force and self._connected:
+            self.disconnect()
+
+        self._checked_at = utc_timestamp()
+        self._last_error = None
 
         if self._server.fail_connect:
-            self._connected = False
-            self._last_error = f"Unable to connect to MCP server '{self._server.id}'."
-            raise McpConnectionError(self._last_error)
+            return self._fail(f"Unable to connect to MCP server '{self._server.id}'.")
+        if self._server.transport == "stdio" and not self._server.command:
+            return self._fail(f"Configured stdio MCP server '{self._server.id}' is missing a command.")
+        if self._server.transport in {"http", "sse"} and not self._server.url:
+            return self._fail(f"Configured {self._server.transport} MCP server '{self._server.id}' is missing a url.")
 
         self._connected = True
+        self._connected_at = self._checked_at
         self._last_error = None
-        return self.describe(status="connected")
+        return self.status()
 
-    def disconnect(self) -> McpServerDescriptor:
+    def disconnect(self) -> McpServerStatus:
+        self._checked_at = utc_timestamp()
         self._connected = False
         self._last_error = None
-        return self.describe(status="disconnected")
+        self._disconnected_at = self._checked_at
+        return self.status()
 
-    def describe(self, status: str | None = None, error_message: str | None = None) -> McpServerDescriptor:
+    def status(self) -> McpServerStatus:
         tools = self.list_tools(allow_disconnected=True)
         resources = list(self._server.mock_resources)
-        effective_error = error_message or self._last_error
-        derived_status = status or ("error" if effective_error else ("connected" if self._connected else "disconnected"))
-        return McpServerDescriptor(
-            id=self._server.id,
+        return McpServerStatus(
+            server_id=self._server.id,
             name=self._server.name,
             transport=self._server.transport,
-            status=derived_status,
+            configured=True,
+            enabled=self._server.enabled,
+            state="error" if self._last_error else ("connected" if self._connected else "disconnected"),
+            connected=self._connected,
+            checked_at=self._checked_at or utc_timestamp(),
+            connected_at=self._connected_at,
+            disconnected_at=self._disconnected_at,
             tool_count=len(tools),
             resource_count=len(resources),
             capabilities={
@@ -55,8 +69,33 @@ class BoundedMcpClient:
                 "resources": bool(resources),
                 "toolExecution": bool(tools),
             },
-            metadata={**self._server.metadata},
-            error_message=effective_error,
+            error_message=self._last_error,
+            metadata=self._connection_metadata(),
+        )
+
+    def describe(self) -> McpServerDescriptor:
+        current_status = self.status()
+        return McpServerDescriptor(
+            id=self._server.id,
+            name=self._server.name,
+            transport=self._server.transport,
+            enabled=self._server.enabled,
+            command=self._server.command,
+            args=list(self._server.args),
+            url=self._server.url,
+            env=dict(self._server.env),
+            timeout_ms=self._server.timeout_ms,
+            connect_on_startup=self._server.connect_on_startup,
+            status=current_status.state,
+            connected=current_status.connected,
+            checked_at=current_status.checked_at,
+            connected_at=current_status.connected_at,
+            disconnected_at=current_status.disconnected_at,
+            tool_count=current_status.tool_count,
+            resource_count=current_status.resource_count,
+            capabilities=current_status.capabilities,
+            metadata={**self._server.metadata, **current_status.metadata},
+            error_message=current_status.error_message,
         )
 
     def list_tools(self, allow_disconnected: bool = False) -> list[McpToolDescriptor]:
@@ -153,3 +192,17 @@ class BoundedMcpClient:
             content=[{"type": "json", "json": args}],
             structured_content={"arguments": args},
         )
+
+    def _fail(self, message: str) -> McpServerStatus:
+        self._connected = False
+        self._last_error = message
+        self._disconnected_at = self._checked_at
+        raise McpConnectionError(message)
+
+    def _connection_metadata(self) -> dict[str, Any]:
+        metadata: dict[str, Any] = {**self._server.metadata, "connectionMode": "bounded-runtime"}
+        if self._server.transport == "stdio":
+            metadata["startupMode"] = "bounded-stdio"
+        elif self._server.transport in {"http", "sse"}:
+            metadata["connectionMode"] = "bounded-remote"
+        return metadata

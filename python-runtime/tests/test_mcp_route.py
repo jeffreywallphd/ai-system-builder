@@ -12,8 +12,8 @@ def override_service() -> McpService:
     config = McpRuntimeConfig(
         enabled=True,
         servers_json='['
-        '{"id": "local", "name": "Local MCP", "transport": "inmemory", "mock_tools": [{"name": "echo", "inputSchema": {"type": "object"}}, {"name": "sum_numbers", "inputSchema": {"type": "object"}}], "mock_resources": [{"uri": "memory://resource/1", "name": "Example Resource"}], "metadata": {"scope": "workspace"}},'
-        '{"id": "remote", "name": "Remote MCP", "transport": "http", "metadata": {"scope": "cloud"}}'
+        '{"id": "local", "name": "Local MCP", "transport": "stdio", "command": "python", "args": ["server.py"], "mock_tools": [{"name": "echo", "inputSchema": {"type": "object"}}, {"name": "sum_numbers", "inputSchema": {"type": "object"}}], "mock_resources": [{"uri": "memory://resource/1", "name": "Example Resource"}], "metadata": {"scope": "workspace"}},'
+        '{"id": "remote", "name": "Remote MCP", "transport": "http", "url": "http://localhost:9000/mcp", "metadata": {"scope": "cloud"}}'
         ']'
     )
     registry = McpRegistry(config)
@@ -31,8 +31,8 @@ def test_mcp_status_route() -> None:
     payload = response.json()
     assert payload["enabled"] is True
     assert payload["state"] == "ready"
-    assert payload["servers"][0]["toolCount"] == 2
-    assert payload["servers"][0]["status"] == "disconnected"
+    assert payload["servers"][0]["serverId"] == "local"
+    assert payload["servers"][0]["state"] == "disconnected"
 
 
 def test_mcp_servers_route_lists_configured_servers() -> None:
@@ -46,6 +46,7 @@ def test_mcp_servers_route_lists_configured_servers() -> None:
     payload = response.json()
     assert payload["totalCount"] == 2
     assert payload["servers"][0]["id"] == "local"
+    assert payload["servers"][0]["command"] == "python"
 
 
 def test_mcp_server_search_route_filters_by_query() -> None:
@@ -62,18 +63,21 @@ def test_mcp_server_search_route_filters_by_query() -> None:
     assert payload["servers"][0]["id"] == "remote"
 
 
-def test_mcp_connect_and_disconnect_routes_manage_lifecycle() -> None:
+def test_mcp_connect_disconnect_and_reconnect_routes_manage_lifecycle() -> None:
     app.dependency_overrides[get_mcp_service] = override_service
     client = TestClient(app)
 
     connect_response = client.post("/mcp/servers/connect", json={"serverId": "local"})
     disconnect_response = client.post("/mcp/servers/disconnect", json={"serverId": "local"})
+    reconnect_response = client.post("/mcp/servers/reconnect", json={"serverId": "local"})
 
     app.dependency_overrides.clear()
     assert connect_response.status_code == 200
     assert disconnect_response.status_code == 200
+    assert reconnect_response.status_code == 200
     assert connect_response.json()["server"]["status"] == "connected"
-    assert disconnect_response.json()["server"]["status"] == "disconnected"
+    assert disconnect_response.json()["status"]["state"] == "disconnected"
+    assert reconnect_response.json()["action"] == "reconnect"
 
 
 def test_mcp_tools_route_lists_tools_and_resources() -> None:

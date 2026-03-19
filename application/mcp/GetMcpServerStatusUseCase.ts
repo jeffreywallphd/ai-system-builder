@@ -1,26 +1,19 @@
-import type { IMcpRuntimeClient } from "../ports/interfaces/IMcpRuntimeClient";
-import type { McpServerDescriptor } from "./models/McpServerDescriptor";
+import type { IMcpServerCatalog } from "../ports/interfaces/IMcpServerCatalog";
+import type { McpServerStatus } from "./models/McpServerStatus";
 
 export interface IGetMcpServerStatusRequest {
   readonly serverId: string;
 }
 
 export class GetMcpServerStatusUseCase {
-  constructor(private readonly runtimeClient: IMcpRuntimeClient) {}
+  constructor(private readonly catalog: IMcpServerCatalog) {}
 
-  public async execute(request: IGetMcpServerStatusRequest): Promise<McpServerDescriptor> {
+  public async execute(request: IGetMcpServerStatusRequest): Promise<McpServerStatus> {
     const serverId = request.serverId.trim();
     if (!serverId) {
       throw new Error("MCP server status lookup requires a serverId.");
     }
 
-    const response = await this.runtimeClient.listServers();
-    const server = response.servers.find((item) => item.id === serverId);
-
-    if (!server) {
-      throw new Error(`Unknown MCP server '${serverId}'.`);
-    }
-
-    return server;
+    return this.catalog.getServerStatus(serverId);
   }
 }

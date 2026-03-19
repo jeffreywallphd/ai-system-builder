@@ -1,18 +1,18 @@
 import { describe, expect, it } from "bun:test";
-import { DisconnectMcpServerUseCase } from "../DisconnectMcpServerUseCase";
+import { ReconnectMcpServerUseCase } from "../ReconnectMcpServerUseCase";
 import type { IMcpServerManager } from "../../ports/interfaces/IMcpServerManager";
 
 function buildResult(serverId: string) {
   return {
-    action: "disconnect" as const,
+    action: "reconnect" as const,
     checkedAt: "2026-03-19T00:00:00.000Z",
     server: {
       id: serverId,
       name: "Local MCP",
       transport: "stdio" as const,
       enabled: true,
-      status: "disconnected" as const,
-      connected: false,
+      status: "connected" as const,
+      connected: true,
       toolCount: 2,
       resourceCount: 0,
       capabilities: { tools: true, resources: false, toolExecution: true },
@@ -23,13 +23,14 @@ function buildResult(serverId: string) {
       transport: "stdio" as const,
       configured: true,
       enabled: true,
-      state: "disconnected" as const,
-      connected: false,
+      state: "connected" as const,
+      connected: true,
       checkedAt: "2026-03-19T00:00:00.000Z",
-      disconnectedAt: "2026-03-19T00:00:00.000Z",
+      connectedAt: "2026-03-19T00:00:00.000Z",
       toolCount: 2,
       resourceCount: 0,
       capabilities: { tools: true, resources: false, toolExecution: true },
+      metadata: { reconnect: true },
     },
     runtime: {
       enabled: true,
@@ -41,25 +42,25 @@ function buildResult(serverId: string) {
   };
 }
 
-describe("DisconnectMcpServerUseCase", () => {
-  it("delegates a normalized disconnect request", async () => {
+describe("ReconnectMcpServerUseCase", () => {
+  it("delegates a normalized reconnect request", async () => {
     const requests: string[] = [];
     const manager: IMcpServerManager = {
       connectServer: async () => {
         throw new Error("unused");
       },
-      disconnectServer: async (serverId) => {
+      disconnectServer: async () => {
+        throw new Error("unused");
+      },
+      reconnectServer: async (serverId) => {
         requests.push(serverId);
         return buildResult(serverId);
       },
-      reconnectServer: async () => {
-        throw new Error("unused");
-      },
     };
 
-    const result = await new DisconnectMcpServerUseCase(manager).execute({ serverId: " local " });
+    const result = await new ReconnectMcpServerUseCase(manager).execute({ serverId: " local " });
 
-    expect(result.server.status).toBe("disconnected");
+    expect(result.action).toBe("reconnect");
     expect(requests).toEqual(["local"]);
   });
 
@@ -70,6 +71,6 @@ describe("DisconnectMcpServerUseCase", () => {
       reconnectServer: async () => buildResult("unused"),
     };
 
-    await expect(new DisconnectMcpServerUseCase(manager).execute({ serverId: "  " })).rejects.toThrow("serverId");
+    await expect(new ReconnectMcpServerUseCase(manager).execute({ serverId: "  " })).rejects.toThrow("serverId");
   });
 });

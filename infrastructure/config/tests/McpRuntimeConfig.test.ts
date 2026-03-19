@@ -22,6 +22,16 @@ describe("McpRuntimeConfig", () => {
           transport: "stdio",
           command: "python",
           args: ["server.py"],
+          env: { MCP_MODE: "test" },
+          timeoutMs: 9000,
+          connectOnStartup: true,
+        },
+        {
+          id: "remote",
+          name: "Remote MCP",
+          transport: "http",
+          url: "http://localhost:9000/mcp",
+          enabled: false,
         },
       ]),
     });
@@ -29,7 +39,27 @@ describe("McpRuntimeConfig", () => {
     expect(config.enabled).toBe(true);
     expect(config.timeoutMs).toBe(2500);
     expect(config.connectOnStartup).toBe(true);
-    expect(config.servers[0]?.id).toBe("local");
-    expect(config.servers[0]?.args).toEqual(["server.py"]);
+    expect(config.servers[0]?.command).toBe("python");
+    expect(config.servers[0]?.env).toEqual({ MCP_MODE: "test" });
+    expect(config.servers[0]?.timeoutMs).toBe(9000);
+    expect(config.servers[1]?.enabled).toBe(false);
+  });
+
+  it("rejects invalid transport-specific configuration", () => {
+    expect(
+      () =>
+        new McpRuntimeConfig({
+          enabled: true,
+          servers: [{ id: "local", name: "Local MCP", transport: "stdio" }],
+        }),
+    ).toThrow("requires a command");
+
+    expect(
+      () =>
+        new McpRuntimeConfig({
+          enabled: true,
+          servers: [{ id: "remote", name: "Remote MCP", transport: "http" }],
+        }),
+    ).toThrow("requires a url");
   });
 });

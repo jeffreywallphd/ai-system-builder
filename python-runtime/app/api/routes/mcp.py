@@ -71,6 +71,19 @@ def disconnect_mcp_server(
         raise HTTPException(status_code=503, detail=str(error)) from error
 
 
+@router.post("/servers/reconnect", response_model=McpServerConnectionResult)
+def reconnect_mcp_server(
+    request: McpServerDisconnectRequest,
+    service: McpService = Depends(get_mcp_service),
+) -> McpServerConnectionResult:
+    try:
+        return service.reconnect_server(request.server_id)
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except RuntimeError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+
+
 @router.get("/tools", response_model=ListMcpToolsResponse)
 def list_mcp_tools(service: McpService = Depends(get_mcp_service)) -> ListMcpToolsResponse:
     return service.list_tools()

@@ -33,23 +33,25 @@ class McpService:
                 metadata={"configuredServerCount": 0},
             )
 
-        server_descriptors = self._sessions.list_servers()
-        has_error = any(server.status == "error" for server in server_descriptors)
-        state = "degraded" if has_error and server_descriptors else "ready"
-        if not server_descriptors:
+        statuses = self._sessions.list_statuses()
+        if not statuses:
             state = "unavailable"
+        elif any(server.state == "error" for server in statuses):
+            state = "degraded"
+        else:
+            state = "ready"
 
         return McpConnectionStatus(
             enabled=True,
             state=state,
             checked_at=utc_timestamp(),
-            servers=server_descriptors,
+            servers=statuses,
             capabilities={
-                "tools": any(server.capabilities.get("tools", False) for server in server_descriptors),
-                "resources": any(server.capabilities.get("resources", False) for server in server_descriptors),
-                "toolExecution": any(server.capabilities.get("toolExecution", False) for server in server_descriptors),
+                "tools": any(server.capabilities.get("tools", False) for server in statuses),
+                "resources": any(server.capabilities.get("resources", False) for server in statuses),
+                "toolExecution": any(server.capabilities.get("toolExecution", False) for server in statuses),
             },
-            metadata={"configuredServerCount": len(server_descriptors)},
+            metadata={"configuredServerCount": len(statuses)},
         )
 
     def get_snapshot(self) -> McpSnapshot:
@@ -57,12 +59,13 @@ class McpService:
         return McpSnapshot(status=self.get_status(), servers=snapshots)
 
     def list_servers(self) -> McpServerSearchResponse:
+        servers = self._sessions.list_servers() if self._registry.is_enabled() else []
         status = self.get_status()
         return McpServerSearchResponse(
             query="",
-            total_count=len(status.servers),
-            limit=max(len(status.servers), 20),
-            servers=status.servers,
+            total_count=len(servers),
+            limit=max(len(servers), 20),
+            servers=servers,
             status=status,
         )
 
@@ -89,7 +92,7 @@ class McpService:
                 and (not transports or server.transport in transports)
             )
 
-        matches_list = [server for server in status.servers if matches(server)]
+        matches_list = [server for server in self._sessions.list_servers() if matches(server)] if self._registry.is_enabled() else []
         return McpServerSearchResponse(
             query=request.query.strip(),
             total_count=len(matches_list),
@@ -98,23 +101,41 @@ class McpService:
             status=status,
         )
 
-    def get_snapshot_for_server(self, server_id: str) -> McpServerDescriptor:
+    def get_server_status(self, server_id: str):
         normalized = server_id.strip()
         if not normalized:
             raise ValueError("MCP serverId is required.")
-        return self._sessions.describe_server(normalized)
+        return self._sessions.get_server_status(normalized)
 
     def connect_server(self, request: McpServerConnectionRequest) -> McpServerConnectionResult:
+        if request.reconnect:
+            return self.reconnect_server(request.server_id)
+
         if not self._registry.is_enabled():
             raise RuntimeError("MCP runtime is disabled.")
 
-        server = self._sessions.connect_server(request.server_id, reconnect=request.reconnect)
+        server = self._sessions.connect_server(request.server_id, reconnect=False)
         return McpServerConnectionResult(
-            action="reconnect" if request.reconnect else "connect",
+            action="connect",
             server=server,
-            status=self.get_status(),
+            status=self._sessions.get_server_status(request.server_id),
+            runtime=self.get_status(),
             checked_at=utc_timestamp(),
-            metadata={"reconnect": request.reconnect},
+            metadata={"reconnect": False},
+        )
+
+    def reconnect_server(self, server_id: str) -> McpServerConnectionResult:
+        if not self._registry.is_enabled():
+            raise RuntimeError("MCP runtime is disabled.")
+
+        server = self._sessions.connect_server(server_id, reconnect=True)
+        return McpServerConnectionResult(
+            action="reconnect",
+            server=server,
+            status=self._sessions.get_server_status(server_id),
+            runtime=self.get_status(),
+            checked_at=utc_timestamp(),
+            metadata={"reconnect": True},
         )
 
     def disconnect_server(self, server_id: str) -> McpServerConnectionResult:
@@ -125,7 +146,8 @@ class McpService:
         return McpServerConnectionResult(
             action="disconnect",
             server=server,
-            status=self.get_status(),
+            status=self._sessions.get_server_status(server_id),
+            runtime=self.get_status(),
             checked_at=utc_timestamp(),
         )
 
