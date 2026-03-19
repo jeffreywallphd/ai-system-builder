@@ -299,6 +299,94 @@ function dedupeConsecutiveMessages(messages: ChatMessage[]): ChatMessage[] {
   }, []);
 }
 
+function getRequiredToolArgumentNames(tool: ToolRuntimeDefinition): string[] {
+  const schema = ensureObjectRecord(tool.inputSchema);
+  const required = schema.required;
+  if (!Array.isArray(required)) {
+    return [];
+  }
+
+  return required.filter((value): value is string => typeof value === "string" && value.trim().length > 0);
+}
+
+function toToolCall(value: unknown): ToolCall | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const record = value as Record<string, unknown>;
+  const name = typeof record.name === "string" ? record.name.trim() : "";
+  if (!name) {
+    return undefined;
+  }
+
+  const argumentsValue = record.arguments ?? record.args;
+  return {
+    name,
+    arguments: ensureObjectRecord(argumentsValue),
+  } satisfies ToolCall;
+}
+
+function pickToolForTask(task: string, tools: readonly ToolRuntimeDefinition[]): ToolRuntimeDefinition | undefined {
+  if (tools.length === 0) {
+    return undefined;
+  }
+
+  const normalizedTask = task.toLowerCase();
+  const exact = tools.find((tool) => normalizedTask.includes(tool.name.toLowerCase()));
+  if (exact) {
+    return exact;
+  }
+
+  const keywordTriggered = tools.find((tool) => {
+    const description = tool.description.toLowerCase();
+    return ["search", "find", "lookup", "retrieve", "tool"].some(
+      (keyword) => normalizedTask.includes(keyword) && description.includes(keyword)
+    );
+  });
+
+  return keywordTriggered ?? tools[0];
+}
+
+function buildDeterministicToolResult(options: {
+  readonly tool: ToolRuntimeDefinition;
+  readonly argumentsRecord: Record<string, unknown>;
+}): {
+  readonly toolCall: ToolCall;
+  readonly toolResult: Readonly<Record<string, unknown>>;
+  readonly resultText: string;
+  readonly missingRequiredArguments: ReadonlyArray<string>;
+} {
+  const { tool, argumentsRecord } = options;
+  const missingRequiredArguments = getRequiredToolArgumentNames(tool).filter(
+    (name) => argumentsRecord[name] === undefined || argumentsRecord[name] === null || normalizeText(argumentsRecord[name]).trim() === ""
+  );
+  const primaryInput = normalizeText(
+    argumentsRecord.input ?? argumentsRecord.query ?? argumentsRecord.request ?? argumentsRecord.text
+  ).trim();
+  const toolCall = {
+    name: tool.name,
+    arguments: argumentsRecord,
+  } satisfies ToolCall;
+  const toolResult = {
+    toolName: tool.name,
+    arguments: argumentsRecord,
+    missingRequiredArguments,
+    status: missingRequiredArguments.length > 0 ? "missing-required-arguments" : "completed",
+    output:
+      primaryInput || Object.keys(argumentsRecord).length > 0
+        ? `${tool.description} :: ${primaryInput || stringifyValue(argumentsRecord)}`
+        : `${tool.description} :: no arguments provided`,
+  } as const;
+
+  return {
+    toolCall,
+    toolResult,
+    resultText: stringifyValue(toolResult),
+    missingRequiredArguments,
+  };
+}
+
 function tokenize(value: string): string[] {
   return value
     .toLowerCase()
@@ -1272,43 +1360,85 @@ export class LangChainNodeExecutor implements INodeExecutor {
       };
     }
 
-    if (supportsNodeType(nodeType, "langchain.tool_call_executor")) {
-      const tool = ensureObjectRecord(inputs.tool);
-      const argumentsRecord = ensureObjectRecord(inputs.arguments);
+    if (supportsNodeType(nodeType, "langchain.tool_execution", "langchain.tool_call_executor")) {
+      const toolCall = toToolCall(inputs.toolCall);
+      const toolRecord = ensureObjectRecord(inputs.tool);
+      const tool =
+        typeof toolRecord.name === "string" && typeof toolRecord.description === "string"
+          ? ({
+              name: toolRecord.name,
+              description: toolRecord.description,
+              inputSchema: ensureObjectRecord(toolRecord.inputSchema),
+              strictSchema:
+                typeof toolRecord.strictSchema === "boolean" ? toolRecord.strictSchema : undefined,
+              handler: toolRecord.handler,
+            } satisfies ToolRuntimeDefinition)
+          : undefined;
+      const argumentsInput = ensureObjectRecord(inputs.arguments);
+      const argumentsRecord =
+        Object.keys(argumentsInput).length > 0
+          ? argumentsInput
+          : ensureObjectRecord(toolCall?.arguments);
       const failOnMissingArgs = Boolean(properties.failOnMissingArgs ?? true);
       const stringifyResult = Boolean(properties.stringifyResult ?? true);
-      const missingArgs = failOnMissingArgs && Object.keys(argumentsRecord).length === 0;
-      const toolName = typeof tool.name === "string" ? tool.name : "unnamed-tool";
-      const toolResult = {
-        toolName,
-        arguments: argumentsRecord,
-        status: missingArgs ? "missing-arguments" : "completed",
-      };
+      const missingTool = !tool;
+      const missingArguments = !missingTool && Object.keys(argumentsRecord).length === 0;
+      const executed =
+        tool && !missingArguments
+          ? buildDeterministicToolResult({
+              tool,
+              argumentsRecord,
+            })
+          : tool
+            ? buildDeterministicToolResult({
+                tool,
+                argumentsRecord,
+              })
+            : undefined;
+      const blockedByValidation =
+        Boolean(failOnMissingArgs) &&
+        (missingArguments || (executed?.missingRequiredArguments.length ?? 0) > 0);
+      const toolName = tool?.name ?? toolCall?.name ?? "unnamed-tool";
+      const toolResult =
+        missingTool
+          ? {
+              toolName,
+              arguments: argumentsRecord,
+              missingRequiredArguments: [],
+              status: "missing-tool",
+              output: "No executable tool definition was provided.",
+            }
+          : executed?.toolResult;
 
       return {
         nodeId: context.node.id,
-        status: missingArgs ? "failed" : "completed",
+        status: missingTool || blockedByValidation ? "failed" : "completed",
         outputs: {
+          toolCall: executed?.toolCall ?? toolCall,
           toolResult,
-          resultText: stringifyResult ? stringifyValue(toolResult) : undefined,
+          resultText: stringifyResult && toolResult ? stringifyValue(toolResult) : undefined,
         },
         messages: [
-          missingArgs
-            ? `Tool '${toolName}' could not run because no arguments were provided.`
-            : `Executed tool '${toolName}' with ${Object.keys(argumentsRecord).length} argument field(s).`,
+          missingTool
+            ? "Tool execution requires a tool definition input."
+            : blockedByValidation
+              ? `Tool '${toolName}' was blocked because required inputs were missing.`
+              : `Executed tool '${toolName}' with ${Object.keys(argumentsRecord).length} argument field(s).`,
         ],
         errorMessage:
-          missingArgs
-            ? `Tool '${toolName}' could not run because no arguments were provided.`
-            : undefined,
+          missingTool
+            ? "Tool execution requires a tool definition input."
+            : blockedByValidation
+              ? `Tool '${toolName}' was blocked because required inputs were missing.`
+              : undefined,
       };
     }
 
-    if (supportsNodeType(nodeType, "langchain.agent")) {
+    if (supportsNodeType(nodeType, "langchain.simple_agent", "langchain.agent")) {
       const model = String(properties.model ?? "");
       const systemPrompt = normalizeText(properties.systemPrompt);
       const temperature = Number(properties.temperature ?? 0.7);
-      const maxIterations = Math.max(1, Number(properties.maxIterations ?? 5));
+      const maxIterations = Math.max(1, Number(properties.maxIterations ?? 3));
       const useMemory = Boolean(properties.useMemory ?? true);
       const verbose = Boolean(properties.verbose ?? false);
       const history = useMemory ? toChatMessages(inputs.history) : [];
@@ -1331,19 +1461,22 @@ export class LangChainNodeExecutor implements INodeExecutor {
 
       const latestUserInput =
         assembledMessages.filter((message) => message.role === "user").at(-1)?.content ?? directInput;
-      const toolCalls: ToolCall[] =
-        tools.length > 0 && latestUserInput
-          ? [
-              {
-                name: tools[0].name,
-                arguments: { input: latestUserInput },
-              },
-            ]
-          : [];
+      const chosenTool = latestUserInput ? pickToolForTask(latestUserInput, tools) : undefined;
+      const firstPassArguments = latestUserInput ? { input: latestUserInput } : {};
+      const executedTool =
+        chosenTool && latestUserInput
+          ? buildDeterministicToolResult({
+              tool: chosenTool,
+              argumentsRecord: firstPassArguments,
+            })
+          : undefined;
+      const iterationCount = latestUserInput ? (executedTool ? Math.min(maxIterations, 2) : 1) : 0;
       const response = latestUserInput
-        ? `[${model || "agent-model"}] ${latestUserInput}${
-            tools.length > 0 ? `\n\nTools available: ${tools.map((tool) => tool.name).join(", ")}.` : ""
-          }`
+        ? executedTool
+          ? `[${model || "assistant-model"}] ${latestUserInput}
+
+Used tool '${chosenTool?.name}' and observed: ${normalizeText(executedTool.toolResult.output)}`
+          : `[${model || "assistant-model"}] ${latestUserInput}`
         : "";
 
       return {
@@ -1354,21 +1487,24 @@ export class LangChainNodeExecutor implements INodeExecutor {
           messages: response
             ? [...assembledMessages, { role: "assistant", content: response }]
             : assembledMessages,
-          toolCalls,
+          toolCalls: executedTool ? [executedTool.toolCall] : [],
+          toolResults: executedTool ? [executedTool.toolResult] : [],
           trace: verbose
             ? {
                 temperature,
                 maxIterations,
+                iterationCount,
                 toolCount: tools.length,
+                selectedTool: chosenTool?.name,
               }
             : undefined,
         },
         messages: [
           response
-            ? `Agent completed a bounded run with ${Math.min(maxIterations, 1)} iteration(s).`
-            : "Agent requires messages or input text.",
+            ? `AI assistant completed a bounded run in ${iterationCount} iteration(s).`
+            : "AI assistant requires messages or input text.",
         ],
-        errorMessage: response ? undefined : "Agent requires messages or input text.",
+        errorMessage: response ? undefined : "AI assistant requires messages or input text.",
       };
     }
 

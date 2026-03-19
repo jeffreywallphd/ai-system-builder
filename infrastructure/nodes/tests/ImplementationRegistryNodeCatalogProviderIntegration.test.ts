@@ -11,8 +11,8 @@ describe("ImplementationRegistryNodeCatalogProvider integration", () => {
     const definitions = await provider.getAllDefinitions();
     const categories = await provider.getCategories();
 
-    expect(definitions.find((definition) => definition.type === "langchain.agent")?.category).toBe(
-      "LangChain"
+    expect(definitions.find((definition) => definition.type === "langchain.simple_agent")?.category).toBe(
+      "LangChain / Assistants"
     );
     expect(
       definitions.find((definition) => definition.type === "shared.document-uploader")?.description

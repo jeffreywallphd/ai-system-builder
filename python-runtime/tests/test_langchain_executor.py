@@ -103,6 +103,53 @@ def test_tool_definition_returns_manifest() -> None:
     assert result['tool']['inputSchema']['properties'] == {'query': {'type': 'string'}}
 
 
+def test_tool_execution_normalizes_tool_call_and_result() -> None:
+    executor = LangChainExecutor()
+    result = executor.execute(
+        'langchain.tool_execution',
+        inputs={
+            'tool': {
+                'name': 'search_docs',
+                'description': 'Search project documents.',
+                'inputSchema': {'type': 'object', 'required': ['query']},
+            },
+            'toolCall': {'name': 'search_docs', 'arguments': {'query': 'workflow nodes'}},
+        },
+        properties={'failOnMissingArgs': True, 'stringifyResult': True},
+    )
+
+    assert result['toolCall'] == {'name': 'search_docs', 'arguments': {'query': 'workflow nodes'}}
+    assert result['toolResult']['status'] == 'completed'
+    assert result['toolResult']['missingRequiredArguments'] == []
+    assert 'Search project documents.' in result['toolResult']['output']
+
+
+
+def test_simple_agent_uses_one_tool_in_bounded_mode() -> None:
+    executor = LangChainExecutor()
+    result = executor.execute(
+        'langchain.simple_agent',
+        inputs={
+            'input': 'Please search the workflow docs for node editor tips.',
+            'tools': [{'name': 'search_docs', 'description': 'Search project documents.'}],
+            'history': [{'role': 'user', 'content': 'Hi'}],
+        },
+        properties={
+            'model': 'assistant-demo',
+            'systemPrompt': 'Be helpful.',
+            'temperature': 0.2,
+            'maxIterations': 2,
+            'useMemory': True,
+            'verbose': True,
+        },
+    )
+
+    assert result['response'].startswith('[assistant-demo] Please search the workflow docs')
+    assert result['toolCalls'] == [{'name': 'search_docs', 'arguments': {'input': 'Please search the workflow docs for node editor tips.'}}]
+    assert result['toolResults'][0]['status'] == 'completed'
+    assert result['trace']['iterationCount'] == 2
+
+
 def test_vector_store_upsert_and_similarity_search_return_documents() -> None:
     executor = LangChainExecutor()
     upsert = executor.execute(
