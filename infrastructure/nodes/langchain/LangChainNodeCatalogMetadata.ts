@@ -857,9 +857,9 @@ export const LANGCHAIN_NODE_CATALOG_METADATA: Readonly<
     technicalName: "langchain.simple_agent",
     nonTechnicalName: "AI Assistant",
     technicalDescription:
-      "Runs a bounded single-assistant loop that can optionally choose one tool, use it, and return a final response.",
+      "Runs a bounded assistant loop that can inspect available tools, honor a selected subset, execute a few tool steps, and return a final response.",
     nonTechnicalDescription:
-      "Let the AI respond directly or use one tool once before answering.",
+      "Let the AI respond directly or use a small, inspectable sequence of tools before answering.",
     inputPorts: Object.freeze([
       inputPort(
         "messages",
@@ -881,6 +881,13 @@ export const LANGCHAIN_NODE_CATALOG_METADATA: Readonly<
         ["generic", "json"],
         true,
         "Optional tool definition list the assistant may use during its bounded run."
+      ),
+      inputPort(
+        "selectedTools",
+        "Selected Tools",
+        ["generic", "json"],
+        true,
+        "Optional explicit subset of tool IDs or descriptors that further bounds which tools the assistant may use."
       ),
       inputPort(
         "history",
@@ -909,6 +916,30 @@ export const LANGCHAIN_NODE_CATALOG_METADATA: Readonly<
         "Tool Results",
         ["tool-result", "json"],
         "Structured tool results produced during the assistant run."
+      ),
+      outputPort(
+        "stepResults",
+        "Step Results",
+        ["json"],
+        "Structured step-by-step reasoning and execution summaries for each bounded tool-use iteration."
+      ),
+      outputPort(
+        "selectedTools",
+        "Selected Tools",
+        ["json"],
+        "The bounded tool subset actually exposed to the assistant for this run."
+      ),
+      outputPort(
+        "availableTools",
+        "Available Tools",
+        ["json"],
+        "The full tool list inspected before the assistant began its bounded run."
+      ),
+      outputPort(
+        "trace",
+        "Trace",
+        ["json"],
+        "Optional execution trace with iteration counts, provider usage, and stop reasons."
       ),
     ]),
     properties: Object.freeze([

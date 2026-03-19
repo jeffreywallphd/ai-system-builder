@@ -138,3 +138,34 @@ def test_execute_node_route_mcp_tool_call_executes_selected_tool() -> None:
     assert payload['status'] == 'completed'
     assert payload['outputs']['structuredContent']['total'] == 12
     assert payload['outputs']['result']['toolName'] == 'sum_numbers'
+
+
+def test_execute_node_route_simple_agent_returns_bounded_step_results() -> None:
+    app.dependency_overrides[get_runtime_service] = build_runtime_service
+    client = TestClient(app)
+
+    response = client.post('/execute/node', json={
+        'node_id': 'agent-1',
+        'node_type': 'langchain.simple_agent',
+        'properties': {'model': 'route-agent', 'maxIterations': 1, 'verbose': True},
+        'inputs': {
+            'input': 'Please echo this through MCP.',
+            'tools': [
+                {
+                    'id': 'mcp:local:echo',
+                    'displayName': 'Local Echo',
+                    'description': 'Echo text through MCP.',
+                    'provider': {'kind': 'mcp', 'id': 'python-mcp-runtime', 'label': 'MCP Tools'},
+                    'source': {'serverId': 'local', 'toolName': 'echo'},
+                },
+            ],
+            'selectedTools': ['mcp:local:echo'],
+        },
+    })
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload['outputs']['stepResults'][0]['provider']['kind'] == 'mcp'
+    assert payload['outputs']['toolResults'][0]['source']['serverId'] == 'local'
+    assert payload['outputs']['trace']['iterationCount'] == 1
