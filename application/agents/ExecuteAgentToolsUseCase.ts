@@ -59,9 +59,10 @@ export class ExecuteAgentToolsUseCase {
       ...result,
       input,
       maxIterations,
+      iterationCount: Math.min(maxIterations, Math.max(0, Math.trunc(result.iterationCount ?? result.steps.length))),
       availableTools,
       selectedTools,
-      steps: Object.freeze([...result.steps]),
+      steps: Object.freeze(result.steps.map((step) => Object.freeze({ ...step }))),
       metadata: result.metadata ? Object.freeze({ ...result.metadata }) : result.metadata,
     });
   }
@@ -79,6 +80,12 @@ export class ExecuteAgentToolsUseCase {
     const providerKinds = new Set<ToolCapabilityProviderKind>(selection.providerKinds ?? []);
     const source = selection.source;
 
+    this.validateSelection(selection.mode, capabilityIds, providerKinds, source);
+
+    if (selection.mode === "all") {
+      return [...availableTools];
+    }
+
     if (capabilityIds.length > 0) {
       const selectedById = capabilityIds.map((capabilityId) => {
         const match = availableTools.find((tool) => tool.id === capabilityId);
@@ -92,6 +99,33 @@ export class ExecuteAgentToolsUseCase {
     }
 
     return this.filterByProviderAndSource(availableTools, providerKinds, source);
+  }
+
+  private validateSelection(
+    mode: AgentExecutionRequest["toolSelection"] extends infer T
+      ? T extends { mode: infer M }
+        ? M
+        : never
+      : never,
+    capabilityIds: ReadonlyArray<string>,
+    providerKinds: ReadonlySet<ToolCapabilityProviderKind>,
+    source?: ToolCapabilitySourceDescriptor
+  ): void {
+    if (mode === "capabilityIds" && capabilityIds.length === 0) {
+      throw new Error("Agent tool selection mode 'capabilityIds' requires at least one capability id.");
+    }
+
+    if (mode === "providerKinds" && providerKinds.size === 0) {
+      throw new Error("Agent tool selection mode 'providerKinds' requires at least one provider kind.");
+    }
+
+    if (mode === "source" && !source) {
+      throw new Error("Agent tool selection mode 'source' requires a source filter.");
+    }
+
+    if (mode === "mixed" && capabilityIds.length === 0 && providerKinds.size === 0 && !source) {
+      throw new Error("Agent tool selection mode 'mixed' requires at least one filter.");
+    }
   }
 
   private filterByProviderAndSource(

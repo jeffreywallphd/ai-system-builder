@@ -42,6 +42,8 @@ function makeExecutionResult(
     status: overrides.status ?? "completed",
     input: overrides.input ?? request.input,
     maxIterations: overrides.maxIterations ?? request.maxIterations,
+    iterationCount: overrides.iterationCount ?? overrides.steps?.length ?? 0,
+    stoppedReason: overrides.stoppedReason ?? "completed",
     availableTools: overrides.availableTools ?? request.availableTools,
     selectedTools: overrides.selectedTools ?? request.selectedTools,
     steps: overrides.steps ?? [],
@@ -117,9 +119,11 @@ describe("ExecuteAgentToolsUseCase", () => {
       {
         async execute(request) {
           return makeExecutionResult(request, {
+            iterationCount: 1,
             steps: [
               {
                 stepIndex: 1,
+                taskInput: "Add 2 and 3",
                 capabilityId: capability.id,
                 displayName: capability.displayName,
                 provider: capability.provider,
@@ -127,6 +131,7 @@ describe("ExecuteAgentToolsUseCase", () => {
                 status: "completed",
                 reasoning: "The task asks for arithmetic.",
                 invocationArguments: { numbers: [2, 3] },
+                resultText: "5",
                 result: {
                   capabilityId: capability.id,
                   executionId: "tool-exec-1",
@@ -146,7 +151,9 @@ describe("ExecuteAgentToolsUseCase", () => {
 
     const result = await useCase.execute({ input: "Add 2 and 3", maxIterations: 1 });
 
+    expect(result.iterationCount).toBe(1);
     expect(result.steps).toHaveLength(1);
+    expect(result.steps[0]?.taskInput).toBe("Add 2 and 3");
     expect(result.steps[0]?.reasoning).toContain("arithmetic");
     expect(result.steps[0]?.result?.structuredContent).toEqual({ total: 5 });
     expect(result.finalOutput).toBe("Computed 5.");
@@ -211,5 +218,23 @@ describe("ExecuteAgentToolsUseCase", () => {
     expect((capturedRequest?.metadata?.workflowContext as { promptText?: string })?.promptText).toBe(
       "Policy: stay concise."
     );
+  });
+
+  it("rejects invalid provider-kind selection requests before orchestration", async () => {
+    const useCase = new ExecuteAgentToolsUseCase(
+      makeCatalog([makeCapability({ id: "workflow:tool-a" })]),
+      {
+        async execute(request) {
+          return makeExecutionResult(request);
+        },
+      } satisfies IAgentToolOrchestrator
+    );
+
+    await expect(
+      useCase.execute({
+        input: "Run a provider-scoped agent task",
+        toolSelection: { mode: "providerKinds", providerKinds: [] },
+      })
+    ).rejects.toThrow("requires at least one provider kind");
   });
 });
