@@ -38,8 +38,7 @@ import { RuntimeEventBuffer } from "../../application/runtime/RuntimeEventBuffer
 import { HttpPythonRuntimeClient } from "../../infrastructure/python/client/HttpPythonRuntimeClient";
 import { PythonRuntimeConfig } from "../../infrastructure/config/PythonRuntimeConfig";
 import { NodeProcessRuntimeEventSink } from "../../infrastructure/python/runtime/NodeProcessRuntimeEventSink";
-import { PythonRuntimeLauncher } from "../../infrastructure/python/runtime/PythonRuntimeLauncher";
-import { PythonRuntimeProcessManager } from "../../infrastructure/python/runtime/PythonRuntimeProcessManager";
+import { BrowserPythonRuntimeManager } from "../../infrastructure/python/runtime/BrowserPythonRuntimeManager";
 import { RuntimeConsoleStore } from "../state/RuntimeConsoleStore";
 import { LocalStorageUiSettingsStorage, UiSettingsStore } from "../settings/UiSettingsStore";
 
@@ -167,16 +166,10 @@ export function createUiDependencies(
   const runtimeClient = settings.runtime.mode === "disabled"
     ? createDisabledRuntimeClient()
     : new HttpPythonRuntimeClient(pythonRuntimeConfig);
-  const pythonRuntimeManager = new PythonRuntimeProcessManager({
+  const pythonRuntimeManager = new BrowserPythonRuntimeManager({
     client: runtimeClient,
-    launcher: new PythonRuntimeLauncher({
-      spawn: () => {
-        throw new Error("Node child process spawning is unavailable in browser composition.");
-      },
-    }),
     eventSink: runtimeEventSink,
     config: pythonRuntimeConfig,
-    autoStartEnabled: settings.runtime.mode === "disabled" ? false : settings.runtime.autoStartEnabled,
   });
   const runtimeConsoleStore = new RuntimeConsoleStore({
     runtimeEventStore,
