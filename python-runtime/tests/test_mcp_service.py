@@ -82,7 +82,8 @@ def test_mcp_service_lists_tools_and_resources() -> None:
     assert response.status.state == "ready"
     assert len(response.tools) == 1
     assert response.tools[0].name == "echo"
-    assert response.resources[0]["uri"] == "memory://doc"
+    assert response.resources[0].uri == "memory://doc"
+    assert response.resources[0].server_id == "local"
 
 
 def test_mcp_service_executes_bounded_tool() -> None:

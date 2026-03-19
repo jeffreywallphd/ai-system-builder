@@ -2,7 +2,7 @@ import uuid
 from typing import Any
 
 from app.core.mcp_config import McpServerConfig
-from app.mcp.models import McpServerDescriptor, McpToolDescriptor, McpToolExecutionRequest, McpToolExecutionResult
+from app.mcp.models import McpResourceDescriptor, McpServerDescriptor, McpToolDescriptor, McpToolExecutionRequest, McpToolExecutionResult
 
 
 class McpConnectionError(RuntimeError):
@@ -79,10 +79,24 @@ class BoundedMcpClient:
             )
         return descriptors
 
-    def list_resources(self) -> list[dict[str, Any]]:
+    def list_resources(self) -> list[McpResourceDescriptor]:
         if not self._connected:
             self.connect()
-        return [dict(resource) for resource in self._server.mock_resources]
+
+        descriptors: list[McpResourceDescriptor] = []
+        for resource in self._server.mock_resources:
+            descriptors.append(
+                McpResourceDescriptor(
+                    server_id=self._server.id,
+                    uri=str(resource.get("uri", resource.get("name", "resource://unknown"))),
+                    name=resource.get("name"),
+                    title=resource.get("title"),
+                    description=resource.get("description"),
+                    mime_type=resource.get("mimeType") or resource.get("mime_type"),
+                    metadata=resource.get("metadata", {}),
+                )
+            )
+        return descriptors
 
     def execute_tool(self, request: McpToolExecutionRequest) -> McpToolExecutionResult:
         if not self._connected:

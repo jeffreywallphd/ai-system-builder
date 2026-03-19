@@ -2,6 +2,7 @@ import type { IMcpRuntimeClient } from "../../../application/ports/interfaces/IM
 import type { IRuntimeEventSink } from "../../../application/ports/interfaces/IRuntimeEventSink";
 import { RuntimeEventSources } from "../../../application/runtime/RuntimeEvent";
 import type { McpConnectionStatus } from "../../../application/mcp/models/McpConnectionStatus";
+import type { McpResourceDescriptor } from "../../../application/mcp/models/McpResourceDescriptor";
 import type { McpServerConnectionRequest } from "../../../application/mcp/models/McpServerConnectionRequest";
 import type { McpServerConnectionResult } from "../../../application/mcp/models/McpServerConnectionResult";
 import type { McpServerSearchCriteria } from "../../../application/mcp/models/McpServerSearchCriteria";
@@ -11,6 +12,11 @@ import type { McpToolExecutionRequest } from "../../../application/mcp/models/Mc
 import type { McpToolExecutionResult } from "../../../application/mcp/models/McpToolExecutionResult";
 import { PythonRuntimeError } from "../client/PythonRuntimeError";
 import { PythonRuntimeConfig } from "../../config/PythonRuntimeConfig";
+
+interface McpCatalogSnapshot {
+  readonly tools: ReadonlyArray<McpToolDescriptor>;
+  readonly resources: ReadonlyArray<McpResourceDescriptor>;
+}
 
 export class HttpMcpRuntimeClient implements IMcpRuntimeClient {
   private readonly baseUrl: string;
@@ -154,10 +160,18 @@ export class HttpMcpRuntimeClient implements IMcpRuntimeClient {
 
   public async listTools(): Promise<ReadonlyArray<McpToolDescriptor>> {
     try {
-      const payload = await this.request<{ readonly tools: ReadonlyArray<McpToolDescriptor> }>("GET", "/mcp/tools");
-      return payload.tools;
+      return (await this.listCatalogSnapshot()).tools;
     } catch (error) {
       this.emitError("MCP tool discovery request failed.", error, "mcp-connection-failure");
+      throw error;
+    }
+  }
+
+  public async listResources(): Promise<ReadonlyArray<McpResourceDescriptor>> {
+    try {
+      return (await this.listCatalogSnapshot()).resources;
+    } catch (error) {
+      this.emitError("MCP resource discovery request failed.", error, "mcp-connection-failure");
       throw error;
     }
   }
@@ -172,6 +186,18 @@ export class HttpMcpRuntimeClient implements IMcpRuntimeClient {
       });
       throw error;
     }
+  }
+
+  private async listCatalogSnapshot(): Promise<McpCatalogSnapshot> {
+    const payload = await this.request<{
+      readonly tools?: ReadonlyArray<McpToolDescriptor>;
+      readonly resources?: ReadonlyArray<McpResourceDescriptor>;
+    }>("GET", "/mcp/tools");
+
+    return {
+      tools: payload.tools ?? [],
+      resources: payload.resources ?? [],
+    };
   }
 
   private async request<T>(method: "GET" | "POST", path: string, body?: unknown): Promise<T> {

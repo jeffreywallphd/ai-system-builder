@@ -36,6 +36,16 @@ class McpToolDescriptor(McpModel):
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
+class McpResourceDescriptor(McpModel):
+    server_id: str
+    uri: str
+    name: Optional[str] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+    mime_type: Optional[str] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
 class McpConnectionStatus(McpModel):
     enabled: bool
     state: Literal["disabled", "ready", "degraded", "unavailable"]
@@ -80,7 +90,7 @@ class McpServerConnectionResult(McpModel):
 class ListMcpToolsResponse(McpModel):
     status: McpConnectionStatus
     tools: List[McpToolDescriptor] = Field(default_factory=list)
-    resources: List[Dict[str, Any]] = Field(default_factory=list)
+    resources: List[McpResourceDescriptor] = Field(default_factory=list)
     capabilities: Dict[str, bool] = Field(default_factory=dict)
 
 
@@ -106,7 +116,7 @@ class McpToolExecutionResult(McpModel):
 class McpServerSnapshot(McpModel):
     server: McpServerDescriptor
     tools: List[McpToolDescriptor] = Field(default_factory=list)
-    resources: List[Dict[str, Any]] = Field(default_factory=list)
+    resources: List[McpResourceDescriptor] = Field(default_factory=list)
 
 
 class McpSnapshot(McpModel):

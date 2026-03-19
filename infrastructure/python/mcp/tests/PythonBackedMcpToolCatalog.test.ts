@@ -3,7 +3,7 @@ import { RuntimeEventBuffer } from "../../../../application/runtime/RuntimeEvent
 import { PythonBackedMcpToolCatalog } from "../PythonBackedMcpToolCatalog";
 
 describe("PythonBackedMcpToolCatalog", () => {
-  it("lists tools and emits discovery events", async () => {
+  it("lists tools, resources, and emits discovery events", async () => {
     const events = new RuntimeEventBuffer();
     const catalog = new PythonBackedMcpToolCatalog(
       {
@@ -15,6 +15,7 @@ describe("PythonBackedMcpToolCatalog", () => {
           servers: [],
         }),
         listTools: async () => [{ serverId: "server", name: "echo", inputSchema: { type: "object" } }],
+        listResources: async () => [{ serverId: "server", uri: "memory://guide", name: "Guide" }],
         executeTool: async () => {
           throw new Error("unused");
         },
@@ -23,8 +24,10 @@ describe("PythonBackedMcpToolCatalog", () => {
     );
 
     const tools = await catalog.listTools();
+    const resources = await catalog.listResources();
 
     expect(tools).toHaveLength(1);
+    expect(resources).toEqual([{ serverId: "server", uri: "memory://guide", name: "Guide" }]);
     expect(events.list().map((event) => event.details?.eventType)).toEqual([
       "mcp-tool-discovery",
       "mcp-tool-discovery",

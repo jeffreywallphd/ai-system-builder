@@ -1,3 +1,5 @@
+import type { CapabilitySearchQuery } from "../../application/research/models/CapabilitySearchQuery";
+import { SearchCapabilitiesUseCase } from "../../application/research/SearchCapabilitiesUseCase";
 import type { ToolSearchCriteria } from "../../application/dto/ToolSearchCriteria";
 import type { ToolRunRequest } from "../../application/projection/models/ToolRunRequest";
 import { ListToolCapabilitiesUseCase } from "../../application/tools/ListToolCapabilitiesUseCase";
@@ -13,7 +15,8 @@ export class ToolService {
     private readonly loadToolDefinitionUseCase: LoadToolDefinitionUseCase,
     private readonly runToolUseCase: RunToolUseCase,
     private readonly listToolCapabilitiesUseCase: ListToolCapabilitiesUseCase,
-    private readonly invokeToolCapabilityUseCase: InvokeToolCapabilityUseCase
+    private readonly invokeToolCapabilityUseCase: InvokeToolCapabilityUseCase,
+    private readonly searchCapabilitiesUseCase: SearchCapabilitiesUseCase
   ) {}
 
   public async listPublishedTools(criteria?: ToolSearchCriteria) {
@@ -22,6 +25,10 @@ export class ToolService {
 
   public async listToolCapabilities() {
     return this.listToolCapabilitiesUseCase.execute();
+  }
+
+  public async searchCapabilities(query: CapabilitySearchQuery) {
+    return this.searchCapabilitiesUseCase.execute(query);
   }
 
   public async loadToolDefinition(toolId: string) {

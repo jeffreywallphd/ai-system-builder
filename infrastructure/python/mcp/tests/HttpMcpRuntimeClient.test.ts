@@ -83,6 +83,32 @@ describe("HttpMcpRuntimeClient", () => {
     expect(events.list().map((event) => event.details?.eventType)).toContain("mcp-server-search");
   });
 
+  it("lists MCP tools and resources from the discovery endpoint", async () => {
+    const client = new HttpMcpRuntimeClient(
+      new PythonRuntimeConfig({ mode: "local-http", baseUrl: "http://runtime" }),
+      (async () =>
+        new Response(
+          JSON.stringify({
+            status: {
+              enabled: true,
+              state: "ready",
+              checkedAt: "2026-03-19T00:00:00.000Z",
+              servers: [],
+              capabilities: { tools: true, resources: true, toolExecution: true },
+            },
+            tools: [{ serverId: "local", name: "echo", inputSchema: { type: "object" } }],
+            resources: [{ serverId: "local", uri: "memory://guide", name: "Guide" }],
+          }),
+          { status: 200 }
+        )) as typeof fetch,
+    );
+
+    const [tools, resources] = await Promise.all([client.listTools(), client.listResources()]);
+
+    expect(tools).toEqual([{ serverId: "local", name: "echo", inputSchema: { type: "object" } }]);
+    expect(resources).toEqual([{ serverId: "local", uri: "memory://guide", name: "Guide" }]);
+  });
+
   it("connects and disconnects MCP servers while emitting lifecycle events", async () => {
     const events = new RuntimeEventBuffer();
     const calls: Array<{ input: string; body?: string }> = [];
