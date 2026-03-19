@@ -3,7 +3,7 @@ import { EnvironmentConfigProvider } from "../EnvironmentConfigProvider";
 import { FileStorage, FileStorageEntryInfo, FileStorageReadResult } from "../FileStorage";
 import { ModelDownloadHandle, ModelDownloadProgress, ModelDownloadResult, ModelDownloader } from "../ModelDownloader";
 import { ModelInstallHandle, ModelInstallProgress, ModelInstallResult, ModelInstaller } from "../ModelInstaller";
-import { NodeCatalogProvider } from "../NodeCatalogProvider";
+import { CompositeNodeCatalogProvider } from "../../nodes/CompositeNodeCatalogProvider";
 import { RemoteModelCatalog, RemoteModelCatalogItem, RemoteModelCatalogSearchResult } from "../RemoteModelCatalog";
 import { WorkflowExecutionEvent, WorkflowExecutionHandle, WorkflowExecutionProgress, WorkflowExecutionResult, WorkflowExecutor } from "../WorkflowExecutor";
 import { WorkflowSerializationResult, WorkflowSerializer } from "../WorkflowSerializer";
@@ -35,7 +35,7 @@ describe("Application ports contracts", () => {
     const installHandle: IModelInstallHandle = new ModelInstallHandle({ operationId: "op", request: { model: makeModel(), destination: "/m" }, completionPromise: Promise.resolve(installResult) });
     const installer: IModelInstaller = new ModelInstaller({});
 
-    const nodeCatalog: INodeCatalogProvider = new NodeCatalogProvider({});
+    const nodeCatalog: INodeCatalogProvider = new CompositeNodeCatalogProvider({});
 
     const catalogItem: IRemoteModelCatalogItem = new RemoteModelCatalogItem({ model: makeModel(), provider: "hf" });
     const catalogResult: IRemoteModelCatalogSearchResult = new RemoteModelCatalogSearchResult({ items: [catalogItem] });

@@ -1,4 +1,4 @@
-import { NodeCatalogProvider } from "../../application/ports/NodeCatalogProvider";
+import { CompositeNodeCatalogProvider } from "../../application/nodes/CompositeNodeCatalogProvider";
 import { Workflow } from "../../domain/workflows/Workflow";
 import { WorkflowConnection } from "../../domain/workflows/WorkflowConnection";
 import { WorkflowAuditInfo } from "../../domain/workflows/WorkflowMetadata";
@@ -9,7 +9,7 @@ import sampleImagePipelineRecord from "../../dev/workflow-data/workflows/sample-
 import sampleTextAnalysisRecord from "../../dev/workflow-data/workflows/sample-text-analysis.json";
 import basicRagPipelineRecord from "../../dev/workflow-data/workflows/basic-rag-pipeline.json";
 
-const SEED_NODE_CATALOG_PROVIDER = new NodeCatalogProvider({
+const SEED_NODE_CATALOG_PROVIDER = new CompositeNodeCatalogProvider({
   providers: [
     new MockNodeCatalogProvider(),
     new ImplementationRegistryNodeCatalogProvider(
