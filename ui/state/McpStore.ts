@@ -1,6 +1,7 @@
 import type { McpServerDescriptor } from "../../application/mcp/models/McpServerDescriptor";
 import type { McpServerSearchCriteria } from "../../application/mcp/models/McpServerSearchCriteria";
 import type { McpServerStatus } from "../../application/mcp/models/McpServerStatus";
+import type { McpToolDescriptor } from "../../application/mcp/models/McpToolDescriptor";
 import { McpService } from "../services/McpService";
 
 export interface McpStoreState {
@@ -8,11 +9,16 @@ export interface McpStoreState {
   readonly discoveredServers: ReadonlyArray<McpServerDescriptor>;
   readonly selectedServerId?: string;
   readonly selectedServerStatus?: McpServerStatus;
+  readonly selectedServerTools: ReadonlyArray<McpToolDescriptor>;
+  readonly selectedToolId?: string;
+  readonly selectedToolDescriptor?: McpToolDescriptor;
+  readonly toolSearchQuery: string;
   readonly searchCriteria?: McpServerSearchCriteria;
   readonly searchQuery: string;
   readonly isLoadingConfigured: boolean;
   readonly isSearching: boolean;
   readonly isMutating: boolean;
+  readonly isLoadingTools: boolean;
   readonly error?: string;
 }
 
@@ -23,11 +29,16 @@ const defaultState: McpStoreState = Object.freeze({
   discoveredServers: Object.freeze([]),
   selectedServerId: undefined,
   selectedServerStatus: undefined,
+  selectedServerTools: Object.freeze([]),
+  selectedToolId: undefined,
+  selectedToolDescriptor: undefined,
+  toolSearchQuery: "",
   searchCriteria: undefined,
   searchQuery: "",
   isLoadingConfigured: false,
   isSearching: false,
   isMutating: false,
+  isLoadingTools: false,
   error: undefined,
 });
 
@@ -63,6 +74,8 @@ export class McpStore {
         selectedServerStatus,
         isLoadingConfigured: false,
       });
+
+      await this.refreshSelectedTools(selectedServerId);
     } catch (error) {
       this.patch({
         isLoadingConfigured: false,
@@ -98,6 +111,8 @@ export class McpStore {
         selectedServerStatus,
         isSearching: false,
       });
+
+      await this.refreshSelectedTools(selectedServerId);
     } catch (error) {
       this.patch({
         isSearching: false,
@@ -149,6 +164,7 @@ export class McpStore {
 
       await this.refreshConfigured();
       await this.refreshSelectedStatus(serverId);
+      await this.refreshSelectedTools(serverId);
       this.patch({ isMutating: false });
     } catch (error) {
       this.patch({ isMutating: false, error: toErrorMessage(error) });
@@ -163,6 +179,7 @@ export class McpStore {
       await this.mcpService.disconnectServer(serverId);
       await this.refreshConfigured();
       await this.refreshSelectedStatus(serverId);
+      await this.refreshSelectedTools(serverId);
       this.patch({ isMutating: false });
     } catch (error) {
       this.patch({ isMutating: false, error: toErrorMessage(error) });
@@ -172,14 +189,41 @@ export class McpStore {
 
   public selectServer(serverId: string | undefined): void {
     const normalizedId = serverId?.trim() || undefined;
-    this.patch({ selectedServerId: normalizedId });
+    this.patch({ selectedServerId: normalizedId, selectedToolId: undefined, selectedToolDescriptor: undefined });
 
     if (!normalizedId) {
-      this.patch({ selectedServerStatus: undefined });
+      this.patch({ selectedServerStatus: undefined, selectedServerTools: Object.freeze([]), toolSearchQuery: "" });
       return;
     }
 
-    void this.refreshSelectedStatus(normalizedId).catch(() => undefined);
+    void Promise.all([
+      this.refreshSelectedStatus(normalizedId),
+      this.refreshSelectedTools(normalizedId),
+    ]).catch(() => undefined);
+  }
+
+  public async searchTools(query: string): Promise<void> {
+    const normalizedQuery = query.trim();
+    this.patch({ toolSearchQuery: normalizedQuery });
+    await this.refreshSelectedTools(this.state.selectedServerId, normalizedQuery);
+  }
+
+  public async selectTool(toolId: string | undefined): Promise<void> {
+    const normalizedId = toolId?.trim() || undefined;
+    this.patch({ selectedToolId: normalizedId });
+
+    if (!normalizedId) {
+      this.patch({ selectedToolDescriptor: undefined });
+      return;
+    }
+
+    try {
+      const descriptor = await this.mcpService.getToolDescriptor(normalizedId);
+      this.patch({ selectedToolDescriptor: descriptor });
+    } catch (error) {
+      this.patch({ error: toErrorMessage(error) });
+      throw error;
+    }
   }
 
   public getSelectedServer(): McpServerDescriptor | undefined {
@@ -192,6 +236,45 @@ export class McpStore {
       selectedServerId: serverId.trim(),
       selectedServerStatus,
     });
+  }
+
+  private async refreshSelectedTools(serverId?: string, query = this.state.toolSearchQuery): Promise<void> {
+    const normalizedServerId = serverId?.trim();
+    if (!normalizedServerId) {
+      this.patch({
+        selectedServerTools: Object.freeze([]),
+        selectedToolId: undefined,
+        selectedToolDescriptor: undefined,
+        isLoadingTools: false,
+      });
+      return;
+    }
+
+    this.patch({ isLoadingTools: true, toolSearchQuery: query, error: undefined });
+
+    try {
+      const result = await this.mcpService.searchTools({
+        query: query.trim() || undefined,
+        serverIds: [normalizedServerId],
+      });
+      const selectedToolId = this.resolveSelectedToolId(result.tools);
+      const selectedToolDescriptor = selectedToolId
+        ? await this.mcpService.getToolDescriptor(selectedToolId)
+        : undefined;
+
+      this.patch({
+        selectedServerTools: Object.freeze([...result.tools]),
+        selectedToolId,
+        selectedToolDescriptor,
+        isLoadingTools: false,
+      });
+    } catch (error) {
+      this.patch({
+        isLoadingTools: false,
+        error: toErrorMessage(error),
+      });
+      throw error;
+    }
   }
 
   private async loadStatusSafely(serverId: string): Promise<McpServerStatus | undefined> {
@@ -226,6 +309,15 @@ export class McpStore {
     return candidates[0]?.id;
   }
 
+  private resolveSelectedToolId(tools: ReadonlyArray<McpToolDescriptor>): string | undefined {
+    const current = this.state.selectedToolId;
+    if (current && tools.some((tool) => tool.id === current)) {
+      return current;
+    }
+
+    return tools[0]?.id;
+  }
+
   private patch(patch: Partial<McpStoreState>): void {
     this.state = Object.freeze({
       ...this.state,
@@ -236,11 +328,16 @@ export class McpStore {
       discoveredServers: patch.discoveredServers
         ? Object.freeze([...patch.discoveredServers])
         : this.state.discoveredServers,
+      selectedServerTools: patch.selectedServerTools
+        ? Object.freeze([...patch.selectedServerTools])
+        : this.state.selectedServerTools,
       searchCriteria: "searchCriteria" in patch
         ? (patch.searchCriteria ? Object.freeze({ ...patch.searchCriteria }) : undefined)
         : this.state.searchCriteria,
       selectedServerStatus: "selectedServerStatus" in patch ? patch.selectedServerStatus : this.state.selectedServerStatus,
+      selectedToolDescriptor: "selectedToolDescriptor" in patch ? patch.selectedToolDescriptor : this.state.selectedToolDescriptor,
       searchQuery: patch.searchQuery ?? this.state.searchQuery,
+      toolSearchQuery: patch.toolSearchQuery ?? this.state.toolSearchQuery,
     });
 
     for (const listener of this.listeners) {

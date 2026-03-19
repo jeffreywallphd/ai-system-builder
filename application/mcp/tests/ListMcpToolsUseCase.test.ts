@@ -3,7 +3,7 @@ import { ListMcpToolsUseCase } from "../ListMcpToolsUseCase";
 import type { IMcpToolCatalog } from "../../ports/interfaces/IMcpToolCatalog";
 
 describe("ListMcpToolsUseCase", () => {
-  it("returns status, tools, and resources from the catalog", async () => {
+  it("returns normalized status, tools, and resources from the catalog", async () => {
     const catalog: IMcpToolCatalog = {
       getConnectionStatus: async () => ({
         enabled: true,
@@ -28,12 +28,22 @@ describe("ListMcpToolsUseCase", () => {
       }),
       listTools: async () => [
         {
-          serverId: "local",
-          name: "echo",
+          serverId: " local ",
+          name: " echo ",
           title: "Echo",
-          inputSchema: { type: "object" },
+          description: " Returns input. ",
+          inputSchema: {
+            type: "object",
+            required: ["message"],
+            properties: {
+              message: { type: "string", description: "Text to echo" },
+            },
+          },
+          metadata: { category: "utility", tags: [" text ", "echo"] },
         },
-      ],
+      ] as any,
+      searchTools: async () => ({ query: "", totalCount: 0, limit: 20, tools: [] }),
+      getToolDescriptor: async () => undefined,
       listResources: async () => [
         {
           serverId: "local",
@@ -47,7 +57,26 @@ describe("ListMcpToolsUseCase", () => {
 
     expect(result.status.state).toBe("ready");
     expect(result.tools).toHaveLength(1);
-    expect(result.tools[0]?.name).toBe("echo");
+    expect(result.tools[0]).toMatchObject({
+      id: "mcp:local:echo",
+      serverId: "local",
+      name: "echo",
+      categories: ["utility"],
+      tags: ["echo", "text"],
+    });
+    expect(result.tools[0]?.arguments).toEqual([
+      {
+        name: "message",
+        title: undefined,
+        description: "Text to echo",
+        type: "string",
+        required: true,
+        defaultValue: undefined,
+        enumValues: undefined,
+        format: undefined,
+        schema: { type: "string", description: "Text to echo" },
+      },
+    ]);
     expect(result.resources).toEqual([
       {
         serverId: "local",

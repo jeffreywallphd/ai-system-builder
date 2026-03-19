@@ -9,8 +9,11 @@ from app.mcp.models import (
     McpServerDisconnectRequest,
     McpServerSearchRequest,
     McpServerSearchResponse,
+    McpToolDescriptor,
     McpToolExecutionRequest,
     McpToolExecutionResult,
+    McpToolSearchRequest,
+    McpToolSearchResponse,
 )
 from app.mcp.service import McpService
 
@@ -87,6 +90,37 @@ def reconnect_mcp_server(
 @router.get("/tools", response_model=ListMcpToolsResponse)
 def list_mcp_tools(service: McpService = Depends(get_mcp_service)) -> ListMcpToolsResponse:
     return service.list_tools()
+
+
+@router.get("/tools/search", response_model=McpToolSearchResponse)
+def search_mcp_tools(
+    query: str = Query(default="", max_length=160),
+    server_id: list[str] | None = Query(default=None, alias="serverId"),
+    category: list[str] | None = Query(default=None),
+    tag: list[str] | None = Query(default=None),
+    limit: int = Query(default=20, ge=1, le=50),
+    service: McpService = Depends(get_mcp_service),
+) -> McpToolSearchResponse:
+    return service.search_tools(
+        McpToolSearchRequest(
+            query=query,
+            server_ids=server_id or [],
+            categories=category or [],
+            tags=tag or [],
+            limit=limit,
+        )
+    )
+
+
+@router.get("/tools/{tool_id:path}", response_model=McpToolDescriptor)
+def get_mcp_tool_descriptor(
+    tool_id: str,
+    service: McpService = Depends(get_mcp_service),
+) -> McpToolDescriptor:
+    try:
+        return service.get_tool_descriptor(tool_id)
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
 
 
 @router.post("/tools/execute", response_model=McpToolExecutionResult)

@@ -3,13 +3,18 @@ import type { IRuntimeEventSink } from "../../../application/ports/interfaces/IR
 import { RuntimeEventSources } from "../../../application/runtime/RuntimeEvent";
 import type { McpConnectionStatus } from "../../../application/mcp/models/McpConnectionStatus";
 import type { McpResourceDescriptor } from "../../../application/mcp/models/McpResourceDescriptor";
+import {
+  normalizeMcpToolDescriptor,
+  type McpToolDescriptor,
+} from "../../../application/mcp/models/McpToolDescriptor";
+import type { McpToolExecutionRequest } from "../../../application/mcp/models/McpToolExecutionRequest";
+import type { McpToolExecutionResult } from "../../../application/mcp/models/McpToolExecutionResult";
 import type { McpServerConnectionRequest } from "../../../application/mcp/models/McpServerConnectionRequest";
 import type { McpServerConnectionResult } from "../../../application/mcp/models/McpServerConnectionResult";
 import type { McpServerSearchCriteria } from "../../../application/mcp/models/McpServerSearchCriteria";
 import type { McpServerSearchResult } from "../../../application/mcp/models/McpServerSearchResult";
-import type { McpToolDescriptor } from "../../../application/mcp/models/McpToolDescriptor";
-import type { McpToolExecutionRequest } from "../../../application/mcp/models/McpToolExecutionRequest";
-import type { McpToolExecutionResult } from "../../../application/mcp/models/McpToolExecutionResult";
+import type { McpToolSearchQuery } from "../../../application/mcp/models/McpToolSearchQuery";
+import type { McpToolSearchResult } from "../../../application/mcp/models/McpToolSearchResult";
 import { PythonRuntimeError } from "../client/PythonRuntimeError";
 import { PythonRuntimeConfig } from "../../config/PythonRuntimeConfig";
 
@@ -167,6 +172,71 @@ export class HttpMcpRuntimeClient implements IMcpRuntimeClient {
     }
   }
 
+  public async searchTools(query: McpToolSearchQuery = {}): Promise<McpToolSearchResult> {
+    this.emit("info", "MCP tool search started.", {
+      eventType: "mcp-tool-search",
+      query: query.query ?? "",
+    });
+
+    try {
+      const params = new URLSearchParams();
+      if (query.query?.trim()) {
+        params.set("query", query.query.trim());
+      }
+      if (query.limit !== undefined) {
+        params.set("limit", String(query.limit));
+      }
+      for (const serverId of query.serverIds ?? []) {
+        params.append("serverId", serverId);
+      }
+      for (const category of query.categories ?? []) {
+        params.append("category", category);
+      }
+      for (const tag of query.tags ?? []) {
+        params.append("tag", tag);
+      }
+
+      const suffix = params.size > 0 ? `?${params.toString()}` : "";
+      const payload = await this.request<McpToolSearchResult>("GET", `/mcp/tools/search${suffix}`);
+      this.emit("success", "MCP tool search completed.", {
+        eventType: "mcp-tool-search",
+        query: payload.query,
+        toolCount: payload.tools.length,
+      });
+      return Object.freeze({
+        query: payload.query,
+        totalCount: payload.totalCount,
+        limit: payload.limit,
+        tools: Object.freeze(payload.tools.map((tool) => normalizeMcpToolDescriptor(tool))),
+      });
+    } catch (error) {
+      this.emitError("MCP tool search failed.", error, "mcp-tool-search", {
+        query: query.query ?? "",
+      });
+      throw error;
+    }
+  }
+
+  public async getToolDescriptor(toolId: string): Promise<McpToolDescriptor | undefined> {
+    const normalizedToolId = toolId.trim();
+    if (!normalizedToolId) {
+      throw new PythonRuntimeError("MCP tool descriptor lookup requires a toolId.");
+    }
+
+    try {
+      const payload = await this.request<McpToolDescriptor>("GET", `/mcp/tools/${encodeURIComponent(normalizedToolId)}`);
+      return normalizeMcpToolDescriptor(payload);
+    } catch (error) {
+      if (error instanceof PythonRuntimeError && error.statusCode === 404) {
+        return undefined;
+      }
+      this.emitError("MCP tool descriptor lookup failed.", error, "mcp-tool-descriptor", {
+        toolId: normalizedToolId,
+      });
+      throw error;
+    }
+  }
+
   public async listResources(): Promise<ReadonlyArray<McpResourceDescriptor>> {
     try {
       return (await this.listCatalogSnapshot()).resources;
@@ -195,7 +265,7 @@ export class HttpMcpRuntimeClient implements IMcpRuntimeClient {
     }>("GET", "/mcp/tools");
 
     return {
-      tools: payload.tools ?? [],
+      tools: Object.freeze((payload.tools ?? []).map((tool) => normalizeMcpToolDescriptor(tool))),
       resources: payload.resources ?? [],
     };
   }

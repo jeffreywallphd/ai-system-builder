@@ -4,7 +4,12 @@ import { RuntimeEventSources } from "../../../application/runtime/RuntimeEvent";
 import type { IMcpRuntimeClient } from "../../../application/ports/interfaces/IMcpRuntimeClient";
 import type { McpConnectionStatus } from "../../../application/mcp/models/McpConnectionStatus";
 import type { McpResourceDescriptor } from "../../../application/mcp/models/McpResourceDescriptor";
-import type { McpToolDescriptor } from "../../../application/mcp/models/McpToolDescriptor";
+import {
+  normalizeMcpToolDescriptor,
+  type McpToolDescriptor,
+} from "../../../application/mcp/models/McpToolDescriptor";
+import type { McpToolSearchQuery } from "../../../application/mcp/models/McpToolSearchQuery";
+import type { McpToolSearchResult } from "../../../application/mcp/models/McpToolSearchResult";
 
 export class PythonBackedMcpToolCatalog implements IMcpToolCatalog {
   constructor(
@@ -17,31 +22,68 @@ export class PythonBackedMcpToolCatalog implements IMcpToolCatalog {
   }
 
   public async listTools(): Promise<ReadonlyArray<McpToolDescriptor>> {
-    this.eventSink?.emit({
-      source: RuntimeEventSources.pythonRuntime,
-      severity: "info",
-      message: "MCP tool discovery started.",
-      details: { eventType: "mcp-tool-discovery" },
-    });
+    this.emit("info", "MCP tool discovery started.", { eventType: "mcp-tool-discovery" });
 
     try {
       const tools = await this.client.listTools();
-      this.eventSink?.emit({
-        source: RuntimeEventSources.pythonRuntime,
-        severity: "success",
-        message: "MCP tool discovery completed.",
-        details: { eventType: "mcp-tool-discovery", toolCount: tools.length },
+      const normalizedTools = Object.freeze(tools.map((tool) => normalizeMcpToolDescriptor(tool)));
+      this.emit("success", "MCP tool discovery completed.", {
+        eventType: "mcp-tool-discovery",
+        toolCount: normalizedTools.length,
       });
-      return tools;
+      return normalizedTools;
     } catch (error) {
-      this.eventSink?.emit({
-        source: RuntimeEventSources.pythonRuntime,
-        severity: "error",
-        message: "MCP tool discovery failed.",
-        details: {
-          eventType: "mcp-tool-discovery",
-          cause: error instanceof Error ? error.message : String(error),
-        },
+      this.emit("error", "MCP tool discovery failed.", {
+        eventType: "mcp-tool-discovery",
+        cause: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  public async searchTools(query: McpToolSearchQuery = {}): Promise<McpToolSearchResult> {
+    this.emit("info", "MCP tool search started.", {
+      eventType: "mcp-tool-search",
+      query: query.query ?? "",
+    });
+
+    try {
+      const result = await this.client.searchTools(query);
+      const normalizedTools = Object.freeze(result.tools.map((tool) => normalizeMcpToolDescriptor(tool)));
+      this.emit("success", "MCP tool search completed.", {
+        eventType: "mcp-tool-search",
+        toolCount: normalizedTools.length,
+      });
+      return Object.freeze({ ...result, tools: normalizedTools });
+    } catch (error) {
+      this.emit("error", "MCP tool search failed.", {
+        eventType: "mcp-tool-search",
+        cause: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  public async getToolDescriptor(toolId: string): Promise<McpToolDescriptor | undefined> {
+    this.emit("info", "MCP tool descriptor lookup started.", {
+      eventType: "mcp-tool-descriptor",
+      toolId,
+    });
+
+    try {
+      const descriptor = await this.client.getToolDescriptor(toolId);
+      const normalizedDescriptor = descriptor ? normalizeMcpToolDescriptor(descriptor) : undefined;
+      this.emit("success", "MCP tool descriptor lookup completed.", {
+        eventType: "mcp-tool-descriptor",
+        toolId,
+        found: normalizedDescriptor !== undefined,
+      });
+      return normalizedDescriptor;
+    } catch (error) {
+      this.emit("error", "MCP tool descriptor lookup failed.", {
+        eventType: "mcp-tool-descriptor",
+        toolId,
+        cause: error instanceof Error ? error.message : String(error),
       });
       throw error;
     }
@@ -53,5 +95,18 @@ export class PythonBackedMcpToolCatalog implements IMcpToolCatalog {
     }
 
     return this.client.listResources();
+  }
+
+  private emit(
+    severity: "info" | "success" | "error",
+    message: string,
+    details: Readonly<Record<string, unknown>>
+  ): void {
+    this.eventSink?.emit({
+      source: RuntimeEventSources.pythonRuntime,
+      severity,
+      message,
+      details,
+    });
   }
 }
