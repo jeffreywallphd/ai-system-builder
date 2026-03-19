@@ -23,8 +23,9 @@ describe("SettingsPage", () => {
     expect(source).toContain("Advanced runtime settings");
     expect(source).toContain("<McpRuntimeStatusPanel");
     expect(source).toContain("mcpStore.subscribe(setMcpState)");
-    expect(source).toContain("servers={mcpState.servers}");
-    expect(source).toContain("onSearchChange={(value) => void mcpStore.search(value).catch(() => undefined)}");
+    expect(source).toContain("servers={mcpState.configuredServers}");
+    expect(source).toContain("isLoading={mcpState.isLoadingConfigured || mcpState.isSearching || mcpState.isMutating}");
+    expect(source).toContain("onSearchChange={(value) => void mcpStore.search({ query: value }).catch(() => undefined)}");
     expect(source).toContain("Authentication & install defaults");
     expect(source).toContain("Advanced development settings");
     expect(source).toContain('id="settings-authoring-default-view-mode"');

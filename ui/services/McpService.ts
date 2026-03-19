@@ -1,9 +1,8 @@
+import type { AddConfiguredMcpServerUseCase } from "../../application/mcp/AddConfiguredMcpServerUseCase";
 import type { ConnectMcpServerUseCase } from "../../application/mcp/ConnectMcpServerUseCase";
 import type { DisconnectMcpServerUseCase } from "../../application/mcp/DisconnectMcpServerUseCase";
 import type { GetMcpServerStatusUseCase } from "../../application/mcp/GetMcpServerStatusUseCase";
 import type { ListConfiguredMcpServersUseCase } from "../../application/mcp/ListConfiguredMcpServersUseCase";
-import { ListMcpToolsUseCase } from "../../application/mcp/ListMcpToolsUseCase";
-import type { IListMcpToolsResult } from "../../application/mcp/ListMcpToolsUseCase";
 import type { ReconnectMcpServerUseCase } from "../../application/mcp/ReconnectMcpServerUseCase";
 import type { SearchMcpServersUseCase } from "../../application/mcp/SearchMcpServersUseCase";
 import type { McpServerConnectionResult } from "../../application/mcp/models/McpServerConnectionResult";
@@ -14,18 +13,14 @@ import type { McpServerStatus } from "../../application/mcp/models/McpServerStat
 
 export class McpService {
   constructor(
-    private readonly listMcpToolsUseCase: ListMcpToolsUseCase,
     private readonly listConfiguredMcpServersUseCase: Pick<ListConfiguredMcpServersUseCase, "execute">,
     private readonly searchMcpServersUseCase: Pick<SearchMcpServersUseCase, "execute">,
+    private readonly addConfiguredMcpServerUseCase: Pick<AddConfiguredMcpServerUseCase, "execute">,
     private readonly getMcpServerStatusUseCase: Pick<GetMcpServerStatusUseCase, "execute">,
     private readonly connectMcpServerUseCase: Pick<ConnectMcpServerUseCase, "execute">,
     private readonly disconnectMcpServerUseCase: Pick<DisconnectMcpServerUseCase, "execute">,
     private readonly reconnectMcpServerUseCase: Pick<ReconnectMcpServerUseCase, "execute">,
   ) {}
-
-  public async getRuntimeSnapshot(): Promise<IListMcpToolsResult> {
-    return this.listMcpToolsUseCase.execute();
-  }
 
   public async listConfiguredServers(): Promise<ReadonlyArray<McpServerDescriptor>> {
     return this.listConfiguredMcpServersUseCase.execute();
@@ -33,6 +28,10 @@ export class McpService {
 
   public async searchServers(criteria?: McpServerSearchCriteria): Promise<McpServerSearchResult> {
     return this.searchMcpServersUseCase.execute({ criteria });
+  }
+
+  public async addConfiguredServer(server: McpServerDescriptor): Promise<McpServerDescriptor> {
+    return this.addConfiguredMcpServerUseCase.execute({ server });
   }
 
   public async getServerStatus(serverId: string): Promise<McpServerStatus> {

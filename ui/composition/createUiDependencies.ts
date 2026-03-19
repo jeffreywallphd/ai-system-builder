@@ -47,11 +47,13 @@ import { HttpMcpRuntimeClient } from "../../infrastructure/python/mcp/HttpMcpRun
 import { HttpMcpServerRuntimeClient } from "../../infrastructure/python/mcp/HttpMcpServerRuntimeClient";
 import { PythonBackedMcpServerCatalog } from "../../infrastructure/python/mcp/PythonBackedMcpServerCatalog";
 import { PythonBackedMcpServerManager } from "../../infrastructure/python/mcp/PythonBackedMcpServerManager";
+import { ConfiguredMcpServerCatalog } from "../../infrastructure/browser/mcp/ConfiguredMcpServerCatalog";
+import { LocalStorageMcpConfiguredServerRepository } from "../../infrastructure/browser/mcp/LocalStorageMcpConfiguredServerRepository";
 import { PythonBackedMcpToolCatalog } from "../../infrastructure/python/mcp/PythonBackedMcpToolCatalog";
 import { PythonBackedMcpToolExecutor } from "../../infrastructure/python/mcp/PythonBackedMcpToolExecutor";
-import { ListMcpToolsUseCase } from "../../application/mcp/ListMcpToolsUseCase";
 import { ListConfiguredMcpServersUseCase } from "../../application/mcp/ListConfiguredMcpServersUseCase";
 import { SearchMcpServersUseCase } from "../../application/mcp/SearchMcpServersUseCase";
+import { AddConfiguredMcpServerUseCase } from "../../application/mcp/AddConfiguredMcpServerUseCase";
 import { GetMcpServerStatusUseCase } from "../../application/mcp/GetMcpServerStatusUseCase";
 import { ConnectMcpServerUseCase } from "../../application/mcp/ConnectMcpServerUseCase";
 import { DisconnectMcpServerUseCase } from "../../application/mcp/DisconnectMcpServerUseCase";
@@ -208,12 +210,14 @@ export function createUiDependencies(
   const mcpServerRuntimeClient = settings.runtime.mode === "disabled"
     ? createDisabledMcpServerRuntimeClient()
     : new HttpMcpServerRuntimeClient(pythonRuntimeConfig, fetch, runtimeEventSink);
-  const mcpServerCatalog = settings.runtime.mode === "disabled"
+  const persistedMcpServerRepository = new LocalStorageMcpConfiguredServerRepository();
+  const runtimeMcpServerCatalog = settings.runtime.mode === "disabled"
     ? createDisabledMcpServerCatalog()
     : new PythonBackedMcpServerCatalog(mcpServerRuntimeClient);
+  const mcpServerCatalog = new ConfiguredMcpServerCatalog(runtimeMcpServerCatalog, persistedMcpServerRepository);
   const mcpServerManager = settings.runtime.mode === "disabled"
     ? createDisabledMcpServerManager()
-    : new PythonBackedMcpServerManager(mcpServerRuntimeClient, mcpServerCatalog, runtimeEventSink);
+    : new PythonBackedMcpServerManager(mcpServerRuntimeClient, runtimeMcpServerCatalog, runtimeEventSink);
   const pythonBackedMcpToolCatalog = new PythonBackedMcpToolCatalog(mcpClient, runtimeEventSink);
   const toolCapabilityCatalog = new CompositeToolCapabilityCatalog([
     new WorkflowProjectedToolCapabilityCatalog(workflowRepository, workflowToolProjectionService),
@@ -243,9 +247,9 @@ export function createUiDependencies(
     })
   );
   const mcpService = new McpService(
-    new ListMcpToolsUseCase(pythonBackedMcpToolCatalog),
     new ListConfiguredMcpServersUseCase(mcpServerCatalog),
     new SearchMcpServersUseCase(mcpClient),
+    new AddConfiguredMcpServerUseCase(persistedMcpServerRepository),
     new GetMcpServerStatusUseCase(mcpServerCatalog),
     new ConnectMcpServerUseCase(mcpServerManager),
     new DisconnectMcpServerUseCase(mcpServerManager),
