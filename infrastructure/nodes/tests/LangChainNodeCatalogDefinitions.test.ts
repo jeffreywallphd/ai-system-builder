@@ -128,8 +128,8 @@ const requiredTierTwoNodes = [
   {
     type: "langchain.simple_agent",
     title: "AI Assistant",
-    requiredInputs: ["messages", "input", "tools", "history"],
-    requiredOutputs: ["response", "messages", "toolCalls", "toolResults"],
+    requiredInputs: ["messages", "input", "tools", "selectedTools", "history"],
+    requiredOutputs: ["response", "messages", "toolCalls", "toolResults", "stepResults", "selectedTools", "availableTools", "trace"],
     expectedProperties: ["model", "systemPrompt", "temperature", "maxIterations", "useMemory", "verbose"],
   },
   {
@@ -241,8 +241,8 @@ describe("LangChain node catalog definitions", () => {
     expect(llmNode?.projection.supportsAuthoringView).toBeTrue();
     expect(llmNode?.projection.supportsToolView).toBeTrue();
     expect(documentLoader?.projection.keywords).toContain("documents");
-    expect(simpleAgent?.technicalDescription).toContain("bounded single-assistant loop");
-    expect(simpleAgent?.description).toContain("use one tool once");
+    expect(simpleAgent?.technicalDescription).toContain("inspect available tools");
+    expect(simpleAgent?.description).toContain("small, inspectable sequence of tools");
     expect(simpleAgent?.projection.group).toBe("Tier 2 LLM");
   });
 
