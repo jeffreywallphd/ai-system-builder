@@ -348,10 +348,8 @@ describe("LangChainNodeExecutor", () => {
 
   it("formats retrieved documents into prompt-ready context", async () => {
     const node = makeLangChainNode("n-format-context", "langchain.context_formatter", [
-      new NodeProperty({ id: "template", name: "Template", type: "multiline-text", value: "Doc {index}: {text}" }),
-      new NodeProperty({ id: "separator", name: "Separator", type: "text", value: "\n---\n" }),
-      new NodeProperty({ id: "includeMetadata", name: "Include Metadata", type: "boolean", value: false }),
-      new NodeProperty({ id: "maxItems", name: "Max Items", type: "integer", value: 2 }),
+      new NodeProperty({ id: "template", name: "Template", type: "multiline-text", value: "Doc {index}: {content}" }),
+      new NodeProperty({ id: "maxLength", name: "Max Length", type: "integer", value: 100 }),
     ]);
     const executor = new LangChainNodeExecutor();
     const result = await executor.executeNode({
@@ -370,17 +368,16 @@ describe("LangChainNodeExecutor", () => {
     });
 
     expect(result.status).toBe("completed");
-    expect(result.outputs.context).toBe("Doc 1: Alpha\n---\nDoc 2: Beta");
+    expect(result.outputs.context).toBe("Doc 1: Alpha\n\nDoc 2: Beta\n\nDoc 3: Gamma");
   });
 
   it("supports vector upsert and similarity search scaffolds", async () => {
     const upsertNode = makeLangChainNode("n-upsert", "langchain.vector_store_upsert", [
-      new NodeProperty({ id: "collection", name: "Collection", type: "text", value: "kb" }),
-      new NodeProperty({ id: "upsertMode", name: "Upsert Mode", type: "select", value: "append" }),
-      new NodeProperty({ id: "batchSize", name: "Batch Size", type: "integer", value: 10 }),
+      new NodeProperty({ id: "storeType", name: "Store Type", type: "select", value: "memory" }),
+      new NodeProperty({ id: "collectionName", name: "Collection Name", type: "text", value: "kb" }),
     ]);
     const searchNode = makeLangChainNode("n-search", "langchain.similarity_search", [
-      new NodeProperty({ id: "topK", name: "Top K", type: "integer", value: 1 }),
+      new NodeProperty({ id: "k", name: "Top K", type: "integer", value: 1 }),
       new NodeProperty({ id: "scoreThreshold", name: "Score Threshold", type: "number", value: 0 }),
     ]);
     const executor = new LangChainNodeExecutor();
@@ -400,7 +397,6 @@ describe("LangChainNodeExecutor", () => {
           [0.1, 0.2],
           [0.2, 0.3],
         ],
-        vectorStore: { provider: "memory" },
       },
     });
 
@@ -417,13 +413,23 @@ describe("LangChainNodeExecutor", () => {
     });
 
     expect(upsertResult.status).toBe("completed");
-    expect(upsertResult.outputs.upsertResult).toEqual({
-      collection: "kb",
-      upsertMode: "append",
-      batchSize: 10,
-      documentCount: 2,
-      embeddingCount: 2,
-      recordCount: 2,
+    expect(upsertResult.outputs.vectorStore).toEqual({
+      storeType: "memory",
+      collectionName: "kb",
+      records: [
+        {
+          id: "d1",
+          content: "workflow canvas editor",
+          metadata: { source: "kb" },
+          embedding: [0.1, 0.2],
+        },
+        {
+          id: "d2",
+          content: "vector database basics",
+          metadata: { source: "kb" },
+          embedding: [0.2, 0.3],
+        },
+      ],
     });
     expect(searchResult.status).toBe("completed");
     expect(searchResult.outputs.documents).toEqual([
@@ -513,14 +519,10 @@ describe("LangChainNodeExecutor", () => {
       new NodeProperty({ id: "verbose", name: "Verbose", type: "boolean", value: false }),
     ]);
     const summaryNode = makeLangChainNode("n-summary", "langchain.summarization", [
-      new NodeProperty({ id: "model", name: "Model", type: "text", value: "summary-model" }),
-      new NodeProperty({ id: "style", name: "Style", type: "select", value: "brief" }),
-      new NodeProperty({ id: "maxLength", name: "Max Length", type: "integer", value: 30 }),
+      new NodeProperty({ id: "strategy", name: "Strategy", type: "select", value: "stuff" }),
     ]);
     const combineNode = makeLangChainNode("n-combine", "langchain.combine_summaries", [
-      new NodeProperty({ id: "separator", name: "Separator", type: "text", value: " | " }),
-      new NodeProperty({ id: "strategy", name: "Strategy", type: "select", value: "concatenate" }),
-      new NodeProperty({ id: "model", name: "Model", type: "text", value: "combiner-model" }),
+      new NodeProperty({ id: "method", name: "Method", type: "select", value: "concatenate" }),
     ]);
     const knowledgeBaseNode = makeLangChainNode("n-kb", "langchain.knowledge_base_retriever", [
       new NodeProperty({ id: "topK", name: "Top K", type: "integer", value: 1 }),
@@ -549,6 +551,7 @@ describe("LangChainNodeExecutor", () => {
       upstreamOutputs: {},
       resolvedInputs: {
         documents: [{ id: "d1", text: "A long workflow explanation for new users." }],
+        model: "summary-model",
       },
     });
 
@@ -590,10 +593,10 @@ describe("LangChainNodeExecutor", () => {
     ]);
 
     expect(summaryResult.status).toBe("completed");
-    expect(summaryResult.outputs.summary).toBe("[summary-model] Summary: A long workflow explanation fo");
+    expect(summaryResult.outputs.summary).toBe("[summary-model] Summary: A long workflow explanation for new users.");
 
     expect(combineResult.status).toBe("completed");
-    expect(combineResult.outputs.summary).toBe("First summary | Second summary");
+    expect(combineResult.outputs.combinedSummary).toBe("First summary\n\nSecond summary");
 
     expect(knowledgeBaseResult.status).toBe("completed");
     expect(knowledgeBaseResult.outputs.documents).toEqual([

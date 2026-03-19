@@ -17,6 +17,7 @@ export type NodePortValueType =
   | "document"
   | "chunks"
   | "dataset"
+  | "vector-store"
   | "model"
   | "model-reference"
   | "model-artifact"

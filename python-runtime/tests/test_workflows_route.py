@@ -12,3 +12,5 @@ def test_workflows_capabilities_contract() -> None:
     assert isinstance(payload['supported_node_types'], list)
     assert 'langchain.context_merger' in payload['supported_node_types']
     assert 'langchain.output_parser' in payload['supported_node_types']
+    assert 'langchain.vector_store_upsert' in payload['supported_node_types']
+    assert 'langchain.combine_summaries' in payload['supported_node_types']

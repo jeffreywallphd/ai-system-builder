@@ -8,7 +8,8 @@ function langChainImplementation(
   executionStyles: ReadonlyArray<"interpreted-node" | "python-node" | "hybrid"> = [
     "interpreted-node",
     "python-node",
-  ]
+  ],
+  category = "LangChain"
 ): INodeRuntimeImplementation {
   return {
     descriptor: new NodeImplementationDescriptor({
@@ -18,7 +19,7 @@ function langChainImplementation(
       title,
       executionStyles,
       metadata: {
-        category: "LangChain",
+        category,
         tier: "tier-1-llm",
       },
     }),
@@ -53,17 +54,21 @@ const LANGCHAIN_IMPLEMENTATIONS: ReadonlyArray<INodeRuntimeImplementation> = Obj
   langChainImplementation("langchain.memory", "Remember Conversation"),
   langChainImplementation("langchain.document_loader", "Load Document"),
   langChainImplementation("langchain.document_to_chunks", "Prepare Document Chunks"),
-  langChainImplementation("langchain.vector_store_upsert", "Save Knowledge to Search Index", [
+  langChainImplementation("langchain.vector_store_upsert", "Save to Knowledge Base", [
     "interpreted-node",
     "python-node",
     "hybrid",
-  ]),
-  langChainImplementation("langchain.similarity_search", "Search Similar Content", [
+  ], "LangChain / Knowledge"),
+  langChainImplementation("langchain.similarity_search", "Search Knowledge Base", [
     "interpreted-node",
     "python-node",
     "hybrid",
-  ]),
-  langChainImplementation("langchain.context_formatter", "Build Context for AI"),
+  ], "LangChain / Knowledge"),
+  langChainImplementation("langchain.context_formatter", "Prepare Context", [
+    "interpreted-node",
+    "python-node",
+    "hybrid",
+  ], "LangChain / Text"),
   langChainImplementation("langchain.tool_definition", "Create AI Tool"),
   langChainImplementation("langchain.tool_call_executor", "Run AI Tool", [
     "interpreted-node",
@@ -79,12 +84,12 @@ const LANGCHAIN_IMPLEMENTATIONS: ReadonlyArray<INodeRuntimeImplementation> = Obj
     "interpreted-node",
     "python-node",
     "hybrid",
-  ]),
+  ], "LangChain / Text"),
   langChainImplementation("langchain.combine_summaries", "Combine Summaries", [
     "interpreted-node",
     "python-node",
     "hybrid",
-  ]),
+  ], "LangChain / Text"),
   langChainImplementation(
     "langchain.knowledge_base_retriever",
     "Search Knowledge Base",

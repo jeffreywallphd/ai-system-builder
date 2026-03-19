@@ -92,24 +92,24 @@ const requiredTierTwoNodes = [
   },
   {
     type: "langchain.vector_store_upsert",
-    title: "Save Knowledge to Search Index",
-    requiredInputs: ["documents", "embeddings", "vectorStore"],
-    requiredOutputs: ["vectorStore", "upsertResult"],
-    expectedProperties: ["collection", "upsertMode", "batchSize"],
+    title: "Save to Knowledge Base",
+    requiredInputs: ["documents", "embeddings"],
+    requiredOutputs: ["vectorStore"],
+    expectedProperties: ["storeType", "collectionName"],
   },
   {
     type: "langchain.similarity_search",
-    title: "Search Similar Content",
-    requiredInputs: ["query", "queryEmbedding", "vectorStore"],
+    title: "Search Knowledge Base",
+    requiredInputs: ["query", "vectorStore"],
     requiredOutputs: ["documents"],
-    expectedProperties: ["topK", "scoreThreshold"],
+    expectedProperties: ["k", "scoreThreshold"],
   },
   {
     type: "langchain.context_formatter",
-    title: "Build Context for AI",
-    requiredInputs: ["documents", "chunks"],
+    title: "Prepare Context",
+    requiredInputs: ["documents"],
     requiredOutputs: ["context"],
-    expectedProperties: ["template", "separator", "includeMetadata", "maxItems"],
+    expectedProperties: ["template", "maxLength"],
   },
   {
     type: "langchain.tool_definition",
@@ -135,16 +135,16 @@ const requiredTierTwoNodes = [
   {
     type: "langchain.summarization",
     title: "Summarize Text",
-    requiredInputs: ["text", "documents"],
+    requiredInputs: ["documents", "model"],
     requiredOutputs: ["summary"],
-    expectedProperties: ["model", "style", "maxLength"],
+    expectedProperties: ["strategy"],
   },
   {
     type: "langchain.combine_summaries",
     title: "Combine Summaries",
     requiredInputs: ["summaries"],
-    requiredOutputs: ["summary"],
-    expectedProperties: ["separator", "strategy", "model"],
+    requiredOutputs: ["combinedSummary"],
+    expectedProperties: ["method"],
   },
   {
     type: "langchain.knowledge_base_retriever",
@@ -246,7 +246,7 @@ describe("LangChain node catalog definitions", () => {
     const scoreThreshold = similaritySearch?.properties.find(
       (property) => property.id === "scoreThreshold"
     );
-    const strategy = combineSummaries?.properties.find((property) => property.id === "strategy");
+    const strategy = combineSummaries?.properties.find((property) => property.id === "method");
 
     expect(template?.type).toBe("multiline-text");
     expect(template?.projection?.label).toBe("Prompt template");
@@ -286,7 +286,6 @@ describe("LangChain node catalog definitions", () => {
     expect(strategy?.options?.map((option) => option.value)).toEqual([
       "concatenate",
       "reduce",
-      "outline",
     ]);
   });
 
@@ -315,15 +314,14 @@ describe("LangChain node catalog definitions", () => {
     expect(retriever?.getInputPort("embeddings")?.compatibility.isOptional).toBeTrue();
     expect(retriever?.getInputPort("vectorStore")?.compatibility.isOptional).toBeFalse();
 
-    expect(similaritySearch?.getInputPort("query")?.compatibility.isOptional).toBeTrue();
-    expect(similaritySearch?.getInputPort("queryEmbedding")?.compatibility.isOptional).toBeTrue();
+    expect(similaritySearch?.getInputPort("query")?.compatibility.isOptional).toBeFalse();
     expect(similaritySearch?.getInputPort("vectorStore")?.compatibility.isOptional).toBeFalse();
 
     expect(agent?.getInputPort("messages")?.compatibility.isOptional).toBeTrue();
     expect(agent?.getInputPort("input")?.compatibility.isOptional).toBeTrue();
     expect(agent?.getInputPort("history")?.compatibility.isOptional).toBeTrue();
 
-    expect(summarization?.getInputPort("text")?.compatibility.isOptional).toBeTrue();
-    expect(summarization?.getInputPort("documents")?.compatibility.isOptional).toBeTrue();
+    expect(summarization?.getInputPort("documents")?.compatibility.isOptional).toBeFalse();
+    expect(summarization?.getInputPort("model")?.compatibility.isOptional).toBeFalse();
   });
 });

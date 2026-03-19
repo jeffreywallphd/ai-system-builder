@@ -1,6 +1,7 @@
 import type { IModelExecutor } from "../../../application/ports/interfaces/IModelExecutor";
 import type { INodeExecutor, INodeExecutionResult } from "../../../application/ports/interfaces/INodeExecutor";
 import type { INodeExecutionContext } from "../../../application/ports/interfaces/INodeExecutionContextResolver";
+import type { IPythonRuntimeClient } from "../../../application/ports/interfaces/IPythonRuntimeClient";
 import type { INode } from "../../../domain/nodes/interfaces/INode";
 import type {
   ChatMessage,
@@ -113,6 +114,8 @@ function toDocuments(value: unknown): Document[] {
     const text =
       typeof record.text === "string"
         ? record.text
+        : typeof record.content === "string"
+          ? record.content
         : typeof nestedDocument?.text === "string"
           ? (nestedDocument.text as string)
           : normalizeText(record);
@@ -284,11 +287,71 @@ function supportsNodeType(nodeType: string, ...types: string[]): boolean {
   return types.includes(nodeType);
 }
 
+function nodePropertiesToObject(node: INode): Readonly<Record<string, unknown>> {
+  return Object.freeze(
+    Object.fromEntries(node.properties.map((property) => [property.id, property.value]))
+  );
+}
+
+function normalizePythonOutputs(
+  nodeType: string,
+  outputs: Readonly<Record<string, unknown>>
+): Readonly<Record<string, unknown>> {
+  if (supportsNodeType(nodeType, "langchain.similarity_search", "langchain.vector_store_upsert")) {
+    return {
+      ...outputs,
+      documents: outputs.documents !== undefined ? toDocuments(outputs.documents) : outputs.documents,
+    };
+  }
+
+  if (supportsNodeType(nodeType, "langchain.summarization")) {
+    return {
+      ...outputs,
+      summary: normalizeText(outputs.summary),
+    };
+  }
+
+  if (supportsNodeType(nodeType, "langchain.combine_summaries")) {
+    return {
+      ...outputs,
+      combinedSummary:
+        outputs.combinedSummary !== undefined
+          ? normalizeText(outputs.combinedSummary)
+          : outputs.summary !== undefined
+            ? normalizeText(outputs.summary)
+            : "",
+    };
+  }
+
+  return outputs;
+}
+
 export class LangChainNodeExecutor implements INodeExecutor {
   private readonly modelExecutor?: IModelExecutor;
+  private readonly pythonRuntimeClient?: IPythonRuntimeClient;
 
-  constructor(modelExecutor?: IModelExecutor) {
-    this.modelExecutor = modelExecutor;
+  constructor(
+    modelExecutorOrOptions?:
+      | IModelExecutor
+      | {
+          readonly modelExecutor?: IModelExecutor;
+          readonly pythonRuntimeClient?: IPythonRuntimeClient;
+        },
+    pythonRuntimeClient?: IPythonRuntimeClient
+  ) {
+    if (
+      modelExecutorOrOptions &&
+      typeof modelExecutorOrOptions === "object" &&
+      ("modelExecutor" in modelExecutorOrOptions ||
+        "pythonRuntimeClient" in modelExecutorOrOptions)
+    ) {
+      this.modelExecutor = modelExecutorOrOptions.modelExecutor;
+      this.pythonRuntimeClient = modelExecutorOrOptions.pythonRuntimeClient;
+      return;
+    }
+
+    this.modelExecutor = modelExecutorOrOptions as IModelExecutor | undefined;
+    this.pythonRuntimeClient = pythonRuntimeClient;
   }
 
   public canExecuteNode(node: INode, runtime = "langchain"): boolean {
@@ -332,6 +395,38 @@ export class LangChainNodeExecutor implements INodeExecutor {
     const properties = Object.fromEntries(
       context.node.properties.map((property) => [property.id, property.value])
     );
+
+    if (
+      this.pythonRuntimeClient &&
+      supportsNodeType(
+        nodeType,
+        "langchain.vector_store_upsert",
+        "langchain.similarity_search",
+        "langchain.context_formatter",
+        "langchain.summarization",
+        "langchain.combine_summaries"
+      )
+    ) {
+      const response = await this.pythonRuntimeClient.executeNode({
+        workflowId: context.workflow.id,
+        nodeId: context.node.id,
+        nodeType: context.node.definition.type,
+        inputs,
+        properties: nodePropertiesToObject(context.node),
+        context: {
+          workflowInputs: context.workflowInputs,
+          upstreamOutputs: context.upstreamOutputs,
+        },
+      });
+
+      return {
+        nodeId: response.nodeId,
+        status: response.status,
+        outputs: normalizePythonOutputs(nodeType, response.outputs),
+        messages: response.messages,
+        errorMessage: response.errorMessage,
+      };
+    }
 
     if (nodeType === "shared.document-uploader") {
       const document = readProperty(context.node, "document") as UploadedDocument | undefined;
@@ -493,38 +588,19 @@ export class LangChainNodeExecutor implements INodeExecutor {
 
     if (supportsNodeType(nodeType, "langchain.context_formatter")) {
       const documents = toDocuments(inputs.documents);
-      const chunkValues = Array.isArray(inputs.chunks) ? inputs.chunks : [];
-      const chunkTexts = chunkValues
-        .map((item) => normalizeText(item))
-        .filter((item) => item.trim().length > 0);
-      const template = String(properties.template ?? "");
-      const separator = String(properties.separator ?? "\n\n");
-      const includeMetadata = Boolean(properties.includeMetadata ?? false);
-      const maxItems = Math.max(
-        1,
-        Number(properties.maxItems ?? (documents.length + chunkTexts.length || 1))
+      const template = String(properties.template ?? "[{index}] {content}");
+      const maxLength = Math.max(1, Number(properties.maxLength ?? 2000));
+      const renderedItems = documents.map((document, index) =>
+        template
+          .replace(/\{index\}/g, String(index + 1))
+          .replace(/\{content\}/g, document.text)
+          .replace(/\{text\}/g, document.text)
+          .replace(
+            /\{metadata\}/g,
+            document.metadata ? stringifyValue(document.metadata) : "{}"
+          )
       );
-      const renderedItems = [
-        ...documents.map((document, index) => {
-          const metadataText =
-            includeMetadata && document.metadata
-              ? `\nMetadata: ${stringifyValue(document.metadata)}`
-              : "";
-          const fallback = `${document.text}${metadataText}`;
-          if (!template.trim()) {
-            return fallback;
-          }
-
-          return template
-            .replace(/\{index\}/g, String(index + 1))
-            .replace(/\{text\}/g, document.text)
-            .replace(/\{metadata\}/g, metadataText ? stringifyValue(document.metadata) : "");
-        }),
-        ...chunkTexts,
-      ]
-        .filter((item) => item.trim().length > 0)
-        .slice(0, maxItems);
-      const contextText = renderedItems.join(separator);
+      const contextText = renderedItems.join("\n\n").slice(0, maxLength);
 
       return {
         nodeId: context.node.id,
@@ -535,9 +611,9 @@ export class LangChainNodeExecutor implements INodeExecutor {
         messages: [
           contextText
             ? `Formatted ${renderedItems.length} context item(s).`
-            : "Context formatter received no documents or chunks.",
+            : "Context formatter received no documents.",
         ],
-        errorMessage: contextText ? undefined : "Context formatter received no documents or chunks.",
+        errorMessage: contextText ? undefined : "Context formatter received no documents.",
       };
     }
 
@@ -768,47 +844,40 @@ export class LangChainNodeExecutor implements INodeExecutor {
       const embeddings = Array.isArray(inputs.embeddings)
         ? inputs.embeddings.filter(Array.isArray)
         : [];
-      const vectorStore = ensureObjectRecord(inputs.vectorStore);
-      const collection = String(properties.collection ?? vectorStore.collection ?? "default");
-      const upsertMode = String(properties.upsertMode ?? "append");
-      const batchSize = Math.max(1, Number(properties.batchSize ?? 100));
+      const storeType = String(properties.storeType ?? "memory");
+      const collectionName = String(
+        properties.collectionName ?? properties.collection ?? "default"
+      );
       const recordCount = Math.max(documents.length, embeddings.length);
-      const records = Array.from({ length: recordCount }, (_unused, index) => ({
-        id: documents[index]?.id ?? `${collection}-${index + 1}`,
-        document: documents[index],
-        embedding: embeddings[index],
-      }));
+      const records = Array.from({ length: recordCount }, (_unused, index) => {
+        const document = documents[index];
+        return {
+          id: document?.id ?? `${collectionName}-${index + 1}`,
+          content: document?.text ?? "",
+          metadata: document?.metadata ?? {},
+          embedding: embeddings[index],
+        };
+      });
 
       return {
         nodeId: context.node.id,
-        status: vectorStore && recordCount > 0 ? "completed" : "failed",
+        status: recordCount > 0 ? "completed" : "failed",
         outputs: {
           vectorStore: {
-            ...vectorStore,
-            collection,
-            upsertMode,
-            batchSize,
-            recordCount,
+            storeType,
+            collectionName,
             records,
-          },
-          upsertResult: {
-            collection,
-            upsertMode,
-            batchSize,
-            documentCount: documents.length,
-            embeddingCount: embeddings.length,
-            recordCount,
           },
         },
         messages: [
           recordCount > 0
-            ? `Prepared ${recordCount} vector store upsert record(s).`
-            : "Vector store upsert requires documents and/or embeddings.",
+            ? `Prepared ${recordCount} vector store record(s) for ${collectionName}.`
+            : "Vector store upsert requires documents and embeddings.",
         ],
         errorMessage:
           recordCount > 0
             ? undefined
-            : "Vector store upsert requires documents and/or embeddings.",
+            : "Vector store upsert requires documents and embeddings.",
       };
     }
 
@@ -844,24 +913,28 @@ export class LangChainNodeExecutor implements INodeExecutor {
 
     if (supportsNodeType(nodeType, "langchain.similarity_search")) {
       const query = normalizeText(inputs.query);
-      const queryEmbedding = Array.isArray(inputs.queryEmbedding)
-        ? (inputs.queryEmbedding as number[])
-        : undefined;
-      const topK = Math.max(1, Number(properties.topK ?? 5));
+      const topK = Math.max(1, Number(properties.k ?? properties.topK ?? 4));
       const minimumScore = Number(properties.scoreThreshold ?? 0);
       const vectorStore = inputs.vectorStore as Record<string, unknown> | unknown[] | undefined;
       const candidateDocuments = [
-        ...toDocuments((vectorStore as Record<string, unknown> | undefined)?.records),
+        ...toDocuments(
+          Array.isArray((vectorStore as Record<string, unknown> | undefined)?.records)
+            ? ((vectorStore as Record<string, unknown>).records as unknown[]).map((record) => {
+                const item = ensureObjectRecord(record);
+                return {
+                  id: item.id,
+                  text: item.content,
+                  metadata: item.metadata,
+                };
+              })
+            : []
+        ),
         ...toDocuments(vectorStore),
       ];
       const scored = candidateDocuments
         .map((document, index) => {
           const lexicalScore = query ? scoreText(query, document.text) : 0;
-          const embeddingScore =
-            queryEmbedding && Array.isArray((vectorStore as Record<string, unknown> | undefined)?.records)
-              ? 0.75
-              : 0;
-          const score = Number(Math.max(lexicalScore, embeddingScore).toFixed(3));
+          const score = Number(lexicalScore.toFixed(3));
 
           return {
             id: document.id ?? `doc-${index + 1}`,
@@ -885,12 +958,12 @@ export class LangChainNodeExecutor implements INodeExecutor {
         messages: [
           scored.length > 0
             ? `Found ${scored.length} similar document(s).`
-            : "Similarity search requires a query or query embedding and searchable records.",
+            : "Similarity search requires a query and a searchable vector store.",
         ],
         errorMessage:
           scored.length > 0
             ? undefined
-            : "Similarity search requires a query or query embedding and searchable records.",
+            : "Similarity search requires a query and a searchable vector store.",
       };
     }
 
@@ -1164,20 +1237,17 @@ export class LangChainNodeExecutor implements INodeExecutor {
     }
 
     if (supportsNodeType(nodeType, "langchain.summarization")) {
-      const model = String(properties.model ?? "");
-      const style = String(properties.style ?? "brief");
-      const maxLength = Number(properties.maxLength ?? 300);
-      const text = normalizeText(inputs.text);
       const documents = toDocuments(inputs.documents);
-      const sourceText =
-        text || documents.map((document) => document.text).join("\n\n");
-      const clippedText = sourceText.slice(0, Math.max(1, maxLength));
+      const model = normalizeText(inputs.model) || String(properties.model ?? "summary-model");
+      const strategy = String(properties.strategy ?? "stuff");
+      const sourceText = documents.map((document) => document.text).join("\n\n");
+      const clippedText = sourceText.slice(0, 300);
       const summary =
-        style === "bullet"
-          ? `- ${clippedText}`
-          : style === "detailed"
-            ? `[${model || "summary-model"}] Detailed summary: ${clippedText}`
-            : `[${model || "summary-model"}] Summary: ${clippedText}`;
+        strategy === "map_reduce"
+          ? `[${model}] Map-reduce summary: ${clippedText}`
+          : strategy === "refine"
+            ? `[${model}] Refined summary: ${clippedText}`
+            : `[${model}] Summary: ${clippedText}`;
 
       return {
         nodeId: context.node.id,
@@ -1188,31 +1258,30 @@ export class LangChainNodeExecutor implements INodeExecutor {
         messages: [
           sourceText
             ? "Summarization node generated a deterministic summary."
-            : "Summarization requires text or documents.",
+            : "Summarization requires documents and a model input.",
         ],
-        errorMessage: sourceText ? undefined : "Summarization requires text or documents.",
+        errorMessage:
+          sourceText && model ? undefined : "Summarization requires documents and a model input.",
       };
     }
 
     if (supportsNodeType(nodeType, "langchain.combine_summaries")) {
       const summaryInput = Array.isArray(inputs.summaries)
         ? inputs.summaries.map((item) => normalizeText(item)).filter(Boolean)
-        : [];
-      const separator = String(properties.separator ?? "\n\n");
-      const strategy = String(properties.strategy ?? "reduce");
-      const model = String(properties.model ?? "");
+        : normalizeText(inputs.summaries)
+          ? [normalizeText(inputs.summaries)]
+          : [];
+      const method = String(properties.method ?? properties.strategy ?? "concatenate");
       const summary =
-        strategy === "concatenate"
-          ? summaryInput.join(separator)
-          : strategy === "outline"
-            ? summaryInput.map((item, index) => `${index + 1}. ${item}`).join("\n")
-            : `[${model || "summary-combiner"}] ${summaryInput.join(separator)}`;
+        method === "reduce"
+          ? summaryInput.join(" ").trim()
+          : summaryInput.join("\n\n");
 
       return {
         nodeId: context.node.id,
         status: summaryInput.length > 0 ? "completed" : "failed",
         outputs: {
-          summary,
+          combinedSummary: summary,
         },
         messages: [
           summaryInput.length > 0
