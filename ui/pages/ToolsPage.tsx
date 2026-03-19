@@ -15,7 +15,7 @@ export default function ToolsPage(): JSX.Element {
   return (
     <section className="ui-page">
       <h1 className="ui-page__title">Tools</h1>
-      <p className="ui-page__subtitle">Use published tools without editing workflows.</p>
+      <p className="ui-page__subtitle">Open published tools and enter the details needed to get a result.</p>
       <ToolSearchBar
         value={{ query: state.activeSearch?.query ?? "", typeId: state.activeSearch?.typeIds?.[0] }}
         typeOptions={state.availableTypes}

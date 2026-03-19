@@ -1,17 +1,5 @@
-export type FieldVisibility = "basic" | "advanced" | "hidden";
+import type { ProjectedField } from "./ProjectedField";
 
-export interface FormField {
-  readonly id: string;
-  readonly nodeId: string;
-  readonly propertyId: string;
-  readonly label: string;
-  readonly description?: string;
-  readonly type: string;
-  readonly required: boolean;
-  readonly order: number;
-  readonly sectionId: string;
-  readonly defaultValue?: unknown;
-  readonly value?: unknown;
-  readonly options?: ReadonlyArray<{ readonly label: string; readonly value: unknown }>;
-  readonly visibility: FieldVisibility;
-}
+export type FieldVisibility = ProjectedField["visibility"];
+
+export type FormField = ProjectedField;

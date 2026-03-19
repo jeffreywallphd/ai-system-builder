@@ -1,0 +1,37 @@
+import type { ProjectedField } from "../../../application/projection/models/ProjectedField";
+import NodePropertyField from "../nodes/NodePropertyField";
+import type { NodePropertyFieldViewModel } from "../../presenters/NodePresenter";
+
+function toNodePropertyField(field: ProjectedField): NodePropertyFieldViewModel {
+  return Object.freeze({
+    id: field.propertyId,
+    name: field.label,
+    type: field.type,
+    value: field.value,
+    defaultValue: field.defaultValue,
+    description: field.description,
+    isEditable: field.isEditable,
+    isAdvanced: field.visibility === "advanced",
+    isEmpty: field.value === undefined || field.value === null || field.value === "",
+    min: field.min,
+    max: field.max,
+    step: field.step,
+    shouldClampToRange: field.shouldClampToRange,
+    options: field.options,
+  });
+}
+
+export default function ProjectedFieldEditor({
+  field,
+  onChange,
+}: {
+  readonly field: ProjectedField;
+  readonly onChange: (id: string, value: unknown) => void;
+}): JSX.Element {
+  return (
+    <NodePropertyField
+      field={toNodePropertyField(field)}
+      onChange={(_, value) => onChange(field.id, value)}
+    />
+  );
+}

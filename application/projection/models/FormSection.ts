@@ -1,9 +1,4 @@
 import type { FormField } from "./FormField";
+import type { ProjectedSection } from "./ProjectedSection";
 
-export interface FormSection {
-  readonly id: string;
-  readonly title: string;
-  readonly description?: string;
-  readonly order: number;
-  readonly fields: ReadonlyArray<FormField>;
-}
+export type FormSection = ProjectedSection<FormField>;

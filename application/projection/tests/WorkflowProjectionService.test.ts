@@ -1,7 +1,46 @@
 import { describe, expect, it } from "bun:test";
 import { WorkflowProjectionService } from "../WorkflowProjectionService";
+import { WorkflowToolProjectionService } from "../WorkflowToolProjectionService";
 import { makeNode, makeWorkflow } from "../../../domain/services/tests/testUtils";
 import { NodeProperty } from "../../../domain/nodes/NodeProperty";
+
+function makeProjectedWorkflow() {
+  const node = makeNode({
+    id: "n1",
+    properties: [
+      new NodeProperty({
+        id: "prompt",
+        name: "Prompt",
+        description: "Internal prompt field",
+        type: "text",
+        value: "hello",
+        defaultValue: "draft",
+        order: 7,
+        isEditable: true,
+        constraints: {
+          required: true,
+          range: {
+            min: 1,
+            max: 10,
+            step: 1,
+            defaultValue: 4,
+          },
+        },
+        projection: {
+          label: "Ask",
+          description: "What should this tool help with?",
+          group: "Inputs",
+          order: 2,
+          fieldTypeHint: "multiline-text",
+          authorVisibility: "basic",
+          toolVisibility: "basic",
+        },
+      }),
+    ],
+  }).withNotes("Collect the core request.");
+
+  return makeWorkflow({ id: "wf1", nodes: [node] });
+}
 
 describe("WorkflowProjectionService", () => {
   it("projects workflow to author form", () => {
@@ -9,5 +48,30 @@ describe("WorkflowProjectionService", () => {
     const schema = new WorkflowProjectionService().projectToForm(makeWorkflow({ id: "wf1", nodes: [node] }));
     expect(schema.sections.length).toBeGreaterThan(0);
     expect(schema.sections[0]?.fields[0]?.id).toBe("n1.p1");
+  });
+
+  it("reuses projection metadata that is compatible with the tool surface", () => {
+    const workflow = makeProjectedWorkflow();
+    const form = new WorkflowProjectionService().projectToForm(workflow);
+    const tool = new WorkflowToolProjectionService().projectToTool(workflow);
+    const formSection = form.sections[0];
+    const toolSection = tool.sections[0];
+    const formField = formSection?.fields[0];
+    const toolField = toolSection?.fields[0];
+
+    expect(formSection).toEqual(toolSection);
+    expect(formField).toEqual(toolField);
+    expect(formField).toMatchObject({
+      label: "Ask",
+      description: "What should this tool help with?",
+      type: "multiline-text",
+      order: 2,
+      sectionId: "Inputs",
+      required: true,
+      min: 1,
+      max: 10,
+      step: 1,
+      shouldClampToRange: true,
+    });
   });
 });
