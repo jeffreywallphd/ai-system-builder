@@ -1,16 +1,3 @@
-import type { FieldVisibility } from "./FormField";
+import type { ProjectedField } from "./ProjectedField";
 
-export interface ToolField {
-  readonly id: string;
-  readonly nodeId: string;
-  readonly propertyId: string;
-  readonly label: string;
-  readonly description?: string;
-  readonly type: string;
-  readonly required: boolean;
-  readonly order: number;
-  readonly defaultValue?: unknown;
-  readonly value?: unknown;
-  readonly options?: ReadonlyArray<{ readonly label: string; readonly value: unknown }>;
-  readonly visibility: FieldVisibility;
-}
+export type ToolField = ProjectedField;

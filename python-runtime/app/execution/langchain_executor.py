@@ -136,6 +136,84 @@ def _dedupe_consecutive_messages(messages: List[Dict[str, str]]) -> List[Dict[st
     return deduped
 
 
+def _normalize_tool(tool: Any) -> Dict[str, Any] | None:
+    if not isinstance(tool, dict):
+        return None
+    name = tool.get("name")
+    description = tool.get("description")
+    if not isinstance(name, str) or not name.strip() or not isinstance(description, str):
+        return None
+    schema = tool.get("inputSchema") if isinstance(tool.get("inputSchema"), dict) else None
+    return {
+        "name": name.strip(),
+        "description": description,
+        "inputSchema": schema,
+        "strictSchema": tool.get("strictSchema") if isinstance(tool.get("strictSchema"), bool) else None,
+        "handler": tool.get("handler"),
+    }
+
+
+def _normalize_tool_call(value: Any) -> Dict[str, Any] | None:
+    if not isinstance(value, dict):
+        return None
+    name = value.get("name")
+    if not isinstance(name, str) or not name.strip():
+        return None
+    arguments = value.get("arguments") if isinstance(value.get("arguments"), dict) else value.get("args") if isinstance(value.get("args"), dict) else {}
+    return {"name": name.strip(), "arguments": dict(arguments)}
+
+
+def _required_tool_arguments(tool: Dict[str, Any]) -> List[str]:
+    schema = tool.get("inputSchema") if isinstance(tool.get("inputSchema"), dict) else {}
+    required = schema.get("required")
+    if not isinstance(required, list):
+        return []
+    return [str(value) for value in required if isinstance(value, str) and value.strip()]
+
+
+def _pick_tool_for_task(task: str, tools: List[Dict[str, Any]]) -> Dict[str, Any] | None:
+    if not tools:
+        return None
+    normalized_task = task.lower()
+    for tool in tools:
+        if tool["name"].lower() in normalized_task:
+            return tool
+    for tool in tools:
+        description = str(tool.get("description") or "").lower()
+        if any(keyword in normalized_task and keyword in description for keyword in ["search", "find", "lookup", "retrieve", "tool"]):
+            return tool
+    return tools[0]
+
+
+def _build_tool_result(tool: Dict[str, Any], arguments: Dict[str, Any]) -> Dict[str, Any]:
+    missing_required_arguments = [
+        name
+        for name in _required_tool_arguments(tool)
+        if arguments.get(name) in (None, "")
+    ]
+    primary_input = str(
+        arguments.get("input")
+        or arguments.get("query")
+        or arguments.get("request")
+        or arguments.get("text")
+        or ""
+    ).strip()
+    tool_call = {"name": tool["name"], "arguments": dict(arguments)}
+    tool_result = {
+        "toolName": tool["name"],
+        "arguments": dict(arguments),
+        "missingRequiredArguments": missing_required_arguments,
+        "status": "missing-required-arguments" if missing_required_arguments else "completed",
+        "output": f"{tool['description']} :: {primary_input or json.dumps(arguments, sort_keys=True) if arguments else 'no arguments provided'}",
+    }
+    return {
+        "toolCall": tool_call,
+        "toolResult": tool_result,
+        "resultText": json.dumps(tool_result, sort_keys=True),
+        "missingRequiredArguments": missing_required_arguments,
+    }
+
+
 def _normalize_knowledge_base_handle(value: Any) -> Dict[str, Any]:
     if isinstance(value, dict):
         records = value.get("records")
@@ -618,6 +696,87 @@ class LangChainExecutor:
                     "inputSchema": merged_schema or None,
                 },
             }
+
+        if node_type in {"langchain.tool_execution", "langchain.tool_call_executor"}:
+            tool_call = _normalize_tool_call(inputs.get("toolCall"))
+            tool = _normalize_tool(inputs.get("tool"))
+            raw_arguments = inputs.get("arguments") if isinstance(inputs.get("arguments"), dict) else None
+            arguments = dict(raw_arguments or (tool_call.get("arguments") if isinstance(tool_call, dict) else {}) or {})
+            fail_on_missing_args = bool(properties.get("failOnMissingArgs", True))
+            stringify_result = bool(properties.get("stringifyResult", True))
+
+            if tool is None:
+                tool_name = tool_call.get("name") if isinstance(tool_call, dict) else "unnamed-tool"
+                tool_result = {
+                    "toolName": tool_name,
+                    "arguments": arguments,
+                    "missingRequiredArguments": [],
+                    "status": "missing-tool",
+                    "output": "No executable tool definition was provided.",
+                }
+                return {
+                    "toolCall": tool_call,
+                    "toolResult": tool_result,
+                    "resultText": json.dumps(tool_result, sort_keys=True) if stringify_result else None,
+                }
+
+            executed = _build_tool_result(tool, arguments)
+            return {
+                "toolCall": executed["toolCall"],
+                "toolResult": executed["toolResult"],
+                "resultText": executed["resultText"] if stringify_result else None,
+            }
+
+        if node_type in {"langchain.simple_agent", "langchain.agent"}:
+            model = str(properties.get("model") or "assistant-model")
+            system_prompt = str(properties.get("systemPrompt") or "")
+            temperature = float(properties.get("temperature", 0.7))
+            max_iterations = max(1, int(properties.get("maxIterations") or 3))
+            use_memory = bool(properties.get("useMemory", True))
+            verbose = bool(properties.get("verbose", False))
+            history = _normalize_messages(inputs.get("history")) if use_memory else []
+            incoming_messages = _normalize_messages(inputs.get("messages"))
+            direct_input = str(inputs.get("input") or "")
+            tools = [tool for tool in [_normalize_tool(item) for item in (inputs.get("tools") or [])] if tool is not None]
+
+            assembled_messages: List[Dict[str, str]] = []
+            if system_prompt.strip():
+                assembled_messages.append({"role": "system", "content": system_prompt})
+            assembled_messages.extend(history)
+            if incoming_messages:
+                assembled_messages.extend(incoming_messages)
+            elif direct_input.strip():
+                assembled_messages.append({"role": "user", "content": direct_input})
+
+            user_messages = [message["content"] for message in assembled_messages if message["role"] == "user"]
+            latest_user_input = user_messages[-1] if user_messages else direct_input
+            chosen_tool = _pick_tool_for_task(latest_user_input, tools) if latest_user_input else None
+            executed_tool = _build_tool_result(chosen_tool, {"input": latest_user_input}) if chosen_tool and latest_user_input else None
+            iteration_count = 0 if not latest_user_input else min(max_iterations, 2 if executed_tool else 1)
+            response = (
+                f"[{model}] {latest_user_input}\n\nUsed tool '{chosen_tool['name']}' and observed: {executed_tool['toolResult']['output']}"
+                if executed_tool and latest_user_input
+                else f"[{model}] {latest_user_input}" if latest_user_input
+                else ""
+            )
+            output_messages = list(assembled_messages)
+            if response:
+                output_messages.append({"role": "assistant", "content": response})
+            result: Dict[str, Any] = {
+                "response": response,
+                "messages": output_messages,
+                "toolCalls": [executed_tool["toolCall"]] if executed_tool else [],
+                "toolResults": [executed_tool["toolResult"]] if executed_tool else [],
+            }
+            if verbose:
+                result["trace"] = {
+                    "temperature": temperature,
+                    "maxIterations": max_iterations,
+                    "iterationCount": iteration_count,
+                    "toolCount": len(tools),
+                    "selectedTool": chosen_tool["name"] if chosen_tool else None,
+                }
+            return result
 
         if node_type == "langchain.summarization":
             documents = _normalize_documents(inputs.get("documents") or [])

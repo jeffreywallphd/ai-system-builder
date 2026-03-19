@@ -1,5 +1,7 @@
 import { EnvironmentConfig } from "../config/EnvironmentConfig";
 import { EnvironmentConfigProvider } from "../config/EnvironmentConfigProvider";
+import { McpRuntimeConfig } from "../config/McpRuntimeConfig";
+import { PythonRuntimeConfig } from "../config/PythonRuntimeConfig";
 import { LocalFileStorage } from "../filesystem/LocalFileStorage";
 import { LocalAssetRepository } from "../filesystem/LocalAssetRepository";
 import { LocalModelRepository } from "../filesystem/LocalModelRepository";
@@ -26,13 +28,24 @@ import type { IRemoteModelCatalog } from "../../application/ports/interfaces/IRe
 import type { IModelInstaller } from "../../application/ports/interfaces/IModelInstaller";
 import type { IWorkflowExecutor } from "../../application/ports/interfaces/IWorkflowExecutor";
 import type { IWorkflowSerializer } from "../../application/ports/interfaces/IWorkflowSerializer";
+import type { IMcpRuntimeClient } from "../../application/ports/interfaces/IMcpRuntimeClient";
+import type { IMcpToolCatalog } from "../../application/ports/interfaces/IMcpToolCatalog";
+import type { IMcpToolExecutor } from "../../application/ports/interfaces/IMcpToolExecutor";
+import type { IRuntimeEventSink } from "../../application/ports/interfaces/IRuntimeEventSink";
 import type { INodeImplementationRegistry } from "../nodes/shared/INodeImplementationRegistry";
 import { CompositeNodeImplementationRegistry } from "../nodes/CompositeNodeImplementationRegistry";
 import { createCompositeNodeImplementationRegistry } from "../nodes/NodeProviderRegistryIndex";
+import { HttpMcpRuntimeClient } from "../python/mcp/HttpMcpRuntimeClient";
+import { PythonBackedMcpToolCatalog } from "../python/mcp/PythonBackedMcpToolCatalog";
+import { PythonBackedMcpToolExecutor } from "../python/mcp/PythonBackedMcpToolExecutor";
 
 export const TOKENS = Object.freeze({
   EnvironmentConfig: Symbol("EnvironmentConfig"),
   EnvironmentConfigProvider: Symbol("EnvironmentConfigProvider"),
+  McpRuntimeConfig: Symbol("McpRuntimeConfig"),
+  McpRuntimeClient: Symbol("McpRuntimeClient"),
+  McpToolCatalog: Symbol("McpToolCatalog"),
+  McpToolExecutor: Symbol("McpToolExecutor"),
   FileStorage: Symbol("FileStorage"),
   AssetCatalog: Symbol("AssetCatalog"),
   InstalledModelCatalog: Symbol("InstalledModelCatalog"),
@@ -66,6 +79,14 @@ export interface IInfrastructureRegistryOptions {
   readonly nodeImplementationRegistries?: ReadonlyArray<INodeImplementationRegistry>;
 }
 
+function toStringEnv(
+  env: Readonly<Record<string, unknown>>
+): Readonly<Record<string, string | undefined>> {
+  return Object.fromEntries(
+    Object.entries(env).map(([key, value]) => [key, value === undefined ? undefined : String(value)])
+  );
+}
+
 export class InfrastructureRegistry {
   public static register(
     container: DependencyContainer,
@@ -90,6 +111,55 @@ export class InfrastructureRegistry {
         return new ApplicationEnvironmentConfigProvider(config.toObject());
       }
     );
+
+    container.registerSingleton(TOKENS.McpRuntimeConfig, (c) => {
+      const config = c.resolve<EnvironmentConfig>(TOKENS.EnvironmentConfig);
+      return McpRuntimeConfig.fromEnv(toStringEnv(config.toObject()));
+    });
+
+    container.registerSingleton<IMcpRuntimeClient>(TOKENS.McpRuntimeClient, (c) => {
+      const config = c.resolve<EnvironmentConfig>(TOKENS.EnvironmentConfig);
+      const pythonRuntimeConfig = PythonRuntimeConfig.fromEnv(toStringEnv(config.toObject()));
+      const eventSink = c.tryResolve<IRuntimeEventSink>(Symbol.for("RuntimeEventSink"));
+
+      if (!pythonRuntimeConfig.isEnabled) {
+        return {
+          getConnectionStatus: async () => ({
+            enabled: false,
+            state: "disabled",
+            checkedAt: new Date().toISOString(),
+            servers: [],
+            capabilities: { tools: false, resources: false, toolExecution: false },
+            metadata: { reason: "python-runtime-disabled" },
+          }),
+          listTools: async () => [],
+          executeTool: async (request) => ({
+            executionId: request.executionId?.trim() || "mcp-disabled",
+            serverId: request.serverId,
+            toolName: request.toolName,
+            status: "failed",
+            content: [],
+            errorMessage: "Python runtime is disabled.",
+          }),
+        } satisfies IMcpRuntimeClient;
+      }
+
+      return new HttpMcpRuntimeClient(pythonRuntimeConfig, fetch, eventSink);
+    });
+
+    container.registerSingleton<IMcpToolCatalog>(TOKENS.McpToolCatalog, (c) => {
+      return new PythonBackedMcpToolCatalog(
+        c.resolve<IMcpRuntimeClient>(TOKENS.McpRuntimeClient),
+        c.tryResolve<IRuntimeEventSink>(Symbol.for("RuntimeEventSink"))
+      );
+    });
+
+    container.registerSingleton<IMcpToolExecutor>(TOKENS.McpToolExecutor, (c) => {
+      return new PythonBackedMcpToolExecutor(
+        c.resolve<IMcpRuntimeClient>(TOKENS.McpRuntimeClient),
+        c.tryResolve<IRuntimeEventSink>(Symbol.for("RuntimeEventSink"))
+      );
+    });
 
     container.registerSingleton<IFileStorage>(TOKENS.FileStorage, () => {
       return new LocalFileStorage();

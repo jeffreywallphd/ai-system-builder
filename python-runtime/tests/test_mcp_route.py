@@ -1,0 +1,60 @@
+from fastapi.testclient import TestClient
+
+from app.main import app
+from app.api.dependencies import get_mcp_service
+from app.core.mcp_config import McpRuntimeConfig
+from app.mcp.registry import McpRegistry
+from app.mcp.service import McpService
+from app.mcp.session import McpSessionManager
+
+
+def override_service() -> McpService:
+    config = McpRuntimeConfig(
+        enabled=True,
+        servers_json='[{"id": "local", "name": "Local MCP", "transport": "inmemory", "mock_tools": [{"name": "echo", "inputSchema": {"type": "object"}}, {"name": "sum_numbers", "inputSchema": {"type": "object"}}], "mock_resources": [{"uri": "memory://resource/1", "name": "Example Resource"}]}]'
+    )
+    registry = McpRegistry(config)
+    return McpService(registry=registry, sessions=McpSessionManager(registry))
+
+
+def test_mcp_status_route() -> None:
+    app.dependency_overrides[get_mcp_service] = override_service
+    client = TestClient(app)
+
+    response = client.get("/mcp/status")
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["enabled"] is True
+    assert payload["state"] == "ready"
+    assert payload["servers"][0]["toolCount"] == 2
+
+
+def test_mcp_tools_route_lists_tools_and_resources() -> None:
+    app.dependency_overrides[get_mcp_service] = override_service
+    client = TestClient(app)
+
+    response = client.get("/mcp/tools")
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["tools"][0]["serverId"] == "local"
+    assert payload["resources"][0]["uri"] == "memory://resource/1"
+
+
+def test_mcp_execute_route_executes_tool() -> None:
+    app.dependency_overrides[get_mcp_service] = override_service
+    client = TestClient(app)
+
+    response = client.post(
+        "/mcp/tools/execute",
+        json={"serverId": "local", "toolName": "sum_numbers", "arguments": {"numbers": [2, 3, 4]}},
+    )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "completed"
+    assert payload["structuredContent"]["total"] == 9

@@ -6,8 +6,9 @@ describe("SettingsPage", () => {
     const source = readSource("ui/pages/SettingsPage.tsx");
 
     expect(source).toContain('title="Workspace Data"');
-    expect(source).toContain('title="Models"');
+    expect(source).toContain('title="Models & Downloads"');
     expect(source).toContain('title="Runtime & Integrations"');
+    expect(source).toContain('title="Workflow Authoring"');
     expect(source).toContain('title="Development Tools"');
   });
 
@@ -20,7 +21,12 @@ describe("SettingsPage", () => {
     expect(source).toContain("Development (dev/workflow-data)");
     expect(source).toContain("Production (user/workflow-data)");
     expect(source).toContain("Advanced runtime settings");
+    expect(source).toContain("<McpRuntimeStatusPanel");
+    expect(source).toContain("mcpStore.subscribe(setMcpState)");
+    expect(source).toContain("Authentication & install defaults");
     expect(source).toContain("Advanced development settings");
+    expect(source).toContain('id="settings-authoring-default-view-mode"');
+    expect(source).toContain("function NumberField");
   });
 
   it("uses folder picker dialogs for directory-based settings", () => {

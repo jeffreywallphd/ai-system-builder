@@ -16,8 +16,9 @@ describe("ui/components/models interactions", () => {
     expect(page).toContain("onSearch={(value) => {");
     expect(page).toContain("settingsStore.subscribe");
     expect(page).toContain("settingsState.settings.models.installDirectory");
+    expect(page).toContain("remoteSearchLimit");
     expect(page).toContain("createInstallationModel(remoteModel.model, installTargets)");
     expect(page).toContain("state.remoteModels");
-    expect(page).toContain("destination: `${installBaseDirectory}/");
+    expect(page).toContain("destination: `${modelSettings.installDirectory}/");
   });
 });

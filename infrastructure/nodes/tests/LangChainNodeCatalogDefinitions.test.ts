@@ -119,6 +119,20 @@ const requiredTierTwoNodes = [
     expectedProperties: ["toolName", "description", "inputSchemaSource", "inputSchema", "strictSchema", "displayName"],
   },
   {
+    type: "langchain.tool_execution",
+    title: "Run Tool",
+    requiredInputs: ["tool", "toolCall", "arguments"],
+    requiredOutputs: ["toolCall", "toolResult", "resultText"],
+    expectedProperties: ["failOnMissingArgs", "stringifyResult"],
+  },
+  {
+    type: "langchain.simple_agent",
+    title: "AI Assistant",
+    requiredInputs: ["messages", "input", "tools", "history"],
+    requiredOutputs: ["response", "messages", "toolCalls", "toolResults"],
+    expectedProperties: ["model", "systemPrompt", "temperature", "maxIterations", "useMemory", "verbose"],
+  },
+  {
     type: "langchain.tool_call_executor",
     title: "Run AI Tool",
     requiredInputs: ["tool", "arguments"],
@@ -218,7 +232,7 @@ describe("LangChain node catalog definitions", () => {
   it("stores technical and projection metadata for Tier 1 nodes", () => {
     const llmNode = getLangChainNodeCatalogMetadata("langchain.llm_chat");
     const documentLoader = getLangChainNodeCatalogMetadata("langchain.document_loader");
-    const agent = getLangChainNodeCatalogMetadata("langchain.agent");
+    const simpleAgent = getLangChainNodeCatalogMetadata("langchain.simple_agent");
 
     expect(llmNode?.technicalName).toBe("langchain.llm_chat");
     expect(llmNode?.technicalDescription).toContain("Invokes a language model");
@@ -227,9 +241,9 @@ describe("LangChain node catalog definitions", () => {
     expect(llmNode?.projection.supportsAuthoringView).toBeTrue();
     expect(llmNode?.projection.supportsToolView).toBeTrue();
     expect(documentLoader?.projection.keywords).toContain("documents");
-    expect(agent?.technicalDescription).toContain("Uses an LLM with tools");
-    expect(agent?.description).toContain("tools and memory");
-    expect(agent?.projection.group).toBe("Tier 2 LLM");
+    expect(simpleAgent?.technicalDescription).toContain("bounded single-assistant loop");
+    expect(simpleAgent?.description).toContain("use one tool once");
+    expect(simpleAgent?.projection.group).toBe("Tier 2 LLM");
   });
 
   it("adds projection-friendly property metadata, defaults, and data types", async () => {
@@ -392,7 +406,7 @@ describe("LangChain node catalog definitions", () => {
     const similaritySearch = definitions.find(
       (definition) => definition.type === "langchain.similarity_search"
     );
-    const agent = definitions.find((definition) => definition.type === "langchain.agent");
+    const agent = definitions.find((definition) => definition.type === "langchain.simple_agent");
     const summarization = definitions.find(
       (definition) => definition.type === "langchain.summarization"
     );

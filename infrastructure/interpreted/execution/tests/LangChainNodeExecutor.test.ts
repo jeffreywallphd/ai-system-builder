@@ -502,7 +502,7 @@ describe("LangChainNodeExecutor", () => {
       new NodeProperty({ id: "strictSchema", name: "Strict Schema", type: "boolean", value: true }),
       new NodeProperty({ id: "displayName", name: "Display Name", type: "text", value: "Search Docs" }),
     ]);
-    const executorNode = makeLangChainNode("n-tool-run", "langchain.tool_call_executor", [
+    const executorNode = makeLangChainNode("n-tool-run", "langchain.tool_execution", [
       new NodeProperty({
         id: "failOnMissingArgs",
         name: "Fail On Missing Arguments",
@@ -536,7 +536,7 @@ describe("LangChainNodeExecutor", () => {
       upstreamOutputs: {},
       resolvedInputs: {
         tool: toolResult.outputs.tool,
-        arguments: { query: "nodes" },
+        toolCall: { name: "search_docs", arguments: { query: "nodes" } },
       },
     });
 
@@ -567,16 +567,22 @@ describe("LangChainNodeExecutor", () => {
       },
     });
     expect(runResult.status).toBe("completed");
+    expect(runResult.outputs.toolCall).toEqual({
+      name: "search_docs",
+      arguments: { query: "nodes" },
+    });
     expect(runResult.outputs.toolResult).toEqual({
       toolName: "search_docs",
       arguments: { query: "nodes" },
+      missingRequiredArguments: [],
       status: "completed",
+      output: "Search project documents. :: nodes",
     });
     expect(runResult.outputs.resultText).toContain("\"toolName\": \"search_docs\"");
   });
 
   it("runs agent and summarization tier 2 nodes with bounded outputs", async () => {
-    const agentNode = makeLangChainNode("n-agent", "langchain.agent", [
+    const agentNode = makeLangChainNode("n-agent", "langchain.simple_agent", [
       new NodeProperty({ id: "model", name: "Model", type: "text", value: "agent-model" }),
       new NodeProperty({ id: "systemPrompt", name: "System Prompt", type: "multiline-text", value: "Be helpful." }),
       new NodeProperty({ id: "temperature", name: "Temperature", type: "slider", value: 0.3 }),
@@ -651,10 +657,20 @@ describe("LangChainNodeExecutor", () => {
 
     expect(agentResult.status).toBe("completed");
     expect(agentResult.outputs.response).toContain("[agent-model] Find workflow help.");
+    expect(agentResult.outputs.response).toContain("Used tool 'search_docs'");
     expect(agentResult.outputs.toolCalls).toEqual([
       {
         name: "search_docs",
         arguments: { input: "Find workflow help." },
+      },
+    ]);
+    expect(agentResult.outputs.toolResults).toEqual([
+      {
+        toolName: "search_docs",
+        arguments: { input: "Find workflow help." },
+        missingRequiredArguments: [],
+        status: "completed",
+        output: "Search documents. :: Find workflow help.",
       },
     ]);
 

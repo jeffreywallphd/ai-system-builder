@@ -20,6 +20,8 @@ def get_capabilities() -> dict[str, object]:
             "langchain.similarity_search",
             "langchain.context_formatter",
             "langchain.tool_definition",
+            "langchain.tool_execution",
+            "langchain.simple_agent",
             "langchain.summarization",
             "langchain.combine_summaries",
         ],

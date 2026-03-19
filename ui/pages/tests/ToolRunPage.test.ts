@@ -2,7 +2,10 @@ import { describe, expect, it } from "bun:test";
 import { readSource } from "../../tests/testUtils";
 
 describe("ToolRunPage", () => {
-  it("loads selected tool", () => {
-    expect(readSource("ui/pages/ToolRunPage.tsx")).toContain("loadTool");
+  it("loads the selected tool with tool-first loading copy", () => {
+    const source = readSource("ui/pages/ToolRunPage.tsx");
+    expect(source).toContain("loadTool");
+    expect(source).toContain("Preparing tool…");
+    expect(source).not.toContain("Loading workflow");
   });
 });

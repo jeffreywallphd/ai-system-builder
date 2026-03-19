@@ -713,6 +713,83 @@ export const LANGCHAIN_NODE_CATALOG_METADATA: Readonly<
   "langchain.similarity_search": SIMILARITY_SEARCH_NODE_DEFINITION,
   "langchain.context_formatter": CONTEXT_FORMATTER_NODE_DEFINITION,
   "langchain.tool_definition": TOOL_DEFINITION_NODE_DEFINITION,
+  "langchain.tool_execution": metadata({
+    technicalName: "langchain.tool_execution",
+    nonTechnicalName: "Run Tool",
+    technicalDescription:
+      "Executes one bounded tool call using a provided tool definition plus explicit arguments or a tool-call payload.",
+    nonTechnicalDescription:
+      "Run a single tool step and pass the result back into your workflow.",
+    inputPorts: Object.freeze([
+      inputPort(
+        "tool",
+        "Tool",
+        ["generic", "json"],
+        false,
+        "The tool definition to execute, including description and optional input schema."
+      ),
+      inputPort(
+        "toolCall",
+        "Tool Call",
+        ["tool-call", "json"],
+        true,
+        "Optional requested tool call containing the target tool name and arguments."
+      ),
+      inputPort(
+        "arguments",
+        "Arguments",
+        ["json", "generic"],
+        true,
+        "Structured arguments to pass into the tool when no tool-call payload is supplied."
+      ),
+    ]),
+    outputPorts: Object.freeze([
+      outputPort(
+        "toolCall",
+        "Tool Call",
+        ["tool-call", "json"],
+        "The normalized tool call that was executed."
+      ),
+      outputPort(
+        "toolResult",
+        "Tool Result",
+        ["tool-result", "json", "generic"],
+        "Structured result returned by the executed tool step."
+      ),
+      outputPort(
+        "resultText",
+        "Result Text",
+        ["text"],
+        "Optional text form of the tool result for prompt assembly or display."
+      ),
+    ]),
+    properties: Object.freeze([
+      property({
+        id: "failOnMissingArgs",
+        name: "Fail On Missing Arguments",
+        type: "boolean",
+        value: true,
+        defaultValue: true,
+        description:
+          "Stop execution when the tool call is missing required arguments or the arguments payload is empty.",
+        projectionGroup: "Execution",
+        order: 0,
+      }),
+      property({
+        id: "stringifyResult",
+        name: "Stringify Result",
+        type: "boolean",
+        value: true,
+        defaultValue: true,
+        description: "Also expose a text version of the tool result for downstream prompt-oriented nodes.",
+        projectionGroup: "Execution",
+        order: 1,
+      }),
+    ]),
+    group: tierTwoProjectionGroup,
+    tags: ["tools", "execution", "agent"],
+    keywords: ["tool execution", "run tool", "tool result"],
+  }),
   "langchain.tool_call_executor": metadata({
     technicalName: "langchain.tool_call_executor",
     nonTechnicalName: "Run AI Tool",
@@ -775,6 +852,137 @@ export const LANGCHAIN_NODE_CATALOG_METADATA: Readonly<
     group: tierTwoProjectionGroup,
     tags: ["tools", "execution", "agent"],
     keywords: ["tool execution", "run tool", "tool result"],
+  }),
+  "langchain.simple_agent": metadata({
+    technicalName: "langchain.simple_agent",
+    nonTechnicalName: "AI Assistant",
+    technicalDescription:
+      "Runs a bounded single-assistant loop that can optionally choose one tool, use it, and return a final response.",
+    nonTechnicalDescription:
+      "Let the AI respond directly or use one tool once before answering.",
+    inputPorts: Object.freeze([
+      inputPort(
+        "messages",
+        "Messages",
+        ["messages", "json"],
+        true,
+        "Optional structured chat messages to seed the assistant turn."
+      ),
+      inputPort(
+        "input",
+        "Input",
+        ["text"],
+        true,
+        "Optional plain text task or instruction for the assistant."
+      ),
+      inputPort(
+        "tools",
+        "Tools",
+        ["generic", "json"],
+        true,
+        "Optional tool definition list the assistant may use during its bounded run."
+      ),
+      inputPort(
+        "history",
+        "History",
+        ["messages", "json"],
+        true,
+        "Optional prior conversation history to provide continuity."
+      ),
+    ]),
+    outputPorts: Object.freeze([
+      outputPort("response", "Response", ["text"], "The assistant's final natural-language response."),
+      outputPort(
+        "messages",
+        "Messages",
+        ["messages", "json"],
+        "Message trace produced by the bounded assistant execution."
+      ),
+      outputPort(
+        "toolCalls",
+        "Tool Calls",
+        ["tool-call", "json"],
+        "Structured tool calls proposed or used by the assistant."
+      ),
+      outputPort(
+        "toolResults",
+        "Tool Results",
+        ["tool-result", "json"],
+        "Structured tool results produced during the assistant run."
+      ),
+    ]),
+    properties: Object.freeze([
+      property({
+        id: "model",
+        name: "Model",
+        type: "text",
+        value: "",
+        description: "The model identifier used for assistant reasoning and response generation.",
+        required: true,
+        projectionGroup: "Model",
+        fieldTypeHint: "model",
+        order: 0,
+      }),
+      property({
+        id: "systemPrompt",
+        name: "System Prompt",
+        type: "multiline-text",
+        value: "",
+        description: "Optional assistant instructions describing behavior, role, and constraints.",
+        projectionGroup: "Behavior",
+        fieldTypeHint: "textarea",
+        order: 1,
+      }),
+      property({
+        id: "temperature",
+        name: "Temperature",
+        type: "slider",
+        value: 0.7,
+        defaultValue: 0.7,
+        description: "Controls how exploratory or deterministic the assistant should be.",
+        min: 0,
+        max: 2,
+        step: 0.1,
+        projectionGroup: "Behavior",
+        order: 2,
+      }),
+      property({
+        id: "maxIterations",
+        name: "Max Iterations",
+        type: "integer",
+        value: 2,
+        defaultValue: 2,
+        description: "Upper bound for assistant reasoning steps in this first-pass implementation.",
+        min: 1,
+        max: 5,
+        step: 1,
+        projectionGroup: "Behavior",
+        order: 3,
+      }),
+      property({
+        id: "useMemory",
+        name: "Use Memory",
+        type: "boolean",
+        value: true,
+        defaultValue: true,
+        description: "Include incoming history when available.",
+        projectionGroup: "Behavior",
+        order: 4,
+      }),
+      property({
+        id: "verbose",
+        name: "Verbose Trace",
+        type: "boolean",
+        value: false,
+        defaultValue: false,
+        description: "Expose a small execution trace for debugging and future expansion.",
+        projectionGroup: "Behavior",
+        order: 5,
+      }),
+    ]),
+    group: tierTwoProjectionGroup,
+    tags: ["assistant", "agent", "tools"],
+    keywords: ["ai assistant", "simple agent", "tool use", "chat"],
   }),
   "langchain.agent": metadata({
     technicalName: "langchain.agent",

@@ -1,5 +1,6 @@
 import type { AppRuntimeConfig } from "../../infrastructure/config/AppRuntimeConfig";
 import { PythonRuntimeMode, type PythonRuntimeMode as PythonRuntimeModeValue } from "../../infrastructure/config/PythonRuntimeMode";
+import type { WorkflowViewMode } from "../state/WorkflowViewMode";
 
 export const WorkspaceDataMode = {
   development: "development",
@@ -17,16 +18,29 @@ export interface WorkspaceSettings {
 
 export interface ModelLibrarySettings {
   readonly installDirectory: string;
+  readonly remoteSearchLimit: number;
+  readonly authToken: string;
+  readonly verifyDownloads: boolean;
+  readonly registerInstalledModels: boolean;
+  readonly allowOverwrite: boolean;
 }
 
 export interface RuntimeSettings {
   readonly mode: PythonRuntimeModeValue;
   readonly baseUrl: string;
+  readonly authToken: string;
   readonly workingDirectory: string;
   readonly requestTimeoutMs: number;
   readonly startupTimeoutMs: number;
   readonly healthPollIntervalMs: number;
   readonly autoStartEnabled: boolean;
+}
+
+export interface AuthoringSettings {
+  readonly defaultWorkflowViewMode: WorkflowViewMode;
+  readonly openNodePaletteByDefault: boolean;
+  readonly openInspectorByDefault: boolean;
+  readonly openOutputsByDefault: boolean;
 }
 
 export interface DevelopmentSettings {
@@ -39,6 +53,7 @@ export interface UiSettings {
   readonly workspace: WorkspaceSettings;
   readonly models: ModelLibrarySettings;
   readonly runtime: RuntimeSettings;
+  readonly authoring: AuthoringSettings;
   readonly development: DevelopmentSettings;
 }
 
@@ -79,15 +94,27 @@ export function createDefaultUiSettings(config: AppRuntimeConfig): UiSettings {
     workspace: createWorkspaceDefaults(workspaceDataMode),
     models: Object.freeze({
       installDirectory: config.modelInstallDirectory,
+      remoteSearchLimit: 16,
+      authToken: "",
+      verifyDownloads: true,
+      registerInstalledModels: true,
+      allowOverwrite: false,
     }),
     runtime: Object.freeze({
       mode: PythonRuntimeMode.localHttp,
       baseUrl: "http://127.0.0.1:8000",
+      authToken: "",
       workingDirectory: resolveDefaultRuntimeWorkingDirectory(),
       requestTimeoutMs: 15_000,
       startupTimeoutMs: 20_000,
       healthPollIntervalMs: 500,
       autoStartEnabled: true,
+    }),
+    authoring: Object.freeze({
+      defaultWorkflowViewMode: "canvas",
+      openNodePaletteByDefault: false,
+      openInspectorByDefault: false,
+      openOutputsByDefault: false,
     }),
     development: Object.freeze({
       workspaceDataMode,
@@ -131,10 +158,23 @@ export function mergeUiSettings(
         overrides?.models?.installDirectory,
         defaults.models.installDirectory
       ),
+      remoteSearchLimit: normalizePositiveNumber(
+        overrides?.models?.remoteSearchLimit,
+        defaults.models.remoteSearchLimit
+      ),
+      authToken: normalizeString(
+        overrides?.models?.authToken,
+        defaults.models.authToken
+      ),
+      verifyDownloads: overrides?.models?.verifyDownloads ?? defaults.models.verifyDownloads,
+      registerInstalledModels:
+        overrides?.models?.registerInstalledModels ?? defaults.models.registerInstalledModels,
+      allowOverwrite: overrides?.models?.allowOverwrite ?? defaults.models.allowOverwrite,
     }),
     runtime: Object.freeze({
       mode: normalizeRuntimeMode(overrides?.runtime?.mode, defaults.runtime.mode),
       baseUrl: normalizeString(overrides?.runtime?.baseUrl, defaults.runtime.baseUrl),
+      authToken: normalizeString(overrides?.runtime?.authToken, defaults.runtime.authToken),
       workingDirectory: normalizeDirectory(
         overrides?.runtime?.workingDirectory,
         defaults.runtime.workingDirectory
@@ -152,6 +192,18 @@ export function mergeUiSettings(
         defaults.runtime.healthPollIntervalMs
       ),
       autoStartEnabled: overrides?.runtime?.autoStartEnabled ?? defaults.runtime.autoStartEnabled,
+    }),
+    authoring: Object.freeze({
+      defaultWorkflowViewMode: normalizeWorkflowViewMode(
+        overrides?.authoring?.defaultWorkflowViewMode,
+        defaults.authoring.defaultWorkflowViewMode
+      ),
+      openNodePaletteByDefault:
+        overrides?.authoring?.openNodePaletteByDefault ?? defaults.authoring.openNodePaletteByDefault,
+      openInspectorByDefault:
+        overrides?.authoring?.openInspectorByDefault ?? defaults.authoring.openInspectorByDefault,
+      openOutputsByDefault:
+        overrides?.authoring?.openOutputsByDefault ?? defaults.authoring.openOutputsByDefault,
     }),
     development: Object.freeze({
       workspaceDataMode,
@@ -206,6 +258,17 @@ function normalizeWorkspaceDataMode(
   fallback: WorkspaceDataMode
 ): WorkspaceDataMode {
   if (value === WorkspaceDataMode.development || value === WorkspaceDataMode.production) {
+    return value;
+  }
+
+  return fallback;
+}
+
+function normalizeWorkflowViewMode(
+  value: unknown,
+  fallback: WorkflowViewMode
+): WorkflowViewMode {
+  if (value === "canvas" || value === "form") {
     return value;
   }
 

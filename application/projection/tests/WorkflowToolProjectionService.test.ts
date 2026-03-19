@@ -57,4 +57,34 @@ describe("WorkflowToolProjectionService", () => {
       slug: "wf-internal-id",
     });
   });
+
+  it("can keep author-only metadata out of published tools while still exposing the same field to authors", () => {
+    const workflow = makeWorkflow({
+      id: "wf1",
+      nodes: [
+        makeNode({
+          id: "n1",
+          properties: [
+            new NodeProperty({
+              id: "internal-notes",
+              name: "Internal Notes",
+              type: "text",
+              value: "draft",
+              projection: {
+                exposeInAuthorForm: true,
+                exposeInTool: false,
+                authorVisibility: "advanced",
+                toolVisibility: "hidden",
+              },
+            }),
+          ],
+        }),
+      ],
+    });
+
+    const service = new WorkflowToolProjectionService();
+    const tool = service.projectToTool(workflow);
+
+    expect(tool.sections).toEqual([]);
+  });
 });

@@ -17,6 +17,8 @@ describe("ui composition interactions", () => {
     expect(dependencies.modelStore).toBeDefined();
     expect(dependencies.modelService).toBeDefined();
     expect(dependencies.runtimeConsoleStore).toBeDefined();
+    expect(dependencies.mcpService).toBeDefined();
+    expect(dependencies.mcpStore).toBeDefined();
     expect(dependencies.settingsStore).toBeDefined();
   });
 
@@ -31,6 +33,8 @@ describe("ui composition interactions", () => {
     expect(nodeTypeIds).toContain("langchain.output_parser");
     expect(nodeTypeIds).toContain("langchain.document_loader");
     expect(nodeTypeIds).toContain("langchain.llm_chat");
+    expect(nodeTypeIds).toContain("mcp.tool_catalog");
+    expect(nodeTypeIds).toContain("mcp.tool_call");
   });
 
 

@@ -40,7 +40,12 @@ import { PythonRuntimeConfig } from "../../infrastructure/config/PythonRuntimeCo
 import { NodeProcessRuntimeEventSink } from "../../infrastructure/python/runtime/NodeProcessRuntimeEventSink";
 import { BrowserPythonRuntimeManager } from "../../infrastructure/python/runtime/BrowserPythonRuntimeManager";
 import { RuntimeConsoleStore } from "../state/RuntimeConsoleStore";
+import { McpService } from "../services/McpService";
+import { McpStore } from "../state/McpStore";
 import { LocalStorageUiSettingsStorage, UiSettingsStore } from "../settings/UiSettingsStore";
+import { HttpMcpRuntimeClient } from "../../infrastructure/python/mcp/HttpMcpRuntimeClient";
+import { PythonBackedMcpToolCatalog } from "../../infrastructure/python/mcp/PythonBackedMcpToolCatalog";
+import { ListMcpToolsUseCase } from "../../application/mcp/ListMcpToolsUseCase";
 
 import { WorkflowProjectionService } from "../../application/projection/WorkflowProjectionService";
 import { WorkflowToolProjectionService } from "../../application/projection/WorkflowToolProjectionService";
@@ -156,6 +161,7 @@ export function createUiDependencies(
     mode: settings.runtime.mode,
     baseUrl: settings.runtime.mode === "disabled" ? undefined : settings.runtime.baseUrl,
     timeoutMs: settings.runtime.requestTimeoutMs,
+    authToken: settings.runtime.authToken,
     runtimeWorkingDirectory: settings.runtime.workingDirectory,
     startupTimeoutMs: settings.runtime.startupTimeoutMs,
     healthPollIntervalMs: settings.runtime.healthPollIntervalMs,
@@ -175,6 +181,15 @@ export function createUiDependencies(
     runtimeEventStore,
     pythonRuntimeManager,
   });
+  const mcpClient = settings.runtime.mode === "disabled"
+    ? createDisabledMcpRuntimeClient()
+    : new HttpMcpRuntimeClient(pythonRuntimeConfig, fetch, runtimeEventSink);
+  const mcpService = new McpService(
+    new ListMcpToolsUseCase(
+      new PythonBackedMcpToolCatalog(mcpClient, runtimeEventSink),
+    ),
+  );
+  const mcpStore = new McpStore(mcpService);
 
   return Object.freeze({
     config,
@@ -187,6 +202,8 @@ export function createUiDependencies(
     runtimeConsoleStore,
     toolService,
     toolStore: new ToolStore(toolService),
+    mcpService,
+    mcpStore,
     workflowProjectionService,
     settingsStore,
   });
@@ -303,4 +320,33 @@ class InMemoryInstalledModelCatalog implements IInstalledModelCatalog {
   public async isInstalled(id: string): Promise<boolean> {
     return this.modelsById.has(id.trim());
   }
+}
+
+
+function createDisabledMcpRuntimeClient() {
+  return {
+    async getConnectionStatus() {
+      return {
+        enabled: false,
+        state: "disabled" as const,
+        checkedAt: new Date().toISOString(),
+        servers: [],
+        capabilities: { tools: false, resources: false, toolExecution: false },
+        metadata: { reason: "python-runtime-disabled" },
+      };
+    },
+    async listTools() {
+      return [];
+    },
+    async executeTool(request: { serverId: string; toolName: string; executionId?: string }) {
+      return {
+        executionId: request.executionId?.trim() || "mcp-disabled",
+        serverId: request.serverId,
+        toolName: request.toolName,
+        status: "failed" as const,
+        content: [],
+        errorMessage: "Python runtime is disabled.",
+      };
+    },
+  };
 }

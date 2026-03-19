@@ -35,17 +35,18 @@ describe("Node provider interactions", () => {
 
     const langchainVectorStore = langchain.findByNodeType("langchain.vector_store_upsert");
     const pythonVectorStore = python.findByNodeType("langchain.vector_store_upsert");
-    const langchainAgent = langchain.findByNodeType("langchain.agent");
+    const langchainAssistant = langchain.findByNodeType("langchain.simple_agent");
 
     expect(langchain.findByNodeType("langchain.output_parser")?.descriptor.title).toContain("Extract Structured Data");
     expect(langchain.findByNodeType("langchain.message_history")?.descriptor.title).toContain("Remember Conversation");
     expect(langchain.findByNodeType("langchain.document_loader")?.descriptor.title).toContain("Load Document");
-    expect(langchainAgent?.descriptor.title).toContain("AI Agent");
+    expect(langchain.findByNodeType("langchain.tool_execution")?.descriptor.title).toContain("Run Tool");
+    expect(langchainAssistant?.descriptor.title).toContain("AI Assistant");
     expect(langchainVectorStore?.descriptor.title).toContain("Save to Knowledge Base");
     expect(langchainVectorStore?.descriptor.nodeDefinition?.category).toBe("LangChain / Knowledge");
     expect(langchainVectorStore?.descriptor.nodeDefinition?.description).toContain("knowledge base");
-    expect(langchainAgent?.descriptor.nodeDefinition?.technicalDescription).toContain("Uses an LLM with tools");
-    expect(langchainAgent?.descriptor.nodeDefinition?.projection?.group).toBe("Tier 2 LLM");
+    expect(langchainAssistant?.descriptor.nodeDefinition?.technicalDescription).toContain("bounded single-assistant loop");
+    expect(langchainAssistant?.descriptor.nodeDefinition?.projection?.group).toBe("Tier 2 LLM");
     expect(pythonVectorStore?.descriptor.providerId).toBe("python");
     expect(pythonVectorStore?.descriptor.nodeDefinition?.title).toBe(
       langchainVectorStore?.descriptor.nodeDefinition?.title
