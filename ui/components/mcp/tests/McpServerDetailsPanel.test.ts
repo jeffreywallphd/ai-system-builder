@@ -8,52 +8,41 @@ describe("McpServerDetailsPanel", () => {
     const html = renderToStaticMarkup(
       React.createElement(McpServerDetailsPanel, {
         server: {
-          id: "docs",
-          name: "Docs MCP",
-          transport: "http",
-          url: "https://example.com/mcp",
-          status: "disconnected",
-          connected: false,
-          toolCount: 3,
-          resourceCount: 1,
-          capabilities: { tools: true },
+          id: "local",
+          name: "Local MCP",
+          transport: "stdio",
+          status: "connected",
+          toolCount: 1,
+          resourceCount: 0,
+          connected: true,
+        },
+        status: {
+          serverId: "local",
+          connected: true,
+          state: "connected",
+          checkedAt: "2026-03-19T00:00:00.000Z",
         },
         tools: [
           {
-            id: "mcp:docs:search_docs",
-            serverId: "docs",
-            source: { kind: "mcp-server", serverId: "docs" },
-            name: "search_docs",
-            title: "Search Docs",
-            description: "Search indexed documents.",
+            id: "mcp:local:echo",
+            serverId: "local",
+            source: { kind: "mcp-server", serverId: "local" },
+            name: "echo",
+            title: "Echo",
+            description: "Repeat text.",
             inputSchema: { type: "object" },
-            arguments: [{ name: "query", type: "string", required: true, schema: { type: "string" } }],
-            categories: ["knowledge"],
-            tags: ["docs", "search"],
+            arguments: [{ name: "text", type: "string", required: true, schema: { type: "string" } }],
+            categories: ["utility"],
+            tags: ["text"],
           },
         ],
-        selectedTool: {
-          id: "mcp:docs:search_docs",
-          serverId: "docs",
-          source: { kind: "mcp-server", serverId: "docs" },
-          name: "search_docs",
-          title: "Search Docs",
-          description: "Search indexed documents.",
-          inputSchema: { type: "object" },
-          arguments: [{ name: "query", type: "string", required: true, schema: { type: "string" } }],
-          categories: ["knowledge"],
-          tags: ["docs", "search"],
-        },
-        isConfigured: false,
-      }),
+        isConfigured: true,
+      })
     );
 
-    expect(html).toContain("Docs MCP");
-    expect(html).toContain("Available to add to My MCP Servers.");
-    expect(html).toContain("Available tools");
     expect(html).toContain("Inspect normalized MCP tool descriptors");
-    expect(html).toContain("Search Docs");
-    expect(html).toContain("Input schema");
-    expect(html).toContain("Add to My MCP Servers");
+    expect(html).toContain("Unified capability mapping");
+    expect(html).toContain("capabilityId=mcp:local:echo");
+    expect(html).toContain("python-mcp-runtime");
   });
 });

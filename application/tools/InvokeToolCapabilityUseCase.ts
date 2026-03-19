@@ -1,4 +1,8 @@
 import type { IToolCapabilityExecutor } from "../ports/interfaces/IToolCapabilityExecutor";
+import {
+  cloneToolCapabilityRecord,
+  type ToolCapabilitySourceDescriptor,
+} from "./models/ToolCapabilityDescriptor";
 import type { ToolCapabilityInvocationRequest } from "./models/ToolCapabilityInvocationRequest";
 import type { ToolCapabilityInvocationResult } from "./models/ToolCapabilityInvocationResult";
 
@@ -24,6 +28,11 @@ export class InvokeToolCapabilityUseCase {
       throw new Error("Tool capability invocation requires a provider.label.");
     }
 
+    const source = normalizeSource(request.source);
+    if (source?.kind && source.kind !== request.provider.kind) {
+      throw new Error("Tool capability invocation source.kind must match provider.kind.");
+    }
+
     return this.executor.invoke({
       capabilityId,
       provider: Object.freeze({
@@ -31,16 +40,26 @@ export class InvokeToolCapabilityUseCase {
         id: providerId,
         label: providerLabel,
       }),
-      source: request.source
-        ? Object.freeze({ ...request.source })
-        : undefined,
-      arguments: request.arguments
-        ? Object.freeze({ ...request.arguments })
-        : undefined,
+      source,
+      arguments: cloneToolCapabilityRecord(request.arguments) as ToolCapabilityInvocationRequest["arguments"],
       executionId: request.executionId?.trim() || undefined,
-      metadata: request.metadata
-        ? Object.freeze({ ...request.metadata })
-        : undefined,
+      metadata: cloneToolCapabilityRecord(request.metadata) as ToolCapabilityInvocationRequest["metadata"],
     });
   }
+}
+
+function normalizeSource(
+  source?: ToolCapabilitySourceDescriptor
+): ToolCapabilitySourceDescriptor | undefined {
+  if (!source) {
+    return undefined;
+  }
+
+  return Object.freeze(
+    Object.fromEntries(
+      Object.entries(source)
+        .map(([key, value]) => [key, typeof value === "string" ? value.trim() : value])
+        .filter(([, value]) => value !== undefined && value !== "")
+    ) as ToolCapabilitySourceDescriptor
+  );
 }

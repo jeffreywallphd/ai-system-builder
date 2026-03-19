@@ -48,7 +48,9 @@ import { PythonBackedMcpServerManager } from "../python/mcp/PythonBackedMcpServe
 import { PythonBackedMcpToolCatalog } from "../python/mcp/PythonBackedMcpToolCatalog";
 import { PythonBackedMcpToolExecutor } from "../python/mcp/PythonBackedMcpToolExecutor";
 import { CompositeToolCapabilityCatalog } from "../tools/CompositeToolCapabilityCatalog";
+import { StaticLocalToolCapabilityCatalog, LOCAL_TOOL_CAPABILITY_PROVIDER } from "../tools/StaticLocalToolCapabilityCatalog";
 import { CompositeToolCapabilityExecutor } from "../tools/CompositeToolCapabilityExecutor";
+import { StaticLocalToolCapabilityExecutor } from "../tools/StaticLocalToolCapabilityExecutor";
 import { McpToolCapabilityCatalog, MCP_TOOL_CAPABILITY_PROVIDER } from "../tools/McpToolCapabilityCatalog";
 import { McpToolCapabilityExecutor } from "../tools/McpToolCapabilityExecutor";
 import { WorkflowProjectedToolCapabilityCatalog, WORKFLOW_TOOL_CAPABILITY_PROVIDER } from "../tools/WorkflowProjectedToolCapabilityCatalog";
@@ -204,6 +206,7 @@ export class InfrastructureRegistry {
           c.resolve(TOKENS.WorkflowRepository),
           new WorkflowToolProjectionService()
         ),
+        new StaticLocalToolCapabilityCatalog([]),
         new McpToolCapabilityCatalog(c.resolve<IMcpToolCatalog>(TOKENS.McpToolCatalog)),
       ]);
     });
@@ -231,6 +234,11 @@ export class InfrastructureRegistry {
           providerKind: WORKFLOW_TOOL_CAPABILITY_PROVIDER.kind,
           providerId: WORKFLOW_TOOL_CAPABILITY_PROVIDER.id,
           executor: new WorkflowToolCapabilityExecutor(runToolUseCase),
+        },
+        {
+          providerKind: LOCAL_TOOL_CAPABILITY_PROVIDER.kind,
+          providerId: LOCAL_TOOL_CAPABILITY_PROVIDER.id,
+          executor: new StaticLocalToolCapabilityExecutor({}),
         },
         {
           providerKind: MCP_TOOL_CAPABILITY_PROVIDER.kind,

@@ -11,10 +11,12 @@ import type { AgentExecutionResult } from "../models/AgentExecutionResult";
 function makeCapability(overrides: Partial<ToolCapabilityDescriptor> & Pick<ToolCapabilityDescriptor, "id">): ToolCapabilityDescriptor {
   return {
     id: overrides.id,
+    identity: overrides.identity ?? { stableId: overrides.id, providerScopedId: overrides.id },
+    routingName: overrides.routingName ?? overrides.displayName ?? overrides.id,
     displayName: overrides.displayName ?? overrides.id,
     description: overrides.description,
     provider: overrides.provider ?? { kind: "workflow", id: "workflow-projection", label: "Workflow Tools" },
-    source: overrides.source ?? {},
+    source: overrides.source ?? { kind: "workflow" },
     publication: overrides.publication ?? { isPublished: true },
     inputSchema: overrides.inputSchema,
     outputSchema: overrides.outputSchema,
@@ -73,14 +75,16 @@ describe("ExecuteAgentToolsUseCase", () => {
     const workflowTool = makeCapability({
       id: "workflow:generate-image",
       displayName: "Generate Image",
+      routingName: "generate-image",
       provider: { kind: "workflow", id: "workflow-projection", label: "Workflow Tools" },
-      source: { workflowId: "wf-image", workflowToolId: "wf-image", workflowToolSlug: "generate-image" },
+      source: { kind: "workflow", workflowId: "wf-image", workflowToolId: "wf-image", workflowToolSlug: "generate-image" },
     });
     const mcpTool = makeCapability({
       id: "mcp:local:echo",
       displayName: "Echo",
+      routingName: "echo",
       provider: { kind: "mcp", id: "python-mcp-runtime", label: "MCP Tools" },
-      source: { serverId: "local", toolName: "echo" },
+      source: { kind: "mcp", serverId: "local", toolName: "echo" },
     });
 
     let capturedRequest: AgentToolOrchestrationRequest | undefined;
@@ -107,7 +111,7 @@ describe("ExecuteAgentToolsUseCase", () => {
   });
 
   it("returns structured step results from the orchestrator", async () => {
-    const capability = makeCapability({ id: "mcp:local:sum_numbers" });
+    const capability = makeCapability({ id: "mcp:local:sum_numbers", provider: { kind: "mcp", id: "python-mcp-runtime", label: "MCP Tools" }, source: { kind: "mcp", serverId: "local", toolName: "sum_numbers" } });
     const useCase = new ExecuteAgentToolsUseCase(
       makeCatalog([capability]),
       {
@@ -119,7 +123,7 @@ describe("ExecuteAgentToolsUseCase", () => {
                 capabilityId: capability.id,
                 displayName: capability.displayName,
                 provider: capability.provider,
-                source: { serverId: "local", toolName: "sum_numbers" },
+                source: { kind: "mcp", serverId: "local", toolName: "sum_numbers" },
                 status: "completed",
                 reasoning: "The task asks for arithmetic.",
                 invocationArguments: { numbers: [2, 3] },
@@ -128,7 +132,7 @@ describe("ExecuteAgentToolsUseCase", () => {
                   executionId: "tool-exec-1",
                   status: "completed",
                   provider: capability.provider,
-                  source: { serverId: "local", toolName: "sum_numbers" },
+                  source: { kind: "mcp", serverId: "local", toolName: "sum_numbers" },
                   content: [{ type: "text", text: "5" }],
                   structuredContent: { total: 5 },
                 },
@@ -153,13 +157,13 @@ describe("ExecuteAgentToolsUseCase", () => {
       id: "mcp:local:echo",
       displayName: "Local Echo",
       provider: { kind: "mcp", id: "python-mcp-runtime", label: "MCP Tools" },
-      source: { serverId: "local", toolName: "echo" },
+      source: { kind: "mcp", serverId: "local", toolName: "echo" },
     });
     const remoteEcho = makeCapability({
       id: "mcp:remote:echo",
       displayName: "Remote Echo",
       provider: { kind: "mcp", id: "python-mcp-runtime", label: "MCP Tools" },
-      source: { serverId: "remote", toolName: "echo" },
+      source: { kind: "mcp", serverId: "remote", toolName: "echo" },
     });
 
     const useCase = new ExecuteAgentToolsUseCase(
@@ -176,12 +180,13 @@ describe("ExecuteAgentToolsUseCase", () => {
       toolSelection: {
         mode: "mixed",
         capabilityIds: ["mcp:local:echo", "mcp:remote:echo"],
-        source: { serverId: "local" },
+        source: { kind: "mcp", serverId: "local" },
       },
     });
 
     expect(result.selectedTools).toEqual([localEcho]);
   });
+
   it("forwards assembled workflow context into orchestrator metadata", async () => {
     const capability = makeCapability({ id: "workflow:tool-a" });
     let capturedRequest: AgentToolOrchestrationRequest | undefined;
@@ -207,5 +212,4 @@ describe("ExecuteAgentToolsUseCase", () => {
       "Policy: stay concise."
     );
   });
-
 });
