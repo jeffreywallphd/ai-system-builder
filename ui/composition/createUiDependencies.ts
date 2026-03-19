@@ -41,6 +41,7 @@ import { NodeProcessRuntimeEventSink } from "../../infrastructure/python/runtime
 import { BrowserPythonRuntimeManager } from "../../infrastructure/python/runtime/BrowserPythonRuntimeManager";
 import { RuntimeConsoleStore } from "../state/RuntimeConsoleStore";
 import { McpService } from "../services/McpService";
+import { McpToolCallAuthoringService } from "../services/McpToolCallAuthoringService";
 import { McpStore } from "../state/McpStore";
 import { LocalStorageUiSettingsStorage, UiSettingsStore } from "../settings/UiSettingsStore";
 import { HttpMcpRuntimeClient } from "../../infrastructure/python/mcp/HttpMcpRuntimeClient";
@@ -76,7 +77,9 @@ import { ToolStore } from "../state/ToolStore";
 import type { CreateUiDependenciesOptions, UiDependencies } from "./types";
 import { createSeedWorkflows } from "./seedWorkflows";
 import { CompositeToolCapabilityCatalog } from "../../infrastructure/tools/CompositeToolCapabilityCatalog";
+import { StaticLocalToolCapabilityCatalog, LOCAL_TOOL_CAPABILITY_PROVIDER } from "../../infrastructure/tools/StaticLocalToolCapabilityCatalog";
 import { CompositeToolCapabilityExecutor } from "../../infrastructure/tools/CompositeToolCapabilityExecutor";
+import { StaticLocalToolCapabilityExecutor } from "../../infrastructure/tools/StaticLocalToolCapabilityExecutor";
 import { McpToolCapabilityCatalog, MCP_TOOL_CAPABILITY_PROVIDER } from "../../infrastructure/tools/McpToolCapabilityCatalog";
 import { McpToolCapabilityExecutor } from "../../infrastructure/tools/McpToolCapabilityExecutor";
 import { WorkflowProjectedToolCapabilityCatalog, WORKFLOW_TOOL_CAPABILITY_PROVIDER } from "../../infrastructure/tools/WorkflowProjectedToolCapabilityCatalog";
@@ -145,11 +148,6 @@ export function createUiDependencies(
     loadToolDefinitionUseCase,
     workflowContextService
   );
-
-  const workflowStore = new WorkflowStore({
-    workflowService,
-    nodeService,
-  });
 
   const nodeStore = new NodeStore({
     nodeService,
@@ -223,6 +221,7 @@ export function createUiDependencies(
   const pythonBackedMcpToolCatalog = new PythonBackedMcpToolCatalog(mcpClient, runtimeEventSink);
   const toolCapabilityCatalog = new CompositeToolCapabilityCatalog([
     new WorkflowProjectedToolCapabilityCatalog(workflowRepository, workflowToolProjectionService),
+    new StaticLocalToolCapabilityCatalog([]),
     new McpToolCapabilityCatalog(pythonBackedMcpToolCatalog),
   ]);
   const toolCapabilityExecutor = new CompositeToolCapabilityExecutor([
@@ -230,6 +229,11 @@ export function createUiDependencies(
       providerKind: WORKFLOW_TOOL_CAPABILITY_PROVIDER.kind,
       providerId: WORKFLOW_TOOL_CAPABILITY_PROVIDER.id,
       executor: new WorkflowToolCapabilityExecutor(runToolUseCase),
+    },
+    {
+      providerKind: LOCAL_TOOL_CAPABILITY_PROVIDER.kind,
+      providerId: LOCAL_TOOL_CAPABILITY_PROVIDER.id,
+      executor: new StaticLocalToolCapabilityExecutor({}),
     },
     {
       providerKind: MCP_TOOL_CAPABILITY_PROVIDER.kind,
@@ -259,6 +263,12 @@ export function createUiDependencies(
     new SearchMcpToolsUseCase(pythonBackedMcpToolCatalog),
     new GetMcpToolDescriptorUseCase(pythonBackedMcpToolCatalog),
   );
+  const mcpToolCallAuthoringService = new McpToolCallAuthoringService(mcpService);
+  const workflowStore = new WorkflowStore({
+    workflowService,
+    nodeService,
+    mcpToolCallAuthoringService,
+  });
   const mcpStore = new McpStore(mcpService);
 
   return Object.freeze({

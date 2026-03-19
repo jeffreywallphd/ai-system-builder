@@ -22,6 +22,7 @@ describe("NodeProviderRegistryIndex", () => {
     expect(composite.findByNodeType("langchain.llm_chat")?.descriptor.providerId).toBe(
       "langchain"
     );
+    expect(composite.findByNodeType("mcp.server_select")?.descriptor.providerId).toBe("mcp");
     expect(composite.findByNodeType("mcp.tool_call")?.descriptor.providerId).toBe("mcp");
   });
 });

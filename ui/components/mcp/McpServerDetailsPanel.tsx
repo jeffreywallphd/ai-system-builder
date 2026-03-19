@@ -193,6 +193,15 @@ export default function McpServerDetailsPanel({
                   <div className="ui-text-small ui-text-secondary">Tool id: {activeTool.id}</div>
                 </div>
                 <p className="ui-text-secondary ui-text-small">{activeTool.description ?? "No tool description is available yet."}</p>
+                <div className="ui-stack ui-stack--2xs">
+                  <span className="ui-text-small ui-text-secondary">Unified capability mapping</span>
+                  <code className="ui-subtle" style={{ overflowWrap: "anywhere" }}>
+                    capabilityId={activeTool.id}
+                  </code>
+                  <span className="ui-text-small ui-text-secondary">
+                    Routed as MCP Tools / python-mcp-runtime using server <strong>{activeTool.serverId}</strong> and tool <strong>{activeTool.name}</strong>.
+                  </span>
+                </div>
                 {activeTool.categories.length > 0 ? (
                   <div className="ui-stack ui-stack--2xs">
                     <span className="ui-text-small ui-text-secondary">Categories</span>
@@ -259,9 +268,15 @@ function friendlyState(state: McpServerStatus["state"] | McpServerDescriptor["st
       return "Connected";
     case "connecting":
       return "Connecting";
-    case "error":
-      return "Needs attention";
-    default:
+    case "disconnected":
       return "Disconnected";
+    case "error":
+      return "Error";
+    case "ready":
+      return "Ready";
+    case "disabled":
+      return "Disabled";
+    default:
+      return state;
   }
 }

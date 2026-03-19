@@ -5,6 +5,7 @@ import type {
 } from "../../application/ports/interfaces/IWorkflowRepository";
 import type { IFileStorage } from "../../application/ports/interfaces/IFileStorage";
 import type { INodeCatalogProvider } from "../../application/ports/interfaces/INodeCatalogProvider";
+import { McpToolCallNodeConfigurationService } from "../../application/mcp/McpToolCallNodeConfigurationService";
 import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
 import { Workflow } from "../../domain/workflows/Workflow";
 import { WorkflowConnection } from "../../domain/workflows/WorkflowConnection";
@@ -103,6 +104,8 @@ interface WorkflowRecord {
 }
 
 export class LocalWorkflowRepository implements IWorkflowRepository {
+  private readonly mcpToolCallNodeConfigurationService = new McpToolCallNodeConfigurationService();
+
   private readonly fileStorage: IFileStorage;
   private readonly nodeCatalogProvider: INodeCatalogProvider;
   private readonly rootDirectory: string;
@@ -348,10 +351,25 @@ export class LocalWorkflowRepository implements IWorkflowRepository {
 
         for (const propertyRecord of nodeRecord.properties) {
           if (!node.getProperty(propertyRecord.id)) {
+            if (
+              this.mcpToolCallNodeConfigurationService.isMcpToolCallNode(node)
+              && propertyRecord.id === "toolDescriptor"
+            ) {
+              node = this.mcpToolCallNodeConfigurationService.configureNode(
+                node.withPropertyValue(propertyRecord.id, propertyRecord.value)
+              );
+            }
             continue;
           }
 
           node = node.withPropertyValue(propertyRecord.id, propertyRecord.value);
+
+          if (
+            this.mcpToolCallNodeConfigurationService.isMcpToolCallNode(node)
+            && propertyRecord.id === "toolDescriptor"
+          ) {
+            node = this.mcpToolCallNodeConfigurationService.configureNode(node);
+          }
         }
 
         return node;

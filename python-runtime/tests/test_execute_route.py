@@ -98,14 +98,14 @@ def test_execute_node_route_chat_prompt_builder_returns_prompt_object() -> None:
 
 
 
-def test_execute_node_route_mcp_tool_catalog_returns_discovered_tools() -> None:
+def test_execute_node_route_mcp_server_select_returns_server_handle() -> None:
     app.dependency_overrides[get_runtime_service] = build_runtime_service
     client = TestClient(app)
 
     response = client.post('/execute/node', json={
-        'node_id': 'mcp-catalog',
-        'node_type': 'mcp.tool_catalog',
-        'properties': {},
+        'node_id': 'mcp-server',
+        'node_type': 'mcp.server_select',
+        'properties': {'serverId': 'local'},
         'inputs': {},
     })
 
@@ -113,8 +113,33 @@ def test_execute_node_route_mcp_tool_catalog_returns_discovered_tools() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload['status'] == 'completed'
-    assert payload['outputs']['toolCount'] == 2
-    assert payload['outputs']['tools'][0]['serverId'] == 'local'
+    assert payload['outputs']['serverHandle']['kind'] == 'mcp-server-handle'
+    assert payload['outputs']['serverHandle']['serverId'] == 'local'
+    assert payload['outputs']['connectionStatus']['enabled'] is True
+
+
+
+def test_execute_node_route_mcp_tool_catalog_returns_capability_aligned_tools() -> None:
+    app.dependency_overrides[get_runtime_service] = build_runtime_service
+    client = TestClient(app)
+
+    response = client.post('/execute/node', json={
+        'node_id': 'mcp-catalog',
+        'node_type': 'mcp.tool_catalog',
+        'properties': {'searchQuery': 'sum'},
+        'inputs': {
+            'serverHandle': {'serverId': 'local'},
+        },
+    })
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload['status'] == 'completed'
+    assert len(payload['outputs']['tools']) == 1
+    assert payload['outputs']['tools'][0]['provider']['kind'] == 'mcp'
+    assert payload['outputs']['tools'][0]['source']['serverId'] == 'local'
+    assert payload['outputs']['tools'][0]['source']['toolName'] == 'sum_numbers'
 
 
 
@@ -125,9 +150,16 @@ def test_execute_node_route_mcp_tool_call_executes_selected_tool() -> None:
     response = client.post('/execute/node', json={
         'node_id': 'mcp-call',
         'node_type': 'mcp.tool_call',
-        'properties': {'serverId': 'local'},
+        'properties': {'stringifyResult': True, 'failOnMissingArgs': True},
         'inputs': {
-            'tool': {'serverId': 'local', 'name': 'sum_numbers'},
+            'serverHandle': {'serverId': 'local'},
+            'tool': {
+                'id': 'mcp:local:sum_numbers',
+                'routingName': 'sum_numbers',
+                'provider': {'kind': 'mcp', 'id': 'python-mcp-runtime', 'label': 'MCP Tools'},
+                'source': {'serverId': 'local', 'toolName': 'sum_numbers'},
+                'inputSchema': {'type': 'object', 'required': ['numbers']},
+            },
             'arguments': {'numbers': [5, 7]},
         },
     })
@@ -136,8 +168,68 @@ def test_execute_node_route_mcp_tool_call_executes_selected_tool() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload['status'] == 'completed'
-    assert payload['outputs']['structuredContent']['total'] == 12
-    assert payload['outputs']['result']['toolName'] == 'sum_numbers'
+    assert payload['outputs']['toolResult']['structuredContent']['total'] == 12
+    assert payload['outputs']['toolResult']['toolName'] == 'sum_numbers'
+    assert payload['outputs']['resultText'] == '{"total": 12}'
+
+
+def test_execute_node_route_mcp_tool_call_uses_schema_materialized_property_arguments() -> None:
+    app.dependency_overrides[get_runtime_service] = build_runtime_service
+    client = TestClient(app)
+
+    response = client.post('/execute/node', json={
+        'node_id': 'mcp-call-properties',
+        'node_type': 'mcp.tool_call',
+        'properties': {
+            'serverId': 'local',
+            'toolName': 'sum_numbers',
+            'toolDescriptor': {
+                'id': 'mcp:local:sum_numbers',
+                'serverId': 'local',
+                'source': {'serverId': 'local', 'toolName': 'sum_numbers'},
+                'inputSchema': {'type': 'object', 'required': ['numbers']},
+            },
+            'arg.numbers': [2, 3, 7],
+            'stringifyResult': True,
+            'failOnMissingArgs': True,
+        },
+        'inputs': {},
+    })
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload['status'] == 'completed'
+    assert payload['outputs']['toolResult']['structuredContent']['total'] == 12
+    assert payload['outputs']['toolResult']['toolName'] == 'sum_numbers'
+    assert payload['outputs']['resultText'] == '{"total": 12}'
+
+
+
+def test_execute_node_route_mcp_tool_call_validates_required_args() -> None:
+    app.dependency_overrides[get_runtime_service] = build_runtime_service
+    client = TestClient(app)
+
+    response = client.post('/execute/node', json={
+        'node_id': 'mcp-call-missing',
+        'node_type': 'mcp.tool_call',
+        'properties': {'stringifyResult': True, 'failOnMissingArgs': True},
+        'inputs': {
+            'serverHandle': {'serverId': 'local'},
+            'tool': {
+                'id': 'mcp:local:sum_numbers',
+                'source': {'serverId': 'local', 'toolName': 'sum_numbers'},
+                'inputSchema': {'type': 'object', 'required': ['numbers']},
+            },
+            'arguments': {},
+        },
+    })
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload['status'] == 'failed'
+    assert 'missing required arguments' in payload['error_message']
 
 
 def test_execute_node_route_simple_agent_returns_bounded_step_results() -> None:

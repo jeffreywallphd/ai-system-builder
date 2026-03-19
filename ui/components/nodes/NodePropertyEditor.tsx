@@ -12,7 +12,9 @@ export default function NodePropertyEditor({
   disabled,
   onPropertyChange,
 }: NodePropertyEditorProps): JSX.Element {
-  if (fields.length === 0) {
+  const visibleFields = fields.filter((field) => field.visibility !== "hidden");
+
+  if (visibleFields.length === 0) {
     return (
       <div className="ui-empty-state">
         <p className="ui-text-secondary">This node does not expose editable properties.</p>
@@ -20,8 +22,8 @@ export default function NodePropertyEditor({
     );
   }
 
-  const basicFields = fields.filter((field) => !field.isAdvanced);
-  const advancedFields = fields.filter((field) => field.isAdvanced);
+  const basicFields = visibleFields.filter((field) => !field.isAdvanced);
+  const advancedFields = visibleFields.filter((field) => field.isAdvanced);
 
   return (
     <div className="ui-stack ui-stack--md">

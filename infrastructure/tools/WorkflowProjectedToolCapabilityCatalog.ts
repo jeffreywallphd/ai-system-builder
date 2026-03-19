@@ -2,7 +2,10 @@ import type { IWorkflowRepository } from "../../application/ports/interfaces/IWo
 import type { IToolCapabilityCatalog } from "../../application/ports/interfaces/IToolCapabilityCatalog";
 import { WorkflowToolProjectionService } from "../../application/projection/WorkflowToolProjectionService";
 import type { ToolCapabilityDescriptor } from "../../application/tools/models/ToolCapabilityDescriptor";
-import { buildToolCapabilityId } from "../../application/tools/models/ToolCapabilityDescriptor";
+import {
+  buildToolCapabilityId,
+  createToolCapabilityDescriptor,
+} from "../../application/tools/models/ToolCapabilityDescriptor";
 import type { ProjectedField } from "../../application/projection/models/ProjectedField";
 
 export const WORKFLOW_TOOL_CAPABILITY_PROVIDER = Object.freeze({
@@ -85,12 +88,18 @@ export class WorkflowProjectedToolCapabilityCatalog implements IToolCapabilityCa
       const definition = this.workflowToolProjectionService.projectToTool(workflow);
       const fields = definition.sections.flatMap((section) => [...section.fields]);
       capabilities.push(
-        Object.freeze({
+        createToolCapabilityDescriptor({
           id: buildToolCapabilityId("workflow", definition.workflowId),
+          identity: Object.freeze({
+            stableId: definition.id,
+            providerScopedId: definition.workflowId,
+          }),
+          routingName: definition.slug ?? definition.title,
           displayName: definition.title,
           description: definition.description,
           provider: WORKFLOW_TOOL_CAPABILITY_PROVIDER,
           source: Object.freeze({
+            kind: "workflow",
             workflowId: definition.workflowId,
             workflowToolId: definition.id,
             workflowToolSlug: definition.slug,

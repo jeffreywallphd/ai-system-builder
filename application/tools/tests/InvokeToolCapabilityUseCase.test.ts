@@ -20,16 +20,16 @@ describe("InvokeToolCapabilityUseCase", () => {
     const result = await new InvokeToolCapabilityUseCase(executor).execute({
       capabilityId: " workflow:wf-image ",
       provider: { kind: "workflow", id: " workflow-projection ", label: " Workflow Tools " },
-      source: { workflowId: "wf-image", workflowToolId: "wf-image" },
-      arguments: { prompt: "hello" },
+      source: { kind: "workflow", workflowId: " wf-image ", workflowToolId: " wf-image " },
+      arguments: { prompt: "hello", nested: { tone: "friendly" } },
       metadata: { origin: "test" },
     });
 
     expect(invoke).toHaveBeenCalledWith({
       capabilityId: "workflow:wf-image",
       provider: { kind: "workflow", id: "workflow-projection", label: "Workflow Tools" },
-      source: { workflowId: "wf-image", workflowToolId: "wf-image" },
-      arguments: { prompt: "hello" },
+      source: { kind: "workflow", workflowId: "wf-image", workflowToolId: "wf-image" },
+      arguments: { prompt: "hello", nested: { tone: "friendly" } },
       executionId: undefined,
       metadata: { origin: "test" },
     });
@@ -56,5 +56,21 @@ describe("InvokeToolCapabilityUseCase", () => {
         provider: { kind: "local", id: " ", label: "Local Tools" },
       })
     ).rejects.toThrow("Tool capability invocation requires a provider.id.");
+  });
+
+  it("rejects invocations whose source kind conflicts with the provider", async () => {
+    const executor: IToolCapabilityExecutor = {
+      async invoke() {
+        throw new Error("should not execute");
+      },
+    };
+
+    await expect(
+      new InvokeToolCapabilityUseCase(executor).execute({
+        capabilityId: "mcp:local:echo",
+        provider: { kind: "mcp", id: "python-mcp-runtime", label: "MCP Tools" },
+        source: { kind: "workflow", serverId: "local", toolName: "echo" },
+      })
+    ).rejects.toThrow("Tool capability invocation source.kind must match provider.kind.");
   });
 });

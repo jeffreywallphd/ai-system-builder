@@ -18,6 +18,7 @@ function toNodePropertyField(field: ProjectedField): NodePropertyFieldViewModel 
     max: field.max,
     step: field.step,
     shouldClampToRange: field.shouldClampToRange,
+    visibility: field.visibility,
     options: field.options,
   });
 }

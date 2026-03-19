@@ -2,7 +2,6 @@ import type { IToolCapabilityExecutor } from "../../application/ports/interfaces
 import type { ToolCapabilityInvocationRequest } from "../../application/tools/models/ToolCapabilityInvocationRequest";
 import type { ToolCapabilityInvocationResult } from "../../application/tools/models/ToolCapabilityInvocationResult";
 import { RunToolUseCase } from "../../application/tools/RunToolUseCase";
-import { WORKFLOW_TOOL_CAPABILITY_PROVIDER } from "./WorkflowProjectedToolCapabilityCatalog";
 
 export class WorkflowToolCapabilityExecutor implements IToolCapabilityExecutor {
   constructor(private readonly runToolUseCase: RunToolUseCase) {}
@@ -25,7 +24,7 @@ export class WorkflowToolCapabilityExecutor implements IToolCapabilityExecutor {
       capabilityId: request.capabilityId,
       executionId: result.executionId,
       status: result.status,
-      provider: WORKFLOW_TOOL_CAPABILITY_PROVIDER,
+      provider: Object.freeze({ ...request.provider }),
       source: request.source ? Object.freeze({ ...request.source }) : undefined,
       content: Object.freeze(
         result.messages.map((message) => Object.freeze({ type: "message", text: message }))

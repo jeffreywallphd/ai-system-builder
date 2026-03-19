@@ -1,4 +1,9 @@
 import { describe, expect, it } from "bun:test";
+import { McpToolCallNodeConfigurationService } from "../../../application/mcp/McpToolCallNodeConfigurationService";
+import { ImplementationRegistryNodeCatalogProvider } from "../../../infrastructure/nodes/ImplementationRegistryNodeCatalogProvider";
+import { McpNodeImplementationRegistry } from "../../../infrastructure/nodes/mcp/McpNodeImplementationRegistry";
+import { Workflow } from "../../../domain/workflows/Workflow";
+import { WorkflowMetadata } from "../../../domain/workflows/WorkflowMetadata";
 import { WorkflowExecutionStore } from "../WorkflowExecutionStore";
 import { WorkflowStore } from "../WorkflowStore";
 
@@ -112,5 +117,57 @@ describe("ui/state interactions", () => {
     expect(store.getState().lastExecutionEvent).toBeUndefined();
     expect(store.getState().nodeExecutionOutputs).toEqual({});
     expect(store.getState().outputAssets).toEqual([]);
+  });
+
+  it("routes MCP tool call property updates through authoring configuration so generated fields appear in editor state", async () => {
+    const provider = new ImplementationRegistryNodeCatalogProvider(new McpNodeImplementationRegistry());
+    const definition = await provider.getDefinitionByType("mcp.tool_call");
+    if (!definition) {
+      throw new Error("Expected mcp.tool_call definition.");
+    }
+
+    const node = definition.createInstance("call-1");
+    const workflow = new Workflow({
+      id: "wf-mcp",
+      metadata: new WorkflowMetadata({ name: "Workflow" }),
+      nodes: [node],
+    });
+    const configurationService = new McpToolCallNodeConfigurationService();
+
+    const store = new WorkflowStore({
+      workflowService: {
+        updateNodeProperty: (currentWorkflow: Workflow, nodeId: string, propertyId: string, value: unknown) =>
+          currentWorkflow.updateNode(currentWorkflow.getNode(nodeId)!.withPropertyValue(propertyId, value)),
+      } as any,
+      nodeService: {} as any,
+      mcpToolCallAuthoringService: {
+        applyPropertyChange: async (currentWorkflow: Workflow, nodeId: string, propertyId: string, value: unknown) => {
+          let updatedNode = currentWorkflow.getNode(nodeId)!.withPropertyValue(propertyId, value);
+          updatedNode = configurationService.configureNode(updatedNode, {
+            serverOptions: [{ label: "Local MCP", value: "local" }],
+            toolOptions: [{ label: "Echo", value: "echo" }],
+            toolDescriptor: {
+              id: "mcp:local:echo",
+              serverId: "local",
+              source: { kind: "mcp-server", serverId: "local" },
+              name: "echo",
+              inputSchema: { type: "object" },
+              arguments: [{ name: "message", type: "string", required: true, schema: { type: "string" } }],
+              categories: [],
+              tags: [],
+            },
+          });
+          return currentWorkflow.updateNode(updatedNode);
+        },
+      } as any,
+      initialState: {
+        currentWorkflow: workflow,
+      },
+    });
+
+    await store.updateNodeProperty("call-1", "toolName", "echo");
+
+    expect(store.getState().currentWorkflow?.getNode("call-1")?.getProperty("toolName")?.value).toBe("echo");
+    expect(store.getState().currentWorkflow?.getNode("call-1")?.getProperty("arg.message")?.name).toBe("message");
   });
 });

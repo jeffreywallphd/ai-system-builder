@@ -11,10 +11,12 @@ function makeCapability(
 ): ToolCapabilityDescriptor {
   return {
     id: overrides.id,
+    identity: overrides.identity ?? { stableId: overrides.id, providerScopedId: overrides.id },
+    routingName: overrides.routingName ?? overrides.displayName,
     displayName: overrides.displayName,
     description: overrides.description,
     provider: overrides.provider ?? { kind: "workflow", id: "workflow-projection", label: "Workflow Tools" },
-    source: overrides.source ?? {},
+    source: overrides.source ?? { kind: "workflow" },
     publication: overrides.publication ?? { isPublished: false },
     inputSchema: overrides.inputSchema,
     outputSchema: overrides.outputSchema,
@@ -32,13 +34,14 @@ describe("SearchCapabilitiesUseCase", () => {
             id: buildToolCapabilityId("workflow", "local-research-digest"),
             displayName: "Local Research Digest",
             description: "Compile local MCP notes into a research digest.",
+            source: { kind: "workflow", workflowToolSlug: "local-research-digest" },
           }),
           makeCapability({
             id: buildToolCapabilityId("mcp", "local", "search_docs"),
             displayName: "Search Docs",
             description: "Search workspace and MCP-provided documents.",
             provider: { kind: "mcp", id: "python-mcp-runtime", label: "MCP Tools" },
-            source: { serverId: "local", toolName: "search_docs" },
+            source: { kind: "mcp", serverId: "local", toolName: "search_docs" },
           }),
         ];
       },
@@ -107,13 +110,13 @@ describe("SearchCapabilitiesUseCase", () => {
     expect(serverSearchCalls).toEqual([{ query: "local", limit: 5 }]);
     expect(result.sources).toEqual({ toolCapabilities: 2, mcpServers: 1, mcpResources: 1 });
     expect(result.candidates.map((candidate) => candidate.kind)).toEqual([
-      "mcp-server",
       "tool-capability",
+      "mcp-server",
       "tool-capability",
       "mcp-resource",
     ]);
-    expect(result.candidates[0]?.server?.id).toBe("local");
-    expect(result.candidates[1]?.title).toBe("Local Research Digest");
+    expect(result.candidates[0]?.title).toBe("Local Research Digest");
+    expect(result.candidates[1]?.server?.id).toBe("local");
     expect(result.candidates[3]?.resource?.uri).toBe("memory://docs/research-guide");
   });
 
@@ -167,9 +170,9 @@ describe("SearchCapabilitiesUseCase", () => {
     const useCase = new SearchCapabilitiesUseCase({
       async listCapabilities() {
         return [
-          makeCapability({ id: buildToolCapabilityId("local", "zeta"), displayName: "Agent Notes", provider: { kind: "local", id: "local", label: "Local Tools" }, source: { localToolName: "zeta" } }),
-          makeCapability({ id: buildToolCapabilityId("local", "alpha"), displayName: "Agent Notes", provider: { kind: "local", id: "local", label: "Local Tools" }, source: { localToolName: "alpha" } }),
-          makeCapability({ id: buildToolCapabilityId("workflow", "beta"), displayName: "Agent Notes" }),
+          makeCapability({ id: buildToolCapabilityId("local", "zeta"), displayName: "Agent Notes", provider: { kind: "local", id: "local", label: "Local Tools" }, source: { kind: "local", localToolName: "zeta" } }),
+          makeCapability({ id: buildToolCapabilityId("local", "alpha"), displayName: "Agent Notes", provider: { kind: "local", id: "local", label: "Local Tools" }, source: { kind: "local", localToolName: "alpha" } }),
+          makeCapability({ id: buildToolCapabilityId("workflow", "beta"), displayName: "Agent Notes", source: { kind: "workflow", workflowToolSlug: "beta" } }),
         ];
       },
     });

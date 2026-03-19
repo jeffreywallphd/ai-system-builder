@@ -43,10 +43,23 @@ def test_workflow_executor_routes_connected_outputs_into_mcp_nodes() -> None:
     request = ExecuteWorkflowRequest(
         workflow_id='wf-mcp',
         nodes=[
-            RuntimeNode(id='catalog', node_type='mcp.tool_catalog', properties={}),
-            RuntimeNode(id='call', node_type='mcp.tool_call', properties={'serverId': 'local', 'toolName': 'echo'}),
+            RuntimeNode(id='server', node_type='mcp.server_select', properties={'serverId': 'local'}),
+            RuntimeNode(id='catalog', node_type='mcp.tool_catalog', properties={'searchQuery': 'echo'}),
+            RuntimeNode(id='call', node_type='mcp.tool_call', properties={'stringifyResult': True}),
         ],
         connections=[
+            RuntimeConnection(
+                source_node_id='server',
+                source_port_id='serverHandle',
+                target_node_id='catalog',
+                target_port_id='serverHandle',
+            ),
+            RuntimeConnection(
+                source_node_id='server',
+                source_port_id='serverHandle',
+                target_node_id='call',
+                target_port_id='serverHandle',
+            ),
             RuntimeConnection(
                 source_node_id='catalog',
                 source_port_id='tools',
@@ -59,7 +72,47 @@ def test_workflow_executor_routes_connected_outputs_into_mcp_nodes() -> None:
 
     state = executor.execute(request)
 
-    assert state.outputs['catalog']['toolCount'] == 2
-    assert state.outputs['call']['result']['status'] == 'completed'
-    assert state.outputs['call']['result']['toolName'] == 'echo'
+    assert state.outputs['server']['serverHandle']['serverId'] == 'local'
+    assert len(state.outputs['catalog']['tools']) == 1
+    assert state.outputs['catalog']['tools'][0]['source']['toolName'] == 'echo'
+    assert state.outputs['call']['toolResult']['status'] == 'completed'
+    assert state.outputs['call']['toolResult']['toolName'] == 'echo'
     assert state.outputs['call']['resultText']
+
+
+def test_workflow_executor_runs_simple_agent_with_mcp_tool_capabilities() -> None:
+    executor = WorkflowExecutor(build_mcp_dispatcher())
+    request = ExecuteWorkflowRequest(
+        workflow_id='wf-agent-mcp',
+        nodes=[
+            RuntimeNode(id='server', node_type='mcp.server_select', properties={'serverId': 'local'}),
+            RuntimeNode(id='catalog', node_type='mcp.tool_catalog', properties={'searchQuery': 'echo'}),
+            RuntimeNode(id='agent', node_type='langchain.simple_agent', properties={'model': 'workflow-agent', 'maxIterations': 1, 'verbose': True}),
+        ],
+        connections=[
+            RuntimeConnection(
+                source_node_id='server',
+                source_port_id='serverHandle',
+                target_node_id='catalog',
+                target_port_id='serverHandle',
+            ),
+            RuntimeConnection(
+                source_node_id='catalog',
+                source_port_id='tools',
+                target_node_id='agent',
+                target_port_id='tools',
+            ),
+        ],
+        workflow_inputs={
+            'input': 'Please echo this through the workflow agent.',
+            'selectedTools': ['mcp:local:echo'],
+        },
+    )
+
+    state = executor.execute(request)
+
+    assert state.outputs['agent']['selectedTools'][0]['capabilityId'] == 'mcp:local:echo'
+    assert state.outputs['agent']['toolResults'][0]['provider']['kind'] == 'mcp'
+    assert state.outputs['agent']['toolResults'][0]['source']['serverId'] == 'local'
+    assert state.outputs['agent']['stepResults'][0]['invocationArguments'] == {'input': 'Please echo this through the workflow agent.'}
+    assert state.outputs['agent']['trace']['stoppedReason'] == 'max-iterations-reached'
