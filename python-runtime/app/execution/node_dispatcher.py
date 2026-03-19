@@ -102,12 +102,19 @@ class NodeDispatcher:
         service = self._require_mcp_service()
         server_handle = inputs.get("serverHandle")
         tool_value = inputs.get("tool")
-        arguments = self._coerce_arguments(inputs.get("arguments"))
+        arguments = {
+            **self._coerce_configured_arguments(properties),
+            **self._coerce_arguments(inputs.get("arguments")),
+        }
         fail_on_missing_args = self._coerce_boolean(properties.get("failOnMissingArgs"), default=True)
         stringify_result = self._coerce_boolean(properties.get("stringifyResult"), default=True)
 
-        server_id = self._resolve_server_id(server_handle) or self._resolve_server_id(tool_value)
-        tool_name = self._tool_name_from_value(tool_value)
+        server_id = (
+            self._resolve_server_id(server_handle)
+            or self._resolve_server_id(tool_value)
+            or self._normalize_string(properties.get("serverId"))
+        )
+        tool_name = self._tool_name_from_value(tool_value) or self._normalize_string(properties.get("toolName"))
 
         if not server_id:
             raise ValueError("MCP tool execution requires a serverHandle or tool descriptor with a serverId.")
@@ -116,7 +123,7 @@ class NodeDispatcher:
             raise ValueError("MCP tool execution requires a tool input.")
 
         if fail_on_missing_args:
-            missing_args = self._missing_required_arguments(tool_value, arguments)
+            missing_args = self._missing_required_arguments(tool_value or properties.get("toolDescriptor"), arguments)
             if missing_args:
                 raise ValueError(
                     "MCP tool execution is missing required arguments: " + ", ".join(sorted(missing_args))
@@ -186,6 +193,16 @@ class NodeDispatcher:
 
     def _coerce_arguments(self, value: Any) -> Dict[str, Any]:
         return value if isinstance(value, dict) else {}
+
+    def _coerce_configured_arguments(self, properties: Dict[str, Any]) -> Dict[str, Any]:
+        arguments: Dict[str, Any] = {}
+        for key, value in properties.items():
+            if not isinstance(key, str) or not key.startswith("arg."):
+                continue
+            if value is None:
+                continue
+            arguments[key[4:]] = value
+        return arguments
 
     def _tool_name_from_value(self, value: Any) -> str | None:
         if isinstance(value, str):

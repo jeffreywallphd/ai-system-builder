@@ -57,4 +57,21 @@ describe("NodePresenter", () => {
     expect(field.step).toBe(0.1);
     expect(field.shouldClampToRange).toBeTrue();
   });
+
+  it("surfaces hidden projection visibility for editor filtering", () => {
+    const presenter = new NodePresenter();
+    const field = presenter.presentProperty(
+      new NodeProperty({
+        id: "toolDescriptor",
+        name: "Tool Descriptor",
+        type: "json",
+        value: {},
+        projection: {
+          authorVisibility: "hidden",
+        },
+      })
+    );
+
+    expect(field.visibility).toBe("hidden");
+  });
 });

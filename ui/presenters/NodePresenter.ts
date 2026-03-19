@@ -36,6 +36,7 @@ export interface NodePropertyFieldViewModel {
   readonly max?: number;
   readonly step?: number;
   readonly shouldClampToRange: boolean;
+  readonly visibility: "basic" | "advanced" | "hidden";
   readonly options?: ReadonlyArray<{
     readonly label: string;
     readonly value: unknown;
@@ -177,6 +178,7 @@ export class NodePresenter {
       max: property.constraints?.range?.max ?? property.constraints?.max,
       step: property.constraints?.range?.step,
       shouldClampToRange: property.constraints?.range?.clamp ?? false,
+      visibility: property.projection?.authorVisibility ?? (property.isAdvanced ? "advanced" : "basic"),
       options: property.options
         ? Object.freeze(
             property.options.map((option) =>

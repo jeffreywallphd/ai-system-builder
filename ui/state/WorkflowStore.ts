@@ -9,6 +9,7 @@ import type {
 } from "../../domain/services/interfaces/IWorkflowValidator";
 import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
 import { NodeService } from "../services/NodeService";
+import { McpToolCallAuthoringService } from "../services/McpToolCallAuthoringService";
 import { WorkflowService } from "../services/WorkflowService";
 import {
   WorkflowExecutionStore,
@@ -34,6 +35,7 @@ export type WorkflowStoreListener = (state: IWorkflowStoreState) => void;
 export interface IWorkflowStoreOptions {
   readonly workflowService: WorkflowService;
   readonly nodeService: NodeService;
+  readonly mcpToolCallAuthoringService?: McpToolCallAuthoringService;
   readonly initialState?: Partial<IWorkflowStoreState>;
   readonly executionStore?: WorkflowExecutionStore;
 }
@@ -53,6 +55,7 @@ const defaultEditorState: IWorkflowEditorState = Object.freeze({
 export class WorkflowStore {
   private readonly workflowService: WorkflowService;
   private readonly nodeService: NodeService;
+  private readonly mcpToolCallAuthoringService?: McpToolCallAuthoringService;
   private readonly executionStore: WorkflowExecutionStore;
   private readonly listeners = new Set<WorkflowStoreListener>();
   private editorState: IWorkflowEditorState;
@@ -61,6 +64,7 @@ export class WorkflowStore {
   constructor(options: IWorkflowStoreOptions) {
     this.workflowService = options.workflowService;
     this.nodeService = options.nodeService;
+    this.mcpToolCallAuthoringService = options.mcpToolCallAuthoringService;
 
     const initialState = options.initialState ?? {};
     this.executionStore =
@@ -171,7 +175,7 @@ export class WorkflowStore {
 
       this.executionStore.clearSession();
       this.setEditorState({
-        currentWorkflow: workflow,
+        currentWorkflow: workflow ? await this.hydrateMcpToolCallNodes(workflow) : undefined,
         selectedNodeId: undefined,
         selectedConnectionId: undefined,
         validation: undefined,
@@ -309,7 +313,7 @@ export class WorkflowStore {
       });
 
       this.setEditorState({
-        currentWorkflow: result.workflow,
+        currentWorkflow: await this.hydrateMcpToolCallNodes(result.workflow),
         selectedNodeId: result.node.id,
         selectedConnectionId: undefined,
         isDirty: true,
@@ -353,22 +357,40 @@ export class WorkflowStore {
     nodeId: string,
     propertyId: string,
     value: unknown
-  ): void {
+  ): Promise<void> {
     const workflow = this.requireCurrentWorkflow();
-    const updatedWorkflow = this.workflowService.updateNodeProperty(
-      workflow,
-      nodeId,
-      propertyId,
-      value
-    );
+    const nextWorkflow = this.mcpToolCallAuthoringService
+      ? this.mcpToolCallAuthoringService.applyPropertyChange(
+        workflow,
+        nodeId,
+        propertyId,
+        value
+      )
+      : Promise.resolve(
+        this.workflowService.updateNodeProperty(
+          workflow,
+          nodeId,
+          propertyId,
+          value
+        )
+      );
 
-    this.setEditorState({
-      currentWorkflow: updatedWorkflow,
-      selectedNodeId: nodeId.trim(),
-      isDirty: true,
-      validation: undefined,
-      error: undefined,
-    });
+    return nextWorkflow
+      .then((updatedWorkflow) => {
+        this.setEditorState({
+          currentWorkflow: updatedWorkflow,
+          selectedNodeId: nodeId.trim(),
+          isDirty: true,
+          validation: undefined,
+          error: undefined,
+        });
+      })
+      .catch((error: unknown) => {
+        this.setEditorState({
+          error: toErrorMessage(error),
+        });
+        throw error;
+      });
   }
 
   public moveNode(
@@ -495,6 +517,14 @@ export class WorkflowStore {
     }
 
     return workflow;
+  }
+
+  private async hydrateMcpToolCallNodes(workflow: IWorkflow): Promise<IWorkflow> {
+    if (!this.mcpToolCallAuthoringService) {
+      return workflow;
+    }
+
+    return this.mcpToolCallAuthoringService.hydrateWorkflow(workflow);
   }
 
   private setEditorState(patch: Partial<IWorkflowEditorState>): void {

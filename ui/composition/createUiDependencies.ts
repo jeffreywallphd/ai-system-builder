@@ -41,6 +41,7 @@ import { NodeProcessRuntimeEventSink } from "../../infrastructure/python/runtime
 import { BrowserPythonRuntimeManager } from "../../infrastructure/python/runtime/BrowserPythonRuntimeManager";
 import { RuntimeConsoleStore } from "../state/RuntimeConsoleStore";
 import { McpService } from "../services/McpService";
+import { McpToolCallAuthoringService } from "../services/McpToolCallAuthoringService";
 import { McpStore } from "../state/McpStore";
 import { LocalStorageUiSettingsStorage, UiSettingsStore } from "../settings/UiSettingsStore";
 import { HttpMcpRuntimeClient } from "../../infrastructure/python/mcp/HttpMcpRuntimeClient";
@@ -147,11 +148,6 @@ export function createUiDependencies(
     loadToolDefinitionUseCase,
     workflowContextService
   );
-
-  const workflowStore = new WorkflowStore({
-    workflowService,
-    nodeService,
-  });
 
   const nodeStore = new NodeStore({
     nodeService,
@@ -267,6 +263,12 @@ export function createUiDependencies(
     new SearchMcpToolsUseCase(pythonBackedMcpToolCatalog),
     new GetMcpToolDescriptorUseCase(pythonBackedMcpToolCatalog),
   );
+  const mcpToolCallAuthoringService = new McpToolCallAuthoringService(mcpService);
+  const workflowStore = new WorkflowStore({
+    workflowService,
+    nodeService,
+    mcpToolCallAuthoringService,
+  });
   const mcpStore = new McpStore(mcpService);
 
   return Object.freeze({
