@@ -7,5 +7,6 @@ describe("ToolRunPage", () => {
     expect(source).toContain("loadTool");
     expect(source).toContain("Preparing tool…");
     expect(source).not.toContain("Loading workflow");
+    expect(source).not.toContain("ContextInspectionPanel");
   });
 });
