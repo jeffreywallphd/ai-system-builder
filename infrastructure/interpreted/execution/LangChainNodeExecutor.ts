@@ -110,6 +110,38 @@ function readProperty(node: INode, propertyId: string): unknown {
   return node.properties.find((property) => property.id === propertyId)?.value;
 }
 
+function resolveWorkflowContextRecord(
+  executionMetadata?: Readonly<Record<string, unknown>>
+): Readonly<Record<string, unknown>> | undefined {
+  const workflowContext = executionMetadata?.workflowContext;
+  return workflowContext && typeof workflowContext === "object"
+    ? (workflowContext as Record<string, unknown>)
+    : undefined;
+}
+
+function resolveWorkflowContextText(
+  executionMetadata?: Readonly<Record<string, unknown>>
+): string {
+  const workflowContext = resolveWorkflowContextRecord(executionMetadata);
+  const inspection =
+    workflowContext?.inspection && typeof workflowContext.inspection === "object"
+      ? (workflowContext.inspection as Record<string, unknown>)
+      : undefined;
+  if (typeof inspection?.finalPromptText === "string" && inspection.finalPromptText.trim()) {
+    return inspection.finalPromptText.trim();
+  }
+
+  if (typeof workflowContext?.promptText === "string" && workflowContext.promptText.trim()) {
+    return workflowContext.promptText.trim();
+  }
+
+  const assembledContext =
+    workflowContext?.assembledContext && typeof workflowContext.assembledContext === "object"
+      ? (workflowContext.assembledContext as Record<string, unknown>)
+      : undefined;
+  return typeof assembledContext?.promptText === "string" ? assembledContext.promptText.trim() : "";
+}
+
 function normalizeText(value: unknown): string {
   if (typeof value === "string") {
     return value;
@@ -899,8 +931,20 @@ export class LangChainNodeExecutor implements INodeExecutor {
         variablesInput && typeof variablesInput === "object" && !Array.isArray(variablesInput)
           ? (variablesInput as Record<string, unknown>)
           : {};
+      const workflowContextText = resolveWorkflowContextText(context.executionMetadata);
+      const enrichedVariables: Record<string, unknown> = {
+        ...variables,
+        ...(workflowContextText
+          ? {
+              context: variables.context ?? workflowContextText,
+              workflowContext: variables.workflowContext ?? workflowContextText,
+              assembledContext: variables.assembledContext ?? workflowContextText,
+              contextInstructions: variables.contextInstructions ?? workflowContextText,
+            }
+          : {}),
+      };
       const prompt = template.replace(/\{([^}]+)\}/g, (_match, key) => {
-        const value = variables[key.trim()];
+        const value = enrichedVariables[key.trim()];
         return value === undefined || value === null ? "" : normalizeText(value);
       });
 
@@ -910,6 +954,7 @@ export class LangChainNodeExecutor implements INodeExecutor {
         outputs: {
           prompt,
           formatted_prompt: prompt,
+          context: workflowContextText || undefined,
         },
         messages: [prompt ? "Prompt template formatted successfully." : "Prompt template is empty."],
         errorMessage: prompt ? undefined : "Prompt template is empty.",
@@ -922,13 +967,9 @@ export class LangChainNodeExecutor implements INodeExecutor {
       const history = includeHistory ? toChatMessages(inputs.history) : [];
       const system = normalizeText(inputs.system);
       const user = normalizeText(inputs.user);
-      const workflowContext =
-        context.executionMetadata?.workflowContext && typeof context.executionMetadata.workflowContext === "object"
-          ? (context.executionMetadata.workflowContext as Record<string, unknown>)
-          : undefined;
+      const workflowContext = resolveWorkflowContextRecord(context.executionMetadata);
       const contextText = includeContext
-        ? normalizeText(inputs.context) ||
-          (typeof workflowContext?.promptText === "string" ? workflowContext.promptText : "")
+        ? normalizeText(inputs.context) || resolveWorkflowContextText(context.executionMetadata)
         : "";
       const messages: ChatMessage[] = [];
 
@@ -1477,6 +1518,7 @@ export class LangChainNodeExecutor implements INodeExecutor {
           : ensureObjectRecord(toolCall?.arguments);
       const failOnMissingArgs = Boolean(properties.failOnMissingArgs ?? true);
       const stringifyResult = Boolean(properties.stringifyResult ?? true);
+      const contextInstructions = resolveWorkflowContextText(context.executionMetadata);
       const missingTool = !tool;
       const missingArguments = !missingTool && Object.keys(argumentsRecord).length === 0;
       const executed =
@@ -1513,6 +1555,7 @@ export class LangChainNodeExecutor implements INodeExecutor {
           toolCall: executed?.toolCall ?? toolCall,
           toolResult,
           resultText: stringifyResult && toolResult ? stringifyValue(toolResult) : undefined,
+          contextInstructions: contextInstructions || undefined,
         },
         messages: [
           missingTool
@@ -1532,7 +1575,13 @@ export class LangChainNodeExecutor implements INodeExecutor {
 
     if (supportsNodeType(nodeType, "langchain.simple_agent", "langchain.agent")) {
       const model = String(properties.model ?? "");
-      const systemPrompt = normalizeText(properties.systemPrompt);
+      const workflowContextText = resolveWorkflowContextText(context.executionMetadata);
+      const systemPrompt = [
+        normalizeText(properties.systemPrompt),
+        workflowContextText ? `Context:\n${workflowContextText}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n\n");
       const temperature = Number(properties.temperature ?? 0.7);
       const maxIterations = Math.max(1, Number(properties.maxIterations ?? 3));
       const useMemory = Boolean(properties.useMemory ?? true);

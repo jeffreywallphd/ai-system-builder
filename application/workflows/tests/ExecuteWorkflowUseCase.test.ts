@@ -66,6 +66,11 @@ describe("ExecuteWorkflowUseCase", () => {
 
     await useCase.execute({ workflow });
 
-    expect((capturedMetadata?.workflowContext as { promptText?: string })?.promptText).toContain("Be concise.");
+    const workflowContext = capturedMetadata?.workflowContext as {
+      inspection?: { finalPromptText?: string };
+      assembledContext?: { promptText?: string };
+    } | undefined;
+    expect(workflowContext?.inspection?.finalPromptText).toContain("Be concise.");
+    expect(workflowContext?.assembledContext?.promptText).toContain("Be concise.");
   });
 });

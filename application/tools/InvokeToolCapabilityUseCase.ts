@@ -1,3 +1,4 @@
+import { ExecutionContextToolPolicyService } from "../context/ExecutionContextToolPolicyService";
 import type { IToolCapabilityExecutor } from "../ports/interfaces/IToolCapabilityExecutor";
 import {
   cloneToolCapabilityRecord,
@@ -7,7 +8,10 @@ import type { ToolCapabilityInvocationRequest } from "./models/ToolCapabilityInv
 import type { ToolCapabilityInvocationResult } from "./models/ToolCapabilityInvocationResult";
 
 export class InvokeToolCapabilityUseCase {
-  constructor(private readonly executor: IToolCapabilityExecutor) {}
+  constructor(
+    private readonly executor: IToolCapabilityExecutor,
+    private readonly policyService: ExecutionContextToolPolicyService = new ExecutionContextToolPolicyService()
+  ) {}
 
   public async execute(
     request: ToolCapabilityInvocationRequest
@@ -33,6 +37,24 @@ export class InvokeToolCapabilityUseCase {
       throw new Error("Tool capability invocation source.kind must match provider.kind.");
     }
 
+    this.policyService.assertInvocationAllowed(request.provider.kind, source, request.context);
+
+    const metadata = {
+      ...(request.metadata ? cloneToolCapabilityRecord(request.metadata) : undefined),
+      ...(request.context
+        ? {
+            workflowContext: Object.freeze({
+              packageReferences: request.context.packageReferences,
+              assembledContext: request.context.assembledContext,
+              trimmingPolicy: request.context.trimmingPolicy,
+              budget: request.context.budget,
+              inspection: request.context.inspection,
+              toolUsePolicy: request.context.toolUsePolicy,
+            }),
+          }
+        : {}),
+    };
+
     return this.executor.invoke({
       capabilityId,
       provider: Object.freeze({
@@ -41,9 +63,10 @@ export class InvokeToolCapabilityUseCase {
         label: providerLabel,
       }),
       source,
+      context: request.context,
       arguments: cloneToolCapabilityRecord(request.arguments) as ToolCapabilityInvocationRequest["arguments"],
       executionId: request.executionId?.trim() || undefined,
-      metadata: cloneToolCapabilityRecord(request.metadata) as ToolCapabilityInvocationRequest["metadata"],
+      metadata: Object.keys(metadata).length > 0 ? Object.freeze(metadata) as ToolCapabilityInvocationRequest["metadata"] : undefined,
     });
   }
 }

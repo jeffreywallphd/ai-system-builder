@@ -22,6 +22,7 @@ export class McpToolCapabilityExecutor implements IToolCapabilityExecutor {
       arguments: request.arguments,
       executionId: request.executionId,
       metadata: request.metadata,
+      context: request.context,
     });
 
     return Object.freeze({

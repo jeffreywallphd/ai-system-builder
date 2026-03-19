@@ -61,6 +61,11 @@ describe("RunToolUseCase", () => {
 
     await useCase.execute({ toolId: "wf-context", values: { "workflow.context.selectedPackageIds": ["pkg-style"] } });
 
-    expect((capturedMetadata?.workflowContext as { promptText?: string })?.promptText).toContain("Be friendly.");
+    const workflowContext = capturedMetadata?.workflowContext as {
+      inspection?: { finalPromptText?: string };
+      assembledContext?: { promptText?: string };
+    } | undefined;
+    expect(workflowContext?.inspection?.finalPromptText).toContain("Be friendly.");
+    expect(workflowContext?.assembledContext?.promptText).toContain("Be friendly.");
   });
 });

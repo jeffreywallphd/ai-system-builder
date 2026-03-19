@@ -43,6 +43,7 @@ export interface IPythonRuntimeExecuteWorkflowRequest {
   readonly nodes: ReadonlyArray<IPythonRuntimeWorkflowNode>;
   readonly connections: ReadonlyArray<IPythonRuntimeWorkflowConnection>;
   readonly workflowInputs?: Readonly<Record<string, unknown>>;
+  readonly executionContext?: Readonly<Record<string, unknown>>;
 }
 
 export interface IPythonRuntimeExecuteWorkflowResponse {

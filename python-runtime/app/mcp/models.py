@@ -169,6 +169,7 @@ class McpToolExecutionRequest(McpModel):
     arguments: Dict[str, Any] = Field(default_factory=dict)
     execution_id: Optional[str] = None
     metadata: Dict[str, Any] = Field(default_factory=dict)
+    context: Dict[str, Any] = Field(default_factory=dict)
 
 
 class McpToolExecutionResult(McpModel):

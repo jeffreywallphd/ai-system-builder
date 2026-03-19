@@ -3,6 +3,7 @@ import { DeterministicToolCapabilityAgentOrchestrator } from "../DeterministicTo
 import type { IToolCapabilityExecutor } from "../../../application/ports/interfaces/IToolCapabilityExecutor";
 import type { ToolCapabilityDescriptor } from "../../../application/tools/models/ToolCapabilityDescriptor";
 import type { ToolCapabilityInvocationRequest } from "../../../application/tools/models/ToolCapabilityInvocationRequest";
+import { ExecutionContextEnvelope } from "../../../application/context/models/ExecutionContextEnvelope";
 
 function makeCapability(overrides: Partial<ToolCapabilityDescriptor> & Pick<ToolCapabilityDescriptor, "id">): ToolCapabilityDescriptor {
   return {
@@ -43,6 +44,13 @@ describe("DeterministicToolCapabilityAgentOrchestrator", () => {
     const echoTool = makeCapability({ id: "mcp:local:echo", displayName: "Echo", routingName: "echo", description: "Echo text back to the user.", source: { kind: "mcp", serverId: "local", toolName: "echo" } });
     const searchTool = makeCapability({ id: "mcp:local:search_docs", displayName: "Search Docs", routingName: "search_docs", description: "Search project docs.", source: { kind: "mcp", serverId: "local", toolName: "search_docs" } });
 
+    const executionContext = new ExecutionContextEnvelope({
+      packageReferences: [{ packageId: "pkg-1", alias: "Policy" }],
+      assembledContext: { fragments: [{ id: "ctx-1", kind: "instructions", content: "Use tools carefully.", order: 0, assemblyKey: "instructions:ctx-1", precedence: 0, provenance: [] }], sections: [{ kind: "instructions", title: "System Instructions", fragments: [{ id: "ctx-1", kind: "instructions", content: "Use tools carefully.", order: 0, assemblyKey: "instructions:ctx-1", precedence: 0, provenance: [] }], content: "Use tools carefully." }], promptText: "Use tools carefully." },
+      inspection: { assembledPromptText: "Use tools carefully.", finalPromptText: "Use tools carefully.", finalFragmentIds: ["ctx-1"], entries: [] },
+      toolUsePolicy: { instructions: "Use tools carefully." },
+    });
+
     const result = await orchestrator.execute({
       executionId: "agent-123",
       input: "First search the docs, then echo the answer.",
@@ -50,6 +58,7 @@ describe("DeterministicToolCapabilityAgentOrchestrator", () => {
       availableTools: [searchTool, echoTool],
       selectedTools: [searchTool, echoTool],
       metadata: { workflowId: "wf-agent" },
+      context: executionContext,
     });
 
     expect(invocations).toHaveLength(2);
@@ -59,6 +68,8 @@ describe("DeterministicToolCapabilityAgentOrchestrator", () => {
     expect(result.stoppedReason).toBe("max-iterations-reached");
     expect(result.steps[0]?.result?.structuredContent).toEqual({ echoed: "First search the docs" });
     expect(result.steps[1]?.provider.kind).toBe("mcp");
+    expect(invocations[0]?.context?.inspection?.finalPromptText).toBe("Use tools carefully.");
+    expect(invocations[0]?.metadata?.contextInstructions).toBe("Use tools carefully.");
   });
 
   it("stops with a structured failure when a tool invocation fails", async () => {

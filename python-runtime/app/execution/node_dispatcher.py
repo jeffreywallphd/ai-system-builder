@@ -18,9 +18,21 @@ class NodeDispatcher:
         self._langchain_executor = langchain_executor or LangChainExecutor(mcp_service=mcp_service)
         self._mcp_service = mcp_service
 
-    def dispatch(self, node_type: str, *, inputs: Dict[str, Any], properties: Dict[str, Any]) -> Dict[str, Any]:
+    def dispatch(
+        self,
+        node_type: str,
+        *,
+        inputs: Dict[str, Any],
+        properties: Dict[str, Any],
+        runtime_context: Dict[str, Any] | None = None,
+    ) -> Dict[str, Any]:
         if node_type.startswith("langchain."):
-            return self._langchain_executor.execute(node_type, inputs=inputs, properties=properties)
+            return self._langchain_executor.execute(
+                node_type,
+                inputs=inputs,
+                properties=properties,
+                runtime_context=runtime_context,
+            )
 
         if node_type == "mcp.server_select":
             return self._dispatch_mcp_server_select(inputs=inputs, properties=properties)
@@ -29,7 +41,7 @@ class NodeDispatcher:
             return self._dispatch_mcp_tool_catalog(inputs=inputs, properties=properties)
 
         if node_type == "mcp.tool_call":
-            return self._dispatch_mcp_tool_call(inputs=inputs, properties=properties)
+            return self._dispatch_mcp_tool_call(inputs=inputs, properties=properties, runtime_context=runtime_context)
 
         return {"inputs": inputs, "properties": properties, "note": "default passthrough"}
 
@@ -98,7 +110,13 @@ class NodeDispatcher:
             "tools": tools,
         }
 
-    def _dispatch_mcp_tool_call(self, *, inputs: Dict[str, Any], properties: Dict[str, Any]) -> Dict[str, Any]:
+    def _dispatch_mcp_tool_call(
+        self,
+        *,
+        inputs: Dict[str, Any],
+        properties: Dict[str, Any],
+        runtime_context: Dict[str, Any] | None = None,
+    ) -> Dict[str, Any]:
         service = self._require_mcp_service()
         server_handle = inputs.get("serverHandle")
         tool_value = inputs.get("tool")
@@ -129,11 +147,20 @@ class NodeDispatcher:
                     "MCP tool execution is missing required arguments: " + ", ".join(sorted(missing_args))
                 )
 
+        workflow_context = self._workflow_context(runtime_context)
+        self._assert_mcp_tool_allowed(server_id, tool_name, workflow_context)
+
+        metadata = {
+            **self._workflow_context_metadata(workflow_context),
+            **({"origin": "workflow.mcp.tool_call"}),
+        }
+
         result = service.execute_tool(
             McpToolExecutionRequest(
                 server_id=server_id,
                 tool_name=tool_name,
                 arguments=arguments,
+                metadata=metadata,
             )
         )
         structured_content = dict(result.structured_content)
@@ -248,6 +275,67 @@ class NodeDispatcher:
             return {}
 
         return value if isinstance(value, dict) else {}
+
+
+
+    def _workflow_context(self, runtime_context: Dict[str, Any] | None) -> Dict[str, Any]:
+        if not isinstance(runtime_context, dict):
+            return {}
+        direct = runtime_context.get("workflowContext")
+        if isinstance(direct, dict):
+            return direct
+        execution_metadata = runtime_context.get("executionMetadata")
+        if isinstance(execution_metadata, dict):
+            nested = execution_metadata.get("workflowContext")
+            if isinstance(nested, dict):
+                return nested
+        return {}
+
+    def _workflow_context_metadata(self, workflow_context: Dict[str, Any]) -> Dict[str, Any]:
+        if not workflow_context:
+            return {}
+        return {
+            "workflowContext": workflow_context,
+            "contextInstructions": self._tool_use_instructions(workflow_context),
+        }
+
+    def _tool_use_instructions(self, workflow_context: Dict[str, Any]) -> str | None:
+        tool_use_policy = workflow_context.get("toolUsePolicy")
+        if not isinstance(tool_use_policy, dict):
+            return None
+        instructions = tool_use_policy.get("instructions")
+        return instructions.strip() if isinstance(instructions, str) and instructions.strip() else None
+
+    def _assert_mcp_tool_allowed(self, server_id: str, tool_name: str, workflow_context: Dict[str, Any]) -> None:
+        tool_use_policy = workflow_context.get("toolUsePolicy")
+        if not isinstance(tool_use_policy, dict):
+            return
+        mcp_policy = tool_use_policy.get("mcp")
+        if not isinstance(mcp_policy, dict):
+            return
+
+        allowed_server_ids = set(self._string_list(mcp_policy.get("allowedServerIds")))
+        blocked_server_ids = set(self._string_list(mcp_policy.get("blockedServerIds")))
+        allowed_tool_names = set(self._string_list(mcp_policy.get("allowedToolNames")))
+        blocked_tool_names = set(self._string_list(mcp_policy.get("blockedToolNames")))
+
+        if allowed_server_ids and server_id not in allowed_server_ids:
+            raise ValueError("Execution context policy blocked the requested MCP server.")
+        if server_id in blocked_server_ids:
+            raise ValueError("Execution context policy blocked the requested MCP server.")
+        if allowed_tool_names and tool_name not in allowed_tool_names:
+            raise ValueError("Execution context policy blocked the requested MCP tool.")
+        if tool_name in blocked_tool_names:
+            raise ValueError("Execution context policy blocked the requested MCP tool.")
+
+    def _string_list(self, value: Any) -> List[str]:
+        if not isinstance(value, list):
+            return []
+        normalized: List[str] = []
+        for item in value:
+            if isinstance(item, str) and item.strip():
+                normalized.append(item.strip())
+        return normalized
 
     def _matches_tool(self, tool: McpToolDescriptor, query: str, include_hidden_tools: bool) -> bool:
         hidden = self._tool_hidden(tool)

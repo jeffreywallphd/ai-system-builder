@@ -26,7 +26,12 @@ class WorkflowExecutor:
 
         for node in request.nodes:
             inputs = {**request.workflow_inputs, **self._resolve_node_inputs(node.id, inbound_connections, state.outputs)}
-            output = self._dispatcher.dispatch(node.node_type, inputs=inputs, properties=node.properties)
+            output = self._dispatcher.dispatch(
+                node.node_type,
+                inputs=inputs,
+                properties=node.properties,
+                runtime_context=request.execution_context,
+            )
             state.outputs[node.id] = output
             state.messages.append(f"Executed node {node.id} ({node.node_type})")
 

@@ -54,12 +54,7 @@ export class RunToolUseCase {
     });
 
     return Object.freeze({
-      workflowContext: Object.freeze({
-        promptText: result.inspection.finalPromptText,
-        inspection: result.inspection,
-        selectedPackageIds: result.selectedPackageIds,
-        packageLabels: result.packageLabels,
-      }),
+      workflowContext: result.executionContext,
     });
   }
 }

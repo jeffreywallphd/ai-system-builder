@@ -92,6 +92,7 @@ export class DeterministicToolCapabilityAgentOrchestrator implements IAgentToolO
         capabilityId: tool.id,
         provider: tool.provider,
         source: tool.source,
+        context: request.context,
         arguments: invocationArguments,
         executionId: `${request.executionId ?? "agent"}-step-${index + 1}`,
         metadata: {
@@ -99,6 +100,7 @@ export class DeterministicToolCapabilityAgentOrchestrator implements IAgentToolO
           origin: "application.agent",
           agentExecutionId: request.executionId ?? "agent",
           stepIndex: index + 1,
+          contextInstructions: request.context?.toolUsePolicy?.instructions,
         },
       });
 

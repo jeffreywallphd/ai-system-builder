@@ -1,3 +1,5 @@
+import type { ExecutionContextEnvelope } from "../../context/models/ExecutionContextEnvelope";
+
 import type { AgentToolSelection } from "./AgentToolSelection";
 
 export interface AgentExecutionRequest {
@@ -5,10 +7,6 @@ export interface AgentExecutionRequest {
   readonly executionId?: string;
   readonly maxIterations?: number;
   readonly toolSelection?: AgentToolSelection;
-  readonly context?: Readonly<{
-    promptText: string;
-    selectedPackageIds?: ReadonlyArray<string>;
-    packageLabels?: Readonly<Record<string, string>>;
-  }>;
+  readonly context?: ExecutionContextEnvelope;
   readonly metadata?: Readonly<Record<string, unknown>>;
 }

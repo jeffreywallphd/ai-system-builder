@@ -295,17 +295,69 @@ class _DeterministicLlm:
         return self.invoke(prompt)
 
 
+
+
+def _workflow_context(runtime_context: Dict[str, Any] | None) -> Dict[str, Any]:
+    if not isinstance(runtime_context, dict):
+        return {}
+    direct = runtime_context.get("workflowContext")
+    if isinstance(direct, dict):
+        return direct
+    execution_metadata = runtime_context.get("executionMetadata")
+    if isinstance(execution_metadata, dict):
+        nested = execution_metadata.get("workflowContext")
+        if isinstance(nested, dict):
+            return nested
+    return {}
+
+
+def _workflow_context_text(runtime_context: Dict[str, Any] | None) -> str:
+    workflow_context = _workflow_context(runtime_context)
+    inspection = workflow_context.get("inspection")
+    if isinstance(inspection, dict):
+        final_prompt_text = inspection.get("finalPromptText")
+        if isinstance(final_prompt_text, str) and final_prompt_text.strip():
+            return final_prompt_text.strip()
+    prompt_text = workflow_context.get("promptText")
+    if isinstance(prompt_text, str) and prompt_text.strip():
+        return prompt_text.strip()
+    assembled_context = workflow_context.get("assembledContext")
+    if isinstance(assembled_context, dict):
+        assembled_prompt_text = assembled_context.get("promptText")
+        if isinstance(assembled_prompt_text, str) and assembled_prompt_text.strip():
+            return assembled_prompt_text.strip()
+    return ""
+
+
+def _augment_template_variables(variables: Dict[str, Any], runtime_context: Dict[str, Any] | None) -> Dict[str, Any]:
+    context_text = _workflow_context_text(runtime_context)
+    enriched = dict(variables)
+    if context_text:
+        enriched.setdefault("context", context_text)
+        enriched.setdefault("workflowContext", context_text)
+        enriched.setdefault("assembledContext", context_text)
+        enriched.setdefault("contextInstructions", context_text)
+    return enriched
+
+
 class LangChainExecutor:
     def __init__(self, mcp_service: McpService | None = None) -> None:
         self._mcp_service = mcp_service
 
-    def execute(self, node_type: str, *, inputs: Dict[str, Any], properties: Dict[str, Any]) -> Dict[str, Any]:
+    def execute(
+        self,
+        node_type: str,
+        *,
+        inputs: Dict[str, Any],
+        properties: Dict[str, Any],
+        runtime_context: Dict[str, Any] | None = None,
+    ) -> Dict[str, Any]:
         if node_type in {"langchain.prompt_template", "langchain.prompt-template"}:
             template = str(properties.get("template") or inputs.get("template") or "{input}")
             variables = dict(inputs.get("variables") or inputs.get("template-input") or properties.get("variables") or {})
             prompt = PromptTemplate.from_template(template)
-            formatted = prompt.format(**variables)
-            return {"prompt": formatted, "formatted_prompt": formatted}
+            formatted = prompt.format(**_augment_template_variables(variables, runtime_context))
+            return {"prompt": formatted, "formatted_prompt": formatted, "context": _workflow_context_text(runtime_context)}
 
         if node_type in {"langchain.text_splitter", "langchain.text-splitter"}:
             text = str(inputs.get("text") or properties.get("text") or "")
@@ -337,7 +389,7 @@ class LangChainExecutor:
         if node_type in {"langchain.chat_prompt", "langchain.chat-prompt"}:
             system_prompt = str(inputs.get("system") or properties.get("system") or "")
             user_prompt = str(inputs.get("user") or properties.get("user") or "")
-            context_value = inputs.get("context") or properties.get("context") or ""
+            context_value = inputs.get("context") or properties.get("context") or _workflow_context_text(runtime_context)
             history = list(inputs.get("history") or []) if bool(properties.get("includeHistory", properties.get("include-history", True))) else []
             include_context = bool(properties.get("includeContext", True))
             context_text = str(context_value) if include_context else ""
@@ -358,7 +410,7 @@ class LangChainExecutor:
             system_message = str(inputs.get("systemMessage") or properties.get("systemMessage") or "")
             user_message = str(inputs.get("userMessage") or properties.get("userMessage") or "")
             include_context = bool(properties.get("includeContext", True))
-            context_value = inputs.get("context") or properties.get("context") or ""
+            context_value = inputs.get("context") or properties.get("context") or _workflow_context_text(runtime_context)
             context_text = str(context_value) if include_context and context_value else ""
             context_label = str(properties.get("contextLabel") or "Context")
             user_label = str(properties.get("userLabel") or "User")
@@ -666,7 +718,12 @@ class LangChainExecutor:
                     "resultText": json.dumps(tool_result, sort_keys=True) if stringify_result else None,
                 }
 
-            executed = execute_tool(tool, arguments, mcp_service=self._mcp_service)
+            executed = execute_tool(
+                tool,
+                arguments,
+                mcp_service=self._mcp_service,
+                execution_context=runtime_context,
+            )
             return {
                 "toolCall": executed["toolCall"],
                 "toolResult": executed["toolResult"],
@@ -675,7 +732,14 @@ class LangChainExecutor:
 
         if node_type in {"langchain.simple_agent", "langchain.agent"}:
             model = str(properties.get("model") or "assistant-model")
+            context_text = _workflow_context_text(runtime_context)
             system_prompt = str(properties.get("systemPrompt") or "")
+            if context_text:
+                system_prompt = (
+                    f"{system_prompt}\n\nContext:\n{context_text}".strip()
+                    if system_prompt
+                    else f"Context:\n{context_text}"
+                )
             temperature = float(properties.get("temperature", 0.7))
             max_iterations = max(1, int(properties.get("maxIterations") or 3))
             use_memory = bool(properties.get("useMemory", True))
@@ -704,6 +768,7 @@ class LangChainExecutor:
                 temperature=temperature,
                 verbose=verbose,
                 mcp_service=self._mcp_service,
+                execution_context=runtime_context,
             )
             output_messages = list(assembled_messages)
             if result.get("response"):
