@@ -13,7 +13,10 @@ describe("ApplicationBootstrap", () => {
     });
 
     expect(c.isRegistered(TOKENS.FileStorage)).toBe(true);
+    expect(c.isRegistered(TOKENS.McpToolCatalog)).toBe(true);
     expect(c.isRegistered(APPLICATION_TOKENS.WorkflowValidator)).toBe(true);
     expect(c.isRegistered(APPLICATION_TOKENS.InstallModelUseCase)).toBe(true);
+    expect(c.isRegistered(APPLICATION_TOKENS.ListMcpToolsUseCase)).toBe(true);
+    expect(c.isRegistered(APPLICATION_TOKENS.ExecuteMcpToolUseCase)).toBe(true);
   });
 });

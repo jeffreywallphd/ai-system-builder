@@ -23,6 +23,8 @@ import { SaveAssetUseCase } from "../../application/assets/SaveAssetUseCase";
 import { LoadAssetUseCase } from "../../application/assets/LoadAssetUseCase";
 import { ListAssetsUseCase } from "../../application/assets/ListAssetsUseCase";
 import { DeleteAssetUseCase } from "../../application/assets/DeleteAssetUseCase";
+import { ListMcpToolsUseCase } from "../../application/mcp/ListMcpToolsUseCase";
+import { ExecuteMcpToolUseCase } from "../../application/mcp/ExecuteMcpToolUseCase";
 
 import type { INodeCatalogProvider } from "../../application/ports/interfaces/INodeCatalogProvider";
 import type { IWorkflowExecutor } from "../../application/ports/interfaces/IWorkflowExecutor";
@@ -32,6 +34,8 @@ import type { IInstalledModelCatalog } from "../../application/ports/interfaces/
 import type { IRemoteModelCatalog } from "../../application/ports/interfaces/IRemoteModelCatalog";
 import type { IModelInstaller } from "../../application/ports/interfaces/IModelInstaller";
 import type { IFileStorage } from "../../application/ports/interfaces/IFileStorage";
+import type { IMcpToolCatalog } from "../../application/ports/interfaces/IMcpToolCatalog";
+import type { IMcpToolExecutor } from "../../application/ports/interfaces/IMcpToolExecutor";
 import type { IWorkflowValidator } from "../../domain/services/interfaces/IWorkflowValidator";
 import type { INodeCompatibilityService } from "../../domain/services/interfaces/INodeCompatibilityService";
 import type { IModelCompatibilityService } from "../../domain/services/interfaces/IModelCompatibilityService";
@@ -59,6 +63,9 @@ export const APPLICATION_TOKENS = Object.freeze({
   LoadAssetUseCase: Symbol("LoadAssetUseCase"),
   ListAssetsUseCase: Symbol("ListAssetsUseCase"),
   DeleteAssetUseCase: Symbol("DeleteAssetUseCase"),
+
+  ListMcpToolsUseCase: Symbol("ListMcpToolsUseCase"),
+  ExecuteMcpToolUseCase: Symbol("ExecuteMcpToolUseCase"),
 });
 
 export interface IApplicationBootstrapOptions extends IInfrastructureRegistryOptions {}
@@ -236,6 +243,22 @@ export class ApplicationBootstrap {
           assetCatalog: c.resolve<IAssetCatalog>(TOKENS.AssetCatalog),
           fileStorage: c.resolve<IFileStorage>(TOKENS.FileStorage),
         })
+    );
+
+    container.registerSingleton(
+      APPLICATION_TOKENS.ListMcpToolsUseCase,
+      (c) =>
+        new ListMcpToolsUseCase(
+          c.resolve<IMcpToolCatalog>(TOKENS.McpToolCatalog)
+        )
+    );
+
+    container.registerSingleton(
+      APPLICATION_TOKENS.ExecuteMcpToolUseCase,
+      (c) =>
+        new ExecuteMcpToolUseCase(
+          c.resolve<IMcpToolExecutor>(TOKENS.McpToolExecutor)
+        )
     );
   }
 }
