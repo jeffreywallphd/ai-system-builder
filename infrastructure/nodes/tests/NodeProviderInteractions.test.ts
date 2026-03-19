@@ -37,7 +37,8 @@ describe("Node provider interactions", () => {
     const pythonVectorStore = python.findByNodeType("langchain.vector_store_upsert");
     const langchainAgent = langchain.findByNodeType("langchain.agent");
 
-    expect(langchain.findByNodeType("langchain.output_parser")?.descriptor.title).toContain("Format AI Output");
+    expect(langchain.findByNodeType("langchain.output_parser")?.descriptor.title).toContain("Extract Structured Data");
+    expect(langchain.findByNodeType("langchain.message_history")?.descriptor.title).toContain("Remember Conversation");
     expect(langchain.findByNodeType("langchain.document_loader")?.descriptor.title).toContain("Load Document");
     expect(langchainAgent?.descriptor.title).toContain("AI Agent");
     expect(langchainVectorStore?.descriptor.title).toContain("Save to Knowledge Base");

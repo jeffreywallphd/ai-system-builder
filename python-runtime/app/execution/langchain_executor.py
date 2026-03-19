@@ -13,6 +13,9 @@ except Exception:  # pragma: no cover - optional dependency in this runtime imag
     load_summarize_chain = None
 
 
+_MESSAGE_HISTORY_STORE: Dict[str, List[Dict[str, str]]] = {}
+
+
 class _DeterministicVectorStore:
     def __init__(self) -> None:
         self._documents: List[LangChainDocument] = []
@@ -65,6 +68,72 @@ def _serialize_document(
         "content": text,
         "metadata": normalized_metadata,
     }
+
+
+def _trim_code_fence(value: str) -> str:
+    trimmed = value.strip()
+    if trimmed.startswith("```") and trimmed.endswith("```"):
+        lines = trimmed.splitlines()
+        if len(lines) >= 2:
+            return "\n".join(lines[1:-1]).strip()
+    return trimmed
+
+
+def _coerce_scalar(value: str) -> Any:
+    normalized = value.strip()
+    if normalized.lower() == "true":
+        return True
+    if normalized.lower() == "false":
+        return False
+    try:
+        if "." in normalized:
+            return float(normalized)
+        return int(normalized)
+    except Exception:
+        return normalized
+
+
+def _parse_key_value_text(value: str, *, coerce_numbers: bool) -> Dict[str, Any]:
+    parsed: Dict[str, Any] = {}
+    for line in value.splitlines():
+        normalized = line.strip()
+        if not normalized or ":" not in normalized:
+            continue
+        key, raw_value = normalized.split(":", 1)
+        cleaned_key = key.strip()
+        if not cleaned_key:
+            continue
+        parsed[cleaned_key] = (
+            _coerce_scalar(raw_value)
+            if coerce_numbers
+            else raw_value.strip()
+        )
+    return parsed
+
+
+def _normalize_messages(value: Any) -> List[Dict[str, str]]:
+    if not isinstance(value, list):
+        return []
+
+    messages: List[Dict[str, str]] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        role = item.get("role")
+        content = item.get("content")
+        if role in {"system", "user", "assistant"} and isinstance(content, str) and content.strip():
+            messages.append({"role": role, "content": content})
+    return messages
+
+
+def _dedupe_consecutive_messages(messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    deduped: List[Dict[str, str]] = []
+    for message in messages:
+        previous = deduped[-1] if deduped else None
+        if previous and previous["role"] == message["role"] and previous["content"] == message["content"]:
+            continue
+        deduped.append(message)
+    return deduped
 
 
 def _normalize_knowledge_base_handle(value: Any) -> Dict[str, Any]:
@@ -343,17 +412,72 @@ class LangChainExecutor:
             normalized = output_text.strip()
             if prefix and normalized.startswith(prefix):
                 normalized = normalized[len(prefix):].strip()
-            if str(properties.get("format") or "json") == "json":
+            if bool(properties.get("trimCodeFence", True)):
+                normalized = _trim_code_fence(normalized)
+
+            format_mode = str(properties.get("format") or "json")
+            schema: Dict[str, Any] = {}
+            if isinstance(properties.get("schema"), dict):
+                schema.update(properties["schema"])
+            if isinstance(inputs.get("schema"), dict):
+                schema.update(inputs["schema"])
+
+            used_fallback = False
+            if format_mode in {"json", "json_schema"}:
                 try:
                     parsed: Any = json.loads(normalized)
                 except Exception:
                     parsed = {"text": normalized}
+                    used_fallback = True
+            elif format_mode == "key_value":
+                parsed = _parse_key_value_text(
+                    normalized,
+                    coerce_numbers=bool(properties.get("coerceNumbers", True)),
+                )
             else:
                 parsed = normalized
             return {
                 "parsed": parsed,
                 "parsed_output": parsed,
                 "raw_output": output_text,
+                "parseReport": {
+                    "format": format_mode,
+                    "usedFallback": used_fallback,
+                    "schema": schema,
+                    "extractedKeys": list(parsed.keys()) if isinstance(parsed, dict) else [],
+                },
+            }
+
+        if node_type in {"langchain.message_history", "langchain.memory"}:
+            session_id = str(inputs.get("sessionId") or "").strip()
+            messages = _normalize_messages(inputs.get("messages"))
+            seed_history = _normalize_messages(inputs.get("seedHistory"))
+            seed_strategy = str(properties.get("seedStrategy") or "on-miss")
+            max_messages = max(1, int(properties.get("maxMessages") or 12))
+            dedupe_consecutive = bool(properties.get("dedupeConsecutive", True))
+
+            existing_history = list(_MESSAGE_HISTORY_STORE.get(session_id, [])) if session_id else []
+            if seed_strategy == "merge":
+                combined = [*seed_history, *existing_history, *messages]
+            elif existing_history:
+                combined = [*existing_history, *messages]
+            else:
+                combined = [*seed_history, *messages]
+
+            history = _dedupe_consecutive_messages(combined) if dedupe_consecutive else combined
+            history = history[-max_messages:]
+
+            if session_id:
+                _MESSAGE_HISTORY_STORE[session_id] = history
+
+            return {
+                "history": history,
+                "historyState": {
+                    "sessionId": session_id,
+                    "storedMessageCount": len(history),
+                    "seededMessageCount": len(seed_history),
+                    "appendedMessageCount": len(messages),
+                },
             }
 
         if node_type == "langchain.vector_store_upsert":
@@ -456,6 +580,44 @@ class LangChainExecutor:
                 for index, document in enumerate(documents)
             ]
             return {"context": "\n\n".join(rendered)[:max_length]}
+
+        if node_type == "langchain.tool_definition":
+            tool_name = str(properties.get("toolName") or "")
+            description = str(properties.get("description") or "")
+            strict_schema = bool(properties.get("strictSchema", True))
+            display_name = str(properties.get("displayName") or "")
+            schema_source = str(properties.get("inputSchemaSource") or "merge")
+
+            property_schema = properties.get("inputSchema") if isinstance(properties.get("inputSchema"), dict) else {}
+            input_schema = inputs.get("inputSchema") if isinstance(inputs.get("inputSchema"), dict) else {}
+            if schema_source == "property":
+                merged_schema = dict(property_schema)
+            elif schema_source == "input":
+                merged_schema = dict(input_schema)
+            else:
+                merged_schema = {**property_schema, **input_schema}
+
+            tool = {
+                "name": tool_name,
+                "displayName": display_name or None,
+                "description": description,
+                "inputSchema": merged_schema or None,
+                "strictSchema": strict_schema,
+                "handler": inputs.get("toolHandler"),
+            }
+
+            return {
+                "tool": tool,
+                "toolManifest": {
+                    "name": tool_name,
+                    "displayName": display_name or tool_name,
+                    "description": description,
+                    "strictSchema": strict_schema,
+                    "schemaSource": schema_source,
+                    "hasHandler": inputs.get("toolHandler") is not None,
+                    "inputSchema": merged_schema or None,
+                },
+            }
 
         if node_type == "langchain.summarization":
             documents = _normalize_documents(inputs.get("documents") or [])
