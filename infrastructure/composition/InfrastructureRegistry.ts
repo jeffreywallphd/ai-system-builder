@@ -31,6 +31,8 @@ import type { IWorkflowExecutor } from "../../application/ports/interfaces/IWork
 import type { IContextPackageRepository } from "../../application/ports/interfaces/IContextPackageRepository";
 import type { IWorkflowSerializer } from "../../application/ports/interfaces/IWorkflowSerializer";
 import type { IMcpRuntimeClient } from "../../application/ports/interfaces/IMcpRuntimeClient";
+import type { IMcpServerCatalog } from "../../application/ports/interfaces/IMcpServerCatalog";
+import type { IMcpServerManager } from "../../application/ports/interfaces/IMcpServerManager";
 import type { IMcpToolCatalog } from "../../application/ports/interfaces/IMcpToolCatalog";
 import type { IMcpToolExecutor } from "../../application/ports/interfaces/IMcpToolExecutor";
 import type { IToolCapabilityCatalog } from "../../application/ports/interfaces/IToolCapabilityCatalog";
@@ -40,6 +42,9 @@ import type { INodeImplementationRegistry } from "../nodes/shared/INodeImplement
 import { CompositeNodeImplementationRegistry } from "../nodes/CompositeNodeImplementationRegistry";
 import { createCompositeNodeImplementationRegistry } from "../nodes/NodeProviderRegistryIndex";
 import { HttpMcpRuntimeClient } from "../python/mcp/HttpMcpRuntimeClient";
+import { HttpMcpServerRuntimeClient } from "../python/mcp/HttpMcpServerRuntimeClient";
+import { PythonBackedMcpServerCatalog } from "../python/mcp/PythonBackedMcpServerCatalog";
+import { PythonBackedMcpServerManager } from "../python/mcp/PythonBackedMcpServerManager";
 import { PythonBackedMcpToolCatalog } from "../python/mcp/PythonBackedMcpToolCatalog";
 import { PythonBackedMcpToolExecutor } from "../python/mcp/PythonBackedMcpToolExecutor";
 import { CompositeToolCapabilityCatalog } from "../tools/CompositeToolCapabilityCatalog";
@@ -58,6 +63,8 @@ export const TOKENS = Object.freeze({
   EnvironmentConfigProvider: Symbol("EnvironmentConfigProvider"),
   McpRuntimeConfig: Symbol("McpRuntimeConfig"),
   McpRuntimeClient: Symbol("McpRuntimeClient"),
+  McpServerCatalog: Symbol("McpServerCatalog"),
+  McpServerManager: Symbol("McpServerManager"),
   McpToolCatalog: Symbol("McpToolCatalog"),
   McpToolExecutor: Symbol("McpToolExecutor"),
   ToolCapabilityCatalog: Symbol("ToolCapabilityCatalog"),
@@ -140,100 +147,41 @@ export class InfrastructureRegistry {
       const eventSink = c.tryResolve<IRuntimeEventSink>(Symbol.for("RuntimeEventSink"));
 
       if (!pythonRuntimeConfig.isEnabled) {
-        return {
-          getConnectionStatus: async () => ({
-            enabled: false,
-            state: "disabled",
-            checkedAt: new Date().toISOString(),
-            servers: [],
-            capabilities: { tools: false, resources: false, toolExecution: false },
-            metadata: { reason: "python-runtime-disabled" },
-          }),
-          listServers: async () => ({
-            query: "",
-            totalCount: 0,
-            limit: 20,
-            servers: [],
-            status: {
-              enabled: false,
-              state: "disabled",
-              checkedAt: new Date().toISOString(),
-              servers: [],
-              capabilities: { tools: false, resources: false, toolExecution: false },
-              metadata: { reason: "python-runtime-disabled" },
-            },
-          }),
-          searchServers: async (criteria) => ({
-            query: criteria?.query?.trim() || "",
-            totalCount: 0,
-            limit: criteria?.limit ?? 20,
-            servers: [],
-            status: {
-              enabled: false,
-              state: "disabled",
-              checkedAt: new Date().toISOString(),
-              servers: [],
-              capabilities: { tools: false, resources: false, toolExecution: false },
-              metadata: { reason: "python-runtime-disabled" },
-            },
-          }),
-          connectServer: async (request) => ({
-            action: request.reconnect ? "reconnect" : "connect",
-            checkedAt: new Date().toISOString(),
-            server: {
-              id: request.serverId,
-              name: request.serverId,
-              transport: "inmemory",
-              status: "error",
-              toolCount: 0,
-              resourceCount: 0,
-              capabilities: { tools: false, resources: false, toolExecution: false },
-              errorMessage: "Python runtime is disabled.",
-            },
-            status: {
-              enabled: false,
-              state: "disabled",
-              checkedAt: new Date().toISOString(),
-              servers: [],
-              capabilities: { tools: false, resources: false, toolExecution: false },
-              metadata: { reason: "python-runtime-disabled" },
-            },
-          }),
-          disconnectServer: async (serverId) => ({
-            action: "disconnect",
-            checkedAt: new Date().toISOString(),
-            server: {
-              id: serverId,
-              name: serverId,
-              transport: "inmemory",
-              status: "disconnected",
-              toolCount: 0,
-              resourceCount: 0,
-              capabilities: { tools: false, resources: false, toolExecution: false },
-              errorMessage: "Python runtime is disabled.",
-            },
-            status: {
-              enabled: false,
-              state: "disabled",
-              checkedAt: new Date().toISOString(),
-              servers: [],
-              capabilities: { tools: false, resources: false, toolExecution: false },
-              metadata: { reason: "python-runtime-disabled" },
-            },
-          }),
-          listTools: async () => [],
-          executeTool: async (request) => ({
-            executionId: request.executionId?.trim() || "mcp-disabled",
-            serverId: request.serverId,
-            toolName: request.toolName,
-            status: "failed",
-            content: [],
-            errorMessage: "Python runtime is disabled.",
-          }),
-        } satisfies IMcpRuntimeClient;
+        return createDisabledMcpRuntimeClient();
       }
 
       return new HttpMcpRuntimeClient(pythonRuntimeConfig, fetch, eventSink);
+    });
+
+    container.registerSingleton<IMcpServerCatalog>(TOKENS.McpServerCatalog, (c) => {
+      const config = c.resolve<EnvironmentConfig>(TOKENS.EnvironmentConfig);
+      const pythonRuntimeConfig = PythonRuntimeConfig.fromEnv(toStringEnv(config.toObject()));
+      const eventSink = c.tryResolve<IRuntimeEventSink>(Symbol.for("RuntimeEventSink"));
+
+      if (!pythonRuntimeConfig.isEnabled) {
+        return createDisabledMcpServerCatalog();
+      }
+
+      return new PythonBackedMcpServerCatalog(
+        new HttpMcpServerRuntimeClient(pythonRuntimeConfig, fetch, eventSink)
+      );
+    });
+
+    container.registerSingleton<IMcpServerManager>(TOKENS.McpServerManager, (c) => {
+      const config = c.resolve<EnvironmentConfig>(TOKENS.EnvironmentConfig);
+      const pythonRuntimeConfig = PythonRuntimeConfig.fromEnv(toStringEnv(config.toObject()));
+      const eventSink = c.tryResolve<IRuntimeEventSink>(Symbol.for("RuntimeEventSink"));
+
+      if (!pythonRuntimeConfig.isEnabled) {
+        return createDisabledMcpServerManager();
+      }
+
+      const client = new HttpMcpServerRuntimeClient(pythonRuntimeConfig, fetch, eventSink);
+      return new PythonBackedMcpServerManager(
+        client,
+        c.resolve<IMcpServerCatalog>(TOKENS.McpServerCatalog),
+        eventSink,
+      );
     });
 
     container.registerSingleton<IMcpToolCatalog>(TOKENS.McpToolCatalog, (c) => {
@@ -409,4 +357,104 @@ export class InfrastructureRegistry {
       });
     });
   }
+}
+
+
+function createDisabledMcpRuntimeClient(): IMcpRuntimeClient {
+  const runtime = createDisabledRuntimeStatus();
+
+  return {
+    getConnectionStatus: async () => runtime,
+    listServers: async () => ({ query: "", totalCount: 0, limit: 20, servers: [], status: runtime }),
+    searchServers: async (criteria) => ({
+      query: criteria?.query?.trim() || "",
+      totalCount: 0,
+      limit: criteria?.limit ?? 20,
+      servers: [],
+      status: runtime,
+    }),
+    connectServer: async (request) => createDisabledConnectionResult(request.serverId, request.reconnect ? "reconnect" : "connect"),
+    disconnectServer: async (serverId) => createDisabledConnectionResult(serverId, "disconnect"),
+    listTools: async () => [],
+    listResources: async () => [],
+    executeTool: async (request) => ({
+      executionId: request.executionId?.trim() || "mcp-disabled",
+      serverId: request.serverId,
+      toolName: request.toolName,
+      status: "failed",
+      content: [],
+      structuredContent: {},
+      errorMessage: "Python runtime is disabled.",
+    }),
+  };
+}
+
+function createDisabledMcpServerCatalog(): IMcpServerCatalog {
+  return {
+    getConnectionStatus: async () => createDisabledRuntimeStatus(),
+    listConfiguredServers: async () => [],
+    getServerStatus: async (serverId: string) => createDisabledServerStatus(serverId),
+  };
+}
+
+function createDisabledMcpServerManager(): IMcpServerManager {
+  return {
+    connectServer: async (request) => createDisabledConnectionResult(request.serverId, "connect"),
+    disconnectServer: async (serverId) => createDisabledConnectionResult(serverId, "disconnect"),
+    reconnectServer: async (serverId) => createDisabledConnectionResult(serverId, "reconnect"),
+  };
+}
+
+function createDisabledRuntimeStatus() {
+  return {
+    enabled: false,
+    state: "disabled" as const,
+    checkedAt: new Date().toISOString(),
+    servers: [],
+    capabilities: { tools: false, resources: false, toolExecution: false },
+    metadata: { reason: "python-runtime-disabled" },
+  };
+}
+
+function createDisabledServerDescriptor(serverId: string) {
+  return {
+    id: serverId,
+    name: serverId,
+    transport: "inmemory" as const,
+    enabled: false,
+    status: "error" as const,
+    connected: false,
+    toolCount: 0,
+    resourceCount: 0,
+    capabilities: { tools: false, resources: false, toolExecution: false },
+    errorMessage: "Python runtime is disabled.",
+  };
+}
+
+function createDisabledServerStatus(serverId: string) {
+  return {
+    serverId,
+    name: serverId,
+    transport: "inmemory" as const,
+    configured: false,
+    enabled: false,
+    state: "error" as const,
+    connected: false,
+    checkedAt: new Date().toISOString(),
+    toolCount: 0,
+    resourceCount: 0,
+    capabilities: { tools: false, resources: false, toolExecution: false },
+    errorMessage: "Python runtime is disabled.",
+  };
+}
+
+function createDisabledConnectionResult(serverId: string, action: "connect" | "disconnect" | "reconnect") {
+  return {
+    action,
+    checkedAt: new Date().toISOString(),
+    server: createDisabledServerDescriptor(serverId),
+    status: createDisabledServerStatus(serverId),
+    runtime: createDisabledRuntimeStatus(),
+    metadata: { reason: "python-runtime-disabled" },
+  };
 }

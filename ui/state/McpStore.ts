@@ -79,29 +79,18 @@ export class McpStore {
   }
 
   public async connect(serverId: string, reconnect = false): Promise<void> {
-    await this.mcpService.connectServer(serverId, reconnect);
-    const descriptor = await this.mcpService.getServerStatus(serverId);
-    this.upsertServer(descriptor);
+    if (reconnect) {
+      await this.mcpService.reconnectServer(serverId);
+    } else {
+      await this.mcpService.connectServer(serverId);
+    }
+
     await this.refresh();
   }
 
   public async disconnect(serverId: string): Promise<void> {
     await this.mcpService.disconnectServer(serverId);
-    const descriptor = await this.mcpService.getServerStatus(serverId);
-    this.upsertServer(descriptor);
     await this.refresh();
-  }
-
-  private upsertServer(server: McpServerDescriptor): void {
-    const next = [...this.state.servers];
-    const index = next.findIndex((item) => item.id === server.id);
-    if (index >= 0) {
-      next[index] = server;
-    } else {
-      next.push(server);
-    }
-
-    this.patch({ servers: Object.freeze(next) });
   }
 
   private patch(patch: Partial<McpStoreState>): void {

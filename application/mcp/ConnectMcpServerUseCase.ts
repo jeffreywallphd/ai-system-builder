@@ -1,13 +1,12 @@
-import type { IMcpRuntimeClient } from "../ports/interfaces/IMcpRuntimeClient";
+import type { IMcpServerManager } from "../ports/interfaces/IMcpServerManager";
 import type { McpServerConnectionResult } from "./models/McpServerConnectionResult";
 
 export interface IConnectMcpServerRequest {
   readonly serverId: string;
-  readonly reconnect?: boolean;
 }
 
 export class ConnectMcpServerUseCase {
-  constructor(private readonly runtimeClient: IMcpRuntimeClient) {}
+  constructor(private readonly serverManager: IMcpServerManager) {}
 
   public async execute(request: IConnectMcpServerRequest): Promise<McpServerConnectionResult> {
     const serverId = request.serverId.trim();
@@ -15,9 +14,6 @@ export class ConnectMcpServerUseCase {
       throw new Error("Connecting an MCP server requires a serverId.");
     }
 
-    return this.runtimeClient.connectServer({
-      serverId,
-      reconnect: request.reconnect === true,
-    });
+    return this.serverManager.connectServer({ serverId });
   }
 }

@@ -44,13 +44,18 @@ import { McpService } from "../services/McpService";
 import { McpStore } from "../state/McpStore";
 import { LocalStorageUiSettingsStorage, UiSettingsStore } from "../settings/UiSettingsStore";
 import { HttpMcpRuntimeClient } from "../../infrastructure/python/mcp/HttpMcpRuntimeClient";
+import { HttpMcpServerRuntimeClient } from "../../infrastructure/python/mcp/HttpMcpServerRuntimeClient";
+import { PythonBackedMcpServerCatalog } from "../../infrastructure/python/mcp/PythonBackedMcpServerCatalog";
+import { PythonBackedMcpServerManager } from "../../infrastructure/python/mcp/PythonBackedMcpServerManager";
 import { PythonBackedMcpToolCatalog } from "../../infrastructure/python/mcp/PythonBackedMcpToolCatalog";
 import { PythonBackedMcpToolExecutor } from "../../infrastructure/python/mcp/PythonBackedMcpToolExecutor";
 import { ListMcpToolsUseCase } from "../../application/mcp/ListMcpToolsUseCase";
+import { ListConfiguredMcpServersUseCase } from "../../application/mcp/ListConfiguredMcpServersUseCase";
 import { SearchMcpServersUseCase } from "../../application/mcp/SearchMcpServersUseCase";
 import { GetMcpServerStatusUseCase } from "../../application/mcp/GetMcpServerStatusUseCase";
 import { ConnectMcpServerUseCase } from "../../application/mcp/ConnectMcpServerUseCase";
 import { DisconnectMcpServerUseCase } from "../../application/mcp/DisconnectMcpServerUseCase";
+import { ReconnectMcpServerUseCase } from "../../application/mcp/ReconnectMcpServerUseCase";
 import { WorkflowContextService } from "../../application/context/WorkflowContextService";
 import { InMemoryContextPackageRepository } from "../../infrastructure/mocks/repositories/InMemoryContextPackageRepository";
 
@@ -200,6 +205,15 @@ export function createUiDependencies(
   const mcpClient = settings.runtime.mode === "disabled"
     ? createDisabledMcpRuntimeClient()
     : new HttpMcpRuntimeClient(pythonRuntimeConfig, fetch, runtimeEventSink);
+  const mcpServerRuntimeClient = settings.runtime.mode === "disabled"
+    ? createDisabledMcpServerRuntimeClient()
+    : new HttpMcpServerRuntimeClient(pythonRuntimeConfig, fetch, runtimeEventSink);
+  const mcpServerCatalog = settings.runtime.mode === "disabled"
+    ? createDisabledMcpServerCatalog()
+    : new PythonBackedMcpServerCatalog(mcpServerRuntimeClient);
+  const mcpServerManager = settings.runtime.mode === "disabled"
+    ? createDisabledMcpServerManager()
+    : new PythonBackedMcpServerManager(mcpServerRuntimeClient, mcpServerCatalog, runtimeEventSink);
   const pythonBackedMcpToolCatalog = new PythonBackedMcpToolCatalog(mcpClient, runtimeEventSink);
   const toolCapabilityCatalog = new CompositeToolCapabilityCatalog([
     new WorkflowProjectedToolCapabilityCatalog(workflowRepository, workflowToolProjectionService),
@@ -230,10 +244,12 @@ export function createUiDependencies(
   );
   const mcpService = new McpService(
     new ListMcpToolsUseCase(pythonBackedMcpToolCatalog),
+    new ListConfiguredMcpServersUseCase(mcpServerCatalog),
     new SearchMcpServersUseCase(mcpClient),
-    new GetMcpServerStatusUseCase(mcpClient),
-    new ConnectMcpServerUseCase(mcpClient),
-    new DisconnectMcpServerUseCase(mcpClient),
+    new GetMcpServerStatusUseCase(mcpServerCatalog),
+    new ConnectMcpServerUseCase(mcpServerManager),
+    new DisconnectMcpServerUseCase(mcpServerManager),
+    new ReconnectMcpServerUseCase(mcpServerManager),
   );
   const mcpStore = new McpStore(mcpService);
 
@@ -369,15 +385,62 @@ class InMemoryInstalledModelCatalog implements IInstalledModelCatalog {
 }
 
 
-function createDisabledMcpRuntimeClient() {
-  const disabledStatus = () => ({
+function createDisabledRuntimeStatus() {
+  return {
     enabled: false,
     state: "disabled" as const,
     checkedAt: new Date().toISOString(),
     servers: [],
     capabilities: { tools: false, resources: false, toolExecution: false },
     metadata: { reason: "python-runtime-disabled" },
-  });
+  };
+}
+
+function createDisabledServerDescriptor(serverId: string) {
+  return {
+    id: serverId,
+    name: serverId,
+    transport: "inmemory" as const,
+    enabled: false,
+    status: "error" as const,
+    connected: false,
+    toolCount: 0,
+    resourceCount: 0,
+    capabilities: { tools: false, resources: false, toolExecution: false },
+    errorMessage: "Python runtime is disabled.",
+  };
+}
+
+function createDisabledServerStatus(serverId: string) {
+  return {
+    serverId,
+    name: serverId,
+    transport: "inmemory" as const,
+    configured: false,
+    enabled: false,
+    state: "error" as const,
+    connected: false,
+    checkedAt: new Date().toISOString(),
+    toolCount: 0,
+    resourceCount: 0,
+    capabilities: { tools: false, resources: false, toolExecution: false },
+    errorMessage: "Python runtime is disabled.",
+  };
+}
+
+function createDisabledConnectionResult(serverId: string, action: "connect" | "disconnect" | "reconnect") {
+  return {
+    action,
+    checkedAt: new Date().toISOString(),
+    server: createDisabledServerDescriptor(serverId),
+    status: createDisabledServerStatus(serverId),
+    runtime: createDisabledRuntimeStatus(),
+    metadata: { reason: "python-runtime-disabled" },
+  };
+}
+
+function createDisabledMcpRuntimeClient() {
+  const disabledStatus = () => createDisabledRuntimeStatus();
 
   return {
     async getConnectionStatus() {
@@ -396,38 +459,10 @@ function createDisabledMcpRuntimeClient() {
       };
     },
     async connectServer(request: { serverId: string; reconnect?: boolean }) {
-      return {
-        action: request.reconnect ? "reconnect" as const : "connect" as const,
-        checkedAt: new Date().toISOString(),
-        server: {
-          id: request.serverId,
-          name: request.serverId,
-          transport: "inmemory" as const,
-          status: "error" as const,
-          toolCount: 0,
-          resourceCount: 0,
-          capabilities: { tools: false, resources: false, toolExecution: false },
-          errorMessage: "Python runtime is disabled.",
-        },
-        status: disabledStatus(),
-      };
+      return createDisabledConnectionResult(request.serverId, request.reconnect ? "reconnect" : "connect");
     },
     async disconnectServer(serverId: string) {
-      return {
-        action: "disconnect" as const,
-        checkedAt: new Date().toISOString(),
-        server: {
-          id: serverId,
-          name: serverId,
-          transport: "inmemory" as const,
-          status: "disconnected" as const,
-          toolCount: 0,
-          resourceCount: 0,
-          capabilities: { tools: false, resources: false, toolExecution: false },
-          errorMessage: "Python runtime is disabled.",
-        },
-        status: disabledStatus(),
-      };
+      return createDisabledConnectionResult(serverId, "disconnect");
     },
     async listTools() {
       return [];
@@ -442,8 +477,57 @@ function createDisabledMcpRuntimeClient() {
         toolName: request.toolName,
         status: "failed" as const,
         content: [],
+        structuredContent: {},
         errorMessage: "Python runtime is disabled.",
       };
+    },
+  };
+}
+
+function createDisabledMcpServerRuntimeClient() {
+  return {
+    async getConnectionStatus() {
+      return createDisabledRuntimeStatus();
+    },
+    async listConfiguredServers() {
+      return [];
+    },
+    async connectServer(request: { serverId: string }) {
+      return createDisabledConnectionResult(request.serverId, "connect");
+    },
+    async disconnectServer(serverId: string) {
+      return createDisabledConnectionResult(serverId, "disconnect");
+    },
+    async reconnectServer(serverId: string) {
+      return createDisabledConnectionResult(serverId, "reconnect");
+    },
+  };
+}
+
+function createDisabledMcpServerCatalog() {
+  return {
+    async getConnectionStatus() {
+      return createDisabledRuntimeStatus();
+    },
+    async listConfiguredServers() {
+      return [];
+    },
+    async getServerStatus(serverId: string) {
+      return createDisabledServerStatus(serverId);
+    },
+  };
+}
+
+function createDisabledMcpServerManager() {
+  return {
+    async connectServer(request: { serverId: string }) {
+      return createDisabledConnectionResult(request.serverId, "connect");
+    },
+    async disconnectServer(serverId: string) {
+      return createDisabledConnectionResult(serverId, "disconnect");
+    },
+    async reconnectServer(serverId: string) {
+      return createDisabledConnectionResult(serverId, "reconnect");
     },
   };
 }

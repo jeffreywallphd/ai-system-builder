@@ -13,11 +13,40 @@ class McpModel(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 
+class McpServerStatus(McpModel):
+    server_id: str
+    name: str
+    transport: Literal["stdio", "http", "sse", "inmemory"]
+    configured: bool = True
+    enabled: bool = True
+    state: Literal["connected", "connecting", "disconnected", "error"]
+    connected: bool = False
+    checked_at: str
+    connected_at: Optional[str] = None
+    disconnected_at: Optional[str] = None
+    tool_count: int = 0
+    resource_count: int = 0
+    capabilities: Dict[str, bool] = Field(default_factory=dict)
+    error_message: Optional[str] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
 class McpServerDescriptor(McpModel):
     id: str
     name: str
     transport: Literal["stdio", "http", "sse", "inmemory"]
+    enabled: bool = True
+    command: Optional[str] = None
+    args: List[str] = Field(default_factory=list)
+    url: Optional[str] = None
+    env: Dict[str, str] = Field(default_factory=dict)
+    timeout_ms: Optional[int] = None
+    connect_on_startup: Optional[bool] = None
     status: Literal["connected", "connecting", "disconnected", "error"]
+    connected: bool = False
+    checked_at: Optional[str] = None
+    connected_at: Optional[str] = None
+    disconnected_at: Optional[str] = None
     tool_count: int = 0
     resource_count: int = 0
     capabilities: Dict[str, bool] = Field(default_factory=dict)
@@ -50,7 +79,7 @@ class McpConnectionStatus(McpModel):
     enabled: bool
     state: Literal["disabled", "ready", "degraded", "unavailable"]
     checked_at: str
-    servers: List[McpServerDescriptor] = Field(default_factory=list)
+    servers: List[McpServerStatus] = Field(default_factory=list)
     capabilities: Dict[str, bool] = Field(default_factory=dict)
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
@@ -73,6 +102,7 @@ class McpServerSearchResponse(McpModel):
 class McpServerConnectionRequest(McpModel):
     server_id: str
     reconnect: bool = False
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
 class McpServerDisconnectRequest(McpModel):
@@ -82,7 +112,8 @@ class McpServerDisconnectRequest(McpModel):
 class McpServerConnectionResult(McpModel):
     action: Literal["connect", "reconnect", "disconnect"]
     server: McpServerDescriptor
-    status: McpConnectionStatus
+    status: McpServerStatus
+    runtime: McpConnectionStatus
     checked_at: str
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
