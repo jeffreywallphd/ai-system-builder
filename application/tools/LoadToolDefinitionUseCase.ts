@@ -8,7 +8,7 @@ export class LoadToolDefinitionUseCase {
     private readonly workflowToolProjectionService: WorkflowToolProjectionService
   ) {}
 
-  public async execute(toolId: string): Promise<ToolDefinition> {
+  public async execute(toolIdentifier: string): Promise<ToolDefinition> {
     const summaries = await this.workflowRepository.list();
 
     for (const summary of summaries) {
@@ -20,11 +20,11 @@ export class LoadToolDefinitionUseCase {
         continue;
       }
       const definition = this.workflowToolProjectionService.projectToTool(workflow);
-      if (definition.id === toolId || definition.slug === toolId || definition.workflowId === toolId) {
+      if (definition.id === toolIdentifier || definition.slug === toolIdentifier) {
         return definition;
       }
     }
 
-    throw new Error(`Tool '${toolId}' was not found.`);
+    throw new Error(`Tool '${toolIdentifier}' was not found.`);
   }
 }

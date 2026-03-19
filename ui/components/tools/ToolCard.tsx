@@ -4,7 +4,7 @@ export default function ToolCard({
   tool,
 }: {
   readonly tool: {
-    readonly id: string;
+    readonly slug: string;
     readonly title: string;
     readonly description?: string;
     readonly category?: string;
@@ -19,7 +19,7 @@ export default function ToolCard({
           <span className="ui-badge ui-badge--info">{tool.typeLabel}</span>
         </div>
         {tool.description ? <p>{tool.description}</p> : null}
-        <Link to={`/tools/${tool.id}`} className="ui-button ui-button--sm ui-button--primary">
+        <Link to={`/tools/${tool.slug}`} className="ui-button ui-button--sm ui-button--primary">
           Open
         </Link>
       </div>
