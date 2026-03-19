@@ -35,6 +35,7 @@ import { InvokeToolCapabilityUseCase } from "../../application/tools/InvokeToolC
 import type { INodeCatalogProvider } from "../../application/ports/interfaces/INodeCatalogProvider";
 import type { IWorkflowExecutor } from "../../application/ports/interfaces/IWorkflowExecutor";
 import type { IWorkflowSerializer } from "../../application/ports/interfaces/IWorkflowSerializer";
+import type { IContextPackageRepository } from "../../application/ports/interfaces/IContextPackageRepository";
 import type { IAssetCatalog } from "../../application/ports/interfaces/IAssetCatalog";
 import type { IInstalledModelCatalog } from "../../application/ports/interfaces/IInstalledModelCatalog";
 import type { IRemoteModelCatalog } from "../../application/ports/interfaces/IRemoteModelCatalog";
@@ -44,6 +45,7 @@ import type { IMcpToolCatalog } from "../../application/ports/interfaces/IMcpToo
 import type { IMcpToolExecutor } from "../../application/ports/interfaces/IMcpToolExecutor";
 import type { IToolCapabilityCatalog } from "../../application/ports/interfaces/IToolCapabilityCatalog";
 import type { IToolCapabilityExecutor } from "../../application/ports/interfaces/IToolCapabilityExecutor";
+import { WorkflowContextService } from "../../application/context/WorkflowContextService";
 import type { IWorkflowValidator } from "../../domain/services/interfaces/IWorkflowValidator";
 import type { INodeCompatibilityService } from "../../domain/services/interfaces/INodeCompatibilityService";
 import type { IModelCompatibilityService } from "../../domain/services/interfaces/IModelCompatibilityService";
@@ -135,7 +137,10 @@ export class ApplicationBootstrap {
       (c) =>
         new ExecuteWorkflowUseCase(
           c.resolve<IWorkflowExecutor>(TOKENS.WorkflowExecutor),
-          c.resolve<IWorkflowValidator>(APPLICATION_TOKENS.WorkflowValidator)
+          c.resolve<IWorkflowValidator>(APPLICATION_TOKENS.WorkflowValidator),
+          new WorkflowContextService(
+            c.resolve<IContextPackageRepository>(TOKENS.ContextPackageRepository)
+          )
         )
     );
 

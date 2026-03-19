@@ -1,12 +1,115 @@
 import type {
   IWorkflowAuditInfo,
+  IWorkflowContextConfiguration,
+  IWorkflowContextPackageReference,
   IWorkflowMetadata,
   IWorkflowRuntimeProfile,
+  WorkflowContextVisibilityMode,
 } from "./interfaces/IWorkflow";
 import type { RuntimeEngine } from "../models/interfaces/IModelCompatibility";
 
 function freezeArray<T>(values?: ReadonlyArray<T>): ReadonlyArray<T> | undefined {
   return values ? Object.freeze([...values]) : undefined;
+}
+
+function normalizeOptional(value?: string): string | undefined {
+  const normalized = value?.trim();
+  return normalized ? normalized : undefined;
+}
+
+function normalizeOptionalArray(values?: ReadonlyArray<string>): ReadonlyArray<string> | undefined {
+  const normalized = [...new Set((values ?? []).map((value) => value.trim()).filter(Boolean))];
+  return normalized.length > 0 ? Object.freeze(normalized) : undefined;
+}
+
+function normalizeOptionalInteger(value?: number): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (!Number.isFinite(value) || value < 0) {
+    throw new Error("WorkflowMetadata.contextConfiguration numeric values must be finite positive numbers or zero.");
+  }
+
+  return Math.floor(value);
+}
+
+function freezeContextPackageReferences(
+  references?: ReadonlyArray<IWorkflowContextPackageReference>
+): ReadonlyArray<IWorkflowContextPackageReference> | undefined {
+  if (!references || references.length === 0) {
+    return undefined;
+  }
+
+  const normalized = references
+    .map((reference) => {
+      const packageId = reference.packageId.trim();
+      if (!packageId) {
+        return undefined;
+      }
+
+      return Object.freeze({
+        packageId,
+        alias: normalizeOptional(reference.alias),
+        version: normalizeOptional(reference.version),
+        includeFragmentIds: normalizeOptionalArray(reference.includeFragmentIds),
+        excludeFragmentIds: normalizeOptionalArray(reference.excludeFragmentIds),
+        isEnabled: reference.isEnabled ?? true,
+      });
+    })
+    .filter((reference): reference is IWorkflowContextPackageReference => Boolean(reference));
+
+  return normalized.length > 0 ? Object.freeze(normalized) : undefined;
+}
+
+function freezeContextConfiguration(
+  configuration?: IWorkflowContextConfiguration
+): IWorkflowContextConfiguration | undefined {
+  if (!configuration) {
+    return undefined;
+  }
+
+  const visibilityMode = configuration.visibilityMode;
+  if (visibilityMode !== undefined && visibilityMode !== "basic" && visibilityMode !== "advanced") {
+    throw new Error("WorkflowMetadata.contextConfiguration.visibilityMode must be 'basic' or 'advanced'.");
+  }
+
+  const packageReferences = freezeContextPackageReferences(configuration.packageReferences);
+  const selectedPackageIds = normalizeOptionalArray(configuration.selectedPackageIds);
+  const includeKinds = normalizeOptionalArray(configuration.includeKinds);
+  const excludeKinds = normalizeOptionalArray(configuration.excludeKinds);
+
+  if (
+    selectedPackageIds &&
+    packageReferences &&
+    selectedPackageIds.some((packageId) => !packageReferences.some((reference) => reference.packageId === packageId))
+  ) {
+    throw new Error("WorkflowMetadata.contextConfiguration.selectedPackageIds must reference configured context packages.");
+  }
+
+  const normalized: IWorkflowContextConfiguration = Object.freeze({
+    packageReferences,
+    selectedPackageIds,
+    visibilityMode: visibilityMode as WorkflowContextVisibilityMode | undefined,
+    maxCharacters: normalizeOptionalInteger(configuration.maxCharacters),
+    maxTokens: normalizeOptionalInteger(configuration.maxTokens),
+    trimPartialFragments: configuration.trimPartialFragments ?? true,
+    includeKinds,
+    excludeKinds,
+  });
+
+  return (
+    normalized.packageReferences ||
+    normalized.selectedPackageIds ||
+    normalized.visibilityMode !== undefined ||
+    normalized.maxCharacters !== undefined ||
+    normalized.maxTokens !== undefined ||
+    normalized.trimPartialFragments !== true ||
+    normalized.includeKinds ||
+    normalized.excludeKinds
+  )
+    ? normalized
+    : undefined;
 }
 
 export class WorkflowMetadata implements IWorkflowMetadata {
@@ -20,6 +123,7 @@ export class WorkflowMetadata implements IWorkflowMetadata {
   public readonly toolDescription?: string;
   public readonly toolCategory?: string;
   public readonly toolSlug?: string;
+  public readonly contextConfiguration?: IWorkflowContextConfiguration;
 
   constructor(params: {
     name: string;
@@ -32,6 +136,7 @@ export class WorkflowMetadata implements IWorkflowMetadata {
     toolDescription?: string;
     toolCategory?: string;
     toolSlug?: string;
+    contextConfiguration?: IWorkflowContextConfiguration;
   }) {
     const normalizedName = params.name.trim();
 
@@ -51,6 +156,7 @@ export class WorkflowMetadata implements IWorkflowMetadata {
     this.toolDescription = params.toolDescription?.trim() || undefined;
     this.toolCategory = params.toolCategory?.trim() || undefined;
     this.toolSlug = params.toolSlug?.trim() || undefined;
+    this.contextConfiguration = freezeContextConfiguration(params.contextConfiguration);
   }
 
   public static from(metadata: IWorkflowMetadata): WorkflowMetadata {
@@ -65,6 +171,7 @@ export class WorkflowMetadata implements IWorkflowMetadata {
       toolDescription: metadata.toolDescription,
       toolCategory: metadata.toolCategory,
       toolSlug: metadata.toolSlug,
+      contextConfiguration: metadata.contextConfiguration,
     });
   }
 }

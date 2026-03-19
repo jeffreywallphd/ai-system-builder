@@ -87,4 +87,29 @@ describe("WorkflowToolProjectionService", () => {
 
     expect(tool.sections).toEqual([]);
   });
+
+  it("adds non-technical context controls for published tools when workflow context packages are configured", () => {
+    const workflow = makeWorkflow({ id: "wf-context" }).withMetadata(
+      new WorkflowMetadata({
+        name: "Workflow Name",
+        isPublishedAsTool: true,
+        contextConfiguration: {
+          packageReferences: [
+            { packageId: "pkg-style", alias: "Style guide" },
+            { packageId: "pkg-faq", alias: "FAQ" },
+          ],
+          selectedPackageIds: ["pkg-style"],
+          visibilityMode: "basic",
+          maxTokens: 250,
+        },
+      })
+    );
+
+    const tool = new WorkflowToolProjectionService().projectToTool(workflow);
+    const contextSection = tool.sections.find((section) => section.id === "workflow-context");
+
+    expect(contextSection?.title).toBe("Knowledge & Context");
+    expect(contextSection?.fields.map((field) => field.label)).toEqual(["Knowledge to use", "Context detail"]);
+    expect(contextSection?.fields.some((field) => field.label === "Token budget")).toBeFalse();
+  });
 });

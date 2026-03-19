@@ -922,7 +922,14 @@ export class LangChainNodeExecutor implements INodeExecutor {
       const history = includeHistory ? toChatMessages(inputs.history) : [];
       const system = normalizeText(inputs.system);
       const user = normalizeText(inputs.user);
-      const contextText = includeContext ? normalizeText(inputs.context) : "";
+      const workflowContext =
+        context.executionMetadata?.workflowContext && typeof context.executionMetadata.workflowContext === "object"
+          ? (context.executionMetadata.workflowContext as Record<string, unknown>)
+          : undefined;
+      const contextText = includeContext
+        ? normalizeText(inputs.context) ||
+          (typeof workflowContext?.promptText === "string" ? workflowContext.promptText : "")
+        : "";
       const messages: ChatMessage[] = [];
 
       if (system) {
@@ -946,6 +953,8 @@ export class LangChainNodeExecutor implements INodeExecutor {
         status: user ? "completed" : "failed",
         outputs: {
           messages,
+          context: contextText,
+          inspection: workflowContext?.inspection,
         },
         messages: [user ? `Chat prompt assembled ${messages.length} message(s).` : "Chat prompt requires a user message."],
         errorMessage: user ? undefined : "Chat prompt requires a user message.",

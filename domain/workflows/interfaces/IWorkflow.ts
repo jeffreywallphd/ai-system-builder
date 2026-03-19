@@ -78,6 +78,33 @@ export interface IWorkflowMetadata {
    * Optional stable slug/URL key used in tool routes.
    */
   readonly toolSlug?: string;
+
+  /**
+   * Optional workflow-level reusable context configuration.
+   */
+  readonly contextConfiguration?: IWorkflowContextConfiguration;
+}
+
+export type WorkflowContextVisibilityMode = "basic" | "advanced";
+
+export interface IWorkflowContextPackageReference {
+  readonly packageId: string;
+  readonly alias?: string;
+  readonly version?: string;
+  readonly includeFragmentIds?: ReadonlyArray<string>;
+  readonly excludeFragmentIds?: ReadonlyArray<string>;
+  readonly isEnabled?: boolean;
+}
+
+export interface IWorkflowContextConfiguration {
+  readonly packageReferences?: ReadonlyArray<IWorkflowContextPackageReference>;
+  readonly selectedPackageIds?: ReadonlyArray<string>;
+  readonly visibilityMode?: WorkflowContextVisibilityMode;
+  readonly maxCharacters?: number;
+  readonly maxTokens?: number;
+  readonly trimPartialFragments?: boolean;
+  readonly includeKinds?: ReadonlyArray<string>;
+  readonly excludeKinds?: ReadonlyArray<string>;
 }
 
 export interface IWorkflowAuditInfo {

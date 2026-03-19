@@ -1,4 +1,6 @@
+import type { WorkflowContextService } from "../context/WorkflowContextService";
 import type { IWorkflowRepository } from "../ports/interfaces/IWorkflowRepository";
+import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
 import type { IWorkflowExecutor } from "../ports/interfaces/IWorkflowExecutor";
 import { WorkflowToolProjectionService } from "../projection/WorkflowToolProjectionService";
 import type { ToolRunRequest } from "../projection/models/ToolRunRequest";
@@ -10,7 +12,8 @@ export class RunToolUseCase {
     private readonly workflowRepository: IWorkflowRepository,
     private readonly workflowToolProjectionService: WorkflowToolProjectionService,
     private readonly workflowExecutor: IWorkflowExecutor,
-    private readonly loadToolDefinitionUseCase: LoadToolDefinitionUseCase
+    private readonly loadToolDefinitionUseCase: LoadToolDefinitionUseCase,
+    private readonly workflowContextService?: WorkflowContextService
   ) {}
 
   public async execute(request: ToolRunRequest): Promise<ToolRunResult> {
@@ -22,7 +25,12 @@ export class RunToolUseCase {
     }
 
     const effectiveWorkflow = this.workflowToolProjectionService.applyToolInput(workflow, request.values);
-    const result = await this.workflowExecutor.execute({ workflow: effectiveWorkflow });
+    const executionMetadata = await this.resolveExecutionMetadata(effectiveWorkflow);
+    const result = await this.workflowExecutor.execute({
+      workflow: effectiveWorkflow,
+      parameters: Object.freeze({ ...request.values }),
+      executionMetadata,
+    });
 
     return {
       toolId: definition.id,
@@ -30,5 +38,28 @@ export class RunToolUseCase {
       status: result.status,
       messages: Object.freeze([...(result.messages ?? []), ...(result.errorMessage ? [result.errorMessage] : [])]),
     };
+  }
+
+  private async resolveExecutionMetadata(
+    workflow: IWorkflow
+  ): Promise<Readonly<Record<string, unknown>> | undefined> {
+    if (!this.workflowContextService || !workflow.metadata.contextConfiguration?.packageReferences?.length) {
+      return undefined;
+    }
+
+    const result = await this.workflowContextService.inspectWorkflowContext({
+      workflow,
+      selectedPackageIds: workflow.metadata.contextConfiguration.selectedPackageIds,
+      visibilityMode: workflow.metadata.contextConfiguration.visibilityMode,
+    });
+
+    return Object.freeze({
+      workflowContext: Object.freeze({
+        promptText: result.inspection.finalPromptText,
+        inspection: result.inspection,
+        selectedPackageIds: result.selectedPackageIds,
+        packageLabels: result.packageLabels,
+      }),
+    });
   }
 }

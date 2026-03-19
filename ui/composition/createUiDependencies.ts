@@ -51,6 +51,8 @@ import { SearchMcpServersUseCase } from "../../application/mcp/SearchMcpServersU
 import { GetMcpServerStatusUseCase } from "../../application/mcp/GetMcpServerStatusUseCase";
 import { ConnectMcpServerUseCase } from "../../application/mcp/ConnectMcpServerUseCase";
 import { DisconnectMcpServerUseCase } from "../../application/mcp/DisconnectMcpServerUseCase";
+import { WorkflowContextService } from "../../application/context/WorkflowContextService";
+import { InMemoryContextPackageRepository } from "../../infrastructure/mocks/repositories/InMemoryContextPackageRepository";
 
 import { WorkflowProjectionService } from "../../application/projection/WorkflowProjectionService";
 import { WorkflowToolProjectionService } from "../../application/projection/WorkflowToolProjectionService";
@@ -84,6 +86,8 @@ export function createUiDependencies(
   const workflowRepository = createWorkflowRepository(config);
   const workflowExecutor = createWorkflowExecutor(config);
   const nodeCatalogProvider = createNodeCatalogProvider(config);
+  const contextPackageRepository = new InMemoryContextPackageRepository();
+  const workflowContextService = new WorkflowContextService(contextPackageRepository);
 
   const modelCompatibilityService = new ModelCompatibilityService();
   const nodeCompatibilityService = new NodeCompatibilityService(
@@ -94,7 +98,8 @@ export function createUiDependencies(
   const createWorkflowUseCase = new CreateWorkflowUseCase();
   const executeWorkflowUseCase = new ExecuteWorkflowUseCase(
     workflowExecutor,
-    workflowValidator
+    workflowValidator,
+    workflowContextService
   );
   const validateWorkflowUseCase = new ValidateWorkflowUseCase(workflowValidator);
 
@@ -128,7 +133,8 @@ export function createUiDependencies(
     workflowRepository,
     workflowToolProjectionService,
     workflowExecutor,
-    loadToolDefinitionUseCase
+    loadToolDefinitionUseCase,
+    workflowContextService
   );
 
   const workflowStore = new WorkflowStore({
