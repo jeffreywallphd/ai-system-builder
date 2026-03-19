@@ -2,6 +2,12 @@ import type { IModelExecutor } from "../../../application/ports/interfaces/IMode
 import type { INodeExecutor, INodeExecutionResult } from "../../../application/ports/interfaces/INodeExecutor";
 import type { INodeExecutionContext } from "../../../application/ports/interfaces/INodeExecutionContextResolver";
 import type { IPythonRuntimeClient } from "../../../application/ports/interfaces/IPythonRuntimeClient";
+import { ContextBudgetingService } from "../../../application/context/ContextBudgetingService";
+import { ContextTrimmingService } from "../../../application/context/ContextTrimmingService";
+import type { IAssembledContextFragment } from "../../../application/context/models/AssembledContext";
+import type { ContextFragmentKind } from "../../../application/context/models/ContextFragment";
+import type { IContextBudget } from "../../../application/context/models/ContextBudget";
+import type { IContextTrimmingPolicy } from "../../../application/context/models/ContextTrimmingPolicy";
 import type { INode } from "../../../domain/nodes/interfaces/INode";
 import type {
   ChatMessage,
@@ -30,6 +36,80 @@ interface ToolRuntimeDefinition extends ToolDefinition {
 }
 
 const messageHistoryStore = new Map<string, ChatMessage[]>();
+const contextTrimmingService = new ContextTrimmingService();
+const contextBudgetingService = new ContextBudgetingService();
+
+interface ContextControlSettings {
+  readonly trimmingPolicy: IContextTrimmingPolicy;
+  readonly budget: IContextBudget;
+}
+
+function toStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return [...new Set(value.map((item) => (typeof item === "string" ? item.trim() : "")).filter(Boolean))];
+}
+
+function resolveContextControlSettings(properties: Record<string, unknown>): ContextControlSettings {
+  return {
+    trimmingPolicy: {
+      visibilityMode: properties.visibilityMode === "basic" ? "basic" : "advanced",
+      includeKinds: toStringArray(properties.includeFragmentKinds) as ContextFragmentKind[],
+      excludeKinds: toStringArray(properties.excludeFragmentKinds) as ContextFragmentKind[],
+      includeSources: toStringArray(properties.includeSources),
+      excludeSources: toStringArray(properties.excludeSources),
+    },
+    budget: {
+      maxCharacters:
+        properties.maxLength !== undefined && Number.isFinite(Number(properties.maxLength))
+          ? Math.max(0, Number(properties.maxLength))
+          : undefined,
+      maxTokens:
+        properties.maxTokens !== undefined && Number.isFinite(Number(properties.maxTokens)) && Number(properties.maxTokens) > 0
+          ? Math.max(0, Number(properties.maxTokens))
+          : undefined,
+      approximateCharactersPerToken:
+        properties.approximateCharactersPerToken !== undefined &&
+        Number.isFinite(Number(properties.approximateCharactersPerToken))
+          ? Math.max(1, Number(properties.approximateCharactersPerToken))
+          : undefined,
+      trimPartialFragments: properties.trimPartialFragments !== false,
+      separator: "\n\n",
+    },
+  };
+}
+
+function createContextFragmentsFromDocuments(
+  documents: ReadonlyArray<Document>,
+  template: string
+): ReadonlyArray<IAssembledContextFragment> {
+  return Object.freeze(
+    documents.map((document, index) =>
+      Object.freeze({
+        id: document.id || `doc-${index + 1}`,
+        kind: "retrieved-context" as const,
+        title: typeof document.metadata?.title === "string" ? document.metadata.title : undefined,
+        content: template
+          .replace(/\{index\}/g, String(index + 1))
+          .replace(/\{content\}/g, document.text)
+          .replace(/\{text\}/g, document.text)
+          .replace(/\{metadata\}/g, document.metadata ? stringifyValue(document.metadata) : "{}"),
+        order: index,
+        assemblyKey: `retrieved-context:${document.id || `doc-${index + 1}`}`,
+        precedence: 0,
+        provenance: Object.freeze([
+          Object.freeze({
+            sourceType: "direct" as const,
+            fragmentId: document.id || `doc-${index + 1}`,
+          }),
+        ]),
+        metadata: document.metadata ? Object.freeze({ ...document.metadata }) : undefined,
+      })
+    )
+  );
+}
 
 function readProperty(node: INode, propertyId: string): unknown {
   return node.properties.find((property) => property.id === propertyId)?.value;
@@ -752,28 +832,33 @@ export class LangChainNodeExecutor implements INodeExecutor {
     if (supportsNodeType(nodeType, "langchain.context_formatter")) {
       const documents = toDocuments(inputs.documents);
       const template = String(properties.template ?? "[{index}] {content}");
-      const maxLength = Math.max(1, Number(properties.maxLength ?? 2000));
-      const renderedItems = documents.map((document, index) =>
-        template
-          .replace(/\{index\}/g, String(index + 1))
-          .replace(/\{content\}/g, document.text)
-          .replace(/\{text\}/g, document.text)
-          .replace(
-            /\{metadata\}/g,
-            document.metadata ? stringifyValue(document.metadata) : "{}"
-          )
-      );
-      const contextText = renderedItems.join("\n\n").slice(0, maxLength);
+      const settings = resolveContextControlSettings(properties);
+      const contextFragments = createContextFragmentsFromDocuments(documents, template);
+      const trimmedContext = contextTrimmingService.trim(contextFragments, settings.trimmingPolicy, "\n\n");
+      const budgetedContext = contextBudgetingService.enforceBudget(trimmedContext.fragments, settings.budget);
+      const contextText = budgetedContext.promptText;
 
       return {
         nodeId: context.node.id,
         status: contextText ? "completed" : "failed",
         outputs: {
           context: contextText,
+          fragments: budgetedContext.fragments,
+          budget: {
+            totalCharacterCount: budgetedContext.totalCharacterCount,
+            includedCharacterCount: budgetedContext.includedCharacterCount,
+            totalTokenCount: budgetedContext.totalTokenCount,
+            includedTokenCount: budgetedContext.includedTokenCount,
+            wasTrimmed: budgetedContext.wasTrimmed,
+          },
+          filtering: {
+            visibilityMode: settings.trimmingPolicy.visibilityMode ?? "advanced",
+            decisions: trimmedContext.decisions,
+          },
         },
         messages: [
           contextText
-            ? `Formatted ${renderedItems.length} context item(s).`
+            ? `Formatted ${documents.length} context item(s); retained ${budgetedContext.fragments.length} after filtering and budgeting.`
             : "Context formatter received no documents.",
         ],
         errorMessage: contextText ? undefined : "Context formatter received no documents.",
