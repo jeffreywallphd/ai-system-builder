@@ -6,6 +6,7 @@ import { LocalFileStorage } from "../filesystem/LocalFileStorage";
 import { LocalAssetRepository } from "../filesystem/LocalAssetRepository";
 import { LocalModelRepository } from "../filesystem/LocalModelRepository";
 import { LocalWorkflowRepository } from "../filesystem/LocalWorkflowRepository";
+import { LocalContextPackageRepository } from "../filesystem/LocalContextPackageRepository";
 import { DependencyContainer, type DependencyToken } from "./DependencyContainer";
 
 import { AssetCatalog } from "../../application/ports/AssetCatalog";
@@ -27,6 +28,7 @@ import type { IModelDownloader } from "../../application/ports/interfaces/IModel
 import type { IRemoteModelCatalog } from "../../application/ports/interfaces/IRemoteModelCatalog";
 import type { IModelInstaller } from "../../application/ports/interfaces/IModelInstaller";
 import type { IWorkflowExecutor } from "../../application/ports/interfaces/IWorkflowExecutor";
+import type { IContextPackageRepository } from "../../application/ports/interfaces/IContextPackageRepository";
 import type { IWorkflowSerializer } from "../../application/ports/interfaces/IWorkflowSerializer";
 import type { IMcpRuntimeClient } from "../../application/ports/interfaces/IMcpRuntimeClient";
 import type { IMcpToolCatalog } from "../../application/ports/interfaces/IMcpToolCatalog";
@@ -49,6 +51,7 @@ import { WorkflowToolCapabilityExecutor } from "../tools/WorkflowToolCapabilityE
 import { WorkflowToolProjectionService } from "../../application/projection/WorkflowToolProjectionService";
 import { LoadToolDefinitionUseCase } from "../../application/tools/LoadToolDefinitionUseCase";
 import { RunToolUseCase } from "../../application/tools/RunToolUseCase";
+import { WorkflowContextService } from "../../application/context/WorkflowContextService";
 
 export const TOKENS = Object.freeze({
   EnvironmentConfig: Symbol("EnvironmentConfig"),
@@ -69,6 +72,7 @@ export const TOKENS = Object.freeze({
   WorkflowExecutor: Symbol("WorkflowExecutor"),
   WorkflowSerializer: Symbol("WorkflowSerializer"),
   WorkflowRepository: Symbol("WorkflowRepository"),
+  ContextPackageRepository: Symbol("ContextPackageRepository"),
   AssetRepository: Symbol("AssetRepository"),
   ModelRepository: Symbol("ModelRepository"),
   NodeImplementationRegistry: Symbol("NodeImplementationRegistry"),
@@ -263,11 +267,15 @@ export class InfrastructureRegistry {
         workflowRepository,
         workflowToolProjectionService
       );
+      const workflowContextService = new WorkflowContextService(
+        c.resolve<IContextPackageRepository>(TOKENS.ContextPackageRepository)
+      );
       const runToolUseCase = new RunToolUseCase(
         workflowRepository,
         workflowToolProjectionService,
         c.resolve<IWorkflowExecutor>(TOKENS.WorkflowExecutor),
-        loadToolDefinitionUseCase
+        loadToolDefinitionUseCase,
+        workflowContextService
       );
 
       return new CompositeToolCapabilityExecutor([
@@ -289,6 +297,14 @@ export class InfrastructureRegistry {
     container.registerSingleton<IFileStorage>(TOKENS.FileStorage, () => {
       return new LocalFileStorage();
     });
+
+    container.registerSingleton<IContextPackageRepository>(TOKENS.ContextPackageRepository, (c) => {
+      return new LocalContextPackageRepository({
+        fileStorage: c.resolve<IFileStorage>(TOKENS.FileStorage),
+        rootDirectory: `${options.paths.workflowsDirectory}/../context-packages`,
+      });
+    });
+
 
     container.registerSingleton(TOKENS.AssetRepository, (c) => {
       return new LocalAssetRepository({

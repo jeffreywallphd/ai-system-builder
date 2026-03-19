@@ -182,4 +182,30 @@ describe("ExecuteAgentToolsUseCase", () => {
 
     expect(result.selectedTools).toEqual([localEcho]);
   });
+  it("forwards assembled workflow context into orchestrator metadata", async () => {
+    const capability = makeCapability({ id: "workflow:tool-a" });
+    let capturedRequest: AgentToolOrchestrationRequest | undefined;
+    const useCase = new ExecuteAgentToolsUseCase(
+      makeCatalog([capability]),
+      {
+        async execute(request) {
+          capturedRequest = request;
+          return makeExecutionResult(request);
+        },
+      } satisfies IAgentToolOrchestrator
+    );
+
+    await useCase.execute({
+      input: "Use the workflow tool",
+      context: {
+        promptText: "Policy: stay concise.",
+        selectedPackageIds: ["pkg-style"],
+      },
+    });
+
+    expect((capturedRequest?.metadata?.workflowContext as { promptText?: string })?.promptText).toBe(
+      "Policy: stay concise."
+    );
+  });
+
 });

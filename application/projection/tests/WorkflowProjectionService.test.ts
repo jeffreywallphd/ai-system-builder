@@ -3,6 +3,7 @@ import { WorkflowProjectionService } from "../WorkflowProjectionService";
 import { WorkflowToolProjectionService } from "../WorkflowToolProjectionService";
 import { makeNode, makeWorkflow } from "../../../domain/services/tests/testUtils";
 import { NodeProperty } from "../../../domain/nodes/NodeProperty";
+import { WorkflowMetadata } from "../../../domain/workflows/WorkflowMetadata";
 
 function makeProjectedWorkflow() {
   const node = makeNode({
@@ -74,4 +75,31 @@ describe("WorkflowProjectionService", () => {
       shouldClampToRange: true,
     });
   });
+
+  it("projects richer author-facing workflow context controls", () => {
+    const workflow = makeWorkflow({ id: "wf-context" }).withMetadata(
+      new WorkflowMetadata({
+        name: "WF",
+        contextConfiguration: {
+          packageReferences: [{ packageId: "pkg-style", alias: "Style guide" }],
+          selectedPackageIds: ["pkg-style"],
+          visibilityMode: "advanced",
+          maxCharacters: 800,
+        },
+      })
+    );
+
+    const schema = new WorkflowProjectionService().projectToForm(workflow);
+    const contextSection = schema.sections.find((section) => section.id === "workflow-context");
+
+    expect(contextSection?.fields.map((field) => field.label)).toEqual([
+      "Context packages",
+      "Default package selection",
+      "Visible context detail",
+      "Character budget",
+      "Token budget",
+      "Allow partial fragment trim",
+    ]);
+  });
+
 });

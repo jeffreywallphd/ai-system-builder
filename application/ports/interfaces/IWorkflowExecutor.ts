@@ -83,6 +83,11 @@ export interface IWorkflowExecutionInput {
    * Useful for future extensibility without changing the interface.
    */
   readonly parameters?: Readonly<Record<string, unknown>>;
+
+  /**
+   * Optional execution metadata shared with downstream node execution contexts.
+   */
+  readonly executionMetadata?: Readonly<Record<string, unknown>>;
 }
 
 export interface IWorkflowExecutionProgress {

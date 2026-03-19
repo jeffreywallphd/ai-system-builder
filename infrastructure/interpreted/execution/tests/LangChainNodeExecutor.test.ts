@@ -85,6 +85,39 @@ describe("LangChainNodeExecutor", () => {
     ]);
   });
 
+
+  it("uses assembled workflow context when chat prompt nodes do not receive direct context input", async () => {
+    const node = makeLangChainNode("n-chat-context", "langchain.chat_prompt", [
+      new NodeProperty({ id: "includeContext", name: "Include Context", type: "boolean", value: true }),
+      new NodeProperty({ id: "includeHistory", name: "Include History", type: "boolean", value: false }),
+    ]);
+    const executor = new LangChainNodeExecutor();
+    const result = await executor.executeNode({
+      workflow: {} as never,
+      node,
+      inputAssets: [],
+      workflowInputs: {},
+      upstreamOutputs: {},
+      resolvedInputs: {
+        system: "Be helpful.",
+        user: "Answer the question.",
+      },
+      executionMetadata: {
+        workflowContext: {
+          promptText: "Persona:\nUse the saved style guide.",
+          inspection: { id: "inspection" },
+        },
+      },
+    });
+
+    expect(result.outputs.messages).toContainEqual({
+      role: "system",
+      content: "Context:\nPersona:\nUse the saved style guide.",
+    });
+    expect(result.outputs.inspection).toEqual({ id: "inspection" });
+  });
+
+
   it("executes llm chat nodes with deterministic response metadata", async () => {
     const node = makeLangChainNode("n-llm", "langchain.llm_chat", [
       new NodeProperty({ id: "model", name: "Model", type: "text", value: "demo-model" }),
@@ -403,6 +436,53 @@ describe("LangChainNodeExecutor", () => {
 
     expect(result.status).toBe("completed");
     expect(result.outputs.context).toBe("Doc 1: Alpha\n\nDoc 2: Beta\n\nDoc 3: Gamma");
+    expect(result.outputs.budget).toEqual(
+      expect.objectContaining({ wasTrimmed: false, includedCharacterCount: 39 })
+    );
+    expect(result.outputs.filtering).toEqual(
+      expect.objectContaining({ visibilityMode: "advanced" })
+    );
+  });
+
+  it("applies filtering and budgeting controls in context formatter nodes", async () => {
+    const node = makeLangChainNode("n-format-context-qc", "langchain.context_formatter", [
+      new NodeProperty({ id: "template", name: "Template", type: "multiline-text", value: "{content}" }),
+      new NodeProperty({ id: "maxLength", name: "Max Length", type: "integer", value: 8 }),
+      new NodeProperty({ id: "visibilityMode", name: "Visibility Mode", type: "select", value: "basic" }),
+      new NodeProperty({ id: "excludeSources", name: "Exclude Sources", type: "generic", value: ["memory-bank"] }),
+    ]);
+    const executor = new LangChainNodeExecutor();
+    const result = await executor.executeNode({
+      workflow: {} as never,
+      node,
+      inputAssets: [],
+      workflowInputs: {},
+      upstreamOutputs: {},
+      resolvedInputs: {
+        documents: [
+          { id: "d1", text: "Alpha", metadata: { source: "knowledge-base" } },
+          { id: "d2", text: "Beta", metadata: { visibility: "advanced", source: "knowledge-base" } },
+          { id: "d3", text: "Gamma", metadata: { source: "memory-bank" } },
+          { id: "d4", text: "DeltaDelta", metadata: { source: "knowledge-base" } },
+        ],
+      },
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.outputs.context).toBe("Alpha\n\nD");
+    expect(result.outputs.fragments).toEqual([
+      expect.objectContaining({ id: "d1", content: "Alpha" }),
+      expect.objectContaining({ id: "d4", content: "D" }),
+    ]);
+    expect(result.outputs.filtering.decisions).toEqual([
+      expect.objectContaining({ id: "d1", action: "included" }),
+      expect.objectContaining({ id: "d2", action: "excluded-by-visibility" }),
+      expect.objectContaining({ id: "d3", action: "excluded-by-source" }),
+      expect.objectContaining({ id: "d4", action: "included" }),
+    ]);
+    expect(result.outputs.budget).toEqual(
+      expect.objectContaining({ wasTrimmed: true, includedCharacterCount: 8 })
+    );
   });
 
   it("supports vector upsert and similarity search scaffolds", async () => {

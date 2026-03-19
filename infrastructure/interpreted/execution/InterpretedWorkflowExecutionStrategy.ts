@@ -72,6 +72,7 @@ export class InterpretedWorkflowExecutionStrategy implements IWorkflowExecutionS
         outputStore,
         inputAssets: input.inputAssets,
         workflowInputs: input.parameters,
+        executionMetadata: input.executionMetadata,
       });
       const nodeResult = await this.nodeExecutor.executeNode(context);
       outputStore.setNodeOutput(node.id, nodeResult.outputs);

@@ -1,5 +1,11 @@
 export type FieldVisibility = "basic" | "advanced" | "hidden";
 
+export type ProjectedFieldPresentation =
+  | "default"
+  | "context-package-references"
+  | "context-package-selection"
+  | "context-visibility";
+
 export interface ProjectedField {
   readonly id: string;
   readonly nodeId: string;
@@ -19,4 +25,6 @@ export interface ProjectedField {
   readonly max?: number;
   readonly step?: number;
   readonly shouldClampToRange: boolean;
+  readonly presentation?: ProjectedFieldPresentation;
+  readonly metadata?: Readonly<Record<string, unknown>>;
 }

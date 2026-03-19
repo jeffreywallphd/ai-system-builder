@@ -10,6 +10,7 @@ import type {
   IWorkflowValidator,
 } from "../../domain/services/interfaces/IWorkflowValidator";
 import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
+import type { WorkflowContextService } from "../context/WorkflowContextService";
 
 export interface IExecuteWorkflowRequest {
   readonly workflow: IWorkflow;
@@ -32,7 +33,8 @@ export class ExecuteWorkflowUseCase {
 
   constructor(
     workflowExecutor: IWorkflowExecutor,
-    workflowValidator: IWorkflowValidator
+    workflowValidator: IWorkflowValidator,
+    private readonly workflowContextService?: WorkflowContextService
   ) {
     this.workflowExecutor = workflowExecutor;
     this.workflowValidator = workflowValidator;
@@ -46,6 +48,7 @@ export class ExecuteWorkflowUseCase {
       request.workflow,
       request.propertyOverrides
     );
+    const executionMetadata = await this.resolveExecutionMetadata(effectiveWorkflow, request.parameters);
 
     if (request.validateBeforeExecute ?? true) {
       this.ensureWorkflowValid(
@@ -68,6 +71,7 @@ export class ExecuteWorkflowUseCase {
         propertyOverrides: request.propertyOverrides,
         inputAssets: request.inputAssets,
         parameters: request.parameters,
+        executionMetadata,
       },
       onEvent
     );
@@ -88,6 +92,7 @@ export class ExecuteWorkflowUseCase {
       request.workflow,
       request.propertyOverrides
     );
+    const executionMetadata = await this.resolveExecutionMetadata(effectiveWorkflow, request.parameters);
 
     if (request.validateBeforeExecute ?? true) {
       this.ensureWorkflowValid(
@@ -109,6 +114,7 @@ export class ExecuteWorkflowUseCase {
       propertyOverrides: request.propertyOverrides,
       inputAssets: request.inputAssets,
       parameters: request.parameters,
+      executionMetadata,
     });
 
     return Object.freeze({
@@ -150,6 +156,47 @@ export class ExecuteWorkflowUseCase {
     }
 
     return effectiveWorkflow;
+  }
+
+  private async resolveExecutionMetadata(
+    workflow: IWorkflow,
+    parameters?: Readonly<Record<string, unknown>>
+  ): Promise<Readonly<Record<string, unknown>> | undefined> {
+    if (!this.workflowContextService || !workflow.metadata.contextConfiguration?.packageReferences?.length) {
+      return undefined;
+    }
+
+    const contextSelection =
+      parameters?.workflowContext && typeof parameters.workflowContext === "object"
+        ? (parameters.workflowContext as Record<string, unknown>)
+        : undefined;
+
+    const result = await this.workflowContextService.inspectWorkflowContext({
+      workflow,
+      selectedPackageIds: Array.isArray(contextSelection?.selectedPackageIds)
+        ? contextSelection.selectedPackageIds.filter((value): value is string => typeof value === "string")
+        : undefined,
+      visibilityMode:
+        contextSelection?.visibilityMode === "basic" || contextSelection?.visibilityMode === "advanced"
+          ? contextSelection.visibilityMode
+          : undefined,
+      maxCharacters:
+        typeof contextSelection?.maxCharacters === "number" ? contextSelection.maxCharacters : undefined,
+      maxTokens: typeof contextSelection?.maxTokens === "number" ? contextSelection.maxTokens : undefined,
+      trimPartialFragments:
+        typeof contextSelection?.trimPartialFragments === "boolean"
+          ? contextSelection.trimPartialFragments
+          : undefined,
+    });
+
+    return Object.freeze({
+      workflowContext: Object.freeze({
+        promptText: result.inspection.finalPromptText,
+        inspection: result.inspection,
+        selectedPackageIds: result.selectedPackageIds,
+        packageLabels: result.packageLabels,
+      }),
+    });
   }
 
   private ensureWorkflowValid(

@@ -22,6 +22,28 @@ interface WorkflowRecord {
     readonly author?: string;
     readonly tags?: ReadonlyArray<string>;
     readonly version?: string;
+    readonly isPublishedAsTool?: boolean;
+    readonly toolTitle?: string;
+    readonly toolDescription?: string;
+    readonly toolCategory?: string;
+    readonly toolSlug?: string;
+    readonly contextConfiguration?: {
+      readonly packageReferences?: ReadonlyArray<{
+        readonly packageId: string;
+        readonly alias?: string;
+        readonly version?: string;
+        readonly includeFragmentIds?: ReadonlyArray<string>;
+        readonly excludeFragmentIds?: ReadonlyArray<string>;
+        readonly isEnabled?: boolean;
+      }>;
+      readonly selectedPackageIds?: ReadonlyArray<string>;
+      readonly visibilityMode?: "basic" | "advanced";
+      readonly maxCharacters?: number;
+      readonly maxTokens?: number;
+      readonly trimPartialFragments?: boolean;
+      readonly includeKinds?: ReadonlyArray<string>;
+      readonly excludeKinds?: ReadonlyArray<string>;
+    };
   };
   readonly status: IWorkflow["status"];
   readonly isEnabled: boolean;
@@ -198,6 +220,30 @@ export class LocalWorkflowRepository implements IWorkflowRepository {
         author: workflow.metadata.author,
         tags: workflow.metadata.tags,
         version: workflow.metadata.version,
+        isPublishedAsTool: workflow.metadata.isPublishedAsTool,
+        toolTitle: workflow.metadata.toolTitle,
+        toolDescription: workflow.metadata.toolDescription,
+        toolCategory: workflow.metadata.toolCategory,
+        toolSlug: workflow.metadata.toolSlug,
+        contextConfiguration: workflow.metadata.contextConfiguration
+          ? {
+              packageReferences: workflow.metadata.contextConfiguration.packageReferences?.map((reference) => ({
+                packageId: reference.packageId,
+                alias: reference.alias,
+                version: reference.version,
+                includeFragmentIds: reference.includeFragmentIds,
+                excludeFragmentIds: reference.excludeFragmentIds,
+                isEnabled: reference.isEnabled,
+              })),
+              selectedPackageIds: workflow.metadata.contextConfiguration.selectedPackageIds,
+              visibilityMode: workflow.metadata.contextConfiguration.visibilityMode,
+              maxCharacters: workflow.metadata.contextConfiguration.maxCharacters,
+              maxTokens: workflow.metadata.contextConfiguration.maxTokens,
+              trimPartialFragments: workflow.metadata.contextConfiguration.trimPartialFragments,
+              includeKinds: workflow.metadata.contextConfiguration.includeKinds,
+              excludeKinds: workflow.metadata.contextConfiguration.excludeKinds,
+            }
+          : undefined,
       },
       status: workflow.status,
       isEnabled: workflow.isEnabled,

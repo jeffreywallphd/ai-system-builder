@@ -2,6 +2,11 @@ import type { IModelExecutor } from "../../../application/ports/interfaces/IMode
 import type { INodeExecutor, INodeExecutionResult } from "../../../application/ports/interfaces/INodeExecutor";
 import type { INodeExecutionContext } from "../../../application/ports/interfaces/INodeExecutionContextResolver";
 import type { IPythonRuntimeClient } from "../../../application/ports/interfaces/IPythonRuntimeClient";
+import { InspectContextAssemblyUseCase } from "../../../application/context/InspectContextAssemblyUseCase";
+import type { IAssembledContextFragment } from "../../../application/context/models/AssembledContext";
+import type { ContextFragmentKind } from "../../../application/context/models/ContextFragment";
+import type { IContextBudget } from "../../../application/context/models/ContextBudget";
+import type { IContextTrimmingPolicy } from "../../../application/context/models/ContextTrimmingPolicy";
 import type { INode } from "../../../domain/nodes/interfaces/INode";
 import type {
   ChatMessage,
@@ -30,6 +35,76 @@ interface ToolRuntimeDefinition extends ToolDefinition {
 }
 
 const messageHistoryStore = new Map<string, ChatMessage[]>();
+const inspectContextAssemblyUseCase = new InspectContextAssemblyUseCase();
+
+interface ContextControlSettings {
+  readonly trimmingPolicy: IContextTrimmingPolicy;
+  readonly budget: IContextBudget;
+}
+
+function toStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return [...new Set(value.map((item) => (typeof item === "string" ? item.trim() : "")).filter(Boolean))];
+}
+
+function resolveContextControlSettings(properties: Record<string, unknown>): ContextControlSettings {
+  return {
+    trimmingPolicy: {
+      visibilityMode: properties.visibilityMode === "basic" ? "basic" : "advanced",
+      includeKinds: toStringArray(properties.includeFragmentKinds) as ContextFragmentKind[],
+      excludeKinds: toStringArray(properties.excludeFragmentKinds) as ContextFragmentKind[],
+      includeSources: toStringArray(properties.includeSources),
+      excludeSources: toStringArray(properties.excludeSources),
+    },
+    budget: {
+      maxCharacters:
+        properties.maxLength !== undefined && Number.isFinite(Number(properties.maxLength))
+          ? Math.max(0, Number(properties.maxLength))
+          : undefined,
+      maxTokens:
+        properties.maxTokens !== undefined && Number.isFinite(Number(properties.maxTokens)) && Number(properties.maxTokens) > 0
+          ? Math.max(0, Number(properties.maxTokens))
+          : undefined,
+      approximateCharactersPerToken:
+        properties.approximateCharactersPerToken !== undefined &&
+        Number.isFinite(Number(properties.approximateCharactersPerToken))
+          ? Math.max(1, Number(properties.approximateCharactersPerToken))
+          : undefined,
+      trimPartialFragments: properties.trimPartialFragments !== false,
+      separator: "\n\n",
+    },
+  };
+}
+
+function createContextFragmentsFromDocuments(
+  documents: ReadonlyArray<Document>,
+  template: string
+): ReadonlyArray<{
+  readonly id: string;
+  readonly kind: "retrieved-context";
+  readonly title?: string;
+  readonly content: string;
+  readonly order: number;
+  readonly metadata?: Readonly<Record<string, unknown>>;
+}> {
+  return Object.freeze(
+    documents.map((document, index) => ({
+      id: document.id || `doc-${index + 1}`,
+      kind: "retrieved-context" as const,
+      title: typeof document.metadata?.title === "string" ? document.metadata.title : undefined,
+      content: template
+        .replace(/\{index\}/g, String(index + 1))
+        .replace(/\{content\}/g, document.text)
+        .replace(/\{text\}/g, document.text)
+        .replace(/\{metadata\}/g, document.metadata ? stringifyValue(document.metadata) : "{}"),
+      order: index,
+      metadata: document.metadata ? Object.freeze({ ...document.metadata }) : undefined,
+    }))
+  );
+}
 
 function readProperty(node: INode, propertyId: string): unknown {
   return node.properties.find((property) => property.id === propertyId)?.value;
@@ -752,28 +827,40 @@ export class LangChainNodeExecutor implements INodeExecutor {
     if (supportsNodeType(nodeType, "langchain.context_formatter")) {
       const documents = toDocuments(inputs.documents);
       const template = String(properties.template ?? "[{index}] {content}");
-      const maxLength = Math.max(1, Number(properties.maxLength ?? 2000));
-      const renderedItems = documents.map((document, index) =>
-        template
-          .replace(/\{index\}/g, String(index + 1))
-          .replace(/\{content\}/g, document.text)
-          .replace(/\{text\}/g, document.text)
-          .replace(
-            /\{metadata\}/g,
-            document.metadata ? stringifyValue(document.metadata) : "{}"
-          )
-      );
-      const contextText = renderedItems.join("\n\n").slice(0, maxLength);
+      const settings = resolveContextControlSettings(properties);
+      const contextFragments = createContextFragmentsFromDocuments(documents, template);
+      const inspection = inspectContextAssemblyUseCase.execute({
+        assembly: {
+          fragments: contextFragments,
+          separator: "\n\n",
+        },
+        trimmingPolicy: settings.trimmingPolicy,
+        budget: settings.budget,
+      });
+      const contextText = inspection.finalPromptText;
 
       return {
         nodeId: context.node.id,
         status: contextText ? "completed" : "failed",
         outputs: {
           context: contextText,
+          fragments: inspection.finalFragments,
+          inspection,
+          budget: {
+            totalCharacterCount: inspection.budgeting.totalCharacterCount,
+            includedCharacterCount: inspection.budgeting.includedCharacterCount,
+            totalTokenCount: inspection.budgeting.totalTokenCount,
+            includedTokenCount: inspection.budgeting.includedTokenCount,
+            wasTrimmed: inspection.budgeting.wasTrimmed,
+          },
+          filtering: {
+            visibilityMode: settings.trimmingPolicy.visibilityMode ?? "advanced",
+            decisions: inspection.trimming.decisions,
+          },
         },
         messages: [
           contextText
-            ? `Formatted ${renderedItems.length} context item(s).`
+            ? `Formatted ${documents.length} context item(s); retained ${inspection.finalFragments.length} after filtering and budgeting.`
             : "Context formatter received no documents.",
         ],
         errorMessage: contextText ? undefined : "Context formatter received no documents.",
@@ -835,7 +922,14 @@ export class LangChainNodeExecutor implements INodeExecutor {
       const history = includeHistory ? toChatMessages(inputs.history) : [];
       const system = normalizeText(inputs.system);
       const user = normalizeText(inputs.user);
-      const contextText = includeContext ? normalizeText(inputs.context) : "";
+      const workflowContext =
+        context.executionMetadata?.workflowContext && typeof context.executionMetadata.workflowContext === "object"
+          ? (context.executionMetadata.workflowContext as Record<string, unknown>)
+          : undefined;
+      const contextText = includeContext
+        ? normalizeText(inputs.context) ||
+          (typeof workflowContext?.promptText === "string" ? workflowContext.promptText : "")
+        : "";
       const messages: ChatMessage[] = [];
 
       if (system) {
@@ -859,6 +953,8 @@ export class LangChainNodeExecutor implements INodeExecutor {
         status: user ? "completed" : "failed",
         outputs: {
           messages,
+          context: contextText,
+          inspection: workflowContext?.inspection,
         },
         messages: [user ? `Chat prompt assembled ${messages.length} message(s).` : "Chat prompt requires a user message."],
         errorMessage: user ? undefined : "Chat prompt requires a user message.",

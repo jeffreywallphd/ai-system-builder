@@ -109,7 +109,7 @@ const requiredTierTwoNodes = [
     title: "Prepare Context",
     requiredInputs: ["documents"],
     requiredOutputs: ["context"],
-    expectedProperties: ["template", "maxLength"],
+    expectedProperties: ["template", "maxLength", "maxTokens", "visibilityMode", "includeFragmentKinds", "excludeFragmentKinds", "includeSources", "excludeSources", "trimPartialFragments", "approximateCharactersPerToken"],
   },
   {
     type: "langchain.tool_definition",

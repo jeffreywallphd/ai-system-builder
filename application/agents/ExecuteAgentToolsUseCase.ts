@@ -29,13 +29,30 @@ export class ExecuteAgentToolsUseCase {
     const selectedTools = Object.freeze(this.selectTools(availableTools, request));
     const maxIterations = this.normalizeMaxIterations(request.maxIterations);
 
+    const metadata = {
+      ...(request.metadata ? { ...request.metadata } : {}),
+      ...(request.context
+        ? {
+            workflowContext: Object.freeze({
+              promptText: request.context.promptText,
+              selectedPackageIds: request.context.selectedPackageIds
+                ? Object.freeze([...request.context.selectedPackageIds])
+                : undefined,
+              packageLabels: request.context.packageLabels
+                ? Object.freeze({ ...request.context.packageLabels })
+                : undefined,
+            }),
+          }
+        : {}),
+    };
+
     const result = await this.orchestrator.execute({
       input,
       executionId: request.executionId?.trim() || undefined,
       maxIterations,
       availableTools,
       selectedTools,
-      metadata: request.metadata ? Object.freeze({ ...request.metadata }) : undefined,
+      metadata: Object.keys(metadata).length > 0 ? Object.freeze(metadata) : undefined,
     });
 
     return Object.freeze({

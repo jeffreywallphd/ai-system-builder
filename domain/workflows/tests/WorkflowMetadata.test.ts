@@ -18,6 +18,13 @@ describe("Workflow metadata primitives", () => {
       toolDescription: " desc ",
       toolCategory: " cat ",
       toolSlug: " tool-slug ",
+      contextConfiguration: {
+        packageReferences: [{ packageId: " pkg-1 ", alias: " Style Guide " }],
+        selectedPackageIds: [" pkg-1 "],
+        visibilityMode: "advanced",
+        maxCharacters: 1200,
+        trimPartialFragments: true,
+      },
     });
 
     expect(metadata.name).toBe("Demo Workflow");
@@ -31,12 +38,30 @@ describe("Workflow metadata primitives", () => {
     expect(metadata.toolDescription).toBe("desc");
     expect(metadata.toolCategory).toBe("cat");
     expect(metadata.toolSlug).toBe("tool-slug");
+    expect(metadata.contextConfiguration?.packageReferences).toEqual([
+      { packageId: "pkg-1", alias: "Style Guide", isEnabled: true },
+    ]);
+    expect(metadata.contextConfiguration?.selectedPackageIds).toEqual(["pkg-1"]);
+    expect(metadata.contextConfiguration?.maxCharacters).toBe(1200);
   });
 
   it("rejects empty names", () => {
     expect(() => new WorkflowMetadata({ name: "   " })).toThrow(
       "WorkflowMetadata.name cannot be empty."
     );
+  });
+
+  it("rejects selected package ids that are not configured", () => {
+    expect(
+      () =>
+        new WorkflowMetadata({
+          name: "Bad Workflow",
+          contextConfiguration: {
+            packageReferences: [{ packageId: "pkg-1" }],
+            selectedPackageIds: ["pkg-2"],
+          },
+        })
+    ).toThrow("selectedPackageIds");
   });
 
   it("clones metadata via from", () => {
