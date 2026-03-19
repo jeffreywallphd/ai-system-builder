@@ -1,18 +1,21 @@
-import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
-import type { IAsset } from "../../domain/assets/interfaces/IAsset";
 import type { IWorkflowExecutionEvent } from "../../application/ports/interfaces/IWorkflowExecutor";
+import type { ICreateNodeRequest } from "../../application/nodes/CreateNodeUseCase";
+import type { IConnectNodesRequest } from "../../application/nodes/ConnectNodesUseCase";
+import type { ICreateWorkflowRequest } from "../../application/workflows/CreateWorkflowUseCase";
+import type { IExecuteWorkflowRequest } from "../../application/workflows/ExecuteWorkflowUseCase";
 import type {
   IWorkflowValidationOptions,
   IWorkflowValidationResult,
 } from "../../domain/services/interfaces/IWorkflowValidator";
-import type { ICreateWorkflowRequest } from "../../application/workflows/CreateWorkflowUseCase";
-import type { ICreateNodeRequest } from "../../application/nodes/CreateNodeUseCase";
-import type { IConnectNodesRequest } from "../../application/nodes/ConnectNodesUseCase";
-import type { IExecuteWorkflowRequest } from "../../application/workflows/ExecuteWorkflowUseCase";
-import { WorkflowService } from "../services/WorkflowService";
+import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
 import { NodeService } from "../services/NodeService";
+import { WorkflowService } from "../services/WorkflowService";
+import {
+  WorkflowExecutionStore,
+  type IWorkflowExecutionState,
+} from "./WorkflowExecutionStore";
 
-export interface IWorkflowStoreState {
+export interface IWorkflowEditorState {
   readonly workflows: ReadonlyArray<IWorkflow>;
   readonly currentWorkflow?: IWorkflow;
   readonly validation?: IWorkflowValidationResult;
@@ -21,12 +24,10 @@ export interface IWorkflowStoreState {
   readonly isDirty: boolean;
   readonly isLoading: boolean;
   readonly isSaving: boolean;
-  readonly isExecuting: boolean;
-  readonly lastExecutionEvent?: IWorkflowExecutionEvent;
-  readonly nodeExecutionOutputs: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
-  readonly outputAssets: ReadonlyArray<IAsset>;
   readonly error?: string;
 }
+
+export type IWorkflowStoreState = IWorkflowEditorState & IWorkflowExecutionState;
 
 export type WorkflowStoreListener = (state: IWorkflowStoreState) => void;
 
@@ -34,9 +35,10 @@ export interface IWorkflowStoreOptions {
   readonly workflowService: WorkflowService;
   readonly nodeService: NodeService;
   readonly initialState?: Partial<IWorkflowStoreState>;
+  readonly executionStore?: WorkflowExecutionStore;
 }
 
-const defaultState: IWorkflowStoreState = Object.freeze({
+const defaultEditorState: IWorkflowEditorState = Object.freeze({
   workflows: Object.freeze([]),
   currentWorkflow: undefined,
   validation: undefined,
@@ -45,26 +47,38 @@ const defaultState: IWorkflowStoreState = Object.freeze({
   isDirty: false,
   isLoading: false,
   isSaving: false,
-  isExecuting: false,
-  lastExecutionEvent: undefined,
-  nodeExecutionOutputs: Object.freeze({}),
-  outputAssets: Object.freeze([]),
   error: undefined,
 });
 
 export class WorkflowStore {
   private readonly workflowService: WorkflowService;
   private readonly nodeService: NodeService;
+  private readonly executionStore: WorkflowExecutionStore;
   private readonly listeners = new Set<WorkflowStoreListener>();
+  private editorState: IWorkflowEditorState;
   private state: IWorkflowStoreState;
 
   constructor(options: IWorkflowStoreOptions) {
     this.workflowService = options.workflowService;
     this.nodeService = options.nodeService;
-    this.state = Object.freeze({
-      ...defaultState,
-      ...options.initialState,
-      workflows: Object.freeze([...(options.initialState?.workflows ?? [])]),
+
+    const initialState = options.initialState ?? {};
+    this.executionStore =
+      options.executionStore ?? new WorkflowExecutionStore({ initialState });
+    this.editorState = freezeEditorState({
+      ...defaultEditorState,
+      ...toEditorState(initialState),
+    });
+    this.state = composeWorkflowState(this.editorState, this.executionStore.getState());
+
+    let skipInitialExecutionEmission = true;
+    this.executionStore.subscribe(() => {
+      if (skipInitialExecutionEmission) {
+        skipInitialExecutionEmission = false;
+        return;
+      }
+
+      this.emitState();
     });
   }
 
@@ -82,7 +96,7 @@ export class WorkflowStore {
   }
 
   public async refreshWorkflows(): Promise<void> {
-    this.setState({
+    this.setEditorState({
       isLoading: true,
       error: undefined,
     });
@@ -90,12 +104,12 @@ export class WorkflowStore {
     try {
       const workflows = await this.workflowService.listWorkflows();
 
-      this.setState({
-        workflows: Object.freeze([...workflows]),
+      this.setEditorState({
+        workflows,
         isLoading: false,
       });
     } catch (error: unknown) {
-      this.setState({
+      this.setEditorState({
         isLoading: false,
         error: toErrorMessage(error),
       });
@@ -104,7 +118,7 @@ export class WorkflowStore {
   }
 
   public async createWorkflow(request: ICreateWorkflowRequest): Promise<IWorkflow> {
-    this.setState({
+    this.setEditorState({
       isLoading: true,
       error: undefined,
     });
@@ -112,19 +126,19 @@ export class WorkflowStore {
     try {
       const result = await this.workflowService.createWorkflow(request);
 
-      this.setState({
+      this.executionStore.clearSession();
+      this.setEditorState({
         currentWorkflow: result.workflow,
         selectedNodeId: undefined,
         selectedConnectionId: undefined,
         validation: undefined,
         isDirty: true,
         isLoading: false,
-        outputAssets: Object.freeze([]),
       });
 
       return result.workflow;
     } catch (error: unknown) {
-      this.setState({
+      this.setEditorState({
         isLoading: false,
         error: toErrorMessage(error),
       });
@@ -139,39 +153,35 @@ export class WorkflowStore {
       throw new Error("WorkflowStore.loadWorkflow requires an id.");
     }
 
-    this.setState({
+    this.setEditorState({
       isLoading: true,
       error: undefined,
     });
 
     try {
       const workflow = await this.workflowService.loadWorkflow(normalizedId);
-
       const currentWorkflow = this.state.currentWorkflow;
       const hasConcurrentEdits =
         currentWorkflow?.id === normalizedId && this.state.isDirty;
 
       if (hasConcurrentEdits) {
-        this.setState({
-          isLoading: false,
-        });
-
+        this.setEditorState({ isLoading: false });
         return currentWorkflow;
       }
 
-      this.setState({
+      this.executionStore.clearSession();
+      this.setEditorState({
         currentWorkflow: workflow,
         selectedNodeId: undefined,
         selectedConnectionId: undefined,
         validation: undefined,
         isDirty: false,
         isLoading: false,
-        outputAssets: Object.freeze([]),
       });
 
       return workflow;
     } catch (error: unknown) {
-      this.setState({
+      this.setEditorState({
         isLoading: false,
         error: toErrorMessage(error),
       });
@@ -182,7 +192,7 @@ export class WorkflowStore {
   public async saveCurrentWorkflow(): Promise<IWorkflow> {
     const workflow = this.requireCurrentWorkflow();
 
-    this.setState({
+    this.setEditorState({
       isSaving: true,
       error: undefined,
     });
@@ -191,7 +201,7 @@ export class WorkflowStore {
       const saved = await this.workflowService.saveWorkflow(workflow);
       await this.refreshWorkflows();
 
-      this.setState({
+      this.setEditorState({
         currentWorkflow: saved,
         isDirty: false,
         isSaving: false,
@@ -199,7 +209,7 @@ export class WorkflowStore {
 
       return saved;
     } catch (error: unknown) {
-      this.setState({
+      this.setEditorState({
         isSaving: false,
         error: toErrorMessage(error),
       });
@@ -208,7 +218,7 @@ export class WorkflowStore {
   }
 
   public async deleteWorkflow(id: string): Promise<boolean> {
-    this.setState({
+    this.setEditorState({
       isLoading: true,
       error: undefined,
     });
@@ -220,14 +230,18 @@ export class WorkflowStore {
 
       await this.refreshWorkflows();
 
-      this.setState({
+      if (!currentWorkflow) {
+        this.executionStore.clearSession();
+      }
+
+      this.setEditorState({
         currentWorkflow,
         isLoading: false,
       });
 
       return deleted;
     } catch (error: unknown) {
-      this.setState({
+      this.setEditorState({
         isLoading: false,
         error: toErrorMessage(error),
       });
@@ -241,7 +255,7 @@ export class WorkflowStore {
     const workflow = this.requireCurrentWorkflow();
     const validation = this.workflowService.validateWorkflow(workflow, options);
 
-    this.setState({
+    this.setEditorState({
       validation,
       error: undefined,
     });
@@ -255,13 +269,10 @@ export class WorkflowStore {
   ): Promise<void> {
     const workflow = this.requireCurrentWorkflow();
 
-    this.setState({
-      isExecuting: true,
+    this.setEditorState({
       error: undefined,
-      lastExecutionEvent: undefined,
-      nodeExecutionOutputs: Object.freeze({}),
-      outputAssets: Object.freeze([]),
     });
+    this.executionStore.beginExecution();
 
     try {
       const result = await this.workflowService.executeWorkflow(
@@ -270,31 +281,18 @@ export class WorkflowStore {
           ...request,
         },
         (event) => {
-          const payloadOutputs =
-            event.payload && "nodeOutputs" in event.payload
-              ? (event.payload.nodeOutputs as Readonly<Record<string, Readonly<Record<string, unknown>>>>)
-              : undefined;
-
-          this.setState({
-            lastExecutionEvent: event,
-            nodeExecutionOutputs: payloadOutputs ?? this.state.nodeExecutionOutputs,
-            outputAssets: event.asset
-              ? Object.freeze([...this.state.outputAssets, event.asset])
-              : this.state.outputAssets,
-          });
-
+          this.executionStore.recordEvent(event);
           onEvent?.(event);
         }
       );
 
-      this.setState({
+      this.setEditorState({
         currentWorkflow: result.effectiveWorkflow,
-        isExecuting: false,
-        outputAssets: Object.freeze([...(result.result.outputAssets ?? this.state.outputAssets)]),
       });
+      this.executionStore.completeExecution(result.result.outputAssets);
     } catch (error: unknown) {
-      this.setState({
-        isExecuting: false,
+      this.executionStore.failExecution();
+      this.setEditorState({
         error: toErrorMessage(error),
       });
       throw error;
@@ -310,7 +308,7 @@ export class WorkflowStore {
         ...request,
       });
 
-      this.setState({
+      this.setEditorState({
         currentWorkflow: result.workflow,
         selectedNodeId: result.node.id,
         selectedConnectionId: undefined,
@@ -319,7 +317,7 @@ export class WorkflowStore {
         error: undefined,
       });
     } catch (error: unknown) {
-      this.setState({
+      this.setEditorState({
         error: toErrorMessage(error),
       });
       throw error;
@@ -335,7 +333,7 @@ export class WorkflowStore {
         ...request,
       });
 
-      this.setState({
+      this.setEditorState({
         currentWorkflow: result.workflow,
         selectedConnectionId: result.connection.id,
         selectedNodeId: undefined,
@@ -344,7 +342,7 @@ export class WorkflowStore {
         error: undefined,
       });
     } catch (error: unknown) {
-      this.setState({
+      this.setEditorState({
         error: toErrorMessage(error),
       });
       throw error;
@@ -364,7 +362,7 @@ export class WorkflowStore {
       value
     );
 
-    this.setState({
+    this.setEditorState({
       currentWorkflow: updatedWorkflow,
       selectedNodeId: nodeId.trim(),
       isDirty: true,
@@ -380,7 +378,7 @@ export class WorkflowStore {
     const workflow = this.requireCurrentWorkflow();
     const updatedWorkflow = this.nodeService.moveNode(workflow, nodeId, position);
 
-    this.setState({
+    this.setEditorState({
       currentWorkflow: updatedWorkflow,
       selectedNodeId: nodeId.trim(),
       isDirty: true,
@@ -393,7 +391,7 @@ export class WorkflowStore {
     const workflow = this.requireCurrentWorkflow();
     const updatedWorkflow = this.nodeService.removeNode(workflow, nodeId);
 
-    this.setState({
+    this.setEditorState({
       currentWorkflow: updatedWorkflow,
       selectedNodeId: undefined,
       isDirty: true,
@@ -409,7 +407,7 @@ export class WorkflowStore {
       connectionId
     );
 
-    this.setState({
+    this.setEditorState({
       currentWorkflow: updatedWorkflow,
       selectedConnectionId: undefined,
       isDirty: true,
@@ -419,28 +417,29 @@ export class WorkflowStore {
   }
 
   public selectNode(nodeId: string | undefined): void {
-    this.setState({
+    this.setEditorState({
       selectedNodeId: nodeId?.trim() || undefined,
       selectedConnectionId: undefined,
     });
   }
 
   public selectConnection(connectionId: string | undefined): void {
-    this.setState({
+    this.setEditorState({
       selectedConnectionId: connectionId?.trim() || undefined,
       selectedNodeId: undefined,
     });
   }
 
   public clearSelection(): void {
-    this.setState({
+    this.setEditorState({
       selectedNodeId: undefined,
       selectedConnectionId: undefined,
     });
   }
 
   public clearEditorSession(): void {
-    this.setState({
+    this.executionStore.clearSession();
+    this.setEditorState({
       currentWorkflow: undefined,
       validation: undefined,
       selectedNodeId: undefined,
@@ -448,22 +447,18 @@ export class WorkflowStore {
       isDirty: false,
       isLoading: false,
       isSaving: false,
-      isExecuting: false,
-      lastExecutionEvent: undefined,
-      nodeExecutionOutputs: Object.freeze({}),
-      outputAssets: Object.freeze([]),
       error: undefined,
     });
   }
 
   public setCurrentWorkflow(workflow: IWorkflow | undefined): void {
-    this.setState({
+    this.executionStore.clearSession();
+    this.setEditorState({
       currentWorkflow: workflow,
       selectedNodeId: undefined,
       selectedConnectionId: undefined,
       validation: undefined,
       isDirty: false,
-      outputAssets: Object.freeze([]),
     });
   }
 
@@ -471,7 +466,7 @@ export class WorkflowStore {
     const workflow = this.requireCurrentWorkflow();
     const updatedWorkflow = this.workflowService.renameWorkflow(workflow, name);
 
-    this.setState({
+    this.setEditorState({
       currentWorkflow: updatedWorkflow,
       isDirty: true,
       error: undefined,
@@ -485,7 +480,7 @@ export class WorkflowStore {
       description
     );
 
-    this.setState({
+    this.setEditorState({
       currentWorkflow: updatedWorkflow,
       isDirty: true,
       error: undefined,
@@ -502,22 +497,64 @@ export class WorkflowStore {
     return workflow;
   }
 
-  private setState(patch: Partial<IWorkflowStoreState>): void {
-    this.state = Object.freeze({
-      ...this.state,
+  private setEditorState(patch: Partial<IWorkflowEditorState>): void {
+    this.editorState = freezeEditorState({
+      ...this.editorState,
       ...patch,
-      workflows: patch.workflows
-        ? Object.freeze([...patch.workflows])
-        : this.state.workflows,
-      outputAssets: patch.outputAssets
-        ? Object.freeze([...patch.outputAssets])
-        : this.state.outputAssets,
     });
+    this.emitState();
+  }
+
+  private emitState(): void {
+    this.state = composeWorkflowState(this.editorState, this.executionStore.getState());
 
     for (const listener of this.listeners) {
       listener(this.state);
     }
   }
+}
+
+function toEditorState(state: Partial<IWorkflowStoreState>): Partial<IWorkflowEditorState> {
+  const {
+    workflows,
+    currentWorkflow,
+    validation,
+    selectedNodeId,
+    selectedConnectionId,
+    isDirty,
+    isLoading,
+    isSaving,
+    error,
+  } = state;
+
+  return {
+    workflows,
+    currentWorkflow,
+    validation,
+    selectedNodeId,
+    selectedConnectionId,
+    isDirty,
+    isLoading,
+    isSaving,
+    error,
+  };
+}
+
+function composeWorkflowState(
+  editorState: IWorkflowEditorState,
+  executionState: IWorkflowExecutionState
+): IWorkflowStoreState {
+  return Object.freeze({
+    ...editorState,
+    ...executionState,
+  });
+}
+
+function freezeEditorState(state: IWorkflowEditorState): IWorkflowEditorState {
+  return Object.freeze({
+    ...state,
+    workflows: Object.freeze([...(state.workflows ?? [])]),
+  });
 }
 
 function toErrorMessage(error: unknown): string {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { NodeStore } from "../NodeStore";
 import { ModelStore } from "../ModelStore";
+import { WorkflowExecutionStore } from "../WorkflowExecutionStore";
 import { WorkflowStore } from "../WorkflowStore";
 
 describe("ui/state unit coverage", () => {
@@ -54,7 +55,30 @@ describe("ui/state unit coverage", () => {
     expect(store.getState().currentWorkflow?.metadata.description).toBe("Updated");
     expect(store.getState().isDirty).toBeTrue();
   });
-  it("WorkflowStore clears editor session state when leaving the editor", () => {
+
+  it("WorkflowExecutionStore tracks transient execution state separately", () => {
+    const outputAsset = { id: "asset-1" } as any;
+    const store = new WorkflowExecutionStore();
+
+    store.beginExecution();
+    store.recordEvent({
+      executionId: "exec-1",
+      kind: "node-completed",
+      status: "running",
+      payload: {
+        nodeOutputs: { "n-1": { value: 1 } },
+      },
+      asset: outputAsset,
+    } as any);
+    store.completeExecution([outputAsset]);
+
+    expect(store.getState().isExecuting).toBeFalse();
+    expect(store.getState().lastExecutionEvent?.executionId).toBe("exec-1");
+    expect(store.getState().nodeExecutionOutputs).toEqual({ "n-1": { value: 1 } });
+    expect(store.getState().outputAssets).toEqual([outputAsset]);
+  });
+
+  it("WorkflowStore clears editor and execution session state when leaving the editor", () => {
     const store = new WorkflowStore({
       workflowService: {} as any,
       nodeService: {} as any,
@@ -89,5 +113,4 @@ describe("ui/state unit coverage", () => {
     expect(store.getState().outputAssets).toEqual([]);
     expect(store.getState().error).toBeUndefined();
   });
-
 });
