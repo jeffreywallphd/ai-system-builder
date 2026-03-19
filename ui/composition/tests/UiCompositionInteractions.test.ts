@@ -33,6 +33,7 @@ describe("ui composition interactions", () => {
     expect(nodeTypeIds).toContain("langchain.output_parser");
     expect(nodeTypeIds).toContain("langchain.document_loader");
     expect(nodeTypeIds).toContain("langchain.llm_chat");
+    expect(nodeTypeIds).toContain("mcp.server_select");
     expect(nodeTypeIds).toContain("mcp.tool_catalog");
     expect(nodeTypeIds).toContain("mcp.tool_call");
   });
