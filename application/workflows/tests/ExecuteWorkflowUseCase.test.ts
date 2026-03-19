@@ -73,4 +73,58 @@ describe("ExecuteWorkflowUseCase", () => {
     expect(workflowContext?.inspection?.finalPromptText).toContain("Be concise.");
     expect(workflowContext?.assembledContext?.promptText).toContain("Be concise.");
   });
+
+  it("passes dynamic workflow context sources through execution metadata", async () => {
+    const repository = new InMemoryContextPackageRepository([
+      new ContextPackage({
+        id: "pkg-style",
+        name: "Style Guide",
+        fragments: [{ id: "style", kind: "persona", content: "Be concise.", order: 0 }],
+      }),
+    ]);
+    const workflow = makeWorkflow({ nodes: [makeNode({ id: "n1" })] }).withMetadata(
+      new WorkflowMetadata({
+        name: "Context Workflow",
+        contextConfiguration: {
+          packageReferences: [{ packageId: "pkg-style", alias: "Style Guide" }],
+          selectedPackageIds: ["pkg-style"],
+        },
+      })
+    );
+    let capturedMetadata: Readonly<Record<string, unknown>> | undefined;
+    const executor = makeWorkflowExecutor({
+      execute: async (input) => {
+        capturedMetadata = input.executionMetadata;
+        return { executionId: "exec", status: "completed", outputAssets: [] };
+      },
+    });
+    const useCase = new ExecuteWorkflowUseCase(
+      executor,
+      makeWorkflowValidator(),
+      new WorkflowContextService(repository)
+    );
+
+    await useCase.execute({
+      workflow,
+      parameters: {
+        workflowContext: {
+          dynamicSources: [
+            {
+              sourceType: "example",
+              id: "few-shot",
+              examples: [{ input: "Q", output: "A" }],
+            },
+          ],
+        },
+      },
+    });
+
+    const workflowContext = capturedMetadata?.workflowContext as {
+      inspection?: { finalPromptText?: string };
+      assembledContext?: { promptText?: string };
+    } | undefined;
+    expect(workflowContext?.inspection?.finalPromptText).toContain("Input:\nQ");
+    expect(workflowContext?.assembledContext?.promptText).toContain("Output:\nA");
+  });
+
 });

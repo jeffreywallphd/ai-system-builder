@@ -187,6 +187,9 @@ export class ExecuteWorkflowUseCase {
         typeof contextSelection?.trimPartialFragments === "boolean"
           ? contextSelection.trimPartialFragments
           : undefined,
+      dynamicSources: Array.isArray(contextSelection?.dynamicSources)
+        ? (contextSelection.dynamicSources as ReadonlyArray<Record<string, unknown>>)
+        : undefined,
     });
 
     return Object.freeze({

@@ -82,4 +82,55 @@ describe("WorkflowContextService", () => {
       },
     });
   });
+
+  it("merges package and dynamic capability guidance into execution context tool policy", async () => {
+    const repository = new InMemoryContextPackageRepository([
+      new ContextPackage({
+        id: "pkg-base",
+        name: "Base",
+        fragments: [{ id: "base", kind: "instructions", content: "Base package guidance.", order: 0 }],
+      }),
+    ]);
+    const workflow = makeWorkflow({}).withMetadata(
+      new WorkflowMetadata({
+        name: "Dynamic Context Workflow",
+        contextConfiguration: {
+          packageReferences: [{ packageId: "pkg-base", alias: "Base package" }],
+        },
+      })
+    );
+
+    const result = await new WorkflowContextService(repository).inspectWorkflowContext({
+      workflow,
+      dynamicSources: [
+        {
+          sourceType: "capability-guidance",
+          id: "cap-guidance",
+          guidance: [
+            {
+              title: "MCP Use",
+              content: "Prefer the local MCP search_docs tool.",
+              providerKind: "mcp",
+              serverId: "local",
+              toolNames: ["search_docs"],
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(result.executionContext.assembledContext.promptText).toContain("Prefer the local MCP search_docs tool.");
+    expect(result.executionContext.toolUsePolicy).toEqual({
+      instructions: "Prefer the local MCP search_docs tool.",
+      allowedProviderKinds: ["mcp"],
+      blockedProviderKinds: undefined,
+      mcp: {
+        allowedServerIds: ["local"],
+        blockedServerIds: undefined,
+        allowedToolNames: ["search_docs"],
+        blockedToolNames: undefined,
+      },
+    });
+  });
+
 });
