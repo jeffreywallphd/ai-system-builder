@@ -64,4 +64,25 @@ describe("RuntimeConsoleStore", () => {
     await Promise.all([store.initializeRuntime(), store.initializeRuntime()]);
     expect(calls).toBe(1);
   });
+  it("swallows runtime initialization failures", async () => {
+    const store = new RuntimeConsoleStore({
+      runtimeEventStore: new RuntimeEventBuffer(),
+      pythonRuntimeManager: {
+        checkAvailability: async () => false,
+        ensureRuntimeAvailability: async () => {
+          throw new Error("runtime unavailable");
+        },
+        getStatus: () => ({
+          status: "unavailable",
+          isAvailable: false,
+          owner: "none",
+          lastUpdatedAt: new Date().toISOString(),
+        }),
+        stopManagedRuntime: async () => undefined,
+      },
+    });
+
+    await expect(store.initializeRuntime()).resolves.toBeUndefined();
+  });
+
 });
