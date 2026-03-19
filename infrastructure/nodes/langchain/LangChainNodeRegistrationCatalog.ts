@@ -31,6 +31,8 @@ export const LANGCHAIN_NODE_REGISTRATIONS: ReadonlyArray<ILangChainNodeRegistrat
     { nodeTypeId: "langchain.similarity_search", executionStyles: ["interpreted-node", "python-node", "hybrid"], category: "LangChain / Knowledge" },
     { nodeTypeId: "langchain.context_formatter", executionStyles: ["interpreted-node", "python-node", "hybrid"], category: "LangChain / Text" },
     { nodeTypeId: "langchain.tool_definition", executionStyles: DEFAULT_EXECUTION_STYLES, category: "LangChain / Tools" },
+    { nodeTypeId: "langchain.tool_execution", executionStyles: ["interpreted-node", "python-node", "hybrid"], category: "LangChain / Tools" },
+    { nodeTypeId: "langchain.simple_agent", executionStyles: ["interpreted-node", "python-node", "hybrid"], category: "LangChain / Assistants" },
     { nodeTypeId: "langchain.tool_call_executor", executionStyles: ["interpreted-node", "python-node", "hybrid"], category: "LangChain" },
     { nodeTypeId: "langchain.agent", executionStyles: ["interpreted-node", "python-node", "hybrid"], category: "LangChain" },
     { nodeTypeId: "langchain.summarization", executionStyles: ["interpreted-node", "python-node", "hybrid"], category: "LangChain / Text" },
