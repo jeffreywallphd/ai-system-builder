@@ -4,10 +4,12 @@ import type { ContextFragmentKind } from "./models/ContextFragment";
 import type { IContextPackageRepository } from "../ports/interfaces/IContextPackageRepository";
 import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
 import { ExecutionContextEnvelope, type IExecutionContextToolUsePolicy } from "./models/ExecutionContextEnvelope";
+import type { DynamicContextSourceInput } from "./models/ContextAssemblyRequest";
 
 export interface IResolveWorkflowContextRequest {
   readonly workflow: IWorkflow;
   readonly selectedPackageIds?: ReadonlyArray<string>;
+  readonly dynamicSources?: ReadonlyArray<DynamicContextSourceInput>;
   readonly visibilityMode?: "basic" | "advanced";
   readonly maxCharacters?: number;
   readonly maxTokens?: number;
@@ -185,6 +187,7 @@ export class WorkflowContextService {
     const inspection = this.inspectContextAssemblyUseCase.execute({
       assembly: {
         packages,
+        dynamicSources: request.dynamicSources,
       },
       trimmingPolicy: {
         visibilityMode: request.visibilityMode ?? contextConfiguration?.visibilityMode,

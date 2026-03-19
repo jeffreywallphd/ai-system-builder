@@ -56,12 +56,18 @@ function extractFragmentSources(fragment: IAssembledContextFragment): ReadonlyAr
   add(metadata?.packageId);
   add(metadata?.packageAlias);
   add(metadata?.packageName);
+  add(metadata?.dynamicSourceId);
+  add(metadata?.dynamicSourceType);
+  add(metadata?.dynamicSourceLabel);
 
   for (const provenance of fragment.provenance) {
     add(provenance.sourceType);
     add(provenance.packageId);
     add(provenance.packageAlias);
     add(provenance.packageName);
+    add(provenance.dynamicSourceId);
+    add(provenance.dynamicSourceType);
+    add(provenance.dynamicSourceLabel);
   }
 
   return Object.freeze([...sources].sort());

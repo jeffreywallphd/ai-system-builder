@@ -125,4 +125,46 @@ describe("InspectContextAssemblyUseCase", () => {
       })
     );
   });
+
+  it("preserves dynamic-source provenance across inspection, trimming, and budgeting", () => {
+    const useCase = new InspectContextAssemblyUseCase();
+
+    const result = useCase.execute({
+      assembly: {
+        dynamicSources: [
+          {
+            sourceType: "retrieved",
+            id: "retrieval",
+            label: "Knowledge Search",
+            documents: [{ id: "doc-1", text: "Alpha knowledge." }],
+          },
+          {
+            sourceType: "memory",
+            id: "memory",
+            messages: [{ role: "assistant", content: "Earlier reply." }],
+          },
+        ],
+      },
+      budget: {
+        maxCharacters: 16,
+        separator: "\n\n",
+      },
+    });
+
+    expect(result.entries).toContainEqual(
+      expect.objectContaining({
+        fragmentId: "doc-1",
+        matchedSources: ["dynamic", "knowledge search", "retrieval", "retrieved"],
+      })
+    );
+    expect(result.entries).toContainEqual(
+      expect.objectContaining({
+        fragmentId: "memory:message:1",
+        stage: "budget",
+        reason: "excluded-over-budget",
+        provenance: [expect.objectContaining({ dynamicSourceType: "memory" })],
+      })
+    );
+  });
+
 });

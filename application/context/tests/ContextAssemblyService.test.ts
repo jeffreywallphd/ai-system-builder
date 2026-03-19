@@ -156,4 +156,118 @@ describe("ContextAssemblyService", () => {
       }),
     ]);
   });
+
+  it("normalizes dynamic sources alongside packages and direct fragments with preserved provenance", () => {
+    const service = new ContextAssemblyService();
+
+    const result = service.assemble({
+      packages: [
+        {
+          order: 30,
+          contextPackage: new ContextPackage({
+            id: "ctx-style",
+            name: "Style",
+            fragments: [{ id: "style", kind: "persona", content: "Be calm.", order: 0 }],
+          }),
+        },
+      ],
+      fragments: [{ id: "sys", kind: "instructions", content: "Stay accurate.", order: 0 }],
+      dynamicSources: [
+        {
+          sourceType: "retrieved",
+          id: "retrieval",
+          order: 10,
+          documents: [
+            { id: "doc-2", text: "Second chunk", score: 0.4 },
+            { id: "doc-1", text: "First chunk", score: 0.9 },
+          ],
+        },
+        {
+          sourceType: "memory",
+          id: "memory",
+          order: 20,
+          messages: [{ role: "user", content: "Use short answers." }],
+        },
+      ],
+    });
+
+    expect(result.assembledContext.fragments.map((fragment) => fragment.id)).toEqual([
+      "sys",
+      "style",
+      "doc-2",
+      "doc-1",
+      "memory:message:1",
+    ]);
+    expect(result.assembledContext.fragments[2]?.provenance).toEqual([
+      expect.objectContaining({
+        sourceType: "dynamic",
+        dynamicSourceId: "retrieval",
+        dynamicSourceType: "retrieved",
+        fragmentId: "doc-2",
+      }),
+    ]);
+    expect(result.assembledContext.fragments[4]?.metadata).toEqual(
+      expect.objectContaining({
+        dynamicSourceType: "memory",
+        dynamicSourceId: "memory",
+      })
+    );
+  });
+
+  it("keeps deterministic precedence when static and dynamic sources share an assembly key", () => {
+    const service = new ContextAssemblyService();
+
+    const result = service.assemble({
+      packages: [
+        {
+          contextPackage: new ContextPackage({
+            id: "pkg",
+            name: "Pkg",
+            fragments: [
+              {
+                id: "pkg-guidance",
+                kind: "instructions",
+                content: "Base guidance.",
+                order: 0,
+                metadata: { assemblyKey: "guidance.core", precedence: 1 },
+              },
+            ],
+          }),
+        },
+      ],
+      dynamicSources: [
+        {
+          sourceType: "capability-guidance",
+          id: "capability",
+          precedence: 4,
+          guidance: [
+            {
+              id: "dynamic-guidance",
+              content: "Use MCP tools only when allowed.",
+              toolUsePolicy: { allowedProviderKinds: ["mcp"] },
+              metadata: { assemblyKey: "guidance.core" },
+            },
+          ],
+        },
+      ],
+      fragments: [
+        {
+          id: "direct-guidance",
+          kind: "instructions",
+          content: "Direct guidance wins ties.",
+          order: 0,
+          metadata: { assemblyKey: "guidance.core", precedence: 4 },
+        },
+      ],
+    });
+
+    expect(result.assembledContext.fragments.map((fragment) => fragment.id)).toEqual(["direct-guidance"]);
+    expect(result.excludedFragments).toContainEqual(
+      expect.objectContaining({ id: "dynamic-guidance", reason: "shadowed-by-precedence" })
+    );
+    expect(result.excludedFragments).toContainEqual(
+      expect.objectContaining({ id: "pkg-guidance", reason: "shadowed-by-precedence" })
+    );
+  });
+
 });

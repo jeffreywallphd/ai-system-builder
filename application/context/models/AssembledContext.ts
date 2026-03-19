@@ -1,7 +1,10 @@
 import type { ContextFragmentKind } from "./ContextFragment";
 
 export interface IContextFragmentProvenance {
-  readonly sourceType: "direct" | "package";
+  readonly sourceType: "direct" | "package" | "dynamic";
+  readonly dynamicSourceId?: string;
+  readonly dynamicSourceType?: string;
+  readonly dynamicSourceLabel?: string;
   readonly packageId?: string;
   readonly packageName?: string;
   readonly packageAlias?: string;
@@ -63,6 +66,9 @@ function freezeProvenance(
       Object.freeze({
         ...entry,
         packageId: normalizeOptional(entry.packageId),
+        dynamicSourceId: normalizeOptional(entry.dynamicSourceId),
+        dynamicSourceType: normalizeOptional(entry.dynamicSourceType),
+        dynamicSourceLabel: normalizeOptional(entry.dynamicSourceLabel),
         packageName: normalizeOptional(entry.packageName),
         packageAlias: normalizeOptional(entry.packageAlias),
         fragmentId: normalizeRequired(entry.fragmentId, "provenance.fragmentId"),
