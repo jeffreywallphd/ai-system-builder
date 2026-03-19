@@ -55,6 +55,9 @@ describe("McpNodeImplementationRegistry integration", () => {
       "resultText",
     ]);
     expect(toolCall?.properties.map((property) => property.id)).toEqual([
+      "serverId",
+      "toolName",
+      "toolDescriptor",
       "stringifyResult",
       "failOnMissingArgs",
     ]);
@@ -90,6 +93,9 @@ describe("McpNodeImplementationRegistry integration", () => {
       "json",
       "tool-result",
     ]);
+    expect(toolCall?.getProperty("serverId")?.constraints?.required).toBeTrue();
+    expect(toolCall?.getProperty("toolName")?.constraints?.required).toBeTrue();
+    expect(toolCall?.getProperty("toolDescriptor")?.projection?.authorVisibility).toBe("hidden");
     expect(toolCall?.getProperty("stringifyResult")?.defaultValue).toBe(true);
     expect(toolCall?.getProperty("failOnMissingArgs")?.defaultValue).toBe(true);
     expect(toolCallImpl?.descriptor.metadata?.infrastructureBoundary).toBe("tool-usage");

@@ -107,6 +107,8 @@ function property<TValue extends NodePropertyValue>(params: {
   required?: boolean;
   isAdvanced?: boolean;
   order?: number;
+  projection?: Partial<NonNullable<NodeProperty<TValue>["projection"]>>;
+  isEditable?: boolean;
 }): NodeProperty<TValue> {
   return new NodeProperty<TValue>({
     id: params.id,
@@ -115,6 +117,7 @@ function property<TValue extends NodePropertyValue>(params: {
     type: params.type,
     value: params.value,
     defaultValue: params.defaultValue,
+    isEditable: params.isEditable,
     isAdvanced: params.isAdvanced ?? false,
     order: params.order ?? 0,
     constraints: params.required ? { required: true } : undefined,
@@ -128,6 +131,7 @@ function property<TValue extends NodePropertyValue>(params: {
       exposeInAuthorForm: true,
       exposeInTool: true,
       fieldTypeHint: params.type,
+      ...params.projection,
     },
   });
 }
@@ -336,13 +340,50 @@ const MCP_NODE_CATALOG_METADATA: Readonly<Record<string, IMcpNodeCatalogMetadata
       ]),
       properties: Object.freeze([
         property({
+          id: "serverId",
+          name: "Server",
+          type: "select",
+          value: "",
+          defaultValue: "",
+          description: "Configured MCP server used when no incoming server handle is connected.",
+          required: true,
+          order: 0,
+        }),
+        property({
+          id: "toolName",
+          name: "Tool",
+          type: "select",
+          value: "",
+          defaultValue: "",
+          description: "Discovered MCP tool to execute on the selected configured server when no tool input is connected.",
+          required: true,
+          order: 1,
+        }),
+        property({
+          id: "toolDescriptor",
+          name: "Tool Descriptor",
+          type: "json",
+          value: {},
+          defaultValue: {},
+          description: "Persisted MCP tool descriptor snapshot used to materialize authoring fields from the selected tool schema.",
+          isAdvanced: true,
+          isEditable: false,
+          order: 2,
+          projection: {
+            authorVisibility: "hidden",
+            toolVisibility: "hidden",
+            exposeInAuthorForm: false,
+            exposeInTool: false,
+          },
+        }),
+        property({
           id: "stringifyResult",
           name: "Stringify Result",
           type: "boolean",
           value: true,
           defaultValue: true,
           description: "Produce a text rendering of structured MCP tool output for downstream text-oriented nodes.",
-          order: 0,
+          order: 100,
         }),
         property({
           id: "failOnMissingArgs",
@@ -352,7 +393,7 @@ const MCP_NODE_CATALOG_METADATA: Readonly<Record<string, IMcpNodeCatalogMetadata
           defaultValue: true,
           description: "Validate required MCP tool arguments before execution and fail fast when any are missing.",
           isAdvanced: true,
-          order: 1,
+          order: 101,
         }),
       ]),
       executionKind: "utility",
