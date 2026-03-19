@@ -39,10 +39,12 @@ export default function ModelsPage(): JSX.Element {
 
   useEffect(() => settingsStore.subscribe(setSettingsState), [settingsStore]);
 
+  const remoteSearchLimit = settingsState.settings.models.remoteSearchLimit;
+
   useEffect(() => {
     void modelStore.refreshInstalled();
-    void modelStore.searchRemote({ limit: 16 });
-  }, [modelStore]);
+    void modelStore.searchRemote({ limit: remoteSearchLimit });
+  }, [modelStore, remoteSearchLimit]);
 
   const installedModels = useMemo(
     () => presenter.presentList(state.installedModels),
@@ -78,16 +80,16 @@ export default function ModelsPage(): JSX.Element {
         isSearchingRemote={state.isSearchingRemote}
         isInstalling={state.isInstalling}
         onSearch={(value) => {
-          void searchModels(modelStore, value);
+          void searchModels(modelStore, value, remoteSearchLimit);
         }}
         onClearSearch={() => {
-          void modelStore.searchRemote({ limit: 16 });
+          void modelStore.searchRemote({ limit: remoteSearchLimit });
         }}
         onInstallRemoteFiles={(modelId, files) => {
           void installRemoteFiles(
             modelStore,
             state.remoteModels,
-            settingsState.settings.models.installDirectory,
+            settingsState.settings.models,
             modelId,
             files
           );
@@ -103,7 +105,7 @@ export default function ModelsPage(): JSX.Element {
 async function installRemoteFiles(
   modelStore: ModelStore,
   remoteModels: ReadonlyArray<IRemoteModelCatalogItem>,
-  installBaseDirectory: string,
+  modelSettings: UiSettingsState["settings"]["models"],
   modelId: string,
   files: ReadonlyArray<ModelDownloadFileViewModel>
 ): Promise<void> {
@@ -130,10 +132,11 @@ async function installRemoteFiles(
   await modelStore.installModel({
     model: modelForInstallation,
     provider: remoteModel.provider,
-    destination: `${installBaseDirectory}/${sanitizePathSegment(remoteModel.remoteId ?? remoteModel.model.id)}`,
-    overwrite: false,
-    verifyIntegrity: true,
-    registerInstalled: true,
+    destination: `${modelSettings.installDirectory}/${sanitizePathSegment(remoteModel.remoteId ?? remoteModel.model.id)}`,
+    overwrite: modelSettings.allowOverwrite,
+    verifyIntegrity: modelSettings.verifyDownloads,
+    authToken: modelSettings.authToken || undefined,
+    registerInstalled: modelSettings.registerInstalledModels,
   });
 }
 
@@ -205,7 +208,8 @@ function sanitizePathSegment(value: string): string {
 
 async function searchModels(
   modelStore: ModelStore,
-  value: ModelSearchBarValue
+  value: ModelSearchBarValue,
+  remoteSearchLimit: number
 ): Promise<void> {
   if (value.mode === "installed") {
     await modelStore.refreshInstalled({
@@ -221,7 +225,7 @@ async function searchModels(
     providers: value.provider ? [value.provider] : undefined,
     kinds: value.kind ? [value.kind as IModel["kind"]] : undefined,
     runtimes: value.runtime ? [value.runtime as RuntimeEngine] : undefined,
-    limit: 24,
+    limit: remoteSearchLimit,
   });
 
   if (value.mode === "all") {

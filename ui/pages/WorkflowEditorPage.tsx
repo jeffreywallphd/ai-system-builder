@@ -19,6 +19,7 @@ import { WorkflowOutputPresenter } from "../presenters/WorkflowOutputPresenter";
 import { ValidationPresenter } from "../presenters/ValidationPresenter";
 import { NodeStore, type INodeStoreState } from "../state/NodeStore";
 import { WorkflowStore, type IWorkflowStoreState } from "../state/WorkflowStore";
+import type { UiSettingsState } from "../settings/UiSettingsStore";
 
 export interface WorkflowEditorPageProps {
   readonly workflowStore?: WorkflowStore;
@@ -60,6 +61,7 @@ export default function WorkflowEditorPage({
     workflowStore: injectedWorkflowStore,
     nodeStore: injectedNodeStore,
     workflowProjectionService,
+    settingsStore,
   } = useUiDependencies();
 
   const workflowStore = workflowStoreProp ?? injectedWorkflowStore;
@@ -70,12 +72,14 @@ export default function WorkflowEditorPage({
   const [workflowState, setWorkflowState] =
     useState<IWorkflowStoreState>(fallbackWorkflowState);
   const [nodeState, setNodeState] = useState<INodeStoreState>(fallbackNodeState);
+  const [settingsState, setSettingsState] = useState<UiSettingsState>(() => settingsStore.getState());
+  const authoringSettings = settingsState.settings.authoring;
   const [fitViewNonce, setFitViewNonce] = useState(0);
-  const [viewMode, setViewMode] = useState<WorkflowViewMode>("canvas");
-  const [isLeftMenuOpen, setIsLeftMenuOpen] = useState(false);
-  const [isPropertiesOpen, setIsPropertiesOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<WorkflowViewMode>(authoringSettings.defaultWorkflowViewMode);
+  const [isLeftMenuOpen, setIsLeftMenuOpen] = useState(authoringSettings.openNodePaletteByDefault);
+  const [isPropertiesOpen, setIsPropertiesOpen] = useState(authoringSettings.openInspectorByDefault);
   const [isCanvasLocked, setIsCanvasLocked] = useState(false);
-  const [isOutputOpen, setIsOutputOpen] = useState(false);
+  const [isOutputOpen, setIsOutputOpen] = useState(authoringSettings.openOutputsByDefault);
   const [dismissedValidationMessages, setDismissedValidationMessages] = useState<
     ReadonlyArray<string>
   >([]);
@@ -124,6 +128,8 @@ export default function WorkflowEditorPage({
   useEffect(() => {
     return nodeStore.subscribe(setNodeState);
   }, [nodeStore]);
+
+  useEffect(() => settingsStore.subscribe(setSettingsState), [settingsStore]);
 
   useEffect(() => {
     void nodeStore.refreshCatalog();

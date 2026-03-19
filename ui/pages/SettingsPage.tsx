@@ -101,17 +101,67 @@ export default function SettingsPage(): JSX.Element {
         </SettingsSection>
 
         <SettingsSection
-          title="Models"
-          description="Point AI Loom Studio at a shared model library so downloads can be reused across tools and other AI apps."
+          title="Models & Downloads"
+          description="Point AI Loom Studio at a shared model library, then tune remote search and install defaults for repeatable model management."
           onReset={() => settingsStore.resetSection("models")}
         >
-          <FolderPathField
-            id="settings-models-install-directory"
-            label="Shared model library"
-            hint="New model installs use this location immediately."
-            value={state.settings.models.installDirectory}
-            onChange={(value) => settingsStore.updateSection("models", { installDirectory: value })}
-          />
+          <div className="ui-settings-page__field-grid">
+            <FolderPathField
+              id="settings-models-install-directory"
+              label="Shared model library"
+              hint="New model installs use this location immediately."
+              value={state.settings.models.installDirectory}
+              onChange={(value) => settingsStore.updateSection("models", { installDirectory: value })}
+            />
+            <NumberField
+              id="settings-models-remote-search-limit"
+              label="Default remote search size"
+              hint="How many remote models to fetch when the browser first loads or clears filters."
+              value={state.settings.models.remoteSearchLimit}
+              onChange={(value) => settingsStore.updateSection("models", { remoteSearchLimit: value })}
+              min={1}
+              step={1}
+            />
+          </div>
+
+          <AdvancedSection
+            title="Authentication & install defaults"
+            isOpen={isAdvancedExpanded("models")}
+            onToggle={() => toggleAdvancedSection("models")}
+          >
+            <div className="ui-settings-page__field-grid">
+              <TextField
+                id="settings-models-auth-token"
+                label="Hugging Face access token"
+                hint="Used when installing gated or private model files from the Models page."
+                value={state.settings.models.authToken}
+                onChange={(value) => settingsStore.updateSection("models", { authToken: value })}
+                placeholder="hf_..."
+              />
+            </div>
+
+            <CheckboxField
+              id="settings-models-verify-downloads"
+              label="Verify downloaded model files"
+              hint="Keep integrity checks on during installs whenever checksums are available."
+              checked={state.settings.models.verifyDownloads}
+              onChange={(checked) => settingsStore.updateSection("models", { verifyDownloads: checked })}
+            />
+            <CheckboxField
+              id="settings-models-register-installed"
+              label="Register downloaded models automatically"
+              hint="Adds newly installed models to the local installed-model catalog after download."
+              checked={state.settings.models.registerInstalledModels}
+              onChange={(checked) => settingsStore.updateSection("models", { registerInstalledModels: checked })}
+            />
+            <CheckboxField
+              id="settings-models-allow-overwrite"
+              label="Allow overwriting existing model files"
+              hint="If disabled, installs keep existing files untouched and fail instead of replacing them."
+              checked={state.settings.models.allowOverwrite}
+              onChange={(checked) => settingsStore.updateSection("models", { allowOverwrite: checked })}
+            />
+          </AdvancedSection>
         </SettingsSection>
 
         <SettingsSection
@@ -138,6 +188,14 @@ export default function SettingsPage(): JSX.Element {
               value={state.settings.runtime.baseUrl}
               onChange={(value) => settingsStore.updateSection("runtime", { baseUrl: value })}
               placeholder="http://127.0.0.1:8000"
+            />
+            <TextField
+              id="settings-runtime-auth-token"
+              label="Runtime bearer token"
+              hint="Included with runtime HTTP requests when your Python runtime requires authentication."
+              value={state.settings.runtime.authToken}
+              onChange={(value) => settingsStore.updateSection("runtime", { authToken: value })}
+              placeholder="Optional token"
             />
           </div>
 
@@ -185,6 +243,50 @@ export default function SettingsPage(): JSX.Element {
               onChange={(checked) => settingsStore.updateSection("runtime", { autoStartEnabled: checked })}
             />
           </AdvancedSection>
+        </SettingsSection>
+
+        <SettingsSection
+          title="Workflow Authoring"
+          description="Set the default editing layout so each workflow opens in the authoring mode your team prefers."
+          onReset={() => settingsStore.resetSection("authoring")}
+        >
+          <div className="ui-settings-page__field-grid">
+            <SelectField
+              id="settings-authoring-default-view-mode"
+              label="Default editor view"
+              hint="Choose whether new workflow editor sessions start in canvas or form mode."
+              value={state.settings.authoring.defaultWorkflowViewMode}
+              onChange={(value) => settingsStore.updateSection("authoring", {
+                defaultWorkflowViewMode: value as UiSettings["authoring"]["defaultWorkflowViewMode"],
+              })}
+              options={[
+                { value: "canvas", label: "Canvas" },
+                { value: "form", label: "Form" },
+              ]}
+            />
+          </div>
+
+          <CheckboxField
+            id="settings-authoring-open-node-palette"
+            label="Open the node palette by default"
+            hint="Shows the left-side node browser whenever you open the workflow editor."
+            checked={state.settings.authoring.openNodePaletteByDefault}
+            onChange={(checked) => settingsStore.updateSection("authoring", { openNodePaletteByDefault: checked })}
+          />
+          <CheckboxField
+            id="settings-authoring-open-inspector"
+            label="Open the inspector by default"
+            hint="Keeps the properties and validation sidebar visible when entering the editor."
+            checked={state.settings.authoring.openInspectorByDefault}
+            onChange={(checked) => settingsStore.updateSection("authoring", { openInspectorByDefault: checked })}
+          />
+          <CheckboxField
+            id="settings-authoring-open-outputs"
+            label="Open workflow outputs by default"
+            hint="Useful if you frequently review generated output assets while editing."
+            checked={state.settings.authoring.openOutputsByDefault}
+            onChange={(checked) => settingsStore.updateSection("authoring", { openOutputsByDefault: checked })}
+          />
         </SettingsSection>
 
         <SettingsSection
@@ -305,6 +407,31 @@ function TextField({ id, label, hint, value, onChange, placeholder }: TextFieldP
         value={value}
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
+      />
+    </label>
+  );
+}
+
+interface NumberFieldProps extends BaseFieldProps {
+  readonly value: number;
+  readonly onChange: (value: number) => void;
+  readonly min?: number;
+  readonly step?: number;
+}
+
+function NumberField({ id, label, hint, value, onChange, min, step = 1 }: NumberFieldProps): JSX.Element {
+  return (
+    <label className="ui-field ui-stack ui-stack--2xs" htmlFor={id}>
+      <span className="ui-field__label">{label}</span>
+      <span className="ui-field__hint">{hint}</span>
+      <input
+        id={id}
+        className="ui-input"
+        type="number"
+        value={value}
+        min={min}
+        step={step}
+        onChange={(event) => onChange(Number(event.target.value))}
       />
     </label>
   );

@@ -156,6 +156,7 @@ export function createUiDependencies(
     mode: settings.runtime.mode,
     baseUrl: settings.runtime.mode === "disabled" ? undefined : settings.runtime.baseUrl,
     timeoutMs: settings.runtime.requestTimeoutMs,
+    authToken: settings.runtime.authToken,
     runtimeWorkingDirectory: settings.runtime.workingDirectory,
     startupTimeoutMs: settings.runtime.startupTimeoutMs,
     healthPollIntervalMs: settings.runtime.healthPollIntervalMs,
