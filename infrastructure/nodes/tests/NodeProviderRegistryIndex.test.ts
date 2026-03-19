@@ -18,5 +18,8 @@ describe("NodeProviderRegistryIndex", () => {
   it("builds a composite registry", () => {
     const composite = createCompositeNodeImplementationRegistry();
     expect(composite.findByNodeType("PromptText")?.descriptor.providerId).toBe("comfyui");
+    expect(composite.findByNodeType("langchain.llm_chat")?.descriptor.providerId).toBe(
+      "langchain"
+    );
   });
 });
