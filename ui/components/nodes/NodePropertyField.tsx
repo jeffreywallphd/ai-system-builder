@@ -182,6 +182,41 @@ export default function NodePropertyField({
 
       case "multi-select":
       case "model-list":
+        if ((field.options ?? []).length > 0) {
+          const selectedValues = new Set(
+            Array.isArray(field.value) ? field.value.map((item) => String(item)) : []
+          );
+
+          return (
+            <div className="ui-stack ui-stack--xs">
+              {(field.options ?? []).map((option) => {
+                const optionValue = String(option.value);
+                const checked = selectedValues.has(optionValue);
+                return (
+                  <label key={`${field.id}-${optionValue}`} className="ui-row ui-row--wrap">
+                    <input
+                      className="ui-checkbox"
+                      type="checkbox"
+                      checked={checked}
+                      disabled={isDisabled}
+                      onChange={(event) => {
+                        const next = new Set(selectedValues);
+                        if (event.target.checked) {
+                          next.add(optionValue);
+                        } else {
+                          next.delete(optionValue);
+                        }
+                        emit([...next]);
+                      }}
+                    />
+                    <span className="ui-text-body">{option.label}</span>
+                  </label>
+                );
+              })}
+            </div>
+          );
+        }
+
         return (
           <textarea
             className="ui-textarea"

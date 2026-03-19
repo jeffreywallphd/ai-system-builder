@@ -1,6 +1,7 @@
 import type { ProjectedField } from "../../../application/projection/models/ProjectedField";
 import NodePropertyField from "../nodes/NodePropertyField";
 import type { NodePropertyFieldViewModel } from "../../presenters/NodePresenter";
+import ContextPackageReferenceFieldEditor from "./ContextPackageReferenceFieldEditor";
 
 function toNodePropertyField(field: ProjectedField): NodePropertyFieldViewModel {
   return Object.freeze({
@@ -28,6 +29,10 @@ export default function ProjectedFieldEditor({
   readonly field: ProjectedField;
   readonly onChange: (id: string, value: unknown) => void;
 }): JSX.Element {
+  if (field.presentation === "context-package-references") {
+    return <ContextPackageReferenceFieldEditor field={field} onChange={onChange} />;
+  }
+
   return (
     <NodePropertyField
       field={toNodePropertyField(field)}
