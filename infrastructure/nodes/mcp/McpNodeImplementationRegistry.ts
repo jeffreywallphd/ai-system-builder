@@ -24,6 +24,8 @@ function mcpImplementation(nodeTypeId: string): INodeRuntimeImplementation {
     throw new Error(`Missing MCP catalog metadata for ${nodeTypeId}.`);
   }
 
+  const isInfrastructureNode = registration.nodeTypeId === "mcp.server_select";
+
   return {
     descriptor: new NodeImplementationDescriptor({
       providerId: "mcp",
@@ -35,6 +37,8 @@ function mcpImplementation(nodeTypeId: string): INodeRuntimeImplementation {
         bridgeProvider: "python-mcp-runtime",
         category: registration.category,
         boundary: "python",
+        infrastructureBoundary: isInfrastructureNode ? "selection" : "tool-usage",
+        isAdvancedInfrastructure: isInfrastructureNode,
       },
       nodeDefinition,
     }),

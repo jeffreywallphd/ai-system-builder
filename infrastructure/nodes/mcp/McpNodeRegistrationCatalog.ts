@@ -16,6 +16,14 @@ export interface IMcpNodeRegistrationDescriptor {
   readonly category: string;
 }
 
+interface IMcpNodeCatalogMetadataProjection {
+  readonly group: string;
+  readonly tags: ReadonlyArray<string>;
+  readonly keywords: ReadonlyArray<string>;
+  readonly supportsAuthoringView: boolean;
+  readonly supportsToolView: boolean;
+}
+
 interface IMcpNodeCatalogMetadata {
   readonly technicalName: string;
   readonly nonTechnicalName: string;
@@ -25,6 +33,8 @@ interface IMcpNodeCatalogMetadata {
   readonly outputPorts: INodeDefinition["outputPorts"];
   readonly properties: INodeDefinition["properties"];
   readonly executionKind: INodeDefinition["executionKind"];
+  readonly isVisibleInBasicMode?: boolean;
+  readonly projection: IMcpNodeCatalogMetadataProjection;
 }
 
 const DEFAULT_EXECUTION_STYLES: ReadonlyArray<NodeExecutionStyle> = Object.freeze([
@@ -34,6 +44,11 @@ const DEFAULT_EXECUTION_STYLES: ReadonlyArray<NodeExecutionStyle> = Object.freez
 
 export const MCP_NODE_REGISTRATIONS: ReadonlyArray<IMcpNodeRegistrationDescriptor> =
   Object.freeze([
+    {
+      nodeTypeId: "mcp.server_select",
+      executionStyles: DEFAULT_EXECUTION_STYLES,
+      category: "MCP / Infrastructure",
+    },
     {
       nodeTypeId: "mcp.tool_catalog",
       executionStyles: DEFAULT_EXECUTION_STYLES,
@@ -126,6 +141,8 @@ function metadata(params: {
   outputPorts: INodeDefinition["outputPorts"];
   properties: INodeDefinition["properties"];
   executionKind: INodeDefinition["executionKind"];
+  isVisibleInBasicMode?: boolean;
+  projection: IMcpNodeCatalogMetadataProjection;
 }): IMcpNodeCatalogMetadata {
   return Object.freeze({
     technicalName: params.technicalName,
@@ -136,83 +153,57 @@ function metadata(params: {
     outputPorts: params.outputPorts,
     properties: params.properties,
     executionKind: params.executionKind,
+    isVisibleInBasicMode: params.isVisibleInBasicMode,
+    projection: params.projection,
   });
 }
 
+const infrastructureProjection = Object.freeze({
+  group: "MCP",
+  tags: Object.freeze(["mcp", "server", "infrastructure"]),
+  keywords: Object.freeze(["model context protocol", "server handle", "connect mcp server"]),
+  supportsAuthoringView: true,
+  supportsToolView: false,
+});
+
+const toolProjection = Object.freeze({
+  group: "MCP",
+  tags: Object.freeze(["mcp", "tools", "capabilities"]),
+  keywords: Object.freeze(["model context protocol", "tool discovery", "tool execution"]),
+  supportsAuthoringView: true,
+  supportsToolView: true,
+});
+
 const MCP_NODE_CATALOG_METADATA: Readonly<Record<string, IMcpNodeCatalogMetadata>> =
   Object.freeze({
-    "mcp.tool_catalog": metadata({
-      technicalName: "mcp.tool_catalog",
-      nonTechnicalName: "List MCP Tools",
+    "mcp.server_select": metadata({
+      technicalName: "mcp.server_select",
+      nonTechnicalName: "Choose MCP Server",
       technicalDescription:
-        "Queries the Python-backed MCP runtime for currently connected tool descriptors and connection status.",
+        "Resolves a configured MCP server into a reusable workflow server handle and, when enabled, establishes the runtime connection.",
       description:
-        "See which MCP tools are available before choosing one for the next workflow step.",
-      inputPorts: Object.freeze([]),
-      outputPorts: Object.freeze([
-        outputPort(
-          "tools",
-          "Tools",
-          ["json"],
-          "Discovered MCP tool descriptors, including names, schemas, and server IDs.",
-        ),
-        outputPort(
-          "toolCount",
-          "Tool Count",
-          ["number"],
-          "How many MCP tools are currently available.",
-        ),
-        outputPort(
-          "status",
-          "Status",
-          ["json"],
-          "Current MCP connection status reported by the Python runtime.",
-        ),
-      ]),
-      properties: Object.freeze([]),
-      executionKind: "source",
-    }),
-    "mcp.tool_call": metadata({
-      technicalName: "mcp.tool_call",
-      nonTechnicalName: "Run MCP Tool",
-      technicalDescription:
-        "Executes a specific MCP tool through the Python-backed MCP runtime using a descriptor or explicit tool name plus arguments.",
-      description:
-        "Run an MCP tool from a workflow and capture both its raw result and the structured output it returns.",
+        "Choose one configured MCP server so downstream MCP nodes can discover tools and run them without embedding server lifecycle details everywhere.",
       inputPorts: Object.freeze([
         inputPort(
-          "tool",
-          "Tool",
+          "selection",
+          "Selection",
           ["json", "text"],
           true,
-          "Optional MCP tool descriptor or tool name supplied by an upstream node.",
-        ),
-        inputPort(
-          "arguments",
-          "Arguments",
-          ["json"],
-          true,
-          "Optional structured arguments passed to the selected MCP tool.",
+          "Optional server selection input, such as a server id string or a previously selected server descriptor.",
         ),
       ]),
       outputPorts: Object.freeze([
         outputPort(
-          "result",
-          "Result",
-          ["json", "tool-result"],
-          "The full MCP tool execution result payload.",
+          "serverHandle",
+          "Server Handle",
+          ["json", "workflow-state"],
+          "Reusable handle describing the configured MCP server selection and current connection state.",
         ),
         outputPort(
-          "structuredContent",
-          "Structured Content",
-          ["json"],
-          "Structured MCP tool output, when the tool provides one.",
-        ),
-        outputPort(
-          "resultText",
-          "Result Text",
-          ["text"],
-          "A text summary extracted from the MCP tool result content.",
+          "connectionStatus",
+          "Connection Status",
+          ["json", "workflow-state"],
+          "Current MCP runtime connection status after selecting the configured server.",
         ),
       ]),
       properties: Object.freeze([
@@ -221,22 +212,151 @@ const MCP_NODE_CATALOG_METADATA: Readonly<Record<string, IMcpNodeCatalogMetadata
           name: "Server Id",
           type: "text",
           value: "",
-          description:
-            "Configured MCP server ID to use when no upstream descriptor provides one.",
+          description: "Configured MCP server id to select when no upstream selection input is connected.",
           required: true,
+          isAdvanced: true,
           order: 0,
         }),
         property({
-          id: "toolName",
-          name: "Tool Name",
+          id: "autoConnect",
+          name: "Auto Connect",
+          type: "boolean",
+          value: true,
+          defaultValue: true,
+          description: "Automatically connect the selected configured MCP server before emitting the server handle.",
+          isAdvanced: true,
+          order: 1,
+        }),
+        property({
+          id: "allowReconnect",
+          name: "Allow Reconnect",
+          type: "boolean",
+          value: true,
+          defaultValue: true,
+          description: "Allow reconnect attempts when the selected MCP server is disconnected or in an error state.",
+          isAdvanced: true,
+          order: 2,
+        }),
+      ]),
+      executionKind: "selector",
+      isVisibleInBasicMode: false,
+      projection: infrastructureProjection,
+    }),
+    "mcp.tool_catalog": metadata({
+      technicalName: "mcp.tool_catalog",
+      nonTechnicalName: "List MCP Tools",
+      technicalDescription:
+        "Lists tool capability descriptors for one selected MCP server so workflows can browse or choose runnable MCP tools.",
+      description:
+        "Discover the MCP tools available on the selected server before choosing one for the next workflow step.",
+      inputPorts: Object.freeze([
+        inputPort(
+          "serverHandle",
+          "Server Handle",
+          ["json", "workflow-state"],
+          false,
+          "Server handle from Choose MCP Server that scopes tool discovery to one configured MCP server.",
+        ),
+      ]),
+      outputPorts: Object.freeze([
+        outputPort(
+          "tools",
+          "Tools",
+          ["json"],
+          "Capability-aligned MCP tool descriptors for the selected server.",
+        ),
+      ]),
+      properties: Object.freeze([
+        property({
+          id: "searchQuery",
+          name: "Search Query",
           type: "text",
           value: "",
-          description:
-            "Fallback MCP tool name used when no upstream descriptor or tool input is connected.",
+          defaultValue: "",
+          description: "Optional text filter applied to the selected server's discovered MCP tools.",
+          order: 0,
+        }),
+        property({
+          id: "includeHiddenTools",
+          name: "Include Hidden Tools",
+          type: "boolean",
+          value: false,
+          defaultValue: false,
+          description: "Include tools marked hidden in MCP metadata or annotations when supported by the server descriptor.",
+          isAdvanced: true,
+          order: 1,
+        }),
+      ]),
+      executionKind: "source",
+      projection: toolProjection,
+    }),
+    "mcp.tool_call": metadata({
+      technicalName: "mcp.tool_call",
+      nonTechnicalName: "Run MCP Tool",
+      technicalDescription:
+        "Executes a selected MCP tool against the chosen server using structured workflow arguments and returns the runtime result.",
+      description:
+        "Run a selected MCP tool from a workflow using a chosen server handle and structured arguments.",
+      inputPorts: Object.freeze([
+        inputPort(
+          "serverHandle",
+          "Server Handle",
+          ["json", "workflow-state"],
+          false,
+          "Server handle from Choose MCP Server that scopes tool execution to one configured MCP server.",
+        ),
+        inputPort(
+          "tool",
+          "Tool",
+          ["json", "text"],
+          false,
+          "Selected MCP tool descriptor, capability descriptor, or tool name to execute on the chosen server.",
+        ),
+        inputPort(
+          "arguments",
+          "Arguments",
+          ["json"],
+          false,
+          "Structured arguments object passed to the selected MCP tool.",
+        ),
+      ]),
+      outputPorts: Object.freeze([
+        outputPort(
+          "toolResult",
+          "Tool Result",
+          ["json", "tool-result"],
+          "The full MCP tool execution result payload.",
+        ),
+        outputPort(
+          "resultText",
+          "Result Text",
+          ["text"],
+          "Optional string representation of the MCP tool output for easy downstream display or prompting.",
+        ),
+      ]),
+      properties: Object.freeze([
+        property({
+          id: "stringifyResult",
+          name: "Stringify Result",
+          type: "boolean",
+          value: true,
+          defaultValue: true,
+          description: "Produce a text rendering of structured MCP tool output for downstream text-oriented nodes.",
+          order: 0,
+        }),
+        property({
+          id: "failOnMissingArgs",
+          name: "Fail On Missing Args",
+          type: "boolean",
+          value: true,
+          defaultValue: true,
+          description: "Validate required MCP tool arguments before execution and fail fast when any are missing.",
+          isAdvanced: true,
           order: 1,
         }),
       ]),
       executionKind: "utility",
+      projection: toolProjection,
     }),
   });
 
@@ -259,12 +379,7 @@ export function buildMcpNodeCatalogDescriptor(
     properties: metadata.properties,
     technicalName: metadata.technicalName,
     technicalDescription: metadata.technicalDescription,
-    projection: {
-      group: "Integrations",
-      tags: Object.freeze(["mcp", "tools", "python-runtime"]),
-      keywords: Object.freeze(["mcp", "model context protocol", "tools"]),
-      supportsAuthoringView: true,
-      supportsToolView: false,
-    },
+    isVisibleInBasicMode: metadata.isVisibleInBasicMode,
+    projection: metadata.projection,
   });
 }
