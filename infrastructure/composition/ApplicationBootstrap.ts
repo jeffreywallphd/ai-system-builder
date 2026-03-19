@@ -25,6 +25,8 @@ import { ListAssetsUseCase } from "../../application/assets/ListAssetsUseCase";
 import { DeleteAssetUseCase } from "../../application/assets/DeleteAssetUseCase";
 import { ListMcpToolsUseCase } from "../../application/mcp/ListMcpToolsUseCase";
 import { ExecuteMcpToolUseCase } from "../../application/mcp/ExecuteMcpToolUseCase";
+import { ListToolCapabilitiesUseCase } from "../../application/tools/ListToolCapabilitiesUseCase";
+import { InvokeToolCapabilityUseCase } from "../../application/tools/InvokeToolCapabilityUseCase";
 
 import type { INodeCatalogProvider } from "../../application/ports/interfaces/INodeCatalogProvider";
 import type { IWorkflowExecutor } from "../../application/ports/interfaces/IWorkflowExecutor";
@@ -36,6 +38,8 @@ import type { IModelInstaller } from "../../application/ports/interfaces/IModelI
 import type { IFileStorage } from "../../application/ports/interfaces/IFileStorage";
 import type { IMcpToolCatalog } from "../../application/ports/interfaces/IMcpToolCatalog";
 import type { IMcpToolExecutor } from "../../application/ports/interfaces/IMcpToolExecutor";
+import type { IToolCapabilityCatalog } from "../../application/ports/interfaces/IToolCapabilityCatalog";
+import type { IToolCapabilityExecutor } from "../../application/ports/interfaces/IToolCapabilityExecutor";
 import type { IWorkflowValidator } from "../../domain/services/interfaces/IWorkflowValidator";
 import type { INodeCompatibilityService } from "../../domain/services/interfaces/INodeCompatibilityService";
 import type { IModelCompatibilityService } from "../../domain/services/interfaces/IModelCompatibilityService";
@@ -66,6 +70,8 @@ export const APPLICATION_TOKENS = Object.freeze({
 
   ListMcpToolsUseCase: Symbol("ListMcpToolsUseCase"),
   ExecuteMcpToolUseCase: Symbol("ExecuteMcpToolUseCase"),
+  ListToolCapabilitiesUseCase: Symbol("ListToolCapabilitiesUseCase"),
+  InvokeToolCapabilityUseCase: Symbol("InvokeToolCapabilityUseCase"),
 });
 
 export interface IApplicationBootstrapOptions extends IInfrastructureRegistryOptions {}
@@ -258,6 +264,22 @@ export class ApplicationBootstrap {
       (c) =>
         new ExecuteMcpToolUseCase(
           c.resolve<IMcpToolExecutor>(TOKENS.McpToolExecutor)
+        )
+    );
+
+    container.registerSingleton(
+      APPLICATION_TOKENS.ListToolCapabilitiesUseCase,
+      (c) =>
+        new ListToolCapabilitiesUseCase(
+          c.resolve<IToolCapabilityCatalog>(TOKENS.ToolCapabilityCatalog)
+        )
+    );
+
+    container.registerSingleton(
+      APPLICATION_TOKENS.InvokeToolCapabilityUseCase,
+      (c) =>
+        new InvokeToolCapabilityUseCase(
+          c.resolve<IToolCapabilityExecutor>(TOKENS.ToolCapabilityExecutor)
         )
     );
   }

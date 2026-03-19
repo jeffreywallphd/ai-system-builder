@@ -15,7 +15,11 @@ import type { INodeCatalogProvider } from "../interfaces/INodeCatalogProvider";
 import type { IRemoteModelCatalog, IRemoteModelCatalogItem, IRemoteModelCatalogSearchResult } from "../interfaces/IRemoteModelCatalog";
 import type { IWorkflowExecutionEvent, IWorkflowExecutionHandle, IWorkflowExecutionProgress, IWorkflowExecutionResult, IWorkflowExecutor } from "../interfaces/IWorkflowExecutor";
 import type { IWorkflowSerializationResult, IWorkflowSerializer } from "../interfaces/IWorkflowSerializer";
+import type { IToolCapabilityCatalog } from "../interfaces/IToolCapabilityCatalog";
+import type { IToolCapabilityExecutor } from "../interfaces/IToolCapabilityExecutor";
 import { makeModel, makeWorkflow } from "./testUtils";
+import { CompositeToolCapabilityCatalog } from "../../../infrastructure/tools/CompositeToolCapabilityCatalog";
+import { CompositeToolCapabilityExecutor } from "../../../infrastructure/tools/CompositeToolCapabilityExecutor";
 
 describe("Application ports contracts", () => {
   it("concrete implementations satisfy declared interfaces", async () => {
@@ -50,6 +54,9 @@ describe("Application ports contracts", () => {
     const serializationResult: IWorkflowSerializationResult = new WorkflowSerializationResult({ content: "{}", format: "json" });
     const serializer: IWorkflowSerializer = new WorkflowSerializer([]);
 
+    const capabilityCatalog: IToolCapabilityCatalog = new CompositeToolCapabilityCatalog([]);
+    const capabilityExecutor: IToolCapabilityExecutor = new CompositeToolCapabilityExecutor([]);
+
     expect(await envProvider.getString("a")).toBe("1");
     expect(fileStorage).toBeDefined();
     expect(fileEntry.kind).toBe("file");
@@ -71,5 +78,10 @@ describe("Application ports contracts", () => {
     expect(executor.canExecute({ workflow: makeWorkflow() })).toBeFalse();
     expect(serializationResult.format).toBe("json");
     expect(serializer.canSerialize({ format: "json" })).toBeFalse();
+    expect(await capabilityCatalog.listCapabilities()).toHaveLength(0);
+    await expect(capabilityExecutor.invoke({
+      capabilityId: "workflow:missing",
+      provider: { kind: "workflow", id: "workflow-projection", label: "Workflow Tools" },
+    })).rejects.toThrow("No tool capability executor is registered");
   });
 });

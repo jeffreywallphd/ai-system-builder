@@ -7,5 +7,7 @@ describe("ToolService", () => {
     expect(source).toContain("listPublishedTools");
     expect(source).toContain("loadToolDefinition");
     expect(source).toContain("runTool");
+    expect(source).toContain("listToolCapabilities");
+    expect(source).toContain("invokeToolCapability");
   });
 });
