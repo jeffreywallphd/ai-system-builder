@@ -33,6 +33,7 @@ describe("HttpMcpRuntimeClient", () => {
 
   it("searches MCP servers with bounded query params", async () => {
     const calls: string[] = [];
+    const events = new RuntimeEventBuffer();
     const client = new HttpMcpRuntimeClient(
       new PythonRuntimeConfig({ mode: "local-http", baseUrl: "http://runtime" }),
       (async (input) => {
@@ -66,7 +67,6 @@ describe("HttpMcpRuntimeClient", () => {
       }) as typeof fetch,
       { emit: (event) => events.append(event as never) }
     );
-    const events = new RuntimeEventBuffer();
 
     const response = await client.searchServers({
       query: "local",
@@ -105,8 +105,84 @@ describe("HttpMcpRuntimeClient", () => {
 
     const [tools, resources] = await Promise.all([client.listTools(), client.listResources()]);
 
-    expect(tools).toEqual([{ serverId: "local", name: "echo", inputSchema: { type: "object" } }]);
+    expect(tools).toEqual([
+      {
+        id: "mcp:local:echo",
+        serverId: "local",
+        source: { kind: "mcp-server", serverId: "local" },
+        name: "echo",
+        title: undefined,
+        description: undefined,
+        inputSchema: { type: "object" },
+        outputSchema: undefined,
+        arguments: [],
+        categories: [],
+        tags: [],
+        annotations: undefined,
+        metadata: undefined,
+      },
+    ]);
     expect(resources).toEqual([{ serverId: "local", uri: "memory://guide", name: "Guide" }]);
+  });
+
+  it("searches and retrieves normalized MCP tool descriptors", async () => {
+    const calls: string[] = [];
+    const client = new HttpMcpRuntimeClient(
+      new PythonRuntimeConfig({ mode: "local-http", baseUrl: "http://runtime" }),
+      (async (input) => {
+        calls.push(String(input));
+        if (String(input).includes("/mcp/tools/search")) {
+          return new Response(
+            JSON.stringify({
+              query: "echo",
+              totalCount: 1,
+              limit: 5,
+              tools: [
+                {
+                  serverId: "local",
+                  name: "echo",
+                  description: "Echo text.",
+                  inputSchema: {
+                    type: "object",
+                    required: ["message"],
+                    properties: {
+                      message: { type: "string", description: "Message" },
+                    },
+                  },
+                  metadata: { category: "utility", tags: ["text"] },
+                },
+              ],
+            }),
+            { status: 200 }
+          );
+        }
+
+        return new Response(
+          JSON.stringify({
+            serverId: "local",
+            name: "echo",
+            description: "Echo text.",
+            inputSchema: { type: "object" },
+            metadata: { category: "utility" },
+          }),
+          { status: 200 }
+        );
+      }) as typeof fetch,
+    );
+
+    const [searchResult, descriptor] = await Promise.all([
+      client.searchTools({ query: "echo", serverIds: ["local"], categories: ["utility"], tags: ["text"], limit: 5 }),
+      client.getToolDescriptor("mcp:local:echo"),
+    ]);
+
+    expect(calls[0]).toContain("/mcp/tools/search?");
+    expect(calls[0]).toContain("serverId=local");
+    expect(calls[0]).toContain("category=utility");
+    expect(calls[0]).toContain("tag=text");
+    expect(calls[1]).toBe("http://runtime/mcp/tools/mcp%3Alocal%3Aecho");
+    expect(searchResult.tools[0]?.categories).toEqual(["utility"]);
+    expect(searchResult.tools[0]?.arguments[0]?.name).toBe("message");
+    expect(descriptor?.id).toBe("mcp:local:echo");
   });
 
   it("connects and disconnects MCP servers while emitting lifecycle events", async () => {

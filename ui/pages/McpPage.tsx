@@ -8,11 +8,16 @@ const fallbackState: McpStoreState = Object.freeze({
   discoveredServers: Object.freeze([]),
   selectedServerId: undefined,
   selectedServerStatus: undefined,
+  selectedServerTools: Object.freeze([]),
+  selectedToolId: undefined,
+  selectedToolDescriptor: undefined,
+  toolSearchQuery: "",
   searchCriteria: undefined,
   searchQuery: "",
   isLoadingConfigured: false,
   isSearching: false,
   isMutating: false,
+  isLoadingTools: false,
   error: undefined,
 });
 
@@ -42,9 +47,14 @@ export default function McpPage(): JSX.Element {
         discoveredServers={state.discoveredServers}
         selectedServer={mcpStore.getSelectedServer()}
         selectedServerStatus={state.selectedServerStatus}
+        selectedServerTools={state.selectedServerTools}
+        selectedToolId={state.selectedToolId}
+        selectedTool={state.selectedToolDescriptor}
+        toolSearchQuery={state.toolSearchQuery}
         isLoadingConfigured={state.isLoadingConfigured}
         isSearching={state.isSearching}
         isMutating={state.isMutating}
+        isLoadingTools={state.isLoadingTools}
         error={state.error}
         searchCriteria={state.searchCriteria}
         onSearch={(criteria) => {
@@ -62,6 +72,12 @@ export default function McpPage(): JSX.Element {
         }}
         onDisconnectServer={(serverId) => {
           void mcpStore.disconnect(serverId).catch(() => undefined);
+        }}
+        onToolSearch={(query) => {
+          void mcpStore.searchTools(query).catch(() => undefined);
+        }}
+        onSelectTool={(toolId) => {
+          void mcpStore.selectTool(toolId).catch(() => undefined);
         }}
       />
     </section>

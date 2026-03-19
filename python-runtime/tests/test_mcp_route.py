@@ -12,7 +12,7 @@ def override_service() -> McpService:
     config = McpRuntimeConfig(
         enabled=True,
         servers_json='['
-        '{"id": "local", "name": "Local MCP", "transport": "stdio", "command": "python", "args": ["server.py"], "mock_tools": [{"name": "echo", "inputSchema": {"type": "object"}}, {"name": "sum_numbers", "inputSchema": {"type": "object"}}], "mock_resources": [{"uri": "memory://resource/1", "name": "Example Resource"}], "metadata": {"scope": "workspace"}},'
+        '{"id": "local", "name": "Local MCP", "transport": "stdio", "command": "python", "args": ["server.py"], "mock_tools": [{"name": "echo", "description": "Echo text.", "inputSchema": {"type": "object", "required": ["message"], "properties": {"message": {"type": "string", "description": "Message"}}}, "metadata": {"category": "utility", "tags": ["text"]}}, {"name": "sum_numbers", "inputSchema": {"type": "object"}}], "mock_resources": [{"uri": "memory://resource/1", "name": "Example Resource"}], "metadata": {"scope": "workspace"}},'
         '{"id": "remote", "name": "Remote MCP", "transport": "http", "url": "http://localhost:9000/mcp", "metadata": {"scope": "cloud"}}'
         ']'
     )
@@ -89,9 +89,41 @@ def test_mcp_tools_route_lists_tools_and_resources() -> None:
     app.dependency_overrides.clear()
     assert response.status_code == 200
     payload = response.json()
-    assert payload["tools"][0]["serverId"] == "local"
+    assert payload["tools"][0]["id"] == "mcp:local:echo"
+    assert payload["tools"][0]["arguments"][0]["name"] == "message"
     assert payload["resources"][0]["uri"] == "memory://resource/1"
     assert payload["resources"][0]["serverId"] == "local"
+
+
+def test_mcp_tool_search_route_filters_tools() -> None:
+    app.dependency_overrides[get_mcp_service] = override_service
+    client = TestClient(app)
+
+    response = client.get(
+        "/mcp/tools/search",
+        params={"query": "echo", "serverId": "local", "category": "utility", "tag": "text", "limit": 5},
+    )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["query"] == "echo"
+    assert payload["totalCount"] == 1
+    assert payload["tools"][0]["id"] == "mcp:local:echo"
+
+
+def test_mcp_tool_descriptor_route_returns_normalized_descriptor() -> None:
+    app.dependency_overrides[get_mcp_service] = override_service
+    client = TestClient(app)
+
+    response = client.get("/mcp/tools/mcp:local:echo")
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["serverId"] == "local"
+    assert payload["categories"] == ["utility"]
+    assert payload["tags"] == ["text"]
 
 
 def test_mcp_execute_route_executes_tool() -> None:

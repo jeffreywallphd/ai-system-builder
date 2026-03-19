@@ -38,6 +38,36 @@ function createService() {
       capabilities: { tools: true },
     },
   ];
+  const toolsByServer = {
+    local: [
+      {
+        id: "mcp:local:echo",
+        serverId: "local",
+        source: { kind: "mcp-server", serverId: "local" },
+        name: "echo",
+        title: "Echo",
+        description: "Echo text back.",
+        inputSchema: { type: "object" },
+        arguments: [{ name: "message", type: "string", required: true, schema: { type: "string" } }],
+        categories: ["utility"],
+        tags: ["text"],
+      },
+    ],
+    "remote-docs": [
+      {
+        id: "mcp:remote-docs:search_docs",
+        serverId: "remote-docs",
+        source: { kind: "mcp-server", serverId: "remote-docs" },
+        name: "search_docs",
+        title: "Search Docs",
+        description: "Search docs.",
+        inputSchema: { type: "object" },
+        arguments: [{ name: "query", type: "string", required: true, schema: { type: "string" } }],
+        categories: ["knowledge"],
+        tags: ["docs", "search"],
+      },
+    ],
+  } as const;
 
   return new McpService(
     { execute: async () => configured } as any,
@@ -46,7 +76,7 @@ function createService() {
         query: criteria?.query ?? "",
         totalCount: discovered.length,
         limit: 12,
-        servers: criteria?.query ? discovered.filter((server) => server.name.toLowerCase().includes(criteria.query.toLowerCase())) : discovered,
+        servers: criteria?.query ? discovered.filter((server) => server.name.toLowerCase().includes((criteria.query ?? "").toLowerCase())) : discovered,
         status: {
           enabled: true,
           state: "ready",
@@ -75,11 +105,29 @@ function createService() {
     { execute: async () => ({ action: "connect" }) } as any,
     { execute: async () => ({ action: "disconnect" }) } as any,
     { execute: async () => ({ action: "reconnect" }) } as any,
+    {
+      execute: async ({ query }: { query?: { serverIds?: string[]; query?: string } }) => {
+        const serverId = query?.serverIds?.[0] as keyof typeof toolsByServer | undefined;
+        const tools = serverId ? toolsByServer[serverId] ?? [] : [];
+        const filtered = query?.query
+          ? tools.filter((tool) => `${tool.name} ${tool.description}`.toLowerCase().includes((query.query ?? "").toLowerCase()))
+          : tools;
+        return {
+          query: query?.query ?? "",
+          totalCount: filtered.length,
+          limit: 10,
+          tools: filtered,
+        };
+      },
+    } as any,
+    {
+      execute: async ({ toolId }: { toolId: string }) => Object.values(toolsByServer).flat().find((tool) => tool.id === toolId),
+    } as any,
   );
 }
 
 describe("McpStore", () => {
-  it("loads configured servers and discovery results with a selected server", async () => {
+  it("loads configured servers, discovery results, and selected server tools", async () => {
     const store = new McpStore(createService());
 
     await store.initialize();
@@ -87,9 +135,11 @@ describe("McpStore", () => {
     expect(store.getState().configuredServers).toHaveLength(1);
     expect(store.getState().discoveredServers).toHaveLength(2);
     expect(store.getState().selectedServerId).toBe("local");
+    expect(store.getState().selectedServerTools[0]?.id).toBe("mcp:local:echo");
+    expect(store.getState().selectedToolDescriptor?.name).toBe("echo");
   });
 
-  it("supports discovery search, add-to-configured, and connect/disconnect actions", async () => {
+  it("supports discovery search, add-to-configured, tool search, and connect/disconnect actions", async () => {
     const store = new McpStore(createService());
 
     await store.search({ query: "remote" });
@@ -98,6 +148,13 @@ describe("McpStore", () => {
 
     await store.addConfiguredServer("remote-docs");
     expect(store.getState().selectedServerId).toBe("remote-docs");
+
+    await store.searchTools("search");
+    expect(store.getState().toolSearchQuery).toBe("search");
+    expect(store.getState().selectedServerTools[0]?.id).toBe("mcp:remote-docs:search_docs");
+
+    await store.selectTool("mcp:remote-docs:search_docs");
+    expect(store.getState().selectedToolDescriptor?.name).toBe("search_docs");
 
     await store.connect("local");
     await store.connect("local", true);
@@ -116,6 +173,8 @@ describe("McpStore", () => {
         { execute: async () => ({}) } as any,
         { execute: async () => ({}) } as any,
         { execute: async () => ({}) } as any,
+        { execute: async () => ({ query: "", totalCount: 0, limit: 10, tools: [] }) } as any,
+        { execute: async () => undefined } as any,
       ),
     );
 

@@ -23,7 +23,9 @@ describe("ApplicationBootstrap", () => {
     expect(c.isRegistered(APPLICATION_TOKENS.ListMcpToolsUseCase)).toBe(true);
     expect(c.isRegistered(APPLICATION_TOKENS.ListConfiguredMcpServersUseCase)).toBe(true);
     expect(c.isRegistered(APPLICATION_TOKENS.SearchMcpServersUseCase)).toBe(true);
+    expect(c.isRegistered(APPLICATION_TOKENS.SearchMcpToolsUseCase)).toBe(true);
     expect(c.isRegistered(APPLICATION_TOKENS.GetMcpServerStatusUseCase)).toBe(true);
+    expect(c.isRegistered(APPLICATION_TOKENS.GetMcpToolDescriptorUseCase)).toBe(true);
     expect(c.isRegistered(APPLICATION_TOKENS.ConnectMcpServerUseCase)).toBe(true);
     expect(c.isRegistered(APPLICATION_TOKENS.DisconnectMcpServerUseCase)).toBe(true);
     expect(c.isRegistered(APPLICATION_TOKENS.ReconnectMcpServerUseCase)).toBe(true);

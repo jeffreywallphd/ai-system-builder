@@ -8,8 +8,12 @@ from app.mcp.models import (
     McpServerSearchRequest,
     McpServerSearchResponse,
     McpSnapshot,
+    McpToolDescriptor,
     McpToolExecutionRequest,
     McpToolExecutionResult,
+    McpToolSearchRequest,
+    McpToolSearchResponse,
+    parse_mcp_tool_id,
     utc_timestamp,
 )
 from app.mcp.registry import McpRegistry
@@ -162,6 +166,32 @@ class McpService:
             capabilities=snapshot.status.capabilities,
         )
 
+    def search_tools(self, request: McpToolSearchRequest) -> McpToolSearchResponse:
+        bounded_limit = min(max(request.limit, 1), 50)
+        server_ids = {value.strip() for value in request.server_ids if value.strip()}
+        categories = {value.strip() for value in request.categories if value.strip()}
+        tags = {value.strip() for value in request.tags if value.strip()}
+        normalized_query = request.query.strip().lower()
+        matches = [
+            tool
+            for tool in self.list_tools().tools
+            if self._matches_tool(tool, normalized_query, server_ids, categories, tags)
+        ]
+
+        return McpToolSearchResponse(
+            query=request.query.strip(),
+            total_count=len(matches),
+            limit=bounded_limit,
+            tools=matches[:bounded_limit],
+        )
+
+    def get_tool_descriptor(self, tool_id: str) -> McpToolDescriptor:
+        server_id, tool_name = parse_mcp_tool_id(tool_id)
+        for tool in self.list_tools().tools:
+            if tool.server_id == server_id and tool.name == tool_name:
+                return tool
+        raise ValueError(f"Unknown MCP tool '{tool_id.strip()}'.")
+
     def execute_tool(self, request: McpToolExecutionRequest) -> McpToolExecutionResult:
         if not self._registry.is_enabled():
             return McpToolExecutionResult(
@@ -187,3 +217,34 @@ class McpService:
                 structured_content={},
                 error_message=str(error),
             )
+
+    def _matches_tool(
+        self,
+        tool: McpToolDescriptor,
+        query: str,
+        server_ids: set[str],
+        categories: set[str],
+        tags: set[str],
+    ) -> bool:
+        if server_ids and tool.server_id not in server_ids:
+            return False
+        if categories and not any(category in categories for category in tool.categories):
+            return False
+        if tags and not any(tag in tags for tag in tool.tags):
+            return False
+        if not query:
+            return True
+
+        haystack_parts = [
+            tool.id,
+            tool.server_id,
+            tool.name,
+            tool.title or "",
+            tool.description or "",
+            *tool.categories,
+            *tool.tags,
+            *(argument.name for argument in tool.arguments),
+            *(argument.description or "" for argument in tool.arguments),
+        ]
+        haystack = " ".join(part for part in haystack_parts if part).lower()
+        return query in haystack

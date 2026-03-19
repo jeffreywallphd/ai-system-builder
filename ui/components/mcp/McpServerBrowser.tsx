@@ -1,6 +1,7 @@
 import type { McpServerDescriptor } from "../../../application/mcp/models/McpServerDescriptor";
 import type { McpServerSearchCriteria } from "../../../application/mcp/models/McpServerSearchCriteria";
 import type { McpServerStatus } from "../../../application/mcp/models/McpServerStatus";
+import type { McpToolDescriptor } from "../../../application/mcp/models/McpToolDescriptor";
 import McpServerCard from "./McpServerCard";
 import McpServerDetailsPanel from "./McpServerDetailsPanel";
 import McpServerSearchBar from "./McpServerSearchBar";
@@ -10,9 +11,14 @@ export interface McpServerBrowserProps {
   readonly discoveredServers: ReadonlyArray<McpServerDescriptor>;
   readonly selectedServer?: McpServerDescriptor;
   readonly selectedServerStatus?: McpServerStatus;
+  readonly selectedServerTools?: ReadonlyArray<McpToolDescriptor>;
+  readonly selectedToolId?: string;
+  readonly selectedTool?: McpToolDescriptor;
+  readonly toolSearchQuery?: string;
   readonly isLoadingConfigured?: boolean;
   readonly isSearching?: boolean;
   readonly isMutating?: boolean;
+  readonly isLoadingTools?: boolean;
   readonly error?: string;
   readonly searchCriteria?: McpServerSearchCriteria;
   readonly onSearch: (criteria: McpServerSearchCriteria) => void;
@@ -21,6 +27,8 @@ export interface McpServerBrowserProps {
   readonly onAddConfigured?: (serverId: string) => void;
   readonly onConnectServer?: (serverId: string, reconnect?: boolean) => void;
   readonly onDisconnectServer?: (serverId: string) => void;
+  readonly onToolSearch?: (query: string) => void;
+  readonly onSelectTool?: (toolId: string) => void;
 }
 
 export default function McpServerBrowser({
@@ -28,9 +36,14 @@ export default function McpServerBrowser({
   discoveredServers,
   selectedServer,
   selectedServerStatus,
+  selectedServerTools = [],
+  selectedToolId,
+  selectedTool,
+  toolSearchQuery,
   isLoadingConfigured,
   isSearching,
   isMutating,
+  isLoadingTools,
   error,
   searchCriteria,
   onSearch,
@@ -39,6 +52,8 @@ export default function McpServerBrowser({
   onAddConfigured,
   onConnectServer,
   onDisconnectServer,
+  onToolSearch,
+  onSelectTool,
 }: McpServerBrowserProps): JSX.Element {
   const configuredIds = new Set(configuredServers.map((server) => server.id));
   const discoverableServers = discoveredServers.filter((server) => !configuredIds.has(server.id));
@@ -129,8 +144,15 @@ export default function McpServerBrowser({
         <McpServerDetailsPanel
           server={selectedServer}
           status={selectedServerStatus}
+          tools={selectedServerTools}
+          selectedToolId={selectedToolId}
+          selectedTool={selectedTool}
+          toolSearchQuery={toolSearchQuery}
           isConfigured={selectedIsConfigured}
           isBusy={isMutating}
+          isLoadingTools={isLoadingTools}
+          onToolSearch={onToolSearch}
+          onSelectTool={onSelectTool}
           onAdd={onAddConfigured}
           onConnect={onConnectServer}
           onDisconnect={onDisconnectServer}

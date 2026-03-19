@@ -376,6 +376,13 @@ function createDisabledMcpRuntimeClient(): IMcpRuntimeClient {
     connectServer: async (request) => createDisabledConnectionResult(request.serverId, request.reconnect ? "reconnect" : "connect"),
     disconnectServer: async (serverId) => createDisabledConnectionResult(serverId, "disconnect"),
     listTools: async () => [],
+    searchTools: async (criteria) => ({
+      query: criteria?.query?.trim() || "",
+      totalCount: 0,
+      limit: criteria?.limit ?? 20,
+      tools: [],
+    }),
+    getToolDescriptor: async () => undefined,
     listResources: async () => [],
     executeTool: async (request) => ({
       executionId: request.executionId?.trim() || "mcp-disabled",

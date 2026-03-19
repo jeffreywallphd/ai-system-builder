@@ -55,6 +55,8 @@ import { ListConfiguredMcpServersUseCase } from "../../application/mcp/ListConfi
 import { SearchMcpServersUseCase } from "../../application/mcp/SearchMcpServersUseCase";
 import { AddConfiguredMcpServerUseCase } from "../../application/mcp/AddConfiguredMcpServerUseCase";
 import { GetMcpServerStatusUseCase } from "../../application/mcp/GetMcpServerStatusUseCase";
+import { SearchMcpToolsUseCase } from "../../application/mcp/SearchMcpToolsUseCase";
+import { GetMcpToolDescriptorUseCase } from "../../application/mcp/GetMcpToolDescriptorUseCase";
 import { ConnectMcpServerUseCase } from "../../application/mcp/ConnectMcpServerUseCase";
 import { DisconnectMcpServerUseCase } from "../../application/mcp/DisconnectMcpServerUseCase";
 import { ReconnectMcpServerUseCase } from "../../application/mcp/ReconnectMcpServerUseCase";
@@ -254,6 +256,8 @@ export function createUiDependencies(
     new ConnectMcpServerUseCase(mcpServerManager),
     new DisconnectMcpServerUseCase(mcpServerManager),
     new ReconnectMcpServerUseCase(mcpServerManager),
+    new SearchMcpToolsUseCase(pythonBackedMcpToolCatalog),
+    new GetMcpToolDescriptorUseCase(pythonBackedMcpToolCatalog),
   );
   const mcpStore = new McpStore(mcpService);
 
@@ -470,6 +474,12 @@ function createDisabledMcpRuntimeClient() {
     },
     async listTools() {
       return [];
+    },
+    async searchTools(criteria?: { query?: string; limit?: number }) {
+      return { query: criteria?.query?.trim() || "", totalCount: 0, limit: criteria?.limit ?? 20, tools: [] };
+    },
+    async getToolDescriptor() {
+      return undefined;
     },
     async listResources() {
       return [];

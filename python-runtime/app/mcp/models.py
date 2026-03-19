@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Literal, Optional
+from urllib.parse import quote, unquote
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -54,13 +55,35 @@ class McpServerDescriptor(McpModel):
     error_message: Optional[str] = None
 
 
-class McpToolDescriptor(McpModel):
+class McpToolDescriptorSource(McpModel):
+    kind: Literal["mcp-server"] = "mcp-server"
     server_id: str
+
+
+class McpToolArgumentDescriptor(McpModel):
+    name: str
+    title: Optional[str] = None
+    description: Optional[str] = None
+    type: str = "unknown"
+    required: bool = False
+    default_value: Optional[Any] = None
+    enum_values: List[Any] = Field(default_factory=list)
+    format: Optional[str] = None
+    schema_data: Dict[str, Any] = Field(default_factory=dict, alias="schema", serialization_alias="schema")
+
+
+class McpToolDescriptor(McpModel):
+    id: str
+    server_id: str
+    source: McpToolDescriptorSource
     name: str
     title: Optional[str] = None
     description: Optional[str] = None
     input_schema: Dict[str, Any] = Field(default_factory=dict)
     output_schema: Dict[str, Any] = Field(default_factory=dict)
+    arguments: List[McpToolArgumentDescriptor] = Field(default_factory=list)
+    categories: List[str] = Field(default_factory=list)
+    tags: List[str] = Field(default_factory=list)
     annotations: Dict[str, Any] = Field(default_factory=dict)
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
@@ -97,6 +120,21 @@ class McpServerSearchResponse(McpModel):
     limit: int = 20
     servers: List[McpServerDescriptor] = Field(default_factory=list)
     status: McpConnectionStatus
+
+
+class McpToolSearchRequest(McpModel):
+    query: str = ""
+    server_ids: List[str] = Field(default_factory=list)
+    categories: List[str] = Field(default_factory=list)
+    tags: List[str] = Field(default_factory=list)
+    limit: int = 20
+
+
+class McpToolSearchResponse(McpModel):
+    query: str = ""
+    total_count: int = 0
+    limit: int = 20
+    tools: List[McpToolDescriptor] = Field(default_factory=list)
 
 
 class McpServerConnectionRequest(McpModel):
@@ -153,6 +191,22 @@ class McpServerSnapshot(McpModel):
 class McpSnapshot(McpModel):
     status: McpConnectionStatus
     servers: List[McpServerSnapshot] = Field(default_factory=list)
+
+
+def build_mcp_tool_id(server_id: str, tool_name: str) -> str:
+    return f"mcp:{quote(server_id.strip(), safe='')}:{quote(tool_name.strip(), safe='')}"
+
+
+def parse_mcp_tool_id(tool_id: str) -> tuple[str, str]:
+    normalized = tool_id.strip()
+    if not normalized.startswith("mcp:"):
+        raise ValueError("MCP toolId must start with 'mcp:'.")
+
+    parts = normalized.split(":", 2)
+    if len(parts) != 3 or not parts[1] or not parts[2]:
+        raise ValueError("MCP toolId must include encoded serverId and toolName segments.")
+
+    return unquote(parts[1]), unquote(parts[2])
 
 
 def utc_timestamp() -> str:

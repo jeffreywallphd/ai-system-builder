@@ -2,7 +2,18 @@ import uuid
 from typing import Any
 
 from app.core.mcp_config import McpServerConfig
-from app.mcp.models import McpResourceDescriptor, McpServerDescriptor, McpServerStatus, McpToolDescriptor, McpToolExecutionRequest, McpToolExecutionResult, utc_timestamp
+from app.mcp.models import (
+    McpResourceDescriptor,
+    McpServerDescriptor,
+    McpServerStatus,
+    McpToolArgumentDescriptor,
+    McpToolDescriptor,
+    McpToolDescriptorSource,
+    McpToolExecutionRequest,
+    McpToolExecutionResult,
+    build_mcp_tool_id,
+    utc_timestamp,
+)
 
 
 class McpConnectionError(RuntimeError):
@@ -104,18 +115,7 @@ class BoundedMcpClient:
 
         descriptors: list[McpToolDescriptor] = []
         for tool in self._server.mock_tools:
-            descriptors.append(
-                McpToolDescriptor(
-                    server_id=self._server.id,
-                    name=str(tool.get("name", "tool")),
-                    title=tool.get("title"),
-                    description=tool.get("description"),
-                    input_schema=tool.get("inputSchema", {"type": "object"}),
-                    output_schema=tool.get("outputSchema", {}),
-                    annotations=tool.get("annotations", {}),
-                    metadata=tool.get("metadata", {}),
-                )
-            )
+            descriptors.append(self._build_tool_descriptor(tool))
         return descriptors
 
     def list_resources(self) -> list[McpResourceDescriptor]:
@@ -193,6 +193,37 @@ class BoundedMcpClient:
             structured_content={"arguments": args},
         )
 
+    def _build_tool_descriptor(self, tool: dict[str, Any]) -> McpToolDescriptor:
+        name = str(tool.get("name", "tool")).strip() or "tool"
+        input_schema = ensure_object(tool.get("inputSchema") or tool.get("input_schema") or {"type": "object"})
+        output_schema = ensure_object(tool.get("outputSchema") or tool.get("output_schema") or {})
+        annotations = ensure_object(tool.get("annotations") or {})
+        metadata = ensure_object(tool.get("metadata") or {})
+        categories = normalize_string_list(
+            tool.get("categories"),
+            metadata.get("category"),
+            metadata.get("categories"),
+            annotations.get("category"),
+            annotations.get("categories"),
+        )
+        tags = normalize_string_list(tool.get("tags"), metadata.get("tags"), annotations.get("tags"))
+
+        return McpToolDescriptor(
+            id=build_mcp_tool_id(self._server.id, name),
+            server_id=self._server.id,
+            source=McpToolDescriptorSource(server_id=self._server.id),
+            name=name,
+            title=normalize_optional_string(tool.get("title")),
+            description=normalize_optional_string(tool.get("description")),
+            input_schema=input_schema,
+            output_schema=output_schema,
+            arguments=build_argument_descriptors(input_schema, tool.get("arguments")),
+            categories=categories,
+            tags=tags,
+            annotations=annotations,
+            metadata=metadata,
+        )
+
     def _fail(self, message: str) -> McpServerStatus:
         self._connected = False
         self._last_error = message
@@ -206,3 +237,96 @@ class BoundedMcpClient:
         elif self._server.transport in {"http", "sse"}:
             metadata["connectionMode"] = "bounded-remote"
         return metadata
+
+
+def build_argument_descriptors(input_schema: dict[str, Any], explicit_arguments: Any) -> list[McpToolArgumentDescriptor]:
+    if isinstance(explicit_arguments, list) and explicit_arguments:
+        descriptors: list[McpToolArgumentDescriptor] = []
+        for argument in explicit_arguments:
+            if not isinstance(argument, dict):
+                continue
+            schema = ensure_object(argument.get("schema") or {})
+            descriptors.append(
+                McpToolArgumentDescriptor(
+                    name=str(argument.get("name", "")).strip(),
+                    title=normalize_optional_string(argument.get("title")),
+                    description=normalize_optional_string(argument.get("description")),
+                    type=normalize_type(argument.get("type") or schema.get("type")),
+                    required=bool(argument.get("required", False)),
+                    default_value=argument.get("defaultValue", schema.get("default")),
+                    enum_values=normalize_enum_values(argument.get("enumValues") or schema.get("enum")),
+                    format=normalize_optional_string(argument.get("format") or schema.get("format")),
+                    schema_data=schema,
+                )
+            )
+        return sorted(descriptors, key=lambda argument: argument.name)
+
+    properties = ensure_plain_object(input_schema.get("properties"))
+    required = {
+        value.strip()
+        for value in input_schema.get("required", [])
+        if isinstance(value, str) and value.strip()
+    }
+
+    descriptors = [
+        McpToolArgumentDescriptor(
+            name=name,
+            title=normalize_optional_string(schema.get("title")),
+            description=normalize_optional_string(schema.get("description")),
+            type=normalize_type(schema.get("type")),
+            required=name in required,
+            default_value=schema.get("default"),
+            enum_values=normalize_enum_values(schema.get("enum")),
+            format=normalize_optional_string(schema.get("format")),
+            schema_data=schema,
+        )
+        for name, schema in sorted(properties.items())
+    ]
+    return descriptors
+
+
+def ensure_object(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return value
+    return {"type": "object"}
+
+
+def ensure_plain_object(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return value
+    return {}
+
+
+def normalize_optional_string(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip()
+    return normalized or None
+
+
+def normalize_type(value: Any) -> str:
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    if isinstance(value, list):
+        parts = [part.strip() for part in value if isinstance(part, str) and part.strip()]
+        return " | ".join(parts) or "unknown"
+    return "unknown"
+
+
+def normalize_enum_values(value: Any) -> list[Any]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, (str, int, float, bool)) or item is None]
+
+
+def normalize_string_list(*groups: Any) -> list[str]:
+    values: set[str] = set()
+    for group in groups:
+        items = group if isinstance(group, list) else [group]
+        for item in items:
+            if not isinstance(item, str):
+                continue
+            normalized = item.strip()
+            if normalized:
+                values.add(normalized)
+    return sorted(values)

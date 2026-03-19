@@ -27,6 +27,8 @@ import { ListMcpToolsUseCase } from "../../application/mcp/ListMcpToolsUseCase";
 import { ListConfiguredMcpServersUseCase } from "../../application/mcp/ListConfiguredMcpServersUseCase";
 import { SearchMcpServersUseCase } from "../../application/mcp/SearchMcpServersUseCase";
 import { GetMcpServerStatusUseCase } from "../../application/mcp/GetMcpServerStatusUseCase";
+import { SearchMcpToolsUseCase } from "../../application/mcp/SearchMcpToolsUseCase";
+import { GetMcpToolDescriptorUseCase } from "../../application/mcp/GetMcpToolDescriptorUseCase";
 import { ConnectMcpServerUseCase } from "../../application/mcp/ConnectMcpServerUseCase";
 import { DisconnectMcpServerUseCase } from "../../application/mcp/DisconnectMcpServerUseCase";
 import { ReconnectMcpServerUseCase } from "../../application/mcp/ReconnectMcpServerUseCase";
@@ -81,7 +83,9 @@ export const APPLICATION_TOKENS = Object.freeze({
   ListMcpToolsUseCase: Symbol("ListMcpToolsUseCase"),
   ListConfiguredMcpServersUseCase: Symbol("ListConfiguredMcpServersUseCase"),
   SearchMcpServersUseCase: Symbol("SearchMcpServersUseCase"),
+  SearchMcpToolsUseCase: Symbol("SearchMcpToolsUseCase"),
   GetMcpServerStatusUseCase: Symbol("GetMcpServerStatusUseCase"),
+  GetMcpToolDescriptorUseCase: Symbol("GetMcpToolDescriptorUseCase"),
   ConnectMcpServerUseCase: Symbol("ConnectMcpServerUseCase"),
   DisconnectMcpServerUseCase: Symbol("DisconnectMcpServerUseCase"),
   ReconnectMcpServerUseCase: Symbol("ReconnectMcpServerUseCase"),
@@ -289,8 +293,18 @@ export class ApplicationBootstrap {
     );
 
     container.registerSingleton(
+      APPLICATION_TOKENS.SearchMcpToolsUseCase,
+      (c) => new SearchMcpToolsUseCase(c.resolve<IMcpToolCatalog>(TOKENS.McpToolCatalog))
+    );
+
+    container.registerSingleton(
       APPLICATION_TOKENS.GetMcpServerStatusUseCase,
       (c) => new GetMcpServerStatusUseCase(c.resolve<IMcpServerCatalog>(TOKENS.McpServerCatalog))
+    );
+
+    container.registerSingleton(
+      APPLICATION_TOKENS.GetMcpToolDescriptorUseCase,
+      (c) => new GetMcpToolDescriptorUseCase(c.resolve<IMcpToolCatalog>(TOKENS.McpToolCatalog))
     );
 
     container.registerSingleton(
