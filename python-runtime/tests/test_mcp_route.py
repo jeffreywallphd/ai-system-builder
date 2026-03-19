@@ -87,6 +87,7 @@ def test_mcp_tools_route_lists_tools_and_resources() -> None:
     payload = response.json()
     assert payload["tools"][0]["serverId"] == "local"
     assert payload["resources"][0]["uri"] == "memory://resource/1"
+    assert payload["resources"][0]["serverId"] == "local"
 
 
 def test_mcp_execute_route_executes_tool() -> None:

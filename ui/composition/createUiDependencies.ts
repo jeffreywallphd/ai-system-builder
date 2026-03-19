@@ -59,6 +59,7 @@ import { LoadToolDefinitionUseCase } from "../../application/tools/LoadToolDefin
 import { RunToolUseCase } from "../../application/tools/RunToolUseCase";
 import { ListToolCapabilitiesUseCase } from "../../application/tools/ListToolCapabilitiesUseCase";
 import { InvokeToolCapabilityUseCase } from "../../application/tools/InvokeToolCapabilityUseCase";
+import { SearchCapabilitiesUseCase } from "../../application/research/SearchCapabilitiesUseCase";
 import { ToolService } from "../services/ToolService";
 import { ToolStore } from "../state/ToolStore";
 import type { CreateUiDependenciesOptions, UiDependencies } from "./types";
@@ -215,7 +216,11 @@ export function createUiDependencies(
     loadToolDefinitionUseCase,
     runToolUseCase,
     new ListToolCapabilitiesUseCase(toolCapabilityCatalog),
-    new InvokeToolCapabilityUseCase(toolCapabilityExecutor)
+    new InvokeToolCapabilityUseCase(toolCapabilityExecutor),
+    new SearchCapabilitiesUseCase(toolCapabilityCatalog, {
+      mcpToolCatalog: pythonBackedMcpToolCatalog,
+      mcpRuntimeClient: mcpClient,
+    })
   );
   const mcpService = new McpService(
     new ListMcpToolsUseCase(pythonBackedMcpToolCatalog),
@@ -419,6 +424,9 @@ function createDisabledMcpRuntimeClient() {
       };
     },
     async listTools() {
+      return [];
+    },
+    async listResources() {
       return [];
     },
     async executeTool(request: { serverId: string; toolName: string; executionId?: string }) {

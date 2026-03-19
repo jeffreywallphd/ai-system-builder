@@ -30,6 +30,7 @@ export class McpToolCapabilityCatalog implements IToolCapabilityCatalog {
             isPublished: false,
             title: tool.title ?? tool.name,
             description: tool.description,
+            category: typeof tool.metadata?.category === "string" ? tool.metadata.category : undefined,
           }),
           inputSchema: Object.freeze({ ...tool.inputSchema }),
           outputSchema: tool.outputSchema

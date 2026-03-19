@@ -1,3 +1,4 @@
+import type { CapabilitySearchResult } from "../../application/research/models/CapabilitySearchResult";
 import type { ToolSearchCriteria } from "../../application/dto/ToolSearchCriteria";
 import type { ToolDefinition } from "../../application/projection/models/ToolDefinition";
 import type { ToolRunResult } from "../../application/projection/models/ToolRunResult";
@@ -15,6 +16,7 @@ export interface ToolStoreState {
     readonly typeLabel: string;
   }>;
   readonly capabilities: ReadonlyArray<ToolCapabilityDescriptor>;
+  readonly capabilitySearchResult?: CapabilitySearchResult;
   readonly availableTypes: ReadonlyArray<{ readonly id: string; readonly label: string }>;
   readonly selectedTool?: ToolDefinition;
   readonly runResult?: ToolRunResult;
@@ -51,13 +53,21 @@ export class ToolStore {
   public async refreshTools(criteria?: ToolSearchCriteria): Promise<void> {
     this.patch({ isLoading: true, error: undefined, activeSearch: criteria });
     try {
-      const [publishedTools, capabilitySnapshot] = await Promise.all([
+      const normalizedQuery = criteria?.query?.trim();
+      const [publishedTools, capabilitySnapshot, capabilitySearchResult] = await Promise.all([
         this.toolService.listPublishedTools(criteria),
         this.toolService.listToolCapabilities(),
+        normalizedQuery
+          ? this.toolService.searchCapabilities({
+              query: normalizedQuery,
+              limit: 6,
+            })
+          : Promise.resolve(undefined),
       ]);
       this.patch({
         tools: Object.freeze([...publishedTools.tools]),
         capabilities: Object.freeze([...capabilitySnapshot.capabilities]),
+        capabilitySearchResult: normalizedQuery ? capabilitySearchResult : undefined,
         availableTypes: Object.freeze([...publishedTools.availableTypes]),
         isLoading: false,
       });
@@ -113,6 +123,9 @@ export class ToolStore {
       availableTypes: patch.availableTypes
         ? Object.freeze([...patch.availableTypes])
         : this.state.availableTypes,
+      capabilitySearchResult: Object.prototype.hasOwnProperty.call(patch, "capabilitySearchResult")
+        ? patch.capabilitySearchResult
+        : this.state.capabilitySearchResult,
     });
     for (const listener of this.listeners) listener(this.state);
   }

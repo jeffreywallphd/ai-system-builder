@@ -3,6 +3,7 @@ import type { IRuntimeEventSink } from "../../../application/ports/interfaces/IR
 import { RuntimeEventSources } from "../../../application/runtime/RuntimeEvent";
 import type { IMcpRuntimeClient } from "../../../application/ports/interfaces/IMcpRuntimeClient";
 import type { McpConnectionStatus } from "../../../application/mcp/models/McpConnectionStatus";
+import type { McpResourceDescriptor } from "../../../application/mcp/models/McpResourceDescriptor";
 import type { McpToolDescriptor } from "../../../application/mcp/models/McpToolDescriptor";
 
 export class PythonBackedMcpToolCatalog implements IMcpToolCatalog {
@@ -44,5 +45,13 @@ export class PythonBackedMcpToolCatalog implements IMcpToolCatalog {
       });
       throw error;
     }
+  }
+
+  public async listResources(): Promise<ReadonlyArray<McpResourceDescriptor>> {
+    if (typeof this.client.listResources !== "function") {
+      return Object.freeze([]);
+    }
+
+    return this.client.listResources();
   }
 }

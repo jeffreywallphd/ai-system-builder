@@ -3,6 +3,12 @@ import ToolBrowser from "../components/tools/ToolBrowser";
 import ToolSearchBar from "../components/tools/ToolSearchBar";
 import { useUiDependencies } from "../composition/AppProviders";
 
+const capabilityKindLabels = Object.freeze({
+  "tool-capability": "Capability",
+  "mcp-server": "MCP Server",
+  "mcp-resource": "MCP Resource",
+} as const);
+
 export default function ToolsPage(): JSX.Element {
   const { toolStore } = useUiDependencies();
   const [state, setState] = useState(toolStore.getState());
@@ -44,6 +50,27 @@ export default function ToolsPage(): JSX.Element {
         }
         onClear={() => void toolStore.refreshTools()}
       />
+      {state.capabilitySearchResult?.candidates.length ? (
+        <div className="ui-card">
+          <div className="ui-card__body ui-stack">
+            <div>
+              <strong>Capability search candidates</strong>
+              <div className="ui-muted">
+                Showing {state.capabilitySearchResult.candidates.length} of {state.capabilitySearchResult.totalCandidateCount} bounded matches.
+              </div>
+            </div>
+            <ul className="ui-stack" aria-label="Capability search candidates">
+              {state.capabilitySearchResult.candidates.map((candidate) => (
+                <li key={candidate.id}>
+                  <strong>{candidate.title}</strong> — {capabilityKindLabels[candidate.kind]}
+                  {candidate.subtitle ? ` · ${candidate.subtitle}` : ""}
+                  {candidate.description ? <div className="ui-muted">{candidate.description}</div> : null}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      ) : null}
       <ToolBrowser tools={state.tools} />
     </section>
   );

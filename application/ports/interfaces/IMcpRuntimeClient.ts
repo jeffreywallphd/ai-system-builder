@@ -1,4 +1,5 @@
 import type { McpConnectionStatus } from "../../mcp/models/McpConnectionStatus";
+import type { McpResourceDescriptor } from "../../mcp/models/McpResourceDescriptor";
 import type { McpServerConnectionRequest } from "../../mcp/models/McpServerConnectionRequest";
 import type { McpServerConnectionResult } from "../../mcp/models/McpServerConnectionResult";
 import type { McpServerSearchCriteria } from "../../mcp/models/McpServerSearchCriteria";
@@ -14,5 +15,6 @@ export interface IMcpRuntimeClient {
   connectServer(request: McpServerConnectionRequest): Promise<McpServerConnectionResult>;
   disconnectServer(serverId: string): Promise<McpServerConnectionResult>;
   listTools(): Promise<ReadonlyArray<McpToolDescriptor>>;
+  listResources?(): Promise<ReadonlyArray<McpResourceDescriptor>>;
   executeTool(request: McpToolExecutionRequest): Promise<McpToolExecutionResult>;
 }
