@@ -153,9 +153,17 @@ describe("LangChainNodeExecutor", () => {
     });
   });
 
-  it("executes output parser nodes and falls back to JSON-shaped output", async () => {
+  it("executes output parser nodes with schema-aware reports and key-value parsing", async () => {
     const node = makeLangChainNode("n-parse", "langchain.output_parser", [
-      new NodeProperty({ id: "format", name: "Format", type: "select", value: "json" }),
+      new NodeProperty({ id: "format", name: "Format", type: "select", value: "key_value" }),
+      new NodeProperty({ id: "coerceNumbers", name: "Coerce Numbers", type: "boolean", value: true }),
+      new NodeProperty({ id: "trimCodeFence", name: "Trim Code Fence", type: "boolean", value: true }),
+      new NodeProperty({
+        id: "schema",
+        name: "Schema",
+        type: "json",
+        value: { type: "object", properties: { priority: { type: "number" } } },
+      }),
     ]);
     const executor = new LangChainNodeExecutor();
     const result = await executor.executeNode({
@@ -164,14 +172,27 @@ describe("LangChainNodeExecutor", () => {
       inputAssets: [],
       workflowInputs: {},
       upstreamOutputs: {},
-      resolvedInputs: { text: "not-json" },
+      resolvedInputs: {
+        text: "```json\npriority: 3\nstatus: ready\n```",
+        schema: { required: ["priority"] },
+      },
     });
 
     expect(result.status).toBe("completed");
     expect(result.outputs).toEqual({
-      parsed: { text: "not-json" },
-      parsed_output: { text: "not-json" },
-      raw_output: "not-json",
+      parsed: { priority: 3, status: "ready" },
+      parsed_output: { priority: 3, status: "ready" },
+      raw_output: "```json\npriority: 3\nstatus: ready\n```",
+      parseReport: {
+        format: "key_value",
+        usedFallback: false,
+        schema: {
+          type: "object",
+          properties: { priority: { type: "number" } },
+          required: ["priority"],
+        },
+        extractedKeys: ["priority", "status"],
+      },
     });
   });
 
@@ -238,9 +259,11 @@ describe("LangChainNodeExecutor", () => {
     expect((rerankResult.outputs.documents as Array<unknown>).length).toBe(1);
   });
 
-  it("stores message history by session", async () => {
-    const node = makeLangChainNode("n-memory", "langchain.memory", [
-      new NodeProperty({ id: "maxMessages", name: "Max Messages", type: "integer", value: 2 }),
+  it("stores session-oriented message history with seed support", async () => {
+    const node = makeLangChainNode("n-memory", "langchain.message_history", [
+      new NodeProperty({ id: "maxMessages", name: "Max Messages", type: "integer", value: 3 }),
+      new NodeProperty({ id: "seedStrategy", name: "Seed Strategy", type: "select", value: "on-miss" }),
+      new NodeProperty({ id: "dedupeConsecutive", name: "Dedupe Consecutive", type: "boolean", value: true }),
     ]);
     const executor = new LangChainNodeExecutor();
 
@@ -252,7 +275,11 @@ describe("LangChainNodeExecutor", () => {
       upstreamOutputs: {},
       resolvedInputs: {
         sessionId: "session-1",
-        messages: [{ role: "user", content: "Hello" }],
+        seedHistory: [{ role: "system", content: "You are a helpful assistant." }],
+        messages: [
+          { role: "user", content: "Hello" },
+          { role: "user", content: "Hello" },
+        ],
       },
     });
 
@@ -270,9 +297,16 @@ describe("LangChainNodeExecutor", () => {
 
     expect(first.status).toBe("completed");
     expect(second.outputs.history).toEqual([
+      { role: "system", content: "You are a helpful assistant." },
       { role: "user", content: "Hello" },
       { role: "assistant", content: "Hi there" },
     ]);
+    expect(second.outputs.historyState).toEqual({
+      sessionId: "session-1",
+      storedMessageCount: 3,
+      seededMessageCount: 0,
+      appendedMessageCount: 1,
+    });
   });
 
   it("loads documents from a source string", async () => {
@@ -450,7 +484,23 @@ describe("LangChainNodeExecutor", () => {
         type: "multiline-text",
         value: "Search project documents.",
       }),
+      new NodeProperty({
+        id: "inputSchemaSource",
+        name: "Input Schema Source",
+        type: "select",
+        value: "merge",
+      }),
+      new NodeProperty({
+        id: "inputSchema",
+        name: "Input Schema",
+        type: "json",
+        value: {
+          type: "object",
+          properties: { limit: { type: "number" } },
+        },
+      }),
       new NodeProperty({ id: "strictSchema", name: "Strict Schema", type: "boolean", value: true }),
+      new NodeProperty({ id: "displayName", name: "Display Name", type: "text", value: "Search Docs" }),
     ]);
     const executorNode = makeLangChainNode("n-tool-run", "langchain.tool_call_executor", [
       new NodeProperty({
@@ -473,6 +523,7 @@ describe("LangChainNodeExecutor", () => {
         inputSchema: {
           type: "object",
           properties: { query: { type: "string" } },
+          required: ["query"],
         },
       },
     });
@@ -492,13 +543,28 @@ describe("LangChainNodeExecutor", () => {
     expect(toolResult.status).toBe("completed");
     expect(toolResult.outputs.tool).toEqual({
       name: "search_docs",
+      displayName: "Search Docs",
       description: "Search project documents.",
       inputSchema: {
         type: "object",
         properties: { query: { type: "string" } },
+        required: ["query"],
       },
       strictSchema: true,
       handler: undefined,
+    });
+    expect(toolResult.outputs.toolManifest).toEqual({
+      name: "search_docs",
+      displayName: "Search Docs",
+      description: "Search project documents.",
+      strictSchema: true,
+      schemaSource: "merge",
+      hasHandler: false,
+      inputSchema: {
+        type: "object",
+        properties: { query: { type: "string" } },
+        required: ["query"],
+      },
     });
     expect(runResult.status).toBe("completed");
     expect(runResult.outputs.toolResult).toEqual({
