@@ -19,3 +19,4 @@ class ExecuteWorkflowRequest(BaseModel):
     nodes: List[RuntimeNode] = Field(default_factory=list)
     connections: List[RuntimeConnection] = Field(default_factory=list)
     workflow_inputs: Dict[str, Any] = Field(default_factory=dict)
+    execution_context: Dict[str, Any] = Field(default_factory=dict)

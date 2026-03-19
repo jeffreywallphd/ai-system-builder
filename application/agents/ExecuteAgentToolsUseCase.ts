@@ -1,3 +1,4 @@
+import { ExecutionContextToolPolicyService } from "../context/ExecutionContextToolPolicyService";
 import type { IAgentToolOrchestrator } from "../ports/interfaces/IAgentToolOrchestrator";
 import type { IToolCapabilityCatalog } from "../ports/interfaces/IToolCapabilityCatalog";
 import type {
@@ -14,7 +15,8 @@ const MAX_ALLOWED_ITERATIONS = 10;
 export class ExecuteAgentToolsUseCase {
   constructor(
     private readonly catalog: IToolCapabilityCatalog,
-    private readonly orchestrator: IAgentToolOrchestrator
+    private readonly orchestrator: IAgentToolOrchestrator,
+    private readonly policyService: ExecutionContextToolPolicyService = new ExecutionContextToolPolicyService()
   ) {}
 
   public async execute(request: AgentExecutionRequest): Promise<AgentExecutionResult> {
@@ -26,7 +28,7 @@ export class ExecuteAgentToolsUseCase {
     const availableTools = Object.freeze([
       ...(await this.catalog.listCapabilities()),
     ]);
-    const selectedTools = Object.freeze(this.selectTools(availableTools, request));
+    const selectedTools = Object.freeze(this.filterToolsByContextPolicy(this.selectTools(availableTools, request), request));
     const maxIterations = this.normalizeMaxIterations(request.maxIterations);
 
     const metadata = {
@@ -34,13 +36,12 @@ export class ExecuteAgentToolsUseCase {
       ...(request.context
         ? {
             workflowContext: Object.freeze({
-              promptText: request.context.promptText,
-              selectedPackageIds: request.context.selectedPackageIds
-                ? Object.freeze([...request.context.selectedPackageIds])
-                : undefined,
-              packageLabels: request.context.packageLabels
-                ? Object.freeze({ ...request.context.packageLabels })
-                : undefined,
+              packageReferences: request.context.packageReferences,
+              assembledContext: request.context.assembledContext,
+              trimmingPolicy: request.context.trimmingPolicy,
+              budget: request.context.budget,
+              inspection: request.context.inspection,
+              toolUsePolicy: request.context.toolUsePolicy,
             }),
           }
         : {}),
@@ -52,6 +53,7 @@ export class ExecuteAgentToolsUseCase {
       maxIterations,
       availableTools,
       selectedTools,
+      context: request.context,
       metadata: Object.keys(metadata).length > 0 ? Object.freeze(metadata) : undefined,
     });
 
@@ -99,6 +101,17 @@ export class ExecuteAgentToolsUseCase {
     }
 
     return this.filterByProviderAndSource(availableTools, providerKinds, source);
+  }
+
+  private filterToolsByContextPolicy(
+    tools: ReadonlyArray<ToolCapabilityDescriptor>,
+    request: AgentExecutionRequest
+  ): ReadonlyArray<ToolCapabilityDescriptor> {
+    if (!request.context) {
+      return [...tools];
+    }
+
+    return tools.filter((tool) => this.policyService.isSourceAllowed(tool.provider.kind, tool.source, request.context));
   }
 
   private validateSelection(

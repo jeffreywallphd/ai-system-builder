@@ -29,6 +29,13 @@ describe("WorkflowContextService", () => {
             kind: "instructions",
             content: "Never reveal internal notes.",
             order: 0,
+            metadata: {
+              toolInstructions: "Use approved tools only.",
+              toolUsePolicy: {
+                allowedProviderKinds: ["workflow", "mcp"],
+                mcp: { allowedServerIds: ["local"], allowedToolNames: ["echo"] },
+              },
+            },
           },
         ],
       }),
@@ -59,6 +66,20 @@ describe("WorkflowContextService", () => {
     expect(result.packageLabels).toEqual({
       "pkg-style": "Style guide",
       "pkg-policy": "Safety rules",
+    });
+    expect(result.executionContext.packageReferences).toEqual([
+      { packageId: "pkg-policy", alias: "Safety rules", fragmentIds: undefined },
+    ]);
+    expect(result.executionContext.toolUsePolicy).toEqual({
+      instructions: "Use approved tools only.",
+      allowedProviderKinds: ["workflow", "mcp"],
+      blockedProviderKinds: undefined,
+      mcp: {
+        allowedServerIds: ["local"],
+        blockedServerIds: undefined,
+        allowedToolNames: ["echo"],
+        blockedToolNames: undefined,
+      },
     });
   });
 });

@@ -1,3 +1,5 @@
+import type { ExecutionContextEnvelope } from "../../context/models/ExecutionContextEnvelope";
+
 import type {
   ToolCapabilityProviderDescriptor,
   ToolCapabilitySerializableValue,
@@ -5,6 +7,7 @@ import type {
 } from "./ToolCapabilityDescriptor";
 
 export interface ToolCapabilityInvocationRequest {
+  readonly context?: ExecutionContextEnvelope;
   readonly capabilityId: string;
   readonly provider: ToolCapabilityProviderDescriptor;
   readonly source?: ToolCapabilitySourceDescriptor;

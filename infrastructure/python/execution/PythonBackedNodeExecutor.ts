@@ -55,6 +55,7 @@ export class PythonBackedNodeExecutor implements INodeExecutor {
       context: {
         workflowInputs: context.workflowInputs,
         upstreamOutputs: context.upstreamOutputs,
+        executionMetadata: context.executionMetadata,
       },
     });
 

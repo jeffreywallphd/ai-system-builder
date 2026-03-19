@@ -127,6 +127,75 @@ def split_task_into_steps(task: str, *, max_steps: int) -> List[str]:
     return (parts or [normalized])[:max_steps]
 
 
+
+
+def _string_list(value: Any) -> List[str]:
+    if not isinstance(value, list):
+        return []
+    return [item.strip() for item in value if isinstance(item, str) and item.strip()]
+
+
+def _workflow_context(execution_context: Dict[str, Any] | None) -> Dict[str, Any]:
+    if not isinstance(execution_context, dict):
+        return {}
+    direct = execution_context.get("workflowContext")
+    if isinstance(direct, dict):
+        return direct
+    nested = execution_context.get("executionMetadata")
+    if isinstance(nested, dict):
+        workflow_context = nested.get("workflowContext")
+        if isinstance(workflow_context, dict):
+            return workflow_context
+    return {}
+
+
+def _context_instruction_text(execution_context: Dict[str, Any] | None) -> str:
+    workflow_context = _workflow_context(execution_context)
+    tool_use_policy = workflow_context.get("toolUsePolicy")
+    if isinstance(tool_use_policy, dict):
+        instructions = tool_use_policy.get("instructions")
+        if isinstance(instructions, str) and instructions.strip():
+            return instructions.strip()
+    inspection = workflow_context.get("inspection")
+    if isinstance(inspection, dict):
+        final_prompt_text = inspection.get("finalPromptText")
+        if isinstance(final_prompt_text, str) and final_prompt_text.strip():
+            return final_prompt_text.strip()
+    prompt_text = workflow_context.get("promptText")
+    return prompt_text.strip() if isinstance(prompt_text, str) and prompt_text.strip() else ""
+
+
+def _assert_mcp_tool_allowed(
+    tool: Dict[str, Any],
+    execution_context: Dict[str, Any] | None,
+) -> None:
+    workflow_context = _workflow_context(execution_context)
+    tool_use_policy = workflow_context.get("toolUsePolicy")
+    if not isinstance(tool_use_policy, dict):
+        return
+    mcp_policy = tool_use_policy.get("mcp")
+    if not isinstance(mcp_policy, dict):
+        return
+
+    source = tool.get("source") if isinstance(tool.get("source"), dict) else {}
+    server_id = str(source.get("serverId") or "").strip()
+    tool_name = str(source.get("toolName") or tool.get("name") or "").strip()
+
+    allowed_server_ids = set(_string_list(mcp_policy.get("allowedServerIds")))
+    blocked_server_ids = set(_string_list(mcp_policy.get("blockedServerIds")))
+    allowed_tool_names = set(_string_list(mcp_policy.get("allowedToolNames")))
+    blocked_tool_names = set(_string_list(mcp_policy.get("blockedToolNames")))
+
+    if allowed_server_ids and server_id not in allowed_server_ids:
+        raise ValueError("Execution context policy blocked the requested MCP server.")
+    if server_id and server_id in blocked_server_ids:
+        raise ValueError("Execution context policy blocked the requested MCP server.")
+    if allowed_tool_names and tool_name not in allowed_tool_names:
+        raise ValueError("Execution context policy blocked the requested MCP tool.")
+    if tool_name and tool_name in blocked_tool_names:
+        raise ValueError("Execution context policy blocked the requested MCP tool.")
+
+
 def build_fallback_tool_result(tool: Dict[str, Any], arguments: Dict[str, Any]) -> Dict[str, Any]:
     missing_required_arguments = [
         name for name in required_tool_arguments(tool) if arguments.get(name) in (None, "")
@@ -176,6 +245,7 @@ def execute_tool(
     arguments: Dict[str, Any],
     *,
     mcp_service: McpService | None = None,
+    execution_context: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     provider = tool.get("provider") if isinstance(tool.get("provider"), dict) else {}
     source = tool.get("source") if isinstance(tool.get("source"), dict) else {}
@@ -185,6 +255,7 @@ def execute_tool(
         and source.get("serverId")
         and mcp_service is not None
     ):
+        _assert_mcp_tool_allowed(tool, execution_context)
         tool_name = str(source.get("toolName") or tool.get("name") or "").strip()
         result = mcp_service.execute_tool(
             McpToolExecutionRequest(
@@ -192,7 +263,11 @@ def execute_tool(
                 tool_name=tool_name,
                 arguments=dict(arguments),
                 execution_id=f"agent-{tool.get('capabilityId') or tool_name}",
-                metadata={"origin": "langchain.simple_agent"},
+                metadata={
+                    "origin": "langchain.simple_agent",
+                    "contextInstructions": _context_instruction_text(execution_context) or None,
+                    **({"workflowContext": _workflow_context(execution_context)} if _workflow_context(execution_context) else {}),
+                },
             )
         )
         content = [dict(item) for item in result.content]
@@ -319,6 +394,7 @@ def run_agent_orchestration(
     temperature: float,
     verbose: bool,
     mcp_service: McpService | None = None,
+    execution_context: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     available_tools = [
         tool for tool in [normalize_tool_descriptor(item) for item in (tools_input or [])] if tool is not None
@@ -342,6 +418,7 @@ def run_agent_orchestration(
             chosen_tool,
             {"input": task_segment},
             mcp_service=mcp_service,
+            execution_context=execution_context,
         )
         tool_calls.append(dict(executed_tool["toolCall"]))
         tool_results.append(dict(executed_tool["toolResult"]))
