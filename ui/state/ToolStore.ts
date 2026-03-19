@@ -1,6 +1,8 @@
+import type { CapabilitySearchResult } from "../../application/research/models/CapabilitySearchResult";
+import type { ToolSearchCriteria } from "../../application/dto/ToolSearchCriteria";
 import type { ToolDefinition } from "../../application/projection/models/ToolDefinition";
 import type { ToolRunResult } from "../../application/projection/models/ToolRunResult";
-import type { ToolSearchCriteria } from "../../application/dto/ToolSearchCriteria";
+import type { ToolCapabilityDescriptor } from "../../application/tools/models/ToolCapabilityDescriptor";
 import { ToolService } from "../services/ToolService";
 
 export interface ToolStoreState {
@@ -13,6 +15,8 @@ export interface ToolStoreState {
     readonly typeId: string;
     readonly typeLabel: string;
   }>;
+  readonly capabilities: ReadonlyArray<ToolCapabilityDescriptor>;
+  readonly capabilitySearchResult?: CapabilitySearchResult;
   readonly availableTypes: ReadonlyArray<{ readonly id: string; readonly label: string }>;
   readonly selectedTool?: ToolDefinition;
   readonly runResult?: ToolRunResult;
@@ -24,6 +28,7 @@ export interface ToolStoreState {
 
 const defaultState: ToolStoreState = Object.freeze({
   tools: Object.freeze([]),
+  capabilities: Object.freeze([]),
   availableTypes: Object.freeze([]),
   isLoading: false,
   isRunning: false,
@@ -38,6 +43,7 @@ export class ToolStore {
   public getState(): ToolStoreState {
     return this.state;
   }
+
   public subscribe(listener: (state: ToolStoreState) => void): () => void {
     this.listeners.add(listener);
     listener(this.state);
@@ -47,10 +53,22 @@ export class ToolStore {
   public async refreshTools(criteria?: ToolSearchCriteria): Promise<void> {
     this.patch({ isLoading: true, error: undefined, activeSearch: criteria });
     try {
-      const result = await this.toolService.listPublishedTools(criteria);
+      const normalizedQuery = criteria?.query?.trim();
+      const [publishedTools, capabilitySnapshot, capabilitySearchResult] = await Promise.all([
+        this.toolService.listPublishedTools(criteria),
+        this.toolService.listToolCapabilities(),
+        normalizedQuery
+          ? this.toolService.searchCapabilities({
+              query: normalizedQuery,
+              limit: 6,
+            })
+          : Promise.resolve(undefined),
+      ]);
       this.patch({
-        tools: Object.freeze([...result.tools]),
-        availableTypes: Object.freeze([...result.availableTypes]),
+        tools: Object.freeze([...publishedTools.tools]),
+        capabilities: Object.freeze([...capabilitySnapshot.capabilities]),
+        capabilitySearchResult: normalizedQuery ? capabilitySearchResult : undefined,
+        availableTypes: Object.freeze([...publishedTools.availableTypes]),
         isLoading: false,
       });
     } catch (error) {
@@ -99,9 +117,15 @@ export class ToolStore {
       ...this.state,
       ...patch,
       tools: patch.tools ? Object.freeze([...patch.tools]) : this.state.tools,
+      capabilities: patch.capabilities
+        ? Object.freeze([...patch.capabilities])
+        : this.state.capabilities,
       availableTypes: patch.availableTypes
         ? Object.freeze([...patch.availableTypes])
         : this.state.availableTypes,
+      capabilitySearchResult: Object.prototype.hasOwnProperty.call(patch, "capabilitySearchResult")
+        ? patch.capabilitySearchResult
+        : this.state.capabilitySearchResult,
     });
     for (const listener of this.listeners) listener(this.state);
   }

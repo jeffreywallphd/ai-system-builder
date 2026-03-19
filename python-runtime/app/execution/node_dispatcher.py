@@ -15,7 +15,7 @@ class NodeDispatcher:
         langchain_executor: LangChainExecutor | None = None,
         mcp_service: McpService | None = None,
     ) -> None:
-        self._langchain_executor = langchain_executor or LangChainExecutor()
+        self._langchain_executor = langchain_executor or LangChainExecutor(mcp_service=mcp_service)
         self._mcp_service = mcp_service
 
     def dispatch(self, node_type: str, *, inputs: Dict[str, Any], properties: Dict[str, Any]) -> Dict[str, Any]:

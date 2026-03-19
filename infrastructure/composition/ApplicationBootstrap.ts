@@ -24,7 +24,13 @@ import { LoadAssetUseCase } from "../../application/assets/LoadAssetUseCase";
 import { ListAssetsUseCase } from "../../application/assets/ListAssetsUseCase";
 import { DeleteAssetUseCase } from "../../application/assets/DeleteAssetUseCase";
 import { ListMcpToolsUseCase } from "../../application/mcp/ListMcpToolsUseCase";
+import { SearchMcpServersUseCase } from "../../application/mcp/SearchMcpServersUseCase";
+import { GetMcpServerStatusUseCase } from "../../application/mcp/GetMcpServerStatusUseCase";
+import { ConnectMcpServerUseCase } from "../../application/mcp/ConnectMcpServerUseCase";
+import { DisconnectMcpServerUseCase } from "../../application/mcp/DisconnectMcpServerUseCase";
 import { ExecuteMcpToolUseCase } from "../../application/mcp/ExecuteMcpToolUseCase";
+import { ListToolCapabilitiesUseCase } from "../../application/tools/ListToolCapabilitiesUseCase";
+import { InvokeToolCapabilityUseCase } from "../../application/tools/InvokeToolCapabilityUseCase";
 
 import type { INodeCatalogProvider } from "../../application/ports/interfaces/INodeCatalogProvider";
 import type { IWorkflowExecutor } from "../../application/ports/interfaces/IWorkflowExecutor";
@@ -36,6 +42,8 @@ import type { IModelInstaller } from "../../application/ports/interfaces/IModelI
 import type { IFileStorage } from "../../application/ports/interfaces/IFileStorage";
 import type { IMcpToolCatalog } from "../../application/ports/interfaces/IMcpToolCatalog";
 import type { IMcpToolExecutor } from "../../application/ports/interfaces/IMcpToolExecutor";
+import type { IToolCapabilityCatalog } from "../../application/ports/interfaces/IToolCapabilityCatalog";
+import type { IToolCapabilityExecutor } from "../../application/ports/interfaces/IToolCapabilityExecutor";
 import type { IWorkflowValidator } from "../../domain/services/interfaces/IWorkflowValidator";
 import type { INodeCompatibilityService } from "../../domain/services/interfaces/INodeCompatibilityService";
 import type { IModelCompatibilityService } from "../../domain/services/interfaces/IModelCompatibilityService";
@@ -65,7 +73,13 @@ export const APPLICATION_TOKENS = Object.freeze({
   DeleteAssetUseCase: Symbol("DeleteAssetUseCase"),
 
   ListMcpToolsUseCase: Symbol("ListMcpToolsUseCase"),
+  SearchMcpServersUseCase: Symbol("SearchMcpServersUseCase"),
+  GetMcpServerStatusUseCase: Symbol("GetMcpServerStatusUseCase"),
+  ConnectMcpServerUseCase: Symbol("ConnectMcpServerUseCase"),
+  DisconnectMcpServerUseCase: Symbol("DisconnectMcpServerUseCase"),
   ExecuteMcpToolUseCase: Symbol("ExecuteMcpToolUseCase"),
+  ListToolCapabilitiesUseCase: Symbol("ListToolCapabilitiesUseCase"),
+  InvokeToolCapabilityUseCase: Symbol("InvokeToolCapabilityUseCase"),
 });
 
 export interface IApplicationBootstrapOptions extends IInfrastructureRegistryOptions {}
@@ -254,10 +268,46 @@ export class ApplicationBootstrap {
     );
 
     container.registerSingleton(
+      APPLICATION_TOKENS.SearchMcpServersUseCase,
+      (c) => new SearchMcpServersUseCase(c.resolve(TOKENS.McpRuntimeClient))
+    );
+
+    container.registerSingleton(
+      APPLICATION_TOKENS.GetMcpServerStatusUseCase,
+      (c) => new GetMcpServerStatusUseCase(c.resolve(TOKENS.McpRuntimeClient))
+    );
+
+    container.registerSingleton(
+      APPLICATION_TOKENS.ConnectMcpServerUseCase,
+      (c) => new ConnectMcpServerUseCase(c.resolve(TOKENS.McpRuntimeClient))
+    );
+
+    container.registerSingleton(
+      APPLICATION_TOKENS.DisconnectMcpServerUseCase,
+      (c) => new DisconnectMcpServerUseCase(c.resolve(TOKENS.McpRuntimeClient))
+    );
+
+    container.registerSingleton(
       APPLICATION_TOKENS.ExecuteMcpToolUseCase,
       (c) =>
         new ExecuteMcpToolUseCase(
           c.resolve<IMcpToolExecutor>(TOKENS.McpToolExecutor)
+        )
+    );
+
+    container.registerSingleton(
+      APPLICATION_TOKENS.ListToolCapabilitiesUseCase,
+      (c) =>
+        new ListToolCapabilitiesUseCase(
+          c.resolve<IToolCapabilityCatalog>(TOKENS.ToolCapabilityCatalog)
+        )
+    );
+
+    container.registerSingleton(
+      APPLICATION_TOKENS.InvokeToolCapabilityUseCase,
+      (c) =>
+        new InvokeToolCapabilityUseCase(
+          c.resolve<IToolCapabilityExecutor>(TOKENS.ToolCapabilityExecutor)
         )
     );
   }

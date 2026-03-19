@@ -3,7 +3,7 @@ import { ListMcpToolsUseCase } from "../ListMcpToolsUseCase";
 import type { IMcpToolCatalog } from "../../ports/interfaces/IMcpToolCatalog";
 
 describe("ListMcpToolsUseCase", () => {
-  it("returns status and tools from the catalog", async () => {
+  it("returns status, tools, and resources from the catalog", async () => {
     const catalog: IMcpToolCatalog = {
       getConnectionStatus: async () => ({
         enabled: true,
@@ -30,6 +30,13 @@ describe("ListMcpToolsUseCase", () => {
           inputSchema: { type: "object" },
         },
       ],
+      listResources: async () => [
+        {
+          serverId: "local",
+          uri: "memory://docs/guide",
+          name: "Guide",
+        },
+      ],
     };
 
     const result = await new ListMcpToolsUseCase(catalog).execute();
@@ -37,5 +44,12 @@ describe("ListMcpToolsUseCase", () => {
     expect(result.status.state).toBe("ready");
     expect(result.tools).toHaveLength(1);
     expect(result.tools[0]?.name).toBe("echo");
+    expect(result.resources).toEqual([
+      {
+        serverId: "local",
+        uri: "memory://docs/guide",
+        name: "Guide",
+      },
+    ]);
   });
 });

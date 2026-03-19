@@ -206,8 +206,13 @@ export default function SettingsPage(): JSX.Element {
           <McpRuntimeStatusPanel
             status={mcpState.status}
             tools={mcpState.tools}
+            servers={mcpState.servers}
+            searchQuery={mcpState.searchQuery}
             isLoading={mcpState.isLoading}
             error={mcpState.error}
+            onSearchChange={(value) => void mcpStore.search(value).catch(() => undefined)}
+            onConnectServer={(serverId, reconnect) => void mcpStore.connect(serverId, reconnect).catch(() => undefined)}
+            onDisconnectServer={(serverId) => void mcpStore.disconnect(serverId).catch(() => undefined)}
           />
 
           <AdvancedSection

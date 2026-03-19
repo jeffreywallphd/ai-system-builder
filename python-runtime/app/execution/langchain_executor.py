@@ -6,6 +6,16 @@ from typing import Any, Dict, List
 from langchain_core.documents import Document as LangChainDocument
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from app.mcp.service import McpService
+
+from .agent_tool_orchestrator import (
+    build_step_result,
+    execute_tool,
+    normalize_tool_descriptor,
+    normalize_tool_identifier,
+    pick_tool_for_task,
+    split_task_into_steps,
+)
 
 try:
     from langchain.chains.summarize import load_summarize_chain  # type: ignore
@@ -137,20 +147,7 @@ def _dedupe_consecutive_messages(messages: List[Dict[str, str]]) -> List[Dict[st
 
 
 def _normalize_tool(tool: Any) -> Dict[str, Any] | None:
-    if not isinstance(tool, dict):
-        return None
-    name = tool.get("name")
-    description = tool.get("description")
-    if not isinstance(name, str) or not name.strip() or not isinstance(description, str):
-        return None
-    schema = tool.get("inputSchema") if isinstance(tool.get("inputSchema"), dict) else None
-    return {
-        "name": name.strip(),
-        "description": description,
-        "inputSchema": schema,
-        "strictSchema": tool.get("strictSchema") if isinstance(tool.get("strictSchema"), bool) else None,
-        "handler": tool.get("handler"),
-    }
+    return normalize_tool_descriptor(tool)
 
 
 def _normalize_tool_call(value: Any) -> Dict[str, Any] | None:
@@ -161,57 +158,6 @@ def _normalize_tool_call(value: Any) -> Dict[str, Any] | None:
         return None
     arguments = value.get("arguments") if isinstance(value.get("arguments"), dict) else value.get("args") if isinstance(value.get("args"), dict) else {}
     return {"name": name.strip(), "arguments": dict(arguments)}
-
-
-def _required_tool_arguments(tool: Dict[str, Any]) -> List[str]:
-    schema = tool.get("inputSchema") if isinstance(tool.get("inputSchema"), dict) else {}
-    required = schema.get("required")
-    if not isinstance(required, list):
-        return []
-    return [str(value) for value in required if isinstance(value, str) and value.strip()]
-
-
-def _pick_tool_for_task(task: str, tools: List[Dict[str, Any]]) -> Dict[str, Any] | None:
-    if not tools:
-        return None
-    normalized_task = task.lower()
-    for tool in tools:
-        if tool["name"].lower() in normalized_task:
-            return tool
-    for tool in tools:
-        description = str(tool.get("description") or "").lower()
-        if any(keyword in normalized_task and keyword in description for keyword in ["search", "find", "lookup", "retrieve", "tool"]):
-            return tool
-    return tools[0]
-
-
-def _build_tool_result(tool: Dict[str, Any], arguments: Dict[str, Any]) -> Dict[str, Any]:
-    missing_required_arguments = [
-        name
-        for name in _required_tool_arguments(tool)
-        if arguments.get(name) in (None, "")
-    ]
-    primary_input = str(
-        arguments.get("input")
-        or arguments.get("query")
-        or arguments.get("request")
-        or arguments.get("text")
-        or ""
-    ).strip()
-    tool_call = {"name": tool["name"], "arguments": dict(arguments)}
-    tool_result = {
-        "toolName": tool["name"],
-        "arguments": dict(arguments),
-        "missingRequiredArguments": missing_required_arguments,
-        "status": "missing-required-arguments" if missing_required_arguments else "completed",
-        "output": f"{tool['description']} :: {primary_input or json.dumps(arguments, sort_keys=True) if arguments else 'no arguments provided'}",
-    }
-    return {
-        "toolCall": tool_call,
-        "toolResult": tool_result,
-        "resultText": json.dumps(tool_result, sort_keys=True),
-        "missingRequiredArguments": missing_required_arguments,
-    }
 
 
 def _normalize_knowledge_base_handle(value: Any) -> Dict[str, Any]:
@@ -353,6 +299,9 @@ class _DeterministicLlm:
 
 
 class LangChainExecutor:
+    def __init__(self, mcp_service: McpService | None = None) -> None:
+        self._mcp_service = mcp_service
+
     def execute(self, node_type: str, *, inputs: Dict[str, Any], properties: Dict[str, Any]) -> Dict[str, Any]:
         if node_type in {"langchain.prompt_template", "langchain.prompt-template"}:
             template = str(properties.get("template") or inputs.get("template") or "{input}")
@@ -720,7 +669,7 @@ class LangChainExecutor:
                     "resultText": json.dumps(tool_result, sort_keys=True) if stringify_result else None,
                 }
 
-            executed = _build_tool_result(tool, arguments)
+            executed = execute_tool(tool, arguments, mcp_service=self._mcp_service)
             return {
                 "toolCall": executed["toolCall"],
                 "toolResult": executed["toolResult"],
@@ -738,6 +687,7 @@ class LangChainExecutor:
             incoming_messages = _normalize_messages(inputs.get("messages"))
             direct_input = str(inputs.get("input") or "")
             tools = [tool for tool in [_normalize_tool(item) for item in (inputs.get("tools") or [])] if tool is not None]
+            selected_tool_inputs = inputs.get("selectedTools")
 
             assembled_messages: List[Dict[str, str]] = []
             if system_prompt.strip():
@@ -750,23 +700,96 @@ class LangChainExecutor:
 
             user_messages = [message["content"] for message in assembled_messages if message["role"] == "user"]
             latest_user_input = user_messages[-1] if user_messages else direct_input
-            chosen_tool = _pick_tool_for_task(latest_user_input, tools) if latest_user_input else None
-            executed_tool = _build_tool_result(chosen_tool, {"input": latest_user_input}) if chosen_tool and latest_user_input else None
-            iteration_count = 0 if not latest_user_input else min(max_iterations, 2 if executed_tool else 1)
-            response = (
-                f"[{model}] {latest_user_input}\n\nUsed tool '{chosen_tool['name']}' and observed: {executed_tool['toolResult']['output']}"
-                if executed_tool and latest_user_input
-                else f"[{model}] {latest_user_input}" if latest_user_input
-                else ""
+            selected_identifiers = []
+            if isinstance(selected_tool_inputs, list):
+                selected_identifiers = [
+                    identifier
+                    for identifier in (normalize_tool_identifier(item) for item in selected_tool_inputs)
+                    if identifier
+                ]
+
+            selected_tools = (
+                [
+                    tool
+                    for tool in tools
+                    if tool.get("capabilityId") in selected_identifiers
+                    or tool.get("name") in selected_identifiers
+                    or tool.get("displayName") in selected_identifiers
+                ]
+                if selected_identifiers
+                else list(tools)
             )
+
+            task_segments = split_task_into_steps(latest_user_input, max_steps=max_iterations)
+            tool_calls: List[Dict[str, Any]] = []
+            tool_results: List[Dict[str, Any]] = []
+            step_results: List[Dict[str, Any]] = []
+            chosen_tool_names: List[str] = []
+
+            for step_index, task_segment in enumerate(task_segments, start=1):
+                chosen_tool = pick_tool_for_task(task_segment, selected_tools)
+                if chosen_tool is None:
+                    break
+
+                chosen_tool_names.append(str(chosen_tool.get("name") or ""))
+                executed_tool = execute_tool(
+                    chosen_tool,
+                    {"input": task_segment},
+                    mcp_service=self._mcp_service,
+                )
+                tool_calls.append(dict(executed_tool["toolCall"]))
+                tool_results.append(dict(executed_tool["toolResult"]))
+                step_results.append(
+                    build_step_result(
+                        index=step_index,
+                        task=task_segment,
+                        tool=chosen_tool,
+                        executed=executed_tool,
+                    )
+                )
+
+                if executed_tool["toolResult"].get("status") != "completed":
+                    break
+
+            iteration_count = len(step_results)
+            if tool_results and latest_user_input:
+                observed = "; ".join(
+                    str(tool_result.get("output") or tool_result.get("errorMessage") or "").strip()
+                    for tool_result in tool_results
+                    if str(tool_result.get("output") or tool_result.get("errorMessage") or "").strip()
+                )
+                response = f"[{model}] {latest_user_input}\n\nUsed {iteration_count} tool step(s): {', '.join(chosen_tool_names)}.\nObserved: {observed}"
+            else:
+                response = f"[{model}] {latest_user_input}" if latest_user_input else ""
             output_messages = list(assembled_messages)
             if response:
                 output_messages.append({"role": "assistant", "content": response})
             result: Dict[str, Any] = {
                 "response": response,
                 "messages": output_messages,
-                "toolCalls": [executed_tool["toolCall"]] if executed_tool else [],
-                "toolResults": [executed_tool["toolResult"]] if executed_tool else [],
+                "toolCalls": tool_calls,
+                "toolResults": tool_results,
+                "stepResults": step_results,
+                "availableTools": [
+                    {
+                        "capabilityId": tool.get("capabilityId"),
+                        "name": tool.get("name"),
+                        "displayName": tool.get("displayName"),
+                        "provider": dict(tool.get("provider") or {}),
+                        "source": dict(tool.get("source") or {}),
+                    }
+                    for tool in tools
+                ],
+                "selectedTools": [
+                    {
+                        "capabilityId": tool.get("capabilityId"),
+                        "name": tool.get("name"),
+                        "displayName": tool.get("displayName"),
+                        "provider": dict(tool.get("provider") or {}),
+                        "source": dict(tool.get("source") or {}),
+                    }
+                    for tool in selected_tools
+                ],
             }
             if verbose:
                 result["trace"] = {
@@ -774,7 +797,23 @@ class LangChainExecutor:
                     "maxIterations": max_iterations,
                     "iterationCount": iteration_count,
                     "toolCount": len(tools),
-                    "selectedTool": chosen_tool["name"] if chosen_tool else None,
+                    "selectedToolCount": len(selected_tools),
+                    "selectedTools": [tool.get("name") for tool in selected_tools],
+                    "usedProviderKinds": sorted(
+                        {
+                            str(tool_result.get("provider", {}).get("kind"))
+                            for tool_result in tool_results
+                            if isinstance(tool_result.get("provider"), dict)
+                            and tool_result.get("provider", {}).get("kind")
+                        }
+                    ),
+                    "stoppedReason": (
+                        "max-iterations-reached"
+                        if latest_user_input and iteration_count >= max_iterations and max_iterations > 0
+                        else "no-tool-selected"
+                        if latest_user_input and iteration_count == 0
+                        else "completed"
+                    ),
                 }
             return result
 

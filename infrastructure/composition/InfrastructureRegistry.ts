@@ -31,6 +31,8 @@ import type { IWorkflowSerializer } from "../../application/ports/interfaces/IWo
 import type { IMcpRuntimeClient } from "../../application/ports/interfaces/IMcpRuntimeClient";
 import type { IMcpToolCatalog } from "../../application/ports/interfaces/IMcpToolCatalog";
 import type { IMcpToolExecutor } from "../../application/ports/interfaces/IMcpToolExecutor";
+import type { IToolCapabilityCatalog } from "../../application/ports/interfaces/IToolCapabilityCatalog";
+import type { IToolCapabilityExecutor } from "../../application/ports/interfaces/IToolCapabilityExecutor";
 import type { IRuntimeEventSink } from "../../application/ports/interfaces/IRuntimeEventSink";
 import type { INodeImplementationRegistry } from "../nodes/shared/INodeImplementationRegistry";
 import { CompositeNodeImplementationRegistry } from "../nodes/CompositeNodeImplementationRegistry";
@@ -38,6 +40,15 @@ import { createCompositeNodeImplementationRegistry } from "../nodes/NodeProvider
 import { HttpMcpRuntimeClient } from "../python/mcp/HttpMcpRuntimeClient";
 import { PythonBackedMcpToolCatalog } from "../python/mcp/PythonBackedMcpToolCatalog";
 import { PythonBackedMcpToolExecutor } from "../python/mcp/PythonBackedMcpToolExecutor";
+import { CompositeToolCapabilityCatalog } from "../tools/CompositeToolCapabilityCatalog";
+import { CompositeToolCapabilityExecutor } from "../tools/CompositeToolCapabilityExecutor";
+import { McpToolCapabilityCatalog, MCP_TOOL_CAPABILITY_PROVIDER } from "../tools/McpToolCapabilityCatalog";
+import { McpToolCapabilityExecutor } from "../tools/McpToolCapabilityExecutor";
+import { WorkflowProjectedToolCapabilityCatalog, WORKFLOW_TOOL_CAPABILITY_PROVIDER } from "../tools/WorkflowProjectedToolCapabilityCatalog";
+import { WorkflowToolCapabilityExecutor } from "../tools/WorkflowToolCapabilityExecutor";
+import { WorkflowToolProjectionService } from "../../application/projection/WorkflowToolProjectionService";
+import { LoadToolDefinitionUseCase } from "../../application/tools/LoadToolDefinitionUseCase";
+import { RunToolUseCase } from "../../application/tools/RunToolUseCase";
 
 export const TOKENS = Object.freeze({
   EnvironmentConfig: Symbol("EnvironmentConfig"),
@@ -46,6 +57,8 @@ export const TOKENS = Object.freeze({
   McpRuntimeClient: Symbol("McpRuntimeClient"),
   McpToolCatalog: Symbol("McpToolCatalog"),
   McpToolExecutor: Symbol("McpToolExecutor"),
+  ToolCapabilityCatalog: Symbol("ToolCapabilityCatalog"),
+  ToolCapabilityExecutor: Symbol("ToolCapabilityExecutor"),
   FileStorage: Symbol("FileStorage"),
   AssetCatalog: Symbol("AssetCatalog"),
   InstalledModelCatalog: Symbol("InstalledModelCatalog"),
@@ -132,6 +145,78 @@ export class InfrastructureRegistry {
             capabilities: { tools: false, resources: false, toolExecution: false },
             metadata: { reason: "python-runtime-disabled" },
           }),
+          listServers: async () => ({
+            query: "",
+            totalCount: 0,
+            limit: 20,
+            servers: [],
+            status: {
+              enabled: false,
+              state: "disabled",
+              checkedAt: new Date().toISOString(),
+              servers: [],
+              capabilities: { tools: false, resources: false, toolExecution: false },
+              metadata: { reason: "python-runtime-disabled" },
+            },
+          }),
+          searchServers: async (criteria) => ({
+            query: criteria?.query?.trim() || "",
+            totalCount: 0,
+            limit: criteria?.limit ?? 20,
+            servers: [],
+            status: {
+              enabled: false,
+              state: "disabled",
+              checkedAt: new Date().toISOString(),
+              servers: [],
+              capabilities: { tools: false, resources: false, toolExecution: false },
+              metadata: { reason: "python-runtime-disabled" },
+            },
+          }),
+          connectServer: async (request) => ({
+            action: request.reconnect ? "reconnect" : "connect",
+            checkedAt: new Date().toISOString(),
+            server: {
+              id: request.serverId,
+              name: request.serverId,
+              transport: "inmemory",
+              status: "error",
+              toolCount: 0,
+              resourceCount: 0,
+              capabilities: { tools: false, resources: false, toolExecution: false },
+              errorMessage: "Python runtime is disabled.",
+            },
+            status: {
+              enabled: false,
+              state: "disabled",
+              checkedAt: new Date().toISOString(),
+              servers: [],
+              capabilities: { tools: false, resources: false, toolExecution: false },
+              metadata: { reason: "python-runtime-disabled" },
+            },
+          }),
+          disconnectServer: async (serverId) => ({
+            action: "disconnect",
+            checkedAt: new Date().toISOString(),
+            server: {
+              id: serverId,
+              name: serverId,
+              transport: "inmemory",
+              status: "disconnected",
+              toolCount: 0,
+              resourceCount: 0,
+              capabilities: { tools: false, resources: false, toolExecution: false },
+              errorMessage: "Python runtime is disabled.",
+            },
+            status: {
+              enabled: false,
+              state: "disabled",
+              checkedAt: new Date().toISOString(),
+              servers: [],
+              capabilities: { tools: false, resources: false, toolExecution: false },
+              metadata: { reason: "python-runtime-disabled" },
+            },
+          }),
           listTools: async () => [],
           executeTool: async (request) => ({
             executionId: request.executionId?.trim() || "mcp-disabled",
@@ -159,6 +244,46 @@ export class InfrastructureRegistry {
         c.resolve<IMcpRuntimeClient>(TOKENS.McpRuntimeClient),
         c.tryResolve<IRuntimeEventSink>(Symbol.for("RuntimeEventSink"))
       );
+    });
+
+    container.registerSingleton<IToolCapabilityCatalog>(TOKENS.ToolCapabilityCatalog, (c) => {
+      return new CompositeToolCapabilityCatalog([
+        new WorkflowProjectedToolCapabilityCatalog(
+          c.resolve(TOKENS.WorkflowRepository),
+          new WorkflowToolProjectionService()
+        ),
+        new McpToolCapabilityCatalog(c.resolve<IMcpToolCatalog>(TOKENS.McpToolCatalog)),
+      ]);
+    });
+
+    container.registerSingleton<IToolCapabilityExecutor>(TOKENS.ToolCapabilityExecutor, (c) => {
+      const workflowRepository = c.resolve(TOKENS.WorkflowRepository);
+      const workflowToolProjectionService = new WorkflowToolProjectionService();
+      const loadToolDefinitionUseCase = new LoadToolDefinitionUseCase(
+        workflowRepository,
+        workflowToolProjectionService
+      );
+      const runToolUseCase = new RunToolUseCase(
+        workflowRepository,
+        workflowToolProjectionService,
+        c.resolve<IWorkflowExecutor>(TOKENS.WorkflowExecutor),
+        loadToolDefinitionUseCase
+      );
+
+      return new CompositeToolCapabilityExecutor([
+        {
+          providerKind: WORKFLOW_TOOL_CAPABILITY_PROVIDER.kind,
+          providerId: WORKFLOW_TOOL_CAPABILITY_PROVIDER.id,
+          executor: new WorkflowToolCapabilityExecutor(runToolUseCase),
+        },
+        {
+          providerKind: MCP_TOOL_CAPABILITY_PROVIDER.kind,
+          providerId: MCP_TOOL_CAPABILITY_PROVIDER.id,
+          executor: new McpToolCapabilityExecutor(
+            c.resolve<IMcpToolExecutor>(TOKENS.McpToolExecutor)
+          ),
+        },
+      ]);
     });
 
     container.registerSingleton<IFileStorage>(TOKENS.FileStorage, () => {

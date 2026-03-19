@@ -1,4 +1,8 @@
 from app.execution.langchain_executor import LangChainExecutor
+from app.core.mcp_config import McpRuntimeConfig
+from app.mcp.registry import McpRegistry
+from app.mcp.service import McpService
+from app.mcp.session import McpSessionManager
 
 
 def test_text_splitter_generates_chunks() -> None:
@@ -118,7 +122,8 @@ def test_tool_execution_normalizes_tool_call_and_result() -> None:
         properties={'failOnMissingArgs': True, 'stringifyResult': True},
     )
 
-    assert result['toolCall'] == {'name': 'search_docs', 'arguments': {'query': 'workflow nodes'}}
+    assert result['toolCall']['name'] == 'search_docs'
+    assert result['toolCall']['arguments'] == {'query': 'workflow nodes'}
     assert result['toolResult']['status'] == 'completed'
     assert result['toolResult']['missingRequiredArguments'] == []
     assert 'Search project documents.' in result['toolResult']['output']
@@ -145,9 +150,81 @@ def test_simple_agent_uses_one_tool_in_bounded_mode() -> None:
     )
 
     assert result['response'].startswith('[assistant-demo] Please search the workflow docs')
-    assert result['toolCalls'] == [{'name': 'search_docs', 'arguments': {'input': 'Please search the workflow docs for node editor tips.'}}]
+    assert result['toolCalls'][0]['name'] == 'search_docs'
+    assert result['toolCalls'][0]['arguments'] == {'input': 'Please search the workflow docs for node editor tips.'}
     assert result['toolResults'][0]['status'] == 'completed'
+    assert result['stepResults'][0]['capabilityId'] == 'search_docs'
+    assert result['selectedTools'][0]['name'] == 'search_docs'
+    assert result['trace']['iterationCount'] == 1
+
+
+def test_simple_agent_runs_multiple_bounded_steps() -> None:
+    executor = LangChainExecutor()
+    result = executor.execute(
+        'langchain.simple_agent',
+        inputs={
+            'input': 'First search the workflow docs, then echo the summary back.',
+            'tools': [
+                {'name': 'search_docs', 'description': 'Search project documents.'},
+                {'name': 'echo_reply', 'description': 'Echo the latest answer back to the user.'},
+            ],
+        },
+        properties={
+            'model': 'assistant-demo',
+            'maxIterations': 2,
+            'verbose': True,
+        },
+    )
+
+    assert len(result['toolCalls']) == 2
+    assert len(result['stepResults']) == 2
     assert result['trace']['iterationCount'] == 2
+    assert result['trace']['stoppedReason'] == 'max-iterations-reached'
+
+
+def test_simple_agent_honors_selected_tool_subset_and_mcp_metadata() -> None:
+    config = McpRuntimeConfig(
+        enabled=True,
+        servers_json='[{"id": "local", "name": "Local MCP", "transport": "inmemory", "mock_tools": [{"name": "echo", "inputSchema": {"type": "object"}}]}]',
+    )
+    registry = McpRegistry(config)
+    mcp_service = McpService(registry=registry, sessions=McpSessionManager(registry))
+    executor = LangChainExecutor(mcp_service=mcp_service)
+
+    result = executor.execute(
+        'langchain.simple_agent',
+        inputs={
+            'input': 'Please echo this task.',
+            'tools': [
+                {
+                    'id': 'mcp:local:echo',
+                    'displayName': 'Local Echo',
+                    'description': 'Echoes text through MCP.',
+                    'provider': {'kind': 'mcp', 'id': 'python-mcp-runtime', 'label': 'MCP Tools'},
+                    'source': {'serverId': 'local', 'toolName': 'echo'},
+                },
+                {
+                    'id': 'workflow:wf-tool',
+                    'displayName': 'Workflow Tool',
+                    'description': 'Does workflow work.',
+                    'provider': {'kind': 'workflow', 'id': 'workflow-projection', 'label': 'Workflow Tools'},
+                    'source': {'workflowId': 'wf-tool'},
+                },
+            ],
+            'selectedTools': ['mcp:local:echo'],
+        },
+        properties={
+            'model': 'assistant-demo',
+            'maxIterations': 1,
+            'verbose': True,
+        },
+    )
+
+    assert len(result['selectedTools']) == 1
+    assert result['selectedTools'][0]['provider']['kind'] == 'mcp'
+    assert result['toolResults'][0]['provider']['kind'] == 'mcp'
+    assert result['toolResults'][0]['source']['serverId'] == 'local'
+    assert result['trace']['usedProviderKinds'] == ['mcp']
 
 
 def test_vector_store_upsert_and_similarity_search_return_documents() -> None:

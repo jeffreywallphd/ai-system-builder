@@ -36,6 +36,16 @@ class McpToolDescriptor(McpModel):
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
+class McpResourceDescriptor(McpModel):
+    server_id: str
+    uri: str
+    name: Optional[str] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+    mime_type: Optional[str] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
 class McpConnectionStatus(McpModel):
     enabled: bool
     state: Literal["disabled", "ready", "degraded", "unavailable"]
@@ -45,10 +55,42 @@ class McpConnectionStatus(McpModel):
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
+class McpServerSearchRequest(McpModel):
+    query: str = ""
+    status: List[Literal["connected", "connecting", "disconnected", "error"]] = Field(default_factory=list)
+    transport: List[Literal["stdio", "http", "sse", "inmemory"]] = Field(default_factory=list)
+    limit: int = 20
+
+
+class McpServerSearchResponse(McpModel):
+    query: str = ""
+    total_count: int = 0
+    limit: int = 20
+    servers: List[McpServerDescriptor] = Field(default_factory=list)
+    status: McpConnectionStatus
+
+
+class McpServerConnectionRequest(McpModel):
+    server_id: str
+    reconnect: bool = False
+
+
+class McpServerDisconnectRequest(McpModel):
+    server_id: str
+
+
+class McpServerConnectionResult(McpModel):
+    action: Literal["connect", "reconnect", "disconnect"]
+    server: McpServerDescriptor
+    status: McpConnectionStatus
+    checked_at: str
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
 class ListMcpToolsResponse(McpModel):
     status: McpConnectionStatus
     tools: List[McpToolDescriptor] = Field(default_factory=list)
-    resources: List[Dict[str, Any]] = Field(default_factory=list)
+    resources: List[McpResourceDescriptor] = Field(default_factory=list)
     capabilities: Dict[str, bool] = Field(default_factory=dict)
 
 
@@ -74,7 +116,7 @@ class McpToolExecutionResult(McpModel):
 class McpServerSnapshot(McpModel):
     server: McpServerDescriptor
     tools: List[McpToolDescriptor] = Field(default_factory=list)
-    resources: List[Dict[str, Any]] = Field(default_factory=list)
+    resources: List[McpResourceDescriptor] = Field(default_factory=list)
 
 
 class McpSnapshot(McpModel):

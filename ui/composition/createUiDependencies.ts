@@ -45,17 +45,31 @@ import { McpStore } from "../state/McpStore";
 import { LocalStorageUiSettingsStorage, UiSettingsStore } from "../settings/UiSettingsStore";
 import { HttpMcpRuntimeClient } from "../../infrastructure/python/mcp/HttpMcpRuntimeClient";
 import { PythonBackedMcpToolCatalog } from "../../infrastructure/python/mcp/PythonBackedMcpToolCatalog";
+import { PythonBackedMcpToolExecutor } from "../../infrastructure/python/mcp/PythonBackedMcpToolExecutor";
 import { ListMcpToolsUseCase } from "../../application/mcp/ListMcpToolsUseCase";
+import { SearchMcpServersUseCase } from "../../application/mcp/SearchMcpServersUseCase";
+import { GetMcpServerStatusUseCase } from "../../application/mcp/GetMcpServerStatusUseCase";
+import { ConnectMcpServerUseCase } from "../../application/mcp/ConnectMcpServerUseCase";
+import { DisconnectMcpServerUseCase } from "../../application/mcp/DisconnectMcpServerUseCase";
 
 import { WorkflowProjectionService } from "../../application/projection/WorkflowProjectionService";
 import { WorkflowToolProjectionService } from "../../application/projection/WorkflowToolProjectionService";
 import { ListPublishedToolsUseCase } from "../../application/tools/ListPublishedToolsUseCase";
 import { LoadToolDefinitionUseCase } from "../../application/tools/LoadToolDefinitionUseCase";
 import { RunToolUseCase } from "../../application/tools/RunToolUseCase";
+import { ListToolCapabilitiesUseCase } from "../../application/tools/ListToolCapabilitiesUseCase";
+import { InvokeToolCapabilityUseCase } from "../../application/tools/InvokeToolCapabilityUseCase";
+import { SearchCapabilitiesUseCase } from "../../application/research/SearchCapabilitiesUseCase";
 import { ToolService } from "../services/ToolService";
 import { ToolStore } from "../state/ToolStore";
 import type { CreateUiDependenciesOptions, UiDependencies } from "./types";
 import { createSeedWorkflows } from "./seedWorkflows";
+import { CompositeToolCapabilityCatalog } from "../../infrastructure/tools/CompositeToolCapabilityCatalog";
+import { CompositeToolCapabilityExecutor } from "../../infrastructure/tools/CompositeToolCapabilityExecutor";
+import { McpToolCapabilityCatalog, MCP_TOOL_CAPABILITY_PROVIDER } from "../../infrastructure/tools/McpToolCapabilityCatalog";
+import { McpToolCapabilityExecutor } from "../../infrastructure/tools/McpToolCapabilityExecutor";
+import { WorkflowProjectedToolCapabilityCatalog, WORKFLOW_TOOL_CAPABILITY_PROVIDER } from "../../infrastructure/tools/WorkflowProjectedToolCapabilityCatalog";
+import { WorkflowToolCapabilityExecutor } from "../../infrastructure/tools/WorkflowToolCapabilityExecutor";
 
 export function createUiDependencies(
   options: CreateUiDependenciesOptions = {}
@@ -110,15 +124,11 @@ export function createUiDependencies(
     workflowRepository,
     workflowToolProjectionService
   );
-  const toolService = new ToolService(
-    new ListPublishedToolsUseCase(workflowRepository, workflowToolProjectionService),
-    loadToolDefinitionUseCase,
-    new RunToolUseCase(
-      workflowRepository,
-      workflowToolProjectionService,
-      workflowExecutor,
-      loadToolDefinitionUseCase
-    )
+  const runToolUseCase = new RunToolUseCase(
+    workflowRepository,
+    workflowToolProjectionService,
+    workflowExecutor,
+    loadToolDefinitionUseCase
   );
 
   const workflowStore = new WorkflowStore({
@@ -184,10 +194,40 @@ export function createUiDependencies(
   const mcpClient = settings.runtime.mode === "disabled"
     ? createDisabledMcpRuntimeClient()
     : new HttpMcpRuntimeClient(pythonRuntimeConfig, fetch, runtimeEventSink);
+  const pythonBackedMcpToolCatalog = new PythonBackedMcpToolCatalog(mcpClient, runtimeEventSink);
+  const toolCapabilityCatalog = new CompositeToolCapabilityCatalog([
+    new WorkflowProjectedToolCapabilityCatalog(workflowRepository, workflowToolProjectionService),
+    new McpToolCapabilityCatalog(pythonBackedMcpToolCatalog),
+  ]);
+  const toolCapabilityExecutor = new CompositeToolCapabilityExecutor([
+    {
+      providerKind: WORKFLOW_TOOL_CAPABILITY_PROVIDER.kind,
+      providerId: WORKFLOW_TOOL_CAPABILITY_PROVIDER.id,
+      executor: new WorkflowToolCapabilityExecutor(runToolUseCase),
+    },
+    {
+      providerKind: MCP_TOOL_CAPABILITY_PROVIDER.kind,
+      providerId: MCP_TOOL_CAPABILITY_PROVIDER.id,
+      executor: new McpToolCapabilityExecutor(new PythonBackedMcpToolExecutor(mcpClient, runtimeEventSink)),
+    },
+  ]);
+  const toolService = new ToolService(
+    new ListPublishedToolsUseCase(workflowRepository, workflowToolProjectionService),
+    loadToolDefinitionUseCase,
+    runToolUseCase,
+    new ListToolCapabilitiesUseCase(toolCapabilityCatalog),
+    new InvokeToolCapabilityUseCase(toolCapabilityExecutor),
+    new SearchCapabilitiesUseCase(toolCapabilityCatalog, {
+      mcpToolCatalog: pythonBackedMcpToolCatalog,
+      mcpRuntimeClient: mcpClient,
+    })
+  );
   const mcpService = new McpService(
-    new ListMcpToolsUseCase(
-      new PythonBackedMcpToolCatalog(mcpClient, runtimeEventSink),
-    ),
+    new ListMcpToolsUseCase(pythonBackedMcpToolCatalog),
+    new SearchMcpServersUseCase(mcpClient),
+    new GetMcpServerStatusUseCase(mcpClient),
+    new ConnectMcpServerUseCase(mcpClient),
+    new DisconnectMcpServerUseCase(mcpClient),
   );
   const mcpStore = new McpStore(mcpService);
 
@@ -324,18 +364,69 @@ class InMemoryInstalledModelCatalog implements IInstalledModelCatalog {
 
 
 function createDisabledMcpRuntimeClient() {
+  const disabledStatus = () => ({
+    enabled: false,
+    state: "disabled" as const,
+    checkedAt: new Date().toISOString(),
+    servers: [],
+    capabilities: { tools: false, resources: false, toolExecution: false },
+    metadata: { reason: "python-runtime-disabled" },
+  });
+
   return {
     async getConnectionStatus() {
+      return disabledStatus();
+    },
+    async listServers() {
+      return { query: "", totalCount: 0, limit: 20, servers: [], status: disabledStatus() };
+    },
+    async searchServers(criteria?: { query?: string; limit?: number }) {
       return {
-        enabled: false,
-        state: "disabled" as const,
-        checkedAt: new Date().toISOString(),
+        query: criteria?.query?.trim() || "",
+        totalCount: 0,
+        limit: criteria?.limit ?? 20,
         servers: [],
-        capabilities: { tools: false, resources: false, toolExecution: false },
-        metadata: { reason: "python-runtime-disabled" },
+        status: disabledStatus(),
+      };
+    },
+    async connectServer(request: { serverId: string; reconnect?: boolean }) {
+      return {
+        action: request.reconnect ? "reconnect" as const : "connect" as const,
+        checkedAt: new Date().toISOString(),
+        server: {
+          id: request.serverId,
+          name: request.serverId,
+          transport: "inmemory" as const,
+          status: "error" as const,
+          toolCount: 0,
+          resourceCount: 0,
+          capabilities: { tools: false, resources: false, toolExecution: false },
+          errorMessage: "Python runtime is disabled.",
+        },
+        status: disabledStatus(),
+      };
+    },
+    async disconnectServer(serverId: string) {
+      return {
+        action: "disconnect" as const,
+        checkedAt: new Date().toISOString(),
+        server: {
+          id: serverId,
+          name: serverId,
+          transport: "inmemory" as const,
+          status: "disconnected" as const,
+          toolCount: 0,
+          resourceCount: 0,
+          capabilities: { tools: false, resources: false, toolExecution: false },
+          errorMessage: "Python runtime is disabled.",
+        },
+        status: disabledStatus(),
       };
     },
     async listTools() {
+      return [];
+    },
+    async listResources() {
       return [];
     },
     async executeTool(request: { serverId: string; toolName: string; executionId?: string }) {
