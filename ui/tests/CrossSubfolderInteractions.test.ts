@@ -7,10 +7,12 @@ describe("ui cross-subfolder interactions", () => {
       "ui/services/ModelService.ts",
       "ui/services/NodeService.ts",
       "ui/services/WorkflowService.ts",
+      "ui/services/McpService.ts",
       "ui/state/ModelStore.ts",
       "ui/state/NodeStore.ts",
       "ui/state/WorkflowStore.ts",
       "ui/state/WorkflowExecutionStore.ts",
+      "ui/state/McpStore.ts",
     ];
 
     expect(modules.every((modulePath) => readSource(modulePath).trim().length > 0)).toBeTrue();

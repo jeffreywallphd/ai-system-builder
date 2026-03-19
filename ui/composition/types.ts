@@ -8,6 +8,8 @@ import { ModelStore } from "../state/ModelStore";
 import { RuntimeConsoleStore } from "../state/RuntimeConsoleStore";
 import { ToolService } from "../services/ToolService";
 import { ToolStore } from "../state/ToolStore";
+import { McpService } from "../services/McpService";
+import { McpStore } from "../state/McpStore";
 import { WorkflowProjectionService } from "../../application/projection/WorkflowProjectionService";
 import type { UiSettingsStorage } from "../settings/UiSettingsStore";
 import { UiSettingsStore } from "../settings/UiSettingsStore";
@@ -23,6 +25,8 @@ export interface UiDependencies {
   readonly runtimeConsoleStore: RuntimeConsoleStore;
   readonly toolService: ToolService;
   readonly toolStore: ToolStore;
+  readonly mcpService: McpService;
+  readonly mcpStore: McpStore;
   readonly workflowProjectionService: WorkflowProjectionService;
   readonly settingsStore: UiSettingsStore;
 }

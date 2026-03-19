@@ -21,6 +21,8 @@ describe("SettingsPage", () => {
     expect(source).toContain("Development (dev/workflow-data)");
     expect(source).toContain("Production (user/workflow-data)");
     expect(source).toContain("Advanced runtime settings");
+    expect(source).toContain("<McpRuntimeStatusPanel");
+    expect(source).toContain("mcpStore.subscribe(setMcpState)");
     expect(source).toContain("Authentication & install defaults");
     expect(source).toContain("Advanced development settings");
     expect(source).toContain('id="settings-authoring-default-view-mode"');

@@ -23,6 +23,7 @@ export function AppProviders({
 
   useEffect(() => {
     void dependencies.runtimeConsoleStore.initializeRuntime();
+    void dependencies.mcpStore.refresh().catch(() => undefined);
 
     return () => {
       dependencies.runtimeConsoleStore.dispose();

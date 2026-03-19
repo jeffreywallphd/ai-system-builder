@@ -1,6 +1,21 @@
+from app.core.mcp_config import McpRuntimeConfig
+from app.execution.node_dispatcher import NodeDispatcher
 from app.execution.workflow_executor import WorkflowExecutor
+from app.mcp.registry import McpRegistry
+from app.mcp.service import McpService
+from app.mcp.session import McpSessionManager
 from app.models.requests import ExecuteWorkflowRequest
-from app.models.runtime import RuntimeNode
+from app.models.runtime import RuntimeConnection, RuntimeNode
+
+
+def build_mcp_dispatcher() -> NodeDispatcher:
+    config = McpRuntimeConfig(
+        enabled=True,
+        servers_json='[{"id": "local", "name": "Local MCP", "transport": "inmemory", "mock_tools": [{"name": "echo", "inputSchema": {"type": "object"}}, {"name": "sum_numbers", "inputSchema": {"type": "object"}}]}]',
+    )
+    registry = McpRegistry(config)
+    return NodeDispatcher(mcp_service=McpService(registry=registry, sessions=McpSessionManager(registry)))
+
 
 
 def test_workflow_executor_runs_nodes() -> None:
@@ -20,3 +35,31 @@ def test_workflow_executor_runs_nodes() -> None:
     state = executor.execute(request)
     assert 'n1' in state.outputs
     assert state.outputs['n1']['formatted_prompt'] == 'Hello Studio'
+
+
+
+def test_workflow_executor_routes_connected_outputs_into_mcp_nodes() -> None:
+    executor = WorkflowExecutor(build_mcp_dispatcher())
+    request = ExecuteWorkflowRequest(
+        workflow_id='wf-mcp',
+        nodes=[
+            RuntimeNode(id='catalog', node_type='mcp.tool_catalog', properties={}),
+            RuntimeNode(id='call', node_type='mcp.tool_call', properties={'serverId': 'local', 'toolName': 'echo'}),
+        ],
+        connections=[
+            RuntimeConnection(
+                source_node_id='catalog',
+                source_port_id='tools',
+                target_node_id='call',
+                target_port_id='tool',
+            )
+        ],
+        workflow_inputs={'arguments': {'message': 'hello from workflow'}},
+    )
+
+    state = executor.execute(request)
+
+    assert state.outputs['catalog']['toolCount'] == 2
+    assert state.outputs['call']['result']['status'] == 'completed'
+    assert state.outputs['call']['result']['toolName'] == 'echo'
+    assert state.outputs['call']['resultText']

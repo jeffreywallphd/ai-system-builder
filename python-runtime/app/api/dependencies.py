@@ -16,15 +16,15 @@ def get_health_service() -> HealthService:
 
 
 @lru_cache
-def get_runtime_service() -> RuntimeService:
-    dispatcher = NodeDispatcher()
-    workflow_executor = WorkflowExecutor(dispatcher)
-    return RuntimeService(dispatcher=dispatcher, workflow_executor=workflow_executor)
-
-
-@lru_cache
 def get_mcp_service() -> McpService:
     config = load_mcp_runtime_config()
     registry = McpRegistry(config)
     sessions = McpSessionManager(registry)
     return McpService(registry=registry, sessions=sessions)
+
+
+@lru_cache
+def get_runtime_service() -> RuntimeService:
+    dispatcher = NodeDispatcher(mcp_service=get_mcp_service())
+    workflow_executor = WorkflowExecutor(dispatcher)
+    return RuntimeService(dispatcher=dispatcher, workflow_executor=workflow_executor)
