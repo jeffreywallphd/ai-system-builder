@@ -18,6 +18,7 @@ describe("ui/routes contract adherence", () => {
     expect(source).toContain('home: "/"');
     expect(source).toContain('workflows: "/workflows"');
     expect(source).toContain('models: "/models"');
+    expect(source).toContain('mcp: "/mcp"');
     expect(source).toContain('assets: "/assets"');
     expect(source).toContain('settings: "/settings"');
     expect(source).toContain('notFound: "*"');

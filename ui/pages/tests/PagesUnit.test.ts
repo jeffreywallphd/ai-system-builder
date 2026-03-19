@@ -8,6 +8,7 @@ describe("ui/pages unit coverage", () => {
     const editor = readSource("ui/pages/WorkflowEditorPage.tsx");
     const models = readSource("ui/pages/ModelsPage.tsx");
     const assets = readSource("ui/pages/AssetsPage.tsx");
+    const mcp = readSource("ui/pages/McpPage.tsx");
     const notFound = readSource("ui/pages/NotFoundPage.tsx");
 
     expect(home).toContain("AI Loom Studio");
@@ -15,6 +16,7 @@ describe("ui/pages unit coverage", () => {
     expect(editor).toContain("Workflow Editor");
     expect(models).toContain("Search remote models");
     expect(assets).toContain("Browse generated and stored workflow assets");
+    expect(mcp).toContain("Manage your MCP servers");
     expect(notFound).toContain("Page Not Found");
   });
 });

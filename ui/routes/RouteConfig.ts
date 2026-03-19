@@ -16,6 +16,7 @@ export const ROUTE_PATHS = Object.freeze({
   tools: "/tools",
   toolRun: "/tools/:toolId",
   models: "/models",
+  mcp: "/mcp",
   assets: "/assets",
   settings: "/settings",
   notFound: "*",
@@ -56,6 +57,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteDefinition> = Object.freeze([
     key: "models",
     path: ROUTE_PATHS.models,
     title: "Models",
+    showInNavigation: true,
+  }),
+  Object.freeze({
+    key: "mcp",
+    path: ROUTE_PATHS.mcp,
+    title: "MCP",
     showInNavigation: true,
   }),
   Object.freeze({

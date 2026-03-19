@@ -3,7 +3,7 @@ import { SearchMcpServersUseCase } from "../SearchMcpServersUseCase";
 import type { IMcpRuntimeClient } from "../../ports/interfaces/IMcpRuntimeClient";
 
 describe("SearchMcpServersUseCase", () => {
-  it("normalizes bounded criteria before delegating to the runtime client", async () => {
+  it("normalizes bounded criteria and returns a serializable deduplicated result set", async () => {
     const criteriaCalls: unknown[] = [];
     const client: IMcpRuntimeClient = {
       getConnectionStatus: async () => ({
@@ -30,17 +30,27 @@ describe("SearchMcpServersUseCase", () => {
         criteriaCalls.push(criteria);
         return {
           query: criteria?.query ?? "",
-          totalCount: 1,
+          totalCount: 2,
           limit: criteria?.limit ?? 20,
           servers: [
             {
               id: "local",
-              name: "Local MCP",
+              name: " Local MCP ",
               transport: "inmemory",
               status: "disconnected",
               toolCount: 2,
               resourceCount: 1,
               capabilities: { tools: true, resources: true, toolExecution: true },
+              metadata: { provider: "demo" },
+            },
+            {
+              id: "local",
+              name: "Duplicate MCP",
+              transport: "inmemory",
+              status: "connected",
+              toolCount: 99,
+              resourceCount: 99,
+              capabilities: { tools: true },
             },
           ],
           status: {
@@ -67,8 +77,8 @@ describe("SearchMcpServersUseCase", () => {
     const result = await new SearchMcpServersUseCase(client).execute({
       criteria: {
         query: "  local  ",
-        statuses: ["connected", "disconnected"],
-        transports: ["inmemory"],
+        statuses: ["connected", "disconnected", "connected"],
+        transports: ["inmemory", "inmemory"],
         limit: 999,
       },
     });
@@ -78,9 +88,18 @@ describe("SearchMcpServersUseCase", () => {
         query: "local",
         statuses: ["connected", "disconnected"],
         transports: ["inmemory"],
-        limit: 50,
+        limit: 24,
       },
     ]);
-    expect(result.servers[0]?.id).toBe("local");
+    expect(result.limit).toBe(24);
+    expect(result.servers).toHaveLength(1);
+    expect(result.servers[0]).toMatchObject({
+      id: "local",
+      name: "Local MCP",
+      toolCount: 2,
+      resourceCount: 1,
+    });
+    expect(JSON.parse(JSON.stringify(result)).servers[0]?.id).toBe("local");
+    expect(Object.isFrozen(result)).toBeTrue();
   });
 });
