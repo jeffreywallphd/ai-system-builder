@@ -7,6 +7,7 @@ describe("ToolsPage", () => {
     expect(source).toContain("toolStore");
     expect(source).toContain("ToolBrowser");
     expect(source).toContain("Open published tools and enter the details needed to get a result.");
+    expect(source).toContain("callable capabilities indexed");
     expect(source).not.toContain("without editing workflows");
   });
 });

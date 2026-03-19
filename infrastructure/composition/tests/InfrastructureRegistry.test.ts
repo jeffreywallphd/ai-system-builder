@@ -21,6 +21,8 @@ describe("InfrastructureRegistry", () => {
     expect(c.isRegistered(TOKENS.NodeImplementationRegistry)).toBe(true);
     expect(c.isRegistered(TOKENS.McpRuntimeConfig)).toBe(true);
     expect(c.isRegistered(TOKENS.McpToolExecutor)).toBe(true);
+    expect(c.isRegistered(TOKENS.ToolCapabilityCatalog)).toBe(true);
+    expect(c.isRegistered(TOKENS.ToolCapabilityExecutor)).toBe(true);
 
     const mcpClient = c.resolve<IMcpRuntimeClient>(TOKENS.McpRuntimeClient);
     expect((await mcpClient.getConnectionStatus()).state).toBe("disabled");
