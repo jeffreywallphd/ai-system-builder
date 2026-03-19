@@ -4,7 +4,7 @@ from app.core.mcp_config import McpRuntimeConfig
 from app.mcp.registry import McpRegistry
 from app.mcp.service import McpService
 from app.mcp.session import McpSessionManager
-from app.mcp.models import McpServerConnectionRequest, McpServerSearchRequest, McpToolExecutionRequest
+from app.mcp.models import McpServerConnectionRequest, McpServerSearchRequest, McpToolExecutionRequest, McpToolSearchRequest
 
 
 def build_service(config: McpRuntimeConfig) -> McpService:
@@ -80,7 +80,7 @@ def test_mcp_service_lists_tools_and_resources() -> None:
     service = build_service(
         McpRuntimeConfig(
             enabled=True,
-            servers_json='[{"id": "local", "name": "Local MCP", "transport": "stdio", "command": "python", "args": ["server.py"], "mock_tools": [{"name": "echo", "inputSchema": {"type": "object"}}], "mock_resources": [{"uri": "memory://doc", "name": "Doc"}]}]'
+            servers_json='[{"id": "local", "name": "Local MCP", "transport": "stdio", "command": "python", "args": ["server.py"], "mock_tools": [{"name": "echo", "description": "Echo text.", "inputSchema": {"type": "object", "required": ["message"], "properties": {"message": {"type": "string", "description": "Message"}}}, "metadata": {"category": "utility", "tags": ["text"]}}], "mock_resources": [{"uri": "memory://doc", "name": "Doc"}]}]'
         )
     )
 
@@ -89,8 +89,44 @@ def test_mcp_service_lists_tools_and_resources() -> None:
     assert response.status.state == "ready"
     assert len(response.tools) == 1
     assert response.tools[0].name == "echo"
+    assert response.tools[0].id == "mcp:local:echo"
+    assert response.tools[0].arguments[0].name == "message"
+    assert response.tools[0].categories == ["utility"]
+    assert response.tools[0].tags == ["text"]
     assert response.resources[0].uri == "memory://doc"
     assert response.resources[0].server_id == "local"
+
+
+def test_mcp_service_searches_tools_with_filters() -> None:
+    service = build_service(
+        McpRuntimeConfig(
+            enabled=True,
+            servers_json='[{"id": "local", "name": "Local MCP", "transport": "stdio", "command": "python", "args": ["server.py"], "mock_tools": [{"name": "echo", "description": "Echo text.", "inputSchema": {"type": "object", "properties": {"message": {"type": "string"}}}, "metadata": {"category": "utility", "tags": ["text"]}}, {"name": "search_docs", "description": "Search docs.", "inputSchema": {"type": "object", "properties": {"query": {"type": "string"}}}, "metadata": {"category": "knowledge", "tags": ["docs", "search"]}}]}]'
+        )
+    )
+
+    response = service.search_tools(
+        McpToolSearchRequest(query="docs", server_ids=["local"], categories=["knowledge"], tags=["search"], limit=25)
+    )
+
+    assert response.query == "docs"
+    assert response.limit == 25
+    assert response.total_count == 1
+    assert response.tools[0].name == "search_docs"
+
+
+def test_mcp_service_gets_tool_descriptor_by_stable_id() -> None:
+    service = build_service(
+        McpRuntimeConfig(
+            enabled=True,
+            servers_json='[{"id": "local", "name": "Local MCP", "transport": "stdio", "command": "python", "args": ["server.py"], "mock_tools": [{"name": "echo", "inputSchema": {"type": "object"}}]}]'
+        )
+    )
+
+    descriptor = service.get_tool_descriptor("mcp:local:echo")
+
+    assert descriptor.server_id == "local"
+    assert descriptor.name == "echo"
 
 
 def test_mcp_service_executes_bounded_tool() -> None:

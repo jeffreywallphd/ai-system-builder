@@ -11,5 +11,7 @@ describe("McpPage", () => {
     expect(source).toContain("mcpStore.addConfiguredServer");
     expect(source).toContain("mcpStore.connect");
     expect(source).toContain("mcpStore.disconnect");
+    expect(source).toContain("mcpStore.searchTools");
+    expect(source).toContain("mcpStore.selectTool");
   });
 });

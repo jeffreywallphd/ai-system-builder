@@ -1,7 +1,7 @@
 import type { IMcpToolCatalog } from "../ports/interfaces/IMcpToolCatalog";
 import type { McpConnectionStatus } from "./models/McpConnectionStatus";
 import type { McpResourceDescriptor } from "./models/McpResourceDescriptor";
-import type { McpToolDescriptor } from "./models/McpToolDescriptor";
+import { normalizeMcpToolDescriptor, type McpToolDescriptor } from "./models/McpToolDescriptor";
 
 export interface IListMcpToolsResult {
   readonly status: McpConnectionStatus;
@@ -27,7 +27,7 @@ export class ListMcpToolsUseCase {
 
     return Object.freeze({
       status,
-      tools: Object.freeze([...tools]),
+      tools: Object.freeze(tools.map((tool) => normalizeMcpToolDescriptor(tool))),
       resources: Object.freeze([...resources]),
     });
   }
