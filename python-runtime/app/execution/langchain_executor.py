@@ -9,12 +9,9 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from app.mcp.service import McpService
 
 from .agent_tool_orchestrator import (
-    build_step_result,
     execute_tool,
     normalize_tool_descriptor,
-    normalize_tool_identifier,
-    pick_tool_for_task,
-    split_task_into_steps,
+    run_agent_orchestration,
 )
 
 try:
@@ -686,8 +683,6 @@ class LangChainExecutor:
             history = _normalize_messages(inputs.get("history")) if use_memory else []
             incoming_messages = _normalize_messages(inputs.get("messages"))
             direct_input = str(inputs.get("input") or "")
-            tools = [tool for tool in [_normalize_tool(item) for item in (inputs.get("tools") or [])] if tool is not None]
-            selected_tool_inputs = inputs.get("selectedTools")
 
             assembled_messages: List[Dict[str, str]] = []
             if system_prompt.strip():
@@ -700,121 +695,20 @@ class LangChainExecutor:
 
             user_messages = [message["content"] for message in assembled_messages if message["role"] == "user"]
             latest_user_input = user_messages[-1] if user_messages else direct_input
-            selected_identifiers = []
-            if isinstance(selected_tool_inputs, list):
-                selected_identifiers = [
-                    identifier
-                    for identifier in (normalize_tool_identifier(item) for item in selected_tool_inputs)
-                    if identifier
-                ]
-
-            selected_tools = (
-                [
-                    tool
-                    for tool in tools
-                    if tool.get("capabilityId") in selected_identifiers
-                    or tool.get("name") in selected_identifiers
-                    or tool.get("displayName") in selected_identifiers
-                ]
-                if selected_identifiers
-                else list(tools)
+            result = run_agent_orchestration(
+                model=model,
+                latest_user_input=latest_user_input,
+                tools_input=inputs.get("tools") or [],
+                selected_tools_input=inputs.get("selectedTools"),
+                max_iterations=max_iterations,
+                temperature=temperature,
+                verbose=verbose,
+                mcp_service=self._mcp_service,
             )
-
-            task_segments = split_task_into_steps(latest_user_input, max_steps=max_iterations)
-            tool_calls: List[Dict[str, Any]] = []
-            tool_results: List[Dict[str, Any]] = []
-            step_results: List[Dict[str, Any]] = []
-            chosen_tool_names: List[str] = []
-
-            for step_index, task_segment in enumerate(task_segments, start=1):
-                chosen_tool = pick_tool_for_task(task_segment, selected_tools)
-                if chosen_tool is None:
-                    break
-
-                chosen_tool_names.append(str(chosen_tool.get("name") or ""))
-                executed_tool = execute_tool(
-                    chosen_tool,
-                    {"input": task_segment},
-                    mcp_service=self._mcp_service,
-                )
-                tool_calls.append(dict(executed_tool["toolCall"]))
-                tool_results.append(dict(executed_tool["toolResult"]))
-                step_results.append(
-                    build_step_result(
-                        index=step_index,
-                        task=task_segment,
-                        tool=chosen_tool,
-                        executed=executed_tool,
-                    )
-                )
-
-                if executed_tool["toolResult"].get("status") != "completed":
-                    break
-
-            iteration_count = len(step_results)
-            if tool_results and latest_user_input:
-                observed = "; ".join(
-                    str(tool_result.get("output") or tool_result.get("errorMessage") or "").strip()
-                    for tool_result in tool_results
-                    if str(tool_result.get("output") or tool_result.get("errorMessage") or "").strip()
-                )
-                response = f"[{model}] {latest_user_input}\n\nUsed {iteration_count} tool step(s): {', '.join(chosen_tool_names)}.\nObserved: {observed}"
-            else:
-                response = f"[{model}] {latest_user_input}" if latest_user_input else ""
             output_messages = list(assembled_messages)
-            if response:
-                output_messages.append({"role": "assistant", "content": response})
-            result: Dict[str, Any] = {
-                "response": response,
-                "messages": output_messages,
-                "toolCalls": tool_calls,
-                "toolResults": tool_results,
-                "stepResults": step_results,
-                "availableTools": [
-                    {
-                        "capabilityId": tool.get("capabilityId"),
-                        "name": tool.get("name"),
-                        "displayName": tool.get("displayName"),
-                        "provider": dict(tool.get("provider") or {}),
-                        "source": dict(tool.get("source") or {}),
-                    }
-                    for tool in tools
-                ],
-                "selectedTools": [
-                    {
-                        "capabilityId": tool.get("capabilityId"),
-                        "name": tool.get("name"),
-                        "displayName": tool.get("displayName"),
-                        "provider": dict(tool.get("provider") or {}),
-                        "source": dict(tool.get("source") or {}),
-                    }
-                    for tool in selected_tools
-                ],
-            }
-            if verbose:
-                result["trace"] = {
-                    "temperature": temperature,
-                    "maxIterations": max_iterations,
-                    "iterationCount": iteration_count,
-                    "toolCount": len(tools),
-                    "selectedToolCount": len(selected_tools),
-                    "selectedTools": [tool.get("name") for tool in selected_tools],
-                    "usedProviderKinds": sorted(
-                        {
-                            str(tool_result.get("provider", {}).get("kind"))
-                            for tool_result in tool_results
-                            if isinstance(tool_result.get("provider"), dict)
-                            and tool_result.get("provider", {}).get("kind")
-                        }
-                    ),
-                    "stoppedReason": (
-                        "max-iterations-reached"
-                        if latest_user_input and iteration_count >= max_iterations and max_iterations > 0
-                        else "no-tool-selected"
-                        if latest_user_input and iteration_count == 0
-                        else "completed"
-                    ),
-                }
+            if result.get("response"):
+                output_messages.append({"role": "assistant", "content": str(result["response"])})
+            result["messages"] = output_messages
             return result
 
         if node_type == "langchain.summarization":
