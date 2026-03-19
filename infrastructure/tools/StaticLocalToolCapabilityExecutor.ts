@@ -14,7 +14,9 @@ export class StaticLocalToolCapabilityExecutor implements IToolCapabilityExecuto
   public async invoke(
     request: ToolCapabilityInvocationRequest
   ): Promise<ToolCapabilityInvocationResult> {
-    const handler = this.handlers[request.capabilityId];
+    const handler =
+      this.handlers[request.capabilityId] ??
+      (request.source?.localToolName ? this.handlers[request.source.localToolName] : undefined);
 
     if (!handler) {
       throw new Error(`No local tool capability handler is registered for '${request.capabilityId}'.`);

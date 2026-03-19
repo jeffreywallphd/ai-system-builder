@@ -2,7 +2,6 @@ import type { IMcpToolExecutor } from "../../application/ports/interfaces/IMcpTo
 import type { IToolCapabilityExecutor } from "../../application/ports/interfaces/IToolCapabilityExecutor";
 import type { ToolCapabilityInvocationRequest } from "../../application/tools/models/ToolCapabilityInvocationRequest";
 import type { ToolCapabilityInvocationResult } from "../../application/tools/models/ToolCapabilityInvocationResult";
-import { MCP_TOOL_CAPABILITY_PROVIDER } from "./McpToolCapabilityCatalog";
 
 export class McpToolCapabilityExecutor implements IToolCapabilityExecutor {
   constructor(private readonly executor: IMcpToolExecutor) {}
@@ -29,8 +28,9 @@ export class McpToolCapabilityExecutor implements IToolCapabilityExecutor {
       capabilityId: request.capabilityId,
       executionId: result.executionId,
       status: result.status,
-      provider: MCP_TOOL_CAPABILITY_PROVIDER,
+      provider: Object.freeze({ ...request.provider }),
       source: Object.freeze({
+        kind: "mcp",
         serverId: result.serverId,
         toolName: result.toolName,
       }),
