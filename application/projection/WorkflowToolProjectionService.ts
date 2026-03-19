@@ -3,10 +3,39 @@ import type { ToolDefinition } from "./models/ToolDefinition";
 import type { ToolSection } from "./models/ToolSection";
 
 function slugify(value: string): string {
-  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+export interface WorkflowToolIdentity {
+  readonly id: string;
+  readonly slug: string;
 }
 
 export class WorkflowToolProjectionService {
+  /**
+   * Tool identity stays workflow-derived:
+   * - id: stable internal identifier, always the workflow id.
+   * - slug: route-friendly published identifier from metadata.toolSlug when present,
+   *   otherwise derived from the published title/name, with workflow id as the final fallback.
+   */
+  public resolveToolIdentity(workflow: IWorkflow): WorkflowToolIdentity {
+    const title = workflow.metadata.toolTitle ?? workflow.metadata.name;
+    const slug =
+      slugify(workflow.metadata.toolSlug ?? "") ||
+      slugify(title) ||
+      slugify(workflow.id) ||
+      workflow.id;
+
+    return {
+      id: workflow.id,
+      slug,
+    };
+  }
+
   public projectToTool(workflow: IWorkflow): ToolDefinition {
     const sections = new Map<string, ToolSection>();
 
@@ -51,11 +80,12 @@ export class WorkflowToolProjectionService {
     }
 
     const title = workflow.metadata.toolTitle ?? workflow.metadata.name;
+    const identity = this.resolveToolIdentity(workflow);
 
     return {
-      id: workflow.metadata.toolSlug ?? slugify(workflow.id),
+      id: identity.id,
       workflowId: workflow.id,
-      slug: workflow.metadata.toolSlug ?? slugify(title),
+      slug: identity.slug,
       title,
       description: workflow.metadata.toolDescription ?? workflow.metadata.description,
       category: workflow.metadata.toolCategory,

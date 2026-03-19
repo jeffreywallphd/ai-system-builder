@@ -35,11 +35,72 @@ def test_output_parser_removes_prefix() -> None:
     executor = LangChainExecutor()
     result = executor.execute(
         'langchain.output_parser',
-        inputs={'output_text': 'Final: normalized value'},
-        properties={'format': 'text', 'prefix': 'Final:'},
+        inputs={
+            'output_text': 'Final: ```json\nscore: 9\nstatus: ready\n```',
+            'schema': {'required': ['score']},
+        },
+        properties={
+            'format': 'key_value',
+            'prefix': 'Final:',
+            'trimCodeFence': True,
+            'coerceNumbers': True,
+            'schema': {'type': 'object', 'properties': {'score': {'type': 'number'}}},
+        },
     )
-    assert result['parsed_output'] == 'normalized value'
-    assert result['raw_output'] == 'Final: normalized value'
+    assert result['parsed_output'] == {'score': 9, 'status': 'ready'}
+    assert result['raw_output'] == 'Final: ```json\nscore: 9\nstatus: ready\n```'
+    assert result['parseReport']['schema']['required'] == ['score']
+    assert result['parseReport']['extractedKeys'] == ['score', 'status']
+
+
+def test_message_history_tracks_session_state() -> None:
+    executor = LangChainExecutor()
+    first = executor.execute(
+        'langchain.message_history',
+        inputs={
+            'sessionId': 'session-a',
+            'seedHistory': [{'role': 'system', 'content': 'You remember prior steps.'}],
+            'messages': [{'role': 'user', 'content': 'Hello'}, {'role': 'user', 'content': 'Hello'}],
+        },
+        properties={'maxMessages': 3, 'seedStrategy': 'on-miss', 'dedupeConsecutive': True},
+    )
+    second = executor.execute(
+        'langchain.message_history',
+        inputs={
+            'sessionId': 'session-a',
+            'messages': [{'role': 'assistant', 'content': 'Hi there'}],
+        },
+        properties={'maxMessages': 3, 'seedStrategy': 'on-miss', 'dedupeConsecutive': True},
+    )
+
+    assert first['history'][0]['role'] == 'system'
+    assert second['history'] == [
+        {'role': 'system', 'content': 'You remember prior steps.'},
+        {'role': 'user', 'content': 'Hello'},
+        {'role': 'assistant', 'content': 'Hi there'},
+    ]
+    assert second['historyState']['storedMessageCount'] == 3
+
+
+def test_tool_definition_returns_manifest() -> None:
+    executor = LangChainExecutor()
+    result = executor.execute(
+        'langchain.tool_definition',
+        inputs={'inputSchema': {'type': 'object', 'properties': {'query': {'type': 'string'}}}},
+        properties={
+            'toolName': 'search_docs',
+            'description': 'Search project documents.',
+            'inputSchemaSource': 'merge',
+            'inputSchema': {'type': 'object', 'properties': {'limit': {'type': 'number'}}},
+            'displayName': 'Search Docs',
+            'strictSchema': True,
+        },
+    )
+
+    assert result['tool']['name'] == 'search_docs'
+    assert result['toolManifest']['displayName'] == 'Search Docs'
+    assert result['toolManifest']['schemaSource'] == 'merge'
+    assert result['tool']['inputSchema']['properties'] == {'query': {'type': 'string'}}
 
 
 def test_vector_store_upsert_and_similarity_search_return_documents() -> None:

@@ -224,6 +224,81 @@ function stringifyValue(value: unknown): string {
   }
 }
 
+function trimCodeFence(value: string): string {
+  const trimmed = value.trim();
+  const codeFenceMatch = trimmed.match(/^```(?:[a-z0-9_-]+)?\s*([\s\S]*?)\s*```$/i);
+  return codeFenceMatch ? codeFenceMatch[1].trim() : trimmed;
+}
+
+function coerceScalarValue(value: string): string | number | boolean {
+  const normalized = value.trim();
+
+  if (/^-?\d+(?:\.\d+)?$/.test(normalized)) {
+    return Number(normalized);
+  }
+
+  if (normalized === "true") {
+    return true;
+  }
+
+  if (normalized === "false") {
+    return false;
+  }
+
+  return normalized;
+}
+
+function parseKeyValueText(
+  value: string,
+  coerceNumbers: boolean
+): Record<string, unknown> {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .reduce<Record<string, unknown>>((record, line) => {
+      const separatorIndex = line.indexOf(":");
+      if (separatorIndex < 0) {
+        return record;
+      }
+
+      const key = line.slice(0, separatorIndex).trim();
+      const rawValue = line.slice(separatorIndex + 1).trim();
+      if (!key) {
+        return record;
+      }
+
+      record[key] = coerceNumbers ? coerceScalarValue(rawValue) : rawValue;
+      return record;
+    }, {});
+}
+
+function mergeObjectRecords(
+  baseValue: unknown,
+  overrideValue: unknown
+): Record<string, unknown> {
+  return {
+    ...ensureObjectRecord(baseValue),
+    ...ensureObjectRecord(overrideValue),
+  };
+}
+
+function dedupeConsecutiveMessages(messages: ChatMessage[]): ChatMessage[] {
+  return messages.reduce<ChatMessage[]>((accumulator, message) => {
+    const previous = accumulator.at(-1);
+    if (
+      previous &&
+      previous.role === message.role &&
+      previous.content === message.content
+    ) {
+      return accumulator;
+    }
+
+    accumulator.push(message);
+    return accumulator;
+  }, []);
+}
+
 function tokenize(value: string): string[] {
   return value
     .toLowerCase()
@@ -778,20 +853,33 @@ export class LangChainNodeExecutor implements INodeExecutor {
 
     if (supportsNodeType(nodeType, "langchain.output_parser", "langchain.output-parser")) {
       const format = String(properties.format ?? "json");
+      const trimFence = Boolean(properties.trimCodeFence ?? true);
+      const coerceNumbers = Boolean(properties.coerceNumbers ?? true);
+      const propertySchema = ensureObjectRecord(properties.schema);
+      const inputSchema = ensureObjectRecord(inputs.schema);
+      const effectiveSchema = Object.keys(inputSchema).length > 0
+        ? mergeObjectRecords(propertySchema, inputSchema)
+        : propertySchema;
       const outputValue = inputs.text ?? inputs.output ?? inputs.output_text ?? properties.output_text ?? "";
       const outputText = normalizeText(outputValue);
       const prefix = String(inputs.prefix ?? properties.prefix ?? "");
       const parsedText = prefix && outputText.startsWith(prefix)
         ? outputText.slice(prefix.length).trim()
         : outputText.trim();
+      const normalizedText = trimFence ? trimCodeFence(parsedText) : parsedText;
 
       let parsed: unknown = parsedText;
-      if (format === "json") {
+      let usedFallback = false;
+
+      if (format === "json" || format === "json_schema") {
         try {
-          parsed = JSON.parse(parsedText);
+          parsed = JSON.parse(normalizedText);
         } catch {
-          parsed = { text: parsedText };
+          parsed = { text: normalizedText };
+          usedFallback = true;
         }
+      } else if (format === "key_value") {
+        parsed = parseKeyValueText(normalizedText, coerceNumbers);
       }
 
       return {
@@ -801,6 +889,15 @@ export class LangChainNodeExecutor implements INodeExecutor {
           parsed,
           parsed_output: parsed,
           raw_output: outputText,
+          parseReport: {
+            format,
+            usedFallback,
+            schema: effectiveSchema,
+            extractedKeys:
+              parsed && typeof parsed === "object" && !Array.isArray(parsed)
+                ? Object.keys(parsed as Record<string, unknown>)
+                : [],
+          },
         },
         messages: ["LangChain output parser executed with interpreter."],
       };
@@ -1083,12 +1180,26 @@ export class LangChainNodeExecutor implements INodeExecutor {
       };
     }
 
-    if (supportsNodeType(nodeType, "langchain.memory")) {
+    if (supportsNodeType(nodeType, "langchain.message_history", "langchain.memory")) {
       const sessionId = normalizeText(inputs.sessionId);
       const newMessages = toChatMessages(inputs.messages);
-      const maxMessages = Math.max(1, Number(properties.maxMessages ?? 10));
+      const seedHistory = toChatMessages(inputs.seedHistory);
+      const maxMessages = Math.max(1, Number(properties.maxMessages ?? 12));
+      const seedStrategy = String(properties.seedStrategy ?? "on-miss");
+      const dedupeConsecutive = Boolean(properties.dedupeConsecutive ?? true);
       const existingHistory = messageHistoryStore.get(sessionId) ?? [];
-      const history = [...existingHistory, ...newMessages].slice(-maxMessages);
+      const baseHistory =
+        seedStrategy === "merge"
+          ? [...seedHistory, ...existingHistory]
+          : existingHistory.length > 0
+            ? existingHistory
+            : seedHistory;
+      const combinedHistory = [...baseHistory, ...newMessages];
+      const history = (dedupeConsecutive
+        ? dedupeConsecutiveMessages(combinedHistory)
+        : combinedHistory
+      ).slice(-maxMessages);
+
       if (sessionId) {
         messageHistoryStore.set(sessionId, history);
       }
@@ -1098,6 +1209,12 @@ export class LangChainNodeExecutor implements INodeExecutor {
         status: sessionId ? "completed" : "failed",
         outputs: {
           history,
+          historyState: {
+            sessionId,
+            storedMessageCount: history.length,
+            seededMessageCount: seedHistory.length,
+            appendedMessageCount: newMessages.length,
+          },
         },
         messages: [sessionId ? `Stored ${history.length} message(s) for session ${sessionId}.` : "Message history requires a session ID."],
         errorMessage: sessionId ? undefined : "Message history requires a session ID.",
@@ -1108,12 +1225,22 @@ export class LangChainNodeExecutor implements INodeExecutor {
       const toolName = String(properties.toolName ?? "");
       const description = String(properties.description ?? "");
       const strictSchema = Boolean(properties.strictSchema ?? true);
+      const displayName = String(properties.displayName ?? "");
+      const schemaSource = String(properties.inputSchemaSource ?? "merge");
+      const propertySchema = ensureObjectRecord(properties.inputSchema);
       const inputSchema = ensureObjectRecord(inputs.inputSchema);
       const handler = inputs.toolHandler;
+      const mergedSchema =
+        schemaSource === "property"
+          ? propertySchema
+          : schemaSource === "input"
+            ? inputSchema
+            : mergeObjectRecords(propertySchema, inputSchema);
       const tool = {
         name: toolName,
+        displayName: displayName || undefined,
         description,
-        inputSchema: Object.keys(inputSchema).length > 0 ? inputSchema : undefined,
+        inputSchema: Object.keys(mergedSchema).length > 0 ? mergedSchema : undefined,
         strictSchema,
         handler,
       };
@@ -1123,6 +1250,15 @@ export class LangChainNodeExecutor implements INodeExecutor {
         status: toolName && description ? "completed" : "failed",
         outputs: {
           tool,
+          toolManifest: {
+            name: toolName,
+            displayName: displayName || toolName,
+            description,
+            strictSchema,
+            schemaSource,
+            hasHandler: handler !== undefined,
+            inputSchema: Object.keys(mergedSchema).length > 0 ? mergedSchema : undefined,
+          },
         },
         messages: [
           toolName && description

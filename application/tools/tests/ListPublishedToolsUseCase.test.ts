@@ -27,6 +27,8 @@ describe("ListPublishedToolsUseCase", () => {
     ).execute();
 
     expect(result.tools.length).toBe(1);
+    expect(result.tools[0]?.id).toBe("wf-image");
+    expect(result.tools[0]?.slug).toBe("image-creator");
     expect(result.tools[0]?.typeLabel).toBe("Image Creation");
     expect(result.availableTypes.length).toBeGreaterThan(0);
   });

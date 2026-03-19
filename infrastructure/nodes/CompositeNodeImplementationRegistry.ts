@@ -8,11 +8,65 @@ function normalize(value: string): string {
   return value.trim().toLowerCase();
 }
 
-export class CompositeNodeImplementationRegistry implements INodeImplementationRegistry {
-  private readonly registries: ReadonlyArray<INodeImplementationRegistry>;
+export interface ICompositeNodeImplementationRegistryEntry {
+  readonly registry: INodeImplementationRegistry;
+  readonly precedence: number;
+}
 
-  constructor(registries: ReadonlyArray<INodeImplementationRegistry>) {
-    this.registries = Object.freeze([...registries]);
+interface IResolvedCompositeNodeImplementationRegistryEntry
+  extends ICompositeNodeImplementationRegistryEntry {
+  readonly declarationOrder: number;
+}
+
+function isCompositeRegistryEntry(
+  value: INodeImplementationRegistry | ICompositeNodeImplementationRegistryEntry
+): value is ICompositeNodeImplementationRegistryEntry {
+  return "registry" in value;
+}
+
+export class CompositeNodeImplementationRegistry implements INodeImplementationRegistry {
+  private readonly entries: ReadonlyArray<IResolvedCompositeNodeImplementationRegistryEntry>;
+
+  /**
+   * Duplicate node types are resolved by explicit composite precedence.
+   *
+   * The registry with the highest numeric `precedence` wins. When two registries
+   * share the same precedence, declaration order is used as a deterministic
+   * tiebreaker, so the earlier entry wins.
+   *
+   * Plain registries are accepted for compatibility and default to precedence 0.
+   */
+  constructor(
+    registries: ReadonlyArray<
+      INodeImplementationRegistry | ICompositeNodeImplementationRegistryEntry
+    >
+  ) {
+    this.entries = Object.freeze(
+      registries
+        .map((entry, declarationOrder) => {
+          if (isCompositeRegistryEntry(entry)) {
+            return {
+              registry: entry.registry,
+              precedence: entry.precedence,
+              declarationOrder,
+            };
+          }
+
+          return {
+            registry: entry,
+            precedence: 0,
+            declarationOrder,
+          };
+        })
+        .sort((left, right) => {
+          const precedenceDelta = right.precedence - left.precedence;
+          if (precedenceDelta !== 0) {
+            return precedenceDelta;
+          }
+
+          return left.declarationOrder - right.declarationOrder;
+        })
+    );
   }
 
   public getProviderId(): string {
@@ -24,7 +78,7 @@ export class CompositeNodeImplementationRegistry implements INodeImplementationR
   ): ReadonlyArray<INodeRuntimeImplementation> {
     if (options?.providerId) {
       return Object.freeze(
-        this.registries.flatMap((registry) =>
+        this.entries.flatMap(({ registry }) =>
           normalize(registry.getProviderId()) === normalize(options.providerId!)
             ? [...registry.listImplementations(options)]
             : []
@@ -33,7 +87,7 @@ export class CompositeNodeImplementationRegistry implements INodeImplementationR
     }
 
     return Object.freeze(
-      this.registries.flatMap((registry) => [...registry.listImplementations()])
+      this.entries.flatMap(({ registry }) => [...registry.listImplementations()])
     );
   }
 
@@ -41,7 +95,7 @@ export class CompositeNodeImplementationRegistry implements INodeImplementationR
     nodeTypeId: string,
     options?: INodeImplementationSearchOptions
   ): INodeRuntimeImplementation | undefined {
-    for (const registry of this.registries) {
+    for (const { registry } of this.entries) {
       if (
         options?.providerId &&
         normalize(registry.getProviderId()) !== normalize(options.providerId)

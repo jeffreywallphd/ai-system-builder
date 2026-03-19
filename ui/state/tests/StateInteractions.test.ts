@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { WorkflowExecutionStore } from "../WorkflowExecutionStore";
 import { WorkflowStore } from "../WorkflowStore";
 
 describe("ui/state interactions", () => {
@@ -80,4 +81,36 @@ describe("ui/state interactions", () => {
     expect(store.getState().isExecuting).toBeFalse();
   });
 
+  it("resets execution state when switching workflows without disturbing editor state shape", async () => {
+    const nextWorkflow = { id: "wf-2" } as any;
+    const executionStore = new WorkflowExecutionStore({
+      initialState: {
+        isExecuting: false,
+        lastExecutionEvent: { executionId: "exec-1" } as any,
+        nodeExecutionOutputs: { "n-1": { value: 1 } },
+        outputAssets: [{ id: "asset-1" } as any],
+      },
+    });
+    const store = new WorkflowStore({
+      workflowService: {
+        loadWorkflow: async () => nextWorkflow,
+      } as any,
+      nodeService: {} as any,
+      executionStore,
+      initialState: {
+        currentWorkflow: { id: "wf-1" } as any,
+        validation: { isValid: true } as any,
+        selectedNodeId: "n-1",
+      },
+    });
+
+    await store.loadWorkflow("wf-2");
+
+    expect(store.getState().currentWorkflow).toBe(nextWorkflow);
+    expect(store.getState().validation).toBeUndefined();
+    expect(store.getState().selectedNodeId).toBeUndefined();
+    expect(store.getState().lastExecutionEvent).toBeUndefined();
+    expect(store.getState().nodeExecutionOutputs).toEqual({});
+    expect(store.getState().outputAssets).toEqual([]);
+  });
 });

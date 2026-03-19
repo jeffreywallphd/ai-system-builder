@@ -7,9 +7,12 @@ import { CHAT_PROMPT_BUILDER_NODE_DEFINITION } from "./ChatPromptBuilderNodeDefi
 import { COMBINE_SUMMARIES_NODE_DEFINITION } from "./CombineSummariesNodeDefinition";
 import { CONTEXT_FORMATTER_NODE_DEFINITION } from "./ContextFormatterNodeDefinition";
 import { KNOWLEDGE_BASE_RETRIEVER_NODE_DEFINITION } from "./KnowledgeBaseRetrieverNodeDefinition";
+import { MESSAGE_HISTORY_NODE_DEFINITION } from "./MessageHistoryNodeDefinition";
+import { OUTPUT_PARSER_NODE_DEFINITION } from "./OutputParserNodeDefinition";
 import { RETRIEVAL_QA_NODE_DEFINITION } from "./RetrievalQaNodeDefinition";
 import { SIMILARITY_SEARCH_NODE_DEFINITION } from "./SimilaritySearchNodeDefinition";
 import { SUMMARIZATION_NODE_DEFINITION } from "./SummarizationNodeDefinition";
+import { TOOL_DEFINITION_NODE_DEFINITION } from "./ToolDefinitionNodeDefinition";
 import { VECTOR_STORE_UPSERT_NODE_DEFINITION } from "./VectorStoreUpsertNodeDefinition";
 
 interface ILangChainNodeProjectionMetadata {
@@ -579,107 +582,8 @@ export const LANGCHAIN_NODE_CATALOG_METADATA: Readonly<
     tags: ["retrieval", "ranking", "rag"],
     keywords: ["rerank", "results", "search", "relevance"],
   }),
-  "langchain.output_parser": metadata({
-    technicalName: "langchain.output_parser",
-    nonTechnicalName: "Format AI Output",
-    technicalDescription:
-      "Parses LLM output into structured data such as JSON, schema-aligned objects, or cleaned text.",
-    nonTechnicalDescription:
-      "Turn AI output into clean, structured, or easier-to-use results.",
-    inputPorts: Object.freeze([
-      inputPort("text", "Text", ["text", "json"], false, "Model output text to parse."),
-    ]),
-    outputPorts: Object.freeze([
-      outputPort(
-        "parsed",
-        "Parsed Output",
-        ["json", "text", "generic"],
-        "Parsed output ready for downstream workflow nodes."
-      ),
-    ]),
-    properties: Object.freeze([
-      property({
-        id: "format",
-        name: "Format",
-        type: "select",
-        value: "json",
-        defaultValue: "json",
-        description: "Target output format expected from the parser.",
-        options: [
-          { label: "JSON", value: "json", description: "Parse structured JSON output." },
-          { label: "Text", value: "text", description: "Return cleaned plain text." },
-          { label: "Custom", value: "custom", description: "Apply a custom parsing strategy." },
-        ],
-        projectionGroup: "Parsing",
-        order: 0,
-      }),
-      property({
-        id: "schema",
-        name: "Schema",
-        type: "json",
-        value: {},
-        description: "Optional schema or shape guidance for structured parsing.",
-        isAdvanced: true,
-        projectionGroup: "Parsing",
-        fieldTypeHint: "json-editor",
-        order: 1,
-      }),
-    ]),
-    group: tierOneProjectionGroup,
-    tags: ["parsing", "output", "formatting"],
-    keywords: ["parse", "json", "output", "schema"],
-  }),
-  "langchain.memory": metadata({
-    technicalName: "langchain.memory",
-    nonTechnicalName: "Remember Conversation",
-    technicalDescription:
-      "Stores and retrieves chat history for conversational continuity.",
-    nonTechnicalDescription:
-      "Let the AI remember past messages in a conversation.",
-    inputPorts: Object.freeze([
-      inputPort(
-        "messages",
-        "Messages",
-        ["messages", "json"],
-        false,
-        "New chat messages to append to history."
-      ),
-      inputPort(
-        "sessionId",
-        "Session ID",
-        ["text"],
-        false,
-        "Conversation session identifier used to scope memory."
-      ),
-    ]),
-    outputPorts: Object.freeze([
-      outputPort(
-        "history",
-        "History",
-        ["messages", "json"],
-        "Conversation history returned after the latest messages are stored."
-      ),
-    ]),
-    properties: Object.freeze([
-      property({
-        id: "maxMessages",
-        name: "Max Messages",
-        type: "integer",
-        value: 10,
-        defaultValue: 10,
-        description: "Maximum number of messages to keep in memory.",
-        required: true,
-        min: 1,
-        max: 100,
-        step: 1,
-        projectionGroup: "Memory",
-        order: 0,
-      }),
-    ]),
-    group: tierOneProjectionGroup,
-    tags: ["memory", "chat", "history"],
-    keywords: ["remember", "conversation", "history", "session"],
-  }),
+  "langchain.output_parser": OUTPUT_PARSER_NODE_DEFINITION,
+  "langchain.message_history": MESSAGE_HISTORY_NODE_DEFINITION,
   "langchain.document_loader": metadata({
     technicalName: "langchain.document_loader",
     nonTechnicalName: "Load Document",
@@ -808,75 +712,7 @@ export const LANGCHAIN_NODE_CATALOG_METADATA: Readonly<
   "langchain.vector_store_upsert": VECTOR_STORE_UPSERT_NODE_DEFINITION,
   "langchain.similarity_search": SIMILARITY_SEARCH_NODE_DEFINITION,
   "langchain.context_formatter": CONTEXT_FORMATTER_NODE_DEFINITION,
-  "langchain.tool_definition": metadata({
-    technicalName: "langchain.tool_definition",
-    nonTechnicalName: "Create AI Tool",
-    technicalDescription:
-      "Defines a callable tool with name, description, and input schema that can be supplied to an agent or tool-calling model.",
-    nonTechnicalDescription:
-      "Describe a tool the AI is allowed to use.",
-    inputPorts: Object.freeze([
-      inputPort(
-        "inputSchema",
-        "Input Schema",
-        ["json", "generic"],
-        true,
-        "Optional schema object describing the arguments accepted by the tool."
-      ),
-      inputPort(
-        "toolHandler",
-        "Tool Handler",
-        ["generic", "json"],
-        true,
-        "Optional runtime handler reference or implementation payload for the tool."
-      ),
-    ]),
-    outputPorts: Object.freeze([
-      outputPort(
-        "tool",
-        "Tool",
-        ["generic", "json"],
-        "A tool definition object that can be supplied to an agent or executor node."
-      ),
-    ]),
-    properties: Object.freeze([
-      property({
-        id: "toolName",
-        name: "Tool Name",
-        type: "text",
-        value: "",
-        description: "Stable tool identifier exposed to the model.",
-        required: true,
-        projectionGroup: "Definition",
-        order: 0,
-      }),
-      property({
-        id: "description",
-        name: "Description",
-        type: "multiline-text",
-        value: "",
-        description: "Clear instruction telling the model what the tool does and when to use it.",
-        required: true,
-        projectionLabel: "Tool description",
-        projectionGroup: "Definition",
-        fieldTypeHint: "textarea",
-        order: 1,
-      }),
-      property({
-        id: "strictSchema",
-        name: "Strict Schema",
-        type: "boolean",
-        value: true,
-        defaultValue: true,
-        description: "Require tool calls to match the provided schema closely when the runtime supports it.",
-        projectionGroup: "Definition",
-        order: 2,
-      }),
-    ]),
-    group: tierTwoProjectionGroup,
-    tags: ["tools", "agent", "function calling"],
-    keywords: ["tool definition", "tool schema", "callable tool"],
-  }),
+  "langchain.tool_definition": TOOL_DEFINITION_NODE_DEFINITION,
   "langchain.tool_call_executor": metadata({
     technicalName: "langchain.tool_call_executor",
     nonTechnicalName: "Run AI Tool",

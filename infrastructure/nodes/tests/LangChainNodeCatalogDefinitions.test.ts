@@ -61,17 +61,10 @@ const requiredTierOneNodes = [
   },
   {
     type: "langchain.output_parser",
-    title: "Format AI Output",
-    requiredInputs: ["text"],
-    requiredOutputs: ["parsed"],
-    expectedProperties: ["format", "schema"],
-  },
-  {
-    type: "langchain.memory",
-    title: "Remember Conversation",
-    requiredInputs: ["messages", "sessionId"],
-    requiredOutputs: ["history"],
-    expectedProperties: ["maxMessages"],
+    title: "Extract Structured Data",
+    requiredInputs: ["text", "schema"],
+    requiredOutputs: ["parsed", "parseReport"],
+    expectedProperties: ["format", "schema", "trimCodeFence", "coerceNumbers"],
   },
   {
     type: "langchain.document_loader",
@@ -83,6 +76,13 @@ const requiredTierOneNodes = [
 ] as const;
 
 const requiredTierTwoNodes = [
+  {
+    type: "langchain.message_history",
+    title: "Remember Conversation",
+    requiredInputs: ["sessionId", "messages", "seedHistory"],
+    requiredOutputs: ["history", "historyState"],
+    expectedProperties: ["maxMessages", "seedStrategy", "dedupeConsecutive"],
+  },
   {
     type: "langchain.document_to_chunks",
     title: "Prepare Document Chunks",
@@ -115,8 +115,8 @@ const requiredTierTwoNodes = [
     type: "langchain.tool_definition",
     title: "Create AI Tool",
     requiredInputs: ["inputSchema", "toolHandler"],
-    requiredOutputs: ["tool"],
-    expectedProperties: ["toolName", "description", "strictSchema"],
+    requiredOutputs: ["tool", "toolManifest"],
+    expectedProperties: ["toolName", "description", "inputSchemaSource", "inputSchema", "strictSchema", "displayName"],
   },
   {
     type: "langchain.tool_call_executor",
@@ -239,7 +239,7 @@ describe("LangChain node catalog definitions", () => {
     const promptTemplate = definitions.find((definition) => definition.type === "langchain.prompt_template");
     const llmChat = definitions.find((definition) => definition.type === "langchain.llm_chat");
     const outputParser = definitions.find((definition) => definition.type === "langchain.output_parser");
-    const memory = definitions.find((definition) => definition.type === "langchain.memory");
+    const messageHistory = definitions.find((definition) => definition.type === "langchain.message_history");
     const toolDefinition = definitions.find((definition) => definition.type === "langchain.tool_definition");
     const similaritySearch = definitions.find(
       (definition) => definition.type === "langchain.similarity_search"
@@ -261,8 +261,12 @@ describe("LangChain node catalog definitions", () => {
     const temperature = llmChat?.properties.find((property) => property.id === "temperature");
     const format = outputParser?.properties.find((property) => property.id === "format");
     const schema = outputParser?.properties.find((property) => property.id === "schema");
-    const maxMessages = memory?.properties.find((property) => property.id === "maxMessages");
+    const trimCodeFence = outputParser?.properties.find((property) => property.id === "trimCodeFence");
+    const maxMessages = messageHistory?.properties.find((property) => property.id === "maxMessages");
+    const seedStrategy = messageHistory?.properties.find((property) => property.id === "seedStrategy");
     const toolName = toolDefinition?.properties.find((property) => property.id === "toolName");
+    const schemaSource = toolDefinition?.properties.find((property) => property.id === "inputSchemaSource");
+    const defaultToolSchema = toolDefinition?.properties.find((property) => property.id === "inputSchema");
     const strictSchema = toolDefinition?.properties.find(
       (property) => property.id === "strictSchema"
     );
@@ -297,15 +301,20 @@ describe("LangChain node catalog definitions", () => {
     });
 
     expect(format?.type).toBe("select");
-    expect(format?.options?.map((option) => option.value)).toEqual(["json", "text", "custom"]);
+    expect(format?.options?.map((option) => option.value)).toEqual(["json", "json_schema", "key_value", "text"]);
     expect(schema?.type).toBe("json");
     expect(schema?.projection?.fieldTypeHint).toBe("json-editor");
+    expect(trimCodeFence?.defaultValue).toBeTrue();
 
-    expect(maxMessages?.defaultValue).toBe(10);
+    expect(maxMessages?.defaultValue).toBe(12);
     expect(maxMessages?.constraints?.range?.max).toBe(100);
+    expect(seedStrategy?.defaultValue).toBe("on-miss");
+    expect(seedStrategy?.projection?.label).toBe("Seed behavior");
 
     expect(toolName?.constraints?.required).toBeTrue();
     expect(toolName?.projection?.group).toBe("Definition");
+    expect(schemaSource?.defaultValue).toBe("merge");
+    expect(defaultToolSchema?.type).toBe("json");
     expect(strictSchema?.defaultValue).toBeTrue();
 
     expect(scoreThreshold?.type).toBe("number");
@@ -341,9 +350,24 @@ describe("LangChain node catalog definitions", () => {
   });
 
   it("stores useful technical and non-technical metadata for the new Tier 2 nodes", () => {
+    const outputParser = getLangChainNodeCatalogMetadata("langchain.output_parser");
+    const messageHistory = getLangChainNodeCatalogMetadata("langchain.message_history");
+    const toolDefinition = getLangChainNodeCatalogMetadata("langchain.tool_definition");
     const knowledgeBaseRetriever = getLangChainNodeCatalogMetadata("langchain.knowledge_base_retriever");
     const retrievalQa = getLangChainNodeCatalogMetadata("langchain.retrieval_qa");
     const chatPromptBuilder = getLangChainNodeCatalogMetadata("langchain.chat_prompt_builder");
+
+    expect(outputParser?.technicalDescription).toContain("structured workflow data");
+    expect(outputParser?.description).toContain("structured fields");
+    expect(outputParser?.projection.group).toBe("Tier 2 LLM");
+
+    expect(messageHistory?.technicalDescription).toContain("session-scoped chat messages");
+    expect(messageHistory?.description).toContain("ongoing conversation");
+    expect(messageHistory?.projection.tags).toContain("session");
+
+    expect(toolDefinition?.technicalDescription).toContain("tool definition object");
+    expect(toolDefinition?.description).toContain("what inputs it needs");
+    expect(toolDefinition?.projection.supportsToolView).toBeTrue();
 
     expect(knowledgeBaseRetriever?.technicalDescription).toContain("knowledge base or semantic store");
     expect(knowledgeBaseRetriever?.description).toContain("saved knowledge");
