@@ -1,59 +1,51 @@
+import {
+  buildLangChainNodeCatalogDescriptor,
+  LANGCHAIN_NODE_REGISTRATIONS,
+} from "../langchain/LangChainNodeRegistrationCatalog";
 import { NodeImplementationDescriptor } from "../shared/NodeImplementationDescriptor";
 import { NodeImplementationRegistry } from "../shared/NodeImplementationRegistry";
 import type { INodeRuntimeImplementation } from "../shared/INodeRuntimeImplementation";
 
-function pythonImplementation(nodeTypeId: string, title: string): INodeRuntimeImplementation {
+function pythonImplementation(nodeTypeId: string): INodeRuntimeImplementation {
+  const registration = LANGCHAIN_NODE_REGISTRATIONS.find(
+    (candidate) => candidate.nodeTypeId === nodeTypeId
+  );
+
+  if (!registration) {
+    throw new Error(`Missing Python bridge registration for ${nodeTypeId}.`);
+  }
+
+  const nodeDefinition = buildLangChainNodeCatalogDescriptor(
+    registration.nodeTypeId,
+    registration.category
+  );
+
+  if (!nodeDefinition) {
+    throw new Error(`Missing bridged node catalog metadata for ${nodeTypeId}.`);
+  }
+
   return {
     descriptor: new NodeImplementationDescriptor({
       providerId: "python",
       runtimeId: "python",
-      nodeTypeId,
-      title,
+      nodeTypeId: registration.nodeTypeId,
+      title: `Python ${nodeDefinition.title} Adapter`,
       executionStyles: ["python-node", "hybrid"],
       metadata: {
         bridgeProvider: "langchain",
         tier: "tier-1-llm",
+        category: registration.category,
       },
+      nodeDefinition,
     }),
   };
 }
 
-const PYTHON_IMPLEMENTATIONS: ReadonlyArray<INodeRuntimeImplementation> = Object.freeze([
-  pythonImplementation("langchain.prompt_template", "Python Build Prompt Adapter"),
-  pythonImplementation("langchain.chat_prompt", "Python Build Chat Input Adapter"),
-  pythonImplementation("langchain.llm_chat", "Python Generate AI Response Adapter"),
-  pythonImplementation("langchain.text_splitter", "Python Text Splitter Adapter"),
-  pythonImplementation("langchain.embeddings", "Python Embeddings Adapter"),
-  pythonImplementation("langchain.retriever", "Python Retriever Adapter"),
-  pythonImplementation("langchain.reranker", "Python Reranker Adapter"),
-  pythonImplementation("langchain.output_parser", "Python Output Parser Adapter"),
-  pythonImplementation("langchain.memory", "Python Message History Adapter"),
-  pythonImplementation("langchain.document_loader", "Python Document Loader Adapter"),
-  pythonImplementation("langchain.document_to_chunks", "Python Document To Chunks Adapter"),
-  pythonImplementation("langchain.vector_store_upsert", "Python Vector Store Upsert Adapter"),
-  pythonImplementation("langchain.similarity_search", "Python Similarity Search Adapter"),
-  pythonImplementation("langchain.context_formatter", "Python Context Formatter Adapter"),
-  pythonImplementation("langchain.tool_definition", "Python Tool Definition Adapter"),
-  pythonImplementation("langchain.tool_call_executor", "Python Tool Call Executor Adapter"),
-  pythonImplementation("langchain.agent", "Python Agent Adapter"),
-  pythonImplementation("langchain.summarization", "Python Summarization Adapter"),
-  pythonImplementation("langchain.combine_summaries", "Python Combine Summaries Adapter"),
-  pythonImplementation(
-    "langchain.knowledge_base_retriever",
-    "Python Knowledge Base Retriever Adapter"
-  ),
-
-  pythonImplementation("langchain.prompt-template", "Python Prompt Template Adapter"),
-  pythonImplementation("langchain.text-splitter", "Python Text Splitter Adapter"),
-  pythonImplementation("langchain.document-to-chunks", "Python Document To Chunks Adapter"),
-  pythonImplementation("langchain.chat-prompt", "Python Chat Prompt Adapter"),
-  pythonImplementation("langchain.simple-chain", "Python Simple Chain Adapter"),
-  pythonImplementation("langchain.context-merger", "Python Context Merger Adapter"),
-  pythonImplementation("langchain.output-parser", "Python Output Parser Adapter"),
-  pythonImplementation("langchain.embedding-generator", "Python Embedding Generator Adapter"),
-  pythonImplementation("langchain.vector-store-upsert", "Python Vector Store Upsert Adapter"),
-  pythonImplementation("langchain.retrieval-query", "Python Retrieval Query Adapter"),
-]);
+const PYTHON_IMPLEMENTATIONS: ReadonlyArray<INodeRuntimeImplementation> = Object.freeze(
+  LANGCHAIN_NODE_REGISTRATIONS.map((registration) =>
+    pythonImplementation(registration.nodeTypeId)
+  )
+);
 
 export class PythonNodeImplementationRegistry extends NodeImplementationRegistry {
   constructor() {

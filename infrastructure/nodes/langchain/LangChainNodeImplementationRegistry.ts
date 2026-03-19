@@ -1,128 +1,50 @@
+import {
+  buildLangChainNodeCatalogDescriptor,
+  LANGCHAIN_NODE_REGISTRATIONS,
+} from "./LangChainNodeRegistrationCatalog";
 import { NodeImplementationDescriptor } from "../shared/NodeImplementationDescriptor";
 import { NodeImplementationRegistry } from "../shared/NodeImplementationRegistry";
 import type { INodeRuntimeImplementation } from "../shared/INodeRuntimeImplementation";
 
-function langChainImplementation(
-  nodeTypeId: string,
-  title: string,
-  executionStyles: ReadonlyArray<"interpreted-node" | "python-node" | "hybrid"> = [
-    "interpreted-node",
-    "python-node",
-  ]
-): INodeRuntimeImplementation {
+function langChainImplementation(nodeTypeId: string): INodeRuntimeImplementation {
+  const registration = LANGCHAIN_NODE_REGISTRATIONS.find(
+    (candidate) => candidate.nodeTypeId === nodeTypeId
+  );
+
+  if (!registration) {
+    throw new Error(`Missing LangChain node registration for ${nodeTypeId}.`);
+  }
+
+  const nodeDefinition = buildLangChainNodeCatalogDescriptor(
+    registration.nodeTypeId,
+    registration.category
+  );
+
+  if (!nodeDefinition) {
+    throw new Error(`Missing LangChain node catalog metadata for ${nodeTypeId}.`);
+  }
+
   return {
     descriptor: new NodeImplementationDescriptor({
       providerId: "langchain",
       runtimeId: "langchain",
-      nodeTypeId,
-      title,
-      executionStyles,
+      nodeTypeId: registration.nodeTypeId,
+      title: nodeDefinition.title,
+      executionStyles: registration.executionStyles,
       metadata: {
-        category: "LangChain",
+        category: registration.category,
         tier: "tier-1-llm",
       },
+      nodeDefinition,
     }),
   };
 }
 
-const LANGCHAIN_IMPLEMENTATIONS: ReadonlyArray<INodeRuntimeImplementation> = Object.freeze([
-  langChainImplementation("langchain.prompt_template", "Build Prompt"),
-  langChainImplementation("langchain.chat_prompt", "Build Chat Input"),
-  langChainImplementation("langchain.llm_chat", "Generate AI Response", [
-    "interpreted-node",
-    "python-node",
-    "hybrid",
-  ]),
-  langChainImplementation("langchain.text_splitter", "Split Text into Chunks"),
-  langChainImplementation("langchain.embeddings", "Convert Text to Meaning Vectors", [
-    "interpreted-node",
-    "python-node",
-    "hybrid",
-  ]),
-  langChainImplementation("langchain.retriever", "Find Relevant Information", [
-    "interpreted-node",
-    "python-node",
-    "hybrid",
-  ]),
-  langChainImplementation("langchain.reranker", "Improve Search Results", [
-    "interpreted-node",
-    "python-node",
-    "hybrid",
-  ]),
-  langChainImplementation("langchain.output_parser", "Format AI Output"),
-  langChainImplementation("langchain.memory", "Remember Conversation"),
-  langChainImplementation("langchain.document_loader", "Load Document"),
-  langChainImplementation("langchain.document_to_chunks", "Prepare Document Chunks"),
-  langChainImplementation("langchain.vector_store_upsert", "Save Knowledge to Search Index", [
-    "interpreted-node",
-    "python-node",
-    "hybrid",
-  ]),
-  langChainImplementation("langchain.similarity_search", "Search Similar Content", [
-    "interpreted-node",
-    "python-node",
-    "hybrid",
-  ]),
-  langChainImplementation("langchain.context_formatter", "Build Context for AI"),
-  langChainImplementation("langchain.tool_definition", "Create AI Tool"),
-  langChainImplementation("langchain.tool_call_executor", "Run AI Tool", [
-    "interpreted-node",
-    "python-node",
-    "hybrid",
-  ]),
-  langChainImplementation("langchain.agent", "AI Agent", [
-    "interpreted-node",
-    "python-node",
-    "hybrid",
-  ]),
-  langChainImplementation("langchain.summarization", "Summarize Text", [
-    "interpreted-node",
-    "python-node",
-    "hybrid",
-  ]),
-  langChainImplementation("langchain.combine_summaries", "Combine Summaries", [
-    "interpreted-node",
-    "python-node",
-    "hybrid",
-  ]),
-  langChainImplementation(
-    "langchain.knowledge_base_retriever",
-    "Search Knowledge Base",
-    ["interpreted-node", "python-node", "hybrid"]
-  ),
-
-  langChainImplementation("langchain.prompt-template", "Build Prompt"),
-  langChainImplementation("langchain.text-splitter", "Split Text into Chunks"),
-  langChainImplementation("langchain.document-to-chunks", "Chunk Document"),
-  langChainImplementation("langchain.chat-prompt", "Build Chat Prompt"),
-  langChainImplementation("langchain.simple-chain", "Run Simple Chain", [
-    "interpreted-node",
-    "python-node",
-    "hybrid",
-  ]),
-  langChainImplementation("langchain.output-parser", "Format Output"),
-  langChainImplementation("langchain.context-merger", "Merge Context"),
-  langChainImplementation("langchain.embedding-generator", "Generate Embeddings", [
-    "interpreted-node",
-    "python-node",
-    "hybrid",
-  ]),
-  langChainImplementation("langchain.vector-store-upsert", "Prepare Vector Store Records", [
-    "interpreted-node",
-    "python-node",
-    "hybrid",
-  ]),
-  langChainImplementation("langchain.retrieval-query", "Retrieve Matches", [
-    "interpreted-node",
-    "python-node",
-    "hybrid",
-  ]),
-  langChainImplementation("langchain.answer-synthesizer", "Synthesize Answer", [
-    "interpreted-node",
-    "python-node",
-    "hybrid",
-  ]),
-]);
+const LANGCHAIN_IMPLEMENTATIONS: ReadonlyArray<INodeRuntimeImplementation> = Object.freeze(
+  LANGCHAIN_NODE_REGISTRATIONS.map((registration) =>
+    langChainImplementation(registration.nodeTypeId)
+  )
+);
 
 export class LangChainNodeImplementationRegistry extends NodeImplementationRegistry {
   constructor() {

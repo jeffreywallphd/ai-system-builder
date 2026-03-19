@@ -2,6 +2,7 @@ require("dotenv").config();
 const http = require("http");
 const { exec, execFile } = require("child_process");
 const path = require("path");
+const { URL } = require("url");
 
 const PORT = Number(process.env.DEV_SYNC_PORT || 8787);
 const HOST = process.env.DEV_SYNC_HOST || "0.0.0.0";
@@ -62,6 +63,15 @@ function normalizePathList(value) {
     .filter((entry) => typeof entry === "string")
     .map((entry) => entry.trim())
     .filter(Boolean);
+}
+
+function getRequestContext(req) {
+  const requestUrl = new URL(req.url || "/", `http://${req.headers.host || `${HOST}:${PORT}`}`);
+
+  return {
+    pathname: requestUrl.pathname,
+    stashFiles: normalizePathList(requestUrl.searchParams.getAll("stashFiles")),
+  };
 }
 
 function extractOverwrittenFiles(output) {
@@ -215,12 +225,14 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  const requestContext = getRequestContext(req);
+
   if (req.method === "OPTIONS") {
     sendJson(res, 204, {});
     return;
   }
 
-  if (req.url === "/health" && req.method === "GET") {
+  if (requestContext.pathname === "/health" && req.method === "GET") {
     console.log("[dev-sync-agent] Health check requested");
 
     const status = await runStatus();
@@ -236,23 +248,29 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (req.url === "/sync/pull" && req.method === "POST") {
-    console.log("[dev-sync-agent] Sync pull requested");
+  if (requestContext.pathname === "/sync/pull" && (req.method === "POST" || req.method === "GET")) {
+    const requiresToken = req.method === "POST";
 
-    const requestToken = req.headers["x-dev-sync-token"];
+    console.log(`[dev-sync-agent] Sync pull requested via ${req.method}`);
 
-    if (requestToken !== TOKEN) {
-      console.warn("[dev-sync-agent] Unauthorized request attempt");
-      sendJson(res, 401, {
-        ok: false,
-        message: "Unauthorized.",
-      });
-      return;
+    if (requiresToken) {
+      const requestToken = req.headers["x-dev-sync-token"];
+
+      if (requestToken !== TOKEN) {
+        console.warn("[dev-sync-agent] Unauthorized request attempt");
+        sendJson(res, 401, {
+          ok: false,
+          message: "Unauthorized.",
+        });
+        return;
+      }
     }
 
     try {
-      const body = await parseRequestBody(req);
-      const requestedStashFiles = normalizePathList(body.stashFiles);
+      const body = req.method === "POST" ? await parseRequestBody(req) : {};
+      const requestedStashFiles = req.method === "GET"
+        ? requestContext.stashFiles
+        : normalizePathList(body.stashFiles);
 
       if (requestedStashFiles.length > 0) {
         const stashResult = await runStash(requestedStashFiles);

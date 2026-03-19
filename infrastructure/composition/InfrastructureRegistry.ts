@@ -11,7 +11,7 @@ import { EnvironmentConfigProvider as ApplicationEnvironmentConfigProvider } fro
 import { InstalledModelCatalog } from "../../application/ports/InstalledModelCatalog";
 import { ModelDownloader } from "../../application/ports/ModelDownloader";
 import { ModelInstaller } from "../../application/ports/ModelInstaller";
-import { NodeCatalogProvider } from "../../application/ports/NodeCatalogProvider";
+import { CompositeNodeCatalogProvider } from "../../application/nodes/CompositeNodeCatalogProvider";
 import { RemoteModelCatalog } from "../../application/ports/RemoteModelCatalog";
 import { WorkflowExecutor } from "../../application/ports/WorkflowExecutor";
 import { WorkflowSerializer } from "../../application/ports/WorkflowSerializer";
@@ -133,7 +133,7 @@ export class InfrastructureRegistry {
     container.registerSingleton<INodeCatalogProvider>(
       TOKENS.NodeCatalogProvider,
       () => {
-        return new NodeCatalogProvider({
+        return new CompositeNodeCatalogProvider({
           providers: options.nodeCatalogProviders ?? [],
         });
       }

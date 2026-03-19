@@ -15,5 +15,10 @@ def get_capabilities() -> dict[str, object]:
             "langchain.simple_chain",
             "langchain.context_merger",
             "langchain.output_parser",
+            "langchain.vector_store_upsert",
+            "langchain.similarity_search",
+            "langchain.context_formatter",
+            "langchain.summarization",
+            "langchain.combine_summaries",
         ],
     }

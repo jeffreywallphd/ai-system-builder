@@ -1,3 +1,5 @@
+import type { INodeCatalogDefinitionDescriptor } from "./NodeCatalogDefinitionDescriptor";
+
 export type NodeExecutionStyle =
   | "delegated-workflow"
   | "interpreted-node"
@@ -12,6 +14,7 @@ export interface INodeImplementationDescriptorProps {
   readonly title: string;
   readonly executionStyles?: ReadonlyArray<NodeExecutionStyle>;
   readonly metadata?: Readonly<Record<string, unknown>>;
+  readonly nodeDefinition?: INodeCatalogDefinitionDescriptor;
 }
 
 function normalize(value: string): string {
@@ -25,6 +28,7 @@ export class NodeImplementationDescriptor {
   public readonly title: string;
   public readonly executionStyles: ReadonlyArray<NodeExecutionStyle>;
   public readonly metadata?: Readonly<Record<string, unknown>>;
+  public readonly nodeDefinition?: INodeCatalogDefinitionDescriptor;
 
   constructor(props: INodeImplementationDescriptorProps) {
     this.providerId = props.providerId;
@@ -33,6 +37,7 @@ export class NodeImplementationDescriptor {
     this.title = props.title;
     this.executionStyles = Object.freeze([...(props.executionStyles ?? ["generic"])]);
     this.metadata = props.metadata ? Object.freeze({ ...props.metadata }) : undefined;
+    this.nodeDefinition = props.nodeDefinition;
   }
 
   public matchesNodeType(nodeTypeId: string): boolean {

@@ -2,7 +2,7 @@ import type { INodeDefinition } from "../../domain/nodes/interfaces/INodeDefinit
 import type {
   INodeCatalogProvider,
   INodeCatalogSearchCriteria,
-} from "./interfaces/INodeCatalogProvider";
+} from "../ports/interfaces/INodeCatalogProvider";
 
 function normalize(value: string): string {
   return value.trim().toLowerCase();
@@ -89,19 +89,13 @@ function definitionMatchesCriteria(
     criteria.runtimes.length > 0 &&
     !(
       definition.capabilities.allowsAnyRuntime ||
-      includesAnyNormalized(
-        definition.capabilities.runtimes,
-        criteria.runtimes
-      )
+      includesAnyNormalized(definition.capabilities.runtimes, criteria.runtimes)
     )
   ) {
     return false;
   }
 
-  if (
-    criteria.modalities &&
-    criteria.modalities.length > 0
-  ) {
+  if (criteria.modalities && criteria.modalities.length > 0) {
     const modalities = new Set<string>();
 
     for (const property of definition.properties) {
@@ -196,7 +190,7 @@ function dedupeDefinitions(
   return Object.freeze([...deduped.values()]);
 }
 
-export class NodeCatalogProvider implements INodeCatalogProvider {
+export class CompositeNodeCatalogProvider implements INodeCatalogProvider {
   private readonly providers: ReadonlyArray<INodeCatalogProvider>;
   private readonly localDefinitions: ReadonlyArray<INodeDefinition>;
 
@@ -214,8 +208,10 @@ export class NodeCatalogProvider implements INodeCatalogProvider {
     );
 
     return Object.freeze(
-      [...dedupeDefinitions([...this.localDefinitions, ...providerResults.flat()])].sort(
-        (left, right) => normalize(left.title).localeCompare(normalize(right.title))
+      [
+        ...dedupeDefinitions([...this.localDefinitions, ...providerResults.flat()]),
+      ].sort((left, right) =>
+        normalize(left.title).localeCompare(normalize(right.title))
       )
     );
   }
@@ -274,15 +270,19 @@ export class NodeCatalogProvider implements INodeCatalogProvider {
     );
   }
 
-  public withDefinition(definition: INodeDefinition): NodeCatalogProvider {
-    return new NodeCatalogProvider({
+  public withDefinition(
+    definition: INodeDefinition
+  ): CompositeNodeCatalogProvider {
+    return new CompositeNodeCatalogProvider({
       providers: this.providers,
       definitions: [...this.localDefinitions, definition],
     });
   }
 
-  public withProvider(provider: INodeCatalogProvider): NodeCatalogProvider {
-    return new NodeCatalogProvider({
+  public withProvider(
+    provider: INodeCatalogProvider
+  ): CompositeNodeCatalogProvider {
+    return new CompositeNodeCatalogProvider({
       providers: [...this.providers, provider],
       definitions: this.localDefinitions,
     });

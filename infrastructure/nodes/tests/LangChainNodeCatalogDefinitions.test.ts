@@ -92,24 +92,24 @@ const requiredTierTwoNodes = [
   },
   {
     type: "langchain.vector_store_upsert",
-    title: "Save Knowledge to Search Index",
-    requiredInputs: ["documents", "embeddings", "vectorStore"],
-    requiredOutputs: ["vectorStore", "upsertResult"],
-    expectedProperties: ["collection", "upsertMode", "batchSize"],
+    title: "Save to Knowledge Base",
+    requiredInputs: ["documents", "embeddings"],
+    requiredOutputs: ["vectorStore"],
+    expectedProperties: ["storeType", "collectionName"],
   },
   {
     type: "langchain.similarity_search",
-    title: "Search Similar Content",
-    requiredInputs: ["query", "queryEmbedding", "vectorStore"],
+    title: "Search Knowledge Base",
+    requiredInputs: ["query", "vectorStore"],
     requiredOutputs: ["documents"],
-    expectedProperties: ["topK", "scoreThreshold"],
+    expectedProperties: ["k", "scoreThreshold"],
   },
   {
     type: "langchain.context_formatter",
-    title: "Build Context for AI",
-    requiredInputs: ["documents", "chunks"],
+    title: "Prepare Context",
+    requiredInputs: ["documents"],
     requiredOutputs: ["context"],
-    expectedProperties: ["template", "separator", "includeMetadata", "maxItems"],
+    expectedProperties: ["template", "maxLength"],
   },
   {
     type: "langchain.tool_definition",
@@ -135,23 +135,37 @@ const requiredTierTwoNodes = [
   {
     type: "langchain.summarization",
     title: "Summarize Text",
-    requiredInputs: ["text", "documents"],
+    requiredInputs: ["documents", "model"],
     requiredOutputs: ["summary"],
-    expectedProperties: ["model", "style", "maxLength"],
+    expectedProperties: ["strategy"],
   },
   {
     type: "langchain.combine_summaries",
     title: "Combine Summaries",
     requiredInputs: ["summaries"],
-    requiredOutputs: ["summary"],
-    expectedProperties: ["separator", "strategy", "model"],
+    requiredOutputs: ["combinedSummary"],
+    expectedProperties: ["method"],
   },
   {
     type: "langchain.knowledge_base_retriever",
-    title: "Search Knowledge Base",
+    title: "Find Relevant Information",
     requiredInputs: ["query", "knowledgeBase"],
     requiredOutputs: ["documents"],
-    expectedProperties: ["topK", "scoreThreshold"],
+    expectedProperties: ["topK", "searchType", "scoreThreshold"],
+  },
+  {
+    type: "langchain.retrieval_qa",
+    title: "Answer from Knowledge Base",
+    requiredInputs: ["query", "knowledgeBase", "model"],
+    requiredOutputs: ["answer", "sources"],
+    expectedProperties: ["strategy", "topK", "includeSources", "systemPrompt"],
+  },
+  {
+    type: "langchain.chat_prompt_builder",
+    title: "Build AI Prompt",
+    requiredInputs: ["systemMessage", "userMessage", "context"],
+    requiredOutputs: ["prompt", "messages"],
+    expectedProperties: ["template", "includeContext", "contextLabel", "userLabel"],
   },
 ] as const;
 
@@ -233,6 +247,15 @@ describe("LangChain node catalog definitions", () => {
     const combineSummaries = definitions.find(
       (definition) => definition.type === "langchain.combine_summaries"
     );
+    const knowledgeBaseRetriever = definitions.find(
+      (definition) => definition.type === "langchain.knowledge_base_retriever"
+    );
+    const retrievalQa = definitions.find(
+      (definition) => definition.type === "langchain.retrieval_qa"
+    );
+    const chatPromptBuilder = definitions.find(
+      (definition) => definition.type === "langchain.chat_prompt_builder"
+    );
 
     const template = promptTemplate?.properties.find((property) => property.id === "template");
     const temperature = llmChat?.properties.find((property) => property.id === "temperature");
@@ -246,7 +269,19 @@ describe("LangChain node catalog definitions", () => {
     const scoreThreshold = similaritySearch?.properties.find(
       (property) => property.id === "scoreThreshold"
     );
-    const strategy = combineSummaries?.properties.find((property) => property.id === "strategy");
+    const strategy = combineSummaries?.properties.find((property) => property.id === "method");
+    const searchType = knowledgeBaseRetriever?.properties.find(
+      (property) => property.id === "searchType"
+    );
+    const retrieverThreshold = knowledgeBaseRetriever?.properties.find(
+      (property) => property.id === "scoreThreshold"
+    );
+    const retrievalStrategy = retrievalQa?.properties.find((property) => property.id === "strategy");
+    const includeSources = retrievalQa?.properties.find((property) => property.id === "includeSources");
+    const systemPrompt = retrievalQa?.properties.find((property) => property.id === "systemPrompt");
+    const builderTemplate = chatPromptBuilder?.properties.find((property) => property.id === "template");
+    const includeContext = chatPromptBuilder?.properties.find((property) => property.id === "includeContext");
+    const contextLabel = chatPromptBuilder?.properties.find((property) => property.id === "contextLabel");
 
     expect(template?.type).toBe("multiline-text");
     expect(template?.projection?.label).toBe("Prompt template");
@@ -286,8 +321,41 @@ describe("LangChain node catalog definitions", () => {
     expect(strategy?.options?.map((option) => option.value)).toEqual([
       "concatenate",
       "reduce",
-      "outline",
     ]);
+
+    expect(searchType?.type).toBe("select");
+    expect(searchType?.defaultValue).toBe("similarity");
+    expect(searchType?.projection?.label).toBe("Search strategy");
+    expect(retrieverThreshold?.value).toBeNull();
+    expect(retrieverThreshold?.isAdvanced).toBeTrue();
+
+    expect(retrievalStrategy?.type).toBe("select");
+    expect(retrievalStrategy?.defaultValue).toBe("stuff");
+    expect(includeSources?.defaultValue).toBeTrue();
+    expect(systemPrompt?.type).toBe("multiline-text");
+    expect(systemPrompt?.projection?.fieldTypeHint).toBe("textarea");
+
+    expect(builderTemplate?.type).toBe("multiline-text");
+    expect(includeContext?.defaultValue).toBeTrue();
+    expect(contextLabel?.defaultValue).toBe("Context");
+  });
+
+  it("stores useful technical and non-technical metadata for the new Tier 2 nodes", () => {
+    const knowledgeBaseRetriever = getLangChainNodeCatalogMetadata("langchain.knowledge_base_retriever");
+    const retrievalQa = getLangChainNodeCatalogMetadata("langchain.retrieval_qa");
+    const chatPromptBuilder = getLangChainNodeCatalogMetadata("langchain.chat_prompt_builder");
+
+    expect(knowledgeBaseRetriever?.technicalDescription).toContain("knowledge base or semantic store");
+    expect(knowledgeBaseRetriever?.description).toContain("saved knowledge");
+    expect(knowledgeBaseRetriever?.projection.group).toBe("Tier 2 LLM");
+
+    expect(retrievalQa?.technicalDescription).toContain("uses an LLM");
+    expect(retrievalQa?.description).toContain("saved knowledge");
+    expect(retrievalQa?.projection.tags).toContain("question answering");
+
+    expect(chatPromptBuilder?.technicalDescription).toContain("structured chat prompt");
+    expect(chatPromptBuilder?.description).toContain("clean prompt for the AI");
+    expect(chatPromptBuilder?.projection.supportsToolView).toBeTrue();
   });
 
   it("marks optional ports correctly for flexible Tier 1 and Tier 2 nodes", async () => {
@@ -304,6 +372,12 @@ describe("LangChain node catalog definitions", () => {
     const summarization = definitions.find(
       (definition) => definition.type === "langchain.summarization"
     );
+    const retrievalQa = definitions.find(
+      (definition) => definition.type === "langchain.retrieval_qa"
+    );
+    const chatPromptBuilder = definitions.find(
+      (definition) => definition.type === "langchain.chat_prompt_builder"
+    );
 
     expect(chatPrompt?.getInputPort("system")?.compatibility.isOptional).toBeTrue();
     expect(chatPrompt?.getInputPort("user")?.compatibility.isOptional).toBeFalse();
@@ -315,15 +389,18 @@ describe("LangChain node catalog definitions", () => {
     expect(retriever?.getInputPort("embeddings")?.compatibility.isOptional).toBeTrue();
     expect(retriever?.getInputPort("vectorStore")?.compatibility.isOptional).toBeFalse();
 
-    expect(similaritySearch?.getInputPort("query")?.compatibility.isOptional).toBeTrue();
-    expect(similaritySearch?.getInputPort("queryEmbedding")?.compatibility.isOptional).toBeTrue();
+    expect(similaritySearch?.getInputPort("query")?.compatibility.isOptional).toBeFalse();
     expect(similaritySearch?.getInputPort("vectorStore")?.compatibility.isOptional).toBeFalse();
 
     expect(agent?.getInputPort("messages")?.compatibility.isOptional).toBeTrue();
     expect(agent?.getInputPort("input")?.compatibility.isOptional).toBeTrue();
     expect(agent?.getInputPort("history")?.compatibility.isOptional).toBeTrue();
 
-    expect(summarization?.getInputPort("text")?.compatibility.isOptional).toBeTrue();
-    expect(summarization?.getInputPort("documents")?.compatibility.isOptional).toBeTrue();
+    expect(summarization?.getInputPort("documents")?.compatibility.isOptional).toBeFalse();
+    expect(summarization?.getInputPort("model")?.compatibility.isOptional).toBeFalse();
+
+    expect(retrievalQa?.getInputPort("model")?.compatibility.isOptional).toBeTrue();
+    expect(chatPromptBuilder?.getInputPort("systemMessage")?.compatibility.isOptional).toBeTrue();
+    expect(chatPromptBuilder?.getInputPort("userMessage")?.compatibility.isOptional).toBeFalse();
   });
 });

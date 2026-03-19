@@ -1,4 +1,4 @@
-import { NodeCatalogProvider } from "../../application/ports/NodeCatalogProvider";
+import { CompositeNodeCatalogProvider } from "../../application/nodes/CompositeNodeCatalogProvider";
 import { Workflow } from "../../domain/workflows/Workflow";
 import { WorkflowConnection } from "../../domain/workflows/WorkflowConnection";
 import { WorkflowAuditInfo } from "../../domain/workflows/WorkflowMetadata";
@@ -7,8 +7,9 @@ import { ImplementationRegistryNodeCatalogProvider } from "../../infrastructure/
 import { createCompositeNodeImplementationRegistry } from "../../infrastructure/nodes/NodeProviderRegistryIndex";
 import sampleImagePipelineRecord from "../../dev/workflow-data/workflows/sample-image-pipeline.json";
 import sampleTextAnalysisRecord from "../../dev/workflow-data/workflows/sample-text-analysis.json";
+import basicRagPipelineRecord from "../../dev/workflow-data/workflows/basic-rag-pipeline.json";
 
-const SEED_NODE_CATALOG_PROVIDER = new NodeCatalogProvider({
+const SEED_NODE_CATALOG_PROVIDER = new CompositeNodeCatalogProvider({
   providers: [
     new MockNodeCatalogProvider(),
     new ImplementationRegistryNodeCatalogProvider(
@@ -93,7 +94,11 @@ interface WorkflowSeedAuditRecord {
 }
 
 export function createSeedWorkflows(): ReadonlyArray<Workflow> {
-  const seeds = [sampleImagePipelineRecord, sampleTextAnalysisRecord] as const;
+  const seeds: ReadonlyArray<WorkflowSeedRecord> = [
+    sampleImagePipelineRecord as WorkflowSeedRecord,
+    sampleTextAnalysisRecord as WorkflowSeedRecord,
+    basicRagPipelineRecord as WorkflowSeedRecord,
+  ];
 
   return Object.freeze(seeds.map((record) => hydrateSeedWorkflow(record)));
 }
