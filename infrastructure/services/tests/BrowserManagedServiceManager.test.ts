@@ -1,6 +1,10 @@
 import { describe, expect, it } from "bun:test";
 import { RuntimeEventBuffer } from "../../../application/runtime/RuntimeEventBuffer";
 import {
+  ManagedServiceRestartPolicies,
+  ManagedServiceTransports,
+} from "../../../application/services/ManagedServiceDefinition";
+import {
   ManagedServiceKinds,
   ManagedServiceOwnership,
   ManagedServiceStartPolicies,
@@ -8,20 +12,45 @@ import {
 } from "../../../application/services/interfaces/ManagedServiceTypes";
 import { NodeProcessRuntimeEventSink } from "../../python/runtime/NodeProcessRuntimeEventSink";
 import { BrowserManagedServiceManager } from "../BrowserManagedServiceManager";
+import { InMemoryManagedServiceDefinitionRegistry } from "../InMemoryManagedServiceDefinitionRegistry";
 
 describe("BrowserManagedServiceManager", () => {
   it("tracks generic services, emits logs, and updates status subscribers", async () => {
     const eventStore = new RuntimeEventBuffer();
+    const registry = new InMemoryManagedServiceDefinitionRegistry([
+      {
+        serviceId: "python-runtime",
+        kind: ManagedServiceKinds.pythonRuntime,
+        displayName: "Python runtime",
+        transport: ManagedServiceTransports.http,
+        args: [],
+        environmentVariables: {},
+        autoStartPolicy: ManagedServiceStartPolicies.externalOnly,
+        restartPolicy: ManagedServiceRestartPolicies.never,
+        startupTimeoutMs: 20_000,
+        tags: ["runtime"],
+        capabilities: ["workflow-execution"],
+      },
+      {
+        serviceId: "custom-service",
+        kind: ManagedServiceKinds.custom,
+        displayName: "Custom service",
+        transport: ManagedServiceTransports.process,
+        args: ["serve"],
+        environmentVariables: {},
+        autoStartPolicy: ManagedServiceStartPolicies.manual,
+        restartPolicy: ManagedServiceRestartPolicies.never,
+        startupTimeoutMs: 20_000,
+        tags: ["custom"],
+        capabilities: [],
+      },
+    ]);
     const manager = new BrowserManagedServiceManager({
       eventSink: new NodeProcessRuntimeEventSink(eventStore),
+      registry,
       registrations: [
         {
-          descriptor: {
-            id: "python-runtime",
-            kind: ManagedServiceKinds.pythonRuntime,
-            name: "Python runtime",
-            startPolicy: ManagedServiceStartPolicies.externalOnly,
-          },
+          serviceId: "python-runtime",
           initialDetail: "Python runtime is not connected.",
           probe: async () => ({
             state: ManagedServiceStates.running,
@@ -30,12 +59,7 @@ describe("BrowserManagedServiceManager", () => {
           }),
         },
         {
-          descriptor: {
-            id: "custom-service",
-            kind: ManagedServiceKinds.custom,
-            name: "Custom service",
-            startPolicy: ManagedServiceStartPolicies.manual,
-          },
+          serviceId: "custom-service",
           probe: async () => ({
             state: ManagedServiceStates.degraded,
             isAvailable: false,
@@ -68,14 +92,24 @@ describe("BrowserManagedServiceManager", () => {
 
   it("keeps disabled services disabled and does not pretend to stop unmanaged ones", async () => {
     const manager = new BrowserManagedServiceManager({
+      registry: new InMemoryManagedServiceDefinitionRegistry([
+        {
+          serviceId: "python-runtime",
+          kind: ManagedServiceKinds.pythonRuntime,
+          displayName: "Python runtime",
+          transport: ManagedServiceTransports.http,
+          args: [],
+          environmentVariables: {},
+          autoStartPolicy: ManagedServiceStartPolicies.disabled,
+          restartPolicy: ManagedServiceRestartPolicies.never,
+          startupTimeoutMs: 20_000,
+          tags: ["runtime"],
+          capabilities: [],
+        },
+      ]),
       registrations: [
         {
-          descriptor: {
-            id: "python-runtime",
-            kind: ManagedServiceKinds.pythonRuntime,
-            name: "Python runtime",
-            startPolicy: ManagedServiceStartPolicies.disabled,
-          },
+          serviceId: "python-runtime",
           initialDetail: "Python runtime is disabled in settings.",
           probe: async () => ({
             state: ManagedServiceStates.running,

@@ -6,15 +6,14 @@ import type {
 import type { IRuntimeEventSink } from "../../../application/ports/interfaces/IRuntimeEventSink";
 import { ManagedServicePythonRuntimeManagerAdapter } from "../../../application/services/adapters/ManagedServicePythonRuntimeManagerAdapter";
 import {
-  ManagedServiceKinds,
   ManagedServiceOwnership,
-  ManagedServiceStartPolicies,
   ManagedServiceStates,
 } from "../../../application/services/interfaces/ManagedServiceTypes";
 import { RuntimeEventSources } from "../../../application/runtime/RuntimeEvent";
-import { PythonRuntimeMode } from "../../config/PythonRuntimeMode";
 import type { PythonRuntimeConfig } from "../../config/PythonRuntimeConfig";
+import { createPythonRuntimeServiceDefinition } from "./PythonRuntimeServiceDefinition";
 import { BrowserManagedServiceManager } from "../../services/BrowserManagedServiceManager";
+import { InMemoryManagedServiceDefinitionRegistry } from "../../services/InMemoryManagedServiceDefinitionRegistry";
 
 export interface BrowserPythonRuntimeManagerOptions {
   readonly client: IPythonRuntimeClient;
@@ -26,25 +25,19 @@ export class BrowserPythonRuntimeManager implements IPythonRuntimeManager {
   private readonly adapter: ManagedServicePythonRuntimeManagerAdapter;
 
   constructor(options: BrowserPythonRuntimeManagerOptions) {
+    const definition = createPythonRuntimeServiceDefinition(options.config);
     const serviceManager = new BrowserManagedServiceManager({
       eventSink: options.eventSink,
+      registry: new InMemoryManagedServiceDefinitionRegistry([definition]),
       registrations: [
         {
-          descriptor: {
-            id: "python-runtime",
-            kind: ManagedServiceKinds.pythonRuntime,
-            name: "Python runtime",
-            description: "Browser-observed Python runtime service.",
-            startPolicy: options.config.mode === PythonRuntimeMode.disabled
-              ? ManagedServiceStartPolicies.disabled
-              : ManagedServiceStartPolicies.externalOnly,
-          },
-          initialDetail: options.config.mode === PythonRuntimeMode.disabled
+          serviceId: definition.serviceId,
+          initialDetail: definition.autoStartPolicy === "disabled"
             ? "Python runtime is disabled in settings."
             : "Python runtime is not connected.",
           runtimeEventSource: RuntimeEventSources.pythonRuntime,
           probe: async () => {
-            if (options.config.mode === PythonRuntimeMode.disabled) {
+            if (definition.autoStartPolicy === "disabled") {
               return {
                 state: ManagedServiceStates.disabled,
                 isAvailable: false,
@@ -69,7 +62,7 @@ export class BrowserPythonRuntimeManager implements IPythonRuntimeManager {
     this.adapter = new ManagedServicePythonRuntimeManagerAdapter({
       manager: serviceManager,
       supervisor: serviceManager,
-      serviceId: "python-runtime",
+      serviceId: definition.serviceId,
     });
   }
 
