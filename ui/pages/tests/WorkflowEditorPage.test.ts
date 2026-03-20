@@ -9,5 +9,6 @@ describe("WorkflowEditorPage", () => {
     expect(source).toContain("<WorkflowCanvas");
     expect(source).toContain("<WorkflowFormView");
     expect(source).toContain("contextInspection={selectedContextInspection}");
+    expect(source).toContain("contextWorkbenchHref={contextWorkbenchHref}");
   });
 });

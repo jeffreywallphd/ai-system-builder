@@ -5,6 +5,7 @@ export interface WorkflowMetadataPanelProps {
   readonly workflow?: WorkflowHeaderViewModel;
   readonly isSaving?: boolean;
   readonly isExecuting?: boolean;
+  readonly contextWorkbenchHref?: string;
   readonly onRenameWorkflow?: (name: string) => void;
   readonly onUpdateDescription?: (description: string) => void;
   readonly onSaveWorkflow?: () => void;
@@ -16,6 +17,7 @@ export default function WorkflowMetadataPanel({
   workflow,
   isSaving,
   isExecuting,
+  contextWorkbenchHref,
   onRenameWorkflow,
   onUpdateDescription,
   onSaveWorkflow,
@@ -128,6 +130,14 @@ export default function WorkflowMetadataPanel({
             </div>
 
             <div className="ui-row ui-row--wrap">
+              {contextWorkbenchHref ? (
+                <a
+                  className="ui-button ui-button--ghost ui-button--md"
+                  href={contextWorkbenchHref}
+                >
+                  Open Context Workbench
+                </a>
+              ) : null}
               <button
                 type="button"
                 className={`ui-button ui-button--primary ui-button--md${

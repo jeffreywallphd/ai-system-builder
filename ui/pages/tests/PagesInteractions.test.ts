@@ -41,6 +41,8 @@ describe("ui/pages interactions", () => {
     expect(editor).toContain("workflowStore.clearSelection()");
     expect(editor).toContain("workflowStore.removeConnection(connectionId)");
     expect(editor).toContain("workflowStore.executeCurrentWorkflow");
+    expect(editor).toContain("contextWorkbenchHref");
+    expect(editor).toContain("ROUTE_PATHS.workflowContextWorkbench");
     expect(editor).not.toContain("seedStarterNode");
     expect(editor).toContain("ui-canvas-shell__view--active");
     expect(editor).toContain("onViewModeChange={setViewMode}");

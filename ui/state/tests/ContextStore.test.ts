@@ -1,3 +1,6 @@
+import { PreviewWorkflowContextUseCase } from "../../../application/context/PreviewWorkflowContextUseCase";
+import { PreviewToolContextUseCase } from "../../../application/context/PreviewToolContextUseCase";
+import { PreviewAgentContextUseCase } from "../../../application/context/PreviewAgentContextUseCase";
 import { describe, expect, it } from "bun:test";
 import { ContextStore } from "../ContextStore";
 import { ContextService } from "../../services/ContextService";
@@ -34,6 +37,9 @@ function createStore(): ContextStore {
       listContextRecipesUseCase: new ListContextRecipesUseCase(recipeRepository),
       loadContextPackageUseCase: new LoadContextPackageUseCase(repository),
       loadContextRecipeUseCase: new LoadContextRecipeUseCase(recipeRepository),
+      previewWorkflowContextUseCase: new PreviewWorkflowContextUseCase({} as never),
+      previewToolContextUseCase: new PreviewToolContextUseCase({} as never, {} as never, {} as never),
+      previewAgentContextUseCase: new PreviewAgentContextUseCase({} as never, {} as never),
       searchContextPackagesUseCase: new SearchContextPackagesUseCase(repository),
     }),
   );
