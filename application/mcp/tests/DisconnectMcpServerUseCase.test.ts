@@ -55,6 +55,9 @@ describe("DisconnectMcpServerUseCase", () => {
       reconnectServer: async () => {
         throw new Error("unused");
       },
+      createLocalServer: async () => {
+        throw new Error("unused");
+      },
     };
 
     const result = await new DisconnectMcpServerUseCase(manager).execute({ serverId: " local " });
@@ -68,6 +71,9 @@ describe("DisconnectMcpServerUseCase", () => {
       connectServer: async () => buildResult("unused"),
       disconnectServer: async () => buildResult("unused"),
       reconnectServer: async () => buildResult("unused"),
+      createLocalServer: async () => {
+        throw new Error("unused");
+      },
     };
 
     await expect(new DisconnectMcpServerUseCase(manager).execute({ serverId: "  " })).rejects.toThrow("serverId");

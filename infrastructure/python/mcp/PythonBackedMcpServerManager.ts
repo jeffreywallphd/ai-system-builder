@@ -1,3 +1,5 @@
+import type { LocalMcpToolDraft } from "../../../application/mcp/models/LocalMcpToolDraft";
+import type { LocalMcpServerCreateResult } from "../../../application/mcp/models/LocalMcpServerCreateResult";
 import type { IMcpServerCatalog } from "../../../application/ports/interfaces/IMcpServerCatalog";
 import type { IMcpServerManager } from "../../../application/ports/interfaces/IMcpServerManager";
 import type { IRuntimeEventSink } from "../../../application/ports/interfaces/IRuntimeEventSink";
@@ -9,6 +11,7 @@ export interface IMcpServerManagerRuntimeClient {
   connectServer(request: McpServerConnectionRequest): Promise<McpServerConnectionResult>;
   disconnectServer(serverId: string): Promise<McpServerConnectionResult>;
   reconnectServer(serverId: string): Promise<McpServerConnectionResult>;
+  createLocalServer(draft: LocalMcpToolDraft): Promise<LocalMcpServerCreateResult>;
 }
 
 export class PythonBackedMcpServerManager implements IMcpServerManager {
@@ -30,6 +33,20 @@ export class PythonBackedMcpServerManager implements IMcpServerManager {
   public async reconnectServer(serverId: string): Promise<McpServerConnectionResult> {
     await this.emitLocalStartAttempt(serverId, "reconnect");
     return this.client.reconnectServer(serverId.trim());
+  }
+
+  public async createLocalServer(draft: LocalMcpToolDraft): Promise<LocalMcpServerCreateResult> {
+    this.eventSink?.emit({
+      source: RuntimeEventSources.pythonRuntime,
+      severity: "info",
+      message: "Local MCP server provisioning queued.",
+      details: {
+        eventType: "mcp-local-server-provision",
+        serverId: draft.serverId,
+        toolName: draft.toolName,
+      },
+    });
+    return this.client.createLocalServer(draft);
   }
 
   private async emitLocalStartAttempt(

@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterable, Sequence
 
 from app.core.mcp_config import McpRuntimeConfig, McpServerConfig, load_mcp_runtime_config
+from app.mcp.models import LocalMcpToolDraft
 
 DEFAULT_MCP_PACKAGE_SPEC = "mcp[cli]"
 DEFAULT_TEMPLATE_ID = "default-local-calculator"
@@ -200,6 +201,94 @@ class LocalMcpServerProvisioner:
         self._workspace_root.mkdir(parents=True, exist_ok=True)
         return [self._provision_template(template) for template in self._template_registry.list_templates()]
 
+    def provision_local_server(self, draft: LocalMcpToolDraft) -> tuple[McpServerConfig, bool]:
+        server_root = self._workspace_root / draft.server_id
+        state_file = server_root / ".provisioned.json"
+        entrypoint = server_root / "server.py"
+        manifest_path = server_root / "manifest.json"
+        created = not state_file.exists()
+
+        server_root.mkdir(parents=True, exist_ok=True)
+        if created:
+            self._install_runner(
+                [self._python_executable, "-m", "pip", "install", DEFAULT_MCP_PACKAGE_SPEC],
+                server_root,
+            )
+
+        manifest = {
+            "serverId": draft.server_id,
+            "name": draft.server_name,
+            "description": draft.server_description or draft.tool_description or "",
+            "tools": [{
+                "name": draft.tool_name,
+                "title": draft.tool_title or draft.tool_name,
+                "description": draft.tool_description or draft.server_description or "",
+                "inputSchema": dict(draft.input_schema),
+                "outputSchema": dict(draft.output_schema),
+                "metadata": {
+                    **dict(draft.metadata),
+                    "authoringMode": "workspace-local",
+                    "generatedBy": "ai-loom-studio",
+                },
+            }],
+        }
+
+        self._write_text(entrypoint, render_local_server_entrypoint(draft))
+        self._write_text(manifest_path, json.dumps(manifest, indent=2) + "\n")
+        self._write_text(
+            state_file,
+            json.dumps(
+                {
+                    "serverId": draft.server_id,
+                    "name": draft.server_name,
+                    "entrypoint": str(entrypoint),
+                    "toolName": draft.tool_name,
+                    "createdBy": "ai-loom-studio",
+                },
+                indent=2,
+            ) + "\n",
+        )
+
+        return (
+            McpServerConfig(
+                id=draft.server_id,
+                name=draft.server_name,
+                enabled=True,
+                transport="stdio",
+                command=self._python_executable,
+                args=[str(entrypoint)],
+                timeout_ms=draft.timeout_ms or 10000,
+                connect_on_startup=draft.connect_on_startup,
+                mock_tools=[{
+                    "name": draft.tool_name,
+                    "title": draft.tool_title or draft.tool_name,
+                    "description": draft.tool_description or draft.server_description or "",
+                    "inputSchema": dict(draft.input_schema),
+                    "outputSchema": dict(draft.output_schema),
+                    "metadata": {
+                        **dict(draft.metadata),
+                        "authoringMode": "workspace-local",
+                    },
+                }],
+                mock_resources=[{
+                    "uri": f"file://{manifest_path}",
+                    "name": manifest_path.name,
+                    "title": f"{draft.server_name} manifest",
+                    "description": "Workspace-authored local MCP server manifest.",
+                    "mimeType": "application/json",
+                }],
+                metadata={
+                    **dict(draft.metadata),
+                    "workspaceRoot": str(server_root),
+                    "entrypoint": str(entrypoint),
+                    "provisioningStateFile": str(state_file),
+                    "provisioningStatus": "created" if created else "updated",
+                    "serverKind": "workspace-local",
+                },
+            ),
+            created,
+        )
+
     def _provision_template(self, template: ProvisionedMcpServerTemplate) -> McpServerConfig:
         server_root = self._workspace_root / template.server_id
         state_file = server_root / ".provisioned.json"
@@ -295,6 +384,48 @@ def merge_mcp_servers(*server_groups: Iterable[McpServerConfig]) -> list[McpServ
         for server in group:
             merged[server.id] = server
     return list(merged.values())
+
+
+def render_local_server_entrypoint(draft: LocalMcpToolDraft) -> str:
+    function_name = sanitize_python_identifier(draft.tool_name)
+    docstring = (draft.tool_description or draft.server_description or "Workspace-authored MCP tool.").replace('"""', "'")
+    user_code = indent_user_code(draft.code)
+    server_name = json.dumps(draft.server_name)
+    tool_name = json.dumps(draft.tool_name)
+    return f'''from __future__ import annotations
+
+from typing import Any
+
+from mcp.server.fastmcp import FastMCP
+
+mcp = FastMCP({server_name})
+
+
+@mcp.tool(name={tool_name})
+def {function_name}(payload: dict[str, Any]) -> Any:
+    """{docstring}"""
+    payload = payload if isinstance(payload, dict) else {{"input": payload}}
+{user_code}
+
+
+if __name__ == "__main__":
+    mcp.run()
+'''
+
+
+def sanitize_python_identifier(value: str) -> str:
+    normalized = "".join(character if character.isalnum() or character == "_" else "_" for character in value.strip().lower())
+    normalized = normalized.strip("_")
+    if not normalized:
+        return "workspace_tool"
+    if normalized[0].isdigit():
+        normalized = f"tool_{normalized}"
+    return normalized
+
+
+def indent_user_code(code: str) -> str:
+    lines = code.splitlines() or ["return {}"]
+    return "\n".join(f"    {line}" if line.strip() else "" for line in lines)
 
 
 

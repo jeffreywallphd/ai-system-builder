@@ -41,7 +41,7 @@ export default function McpServerDetailsPanel({
         <div className="ui-panel__header">
           <div>
             <div className="ui-panel__title">Server details</div>
-            <div className="ui-panel__subtitle">Choose a server to review connection status, available tools, and setup notes.</div>
+            <div className="ui-panel__subtitle">Choose a server to review runtime status, controlled lifecycle actions, and normalized tool descriptors.</div>
           </div>
         </div>
         <div className="ui-panel__body ui-empty-state">
@@ -114,15 +114,15 @@ export default function McpServerDetailsPanel({
             connected ? (
               <>
                 <button className="ui-button ui-button--secondary ui-button--sm" type="button" disabled={isBusy} onClick={() => onDisconnect?.(server.id)}>
-                  Disconnect
+                  Stop server
                 </button>
                 <button className="ui-button ui-button--ghost ui-button--sm" type="button" disabled={isBusy} onClick={() => onConnect?.(server.id, true)}>
-                  Reconnect
+                  Restart server
                 </button>
               </>
             ) : (
               <button className="ui-button ui-button--primary ui-button--sm" type="button" disabled={isBusy} onClick={() => onConnect?.(server.id, false)}>
-                Connect
+                Start server
               </button>
             )
           ) : (
@@ -262,7 +262,7 @@ function friendlyTransport(transport: McpServerDescriptor["transport"]): string 
   }
 }
 
-function friendlyState(state: McpServerStatus["state"] | McpServerDescriptor["status"]): string {
+function friendlyState(state: string): string {
   switch (state) {
     case "connected":
       return "Connected";
