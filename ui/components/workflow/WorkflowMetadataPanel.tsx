@@ -5,6 +5,9 @@ export interface WorkflowMetadataPanelProps {
   readonly workflow?: WorkflowHeaderViewModel;
   readonly isSaving?: boolean;
   readonly isExecuting?: boolean;
+  readonly validateLabel?: string;
+  readonly executeLabel?: string;
+  readonly workflowStatusMessage?: string;
   readonly contextWorkbenchHref?: string;
   readonly onRenameWorkflow?: (name: string) => void;
   readonly onUpdateDescription?: (description: string) => void;
@@ -17,6 +20,9 @@ export default function WorkflowMetadataPanel({
   workflow,
   isSaving,
   isExecuting,
+  validateLabel,
+  executeLabel,
+  workflowStatusMessage,
   contextWorkbenchHref,
   onRenameWorkflow,
   onUpdateDescription,
@@ -158,7 +164,7 @@ export default function WorkflowMetadataPanel({
                 onClick={() => onValidateWorkflow?.()}
                 disabled={isSaving || isExecuting}
               >
-                Validate
+                {validateLabel ?? "Validate"}
               </button>
 
               <button
@@ -171,10 +177,15 @@ export default function WorkflowMetadataPanel({
               >
                 <span className="ui-button__label">
                   {isExecuting ? <span className="ui-button__spinner" aria-hidden="true" /> : null}
-                  Execute
+                  {executeLabel ?? "Execute"}
                 </span>
               </button>
             </div>
+            {workflowStatusMessage ? (
+              <div className="ui-text-secondary ui-text-small" role="status" aria-live="polite">
+                {workflowStatusMessage}
+              </div>
+            ) : null}
           </div>
         )}
       </div>

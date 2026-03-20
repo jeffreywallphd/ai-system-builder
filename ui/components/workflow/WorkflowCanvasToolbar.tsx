@@ -8,6 +8,9 @@ export interface WorkflowCanvasToolbarProps {
   readonly isCanvasLocked?: boolean;
   readonly canExecuteWorkflow?: boolean;
   readonly isExecutingWorkflow?: boolean;
+  readonly validateLabel?: string;
+  readonly executeLabel?: string;
+  readonly workflowStatusMessage?: string;
   readonly isMenuOpen?: boolean;
   readonly isPropertiesOpen?: boolean;
   readonly canToggleOutput?: boolean;
@@ -30,6 +33,9 @@ export default function WorkflowCanvasToolbar({
   isCanvasLocked,
   canExecuteWorkflow,
   isExecutingWorkflow,
+  validateLabel,
+  executeLabel,
+  workflowStatusMessage,
   isMenuOpen,
   isPropertiesOpen,
   canToggleOutput,
@@ -72,7 +78,7 @@ export default function WorkflowCanvasToolbar({
         >
           <span className="ui-button__label">
             {isExecutingWorkflow ? <span className="ui-button__spinner" aria-hidden="true" /> : null}
-            Execute
+            {executeLabel ?? "Execute"}
           </span>
         </button>
 
@@ -82,8 +88,13 @@ export default function WorkflowCanvasToolbar({
           onClick={() => onValidateWorkflow?.()}
           disabled={isExecutingWorkflow}
         >
-          Validate
+          {validateLabel ?? "Validate"}
         </button>
+        {workflowStatusMessage ? (
+          <span className="ui-text-small ui-text-secondary" role="status" aria-live="polite">
+            {workflowStatusMessage}
+          </span>
+        ) : null}
       </div>
 
       <div className="ui-toolbar__group ui-toolbar__group--center">

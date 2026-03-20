@@ -1,4 +1,4 @@
-import type { Edge } from "@xyflow/react";
+import { MarkerType, type Edge } from "@xyflow/react";
 import type { WorkflowResponse } from "../../../../application/dto/WorkflowResponse";
 
 export function createReactFlowEdgeId(params: {
@@ -32,6 +32,21 @@ export class EdgeAdapter {
           type: "smoothstep",
           animated: false,
           selectable: true,
+          zIndex: 1,
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            width: 18,
+            height: 18,
+            color: "rgba(120, 187, 255, 0.98)",
+          },
+          style: {
+            stroke: "rgba(120, 187, 255, 0.98)",
+            strokeWidth: 3,
+          },
+          pathOptions: {
+            borderRadius: 20,
+            offset: 24,
+          },
           data: Object.freeze({
             connectionId: connection.id,
             kind: connection.kind,

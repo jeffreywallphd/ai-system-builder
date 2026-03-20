@@ -75,6 +75,11 @@ export interface NodeDetailViewModel {
     readonly x: number;
     readonly y: number;
   };
+  readonly modelSearch?: {
+    readonly query: string;
+    readonly kind?: string;
+    readonly runtime?: string;
+  };
   readonly size?: {
     readonly width: number;
     readonly height: number;
@@ -145,6 +150,7 @@ export class NodePresenter {
             y: node.position.y,
           })
         : undefined,
+      modelSearch: this.buildModelSearch(node),
       size: node.size
         ? Object.freeze({
             width: node.size.width,
@@ -217,4 +223,83 @@ export class NodePresenter {
       isOptional: port.compatibility.isOptional,
     });
   }
+
+  private buildModelSearch(node: INode): NodeDetailViewModel["modelSearch"] {
+    if (!node.isModelAware()) {
+      return undefined;
+    }
+
+    const modelCompatibilityProfiles = node.properties
+      .map((property) => property.bindingProfile?.modelCompatibility)
+      .filter((profile): profile is NonNullable<typeof profile> => !!profile);
+
+    const tasks = [...new Set(modelCompatibilityProfiles.flatMap((profile) => profile.supportedTasks))];
+    const inputModalities = [
+      ...new Set(modelCompatibilityProfiles.flatMap((profile) => profile.inputModalities)),
+    ];
+    const outputModalities = [
+      ...new Set(modelCompatibilityProfiles.flatMap((profile) => profile.outputModalities)),
+    ];
+    const queryTerms = tasks.length > 0 ? tasks : [node.definition.title];
+    const runtime = modelCompatibilityProfiles
+      .flatMap((profile) => profile.supportedRuntimes)
+      .find((candidate) => candidate !== "generic");
+
+    return Object.freeze({
+      query: queryTerms.join(" "),
+      kind: inferModelKind(tasks, inputModalities, outputModalities),
+      runtime,
+    });
+  }
+}
+
+function inferModelKind(
+  tasks: ReadonlyArray<string>,
+  inputModalities: ReadonlyArray<string>,
+  outputModalities: ReadonlyArray<string>
+): string | undefined {
+  const normalizedTasks = new Set(tasks.map(normalize));
+  const normalizedInputs = new Set(inputModalities.map(normalize));
+  const normalizedOutputs = new Set(outputModalities.map(normalize));
+
+  if (normalizedTasks.has("embedding")) {
+    return "embedding-model";
+  }
+
+  if (
+    normalizedTasks.has("image-generation") ||
+    normalizedTasks.has("text-to-image") ||
+    normalizedOutputs.has("image")
+  ) {
+    return "image-generation-model";
+  }
+
+  if (normalizedTasks.has("video-generation") || normalizedOutputs.has("video")) {
+    return "video-generation-model";
+  }
+
+  if (normalizedTasks.has("speech-to-text") || normalizedTasks.has("transcription")) {
+    return "speech-to-text-model";
+  }
+
+  if (normalizedTasks.has("text-to-speech") || normalizedOutputs.has("audio")) {
+    return "text-to-speech-model";
+  }
+
+  if (
+    (normalizedInputs.has("image") && normalizedOutputs.has("text")) ||
+    (normalizedInputs.has("text") && normalizedOutputs.has("image"))
+  ) {
+    return "multimodal-model";
+  }
+
+  if (normalizedTasks.size > 0 || normalizedInputs.has("text") || normalizedOutputs.has("text")) {
+    return "completion-model";
+  }
+
+  return undefined;
+}
+
+function normalize(value: string): string {
+  return value.trim().toLowerCase();
 }

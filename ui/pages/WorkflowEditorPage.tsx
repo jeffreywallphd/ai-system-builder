@@ -302,6 +302,64 @@ export default function WorkflowEditorPage({
 
   const validationSummary = validationPresenter.present(workflowState.validation);
   const availableModels = useMemo(() => buildInstalledModelOptions(modelState.installedModels), [modelState.installedModels]);
+  const validateButtonLabel = useMemo(() => {
+    if (!workflowState.validation) {
+      return "Validate";
+    }
+
+    if (workflowState.validation.isValid) {
+      return "Validated";
+    }
+
+    const issueCount = workflowState.validation.messages.length;
+    return `${issueCount} Issue${issueCount === 1 ? "" : "s"}`;
+  }, [workflowState.validation]);
+  const executeButtonLabel = useMemo(() => {
+    if (workflowState.isExecuting) {
+      return "Executing…";
+    }
+
+    switch (workflowState.lastExecutionEvent?.status) {
+      case "completed":
+        return "Executed";
+      case "failed":
+        return "Retry Execute";
+      case "cancelled":
+        return "Execute Cancelled";
+      default:
+        return "Execute";
+    }
+  }, [workflowState.isExecuting, workflowState.lastExecutionEvent?.status]);
+  const workflowStatusMessage = useMemo(() => {
+    if (workflowState.isExecuting) {
+      return workflowState.lastExecutionEvent?.message ?? "Workflow execution is running.";
+    }
+
+    if (workflowState.lastExecutionEvent?.status === "completed") {
+      return workflowState.lastExecutionEvent.message ?? "Workflow execution completed successfully.";
+    }
+
+    if (workflowState.lastExecutionEvent?.status === "failed") {
+      return workflowState.lastExecutionEvent.message ?? "Workflow execution failed.";
+    }
+
+    if (workflowState.validation?.isValid) {
+      return "Workflow validation passed.";
+    }
+
+    if (workflowState.validation && !workflowState.validation.isValid) {
+      return `${workflowState.validation.messages.length} validation issue${
+        workflowState.validation.messages.length === 1 ? "" : "s"
+      } still need attention.`;
+    }
+
+    return undefined;
+  }, [
+    workflowState.isExecuting,
+    workflowState.lastExecutionEvent?.message,
+    workflowState.lastExecutionEvent?.status,
+    workflowState.validation,
+  ]);
 
   const visibleValidationMessages = useMemo(() => {
     const messages = validationSummary.groups.flatMap((group) =>
@@ -436,6 +494,9 @@ export default function WorkflowEditorPage({
               isCanvasLocked={isCanvasLocked}
               canExecuteWorkflow={editorViewModel?.header.isExecutable}
               isExecutingWorkflow={workflowState.isExecuting}
+              validateLabel={validateButtonLabel}
+              executeLabel={executeButtonLabel}
+              workflowStatusMessage={workflowStatusMessage}
               isMenuOpen={isLeftMenuOpen}
               isPropertiesOpen={isPropertiesOpen}
               canToggleOutput={!!workflowOutput}
@@ -643,6 +704,9 @@ export default function WorkflowEditorPage({
                       contextWorkbenchHref={contextWorkbenchHref}
                       isSaving={workflowState.isSaving}
                       isExecuting={workflowState.isExecuting}
+                      validateLabel={validateButtonLabel}
+                      executeLabel={executeButtonLabel}
+                      workflowStatusMessage={workflowStatusMessage}
                       onRenameWorkflow={(name) => {
                         workflowStore.renameCurrentWorkflow(name);
                       }}

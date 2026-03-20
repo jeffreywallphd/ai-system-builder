@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import ModelBrowser from "../components/models/ModelBrowser";
 import type { ModelSearchBarValue } from "../components/models/ModelSearchBar";
 import { useUiDependencies } from "../composition/AppProviders";
@@ -31,6 +31,7 @@ const fallbackState: IModelStoreState = Object.freeze({
 export default function ModelsPage(): JSX.Element {
   const presenter = useMemo(() => new ModelPresenter(), []);
   const { modelStore, settingsStore } = useUiDependencies();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [state, setState] = useState<IModelStoreState>(fallbackState);
   const [settingsState, setSettingsState] = useState<UiSettingsState>(() => settingsStore.getState());
 
@@ -41,11 +42,15 @@ export default function ModelsPage(): JSX.Element {
   useEffect(() => settingsStore.subscribe(setSettingsState), [settingsStore]);
 
   const remoteSearchLimit = settingsState.settings.models.remoteSearchLimit;
+  const searchValue = useMemo(() => readModelSearchValue(searchParams), [searchParams]);
 
   useEffect(() => {
     void modelStore.refreshInstalled();
-    void modelStore.searchRemote({ limit: remoteSearchLimit });
-  }, [modelStore, remoteSearchLimit]);
+  }, [modelStore]);
+
+  useEffect(() => {
+    void searchModels(modelStore, searchValue, remoteSearchLimit);
+  }, [modelStore, remoteSearchLimit, searchValue]);
 
   const installedModels = useMemo(
     () => presenter.presentList(state.installedModels),
@@ -77,14 +82,16 @@ export default function ModelsPage(): JSX.Element {
         installedModels={installedModels}
         remoteModels={remoteModels}
         compatibility={compatibility}
+        searchValue={searchValue}
+        installProgressByModelId={state.installProgressByModelId}
         isLoadingInstalled={state.isLoadingInstalled}
         isSearchingRemote={state.isSearchingRemote}
         isInstalling={state.isInstalling}
         onSearch={(value) => {
-          void searchModels(modelStore, value, remoteSearchLimit);
+          setSearchParams(buildModelSearchParams(value));
         }}
         onClearSearch={() => {
-          void modelStore.searchRemote({ limit: remoteSearchLimit });
+          setSearchParams(new URLSearchParams());
         }}
         onInstallRemoteFiles={(modelId, files) => {
           void installRemoteFiles(
@@ -124,12 +131,50 @@ async function installRemoteFiles(
 
   await modelStore.installModel({
     model: modelForInstallation,
+    modelId: remoteModel.model.id,
+    remoteId: remoteModel.remoteId ?? remoteModel.model.id,
     provider: remoteModel.provider,
     destination: `${modelSettings.installDirectory}/${sanitizePathSegment(remoteModel.remoteId ?? remoteModel.model.id)}`,
     overwrite: modelSettings.allowOverwrite,
     verifyIntegrity: modelSettings.verifyDownloads,
     authToken: modelSettings.authToken || undefined,
     registerInstalled: modelSettings.registerInstalledModels,
+  });
+}
+
+function buildModelSearchParams(value: ModelSearchBarValue): URLSearchParams {
+  const params = new URLSearchParams();
+
+  if (value.query.trim()) {
+    params.set("query", value.query.trim());
+  }
+
+  if (value.provider) {
+    params.set("provider", value.provider);
+  }
+
+  if (value.mode) {
+    params.set("mode", value.mode);
+  }
+
+  if (value.kind) {
+    params.set("kind", value.kind);
+  }
+
+  if (value.runtime) {
+    params.set("runtime", value.runtime);
+  }
+
+  return params;
+}
+
+function readModelSearchValue(searchParams: URLSearchParams): ModelSearchBarValue {
+  return Object.freeze({
+    query: searchParams.get("query") ?? "",
+    provider: searchParams.get("provider") ?? undefined,
+    mode: (searchParams.get("mode") as ModelSearchBarValue["mode"]) ?? "all",
+    kind: searchParams.get("kind") ?? undefined,
+    runtime: searchParams.get("runtime") ?? undefined,
   });
 }
 
