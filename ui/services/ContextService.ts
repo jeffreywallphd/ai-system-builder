@@ -4,6 +4,11 @@ import {
   type ICreateContextPackageResult,
 } from "../../application/context/CreateContextPackageUseCase";
 import {
+  CreateContextRecipeUseCase,
+  type ICreateContextRecipeRequest,
+  type ICreateContextRecipeResult,
+} from "../../application/context/CreateContextRecipeUseCase";
+import {
   DeleteContextPackageUseCase,
   type IDeleteContextPackageResult,
 } from "../../application/context/DeleteContextPackageUseCase";
@@ -13,9 +18,18 @@ import {
   type IListContextPackagesResult,
 } from "../../application/context/ListContextPackagesUseCase";
 import {
+  ListContextRecipesUseCase,
+  type IListContextRecipesRequest,
+  type IListContextRecipesResult,
+} from "../../application/context/ListContextRecipesUseCase";
+import {
   LoadContextPackageUseCase,
   type ILoadContextPackageResult,
 } from "../../application/context/LoadContextPackageUseCase";
+import {
+  LoadContextRecipeUseCase,
+  type ILoadContextRecipeResult,
+} from "../../application/context/LoadContextRecipeUseCase";
 import {
   SearchContextPackagesUseCase,
   type ISearchContextPackagesRequest,
@@ -34,6 +48,9 @@ export interface IContextServiceOptions {
   readonly listContextPackagesUseCase: ListContextPackagesUseCase;
   readonly loadContextPackageUseCase: LoadContextPackageUseCase;
   readonly searchContextPackagesUseCase: SearchContextPackagesUseCase;
+  readonly createContextRecipeUseCase: CreateContextRecipeUseCase;
+  readonly listContextRecipesUseCase: ListContextRecipesUseCase;
+  readonly loadContextRecipeUseCase: LoadContextRecipeUseCase;
 }
 
 export class ContextService {
@@ -43,6 +60,9 @@ export class ContextService {
   private readonly listContextPackagesUseCase: ListContextPackagesUseCase;
   private readonly loadContextPackageUseCase: LoadContextPackageUseCase;
   private readonly searchContextPackagesUseCase: SearchContextPackagesUseCase;
+  private readonly createContextRecipeUseCase: CreateContextRecipeUseCase;
+  private readonly listContextRecipesUseCase: ListContextRecipesUseCase;
+  private readonly loadContextRecipeUseCase: LoadContextRecipeUseCase;
 
   constructor(options: IContextServiceOptions) {
     this.createContextPackageUseCase = options.createContextPackageUseCase;
@@ -51,12 +71,21 @@ export class ContextService {
     this.listContextPackagesUseCase = options.listContextPackagesUseCase;
     this.loadContextPackageUseCase = options.loadContextPackageUseCase;
     this.searchContextPackagesUseCase = options.searchContextPackagesUseCase;
+    this.createContextRecipeUseCase = options.createContextRecipeUseCase;
+    this.listContextRecipesUseCase = options.listContextRecipesUseCase;
+    this.loadContextRecipeUseCase = options.loadContextRecipeUseCase;
   }
 
   public async listContextPackages(
     request: IListContextPackagesRequest = {}
   ): Promise<IListContextPackagesResult> {
     return this.listContextPackagesUseCase.execute(request);
+  }
+
+  public async listContextRecipes(
+    request: IListContextRecipesRequest = {}
+  ): Promise<IListContextRecipesResult> {
+    return this.listContextRecipesUseCase.execute(request);
   }
 
   public async searchContextPackages(
@@ -72,10 +101,23 @@ export class ContextService {
     });
   }
 
+  public async loadContextRecipe(contextRecipeId: string): Promise<ILoadContextRecipeResult> {
+    return this.loadContextRecipeUseCase.execute({
+      contextRecipeId,
+      throwIfNotFound: false,
+    });
+  }
+
   public async createContextPackage(
     request: ICreateContextPackageRequest
   ): Promise<ICreateContextPackageResult> {
     return this.createContextPackageUseCase.execute(request);
+  }
+
+  public async createContextRecipe(
+    request: ICreateContextRecipeRequest
+  ): Promise<ICreateContextRecipeResult> {
+    return this.createContextRecipeUseCase.execute(request);
   }
 
   public async updateContextPackage(

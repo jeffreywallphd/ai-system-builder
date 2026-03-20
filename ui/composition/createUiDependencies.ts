@@ -63,12 +63,16 @@ import { DisconnectMcpServerUseCase } from "../../application/mcp/DisconnectMcpS
 import { ReconnectMcpServerUseCase } from "../../application/mcp/ReconnectMcpServerUseCase";
 import { WorkflowContextService } from "../../application/context/WorkflowContextService";
 import { CreateContextPackageUseCase } from "../../application/context/CreateContextPackageUseCase";
+import { CreateContextRecipeUseCase } from "../../application/context/CreateContextRecipeUseCase";
 import { UpdateContextPackageUseCase } from "../../application/context/UpdateContextPackageUseCase";
 import { DeleteContextPackageUseCase } from "../../application/context/DeleteContextPackageUseCase";
 import { ListContextPackagesUseCase } from "../../application/context/ListContextPackagesUseCase";
+import { ListContextRecipesUseCase } from "../../application/context/ListContextRecipesUseCase";
 import { LoadContextPackageUseCase } from "../../application/context/LoadContextPackageUseCase";
+import { LoadContextRecipeUseCase } from "../../application/context/LoadContextRecipeUseCase";
 import { SearchContextPackagesUseCase } from "../../application/context/SearchContextPackagesUseCase";
 import { LocalStorageContextPackageRepository } from "../../infrastructure/browser/context/LocalStorageContextPackageRepository";
+import { LocalStorageContextRecipeRepository } from "../../infrastructure/browser/context/LocalStorageContextRecipeRepository";
 
 import { WorkflowProjectionService } from "../../application/projection/WorkflowProjectionService";
 import { WorkflowToolProjectionService } from "../../application/projection/WorkflowToolProjectionService";
@@ -107,7 +111,8 @@ export function createUiDependencies(
   const workflowExecutor = createWorkflowExecutor(config);
   const nodeCatalogProvider = createNodeCatalogProvider(config);
   const contextPackageRepository = new LocalStorageContextPackageRepository();
-  const workflowContextService = new WorkflowContextService(contextPackageRepository);
+  const contextRecipeRepository = new LocalStorageContextRecipeRepository();
+  const workflowContextService = new WorkflowContextService(contextPackageRepository, contextRecipeRepository);
 
   const modelCompatibilityService = new ModelCompatibilityService();
   const nodeCompatibilityService = new NodeCompatibilityService(
@@ -283,6 +288,9 @@ export function createUiDependencies(
     createContextPackageUseCase: new CreateContextPackageUseCase({
       contextPackageRepository,
     }),
+    createContextRecipeUseCase: new CreateContextRecipeUseCase({
+      contextRecipeRepository,
+    }),
     updateContextPackageUseCase: new UpdateContextPackageUseCase({
       contextPackageRepository,
     }),
@@ -290,6 +298,8 @@ export function createUiDependencies(
     listContextPackagesUseCase: new ListContextPackagesUseCase(contextPackageRepository),
     loadContextPackageUseCase: new LoadContextPackageUseCase(contextPackageRepository),
     searchContextPackagesUseCase: new SearchContextPackagesUseCase(contextPackageRepository),
+    listContextRecipesUseCase: new ListContextRecipesUseCase(contextRecipeRepository),
+    loadContextRecipeUseCase: new LoadContextRecipeUseCase(contextRecipeRepository),
   });
   const contextStore = new ContextStore(contextService);
 

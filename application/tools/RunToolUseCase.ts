@@ -43,12 +43,17 @@ export class RunToolUseCase {
   private async resolveExecutionMetadata(
     workflow: IWorkflow
   ): Promise<Readonly<Record<string, unknown>> | undefined> {
-    if (!this.workflowContextService || !workflow.metadata.contextConfiguration?.packageReferences?.length) {
+    if (
+      !this.workflowContextService ||
+      (!(workflow.metadata.contextConfiguration?.packageReferences?.length) &&
+        !(workflow.metadata.contextConfiguration?.recipeSelections?.length))
+    ) {
       return undefined;
     }
 
     const result = await this.workflowContextService.inspectWorkflowContext({
       workflow,
+      selectedRecipeIds: workflow.metadata.contextConfiguration.selectedRecipeIds,
       selectedPackageIds: workflow.metadata.contextConfiguration.selectedPackageIds,
       visibilityMode: workflow.metadata.contextConfiguration.visibilityMode,
     });

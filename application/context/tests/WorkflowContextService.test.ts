@@ -2,6 +2,8 @@ import { describe, expect, it } from "bun:test";
 import { WorkflowContextService } from "../WorkflowContextService";
 import { ContextPackage } from "../models/ContextPackage";
 import { InMemoryContextPackageRepository } from "../../../infrastructure/mocks/repositories/InMemoryContextPackageRepository";
+import { InMemoryContextRecipeRepository } from "../../../infrastructure/mocks/repositories/InMemoryContextRecipeRepository";
+import { ContextRecipe } from "../models/ContextRecipe";
 import { makeWorkflow } from "../../../domain/services/tests/testUtils";
 import { WorkflowMetadata } from "../../../domain/workflows/WorkflowMetadata";
 
@@ -131,6 +133,47 @@ describe("WorkflowContextService", () => {
         blockedToolNames: undefined,
       },
     });
+  });
+
+  it("applies selected recipe defaults without exposing recipe internals to the tool surface", async () => {
+    const packageRepository = new InMemoryContextPackageRepository([
+      new ContextPackage({
+        id: "pkg-company",
+        name: "Company Knowledge",
+        fragments: [{ id: "company", kind: "retrieved-context", content: "Use the company handbook.", order: 0 }],
+      }),
+    ]);
+    const recipeRepository = new InMemoryContextRecipeRepository([
+      new ContextRecipe({
+        id: "company-default",
+        name: "Company Default",
+        packageReferences: [{ packageId: "pkg-company", alias: "Company Knowledge" }],
+        budgetingDefaults: { maxTokens: 150 },
+        guidance: { responseStyle: "structured", detailLevel: "concise", strictStructuredOutput: true },
+        toolUseGuidance: { mode: "guided", instructions: "Prefer approved workflow tools first." },
+      }),
+    ]);
+    const workflow = makeWorkflow({}).withMetadata(
+      new WorkflowMetadata({
+        name: "Recipe Workflow",
+        contextConfiguration: {
+          recipeSelections: [{ recipeId: "company-default", alias: "Company default", surfaceInTool: true }],
+          selectedRecipeIds: ["company-default"],
+        },
+      })
+    );
+
+    const result = await new WorkflowContextService(packageRepository, recipeRepository).inspectWorkflowContext({
+      workflow,
+    });
+
+    expect(result.selectedRecipeIds).toEqual(["company-default"]);
+    expect(result.selectedPackageIds).toEqual(["pkg-company"]);
+    expect(result.recipeLabels).toEqual({ "company-default": "Company default" });
+    expect(result.executionContext.assembledContext.promptText).toContain("Response style: structured.");
+    expect(result.executionContext.assembledContext.promptText).toContain("Use the company handbook.");
+    expect(result.executionContext.budget.maxTokens).toBe(150);
+    expect(result.executionContext.toolUsePolicy?.instructions).toContain("Prefer approved workflow tools first.");
   });
 
 });

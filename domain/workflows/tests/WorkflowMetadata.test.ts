@@ -19,6 +19,8 @@ describe("Workflow metadata primitives", () => {
       toolCategory: " cat ",
       toolSlug: " tool-slug ",
       contextConfiguration: {
+        recipeSelections: [{ recipeId: " company-default ", alias: " Company Default ", surfaceInTool: true }],
+        selectedRecipeIds: [" company-default "],
         packageReferences: [{ packageId: " pkg-1 ", alias: " Style Guide " }],
         selectedPackageIds: [" pkg-1 "],
         visibilityMode: "advanced",
@@ -38,6 +40,15 @@ describe("Workflow metadata primitives", () => {
     expect(metadata.toolDescription).toBe("desc");
     expect(metadata.toolCategory).toBe("cat");
     expect(metadata.toolSlug).toBe("tool-slug");
+    expect(metadata.contextConfiguration?.recipeSelections).toEqual([
+      {
+        recipeId: "company-default",
+        alias: "Company Default",
+        isEnabled: true,
+        surfaceInTool: true,
+      },
+    ]);
+    expect(metadata.contextConfiguration?.selectedRecipeIds).toEqual(["company-default"]);
     expect(metadata.contextConfiguration?.packageReferences).toEqual([
       {
         packageId: "pkg-1",
@@ -56,6 +67,42 @@ describe("Workflow metadata primitives", () => {
     expect(() => new WorkflowMetadata({ name: "   " })).toThrow(
       "WorkflowMetadata.name cannot be empty."
     );
+  });
+
+
+  it("rejects selected recipe ids that are not configured", () => {
+    expect(
+      () =>
+        new WorkflowMetadata({
+          name: "Bad Workflow",
+          contextConfiguration: {
+            recipeSelections: [{ recipeId: "recipe-1" }],
+            selectedRecipeIds: ["recipe-2"],
+          },
+        })
+    ).toThrow("selectedRecipeIds");
+  });
+
+  it("deduplicates recipe selections and aligns selected recipes to enabled selection order", () => {
+    const metadata = new WorkflowMetadata({
+      name: "Recipe Workflow",
+      contextConfiguration: {
+        recipeSelections: [
+          { recipeId: "recipe-b", alias: "B" },
+          { recipeId: "recipe-a", alias: "A", isEnabled: false },
+          { recipeId: "recipe-b", alias: "duplicate" },
+          { recipeId: "recipe-c", alias: "C", surfaceInTool: false },
+        ],
+        selectedRecipeIds: ["recipe-c", "recipe-a", "recipe-b"],
+      },
+    });
+
+    expect(metadata.contextConfiguration?.recipeSelections?.map((selection) => selection.recipeId)).toEqual([
+      "recipe-b",
+      "recipe-a",
+      "recipe-c",
+    ]);
+    expect(metadata.contextConfiguration?.selectedRecipeIds).toEqual(["recipe-b", "recipe-c"]);
   });
 
   it("rejects selected package ids that are not configured", () => {
