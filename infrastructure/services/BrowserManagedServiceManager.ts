@@ -1,5 +1,10 @@
 import type { IRuntimeEventSink } from "../../application/ports/interfaces/IRuntimeEventSink";
 import { RuntimeEventSources, type RuntimeEventSource } from "../../application/runtime/RuntimeEvent";
+import {
+  toManagedServiceDescriptor,
+  type ManagedServiceDefinition,
+} from "../../application/services/ManagedServiceDefinition";
+import type { IManagedServiceDefinitionRegistry } from "../../application/services/interfaces/IManagedServiceDefinitionRegistry";
 import type { IManagedServiceManager } from "../../application/services/interfaces/IManagedServiceManager";
 import type { IManagedServiceSupervisor } from "../../application/services/interfaces/IManagedServiceSupervisor";
 import {
@@ -8,10 +13,10 @@ import {
   ManagedServiceStates,
   type ManagedServiceDescriptor,
   type ManagedServiceLogEvent,
-  type ManagedServiceStatus,
-  type ManagedServiceSubscription,
   type ManagedServiceLogListener,
+  type ManagedServiceStatus,
   type ManagedServiceStatusListener,
+  type ManagedServiceSubscription,
 } from "../../application/services/interfaces/ManagedServiceTypes";
 
 export interface BrowserManagedServiceProbeResult {
@@ -22,13 +27,14 @@ export interface BrowserManagedServiceProbeResult {
 }
 
 export interface BrowserManagedServiceRegistration {
-  readonly descriptor: ManagedServiceDescriptor;
+  readonly serviceId: string;
   readonly initialDetail?: string;
   readonly runtimeEventSource?: RuntimeEventSource;
   readonly probe: () => Promise<BrowserManagedServiceProbeResult>;
 }
 
 export interface BrowserManagedServiceManagerOptions {
+  readonly registry: IManagedServiceDefinitionRegistry;
   readonly registrations: ReadonlyArray<BrowserManagedServiceRegistration>;
   readonly eventSink?: IRuntimeEventSink;
 }
@@ -39,21 +45,24 @@ export class BrowserManagedServiceManager implements IManagedServiceManager, IMa
   private readonly logListeners = new Map<string, Set<ManagedServiceLogListener>>();
   private readonly statuses = new Map<string, ManagedServiceStatus>();
   private readonly eventSink?: IRuntimeEventSink;
+  private readonly registry: IManagedServiceDefinitionRegistry;
 
   constructor(options: BrowserManagedServiceManagerOptions) {
     this.eventSink = options.eventSink;
+    this.registry = options.registry;
 
     for (const registration of options.registrations) {
-      this.registrations.set(registration.descriptor.id, registration);
+      const definition = this.getDefinitionOrThrow(registration.serviceId);
+      this.registrations.set(registration.serviceId, registration);
       this.statuses.set(
-        registration.descriptor.id,
-        createInitialStatus(registration.descriptor, registration.initialDetail),
+        registration.serviceId,
+        createInitialStatus(definition, registration.initialDetail),
       );
     }
   }
 
   public listServices(): ReadonlyArray<ManagedServiceDescriptor> {
-    return Object.freeze([...this.registrations.values()].map(({ descriptor }) => descriptor));
+    return Object.freeze(this.registry.listDefinitions().map((definition) => toManagedServiceDescriptor(definition)));
   }
 
   public getServiceStatus(serviceId: string): ManagedServiceStatus | undefined {
@@ -90,40 +99,37 @@ export class BrowserManagedServiceManager implements IManagedServiceManager, IMa
 
   public async ensureRunning(serviceId: string): Promise<ManagedServiceStatus> {
     const registration = this.getRegistration(serviceId);
+    const definition = this.getDefinitionOrThrow(serviceId);
     const current = this.getRequiredStatus(serviceId);
 
-    if (registration.descriptor.startPolicy === ManagedServiceStartPolicies.disabled) {
+    if (definition.autoStartPolicy === ManagedServiceStartPolicies.disabled) {
       const disabledStatus = this.updateStatus(serviceId, {
         state: ManagedServiceStates.disabled,
         isAvailable: false,
         ownership: ManagedServiceOwnership.none,
-        detail: current.detail ?? `${registration.descriptor.name} is disabled in settings.`,
+        detail: current.detail ?? `${definition.displayName} is disabled in settings.`,
       });
-      this.emitLog(serviceId, "info", `${registration.descriptor.name} is disabled in browser settings.`);
+      this.emitLog(serviceId, "info", `${definition.displayName} is disabled in browser settings.`);
       return disabledStatus;
     }
 
-    this.emitLog(serviceId, "info", `Checking ${registration.descriptor.name} health.`);
+    this.emitLog(serviceId, "info", `Checking ${definition.displayName} health.`);
 
-    const nextStatus = this.updateStatus(serviceId, await this.runProbe(registration));
+    const nextStatus = this.updateStatus(serviceId, await this.runProbe(registration, definition));
 
     if (nextStatus.isAvailable) {
-      this.emitLog(serviceId, "success", `${registration.descriptor.name} is healthy.`);
+      this.emitLog(serviceId, "success", `${definition.displayName} is healthy.`);
       return nextStatus;
     }
 
     if (nextStatus.state === ManagedServiceStates.degraded) {
-      this.emitLog(
-        serviceId,
-        "info",
-        `${registration.descriptor.name} endpoint is reachable but not healthy.`,
-      );
+      this.emitLog(serviceId, "info", `${definition.displayName} endpoint is reachable but not healthy.`);
     }
 
     this.emitLog(
       serviceId,
       "info",
-      `Browser UI will continue without managing the ${registration.descriptor.name.toLowerCase()} process.`,
+      `Browser UI will continue without managing the ${definition.displayName.toLowerCase()} process.`,
     );
 
     return nextStatus;
@@ -131,21 +137,22 @@ export class BrowserManagedServiceManager implements IManagedServiceManager, IMa
 
   public async start(serviceId: string): Promise<ManagedServiceStatus> {
     const registration = this.getRegistration(serviceId);
+    const definition = this.getDefinitionOrThrow(serviceId);
 
-    if (registration.descriptor.startPolicy === ManagedServiceStartPolicies.disabled) {
+    if (definition.autoStartPolicy === ManagedServiceStartPolicies.disabled) {
       return this.ensureRunning(serviceId);
     }
 
-    const status = this.updateStatus(serviceId, await this.runProbe(registration));
+    const status = this.updateStatus(serviceId, await this.runProbe(registration, definition));
 
     if (
-      registration.descriptor.startPolicy === ManagedServiceStartPolicies.externalOnly
+      definition.autoStartPolicy === ManagedServiceStartPolicies.externalOnly
       && !status.isAvailable
     ) {
       this.emitLog(
         serviceId,
         "info",
-        `No managed ${registration.descriptor.name.toLowerCase()} process is available in the browser environment.`,
+        `No managed ${definition.displayName.toLowerCase()} process is available in the browser environment.`,
       );
     }
 
@@ -153,14 +160,14 @@ export class BrowserManagedServiceManager implements IManagedServiceManager, IMa
   }
 
   public async stop(serviceId: string): Promise<ManagedServiceStatus> {
-    const registration = this.getRegistration(serviceId);
+    const definition = this.getDefinitionOrThrow(serviceId);
     const status = this.getRequiredStatus(serviceId);
 
     if (status.ownership !== ManagedServiceOwnership.managed) {
       this.emitLog(
         serviceId,
         "info",
-        `No managed ${registration.descriptor.name.toLowerCase()} process is available in the browser environment.`,
+        `No managed ${definition.displayName.toLowerCase()} process is available in the browser environment.`,
       );
       return status;
     }
@@ -169,7 +176,7 @@ export class BrowserManagedServiceManager implements IManagedServiceManager, IMa
       state: ManagedServiceStates.stopped,
       isAvailable: false,
       ownership: ManagedServiceOwnership.managed,
-      detail: `${registration.descriptor.name} stopped.`,
+      detail: `${definition.displayName} stopped.`,
     });
   }
 
@@ -186,6 +193,14 @@ export class BrowserManagedServiceManager implements IManagedServiceManager, IMa
     return registration;
   }
 
+  private getDefinitionOrThrow(serviceId: string): ManagedServiceDefinition {
+    const definition = this.registry.getDefinition(serviceId);
+    if (!definition) {
+      throw new Error(`Unknown managed service definition '${serviceId}'.`);
+    }
+    return definition;
+  }
+
   private getRequiredStatus(serviceId: string): ManagedServiceStatus {
     const status = this.statuses.get(serviceId);
     if (!status) {
@@ -194,7 +209,10 @@ export class BrowserManagedServiceManager implements IManagedServiceManager, IMa
     return status;
   }
 
-  private async runProbe(registration: BrowserManagedServiceRegistration): Promise<Partial<ManagedServiceStatus>> {
+  private async runProbe(
+    registration: BrowserManagedServiceRegistration,
+    definition: ManagedServiceDefinition,
+  ): Promise<Partial<ManagedServiceStatus>> {
     try {
       return await registration.probe();
     } catch {
@@ -202,18 +220,18 @@ export class BrowserManagedServiceManager implements IManagedServiceManager, IMa
         state: ManagedServiceStates.unavailable,
         isAvailable: false,
         ownership: ManagedServiceOwnership.none,
-        detail: `${registration.descriptor.name} is unavailable from the browser environment.`,
+        detail: `${definition.displayName} is unavailable from the browser environment.`,
       };
     }
   }
 
   private updateStatus(serviceId: string, partial: Partial<ManagedServiceStatus>): ManagedServiceStatus {
-    const registration = this.getRegistration(serviceId);
+    const definition = this.getDefinitionOrThrow(serviceId);
     const current = this.getRequiredStatus(serviceId);
     const next = Object.freeze({
       serviceId,
-      kind: registration.descriptor.kind,
-      startPolicy: registration.descriptor.startPolicy,
+      kind: definition.kind,
+      startPolicy: definition.autoStartPolicy,
       state: partial.state ?? current.state,
       isAvailable: partial.isAvailable ?? current.isAvailable,
       ownership: partial.ownership ?? current.ownership,
@@ -226,10 +244,11 @@ export class BrowserManagedServiceManager implements IManagedServiceManager, IMa
   }
 
   private emitLog(serviceId: string, level: ManagedServiceLogEvent["level"], message: string): void {
+    const definition = this.getDefinitionOrThrow(serviceId);
     const registration = this.getRegistration(serviceId);
     const event = Object.freeze({
       serviceId,
-      kind: registration.descriptor.kind,
+      kind: definition.kind,
       level,
       message,
       occurredAt: new Date().toISOString(),
@@ -247,18 +266,18 @@ export class BrowserManagedServiceManager implements IManagedServiceManager, IMa
 }
 
 function createInitialStatus(
-  descriptor: ManagedServiceDescriptor,
+  definition: ManagedServiceDefinition,
   detail?: string,
 ): ManagedServiceStatus {
   return Object.freeze({
-    serviceId: descriptor.id,
-    kind: descriptor.kind,
-    state: descriptor.startPolicy === ManagedServiceStartPolicies.disabled
+    serviceId: definition.serviceId,
+    kind: definition.kind,
+    state: definition.autoStartPolicy === ManagedServiceStartPolicies.disabled
       ? ManagedServiceStates.disabled
       : ManagedServiceStates.unavailable,
     isAvailable: false,
     ownership: ManagedServiceOwnership.none,
-    startPolicy: descriptor.startPolicy,
+    startPolicy: definition.autoStartPolicy,
     lastUpdatedAt: new Date().toISOString(),
     detail: detail?.trim() || undefined,
   });

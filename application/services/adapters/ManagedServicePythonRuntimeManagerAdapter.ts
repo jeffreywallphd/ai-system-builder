@@ -1,13 +1,12 @@
 import type { IPythonRuntimeManager, PythonRuntimeManagerStatus } from "../../ports/interfaces/IPythonRuntimeManager";
 import type { IManagedServiceManager } from "../interfaces/IManagedServiceManager";
 import type { IManagedServiceSupervisor } from "../interfaces/IManagedServiceSupervisor";
+import { PYTHON_RUNTIME_MANAGED_SERVICE_ID } from "../ManagedServiceIds";
 import {
   ManagedServiceOwnership,
   ManagedServiceStates,
   type ManagedServiceStatus,
 } from "../interfaces/ManagedServiceTypes";
-
-export const PYTHON_RUNTIME_MANAGED_SERVICE_ID = "python-runtime";
 
 export interface ManagedServicePythonRuntimeManagerAdapterOptions {
   readonly manager: IManagedServiceManager;
