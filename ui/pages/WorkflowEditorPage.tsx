@@ -20,6 +20,8 @@ import { ValidationPresenter } from "../presenters/ValidationPresenter";
 import { NodeStore, type INodeStoreState } from "../state/NodeStore";
 import { WorkflowStore, type IWorkflowStoreState } from "../state/WorkflowStore";
 import type { UiSettingsState } from "../settings/UiSettingsStore";
+import type { IModelStoreState } from "../state/ModelStore";
+import { buildInstalledModelOptions } from "../models/buildInstalledModelOptions";
 import type { ContextStoreState } from "../state/ContextStore";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 
@@ -66,6 +68,21 @@ const fallbackContextState: ContextStoreState = Object.freeze({
   error: undefined,
 });
 
+const fallbackModelState: IModelStoreState = Object.freeze({
+  installedModels: Object.freeze([]),
+  remoteModels: Object.freeze([]),
+  selectedInstalledModelId: undefined,
+  selectedRemoteModelId: undefined,
+  installedSearchCriteria: undefined,
+  remoteSearchCriteria: undefined,
+  installProgressByModelId: Object.freeze({}),
+  isLoadingInstalled: false,
+  isSearchingRemote: false,
+  isInstalling: false,
+  isRemoving: false,
+  error: undefined,
+});
+
 const mobileQuery = "(max-width: 767px)";
 
 function getContextInspection(output: Readonly<Record<string, unknown>> | undefined) {
@@ -88,6 +105,7 @@ export default function WorkflowEditorPage({
     contextStore,
     workflowProjectionService,
     settingsStore,
+    modelStore,
   } = useUiDependencies();
 
   const workflowStore = workflowStoreProp ?? injectedWorkflowStore;
@@ -99,6 +117,7 @@ export default function WorkflowEditorPage({
     useState<IWorkflowStoreState>(fallbackWorkflowState);
   const [nodeState, setNodeState] = useState<INodeStoreState>(fallbackNodeState);
   const [contextState, setContextState] = useState<ContextStoreState>(fallbackContextState);
+  const [modelState, setModelState] = useState<IModelStoreState>(fallbackModelState);
   const [settingsState, setSettingsState] = useState<UiSettingsState>(() => settingsStore.getState());
   const authoringSettings = settingsState.settings.authoring;
   const [fitViewNonce, setFitViewNonce] = useState(0);
@@ -157,6 +176,7 @@ export default function WorkflowEditorPage({
   }, [nodeStore]);
 
   useEffect(() => settingsStore.subscribe(setSettingsState), [settingsStore]);
+  useEffect(() => modelStore.subscribe(setModelState), [modelStore]);
 
   useEffect(() => {
     return contextStore.subscribe(setContextState);
@@ -169,6 +189,10 @@ export default function WorkflowEditorPage({
   useEffect(() => {
     void contextStore.initialize().catch(() => undefined);
   }, [contextStore]);
+
+  useEffect(() => {
+    void modelStore.refreshInstalled().catch(() => undefined);
+  }, [modelStore]);
 
   useEffect(() => {
     const existingWorkflow = workflowStore.getState().currentWorkflow;
@@ -277,7 +301,7 @@ export default function WorkflowEditorPage({
   );
 
   const validationSummary = validationPresenter.present(workflowState.validation);
-
+  const availableModels = useMemo(() => buildInstalledModelOptions(modelState.installedModels), [modelState.installedModels]);
 
   const visibleValidationMessages = useMemo(() => {
     const messages = validationSummary.groups.flatMap((group) =>
@@ -494,6 +518,7 @@ export default function WorkflowEditorPage({
                     onChange={(fieldId, value) => {
                       workflowStore.applyFormInput({ [fieldId]: value });
                     }}
+                    availableModels={availableModels}
                   />
                 ) : null}
               </div>
@@ -712,6 +737,7 @@ export default function WorkflowEditorPage({
                       <NodeInspector
                         node={selectedNode}
                         contextInspection={selectedContextInspection}
+                        availableModels={availableModels}
                         onPropertyChange={(propertyId, value) => {
                           if (!workflowState.selectedNodeId) {
                             return;
@@ -753,6 +779,7 @@ export default function WorkflowEditorPage({
                       <NodePropertyEditor
                         fields={mobilePropertiesNode.properties}
                         disabled={!mobilePropertiesNode.isEnabled}
+                        availableModels={availableModels}
                         onPropertyChange={(propertyId, value) => {
                           workflowStore.updateNodeProperty(
                             mobilePropertiesNode.id,

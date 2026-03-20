@@ -3,6 +3,7 @@ import type { IContextRecipeSummary } from "../../../application/ports/interface
 import type { ProjectedField } from "../../../application/projection/models/ProjectedField";
 import NodePropertyField from "../nodes/NodePropertyField";
 import type { NodePropertyFieldViewModel } from "../../presenters/NodePresenter";
+import { attachInstalledModelOptions, type InstalledModelOption } from "../../models/buildInstalledModelOptions";
 import ContextPackageReferenceFieldEditor from "./ContextPackageReferenceFieldEditor";
 import ContextRecipeSelectionFieldEditor from "./ContextRecipeSelectionFieldEditor";
 
@@ -11,6 +12,7 @@ function toNodePropertyField(field: ProjectedField): NodePropertyFieldViewModel 
     id: field.propertyId,
     name: field.label,
     type: field.type,
+    editorType: field.type,
     value: field.value,
     defaultValue: field.defaultValue,
     description: field.description,
@@ -31,11 +33,13 @@ export default function ProjectedFieldEditor({
   onChange,
   availableContextPackages,
   availableContextRecipes,
+  availableModels,
 }: {
   readonly field: ProjectedField;
   readonly onChange: (id: string, value: unknown) => void;
   readonly availableContextPackages?: ReadonlyArray<IContextPackageSummary>;
   readonly availableContextRecipes?: ReadonlyArray<IContextRecipeSummary>;
+  readonly availableModels?: ReadonlyArray<InstalledModelOption>;
 }): JSX.Element {
   if (field.presentation === "context-package-references") {
     return (
@@ -59,7 +63,7 @@ export default function ProjectedFieldEditor({
 
   return (
     <NodePropertyField
-      field={toNodePropertyField(field)}
+      field={attachInstalledModelOptions(toNodePropertyField(field), availableModels)}
       onChange={(_, value) => onChange(field.id, value)}
     />
   );

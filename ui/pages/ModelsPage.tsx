@@ -5,6 +5,7 @@ import type { ModelSearchBarValue } from "../components/models/ModelSearchBar";
 import { useUiDependencies } from "../composition/AppProviders";
 import { Model, ModelArtifact } from "../../domain/models/Model";
 import { ModelPresenter, type ModelDownloadFileViewModel } from "../presenters/ModelPresenter";
+import { formatBytes } from "../presenters/PresenterFormatting";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import type { IModelStoreState, ModelStore } from "../state/ModelStore";
 import type { IModel } from "../../domain/models/interfaces/IModel";
@@ -117,15 +118,7 @@ async function installRemoteFiles(
     throw new Error(`Remote model '${modelId}' could not be found in the current catalog results.`);
   }
 
-  const installTargets =
-    files.length > 0
-      ? files
-      : [
-          {
-            name: remoteModel.model.artifact.name,
-            id: `${remoteModel.model.id}::artifact`,
-          } as ModelDownloadFileViewModel,
-        ];
+  const installTargets = files.length > 0 ? files : buildDownloadFileViewModels(remoteModel.model);
 
   const modelForInstallation = createInstallationModel(remoteModel.model, installTargets);
 
@@ -138,6 +131,22 @@ async function installRemoteFiles(
     authToken: modelSettings.authToken || undefined,
     registerInstalled: modelSettings.registerInstalledModels,
   });
+}
+
+function buildDownloadFileViewModels(model: IModel): ReadonlyArray<ModelDownloadFileViewModel> {
+  return Object.freeze(
+    [model.artifact, ...model.additionalArtifacts].map((artifact, index) => ({
+      id: `${model.id}::${index}::${artifact.name}`,
+      name: artifact.name,
+      format: artifact.format,
+      extension: artifact.name.includes(".")
+        ? artifact.name.slice(artifact.name.lastIndexOf(".") + 1).toLowerCase()
+        : artifact.format,
+      sizeBytes: artifact.sizeBytes,
+      sizeLabel: formatBytes(artifact.sizeBytes),
+      isPrimary: index === 0,
+    }))
+  );
 }
 
 function createInstallationModel(
