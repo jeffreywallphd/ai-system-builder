@@ -105,6 +105,12 @@ Open the URL printed by Vite (typically `http://localhost:5174`).
    uvicorn app.main:app --host 0.0.0.0 --port 8100 --reload
    ```
    - Keep this terminal running while you use the app.
+   - Ensure your root `.env` contains:
+   ```bash
+   PYTHON_RUNTIME_MODE=local-http
+   PYTHON_RUNTIME_BASE_URL=http://localhost:8100
+   MCP_RUNTIME_ENABLED=true
+   ```
 
 8. **(Optional) Run tests**
    ```bash
@@ -129,6 +135,22 @@ Runtime endpoints:
 - `POST /execute/node`
 - `POST /execute/workflow`
 - `GET /workflows/capabilities`
+
+### Local MCP server notes
+
+- Workspace-authored local MCP tools are executed by the Python runtime using the saved provisioning state, so they do **not** need to install extra Python packages just to work inside AI Loom Studio.
+- If you want to run a generated `server.py` as a standalone external MCP stdio server outside AI Loom Studio, install the MCP Python package yourself in the environment that will launch that script.
+
+### Podman container
+
+If you prefer to host both the Vite UI and Python runtime in one container, you can use the included `Containerfile`.
+
+```bash
+podman build -t ai-loom-studio .
+podman run --rm -it -p 4173:4173 -p 8100:8100 ai-loom-studio
+```
+
+Then open `http://localhost:4173`.
 
 ## Resume
 

@@ -1,3 +1,4 @@
+import json
 import pytest
 
 from app.core.mcp_config import McpRuntimeConfig
@@ -163,6 +164,56 @@ def test_mcp_service_executes_default_calculator_tool() -> None:
 
     assert result.status == "completed"
     assert result.structured_content["result"] == 42
+    assert result.metadata["serverKind"] == "workspace-local"
+
+
+def test_mcp_service_executes_workspace_local_authored_tool(tmp_path) -> None:
+    state_file = tmp_path / "workspace-helper" / ".provisioned.json"
+    state_file.parent.mkdir(parents=True, exist_ok=True)
+    state_file.write_text(
+        json.dumps(
+            {
+                "serverId": "workspace-helper",
+                "toolName": "summarize_notes",
+                "code": 'return {"summary": payload.get("input", "").upper(), "length": len(payload.get("input", ""))}',
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    service = build_service(
+        McpRuntimeConfig(
+            enabled=True,
+            servers_json=json.dumps(
+                [
+                    {
+                        "id": "workspace-helper",
+                        "name": "Workspace Helper",
+                        "transport": "stdio",
+                        "command": "python",
+                        "args": ["server.py"],
+                        "metadata": {
+                            "serverKind": "workspace-local",
+                            "provisioningStateFile": str(state_file),
+                        },
+                        "mock_tools": [{"name": "summarize_notes", "inputSchema": {"type": "object"}}],
+                    }
+                ]
+            ),
+        )
+    )
+
+    result = service.execute_tool(
+        McpToolExecutionRequest(
+            server_id="workspace-helper",
+            tool_name="summarize_notes",
+            arguments={"input": "release notes"},
+        )
+    )
+
+    assert result.status == "completed"
+    assert result.structured_content["summary"] == "RELEASE NOTES"
+    assert result.structured_content["length"] == 13
     assert result.metadata["serverKind"] == "workspace-local"
 
 

@@ -191,11 +191,13 @@ class LocalMcpServerProvisioner:
         python_executable: str | None = None,
         install_runner: InstallRunner | None = None,
         template_registry: LocalMcpServerTemplateRegistry | None = None,
+        runtime_package_spec: str | None = None,
     ) -> None:
         self._workspace_root = workspace_root
         self._python_executable = (python_executable or sys.executable or "python").strip() or "python"
         self._install_runner = install_runner or self._run_install
         self._template_registry = template_registry or LocalMcpServerTemplateRegistry()
+        self._runtime_package_spec = runtime_package_spec.strip() if runtime_package_spec else None
 
     def provision_defaults(self) -> list[McpServerConfig]:
         self._workspace_root.mkdir(parents=True, exist_ok=True)
@@ -209,11 +211,7 @@ class LocalMcpServerProvisioner:
         created = not state_file.exists()
 
         server_root.mkdir(parents=True, exist_ok=True)
-        if created:
-            self._install_runner(
-                [self._python_executable, "-m", "pip", "install", DEFAULT_MCP_PACKAGE_SPEC],
-                server_root,
-            )
+        self._install_runtime_package(server_root, created)
 
         manifest = {
             "serverId": draft.server_id,
@@ -243,6 +241,13 @@ class LocalMcpServerProvisioner:
                     "name": draft.server_name,
                     "entrypoint": str(entrypoint),
                     "toolName": draft.tool_name,
+                    "toolTitle": draft.tool_title,
+                    "toolDescription": draft.tool_description,
+                    "serverDescription": draft.server_description,
+                    "code": draft.code,
+                    "inputSchema": dict(draft.input_schema),
+                    "outputSchema": dict(draft.output_schema),
+                    "metadata": dict(draft.metadata),
                     "createdBy": "ai-loom-studio",
                 },
                 indent=2,
@@ -296,11 +301,7 @@ class LocalMcpServerProvisioner:
         created = not state_file.exists()
 
         server_root.mkdir(parents=True, exist_ok=True)
-        if created:
-            self._install_runner(
-                [self._python_executable, "-m", "pip", "install", template.package_spec],
-                server_root,
-            )
+        self._install_runtime_package(server_root, created, template.package_spec)
 
         self._write_text(entrypoint, template.render_entrypoint())
         for relative_path, content in template.resource_files.items():
@@ -350,6 +351,26 @@ class LocalMcpServerProvisioner:
         if path.exists() and path.read_text(encoding="utf-8") == content:
             return
         path.write_text(content, encoding="utf-8")
+
+    def _install_runtime_package(
+        self,
+        cwd: Path,
+        created: bool,
+        package_spec: str | None = None,
+    ) -> None:
+        if not created:
+            return
+
+        effective_package_spec = self._runtime_package_spec or package_spec
+        if not self._runtime_package_spec:
+            return
+        if not effective_package_spec:
+            return
+
+        self._install_runner(
+            [self._python_executable, "-m", "pip", "install", effective_package_spec],
+            cwd,
+        )
 
     def _run_install(self, command: Sequence[str], cwd: Path) -> None:
         subprocess.run(command, cwd=str(cwd), check=True, capture_output=True, text=True)
