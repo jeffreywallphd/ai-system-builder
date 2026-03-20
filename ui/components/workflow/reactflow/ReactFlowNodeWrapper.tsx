@@ -1,7 +1,13 @@
 import { memo } from "react";
-import { Handle, Position, type NodeProps } from "@xyflow/react";
+import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
+import { Link } from "react-router-dom";
 import type { ReactFlowNodeData } from "./NodeAdapter";
 import NodePropertyEditor from "../../nodes/NodePropertyEditor";
+import { ROUTE_PATHS } from "../../../routes/RouteConfig";
+import {
+  DEFAULT_NODE_HEIGHT,
+  DEFAULT_NODE_WIDTH,
+} from "../../../../application/nodes/NodeCanvasLayoutMetrics";
 
 const inputHandleStyle: React.CSSProperties = {
   top: "50%",
@@ -18,14 +24,14 @@ const outputHandleStyle: React.CSSProperties = {
 function ReactFlowNodeWrapper({
   data,
   selected,
-}: NodeProps<ReactFlowNodeData>): JSX.Element {
+}: NodeProps<Node<ReactFlowNodeData>>): JSX.Element {
   const node = data.node;
   const nodeWidth = data.isCompactViewport
     ? undefined
-    : node.size?.width ?? 360;
+    : node.size?.width ?? DEFAULT_NODE_WIDTH;
   const nodeMinHeight = data.isCompactViewport
     ? undefined
-    : node.size?.height;
+    : node.size?.height ?? DEFAULT_NODE_HEIGHT;
   const hasProperties = node.properties.length > 0;
   const executionOutput = data.executionOutput;
   const chunkDisplayItems =
@@ -56,6 +62,14 @@ function ReactFlowNodeWrapper({
           {node.isModelAware ? (
             <span className="ui-badge ui-badge--model">Model</span>
           ) : null}
+          {node.modelSearch ? (
+            <Link
+              className="ui-button ui-button--ghost ui-button--sm nodrag"
+              to={`${ROUTE_PATHS.models}?${buildModelSearchQuery(node.modelSearch)}`}
+            >
+              Find Models
+            </Link>
+          ) : null}
         </div>
       </div>
 
@@ -74,13 +88,11 @@ function ReactFlowNodeWrapper({
                   />
                   <div className="ui-rf-node__port-label">
                     <span className="ui-text-small">{port.name}</span>
-                    <div className="ui-chips">
-                      {port.valueTypes.slice(0, 1).map((type) => (
-                        <span key={`${port.id}-${type}`} className="ui-badge ui-badge--info">
-                          {type}
-                        </span>
-                      ))}
-                    </div>
+                    {port.valueTypes.slice(0, 1).map((type) => (
+                      <span key={`${port.id}-${type}`} className="ui-badge ui-badge--info">
+                        {type}
+                      </span>
+                    ))}
                   </div>
                 </div>
               ))
@@ -114,13 +126,11 @@ function ReactFlowNodeWrapper({
                 <div key={port.id} className="ui-rf-node__port-row ui-rf-node__port-row--output">
                   <div className="ui-rf-node__port-label ui-rf-node__port-label--right">
                     <span className="ui-text-small">{port.name}</span>
-                    <div className="ui-chips">
-                      {port.valueTypes.slice(0, 1).map((type) => (
-                        <span key={`${port.id}-${type}`} className="ui-badge ui-badge--info">
-                          {type}
-                        </span>
-                      ))}
-                    </div>
+                    {port.valueTypes.slice(0, 1).map((type) => (
+                      <span key={`${port.id}-${type}`} className="ui-badge ui-badge--info">
+                        {type}
+                      </span>
+                    ))}
                   </div>
                   <Handle
                     id={port.id}
@@ -194,3 +204,19 @@ function ReactFlowNodeWrapper({
 }
 
 export default memo(ReactFlowNodeWrapper);
+
+function buildModelSearchQuery(search: NonNullable<ReactFlowNodeData["node"]["modelSearch"]>): string {
+  const params = new URLSearchParams();
+  params.set("mode", "remote");
+  params.set("query", search.query);
+
+  if (search.kind) {
+    params.set("kind", search.kind);
+  }
+
+  if (search.runtime) {
+    params.set("runtime", search.runtime);
+  }
+
+  return params.toString();
+}

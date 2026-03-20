@@ -3,7 +3,11 @@
   "metadata": {
     "name": "Sample Text Analysis",
     "description": "Document chunking workflow that loads a file and previews chunked output.",
-    "tags": ["sample", "text", "analysis"]
+    "tags": [
+      "sample",
+      "text",
+      "analysis"
+    ]
   },
   "status": "draft",
   "isEnabled": true,
@@ -18,8 +22,14 @@
       "definitionId": "shared.document-uploader",
       "title": "Document Input",
       "notes": "Select a text document to analyze.",
-      "position": { "x": 80, "y": 140 },
-      "size": { "width": 240, "height": 160 },
+      "position": {
+        "x": 80,
+        "y": 140
+      },
+      "size": {
+        "width": 240,
+        "height": 160
+      },
       "properties": [
         {
           "id": "document",
@@ -34,8 +44,14 @@
       "definitionId": "langchain.document-to-chunks",
       "title": "Chunk Document",
       "notes": "Split the uploaded document into smaller analysis chunks.",
-      "position": { "x": 400, "y": 140 },
-      "size": { "width": 250, "height": 180 },
+      "position": {
+        "x": 460,
+        "y": 140
+      },
+      "size": {
+        "width": 250,
+        "height": 180
+      },
       "properties": [
         {
           "id": "chunk-size",
@@ -54,8 +70,14 @@
       "definitionId": "shared.chunk-displayer",
       "title": "Chunk Preview",
       "notes": "Inspect the chunk payload on the canvas.",
-      "position": { "x": 730, "y": 140 },
-      "size": { "width": 220, "height": 140 },
+      "position": {
+        "x": 900,
+        "y": 140
+      },
+      "size": {
+        "width": 220,
+        "height": 140
+      },
       "properties": [],
       "isEnabled": true,
       "isCollapsed": false

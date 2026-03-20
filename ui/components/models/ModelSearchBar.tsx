@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export interface ModelSearchBarValue {
   readonly query: string;
@@ -72,6 +72,10 @@ export default function ModelSearchBar({
   );
 
   const [form, setForm] = useState<ModelSearchBarValue>(initial);
+
+  useEffect(() => {
+    setForm(initial);
+  }, [initial]);
 
   const update = <K extends keyof ModelSearchBarValue>(
     key: K,

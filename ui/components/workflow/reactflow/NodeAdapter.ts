@@ -1,7 +1,7 @@
 import type { Node } from "@xyflow/react";
 import type { NodeDetailViewModel } from "../../../presenters/NodePresenter";
 
-export interface ReactFlowNodeData {
+export interface ReactFlowNodeData extends Record<string, unknown> {
   readonly node: NodeDetailViewModel;
   readonly isCompactViewport: boolean;
   readonly executionOutput?: Readonly<Record<string, unknown>>;
