@@ -18,10 +18,103 @@
   font-size: var(--font-size-xs);
 }
 
+.ui-runtime-console__health,
 .ui-runtime-console__list,
 .ui-runtime-console__empty {
   width: min(var(--container-width), calc(100% - 2rem));
   margin: 0 auto;
+}
+
+.ui-runtime-console__health {
+  padding-bottom: var(--space-sm);
+}
+
+.ui-runtime-console__health-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding-bottom: var(--space-xs);
+}
+
+.ui-runtime-console__health-title {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.ui-runtime-console__health-subtitle {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+}
+
+.ui-runtime-console__health-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.ui-runtime-console__health-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--space-sm);
+  align-items: start;
+  padding: var(--space-xs);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-bg-panel) 85%, transparent);
+}
+
+.ui-runtime-console__health-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 5.5rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  text-transform: uppercase;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  background: var(--color-border-soft);
+  color: var(--color-text-muted);
+}
+
+.ui-runtime-console__health-badge--healthy {
+  background: color-mix(in srgb, var(--color-success) 18%, transparent);
+  color: var(--color-success);
+}
+
+.ui-runtime-console__health-badge--degraded {
+  background: color-mix(in srgb, var(--color-warning) 18%, transparent);
+  color: var(--color-warning);
+}
+
+.ui-runtime-console__health-badge--offline {
+  background: color-mix(in srgb, var(--color-danger) 18%, transparent);
+  color: var(--color-danger);
+}
+
+.ui-runtime-console__health-badge--disabled,
+.ui-runtime-console__health-badge--unknown {
+  background: var(--color-border-soft);
+  color: var(--color-text-muted);
+}
+
+.ui-runtime-console__health-copy {
+  min-width: 0;
+}
+
+.ui-runtime-console__health-label {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+}
+
+.ui-runtime-console__health-detail,
+.ui-runtime-console__health-time {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
 }
 
 .ui-runtime-console__list {
@@ -67,8 +160,13 @@
 }
 
 @media (max-width: 720px) {
+  .ui-runtime-console__health-item,
   .ui-runtime-console__event {
     grid-template-columns: 1fr;
     gap: var(--space-2xs);
+  }
+
+  .ui-runtime-console__health-header {
+    flex-direction: column;
   }
 }

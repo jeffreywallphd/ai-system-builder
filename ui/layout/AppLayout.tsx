@@ -12,6 +12,7 @@ import DevSyncButton from "../dev/DevSyncButton";
 import { useUiDependencies } from "../composition/AppProviders";
 import type { RuntimeConsoleState } from "../state/RuntimeConsoleStore";
 import RuntimeConsoleDrawer from "../components/execution/RuntimeConsoleDrawer";
+import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
 import logo from "../images/ai-loom-studio-logo.svg";
 
 function navLinkClassName(isActive: boolean): string {
@@ -23,10 +24,20 @@ function navLinkClassName(isActive: boolean): string {
 const fallbackConsoleState: RuntimeConsoleState = Object.freeze({
   isExpanded: false,
   events: Object.freeze([]),
+  healthChecks: Object.freeze([]),
+  isRefreshingHealth: false,
 });
 
 function isWorkflowEditorPath(pathname: string): boolean {
   return pathname.startsWith("/workflows/");
+}
+
+function hasWorkflowCanvasContent(workflow: IWorkflow | undefined): boolean {
+  return (workflow?.nodes.length ?? 0) > 0;
+}
+
+function shouldPromptForWorkflowSave(workflow: IWorkflow | undefined, isDirty: boolean): boolean {
+  return Boolean(workflow && isDirty && hasWorkflowCanvasContent(workflow));
 }
 
 function getWorkflowEditorExitPrompt(workflowName?: string): string {
@@ -49,7 +60,7 @@ export default function AppLayout(): JSX.Element {
   const blocker = useBlocker(({ currentLocation, nextLocation }) => {
     const { currentWorkflow, isDirty } = workflowStore.getState();
 
-    if (!currentWorkflow || !isDirty) {
+    if (!shouldPromptForWorkflowSave(currentWorkflow, isDirty)) {
       return false;
     }
 
@@ -100,12 +111,12 @@ export default function AppLayout(): JSX.Element {
   useBeforeUnload((event) => {
     const { currentWorkflow, isDirty } = workflowStore.getState();
 
-    if (!currentWorkflow || !isDirty || !isWorkflowEditorPath(location.pathname)) {
+    if (!shouldPromptForWorkflowSave(currentWorkflow, isDirty) || !isWorkflowEditorPath(location.pathname)) {
       return;
     }
 
     event.preventDefault();
-    event.returnValue = getWorkflowEditorExitPrompt(currentWorkflow.metadata.name);
+    event.returnValue = getWorkflowEditorExitPrompt(currentWorkflow?.metadata.name);
   });
 
   useEffect(() => {
@@ -171,8 +182,11 @@ export default function AppLayout(): JSX.Element {
       <RuntimeConsoleDrawer
         isExpanded={runtimeConsoleState.isExpanded}
         events={runtimeConsoleState.events}
+        healthChecks={runtimeConsoleState.healthChecks}
+        isRefreshingHealth={runtimeConsoleState.isRefreshingHealth}
         onToggleExpanded={() => runtimeConsoleStore.toggleExpanded()}
         onClearEvents={() => runtimeConsoleStore.clearEvents()}
+        onRefreshHealth={() => void runtimeConsoleStore.refreshHealth()}
       />
 
       <footer className="ui-app__footer">

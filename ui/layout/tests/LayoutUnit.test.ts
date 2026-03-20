@@ -11,6 +11,8 @@ describe("ui/layout unit coverage", () => {
     expect(source).toContain("DevSyncButton");
     expect(source).toContain("config.isProductionMode");
     expect(source).toContain("RuntimeConsoleDrawer");
+    expect(source).toContain("shouldPromptForWorkflowSave");
+    expect(source).toContain("hasWorkflowCanvasContent");
     expect(source).toContain("Composable AI workflows for non-technical users");
   });
 
