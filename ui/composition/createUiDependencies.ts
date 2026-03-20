@@ -27,13 +27,13 @@ import { createCompositeNodeImplementationRegistry } from "../../infrastructure/
 import { ImplementationRegistryNodeCatalogProvider } from "../../infrastructure/nodes/ImplementationRegistryNodeCatalogProvider";
 import { HuggingFaceApiClient } from "../../infrastructure/huggingface/HuggingFaceApiClient";
 import { HuggingFaceModelCatalog } from "../../infrastructure/huggingface/HuggingFaceModelCatalog";
+import { BrowserHuggingFaceModelDownloader } from "../../infrastructure/browser/models/BrowserHuggingFaceModelDownloader";
+import { LocalStorageInstalledModelCatalog } from "../../infrastructure/browser/models/LocalStorageInstalledModelCatalog";
+import { ModelDownloader } from "../../application/ports/ModelDownloader";
+import { ModelInstaller } from "../../application/ports/ModelInstaller";
 import type { IModel } from "../../domain/models/interfaces/IModel";
-import type { IModelInstaller } from "../../application/ports/interfaces/IModelInstaller";
 import type { IPythonRuntimeClient } from "../../application/ports/interfaces/IPythonRuntimeClient";
-import type {
-  IInstalledModelCatalog,
-  IInstalledModelSearchCriteria,
-} from "../../application/ports/interfaces/IInstalledModelCatalog";
+import type { IInstalledModelCatalog } from "../../application/ports/interfaces/IInstalledModelCatalog";
 import { RuntimeEventBuffer } from "../../application/runtime/RuntimeEventBuffer";
 import { HttpPythonRuntimeClient } from "../../infrastructure/python/client/HttpPythonRuntimeClient";
 import { PythonRuntimeConfig } from "../../infrastructure/config/PythonRuntimeConfig";
@@ -169,21 +169,29 @@ export function createUiDependencies(
     nodeService,
   });
 
-  const installedModelCatalog = new InMemoryInstalledModelCatalog();
+  const huggingFaceApiClient = new HuggingFaceApiClient();
+  const installedModelCatalog = new LocalStorageInstalledModelCatalog();
   const remoteModelCatalog = new HuggingFaceModelCatalog({
-    apiClient: new HuggingFaceApiClient(),
+    apiClient: huggingFaceApiClient,
+  });
+  const modelInstaller = new ModelInstaller({
+    downloader: new ModelDownloader([
+      new BrowserHuggingFaceModelDownloader({
+        apiClient: huggingFaceApiClient,
+      }),
+    ]),
   });
 
   const modelService = new ModelService({
     installModelUseCase: new InstallModelUseCase({
-      modelInstaller: createNoopModelInstaller(),
+      modelInstaller,
       installedModelCatalog,
       remoteModelCatalog,
     }),
     listInstalledModelsUseCase: new ListInstalledModelsUseCase(installedModelCatalog),
     removeModelUseCase: new RemoveModelUseCase({
       installedModelCatalog,
-      modelInstaller: createNoopModelInstaller(),
+      modelInstaller,
     }),
     resolveModelCompatibilityUseCase: new ResolveModelCompatibilityUseCase(
       modelCompatibilityService
@@ -384,77 +392,10 @@ function createNodeCatalogProvider(config: AppRuntimeConfig) {
   }
 }
 
-function createNoopModelInstaller(): IModelInstaller {
-  return {
-    async startInstall(_request: Parameters<IModelInstaller["startInstall"]>[0]): Promise<never> {
-      throw new Error("Model install is not available in browser mode.");
-    },
-    async install(
-      _request: Parameters<IModelInstaller["install"]>[0],
-      _onProgress?: Parameters<IModelInstaller["install"]>[1]
-    ): Promise<never> {
-      throw new Error("Model install is not available in browser mode.");
-    },
-    canInstall(_request: Parameters<IModelInstaller["canInstall"]>[0]): boolean {
-      return false;
-    },
-    async isInstalled(
-      _model: Parameters<IModelInstaller["isInstalled"]>[0],
-      _destination?: Parameters<IModelInstaller["isInstalled"]>[1]
-    ): Promise<boolean> {
-      return false;
-    },
-    async uninstall(_request: Parameters<IModelInstaller["uninstall"]>[0]): Promise<void> {
-      throw new Error("Model uninstall is not available in browser mode.");
-    },
-    canUninstall(_model: Parameters<IModelInstaller["canUninstall"]>[0]): boolean {
-      return false;
-    },
-  };
-}
-
-class InMemoryInstalledModelCatalog implements IInstalledModelCatalog {
-  private readonly modelsById = new Map<string, IModel>();
-
-  public async listInstalled(
-    criteria?: IInstalledModelSearchCriteria
-  ): Promise<ReadonlyArray<IModel>> {
-    const all = [...this.modelsById.values()];
-    const query = criteria?.query?.trim().toLowerCase();
-
-    if (!query) {
-      return Object.freeze(all);
-    }
-
-    return Object.freeze(
-      all.filter(
-        (model) =>
-          model.id.toLowerCase().includes(query) ||
-          model.name.toLowerCase().includes(query) ||
-          (model.publisher?.toLowerCase().includes(query) ?? false)
-      )
-    );
-  }
-
-  public async getInstalledById(id: string): Promise<IModel | undefined> {
-    return this.modelsById.get(id.trim());
-  }
-
-  public async saveInstalled(model: IModel): Promise<void> {
-    this.modelsById.set(model.id, model);
-  }
-
-  public async removeInstalled(id: string): Promise<boolean> {
-    return this.modelsById.delete(id.trim());
-  }
-
-  public async isInstalled(id: string): Promise<boolean> {
-    return this.modelsById.has(id.trim());
-  }
-}
 
 
 function createDisabledRuntimeStatus() {
+
   return {
     enabled: false,
     state: "disabled" as const,

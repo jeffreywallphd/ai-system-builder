@@ -1,15 +1,18 @@
 import type { NodePropertyFieldViewModel } from "../../presenters/NodePresenter";
+import { attachInstalledModelOptions, type InstalledModelOption } from "../../models/buildInstalledModelOptions";
 import NodePropertyField from "./NodePropertyField";
 
 export interface NodePropertyEditorProps {
   readonly fields: ReadonlyArray<NodePropertyFieldViewModel>;
   readonly disabled?: boolean;
+  readonly availableModels?: ReadonlyArray<InstalledModelOption>;
   readonly onPropertyChange?: (propertyId: string, value: unknown) => void;
 }
 
 export default function NodePropertyEditor({
   fields,
   disabled,
+  availableModels,
   onPropertyChange,
 }: NodePropertyEditorProps): JSX.Element {
   const visibleFields = fields.filter((field) => field.visibility !== "hidden");
@@ -38,7 +41,7 @@ export default function NodePropertyEditor({
             {basicFields.map((field) => (
               <NodePropertyField
                 key={field.id}
-                field={field}
+                field={attachInstalledModelOptions(field, availableModels)}
                 disabled={disabled}
                 onChange={onPropertyChange}
               />
@@ -58,7 +61,7 @@ export default function NodePropertyEditor({
             {advancedFields.map((field) => (
               <NodePropertyField
                 key={field.id}
-                field={field}
+                field={attachInstalledModelOptions(field, availableModels)}
                 disabled={disabled}
                 onChange={onPropertyChange}
               />

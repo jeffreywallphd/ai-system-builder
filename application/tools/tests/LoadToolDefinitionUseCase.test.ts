@@ -35,4 +35,24 @@ describe("LoadToolDefinitionUseCase", () => {
       slug: "routed-tool",
     });
   });
+
+  it("loads workflow-backed tool definitions even without explicit publication metadata", async () => {
+    const repository = new InMemoryWorkflowRepository();
+    await repository.save(
+      makeWorkflow({ id: "wf-form" }).withMetadata(
+        new WorkflowMetadata({
+          name: "Workflow Form",
+          description: "Projected from the workflow form surface.",
+        })
+      )
+    );
+
+    const useCase = new LoadToolDefinitionUseCase(repository, new WorkflowToolProjectionService());
+
+    await expect(useCase.execute("workflow-form")).resolves.toMatchObject({
+      id: "wf-form",
+      slug: "workflow-form",
+    });
+  });
+
 });

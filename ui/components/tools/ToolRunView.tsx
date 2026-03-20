@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ToolDefinition } from "../../../application/projection/models/ToolDefinition";
 import type { ToolRunResult } from "../../../application/projection/models/ToolRunResult";
 import ToolSectionView from "./ToolSectionView";
+import type { InstalledModelOption } from "../../models/buildInstalledModelOptions";
 
 function resolveFieldValue(
   fieldId: string,
@@ -18,10 +19,12 @@ export default function ToolRunView({
   onRun,
   isRunning,
   result,
+  availableModels,
 }: {
   readonly tool: ToolDefinition;
   readonly isRunning: boolean;
   readonly result?: ToolRunResult;
+  readonly availableModels?: ReadonlyArray<InstalledModelOption>;
   readonly onRun: (values: Readonly<Record<string, unknown>>) => void;
 }): JSX.Element {
   const [values, setValues] = useState<Record<string, unknown>>({});
@@ -55,6 +58,7 @@ export default function ToolRunView({
           key={section.id}
           section={section}
           onChange={(id, value) => setValues((current) => ({ ...current, [id]: value }))}
+          availableModels={availableModels}
         />
       ))}
 

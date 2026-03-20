@@ -29,10 +29,12 @@ export class ListPublishedToolsUseCase {
     const selectedTypeIds = new Set(criteria?.typeIds?.map((typeId) => typeId.trim()) ?? []);
 
     for (const summary of summaries) {
-      if (!summary.metadata.isPublishedAsTool) {
+      let workflow;
+      try {
+        workflow = await this.workflowRepository.load(summary.id);
+      } catch {
         continue;
       }
-      const workflow = await this.workflowRepository.load(summary.id);
       if (!workflow) {
         continue;
       }
