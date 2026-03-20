@@ -667,6 +667,40 @@ body {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.ui-tools-dev-workflows {
+  gap: var(--space-md);
+}
+
+.ui-tools-dev-workflows__header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-lg);
+  flex-wrap: wrap;
+}
+
+.ui-tools-dev-workflows__header p {
+  max-width: 42rem;
+  margin: 0;
+}
+
+.ui-tools-dev-workflows__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-md);
+}
+
+.ui-tools-dev-workflow-card {
+  border: 1px solid rgba(79, 156, 249, 0.14);
+  background: linear-gradient(180deg, rgba(18, 24, 38, 0.96), rgba(10, 15, 22, 0.96));
+}
+
+.ui-tools-dev-workflow-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
 @media (max-width: 1100px) {
   .ui-home__hero,
   .ui-home__feature-grid,
@@ -675,9 +709,14 @@ body {
     grid-template-columns: 1fr;
   }
 
-  .ui-home__section-heading {
+  .ui-home__section-heading,
+  .ui-tools-dev-workflows__header {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .ui-tools-dev-workflows__grid {
+    grid-template-columns: 1fr;
   }
 }
 
