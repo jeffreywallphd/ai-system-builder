@@ -9,15 +9,19 @@ import {
 import { MockNodeCatalogProvider } from "../../infrastructure/mocks/catalog/MockNodeCatalogProvider";
 import { ImplementationRegistryNodeCatalogProvider } from "../../infrastructure/nodes/ImplementationRegistryNodeCatalogProvider";
 import { createCompositeNodeImplementationRegistry } from "../../infrastructure/nodes/NodeProviderRegistryIndex";
+import basicRagPipeline from "../../dev/workflow-data/workflows/basic-rag-pipeline.json";
+import sampleImagePipeline from "../../dev/workflow-data/workflows/sample-image-pipeline.json";
+import sampleTextAnalysis from "../../dev/workflow-data/workflows/sample-text-analysis.json";
+import documentChunkDisplayWorkflow from "../../dev/workflow-examples/document-chunk-display.workflow.json";
 
-const WORKFLOW_SEED_MODULES = import.meta.glob("../../dev/workflow-data/workflows/*.json", {
-  eager: true,
-  import: "default",
-});
-const WORKFLOW_EXAMPLE_MODULES = import.meta.glob("../../dev/workflow-examples/*.workflow.json", {
-  eager: true,
-  import: "default",
-});
+const WORKFLOW_SEED_MODULES = [
+  basicRagPipeline,
+  sampleImagePipeline,
+  sampleTextAnalysis,
+] as const;
+const WORKFLOW_EXAMPLE_MODULES = [
+  documentChunkDisplayWorkflow,
+] as const;
 
 const SEED_NODE_CATALOG_PROVIDER = new CompositeNodeCatalogProvider({
   providers: [
@@ -138,7 +142,7 @@ interface WorkflowSeedAuditRecord {
 
 function readWorkflowSeedRecords(): ReadonlyArray<WorkflowSeedRecord> {
   return Object.freeze(
-    [...Object.values(WORKFLOW_SEED_MODULES), ...Object.values(WORKFLOW_EXAMPLE_MODULES)]
+    [...WORKFLOW_SEED_MODULES, ...WORKFLOW_EXAMPLE_MODULES]
       .filter((value): value is WorkflowSeedRecord => !!value && typeof value === "object" && "id" in value)
       .sort((left, right) => left.id.localeCompare(right.id))
   );

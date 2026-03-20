@@ -1,6 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import { AppRuntimeConfig } from "../../../infrastructure/config/AppRuntimeConfig";
-import { readSource } from "../../tests/testUtils";
+import { DisabledPythonRuntimeManager } from "../../../infrastructure/python/runtime/DisabledPythonRuntimeManager";
+import { ExternalHttpPythonRuntimeManager } from "../../../infrastructure/python/runtime/ExternalHttpPythonRuntimeManager";
+import { ManagedLocalPythonRuntimeManager } from "../../../infrastructure/python/runtime/ManagedLocalPythonRuntimeManager";
 import { createUiDependencies } from "../createUiDependencies";
 
 describe("ui composition interactions", () => {
@@ -17,6 +19,7 @@ describe("ui composition interactions", () => {
     expect(dependencies.modelStore).toBeDefined();
     expect(dependencies.modelService).toBeDefined();
     expect(dependencies.runtimeConsoleStore).toBeDefined();
+    expect(dependencies.pythonRuntimeManager).toBeDefined();
     expect(dependencies.mcpService).toBeDefined();
     expect(dependencies.mcpStore).toBeDefined();
     expect(dependencies.settingsStore).toBeDefined();
@@ -38,22 +41,63 @@ describe("ui composition interactions", () => {
     expect(nodeTypeIds).toContain("mcp.tool_call");
   });
 
-
-  it("uses the browser-safe runtime manager in UI composition", () => {
-    const source = readSource("ui/composition/createUiDependencies.ts");
-
-    expect(source).toContain("BrowserPythonRuntimeManager");
-    expect(source).not.toContain("Node child process spawning is unavailable in browser composition.");
-    expect(source).not.toContain("new PythonRuntimeProcessManager");
-  });
-
-  it("keeps runtime console initialization safe when the browser runtime is unavailable", async () => {
+  it("selects the external HTTP runtime manager when configured", () => {
     const dependencies = createUiDependencies({
       config: AppRuntimeConfig.forDevelopment(),
       settingsStorage: {
         load: () => ({
           runtime: {
-            mode: "local-http",
+            mode: "external-http",
+            baseUrl: "http://127.0.0.1:8000",
+          },
+        }),
+        save: () => undefined,
+      },
+    });
+
+    expect(dependencies.pythonRuntimeManager).toBeInstanceOf(ExternalHttpPythonRuntimeManager);
+  });
+
+  it("selects the managed-local runtime manager when configured", () => {
+    const dependencies = createUiDependencies({
+      config: AppRuntimeConfig.forDevelopment(),
+      settingsStorage: {
+        load: () => ({
+          runtime: {
+            mode: "managed-local",
+            baseUrl: "http://127.0.0.1:8000",
+          },
+        }),
+        save: () => undefined,
+      },
+    });
+
+    expect(dependencies.pythonRuntimeManager).toBeInstanceOf(ManagedLocalPythonRuntimeManager);
+  });
+
+  it("selects the disabled runtime manager when configured", () => {
+    const dependencies = createUiDependencies({
+      config: AppRuntimeConfig.forDevelopment(),
+      settingsStorage: {
+        load: () => ({
+          runtime: {
+            mode: "disabled",
+          },
+        }),
+        save: () => undefined,
+      },
+    });
+
+    expect(dependencies.pythonRuntimeManager).toBeInstanceOf(DisabledPythonRuntimeManager);
+  });
+
+  it("keeps runtime console initialization safe when the runtime is unavailable", async () => {
+    const dependencies = createUiDependencies({
+      config: AppRuntimeConfig.forDevelopment(),
+      settingsStorage: {
+        load: () => ({
+          runtime: {
+            mode: "external-http",
             baseUrl: "http://127.0.0.1:1",
           },
         }),

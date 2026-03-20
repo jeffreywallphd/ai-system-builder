@@ -33,12 +33,15 @@ import { ModelDownloader } from "../../application/ports/ModelDownloader";
 import { ModelInstaller } from "../../application/ports/ModelInstaller";
 import type { IModel } from "../../domain/models/interfaces/IModel";
 import type { IPythonRuntimeClient } from "../../application/ports/interfaces/IPythonRuntimeClient";
+import type { IPythonRuntimeManager } from "../../application/ports/interfaces/IPythonRuntimeManager";
 import type { IInstalledModelCatalog } from "../../application/ports/interfaces/IInstalledModelCatalog";
 import { RuntimeEventBuffer } from "../../application/runtime/RuntimeEventBuffer";
 import { HttpPythonRuntimeClient } from "../../infrastructure/python/client/HttpPythonRuntimeClient";
 import { PythonRuntimeConfig } from "../../infrastructure/config/PythonRuntimeConfig";
 import { NodeProcessRuntimeEventSink } from "../../infrastructure/python/runtime/NodeProcessRuntimeEventSink";
-import { BrowserPythonRuntimeManager } from "../../infrastructure/python/runtime/BrowserPythonRuntimeManager";
+import { DisabledPythonRuntimeManager } from "../../infrastructure/python/runtime/DisabledPythonRuntimeManager";
+import { ExternalHttpPythonRuntimeManager } from "../../infrastructure/python/runtime/ExternalHttpPythonRuntimeManager";
+import { ManagedLocalPythonRuntimeManager } from "../../infrastructure/python/runtime/ManagedLocalPythonRuntimeManager";
 import { RuntimeConsoleStore } from "../state/RuntimeConsoleStore";
 import { McpService } from "../services/McpService";
 import { McpToolCallAuthoringService } from "../services/McpToolCallAuthoringService";
@@ -219,13 +222,13 @@ export function createUiDependencies(
   });
   const runtimeEventStore = new RuntimeEventBuffer({ capacity: 500 });
   const runtimeEventSink = new NodeProcessRuntimeEventSink(runtimeEventStore);
-  const runtimeClient = settings.runtime.mode === "disabled"
-    ? createDisabledRuntimeClient()
-    : new HttpPythonRuntimeClient(pythonRuntimeConfig);
-  const pythonRuntimeManager = new BrowserPythonRuntimeManager({
+  const runtimeClient = pythonRuntimeConfig.isEnabled
+    ? new HttpPythonRuntimeClient(pythonRuntimeConfig)
+    : createDisabledRuntimeClient();
+  const pythonRuntimeManager = createPythonRuntimeManager({
+    config: pythonRuntimeConfig,
     client: runtimeClient,
     eventSink: runtimeEventSink,
-    config: pythonRuntimeConfig,
   });
   const mcpClient = settings.runtime.mode === "disabled"
     ? createDisabledMcpRuntimeClient()
@@ -343,6 +346,7 @@ export function createUiDependencies(
     nodeService,
     modelService,
     runtimeConsoleStore,
+    pythonRuntimeManager,
     toolService,
     toolStore: new ToolStore(toolService),
     mcpService,
@@ -351,6 +355,31 @@ export function createUiDependencies(
     contextStore,
     workflowProjectionService,
     settingsStore,
+  });
+}
+
+
+function createPythonRuntimeManager(options: {
+  config: PythonRuntimeConfig;
+  client: IPythonRuntimeClient;
+  eventSink: NodeProcessRuntimeEventSink;
+}): IPythonRuntimeManager {
+  if (!options.config.isEnabled) {
+    return new DisabledPythonRuntimeManager();
+  }
+
+  if (options.config.isExternalHttp) {
+    return new ExternalHttpPythonRuntimeManager({
+      client: options.client,
+      eventSink: options.eventSink,
+      config: options.config,
+    });
+  }
+
+  return new ManagedLocalPythonRuntimeManager({
+    client: options.client,
+    eventSink: options.eventSink,
+    config: options.config,
   });
 }
 

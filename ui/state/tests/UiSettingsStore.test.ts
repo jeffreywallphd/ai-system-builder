@@ -59,6 +59,40 @@ describe("UiSettingsStore", () => {
     expect(store.getSettings().models.installDirectory).toBe("shared/team-models");
   });
 
+
+  it("normalizes legacy local-http settings to managed-local", () => {
+    const store = new UiSettingsStore({
+      config: createConfig(),
+      storage: {
+        load: () => ({
+          runtime: {
+            mode: "local-http",
+          },
+        }),
+        save: () => undefined,
+      },
+    });
+
+    expect(store.getSettings().runtime.mode).toBe("managed-local");
+  });
+
+  it("defaults auto-start off for external-http mode", () => {
+    const store = new UiSettingsStore({
+      config: createConfig(),
+      storage: {
+        load: () => ({
+          runtime: {
+            mode: "external-http",
+          },
+        }),
+        save: () => undefined,
+      },
+    });
+
+    expect(store.getSettings().runtime.mode).toBe("external-http");
+    expect(store.getSettings().runtime.autoStartEnabled).toBeFalse();
+  });
+
   it("switches workspace data mode and updates the workspace folders together", () => {
     const saved: Array<string> = [];
     const store = new UiSettingsStore({

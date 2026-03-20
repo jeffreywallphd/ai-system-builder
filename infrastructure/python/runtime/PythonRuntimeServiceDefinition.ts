@@ -50,6 +50,10 @@ function resolveAutoStartPolicy(config: PythonRuntimeConfig) {
     return ManagedServiceStartPolicies.disabled;
   }
 
+  if (config.mode === PythonRuntimeMode.externalHttp) {
+    return ManagedServiceStartPolicies.externalOnly;
+  }
+
   return config.autoStartEnabled
     ? ManagedServiceStartPolicies.onDemand
     : ManagedServiceStartPolicies.manual;

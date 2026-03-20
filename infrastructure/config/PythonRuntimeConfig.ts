@@ -50,15 +50,21 @@ export class PythonRuntimeConfig {
     this.startupTimeoutMs = values.startupTimeoutMs && values.startupTimeoutMs > 0 ? values.startupTimeoutMs : 20_000;
     this.healthPollIntervalMs =
       values.healthPollIntervalMs && values.healthPollIntervalMs > 0 ? values.healthPollIntervalMs : 500;
-    this.autoStartEnabled = values.autoStartEnabled ?? true;
+    this.autoStartEnabled = resolveAutoStartEnabled(this.mode, values.autoStartEnabled);
 
-    if (this.isEnabled && !this.baseUrl) {
-      throw new Error("Python runtime requires baseUrl when enabled.");
-    }
+    validatePythonRuntimeConfig(this);
   }
 
   public get isEnabled(): boolean {
     return this.mode !== PythonRuntimeMode.disabled;
+  }
+
+  public get isExternalHttp(): boolean {
+    return this.mode === PythonRuntimeMode.externalHttp;
+  }
+
+  public get isManagedLocal(): boolean {
+    return this.mode === PythonRuntimeMode.managedLocal;
   }
 
   public static fromEnv(env: Readonly<Record<string, string | undefined>>): PythonRuntimeConfig {
@@ -80,6 +86,33 @@ export class PythonRuntimeConfig {
         ? ["1", "true", "yes", "on"].includes(env.PYTHON_RUNTIME_AUTO_START.trim().toLowerCase())
         : undefined,
     });
+  }
+}
+
+function resolveAutoStartEnabled(
+  mode: PythonRuntimeModeValue,
+  autoStartEnabled: boolean | undefined,
+): boolean {
+  if (typeof autoStartEnabled === "boolean") {
+    return autoStartEnabled;
+  }
+
+  return mode === PythonRuntimeMode.managedLocal;
+}
+
+function validatePythonRuntimeConfig(config: PythonRuntimeConfig): void {
+  if (config.isEnabled && !config.baseUrl) {
+    throw new Error(`Python runtime mode '${config.mode}' requires baseUrl.`);
+  }
+
+  if (config.mode === PythonRuntimeMode.disabled && config.autoStartEnabled) {
+    throw new Error("Python runtime mode 'disabled' cannot enable auto-start.");
+  }
+
+  if (config.mode === PythonRuntimeMode.externalHttp && config.autoStartEnabled) {
+    throw new Error(
+      "Python runtime mode 'external-http' cannot enable auto-start. Use 'managed-local' to supervise a local runtime."
+    );
   }
 }
 

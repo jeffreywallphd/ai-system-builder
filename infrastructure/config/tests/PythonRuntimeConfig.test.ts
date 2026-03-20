@@ -7,11 +7,29 @@ describe("PythonRuntimeConfig", () => {
     expect(config.isEnabled).toBe(false);
     expect(config.timeoutMs).toBe(15000);
     expect(config.pythonExecutable).toBe("python");
-    expect(config.autoStartEnabled).toBeTrue();
+    expect(config.autoStartEnabled).toBeFalse();
   });
 
   it("requires base url when enabled", () => {
-    expect(() => new PythonRuntimeConfig({ mode: "local-http" })).toThrow();
+    expect(() => new PythonRuntimeConfig({ mode: "managed-local" })).toThrow(
+      "Python runtime mode 'managed-local' requires baseUrl."
+    );
+  });
+
+  it("rejects auto-start for external-http mode", () => {
+    expect(() => new PythonRuntimeConfig({
+      mode: "external-http",
+      baseUrl: "http://localhost:8100",
+      autoStartEnabled: true,
+    })).toThrow("Python runtime mode 'external-http' cannot enable auto-start");
+  });
+
+  it("maps legacy local-http to managed-local", () => {
+    const config = new PythonRuntimeConfig({ mode: "local-http", baseUrl: "http://localhost:8100" });
+
+    expect(config.mode).toBe("managed-local");
+    expect(config.isManagedLocal).toBeTrue();
+    expect(config.autoStartEnabled).toBeTrue();
   });
 
   it("uses a browser-safe default runtime working directory", () => {
@@ -21,7 +39,7 @@ describe("PythonRuntimeConfig", () => {
 
   it("loads from env", () => {
     const config = PythonRuntimeConfig.fromEnv({
-      PYTHON_RUNTIME_MODE: "local-http",
+      PYTHON_RUNTIME_MODE: "managed-local",
       PYTHON_RUNTIME_BASE_URL: " http://localhost:8100 ",
       PYTHON_RUNTIME_TIMEOUT_MS: "2000",
       PYTHON_RUNTIME_AUTH_TOKEN: " token ",

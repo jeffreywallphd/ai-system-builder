@@ -1,6 +1,8 @@
 export const PythonRuntimeMode = {
   disabled: "disabled",
-  localHttp: "local-http",
+  externalHttp: "external-http",
+  managedLocal: "managed-local",
+  localHttp: "managed-local",
 } as const;
 
 export type PythonRuntimeMode = (typeof PythonRuntimeMode)[keyof typeof PythonRuntimeMode];
@@ -12,9 +14,15 @@ export function parsePythonRuntimeMode(value?: string): PythonRuntimeMode {
     return PythonRuntimeMode.disabled;
   }
 
-  if (["local-http", "local", "python", "http"].includes(normalized)) {
-    return PythonRuntimeMode.localHttp;
+  if (["external-http", "external", "external-http-runtime"].includes(normalized)) {
+    return PythonRuntimeMode.externalHttp;
   }
 
-  throw new Error(`Unsupported python runtime mode '${value}'.`);
+  if (["managed-local", "managed", "local-http", "local", "python", "http"].includes(normalized)) {
+    return PythonRuntimeMode.managedLocal;
+  }
+
+  throw new Error(
+    `Unsupported python runtime mode '${value}'. Expected one of: disabled, external-http, managed-local.`
+  );
 }

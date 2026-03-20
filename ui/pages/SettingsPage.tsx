@@ -181,11 +181,12 @@ export default function SettingsPage(): JSX.Element {
             <SelectField
               id="settings-runtime-mode"
               label="Runtime mode"
-              hint="Disable the runtime entirely or point the UI to a local HTTP service."
+              hint="Disable the runtime, connect to an external HTTP runtime, or supervise a managed local runtime."
               value={state.settings.runtime.mode}
               onChange={(value) => settingsStore.updateSection("runtime", { mode: value as UiSettings["runtime"]["mode"] })}
               options={[
-                { value: "local-http", label: "Local HTTP runtime" },
+                { value: "managed-local", label: "Managed local runtime" },
+                { value: "external-http", label: "External HTTP runtime" },
                 { value: "disabled", label: "Disabled" },
               ]}
             />
