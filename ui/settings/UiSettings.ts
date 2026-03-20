@@ -1,5 +1,9 @@
 import type { AppRuntimeConfig } from "../../infrastructure/config/AppRuntimeConfig";
-import { PythonRuntimeMode, type PythonRuntimeMode as PythonRuntimeModeValue } from "../../infrastructure/config/PythonRuntimeMode";
+import {
+  PythonRuntimeMode,
+  parsePythonRuntimeMode,
+  type PythonRuntimeMode as PythonRuntimeModeValue,
+} from "../../infrastructure/config/PythonRuntimeMode";
 import type { WorkflowViewMode } from "../state/WorkflowViewMode";
 
 export const WorkspaceDataMode = {
@@ -104,7 +108,7 @@ export function createDefaultUiSettings(config: AppRuntimeConfig): UiSettings {
       allowOverwrite: false,
     }),
     runtime: Object.freeze({
-      mode: PythonRuntimeMode.localHttp,
+      mode: PythonRuntimeMode.managedLocal,
       baseUrl: "http://127.0.0.1:8000",
       authToken: "",
       workingDirectory: resolveDefaultRuntimeWorkingDirectory(),
@@ -136,6 +140,7 @@ export function mergeUiSettings(
     defaults.development.workspaceDataMode
   );
   const defaultWorkspace = createWorkspaceDefaults(workspaceDataMode);
+  const runtimeMode = normalizeRuntimeMode(overrides?.runtime?.mode, defaults.runtime.mode);
 
   return Object.freeze({
     workspace: Object.freeze({
@@ -175,7 +180,7 @@ export function mergeUiSettings(
       allowOverwrite: overrides?.models?.allowOverwrite ?? defaults.models.allowOverwrite,
     }),
     runtime: Object.freeze({
-      mode: normalizeRuntimeMode(overrides?.runtime?.mode, defaults.runtime.mode),
+      mode: runtimeMode,
       baseUrl: normalizeString(overrides?.runtime?.baseUrl, defaults.runtime.baseUrl),
       authToken: normalizeString(overrides?.runtime?.authToken, defaults.runtime.authToken),
       workingDirectory: normalizeDirectory(
@@ -194,7 +199,11 @@ export function mergeUiSettings(
         overrides?.runtime?.healthPollIntervalMs,
         defaults.runtime.healthPollIntervalMs
       ),
-      autoStartEnabled: overrides?.runtime?.autoStartEnabled ?? defaults.runtime.autoStartEnabled,
+      autoStartEnabled: normalizeRuntimeAutoStartEnabled(
+        overrides?.runtime?.autoStartEnabled,
+        runtimeMode,
+        defaults.runtime.autoStartEnabled,
+      ),
     }),
     authoring: Object.freeze({
       defaultWorkflowViewMode: normalizeWorkflowViewMode(
@@ -249,11 +258,31 @@ function normalizeRuntimeMode(
   value: unknown,
   fallback: PythonRuntimeModeValue
 ): PythonRuntimeModeValue {
-  if (value === PythonRuntimeMode.disabled || value === PythonRuntimeMode.localHttp) {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+
+  try {
+    return parsePythonRuntimeMode(value);
+  } catch {
+    return fallback;
+  }
+}
+
+function normalizeRuntimeAutoStartEnabled(
+  value: unknown,
+  mode: PythonRuntimeModeValue,
+  fallback: boolean,
+): boolean {
+  if (typeof value === "boolean") {
     return value;
   }
 
-  return fallback;
+  if (mode === PythonRuntimeMode.managedLocal) {
+    return fallback;
+  }
+
+  return false;
 }
 
 function normalizeWorkspaceDataMode(

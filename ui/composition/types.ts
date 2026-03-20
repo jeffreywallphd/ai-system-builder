@@ -6,6 +6,7 @@ import { WorkflowStore } from "../state/WorkflowStore";
 import { NodeStore } from "../state/NodeStore";
 import { ModelStore } from "../state/ModelStore";
 import { RuntimeConsoleStore } from "../state/RuntimeConsoleStore";
+import type { IPythonRuntimeManager } from "../../application/ports/interfaces/IPythonRuntimeManager";
 import { ToolService } from "../services/ToolService";
 import { ToolStore } from "../state/ToolStore";
 import { McpService } from "../services/McpService";
@@ -25,6 +26,7 @@ export interface UiDependencies {
   readonly nodeService: NodeService;
   readonly modelService: ModelService;
   readonly runtimeConsoleStore: RuntimeConsoleStore;
+  readonly pythonRuntimeManager: IPythonRuntimeManager;
   readonly toolService: ToolService;
   readonly toolStore: ToolStore;
   readonly mcpService: McpService;
