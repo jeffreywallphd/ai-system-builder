@@ -16,6 +16,21 @@ import {
   WorkflowExecutionStore,
   type IWorkflowExecutionState,
 } from "./WorkflowExecutionStore";
+import { AutoSaveController } from "./AutoSaveController";
+import {
+  PageActionTracker,
+  type PageActionTrackerState,
+  type PageActionRecord,
+} from "./PageActionTracker";
+
+export interface WorkflowActionMetadata {
+  readonly workflowId?: string;
+  readonly nodeId?: string;
+  readonly connectionId?: string;
+  readonly propertyId?: string;
+}
+
+export type WorkflowActionRecord = PageActionRecord<WorkflowActionMetadata>;
 
 export interface IWorkflowEditorState {
   readonly workflows: ReadonlyArray<IWorkflow>;
@@ -26,6 +41,9 @@ export interface IWorkflowEditorState {
   readonly isDirty: boolean;
   readonly isLoading: boolean;
   readonly isSaving: boolean;
+  readonly lastSavedAt?: string;
+  readonly saveError?: string;
+  readonly actionHistory: PageActionTrackerState<WorkflowActionMetadata>;
   readonly error?: string;
 }
 
@@ -51,7 +69,20 @@ const defaultEditorState: IWorkflowEditorState = Object.freeze({
   isDirty: false,
   isLoading: false,
   isSaving: false,
+  lastSavedAt: undefined,
+  saveError: undefined,
+  actionHistory: Object.freeze({
+    entries: Object.freeze([]),
+    canUndo: false,
+    canRedo: false,
+  }),
   error: undefined,
+});
+
+const defaultWorkflowActionHistory: PageActionTrackerState<WorkflowActionMetadata> = Object.freeze({
+  entries: Object.freeze([]),
+  canUndo: false,
+  canRedo: false,
 });
 
 export class WorkflowStore {
@@ -60,6 +91,8 @@ export class WorkflowStore {
   private readonly mcpToolCallAuthoringService?: McpToolCallAuthoringService;
   private readonly executionStore: WorkflowExecutionStore;
   private readonly workflowProjectionService: WorkflowProjectionService;
+  private readonly autoSaveController: AutoSaveController;
+  private readonly actionTracker: PageActionTracker<WorkflowActionMetadata>;
   private readonly listeners = new Set<WorkflowStoreListener>();
   private editorState: IWorkflowEditorState;
   private state: IWorkflowStoreState;
@@ -74,6 +107,19 @@ export class WorkflowStore {
       options.executionStore ?? new WorkflowExecutionStore({ initialState });
     this.workflowProjectionService =
       options.workflowProjectionService ?? new WorkflowProjectionService();
+    this.autoSaveController = new AutoSaveController({
+      delayMs: 1000,
+      onSave: async () => {
+        if (!this.canAutoSave() || !this.state.currentWorkflow || !this.state.isDirty || this.state.isSaving) {
+          return;
+        }
+
+        await this.saveCurrentWorkflow();
+      },
+    });
+    this.actionTracker = new PageActionTracker<WorkflowActionMetadata>({
+      pageId: "workflow-editor",
+    });
     this.editorState = freezeEditorState({
       ...defaultEditorState,
       ...toEditorState(initialState),
@@ -143,7 +189,12 @@ export class WorkflowStore {
         validation: undefined,
         isDirty: true,
         isLoading: false,
+        saveError: undefined,
       });
+      this.recordAction("workflow-created", "Created a new workflow draft.", {
+        workflowId: result.workflow.id,
+      });
+      this.scheduleAutoSave();
 
       return result.workflow;
     } catch (error: unknown) {
@@ -179,6 +230,7 @@ export class WorkflowStore {
       }
 
       this.executionStore.clearSession();
+      this.autoSaveController.cancel();
       this.setEditorState({
         currentWorkflow: workflow ? await this.hydrateMcpToolCallNodes(workflow) : undefined,
         selectedNodeId: undefined,
@@ -186,7 +238,9 @@ export class WorkflowStore {
         validation: undefined,
         isDirty: false,
         isLoading: false,
+        saveError: undefined,
       });
+      this.actionTracker.clear();
 
       return workflow;
     } catch (error: unknown) {
@@ -208,18 +262,21 @@ export class WorkflowStore {
 
     try {
       const saved = await this.workflowService.saveWorkflow(workflow);
-      await this.refreshWorkflows();
 
       this.setEditorState({
         currentWorkflow: saved,
+        workflows: upsertWorkflowSummary(this.editorState.workflows, saved),
         isDirty: false,
         isSaving: false,
+        saveError: undefined,
+        lastSavedAt: new Date().toISOString(),
       });
 
       return saved;
     } catch (error: unknown) {
       this.setEditorState({
         isSaving: false,
+        saveError: toErrorMessage(error),
         error: toErrorMessage(error),
       });
       throw error;
@@ -243,6 +300,7 @@ export class WorkflowStore {
         this.executionStore.clearSession();
       }
 
+      this.autoSaveController.cancel();
       this.setEditorState({
         currentWorkflow,
         isLoading: false,
@@ -327,8 +385,14 @@ export class WorkflowStore {
         selectedConnectionId: undefined,
         isDirty: true,
         validation: undefined,
+        saveError: undefined,
         error: undefined,
       });
+      this.recordAction("node-added", `Added node "${result.node.id}".`, {
+        workflowId: result.workflow.id,
+        nodeId: result.node.id,
+      });
+      this.scheduleAutoSave();
     } catch (error: unknown) {
       this.setEditorState({
         error: toErrorMessage(error),
@@ -352,8 +416,14 @@ export class WorkflowStore {
         selectedNodeId: undefined,
         isDirty: true,
         validation: undefined,
+        saveError: undefined,
         error: undefined,
       });
+      this.recordAction("connection-added", `Connected nodes with "${result.connection.id}".`, {
+        workflowId: result.workflow.id,
+        connectionId: result.connection.id,
+      });
+      this.scheduleAutoSave();
     } catch (error: unknown) {
       this.setEditorState({
         error: toErrorMessage(error),
@@ -370,8 +440,13 @@ export class WorkflowStore {
       currentWorkflow: updatedWorkflow,
       isDirty: true,
       validation: undefined,
+      saveError: undefined,
       error: undefined,
     });
+    this.recordAction("workflow-form-updated", "Updated workflow form values.", {
+      workflowId: updatedWorkflow.id,
+    });
+    this.scheduleAutoSave();
   }
 
   public updateNodeProperty(
@@ -403,8 +478,15 @@ export class WorkflowStore {
           selectedNodeId: nodeId.trim(),
           isDirty: true,
           validation: undefined,
+          saveError: undefined,
           error: undefined,
         });
+        this.recordAction("node-property-updated", `Updated node property "${propertyId.trim()}".`, {
+          workflowId: updatedWorkflow.id,
+          nodeId: nodeId.trim(),
+          propertyId: propertyId.trim(),
+        });
+        this.scheduleAutoSave();
       })
       .catch((error: unknown) => {
         this.setEditorState({
@@ -426,8 +508,14 @@ export class WorkflowStore {
       selectedNodeId: nodeId.trim(),
       isDirty: true,
       validation: undefined,
+      saveError: undefined,
       error: undefined,
     });
+    this.recordAction("node-moved", `Moved node "${nodeId.trim()}".`, {
+      workflowId: updatedWorkflow.id,
+      nodeId: nodeId.trim(),
+    });
+    this.scheduleAutoSave();
   }
 
   public previewNodeMovePlacement(
@@ -459,8 +547,14 @@ export class WorkflowStore {
       selectedNodeId: undefined,
       isDirty: true,
       validation: undefined,
+      saveError: undefined,
       error: undefined,
     });
+    this.recordAction("node-removed", `Removed node "${nodeId.trim()}".`, {
+      workflowId: updatedWorkflow.id,
+      nodeId: nodeId.trim(),
+    });
+    this.scheduleAutoSave();
   }
 
   public removeConnection(connectionId: string): void {
@@ -475,8 +569,14 @@ export class WorkflowStore {
       selectedConnectionId: undefined,
       isDirty: true,
       validation: undefined,
+      saveError: undefined,
       error: undefined,
     });
+    this.recordAction("connection-removed", `Removed connection "${connectionId.trim()}".`, {
+      workflowId: updatedWorkflow.id,
+      connectionId: connectionId.trim(),
+    });
+    this.scheduleAutoSave();
   }
 
   public selectNode(nodeId: string | undefined): void {
@@ -501,7 +601,9 @@ export class WorkflowStore {
   }
 
   public clearEditorSession(): void {
+    this.autoSaveController.cancel();
     this.executionStore.clearSession();
+    this.actionTracker.clear();
     this.setEditorState({
       currentWorkflow: undefined,
       validation: undefined,
@@ -510,18 +612,25 @@ export class WorkflowStore {
       isDirty: false,
       isLoading: false,
       isSaving: false,
+      lastSavedAt: undefined,
+      saveError: undefined,
+      actionHistory: this.actionTracker.getState(),
       error: undefined,
     });
   }
 
   public setCurrentWorkflow(workflow: IWorkflow | undefined): void {
+    this.autoSaveController.cancel();
     this.executionStore.clearSession();
+    this.actionTracker.clear();
     this.setEditorState({
       currentWorkflow: workflow,
       selectedNodeId: undefined,
       selectedConnectionId: undefined,
       validation: undefined,
       isDirty: false,
+      saveError: undefined,
+      actionHistory: this.actionTracker.getState(),
     });
   }
 
@@ -532,8 +641,13 @@ export class WorkflowStore {
     this.setEditorState({
       currentWorkflow: updatedWorkflow,
       isDirty: true,
+      saveError: undefined,
       error: undefined,
     });
+    this.recordAction("workflow-renamed", "Renamed the workflow.", {
+      workflowId: updatedWorkflow.id,
+    });
+    this.scheduleAutoSave();
   }
 
   public updateCurrentWorkflowDescription(description: string | undefined): void {
@@ -546,8 +660,13 @@ export class WorkflowStore {
     this.setEditorState({
       currentWorkflow: updatedWorkflow,
       isDirty: true,
+      saveError: undefined,
       error: undefined,
     });
+    this.recordAction("workflow-description-updated", "Updated the workflow description.", {
+      workflowId: updatedWorkflow.id,
+    });
+    this.scheduleAutoSave();
   }
 
   public async refreshCurrentWorkflowMcpTooling(): Promise<void> {
@@ -595,6 +714,32 @@ export class WorkflowStore {
       listener(this.state);
     }
   }
+
+  private scheduleAutoSave(): void {
+    if (!this.canAutoSave()) {
+      return;
+    }
+
+    this.autoSaveController.schedule();
+  }
+
+  private recordAction(
+    type: string,
+    description: string,
+    metadata?: WorkflowActionMetadata
+  ): void {
+    this.setEditorState({
+      actionHistory: this.actionTracker.record({
+        type,
+        description,
+        metadata,
+      }),
+    });
+  }
+
+  private canAutoSave(): boolean {
+    return typeof this.workflowService.saveWorkflow === "function";
+  }
 }
 
 function toEditorState(state: Partial<IWorkflowStoreState>): Partial<IWorkflowEditorState> {
@@ -607,6 +752,9 @@ function toEditorState(state: Partial<IWorkflowStoreState>): Partial<IWorkflowEd
     isDirty,
     isLoading,
     isSaving,
+    lastSavedAt,
+    saveError,
+    actionHistory,
     error,
   } = state;
 
@@ -619,6 +767,9 @@ function toEditorState(state: Partial<IWorkflowStoreState>): Partial<IWorkflowEd
     isDirty,
     isLoading,
     isSaving,
+    lastSavedAt,
+    saveError,
+    actionHistory,
     error,
   };
 }
@@ -634,10 +785,29 @@ function composeWorkflowState(
 }
 
 function freezeEditorState(state: IWorkflowEditorState): IWorkflowEditorState {
+  const actionHistory = state.actionHistory ?? defaultWorkflowActionHistory;
+
   return Object.freeze({
     ...state,
     workflows: Object.freeze([...(state.workflows ?? [])]),
+    actionHistory: Object.freeze({
+      ...actionHistory,
+      entries: Object.freeze([...(actionHistory.entries ?? [])]),
+    }),
   });
+}
+
+function upsertWorkflowSummary(
+  workflows: ReadonlyArray<IWorkflow>,
+  workflow: IWorkflow
+): ReadonlyArray<IWorkflow> {
+  const existingIndex = workflows.findIndex((item) => item.id === workflow.id);
+
+  if (existingIndex === -1) {
+    return Object.freeze([...workflows, workflow]);
+  }
+
+  return Object.freeze(workflows.map((item) => (item.id === workflow.id ? workflow : item)));
 }
 
 function toErrorMessage(error: unknown): string {

@@ -7,6 +7,7 @@ import {
   type UiSettings,
   type WorkspaceDataMode as WorkspaceDataModeValue,
 } from "./UiSettings";
+import { AutoSaveController } from "../state/AutoSaveController";
 
 export interface UiSettingsStorage {
   load(): DeepPartial<UiSettings> | undefined;
@@ -15,6 +16,7 @@ export interface UiSettingsStorage {
 
 export interface UiSettingsState {
   readonly settings: UiSettings;
+  readonly isAutoSaving: boolean;
   readonly saveError?: string;
   readonly lastSavedAt?: string;
 }
@@ -29,14 +31,21 @@ export interface UiSettingsStoreOptions {
 export class UiSettingsStore {
   private readonly defaults: UiSettings;
   private readonly storage: UiSettingsStorage;
+  private readonly autoSaveController: AutoSaveController;
   private readonly listeners = new Set<UiSettingsStoreListener>();
   private state: UiSettingsState;
 
   constructor(options: UiSettingsStoreOptions) {
     this.defaults = createDefaultUiSettings(options.config);
     this.storage = options.storage;
+    this.autoSaveController = new AutoSaveController({
+      onSave: () => {
+        this.persist(this.state.settings);
+      },
+    });
     this.state = Object.freeze({
       settings: mergeUiSettings(this.defaults, this.storage.load()),
+      isAutoSaving: false,
       saveError: undefined,
       lastSavedAt: undefined,
     });
@@ -71,18 +80,18 @@ export class UiSettingsStore {
       },
     });
 
-    this.persist(nextSettings);
+    this.stage(nextSettings);
   }
 
   public replace(settings: DeepPartial<UiSettings>): void {
-    this.persist(mergeUiSettings(this.defaults, settings));
+    this.stage(mergeUiSettings(this.defaults, settings));
   }
 
 
   public setWorkspaceDataMode(mode: WorkspaceDataModeValue): void {
     const workspaceDefaults = createWorkspaceDefaults(mode);
 
-    this.persist(mergeUiSettings(this.defaults, {
+    this.stage(mergeUiSettings(this.defaults, {
       ...this.state.settings,
       workspace: workspaceDefaults,
       development: {
@@ -94,7 +103,7 @@ export class UiSettingsStore {
 
   public resetSection<K extends keyof UiSettings>(section: K): void {
     if (section === "workspace") {
-      this.persist(mergeUiSettings(this.defaults, {
+      this.stage(mergeUiSettings(this.defaults, {
         ...this.state.settings,
         workspace: createWorkspaceDefaults(this.state.settings.development.workspaceDataMode),
       }));
@@ -103,7 +112,7 @@ export class UiSettingsStore {
 
     if (section === "development") {
       const development = this.defaults.development;
-      this.persist(mergeUiSettings(this.defaults, {
+      this.stage(mergeUiSettings(this.defaults, {
         ...this.state.settings,
         workspace: createWorkspaceDefaults(development.workspaceDataMode),
         development,
@@ -111,30 +120,46 @@ export class UiSettingsStore {
       return;
     }
 
-    this.persist(mergeUiSettings(this.defaults, {
+    this.stage(mergeUiSettings(this.defaults, {
       ...this.state.settings,
       [section]: this.defaults[section],
     }));
   }
 
   public resetAll(): void {
-    this.persist(this.defaults);
+    this.stage(this.defaults);
+  }
+
+  public dispose(): void {
+    void this.autoSaveController.flush();
+    this.autoSaveController.dispose();
   }
 
   private persist(settings: UiSettings): void {
     try {
       this.storage.save(settings);
       this.setState({
+        isAutoSaving: false,
         settings,
         saveError: undefined,
         lastSavedAt: new Date().toISOString(),
       });
     } catch (error) {
       this.setState({
+        isAutoSaving: false,
         settings,
         saveError: error instanceof Error ? error.message : "Unable to save settings.",
       });
     }
+  }
+
+  private stage(settings: UiSettings): void {
+    this.setState({
+      settings,
+      isAutoSaving: true,
+      saveError: undefined,
+    });
+    this.autoSaveController.schedule();
   }
 
   private setState(patch: Partial<UiSettingsState>): void {

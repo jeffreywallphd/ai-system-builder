@@ -50,10 +50,12 @@ describe("ui/state unit coverage", () => {
     store.renameCurrentWorkflow("Renamed");
     expect(store.getState().currentWorkflow?.metadata.name).toBe("Renamed");
     expect(store.getState().isDirty).toBeTrue();
+    expect(store.getState().actionHistory.entries[store.getState().actionHistory.entries.length - 1]?.type).toBe("workflow-renamed");
 
     store.updateCurrentWorkflowDescription("Updated");
     expect(store.getState().currentWorkflow?.metadata.description).toBe("Updated");
     expect(store.getState().isDirty).toBeTrue();
+    expect(store.getState().actionHistory.entries[store.getState().actionHistory.entries.length - 1]?.type).toBe("workflow-description-updated");
   });
 
   it("WorkflowExecutionStore tracks transient execution state separately", () => {

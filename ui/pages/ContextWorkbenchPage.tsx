@@ -16,6 +16,13 @@ const fallbackWorkflowState: IWorkflowStoreState = Object.freeze({
   isDirty: false,
   isLoading: false,
   isSaving: false,
+  lastSavedAt: undefined,
+  saveError: undefined,
+  actionHistory: Object.freeze({
+    entries: Object.freeze([]),
+    canUndo: false,
+    canRedo: false,
+  }),
   isExecuting: false,
   lastExecutionEvent: undefined,
   nodeExecutionOutputs: Object.freeze({}),

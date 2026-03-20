@@ -39,6 +39,13 @@ const fallbackWorkflowState: IWorkflowStoreState = Object.freeze({
   isDirty: false,
   isLoading: false,
   isSaving: false,
+  lastSavedAt: undefined,
+  saveError: undefined,
+  actionHistory: Object.freeze({
+    entries: Object.freeze([]),
+    canUndo: false,
+    canRedo: false,
+  }),
   isExecuting: false,
   lastExecutionEvent: undefined,
   nodeExecutionOutputs: Object.freeze({}),
@@ -331,6 +338,14 @@ export default function WorkflowEditorPage({
     }
   }, [workflowState.isExecuting, workflowState.lastExecutionEvent?.status]);
   const workflowStatusMessage = useMemo(() => {
+    if (workflowState.saveError) {
+      return workflowState.saveError;
+    }
+
+    if (workflowState.isSaving) {
+      return "Saving workflow changes automatically…";
+    }
+
     if (workflowState.isExecuting) {
       return workflowState.lastExecutionEvent?.message ?? "Workflow execution is running.";
     }
@@ -353,8 +368,15 @@ export default function WorkflowEditorPage({
       } still need attention.`;
     }
 
+    if (workflowState.lastSavedAt) {
+      return `Workflow auto-saved at ${new Date(workflowState.lastSavedAt).toLocaleTimeString()}.`;
+    }
+
     return undefined;
   }, [
+    workflowState.lastSavedAt,
+    workflowState.saveError,
+    workflowState.isSaving,
     workflowState.isExecuting,
     workflowState.lastExecutionEvent?.message,
     workflowState.lastExecutionEvent?.status,
