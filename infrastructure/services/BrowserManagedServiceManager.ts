@@ -6,6 +6,7 @@ import {
 } from "../../application/services/ManagedServiceDefinition";
 import type { IManagedServiceDefinitionRegistry } from "../../application/services/interfaces/IManagedServiceDefinitionRegistry";
 import type { IManagedServiceManager } from "../../application/services/interfaces/IManagedServiceManager";
+import type { IManagedServiceStatusRefresher } from "../../application/services/interfaces/IManagedServiceStatusRefresher";
 import type { IManagedServiceSupervisor } from "../../application/services/interfaces/IManagedServiceSupervisor";
 import {
   ManagedServiceOwnership,
@@ -39,7 +40,7 @@ export interface BrowserManagedServiceManagerOptions {
   readonly eventSink?: IRuntimeEventSink;
 }
 
-export class BrowserManagedServiceManager implements IManagedServiceManager, IManagedServiceSupervisor {
+export class BrowserManagedServiceManager implements IManagedServiceManager, IManagedServiceSupervisor, IManagedServiceStatusRefresher {
   private readonly registrations = new Map<string, BrowserManagedServiceRegistration>();
   private readonly statusListeners = new Map<string, Set<ManagedServiceStatusListener>>();
   private readonly logListeners = new Map<string, Set<ManagedServiceLogListener>>();
@@ -133,6 +134,12 @@ export class BrowserManagedServiceManager implements IManagedServiceManager, IMa
     );
 
     return nextStatus;
+  }
+
+  public async refreshServiceStatus(serviceId: string): Promise<ManagedServiceStatus> {
+    const registration = this.getRegistration(serviceId);
+    const definition = this.getDefinitionOrThrow(serviceId);
+    return this.updateStatus(serviceId, await this.runProbe(registration, definition));
   }
 
   public async start(serviceId: string): Promise<ManagedServiceStatus> {

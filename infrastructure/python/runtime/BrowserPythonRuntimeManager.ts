@@ -5,20 +5,20 @@ import type {
 } from "../../../application/ports/interfaces/IPythonRuntimeManager";
 import type { IRuntimeEventSink } from "../../../application/ports/interfaces/IRuntimeEventSink";
 import { ManagedServicePythonRuntimeManagerAdapter } from "../../../application/services/adapters/ManagedServicePythonRuntimeManagerAdapter";
-import {
-  ManagedServiceOwnership,
-  ManagedServiceStates,
-} from "../../../application/services/interfaces/ManagedServiceTypes";
+import type { IManagedServiceSupervisorClient } from "../../../application/services/interfaces/IManagedServiceSupervisorClient";
 import { RuntimeEventSources } from "../../../application/runtime/RuntimeEvent";
 import type { PythonRuntimeConfig } from "../../config/PythonRuntimeConfig";
 import { createPythonRuntimeServiceDefinition } from "./PythonRuntimeServiceDefinition";
-import { BrowserManagedServiceManager } from "../../services/BrowserManagedServiceManager";
+import { HttpManagedServiceSupervisorClient } from "../../services/HttpManagedServiceSupervisorClient";
+import { HttpManagedServiceManager } from "../../services/HttpManagedServiceManager";
 import { InMemoryManagedServiceDefinitionRegistry } from "../../services/InMemoryManagedServiceDefinitionRegistry";
 
 export interface BrowserPythonRuntimeManagerOptions {
   readonly client: IPythonRuntimeClient;
   readonly eventSink: IRuntimeEventSink;
   readonly config: PythonRuntimeConfig;
+  readonly supervisorClient?: IManagedServiceSupervisorClient;
+  readonly supervisorFetch?: typeof fetch;
 }
 
 export class BrowserPythonRuntimeManager implements IPythonRuntimeManager {
@@ -26,8 +26,13 @@ export class BrowserPythonRuntimeManager implements IPythonRuntimeManager {
 
   constructor(options: BrowserPythonRuntimeManagerOptions) {
     const definition = createPythonRuntimeServiceDefinition(options.config);
-    const serviceManager = new BrowserManagedServiceManager({
+    const serviceManager = new HttpManagedServiceManager({
       eventSink: options.eventSink,
+      client: options.supervisorClient ?? new HttpManagedServiceSupervisorClient({
+        baseUrl: options.config.supervisorBaseUrl,
+        timeoutMs: options.config.timeoutMs,
+        authToken: options.config.authToken,
+      }, options.supervisorFetch ?? fetch),
       registry: new InMemoryManagedServiceDefinitionRegistry([definition]),
       registrations: [
         {
@@ -36,25 +41,6 @@ export class BrowserPythonRuntimeManager implements IPythonRuntimeManager {
             ? "Python runtime is disabled in settings."
             : "Python runtime is not connected.",
           runtimeEventSource: RuntimeEventSources.pythonRuntime,
-          probe: async () => {
-            if (definition.autoStartPolicy === "disabled") {
-              return {
-                state: ManagedServiceStates.disabled,
-                isAvailable: false,
-                ownership: ManagedServiceOwnership.none,
-                detail: "Python runtime is disabled in settings.",
-              };
-            }
-
-            const health = await options.client.health();
-            const isHealthy = health.status === "ok";
-            return {
-              state: isHealthy ? ManagedServiceStates.running : ManagedServiceStates.degraded,
-              isAvailable: isHealthy,
-              ownership: isHealthy ? ManagedServiceOwnership.external : ManagedServiceOwnership.none,
-              detail: isHealthy ? undefined : "Python runtime endpoint is reachable but not healthy.",
-            };
-          },
         },
       ],
     });
