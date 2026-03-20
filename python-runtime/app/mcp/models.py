@@ -156,6 +156,30 @@ class McpServerConnectionResult(McpModel):
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
+class LocalMcpToolDraft(McpModel):
+    server_id: str
+    server_name: str
+    server_description: Optional[str] = None
+    tool_name: str
+    tool_title: Optional[str] = None
+    tool_description: Optional[str] = None
+    input_schema: Dict[str, Any] = Field(default_factory=dict)
+    output_schema: Dict[str, Any] = Field(default_factory=dict)
+    code: str
+    connect_on_startup: bool = True
+    timeout_ms: Optional[int] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class LocalMcpServerCreateResult(McpModel):
+    server: McpServerDescriptor
+    status: McpServerStatus
+    runtime: McpConnectionStatus
+    checked_at: str
+    created: bool
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
 class ListMcpToolsResponse(McpModel):
     status: McpConnectionStatus
     tools: List[McpToolDescriptor] = Field(default_factory=list)

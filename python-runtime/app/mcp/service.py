@@ -1,5 +1,7 @@
 from app.mcp.client import McpConnectionError
 from app.mcp.models import (
+    LocalMcpServerCreateResult,
+    LocalMcpToolDraft,
     ListMcpToolsResponse,
     McpConnectionStatus,
     McpServerConnectionRequest,
@@ -17,13 +19,20 @@ from app.mcp.models import (
     utc_timestamp,
 )
 from app.mcp.registry import McpRegistry
+from app.mcp.provisioning import LocalMcpServerProvisioner
 from app.mcp.session import McpSessionManager
 
 
 class McpService:
-    def __init__(self, registry: McpRegistry, sessions: McpSessionManager | None = None) -> None:
+    def __init__(
+        self,
+        registry: McpRegistry,
+        sessions: McpSessionManager | None = None,
+        provisioner: LocalMcpServerProvisioner | None = None,
+    ) -> None:
         self._registry = registry
         self._sessions = sessions or McpSessionManager(registry)
+        self._provisioner = provisioner
         self._sessions.prime_connections()
 
     def get_status(self) -> McpConnectionStatus:
@@ -153,6 +162,30 @@ class McpService:
             status=self._sessions.get_server_status(server_id),
             runtime=self.get_status(),
             checked_at=utc_timestamp(),
+        )
+
+    def create_local_server(self, draft: LocalMcpToolDraft) -> LocalMcpServerCreateResult:
+        if not self._registry.is_enabled():
+            raise RuntimeError("MCP runtime is disabled.")
+        if self._provisioner is None:
+            raise RuntimeError("Local MCP server provisioning is unavailable.")
+
+        server_config, created = self._provisioner.provision_local_server(draft)
+        self._registry.upsert_server(server_config)
+        self._sessions.reset_server(server_config.id)
+        if server_config.connect_on_startup:
+            try:
+                self._sessions.connect_server(server_config.id, reconnect=True)
+            except McpConnectionError:
+                pass
+
+        return LocalMcpServerCreateResult(
+            server=self._sessions.describe_server(server_config.id),
+            status=self._sessions.get_server_status(server_config.id),
+            runtime=self.get_status(),
+            checked_at=utc_timestamp(),
+            created=created,
+            metadata={"serverKind": "workspace-local", "toolName": draft.tool_name},
         )
 
     def list_tools(self) -> ListMcpToolsResponse:

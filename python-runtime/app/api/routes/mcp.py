@@ -3,6 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from app.api.dependencies import get_mcp_service
 from app.mcp.models import (
     ListMcpToolsResponse,
+    LocalMcpServerCreateResult,
+    LocalMcpToolDraft,
     McpConnectionStatus,
     McpServerConnectionRequest,
     McpServerConnectionResult,
@@ -83,6 +85,19 @@ def reconnect_mcp_server(
         return service.reconnect_server(request.server_id)
     except ValueError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
+    except RuntimeError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+
+
+@router.post("/servers/local", response_model=LocalMcpServerCreateResult)
+def create_local_mcp_server(
+    request: LocalMcpToolDraft,
+    service: McpService = Depends(get_mcp_service),
+) -> LocalMcpServerCreateResult:
+    try:
+        return service.create_local_server(request)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
     except RuntimeError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
 

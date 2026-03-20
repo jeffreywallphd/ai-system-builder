@@ -62,6 +62,8 @@ import { GetMcpToolDescriptorUseCase } from "../../application/mcp/GetMcpToolDes
 import { ConnectMcpServerUseCase } from "../../application/mcp/ConnectMcpServerUseCase";
 import { DisconnectMcpServerUseCase } from "../../application/mcp/DisconnectMcpServerUseCase";
 import { ReconnectMcpServerUseCase } from "../../application/mcp/ReconnectMcpServerUseCase";
+import { CreateLocalMcpServerUseCase } from "../../application/mcp/CreateLocalMcpServerUseCase";
+import { GenerateLocalMcpToolDraftUseCase } from "../../application/mcp/GenerateLocalMcpToolDraftUseCase";
 import { WorkflowContextService } from "../../application/context/WorkflowContextService";
 import { CreateContextPackageUseCase } from "../../application/context/CreateContextPackageUseCase";
 import { CreateContextRecipeUseCase } from "../../application/context/CreateContextRecipeUseCase";
@@ -284,6 +286,8 @@ export function createUiDependencies(
     new ReconnectMcpServerUseCase(mcpServerManager),
     new SearchMcpToolsUseCase(pythonBackedMcpToolCatalog),
     new GetMcpToolDescriptorUseCase(pythonBackedMcpToolCatalog),
+    new CreateLocalMcpServerUseCase(mcpServerManager),
+    new GenerateLocalMcpToolDraftUseCase(),
   );
   const mcpToolCallAuthoringService = new McpToolCallAuthoringService(mcpService);
   const workflowStore = new WorkflowStore({
@@ -519,6 +523,15 @@ function createDisabledMcpServerRuntimeClient() {
     async reconnectServer(serverId: string) {
       return createDisabledConnectionResult(serverId, "reconnect");
     },
+    async createLocalServer(draft: { serverId: string }) {
+      return {
+        server: createDisabledServerDescriptor(draft.serverId),
+        status: createDisabledServerStatus(draft.serverId),
+        runtime: createDisabledRuntimeStatus(),
+        checkedAt: new Date().toISOString(),
+        created: false,
+      };
+    },
   };
 }
 
@@ -546,6 +559,15 @@ function createDisabledMcpServerManager() {
     },
     async reconnectServer(serverId: string) {
       return createDisabledConnectionResult(serverId, "reconnect");
+    },
+    async createLocalServer(draft: { serverId: string }) {
+      return {
+        server: createDisabledServerDescriptor(draft.serverId),
+        status: createDisabledServerStatus(draft.serverId),
+        runtime: createDisabledRuntimeStatus(),
+        checkedAt: new Date().toISOString(),
+        created: false,
+      };
     },
   };
 }

@@ -57,15 +57,15 @@ export default function McpServerCard({
             isConnected ? (
               <>
                 <button className="ui-button ui-button--secondary ui-button--sm" type="button" disabled={isBusy} onClick={() => onDisconnect?.(server.id)}>
-                  Disconnect
+                  Stop
                 </button>
                 <button className="ui-button ui-button--ghost ui-button--sm" type="button" disabled={isBusy} onClick={() => onConnect?.(server.id, true)}>
-                  Reconnect
+                  Restart
                 </button>
               </>
             ) : (
               <button className="ui-button ui-button--primary ui-button--sm" type="button" disabled={isBusy} onClick={() => onConnect?.(server.id, false)}>
-                Connect
+                Start
               </button>
             )
           ) : (

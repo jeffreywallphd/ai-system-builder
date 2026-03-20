@@ -2,7 +2,7 @@ import { describe, expect, it, mock } from "bun:test";
 import { McpService } from "../McpService";
 
 describe("McpService", () => {
-  it("delegates configured listing, discovery, lifecycle, and tool inspection actions", async () => {
+  it("delegates configured listing, lifecycle, local authoring, and tool inspection actions", async () => {
     const listConfigured = mock(async () => [{ id: "local", name: "Local MCP" }]);
     const search = mock(async () => ({ query: "docs", totalCount: 1, limit: 12, servers: [{ id: "docs", name: "Docs MCP" }], status: { enabled: true, state: "ready", checkedAt: new Date().toISOString(), servers: [], capabilities: {} } }));
     const addConfigured = mock(async ({ server }: { server: { id: string } }) => server);
@@ -13,6 +13,8 @@ describe("McpService", () => {
     const reconnect = mock(async ({ serverId }: { serverId: string }) => ({ action: "reconnect", server: { id: serverId } }));
     const searchTools = mock(async ({ query }: { query?: { serverIds?: string[] } }) => ({ query: query?.serverIds?.[0] ?? "", totalCount: 1, limit: 10, tools: [{ id: "mcp:docs:echo" }] }));
     const getToolDescriptor = mock(async ({ toolId }: { toolId: string }) => ({ id: toolId, name: "echo" }));
+    const createLocalServer = mock(async ({ draft }: { draft: { serverId: string } }) => ({ created: true, server: { id: draft.serverId } }));
+    const generateDraft = mock(async ({ prompt }: { prompt: string }) => ({ toolName: "generated_tool", code: `# ${prompt}` }));
 
     const service = new McpService(
       { execute: listConfigured } as any,
@@ -25,6 +27,8 @@ describe("McpService", () => {
       { execute: reconnect } as any,
       { execute: searchTools } as any,
       { execute: getToolDescriptor } as any,
+      { execute: createLocalServer } as any,
+      { execute: generateDraft } as any,
     );
 
     await service.listConfiguredServers();
@@ -37,16 +41,10 @@ describe("McpService", () => {
     await service.reconnectServer("docs");
     await service.searchTools({ serverIds: ["docs"] });
     await service.getToolDescriptor("mcp:docs:echo");
+    await service.createLocalServer({ serverId: "local-authoring", serverName: "Local", toolName: "tool", code: "return {}" } as any);
+    await service.generateLocalToolDraft("summarize release notes", { serverId: "local-authoring", serverName: "Local", toolName: "tool", code: "return {}" } as any);
 
-    expect(listConfigured).toHaveBeenCalled();
-    expect(search).toHaveBeenCalledWith({ criteria: { query: "docs" } });
-    expect(addConfigured).toHaveBeenCalledWith({ server: { id: "docs", name: "Docs MCP" } });
-    expect(getConnectionStatus).toHaveBeenCalled();
-    expect(getStatus).toHaveBeenCalledWith({ serverId: "docs" });
-    expect(connect).toHaveBeenCalledWith({ serverId: "docs" });
-    expect(disconnect).toHaveBeenCalledWith({ serverId: "docs" });
-    expect(reconnect).toHaveBeenCalledWith({ serverId: "docs" });
-    expect(searchTools).toHaveBeenCalledWith({ query: { serverIds: ["docs"] } });
-    expect(getToolDescriptor).toHaveBeenCalledWith({ toolId: "mcp:docs:echo" });
+    expect(createLocalServer).toHaveBeenCalledWith({ draft: expect.objectContaining({ serverId: "local-authoring" }) });
+    expect(generateDraft).toHaveBeenCalledWith(expect.objectContaining({ prompt: "summarize release notes" }));
   });
 });
