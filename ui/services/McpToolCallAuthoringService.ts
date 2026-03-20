@@ -16,14 +16,15 @@ export class McpToolCallAuthoringService {
   ) {}
 
   public async hydrateWorkflow(workflow: IWorkflow): Promise<IWorkflow> {
+    const mcpNodes = workflow.nodes.filter((node) => this.configurationService.isMcpToolCallNode(node));
+    if (mcpNodes.length === 0) {
+      return workflow;
+    }
+
     const serverOptions = await this.loadServerOptions();
     let updatedWorkflow = workflow;
 
-    for (const node of workflow.nodes) {
-      if (!this.configurationService.isMcpToolCallNode(node)) {
-        continue;
-      }
-
+    for (const node of mcpNodes) {
       const configuredNode = await this.configureNode(node, serverOptions);
       updatedWorkflow = updatedWorkflow.updateNode(configuredNode);
     }
@@ -102,31 +103,43 @@ export class McpToolCallAuthoringService {
       return existingDescriptor;
     }
 
-    return this.mcpService.getToolDescriptor(buildMcpToolDescriptorId(serverId, toolName));
+    try {
+      return await this.mcpService.getToolDescriptor(buildMcpToolDescriptorId(serverId, toolName));
+    } catch {
+      return existingDescriptor;
+    }
   }
 
   private async loadServerOptions(): Promise<ReadonlyArray<McpToolCallNodeOption>> {
-    const servers = await this.mcpService.listConfiguredServers();
-    return Object.freeze(
-      servers.map((server) => ({
-        label: server.name || server.id,
-        value: server.id,
-        description: server.transport,
-      }))
-    );
+    try {
+      const servers = await this.mcpService.listConfiguredServers();
+      return Object.freeze(
+        servers.map((server) => ({
+          label: server.name || server.id,
+          value: server.id,
+          description: server.transport,
+        }))
+      );
+    } catch {
+      return Object.freeze([]);
+    }
   }
 
   private async loadToolOptions(serverId: string): Promise<ReadonlyArray<McpToolCallNodeOption>> {
-    const result = await this.mcpService.searchTools({ serverIds: [serverId] });
-    return Object.freeze(
-      result.tools
-        .filter((tool) => tool.serverId === serverId)
-        .map((tool) => ({
-          label: tool.title || tool.name,
-          value: tool.name,
-          description: tool.description,
-        }))
-    );
+    try {
+      const result = await this.mcpService.searchTools({ serverIds: [serverId] });
+      return Object.freeze(
+        result.tools
+          .filter((tool) => tool.serverId === serverId)
+          .map((tool) => ({
+            label: tool.title || tool.name,
+            value: tool.name,
+            description: tool.description,
+          }))
+      );
+    } catch {
+      return Object.freeze([]);
+    }
   }
 
   private readNodeString(node: IWorkflow["nodes"][number], propertyId: string): string | undefined {

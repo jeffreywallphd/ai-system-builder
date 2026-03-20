@@ -216,10 +216,6 @@ export function createUiDependencies(
     eventSink: runtimeEventSink,
     config: pythonRuntimeConfig,
   });
-  const runtimeConsoleStore = new RuntimeConsoleStore({
-    runtimeEventStore,
-    pythonRuntimeManager,
-  });
   const mcpClient = settings.runtime.mode === "disabled"
     ? createDisabledMcpRuntimeClient()
     : new HttpMcpRuntimeClient(pythonRuntimeConfig, fetch, runtimeEventSink);
@@ -285,6 +281,11 @@ export function createUiDependencies(
     nodeService,
     mcpToolCallAuthoringService,
     workflowProjectionService,
+  });
+  const runtimeConsoleStore = new RuntimeConsoleStore({
+    runtimeEventStore,
+    pythonRuntimeManager,
+    mcpService,
   });
   const mcpStore = new McpStore(mcpService);
   const previewWorkflowContextUseCase = new PreviewWorkflowContextUseCase(workflowContextService);

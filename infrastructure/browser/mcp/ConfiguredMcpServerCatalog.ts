@@ -15,10 +15,14 @@ export class ConfiguredMcpServerCatalog implements IMcpServerCatalog {
   }
 
   public async listConfiguredServers(): Promise<ReadonlyArray<McpServerDescriptor>> {
-    const [runtimeServers, persistedServers] = await Promise.all([
-      this.runtimeCatalog.listConfiguredServers(),
-      this.repository.listConfiguredServers(),
-    ]);
+    const persistedServers = await this.repository.listConfiguredServers();
+    let runtimeServers: ReadonlyArray<McpServerDescriptor> = Object.freeze([]);
+
+    try {
+      runtimeServers = await this.runtimeCatalog.listConfiguredServers();
+    } catch {
+      runtimeServers = Object.freeze([]);
+    }
 
     const merged = new Map<string, McpServerDescriptor>();
 

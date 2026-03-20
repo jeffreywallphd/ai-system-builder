@@ -64,6 +64,62 @@ describe("RuntimeConsoleStore", () => {
     await Promise.all([store.initializeRuntime(), store.initializeRuntime()]);
     expect(calls).toBe(1);
   });
+
+  it("captures runtime and MCP server health snapshots", async () => {
+    const now = new Date().toISOString();
+    const store = new RuntimeConsoleStore({
+      runtimeEventStore: new RuntimeEventBuffer(),
+      pythonRuntimeManager: {
+        checkAvailability: async () => true,
+        ensureRuntimeAvailability: async () => ({
+          status: "healthy" as const,
+          isAvailable: true,
+          owner: "external" as const,
+          lastUpdatedAt: now,
+        }),
+        getStatus: () => ({
+          status: "healthy" as const,
+          isAvailable: true,
+          owner: "external" as const,
+          lastUpdatedAt: now,
+        }),
+        stopManagedRuntime: async () => undefined,
+      },
+      mcpService: {
+        listConfiguredServers: async () => ([
+          {
+            id: "local",
+            name: "Local MCP",
+            transport: "stdio",
+            status: "disconnected",
+            connected: false,
+            toolCount: 0,
+            resourceCount: 0,
+            capabilities: { tools: true },
+          },
+        ]),
+        getServerStatus: async () => ({
+          serverId: "local",
+          name: "Local MCP",
+          transport: "stdio",
+          configured: true,
+          enabled: true,
+          state: "connected",
+          connected: true,
+          checkedAt: now,
+          toolCount: 1,
+          resourceCount: 0,
+          capabilities: { tools: true },
+        }),
+      } as any,
+    });
+
+    await store.refreshHealth();
+
+    expect(store.getState().healthChecks.map((check) => check.label)).toEqual(["Python runtime", "Local MCP"]);
+    expect(store.getState().healthChecks[1]?.status).toBe("healthy");
+  });
+
   it("swallows runtime initialization failures", async () => {
     const store = new RuntimeConsoleStore({
       runtimeEventStore: new RuntimeEventBuffer(),
@@ -80,9 +136,17 @@ describe("RuntimeConsoleStore", () => {
         }),
         stopManagedRuntime: async () => undefined,
       },
+      mcpService: {
+        listConfiguredServers: async () => {
+          throw new Error("mcp unavailable");
+        },
+        getServerStatus: async () => {
+          throw new Error("mcp unavailable");
+        },
+      } as any,
     });
 
     await expect(store.initializeRuntime()).resolves.toBeUndefined();
+    expect(store.getState().healthChecks.some((check) => check.label === "MCP runtime")).toBeTrue();
   });
-
 });
