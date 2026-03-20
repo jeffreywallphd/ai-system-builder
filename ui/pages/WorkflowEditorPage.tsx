@@ -546,6 +546,9 @@ export default function WorkflowEditorPage({
                   onMoveNodeCommit={(nodeId, position) => {
                     workflowStore.moveNode(nodeId, position);
                   }}
+                  onResolveNodePlacement={(nodeId, position) => {
+                    return workflowStore.previewNodeMovePlacement(nodeId, position);
+                  }}
                   onConnectNodes={(request) => {
                     workflowStore.connectNodes({
                       sourceNodeId: request.sourceNodeId,

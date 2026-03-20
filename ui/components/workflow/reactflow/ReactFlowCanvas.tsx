@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Background,
   Controls,
@@ -39,6 +39,10 @@ export interface ReactFlowCanvasProps {
     nodeId: string,
     position: { readonly x: number; readonly y: number }
   ) => void;
+  readonly onResolveNodePlacement?: (
+    nodeId: string,
+    position: { readonly x: number; readonly y: number }
+  ) => { readonly x: number; readonly y: number };
   readonly onConnectNodes?: (request: {
     readonly sourceNodeId: string;
     readonly sourcePortId: string;
@@ -162,6 +166,7 @@ function InnerReactFlowCanvas({
   onSelectConnection,
   onClearSelection,
   onMoveNodeCommit,
+  onResolveNodePlacement,
   onConnectNodes,
   onOpenNodeProperties,
   onNodePropertyChange,
@@ -224,6 +229,7 @@ function InnerReactFlowCanvas({
 
   const [interactiveNodes, setInteractiveNodes] = useState<ReadonlyArray<Node<ReactFlowNodeData>>>(renderedNodes);
   const [interactiveEdges, setInteractiveEdges] = useState<ReadonlyArray<Edge>>(renderedEdges);
+  const settleAnimationFrameRef = useRef<number>();
 
   useEffect(() => {
     setInteractiveNodes((currentNodes) =>
@@ -236,6 +242,15 @@ function InnerReactFlowCanvas({
       syncInteractiveEdges(currentEdges, renderedEdges)
     );
   }, [renderedEdges]);
+
+  useEffect(
+    () => () => {
+      if (settleAnimationFrameRef.current !== undefined) {
+        window.cancelAnimationFrame(settleAnimationFrameRef.current);
+      }
+    },
+    []
+  );
 
   useEffect(() => {
     if (!nodesInitialized || nodes.length === 0) {
@@ -267,23 +282,78 @@ function InnerReactFlowCanvas({
 
   const onNodesChange = useCallback(
     (changes: NodeChange<Node<ReactFlowNodeData>>[]) => {
-      for (const change of changes) {
-        if (
-          change.type === "position" &&
-          change.position &&
-          !change.dragging &&
-          onMoveNodeCommit
-        ) {
-          onMoveNodeCommit(change.id, {
-            x: change.position.x,
-            y: change.position.y,
-          });
-        }
-      }
-
       setInteractiveNodes((currentNodes) => applyNodeChanges(changes, [...currentNodes]));
     },
+    []
+  );
+
+  const animateNodeSettle = useCallback(
+    (
+      nodeId: string,
+      from: { readonly x: number; readonly y: number },
+      to: { readonly x: number; readonly y: number }
+    ) => {
+      if (settleAnimationFrameRef.current !== undefined) {
+        window.cancelAnimationFrame(settleAnimationFrameRef.current);
+      }
+
+      const durationMs = 220;
+      const startTime = window.performance.now();
+
+      const step = (timestamp: number): void => {
+        const elapsed = timestamp - startTime;
+        const progress = Math.min(1, elapsed / durationMs);
+        const easedProgress = 1 - Math.pow(1 - progress, 3);
+        const nextPosition = {
+          x: Math.round(from.x + (to.x - from.x) * easedProgress),
+          y: Math.round(from.y + (to.y - from.y) * easedProgress),
+        };
+
+        setInteractiveNodes((currentNodes) =>
+          currentNodes.map((node) =>
+            node.id === nodeId
+              ? {
+                  ...node,
+                  position: nextPosition,
+                }
+              : node
+          )
+        );
+
+        if (progress < 1) {
+          settleAnimationFrameRef.current = window.requestAnimationFrame(step);
+          return;
+        }
+
+        settleAnimationFrameRef.current = undefined;
+        onMoveNodeCommit?.(nodeId, to);
+      };
+
+      settleAnimationFrameRef.current = window.requestAnimationFrame(step);
+    },
     [onMoveNodeCommit]
+  );
+
+  const onNodeDragStop = useCallback<NodeMouseHandler<Node<ReactFlowNodeData>>>(
+    (_event, node) => {
+      const releasedPosition = {
+        x: Math.round(node.position.x),
+        y: Math.round(node.position.y),
+      };
+      const settledPosition =
+        onResolveNodePlacement?.(node.id, releasedPosition) ?? releasedPosition;
+
+      if (
+        settledPosition.x === releasedPosition.x &&
+        settledPosition.y === releasedPosition.y
+      ) {
+        onMoveNodeCommit?.(node.id, releasedPosition);
+        return;
+      }
+
+      animateNodeSettle(node.id, releasedPosition, settledPosition);
+    },
+    [animateNodeSettle, onMoveNodeCommit, onResolveNodePlacement]
   );
 
   const onEdgesChange = useCallback(
@@ -357,6 +427,7 @@ function InnerReactFlowCanvas({
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeClick={onNodeClick}
+        onNodeDragStop={onNodeDragStop}
         onEdgeClick={onEdgeClick}
         onPaneClick={() => onClearSelection?.()}
         fitView
