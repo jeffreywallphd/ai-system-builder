@@ -12,6 +12,8 @@ describe("projection interactions", () => {
       new WorkflowMetadata({
         name: "Workflow",
         contextConfiguration: {
+          recipeSelections: [{ recipeId: "company-default", alias: "Company default" }],
+          selectedRecipeIds: ["company-default"],
           packageReferences: [{ packageId: "pkg-style", alias: "Style guide" }],
           selectedPackageIds: ["pkg-style"],
           visibilityMode: "advanced",
@@ -20,6 +22,7 @@ describe("projection interactions", () => {
     );
     const formUpdated = new WorkflowProjectionService().applyFormInput(workflow, {
       "n1.p1": "new",
+      "workflow.context.selectedRecipeIds": ["company-default"],
       "workflow.context.selectedPackageIds": ["pkg-style"],
       "workflow.context.visibilityMode": "basic",
     });
@@ -30,11 +33,13 @@ describe("projection interactions", () => {
     expect(toolUpdated.metadata.contextConfiguration?.visibilityMode).toBe("basic");
   });
 
-  it("normalizes attached package ordering and default selection when authors edit bindings", () => {
+  it("normalizes attached recipe and package ordering and default selection when authors edit bindings", () => {
     const workflow = makeWorkflow({ id: "wf1" }).withMetadata(
       new WorkflowMetadata({
         name: "Workflow",
         contextConfiguration: {
+          recipeSelections: [{ recipeId: "company-default", alias: "Company default" }],
+          selectedRecipeIds: ["company-default"],
           packageReferences: [{ packageId: "pkg-style", alias: "Style guide" }],
           selectedPackageIds: ["pkg-style"],
           visibilityMode: "advanced",
@@ -43,6 +48,13 @@ describe("projection interactions", () => {
     );
 
     const updated = new WorkflowProjectionService().applyFormInput(workflow, {
+      "workflow.context.recipeSelections": [
+        { recipeId: "recipe-b", alias: "Recipe B", isEnabled: true, surfaceInTool: true },
+        { recipeId: "recipe-a", alias: "Recipe A", isEnabled: false, surfaceInTool: true },
+        { recipeId: "recipe-b", alias: "Duplicate B", isEnabled: true, surfaceInTool: true },
+        { recipeId: "recipe-c", alias: "Recipe C", isEnabled: true, surfaceInTool: false },
+      ],
+      "workflow.context.selectedRecipeIds": ["recipe-c", "recipe-a", "recipe-b", "missing"],
       "workflow.context.packageReferences": [
         { packageId: "pkg-b", alias: "Package B", isEnabled: true },
         { packageId: "pkg-a", alias: "Package A", isEnabled: false },
@@ -52,6 +64,12 @@ describe("projection interactions", () => {
       "workflow.context.selectedPackageIds": ["pkg-c", "pkg-a", "pkg-b", "missing"],
     });
 
+    expect(updated.metadata.contextConfiguration?.recipeSelections).toEqual([
+      { recipeId: "recipe-b", alias: "Recipe B", isEnabled: true, surfaceInTool: true },
+      { recipeId: "recipe-a", alias: "Recipe A", isEnabled: false, surfaceInTool: true },
+      { recipeId: "recipe-c", alias: "Recipe C", isEnabled: true, surfaceInTool: false },
+    ]);
+    expect(updated.metadata.contextConfiguration?.selectedRecipeIds).toEqual(["recipe-b", "recipe-c"]);
     expect(updated.metadata.contextConfiguration?.packageReferences).toEqual([
       { packageId: "pkg-b", alias: "Package B", version: undefined, includeFragmentIds: undefined, excludeFragmentIds: undefined, isEnabled: true },
       { packageId: "pkg-a", alias: "Package A", version: undefined, includeFragmentIds: undefined, excludeFragmentIds: undefined, isEnabled: false },

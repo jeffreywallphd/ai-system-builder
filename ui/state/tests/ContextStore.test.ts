@@ -2,20 +2,28 @@ import { describe, expect, it } from "bun:test";
 import { ContextStore } from "../ContextStore";
 import { ContextService } from "../../services/ContextService";
 import { CreateContextPackageUseCase } from "../../../application/context/CreateContextPackageUseCase";
+import { CreateContextRecipeUseCase } from "../../../application/context/CreateContextRecipeUseCase";
 import { UpdateContextPackageUseCase } from "../../../application/context/UpdateContextPackageUseCase";
 import { DeleteContextPackageUseCase } from "../../../application/context/DeleteContextPackageUseCase";
 import { ListContextPackagesUseCase } from "../../../application/context/ListContextPackagesUseCase";
+import { ListContextRecipesUseCase } from "../../../application/context/ListContextRecipesUseCase";
 import { LoadContextPackageUseCase } from "../../../application/context/LoadContextPackageUseCase";
+import { LoadContextRecipeUseCase } from "../../../application/context/LoadContextRecipeUseCase";
 import { SearchContextPackagesUseCase } from "../../../application/context/SearchContextPackagesUseCase";
 import { InMemoryContextPackageRepository } from "../../../infrastructure/mocks/repositories/InMemoryContextPackageRepository";
+import { InMemoryContextRecipeRepository } from "../../../infrastructure/mocks/repositories/InMemoryContextRecipeRepository";
 
 function createStore(): ContextStore {
   const repository = new InMemoryContextPackageRepository();
+  const recipeRepository = new InMemoryContextRecipeRepository();
   return new ContextStore(
     new ContextService({
       createContextPackageUseCase: new CreateContextPackageUseCase({
         contextPackageRepository: repository,
         createId: () => "ctx-store",
+      }),
+      createContextRecipeUseCase: new CreateContextRecipeUseCase({
+        contextRecipeRepository: recipeRepository,
       }),
       updateContextPackageUseCase: new UpdateContextPackageUseCase({
         contextPackageRepository: repository,
@@ -23,15 +31,19 @@ function createStore(): ContextStore {
       }),
       deleteContextPackageUseCase: new DeleteContextPackageUseCase(repository),
       listContextPackagesUseCase: new ListContextPackagesUseCase(repository),
+      listContextRecipesUseCase: new ListContextRecipesUseCase(recipeRepository),
       loadContextPackageUseCase: new LoadContextPackageUseCase(repository),
+      loadContextRecipeUseCase: new LoadContextRecipeUseCase(recipeRepository),
       searchContextPackagesUseCase: new SearchContextPackagesUseCase(repository),
     }),
   );
 }
 
 describe("ContextStore", () => {
-  it("tracks create, search, update, selection, and delete flows", async () => {
+  it("tracks create, search, update, selection, delete flows, and recipe summaries", async () => {
     const store = createStore();
+    await store.initialize();
+    expect(store.getState().recipes).toEqual([]);
 
     await store.createPackage({
       name: "Store Package",

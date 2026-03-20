@@ -162,7 +162,11 @@ export class ExecuteWorkflowUseCase {
     workflow: IWorkflow,
     parameters?: Readonly<Record<string, unknown>>
   ): Promise<Readonly<Record<string, unknown>> | undefined> {
-    if (!this.workflowContextService || !workflow.metadata.contextConfiguration?.packageReferences?.length) {
+    if (
+      !this.workflowContextService ||
+      (!(workflow.metadata.contextConfiguration?.packageReferences?.length) &&
+        !(workflow.metadata.contextConfiguration?.recipeSelections?.length))
+    ) {
       return undefined;
     }
 
@@ -173,6 +177,9 @@ export class ExecuteWorkflowUseCase {
 
     const result = await this.workflowContextService.inspectWorkflowContext({
       workflow,
+      selectedRecipeIds: Array.isArray(contextSelection?.selectedRecipeIds)
+        ? contextSelection.selectedRecipeIds.filter((value): value is string => typeof value === "string")
+        : undefined,
       selectedPackageIds: Array.isArray(contextSelection?.selectedPackageIds)
         ? contextSelection.selectedPackageIds.filter((value): value is string => typeof value === "string")
         : undefined,

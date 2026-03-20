@@ -4,6 +4,8 @@ export type ProjectedFieldPresentation =
   | "default"
   | "context-package-references"
   | "context-package-selection"
+  | "context-recipe-selections"
+  | "context-recipe-selection"
   | "context-visibility";
 
 export interface ProjectedField {

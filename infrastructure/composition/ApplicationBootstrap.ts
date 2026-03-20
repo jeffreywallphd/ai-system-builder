@@ -40,6 +40,7 @@ import type { INodeCatalogProvider } from "../../application/ports/interfaces/IN
 import type { IWorkflowExecutor } from "../../application/ports/interfaces/IWorkflowExecutor";
 import type { IWorkflowSerializer } from "../../application/ports/interfaces/IWorkflowSerializer";
 import type { IContextPackageRepository } from "../../application/ports/interfaces/IContextPackageRepository";
+import type { IContextRecipeRepository } from "../../application/ports/interfaces/IContextRecipeRepository";
 import type { IAssetCatalog } from "../../application/ports/interfaces/IAssetCatalog";
 import type { IInstalledModelCatalog } from "../../application/ports/interfaces/IInstalledModelCatalog";
 import type { IRemoteModelCatalog } from "../../application/ports/interfaces/IRemoteModelCatalog";
@@ -149,7 +150,8 @@ export class ApplicationBootstrap {
           c.resolve<IWorkflowExecutor>(TOKENS.WorkflowExecutor),
           c.resolve<IWorkflowValidator>(APPLICATION_TOKENS.WorkflowValidator),
           new WorkflowContextService(
-            c.resolve<IContextPackageRepository>(TOKENS.ContextPackageRepository)
+            c.resolve<IContextPackageRepository>(TOKENS.ContextPackageRepository),
+            c.resolve<IContextRecipeRepository>(TOKENS.ContextRecipeRepository)
           )
         )
     );

@@ -35,7 +35,7 @@ describe("LocalWorkflowRepository", () => {
     }
   });
 
-  it("persists workflow context package bindings with ordering and fragment filters", async () => {
+  it("persists workflow context recipe and package bindings with ordering and fragment filters", async () => {
     const root = await mkdtemp(path.join(tmpdir(), "loom-workflows-"));
     try {
       const node = makeNode({ id: "n1" });
@@ -44,6 +44,21 @@ describe("LocalWorkflowRepository", () => {
         metadata: new WorkflowMetadata({
           name: "WF Context",
           contextConfiguration: {
+            recipeSelections: [
+              {
+                recipeId: "company-default",
+                alias: "Company default",
+                isEnabled: true,
+                surfaceInTool: true,
+              },
+              {
+                recipeId: "internal-research",
+                alias: "Internal research",
+                isEnabled: false,
+                surfaceInTool: false,
+              },
+            ],
+            selectedRecipeIds: ["internal-research", "company-default"],
             packageReferences: [
               {
                 packageId: "pkg-style",
@@ -82,6 +97,21 @@ describe("LocalWorkflowRepository", () => {
       const loaded = await repo.load("wf-context");
 
       expect(loaded?.metadata.contextConfiguration).toEqual({
+        recipeSelections: [
+          {
+            recipeId: "company-default",
+            alias: "Company default",
+            isEnabled: true,
+            surfaceInTool: true,
+          },
+          {
+            recipeId: "internal-research",
+            alias: "Internal research",
+            isEnabled: false,
+            surfaceInTool: false,
+          },
+        ],
+        selectedRecipeIds: ["company-default"],
         packageReferences: [
           {
             packageId: "pkg-style",

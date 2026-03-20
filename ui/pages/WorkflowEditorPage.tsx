@@ -54,6 +54,7 @@ const fallbackNodeState: INodeStoreState = Object.freeze({
 
 const fallbackContextState: ContextStoreState = Object.freeze({
   packages: Object.freeze([]),
+  recipes: Object.freeze([]),
   selectedPackageId: undefined,
   selectedPackage: undefined,
   searchQuery: "",
@@ -480,6 +481,7 @@ export default function WorkflowEditorPage({
                     schema={formSchema}
                     output={workflowOutput}
                     availableContextPackages={contextState.packages}
+                    availableContextRecipes={contextState.recipes}
                     onChange={(fieldId, value) => {
                       workflowStore.applyFormInput({ [fieldId]: value });
                     }}

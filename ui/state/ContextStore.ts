@@ -2,10 +2,12 @@ import type { ICreateContextPackageRequest } from "../../application/context/Cre
 import type { IUpdateContextPackageRequest } from "../../application/context/UpdateContextPackageUseCase";
 import { ContextPackage } from "../../application/context/models/ContextPackage";
 import type { IContextPackageSummary } from "../../application/ports/interfaces/IContextPackageRepository";
+import type { IContextRecipeSummary } from "../../application/ports/interfaces/IContextRecipeRepository";
 import { ContextService } from "../services/ContextService";
 
 export interface ContextStoreState {
   readonly packages: ReadonlyArray<IContextPackageSummary>;
+  readonly recipes: ReadonlyArray<IContextRecipeSummary>;
   readonly selectedPackageId?: string;
   readonly selectedPackage?: ContextPackage;
   readonly searchQuery: string;
@@ -20,6 +22,7 @@ export type ContextStoreListener = (state: ContextStoreState) => void;
 
 const defaultState: ContextStoreState = Object.freeze({
   packages: Object.freeze([]),
+  recipes: Object.freeze([]),
   selectedPackageId: undefined,
   selectedPackage: undefined,
   searchQuery: "",
@@ -62,18 +65,21 @@ export class ContextStore {
     this.patch({ isLoadingList: true, error: undefined });
 
     try {
-      const result = this.hasActiveSearch()
+      const packageResult = this.hasActiveSearch()
         ? await this.contextService.searchContextPackages({
             query: this.state.searchQuery || undefined,
             tags: this.state.searchTags,
           })
         : await this.contextService.listContextPackages();
+      const recipeResult = await this.contextService.listContextRecipes();
 
-      const packages = Object.freeze([...result.contextPackages]);
+      const packages = Object.freeze([...packageResult.contextPackages]);
+      const recipes = Object.freeze([...recipeResult.contextRecipes]);
       const selectedPackageId = this.resolveSelectedPackageId(packages);
 
       this.patch({
         packages,
+        recipes,
         selectedPackageId,
         isLoadingList: false,
       });
@@ -199,6 +205,7 @@ export class ContextStore {
       ...this.state,
       ...patch,
       packages: patch.packages ?? this.state.packages,
+      recipes: patch.recipes ?? this.state.recipes,
       searchTags: patch.searchTags ?? this.state.searchTags,
     });
 

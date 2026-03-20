@@ -5,6 +5,7 @@ import type { ContextStoreState } from "../state/ContextStore";
 
 const fallbackState: ContextStoreState = Object.freeze({
   packages: Object.freeze([]),
+  recipes: Object.freeze([]),
   selectedPackageId: undefined,
   selectedPackage: undefined,
   searchQuery: "",
