@@ -1,3 +1,4 @@
+import type { RuntimeAppState } from "../../state/RuntimeConsoleStore";
 import type { McpConnectionStatus } from "../../../application/mcp/models/McpConnectionStatus";
 import type { McpServerDescriptor } from "../../../application/mcp/models/McpServerDescriptor";
 import type { McpToolDescriptor } from "../../../application/mcp/models/McpToolDescriptor";
@@ -9,9 +10,13 @@ export interface McpRuntimeStatusPanelProps {
   readonly searchQuery?: string;
   readonly isLoading?: boolean;
   readonly error?: string;
+  readonly runtimeAppState?: RuntimeAppState;
+  readonly runtimeAppStateDetail?: string;
+  readonly isRuntimeUnavailable?: boolean;
   readonly onSearchChange?: (value: string) => void;
   readonly onConnectServer?: (serverId: string, reconnect?: boolean) => void;
   readonly onDisconnectServer?: (serverId: string) => void;
+  readonly onRestartRuntime?: () => void;
 }
 
 export default function McpRuntimeStatusPanel({
@@ -21,11 +26,16 @@ export default function McpRuntimeStatusPanel({
   searchQuery = "",
   isLoading = false,
   error,
+  runtimeAppState = "ready",
+  runtimeAppStateDetail,
+  isRuntimeUnavailable = false,
   onSearchChange,
   onConnectServer,
   onDisconnectServer,
+  onRestartRuntime,
 }: McpRuntimeStatusPanelProps): JSX.Element {
   const toolNames = tools.slice(0, 5).map((tool) => tool.title || tool.name);
+  const isInteractionDisabled = isLoading || isRuntimeUnavailable;
 
   return (
     <section className="ui-panel ui-panel--elevated" aria-live="polite">
@@ -64,11 +74,29 @@ export default function McpRuntimeStatusPanel({
             value={searchQuery}
             onChange={(event) => onSearchChange?.(event.target.value)}
             placeholder="Filter by id, name, transport, or metadata"
+            disabled={isInteractionDisabled}
           />
         </label>
 
         {error ? <p className="ui-muted">{error}</p> : null}
         {isLoading ? <p className="ui-muted">Refreshing MCP tools and server status…</p> : null}
+        {runtimeAppState !== "ready" ? (
+          <div className="ui-row ui-row--between ui-row--wrap" style={{ gap: "0.75rem" }}>
+            <p className="ui-muted" style={{ margin: 0 }}>
+              {runtimeAppStateDetail ?? `Runtime is ${runtimeAppState}; MCP features will reconnect automatically when it becomes available.`}
+            </p>
+            {onRestartRuntime ? (
+              <button
+                className="ui-button ui-button--secondary"
+                type="button"
+                disabled={isLoading || runtimeAppState === "starting" || runtimeAppState === "reconnecting"}
+                onClick={() => onRestartRuntime()}
+              >
+                Restart runtime
+              </button>
+            ) : null}
+          </div>
+        ) : null}
         {!isLoading && toolNames.length > 0 ? (
           <p className="ui-muted">Available tools: {toolNames.join(", ")}</p>
         ) : null}
@@ -93,17 +121,17 @@ export default function McpRuntimeStatusPanel({
                 <div className="ui-panel__body">
                   {server.errorMessage ? <p className="ui-muted">{server.errorMessage}</p> : null}
                   <div className="ui-row" style={{ gap: "0.5rem", flexWrap: "wrap" }}>
-                    <button className="ui-button ui-button--secondary" type="button" onClick={() => onConnectServer?.(server.id, false)}>
+                    <button className="ui-button ui-button--secondary" type="button" onClick={() => onConnectServer?.(server.id, false)} disabled={isInteractionDisabled}>
                       Connect
                     </button>
-                    <button className="ui-button ui-button--ghost" type="button" onClick={() => onConnectServer?.(server.id, true)}>
+                    <button className="ui-button ui-button--ghost" type="button" onClick={() => onConnectServer?.(server.id, true)} disabled={isInteractionDisabled}>
                       Reconnect
                     </button>
                     <button
                       className="ui-button ui-button--ghost"
                       type="button"
                       onClick={() => onDisconnectServer?.(server.id)}
-                      disabled={!isConnected}
+                      disabled={!isConnected || isInteractionDisabled}
                     >
                       Disconnect
                     </button>

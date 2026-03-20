@@ -112,6 +112,11 @@ export class PythonRuntimeProcessManager implements IPythonRuntimeManager {
     }
   }
 
+  public async restartRuntime(): Promise<PythonRuntimeManagerStatus> {
+    await this.stopManagedRuntime();
+    return this.ensureRuntimeAvailability();
+  }
+
   public async stopManagedRuntime(): Promise<void> {
     if (this.state.owner !== PythonRuntimeOwnership.managed || !this.process) {
       return;

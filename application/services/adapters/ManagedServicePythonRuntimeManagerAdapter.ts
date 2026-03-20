@@ -13,18 +13,27 @@ export interface ManagedServicePythonRuntimeManagerAdapterOptions {
   readonly manager: IManagedServiceManager;
   readonly supervisor: IManagedServiceSupervisor;
   readonly serviceId?: string;
+  readonly startupTimeoutMs?: number;
+  readonly healthPollIntervalMs?: number;
+  readonly sleep?: (ms: number) => Promise<void>;
 }
 
 export class ManagedServicePythonRuntimeManagerAdapter implements IPythonRuntimeManager {
   private readonly manager: IManagedServiceManager;
   private readonly supervisor: IManagedServiceSupervisor;
   private readonly serviceId: string;
+  private readonly startupTimeoutMs: number;
+  private readonly healthPollIntervalMs: number;
+  private readonly sleep: (ms: number) => Promise<void>;
   private cachedStatus: PythonRuntimeManagerStatus;
 
   constructor(options: ManagedServicePythonRuntimeManagerAdapterOptions) {
     this.manager = options.manager;
     this.supervisor = options.supervisor;
     this.serviceId = options.serviceId ?? PYTHON_RUNTIME_MANAGED_SERVICE_ID;
+    this.startupTimeoutMs = options.startupTimeoutMs ?? 20_000;
+    this.healthPollIntervalMs = options.healthPollIntervalMs ?? 500;
+    this.sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
     this.cachedStatus = mapManagedServiceStatus(
       this.manager.getServiceStatus(this.serviceId) ?? createUnavailableStatus(this.serviceId),
     );
@@ -40,7 +49,13 @@ export class ManagedServicePythonRuntimeManagerAdapter implements IPythonRuntime
 
   public async ensureRuntimeAvailability(): Promise<PythonRuntimeManagerStatus> {
     const status = await this.supervisor.ensureRunning(this.serviceId);
-    this.cachedStatus = mapManagedServiceStatus(status);
+    this.cachedStatus = await this.waitForReadiness(status, "startup");
+    return this.cachedStatus;
+  }
+
+  public async restartRuntime(): Promise<PythonRuntimeManagerStatus> {
+    const status = await this.supervisor.restart(this.serviceId);
+    this.cachedStatus = await this.waitForReadiness(status, "restart");
     return this.cachedStatus;
   }
 
@@ -56,6 +71,32 @@ export class ManagedServicePythonRuntimeManagerAdapter implements IPythonRuntime
   public async stopManagedRuntime(): Promise<void> {
     const status = await this.supervisor.stop(this.serviceId);
     this.cachedStatus = mapManagedServiceStatus(status);
+  }
+
+  private async waitForReadiness(
+    initialStatus: ManagedServiceStatus,
+    action: "startup" | "restart",
+  ): Promise<PythonRuntimeManagerStatus> {
+    let mappedStatus = mapManagedServiceStatus(initialStatus);
+    if (isReadyStatus(mappedStatus) || !shouldPollForReadiness(mappedStatus) || !hasStatusRefresher(this.manager)) {
+      return mappedStatus;
+    }
+
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < this.startupTimeoutMs) {
+      await this.sleep(this.healthPollIntervalMs);
+      mappedStatus = mapManagedServiceStatus(await this.manager.refreshServiceStatus(this.serviceId));
+      if (isReadyStatus(mappedStatus) || !shouldPollForReadiness(mappedStatus)) {
+        return mappedStatus;
+      }
+    }
+
+    return {
+      ...mappedStatus,
+      detail: mappedStatus.detail
+        ? `${mappedStatus.detail} Timed out waiting for runtime readiness after ${this.startupTimeoutMs}ms.`
+        : `Timed out waiting for runtime ${action} readiness after ${this.startupTimeoutMs}ms.`,
+    };
   }
 }
 
@@ -107,4 +148,12 @@ function mapManagedServiceState(status: ManagedServiceStatus): PythonRuntimeMana
     default:
       return "unavailable";
   }
+}
+
+function isReadyStatus(status: PythonRuntimeManagerStatus): boolean {
+  return status.status === "healthy";
+}
+
+function shouldPollForReadiness(status: PythonRuntimeManagerStatus): boolean {
+  return status.status === "starting" || status.status === "unhealthy";
 }

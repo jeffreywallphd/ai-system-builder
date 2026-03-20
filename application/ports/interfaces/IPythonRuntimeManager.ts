@@ -31,6 +31,7 @@ export interface PythonRuntimeManagerStatus {
 export interface IPythonRuntimeManager {
   checkAvailability(): Promise<boolean>;
   ensureRuntimeAvailability(): Promise<PythonRuntimeManagerStatus>;
+  restartRuntime(): Promise<PythonRuntimeManagerStatus>;
   getStatus(): PythonRuntimeManagerStatus;
   stopManagedRuntime(): Promise<void>;
 }

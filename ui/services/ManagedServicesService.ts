@@ -61,8 +61,7 @@ export class ManagedServicesService {
 
   public async restartService(serviceId: string): Promise<ManagedServiceRecord> {
     this.assertServiceId(serviceId);
-    await this.pythonRuntimeManager.stopManagedRuntime();
-    await this.pythonRuntimeManager.ensureRuntimeAvailability();
+    await this.pythonRuntimeManager.restartRuntime();
     return this.getService(serviceId);
   }
 

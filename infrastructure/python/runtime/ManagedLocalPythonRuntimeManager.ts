@@ -49,6 +49,8 @@ export class ManagedLocalPythonRuntimeManager implements IPythonRuntimeManager {
       manager: serviceManager,
       supervisor: serviceManager,
       serviceId: definition.serviceId,
+      startupTimeoutMs: options.config.startupTimeoutMs,
+      healthPollIntervalMs: options.config.healthPollIntervalMs,
     });
   }
 
@@ -58,6 +60,10 @@ export class ManagedLocalPythonRuntimeManager implements IPythonRuntimeManager {
 
   public ensureRuntimeAvailability(): Promise<PythonRuntimeManagerStatus> {
     return this.adapter.ensureRuntimeAvailability();
+  }
+
+  public restartRuntime(): Promise<PythonRuntimeManagerStatus> {
+    return this.adapter.restartRuntime();
   }
 
   public getStatus(): PythonRuntimeManagerStatus {

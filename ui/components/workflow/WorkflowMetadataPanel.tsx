@@ -5,6 +5,7 @@ export interface WorkflowMetadataPanelProps {
   readonly workflow?: WorkflowHeaderViewModel;
   readonly isSaving?: boolean;
   readonly isExecuting?: boolean;
+  readonly canExecuteWorkflow?: boolean;
   readonly validateLabel?: string;
   readonly executeLabel?: string;
   readonly workflowStatusMessage?: string;
@@ -20,6 +21,7 @@ export default function WorkflowMetadataPanel({
   workflow,
   isSaving,
   isExecuting,
+  canExecuteWorkflow = true,
   validateLabel,
   executeLabel,
   workflowStatusMessage,
@@ -173,7 +175,7 @@ export default function WorkflowMetadataPanel({
                   isExecuting ? " ui-button--loading" : ""
                 }`}
                 onClick={() => onExecuteWorkflow?.()}
-                disabled={!workflow.isExecutable || isSaving || isExecuting}
+                disabled={!workflow.isExecutable || !canExecuteWorkflow || isSaving || isExecuting}
               >
                 <span className="ui-button__label">
                   {isExecuting ? <span className="ui-button__spinner" aria-hidden="true" /> : null}

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import ManagedServicesPanel from "../components/services/ManagedServicesPanel";
 import { useUiDependencies } from "../composition/AppProviders";
 import type { ManagedServicesStoreState } from "../state/ManagedServicesStore";
+import type { RuntimeConsoleState } from "../state/RuntimeConsoleStore";
 
 const fallbackState: ManagedServicesStoreState = Object.freeze({
   services: Object.freeze([]),
@@ -13,10 +14,12 @@ const fallbackState: ManagedServicesStoreState = Object.freeze({
 });
 
 export default function ManagedServicesPage(): JSX.Element {
-  const { managedServicesStore } = useUiDependencies();
+  const { managedServicesStore, runtimeConsoleStore } = useUiDependencies();
   const [state, setState] = useState<ManagedServicesStoreState>(() => managedServicesStore.getState() || fallbackState);
+  const [runtimeState, setRuntimeState] = useState<RuntimeConsoleState>(() => runtimeConsoleStore.getState());
 
   useEffect(() => managedServicesStore.subscribe(setState), [managedServicesStore]);
+  useEffect(() => runtimeConsoleStore.subscribe(setRuntimeState), [runtimeConsoleStore]);
 
   useEffect(() => {
     void managedServicesStore.initialize().catch(() => undefined);
@@ -32,6 +35,25 @@ export default function ManagedServicesPage(): JSX.Element {
           </p>
         </div>
       </div>
+
+      {runtimeState.appState !== "ready" ? (
+        <div className="ui-card">
+          <div className="ui-card__body ui-row ui-row--between ui-row--wrap" style={{ gap: "var(--space-sm)" }}>
+            <div className="ui-stack ui-stack--2xs">
+              <strong>Runtime {runtimeState.appState}</strong>
+              <span className="ui-text-secondary ui-text-small">{runtimeState.appStateDetail}</span>
+            </div>
+            <button
+              type="button"
+              className="ui-button ui-button--secondary ui-button--sm"
+              disabled={!runtimeState.canRestartRuntime || runtimeState.isRestartingRuntime}
+              onClick={() => void runtimeConsoleStore.restartRuntime().catch(() => undefined)}
+            >
+              {runtimeState.isRestartingRuntime ? "Restarting…" : "Restart runtime"}
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <ManagedServicesPanel
         services={state.services}

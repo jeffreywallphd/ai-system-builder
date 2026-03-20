@@ -74,6 +74,10 @@ export class ExternalHttpPythonRuntimeManager implements IPythonRuntimeManager {
     return this.adapter.ensureRuntimeAvailability();
   }
 
+  public restartRuntime(): Promise<PythonRuntimeManagerStatus> {
+    return this.adapter.restartRuntime();
+  }
+
   public getStatus(): PythonRuntimeManagerStatus {
     return this.adapter.getStatus();
   }
