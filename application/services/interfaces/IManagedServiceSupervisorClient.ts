@@ -26,6 +26,66 @@ export interface ManagedSupervisorServiceLogEntry {
   readonly message: string;
 }
 
+export interface ManagedSupervisorServiceProcessHistoryEntry {
+  readonly observedAt: string;
+  readonly pid: number | null;
+  readonly startedAt: string | null;
+  readonly endedAt: string | null;
+  readonly ownership: ManagedSupervisorServiceOwnership;
+  readonly outcome: string;
+  readonly exitCode: number | null;
+  readonly signal: string | null;
+  readonly detail: string;
+}
+
+export interface ManagedSupervisorCircuitBreakerState {
+  readonly state: "open" | "closed";
+  readonly openedAt: string | null;
+  readonly retryAfter: string | null;
+  readonly recentFailures: number;
+  readonly maxFailures: number;
+  readonly failureWindowMs: number;
+  readonly cooldownMs: number;
+}
+
+export interface ManagedSupervisorServiceDiagnostics {
+  readonly lastError: {
+    readonly at: string;
+    readonly category: string;
+    readonly message: string;
+    readonly code: string | null;
+    readonly details: Readonly<Record<string, unknown>>;
+  } | null;
+  readonly lastExit: {
+    readonly at: string;
+    readonly code: number | null;
+    readonly signal: string | null;
+    readonly expected: boolean;
+  } | null;
+  readonly lastStart: {
+    readonly at: string;
+    readonly command: string | null;
+    readonly args: ReadonlyArray<string>;
+    readonly cwd: string;
+  } | null;
+  readonly lastHealthProbe: {
+    readonly at: string;
+    readonly healthy: boolean;
+    readonly detail: string;
+    readonly url: string | null;
+    readonly statusCode: number | null;
+    readonly durationMs: number | null;
+    readonly errorCode: string | null;
+  } | null;
+  readonly circuitBreaker: ManagedSupervisorCircuitBreakerState;
+}
+
+export interface ManagedSupervisorServiceMetadata {
+  readonly version: string;
+  readonly compatibility: Readonly<Record<string, unknown>>;
+  readonly [key: string]: unknown;
+}
+
 export interface ManagedSupervisorServiceRecord {
   readonly serviceId: string;
   readonly name: string;
@@ -40,6 +100,9 @@ export interface ManagedSupervisorServiceRecord {
   readonly ownership: ManagedSupervisorServiceOwnership;
   readonly detail?: string;
   readonly recentLogs: ReadonlyArray<ManagedSupervisorServiceLogEntry>;
+  readonly processHistory: ReadonlyArray<ManagedSupervisorServiceProcessHistoryEntry>;
+  readonly metadata: ManagedSupervisorServiceMetadata;
+  readonly diagnostics: ManagedSupervisorServiceDiagnostics;
 }
 
 export interface ManagedSupervisorHealthResponse {
