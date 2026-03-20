@@ -1,3 +1,4 @@
+import type { McpConnectionStatus } from "../../application/mcp/models/McpConnectionStatus";
 import type { McpServerDescriptor } from "../../application/mcp/models/McpServerDescriptor";
 import type { McpServerSearchCriteria } from "../../application/mcp/models/McpServerSearchCriteria";
 import type { McpServerStatus } from "../../application/mcp/models/McpServerStatus";
@@ -5,6 +6,7 @@ import type { McpToolDescriptor } from "../../application/mcp/models/McpToolDesc
 import { McpService } from "../services/McpService";
 
 export interface McpStoreState {
+  readonly runtimeStatus?: McpConnectionStatus;
   readonly configuredServers: ReadonlyArray<McpServerDescriptor>;
   readonly discoveredServers: ReadonlyArray<McpServerDescriptor>;
   readonly selectedServerId?: string;
@@ -25,6 +27,7 @@ export interface McpStoreState {
 export type McpStoreListener = (state: McpStoreState) => void;
 
 const defaultState: McpStoreState = Object.freeze({
+  runtimeStatus: undefined,
   configuredServers: Object.freeze([]),
   discoveredServers: Object.freeze([]),
   selectedServerId: undefined,
@@ -62,13 +65,17 @@ export class McpStore {
     this.patch({ isLoadingConfigured: true, error: undefined });
 
     try {
-      const configuredServers = await this.mcpService.listConfiguredServers();
+      const [configuredServers, runtimeStatus] = await Promise.all([
+        this.mcpService.listConfiguredServers(),
+        this.loadRuntimeStatusSafely(),
+      ]);
       const selectedServerId = this.resolveSelectedServerId(configuredServers, this.state.discoveredServers);
       const selectedServerStatus = selectedServerId
         ? await this.loadStatusSafely(selectedServerId)
         : undefined;
 
       this.patch({
+        runtimeStatus,
         configuredServers: Object.freeze([...configuredServers]),
         selectedServerId,
         selectedServerStatus,
@@ -106,6 +113,7 @@ export class McpStore {
         : undefined;
 
       this.patch({
+        runtimeStatus: result.status,
         discoveredServers: Object.freeze([...result.servers]),
         selectedServerId,
         selectedServerStatus,
@@ -290,6 +298,14 @@ export class McpStore {
     }
   }
 
+  private async loadRuntimeStatusSafely(): Promise<McpConnectionStatus | undefined> {
+    try {
+      return await this.mcpService.getConnectionStatus();
+    } catch {
+      return undefined;
+    }
+  }
+
   private getServerById(serverId?: string): McpServerDescriptor | undefined {
     if (!serverId) {
       return undefined;
@@ -339,6 +355,7 @@ export class McpStore {
       searchCriteria: "searchCriteria" in patch
         ? (patch.searchCriteria ? Object.freeze({ ...patch.searchCriteria }) : undefined)
         : this.state.searchCriteria,
+      runtimeStatus: "runtimeStatus" in patch ? patch.runtimeStatus : this.state.runtimeStatus,
       selectedServerStatus: "selectedServerStatus" in patch ? patch.selectedServerStatus : this.state.selectedServerStatus,
       selectedToolDescriptor: "selectedToolDescriptor" in patch ? patch.selectedToolDescriptor : this.state.selectedToolDescriptor,
       searchQuery: patch.searchQuery ?? this.state.searchQuery,

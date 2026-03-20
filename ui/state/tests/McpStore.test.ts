@@ -88,6 +88,15 @@ function createService() {
     } as any,
     { execute: async ({ server }: { server: any }) => ({ ...server, status: "disconnected" }) } as any,
     {
+      execute: async () => ({
+        enabled: true,
+        state: "ready",
+        checkedAt: new Date().toISOString(),
+        servers: [],
+        capabilities: { tools: true, resources: false, toolExecution: true },
+      }),
+    } as any,
+    {
       execute: async ({ serverId }: { serverId: string }) => ({
         serverId,
         name: serverId === "remote-docs" ? "Remote Docs MCP" : "Local MCP",
@@ -134,6 +143,7 @@ describe("McpStore", () => {
 
     expect(store.getState().configuredServers).toHaveLength(1);
     expect(store.getState().discoveredServers).toHaveLength(2);
+    expect(store.getState().runtimeStatus?.state).toBe("ready");
     expect(store.getState().selectedServerId).toBe("local");
     expect(store.getState().selectedServerTools[0]?.id).toBe("mcp:local:echo");
     expect(store.getState().selectedToolDescriptor?.name).toBe("echo");
@@ -169,6 +179,7 @@ describe("McpStore", () => {
         { execute: async () => { throw new Error("catalog unavailable"); } } as any,
         { execute: async () => ({ query: "", totalCount: 0, limit: 12, servers: [], status: { enabled: false, state: "disabled", checkedAt: new Date().toISOString(), servers: [], capabilities: {} } }) } as any,
         { execute: async ({ server }: { server: any }) => server } as any,
+        { execute: async () => ({ enabled: false, state: "disabled", checkedAt: new Date().toISOString(), servers: [], capabilities: {} }) } as any,
         { execute: async ({ serverId }: { serverId: string }) => ({ serverId, state: "disconnected" }) } as any,
         { execute: async () => ({}) } as any,
         { execute: async () => ({}) } as any,
