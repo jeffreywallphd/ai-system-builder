@@ -121,7 +121,8 @@ export class NodeService {
       workflow,
       position,
       nodeId,
-      node.size
+      node.size,
+      "settle"
     );
 
     return workflow.updateNode(node.withPosition(resolvedPosition));
@@ -131,13 +132,15 @@ export class NodeService {
     workflow: IWorkflow,
     desiredPosition: { readonly x: number; readonly y: number },
     nodeId?: string,
-    nodeSize?: { readonly width?: number; readonly height?: number }
+    nodeSize?: { readonly width?: number; readonly height?: number },
+    mode: "create" | "settle" = "create"
   ): { readonly x: number; readonly y: number } {
     return this.nodeCanvasLayoutService.resolveNodePlacement({
       workflow,
       desiredPosition,
       nodeId,
       nodeSize,
+      mode,
     });
   }
 

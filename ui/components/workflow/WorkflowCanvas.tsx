@@ -16,6 +16,10 @@ export interface WorkflowCanvasProps {
     nodeId: string,
     position: { readonly x: number; readonly y: number }
   ) => void;
+  readonly onResolveNodePlacement?: (
+    nodeId: string,
+    position: { readonly x: number; readonly y: number }
+  ) => { readonly x: number; readonly y: number };
   readonly onConnectNodes?: (request: {
     readonly sourceNodeId: string;
     readonly sourcePortId: string;
@@ -43,6 +47,7 @@ export default function WorkflowCanvas({
   onSelectConnection,
   onClearSelection,
   onMoveNodeCommit,
+  onResolveNodePlacement,
   onConnectNodes,
   onOpenNodeProperties,
   onNodePropertyChange,
@@ -62,6 +67,7 @@ export default function WorkflowCanvas({
         onSelectConnection={onSelectConnection}
         onClearSelection={onClearSelection}
         onMoveNodeCommit={onMoveNodeCommit}
+        onResolveNodePlacement={onResolveNodePlacement}
         onConnectNodes={onConnectNodes}
         onOpenNodeProperties={onOpenNodeProperties}
         onNodePropertyChange={onNodePropertyChange}

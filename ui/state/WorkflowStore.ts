@@ -430,6 +430,26 @@ export class WorkflowStore {
     });
   }
 
+  public previewNodeMovePlacement(
+    nodeId: string,
+    position: { readonly x: number; readonly y: number }
+  ): { readonly x: number; readonly y: number } {
+    const workflow = this.requireCurrentWorkflow();
+    const node = this.nodeService.getNode(workflow, nodeId);
+
+    if (!node) {
+      throw new Error(`Node '${nodeId.trim()}' was not found.`);
+    }
+
+    return this.nodeService.resolveNodePlacement(
+      workflow,
+      position,
+      nodeId,
+      node.size,
+      "settle"
+    );
+  }
+
   public removeNode(nodeId: string): void {
     const workflow = this.requireCurrentWorkflow();
     const updatedWorkflow = this.nodeService.removeNode(workflow, nodeId);

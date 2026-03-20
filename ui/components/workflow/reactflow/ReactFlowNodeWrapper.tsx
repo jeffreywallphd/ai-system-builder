@@ -12,13 +12,13 @@ import {
 const inputHandleStyle: React.CSSProperties = {
   top: "50%",
   left: 0,
-  transform: "translate(-60%, -50%)",
+  transform: "translate(-50%, -50%)",
 };
 
 const outputHandleStyle: React.CSSProperties = {
   top: "50%",
   right: 0,
-  transform: "translate(60%, -50%)",
+  transform: "translate(50%, -50%)",
 };
 
 function ReactFlowNodeWrapper({
@@ -86,10 +86,12 @@ function ReactFlowNodeWrapper({
                     className="ui-rf-node__handle"
                     style={inputHandleStyle}
                   />
-                  <div className="ui-rf-node__port-label">
-                    <span className="ui-text-small">{port.name}</span>
+                  <div className="ui-rf-node__port-label ui-rf-node__port-label--input">
                     {port.valueTypes.slice(0, 1).map((type) => (
-                      <span key={`${port.id}-${type}`} className="ui-badge ui-badge--info">
+                      <span
+                        key={`${port.id}-${type}`}
+                        className="ui-text-small ui-rf-node__port-type"
+                      >
                         {type}
                       </span>
                     ))}
@@ -125,9 +127,11 @@ function ReactFlowNodeWrapper({
               node.outputPorts.map((port) => (
                 <div key={port.id} className="ui-rf-node__port-row ui-rf-node__port-row--output">
                   <div className="ui-rf-node__port-label ui-rf-node__port-label--right">
-                    <span className="ui-text-small">{port.name}</span>
                     {port.valueTypes.slice(0, 1).map((type) => (
-                      <span key={`${port.id}-${type}`} className="ui-badge ui-badge--info">
+                      <span
+                        key={`${port.id}-${type}`}
+                        className="ui-text-small ui-rf-node__port-type"
+                      >
                         {type}
                       </span>
                     ))}

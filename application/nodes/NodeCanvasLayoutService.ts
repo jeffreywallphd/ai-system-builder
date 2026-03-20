@@ -20,11 +20,18 @@ export interface ResolveNodePlacementRequest {
     readonly x: number;
     readonly y: number;
   };
+  readonly mode?: "create" | "settle";
   readonly nodeId?: string;
   readonly nodeSize?: {
     readonly width?: number;
     readonly height?: number;
   };
+}
+
+interface PlacementSearchConfig {
+  readonly maxRadius: number;
+  readonly xStep: number;
+  readonly yStep: number;
 }
 
 export class NodeCanvasLayoutService {
@@ -41,10 +48,40 @@ export class NodeCanvasLayoutService {
       return origin;
     }
 
-    const xStep = Math.max(24, Math.round((desiredSize.width + NODE_SPACING_X) / 2));
-    const yStep = Math.max(24, Math.round((desiredSize.height + NODE_SPACING_Y) / 2));
+    const placementModes = request.mode === "settle"
+      ? [this.createSettleSearchConfig(desiredSize), this.createCreateSearchConfig(desiredSize)]
+      : [this.createCreateSearchConfig(desiredSize)];
 
-    for (let radius = 1; radius <= 24; radius += 1) {
+    for (const config of placementModes) {
+      const resolvedPosition = this.findNearestAvailablePosition(
+        origin,
+        desiredSize,
+        occupiedBounds,
+        config
+      );
+
+      if (resolvedPosition) {
+        return resolvedPosition;
+      }
+    }
+
+    return origin;
+  }
+
+  private findNearestAvailablePosition(
+    origin: { readonly x: number; readonly y: number },
+    size: { readonly width: number; readonly height: number },
+    occupiedBounds: ReadonlyArray<NodeBounds>,
+    config: PlacementSearchConfig
+  ): { readonly x: number; readonly y: number } | undefined {
+    let bestCandidate:
+      | {
+          readonly position: { readonly x: number; readonly y: number };
+          readonly score: number;
+        }
+      | undefined;
+
+    for (let radius = 1; radius <= config.maxRadius; radius += 1) {
       for (let deltaY = -radius; deltaY <= radius; deltaY += 1) {
         for (let deltaX = -radius; deltaX <= radius; deltaX += 1) {
           if (Math.max(Math.abs(deltaX), Math.abs(deltaY)) !== radius) {
@@ -52,18 +89,64 @@ export class NodeCanvasLayoutService {
           }
 
           const candidate = normalizePosition({
-            x: origin.x + deltaX * xStep,
-            y: origin.y + deltaY * yStep,
+            x: origin.x + deltaX * config.xStep,
+            y: origin.y + deltaY * config.yStep,
           });
 
-          if (!this.hasCollision(candidate, desiredSize, occupiedBounds)) {
-            return candidate;
+          if (this.hasCollision(candidate, size, occupiedBounds)) {
+            continue;
+          }
+
+          const score = this.scoreCandidate(origin, candidate);
+          if (!bestCandidate || score < bestCandidate.score) {
+            bestCandidate = Object.freeze({
+              position: candidate,
+              score,
+            });
           }
         }
       }
+
+      if (bestCandidate) {
+        return bestCandidate.position;
+      }
     }
 
-    return origin;
+    return undefined;
+  }
+
+  private createCreateSearchConfig(size: {
+    readonly width: number;
+    readonly height: number;
+  }): PlacementSearchConfig {
+    return Object.freeze({
+      maxRadius: 24,
+      xStep: Math.max(24, Math.round((size.width + NODE_SPACING_X) / 2)),
+      yStep: Math.max(24, Math.round((size.height + NODE_SPACING_Y) / 2)),
+    });
+  }
+
+  private createSettleSearchConfig(size: {
+    readonly width: number;
+    readonly height: number;
+  }): PlacementSearchConfig {
+    return Object.freeze({
+      maxRadius: 6,
+      xStep: Math.max(12, Math.round(Math.min(NODE_SPACING_X, size.width / 6))),
+      yStep: Math.max(12, Math.round(Math.min(NODE_SPACING_Y, size.height / 6))),
+    });
+  }
+
+  private scoreCandidate(
+    origin: { readonly x: number; readonly y: number },
+    candidate: { readonly x: number; readonly y: number }
+  ): number {
+    const deltaX = candidate.x - origin.x;
+    const deltaY = candidate.y - origin.y;
+    const distance = Math.hypot(deltaX, deltaY);
+    const axisBias = Math.abs(deltaX) + Math.abs(deltaY);
+
+    return distance * 10 + axisBias;
   }
 
   private hasCollision(
