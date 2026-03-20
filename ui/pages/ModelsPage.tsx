@@ -72,7 +72,7 @@ export default function ModelsPage(): JSX.Element {
             Search remote models, manage installed assets, and inspect compatibility.
           </p>
           <p className="ui-text-secondary ui-text-small">
-            New downloads currently install to <strong>{settingsState.settings.models.installDirectory}</strong>. Update this in{" "}
+            New downloads currently go to <strong>{settingsState.settings.models.installDirectory}</strong>. Update this in{" "}
             <Link to={ROUTE_PATHS.settings}>Settings</Link> whenever you want AI Loom Studio to share a library with other tools.
           </p>
         </div>
@@ -93,7 +93,7 @@ export default function ModelsPage(): JSX.Element {
         onClearSearch={() => {
           setSearchParams(new URLSearchParams());
         }}
-        onInstallRemoteFiles={(modelId, files) => {
+        onDownloadRemoteFiles={(modelId, files) => {
           void installRemoteFiles(
             modelStore,
             state.remoteModels,

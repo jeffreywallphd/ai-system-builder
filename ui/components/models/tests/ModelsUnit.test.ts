@@ -13,7 +13,7 @@ describe("ui/components/models unit coverage", () => {
     expect(browser).toContain("{isInstalledExpanded ? \"Hide\" : \"Show\"}");
     expect(card).toContain("export default function ModelCard");
     expect(card).toContain("Show More Details");
-    expect(card).toContain("Install Selected");
+    expect(card).toContain("Download Selected");
     expect(card).toContain("File type");
     expect(search).toContain("export default function ModelSearchBar");
     expect(compatibility).toContain("export default function ModelCompatibilityPanel");

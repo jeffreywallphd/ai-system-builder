@@ -15,8 +15,8 @@ export interface ModelCardProps {
   readonly selectedFileIds?: ReadonlyArray<string>;
   readonly onToggleDetails?: (modelId: string) => void;
   readonly onToggleFileSelection?: (modelId: string, fileId: string) => void;
-  readonly onInstallFile?: (modelId: string, file: ModelDownloadFileViewModel) => void;
-  readonly onInstallFiles?: (
+  readonly onDownloadFile?: (modelId: string, file: ModelDownloadFileViewModel) => void;
+  readonly onDownloadFiles?: (
     modelId: string,
     files: ReadonlyArray<ModelDownloadFileViewModel>
   ) => void;
@@ -37,8 +37,8 @@ export default function ModelCard({
   selectedFileIds,
   onToggleDetails,
   onToggleFileSelection,
-  onInstallFile,
-  onInstallFiles,
+  onDownloadFile,
+  onDownloadFiles,
   onRemove,
 }: ModelCardProps): JSX.Element {
   const effectiveMode = mode ?? (isRemoteModel(model) ? "remote" : "installed");
@@ -61,12 +61,12 @@ export default function ModelCard({
     selectedExtension === "all"
       ? model.downloadFiles
       : model.downloadFiles.filter((file) => file.extension === selectedExtension);
-  const installProgressLabel = formatInstallProgress(installProgress);
-  const installActionLabel = resolveInstallActionLabel(installProgress);
-  const isInstallBusy = installProgress
+  const downloadProgressLabel = formatDownloadProgress(installProgress);
+  const downloadActionLabel = resolveDownloadActionLabel(installProgress);
+  const isDownloadBusy = installProgress
     ? !["completed", "failed", "cancelled"].includes(installProgress.status)
     : false;
-  const installBadgeClass = installProgress
+  const downloadBadgeClass = installProgress
     ? badgeClassForInstallStatus(installProgress.status)
     : "ui-badge--neutral";
 
@@ -124,10 +124,10 @@ export default function ModelCard({
 
         <div className="ui-row ui-row--wrap ui-subtle" style={{ fontSize: "var(--font-size-xs)" }}>
           {!model.isRunnable ? <span>Supporting asset</span> : null}
-          {installProgressLabel ? (
+          {downloadProgressLabel ? (
             <span role="status" aria-live="polite">
-              <span className={`ui-badge ${installBadgeClass}`}>{installActionLabel}</span>{" "}
-              {installProgressLabel}
+              <span className={`ui-badge ${downloadBadgeClass}`}>{downloadActionLabel}</span>{" "}
+              {downloadProgressLabel}
             </span>
           ) : null}
         </div>
@@ -208,10 +208,10 @@ export default function ModelCard({
                       <button
                         className="ui-button ui-button--ghost ui-button--sm"
                         type="button"
-                        disabled={isInstallBusy}
-                        onClick={() => onInstallFile?.(model.id, file)}
+                        disabled={isDownloadBusy}
+                        onClick={() => onDownloadFile?.(model.id, file)}
                       >
-                        {isInstallBusy ? "Working…" : "Install"}
+                        {isDownloadBusy ? "Working…" : "Download"}
                       </button>
                     </div>
                   );
@@ -224,13 +224,13 @@ export default function ModelCard({
                     disabled={
                       !(isRemoteModel(model) && model.isInstallable) ||
                       selectedFiles.length === 0 ||
-                      isInstallBusy
+                      isDownloadBusy
                     }
-                    onClick={() => onInstallFiles?.(model.id, selectedFiles)}
+                    onClick={() => onDownloadFiles?.(model.id, selectedFiles)}
                   >
                     {selectedFiles.length > 0
-                      ? `${installActionLabel} Selected`
-                      : "Install Selected"}
+                      ? `${downloadActionLabel} Selected`
+                      : "Download Selected"}
                   </button>
                   <button
                     className="ui-button ui-button--secondary ui-button--sm"
@@ -238,11 +238,11 @@ export default function ModelCard({
                     disabled={
                       !(isRemoteModel(model) && model.isInstallable) ||
                       model.downloadFiles.length === 0 ||
-                      isInstallBusy
+                      isDownloadBusy
                     }
-                    onClick={() => onInstallFiles?.(model.id, model.downloadFiles)}
+                    onClick={() => onDownloadFiles?.(model.id, model.downloadFiles)}
                   >
-                    {installActionLabel} All
+                    {downloadActionLabel} All
                   </button>
                 </div>
               </section>
@@ -264,7 +264,7 @@ export default function ModelCard({
   );
 }
 
-function formatInstallProgress(progress?: IModelInstallProgress): string | undefined {
+function formatDownloadProgress(progress?: IModelInstallProgress): string | undefined {
   if (!progress) {
     return undefined;
   }
@@ -279,7 +279,7 @@ function formatInstallProgress(progress?: IModelInstallProgress): string | undef
   return message ?? progress.status;
 }
 
-function resolveInstallActionLabel(progress?: IModelInstallProgress): string {
+function resolveDownloadActionLabel(progress?: IModelInstallProgress): string {
   switch (progress?.status) {
     case "queued":
     case "preparing":
@@ -297,7 +297,7 @@ function resolveInstallActionLabel(progress?: IModelInstallProgress): string {
     case "cancelled":
       return "Cancelled";
     default:
-      return "Install";
+      return "Download";
   }
 }
 

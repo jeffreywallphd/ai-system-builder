@@ -248,6 +248,23 @@ export class HuggingFaceApiClient {
     }
 
     const revision = params.revision?.trim() || info.sha || "main";
+    const hubModule = await this.loadHubModule();
+
+    if (hubModule?.listFiles) {
+      try {
+        const files = await this.listModelFilesWithHubModule(hubModule, {
+          modelId,
+          revision,
+        });
+
+        if (files.length > 0) {
+          return files;
+        }
+      } catch {
+        // Fall back to the direct API response when the installed hub package cannot
+        // enumerate files for this repository/version.
+      }
+    }
 
     return Object.freeze(
       (info.siblings ?? [])
@@ -261,6 +278,44 @@ export class HuggingFaceApiClient {
           })
         )
     );
+  }
+
+  private async listModelFilesWithHubModule(
+    hubModule: IHuggingFaceHubModule,
+    params: {
+      readonly modelId: string;
+      readonly revision: string;
+    }
+  ): Promise<ReadonlyArray<IHuggingFaceModelFileInfo>> {
+    const files: IHuggingFaceModelFileInfo[] = [];
+
+    const iterator = hubModule.listFiles({
+      repo: {
+        type: "model",
+        name: params.modelId,
+      },
+      revision: params.revision,
+      recursive: true,
+      expand: true,
+      accessToken: this.authToken,
+    });
+
+    for await (const entry of iterator) {
+      if (!entry || entry.type !== "file" || !entry.path?.trim()) {
+        continue;
+      }
+
+      files.push(
+        Object.freeze({
+          path: entry.path,
+          sizeBytes: entry.lfs?.size ?? entry.size,
+          sha256: entry.lfs?.oid,
+          downloadUrl: buildDownloadUrl(this.baseUrl, params.modelId, params.revision, entry.path),
+        })
+      );
+    }
+
+    return Object.freeze(files);
   }
 
   public async resolveDownloadFile(params: {
@@ -401,9 +456,10 @@ export class HuggingFaceApiClient {
           const moduleName = "@huggingface/hub";
           const hubModule = (await import(/* @vite-ignore */ moduleName)) as Partial<IHuggingFaceHubModule>;
 
-          if (typeof hubModule.listModels === "function") {
+          if (typeof hubModule.listModels === "function" && typeof hubModule.listFiles === "function") {
             return {
               listModels: hubModule.listModels,
+              listFiles: hubModule.listFiles,
             };
           }
 
@@ -424,4 +480,13 @@ export class HuggingFaceApiClient {
 
 interface IHuggingFaceHubModule {
   readonly listModels: (params: Readonly<Record<string, unknown>>) => AsyncIterable<unknown>;
+  readonly listFiles: (params: Readonly<Record<string, unknown>>) => AsyncIterable<{
+    readonly type?: string;
+    readonly size?: number;
+    readonly path?: string;
+    readonly lfs?: {
+      readonly oid?: string;
+      readonly size?: number;
+    };
+  }>;
 }

@@ -21,7 +21,7 @@ export interface ModelBrowserProps {
   readonly isInstalling?: boolean;
   readonly onSearch: (value: ModelSearchBarValue) => void;
   readonly onClearSearch?: () => void;
-  readonly onInstallRemoteFiles?: (
+  readonly onDownloadRemoteFiles?: (
     modelId: string,
     files: ReadonlyArray<ModelDownloadFileViewModel>
   ) => void;
@@ -39,7 +39,7 @@ export default function ModelBrowser({
   isInstalling,
   onSearch,
   onClearSearch,
-  onInstallRemoteFiles,
+  onDownloadRemoteFiles,
   onRemoveInstalled,
 }: ModelBrowserProps): JSX.Element {
   const [expandedModelIds, setExpandedModelIds] = useState<ReadonlyArray<string>>([]);
@@ -134,7 +134,7 @@ export default function ModelBrowser({
               <div>
                 <div className="ui-panel__title">Remote Catalog</div>
                 <div className="ui-panel__subtitle">
-                  Search and install supported remote models.
+                  Search and download supported remote models.
                 </div>
               </div>
               <div className="ui-subtle ui-text-small">
@@ -165,10 +165,10 @@ export default function ModelBrowser({
                     }
                     onToggleDetails={toggleExpanded}
                     onToggleFileSelection={toggleFileSelection}
-                    onInstallFile={(modelId, file) => {
-                      onInstallRemoteFiles?.(modelId, [file]);
+                    onDownloadFile={(modelId, file) => {
+                      onDownloadRemoteFiles?.(modelId, [file]);
                     }}
-                    onInstallFiles={onInstallRemoteFiles}
+                    onDownloadFiles={onDownloadRemoteFiles}
                   />
                 ))}
               </div>
