@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { generatePath, useParams } from "react-router-dom";
 import NodePalette from "../components/nodes/NodePalette";
 import NodeInspector from "../components/nodes/NodeInspector";
 import NodePropertyEditor from "../components/nodes/NodePropertyEditor";
@@ -21,6 +21,7 @@ import { NodeStore, type INodeStoreState } from "../state/NodeStore";
 import { WorkflowStore, type IWorkflowStoreState } from "../state/WorkflowStore";
 import type { UiSettingsState } from "../settings/UiSettingsStore";
 import type { ContextStoreState } from "../state/ContextStore";
+import { ROUTE_PATHS } from "../routes/RouteConfig";
 
 export interface WorkflowEditorPageProps {
   readonly workflowStore?: WorkflowStore;
@@ -244,6 +245,14 @@ export default function WorkflowEditorPage({
 
     return workflowOutputPresenter.present(currentWorkflow, workflowState.outputAssets);
   }, [currentWorkflow, workflowOutputPresenter, workflowState.outputAssets]);
+
+  const contextWorkbenchHref = useMemo(() => {
+    if (!currentWorkflow) {
+      return undefined;
+    }
+
+    return generatePath(ROUTE_PATHS.workflowContextWorkbench, { workflowId: currentWorkflow.id });
+  }, [currentWorkflow]);
 
   const selectedNodeExecutionOutput = selectedNode
     ? workflowState.nodeExecutionOutputs[selectedNode.id]
@@ -606,6 +615,7 @@ export default function WorkflowEditorPage({
                   <div className="ui-overlay-panel__body ui-stack ui-stack--md ui-scrollbar">
                     <WorkflowMetadataPanel
                       workflow={editorViewModel?.header}
+                      contextWorkbenchHref={contextWorkbenchHref}
                       isSaving={workflowState.isSaving}
                       isExecuting={workflowState.isExecuting}
                       onRenameWorkflow={(name) => {

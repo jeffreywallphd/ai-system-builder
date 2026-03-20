@@ -71,6 +71,9 @@ import { ListContextRecipesUseCase } from "../../application/context/ListContext
 import { LoadContextPackageUseCase } from "../../application/context/LoadContextPackageUseCase";
 import { LoadContextRecipeUseCase } from "../../application/context/LoadContextRecipeUseCase";
 import { SearchContextPackagesUseCase } from "../../application/context/SearchContextPackagesUseCase";
+import { PreviewWorkflowContextUseCase } from "../../application/context/PreviewWorkflowContextUseCase";
+import { PreviewToolContextUseCase } from "../../application/context/PreviewToolContextUseCase";
+import { PreviewAgentContextUseCase } from "../../application/context/PreviewAgentContextUseCase";
 import { LocalStorageContextPackageRepository } from "../../infrastructure/browser/context/LocalStorageContextPackageRepository";
 import { LocalStorageContextRecipeRepository } from "../../infrastructure/browser/context/LocalStorageContextRecipeRepository";
 
@@ -284,6 +287,16 @@ export function createUiDependencies(
     workflowProjectionService,
   });
   const mcpStore = new McpStore(mcpService);
+  const previewWorkflowContextUseCase = new PreviewWorkflowContextUseCase(workflowContextService);
+  const previewToolContextUseCase = new PreviewToolContextUseCase(
+    workflowRepository,
+    loadToolDefinitionUseCase,
+    workflowContextService,
+  );
+  const previewAgentContextUseCase = new PreviewAgentContextUseCase(
+    workflowContextService,
+    new ListToolCapabilitiesUseCase(toolCapabilityCatalog),
+  );
   const contextService = new ContextService({
     createContextPackageUseCase: new CreateContextPackageUseCase({
       contextPackageRepository,
@@ -300,6 +313,9 @@ export function createUiDependencies(
     searchContextPackagesUseCase: new SearchContextPackagesUseCase(contextPackageRepository),
     listContextRecipesUseCase: new ListContextRecipesUseCase(contextRecipeRepository),
     loadContextRecipeUseCase: new LoadContextRecipeUseCase(contextRecipeRepository),
+    previewWorkflowContextUseCase,
+    previewToolContextUseCase,
+    previewAgentContextUseCase,
   });
   const contextStore = new ContextStore(contextService);
 
