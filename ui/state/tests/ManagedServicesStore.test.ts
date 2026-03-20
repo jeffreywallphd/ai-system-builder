@@ -1,6 +1,7 @@
 import { describe, expect, it, mock } from "bun:test";
 import { createRuntimeEvent, RuntimeEventSources } from "../../../application/runtime/RuntimeEvent";
 import type { ManagedServiceRecord } from "../../services/ManagedServicesService";
+import type { ManagedServiceEventStreamListener } from "../../services/ManagedServiceEventStream";
 import { ManagedServicesStore } from "../ManagedServicesStore";
 
 function createServiceRecord(overrides: Partial<ManagedServiceRecord> = {}): ManagedServiceRecord {
@@ -117,5 +118,88 @@ describe("ManagedServicesStore", () => {
 
     await expect(store.refresh()).rejects.toThrow("Supervisor offline");
     expect(store.getState().error).toBe("Supervisor offline");
+  });
+
+  it("synchronizes live supervisor snapshots, logs, and reconnect state", async () => {
+    let streamListener: ManagedServiceEventStreamListener | undefined;
+    const listServices = mock(async () => Object.freeze([createServiceRecord({ state: "starting", detail: "Booting…" })]));
+    const mapSupervisorServiceRecord = mock(async (service: any) => createServiceRecord({
+      id: service.serviceId,
+      name: service.name,
+      state: service.state,
+      ownership: service.ownership,
+      isAvailable: service.state === "healthy",
+      detail: service.detail,
+      lastCheckedAt: service.lastHealthCheckAt,
+      recentLogs: Object.freeze((service.recentLogs ?? []).map((entry: any) => createRuntimeEvent({
+        id: `${service.serviceId}:${entry.timestamp}:${entry.message}`,
+        source: RuntimeEventSources.pythonRuntime,
+        severity: entry.level === "stderr" ? "error" : "info",
+        message: entry.message,
+        timestamp: entry.timestamp,
+      }))),
+    }));
+    const listServicesFromSupervisor = mock(async (services: ReadonlyArray<any>) => Object.freeze(await Promise.all(
+      services.map((service) => mapSupervisorServiceRecord(service)),
+    )));
+
+    const store = new ManagedServicesStore(
+      {
+        listServices,
+        mapSupervisorServiceRecord,
+        listServicesFromSupervisor,
+      } as any,
+      {
+        connect(listener: ManagedServiceEventStreamListener) {
+          streamListener = listener;
+          listener.onConnectionStateChange?.("connecting");
+          return () => undefined;
+        },
+      } as any,
+    );
+
+    await store.initialize();
+    streamListener?.onConnectionStateChange?.("open");
+    streamListener?.onSnapshot?.({
+      services: [{
+        serviceId: "python-runtime",
+        name: "Python runtime",
+        args: ["-m", "uvicorn"],
+        pid: 4321,
+        startedAt: "2026-03-20T10:15:00.000Z",
+        lastHealthCheckAt: "2026-03-20T10:15:02.000Z",
+        state: "healthy",
+        ownership: "managed",
+        detail: "Runtime is healthy.",
+        recentLogs: [{
+          timestamp: "2026-03-20T10:15:01.000Z",
+          level: "stdout",
+          message: "runtime ready",
+        }],
+      }],
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    streamListener?.onLog?.({
+      serviceId: "python-runtime",
+      entry: {
+        timestamp: "2026-03-20T10:15:03.000Z",
+        level: "stderr",
+        message: "traceback line",
+      },
+    });
+    streamListener?.onConnectionStateChange?.("closed");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const state = store.getState();
+    expect(listServices).toHaveBeenCalledTimes(1);
+    expect(listServicesFromSupervisor).toHaveBeenCalledTimes(1);
+    expect(mapSupervisorServiceRecord).toHaveBeenCalledTimes(1);
+    expect(state.streamState).toBe("reconnecting");
+    expect(state.services[0]?.state).toBe("healthy");
+    expect(state.recentLogs.map((entry) => entry.message)).toEqual([
+      "runtime ready",
+      "traceback line",
+    ]);
   });
 });

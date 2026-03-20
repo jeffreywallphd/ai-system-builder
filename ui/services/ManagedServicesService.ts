@@ -1,6 +1,10 @@
 import type { IPythonRuntimeManager, PythonRuntimeManagerStatus, PythonRuntimeStatus } from "../../application/ports/interfaces/IPythonRuntimeManager";
 import type { IRuntimeEventStore } from "../../application/ports/interfaces/IRuntimeEventStore";
 import { RuntimeEventSources, type RuntimeEvent } from "../../application/runtime/RuntimeEvent";
+import type {
+  ManagedSupervisorServiceLogEntry,
+  ManagedSupervisorServiceRecord,
+} from "../../application/services/interfaces/IManagedServiceSupervisorClient";
 import {
   createManagedServiceDefinition,
   getManagedServiceHealthUrl,
@@ -185,6 +189,51 @@ export class ManagedServicesService {
     return this.refreshService(serviceId);
   }
 
+  public async listServicesFromSupervisor(
+    services: ReadonlyArray<ManagedSupervisorServiceRecord>,
+  ): Promise<ReadonlyArray<ManagedServiceRecord>> {
+    const records = await Promise.all(services.map((service) => this.mapSupervisorServiceRecord(service)));
+    return Object.freeze(records);
+  }
+
+  public async mapSupervisorServiceRecord(
+    service: ManagedSupervisorServiceRecord,
+  ): Promise<ManagedServiceRecord> {
+    const definitions = await this.listDefinitions();
+    const definition = definitions.find((candidate) => candidate.serviceId === service.serviceId);
+    const fallbackSource = service.serviceId === this.getPythonRuntimeDefinition().serviceId
+      ? ManagedServiceSources.builtin
+      : ManagedServiceSources.custom;
+
+    return Object.freeze({
+      id: service.serviceId,
+      name: definition?.displayName ?? service.name,
+      kind: definition?.kind ?? (service.serviceId === this.getPythonRuntimeDefinition().serviceId ? "python-runtime" : "custom"),
+      description: definition?.description,
+      source: definition?.source ?? fallbackSource,
+      startPolicy: definition?.autoStartPolicy ?? "manual",
+      restartPolicy: definition?.restartPolicy ?? "on-failure",
+      state: service.state,
+      ownership: service.ownership,
+      isAvailable: service.state === "healthy",
+      transport: definition?.transport ?? "http",
+      baseUrl: definition?.baseUrl ?? service.baseUrl,
+      endpointSummary: definition ? summarizeEndpoints(definition) : service.baseUrl,
+      workingDirectory: definition?.workingDirectory ?? service.cwd,
+      command: definition?.command ?? service.command,
+      args: Object.freeze([...(definition?.args ?? service.args)]),
+      environmentVariables: definition?.environmentVariables ?? Object.freeze({}),
+      startupTimeoutMs: definition?.startupTimeoutMs ?? 20_000,
+      canEdit: true,
+      canRemove: definition?.source !== ManagedServiceSources.builtin,
+      canManageLifecycle: true,
+      lastCheckedAt: service.lastHealthCheckAt ?? service.startedAt ?? new Date().toISOString(),
+      lastErrorDetail: isServiceInErrorState(service.state) ? service.detail : undefined,
+      detail: service.detail,
+      recentLogs: Object.freeze(service.recentLogs.map((entry) => this.toRuntimeEvent(service.serviceId, entry))),
+    });
+  }
+
   private async listDefinitions(): Promise<ReadonlyArray<ManagedServiceDefinition>> {
     const persistedDefinitions = await this.definitionRepository.listPersistedDefinitions();
     const definitionsById = new Map(persistedDefinitions.map((definition) => [definition.serviceId, definition]));
@@ -354,6 +403,20 @@ export class ManagedServicesService {
       .filter((event) => event.source === RuntimeEventSources.pythonRuntime)
       .slice(-40);
   }
+
+  private toRuntimeEvent(serviceId: string, entry: ManagedSupervisorServiceLogEntry): RuntimeEvent {
+    return Object.freeze({
+      id: `${serviceId}:${entry.timestamp}:${entry.level}:${entry.message}`,
+      timestamp: entry.timestamp,
+      source: RuntimeEventSources.pythonRuntime,
+      severity: mapSupervisorLogLevelToRuntimeSeverity(entry.level),
+      message: entry.message,
+      details: Object.freeze({
+        serviceId,
+        supervisorLevel: entry.level,
+      }),
+    });
+  }
 }
 
 function summarizeEndpoints(definition: ManagedServiceDefinition): string | undefined {
@@ -368,4 +431,17 @@ function summarizeEndpoints(definition: ManagedServiceDefinition): string | unde
 
 function isServiceInErrorState(status: PythonRuntimeManagerStatus["status"]): boolean {
   return status === "failed" || status === "unhealthy" || status === "unavailable";
+}
+
+function mapSupervisorLogLevelToRuntimeSeverity(
+  level: ManagedSupervisorServiceLogEntry["level"],
+): RuntimeEvent["severity"] {
+  switch (level) {
+    case "stderr":
+      return "error";
+    case "stdout":
+      return "info";
+    default:
+      return level;
+  }
 }

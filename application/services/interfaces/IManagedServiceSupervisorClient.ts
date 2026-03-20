@@ -22,7 +22,7 @@ export type ManagedSupervisorServiceOwnership =
 
 export interface ManagedSupervisorServiceLogEntry {
   readonly timestamp: string;
-  readonly level: "info" | "success" | "warning" | "error";
+  readonly level: "info" | "success" | "warning" | "error" | "stdout" | "stderr";
   readonly message: string;
 }
 

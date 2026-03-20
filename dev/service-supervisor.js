@@ -62,6 +62,39 @@ function sendJson(res, statusCode, payload) {
   res.end(body);
 }
 
+function sendEventStreamHeaders(res) {
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream; charset=utf-8",
+    "Cache-Control": "no-cache, no-transform",
+    Connection: "keep-alive",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "X-Accel-Buffering": "no",
+  });
+}
+
+function writeSseEvent(res, event) {
+  if (!event) {
+    return;
+  }
+
+  if (event.id !== undefined) {
+    res.write(`id: ${event.id}\n`);
+  }
+
+  if (event.type) {
+    res.write(`event: ${event.type}\n`);
+  }
+
+  const serialized = JSON.stringify(event.payload ?? {});
+  for (const line of serialized.split("\n")) {
+    res.write(`data: ${line}\n`);
+  }
+
+  res.write("\n");
+}
+
 function parseRequestBody(req) {
   return new Promise((resolve, reject) => {
     let raw = "";
@@ -396,6 +429,8 @@ export class InMemoryServiceSupervisor {
     this.definitions = new Map();
     this.states = new Map();
     this.operations = new Map();
+    this.listeners = new Set();
+    this.nextEventId = 1;
     this.runtime = options.runtime ?? (DEFAULT_STUB_MODE
       ? createStubProcessRuntime({ clock: this.clock })
       : createNodeProcessRuntime({ clock: this.clock, sleep: this.sleep }));
@@ -409,6 +444,22 @@ export class InMemoryServiceSupervisor {
 
   listServices() {
     return [...this.states.values()].map((state) => this.toSummary(state.serviceId));
+  }
+
+  subscribe(listener) {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  createSnapshotEvent() {
+    return {
+      type: "snapshot",
+      payload: {
+        services: [...this.states.values()].map((state) => this.cloneState(state)),
+      },
+    };
   }
 
   getService(serviceId) {
@@ -430,8 +481,27 @@ export class InMemoryServiceSupervisor {
 
   async restart(serviceId) {
     return this.runLifecycleOperation(serviceId, "restart", async () => {
+      this.emitEvent({
+        type: "service-restart",
+        payload: {
+          serviceId,
+          phase: "requested",
+          service: this.getService(serviceId),
+          timestamp: createClockTimestamp(this.clock),
+        },
+      });
       await this.stopInternal(serviceId);
-      return this.startInternal(serviceId);
+      const restarted = await this.startInternal(serviceId);
+      this.emitEvent({
+        type: "service-restart",
+        payload: {
+          serviceId,
+          phase: "completed",
+          service: restarted,
+          timestamp: createClockTimestamp(this.clock),
+        },
+      });
+      return restarted;
     });
   }
 
@@ -722,6 +792,14 @@ export class InMemoryServiceSupervisor {
     this.updateState(serviceId, {
       recentLogs: appendRecentLog(state.recentLogs, entry, this.logLimit),
     });
+    this.emitEvent({
+      type: "service-log",
+      payload: {
+        serviceId,
+        entry: { ...entry },
+        service: this.getService(serviceId),
+      },
+    });
   }
 
   async runLifecycleOperation(serviceId, action, operation) {
@@ -797,7 +875,35 @@ export class InMemoryServiceSupervisor {
       ...patch,
     };
     this.states.set(serviceId, next);
-    return this.cloneState(next);
+    const clonedNext = this.cloneState(next);
+    const previousState = current.state;
+    const previousHealthCheckAt = current.lastHealthCheckAt;
+
+    this.emitEvent({
+      type: "service-state",
+      payload: {
+        serviceId,
+        previousState,
+        service: clonedNext,
+      },
+    });
+
+    if (
+      previousState !== next.state
+      || previousHealthCheckAt !== next.lastHealthCheckAt
+    ) {
+      this.emitEvent({
+        type: "service-health",
+        payload: {
+          serviceId,
+          previousState,
+          service: clonedNext,
+          changedAt: createClockTimestamp(this.clock),
+        },
+      });
+    }
+
+    return clonedNext;
   }
 
   toSummary(serviceId) {
@@ -824,6 +930,17 @@ export class InMemoryServiceSupervisor {
       args: [...state.args],
       recentLogs: state.recentLogs.map((entry) => ({ ...entry })),
     };
+  }
+
+  emitEvent(event) {
+    const normalized = {
+      id: this.nextEventId++,
+      ...event,
+    };
+
+    for (const listener of this.listeners) {
+      listener(normalized);
+    }
   }
 }
 
@@ -870,6 +987,28 @@ export function createSupervisorServer(options = {}) {
           ok: true,
           services: supervisor.listServices(),
         });
+        return;
+      }
+
+      if (pathname === "/events" && req.method === "GET") {
+        sendEventStreamHeaders(res);
+        res.write("retry: 1500\n\n");
+        writeSseEvent(res, supervisor.createSnapshotEvent());
+
+        const heartbeat = setInterval(() => {
+          res.write(": heartbeat\n\n");
+        }, 15_000);
+        const unsubscribe = supervisor.subscribe((event) => {
+          writeSseEvent(res, event);
+        });
+
+        const cleanup = () => {
+          clearInterval(heartbeat);
+          unsubscribe();
+        };
+
+        req.on("close", cleanup);
+        req.on("error", cleanup);
         return;
       }
 

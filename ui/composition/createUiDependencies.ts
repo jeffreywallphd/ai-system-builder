@@ -98,6 +98,7 @@ import { ToolStore } from "../state/ToolStore";
 import { ContextService } from "../services/ContextService";
 import { ContextStore } from "../state/ContextStore";
 import { ManagedServicesService } from "../services/ManagedServicesService";
+import { ManagedServiceEventStream } from "../services/ManagedServiceEventStream";
 import { ManagedServicesStore } from "../state/ManagedServicesStore";
 import type { CreateUiDependenciesOptions, UiDependencies } from "./types";
 import { createSeedWorkflows } from "./seedWorkflows";
@@ -330,7 +331,12 @@ export function createUiDependencies(
     builtinDefinitions: [pythonRuntimeDefinition],
     definitionRepository: managedServiceDefinitionRepository,
   });
-  const managedServicesStore = new ManagedServicesStore(managedServicesService);
+  const managedServiceEventStream = settings.runtime.mode === "disabled"
+    ? undefined
+    : new ManagedServiceEventStream({
+      baseUrl: pythonRuntimeConfig.supervisorBaseUrl,
+    });
+  const managedServicesStore = new ManagedServicesStore(managedServicesService, managedServiceEventStream);
   const mcpStore = new McpStore(mcpService);
   const previewWorkflowContextUseCase = new PreviewWorkflowContextUseCase(workflowContextService);
   const previewToolContextUseCase = new PreviewToolContextUseCase(
