@@ -1,8 +1,10 @@
 import { NodePort, NodePortCompatibilityProfile } from "../../../domain/nodes/NodePort";
-import { NodeProperty } from "../../../domain/nodes/NodeProperty";
+import { NodeProperty, NodePropertyBindingProfile } from "../../../domain/nodes/NodeProperty";
+import { ModelCompatibility } from "../../../domain/models/ModelCompatibility";
 import type { INodeDefinition } from "../../../domain/nodes/interfaces/INodeDefinition";
 import type { NodePortValueType } from "../../../domain/nodes/interfaces/INodePort";
 import type { NodePropertyType, NodePropertyValue } from "../../../domain/nodes/interfaces/INodeProperty";
+import type { ModelModality, ModelTask } from "../../../domain/models/interfaces/IModelCompatibility";
 import { CHAT_PROMPT_BUILDER_NODE_DEFINITION } from "./ChatPromptBuilderNodeDefinition";
 import { COMBINE_SUMMARIES_NODE_DEFINITION } from "./CombineSummariesNodeDefinition";
 import { CONTEXT_FORMATTER_NODE_DEFINITION } from "./ContextFormatterNodeDefinition";
@@ -85,6 +87,9 @@ function property<TValue extends NodePropertyValue>(params: {
   projectionGroup?: string;
   fieldTypeHint?: string;
   order?: number;
+  modelTasks?: ReadonlyArray<ModelTask>;
+  inputModalities?: ReadonlyArray<ModelModality>;
+  outputModalities?: ReadonlyArray<ModelModality>;
 }): NodeProperty<TValue> {
   return new NodeProperty<TValue>({
     id: params.id,
@@ -115,6 +120,19 @@ function property<TValue extends NodePropertyValue>(params: {
           }
         : undefined,
     options: params.options,
+    bindingProfile:
+      params.modelTasks || params.inputModalities || params.outputModalities
+        ? new NodePropertyBindingProfile({
+            modelCompatibility: new ModelCompatibility({
+              supportedTasks: params.modelTasks,
+              inputModalities: params.inputModalities,
+              outputModalities: params.outputModalities,
+              supportedRuntimes: ["generic"],
+              allowsAnyRuntime: true,
+              allowsAnyArchitectureFamily: true,
+            }),
+          })
+        : undefined,
     projection: {
       label: params.projectionLabel ?? params.name,
       description: params.description,
@@ -323,6 +341,9 @@ export const LANGCHAIN_NODE_CATALOG_METADATA: Readonly<
         projectionLabel: "Model",
         projectionGroup: "Model",
         fieldTypeHint: "model",
+        modelTasks: ["chat", "text-generation", "instruction-following"],
+        inputModalities: ["text"],
+        outputModalities: ["text"],
         order: 0,
       }),
       property({
@@ -456,6 +477,8 @@ export const LANGCHAIN_NODE_CATALOG_METADATA: Readonly<
         projectionLabel: "Embedding model",
         projectionGroup: "Model",
         fieldTypeHint: "model",
+        modelTasks: ["embedding"],
+        inputModalities: ["text"],
         order: 0,
       }),
       property({
@@ -562,6 +585,9 @@ export const LANGCHAIN_NODE_CATALOG_METADATA: Readonly<
         projectionLabel: "Reranker model",
         projectionGroup: "Model",
         fieldTypeHint: "model",
+        modelTasks: ["reranking"],
+        inputModalities: ["text"],
+        outputModalities: ["text"],
         order: 0,
       }),
       property({
@@ -952,6 +978,9 @@ export const LANGCHAIN_NODE_CATALOG_METADATA: Readonly<
         required: true,
         projectionGroup: "Model",
         fieldTypeHint: "model",
+        modelTasks: ["chat", "text-generation", "instruction-following", "tool-calling", "function-calling"],
+        inputModalities: ["text"],
+        outputModalities: ["text"],
         order: 0,
       }),
       property({
@@ -1077,6 +1106,9 @@ export const LANGCHAIN_NODE_CATALOG_METADATA: Readonly<
         required: true,
         projectionGroup: "Model",
         fieldTypeHint: "model",
+        modelTasks: ["chat", "text-generation", "instruction-following", "tool-calling", "function-calling"],
+        inputModalities: ["text"],
+        outputModalities: ["text"],
         order: 0,
       }),
       property({

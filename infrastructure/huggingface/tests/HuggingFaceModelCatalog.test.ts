@@ -30,4 +30,33 @@ describe("HuggingFaceModelCatalog", () => {
       "config.json",
     ]);
   });
+
+  it("maps cross-encoder sentence similarity models to rerankers and searches them via reranking criteria", async () => {
+    const apiClient = {
+      searchModels: async (_criteria: { pipelineTag?: string }) => [
+        {
+          id: "org/reranker",
+          author: "org",
+          pipeline_tag: "sentence-similarity",
+          tags: ["cross-encoder", "reranker"],
+        },
+      ],
+      getModelInfo: async () => ({
+        id: "org/reranker",
+        author: "org",
+        sha: "main",
+        pipeline_tag: "sentence-similarity",
+        tags: ["cross-encoder", "reranker"],
+      }),
+      listModelFiles: async () => [
+        { path: "model.safetensors", sizeBytes: 12, sha256: "abc", downloadUrl: "https://x/model.safetensors" },
+      ],
+    };
+
+    const catalog = new HuggingFaceModelCatalog({ apiClient: apiClient as never });
+    const result = await catalog.search({ tasks: ["reranking"] });
+
+    expect(result.items[0]?.model.kind).toBe("reranker-model");
+    expect(result.items[0]?.model.compatibility.supportedTasks).toContain("reranking");
+  });
 });

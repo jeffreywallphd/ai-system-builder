@@ -153,6 +153,7 @@ export default function NodePropertyField({
         );
 
       case "model":
+      case "model-reference":
       case "select":
         return (
           <select
@@ -282,7 +283,6 @@ export default function NodePropertyField({
       case "text":
       case "template":
       case "directory":
-      case "model-reference":
       case "secret":
       case "color":
       case "date":

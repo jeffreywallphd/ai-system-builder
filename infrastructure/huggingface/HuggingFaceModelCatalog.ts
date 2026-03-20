@@ -32,6 +32,11 @@ function hasTag(tags: ReadonlyArray<string> | undefined, value: string): boolean
   return (tags ?? []).some((tag) => normalize(tag) === normalize(value));
 }
 
+function hasTagFragment(tags: ReadonlyArray<string> | undefined, value: string): boolean {
+  const fragment = normalize(value);
+  return (tags ?? []).some((tag) => normalize(tag).includes(fragment));
+}
+
 function determineKind(
   pipelineTag: string | undefined,
   tags: ReadonlyArray<string> | undefined
@@ -41,7 +46,11 @@ function determineKind(
   if (tag === "text-generation") return "completion-model";
   if (tag === "text2text-generation") return "foundation-model";
   if (tag === "feature-extraction") return "embedding-model";
-  if (tag === "sentence-similarity") return "embedding-model";
+  if (tag === "sentence-similarity") {
+    return hasTag(tags, "reranker") || hasTagFragment(tags, "cross-encoder")
+      ? "reranker-model"
+      : "embedding-model";
+  }
   if (tag === "text-classification") return "classifier-model";
   if (tag === "token-classification") return "classifier-model";
   if (tag === "translation") return "foundation-model";
@@ -192,6 +201,11 @@ function determineTasks(
   if (tag === "text-generation") return Object.freeze(["text-generation", "chat"]);
   if (tag === "text2text-generation") return Object.freeze(["instruction-following", "summarization"]);
   if (tag === "feature-extraction") return Object.freeze(["embedding"]);
+  if (tag === "sentence-similarity") {
+    return kind === "reranker-model"
+      ? Object.freeze(["reranking"])
+      : Object.freeze(["embedding"]);
+  }
   if (tag === "text-classification") return Object.freeze(["classification"]);
   if (tag === "translation") return Object.freeze(["translation"]);
   if (tag === "summarization") return Object.freeze(["summarization"]);
@@ -511,6 +525,10 @@ export class HuggingFaceModelCatalog implements IRemoteModelCatalog {
 
     if (tasks.has("text-to-speech") || kinds.has("text-to-speech-model")) {
       return "text-to-speech";
+    }
+
+    if (tasks.has("reranking") || kinds.has("reranker-model")) {
+      return "sentence-similarity";
     }
 
     if (tasks.has("embedding") || kinds.has("embedding-model")) {

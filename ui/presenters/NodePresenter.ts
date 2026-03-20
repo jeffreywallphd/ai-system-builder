@@ -42,6 +42,11 @@ export interface NodePropertyFieldViewModel {
     readonly label: string;
     readonly value: unknown;
   }>;
+  readonly modelSelection?: {
+    readonly tasks?: ReadonlyArray<string>;
+    readonly inputModalities?: ReadonlyArray<string>;
+    readonly outputModalities?: ReadonlyArray<string>;
+  };
 }
 
 export interface NodePortViewModel {
@@ -190,6 +195,13 @@ export class NodePresenter {
               })
             )
           )
+        : undefined,
+      modelSelection: property.bindingProfile?.modelCompatibility
+        ? Object.freeze({
+            tasks: Object.freeze([...property.bindingProfile.modelCompatibility.supportedTasks]),
+            inputModalities: Object.freeze([...property.bindingProfile.modelCompatibility.inputModalities]),
+            outputModalities: Object.freeze([...property.bindingProfile.modelCompatibility.outputModalities]),
+          })
         : undefined,
     });
   }
