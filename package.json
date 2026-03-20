@@ -10,7 +10,9 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "service-supervisor": "node dev/service-supervisor.js",
+    "test:dev-supervisor": "bun test dev/tests/ServiceSupervisor.test.ts"
   },
   "dependencies": {
     "react": "^18.3.1",
