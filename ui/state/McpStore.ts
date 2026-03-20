@@ -123,10 +123,15 @@ export class McpStore {
   }
 
   public async initialize(): Promise<void> {
-    await Promise.all([
+    const results = await Promise.allSettled([
       this.refreshConfigured(),
       this.search({ query: this.state.searchQuery || undefined }),
     ]);
+
+    const rejected = results.find((result): result is PromiseRejectedResult => result.status === "rejected");
+    if (rejected) {
+      throw rejected.reason;
+    }
   }
 
   public async addConfiguredServer(serverId: string): Promise<void> {
