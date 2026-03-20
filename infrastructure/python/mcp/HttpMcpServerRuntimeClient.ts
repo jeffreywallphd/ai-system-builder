@@ -1,6 +1,8 @@
 import type { IRuntimeEventSink } from "../../../application/ports/interfaces/IRuntimeEventSink";
 import { RuntimeEventSources } from "../../../application/runtime/RuntimeEvent";
 import type { McpConnectionStatus } from "../../../application/mcp/models/McpConnectionStatus";
+import type { LocalMcpToolDraft } from "../../../application/mcp/models/LocalMcpToolDraft";
+import type { LocalMcpServerCreateResult } from "../../../application/mcp/models/LocalMcpServerCreateResult";
 import type { McpServerConnectionRequest } from "../../../application/mcp/models/McpServerConnectionRequest";
 import type { McpServerConnectionResult } from "../../../application/mcp/models/McpServerConnectionResult";
 import type { McpServerDescriptor } from "../../../application/mcp/models/McpServerDescriptor";
@@ -98,6 +100,29 @@ export class HttpMcpServerRuntimeClient {
       { serverId },
       { serverId },
     );
+  }
+
+  public async createLocalServer(draft: LocalMcpToolDraft): Promise<LocalMcpServerCreateResult> {
+    this.emit("info", "Local MCP server provisioning started.", {
+      eventType: "mcp-local-server-provision",
+      serverId: draft.serverId,
+      toolName: draft.toolName,
+    });
+
+    try {
+      const result = await this.request<LocalMcpServerCreateResult>("POST", "/mcp/servers/local", draft);
+      this.emit("success", "Local MCP server provisioning completed.", {
+        eventType: "mcp-local-server-provision",
+        serverId: result.server.id,
+        created: result.created,
+      });
+      return result;
+    } catch (error) {
+      this.emitError("Local MCP server provisioning failed.", error, "mcp-local-server-provision", {
+        serverId: draft.serverId,
+      });
+      throw error;
+    }
   }
 
   private async runLifecycleRequest(

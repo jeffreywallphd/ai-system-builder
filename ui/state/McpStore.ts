@@ -1,3 +1,4 @@
+import type { LocalMcpToolDraft } from "../../application/mcp/models/LocalMcpToolDraft";
 import type { McpConnectionStatus } from "../../application/mcp/models/McpConnectionStatus";
 import type { McpServerDescriptor } from "../../application/mcp/models/McpServerDescriptor";
 import type { McpServerSearchCriteria } from "../../application/mcp/models/McpServerSearchCriteria";
@@ -17,14 +18,46 @@ export interface McpStoreState {
   readonly toolSearchQuery: string;
   readonly searchCriteria?: McpServerSearchCriteria;
   readonly searchQuery: string;
+  readonly authoringDraft: LocalMcpToolDraft;
+  readonly authoringPrompt: string;
   readonly isLoadingConfigured: boolean;
   readonly isSearching: boolean;
   readonly isMutating: boolean;
   readonly isLoadingTools: boolean;
+  readonly isGeneratingDraft: boolean;
   readonly error?: string;
 }
 
 export type McpStoreListener = (state: McpStoreState) => void;
+
+const defaultDraft: LocalMcpToolDraft = Object.freeze({
+  serverId: "workspace-helper",
+  serverName: "Workspace Helper",
+  serverDescription: "Workspace-local MCP server created from the tools page.",
+  toolName: "process_payload",
+  toolTitle: "Process Payload",
+  toolDescription: "Process the incoming payload and return structured data.",
+  inputSchema: Object.freeze({
+    type: "object",
+    properties: Object.freeze({
+      input: Object.freeze({ type: "string" }),
+      options: Object.freeze({ type: "object", additionalProperties: true }),
+    }),
+    additionalProperties: true,
+  }),
+  outputSchema: Object.freeze({
+    type: "object",
+    properties: Object.freeze({
+      summary: Object.freeze({ type: "string" }),
+      data: Object.freeze({ type: "object", additionalProperties: true }),
+    }),
+    additionalProperties: true,
+  }),
+  code: 'summary = payload.get("input", "")\n\nreturn {"summary": summary, "data": {"payload": payload}}',
+  connectOnStartup: true,
+  timeoutMs: 10000,
+  metadata: Object.freeze({ authoringMode: "workspace-local" }),
+});
 
 const defaultState: McpStoreState = Object.freeze({
   runtimeStatus: undefined,
@@ -38,10 +71,13 @@ const defaultState: McpStoreState = Object.freeze({
   toolSearchQuery: "",
   searchCriteria: undefined,
   searchQuery: "",
+  authoringDraft: defaultDraft,
+  authoringPrompt: "",
   isLoadingConfigured: false,
   isSearching: false,
   isMutating: false,
   isLoadingTools: false,
+  isGeneratingDraft: false,
   error: undefined,
 });
 
@@ -59,6 +95,56 @@ export class McpStore {
     this.listeners.add(listener);
     listener(this.state);
     return () => this.listeners.delete(listener);
+  }
+
+  public updateAuthoringDraft(patch: Partial<LocalMcpToolDraft>): void {
+    this.patch({
+      authoringDraft: Object.freeze({
+        ...this.state.authoringDraft,
+        ...patch,
+      }),
+    });
+  }
+
+  public setAuthoringPrompt(value: string): void {
+    this.patch({ authoringPrompt: value });
+  }
+
+  public async generateAuthoringDraft(): Promise<void> {
+    this.patch({ isGeneratingDraft: true, error: undefined });
+
+    try {
+      const generated = await this.mcpService.generateLocalToolDraft(
+        this.state.authoringPrompt,
+        this.state.authoringDraft,
+      );
+      this.patch({
+        authoringDraft: Object.freeze({
+          ...this.state.authoringDraft,
+          ...generated,
+        }),
+        isGeneratingDraft: false,
+      });
+    } catch (error) {
+      this.patch({ isGeneratingDraft: false, error: toErrorMessage(error) });
+      throw error;
+    }
+  }
+
+  public async createLocalServer(): Promise<void> {
+    this.patch({ isMutating: true, error: undefined });
+
+    try {
+      const result = await this.mcpService.createLocalServer(this.state.authoringDraft);
+      await this.mcpService.addConfiguredServer(result.server);
+      await this.refreshConfigured();
+      await this.search(this.state.searchCriteria ?? {});
+      this.selectServer(result.server.id);
+      this.patch({ isMutating: false });
+    } catch (error) {
+      this.patch({ isMutating: false, error: toErrorMessage(error) });
+      throw error;
+    }
   }
 
   public async refreshConfigured(): Promise<void> {
@@ -355,11 +441,15 @@ export class McpStore {
       searchCriteria: "searchCriteria" in patch
         ? (patch.searchCriteria ? Object.freeze({ ...patch.searchCriteria }) : undefined)
         : this.state.searchCriteria,
+      authoringDraft: patch.authoringDraft
+        ? Object.freeze({ ...patch.authoringDraft })
+        : this.state.authoringDraft,
       runtimeStatus: "runtimeStatus" in patch ? patch.runtimeStatus : this.state.runtimeStatus,
       selectedServerStatus: "selectedServerStatus" in patch ? patch.selectedServerStatus : this.state.selectedServerStatus,
       selectedToolDescriptor: "selectedToolDescriptor" in patch ? patch.selectedToolDescriptor : this.state.selectedToolDescriptor,
       searchQuery: patch.searchQuery ?? this.state.searchQuery,
       toolSearchQuery: patch.toolSearchQuery ?? this.state.toolSearchQuery,
+      authoringPrompt: patch.authoringPrompt ?? this.state.authoringPrompt,
     });
 
     for (const listener of this.listeners) {

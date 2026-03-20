@@ -52,6 +52,13 @@ describe("PythonBackedMcpServerManager", () => {
         connectServer: async () => buildResult("connect"),
         disconnectServer: async () => buildResult("disconnect"),
         reconnectServer: async () => buildResult("reconnect"),
+        createLocalServer: async () => ({
+          created: true,
+          checkedAt: "2026-03-19T00:00:00.000Z",
+          server: buildResult("connect").server,
+          status: buildResult("connect").status,
+          runtime: buildResult("connect").runtime,
+        }),
       } as HttpMcpServerRuntimeClient,
       {
         getConnectionStatus: async () => ({
@@ -113,6 +120,13 @@ describe("PythonBackedMcpServerManager", () => {
         connectServer: async () => buildResult("connect"),
         disconnectServer: async () => buildResult("disconnect"),
         reconnectServer: async () => buildResult("reconnect"),
+        createLocalServer: async () => ({
+          created: true,
+          checkedAt: "2026-03-19T00:00:00.000Z",
+          server: buildResult("connect").server,
+          status: buildResult("connect").status,
+          runtime: buildResult("connect").runtime,
+        }),
       } as HttpMcpServerRuntimeClient,
       {
         getConnectionStatus: async () => ({

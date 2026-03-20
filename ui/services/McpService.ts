@@ -1,6 +1,8 @@
 import type { AddConfiguredMcpServerUseCase } from "../../application/mcp/AddConfiguredMcpServerUseCase";
 import type { ConnectMcpServerUseCase } from "../../application/mcp/ConnectMcpServerUseCase";
+import type { CreateLocalMcpServerUseCase } from "../../application/mcp/CreateLocalMcpServerUseCase";
 import type { DisconnectMcpServerUseCase } from "../../application/mcp/DisconnectMcpServerUseCase";
+import type { GenerateLocalMcpToolDraftUseCase } from "../../application/mcp/GenerateLocalMcpToolDraftUseCase";
 import type { GetMcpConnectionStatusUseCase } from "../../application/mcp/GetMcpConnectionStatusUseCase";
 import type { GetMcpServerStatusUseCase } from "../../application/mcp/GetMcpServerStatusUseCase";
 import type { GetMcpToolDescriptorUseCase } from "../../application/mcp/GetMcpToolDescriptorUseCase";
@@ -8,6 +10,8 @@ import type { ListConfiguredMcpServersUseCase } from "../../application/mcp/List
 import type { ReconnectMcpServerUseCase } from "../../application/mcp/ReconnectMcpServerUseCase";
 import type { SearchMcpServersUseCase } from "../../application/mcp/SearchMcpServersUseCase";
 import type { SearchMcpToolsUseCase } from "../../application/mcp/SearchMcpToolsUseCase";
+import type { LocalMcpToolDraft } from "../../application/mcp/models/LocalMcpToolDraft";
+import type { LocalMcpServerCreateResult } from "../../application/mcp/models/LocalMcpServerCreateResult";
 import type { McpServerConnectionResult } from "../../application/mcp/models/McpServerConnectionResult";
 import type { McpConnectionStatus } from "../../application/mcp/models/McpConnectionStatus";
 import type { McpServerDescriptor } from "../../application/mcp/models/McpServerDescriptor";
@@ -30,6 +34,8 @@ export class McpService {
     private readonly reconnectMcpServerUseCase: Pick<ReconnectMcpServerUseCase, "execute">,
     private readonly searchMcpToolsUseCase: Pick<SearchMcpToolsUseCase, "execute">,
     private readonly getMcpToolDescriptorUseCase: Pick<GetMcpToolDescriptorUseCase, "execute">,
+    private readonly createLocalMcpServerUseCase: Pick<CreateLocalMcpServerUseCase, "execute">,
+    private readonly generateLocalMcpToolDraftUseCase: Pick<GenerateLocalMcpToolDraftUseCase, "execute">,
   ) {}
 
   public async listConfiguredServers(): Promise<ReadonlyArray<McpServerDescriptor>> {
@@ -70,5 +76,20 @@ export class McpService {
 
   public async getToolDescriptor(toolId: string): Promise<McpToolDescriptor | undefined> {
     return this.getMcpToolDescriptorUseCase.execute({ toolId });
+  }
+
+  public async createLocalServer(draft: LocalMcpToolDraft): Promise<LocalMcpServerCreateResult> {
+    return this.createLocalMcpServerUseCase.execute({ draft });
+  }
+
+  public async generateLocalToolDraft(prompt: string, currentDraft: LocalMcpToolDraft) {
+    return this.generateLocalMcpToolDraftUseCase.execute({
+      prompt,
+      serverId: currentDraft.serverId,
+      serverName: currentDraft.serverName,
+      toolName: currentDraft.toolName,
+      toolTitle: currentDraft.toolTitle,
+      toolDescription: currentDraft.toolDescription,
+    });
   }
 }

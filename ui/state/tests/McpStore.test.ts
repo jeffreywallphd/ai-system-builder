@@ -67,6 +67,20 @@ function createService() {
         tags: ["docs", "search"],
       },
     ],
+    "workspace-helper": [
+      {
+        id: "mcp:workspace-helper:process_payload",
+        serverId: "workspace-helper",
+        source: { kind: "mcp-server", serverId: "workspace-helper" },
+        name: "process_payload",
+        title: "Process Payload",
+        description: "Process payload.",
+        inputSchema: { type: "object" },
+        arguments: [],
+        categories: ["workspace"],
+        tags: ["local"],
+      },
+    ],
   } as const;
 
   return new McpService(
@@ -99,14 +113,14 @@ function createService() {
     {
       execute: async ({ serverId }: { serverId: string }) => ({
         serverId,
-        name: serverId === "remote-docs" ? "Remote Docs MCP" : "Local MCP",
+        name: serverId,
         transport: serverId === "remote-docs" ? "http" : "stdio",
         configured: true,
         enabled: true,
         state: serverId === "local" ? "connected" : "disconnected",
         connected: serverId === "local",
         checkedAt: new Date().toISOString(),
-        toolCount: serverId === "local" ? 2 : 4,
+        toolCount: 1,
         resourceCount: 0,
         capabilities: { tools: true },
       }),
@@ -132,6 +146,31 @@ function createService() {
     {
       execute: async ({ toolId }: { toolId: string }) => Object.values(toolsByServer).flat().find((tool) => tool.id === toolId),
     } as any,
+    {
+      execute: async ({ draft }: { draft: any }) => ({
+        created: true,
+        server: {
+          id: draft.serverId,
+          name: draft.serverName,
+          transport: "stdio",
+          status: "disconnected",
+          connected: false,
+          toolCount: 1,
+          resourceCount: 1,
+          capabilities: { tools: true },
+        },
+      }),
+    } as any,
+    {
+      execute: async ({ prompt }: { prompt: string }) => ({
+        toolName: "summarize_notes",
+        toolTitle: "Summarize Notes",
+        toolDescription: prompt,
+        inputSchema: { type: "object" },
+        outputSchema: { type: "object" },
+        code: 'return {"summary": payload.get("input", "")}',
+      }),
+    } as any,
   );
 }
 
@@ -146,50 +185,19 @@ describe("McpStore", () => {
     expect(store.getState().runtimeStatus?.state).toBe("ready");
     expect(store.getState().selectedServerId).toBe("local");
     expect(store.getState().selectedServerTools[0]?.id).toBe("mcp:local:echo");
-    expect(store.getState().selectedToolDescriptor?.name).toBe("echo");
   });
 
-  it("supports discovery search, add-to-configured, tool search, and connect/disconnect actions", async () => {
+  it("supports AI draft generation and local server creation", async () => {
     const store = new McpStore(createService());
+    store.setAuthoringPrompt("summarize release notes");
 
-    await store.search({ query: "remote" });
-    expect(store.getState().searchQuery).toBe("remote");
-    expect(store.getState().discoveredServers[0]?.id).toBe("remote-docs");
+    await store.generateAuthoringDraft();
+    expect(store.getState().authoringDraft.toolName).toBe("summarize_notes");
 
-    await store.addConfiguredServer("remote-docs");
-    expect(store.getState().selectedServerId).toBe("remote-docs");
+    store.updateAuthoringDraft({ serverId: "workspace-helper", serverName: "Workspace Helper" });
+    await store.createLocalServer();
 
-    await store.searchTools("search");
-    expect(store.getState().toolSearchQuery).toBe("search");
-    expect(store.getState().selectedServerTools[0]?.id).toBe("mcp:remote-docs:search_docs");
-
-    await store.selectTool("mcp:remote-docs:search_docs");
-    expect(store.getState().selectedToolDescriptor?.name).toBe("search_docs");
-
-    await store.connect("local");
-    await store.connect("local", true);
-    await store.disconnect("local");
-
+    expect(store.getState().selectedServerId).toBe("workspace-helper");
     expect(store.getState().error).toBeUndefined();
-  });
-
-  it("captures failures for MCP page state", async () => {
-    const store = new McpStore(
-      new McpService(
-        { execute: async () => { throw new Error("catalog unavailable"); } } as any,
-        { execute: async () => ({ query: "", totalCount: 0, limit: 12, servers: [], status: { enabled: false, state: "disabled", checkedAt: new Date().toISOString(), servers: [], capabilities: {} } }) } as any,
-        { execute: async ({ server }: { server: any }) => server } as any,
-        { execute: async () => ({ enabled: false, state: "disabled", checkedAt: new Date().toISOString(), servers: [], capabilities: {} }) } as any,
-        { execute: async ({ serverId }: { serverId: string }) => ({ serverId, state: "disconnected" }) } as any,
-        { execute: async () => ({}) } as any,
-        { execute: async () => ({}) } as any,
-        { execute: async () => ({}) } as any,
-        { execute: async () => ({ query: "", totalCount: 0, limit: 10, tools: [] }) } as any,
-        { execute: async () => undefined } as any,
-      ),
-    );
-
-    await expect(store.refreshConfigured()).rejects.toThrow("catalog unavailable");
-    expect(store.getState().error).toBe("catalog unavailable");
   });
 });

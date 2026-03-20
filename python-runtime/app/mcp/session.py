@@ -50,6 +50,16 @@ class McpSessionManager:
         client.disconnect()
         return client.describe()
 
+    def reset_server(self, server_id: str) -> None:
+        normalized = server_id.strip()
+        client = self._clients.pop(normalized, None)
+        if client is None:
+            return
+        try:
+            client.disconnect()
+        except McpConnectionError:
+            return
+
     def snapshot_server(self, server_id: str, connect: bool = False) -> McpServerSnapshot:
         client = self.get_client(server_id)
         try:

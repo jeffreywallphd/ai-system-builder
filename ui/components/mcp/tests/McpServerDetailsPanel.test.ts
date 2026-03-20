@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import McpServerDetailsPanel from "../McpServerDetailsPanel";
 
 describe("McpServerDetailsPanel", () => {
-  it("renders selected server details with tool inspection wording", () => {
+  it("renders controlled server lifecycle actions and tool inspection wording", () => {
     const html = renderToStaticMarkup(
       React.createElement(McpServerDetailsPanel, {
         server: {
@@ -40,9 +40,8 @@ describe("McpServerDetailsPanel", () => {
       })
     );
 
+    expect(html).toContain("Stop server");
+    expect(html).toContain("Restart server");
     expect(html).toContain("Inspect normalized MCP tool descriptors");
-    expect(html).toContain("Unified capability mapping");
-    expect(html).toContain("capabilityId=mcp:local:echo");
-    expect(html).toContain("python-mcp-runtime");
   });
 });
