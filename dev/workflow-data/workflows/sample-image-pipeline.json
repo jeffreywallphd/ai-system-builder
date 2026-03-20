@@ -3,7 +3,11 @@
   "metadata": {
     "name": "Sample Image Pipeline",
     "description": "Prompt-planning workflow that prepares structured image-generation instructions.",
-    "tags": ["sample", "image", "prompting"]
+    "tags": [
+      "sample",
+      "image",
+      "prompting"
+    ]
   },
   "status": "draft",
   "isEnabled": true,
@@ -18,8 +22,14 @@
       "definitionId": "langchain.prompt-template",
       "title": "Image Prompt Template",
       "notes": "Draft a reusable prompt for a concept-art style image request.",
-      "position": { "x": 80, "y": 120 },
-      "size": { "width": 280, "height": 180 },
+      "position": {
+        "x": 80,
+        "y": 120
+      },
+      "size": {
+        "width": 280,
+        "height": 180
+      },
       "properties": [
         {
           "id": "template",
@@ -34,8 +44,14 @@
       "definitionId": "langchain.context-merger",
       "title": "Creative Brief Merger",
       "notes": "Merge prompt notes into structured context for the prompt runner.",
-      "position": { "x": 380, "y": 80 },
-      "size": { "width": 260, "height": 170 },
+      "position": {
+        "x": 500,
+        "y": 80
+      },
+      "size": {
+        "width": 260,
+        "height": 170
+      },
       "properties": [
         {
           "id": "merge-strategy",
@@ -50,8 +66,14 @@
       "definitionId": "langchain.simple-chain",
       "title": "Prompt Expansion",
       "notes": "Expand the template into a richer generation prompt.",
-      "position": { "x": 700, "y": 120 },
-      "size": { "width": 240, "height": 180 },
+      "position": {
+        "x": 920,
+        "y": 120
+      },
+      "size": {
+        "width": 240,
+        "height": 180
+      },
       "properties": [
         {
           "id": "temperature",
@@ -70,8 +92,14 @@
       "definitionId": "langchain.output-parser",
       "title": "Prompt JSON Parser",
       "notes": "Normalize the generated prompt into structured JSON fields.",
-      "position": { "x": 1010, "y": 120 },
-      "size": { "width": 240, "height": 160 },
+      "position": {
+        "x": 1340,
+        "y": 120
+      },
+      "size": {
+        "width": 240,
+        "height": 160
+      },
       "properties": [
         {
           "id": "format",

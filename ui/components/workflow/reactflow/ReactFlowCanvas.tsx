@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Background,
   Controls,
+  MarkerType,
   MiniMap,
   ReactFlow,
   ReactFlowProvider,
@@ -127,6 +128,21 @@ export function createOptimisticEdgeFromConnection(
     type: "smoothstep",
     animated: true,
     selectable: false,
+    zIndex: 1,
+    markerEnd: {
+      type: MarkerType.ArrowClosed,
+      width: 18,
+      height: 18,
+      color: "rgba(120, 187, 255, 0.98)",
+    },
+    style: {
+      stroke: "rgba(120, 187, 255, 0.98)",
+      strokeWidth: 3,
+    },
+    pathOptions: {
+      borderRadius: 20,
+      offset: 24,
+    },
     data: Object.freeze({
       connectionId: undefined,
       state: "pending",
@@ -331,7 +347,7 @@ function InnerReactFlowCanvas({
 
   return (
     <div className="ui-rf-canvas">
-      <ReactFlow
+      <ReactFlow<Node<ReactFlowNodeData>, Edge>
         className="ui-rf-root"
         style={{ width: "100%", height: "100%" }}
         nodes={interactiveNodes as Node<ReactFlowNodeData>[]}
@@ -363,7 +379,19 @@ function InnerReactFlowCanvas({
         defaultEdgeOptions={{
           type: "smoothstep",
           animated: false,
+          zIndex: 1,
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            width: 18,
+            height: 18,
+            color: "rgba(120, 187, 255, 0.98)",
+          },
+          style: {
+            stroke: "rgba(120, 187, 255, 0.98)",
+            strokeWidth: 3,
+          },
         }}
+        elevateEdgesOnSelect
       >
         <Background gap={24} size={1} />
         {!isCompactViewport ? <MiniMap pannable zoomable /> : null}

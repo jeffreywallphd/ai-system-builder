@@ -312,9 +312,13 @@ export class WorkflowStore {
     const workflow = this.requireCurrentWorkflow();
 
     try {
+      const resolvedPosition = request.position
+        ? this.nodeService.resolveNodePlacement(workflow, request.position)
+        : request.position;
       const result = await this.nodeService.createNode({
         workflow,
         ...request,
+        position: resolvedPosition,
       });
 
       this.setEditorState({

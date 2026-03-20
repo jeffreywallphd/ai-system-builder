@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { IModelInstallProgress } from "../../../application/ports/interfaces/IModelInstaller";
 import type {
   ModelCompatibilityViewModel,
   ModelDownloadFileViewModel,
@@ -13,7 +14,8 @@ export interface ModelBrowserProps {
   readonly installedModels: ReadonlyArray<ModelListItemViewModel>;
   readonly remoteModels: ReadonlyArray<RemoteModelListItemViewModel>;
   readonly compatibility?: ModelCompatibilityViewModel;
-  readonly installProgressByModelId?: Readonly<Record<string, string>>;
+  readonly searchValue?: Partial<ModelSearchBarValue>;
+  readonly installProgressByModelId?: Readonly<Record<string, IModelInstallProgress>>;
   readonly isLoadingInstalled?: boolean;
   readonly isSearchingRemote?: boolean;
   readonly isInstalling?: boolean;
@@ -30,6 +32,7 @@ export default function ModelBrowser({
   installedModels,
   remoteModels,
   compatibility,
+  searchValue,
   installProgressByModelId,
   isLoadingInstalled,
   isSearchingRemote,
@@ -70,6 +73,7 @@ export default function ModelBrowser({
   return (
     <section className="ui-model-browser">
       <ModelSearchBar
+        value={searchValue}
         isBusy={isSearchingRemote || isInstalling}
         onSearch={onSearch}
         onClear={onClearSearch}
@@ -155,7 +159,10 @@ export default function ModelBrowser({
                     mode="remote"
                     isDetailsExpanded={expandedModelIds.includes(model.id)}
                     selectedFileIds={selectedFilesByModelId[model.id] ?? []}
-                    installProgressLabel={installProgressByModelId?.[model.remoteId ?? model.id]}
+                    installProgress={
+                      installProgressByModelId?.[model.remoteId ?? model.id] ??
+                      installProgressByModelId?.[model.id]
+                    }
                     onToggleDetails={toggleExpanded}
                     onToggleFileSelection={toggleFileSelection}
                     onInstallFile={(modelId, file) => {

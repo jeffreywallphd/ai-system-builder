@@ -149,9 +149,20 @@ export class ModelStore {
 
     try {
       await this.modelService.installModel(request, (progress) => {
+        const progressIds = [
+          progress.modelId,
+          request.modelId,
+          request.remoteId,
+        ].filter((value): value is string => !!value?.trim());
+        const nextProgress = { ...this.state.installProgressByModelId };
+
+        for (const progressId of progressIds) {
+          nextProgress[progressId] = progress;
+        }
+
         this.setState({
           installProgressByModelId: Object.freeze({
-            ...this.state.installProgressByModelId,
+            ...nextProgress,
             [progress.modelId || progressModelId]: progress,
           }),
         });

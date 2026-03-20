@@ -19,12 +19,14 @@ import {
   type IListAvailableNodesRequest,
   type IListAvailableNodesResult,
 } from "../../application/nodes/ListAvailableNodesUseCase";
+import { NodeCanvasLayoutService } from "../../application/nodes/NodeCanvasLayoutService";
 
 export interface INodeServiceOptions {
   readonly createNodeUseCase: CreateNodeUseCase;
   readonly connectNodesUseCase: ConnectNodesUseCase;
   readonly listAvailableNodesUseCase: ListAvailableNodesUseCase;
   readonly nodeCatalogProvider: INodeCatalogProvider;
+  readonly nodeCanvasLayoutService?: NodeCanvasLayoutService;
 }
 
 export class NodeService {
@@ -32,12 +34,15 @@ export class NodeService {
   private readonly connectNodesUseCase: ConnectNodesUseCase;
   private readonly listAvailableNodesUseCase: ListAvailableNodesUseCase;
   private readonly nodeCatalogProvider: INodeCatalogProvider;
+  private readonly nodeCanvasLayoutService: NodeCanvasLayoutService;
 
   constructor(options: INodeServiceOptions) {
     this.createNodeUseCase = options.createNodeUseCase;
     this.connectNodesUseCase = options.connectNodesUseCase;
     this.listAvailableNodesUseCase = options.listAvailableNodesUseCase;
     this.nodeCatalogProvider = options.nodeCatalogProvider;
+    this.nodeCanvasLayoutService =
+      options.nodeCanvasLayoutService ?? new NodeCanvasLayoutService();
   }
 
   public async listAvailableNodes(
@@ -112,7 +117,28 @@ export class NodeService {
     position: { readonly x: number; readonly y: number }
   ): IWorkflow {
     const node = this.requireNode(workflow, nodeId);
-    return workflow.updateNode(node.withPosition(position));
+    const resolvedPosition = this.resolveNodePlacement(
+      workflow,
+      position,
+      nodeId,
+      node.size
+    );
+
+    return workflow.updateNode(node.withPosition(resolvedPosition));
+  }
+
+  public resolveNodePlacement(
+    workflow: IWorkflow,
+    desiredPosition: { readonly x: number; readonly y: number },
+    nodeId?: string,
+    nodeSize?: { readonly width?: number; readonly height?: number }
+  ): { readonly x: number; readonly y: number } {
+    return this.nodeCanvasLayoutService.resolveNodePlacement({
+      workflow,
+      desiredPosition,
+      nodeId,
+      nodeSize,
+    });
   }
 
   public resizeNode(
