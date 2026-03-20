@@ -70,6 +70,19 @@ function extractExtension(fileName: string, format: string): string {
   return normalizedFormat && normalizedFormat !== "unknown" ? normalizedFormat : "other";
 }
 
+function resolveModelSizeLabel(model: IModel): string | undefined {
+  const explicitSize = formatBytes(model.artifact.sizeBytes);
+
+  if (explicitSize) {
+    return explicitSize;
+  }
+
+  const totalKnownBytes = [model.artifact, ...model.additionalArtifacts].reduce((sum, artifact) =>
+    sum + (artifact.sizeBytes ?? 0), 0);
+
+  return totalKnownBytes > 0 ? formatBytes(totalKnownBytes) : undefined;
+}
+
 export class ModelPresenter {
   public present(model: IModel): ModelDetailViewModel {
     const response = this.toResponse(model);
@@ -78,7 +91,7 @@ export class ModelPresenter {
       ...response,
       kindLabel: toTitleCase(response.kind),
       statusLabel: toTitleCase(response.status),
-      sizeLabel: formatBytes(model.artifact.sizeBytes),
+      sizeLabel: resolveModelSizeLabel(model),
       availableLabel: model.isAvailable() ? "Available" : "Unavailable",
     });
   }
@@ -96,7 +109,7 @@ export class ModelPresenter {
       status: toTitleCase(model.status),
       architectureFamily: model.architectureFamily,
       format: model.artifact.format,
-      sizeLabel: formatBytes(model.artifact.sizeBytes),
+      sizeLabel: resolveModelSizeLabel(model),
       taskBadges: Object.freeze([...(model.compatibility.supportedTasks ?? [])]),
       runtimeBadges: Object.freeze([...(model.compatibility.supportedRuntimes ?? [])]),
       tags: Object.freeze([...(model.tags ?? [])]),

@@ -12,7 +12,9 @@ describe("ui/components/nodes unit coverage", () => {
     expect(palette).toContain("export default function NodePalette");
     expect(paletteItem).toContain("export default function NodePaletteItem");
     expect(propertyField).toContain("export default function NodePropertyField");
+    expect(propertyField).toContain('case "model"');
     expect(propertyEditor).toContain("export default function NodePropertyEditor");
+    expect(propertyEditor).toContain("attachInstalledModelOptions");
     expect(inspector).toContain("export default function NodeInspector");
   });
 

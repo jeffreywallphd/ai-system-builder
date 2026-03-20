@@ -1,18 +1,21 @@
 import { useMemo } from "react";
 import type { ContextInspectionResult } from "../../../application/context/models/ContextInspectionResult";
 import type { NodeDetailViewModel } from "../../presenters/NodePresenter";
+import type { InstalledModelOption } from "../../models/buildInstalledModelOptions";
 import ContextInspectionPanel from "../workflow/ContextInspectionPanel";
 import NodePropertyEditor from "./NodePropertyEditor";
 
 export interface NodeInspectorProps {
   readonly node?: NodeDetailViewModel;
   readonly contextInspection?: ContextInspectionResult;
+  readonly availableModels?: ReadonlyArray<InstalledModelOption>;
   readonly onPropertyChange?: (propertyId: string, value: unknown) => void;
 }
 
 export default function NodeInspector({
   node,
   contextInspection,
+  availableModels,
   onPropertyChange,
 }: NodeInspectorProps): JSX.Element {
   const sortedInputPorts = useMemo(() => node?.inputPorts ?? [], [node]);
@@ -142,6 +145,7 @@ export default function NodeInspector({
             <NodePropertyEditor
               fields={node.properties}
               disabled={!node.isEnabled}
+              availableModels={availableModels}
               onPropertyChange={onPropertyChange}
             />
 

@@ -71,4 +71,24 @@ describe("ListPublishedToolsUseCase", () => {
     expect(byType.tools.length).toBe(1);
     expect(byType.tools[0]?.title).toContain("Summary");
   });
+  it("includes workflows in the tool projection list even when they are not explicitly published", async () => {
+    const workflowRepository = new InMemoryWorkflowRepository();
+
+    await workflowRepository.save(
+      makeWorkflow({ id: "wf-form-only", nodes: [makeNode({ id: "n2" })] }).withMetadata(
+        new WorkflowMetadata({
+          name: "Form Only Workflow",
+          description: "Still available on the tool page",
+        })
+      )
+    );
+
+    const result = await new ListPublishedToolsUseCase(
+      workflowRepository,
+      new WorkflowToolProjectionService()
+    ).execute();
+
+    expect(result.tools.map((tool) => tool.id)).toContain("wf-form-only");
+  });
+
 });

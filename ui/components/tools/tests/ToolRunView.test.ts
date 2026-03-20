@@ -7,6 +7,7 @@ describe("ToolRunView", () => {
     expect(source).toContain("Start tool");
     expect(source).toContain("resolveFieldValue");
     expect(source).toContain("setValues({})");
+    expect(source).toContain("availableModels={availableModels}");
   });
 
   it("keeps multi-select tool controls non-technical by rendering option checkboxes when choices exist", () => {

@@ -26,6 +26,7 @@ export interface NodePropertyFieldViewModel {
   readonly id: string;
   readonly name: string;
   readonly type: string;
+  readonly editorType?: string;
   readonly value: unknown;
   readonly defaultValue?: unknown;
   readonly description?: string;
@@ -168,6 +169,7 @@ export class NodePresenter {
       id: property.id,
       name: property.name,
       type: property.type,
+      editorType: property.projection?.fieldTypeHint ?? property.type,
       value: property.value,
       defaultValue: property.defaultValue,
       description: property.description,

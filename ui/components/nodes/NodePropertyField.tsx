@@ -68,13 +68,14 @@ export default function NodePropertyField({
   onChange,
 }: NodePropertyFieldProps): JSX.Element {
   const isDisabled = disabled || !field.isEditable;
+  const effectiveType = field.editorType ?? field.type;
 
   const emit = (value: unknown): void => {
     onChange?.(field.id, value);
   };
 
   const renderControl = (): JSX.Element => {
-    switch (field.type) {
+    switch (effectiveType) {
       case "boolean":
         return (
           <label className="ui-row ui-row--wrap">
@@ -151,6 +152,7 @@ export default function NodePropertyField({
           />
         );
 
+      case "model":
       case "select":
         return (
           <select
@@ -315,7 +317,7 @@ export default function NodePropertyField({
           </div>
 
           <div className="ui-chips">
-            <span className="ui-badge ui-badge--neutral">{field.type}</span>
+            <span className="ui-badge ui-badge--neutral">{effectiveType}</span>
             {field.isAdvanced ? <span className="ui-badge ui-badge--warning">Advanced</span> : null}
             {!field.isEditable ? <span className="ui-badge ui-badge--danger">Read Only</span> : null}
             {field.isEmpty ? <span className="ui-badge ui-badge--info">Empty</span> : null}
