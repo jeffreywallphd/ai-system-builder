@@ -11,6 +11,7 @@ export interface ManagedServicesPanelProps {
   readonly recentLogs: ReadonlyArray<RuntimeEvent>;
   readonly isLoading: boolean;
   readonly isMutating: boolean;
+  readonly streamState: "idle" | "connecting" | "live" | "reconnecting";
   readonly error?: string;
   readonly onSelectService: (serviceId: string) => void;
   readonly onRefresh: () => void;
@@ -46,6 +47,7 @@ export default function ManagedServicesPanel({
   recentLogs,
   isLoading,
   isMutating,
+  streamState,
   error,
   onSelectService,
   onRefresh,
@@ -88,6 +90,9 @@ export default function ManagedServicesPanel({
             </span>
           </div>
           <div className="ui-managed-services__toolbar-actions">
+            <span className="ui-badge ui-badge--neutral" aria-live="polite">
+              {presentStreamState(streamState)}
+            </span>
             <button
               type="button"
               className="ui-button ui-button--secondary ui-button--sm"
@@ -376,6 +381,20 @@ export default function ManagedServicesPanel({
       </div>
     </div>
   );
+}
+
+function presentStreamState(streamState: ManagedServicesPanelProps["streamState"]): string {
+  switch (streamState) {
+    case "live":
+      return "Live monitoring";
+    case "reconnecting":
+      return "Reconnecting…";
+    case "connecting":
+      return "Connecting…";
+    case "idle":
+    default:
+      return "Monitoring idle";
+  }
 }
 
 function createEmptyEditorState(): ServiceEditorState {

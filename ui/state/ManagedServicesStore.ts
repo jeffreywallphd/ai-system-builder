@@ -1,6 +1,7 @@
 import type { RuntimeEvent } from "../../application/runtime/RuntimeEvent";
 import type { ManagedServiceDefinitionInput } from "../../application/services/ManagedServiceDefinition";
 import type { ManagedServiceRecord, ManagedServicesService } from "../services/ManagedServicesService";
+import type { ManagedServiceEventStream } from "../services/ManagedServiceEventStream";
 
 export interface ManagedServicesStoreState {
   readonly services: ReadonlyArray<ManagedServiceRecord>;
@@ -8,6 +9,7 @@ export interface ManagedServicesStoreState {
   readonly recentLogs: ReadonlyArray<RuntimeEvent>;
   readonly isLoading: boolean;
   readonly isMutating: boolean;
+  readonly streamState: "idle" | "connecting" | "live" | "reconnecting";
   readonly error?: string;
 }
 
@@ -19,14 +21,23 @@ const defaultState: ManagedServicesStoreState = Object.freeze({
   recentLogs: Object.freeze([]),
   isLoading: false,
   isMutating: false,
+  streamState: "idle",
   error: undefined,
 });
 
 export class ManagedServicesStore {
   private state: ManagedServicesStoreState = defaultState;
   private readonly listeners = new Set<ManagedServicesStoreListener>();
+  private readonly eventStream?: ManagedServiceEventStream;
+  private unsubscribeEventStream?: () => void;
+  private isInitialized = false;
 
-  constructor(private readonly managedServicesService: ManagedServicesService) {}
+  constructor(
+    private readonly managedServicesService: ManagedServicesService,
+    eventStream?: ManagedServiceEventStream,
+  ) {
+    this.eventStream = eventStream;
+  }
 
   public getState(): ManagedServicesStoreState {
     return this.state;
@@ -40,6 +51,13 @@ export class ManagedServicesStore {
 
   public async initialize(): Promise<void> {
     await this.refresh();
+    this.connectEventStream();
+    this.isInitialized = true;
+  }
+
+  public dispose(): void {
+    this.unsubscribeEventStream?.();
+    this.unsubscribeEventStream = undefined;
   }
 
   public async refresh(serviceId = this.state.selectedServiceId): Promise<void> {
@@ -155,6 +173,112 @@ export class ManagedServicesStore {
     for (const listener of this.listeners) {
       listener(this.state);
     }
+  }
+
+  private connectEventStream(): void {
+    if (!this.eventStream || this.unsubscribeEventStream) {
+      return;
+    }
+
+    this.unsubscribeEventStream = this.eventStream.connect({
+      onSnapshot: (event) => {
+        void this.syncSupervisorSnapshot(event.services);
+      },
+      onStateChange: (event) => {
+        void this.upsertSupervisorService(event.service);
+      },
+      onLog: (event) => {
+        void this.upsertSupervisorService(event.service).then(() => {
+          if (!event.service) {
+            this.appendLogToSelectedService(event.serviceId, event.entry);
+          }
+        });
+      },
+      onRestart: (event) => {
+        if (event.service) {
+          void this.upsertSupervisorService(event.service);
+        }
+      },
+      onHealthChange: (event) => {
+        void this.upsertSupervisorService(event.service);
+      },
+      onConnectionStateChange: (state) => {
+        this.patch({
+          streamState: state === "open"
+            ? "live"
+            : this.isInitialized
+              ? "reconnecting"
+              : "connecting",
+        });
+      },
+      onError: (error) => {
+        this.patch({ error: error.message, streamState: "reconnecting" });
+      },
+    });
+  }
+
+  private async syncSupervisorSnapshot(services: ReadonlyArray<any>): Promise<void> {
+    const records = await this.managedServicesService.listServicesFromSupervisor(services);
+    const selectedServiceId = resolveSelectedServiceId(records, this.state.selectedServiceId);
+    const selectedService = selectedServiceId
+      ? records.find((service) => service.id === selectedServiceId)
+      : records[0];
+
+    this.patch({
+      services: Object.freeze([...records]),
+      selectedServiceId: selectedService?.id,
+      recentLogs: Object.freeze([...(selectedService?.recentLogs ?? [])]),
+      error: undefined,
+    });
+  }
+
+  private async upsertSupervisorService(service: any): Promise<void> {
+    if (!service) {
+      return;
+    }
+
+    const mapped = await this.managedServicesService.mapSupervisorServiceRecord(service);
+    const existing = this.state.services.some((entry) => entry.id === mapped.id);
+    const services = existing
+      ? this.state.services.map((entry) => entry.id === mapped.id ? mapped : entry)
+      : [...this.state.services, mapped];
+    const selectedService = services.find((entry) => entry.id === (this.state.selectedServiceId ?? mapped.id))
+      ?? services[0];
+
+    this.patch({
+      services: Object.freeze([...services]),
+      selectedServiceId: selectedService?.id,
+      recentLogs: Object.freeze([...(selectedService?.recentLogs ?? [])]),
+      error: undefined,
+    });
+  }
+
+  private appendLogToSelectedService(serviceId: string, entry: { timestamp: string; level: string; message: string }): void {
+    const service = this.state.services.find((candidate) => candidate.id === serviceId);
+    if (!service) {
+      return;
+    }
+
+    const severity = entry.level === "stderr" ? "error" : entry.level === "stdout" ? "info" : entry.level as RuntimeEvent["severity"];
+    const runtimeEvent = Object.freeze({
+      id: `${serviceId}:${entry.timestamp}:${entry.level}:${entry.message}`,
+      timestamp: entry.timestamp,
+      source: "python-runtime",
+      severity,
+      message: entry.message,
+    } satisfies RuntimeEvent);
+    const updatedService = Object.freeze({
+      ...service,
+      recentLogs: Object.freeze([...service.recentLogs, runtimeEvent].slice(-200)),
+    });
+    const services = this.state.services.map((candidate) => candidate.id === serviceId ? updatedService : candidate);
+
+    this.patch({
+      services: Object.freeze(services),
+      recentLogs: this.state.selectedServiceId === serviceId
+        ? Object.freeze([...updatedService.recentLogs])
+        : this.state.recentLogs,
+    });
   }
 }
 

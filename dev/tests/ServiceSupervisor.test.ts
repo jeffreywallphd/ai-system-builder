@@ -80,6 +80,28 @@ async function getAvailablePort(): Promise<number> {
   });
 }
 
+async function readInitialSseChunk(url: string): Promise<{ contentType?: string; body: string }> {
+  return await new Promise((resolve, reject) => {
+    const request = http.get(url, { headers: { Accept: "text/event-stream" } }, (response) => {
+      let body = "";
+      response.setEncoding("utf8");
+      response.on("data", (chunk) => {
+        body += chunk;
+        if (body.includes("event: snapshot")) {
+          request.destroy();
+          resolve({
+            contentType: response.headers["content-type"],
+            body,
+          });
+        }
+      });
+      response.on("error", reject);
+    });
+
+    request.on("error", reject);
+  });
+}
+
 function createRuntimeDefinition(overrides: Record<string, unknown> = {}) {
   return {
     serviceId: "python-runtime",
@@ -311,6 +333,45 @@ describe("service supervisor HTTP API", () => {
     expect(stopped.service.state).toBe(ServiceStates.stopped);
     expect(missingResponse.status).toBe(404);
     expect(missing.message).toContain("Unknown service");
+  });
+
+  it("exposes an SSE snapshot endpoint and emits service events to subscribers", async () => {
+    const port = await getAvailablePort();
+    const servicePort = await getAvailablePort();
+    const app = createSupervisorServer({
+      host: "127.0.0.1",
+      port,
+      runtime: createNodeProcessRuntime(),
+      services: [createRuntimeDefinition({
+        baseUrl: `http://127.0.0.1:${servicePort}`,
+        env: {
+          TEST_RUNTIME_PORT: String(servicePort),
+          TEST_RUNTIME_HEALTHY_AFTER_MS: "0",
+          TEST_RUNTIME_STDOUT_MESSAGE: "streamed stdout",
+        },
+      })],
+    });
+    await app.listen();
+    serversToClose.push(app);
+
+    const snapshotStream = await readInitialSseChunk(`http://127.0.0.1:${port}/events`);
+    expect(snapshotStream.contentType).toContain("text/event-stream");
+    expect(snapshotStream.body).toContain("event: snapshot");
+    expect(snapshotStream.body).toContain("\"python-runtime\"");
+
+    const observedTypes = new Set<string>();
+    const unsubscribe = app.supervisor.subscribe((event) => {
+      observedTypes.add(event.type);
+    });
+
+    await app.supervisor.start("python-runtime");
+    await app.supervisor.restart("python-runtime");
+    unsubscribe();
+
+    expect(observedTypes.has("service-state")).toBeTrue();
+    expect(observedTypes.has("service-log")).toBeTrue();
+    expect(observedTypes.has("service-health")).toBeTrue();
+    expect(observedTypes.has("service-restart")).toBeTrue();
   });
 });
 

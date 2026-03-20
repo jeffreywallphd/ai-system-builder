@@ -10,6 +10,7 @@ const fallbackState: ManagedServicesStoreState = Object.freeze({
   recentLogs: Object.freeze([]),
   isLoading: false,
   isMutating: false,
+  streamState: "idle",
   error: undefined,
 });
 
@@ -61,6 +62,7 @@ export default function ManagedServicesPage(): JSX.Element {
         recentLogs={state.recentLogs}
         isLoading={state.isLoading}
         isMutating={state.isMutating}
+        streamState={state.streamState}
         error={state.error}
         onSelectService={(serviceId) => managedServicesStore.selectService(serviceId)}
         onRefresh={() => void managedServicesStore.refresh().catch(() => undefined)}

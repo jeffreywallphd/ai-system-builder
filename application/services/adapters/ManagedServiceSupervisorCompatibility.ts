@@ -49,6 +49,14 @@ export function mapSupervisorStateToManagedServiceState(state: ManagedSupervisor
 export function mapSupervisorLogLevelToManagedServiceLogLevel(
   level: ManagedSupervisorServiceRecord["recentLogs"][number]["level"],
 ): ManagedServiceLogEvent["level"] {
+  if (level === "stdout") {
+    return "info";
+  }
+
+  if (level === "stderr") {
+    return "error";
+  }
+
   return level;
 }
 
