@@ -8,15 +8,32 @@ const DEFAULT_PORT = Number(process.env.SERVICE_SUPERVISOR_PORT || 8790);
 const DEFAULT_HOST = process.env.SERVICE_SUPERVISOR_HOST || "127.0.0.1";
 const DEFAULT_LOG_LIMIT = Number(process.env.SERVICE_SUPERVISOR_LOG_LIMIT || 200);
 const DEFAULT_STUB_MODE = process.env.SERVICE_SUPERVISOR_STUB_MODE !== "false";
+const DEFAULT_STARTUP_TIMEOUT_MS = 20_000;
+const DEFAULT_HEALTH_POLL_INTERVAL_MS = 250;
+const DEFAULT_STOP_TIMEOUT_MS = 5_000;
+const DEFAULT_FETCH_TIMEOUT_MS = Number(process.env.SERVICE_SUPERVISOR_FETCH_TIMEOUT_MS || 2_000);
+const DEFAULT_PYTHON_RUNTIME_BASE_URL = "http://127.0.0.1:8100";
+const DEFAULT_PYTHON_RUNTIME_WORKDIR = `${process.cwd()}/python-runtime`;
+const DEFAULT_PYTHON_RUNTIME_EXECUTABLE = "python";
+const DEFAULT_PYTHON_RUNTIME_HEALTH_PATH = "/health";
+const DEFAULT_PYTHON_RUNTIME_ENTRYPOINT = "app.main:app";
 
 export const ServiceStates = Object.freeze({
   unavailable: "unavailable",
   starting: "starting",
-  running: "running",
-  degraded: "degraded",
+  healthy: "healthy",
+  unhealthy: "unhealthy",
   failed: "failed",
   stopping: "stopping",
   stopped: "stopped",
+  running: "healthy",
+  degraded: "unhealthy",
+});
+
+export const ServiceOwnership = Object.freeze({
+  none: "none",
+  managed: "managed",
+  external: "external",
 });
 
 function createClockTimestamp(clock) {
@@ -82,6 +99,10 @@ function normalizeServiceDefinition(definition) {
     throw new Error("Service definition serviceId is required.");
   }
 
+  const baseUrl = typeof definition.baseUrl === "string" ? definition.baseUrl.trim() : undefined;
+  const healthCheckPath =
+    typeof definition.healthCheckPath === "string" ? definition.healthCheckPath.trim() : DEFAULT_PYTHON_RUNTIME_HEALTH_PATH;
+
   return Object.freeze({
     serviceId,
     name: name || serviceId,
@@ -91,10 +112,17 @@ function normalizeServiceDefinition(definition) {
       : [],
     cwd: typeof definition.cwd === "string" ? definition.cwd.trim() : process.cwd(),
     env: definition.env && typeof definition.env === "object" ? { ...definition.env } : {},
-    healthCheckPath:
-      typeof definition.healthCheckPath === "string" ? definition.healthCheckPath.trim() : "/health",
+    baseUrl: baseUrl || undefined,
+    healthCheckPath: healthCheckPath || "/health",
+    startupTimeoutMs: normalizePositiveNumber(definition.startupTimeoutMs, DEFAULT_STARTUP_TIMEOUT_MS),
+    healthPollIntervalMs: normalizePositiveNumber(definition.healthPollIntervalMs, DEFAULT_HEALTH_POLL_INTERVAL_MS),
+    stopTimeoutMs: normalizePositiveNumber(definition.stopTimeoutMs, DEFAULT_STOP_TIMEOUT_MS),
     metadata: definition.metadata && typeof definition.metadata === "object" ? { ...definition.metadata } : {},
   });
+}
+
+function normalizePositiveNumber(value, fallback) {
+  return Number.isFinite(Number(value)) && Number(value) > 0 ? Number(value) : fallback;
 }
 
 function createInitialServiceState(definition, clock) {
@@ -104,10 +132,13 @@ function createInitialServiceState(definition, clock) {
     command: definition.command,
     args: definition.args,
     cwd: definition.cwd,
+    baseUrl: definition.baseUrl,
     pid: null,
     startedAt: null,
     lastHealthCheckAt: null,
     state: ServiceStates.stopped,
+    ownership: ServiceOwnership.none,
+    detail: `${definition.name} is stopped.`,
     recentLogs: [createLogEntry(clock, "info", `${definition.name} registered with supervisor.`)],
   };
 }
@@ -115,6 +146,52 @@ function createInitialServiceState(definition, clock) {
 function appendRecentLog(existingLogs, logEntry, limit) {
   const nextLogs = [...existingLogs, logEntry];
   return nextLogs.slice(Math.max(0, nextLogs.length - limit));
+}
+
+function withTimeout(task, timeoutMs, message) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+    Promise.resolve(task)
+      .then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+  });
+}
+
+function createDeferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((nextResolve, nextReject) => {
+    resolve = nextResolve;
+    reject = nextReject;
+  });
+  return { promise, resolve, reject };
+}
+
+function resolveHealthUrl(definition) {
+  if (!definition.baseUrl) {
+    return undefined;
+  }
+
+  return new URL(definition.healthCheckPath || "/health", definition.baseUrl).toString();
+}
+
+function resolveLaunchTarget(baseUrl) {
+  try {
+    const parsed = new URL(baseUrl || DEFAULT_PYTHON_RUNTIME_BASE_URL);
+    const port = parsed.port ? Number(parsed.port) : (parsed.protocol === "https:" ? 443 : 80);
+    return {
+      host: parsed.hostname || "127.0.0.1",
+      port: Number.isFinite(port) && port > 0 ? port : 8100,
+    };
+  } catch {
+    return { host: "127.0.0.1", port: 8100 };
+  }
 }
 
 export function createStubProcessRuntime(options = {}) {
@@ -143,10 +220,10 @@ export function createStubProcessRuntime(options = {}) {
     },
     async checkHealth(definition, state) {
       return {
-        healthy: state.state === ServiceStates.running,
-        detail: state.state === ServiceStates.running
+        healthy: state.state === ServiceStates.healthy,
+        detail: state.state === ServiceStates.healthy
           ? `${definition.name} stub health check passed.`
-          : `${definition.name} is not running.`,
+          : `${definition.name} is not healthy.`,
         logs: [createLogEntry(clock, "info", `Stubbed health check for ${definition.serviceId}.`)],
       };
     },
@@ -155,10 +232,17 @@ export function createStubProcessRuntime(options = {}) {
 
 export function createNodeProcessRuntime(options = {}) {
   const clock = options.clock ?? (() => new Date());
+  const sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
   const childProcesses = new Map();
 
+  function emitHook(hook, payload) {
+    if (typeof hook === "function") {
+      hook(payload);
+    }
+  }
+
   return {
-    async start(definition) {
+    async start(definition, _state, hooks = {}) {
       if (!definition.command) {
         throw new Error(`Service '${definition.serviceId}' is missing a command.`);
       }
@@ -172,38 +256,92 @@ export function createNodeProcessRuntime(options = {}) {
         stdio: ["ignore", "pipe", "pipe"],
       });
 
-      childProcesses.set(definition.serviceId, child);
+      const exitDeferred = createDeferred();
+      const record = {
+        child,
+        exitPromise: exitDeferred.promise,
+        exitCode: null,
+        signal: null,
+        exited: false,
+      };
 
-      const logs = [createLogEntry(clock, "info", `Started ${definition.serviceId} with pid ${child.pid}.`)];
+      childProcesses.set(definition.serviceId, record);
+
       child.stdout?.on("data", (chunk) => {
-        logs.push(createLogEntry(clock, "stdout", String(chunk).trim()));
+        const message = String(chunk).trim();
+        if (!message) {
+          return;
+        }
+        emitHook(hooks.onLog, createLogEntry(clock, "stdout", message));
       });
+
       child.stderr?.on("data", (chunk) => {
-        logs.push(createLogEntry(clock, "stderr", String(chunk).trim()));
+        const message = String(chunk).trim();
+        if (!message) {
+          return;
+        }
+        emitHook(hooks.onLog, createLogEntry(clock, "stderr", message));
       });
+
+      child.on("error", (error) => {
+        emitHook(
+          hooks.onLog,
+          createLogEntry(clock, "error", `Process error for ${definition.serviceId}: ${toErrorMessage(error)}`),
+        );
+      });
+
       child.on("exit", (code, signal) => {
-        logs.push(createLogEntry(clock, "info", `${definition.serviceId} exited (code=${code}, signal=${signal}).`));
+        record.exited = true;
+        record.exitCode = code;
+        record.signal = signal;
         childProcesses.delete(definition.serviceId);
+        const exitInfo = {
+          code: typeof code === "number" ? code : null,
+          signal: signal ?? null,
+        };
+        emitHook(
+          hooks.onLog,
+          createLogEntry(
+            clock,
+            "info",
+            `${definition.serviceId} exited (code=${exitInfo.code ?? "null"}, signal=${exitInfo.signal ?? "null"}).`,
+          ),
+        );
+        emitHook(hooks.onExit, exitInfo);
+        exitDeferred.resolve(exitInfo);
       });
 
       return {
         pid: child.pid ?? null,
         startedAt: createClockTimestamp(clock),
         detail: `Started ${definition.name}.`,
-        logs,
+        logs: [createLogEntry(clock, "info", `Started ${definition.serviceId} with pid ${child.pid ?? "unknown"}.`)],
+        exitPromise: record.exitPromise,
       };
     },
-    async stop(definition) {
-      const child = childProcesses.get(definition.serviceId);
-      if (!child) {
+    async stop(definition, state, hooks = {}) {
+      const record = childProcesses.get(definition.serviceId);
+      if (!record) {
         return {
           detail: `${definition.name} is already stopped.`,
           logs: [createLogEntry(clock, "info", `${definition.serviceId} stop requested without active child.`)],
         };
       }
 
-      child.kill("SIGTERM");
-      childProcesses.delete(definition.serviceId);
+      emitHook(hooks.onLog, createLogEntry(clock, "info", `Sending SIGTERM to ${definition.serviceId}.`));
+      record.child.kill("SIGTERM");
+
+      try {
+        await withTimeout(
+          record.exitPromise,
+          definition.stopTimeoutMs,
+          `${definition.name} did not exit before stop timeout.`,
+        );
+      } catch {
+        emitHook(hooks.onLog, createLogEntry(clock, "warning", `Sending SIGKILL to ${definition.serviceId}.`));
+        record.child.kill("SIGKILL");
+        await withTimeout(record.exitPromise, definition.stopTimeoutMs, `${definition.name} did not exit after SIGKILL.`);
+      }
 
       return {
         detail: `Stopped ${definition.name}.`,
@@ -211,12 +349,41 @@ export function createNodeProcessRuntime(options = {}) {
       };
     },
     async checkHealth(definition, state) {
-      const child = childProcesses.get(definition.serviceId);
-      return {
-        healthy: Boolean(child && state.pid),
-        detail: child ? `${definition.name} process is active.` : `${definition.name} process is not active.`,
-        logs: [createLogEntry(clock, "info", `Checked process health for ${definition.serviceId}.`)],
-      };
+      const record = childProcesses.get(definition.serviceId);
+      const healthUrl = resolveHealthUrl(definition);
+
+      if (!healthUrl) {
+        return {
+          healthy: Boolean(record && state.pid),
+          detail: record ? `${definition.name} process is active.` : `${definition.name} process is not active.`,
+          logs: [createLogEntry(clock, "info", `Checked process health for ${definition.serviceId}.`)],
+        };
+      }
+
+      try {
+        const response = await withTimeout(
+          fetch(healthUrl, { headers: { Accept: "application/json" } }),
+          DEFAULT_FETCH_TIMEOUT_MS,
+          `${definition.name} health check timed out.`,
+        );
+        const healthy = response.ok;
+        return {
+          healthy,
+          detail: healthy
+            ? `${definition.name} health check passed.`
+            : `${definition.name} health check returned HTTP ${response.status}.`,
+          logs: [createLogEntry(clock, "info", `Health check ${healthy ? "passed" : "failed"} for ${definition.serviceId}.`)],
+        };
+      } catch (error) {
+        if (record && state.pid) {
+          await sleep(1);
+        }
+        return {
+          healthy: false,
+          detail: `${definition.name} health check failed: ${toErrorMessage(error)}`,
+          logs: [createLogEntry(clock, "warning", `Health check failed for ${definition.serviceId}.`)],
+        };
+      }
     },
   };
 }
@@ -225,11 +392,13 @@ export class InMemoryServiceSupervisor {
   constructor(options = {}) {
     this.clock = options.clock ?? (() => new Date());
     this.logLimit = Number(options.logLimit ?? DEFAULT_LOG_LIMIT);
+    this.sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
     this.definitions = new Map();
     this.states = new Map();
+    this.operations = new Map();
     this.runtime = options.runtime ?? (DEFAULT_STUB_MODE
       ? createStubProcessRuntime({ clock: this.clock })
-      : createNodeProcessRuntime({ clock: this.clock }));
+      : createNodeProcessRuntime({ clock: this.clock, sleep: this.sleep }));
 
     for (const rawDefinition of options.services ?? []) {
       const definition = normalizeServiceDefinition(rawDefinition);
@@ -252,111 +421,41 @@ export class InMemoryServiceSupervisor {
   }
 
   async start(serviceId) {
-    const definition = this.requireDefinition(serviceId);
-    const state = this.requireState(serviceId);
-
-    if (state.state === ServiceStates.running && state.pid) {
-      return this.recordHealth(serviceId, true, `${definition.name} is already running.`);
-    }
-
-    this.updateState(serviceId, {
-      state: ServiceStates.starting,
-      recentLogs: appendRecentLog(
-        state.recentLogs,
-        createLogEntry(this.clock, "info", `Starting ${definition.name}.`),
-        this.logLimit,
-      ),
-    });
-
-    try {
-      const result = await this.runtime.start(definition, this.cloneState(state));
-      return this.updateState(serviceId, {
-        pid: result?.pid ?? state.pid ?? null,
-        startedAt: result?.startedAt ?? createClockTimestamp(this.clock),
-        lastHealthCheckAt: createClockTimestamp(this.clock),
-        state: ServiceStates.running,
-        detail: result?.detail ?? `${definition.name} started.`,
-        recentLogs: this.mergeLogs(state.recentLogs, [
-          createLogEntry(this.clock, "info", `Starting ${definition.name}.`),
-          ...(result?.logs ?? []),
-        ]),
-      });
-    } catch (error) {
-      return this.updateState(serviceId, {
-        state: ServiceStates.failed,
-        detail: error instanceof Error ? error.message : "Service failed to start.",
-        recentLogs: this.mergeLogs(state.recentLogs, [
-          createLogEntry(this.clock, "error", `Failed to start ${definition.name}.`),
-        ]),
-      });
-    }
+    return this.runLifecycleOperation(serviceId, "start", () => this.startInternal(serviceId));
   }
 
   async stop(serviceId) {
-    const definition = this.requireDefinition(serviceId);
-    const state = this.requireState(serviceId);
-
-    if (state.state === ServiceStates.stopped && !state.pid) {
-      return this.updateState(serviceId, {
-        detail: `${definition.name} is already stopped.`,
-        lastHealthCheckAt: createClockTimestamp(this.clock),
-        recentLogs: this.mergeLogs(state.recentLogs, [
-          createLogEntry(this.clock, "info", `${definition.name} stop skipped because it is already stopped.`),
-        ]),
-      });
-    }
-
-    this.updateState(serviceId, {
-      state: ServiceStates.stopping,
-      recentLogs: this.mergeLogs(state.recentLogs, [
-        createLogEntry(this.clock, "info", `Stopping ${definition.name}.`),
-      ]),
-    });
-
-    try {
-      const result = await this.runtime.stop(definition, this.cloneState(state));
-      return this.updateState(serviceId, {
-        pid: null,
-        state: ServiceStates.stopped,
-        detail: result?.detail ?? `${definition.name} stopped.`,
-        lastHealthCheckAt: createClockTimestamp(this.clock),
-        recentLogs: this.mergeLogs(state.recentLogs, [
-          createLogEntry(this.clock, "info", `Stopping ${definition.name}.`),
-          ...(result?.logs ?? []),
-        ]),
-      });
-    } catch (error) {
-      return this.updateState(serviceId, {
-        state: ServiceStates.failed,
-        detail: error instanceof Error ? error.message : "Service failed to stop.",
-        lastHealthCheckAt: createClockTimestamp(this.clock),
-        recentLogs: this.mergeLogs(state.recentLogs, [
-          createLogEntry(this.clock, "error", `Failed to stop ${definition.name}.`),
-        ]),
-      });
-    }
+    return this.runLifecycleOperation(serviceId, "stop", () => this.stopInternal(serviceId));
   }
 
   async restart(serviceId) {
-    await this.stop(serviceId);
-    return this.start(serviceId);
+    return this.runLifecycleOperation(serviceId, "restart", async () => {
+      await this.stopInternal(serviceId);
+      return this.startInternal(serviceId);
+    });
   }
 
   async ensureRunning(serviceId) {
-    const definition = this.requireDefinition(serviceId);
-    const state = this.requireState(serviceId);
+    return this.runLifecycleOperation(serviceId, "ensure-running", async () => {
+      const definition = this.requireDefinition(serviceId);
+      const state = this.requireState(serviceId);
 
-    if (state.state === ServiceStates.running && state.pid) {
-      const result = await this.runtime.checkHealth?.(definition, this.cloneState(state));
-      return this.recordHealth(
-        serviceId,
-        Boolean(result?.healthy),
-        result?.detail ?? `${definition.name} health check completed.`,
-        result?.logs ?? [],
-      );
-    }
+      if (state.state === ServiceStates.starting) {
+        return this.cloneState(state);
+      }
 
-    return this.start(serviceId);
+      if (state.state === ServiceStates.healthy) {
+        const result = await this.runtime.checkHealth?.(definition, this.cloneState(state));
+        return this.recordHealth(
+          serviceId,
+          Boolean(result?.healthy),
+          result?.detail ?? `${definition.name} health check completed.`,
+          result?.logs ?? [],
+        );
+      }
+
+      return this.startInternal(serviceId);
+    });
   }
 
   async healthCheck(serviceId) {
@@ -370,6 +469,286 @@ export class InMemoryServiceSupervisor {
       result?.detail ?? `${definition.name} health check completed.`,
       result?.logs ?? [],
     );
+  }
+
+  async startInternal(serviceId) {
+    const definition = this.requireDefinition(serviceId);
+    const state = this.requireState(serviceId);
+
+    if (state.state === ServiceStates.healthy) {
+      return this.recordHealth(serviceId, true, `${definition.name} is already healthy.`);
+    }
+
+    const externalStatus = await this.detectExternalService(serviceId, definition, state);
+    if (externalStatus) {
+      return externalStatus;
+    }
+
+    const startingLog = createLogEntry(this.clock, "info", `Starting ${definition.name}.`);
+    this.updateState(serviceId, {
+      state: ServiceStates.starting,
+      ownership: ServiceOwnership.managed,
+      detail: `Starting ${definition.name}.`,
+      recentLogs: this.mergeLogs(state.recentLogs, [startingLog]),
+    });
+
+    const runtimeHooks = {
+      onLog: (entry) => this.appendRuntimeLog(serviceId, entry),
+      onExit: (exitInfo) => this.handleManagedProcessExit(serviceId, exitInfo),
+    };
+
+    try {
+      const launchResult = await this.runtime.start(definition, this.cloneState(this.requireState(serviceId)), runtimeHooks);
+      let startupExitInfo;
+      let startupExited = false;
+      launchResult?.exitPromise?.then((exitInfo) => {
+        startupExited = true;
+        startupExitInfo = exitInfo;
+      });
+      this.updateState(serviceId, {
+        pid: launchResult?.pid ?? null,
+        startedAt: launchResult?.startedAt ?? createClockTimestamp(this.clock),
+        ownership: ServiceOwnership.managed,
+        detail: launchResult?.detail ?? `Started ${definition.name}.`,
+        recentLogs: this.mergeLogs(this.requireState(serviceId).recentLogs, launchResult?.logs ?? []),
+      });
+
+      return await this.waitForHealthyStartup(serviceId, definition, () => startupExited ? startupExitInfo : undefined);
+    } catch (error) {
+      return this.updateState(serviceId, {
+        pid: null,
+        state: ServiceStates.failed,
+        ownership: ServiceOwnership.managed,
+        detail: toErrorMessage(error) || "Service failed to start.",
+        recentLogs: this.mergeLogs(this.requireState(serviceId).recentLogs, [
+          createLogEntry(this.clock, "error", `Failed to start ${definition.name}.`),
+        ]),
+      });
+    }
+  }
+
+  async stopInternal(serviceId) {
+    const definition = this.requireDefinition(serviceId);
+    const state = this.requireState(serviceId);
+
+    if (state.ownership === ServiceOwnership.external) {
+      return this.updateState(serviceId, {
+        lastHealthCheckAt: createClockTimestamp(this.clock),
+        detail: `${definition.name} is running externally and cannot be stopped by the supervisor.`,
+        recentLogs: this.mergeLogs(state.recentLogs, [
+          createLogEntry(this.clock, "info", `${definition.name} stop skipped because ownership is external.`),
+        ]),
+      });
+    }
+
+    if ((state.state === ServiceStates.stopped || state.state === ServiceStates.failed) && !state.pid) {
+      return this.updateState(serviceId, {
+        ownership: ServiceOwnership.none,
+        detail: `${definition.name} is already stopped.`,
+        lastHealthCheckAt: createClockTimestamp(this.clock),
+        recentLogs: this.mergeLogs(state.recentLogs, [
+          createLogEntry(this.clock, "info", `${definition.name} stop skipped because it is already stopped.`),
+        ]),
+      });
+    }
+
+    this.updateState(serviceId, {
+      state: ServiceStates.stopping,
+      ownership: state.ownership === ServiceOwnership.managed ? ServiceOwnership.managed : ServiceOwnership.none,
+      detail: `Stopping ${definition.name}.`,
+      recentLogs: this.mergeLogs(state.recentLogs, [
+        createLogEntry(this.clock, "info", `Stopping ${definition.name}.`),
+      ]),
+    });
+
+    try {
+      const result = await this.runtime.stop(
+        definition,
+        this.cloneState(this.requireState(serviceId)),
+        { onLog: (entry) => this.appendRuntimeLog(serviceId, entry) },
+      );
+      return this.updateState(serviceId, {
+        pid: null,
+        state: ServiceStates.stopped,
+        ownership: ServiceOwnership.none,
+        detail: result?.detail ?? `${definition.name} stopped.`,
+        lastHealthCheckAt: createClockTimestamp(this.clock),
+        recentLogs: this.mergeLogs(this.requireState(serviceId).recentLogs, result?.logs ?? []),
+      });
+    } catch (error) {
+      return this.updateState(serviceId, {
+        state: ServiceStates.failed,
+        detail: toErrorMessage(error) || "Service failed to stop.",
+        lastHealthCheckAt: createClockTimestamp(this.clock),
+        recentLogs: this.mergeLogs(this.requireState(serviceId).recentLogs, [
+          createLogEntry(this.clock, "error", `Failed to stop ${definition.name}.`),
+        ]),
+      });
+    }
+  }
+
+  async waitForHealthyStartup(serviceId, definition, getExitInfo) {
+    const startedAt = Date.now();
+
+    while (Date.now() - startedAt <= definition.startupTimeoutMs) {
+      const current = this.requireState(serviceId);
+      const exitInfo = getExitInfo?.();
+      if (exitInfo) {
+        return this.updateState(serviceId, {
+          pid: null,
+          state: ServiceStates.failed,
+          ownership: ServiceOwnership.none,
+          detail: `${definition.name} exited unexpectedly (code=${exitInfo?.code ?? "null"}, signal=${exitInfo?.signal ?? "null"}).`,
+          lastHealthCheckAt: createClockTimestamp(this.clock),
+        });
+      }
+
+      if (current.state === ServiceStates.failed) {
+        return this.cloneState(current);
+      }
+
+      const result = await this.runtime.checkHealth?.(definition, this.cloneState(current));
+      if (result?.healthy) {
+        return this.updateState(serviceId, {
+          state: ServiceStates.healthy,
+          detail: result.detail ?? `${definition.name} is healthy.`,
+          lastHealthCheckAt: createClockTimestamp(this.clock),
+          ownership: current.ownership === ServiceOwnership.external ? ServiceOwnership.external : ServiceOwnership.managed,
+          recentLogs: this.mergeLogs(this.requireState(serviceId).recentLogs, result.logs ?? []),
+        });
+      }
+
+      this.updateState(serviceId, {
+        state: ServiceStates.starting,
+        detail: result?.detail ?? `Waiting for ${definition.name} health check to pass.`,
+        lastHealthCheckAt: createClockTimestamp(this.clock),
+        recentLogs: this.mergeLogs(this.requireState(serviceId).recentLogs, result?.logs ?? []),
+      });
+
+      await this.sleep(definition.healthPollIntervalMs);
+    }
+
+    const failedState = this.updateState(serviceId, {
+      pid: null,
+      state: ServiceStates.failed,
+      ownership: ServiceOwnership.managed,
+      detail: `${definition.name} startup timed out after ${definition.startupTimeoutMs}ms.`,
+      lastHealthCheckAt: createClockTimestamp(this.clock),
+      recentLogs: this.mergeLogs(this.requireState(serviceId).recentLogs, [
+        createLogEntry(this.clock, "error", `${definition.name} startup timed out.`),
+      ]),
+    });
+
+    try {
+      await this.runtime.stop(
+        definition,
+        failedState,
+        { onLog: (entry) => this.appendRuntimeLog(serviceId, entry) },
+      );
+    } catch {
+      // best effort cleanup after timeout
+    }
+
+    return this.updateState(serviceId, {
+      pid: null,
+      ownership: ServiceOwnership.none,
+    });
+  }
+
+  async detectExternalService(serviceId, definition, state) {
+    if (!definition.baseUrl) {
+      return undefined;
+    }
+
+    const result = await this.runtime.checkHealth?.(definition, this.cloneState(state));
+    if (!result?.healthy) {
+      return undefined;
+    }
+
+    return this.updateState(serviceId, {
+      pid: null,
+      state: ServiceStates.healthy,
+      ownership: ServiceOwnership.external,
+      startedAt: null,
+      detail: result.detail ?? `${definition.name} is already running externally.`,
+      lastHealthCheckAt: createClockTimestamp(this.clock),
+      recentLogs: this.mergeLogs(state.recentLogs, [
+        ...(result.logs ?? []),
+        createLogEntry(this.clock, "info", `${definition.name} is already running at ${definition.baseUrl}.`),
+      ]),
+    });
+  }
+
+  handleManagedProcessExit(serviceId, exitInfo) {
+    const state = this.states.get(serviceId);
+    if (!state || state.ownership !== ServiceOwnership.managed) {
+      return;
+    }
+
+    if (state.state === ServiceStates.stopping || state.state === ServiceStates.stopped) {
+      this.updateState(serviceId, {
+        pid: null,
+        state: ServiceStates.stopped,
+        ownership: ServiceOwnership.none,
+        detail: `${state.name} stopped.`,
+      });
+      return;
+    }
+
+    if (state.state === ServiceStates.failed && state.detail?.includes("startup timed out")) {
+      this.updateState(serviceId, {
+        pid: null,
+        ownership: ServiceOwnership.none,
+        lastHealthCheckAt: createClockTimestamp(this.clock),
+      });
+      return;
+    }
+
+    this.updateState(serviceId, {
+      pid: null,
+      state: ServiceStates.failed,
+      ownership: ServiceOwnership.none,
+      detail: `${state.name} exited unexpectedly (code=${exitInfo?.code ?? "null"}, signal=${exitInfo?.signal ?? "null"}).`,
+      lastHealthCheckAt: createClockTimestamp(this.clock),
+    });
+  }
+
+  appendRuntimeLog(serviceId, entry) {
+    const state = this.states.get(serviceId);
+    if (!state) {
+      return;
+    }
+
+    this.updateState(serviceId, {
+      recentLogs: appendRecentLog(state.recentLogs, entry, this.logLimit),
+    });
+  }
+
+  async runLifecycleOperation(serviceId, action, operation) {
+    const existing = this.operations.get(serviceId);
+    if (existing) {
+      if (existing.action === action || (action === "start" && existing.action === "ensure-running")) {
+        return existing.promise;
+      }
+
+      try {
+        await existing.promise;
+      } catch {
+        // allow follow-up lifecycle requests after previous failure
+      }
+    }
+
+    const promise = Promise.resolve()
+      .then(operation)
+      .finally(() => {
+        const current = this.operations.get(serviceId);
+        if (current?.promise === promise) {
+          this.operations.delete(serviceId);
+        }
+      });
+
+    this.operations.set(serviceId, { action, promise });
+    return promise;
   }
 
   requireDefinition(serviceId) {
@@ -397,7 +776,11 @@ export class InMemoryServiceSupervisor {
 
   recordHealth(serviceId, healthy, detail, logs = []) {
     const state = this.requireState(serviceId);
-    const nextState = healthy ? ServiceStates.running : state.pid ? ServiceStates.degraded : ServiceStates.stopped;
+    const nextState = healthy
+      ? ServiceStates.healthy
+      : state.ownership === ServiceOwnership.external || Boolean(state.pid)
+        ? ServiceStates.unhealthy
+        : ServiceStates.stopped;
 
     return this.updateState(serviceId, {
       state: nextState,
@@ -425,10 +808,12 @@ export class InMemoryServiceSupervisor {
       command: service.command,
       args: service.args,
       cwd: service.cwd,
+      baseUrl: service.baseUrl,
       pid: service.pid,
       startedAt: service.startedAt,
       lastHealthCheckAt: service.lastHealthCheckAt,
       state: service.state,
+      ownership: service.ownership,
       detail: service.detail,
     };
   }
@@ -448,6 +833,7 @@ export function createSupervisorServer(options = {}) {
     runtime: options.runtime,
     clock: options.clock,
     logLimit: options.logLimit,
+    sleep: options.sleep,
   });
   const host = options.host ?? DEFAULT_HOST;
   const port = Number(options.port ?? DEFAULT_PORT);
@@ -574,18 +960,34 @@ export function loadServiceDefinitionsFromEnvironment() {
   const rawDefinitions = process.env.SERVICE_SUPERVISOR_SERVICES;
 
   if (!rawDefinitions) {
+    const baseUrl = process.env.PYTHON_RUNTIME_BASE_URL || DEFAULT_PYTHON_RUNTIME_BASE_URL;
+    const launchTarget = resolveLaunchTarget(baseUrl);
     return [
       {
         serviceId: "python-runtime",
         name: "Python runtime",
-        command: process.env.PYTHON_RUNTIME_COMMAND || "python",
+        baseUrl,
+        command: process.env.PYTHON_RUNTIME_EXECUTABLE || DEFAULT_PYTHON_RUNTIME_EXECUTABLE,
         args: process.env.PYTHON_RUNTIME_ARGS
           ? process.env.PYTHON_RUNTIME_ARGS.split(" ").filter(Boolean)
-          : ["-m", "http.server", "9001"],
-        cwd: process.env.PYTHON_RUNTIME_CWD || process.cwd(),
-        healthCheckPath: "/health",
+          : [
+            "-m",
+            "uvicorn",
+            process.env.PYTHON_RUNTIME_ENTRYPOINT || DEFAULT_PYTHON_RUNTIME_ENTRYPOINT,
+            "--host",
+            launchTarget.host,
+            "--port",
+            String(launchTarget.port),
+          ],
+        cwd: process.env.PYTHON_RUNTIME_WORKDIR || DEFAULT_PYTHON_RUNTIME_WORKDIR,
+        env: parseJsonObject(process.env.PYTHON_RUNTIME_ENV_JSON),
+        healthCheckPath: process.env.PYTHON_RUNTIME_HEALTH_PATH || DEFAULT_PYTHON_RUNTIME_HEALTH_PATH,
+        startupTimeoutMs: normalizePositiveNumber(process.env.PYTHON_RUNTIME_STARTUP_TIMEOUT_MS, DEFAULT_STARTUP_TIMEOUT_MS),
+        healthPollIntervalMs: normalizePositiveNumber(process.env.PYTHON_RUNTIME_HEALTH_POLL_INTERVAL_MS, DEFAULT_HEALTH_POLL_INTERVAL_MS),
+        stopTimeoutMs: normalizePositiveNumber(process.env.SERVICE_SUPERVISOR_STOP_TIMEOUT_MS, DEFAULT_STOP_TIMEOUT_MS),
         metadata: {
           source: "default",
+          kind: "builtin-python-runtime",
         },
       },
     ];
@@ -597,6 +999,27 @@ export function loadServiceDefinitionsFromEnvironment() {
   }
 
   return parsed;
+}
+
+function parseJsonObject(rawValue) {
+  if (!rawValue?.trim()) {
+    return {};
+  }
+
+  const parsed = JSON.parse(rawValue);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Expected JSON object for environment variable map.");
+  }
+
+  return parsed;
+}
+
+function toErrorMessage(error) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return typeof error === "string" ? error : "Unknown error";
 }
 
 async function main() {
