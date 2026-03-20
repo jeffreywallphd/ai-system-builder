@@ -5,6 +5,7 @@ export default function ToolBrowser({
 }: {
   readonly tools: ReadonlyArray<{
     readonly id: string;
+    readonly slug: string;
     readonly title: string;
     readonly description?: string;
     readonly category?: string;

@@ -1,13 +1,23 @@
 import { CompositeNodeCatalogProvider } from "../../application/nodes/CompositeNodeCatalogProvider";
 import { Workflow } from "../../domain/workflows/Workflow";
 import { WorkflowConnection } from "../../domain/workflows/WorkflowConnection";
-import { WorkflowAuditInfo } from "../../domain/workflows/WorkflowMetadata";
+import {
+  WorkflowAuditInfo,
+  WorkflowMetadata,
+  WorkflowRuntimeProfile,
+} from "../../domain/workflows/WorkflowMetadata";
 import { MockNodeCatalogProvider } from "../../infrastructure/mocks/catalog/MockNodeCatalogProvider";
 import { ImplementationRegistryNodeCatalogProvider } from "../../infrastructure/nodes/ImplementationRegistryNodeCatalogProvider";
 import { createCompositeNodeImplementationRegistry } from "../../infrastructure/nodes/NodeProviderRegistryIndex";
-import sampleImagePipelineRecord from "../../dev/workflow-data/workflows/sample-image-pipeline.json";
-import sampleTextAnalysisRecord from "../../dev/workflow-data/workflows/sample-text-analysis.json";
-import basicRagPipelineRecord from "../../dev/workflow-data/workflows/basic-rag-pipeline.json";
+
+const WORKFLOW_SEED_MODULES = import.meta.glob("../../dev/workflow-data/workflows/*.json", {
+  eager: true,
+  import: "default",
+});
+const WORKFLOW_EXAMPLE_MODULES = import.meta.glob("../../dev/workflow-examples/*.workflow.json", {
+  eager: true,
+  import: "default",
+});
 
 const SEED_NODE_CATALOG_PROVIDER = new CompositeNodeCatalogProvider({
   providers: [
@@ -33,10 +43,43 @@ interface WorkflowSeedRecord {
     readonly author?: string;
     readonly tags?: ReadonlyArray<string>;
     readonly version?: string;
+    readonly isPublishedAsTool?: boolean;
+    readonly toolTitle?: string;
+    readonly toolDescription?: string;
+    readonly toolCategory?: string;
+    readonly toolSlug?: string;
+    readonly contextConfiguration?: {
+      readonly recipeSelections?: ReadonlyArray<{
+        readonly recipeId: string;
+        readonly alias?: string;
+        readonly isEnabled?: boolean;
+        readonly surfaceInTool?: boolean;
+      }>;
+      readonly selectedRecipeIds?: ReadonlyArray<string>;
+      readonly packageReferences?: ReadonlyArray<{
+        readonly packageId: string;
+        readonly alias?: string;
+        readonly version?: string;
+        readonly includeFragmentIds?: ReadonlyArray<string>;
+        readonly excludeFragmentIds?: ReadonlyArray<string>;
+        readonly isEnabled?: boolean;
+      }>;
+      readonly selectedPackageIds?: ReadonlyArray<string>;
+      readonly visibilityMode?: "basic" | "advanced";
+      readonly maxCharacters?: number;
+      readonly maxTokens?: number;
+      readonly trimPartialFragments?: boolean;
+      readonly includeKinds?: ReadonlyArray<string>;
+      readonly excludeKinds?: ReadonlyArray<string>;
+    };
   };
   readonly status?: "draft" | "ready" | "invalid" | "disabled" | "archived";
   readonly isEnabled?: boolean;
   readonly executionPolicy?: "acyclic-only" | "allow-cycles" | "engine-defined";
+  readonly runtimeProfile?: {
+    readonly preferredRuntime?: string;
+    readonly allowedRuntimes?: ReadonlyArray<string>;
+  };
   readonly audit?: WorkflowSeedAuditRecord;
   readonly nodes: ReadonlyArray<WorkflowSeedNodeRecord>;
   readonly connections: ReadonlyArray<WorkflowSeedConnectionRecord>;
@@ -93,14 +136,16 @@ interface WorkflowSeedAuditRecord {
   readonly updatedAt?: string;
 }
 
-export function createSeedWorkflows(): ReadonlyArray<Workflow> {
-  const seeds: ReadonlyArray<WorkflowSeedRecord> = [
-    sampleImagePipelineRecord as WorkflowSeedRecord,
-    sampleTextAnalysisRecord as WorkflowSeedRecord,
-    basicRagPipelineRecord as WorkflowSeedRecord,
-  ];
+function readWorkflowSeedRecords(): ReadonlyArray<WorkflowSeedRecord> {
+  return Object.freeze(
+    [...Object.values(WORKFLOW_SEED_MODULES), ...Object.values(WORKFLOW_EXAMPLE_MODULES)]
+      .filter((value): value is WorkflowSeedRecord => !!value && typeof value === "object" && "id" in value)
+      .sort((left, right) => left.id.localeCompare(right.id))
+  );
+}
 
-  return Object.freeze(seeds.map((record) => hydrateSeedWorkflow(record)));
+export function createSeedWorkflows(): ReadonlyArray<Workflow> {
+  return Object.freeze(readWorkflowSeedRecords().map((record) => hydrateSeedWorkflow(record)));
 }
 
 function hydrateSeedWorkflow(record: WorkflowSeedRecord): Workflow {
@@ -168,16 +213,28 @@ function hydrateSeedWorkflow(record: WorkflowSeedRecord): Workflow {
 
   return new Workflow({
     id: record.id,
-    metadata: {
+    metadata: new WorkflowMetadata({
       name: record.metadata.name,
       description: record.metadata.description,
       author: record.metadata.author,
       tags: record.metadata.tags,
       version: record.metadata.version,
-    },
+      isPublishedAsTool: record.metadata.isPublishedAsTool,
+      toolTitle: record.metadata.toolTitle,
+      toolDescription: record.metadata.toolDescription,
+      toolCategory: record.metadata.toolCategory,
+      toolSlug: record.metadata.toolSlug,
+      contextConfiguration: record.metadata.contextConfiguration,
+    }),
     status: record.status,
     isEnabled: record.isEnabled,
     executionPolicy: record.executionPolicy,
+    runtimeProfile: record.runtimeProfile
+      ? new WorkflowRuntimeProfile({
+          preferredRuntime: record.runtimeProfile.preferredRuntime as never,
+          allowedRuntimes: record.runtimeProfile.allowedRuntimes as never,
+        })
+      : undefined,
     audit: record.audit
       ? new WorkflowAuditInfo({
           createdAt: record.audit.createdAt
