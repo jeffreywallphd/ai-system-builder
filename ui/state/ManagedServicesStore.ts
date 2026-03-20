@@ -1,4 +1,5 @@
 import type { RuntimeEvent } from "../../application/runtime/RuntimeEvent";
+import type { ManagedServiceDefinitionInput } from "../../application/services/ManagedServiceDefinition";
 import type { ManagedServiceRecord, ManagedServicesService } from "../services/ManagedServicesService";
 
 export interface ManagedServicesStoreState {
@@ -75,6 +76,28 @@ export class ManagedServicesStore {
     });
   }
 
+  public async createService(definition: ManagedServiceDefinitionInput): Promise<void> {
+    await this.runMutation(undefined, () => this.managedServicesService.createService(definition));
+  }
+
+  public async updateService(serviceId: string, patch: ManagedServiceDefinitionInput): Promise<void> {
+    await this.runMutation(serviceId, (id) => this.managedServicesService.updateService(id, patch));
+  }
+
+  public async removeService(serviceId: string): Promise<void> {
+    this.patch({ isMutating: true, error: undefined });
+
+    try {
+      await this.managedServicesService.removeService(serviceId);
+      const nextSelected = this.state.selectedServiceId === serviceId ? undefined : this.state.selectedServiceId;
+      this.patch({ isMutating: false });
+      await this.refresh(nextSelected);
+    } catch (error) {
+      this.patch({ isMutating: false, error: toErrorMessage(error) });
+      throw error;
+    }
+  }
+
   public async start(serviceId: string): Promise<void> {
     await this.runMutation(serviceId, (id) => this.managedServicesService.startService(id));
   }
@@ -92,16 +115,17 @@ export class ManagedServicesStore {
   }
 
   private async runMutation(
-    serviceId: string,
+    serviceId: string | undefined,
     action: (serviceId: string) => Promise<ManagedServiceRecord>,
   ): Promise<void> {
     this.patch({ isMutating: true, error: undefined });
 
     try {
-      const updatedService = await action(serviceId);
-      const services = this.state.services.length > 0
+      const updatedService = await action(serviceId ?? "");
+      const existing = this.state.services.some((service) => service.id === updatedService.id);
+      const services = existing
         ? this.state.services.map((service) => service.id === updatedService.id ? updatedService : service)
-        : [updatedService];
+        : [...this.state.services, updatedService];
       this.patch({
         services: Object.freeze([...services]),
         selectedServiceId: updatedService.id,

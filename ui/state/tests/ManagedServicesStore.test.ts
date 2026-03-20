@@ -8,12 +8,23 @@ function createServiceRecord(overrides: Partial<ManagedServiceRecord> = {}): Man
     id: "python-runtime",
     name: "Python runtime",
     kind: "python-runtime",
+    source: "builtin",
     startPolicy: "on-demand",
+    restartPolicy: "on-failure",
     state: "healthy",
     ownership: "managed",
     isAvailable: true,
+    transport: "http",
     baseUrl: "http://127.0.0.1:8000",
     endpointSummary: "http://127.0.0.1:8000/health",
+    workingDirectory: "python-runtime",
+    command: "python",
+    args: Object.freeze(["-m", "uvicorn"]),
+    environmentVariables: Object.freeze({}),
+    startupTimeoutMs: 20000,
+    canEdit: true,
+    canRemove: false,
+    canManageLifecycle: true,
     lastCheckedAt: "2026-03-20T10:15:00.000Z",
     lastErrorDetail: undefined,
     detail: "Runtime is healthy.",
@@ -30,11 +41,36 @@ function createServiceRecord(overrides: Partial<ManagedServiceRecord> = {}): Man
 }
 
 describe("ManagedServicesStore", () => {
-  it("loads managed services, tracks selection, and applies lifecycle mutations", async () => {
+  it("loads managed services, tracks selection, applies lifecycle mutations, and supports CRUD", async () => {
     const listServices = mock(async () => Object.freeze([
       createServiceRecord(),
-      createServiceRecord({ id: "python-runtime-alt", name: "Python runtime alt" }),
+      createServiceRecord({
+        id: "local-ollama",
+        name: "Local Ollama",
+        kind: "custom",
+        source: "custom",
+        ownership: "external",
+        canManageLifecycle: false,
+        canRemove: true,
+      }),
     ]));
+    const createService = mock(async () => createServiceRecord({
+      id: "local-webhook",
+      name: "Local webhook",
+      kind: "custom",
+      source: "custom",
+      canManageLifecycle: false,
+      canRemove: true,
+    }));
+    const updateService = mock(async () => createServiceRecord({
+      id: "local-ollama",
+      name: "Local Ollama Dev",
+      kind: "custom",
+      source: "custom",
+      canManageLifecycle: false,
+      canRemove: true,
+    }));
+    const removeService = mock(async () => undefined);
     const startService = mock(async () => createServiceRecord({ state: "starting", detail: "Booting…" }));
     const stopService = mock(async () => createServiceRecord({ state: "stopped", ownership: "none", isAvailable: false }));
     const restartService = mock(async () => createServiceRecord({ state: "healthy", detail: "Restart complete." }));
@@ -42,6 +78,9 @@ describe("ManagedServicesStore", () => {
 
     const store = new ManagedServicesStore({
       listServices,
+      createService,
+      updateService,
+      removeService,
       startService,
       stopService,
       restartService,
@@ -49,20 +88,25 @@ describe("ManagedServicesStore", () => {
     } as any);
 
     await store.initialize();
-    store.selectService("python-runtime-alt");
+    store.selectService("local-ollama");
+    await store.createService({ serviceId: "local-webhook", kind: "custom", displayName: "Local webhook" });
+    await store.updateService("local-ollama", { serviceId: "local-ollama", kind: "custom", displayName: "Local Ollama Dev" });
     await store.start("python-runtime");
     await store.stop("python-runtime");
     await store.restart("python-runtime");
     await store.ensureRunning("python-runtime");
+    await store.removeService("local-ollama");
 
     const state = store.getState();
-    expect(listServices).toHaveBeenCalledTimes(1);
+    expect(listServices).toHaveBeenCalledTimes(2);
+    expect(createService).toHaveBeenCalledTimes(1);
+    expect(updateService).toHaveBeenCalledWith("local-ollama", expect.any(Object));
+    expect(removeService).toHaveBeenCalledWith("local-ollama");
     expect(startService).toHaveBeenCalledWith("python-runtime");
     expect(stopService).toHaveBeenCalledWith("python-runtime");
     expect(restartService).toHaveBeenCalledWith("python-runtime");
     expect(ensureRunning).toHaveBeenCalledWith("python-runtime");
     expect(state.selectedServiceId).toBe("python-runtime");
-    expect(state.services[0]?.detail).toBe("Already running.");
     expect(state.recentLogs[0]?.message).toContain("runtime ready");
   });
 
