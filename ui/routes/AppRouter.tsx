@@ -13,6 +13,7 @@ import ContextPage from "../pages/ContextPage";
 import McpPage from "../pages/McpPage";
 import NotFoundPage from "../pages/NotFoundPage";
 import WorkflowEditorPage from "../pages/WorkflowEditorPage";
+import ContextWorkbenchPage from "../pages/ContextWorkbenchPage";
 import WorkflowsPage from "../pages/WorkflowsPage";
 import ToolsPage from "../pages/ToolsPage";
 import ToolRunPage from "../pages/ToolRunPage";
@@ -48,6 +49,7 @@ export default function AppRouter({
             element: <WorkflowEditorPage />,
           },
           { path: ROUTE_PATHS.models, element: <ModelsPage /> },
+          { path: ROUTE_PATHS.workflowContextWorkbench, element: <ContextWorkbenchPage /> },
           { path: ROUTE_PATHS.context, element: <ContextPage /> },
           { path: ROUTE_PATHS.mcp, element: <McpPage /> },
           { path: ROUTE_PATHS.assets, element: <AssetsPage /> },

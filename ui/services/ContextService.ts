@@ -31,6 +31,18 @@ import {
   type ILoadContextRecipeResult,
 } from "../../application/context/LoadContextRecipeUseCase";
 import {
+  PreviewAgentContextUseCase,
+  type IPreviewAgentContextRequest,
+} from "../../application/context/PreviewAgentContextUseCase";
+import {
+  PreviewToolContextUseCase,
+  type IPreviewToolContextRequest,
+} from "../../application/context/PreviewToolContextUseCase";
+import {
+  PreviewWorkflowContextUseCase,
+  type IPreviewWorkflowContextRequest,
+} from "../../application/context/PreviewWorkflowContextUseCase";
+import {
   SearchContextPackagesUseCase,
   type ISearchContextPackagesRequest,
   type ISearchContextPackagesResult,
@@ -51,6 +63,9 @@ export interface IContextServiceOptions {
   readonly createContextRecipeUseCase: CreateContextRecipeUseCase;
   readonly listContextRecipesUseCase: ListContextRecipesUseCase;
   readonly loadContextRecipeUseCase: LoadContextRecipeUseCase;
+  readonly previewWorkflowContextUseCase: PreviewWorkflowContextUseCase;
+  readonly previewToolContextUseCase: PreviewToolContextUseCase;
+  readonly previewAgentContextUseCase: PreviewAgentContextUseCase;
 }
 
 export class ContextService {
@@ -63,6 +78,9 @@ export class ContextService {
   private readonly createContextRecipeUseCase: CreateContextRecipeUseCase;
   private readonly listContextRecipesUseCase: ListContextRecipesUseCase;
   private readonly loadContextRecipeUseCase: LoadContextRecipeUseCase;
+  private readonly previewWorkflowContextUseCase: PreviewWorkflowContextUseCase;
+  private readonly previewToolContextUseCase: PreviewToolContextUseCase;
+  private readonly previewAgentContextUseCase: PreviewAgentContextUseCase;
 
   constructor(options: IContextServiceOptions) {
     this.createContextPackageUseCase = options.createContextPackageUseCase;
@@ -74,6 +92,9 @@ export class ContextService {
     this.createContextRecipeUseCase = options.createContextRecipeUseCase;
     this.listContextRecipesUseCase = options.listContextRecipesUseCase;
     this.loadContextRecipeUseCase = options.loadContextRecipeUseCase;
+    this.previewWorkflowContextUseCase = options.previewWorkflowContextUseCase;
+    this.previewToolContextUseCase = options.previewToolContextUseCase;
+    this.previewAgentContextUseCase = options.previewAgentContextUseCase;
   }
 
   public async listContextPackages(
@@ -131,5 +152,17 @@ export class ContextService {
       contextPackageId,
       throwIfNotFound: false,
     });
+  }
+
+  public async previewWorkflowContext(request: IPreviewWorkflowContextRequest) {
+    return this.previewWorkflowContextUseCase.execute(request);
+  }
+
+  public async previewToolContext(request: IPreviewToolContextRequest) {
+    return this.previewToolContextUseCase.execute(request);
+  }
+
+  public async previewAgentContext(request: IPreviewAgentContextRequest) {
+    return this.previewAgentContextUseCase.execute(request);
   }
 }
