@@ -188,41 +188,56 @@ body.ui-canvas-locked .ui-page--editor-canvas-locked .ui-canvas-shell {
 .ui-rf-node__port-row {
   position: relative;
   display: flex;
-  align-items: center;
-  min-height: 48px;
+  align-items: flex-start;
+  min-height: 72px;
   overflow: visible;
 }
 
 .ui-rf-node__port-row--input {
   justify-content: flex-start;
+  padding-left: 0.1rem;
   padding-right: var(--space-xs);
 }
 
 .ui-rf-node__port-row--output {
   justify-content: flex-end;
+  padding-right: 0.1rem;
   padding-left: var(--space-xs);
 }
 
 .ui-rf-node__port-label {
   position: relative;
-  left: calc(var(--space-lg) * -1);
+  top: 1.9rem;
+  left: -0.55rem;
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2xs);
-  min-width: 0;
-  padding: 0.2rem 0.5rem;
-  border: 1px solid var(--color-border-soft);
-  border-radius: 999px;
-  background: rgba(15, 23, 36, 0.94);
-  box-shadow: var(--shadow-panel);
+  justify-content: center;
+  min-width: 2.75rem;
+  padding: 0;
   z-index: 2;
+  pointer-events: none;
 }
 
 .ui-rf-node__port-label--right {
   left: auto;
-  right: calc(var(--space-lg) * -1);
-  text-align: right;
-  justify-content: flex-end;
+  right: -0.55rem;
+  text-align: center;
+  justify-content: center;
+}
+
+.ui-rf-node__port-label--input {
+  text-align: center;
+}
+
+.ui-rf-node__port-type {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  color: var(--color-accent);
+  font-weight: 600;
+  line-height: 1.15;
+  text-transform: lowercase;
 }
 
 .ui-rf-node__handle {
@@ -234,6 +249,7 @@ body.ui-canvas-locked .ui-page--editor-canvas-locked .ui-canvas-shell {
     0 0 0 3px rgba(79, 156, 249, 0.18),
     0 0 18px rgba(79, 156, 249, 0.2);
   z-index: 3;
+  pointer-events: auto;
 }
 
 .ui-rf-node__properties {
