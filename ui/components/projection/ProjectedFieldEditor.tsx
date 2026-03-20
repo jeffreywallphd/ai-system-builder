@@ -25,6 +25,7 @@ function toNodePropertyField(field: ProjectedField): NodePropertyFieldViewModel 
     shouldClampToRange: field.shouldClampToRange,
     visibility: field.visibility,
     options: field.options,
+    modelSelection: field.modelSelection,
   });
 }
 

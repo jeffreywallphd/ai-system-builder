@@ -29,4 +29,9 @@ export interface ProjectedField {
   readonly shouldClampToRange: boolean;
   readonly presentation?: ProjectedFieldPresentation;
   readonly metadata?: Readonly<Record<string, unknown>>;
+  readonly modelSelection?: {
+    readonly tasks?: ReadonlyArray<string>;
+    readonly inputModalities?: ReadonlyArray<string>;
+    readonly outputModalities?: ReadonlyArray<string>;
+  };
 }
