@@ -57,6 +57,13 @@ function toProjectedField(
     step: property.constraints?.range?.step,
     shouldClampToRange: property.constraints?.range?.clamp ?? false,
     presentation: "default",
+    modelSelection: property.bindingProfile?.modelCompatibility
+      ? Object.freeze({
+          tasks: Object.freeze([...property.bindingProfile.modelCompatibility.supportedTasks]),
+          inputModalities: Object.freeze([...property.bindingProfile.modelCompatibility.inputModalities]),
+          outputModalities: Object.freeze([...property.bindingProfile.modelCompatibility.outputModalities]),
+        })
+      : undefined,
   });
 }
 
