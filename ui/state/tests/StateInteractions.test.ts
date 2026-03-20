@@ -170,4 +170,53 @@ describe("ui/state interactions", () => {
     expect(store.getState().currentWorkflow?.getNode("call-1")?.getProperty("toolName")?.value).toBe("echo");
     expect(store.getState().currentWorkflow?.getNode("call-1")?.getProperty("arg.message")?.name).toBe("message");
   });
+
+  it("applies projected workflow form input for context recipe and package bindings", async () => {
+    const workflow = new Workflow({
+      id: "wf-context",
+      metadata: new WorkflowMetadata({
+        name: "Workflow",
+        contextConfiguration: {
+          recipeSelections: [{ recipeId: "company-default", alias: "Company default", surfaceInTool: true }],
+          selectedRecipeIds: ["company-default"],
+          packageReferences: [{ packageId: "pkg-style", alias: "Style guide" }],
+          selectedPackageIds: ["pkg-style"],
+          visibilityMode: "advanced",
+        },
+      }),
+    });
+    const store = new WorkflowStore({
+      workflowService: {} as any,
+      nodeService: {} as any,
+      initialState: {
+        currentWorkflow: workflow,
+      },
+    });
+
+    store.applyFormInput({
+      "workflow.context.recipeSelections": [
+        { recipeId: "exec", alias: "Executive", isEnabled: true, surfaceInTool: true },
+        { recipeId: "hidden", alias: "Hidden", isEnabled: false, surfaceInTool: false },
+      ],
+      "workflow.context.selectedRecipeIds": ["exec", "hidden"],
+      "workflow.context.packageReferences": [
+        { packageId: "pkg-policy", alias: "Policy", isEnabled: true },
+        { packageId: "pkg-style", alias: "Style guide", isEnabled: false },
+      ],
+      "workflow.context.selectedPackageIds": ["pkg-style", "pkg-policy"],
+    });
+
+    expect(store.getState().currentWorkflow?.metadata.contextConfiguration?.recipeSelections).toEqual([
+      { recipeId: "exec", alias: "Executive", isEnabled: true, surfaceInTool: true },
+      { recipeId: "hidden", alias: "Hidden", isEnabled: false, surfaceInTool: false },
+    ]);
+    expect(store.getState().currentWorkflow?.metadata.contextConfiguration?.selectedRecipeIds).toEqual(["exec"]);
+    expect(store.getState().currentWorkflow?.metadata.contextConfiguration?.packageReferences).toEqual([
+      { packageId: "pkg-policy", alias: "Policy", version: undefined, includeFragmentIds: undefined, excludeFragmentIds: undefined, isEnabled: true },
+      { packageId: "pkg-style", alias: "Style guide", version: undefined, includeFragmentIds: undefined, excludeFragmentIds: undefined, isEnabled: false },
+    ]);
+    expect(store.getState().currentWorkflow?.metadata.contextConfiguration?.selectedPackageIds).toEqual(["pkg-policy"]);
+    expect(store.getState().isDirty).toBeTrue();
+  });
+
 });

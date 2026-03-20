@@ -20,6 +20,7 @@ import { ValidationPresenter } from "../presenters/ValidationPresenter";
 import { NodeStore, type INodeStoreState } from "../state/NodeStore";
 import { WorkflowStore, type IWorkflowStoreState } from "../state/WorkflowStore";
 import type { UiSettingsState } from "../settings/UiSettingsStore";
+import type { ContextStoreState } from "../state/ContextStore";
 
 export interface WorkflowEditorPageProps {
   readonly workflowStore?: WorkflowStore;
@@ -51,6 +52,19 @@ const fallbackNodeState: INodeStoreState = Object.freeze({
   error: undefined,
 });
 
+const fallbackContextState: ContextStoreState = Object.freeze({
+  packages: Object.freeze([]),
+  recipes: Object.freeze([]),
+  selectedPackageId: undefined,
+  selectedPackage: undefined,
+  searchQuery: "",
+  searchTags: Object.freeze([]),
+  isLoadingList: false,
+  isLoadingSelected: false,
+  isMutating: false,
+  error: undefined,
+});
+
 const mobileQuery = "(max-width: 767px)";
 
 function getContextInspection(output: Readonly<Record<string, unknown>> | undefined) {
@@ -70,6 +84,7 @@ export default function WorkflowEditorPage({
   const {
     workflowStore: injectedWorkflowStore,
     nodeStore: injectedNodeStore,
+    contextStore,
     workflowProjectionService,
     settingsStore,
   } = useUiDependencies();
@@ -82,6 +97,7 @@ export default function WorkflowEditorPage({
   const [workflowState, setWorkflowState] =
     useState<IWorkflowStoreState>(fallbackWorkflowState);
   const [nodeState, setNodeState] = useState<INodeStoreState>(fallbackNodeState);
+  const [contextState, setContextState] = useState<ContextStoreState>(fallbackContextState);
   const [settingsState, setSettingsState] = useState<UiSettingsState>(() => settingsStore.getState());
   const authoringSettings = settingsState.settings.authoring;
   const [fitViewNonce, setFitViewNonce] = useState(0);
@@ -142,8 +158,16 @@ export default function WorkflowEditorPage({
   useEffect(() => settingsStore.subscribe(setSettingsState), [settingsStore]);
 
   useEffect(() => {
+    return contextStore.subscribe(setContextState);
+  }, [contextStore]);
+
+  useEffect(() => {
     void nodeStore.refreshCatalog();
   }, [nodeStore]);
+
+  useEffect(() => {
+    void contextStore.initialize().catch(() => undefined);
+  }, [contextStore]);
 
   useEffect(() => {
     const existingWorkflow = workflowStore.getState().currentWorkflow;
@@ -456,12 +480,10 @@ export default function WorkflowEditorPage({
                   <WorkflowFormView
                     schema={formSchema}
                     output={workflowOutput}
+                    availableContextPackages={contextState.packages}
+                    availableContextRecipes={contextState.recipes}
                     onChange={(fieldId, value) => {
-                      const [nodeId, propertyId] = fieldId.split(".");
-                      if (!nodeId || !propertyId) {
-                        return;
-                      }
-                      workflowStore.updateNodeProperty(nodeId, propertyId, value);
+                      workflowStore.applyFormInput({ [fieldId]: value });
                     }}
                   />
                 ) : null}

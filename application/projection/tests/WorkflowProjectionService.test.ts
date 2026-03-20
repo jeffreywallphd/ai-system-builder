@@ -76,11 +76,13 @@ describe("WorkflowProjectionService", () => {
     });
   });
 
-  it("projects richer author-facing workflow context controls", () => {
+  it("projects richer author-facing workflow context controls including recipes", () => {
     const workflow = makeWorkflow({ id: "wf-context" }).withMetadata(
       new WorkflowMetadata({
         name: "WF",
         contextConfiguration: {
+          recipeSelections: [{ recipeId: "company-default", alias: "Company default", surfaceInTool: true }],
+          selectedRecipeIds: ["company-default"],
           packageReferences: [{ packageId: "pkg-style", alias: "Style guide" }],
           selectedPackageIds: ["pkg-style"],
           visibilityMode: "advanced",
@@ -93,6 +95,8 @@ describe("WorkflowProjectionService", () => {
     const contextSection = schema.sections.find((section) => section.id === "workflow-context");
 
     expect(contextSection?.fields.map((field) => field.label)).toEqual([
+      "Context recipes",
+      "Default recipe selection",
       "Context packages",
       "Default package selection",
       "Visible context detail",
@@ -102,4 +106,44 @@ describe("WorkflowProjectionService", () => {
     ]);
   });
 
+  it("keeps context recipe and package ordering deterministic for author forms and default selection", () => {
+    const workflow = makeWorkflow({ id: "wf-context" }).withMetadata(
+      new WorkflowMetadata({
+        name: "WF",
+        contextConfiguration: {
+          recipeSelections: [
+            { recipeId: "recipe-zeta", alias: "Zeta" },
+            { recipeId: "recipe-alpha", alias: "Alpha", isEnabled: false },
+            { recipeId: "recipe-beta", alias: "Beta", surfaceInTool: false },
+          ],
+          selectedRecipeIds: ["recipe-beta", "recipe-alpha", "recipe-zeta"],
+          packageReferences: [
+            { packageId: "pkg-zeta", alias: "Zeta" },
+            { packageId: "pkg-alpha", alias: "Alpha", isEnabled: false },
+            { packageId: "pkg-beta", alias: "Beta" },
+          ],
+          selectedPackageIds: ["pkg-beta", "pkg-alpha", "pkg-zeta"],
+          visibilityMode: "advanced",
+        },
+      })
+    );
+
+    const schema = new WorkflowProjectionService().projectToForm(workflow);
+    const contextSection = schema.sections.find((section) => section.id === "workflow-context");
+    const recipeField = contextSection?.fields.find((field) => field.id === "workflow.context.recipeSelections");
+    const recipeSelectionField = contextSection?.fields.find((field) => field.id === "workflow.context.selectedRecipeIds");
+    const selectionField = contextSection?.fields.find((field) => field.id === "workflow.context.selectedPackageIds");
+
+    expect((recipeField?.value as Array<{ recipeId: string }>).map((selection) => selection.recipeId)).toEqual([
+      "recipe-zeta",
+      "recipe-alpha",
+      "recipe-beta",
+    ]);
+    expect(recipeSelectionField?.value).toEqual(["recipe-zeta", "recipe-beta"]);
+    expect(selectionField?.options).toEqual([
+      { label: "Zeta", value: "pkg-zeta" },
+      { label: "Beta", value: "pkg-beta" },
+    ]);
+    expect(selectionField?.value).toEqual(["pkg-zeta", "pkg-beta"]);
+  });
 });

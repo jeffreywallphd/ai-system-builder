@@ -25,6 +25,18 @@ def test_prompt_template_formats_variables() -> None:
     assert result['prompt'] == 'Explain workflow orchestration.'
 
 
+def test_prompt_template_injects_runtime_context_variables() -> None:
+    executor = LangChainExecutor()
+    result = executor.execute(
+        'langchain.prompt_template',
+        inputs={'variables': {'topic': 'workflow orchestration'}},
+        properties={'template': 'Rules: {contextInstructions} / {topic}'},
+        runtime_context={'workflowContext': {'inspection': {'finalPromptText': 'Stay concise.'}}},
+    )
+    assert result['prompt'] == 'Rules: Stay concise. / workflow orchestration'
+    assert result['context'] == 'Stay concise.'
+
+
 def test_llm_chat_returns_deterministic_response() -> None:
     executor = LangChainExecutor()
     result = executor.execute(
@@ -128,6 +140,27 @@ def test_tool_execution_normalizes_tool_call_and_result() -> None:
     assert result['toolResult']['missingRequiredArguments'] == []
     assert 'Search project documents.' in result['toolResult']['output']
 
+
+
+def test_simple_agent_merges_runtime_context_into_system_prompt() -> None:
+    executor = LangChainExecutor()
+    result = executor.execute(
+        'langchain.simple_agent',
+        inputs={
+            'input': 'Please search the workflow docs for node editor tips.',
+            'tools': [{'name': 'search_docs', 'description': 'Search project documents.'}],
+        },
+        properties={
+            'model': 'assistant-demo',
+            'systemPrompt': 'Be helpful.',
+            'maxIterations': 1,
+            'verbose': True,
+        },
+        runtime_context={'workflowContext': {'inspection': {'finalPromptText': 'Use project terminology.'}}},
+    )
+
+    assert result['messages'][0]['role'] == 'system'
+    assert 'Use project terminology.' in result['messages'][0]['content']
 
 
 def test_simple_agent_uses_one_tool_in_bounded_mode() -> None:

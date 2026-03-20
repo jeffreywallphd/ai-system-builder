@@ -62,7 +62,17 @@ import { ConnectMcpServerUseCase } from "../../application/mcp/ConnectMcpServerU
 import { DisconnectMcpServerUseCase } from "../../application/mcp/DisconnectMcpServerUseCase";
 import { ReconnectMcpServerUseCase } from "../../application/mcp/ReconnectMcpServerUseCase";
 import { WorkflowContextService } from "../../application/context/WorkflowContextService";
-import { InMemoryContextPackageRepository } from "../../infrastructure/mocks/repositories/InMemoryContextPackageRepository";
+import { CreateContextPackageUseCase } from "../../application/context/CreateContextPackageUseCase";
+import { CreateContextRecipeUseCase } from "../../application/context/CreateContextRecipeUseCase";
+import { UpdateContextPackageUseCase } from "../../application/context/UpdateContextPackageUseCase";
+import { DeleteContextPackageUseCase } from "../../application/context/DeleteContextPackageUseCase";
+import { ListContextPackagesUseCase } from "../../application/context/ListContextPackagesUseCase";
+import { ListContextRecipesUseCase } from "../../application/context/ListContextRecipesUseCase";
+import { LoadContextPackageUseCase } from "../../application/context/LoadContextPackageUseCase";
+import { LoadContextRecipeUseCase } from "../../application/context/LoadContextRecipeUseCase";
+import { SearchContextPackagesUseCase } from "../../application/context/SearchContextPackagesUseCase";
+import { LocalStorageContextPackageRepository } from "../../infrastructure/browser/context/LocalStorageContextPackageRepository";
+import { LocalStorageContextRecipeRepository } from "../../infrastructure/browser/context/LocalStorageContextRecipeRepository";
 
 import { WorkflowProjectionService } from "../../application/projection/WorkflowProjectionService";
 import { WorkflowToolProjectionService } from "../../application/projection/WorkflowToolProjectionService";
@@ -74,6 +84,8 @@ import { InvokeToolCapabilityUseCase } from "../../application/tools/InvokeToolC
 import { SearchCapabilitiesUseCase } from "../../application/research/SearchCapabilitiesUseCase";
 import { ToolService } from "../services/ToolService";
 import { ToolStore } from "../state/ToolStore";
+import { ContextService } from "../services/ContextService";
+import { ContextStore } from "../state/ContextStore";
 import type { CreateUiDependenciesOptions, UiDependencies } from "./types";
 import { createSeedWorkflows } from "./seedWorkflows";
 import { CompositeToolCapabilityCatalog } from "../../infrastructure/tools/CompositeToolCapabilityCatalog";
@@ -98,8 +110,9 @@ export function createUiDependencies(
   const workflowRepository = createWorkflowRepository(config);
   const workflowExecutor = createWorkflowExecutor(config);
   const nodeCatalogProvider = createNodeCatalogProvider(config);
-  const contextPackageRepository = new InMemoryContextPackageRepository();
-  const workflowContextService = new WorkflowContextService(contextPackageRepository);
+  const contextPackageRepository = new LocalStorageContextPackageRepository();
+  const contextRecipeRepository = new LocalStorageContextRecipeRepository();
+  const workflowContextService = new WorkflowContextService(contextPackageRepository, contextRecipeRepository);
 
   const modelCompatibilityService = new ModelCompatibilityService();
   const nodeCompatibilityService = new NodeCompatibilityService(
@@ -268,8 +281,27 @@ export function createUiDependencies(
     workflowService,
     nodeService,
     mcpToolCallAuthoringService,
+    workflowProjectionService,
   });
   const mcpStore = new McpStore(mcpService);
+  const contextService = new ContextService({
+    createContextPackageUseCase: new CreateContextPackageUseCase({
+      contextPackageRepository,
+    }),
+    createContextRecipeUseCase: new CreateContextRecipeUseCase({
+      contextRecipeRepository,
+    }),
+    updateContextPackageUseCase: new UpdateContextPackageUseCase({
+      contextPackageRepository,
+    }),
+    deleteContextPackageUseCase: new DeleteContextPackageUseCase(contextPackageRepository),
+    listContextPackagesUseCase: new ListContextPackagesUseCase(contextPackageRepository),
+    loadContextPackageUseCase: new LoadContextPackageUseCase(contextPackageRepository),
+    searchContextPackagesUseCase: new SearchContextPackagesUseCase(contextPackageRepository),
+    listContextRecipesUseCase: new ListContextRecipesUseCase(contextRecipeRepository),
+    loadContextRecipeUseCase: new LoadContextRecipeUseCase(contextRecipeRepository),
+  });
+  const contextStore = new ContextStore(contextService);
 
   return Object.freeze({
     config,
@@ -284,6 +316,8 @@ export function createUiDependencies(
     toolStore: new ToolStore(toolService),
     mcpService,
     mcpStore,
+    contextService,
+    contextStore,
     workflowProjectionService,
     settingsStore,
   });

@@ -29,6 +29,13 @@ interface WorkflowRecord {
     readonly toolCategory?: string;
     readonly toolSlug?: string;
     readonly contextConfiguration?: {
+      readonly recipeSelections?: ReadonlyArray<{
+        readonly recipeId: string;
+        readonly alias?: string;
+        readonly isEnabled?: boolean;
+        readonly surfaceInTool?: boolean;
+      }>;
+      readonly selectedRecipeIds?: ReadonlyArray<string>;
       readonly packageReferences?: ReadonlyArray<{
         readonly packageId: string;
         readonly alias?: string;
@@ -230,6 +237,13 @@ export class LocalWorkflowRepository implements IWorkflowRepository {
         toolSlug: workflow.metadata.toolSlug,
         contextConfiguration: workflow.metadata.contextConfiguration
           ? {
+              recipeSelections: workflow.metadata.contextConfiguration.recipeSelections?.map((selection) => ({
+                recipeId: selection.recipeId,
+                alias: selection.alias,
+                isEnabled: selection.isEnabled,
+                surfaceInTool: selection.surfaceInTool,
+              })),
+              selectedRecipeIds: workflow.metadata.contextConfiguration.selectedRecipeIds,
               packageReferences: workflow.metadata.contextConfiguration.packageReferences?.map((reference) => ({
                 packageId: reference.packageId,
                 alias: reference.alias,

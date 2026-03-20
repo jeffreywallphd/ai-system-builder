@@ -87,6 +87,13 @@ export interface IWorkflowMetadata {
 
 export type WorkflowContextVisibilityMode = "basic" | "advanced";
 
+export interface IWorkflowContextRecipeSelection {
+  readonly recipeId: string;
+  readonly alias?: string;
+  readonly isEnabled?: boolean;
+  readonly surfaceInTool?: boolean;
+}
+
 export interface IWorkflowContextPackageReference {
   readonly packageId: string;
   readonly alias?: string;
@@ -97,6 +104,8 @@ export interface IWorkflowContextPackageReference {
 }
 
 export interface IWorkflowContextConfiguration {
+  readonly recipeSelections?: ReadonlyArray<IWorkflowContextRecipeSelection>;
+  readonly selectedRecipeIds?: ReadonlyArray<string>;
   readonly packageReferences?: ReadonlyArray<IWorkflowContextPackageReference>;
   readonly selectedPackageIds?: ReadonlyArray<string>;
   readonly visibilityMode?: WorkflowContextVisibilityMode;

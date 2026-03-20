@@ -7,6 +7,7 @@ import { LocalAssetRepository } from "../filesystem/LocalAssetRepository";
 import { LocalModelRepository } from "../filesystem/LocalModelRepository";
 import { LocalWorkflowRepository } from "../filesystem/LocalWorkflowRepository";
 import { LocalContextPackageRepository } from "../filesystem/LocalContextPackageRepository";
+import { LocalContextRecipeRepository } from "../filesystem/LocalContextRecipeRepository";
 import { DependencyContainer, type DependencyToken } from "./DependencyContainer";
 
 import { AssetCatalog } from "../../application/ports/AssetCatalog";
@@ -29,6 +30,7 @@ import type { IRemoteModelCatalog } from "../../application/ports/interfaces/IRe
 import type { IModelInstaller } from "../../application/ports/interfaces/IModelInstaller";
 import type { IWorkflowExecutor } from "../../application/ports/interfaces/IWorkflowExecutor";
 import type { IContextPackageRepository } from "../../application/ports/interfaces/IContextPackageRepository";
+import type { IContextRecipeRepository } from "../../application/ports/interfaces/IContextRecipeRepository";
 import type { IWorkflowSerializer } from "../../application/ports/interfaces/IWorkflowSerializer";
 import type { IMcpRuntimeClient } from "../../application/ports/interfaces/IMcpRuntimeClient";
 import type { IMcpServerCatalog } from "../../application/ports/interfaces/IMcpServerCatalog";
@@ -82,6 +84,7 @@ export const TOKENS = Object.freeze({
   WorkflowSerializer: Symbol("WorkflowSerializer"),
   WorkflowRepository: Symbol("WorkflowRepository"),
   ContextPackageRepository: Symbol("ContextPackageRepository"),
+  ContextRecipeRepository: Symbol("ContextRecipeRepository"),
   AssetRepository: Symbol("AssetRepository"),
   ModelRepository: Symbol("ModelRepository"),
   NodeImplementationRegistry: Symbol("NodeImplementationRegistry"),
@@ -219,7 +222,8 @@ export class InfrastructureRegistry {
         workflowToolProjectionService
       );
       const workflowContextService = new WorkflowContextService(
-        c.resolve<IContextPackageRepository>(TOKENS.ContextPackageRepository)
+        c.resolve<IContextPackageRepository>(TOKENS.ContextPackageRepository),
+        c.resolve<IContextRecipeRepository>(TOKENS.ContextRecipeRepository)
       );
       const runToolUseCase = new RunToolUseCase(
         workflowRepository,
@@ -261,6 +265,12 @@ export class InfrastructureRegistry {
       });
     });
 
+    container.registerSingleton<IContextRecipeRepository>(TOKENS.ContextRecipeRepository, (c) => {
+      return new LocalContextRecipeRepository({
+        fileStorage: c.resolve<IFileStorage>(TOKENS.FileStorage),
+        rootDirectory: `${options.paths.workflowsDirectory}/../context-recipes`,
+      });
+    });
 
     container.registerSingleton(TOKENS.AssetRepository, (c) => {
       return new LocalAssetRepository({

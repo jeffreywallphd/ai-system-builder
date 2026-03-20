@@ -2,6 +2,7 @@ import type {
   IWorkflowAuditInfo,
   IWorkflowContextConfiguration,
   IWorkflowContextPackageReference,
+  IWorkflowContextRecipeSelection,
   IWorkflowMetadata,
   IWorkflowRuntimeProfile,
   WorkflowContextVisibilityMode,
@@ -34,6 +35,35 @@ function normalizeOptionalInteger(value?: number): number | undefined {
   return Math.floor(value);
 }
 
+function freezeContextRecipeSelections(
+  selections?: ReadonlyArray<IWorkflowContextRecipeSelection>
+): ReadonlyArray<IWorkflowContextRecipeSelection> | undefined {
+  if (!selections || selections.length === 0) {
+    return undefined;
+  }
+
+  const deduped = new Map<string, IWorkflowContextRecipeSelection>();
+
+  for (const selection of selections) {
+    const recipeId = selection.recipeId.trim();
+    if (!recipeId || deduped.has(recipeId)) {
+      continue;
+    }
+
+    deduped.set(
+      recipeId,
+      Object.freeze({
+        recipeId,
+        alias: normalizeOptional(selection.alias),
+        isEnabled: selection.isEnabled ?? true,
+        surfaceInTool: selection.surfaceInTool ?? true,
+      })
+    );
+  }
+
+  return deduped.size > 0 ? Object.freeze([...deduped.values()]) : undefined;
+}
+
 function freezeContextPackageReferences(
   references?: ReadonlyArray<IWorkflowContextPackageReference>
 ): ReadonlyArray<IWorkflowContextPackageReference> | undefined {
@@ -41,25 +71,28 @@ function freezeContextPackageReferences(
     return undefined;
   }
 
-  const normalized = references
-    .map((reference) => {
-      const packageId = reference.packageId.trim();
-      if (!packageId) {
-        return undefined;
-      }
+  const deduped = new Map<string, IWorkflowContextPackageReference>();
 
-      return Object.freeze({
+  for (const reference of references) {
+    const packageId = reference.packageId.trim();
+    if (!packageId || deduped.has(packageId)) {
+      continue;
+    }
+
+    deduped.set(
+      packageId,
+      Object.freeze({
         packageId,
         alias: normalizeOptional(reference.alias),
         version: normalizeOptional(reference.version),
         includeFragmentIds: normalizeOptionalArray(reference.includeFragmentIds),
         excludeFragmentIds: normalizeOptionalArray(reference.excludeFragmentIds),
         isEnabled: reference.isEnabled ?? true,
-      });
-    })
-    .filter((reference): reference is IWorkflowContextPackageReference => Boolean(reference));
+      })
+    );
+  }
 
-  return normalized.length > 0 ? Object.freeze(normalized) : undefined;
+  return deduped.size > 0 ? Object.freeze([...deduped.values()]) : undefined;
 }
 
 function freezeContextConfiguration(
@@ -74,10 +107,20 @@ function freezeContextConfiguration(
     throw new Error("WorkflowMetadata.contextConfiguration.visibilityMode must be 'basic' or 'advanced'.");
   }
 
+  const recipeSelections = freezeContextRecipeSelections(configuration.recipeSelections);
+  const selectedRecipeIds = normalizeOptionalArray(configuration.selectedRecipeIds);
   const packageReferences = freezeContextPackageReferences(configuration.packageReferences);
   const selectedPackageIds = normalizeOptionalArray(configuration.selectedPackageIds);
   const includeKinds = normalizeOptionalArray(configuration.includeKinds);
   const excludeKinds = normalizeOptionalArray(configuration.excludeKinds);
+
+  if (
+    selectedRecipeIds &&
+    recipeSelections &&
+    selectedRecipeIds.some((recipeId) => !recipeSelections.some((selection) => selection.recipeId === recipeId))
+  ) {
+    throw new Error("WorkflowMetadata.contextConfiguration.selectedRecipeIds must reference configured context recipes.");
+  }
 
   if (
     selectedPackageIds &&
@@ -87,9 +130,27 @@ function freezeContextConfiguration(
     throw new Error("WorkflowMetadata.contextConfiguration.selectedPackageIds must reference configured context packages.");
   }
 
+  const enabledSelectedRecipeIds = selectedRecipeIds && recipeSelections
+    ? Object.freeze(
+        recipeSelections
+          .filter((selection) => selection.isEnabled !== false && selectedRecipeIds.includes(selection.recipeId))
+          .map((selection) => selection.recipeId)
+      )
+    : selectedRecipeIds;
+
+  const enabledSelectedPackageIds = selectedPackageIds && packageReferences
+    ? Object.freeze(
+        packageReferences
+          .filter((reference) => reference.isEnabled !== false && selectedPackageIds.includes(reference.packageId))
+          .map((reference) => reference.packageId)
+      )
+    : selectedPackageIds;
+
   const normalized: IWorkflowContextConfiguration = Object.freeze({
+    recipeSelections,
+    selectedRecipeIds: enabledSelectedRecipeIds,
     packageReferences,
-    selectedPackageIds,
+    selectedPackageIds: enabledSelectedPackageIds,
     visibilityMode: visibilityMode as WorkflowContextVisibilityMode | undefined,
     maxCharacters: normalizeOptionalInteger(configuration.maxCharacters),
     maxTokens: normalizeOptionalInteger(configuration.maxTokens),
@@ -99,6 +160,8 @@ function freezeContextConfiguration(
   });
 
   return (
+    normalized.recipeSelections ||
+    normalized.selectedRecipeIds ||
     normalized.packageReferences ||
     normalized.selectedPackageIds ||
     normalized.visibilityMode !== undefined ||

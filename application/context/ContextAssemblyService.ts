@@ -17,7 +17,7 @@ type ContextAssemblyPackageSelection = ContextAssemblyRequest["packages"][number
 
 interface IAssemblyCandidate {
   readonly fragment: ContextFragment;
-  readonly sourceType: "direct" | "package";
+  readonly sourceType: "direct" | "dynamic" | "package";
   readonly sourceOrder: number;
   readonly packageInput?: ContextAssemblyPackageSelection;
   readonly assemblyKey: string;
@@ -43,10 +43,15 @@ function getPrecedence(fragment: ContextFragment): number {
   return typeof metadataValue === "number" && Number.isFinite(metadataValue) ? metadataValue : 0;
 }
 
+function compareSourceType(left: IAssemblyCandidate["sourceType"], right: IAssemblyCandidate["sourceType"]): number {
+  const rank = { direct: 0, dynamic: 1, package: 2 } satisfies Record<IAssemblyCandidate["sourceType"], number>;
+  return rank[left] - rank[right];
+}
+
 function compareCandidates(left: IAssemblyCandidate, right: IAssemblyCandidate): number {
   return (
     right.precedence - left.precedence ||
-    (left.sourceType === right.sourceType ? 0 : left.sourceType === "direct" ? -1 : 1) ||
+    compareSourceType(left.sourceType, right.sourceType) ||
     left.sourceOrder - right.sourceOrder ||
     left.fragment.order - right.fragment.order ||
     left.fragment.id.localeCompare(right.fragment.id)
@@ -119,10 +124,13 @@ function createDecision(
 
 function buildProvenance(candidate: {
   readonly fragment: ContextFragment;
-  readonly sourceType: "direct" | "package";
+  readonly sourceType: "direct" | "dynamic" | "package";
   readonly packageId?: string;
   readonly packageName?: string;
   readonly packageAlias?: string;
+  readonly dynamicSourceId?: string;
+  readonly dynamicSourceType?: string;
+  readonly dynamicSourceLabel?: string;
 }): ReadonlyArray<IContextFragmentProvenance> {
   return Object.freeze([
     Object.freeze({
@@ -130,6 +138,9 @@ function buildProvenance(candidate: {
       packageId: normalizeOptional(candidate.packageId),
       packageName: normalizeOptional(candidate.packageName),
       packageAlias: normalizeOptional(candidate.packageAlias),
+      dynamicSourceId: normalizeOptional(candidate.dynamicSourceId),
+      dynamicSourceType: normalizeOptional(candidate.dynamicSourceType),
+      dynamicSourceLabel: normalizeOptional(candidate.dynamicSourceLabel),
       fragmentId: candidate.fragment.id,
       fragmentTitle: normalizeOptional(candidate.fragment.title),
     }),
@@ -152,6 +163,25 @@ export class ContextAssemblyService {
         precedence: getPrecedence(fragment),
         provenance: buildProvenance({ fragment, sourceType: "direct" }),
       });
+    }
+
+    for (const dynamicSource of normalizedRequest.dynamicSources) {
+      for (const fragment of dynamicSource.fragments) {
+        candidates.push({
+          fragment,
+          sourceType: "dynamic",
+          sourceOrder: dynamicSource.order,
+          assemblyKey: getAssemblyKey(fragment),
+          precedence: typeof fragment.metadata?.precedence === "number" ? fragment.metadata.precedence as number : dynamicSource.precedence,
+          provenance: buildProvenance({
+            fragment,
+            sourceType: "dynamic",
+            dynamicSourceId: dynamicSource.id,
+            dynamicSourceType: dynamicSource.sourceType,
+            dynamicSourceLabel: dynamicSource.label,
+          }),
+        });
+      }
     }
 
     for (const packageInput of normalizedRequest.packages) {

@@ -116,3 +116,49 @@ def test_workflow_executor_runs_simple_agent_with_mcp_tool_capabilities() -> Non
     assert state.outputs['agent']['toolResults'][0]['source']['serverId'] == 'local'
     assert state.outputs['agent']['stepResults'][0]['invocationArguments'] == {'input': 'Please echo this through the workflow agent.'}
     assert state.outputs['agent']['trace']['stoppedReason'] == 'max-iterations-reached'
+
+
+def test_workflow_executor_passes_execution_context_into_prompt_and_mcp_nodes() -> None:
+    executor = WorkflowExecutor(build_mcp_dispatcher())
+    request = ExecuteWorkflowRequest(
+        workflow_id='wf-context',
+        execution_context={
+            'workflowContext': {
+                'inspection': {'finalPromptText': 'Only use the local MCP echo tool.'},
+                'toolUsePolicy': {'mcp': {'allowedServerIds': ['local'], 'allowedToolNames': ['echo']}},
+            }
+        },
+        nodes=[
+            RuntimeNode(id='prompt', node_type='langchain.prompt_template', properties={'template': 'Rules: {contextInstructions}'}),
+            RuntimeNode(id='server', node_type='mcp.server_select', properties={'serverId': 'local'}),
+            RuntimeNode(id='catalog', node_type='mcp.tool_catalog', properties={'searchQuery': 'echo'}),
+            RuntimeNode(id='call', node_type='mcp.tool_call', properties={'stringifyResult': True}),
+        ],
+        connections=[
+            RuntimeConnection(
+                source_node_id='server',
+                source_port_id='serverHandle',
+                target_node_id='catalog',
+                target_port_id='serverHandle',
+            ),
+            RuntimeConnection(
+                source_node_id='server',
+                source_port_id='serverHandle',
+                target_node_id='call',
+                target_port_id='serverHandle',
+            ),
+            RuntimeConnection(
+                source_node_id='catalog',
+                source_port_id='tools',
+                target_node_id='call',
+                target_port_id='tool',
+            )
+        ],
+        workflow_inputs={'arguments': {'message': 'hello from workflow'}},
+    )
+
+    state = executor.execute(request)
+
+    assert state.outputs['prompt']['formatted_prompt'] == 'Rules: Only use the local MCP echo tool.'
+    assert state.outputs['call']['toolResult']['status'] == 'completed'
+    assert state.outputs['call']['toolResult']['toolName'] == 'echo'

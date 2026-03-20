@@ -56,6 +56,31 @@ describe("LangChainNodeExecutor", () => {
     expect(result.outputs.prompt).toBe("Explain workflow nodes.");
   });
 
+  it("injects assembled workflow context into prompt template variables", async () => {
+    const node = makeLangChainNode("n-prompt-context", "langchain.prompt_template", [
+      new NodeProperty({ id: "template", name: "Template", type: "multiline-text", value: "Rules: {contextInstructions}\nQuestion: {topic}" }),
+    ]);
+    const executor = new LangChainNodeExecutor();
+    const result = await executor.executeNode({
+      workflow: {} as never,
+      node,
+      inputAssets: [],
+      workflowInputs: {},
+      upstreamOutputs: {},
+      resolvedInputs: { variables: { topic: "workflow nodes" } },
+      executionMetadata: {
+        workflowContext: {
+          inspection: { finalPromptText: "Stay concise and cite sources." },
+          assembledContext: { promptText: "Stay concise and cite sources." },
+        },
+      },
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.outputs.prompt).toContain("Stay concise and cite sources.");
+    expect(result.outputs.context).toBe("Stay concise and cite sources.");
+  });
+
   it("assembles chat prompts with optional history and context", async () => {
     const node = makeLangChainNode("n-chat", "langchain.chat_prompt", [
       new NodeProperty({ id: "includeContext", name: "Include Context", type: "boolean", value: true }),
@@ -117,6 +142,34 @@ describe("LangChainNodeExecutor", () => {
     expect(result.outputs.inspection).toEqual({ id: "inspection" });
   });
 
+
+  it("injects workflow context into simple agent system prompts", async () => {
+    const node = makeLangChainNode("n-agent", "langchain.simple_agent", [
+      new NodeProperty({ id: "systemPrompt", name: "System Prompt", type: "multiline-text", value: "Be helpful." }),
+      new NodeProperty({ id: "maxIterations", name: "Max Iterations", type: "integer", value: 2 }),
+    ]);
+    const executor = new LangChainNodeExecutor();
+    const result = await executor.executeNode({
+      workflow: {} as never,
+      node,
+      inputAssets: [],
+      workflowInputs: {},
+      upstreamOutputs: {},
+      resolvedInputs: {
+        input: "Summarize the workflow",
+        tools: [{ name: "echo", description: "Echo the user input back." }],
+      },
+      executionMetadata: {
+        workflowContext: {
+          inspection: { finalPromptText: "Use project terminology." },
+          assembledContext: { promptText: "Use project terminology." },
+        },
+      },
+    });
+
+    expect(result.status).toBe("completed");
+    expect((result.outputs.messages as Array<{ role: string; content: string }>)[0]?.content).toContain("Use project terminology.");
+  });
 
   it("executes llm chat nodes with deterministic response metadata", async () => {
     const node = makeLangChainNode("n-llm", "langchain.llm_chat", [

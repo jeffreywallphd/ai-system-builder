@@ -43,6 +43,7 @@ export class PythonDelegatedWorkflowExecutionStrategy implements IWorkflowExecut
       executionId,
       workflowId: input.workflow.id,
       workflowInputs: input.parameters,
+      executionContext: input.executionMetadata,
       nodes: input.workflow.nodes.map((node) => ({
         id: node.id,
         nodeType: node.definition.type,

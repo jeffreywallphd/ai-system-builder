@@ -61,8 +61,6 @@ function matchesCriteria(record: ContextPackageRecord, criteria?: IContextPackag
       record.description,
       record.version,
       ...(record.tags ?? []),
-      ...record.fragments.map((fragment) => fragment.title),
-      ...record.fragments.map((fragment) => fragment.content),
     ]
       .filter(Boolean)
       .map((value) => normalize(String(value)));

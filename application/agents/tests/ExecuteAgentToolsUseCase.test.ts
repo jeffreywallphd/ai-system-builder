@@ -7,6 +7,7 @@ import type {
 } from "../../ports/interfaces/IAgentToolOrchestrator";
 import type { ToolCapabilityDescriptor } from "../../tools/models/ToolCapabilityDescriptor";
 import type { AgentExecutionResult } from "../models/AgentExecutionResult";
+import { ExecutionContextEnvelope } from "../../context/models/ExecutionContextEnvelope";
 
 function makeCapability(overrides: Partial<ToolCapabilityDescriptor> & Pick<ToolCapabilityDescriptor, "id">): ToolCapabilityDescriptor {
   return {
@@ -207,17 +208,31 @@ describe("ExecuteAgentToolsUseCase", () => {
       } satisfies IAgentToolOrchestrator
     );
 
-    await useCase.execute({
-      input: "Use the workflow tool",
-      context: {
-        promptText: "Policy: stay concise.",
-        selectedPackageIds: ["pkg-style"],
+    const executionContext = new ExecutionContextEnvelope({
+      packageReferences: [{ packageId: "pkg-style", alias: "Style" }],
+      assembledContext: {
+        fragments: [{ id: "ctx-1", kind: "persona", content: "Policy: stay concise.", order: 0, assemblyKey: "persona:ctx-1", precedence: 0, provenance: [] }],
+        sections: [{ kind: "persona", title: "Persona", fragments: [{ id: "ctx-1", kind: "persona", content: "Policy: stay concise.", order: 0, assemblyKey: "persona:ctx-1", precedence: 0, provenance: [] }], content: "Policy: stay concise." }],
+        promptText: "Persona:\nPolicy: stay concise.",
       },
+      inspection: {
+        assembledPromptText: "Persona:\nPolicy: stay concise.",
+        finalPromptText: "Policy: stay concise.",
+        finalFragmentIds: ["ctx-1"],
+        entries: [],
+      },
+      toolUsePolicy: { allowedProviderKinds: ["workflow"] },
     });
 
-    expect((capturedRequest?.metadata?.workflowContext as { promptText?: string })?.promptText).toBe(
+    await useCase.execute({
+      input: "Use the workflow tool",
+      context: executionContext,
+    });
+
+    expect((capturedRequest?.metadata?.workflowContext as { inspection?: { finalPromptText?: string } })?.inspection?.finalPromptText).toBe(
       "Policy: stay concise."
     );
+    expect(capturedRequest?.context).toBe(executionContext);
   });
 
   it("rejects invalid provider-kind selection requests before orchestration", async () => {
@@ -237,4 +252,36 @@ describe("ExecuteAgentToolsUseCase", () => {
       })
     ).rejects.toThrow("requires at least one provider kind");
   });
+
+  it("filters agent tools using context-aware MCP policy", async () => {
+    const workflowTool = makeCapability({ id: "workflow:tool-a" });
+    const mcpTool = makeCapability({
+      id: "mcp:restricted:echo",
+      provider: { kind: "mcp", id: "python-mcp-runtime", label: "MCP Tools" },
+      source: { kind: "mcp", serverId: "restricted", toolName: "echo" },
+    });
+    let capturedRequest: AgentToolOrchestrationRequest | undefined;
+    const useCase = new ExecuteAgentToolsUseCase(
+      makeCatalog([workflowTool, mcpTool]),
+      {
+        async execute(request) {
+          capturedRequest = request;
+          return makeExecutionResult(request);
+        },
+      } satisfies IAgentToolOrchestrator
+    );
+
+    await useCase.execute({
+      input: "Only use workflow tools",
+      context: new ExecutionContextEnvelope({
+        packageReferences: [],
+        assembledContext: { fragments: [{ id: "ctx-1", kind: "instructions", content: "Use workflow tools only.", order: 0, assemblyKey: "instructions:ctx-1", precedence: 0, provenance: [] }], sections: [{ kind: "instructions", title: "System Instructions", fragments: [{ id: "ctx-1", kind: "instructions", content: "Use workflow tools only.", order: 0, assemblyKey: "instructions:ctx-1", precedence: 0, provenance: [] }], content: "Use workflow tools only." }], promptText: "Use workflow tools only." },
+        inspection: { assembledPromptText: "Use workflow tools only.", finalPromptText: "Use workflow tools only.", finalFragmentIds: ["ctx-1"], entries: [] },
+        toolUsePolicy: { allowedProviderKinds: ["workflow"] },
+      }),
+    });
+
+    expect(capturedRequest?.selectedTools).toEqual([workflowTool]);
+  });
+
 });

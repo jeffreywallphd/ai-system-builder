@@ -190,12 +190,18 @@ function extractMatchedSources(
   add(fragment?.metadata?.packageId);
   add(fragment?.metadata?.packageAlias);
   add(fragment?.metadata?.packageName);
+  add(fragment?.metadata?.dynamicSourceId);
+  add(fragment?.metadata?.dynamicSourceType);
+  add(fragment?.metadata?.dynamicSourceLabel);
 
   for (const item of provenance ?? fragment?.provenance ?? []) {
     add(item.sourceType);
     add(item.packageId);
     add(item.packageAlias);
     add(item.packageName);
+    add(item.dynamicSourceId);
+    add(item.dynamicSourceType);
+    add(item.dynamicSourceLabel);
   }
 
   return Object.freeze([...matched].sort());

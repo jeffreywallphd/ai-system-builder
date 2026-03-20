@@ -1,7 +1,10 @@
+import type { IContextPackageSummary } from "../../../application/ports/interfaces/IContextPackageRepository";
+import type { IContextRecipeSummary } from "../../../application/ports/interfaces/IContextRecipeRepository";
 import type { ProjectedField } from "../../../application/projection/models/ProjectedField";
 import NodePropertyField from "../nodes/NodePropertyField";
 import type { NodePropertyFieldViewModel } from "../../presenters/NodePresenter";
 import ContextPackageReferenceFieldEditor from "./ContextPackageReferenceFieldEditor";
+import ContextRecipeSelectionFieldEditor from "./ContextRecipeSelectionFieldEditor";
 
 function toNodePropertyField(field: ProjectedField): NodePropertyFieldViewModel {
   return Object.freeze({
@@ -26,12 +29,32 @@ function toNodePropertyField(field: ProjectedField): NodePropertyFieldViewModel 
 export default function ProjectedFieldEditor({
   field,
   onChange,
+  availableContextPackages,
+  availableContextRecipes,
 }: {
   readonly field: ProjectedField;
   readonly onChange: (id: string, value: unknown) => void;
+  readonly availableContextPackages?: ReadonlyArray<IContextPackageSummary>;
+  readonly availableContextRecipes?: ReadonlyArray<IContextRecipeSummary>;
 }): JSX.Element {
   if (field.presentation === "context-package-references") {
-    return <ContextPackageReferenceFieldEditor field={field} onChange={onChange} />;
+    return (
+      <ContextPackageReferenceFieldEditor
+        field={field}
+        onChange={onChange}
+        availableContextPackages={availableContextPackages}
+      />
+    );
+  }
+
+  if (field.presentation === "context-recipe-selections") {
+    return (
+      <ContextRecipeSelectionFieldEditor
+        field={field}
+        onChange={onChange}
+        availableContextRecipes={availableContextRecipes}
+      />
+    );
   }
 
   return (

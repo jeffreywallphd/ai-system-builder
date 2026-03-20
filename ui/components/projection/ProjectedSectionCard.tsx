@@ -1,12 +1,18 @@
+import type { IContextPackageSummary } from "../../../application/ports/interfaces/IContextPackageRepository";
+import type { IContextRecipeSummary } from "../../../application/ports/interfaces/IContextRecipeRepository";
 import type { ProjectedSection } from "../../../application/projection/models/ProjectedSection";
 import ProjectedFieldEditor from "./ProjectedFieldEditor";
 
 export default function ProjectedSectionCard({
   section,
   onChange,
+  availableContextPackages,
+  availableContextRecipes,
 }: {
   readonly section: ProjectedSection;
   readonly onChange: (id: string, value: unknown) => void;
+  readonly availableContextPackages?: ReadonlyArray<IContextPackageSummary>;
+  readonly availableContextRecipes?: ReadonlyArray<IContextRecipeSummary>;
 }): JSX.Element {
   return (
     <div className="ui-card">
@@ -20,7 +26,13 @@ export default function ProjectedSectionCard({
 
         <div className="ui-stack ui-stack--sm">
           {section.fields.map((field) => (
-            <ProjectedFieldEditor key={field.id} field={field} onChange={onChange} />
+            <ProjectedFieldEditor
+              key={field.id}
+              field={field}
+              onChange={onChange}
+              availableContextPackages={availableContextPackages}
+              availableContextRecipes={availableContextRecipes}
+            />
           ))}
         </div>
       </div>
