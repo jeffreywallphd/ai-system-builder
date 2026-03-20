@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from app.core.mcp_config import load_mcp_runtime_config
+from app.mcp.provisioning import build_bootstrapped_mcp_runtime_config
 from app.execution.node_dispatcher import NodeDispatcher
 from app.execution.workflow_executor import WorkflowExecutor
 from app.mcp.registry import McpRegistry
@@ -17,7 +17,7 @@ def get_health_service() -> HealthService:
 
 @lru_cache
 def get_mcp_service() -> McpService:
-    config = load_mcp_runtime_config()
+    config = build_bootstrapped_mcp_runtime_config()
     registry = McpRegistry(config)
     sessions = McpSessionManager(registry)
     return McpService(registry=registry, sessions=sessions)

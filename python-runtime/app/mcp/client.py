@@ -180,6 +180,62 @@ class BoundedMcpClient:
                 metadata={"count": len(numbers)},
             )
 
+        if tool_name == "calculate":
+            operation = str(args.get("operation", "")).strip().lower()
+            left = args.get("left")
+            right = args.get("right")
+            if operation not in {"add", "subtract", "multiply", "divide"}:
+                return McpToolExecutionResult(
+                    execution_id=execution_id,
+                    server_id=self._server.id,
+                    tool_name=tool_name,
+                    status="failed",
+                    content=[],
+                    structured_content={},
+                    error_message="calculate requires an operation of add, subtract, multiply, or divide.",
+                )
+            if not isinstance(left, (int, float)) or not isinstance(right, (int, float)):
+                return McpToolExecutionResult(
+                    execution_id=execution_id,
+                    server_id=self._server.id,
+                    tool_name=tool_name,
+                    status="failed",
+                    content=[],
+                    structured_content={},
+                    error_message="calculate requires numeric left and right operands.",
+                )
+            if operation == "divide" and right == 0:
+                return McpToolExecutionResult(
+                    execution_id=execution_id,
+                    server_id=self._server.id,
+                    tool_name=tool_name,
+                    status="failed",
+                    content=[],
+                    structured_content={},
+                    error_message="Division by zero is not supported.",
+                )
+
+            result_value = {
+                "add": left + right,
+                "subtract": left - right,
+                "multiply": left * right,
+                "divide": left / right,
+            }[operation]
+            return McpToolExecutionResult(
+                execution_id=execution_id,
+                server_id=self._server.id,
+                tool_name=tool_name,
+                status="completed",
+                content=[{"type": "text", "text": str(result_value)}],
+                structured_content={
+                    "operation": operation,
+                    "left": left,
+                    "right": right,
+                    "result": result_value,
+                },
+                metadata={"serverKind": self._server.metadata.get("serverKind")},
+            )
+
         available = {tool.name for tool in self.list_tools(allow_disconnected=True)}
         if tool_name not in available:
             raise ValueError(f"Unknown MCP tool '{tool_name}' for server '{self._server.id}'.")
