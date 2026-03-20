@@ -1,5 +1,6 @@
 import type { IPythonRuntimeManager, PythonRuntimeManagerStatus } from "../../ports/interfaces/IPythonRuntimeManager";
 import type { IManagedServiceManager } from "../interfaces/IManagedServiceManager";
+import type { IManagedServiceStatusRefresher } from "../interfaces/IManagedServiceStatusRefresher";
 import type { IManagedServiceSupervisor } from "../interfaces/IManagedServiceSupervisor";
 import { PYTHON_RUNTIME_MANAGED_SERVICE_ID } from "../ManagedServiceIds";
 import {
@@ -30,7 +31,9 @@ export class ManagedServicePythonRuntimeManagerAdapter implements IPythonRuntime
   }
 
   public async checkAvailability(): Promise<boolean> {
-    const status = await this.supervisor.start(this.serviceId);
+    const status = hasStatusRefresher(this.manager)
+      ? await this.manager.refreshServiceStatus(this.serviceId)
+      : await this.supervisor.start(this.serviceId);
     this.cachedStatus = mapManagedServiceStatus(status);
     return this.cachedStatus.isAvailable;
   }
@@ -54,6 +57,12 @@ export class ManagedServicePythonRuntimeManagerAdapter implements IPythonRuntime
     const status = await this.supervisor.stop(this.serviceId);
     this.cachedStatus = mapManagedServiceStatus(status);
   }
+}
+
+function hasStatusRefresher(
+  manager: IManagedServiceManager,
+): manager is IManagedServiceManager & IManagedServiceStatusRefresher {
+  return typeof (manager as Partial<IManagedServiceStatusRefresher>).refreshServiceStatus === "function";
 }
 
 function createUnavailableStatus(serviceId: string): ManagedServiceStatus {
