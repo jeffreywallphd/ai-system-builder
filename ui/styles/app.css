@@ -13,6 +13,7 @@
 @import "./components/assets.css";
 @import "./components/canvas.css";
 @import "./components/runtime-console.css";
+@import "./components/managed-services.css";
 @import "./components/context-library.css";
 
 @import "./layout/container.css";

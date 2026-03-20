@@ -82,6 +82,7 @@ import { PreviewToolContextUseCase } from "../../application/context/PreviewTool
 import { PreviewAgentContextUseCase } from "../../application/context/PreviewAgentContextUseCase";
 import { LocalStorageContextPackageRepository } from "../../infrastructure/browser/context/LocalStorageContextPackageRepository";
 import { LocalStorageContextRecipeRepository } from "../../infrastructure/browser/context/LocalStorageContextRecipeRepository";
+import { createPythonRuntimeServiceDefinition } from "../../infrastructure/python/runtime/PythonRuntimeServiceDefinition";
 
 import { WorkflowProjectionService } from "../../application/projection/WorkflowProjectionService";
 import { WorkflowToolProjectionService } from "../../application/projection/WorkflowToolProjectionService";
@@ -95,6 +96,8 @@ import { ToolService } from "../services/ToolService";
 import { ToolStore } from "../state/ToolStore";
 import { ContextService } from "../services/ContextService";
 import { ContextStore } from "../state/ContextStore";
+import { ManagedServicesService } from "../services/ManagedServicesService";
+import { ManagedServicesStore } from "../state/ManagedServicesStore";
 import type { CreateUiDependenciesOptions, UiDependencies } from "./types";
 import { createSeedWorkflows } from "./seedWorkflows";
 import { CompositeToolCapabilityCatalog } from "../../infrastructure/tools/CompositeToolCapabilityCatalog";
@@ -210,6 +213,16 @@ export function createUiDependencies(
     modelService,
   });
 
+  const pythonRuntimeDefinition = createPythonRuntimeServiceDefinition(new PythonRuntimeConfig({
+    mode: settings.runtime.mode,
+    baseUrl: settings.runtime.mode === "disabled" ? undefined : settings.runtime.baseUrl,
+    timeoutMs: settings.runtime.requestTimeoutMs,
+    authToken: settings.runtime.authToken,
+    runtimeWorkingDirectory: settings.runtime.workingDirectory,
+    startupTimeoutMs: settings.runtime.startupTimeoutMs,
+    healthPollIntervalMs: settings.runtime.healthPollIntervalMs,
+    autoStartEnabled: settings.runtime.autoStartEnabled,
+  }));
   const pythonRuntimeConfig = new PythonRuntimeConfig({
     mode: settings.runtime.mode,
     baseUrl: settings.runtime.mode === "disabled" ? undefined : settings.runtime.baseUrl,
@@ -304,6 +317,12 @@ export function createUiDependencies(
     pythonRuntimeManager,
     mcpService,
   });
+  const managedServicesService = new ManagedServicesService(
+    pythonRuntimeManager,
+    runtimeEventStore,
+    pythonRuntimeDefinition,
+  );
+  const managedServicesStore = new ManagedServicesStore(managedServicesService);
   const mcpStore = new McpStore(mcpService);
   const previewWorkflowContextUseCase = new PreviewWorkflowContextUseCase(workflowContextService);
   const previewToolContextUseCase = new PreviewToolContextUseCase(
@@ -347,6 +366,8 @@ export function createUiDependencies(
     modelService,
     runtimeConsoleStore,
     pythonRuntimeManager,
+    managedServicesService,
+    managedServicesStore,
     toolService,
     toolStore: new ToolStore(toolService),
     mcpService,

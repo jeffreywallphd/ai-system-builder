@@ -11,6 +11,7 @@ import HomePage from "../pages/HomePage";
 import ModelsPage from "../pages/ModelsPage";
 import ContextPage from "../pages/ContextPage";
 import McpPage from "../pages/McpPage";
+import ManagedServicesPage from "../pages/ManagedServicesPage";
 import NotFoundPage from "../pages/NotFoundPage";
 import WorkflowEditorPage from "../pages/WorkflowEditorPage";
 import ContextWorkbenchPage from "../pages/ContextWorkbenchPage";
@@ -52,6 +53,7 @@ export default function AppRouter({
           { path: ROUTE_PATHS.workflowContextWorkbench, element: <ContextWorkbenchPage /> },
           { path: ROUTE_PATHS.context, element: <ContextPage /> },
           { path: ROUTE_PATHS.mcp, element: <McpPage /> },
+          { path: ROUTE_PATHS.services, element: <ManagedServicesPage /> },
           { path: ROUTE_PATHS.assets, element: <AssetsPage /> },
           { path: ROUTE_PATHS.settings, element: <SettingsPage /> },
         ],
