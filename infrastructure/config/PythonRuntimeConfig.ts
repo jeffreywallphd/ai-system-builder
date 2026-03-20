@@ -17,8 +17,11 @@ function resolveDefaultRuntimeWorkingDirectory(): string {
     return "python-runtime";
   }
 
-  const cwd = typeof process !== "undefined" && typeof process.cwd === "function"
-    ? process.cwd()
+  const processLike = typeof globalThis !== "undefined"
+    ? (globalThis as typeof globalThis & { process?: { cwd?: () => string } }).process
+    : undefined;
+  const cwd = typeof processLike?.cwd === "function"
+    ? processLike.cwd()
     : ".";
   return `${cwd}/python-runtime`;
 }

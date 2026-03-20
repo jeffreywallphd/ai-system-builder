@@ -1,15 +1,20 @@
 import type { IPythonRuntimeClient } from "../../../application/ports/interfaces/IPythonRuntimeClient";
-import {
-  PythonRuntimeOwnership,
-  PythonRuntimeStatuses,
-  type IPythonRuntimeManager,
-  type PythonRuntimeManagerStatus,
+import type {
+  IPythonRuntimeManager,
+  PythonRuntimeManagerStatus,
 } from "../../../application/ports/interfaces/IPythonRuntimeManager";
 import type { IRuntimeEventSink } from "../../../application/ports/interfaces/IRuntimeEventSink";
+import { ManagedServicePythonRuntimeManagerAdapter } from "../../../application/services/adapters/ManagedServicePythonRuntimeManagerAdapter";
+import {
+  ManagedServiceKinds,
+  ManagedServiceOwnership,
+  ManagedServiceStartPolicies,
+  ManagedServiceStates,
+} from "../../../application/services/interfaces/ManagedServiceTypes";
 import { RuntimeEventSources } from "../../../application/runtime/RuntimeEvent";
 import { PythonRuntimeMode } from "../../config/PythonRuntimeMode";
 import type { PythonRuntimeConfig } from "../../config/PythonRuntimeConfig";
-import { PythonRuntimeState } from "./PythonRuntimeState";
+import { BrowserManagedServiceManager } from "../../services/BrowserManagedServiceManager";
 
 export interface BrowserPythonRuntimeManagerOptions {
   readonly client: IPythonRuntimeClient;
@@ -18,82 +23,69 @@ export interface BrowserPythonRuntimeManagerOptions {
 }
 
 export class BrowserPythonRuntimeManager implements IPythonRuntimeManager {
-  private readonly client: IPythonRuntimeClient;
-  private readonly eventSink: IRuntimeEventSink;
-  private readonly config: PythonRuntimeConfig;
-  private state: PythonRuntimeState;
+  private readonly adapter: ManagedServicePythonRuntimeManagerAdapter;
 
   constructor(options: BrowserPythonRuntimeManagerOptions) {
-    this.client = options.client;
-    this.eventSink = options.eventSink;
-    this.config = options.config;
-    this.state = new PythonRuntimeState({
-      status: PythonRuntimeStatuses.unavailable,
-      detail: this.config.mode === PythonRuntimeMode.disabled
-        ? "Python runtime is disabled in settings."
-        : "Python runtime is not connected.",
+    const serviceManager = new BrowserManagedServiceManager({
+      eventSink: options.eventSink,
+      registrations: [
+        {
+          descriptor: {
+            id: "python-runtime",
+            kind: ManagedServiceKinds.pythonRuntime,
+            name: "Python runtime",
+            description: "Browser-observed Python runtime service.",
+            startPolicy: options.config.mode === PythonRuntimeMode.disabled
+              ? ManagedServiceStartPolicies.disabled
+              : ManagedServiceStartPolicies.externalOnly,
+          },
+          initialDetail: options.config.mode === PythonRuntimeMode.disabled
+            ? "Python runtime is disabled in settings."
+            : "Python runtime is not connected.",
+          runtimeEventSource: RuntimeEventSources.pythonRuntime,
+          probe: async () => {
+            if (options.config.mode === PythonRuntimeMode.disabled) {
+              return {
+                state: ManagedServiceStates.disabled,
+                isAvailable: false,
+                ownership: ManagedServiceOwnership.none,
+                detail: "Python runtime is disabled in settings.",
+              };
+            }
+
+            const health = await options.client.health();
+            const isHealthy = health.status === "ok";
+            return {
+              state: isHealthy ? ManagedServiceStates.running : ManagedServiceStates.degraded,
+              isAvailable: isHealthy,
+              ownership: isHealthy ? ManagedServiceOwnership.external : ManagedServiceOwnership.none,
+              detail: isHealthy ? undefined : "Python runtime endpoint is reachable but not healthy.",
+            };
+          },
+        },
+      ],
+    });
+
+    this.adapter = new ManagedServicePythonRuntimeManagerAdapter({
+      manager: serviceManager,
+      supervisor: serviceManager,
+      serviceId: "python-runtime",
     });
   }
 
+  public checkAvailability(): Promise<boolean> {
+    return this.adapter.checkAvailability();
+  }
+
+  public ensureRuntimeAvailability(): Promise<PythonRuntimeManagerStatus> {
+    return this.adapter.ensureRuntimeAvailability();
+  }
+
   public getStatus(): PythonRuntimeManagerStatus {
-    return this.state;
+    return this.adapter.getStatus();
   }
 
-  public async checkAvailability(): Promise<boolean> {
-    if (this.config.mode === PythonRuntimeMode.disabled) {
-      this.state = new PythonRuntimeState({
-        status: PythonRuntimeStatuses.unavailable,
-        owner: PythonRuntimeOwnership.none,
-        detail: "Python runtime is disabled in settings.",
-      });
-      this.emitInfo("Python runtime is disabled in browser settings.");
-      return false;
-    }
-
-    this.emitInfo("Checking Python runtime health.");
-
-    try {
-      const health = await this.client.health();
-      const isHealthy = health.status === "ok";
-      this.state = new PythonRuntimeState({
-        status: isHealthy ? PythonRuntimeStatuses.healthy : PythonRuntimeStatuses.unhealthy,
-        owner: isHealthy ? PythonRuntimeOwnership.external : PythonRuntimeOwnership.none,
-        detail: isHealthy ? undefined : "Python runtime endpoint is reachable but not healthy.",
-      });
-
-      if (isHealthy) {
-        this.emitInfo("Python runtime is healthy.");
-      } else {
-        this.emitInfo("Python runtime endpoint reported an unhealthy status.");
-      }
-
-      return isHealthy;
-    } catch {
-      this.state = new PythonRuntimeState({
-        status: PythonRuntimeStatuses.unavailable,
-        owner: PythonRuntimeOwnership.none,
-        detail: "Python runtime endpoint is unavailable from the browser environment.",
-      });
-      this.emitInfo("Python runtime is unavailable from the browser environment.");
-      return false;
-    }
-  }
-
-  public async ensureRuntimeAvailability(): Promise<PythonRuntimeManagerStatus> {
-    await this.checkAvailability();
-
-    if (!this.state.isAvailable) {
-      this.emitInfo("Browser UI will continue without managing a local Python runtime process.");
-    }
-
-    return this.state;
-  }
-
-  public async stopManagedRuntime(): Promise<void> {
-    this.emitInfo("No managed Python runtime process is available in the browser environment.");
-  }
-
-  private emitInfo(message: string): void {
-    this.eventSink.emit({ source: RuntimeEventSources.pythonRuntime, severity: "info", message });
+  public stopManagedRuntime(): Promise<void> {
+    return this.adapter.stopManagedRuntime();
   }
 }
