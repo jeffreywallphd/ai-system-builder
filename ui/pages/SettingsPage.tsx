@@ -204,7 +204,7 @@ export default function SettingsPage(): JSX.Element {
           </div>
 
           <McpRuntimeStatusPanel
-            status={undefined}
+            status={mcpState.runtimeStatus}
             tools={[]}
             servers={mcpState.configuredServers}
             searchQuery={mcpState.searchQuery}

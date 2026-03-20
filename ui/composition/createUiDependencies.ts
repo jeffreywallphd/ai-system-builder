@@ -55,6 +55,7 @@ import { PythonBackedMcpToolExecutor } from "../../infrastructure/python/mcp/Pyt
 import { ListConfiguredMcpServersUseCase } from "../../application/mcp/ListConfiguredMcpServersUseCase";
 import { SearchMcpServersUseCase } from "../../application/mcp/SearchMcpServersUseCase";
 import { AddConfiguredMcpServerUseCase } from "../../application/mcp/AddConfiguredMcpServerUseCase";
+import { GetMcpConnectionStatusUseCase } from "../../application/mcp/GetMcpConnectionStatusUseCase";
 import { GetMcpServerStatusUseCase } from "../../application/mcp/GetMcpServerStatusUseCase";
 import { SearchMcpToolsUseCase } from "../../application/mcp/SearchMcpToolsUseCase";
 import { GetMcpToolDescriptorUseCase } from "../../application/mcp/GetMcpToolDescriptorUseCase";
@@ -276,6 +277,7 @@ export function createUiDependencies(
     new ListConfiguredMcpServersUseCase(mcpServerCatalog),
     new SearchMcpServersUseCase(mcpClient),
     new AddConfiguredMcpServerUseCase(persistedMcpServerRepository),
+    new GetMcpConnectionStatusUseCase(mcpServerCatalog),
     new GetMcpServerStatusUseCase(mcpServerCatalog),
     new ConnectMcpServerUseCase(mcpServerManager),
     new DisconnectMcpServerUseCase(mcpServerManager),

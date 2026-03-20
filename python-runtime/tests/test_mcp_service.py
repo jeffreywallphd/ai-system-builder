@@ -145,6 +145,27 @@ def test_mcp_service_executes_bounded_tool() -> None:
     assert result.structured_content["total"] == 6
 
 
+def test_mcp_service_executes_default_calculator_tool() -> None:
+    service = build_service(
+        McpRuntimeConfig(
+            enabled=True,
+            servers_json='[{"id": "local-calculator", "name": "Local Calculator", "transport": "stdio", "command": "python", "args": ["server.py"], "metadata": {"serverKind": "workspace-local"}, "mock_tools": [{"name": "calculate", "inputSchema": {"type": "object", "required": ["operation", "left", "right"], "properties": {"operation": {"type": "string"}, "left": {"type": "number"}, "right": {"type": "number"}}}}]}]'
+        )
+    )
+
+    result = service.execute_tool(
+        McpToolExecutionRequest(
+            server_id="local-calculator",
+            tool_name="calculate",
+            arguments={"operation": "multiply", "left": 6, "right": 7},
+        )
+    )
+
+    assert result.status == "completed"
+    assert result.structured_content["result"] == 42
+    assert result.metadata["serverKind"] == "workspace-local"
+
+
 def test_mcp_service_degrades_when_a_server_cannot_connect() -> None:
     service = build_service(
         McpRuntimeConfig(

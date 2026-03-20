@@ -22,10 +22,36 @@ export function AppProviders({
   const dependencies = useMemo(() => createUiDependencies({ config }), [config]);
 
   useEffect(() => {
-    void dependencies.runtimeConsoleStore.initializeRuntime();
-    void dependencies.mcpStore.initialize().catch(() => undefined);
+    let isCancelled = false;
+
+    const bootstrap = async (): Promise<void> => {
+      const startupTimeoutMs = dependencies.settingsStore.getSettings().runtime.startupTimeoutMs;
+      const startedAt = Date.now();
+
+      await dependencies.runtimeConsoleStore.initializeRuntime();
+
+      while (!isCancelled) {
+        try {
+          await dependencies.mcpStore.initialize();
+          await dependencies.runtimeConsoleStore.refreshHealth();
+          await dependencies.workflowStore.refreshCurrentWorkflowMcpTooling();
+          return;
+        } catch {
+          await dependencies.runtimeConsoleStore.refreshHealth().catch(() => undefined);
+
+          if (Date.now() - startedAt >= startupTimeoutMs) {
+            return;
+          }
+
+          await sleep(500);
+        }
+      }
+    };
+
+    void bootstrap().catch(() => undefined);
 
     return () => {
+      isCancelled = true;
       dependencies.runtimeConsoleStore.dispose();
     };
   }, [dependencies]);
@@ -45,4 +71,8 @@ export function useUiDependencies(): UiDependencies {
   }
 
   return value;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

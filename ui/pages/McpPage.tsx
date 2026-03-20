@@ -4,6 +4,7 @@ import { useUiDependencies } from "../composition/AppProviders";
 import type { McpStoreState } from "../state/McpStore";
 
 const fallbackState: McpStoreState = Object.freeze({
+  runtimeStatus: undefined,
   configuredServers: Object.freeze([]),
   discoveredServers: Object.freeze([]),
   selectedServerId: undefined,
