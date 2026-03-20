@@ -21,12 +21,16 @@ export default function SettingsPage(): JSX.Element {
       return state.saveError;
     }
 
+    if (state.isAutoSaving) {
+      return "Saving changes to this browser profile…";
+    }
+
     if (!state.lastSavedAt) {
       return "Changes save automatically to this browser profile.";
     }
 
     return `Saved locally at ${new Date(state.lastSavedAt).toLocaleTimeString()}.`;
-  }, [state.lastSavedAt, state.saveError]);
+  }, [state.isAutoSaving, state.lastSavedAt, state.saveError]);
 
   const isAdvancedExpanded = (sectionId: string): boolean => expandedAdvancedSections.includes(sectionId);
 

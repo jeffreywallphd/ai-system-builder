@@ -72,6 +72,7 @@ describe("UiSettingsStore", () => {
     });
 
     store.setWorkspaceDataMode("production");
+    store.dispose();
 
     expect(store.getSettings().development.workspaceDataMode).toBe("production");
     expect(store.getSettings().workspace.rootDirectory).toBe("user/workflow-data");
@@ -79,7 +80,7 @@ describe("UiSettingsStore", () => {
     expect(saved).toEqual(["user/workflow-data"]);
   });
 
-  it("persists updates immediately when a setting changes", () => {
+  it("auto-saves when a setting changes", () => {
     const saved: Array<string> = [];
     const storage: UiSettingsStorage = {
       load: () => undefined,
@@ -90,6 +91,7 @@ describe("UiSettingsStore", () => {
 
     const store = new UiSettingsStore({ config: createConfig(), storage });
     store.updateSection("models", { installDirectory: "shared/new-library" });
+    store.dispose();
 
     expect(store.getSettings().models.installDirectory).toBe("shared/new-library");
     expect(saved).toEqual(["shared/new-library"]);
@@ -107,6 +109,7 @@ describe("UiSettingsStore", () => {
 
     const store = new UiSettingsStore({ config: createConfig(), storage: adapter });
     store.updateSection("development", { devSyncBaseUrl: "http://dev-sync.local" });
+    store.dispose();
 
     expect(adapter.load()?.development?.devSyncBaseUrl).toBe("http://dev-sync.local");
   });

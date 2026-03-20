@@ -22,6 +22,35 @@ describe("ui/state interactions", () => {
     expect(store.getState().currentWorkflow).toBe(created);
     expect(store.getState().isDirty).toBeTrue();
     expect(store.getState().isLoading).toBeFalse();
+    expect(store.getState().actionHistory.entries[store.getState().actionHistory.entries.length - 1]?.type).toBe("workflow-created");
+  });
+
+  it("auto-saves dirty workflow changes and records last saved time", async () => {
+    const workflow = { id: "wf-1", metadata: { name: "Workflow" }, nodes: [] } as any;
+    const saved: string[] = [];
+    const store = new WorkflowStore({
+      workflowService: {
+        saveWorkflow: async (currentWorkflow: any) => {
+          saved.push(currentWorkflow.id);
+          return currentWorkflow;
+        },
+        renameWorkflow: (currentWorkflow: any, name: string) => ({
+          ...currentWorkflow,
+          metadata: { ...currentWorkflow.metadata, name },
+        }),
+      } as any,
+      nodeService: {} as any,
+      initialState: {
+        currentWorkflow: workflow,
+      },
+    });
+
+    store.renameCurrentWorkflow("Renamed");
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+
+    expect(saved).toEqual(["wf-1"]);
+    expect(store.getState().isDirty).toBeFalse();
+    expect(store.getState().lastSavedAt).toBeString();
   });
 
   it("does not overwrite dirty in-memory workflow when a stale load resolves", async () => {
