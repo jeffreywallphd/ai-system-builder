@@ -1,3 +1,4 @@
+import tempfile
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -29,7 +30,7 @@ def override_service() -> McpService:
     )
     registry = McpRegistry(config)
     provisioner = LocalMcpServerProvisioner(
-        workspace_root=Path('/tmp/ai-loom-mcp-tests'),
+        workspace_root=Path(tempfile.mkdtemp(prefix='ai-loom-mcp-tests-')),
         python_executable='python',
         install_runner=RecordingInstallRunner(),
     )
