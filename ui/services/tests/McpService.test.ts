@@ -6,6 +6,7 @@ describe("McpService", () => {
     const listConfigured = mock(async () => [{ id: "local", name: "Local MCP" }]);
     const search = mock(async () => ({ query: "docs", totalCount: 1, limit: 12, servers: [{ id: "docs", name: "Docs MCP" }], status: { enabled: true, state: "ready", checkedAt: new Date().toISOString(), servers: [], capabilities: {} } }));
     const addConfigured = mock(async ({ server }: { server: { id: string } }) => server);
+    const getConnectionStatus = mock(async () => ({ enabled: true, state: "ready", checkedAt: new Date().toISOString(), servers: [], capabilities: {} }));
     const getStatus = mock(async ({ serverId }: { serverId: string }) => ({ serverId, state: "connected" }));
     const connect = mock(async ({ serverId }: { serverId: string }) => ({ action: "connect", server: { id: serverId } }));
     const disconnect = mock(async ({ serverId }: { serverId: string }) => ({ action: "disconnect", server: { id: serverId } }));
@@ -17,6 +18,7 @@ describe("McpService", () => {
       { execute: listConfigured } as any,
       { execute: search } as any,
       { execute: addConfigured } as any,
+      { execute: getConnectionStatus } as any,
       { execute: getStatus } as any,
       { execute: connect } as any,
       { execute: disconnect } as any,
@@ -28,6 +30,7 @@ describe("McpService", () => {
     await service.listConfiguredServers();
     await service.searchServers({ query: "docs" });
     await service.addConfiguredServer({ id: "docs", name: "Docs MCP" } as any);
+    await service.getConnectionStatus();
     await service.getServerStatus("docs");
     await service.connectServer("docs");
     await service.disconnectServer("docs");
@@ -38,6 +41,7 @@ describe("McpService", () => {
     expect(listConfigured).toHaveBeenCalled();
     expect(search).toHaveBeenCalledWith({ criteria: { query: "docs" } });
     expect(addConfigured).toHaveBeenCalledWith({ server: { id: "docs", name: "Docs MCP" } });
+    expect(getConnectionStatus).toHaveBeenCalled();
     expect(getStatus).toHaveBeenCalledWith({ serverId: "docs" });
     expect(connect).toHaveBeenCalledWith({ serverId: "docs" });
     expect(disconnect).toHaveBeenCalledWith({ serverId: "docs" });

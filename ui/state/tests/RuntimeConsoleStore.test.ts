@@ -86,6 +86,27 @@ describe("RuntimeConsoleStore", () => {
         stopManagedRuntime: async () => undefined,
       },
       mcpService: {
+        getConnectionStatus: async () => ({
+          enabled: true,
+          state: "ready",
+          checkedAt: now,
+          servers: [
+            {
+              serverId: "local",
+              name: "Local MCP",
+              transport: "stdio",
+              configured: true,
+              enabled: true,
+              state: "connected",
+              connected: true,
+              checkedAt: now,
+              toolCount: 1,
+              resourceCount: 0,
+              capabilities: { tools: true },
+            },
+          ],
+          capabilities: { tools: true },
+        }),
         listConfiguredServers: async () => ([
           {
             id: "local",
@@ -116,8 +137,9 @@ describe("RuntimeConsoleStore", () => {
 
     await store.refreshHealth();
 
-    expect(store.getState().healthChecks.map((check) => check.label)).toEqual(["Python runtime", "Local MCP"]);
+    expect(store.getState().healthChecks.map((check) => check.label)).toEqual(["Python runtime", "MCP runtime", "Local MCP"]);
     expect(store.getState().healthChecks[1]?.status).toBe("healthy");
+    expect(store.getState().healthChecks[2]?.status).toBe("healthy");
   });
 
   it("swallows runtime initialization failures", async () => {
@@ -137,6 +159,9 @@ describe("RuntimeConsoleStore", () => {
         stopManagedRuntime: async () => undefined,
       },
       mcpService: {
+        getConnectionStatus: async () => {
+          throw new Error("mcp unavailable");
+        },
         listConfiguredServers: async () => {
           throw new Error("mcp unavailable");
         },

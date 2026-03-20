@@ -526,6 +526,18 @@ export class WorkflowStore {
     });
   }
 
+  public async refreshCurrentWorkflowMcpTooling(): Promise<void> {
+    const currentWorkflow = this.state.currentWorkflow;
+    if (!currentWorkflow) {
+      return;
+    }
+
+    const hydratedWorkflow = await this.hydrateMcpToolCallNodes(currentWorkflow);
+    this.setEditorState({
+      currentWorkflow: hydratedWorkflow,
+    });
+  }
+
   private requireCurrentWorkflow(): IWorkflow {
     const workflow = this.state.currentWorkflow;
 

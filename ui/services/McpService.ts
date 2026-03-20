@@ -1,6 +1,7 @@
 import type { AddConfiguredMcpServerUseCase } from "../../application/mcp/AddConfiguredMcpServerUseCase";
 import type { ConnectMcpServerUseCase } from "../../application/mcp/ConnectMcpServerUseCase";
 import type { DisconnectMcpServerUseCase } from "../../application/mcp/DisconnectMcpServerUseCase";
+import type { GetMcpConnectionStatusUseCase } from "../../application/mcp/GetMcpConnectionStatusUseCase";
 import type { GetMcpServerStatusUseCase } from "../../application/mcp/GetMcpServerStatusUseCase";
 import type { GetMcpToolDescriptorUseCase } from "../../application/mcp/GetMcpToolDescriptorUseCase";
 import type { ListConfiguredMcpServersUseCase } from "../../application/mcp/ListConfiguredMcpServersUseCase";
@@ -8,6 +9,7 @@ import type { ReconnectMcpServerUseCase } from "../../application/mcp/ReconnectM
 import type { SearchMcpServersUseCase } from "../../application/mcp/SearchMcpServersUseCase";
 import type { SearchMcpToolsUseCase } from "../../application/mcp/SearchMcpToolsUseCase";
 import type { McpServerConnectionResult } from "../../application/mcp/models/McpServerConnectionResult";
+import type { McpConnectionStatus } from "../../application/mcp/models/McpConnectionStatus";
 import type { McpServerDescriptor } from "../../application/mcp/models/McpServerDescriptor";
 import type { McpServerSearchCriteria } from "../../application/mcp/models/McpServerSearchCriteria";
 import type { McpServerSearchResult } from "../../application/mcp/models/McpServerSearchResult";
@@ -21,6 +23,7 @@ export class McpService {
     private readonly listConfiguredMcpServersUseCase: Pick<ListConfiguredMcpServersUseCase, "execute">,
     private readonly searchMcpServersUseCase: Pick<SearchMcpServersUseCase, "execute">,
     private readonly addConfiguredMcpServerUseCase: Pick<AddConfiguredMcpServerUseCase, "execute">,
+    private readonly getMcpConnectionStatusUseCase: Pick<GetMcpConnectionStatusUseCase, "execute">,
     private readonly getMcpServerStatusUseCase: Pick<GetMcpServerStatusUseCase, "execute">,
     private readonly connectMcpServerUseCase: Pick<ConnectMcpServerUseCase, "execute">,
     private readonly disconnectMcpServerUseCase: Pick<DisconnectMcpServerUseCase, "execute">,
@@ -39,6 +42,10 @@ export class McpService {
 
   public async addConfiguredServer(server: McpServerDescriptor): Promise<McpServerDescriptor> {
     return this.addConfiguredMcpServerUseCase.execute({ server });
+  }
+
+  public async getConnectionStatus(): Promise<McpConnectionStatus> {
+    return this.getMcpConnectionStatusUseCase.execute();
   }
 
   public async getServerStatus(serverId: string): Promise<McpServerStatus> {

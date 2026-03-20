@@ -1,4 +1,5 @@
 import type { McpServerStatus } from "../../application/mcp/models/McpServerStatus";
+import type { McpConnectionStatus } from "../../application/mcp/models/McpConnectionStatus";
 import type { McpService } from "../services/McpService";
 import {
   PythonRuntimeStatuses,
@@ -29,13 +30,13 @@ export type RuntimeConsoleListener = (state: RuntimeConsoleState) => void;
 export interface RuntimeConsoleStoreOptions {
   readonly runtimeEventStore: IRuntimeEventStore;
   readonly pythonRuntimeManager: IPythonRuntimeManager;
-  readonly mcpService?: Pick<McpService, "listConfiguredServers" | "getServerStatus">;
+  readonly mcpService?: Pick<McpService, "getConnectionStatus" | "listConfiguredServers" | "getServerStatus">;
 }
 
 export class RuntimeConsoleStore {
   private readonly runtimeEventStore: IRuntimeEventStore;
   private readonly pythonRuntimeManager: IPythonRuntimeManager;
-  private readonly mcpService?: Pick<McpService, "listConfiguredServers" | "getServerStatus">;
+  private readonly mcpService?: Pick<McpService, "getConnectionStatus" | "listConfiguredServers" | "getServerStatus">;
   private readonly listeners = new Set<RuntimeConsoleListener>();
   private readonly unsubscribeEventStore: () => void;
   private state: RuntimeConsoleState = Object.freeze({
@@ -143,28 +144,18 @@ export class RuntimeConsoleStore {
     }
 
     try {
-      const configuredServers = await this.mcpService.listConfiguredServers();
-      if (configuredServers.length === 0) {
-        checks.push({
-          id: "mcp-runtime",
-          label: "MCP runtime",
-          kind: "mcp-runtime",
-          status: "unknown",
-          detail: "No MCP servers are configured.",
-          checkedAt: new Date().toISOString(),
-        });
+      const [runtimeStatus, configuredServers] = await Promise.all([
+        this.mcpService.getConnectionStatus(),
+        this.mcpService.listConfiguredServers().catch(() => Object.freeze([])),
+      ]);
+
+      checks.push(this.mapMcpRuntimeHealthCheck(runtimeStatus));
+
+      if (configuredServers.length === 0 && runtimeStatus.servers.length === 0) {
         return Object.freeze(checks);
       }
 
-      const statuses = await Promise.all(
-        configuredServers.map(async (server) => {
-          try {
-            return await this.mcpService!.getServerStatus(server.id);
-          } catch (error) {
-            return this.createFallbackMcpServerStatus(server, error);
-          }
-        })
-      );
+      const statuses = await this.collectServerStatuses(configuredServers, runtimeStatus);
 
       return Object.freeze([
         ...checks,
@@ -230,6 +221,52 @@ export class RuntimeConsoleStore {
     };
   }
 
+  private mapMcpRuntimeHealthCheck(status: McpConnectionStatus): RuntimeHealthCheck {
+    return {
+      id: "mcp-runtime",
+      label: "MCP runtime",
+      kind: "mcp-runtime",
+      status: mapMcpRuntimeHealthStatus(status),
+      detail: describeMcpRuntimeStatus(status),
+      checkedAt: status.checkedAt,
+    };
+  }
+
+  private async collectServerStatuses(
+    configuredServers: ReadonlyArray<
+      Awaited<ReturnType<NonNullable<RuntimeConsoleStoreOptions["mcpService"]>["listConfiguredServers"]>>[number]
+    >,
+    runtimeStatus: McpConnectionStatus,
+  ): Promise<ReadonlyArray<McpServerStatus>> {
+    const byId = new Map(runtimeStatus.servers.map((status) => [status.serverId, status]));
+    const allServerIds = new Set<string>([
+      ...configuredServers.map((server) => server.id),
+      ...runtimeStatus.servers.map((server) => server.serverId),
+    ]);
+
+    const statuses = await Promise.all(
+      [...allServerIds].map(async (serverId) => {
+        const existing = byId.get(serverId);
+        if (existing) {
+          return existing;
+        }
+
+        const configuredServer = configuredServers.find((server) => server.id === serverId);
+        if (!configuredServer) {
+          return undefined;
+        }
+
+        try {
+          return await this.mcpService!.getServerStatus(serverId);
+        } catch (error) {
+          return this.createFallbackMcpServerStatus(configuredServer, error);
+        }
+      }),
+    );
+
+    return Object.freeze(statuses.filter((status): status is McpServerStatus => !!status));
+  }
+
   private patch(patch: Partial<RuntimeConsoleState>): void {
     this.state = Object.freeze({ ...this.state, ...patch });
     this.notify();
@@ -272,6 +309,43 @@ function mapMcpServerHealthStatus(status: McpServerStatus): RuntimeHealthCheck["
     default:
       return "unknown";
   }
+}
+
+function mapMcpRuntimeHealthStatus(status: McpConnectionStatus): RuntimeHealthCheck["status"] {
+  if (!status.enabled) {
+    return "disabled";
+  }
+
+  switch (status.state) {
+    case "ready":
+      return "healthy";
+    case "degraded":
+      return "degraded";
+    case "unavailable":
+      return "offline";
+    default:
+      return "unknown";
+  }
+}
+
+function describeMcpRuntimeStatus(status: McpConnectionStatus): string {
+  if (!status.enabled) {
+    return "MCP runtime is disabled.";
+  }
+
+  if (status.state === "ready") {
+    return `MCP runtime is ready with ${status.servers.length} configured server${status.servers.length === 1 ? "" : "s"}.`;
+  }
+
+  if (status.state === "degraded") {
+    return "MCP runtime is reachable, but one or more MCP servers reported errors.";
+  }
+
+  if (status.state === "unavailable") {
+    return "MCP runtime is enabled but no MCP servers are currently available.";
+  }
+
+  return "MCP runtime status is unknown.";
 }
 
 function describePythonRuntimeStatus(status: PythonRuntimeManagerStatus): string {
