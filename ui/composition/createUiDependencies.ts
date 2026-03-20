@@ -316,6 +316,11 @@ export function createUiDependencies(
     runtimeEventStore,
     pythonRuntimeManager,
     mcpService,
+    runtimeManagement: {
+      isManagedLocal: pythonRuntimeConfig.isManagedLocal,
+      autoStartEnabled: pythonRuntimeConfig.autoStartEnabled,
+      healthPollIntervalMs: pythonRuntimeConfig.healthPollIntervalMs,
+    },
   });
   const managedServicesService = new ManagedServicesService(
     pythonRuntimeManager,

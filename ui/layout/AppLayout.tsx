@@ -26,6 +26,10 @@ const fallbackConsoleState: RuntimeConsoleState = Object.freeze({
   events: Object.freeze([]),
   healthChecks: Object.freeze([]),
   isRefreshingHealth: false,
+  appState: "starting",
+  appStateDetail: "Checking runtime status…",
+  canRestartRuntime: false,
+  isRestartingRuntime: false,
 });
 
 function isWorkflowEditorPath(pathname: string): boolean {

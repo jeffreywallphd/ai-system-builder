@@ -1,6 +1,7 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, mock } from "bun:test";
 import { RuntimeEventBuffer } from "../../../application/runtime/RuntimeEventBuffer";
 import { createRuntimeEvent, RuntimeEventSources } from "../../../application/runtime/RuntimeEvent";
+import type { PythonRuntimeManagerStatus } from "../../../application/ports/interfaces/IPythonRuntimeManager";
 import { RuntimeConsoleStore } from "../RuntimeConsoleStore";
 
 describe("RuntimeConsoleStore", () => {
@@ -11,6 +12,12 @@ describe("RuntimeConsoleStore", () => {
       pythonRuntimeManager: {
         checkAvailability: async () => true,
         ensureRuntimeAvailability: async () => ({
+          status: "healthy",
+          isAvailable: true,
+          owner: "external",
+          lastUpdatedAt: new Date().toISOString(),
+        }),
+        restartRuntime: async () => ({
           status: "healthy",
           isAvailable: true,
           owner: "external",
@@ -36,7 +43,7 @@ describe("RuntimeConsoleStore", () => {
     expect(store.getState().events).toHaveLength(0);
   });
 
-  it("initializes runtime once", async () => {
+  it("initializes runtime once and reports a ready app state", async () => {
     let calls = 0;
     const store = new RuntimeConsoleStore({
       runtimeEventStore: new RuntimeEventBuffer(),
@@ -47,22 +54,37 @@ describe("RuntimeConsoleStore", () => {
           return {
             status: "healthy" as const,
             isAvailable: true,
-            owner: "external" as const,
+            owner: "managed" as const,
             lastUpdatedAt: new Date().toISOString(),
+            detail: "Runtime is healthy.",
           };
         },
-        getStatus: () => ({
-          status: "healthy",
+        restartRuntime: async () => ({
+          status: "healthy" as const,
           isAvailable: true,
-          owner: "external",
+          owner: "managed" as const,
           lastUpdatedAt: new Date().toISOString(),
         }),
+        getStatus: () => ({
+          status: "healthy" as const,
+          isAvailable: true,
+          owner: "managed" as const,
+          lastUpdatedAt: new Date().toISOString(),
+          detail: "Runtime is healthy.",
+        }),
         stopManagedRuntime: async () => undefined,
+      },
+      runtimeManagement: {
+        isManagedLocal: true,
+        autoStartEnabled: true,
+        healthPollIntervalMs: 5_000,
       },
     });
 
     await Promise.all([store.initializeRuntime(), store.initializeRuntime()]);
+
     expect(calls).toBe(1);
+    expect(store.getState().appState).toBe("ready");
   });
 
   it("captures runtime and MCP server health snapshots", async () => {
@@ -72,6 +94,12 @@ describe("RuntimeConsoleStore", () => {
       pythonRuntimeManager: {
         checkAvailability: async () => true,
         ensureRuntimeAvailability: async () => ({
+          status: "healthy" as const,
+          isAvailable: true,
+          owner: "external" as const,
+          lastUpdatedAt: now,
+        }),
+        restartRuntime: async () => ({
           status: "healthy" as const,
           isAvailable: true,
           owner: "external" as const,
@@ -142,7 +170,66 @@ describe("RuntimeConsoleStore", () => {
     expect(store.getState().healthChecks[2]?.status).toBe("healthy");
   });
 
-  it("swallows runtime initialization failures", async () => {
+  it("attempts managed-local recovery after an unexpected runtime loss", async () => {
+    let runtimeStatus: PythonRuntimeManagerStatus = {
+      status: "healthy" as const,
+      isAvailable: true,
+      owner: "managed" as const,
+      lastUpdatedAt: "2026-03-20T00:00:00.000Z",
+      detail: "Runtime is healthy.",
+    };
+    const ensureRuntimeAvailability = mock(async () => {
+      if (!runtimeStatus.isAvailable) {
+        runtimeStatus = {
+          status: "healthy",
+          isAvailable: true,
+          owner: "managed",
+          lastUpdatedAt: "2026-03-20T00:00:06.000Z",
+          detail: "Runtime recovered.",
+        };
+      }
+
+      return runtimeStatus;
+    });
+    const checkAvailability = mock(async () => {
+      if (runtimeStatus.status === "healthy") {
+        runtimeStatus = {
+          status: "unavailable",
+          isAvailable: false,
+          owner: "managed",
+          lastUpdatedAt: "2026-03-20T00:00:05.000Z",
+          detail: "Python runtime exited unexpectedly.",
+        };
+        return false;
+      }
+
+      return runtimeStatus.isAvailable;
+    });
+    const store = new RuntimeConsoleStore({
+      runtimeEventStore: new RuntimeEventBuffer(),
+      pythonRuntimeManager: {
+        checkAvailability,
+        ensureRuntimeAvailability,
+        restartRuntime: async () => runtimeStatus,
+        getStatus: () => runtimeStatus,
+        stopManagedRuntime: async () => undefined,
+      },
+      runtimeManagement: {
+        isManagedLocal: true,
+        autoStartEnabled: true,
+        healthPollIntervalMs: 5_000,
+      },
+    });
+
+    await store.initializeRuntime();
+    await store.refreshHealth();
+
+    expect(ensureRuntimeAvailability).toHaveBeenCalledTimes(3);
+    expect(store.getState().appState).toBe("ready");
+    expect(store.getState().appStateDetail).toBe("Runtime recovered.");
+  });
+
+  it("swallows runtime initialization failures and surfaces a failed app state", async () => {
     const store = new RuntimeConsoleStore({
       runtimeEventStore: new RuntimeEventBuffer(),
       pythonRuntimeManager: {
@@ -150,11 +237,19 @@ describe("RuntimeConsoleStore", () => {
         ensureRuntimeAvailability: async () => {
           throw new Error("runtime unavailable");
         },
-        getStatus: () => ({
-          status: "unavailable",
+        restartRuntime: async () => ({
+          status: "failed",
           isAvailable: false,
-          owner: "none",
+          owner: "managed",
           lastUpdatedAt: new Date().toISOString(),
+          detail: "runtime unavailable",
+        }),
+        getStatus: () => ({
+          status: "failed",
+          isAvailable: false,
+          owner: "managed",
+          lastUpdatedAt: new Date().toISOString(),
+          detail: "runtime unavailable",
         }),
         stopManagedRuntime: async () => undefined,
       },
@@ -169,9 +264,15 @@ describe("RuntimeConsoleStore", () => {
           throw new Error("mcp unavailable");
         },
       } as any,
+      runtimeManagement: {
+        isManagedLocal: true,
+        autoStartEnabled: true,
+        healthPollIntervalMs: 5_000,
+      },
     });
 
     await expect(store.initializeRuntime()).resolves.toBeUndefined();
+    expect(store.getState().appState).toBe("failed");
     expect(store.getState().healthChecks.some((check) => check.label === "MCP runtime")).toBeTrue();
   });
 });

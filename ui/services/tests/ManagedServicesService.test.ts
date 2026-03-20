@@ -15,6 +15,13 @@ describe("ManagedServicesService", () => {
       lastUpdatedAt: "2026-03-20T10:15:00.000Z",
       detail: "Runtime is healthy.",
     }));
+    const restartRuntime = mock(async () => ({
+      status: "healthy",
+      isAvailable: true,
+      owner: "managed",
+      lastUpdatedAt: "2026-03-20T10:16:00.000Z",
+      detail: "Runtime restarted.",
+    }));
     const stopManagedRuntime = mock(async () => undefined);
     const getStatus = mock(() => ({
       status: "healthy",
@@ -44,6 +51,7 @@ describe("ManagedServicesService", () => {
       {
         checkAvailability,
         ensureRuntimeAvailability,
+        restartRuntime,
         getStatus,
         stopManagedRuntime,
       },
@@ -69,7 +77,8 @@ describe("ManagedServicesService", () => {
       "stderr: trace line",
     ]);
     expect(started.state).toBe("healthy");
-    expect(ensureRuntimeAvailability).toHaveBeenCalledTimes(3);
-    expect(stopManagedRuntime).toHaveBeenCalledTimes(2);
+    expect(ensureRuntimeAvailability).toHaveBeenCalledTimes(2);
+    expect(restartRuntime).toHaveBeenCalledTimes(1);
+    expect(stopManagedRuntime).toHaveBeenCalledTimes(1);
   });
 });

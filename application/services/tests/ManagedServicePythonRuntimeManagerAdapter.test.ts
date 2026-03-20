@@ -9,16 +9,17 @@ import {
 } from "../interfaces/ManagedServiceTypes";
 
 describe("ManagedServicePythonRuntimeManagerAdapter", () => {
-  it("maps managed service lifecycle operations to the legacy python runtime contract", async () => {
+  it("waits for startup readiness when supervisor reports a starting managed runtime", async () => {
+    let refreshCount = 0;
     let currentStatus: ManagedServiceStatus = {
       serviceId: "python-runtime",
       kind: ManagedServiceKinds.pythonRuntime,
-      state: ManagedServiceStates.unavailable,
+      state: ManagedServiceStates.starting,
       isAvailable: false,
-      ownership: ManagedServiceOwnership.none,
-      startPolicy: ManagedServiceStartPolicies.externalOnly,
+      ownership: ManagedServiceOwnership.managed,
+      startPolicy: ManagedServiceStartPolicies.onDemand,
       lastUpdatedAt: new Date().toISOString(),
-      detail: "Python runtime is not connected.",
+      detail: "Python runtime is starting.",
     };
 
     const adapter = new ManagedServicePythonRuntimeManagerAdapter({
@@ -34,18 +35,19 @@ describe("ManagedServicePythonRuntimeManagerAdapter", () => {
         getServiceStatus: () => currentStatus,
         subscribeToStatus: () => () => undefined,
         subscribeToLogs: () => () => undefined,
-      },
-      supervisor: {
-        ensureRunning: async () => {
+        refreshServiceStatus: async () => {
+          refreshCount += 1;
           currentStatus = {
             ...currentStatus,
             state: ManagedServiceStates.running,
             isAvailable: true,
-            ownership: ManagedServiceOwnership.external,
-            lastUpdatedAt: new Date().toISOString(),
+            detail: "Python runtime is healthy.",
           };
           return currentStatus;
         },
+      },
+      supervisor: {
+        ensureRunning: async () => currentStatus,
         start: async () => currentStatus,
         stop: async () => {
           currentStatus = {
@@ -59,16 +61,21 @@ describe("ManagedServicePythonRuntimeManagerAdapter", () => {
         },
         restart: async () => currentStatus,
       },
+      startupTimeoutMs: 1_000,
+      healthPollIntervalMs: 1,
+      sleep: async () => undefined,
     });
 
-    expect(adapter.getStatus().status).toBe("unavailable");
+    expect(adapter.getStatus().status).toBe("starting");
     expect((await adapter.ensureRuntimeAvailability()).status).toBe("healthy");
+    expect(refreshCount).toBe(1);
+
     await adapter.stopManagedRuntime();
     expect(adapter.getStatus().status).toBe("stopped");
     expect(adapter.getStatus().owner).toBe("managed");
   });
 
-  it("maps degraded and disabled managed service states to compatible runtime statuses", () => {
+  it("keeps degraded and failed managed service states compatible with legacy runtime statuses", async () => {
     let currentStatus: ManagedServiceStatus = {
       serviceId: "python-runtime",
       kind: ManagedServiceKinds.pythonRuntime,
@@ -86,6 +93,7 @@ describe("ManagedServicePythonRuntimeManagerAdapter", () => {
         getServiceStatus: () => currentStatus,
         subscribeToStatus: () => () => undefined,
         subscribeToLogs: () => () => undefined,
+        refreshServiceStatus: async () => currentStatus,
       },
       supervisor: {
         ensureRunning: async () => currentStatus,
@@ -94,10 +102,21 @@ describe("ManagedServicePythonRuntimeManagerAdapter", () => {
           currentStatus = { ...currentStatus, state: ManagedServiceStates.disabled };
           return currentStatus;
         },
-        restart: async () => currentStatus,
+        restart: async () => {
+          currentStatus = {
+            ...currentStatus,
+            state: ManagedServiceStates.failed,
+            detail: "Runtime restart failed.",
+          };
+          return currentStatus;
+        },
       },
+      startupTimeoutMs: 5,
+      healthPollIntervalMs: 1,
+      sleep: async () => undefined,
     });
 
     expect(adapter.getStatus().status).toBe("unhealthy");
+    expect((await adapter.restartRuntime()).status).toBe("failed");
   });
 });

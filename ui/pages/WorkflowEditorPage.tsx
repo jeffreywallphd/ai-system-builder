@@ -24,6 +24,7 @@ import type { IModelStoreState } from "../state/ModelStore";
 import { buildInstalledModelOptions } from "../models/buildInstalledModelOptions";
 import type { ContextStoreState } from "../state/ContextStore";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
+import type { RuntimeConsoleState } from "../state/RuntimeConsoleStore";
 
 export interface WorkflowEditorPageProps {
   readonly workflowStore?: WorkflowStore;
@@ -113,6 +114,7 @@ export default function WorkflowEditorPage({
     workflowProjectionService,
     settingsStore,
     modelStore,
+    runtimeConsoleStore,
   } = useUiDependencies();
 
   const workflowStore = workflowStoreProp ?? injectedWorkflowStore;
@@ -125,6 +127,7 @@ export default function WorkflowEditorPage({
   const [nodeState, setNodeState] = useState<INodeStoreState>(fallbackNodeState);
   const [contextState, setContextState] = useState<ContextStoreState>(fallbackContextState);
   const [modelState, setModelState] = useState<IModelStoreState>(fallbackModelState);
+  const [runtimeState, setRuntimeState] = useState<RuntimeConsoleState>(() => runtimeConsoleStore.getState());
   const [settingsState, setSettingsState] = useState<UiSettingsState>(() => settingsStore.getState());
   const authoringSettings = settingsState.settings.authoring;
   const [fitViewNonce, setFitViewNonce] = useState(0);
@@ -184,6 +187,7 @@ export default function WorkflowEditorPage({
 
   useEffect(() => settingsStore.subscribe(setSettingsState), [settingsStore]);
   useEffect(() => modelStore.subscribe(setModelState), [modelStore]);
+  useEffect(() => runtimeConsoleStore.subscribe(setRuntimeState), [runtimeConsoleStore]);
 
   useEffect(() => {
     return contextStore.subscribe(setContextState);
@@ -322,6 +326,14 @@ export default function WorkflowEditorPage({
     return `${issueCount} Issue${issueCount === 1 ? "" : "s"}`;
   }, [workflowState.validation]);
   const executeButtonLabel = useMemo(() => {
+    if (runtimeState.appState === "starting") {
+      return "Starting runtime…";
+    }
+
+    if (runtimeState.appState === "reconnecting") {
+      return "Reconnecting runtime…";
+    }
+
     if (workflowState.isExecuting) {
       return "Executing…";
     }
@@ -336,8 +348,13 @@ export default function WorkflowEditorPage({
       default:
         return "Execute";
     }
-  }, [workflowState.isExecuting, workflowState.lastExecutionEvent?.status]);
+  }, [runtimeState.appState, workflowState.isExecuting, workflowState.lastExecutionEvent?.status]);
+  const canExecuteWorkflow = editorViewModel?.header.isExecutable && runtimeState.appState === "ready";
   const workflowStatusMessage = useMemo(() => {
+    if (runtimeState.appState !== "ready") {
+      return runtimeState.appStateDetail;
+    }
+
     if (workflowState.saveError) {
       return workflowState.saveError;
     }
@@ -381,6 +398,8 @@ export default function WorkflowEditorPage({
     workflowState.lastExecutionEvent?.message,
     workflowState.lastExecutionEvent?.status,
     workflowState.validation,
+    runtimeState.appState,
+    runtimeState.appStateDetail,
   ]);
 
   const visibleValidationMessages = useMemo(() => {
@@ -505,6 +524,25 @@ export default function WorkflowEditorPage({
         </div>
       ) : null}
 
+      {!isCanvasLocked && runtimeState.appState !== "ready" ? (
+        <div className="ui-card">
+          <div className="ui-card__body ui-row ui-row--between ui-row--wrap" style={{ gap: "var(--space-sm)" }}>
+            <div className="ui-stack ui-stack--2xs">
+              <strong>Runtime {runtimeState.appState}</strong>
+              <span className="ui-text-secondary ui-text-small">{runtimeState.appStateDetail}</span>
+            </div>
+            <button
+              type="button"
+              className="ui-button ui-button--secondary ui-button--sm"
+              disabled={!runtimeState.canRestartRuntime || runtimeState.isRestartingRuntime}
+              onClick={() => void runtimeConsoleStore.restartRuntime().catch(() => undefined)}
+            >
+              {runtimeState.isRestartingRuntime ? "Restarting…" : "Restart runtime"}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <div className="ui-workspace">
         <div className="ui-workspace__main">
           <div className="ui-canvas-shell">
@@ -514,7 +552,7 @@ export default function WorkflowEditorPage({
               hasSelection={hasSelection}
               canOpenProperties={!!selectedNode}
               isCanvasLocked={isCanvasLocked}
-              canExecuteWorkflow={editorViewModel?.header.isExecutable}
+              canExecuteWorkflow={canExecuteWorkflow}
               isExecutingWorkflow={workflowState.isExecuting}
               validateLabel={validateButtonLabel}
               executeLabel={executeButtonLabel}
@@ -729,6 +767,7 @@ export default function WorkflowEditorPage({
                       contextWorkbenchHref={contextWorkbenchHref}
                       isSaving={workflowState.isSaving}
                       isExecuting={workflowState.isExecuting}
+                      canExecuteWorkflow={canExecuteWorkflow}
                       validateLabel={validateButtonLabel}
                       executeLabel={executeButtonLabel}
                       workflowStatusMessage={workflowStatusMessage}

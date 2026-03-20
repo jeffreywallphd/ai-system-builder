@@ -9,6 +9,8 @@ import {
 import type { IRuntimeEventStore } from "../../application/ports/interfaces/IRuntimeEventStore";
 import type { RuntimeEvent } from "../../application/runtime/RuntimeEvent";
 
+export type RuntimeAppState = "starting" | "reconnecting" | "ready" | "degraded" | "failed";
+
 export interface RuntimeHealthCheck {
   readonly id: string;
   readonly label: string;
@@ -23,6 +25,10 @@ export interface RuntimeConsoleState {
   readonly events: ReadonlyArray<RuntimeEvent>;
   readonly healthChecks: ReadonlyArray<RuntimeHealthCheck>;
   readonly isRefreshingHealth: boolean;
+  readonly appState: RuntimeAppState;
+  readonly appStateDetail: string;
+  readonly canRestartRuntime: boolean;
+  readonly isRestartingRuntime: boolean;
 }
 
 export type RuntimeConsoleListener = (state: RuntimeConsoleState) => void;
@@ -31,12 +37,18 @@ export interface RuntimeConsoleStoreOptions {
   readonly runtimeEventStore: IRuntimeEventStore;
   readonly pythonRuntimeManager: IPythonRuntimeManager;
   readonly mcpService?: Pick<McpService, "getConnectionStatus" | "listConfiguredServers" | "getServerStatus">;
+  readonly runtimeManagement?: {
+    readonly isManagedLocal: boolean;
+    readonly autoStartEnabled: boolean;
+    readonly healthPollIntervalMs: number;
+  };
 }
 
 export class RuntimeConsoleStore {
   private readonly runtimeEventStore: IRuntimeEventStore;
   private readonly pythonRuntimeManager: IPythonRuntimeManager;
   private readonly mcpService?: Pick<McpService, "getConnectionStatus" | "listConfiguredServers" | "getServerStatus">;
+  private readonly runtimeManagement;
   private readonly listeners = new Set<RuntimeConsoleListener>();
   private readonly unsubscribeEventStore: () => void;
   private state: RuntimeConsoleState = Object.freeze({
@@ -44,14 +56,21 @@ export class RuntimeConsoleStore {
     events: Object.freeze([]),
     healthChecks: Object.freeze([]),
     isRefreshingHealth: false,
+    appState: "starting",
+    appStateDetail: "Checking managed runtime status…",
+    canRestartRuntime: false,
+    isRestartingRuntime: false,
   });
   private initializePromise?: Promise<void>;
   private refreshHealthPromise?: Promise<void>;
+  private monitorTimer?: ReturnType<typeof setTimeout>;
+  private isDisposed = false;
 
   constructor(options: RuntimeConsoleStoreOptions) {
     this.runtimeEventStore = options.runtimeEventStore;
     this.pythonRuntimeManager = options.pythonRuntimeManager;
     this.mcpService = options.mcpService;
+    this.runtimeManagement = options.runtimeManagement;
     this.unsubscribeEventStore = this.runtimeEventStore.subscribe((events) => {
       this.state = Object.freeze({ ...this.state, events: Object.freeze([...events]) });
       this.notify();
@@ -86,14 +105,52 @@ export class RuntimeConsoleStore {
 
   public initializeRuntime(): Promise<void> {
     if (!this.initializePromise) {
-      this.initializePromise = this.pythonRuntimeManager
-        .ensureRuntimeAvailability()
+      this.patch({
+        appState: "starting",
+        appStateDetail: this.describeStartupIntent(),
+      });
+      this.initializePromise = this.bootstrapRuntime()
         .then(() => this.refreshHealth())
         .catch(() => this.refreshHealth())
-        .then(() => undefined);
+        .then(() => {
+          this.startMonitoring();
+        });
     }
 
     return this.initializePromise;
+  }
+
+  public async restartRuntime(): Promise<void> {
+    this.patch({
+      isRestartingRuntime: true,
+      appState: this.state.appState === "starting" ? "starting" : "reconnecting",
+      appStateDetail: "Restarting the Python runtime…",
+    });
+
+    try {
+      const status = await this.pythonRuntimeManager.restartRuntime();
+      this.applyAppState(status, "manual-restart");
+    } catch (error) {
+      const checkedAt = new Date().toISOString();
+      this.patch({
+        appState: "failed",
+        appStateDetail: toErrorMessage(error) ?? "Runtime restart failed.",
+        healthChecks: Object.freeze([
+          ...this.buildPythonRuntimeHealthChecks(this.pythonRuntimeManager.getStatus()),
+          {
+            id: "mcp-runtime",
+            label: "MCP runtime",
+            kind: "mcp-runtime",
+            status: "offline",
+            detail: "MCP runtime is unavailable while Python runtime restart is failing.",
+            checkedAt,
+          },
+        ]),
+      });
+    } finally {
+      this.patch({ isRestartingRuntime: false });
+      await this.refreshHealth().catch(() => undefined);
+    }
   }
 
   public refreshHealth(): Promise<void> {
@@ -132,11 +189,117 @@ export class RuntimeConsoleStore {
   }
 
   public dispose(): void {
+    this.isDisposed = true;
+    if (this.monitorTimer) {
+      clearTimeout(this.monitorTimer);
+      this.monitorTimer = undefined;
+    }
     this.unsubscribeEventStore();
     this.listeners.clear();
   }
 
+  private async bootstrapRuntime(): Promise<void> {
+    try {
+      const status = await this.pythonRuntimeManager.ensureRuntimeAvailability();
+      this.applyAppState(status, "startup");
+    } catch (error) {
+      const fallbackStatus = this.pythonRuntimeManager.getStatus();
+      this.applyAppState(fallbackStatus, "startup-failed", toErrorMessage(error));
+    }
+  }
+
+  private startMonitoring(): void {
+    if (this.monitorTimer || this.isDisposed) {
+      return;
+    }
+
+    const intervalMs = Math.max(this.runtimeManagement?.healthPollIntervalMs ?? 2_000, 1_000);
+    const tick = async (): Promise<void> => {
+      if (this.isDisposed) {
+        return;
+      }
+
+      try {
+        await this.syncRuntimeState("monitor");
+        if (this.state.isExpanded) {
+          await this.refreshHealth();
+        }
+      } finally {
+        if (!this.isDisposed) {
+          this.monitorTimer = setTimeout(() => {
+            void tick();
+          }, intervalMs);
+        }
+      }
+    };
+
+    this.monitorTimer = setTimeout(() => {
+      void tick();
+    }, intervalMs);
+  }
+
+  private async syncRuntimeState(trigger: "startup" | "startup-failed" | "monitor" | "manual-restart" | "refresh"): Promise<PythonRuntimeManagerStatus> {
+    await this.pythonRuntimeManager.checkAvailability().catch(() => false);
+    let status = this.pythonRuntimeManager.getStatus();
+
+    if ((trigger === "monitor" || trigger === "refresh") && this.shouldAttemptRecovery(status)) {
+      this.patch({
+        appState: "reconnecting",
+        appStateDetail: status.detail ?? "Python runtime connection was lost. Attempting recovery…",
+      });
+
+      try {
+        status = await this.pythonRuntimeManager.ensureRuntimeAvailability();
+      } catch (error) {
+        this.applyAppState(this.pythonRuntimeManager.getStatus(), "startup-failed", toErrorMessage(error));
+        return this.pythonRuntimeManager.getStatus();
+      }
+    }
+
+    this.applyAppState(status, trigger);
+    return status;
+  }
+
+  private shouldAttemptRecovery(status: PythonRuntimeManagerStatus): boolean {
+    if (!this.runtimeManagement?.isManagedLocal || !this.runtimeManagement.autoStartEnabled) {
+      return false;
+    }
+
+    if (this.state.appState !== "ready" && this.state.appState !== "degraded") {
+      return false;
+    }
+
+    return status.status === PythonRuntimeStatuses.failed || status.status === PythonRuntimeStatuses.unavailable;
+  }
+
+  private applyAppState(
+    status: PythonRuntimeManagerStatus,
+    trigger: "startup" | "startup-failed" | "monitor" | "manual-restart" | "refresh",
+    overrideDetail?: string,
+  ): void {
+    const nextAppState = deriveAppState(status, {
+      trigger,
+      isManagedLocal: this.runtimeManagement?.isManagedLocal ?? false,
+      autoStartEnabled: this.runtimeManagement?.autoStartEnabled ?? false,
+    });
+
+    this.patch({
+      appState: nextAppState,
+      appStateDetail: overrideDetail ?? status.detail ?? describePythonRuntimeStatus(status),
+      canRestartRuntime: canRestartRuntime(status),
+    });
+  }
+
+  private describeStartupIntent(): string {
+    if (this.runtimeManagement?.isManagedLocal && this.runtimeManagement.autoStartEnabled) {
+      return "Starting the managed Python runtime and waiting for it to become ready…";
+    }
+
+    return "Checking Python runtime availability…";
+  }
+
   private async collectHealthChecks(): Promise<ReadonlyArray<RuntimeHealthCheck>> {
+    await this.syncRuntimeState("refresh");
     const checks = [...this.buildPythonRuntimeHealthChecks(this.pythonRuntimeManager.getStatus())];
 
     if (!this.mcpService) {
@@ -277,6 +440,34 @@ export class RuntimeConsoleStore {
       listener(this.state);
     }
   }
+}
+
+function deriveAppState(
+  status: PythonRuntimeManagerStatus,
+  context: { trigger: "startup" | "startup-failed" | "monitor" | "manual-restart" | "refresh"; isManagedLocal: boolean; autoStartEnabled: boolean },
+): RuntimeAppState {
+  switch (status.status) {
+    case PythonRuntimeStatuses.healthy:
+      return "ready";
+    case PythonRuntimeStatuses.starting:
+    case PythonRuntimeStatuses.stopping:
+      return context.trigger === "monitor" || context.trigger === "manual-restart" ? "reconnecting" : "starting";
+    case PythonRuntimeStatuses.unhealthy:
+      return "degraded";
+    case PythonRuntimeStatuses.failed:
+      return context.isManagedLocal && context.autoStartEnabled ? "failed" : "degraded";
+    case PythonRuntimeStatuses.stopped:
+      return context.trigger === "manual-restart" ? "reconnecting" : "degraded";
+    case PythonRuntimeStatuses.unavailable:
+    default:
+      return context.isManagedLocal && context.autoStartEnabled && context.trigger !== "refresh"
+        ? "failed"
+        : "degraded";
+  }
+}
+
+function canRestartRuntime(status: PythonRuntimeManagerStatus): boolean {
+  return status.status !== PythonRuntimeStatuses.starting && status.status !== PythonRuntimeStatuses.stopping;
 }
 
 function mapPythonRuntimeHealthStatus(status: PythonRuntimeManagerStatus): RuntimeHealthCheck["status"] {

@@ -16,6 +16,10 @@ export class DisabledPythonRuntimeManager implements IPythonRuntimeManager {
     return this.getStatus();
   }
 
+  public async restartRuntime(): Promise<PythonRuntimeManagerStatus> {
+    return this.getStatus();
+  }
+
   public getStatus(): PythonRuntimeManagerStatus {
     return {
       status: PythonRuntimeStatuses.unavailable,
