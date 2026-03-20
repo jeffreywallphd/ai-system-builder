@@ -1,5 +1,6 @@
 import {
   ManagedServiceRestartPolicies,
+  ManagedServiceSources,
   ManagedServiceTransports,
   type ManagedServiceDefinition,
 } from "../../../application/services/ManagedServiceDefinition";
@@ -23,6 +24,7 @@ export function createPythonRuntimeServiceDefinition(config: PythonRuntimeConfig
     displayName: "Python runtime",
     description: "Built-in Python runtime service definition for the local FastAPI runtime.",
     transport: ManagedServiceTransports.http,
+    source: ManagedServiceSources.builtin,
     baseUrl: config.baseUrl,
     healthCheckPath: DEFAULT_HEALTH_CHECK_PATH,
     workingDirectory: config.runtimeWorkingDirectory,

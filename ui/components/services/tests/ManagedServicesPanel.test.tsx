@@ -5,7 +5,7 @@ import { createRuntimeEvent, RuntimeEventSources } from "../../../../application
 import ManagedServicesPanel from "../ManagedServicesPanel";
 
 describe("ManagedServicesPanel", () => {
-  it("renders service metadata, lifecycle controls, and a recent log viewer", () => {
+  it("renders service metadata, lifecycle controls, custom-service actions, and a recent log viewer", () => {
     const html = renderToStaticMarkup(
       React.createElement(ManagedServicesPanel, {
         services: [
@@ -13,13 +13,24 @@ describe("ManagedServicesPanel", () => {
             id: "python-runtime",
             name: "Python runtime",
             kind: "python-runtime",
+            source: "builtin",
             description: "Local FastAPI worker",
             startPolicy: "on-demand",
+            restartPolicy: "on-failure",
             state: "healthy",
             ownership: "managed",
             isAvailable: true,
+            transport: "http",
             baseUrl: "http://127.0.0.1:8000",
             endpointSummary: "http://127.0.0.1:8000/health",
+            workingDirectory: "python-runtime",
+            command: "python",
+            args: ["-m", "uvicorn"],
+            environmentVariables: {},
+            startupTimeoutMs: 20000,
+            canEdit: true,
+            canRemove: false,
+            canManageLifecycle: true,
             lastCheckedAt: "2026-03-20T10:15:00.000Z",
             lastErrorDetail: undefined,
             detail: "Healthy",
@@ -50,13 +61,17 @@ describe("ManagedServicesPanel", () => {
         onStop: () => undefined,
         onRestart: () => undefined,
         onEnsureRunning: () => undefined,
+        onCreateService: () => undefined,
+        onUpdateService: () => undefined,
+        onRemoveService: () => undefined,
       }),
     );
 
     expect(html).toContain("Managed runtime services");
+    expect(html).toContain("Add custom service");
     expect(html).toContain("Python runtime");
     expect(html).toContain("Current state");
-    expect(html).toContain("Ensure running");
+    expect(html).toContain("Edit service");
     expect(html).toContain("Recent stdout/stderr and supervisor events");
     expect(html).toContain("stderr: traceback line");
   });

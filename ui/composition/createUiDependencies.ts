@@ -83,6 +83,7 @@ import { PreviewAgentContextUseCase } from "../../application/context/PreviewAge
 import { LocalStorageContextPackageRepository } from "../../infrastructure/browser/context/LocalStorageContextPackageRepository";
 import { LocalStorageContextRecipeRepository } from "../../infrastructure/browser/context/LocalStorageContextRecipeRepository";
 import { createPythonRuntimeServiceDefinition } from "../../infrastructure/python/runtime/PythonRuntimeServiceDefinition";
+import { LocalStorageManagedServiceDefinitionRepository } from "../../infrastructure/browser/services/LocalStorageManagedServiceDefinitionRepository";
 
 import { WorkflowProjectionService } from "../../application/projection/WorkflowProjectionService";
 import { WorkflowToolProjectionService } from "../../application/projection/WorkflowToolProjectionService";
@@ -322,11 +323,13 @@ export function createUiDependencies(
       healthPollIntervalMs: pythonRuntimeConfig.healthPollIntervalMs,
     },
   });
-  const managedServicesService = new ManagedServicesService(
+  const managedServiceDefinitionRepository = new LocalStorageManagedServiceDefinitionRepository();
+  const managedServicesService = new ManagedServicesService({
     pythonRuntimeManager,
     runtimeEventStore,
-    pythonRuntimeDefinition,
-  );
+    builtinDefinitions: [pythonRuntimeDefinition],
+    definitionRepository: managedServiceDefinitionRepository,
+  });
   const managedServicesStore = new ManagedServicesStore(managedServicesService);
   const mcpStore = new McpStore(mcpService);
   const previewWorkflowContextUseCase = new PreviewWorkflowContextUseCase(workflowContextService);

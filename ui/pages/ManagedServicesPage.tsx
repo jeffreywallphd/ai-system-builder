@@ -68,6 +68,9 @@ export default function ManagedServicesPage(): JSX.Element {
         onStop={(serviceId) => void managedServicesStore.stop(serviceId).catch(() => undefined)}
         onRestart={(serviceId) => void managedServicesStore.restart(serviceId).catch(() => undefined)}
         onEnsureRunning={(serviceId) => void managedServicesStore.ensureRunning(serviceId).catch(() => undefined)}
+        onCreateService={(definition) => void managedServicesStore.createService(definition).catch(() => undefined)}
+        onUpdateService={(serviceId, definition) => void managedServicesStore.updateService(serviceId, definition).catch(() => undefined)}
+        onRemoveService={(serviceId) => void managedServicesStore.removeService(serviceId).catch(() => undefined)}
       />
     </section>
   );
