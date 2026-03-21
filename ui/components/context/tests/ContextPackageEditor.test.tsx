@@ -19,10 +19,10 @@ describe("ContextPackageEditor", () => {
       }),
     );
 
-    expect(html).toContain("Edit context package");
-    expect(html).toContain("Package name");
-    expect(html).toContain("References");
-    expect(html).toContain("Add fragment");
-    expect(html).toContain("Save package");
+    expect(html).toContain("Edit prompt pack");
+    expect(html).toContain("Pack name");
+    expect(html).toContain("Related packs");
+    expect(html).toContain("Add section");
+    expect(html).toContain("Save pack");
   });
 });

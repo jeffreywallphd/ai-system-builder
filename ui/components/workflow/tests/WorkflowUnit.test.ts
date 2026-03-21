@@ -46,6 +46,6 @@ describe("ui/components/workflow unit coverage", () => {
     expect(nodeAdapter).toContain('type: "aiLoomNode"');
     expect(edgeAdapter).toContain("export class EdgeAdapter");
     expect(edgeAdapter).toContain('type: "smoothstep"');
-    expect(nodeWrapper).toContain("node.size?.width ?? 360");
+    expect(nodeWrapper).toContain("node.size?.width ?? DEFAULT_NODE_WIDTH");
   });
 });

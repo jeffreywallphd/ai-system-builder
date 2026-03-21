@@ -2,12 +2,14 @@ import { describe, expect, it } from "bun:test";
 import { readSource } from "../../tests/testUtils";
 
 describe("ToolsPage", () => {
-  it("converts the tools page into an MCP tool authoring surface", () => {
+  it("creates separate find and create tabs for the tools experience", () => {
     const source = readSource("ui/pages/ToolsPage.tsx");
-    expect(source).toContain("MCP Tools");
+    expect(source).toContain("Find Tools");
+    expect(source).toContain("Create Tool");
+    expect(source).toContain("ToolBrowser");
+    expect(source).toContain("ToolSearchBar");
     expect(source).toContain("McpLocalServerComposer");
-    expect(source).toContain("Ask coding agent");
-    expect(source).toContain("publish new workspace-local tools");
-    expect(source).not.toContain("Developer workflows");
+    expect(source).toContain("toolStore.refreshTools");
+    expect(source).toContain("workspace-local MCP tool");
   });
 });
