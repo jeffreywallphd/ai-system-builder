@@ -248,4 +248,54 @@ describe("ManagedServicesStore", () => {
       "traceback line",
     ]);
   });
+
+  it("suppresses repeated supervisor log messages until the message changes", async () => {
+    let streamListener: ManagedServiceEventStreamListener | undefined;
+    const service = createServiceRecord({ recentLogs: Object.freeze([]) });
+    const store = new ManagedServicesStore(
+      {
+        listServices: mock(async () => Object.freeze([service])),
+        mapSupervisorServiceRecord: mock(async () => service),
+        listServicesFromSupervisor: mock(async () => Object.freeze([service])),
+      } as any,
+      {
+        connect(listener: ManagedServiceEventStreamListener) {
+          streamListener = listener;
+          return () => undefined;
+        },
+      } as any,
+    );
+
+    await store.initialize();
+    streamListener?.onLog?.({
+      serviceId: "python-runtime",
+      entry: {
+        timestamp: "2026-03-20T10:15:01.000Z",
+        level: "stdout",
+        message: "Trying to reconnect…",
+      },
+    });
+    streamListener?.onLog?.({
+      serviceId: "python-runtime",
+      entry: {
+        timestamp: "2026-03-20T10:15:02.000Z",
+        level: "stdout",
+        message: "Trying to reconnect…",
+      },
+    });
+    streamListener?.onLog?.({
+      serviceId: "python-runtime",
+      entry: {
+        timestamp: "2026-03-20T10:15:03.000Z",
+        level: "stdout",
+        message: "Runtime ready",
+      },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(store.getState().recentLogs.map((entry) => entry.message)).toEqual([
+      "Trying to reconnect…",
+      "Runtime ready",
+    ]);
+  });
 });

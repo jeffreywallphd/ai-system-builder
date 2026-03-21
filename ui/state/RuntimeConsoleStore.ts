@@ -16,6 +16,7 @@ import {
   type RuntimeDiagnosticsContext,
   type RuntimeLogVerbosity,
 } from "../../application/runtime/RuntimeDiagnostics";
+import { collapseConsecutiveRuntimeEvents } from "../../application/runtime/RuntimeEventStability";
 
 const DEFAULT_LOG_CAPACITY = 250;
 
@@ -120,10 +121,11 @@ export class RuntimeConsoleStore {
     this.runtimeManagement = options.runtimeManagement;
     this.logCapacity = options.logCapacity && options.logCapacity > 0 ? options.logCapacity : DEFAULT_LOG_CAPACITY;
     this.unsubscribeEventStore = this.runtimeEventStore.subscribe((events) => {
+      const stableEvents = collapseConsecutiveRuntimeEvents(events);
       this.state = Object.freeze({
         ...this.state,
-        events: Object.freeze([...events]),
-        logs: this.buildCombinedLogs(events),
+        events: stableEvents,
+        logs: this.buildCombinedLogs(stableEvents),
       });
       this.notify();
     });
@@ -210,7 +212,7 @@ export class RuntimeConsoleStore {
     this.patch({
       isRestartingRuntime: true,
       appState: this.state.appState === "starting" ? "starting" : "reconnecting",
-      appStateDetail: "Restarting the Python runtime…",
+      appStateDetail: "Trying to restart the Python runtime…",
     });
 
     try {
@@ -374,7 +376,7 @@ export class RuntimeConsoleStore {
     if ((trigger === "monitor" || trigger === "refresh") && this.shouldAttemptRecovery(status)) {
       this.patch({
         appState: "reconnecting",
-        appStateDetail: status.detail ?? "Python runtime connection was lost. Attempting recovery…",
+        appStateDetail: "Trying to reconnect to the Python runtime…",
       });
 
       try {
@@ -424,11 +426,15 @@ export class RuntimeConsoleStore {
       trigger,
       isManagedLocal: this.runtimeManagement?.isManagedLocal ?? false,
       autoStartEnabled: this.runtimeManagement?.autoStartEnabled ?? false,
+      currentAppState: this.state.appState,
     });
+    const nextAppStateDetail = nextAppState === "reconnecting"
+      ? getStableReconnectingDetail(trigger)
+      : overrideDetail ?? status.detail ?? describePythonRuntimeStatus(status);
 
     this.patch({
       appState: nextAppState,
-      appStateDetail: overrideDetail ?? status.detail ?? describePythonRuntimeStatus(status),
+      appStateDetail: nextAppStateDetail,
       canRestartRuntime: canRestartRuntime(status),
     });
   }
@@ -644,22 +650,26 @@ export class RuntimeConsoleStore {
       diagnostics,
     });
 
-    this.diagnosticLogs = Object.freeze([...this.diagnosticLogs, nextEntry].slice(-this.logCapacity));
+    const nextLogs = appendDistinctRuntimeConsoleLog(this.diagnosticLogs, nextEntry, this.logCapacity);
+    if (nextLogs === this.diagnosticLogs) {
+      return;
+    }
+
+    this.diagnosticLogs = nextLogs;
     this.patch({ logs: this.buildCombinedLogs(this.state.events) });
   }
 
   private buildCombinedLogs(events: ReadonlyArray<RuntimeEvent>): ReadonlyArray<RuntimeConsoleLogEntry> {
-    return Object.freeze(
-      [...events.map((event) => this.mapRuntimeEventToLogEntry(event)), ...this.diagnosticLogs]
-        .sort((left, right) => {
-          if (left.timestamp === right.timestamp) {
-            return left.id.localeCompare(right.id);
-          }
+    const sortedLogs = [...events.map((event) => this.mapRuntimeEventToLogEntry(event)), ...this.diagnosticLogs]
+      .sort((left, right) => {
+        if (left.timestamp === right.timestamp) {
+          return left.id.localeCompare(right.id);
+        }
 
-          return left.timestamp.localeCompare(right.timestamp);
-        })
-        .slice(-this.logCapacity),
-    );
+        return left.timestamp.localeCompare(right.timestamp);
+      });
+
+    return Object.freeze(collapseConsecutiveRuntimeConsoleLogs(sortedLogs).slice(-this.logCapacity));
   }
 
   private mapRuntimeEventToLogEntry(event: RuntimeEvent): RuntimeConsoleLogEntry {
@@ -752,8 +762,27 @@ export class RuntimeConsoleStore {
 
 function deriveAppState(
   status: PythonRuntimeManagerStatus,
-  context: { trigger: "startup" | "startup-failed" | "monitor" | "manual-restart" | "refresh"; isManagedLocal: boolean; autoStartEnabled: boolean },
+  context: {
+    trigger: "startup" | "startup-failed" | "monitor" | "manual-restart" | "refresh";
+    isManagedLocal: boolean;
+    autoStartEnabled: boolean;
+    currentAppState: RuntimeAppState;
+  },
 ): RuntimeAppState {
+  if (
+    context.currentAppState === "reconnecting"
+    && context.isManagedLocal
+    && context.autoStartEnabled
+    && (context.trigger === "monitor" || context.trigger === "refresh")
+    && (
+      status.status === PythonRuntimeStatuses.unavailable
+      || status.status === PythonRuntimeStatuses.starting
+      || status.status === PythonRuntimeStatuses.stopping
+    )
+  ) {
+    return "reconnecting";
+  }
+
   switch (status.status) {
     case PythonRuntimeStatuses.healthy:
       return "ready";
@@ -944,4 +973,52 @@ function serializeEventDetails(details: RuntimeEvent["details"]): string | undef
 
 function createRuntimeConsoleLogId(): string {
   return `runtime-console-log-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function collapseConsecutiveRuntimeConsoleLogs(
+  logs: ReadonlyArray<RuntimeConsoleLogEntry>,
+): ReadonlyArray<RuntimeConsoleLogEntry> {
+  const collapsed: RuntimeConsoleLogEntry[] = [];
+
+  for (const log of logs) {
+    const previous = collapsed.length > 0 ? collapsed[collapsed.length - 1] : undefined;
+    if (previous && areRuntimeConsoleLogsEquivalent(previous, log)) {
+      continue;
+    }
+
+    collapsed.push(log);
+  }
+
+  return Object.freeze(collapsed);
+}
+
+function appendDistinctRuntimeConsoleLog(
+  logs: ReadonlyArray<RuntimeConsoleLogEntry>,
+  nextLog: RuntimeConsoleLogEntry,
+  capacity: number,
+): ReadonlyArray<RuntimeConsoleLogEntry> {
+  const previous = logs.length > 0 ? logs[logs.length - 1] : undefined;
+  if (previous && areRuntimeConsoleLogsEquivalent(previous, nextLog)) {
+    return logs;
+  }
+
+  return Object.freeze([...logs, nextLog].slice(-Math.max(capacity, 1)));
+}
+
+function areRuntimeConsoleLogsEquivalent(left: RuntimeConsoleLogEntry, right: RuntimeConsoleLogEntry): boolean {
+  return left.severity === right.severity
+    && left.source === right.source
+    && left.message === right.message
+    && left.details === right.details
+    && left.stack === right.stack
+    && left.requestMethod === right.requestMethod
+    && left.target === right.target;
+}
+
+function getStableReconnectingDetail(
+  trigger: "startup" | "startup-failed" | "monitor" | "manual-restart" | "refresh",
+): string {
+  return trigger === "manual-restart"
+    ? "Trying to restart the Python runtime…"
+    : "Trying to reconnect to the Python runtime…";
 }

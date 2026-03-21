@@ -539,4 +539,65 @@ describe("RuntimeConsoleStore", () => {
     expect(store.getState().logs).toHaveLength(3);
     expect(store.getState().logs.map((entry) => entry.message)).toEqual(["event-2", "event-3", "event-4"]);
   });
+
+  it("collapses consecutive duplicate runtime events and keeps a stable reconnecting message", async () => {
+    let runtimeStatus: PythonRuntimeManagerStatus = {
+      status: "healthy",
+      isAvailable: true,
+      owner: "managed",
+      lastUpdatedAt: "2026-03-20T00:00:00.000Z",
+      detail: "Runtime is healthy.",
+    };
+    const eventStore = new RuntimeEventBuffer();
+    const checkAvailability = mock(async () => {
+      if (runtimeStatus.status === "healthy") {
+        runtimeStatus = {
+          status: "unavailable",
+          isAvailable: false,
+          owner: "managed",
+          lastUpdatedAt: "2026-03-20T00:00:03.000Z",
+          detail: "Runtime unavailable while retrying.",
+        };
+        return false;
+      }
+
+      return runtimeStatus.isAvailable;
+    });
+    const store = new RuntimeConsoleStore({
+      runtimeEventStore: eventStore,
+      pythonRuntimeManager: {
+        checkAvailability,
+        ensureRuntimeAvailability: async () => runtimeStatus,
+        restartRuntime: async () => runtimeStatus,
+        getStatus: () => runtimeStatus,
+        stopManagedRuntime: async () => undefined,
+      },
+      runtimeManagement: {
+        isManagedLocal: true,
+        autoStartEnabled: true,
+        healthPollIntervalMs: 5_000,
+      },
+    });
+
+    eventStore.append(createRuntimeEvent({
+      source: RuntimeEventSources.pythonRuntime,
+      severity: "warning",
+      message: "Trying to reconnect…",
+      timestamp: "2026-03-20T00:00:01.000Z",
+    }));
+    eventStore.append(createRuntimeEvent({
+      source: RuntimeEventSources.pythonRuntime,
+      severity: "warning",
+      message: "Trying to reconnect…",
+      timestamp: "2026-03-20T00:00:02.000Z",
+    }));
+
+    await store.initializeRuntime();
+    await store.refreshHealth();
+
+    expect(store.getState().events.map((entry) => entry.message)).toEqual(["Trying to reconnect…"]);
+    expect(store.getState().logs.filter((entry) => entry.message === "Trying to reconnect…")).toHaveLength(1);
+    expect(store.getState().appState).toBe("reconnecting");
+    expect(store.getState().appStateDetail).toBe("Trying to reconnect to the Python runtime…");
+  });
 });

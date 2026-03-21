@@ -1,4 +1,8 @@
 import type { RuntimeEvent } from "../../application/runtime/RuntimeEvent";
+import {
+  appendDistinctRuntimeEvent,
+  collapseConsecutiveRuntimeEvents,
+} from "../../application/runtime/RuntimeEventStability";
 import type { ManagedServiceDefinitionInput } from "../../application/services/ManagedServiceDefinition";
 import type { ManagedServiceRecord, ManagedServicesService } from "../services/ManagedServicesService";
 import type { ManagedServiceEventStream } from "../services/ManagedServiceEventStream";
@@ -73,7 +77,7 @@ export class ManagedServicesStore {
       this.patch({
         services: Object.freeze([...services]),
         selectedServiceId: selectedService?.id,
-        recentLogs: Object.freeze([...(selectedService?.recentLogs ?? [])]),
+        recentLogs: collapseConsecutiveRuntimeEvents(selectedService?.recentLogs ?? []),
         isLoading: false,
       });
     } catch (error) {
@@ -90,7 +94,7 @@ export class ManagedServicesStore {
 
     this.patch({
       selectedServiceId: selectedService?.id,
-      recentLogs: Object.freeze([...(selectedService?.recentLogs ?? [])]),
+      recentLogs: collapseConsecutiveRuntimeEvents(selectedService?.recentLogs ?? []),
     });
   }
 
@@ -142,14 +146,16 @@ export class ManagedServicesStore {
         .map((service) => updatedServices.find((updated) => updated.id === service.id) ?? service)
         .concat(updatedServices.filter((service) => !this.state.services.some((entry) => entry.id === service.id)))
         .filter((service, index, entries) => entries.findIndex((entry) => entry.id === service.id) === index);
-      const selectedService = updatedServices.at(-1)
+      const selectedService = (updatedServices.length > 0
+        ? updatedServices[updatedServices.length - 1]
+        : undefined)
         ?? services.find((service) => serviceIds.has(service.id))
         ?? services[0];
 
       this.patch({
         services: Object.freeze([...services]),
         selectedServiceId: selectedService?.id,
-        recentLogs: Object.freeze([...(selectedService?.recentLogs ?? [])]),
+        recentLogs: collapseConsecutiveRuntimeEvents(selectedService?.recentLogs ?? []),
         isMutating: false,
       });
     } catch (error) {
@@ -173,7 +179,7 @@ export class ManagedServicesStore {
       this.patch({
         services: Object.freeze([...services]),
         selectedServiceId: updatedService.id,
-        recentLogs: Object.freeze([...updatedService.recentLogs]),
+        recentLogs: collapseConsecutiveRuntimeEvents(updatedService.recentLogs),
         isMutating: false,
       });
     } catch (error) {
@@ -187,7 +193,7 @@ export class ManagedServicesStore {
       ...this.state,
       ...patch,
       services: patch.services ? Object.freeze([...patch.services]) : this.state.services,
-      recentLogs: patch.recentLogs ? Object.freeze([...patch.recentLogs]) : this.state.recentLogs,
+      recentLogs: patch.recentLogs ? collapseConsecutiveRuntimeEvents(patch.recentLogs) : this.state.recentLogs,
       selectedServiceId: Object.prototype.hasOwnProperty.call(patch, "selectedServiceId")
         ? patch.selectedServiceId
         : this.state.selectedServiceId,
@@ -253,7 +259,7 @@ export class ManagedServicesStore {
     this.patch({
       services: Object.freeze([...records]),
       selectedServiceId: selectedService?.id,
-      recentLogs: Object.freeze([...(selectedService?.recentLogs ?? [])]),
+      recentLogs: collapseConsecutiveRuntimeEvents(selectedService?.recentLogs ?? []),
       error: undefined,
     });
   }
@@ -274,7 +280,7 @@ export class ManagedServicesStore {
     this.patch({
       services: Object.freeze([...services]),
       selectedServiceId: selectedService?.id,
-      recentLogs: Object.freeze([...(selectedService?.recentLogs ?? [])]),
+      recentLogs: collapseConsecutiveRuntimeEvents(selectedService?.recentLogs ?? []),
       error: undefined,
     });
   }
@@ -293,16 +299,21 @@ export class ManagedServicesStore {
       severity,
       message: entry.message,
     } satisfies RuntimeEvent);
+    const updatedLogs = appendDistinctRuntimeEvent(service.recentLogs, runtimeEvent, 200);
+    if (updatedLogs === service.recentLogs) {
+      return;
+    }
+
     const updatedService = Object.freeze({
       ...service,
-      recentLogs: Object.freeze([...service.recentLogs, runtimeEvent].slice(-200)),
+      recentLogs: updatedLogs,
     });
     const services = this.state.services.map((candidate) => candidate.id === serviceId ? updatedService : candidate);
 
     this.patch({
       services: Object.freeze(services),
       recentLogs: this.state.selectedServiceId === serviceId
-        ? Object.freeze([...updatedService.recentLogs])
+        ? collapseConsecutiveRuntimeEvents(updatedService.recentLogs)
         : this.state.recentLogs,
     });
   }
