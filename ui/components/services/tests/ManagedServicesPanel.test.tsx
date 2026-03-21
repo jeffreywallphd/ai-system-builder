@@ -31,6 +31,10 @@ describe("ManagedServicesPanel", () => {
             args: ["-m", "uvicorn"],
             environmentVariables: {},
             startupTimeoutMs: 20000,
+            pid: 4100,
+            uptimeSeconds: 125,
+            healthSummary: "Python runtime is ready.",
+            healthCheckedAt: "2026-03-20T10:15:00.000Z",
             canEdit: true,
             canRemove: false,
             canManageLifecycle: true,
@@ -63,6 +67,7 @@ describe("ManagedServicesPanel", () => {
         ],
         isLoading: false,
         isMutating: false,
+        streamState: "live",
         onSelectService: () => undefined,
         onRefresh: () => undefined,
         onStart: () => undefined,
@@ -82,6 +87,10 @@ describe("ManagedServicesPanel", () => {
     expect(html).toContain("Current state");
     expect(html).toContain("Dependencies");
     expect(html).toContain("Dependents");
+    expect(html).toContain("PID");
+    expect(html).toContain("4100");
+    expect(html).toContain("Uptime");
+    expect(html).toContain("2m 5s");
     expect(html).toContain("Python runtime is ready.");
     expect(html).toContain("Start workflow-execution");
     expect(html).toContain("Edit service");

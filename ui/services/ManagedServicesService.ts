@@ -16,6 +16,7 @@ import type { IManagedServiceDefinitionRepository } from "../../application/serv
 import type { IManagedServiceManager } from "../../application/services/interfaces/IManagedServiceManager";
 import type { IManagedServiceStatusRefresher } from "../../application/services/interfaces/IManagedServiceStatusRefresher";
 import type { IManagedServiceSupervisor } from "../../application/services/interfaces/IManagedServiceSupervisor";
+import type { IManagedServiceSupervisorClient } from "../../application/services/interfaces/IManagedServiceSupervisorClient";
 import {
   ManagedServiceOwnership,
   ManagedServiceStates,
@@ -45,6 +46,10 @@ export interface ManagedServiceRecord {
   readonly args: ReadonlyArray<string>;
   readonly environmentVariables: Readonly<Record<string, string>>;
   readonly startupTimeoutMs: number;
+  readonly pid?: number | null;
+  readonly uptimeSeconds?: number;
+  readonly healthSummary?: string;
+  readonly healthCheckedAt?: string;
   readonly canEdit: boolean;
   readonly canRemove: boolean;
   readonly canManageLifecycle: boolean;
@@ -62,6 +67,7 @@ export interface ManagedServiceRecord {
 export interface ManagedServicesServiceOptions {
   readonly serviceManager: IManagedServiceManager;
   readonly serviceSupervisor?: IManagedServiceSupervisor;
+  readonly supervisorClient?: IManagedServiceSupervisorClient;
   readonly runtimeEventStore: IRuntimeEventStore;
   readonly builtinDefinitions: ReadonlyArray<ManagedServiceDefinition>;
   readonly definitionRepository: IManagedServiceDefinitionRepository;
@@ -71,6 +77,7 @@ export interface ManagedServicesServiceOptions {
 export class ManagedServicesService {
   private readonly serviceManager: IManagedServiceManager;
   private readonly serviceSupervisor?: IManagedServiceSupervisor;
+  private readonly supervisorClient?: IManagedServiceSupervisorClient;
   private readonly runtimeEventStore: IRuntimeEventStore;
   private readonly builtinDefinitions = new Map<string, ManagedServiceDefinition>();
   private readonly definitionRepository: IManagedServiceDefinitionRepository;
@@ -79,6 +86,7 @@ export class ManagedServicesService {
   constructor(options: ManagedServicesServiceOptions) {
     this.serviceManager = options.serviceManager;
     this.serviceSupervisor = options.serviceSupervisor;
+    this.supervisorClient = options.supervisorClient;
     this.runtimeEventStore = options.runtimeEventStore;
     this.definitionRepository = options.definitionRepository;
     this.fetchImplementation = options.fetchImplementation ?? fetch;
@@ -89,6 +97,11 @@ export class ManagedServicesService {
   }
 
   public async listServices(): Promise<ReadonlyArray<ManagedServiceRecord>> {
+    if (this.supervisorClient) {
+      const response = await this.supervisorClient.listServices();
+      return this.listServicesFromSupervisor(response.services);
+    }
+
     await this.refreshManagedServices();
     return this.getServices();
   }
@@ -100,6 +113,11 @@ export class ManagedServicesService {
   }
 
   public async refreshService(serviceId: string): Promise<ManagedServiceRecord> {
+    if (this.supervisorClient) {
+      const response = await this.supervisorClient.getService(serviceId);
+      return this.mapSupervisorServiceRecord(response.service);
+    }
+
     const definition = await this.requireDefinition(serviceId);
     if (this.isRegisteredManagedService(definition.serviceId)) {
       await this.refreshManagedService(definition.serviceId);
@@ -108,6 +126,11 @@ export class ManagedServicesService {
   }
 
   public async getService(serviceId: string): Promise<ManagedServiceRecord> {
+    if (this.supervisorClient) {
+      const response = await this.supervisorClient.getService(serviceId);
+      return this.mapSupervisorServiceRecord(response.service);
+    }
+
     const definition = await this.requireDefinition(serviceId);
     return this.buildRecord(definition);
   }
@@ -123,7 +146,9 @@ export class ManagedServicesService {
     }
 
     await this.definitionRepository.savePersistedDefinition(normalized);
-    return this.buildRecord(normalized);
+    return this.supervisorClient
+      ? this.getService(normalized.serviceId)
+      : this.buildRecord(normalized);
   }
 
   public async updateService(serviceId: string, patch: ManagedServiceDefinitionInput): Promise<ManagedServiceRecord> {
@@ -144,7 +169,9 @@ export class ManagedServicesService {
         transport: builtin.transport,
       }));
       await this.definitionRepository.savePersistedDefinition(merged);
-      return this.buildRecord(merged);
+      return this.supervisorClient
+        ? this.getService(merged.serviceId)
+        : this.buildRecord(merged);
     }
 
     const updated = createManagedServiceDefinition({
@@ -155,7 +182,9 @@ export class ManagedServicesService {
       source: ManagedServiceSources.custom,
     });
     await this.definitionRepository.savePersistedDefinition(updated);
-    return this.buildRecord(updated);
+    return this.supervisorClient
+      ? this.getService(updated.serviceId)
+      : this.buildRecord(updated);
   }
 
   public async removeService(serviceId: string): Promise<void> {
@@ -168,6 +197,10 @@ export class ManagedServicesService {
 
   public async startService(serviceId: string): Promise<ManagedServiceRecord> {
     if (this.isRegisteredManagedService(serviceId)) {
+      if (this.supervisorClient) {
+        const response = await this.supervisorClient.start(serviceId);
+        return this.mapSupervisorServiceRecord(response.service);
+      }
       await this.requireServiceSupervisor().start(serviceId);
       return this.getService(serviceId);
     }
@@ -177,6 +210,10 @@ export class ManagedServicesService {
 
   public async stopService(serviceId: string): Promise<ManagedServiceRecord> {
     if (this.isRegisteredManagedService(serviceId)) {
+      if (this.supervisorClient) {
+        const response = await this.supervisorClient.stop(serviceId);
+        return this.mapSupervisorServiceRecord(response.service);
+      }
       await this.requireServiceSupervisor().stop(serviceId);
       return this.getService(serviceId);
     }
@@ -192,6 +229,10 @@ export class ManagedServicesService {
 
   public async restartService(serviceId: string): Promise<ManagedServiceRecord> {
     if (this.isRegisteredManagedService(serviceId)) {
+      if (this.supervisorClient) {
+        const response = await this.supervisorClient.restart(serviceId);
+        return this.mapSupervisorServiceRecord(response.service);
+      }
       await this.requireServiceSupervisor().restart(serviceId);
       return this.getService(serviceId);
     }
@@ -201,6 +242,10 @@ export class ManagedServicesService {
 
   public async ensureRunning(serviceId: string): Promise<ManagedServiceRecord> {
     if (this.isRegisteredManagedService(serviceId)) {
+      if (this.supervisorClient) {
+        const response = await this.supervisorClient.ensureRunning(serviceId);
+        return this.mapSupervisorServiceRecord(response.service);
+      }
       await this.requireServiceSupervisor().ensureRunning(serviceId);
       return this.getService(serviceId);
     }
@@ -227,7 +272,11 @@ export class ManagedServicesService {
 
     for (const definition of orderedDefinitions) {
       if (this.isRegisteredManagedService(definition.serviceId)) {
-        await this.requireServiceSupervisor().ensureRunning(definition.serviceId);
+        if (this.supervisorClient) {
+          await this.supervisorClient.ensureRunning(definition.serviceId);
+        } else {
+          await this.requireServiceSupervisor().ensureRunning(definition.serviceId);
+        }
       } else {
         await this.refreshService(definition.serviceId);
       }
@@ -277,6 +326,10 @@ export class ManagedServicesService {
       args: Object.freeze([...(definition?.args ?? service.args)]),
       environmentVariables: definition?.environmentVariables ?? Object.freeze({}),
       startupTimeoutMs: definition?.startupTimeoutMs ?? 20_000,
+      pid: service.pid,
+      uptimeSeconds: service.startedAt ? Math.max(0, Math.round((Date.now() - new Date(service.startedAt).getTime()) / 1000)) : undefined,
+      healthSummary: service.readiness?.detail ?? service.detail,
+      healthCheckedAt: service.lastHealthCheckAt ?? undefined,
       canEdit: true,
       canRemove: definition?.source !== ManagedServiceSources.builtin,
       canManageLifecycle: true,
@@ -313,6 +366,10 @@ export class ManagedServicesService {
   }
 
   private isRegisteredManagedService(serviceId: string): boolean {
+    if (this.supervisorClient) {
+      return true;
+    }
+
     return this.serviceManager.listServices().some((service) => service.id === serviceId);
   }
 
@@ -397,6 +454,10 @@ export class ManagedServicesService {
       args: definition.args,
       environmentVariables: definition.environmentVariables,
       startupTimeoutMs: definition.startupTimeoutMs,
+      pid: undefined,
+      uptimeSeconds: undefined,
+      healthSummary: status.detail,
+      healthCheckedAt: status.lastUpdatedAt,
       canEdit: true,
       canRemove: definition.source !== ManagedServiceSources.builtin,
       canManageLifecycle: true,
@@ -441,6 +502,10 @@ export class ManagedServicesService {
       args: definition.args,
       environmentVariables: definition.environmentVariables,
       startupTimeoutMs: definition.startupTimeoutMs,
+      pid: undefined,
+      uptimeSeconds: undefined,
+      healthSummary: detail,
+      healthCheckedAt: probe.lastUpdatedAt ?? new Date().toISOString(),
       canEdit: true,
       canRemove: true,
       canManageLifecycle: false,

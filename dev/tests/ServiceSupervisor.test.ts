@@ -653,6 +653,80 @@ describe("service supervisor HTTP API", () => {
     expect(authorizedBody.service.state).toBe(ServiceStates.healthy);
   });
 
+  it("creates custom managed services, persists definitions, and reloads them without terminal-only setup", async () => {
+    const port = await getAvailablePort();
+    const customPort = await getAvailablePort();
+    const tempDir = mkdtempSync(path.join(os.tmpdir(), "service-supervisor-defs-"));
+    tempDirectories.push(tempDir);
+    const definitionsPath = path.join(tempDir, "managed-services.json");
+    const app = createSupervisorServer({
+      host: "127.0.0.1",
+      port,
+      controlToken: "super-secret",
+      definitionsPath,
+      runtime: createNodeProcessRuntime(),
+      services: [createRuntimeDefinition()],
+    });
+    await app.listen();
+    serversToClose.push(app);
+
+    const saveResponse = await fetch(`http://127.0.0.1:${port}/service-definitions/vector-store`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer super-secret",
+      },
+      body: JSON.stringify({
+        serviceId: "vector-store",
+        kind: "custom",
+        displayName: "Vector store",
+        description: "Custom local retrieval service",
+        transport: "hybrid",
+        source: "custom",
+        baseUrl: `http://127.0.0.1:${customPort}`,
+        command: process.execPath,
+        args: [fixtureScriptPath],
+        workingDirectory: repoRoot,
+        environmentVariables: {
+          TEST_RUNTIME_PORT: String(customPort),
+          TEST_RUNTIME_HEALTHY_AFTER_MS: "0",
+        },
+        dependencies: ["python-runtime"],
+        autoStartPolicy: "manual",
+        restartPolicy: "on-failure",
+        startupTimeoutMs: 2_000,
+        capabilities: ["retrieval"],
+        tags: ["custom"],
+      }),
+    });
+
+    expect(saveResponse.status).toBe(200);
+    const savedJson = await saveResponse.json();
+    expect(savedJson.definition.displayName).toBe("Vector store");
+
+    const startResponse = await fetch(`http://127.0.0.1:${port}/services/vector-store/start`, {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer super-secret",
+      },
+    });
+
+    expect(startResponse.status).toBe(200);
+    const startedJson = await startResponse.json();
+    expect(startedJson.service.state).toBe(ServiceStates.healthy);
+    expect(startedJson.service.dependencies).toEqual(["python-runtime"]);
+
+    const persistedSupervisor = new InMemoryServiceSupervisor({
+      services: [createRuntimeDefinition()],
+      definitionsPath,
+      runtime: createNodeProcessRuntime(),
+    });
+    expect(persistedSupervisor.getDefinition("vector-store")?.displayName).toBe("Vector store");
+
+    await app.supervisor.deleteDefinition("vector-store");
+    expect(app.supervisor.getDefinition("vector-store")).toBeUndefined();
+  });
+
   it("exposes an SSE snapshot endpoint and emits service events to subscribers", async () => {
     const port = await getAvailablePort();
     const servicePort = await getAvailablePort();

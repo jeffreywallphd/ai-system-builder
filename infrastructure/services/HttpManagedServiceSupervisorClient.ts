@@ -1,9 +1,12 @@
 import type {
   IManagedServiceSupervisorClient,
+  ManagedSupervisorServiceDefinitionListResponse,
+  ManagedSupervisorServiceDefinitionResponse,
   ManagedSupervisorHealthResponse,
   ManagedSupervisorServiceListResponse,
   ManagedSupervisorServiceResponse,
 } from "../../application/services/interfaces/IManagedServiceSupervisorClient";
+import type { ManagedServiceDefinition } from "../../application/services/ManagedServiceDefinition";
 
 export interface HttpManagedServiceSupervisorClientOptions {
   readonly baseUrl: string;
@@ -44,6 +47,29 @@ export class HttpManagedServiceSupervisorClient implements IManagedServiceSuperv
     return this.request<ManagedSupervisorServiceResponse>("GET", `/services/${encodeURIComponent(serviceId)}`);
   }
 
+  public listDefinitions(): Promise<ManagedSupervisorServiceDefinitionListResponse> {
+    return this.request<ManagedSupervisorServiceDefinitionListResponse>("GET", "/service-definitions");
+  }
+
+  public getDefinition(serviceId: string): Promise<ManagedSupervisorServiceDefinitionResponse> {
+    return this.request<ManagedSupervisorServiceDefinitionResponse>(
+      "GET",
+      `/service-definitions/${encodeURIComponent(serviceId)}`,
+    );
+  }
+
+  public saveDefinition(definition: ManagedServiceDefinition): Promise<ManagedSupervisorServiceDefinitionResponse> {
+    return this.request<ManagedSupervisorServiceDefinitionResponse>(
+      "PUT",
+      `/service-definitions/${encodeURIComponent(definition.serviceId)}`,
+      definition,
+    );
+  }
+
+  public deleteDefinition(serviceId: string): Promise<void> {
+    return this.request<void>("DELETE", `/service-definitions/${encodeURIComponent(serviceId)}`);
+  }
+
   public start(serviceId: string): Promise<ManagedSupervisorServiceResponse> {
     return this.command(serviceId, "start");
   }
@@ -71,7 +97,7 @@ export class HttpManagedServiceSupervisorClient implements IManagedServiceSuperv
     );
   }
 
-  private async request<T>(method: "GET" | "POST", path: string, body?: unknown): Promise<T> {
+  private async request<T>(method: "GET" | "POST" | "PUT" | "DELETE", path: string, body?: unknown): Promise<T> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
 

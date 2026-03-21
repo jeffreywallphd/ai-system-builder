@@ -47,4 +47,63 @@ describe("HttpManagedServiceSupervisorClient", () => {
 
     await expect(client.getService("python-runtime")).rejects.toThrow("Unknown service 'python-runtime'.");
   });
+
+  it("manages service-definition CRUD endpoints for custom services", async () => {
+    const requests: Array<{ url: string; init?: RequestInit }> = [];
+    const client = new HttpManagedServiceSupervisorClient(
+      { baseUrl: "http://supervisor" },
+      (async (url, init) => {
+        requests.push({ url: String(url), init });
+        return new Response(JSON.stringify({
+          ok: true,
+          definition: {
+            serviceId: "vector-store",
+            kind: "custom",
+            displayName: "Vector store",
+            dependencies: ["python-runtime"],
+            transport: "hybrid",
+            source: "custom",
+            baseUrl: "http://127.0.0.1:7000",
+            healthCheckPath: "/health",
+            workingDirectory: "/workspace/ai-loom-studio",
+            command: "node",
+            args: ["server.mjs"],
+            environmentVariables: {},
+            autoStartPolicy: "manual",
+            restartPolicy: "on-failure",
+            startupTimeoutMs: 2_000,
+            tags: ["custom"],
+            capabilities: ["retrieval"],
+          },
+        }), { status: 200 });
+      }) as typeof fetch,
+    );
+
+    const definition = await client.saveDefinition({
+      serviceId: "vector-store",
+      kind: "custom",
+      displayName: "Vector store",
+      dependencies: ["python-runtime"],
+      transport: "hybrid",
+      source: "custom",
+      baseUrl: "http://127.0.0.1:7000",
+      healthCheckPath: "/health",
+      workingDirectory: "/workspace/ai-loom-studio",
+      command: "node",
+      args: ["server.mjs"],
+      environmentVariables: {},
+      autoStartPolicy: "manual",
+      restartPolicy: "on-failure",
+      startupTimeoutMs: 2_000,
+      tags: ["custom"],
+      capabilities: ["retrieval"],
+    });
+    await client.deleteDefinition("vector-store");
+
+    expect(definition.definition.serviceId).toBe("vector-store");
+    expect(requests[0]?.url).toBe("http://supervisor/service-definitions/vector-store");
+    expect(requests[0]?.init?.method).toBe("PUT");
+    expect(requests[1]?.url).toBe("http://supervisor/service-definitions/vector-store");
+    expect(requests[1]?.init?.method).toBe("DELETE");
+  });
 });
