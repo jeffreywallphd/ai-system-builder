@@ -21,6 +21,10 @@ describe("SettingsPage", () => {
     expect(source).toContain("Development (dev/workflow-data)");
     expect(source).toContain("Production (user/workflow-data)");
     expect(source).toContain("Advanced runtime settings");
+    expect(source).toContain('id="settings-runtime-python-version"');
+    expect(source).toContain("Python 3.12 (default)");
+    expect(source).toContain("Python 3.11");
+    expect(source).toContain("repair or recreate the runtime environment");
     expect(source).toContain("<McpRuntimeStatusPanel");
     expect(source).toContain("mcpStore.subscribe(setMcpState)");
     expect(source).toContain("servers={mcpState.configuredServers}");

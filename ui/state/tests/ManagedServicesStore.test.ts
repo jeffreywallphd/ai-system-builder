@@ -32,6 +32,17 @@ function createServiceRecord(overrides: Partial<ManagedServiceRecord> = {}): Man
     lastCheckedAt: "2026-03-20T10:15:00.000Z",
     lastErrorDetail: undefined,
     detail: "Runtime is healthy.",
+    provisioning: Object.freeze({
+      state: "provisioned",
+      required: true,
+      needsReprovision: false,
+      requestedVersion: "3.12",
+      resolvedVersion: "3.12.7",
+      resolvedInterpreter: "/usr/bin/python3.12",
+      environmentPath: "python-runtime/.venv",
+      detail: "Python runtime environment is provisioned.",
+      availableActions: Object.freeze(["repair", "recreate-environment"] as const),
+    }),
     readiness: Object.freeze({
       isReady: true,
       detail: "Python runtime is ready.",
@@ -84,6 +95,9 @@ describe("ManagedServicesStore", () => {
     const stopService = mock(async () => createServiceRecord({ state: "stopped", ownership: "none", isAvailable: false }));
     const restartService = mock(async () => createServiceRecord({ state: "running", detail: "Restart complete." }));
     const ensureRunning = mock(async () => createServiceRecord({ state: "running", detail: "Already running." }));
+    const provisionService = mock(async () => createServiceRecord({ detail: "Provisioned." }));
+    const repairService = mock(async () => createServiceRecord({ detail: "Repaired." }));
+    const recreateEnvironment = mock(async () => createServiceRecord({ detail: "Environment recreated." }));
     const startCapability = mock(async () => Object.freeze([
       createServiceRecord({ id: "python-runtime" }),
       createServiceRecord({
@@ -112,6 +126,9 @@ describe("ManagedServicesStore", () => {
       stopService,
       restartService,
       ensureRunning,
+      provisionService,
+      repairService,
+      recreateEnvironment,
       startCapability,
     } as any);
 
@@ -123,6 +140,9 @@ describe("ManagedServicesStore", () => {
     await store.stop("python-runtime");
     await store.restart("python-runtime");
     await store.ensureRunning("python-runtime");
+    await store.provision("python-runtime");
+    await store.repair("python-runtime");
+    await store.recreateEnvironment("python-runtime");
     await store.startCapability("retrieval");
     await store.removeService("local-ollama");
 
@@ -135,6 +155,9 @@ describe("ManagedServicesStore", () => {
     expect(stopService).toHaveBeenCalledWith("python-runtime");
     expect(restartService).toHaveBeenCalledWith("python-runtime");
     expect(ensureRunning).toHaveBeenCalledWith("python-runtime");
+    expect(provisionService).toHaveBeenCalledWith("python-runtime");
+    expect(repairService).toHaveBeenCalledWith("python-runtime");
+    expect(recreateEnvironment).toHaveBeenCalledWith("python-runtime");
     expect(startCapability).toHaveBeenCalledWith("retrieval");
     expect(state.selectedServiceId).toBe("python-runtime");
     expect(state.recentLogs[0]?.message).toContain("runtime ready");
@@ -212,6 +235,18 @@ describe("ManagedServicesStore", () => {
           lastExit: null,
           lastStart: null,
           lastHealthProbe: null,
+          provisioning: {
+            state: "provisioned",
+            required: true,
+            requestedVersion: "3.12",
+            resolvedVersion: "3.12.7",
+            resolvedInterpreter: "/usr/bin/python3.12",
+            environmentPath: "python-runtime/.venv",
+            versionMismatch: false,
+            needsReprovision: false,
+            lastUpdatedAt: "2026-03-20T10:15:02.000Z",
+            lastError: null,
+          },
           circuitBreaker: {
             state: "closed",
             openedAt: null,

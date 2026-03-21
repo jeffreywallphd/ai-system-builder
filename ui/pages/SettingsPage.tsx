@@ -193,6 +193,19 @@ export default function SettingsPage(): JSX.Element {
                 { value: "disabled", label: "Disabled" },
               ]}
             />
+            <SelectField
+              id="settings-runtime-python-version"
+              label="Built-in Python version"
+              hint="Used the next time the managed local runtime provisions, repairs, or recreates its virtual environment."
+              value={state.settings.runtime.pythonVersion}
+              onChange={(value) => settingsStore.updateSection("runtime", {
+                pythonVersion: value,
+              })}
+              options={[
+                { value: "3.12", label: "Python 3.12 (default)" },
+                { value: "3.11", label: "Python 3.11" },
+              ]}
+            />
             <TextField
               id="settings-runtime-base-url"
               label="Runtime base URL"
@@ -240,6 +253,14 @@ export default function SettingsPage(): JSX.Element {
                 value={state.settings.runtime.workingDirectory}
                 onChange={(value) => settingsStore.updateSection("runtime", { workingDirectory: value })}
               />
+              <TextField
+                id="settings-runtime-python-interpreter"
+                label="Interpreter override"
+                hint="Optional absolute path. Leave blank to let the supervisor resolve the selected version automatically, including Windows py launcher discovery."
+                value={state.settings.runtime.pythonInterpreterPath}
+                onChange={(value) => settingsStore.updateSection("runtime", { pythonInterpreterPath: value })}
+                placeholder="Optional explicit python.exe / python path"
+              />
               <NumberField
                 id="settings-runtime-startup-timeout"
                 label="Startup timeout (ms)"
@@ -270,6 +291,9 @@ export default function SettingsPage(): JSX.Element {
               checked={state.settings.runtime.autoStartEnabled}
               onChange={(checked) => settingsStore.updateSection("runtime", { autoStartEnabled: checked })}
             />
+            <p className="ui-text-secondary ui-text-small" style={{ margin: 0 }}>
+              Changing the built-in Python version does not silently rebuild an existing environment. If the configured version changes, the Managed Services page will prompt you to repair or recreate the runtime environment.
+            </p>
           </AdvancedSection>
         </SettingsSection>
 

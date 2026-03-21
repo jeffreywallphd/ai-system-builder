@@ -52,6 +52,18 @@ describe("createPythonManagedService", () => {
           lastExit: null,
           lastStart: null,
           lastHealthProbe: null,
+          provisioning: {
+            state: "provisioned",
+            required: true,
+            requestedVersion: "3.12",
+            resolvedVersion: "3.12.7",
+            resolvedInterpreter: "/usr/bin/python3.12",
+            environmentPath: "python-runtime/.venv",
+            versionMismatch: false,
+            needsReprovision: false,
+            lastUpdatedAt: "2026-03-20T00:00:00.000Z",
+            lastError: null,
+          },
           circuitBreaker: {
             state: "closed",
             openedAt: null,
@@ -84,6 +96,9 @@ describe("createPythonManagedService", () => {
         stop: async () => healthyService,
         restart: async () => healthyService,
         ensureRunning: async () => healthyService,
+        provision: async () => healthyService,
+        repair: async () => healthyService,
+        recreateEnvironment: async () => healthyService,
       },
     });
 

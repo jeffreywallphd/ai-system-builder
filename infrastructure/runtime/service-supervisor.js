@@ -6,6 +6,7 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  rmSync,
   statSync,
   writeFileSync,
 } from "node:fs";
@@ -40,6 +41,9 @@ const DEFAULT_ALLOWED_EXECUTABLES = [
 const DEFAULT_ALLOWED_PATHS = [process.cwd(), DEFAULT_PYTHON_RUNTIME_WORKDIR];
 const DEFAULT_PYTHON_RUNTIME_HEALTH_PATH = "/health";
 const DEFAULT_PYTHON_RUNTIME_ENTRYPOINT = "app.main:app";
+const DEFAULT_PYTHON_RUNTIME_VERSION = process.env.PYTHON_RUNTIME_PYTHON_VERSION?.trim() || "3.12";
+const SUPPORTED_PYTHON_VERSIONS = new Set(["3.11", "3.12"]);
+const PROVISIONING_METADATA_FILENAME = ".ai-loom-python-provisioning.json";
 const DEFAULT_DEFINITIONS_PATH = path.join(process.cwd(), ".ai-loom-studio", "managed-services.json");
 const DEFAULT_CONTROL_TOKEN = process.env.SERVICE_SUPERVISOR_CONTROL_TOKEN?.trim() || undefined;
 const DEFAULT_RESTART_POLICY = Object.freeze({
@@ -86,6 +90,14 @@ export const ServiceOwnership = Object.freeze({
   none: "none",
   managed: "managed",
   external: "external",
+});
+
+export const ProvisioningStates = Object.freeze({
+  unsupported: "unsupported",
+  unprovisioned: "unprovisioned",
+  provisioning: "provisioning",
+  provisioned: "provisioned",
+  provisionFailed: "provision-failed",
 });
 
 function createClockTimestamp(clock) {
@@ -481,6 +493,18 @@ function normalizeServiceDefinition(definition, options = {}) {
       ? metadata.version.trim()
       : "unversioned";
   const compatibility = normalizeCompatibilityMetadata(definition.compatibility ?? metadata.compatibility);
+  const pythonVersion = typeof definition.pythonVersion === "string" && definition.pythonVersion.trim()
+    ? definition.pythonVersion.trim()
+    : typeof metadata.pythonVersion === "string" && metadata.pythonVersion.trim()
+      ? metadata.pythonVersion.trim()
+      : serviceId === "python-runtime"
+        ? DEFAULT_PYTHON_RUNTIME_VERSION
+        : undefined;
+  const pythonInterpreterPath = typeof definition.pythonInterpreterPath === "string" && definition.pythonInterpreterPath.trim()
+    ? definition.pythonInterpreterPath.trim()
+    : typeof metadata.pythonInterpreterPath === "string" && metadata.pythonInterpreterPath.trim()
+      ? metadata.pythonInterpreterPath.trim()
+      : undefined;
 
   if (baseUrl) {
     try {
@@ -549,6 +573,8 @@ function normalizeServiceDefinition(definition, options = {}) {
       description,
       version,
       compatibility,
+      pythonVersion,
+      pythonInterpreterPath,
     },
     restartPolicy: parseRestartPolicy(definition.restartPolicy),
   });
@@ -580,6 +606,8 @@ function toManagedServiceDefinition(definition) {
     autoStartPolicy: definition.metadata.autoStartPolicy ?? "manual",
     restartPolicy: definition.metadata.restartPolicyName ?? "on-failure",
     startupTimeoutMs: definition.startupTimeoutMs,
+    pythonVersion: definition.metadata.pythonVersion,
+    pythonInterpreterPath: definition.metadata.pythonInterpreterPath,
     tags: [...(definition.metadata.tags ?? [])],
     capabilities: [...(definition.metadata.capabilities ?? [])],
   });
@@ -612,12 +640,13 @@ function persistServiceDefinitions(definitionsPath, definitions) {
   writeFileSync(definitionsPath, `${JSON.stringify(definitions, null, 2)}\n`, "utf8");
 }
 
-function createInitialDiagnostics(definition) {
+function createInitialDiagnostics(definition, clock) {
   return {
     lastError: null,
     lastExit: null,
     lastStart: null,
     lastHealthProbe: null,
+    provisioning: buildInitialProvisioningState(clock, definition),
     circuitBreaker: {
       state: "closed",
       openedAt: null,
@@ -648,7 +677,7 @@ function createInitialServiceState(definition, clock) {
     recentLogs: [createLogEntry(clock, "info", `${definition.name} registered with supervisor.`)],
     processHistory: [],
     metadata: definition.metadata,
-    diagnostics: createInitialDiagnostics(definition),
+    diagnostics: createInitialDiagnostics(definition, clock),
     failureTimestamps: [],
   };
 }
@@ -732,6 +761,82 @@ function createPermissionError(message, error) {
   permissionError.cause = error;
   permissionError.code = error?.code ?? "EACCES";
   return permissionError;
+}
+
+function isProvisioningRequired(definition) {
+  const commandName = path.basename(definition?.command || "").toLowerCase();
+  return definition?.metadata?.kind === "python-runtime"
+    && path.basename(definition?.cwd || "") === "python-runtime"
+    && (commandName.startsWith("python") || commandName === "py");
+}
+
+function resolveRequestedPythonVersion(definition) {
+  return definition?.metadata?.pythonVersion ?? DEFAULT_PYTHON_RUNTIME_VERSION;
+}
+
+function getPythonEnvironmentPath(definition) {
+  return path.join(definition.cwd, ".venv");
+}
+
+function getProvisioningMetadataPath(definition) {
+  return path.join(getPythonEnvironmentPath(definition), PROVISIONING_METADATA_FILENAME);
+}
+
+function getVenvPythonPath(definition) {
+  return process.platform === "win32"
+    ? path.join(getPythonEnvironmentPath(definition), "Scripts", "python.exe")
+    : path.join(getPythonEnvironmentPath(definition), "bin", "python");
+}
+
+function readProvisioningMetadata(definition) {
+  const metadataPath = getProvisioningMetadataPath(definition);
+  if (!existsSync(metadataPath)) {
+    return undefined;
+  }
+
+  try {
+    return JSON.parse(readFileSync(metadataPath, "utf8"));
+  } catch {
+    return undefined;
+  }
+}
+
+function buildInitialProvisioningState(clock, definition) {
+  if (!isProvisioningRequired(definition)) {
+    return {
+      state: ProvisioningStates.unsupported,
+      required: false,
+      requestedVersion: null,
+      resolvedVersion: null,
+      resolvedInterpreter: null,
+      environmentPath: null,
+      versionMismatch: false,
+      needsReprovision: false,
+      lastUpdatedAt: null,
+      lastError: null,
+    };
+  }
+
+  const requestedVersion = resolveRequestedPythonVersion(definition);
+  const metadata = readProvisioningMetadata(definition);
+  const environmentPath = getPythonEnvironmentPath(definition);
+  const venvPythonPath = getVenvPythonPath(definition);
+  const hasEnvironment = existsSync(environmentPath) && existsSync(venvPythonPath);
+  const resolvedVersion = metadata?.resolvedVersion ?? null;
+  const versionMismatch = Boolean(hasEnvironment && resolvedVersion && !String(resolvedVersion).startsWith(requestedVersion));
+
+  return {
+    state: hasEnvironment ? ProvisioningStates.provisioned : ProvisioningStates.unprovisioned,
+    required: true,
+    requestedVersion,
+    resolvedVersion,
+    resolvedInterpreter: metadata?.resolvedInterpreter ?? null,
+    environmentPath,
+    versionMismatch,
+    needsReprovision: versionMismatch,
+    lastUpdatedAt: metadata?.provisionedAt ?? null,
+    lastError: null,
+  };
 }
 
 function toErrorDetails(error) {
@@ -1133,6 +1238,7 @@ export class InMemoryServiceSupervisor {
         metadata: definition.metadata,
         diagnostics: {
           ...existingState.diagnostics,
+          provisioning: this.reconcileProvisioningState(existingState.diagnostics.provisioning, definition),
           circuitBreaker: {
             ...existingState.diagnostics.circuitBreaker,
             maxFailures: definition.restartPolicy.maxFailures,
@@ -1155,6 +1261,279 @@ export class InMemoryServiceSupervisor {
       this.definitionsPath,
       [...this.persistedDefinitions.values()].map((definition) => toManagedServiceDefinition(definition)),
     );
+  }
+
+  reconcileProvisioningState(existingProvisioning, definition) {
+    const baseline = buildInitialProvisioningState(this.clock, definition);
+    if (!existingProvisioning?.required) {
+      return baseline;
+    }
+
+    const requestedVersion = resolveRequestedPythonVersion(definition);
+    const resolvedVersion = existingProvisioning.resolvedVersion ?? baseline.resolvedVersion ?? null;
+    const versionMismatch = Boolean(resolvedVersion && !String(resolvedVersion).startsWith(requestedVersion));
+    return {
+      ...existingProvisioning,
+      required: true,
+      requestedVersion,
+      environmentPath: getPythonEnvironmentPath(definition),
+      versionMismatch,
+      needsReprovision: versionMismatch || baseline.needsReprovision,
+      state: existingProvisioning.state === ProvisioningStates.unsupported
+        ? baseline.state
+        : existingProvisioning.state,
+    };
+  }
+
+  async provision(serviceId) {
+    return this.runLifecycleOperation(serviceId, "provision", () => this.provisionInternal(serviceId, "provision"));
+  }
+
+  async repair(serviceId) {
+    return this.runLifecycleOperation(serviceId, "repair", () => this.provisionInternal(serviceId, "repair"));
+  }
+
+  async recreateEnvironment(serviceId) {
+    return this.runLifecycleOperation(serviceId, "recreate-environment", () => this.provisionInternal(serviceId, "recreate-environment"));
+  }
+
+  async runCommand(command, args, options = {}) {
+    return await new Promise((resolve, reject) => {
+      const child = spawn(command, args, {
+        cwd: options.cwd,
+        env: options.env ? { ...process.env, ...options.env } : process.env,
+        shell: false,
+        windowsHide: true,
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      let stdout = "";
+      let stderr = "";
+      child.stdout?.on("data", (chunk) => {
+        stdout += String(chunk);
+      });
+      child.stderr?.on("data", (chunk) => {
+        stderr += String(chunk);
+      });
+      child.once("error", reject);
+      child.once("close", (code, signal) => {
+        resolve({
+          code: typeof code === "number" ? code : null,
+          signal: signal ?? null,
+          stdout: stdout.trim(),
+          stderr: stderr.trim(),
+        });
+      });
+    });
+  }
+
+  async inspectInterpreter(command, args, cwd) {
+    const result = await this.runCommand(command, [...args, "-c", "import json,platform,sys; print(json.dumps({'version': platform.python_version(), 'executable': sys.executable}))"], { cwd });
+    if (result.code !== 0) {
+      throw new Error(result.stderr || result.stdout || `Interpreter inspection failed for ${command}.`);
+    }
+    try {
+      return JSON.parse(result.stdout);
+    } catch (error) {
+      throw new Error(`Interpreter inspection returned invalid JSON: ${toErrorMessage(error)}`);
+    }
+  }
+
+  async resolvePythonInterpreter(definition) {
+    const requestedVersion = resolveRequestedPythonVersion(definition);
+    if (!SUPPORTED_PYTHON_VERSIONS.has(requestedVersion)) {
+      throw new Error(`Unsupported Python version '${requestedVersion}'. Supported versions: ${[...SUPPORTED_PYTHON_VERSIONS].join(", ")}.`);
+    }
+
+    const candidates = [];
+    if (definition.metadata.pythonInterpreterPath) {
+      candidates.push({ command: definition.metadata.pythonInterpreterPath, args: [], label: definition.metadata.pythonInterpreterPath });
+    }
+    if (process.platform === "win32") {
+      candidates.push({ command: "py", args: [`-${requestedVersion}`], label: `py -${requestedVersion}` });
+    }
+    candidates.push({ command: `python${requestedVersion}`, args: [], label: `python${requestedVersion}` });
+    candidates.push({ command: "python3", args: [], label: "python3" });
+    candidates.push({ command: "python", args: [], label: "python" });
+
+    let lastError;
+    for (const candidate of candidates) {
+      try {
+        const inspection = await this.inspectInterpreter(candidate.command, candidate.args, definition.cwd);
+        if (!String(inspection.version).startsWith(requestedVersion)) {
+          lastError = new Error(`Resolved ${candidate.label} to Python ${inspection.version}, expected ${requestedVersion}.`);
+          continue;
+        }
+        return {
+          command: candidate.command,
+          args: candidate.args,
+          executable: inspection.executable,
+          version: inspection.version,
+          requestedVersion,
+          label: candidate.label,
+        };
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw new Error(`Unable to resolve a compatible Python ${requestedVersion} interpreter. ${lastError ? toErrorMessage(lastError) : ""}`.trim());
+  }
+
+  updateProvisioning(serviceId, patch) {
+    const state = this.requireState(serviceId);
+    return this.updateState(serviceId, {
+      diagnostics: {
+        ...state.diagnostics,
+        provisioning: {
+          ...state.diagnostics.provisioning,
+          ...patch,
+        },
+      },
+    });
+  }
+
+  async provisionInternal(serviceId, action) {
+    const definition = this.requireDefinition(serviceId);
+    const state = this.requireState(serviceId);
+    if (!isProvisioningRequired(definition)) {
+      return this.cloneState(state);
+    }
+
+    const environmentPath = getPythonEnvironmentPath(definition);
+    const metadataPath = getProvisioningMetadataPath(definition);
+    const requestedVersion = resolveRequestedPythonVersion(definition);
+
+    this.updateProvisioning(serviceId, {
+      state: ProvisioningStates.provisioning,
+      required: true,
+      requestedVersion,
+      environmentPath,
+      lastUpdatedAt: createClockTimestamp(this.clock),
+      lastError: null,
+    });
+    this.appendLog(serviceId, "info", `${definition.name} provisioning ${action} started.`);
+
+    try {
+      const interpreter = await this.resolvePythonInterpreter(definition);
+      this.appendLog(serviceId, "info", `Resolved Python ${interpreter.version} at ${interpreter.executable}.`);
+
+      if (action === "recreate-environment" && existsSync(environmentPath)) {
+        this.appendLog(serviceId, "warning", `Removing existing virtual environment at ${environmentPath}.`);
+        rmSync(environmentPath, { recursive: true, force: true });
+      }
+
+      const venvPython = getVenvPythonPath(definition);
+      const metadataBefore = readProvisioningMetadata(definition);
+      const shouldRecreate = action !== "provision"
+        && (
+          !existsSync(venvPython)
+          || (metadataBefore?.resolvedVersion && !String(metadataBefore.resolvedVersion).startsWith(requestedVersion))
+        );
+
+      if (shouldRecreate && existsSync(environmentPath)) {
+        this.appendLog(serviceId, "warning", `Rebuilding incompatible or broken environment at ${environmentPath}.`);
+        rmSync(environmentPath, { recursive: true, force: true });
+      }
+
+      if (!existsSync(venvPython)) {
+        this.appendLog(serviceId, "info", `Creating virtual environment in ${environmentPath}.`);
+        const createResult = await this.runCommand(interpreter.command, [...interpreter.args, "-m", "venv", environmentPath], { cwd: definition.cwd });
+        if (createResult.stdout) {
+          this.appendLog(serviceId, "stdout", createResult.stdout);
+        }
+        if (createResult.stderr) {
+          this.appendLog(serviceId, "stderr", createResult.stderr);
+        }
+        if (createResult.code !== 0) {
+          throw new Error(createResult.stderr || createResult.stdout || "Virtual environment creation failed.");
+        }
+      } else {
+        this.appendLog(serviceId, "info", `Using existing virtual environment at ${environmentPath}.`);
+      }
+
+      const upgradePip = await this.runCommand(venvPython, ["-m", "pip", "install", "--upgrade", "pip"], { cwd: definition.cwd });
+      if (upgradePip.stdout) this.appendLog(serviceId, "stdout", upgradePip.stdout);
+      if (upgradePip.stderr) this.appendLog(serviceId, "stderr", upgradePip.stderr);
+      if (upgradePip.code !== 0) {
+        throw new Error(upgradePip.stderr || upgradePip.stdout || "pip upgrade failed.");
+      }
+
+      const requirementsPath = path.join(definition.cwd, "requirements.txt");
+      this.appendLog(serviceId, "info", `Installing requirements from ${requirementsPath}.`);
+      const installRequirements = await this.runCommand(venvPython, ["-m", "pip", "install", "-r", requirementsPath], { cwd: definition.cwd });
+      if (installRequirements.stdout) this.appendLog(serviceId, "stdout", installRequirements.stdout);
+      if (installRequirements.stderr) this.appendLog(serviceId, "stderr", installRequirements.stderr);
+      if (installRequirements.code !== 0) {
+        throw new Error(installRequirements.stderr || installRequirements.stdout || "requirements installation failed.");
+      }
+
+      mkdirSync(environmentPath, { recursive: true });
+      writeFileSync(metadataPath, `${JSON.stringify({
+        requestedVersion,
+        resolvedVersion: interpreter.version,
+        resolvedInterpreter: interpreter.executable,
+        provisionedAt: createClockTimestamp(this.clock),
+      }, null, 2)}\n`, "utf8");
+
+      this.appendLog(serviceId, "success", `${definition.name} provisioning completed successfully.`);
+      return this.updateState(serviceId, {
+        detail: `${definition.name} is provisioned and ready to start.`,
+        diagnostics: {
+          ...this.requireState(serviceId).diagnostics,
+          provisioning: {
+            ...this.requireState(serviceId).diagnostics.provisioning,
+            state: ProvisioningStates.provisioned,
+            required: true,
+            requestedVersion,
+            resolvedVersion: interpreter.version,
+            resolvedInterpreter: interpreter.executable,
+            environmentPath,
+            versionMismatch: false,
+            needsReprovision: false,
+            lastUpdatedAt: createClockTimestamp(this.clock),
+            lastError: null,
+          },
+        },
+      });
+    } catch (error) {
+      this.appendLog(serviceId, "error", `${definition.name} provisioning failed: ${toErrorMessage(error)}`);
+      return this.updateState(serviceId, {
+        detail: `${definition.name} provisioning failed: ${toErrorMessage(error)}`,
+        diagnostics: {
+          ...this.requireState(serviceId).diagnostics,
+          provisioning: {
+            ...this.requireState(serviceId).diagnostics.provisioning,
+            state: ProvisioningStates.provisionFailed,
+            required: true,
+            requestedVersion,
+            environmentPath,
+            lastUpdatedAt: createClockTimestamp(this.clock),
+            lastError: {
+              at: createClockTimestamp(this.clock),
+              message: toErrorMessage(error),
+              code: error?.code ?? null,
+              details: toErrorDetails(error),
+            },
+          },
+        },
+      });
+    }
+  }
+
+  buildRuntimeLaunchDefinition(definition, state) {
+    if (!isProvisioningRequired(definition)) {
+      return definition;
+    }
+
+    const venvPython = getVenvPythonPath(definition);
+    const resolvedCommand = existsSync(venvPython)
+      ? venvPython
+      : state?.diagnostics?.provisioning?.resolvedInterpreter || definition.command;
+
+    return {
+      ...definition,
+      command: resolvedCommand,
+    };
   }
 
   appendLog(serviceId, level, message) {
@@ -1454,6 +1833,24 @@ export class InMemoryServiceSupervisor {
   async startInternal(serviceId) {
     const definition = this.requireDefinition(serviceId);
     const state = this.requireState(serviceId);
+    const provisioning = state.diagnostics.provisioning;
+
+    if (provisioning?.required && (provisioning.state !== ProvisioningStates.provisioned || provisioning.needsReprovision)) {
+      const detail = provisioning.needsReprovision
+        ? `${definition.name} Python version changed from ${provisioning.resolvedVersion ?? "unknown"} to ${provisioning.requestedVersion ?? "unknown"}. Repair or recreate the environment before starting.`
+        : provisioning.state === ProvisioningStates.provisionFailed
+        ? `${definition.name} provisioning failed. Repair or recreate the environment before starting.`
+        : `${definition.name} must be provisioned before it can start.`;
+      return this.updateState(serviceId, {
+        state: ServiceStates.stopped,
+        ownership: ServiceOwnership.none,
+        detail,
+        diagnostics: {
+          ...state.diagnostics,
+          lastError: createDiagnosticError(this.clock, "provisioning", detail, { provisioning }),
+        },
+      });
+    }
 
     if (state.state === ServiceStates.healthy) {
       return this.recordHealth(serviceId, true, `${definition.name} is already healthy.`);
@@ -1469,6 +1866,7 @@ export class InMemoryServiceSupervisor {
       return externalStatus;
     }
 
+    const runtimeDefinition = this.buildRuntimeLaunchDefinition(definition, state);
     const startingLog = createLogEntry(this.clock, "info", `Starting ${definition.name}.`);
     this.updateState(serviceId, {
       state: ServiceStates.starting,
@@ -1479,9 +1877,9 @@ export class InMemoryServiceSupervisor {
         ...state.diagnostics,
         lastStart: {
           at: createClockTimestamp(this.clock),
-          command: definition.command ?? null,
-          args: [...definition.args],
-          cwd: definition.cwd,
+          command: runtimeDefinition.command ?? null,
+          args: [...runtimeDefinition.args],
+          cwd: runtimeDefinition.cwd,
         },
       },
     });
@@ -1492,7 +1890,7 @@ export class InMemoryServiceSupervisor {
     };
 
     try {
-      const launchResult = await this.runtime.start(definition, this.cloneState(this.requireState(serviceId)), runtimeHooks);
+      const launchResult = await this.runtime.start(runtimeDefinition, this.cloneState(this.requireState(serviceId)), runtimeHooks);
       let startupExitInfo;
       let startupExited = false;
       launchResult?.exitPromise?.then((exitInfo) => {
@@ -2024,6 +2422,12 @@ export class InMemoryServiceSupervisor {
         lastExit: state.diagnostics.lastExit ? { ...state.diagnostics.lastExit } : null,
         lastStart: state.diagnostics.lastStart ? { ...state.diagnostics.lastStart, args: [...state.diagnostics.lastStart.args] } : null,
         lastHealthProbe: state.diagnostics.lastHealthProbe ? { ...state.diagnostics.lastHealthProbe } : null,
+        provisioning: state.diagnostics.provisioning
+          ? {
+            ...state.diagnostics.provisioning,
+            lastError: state.diagnostics.provisioning.lastError ? { ...state.diagnostics.provisioning.lastError } : null,
+          }
+          : null,
         circuitBreaker: { ...state.diagnostics.circuitBreaker },
       },
     }));
@@ -2165,7 +2569,7 @@ export function createSupervisorServer(options = {}) {
         return;
       }
 
-      const routeMatch = pathname.match(/^\/services\/([^/]+?)(?:\/(start|stop|restart|ensure-running))?$/);
+      const routeMatch = pathname.match(/^\/services\/([^/]+?)(?:\/(start|stop|restart|ensure-running|provision|repair|recreate-environment))?$/);
       const definitionRouteMatch = pathname.match(/^\/service-definitions\/([^/]+?)$/);
 
       if (definitionRouteMatch) {
@@ -2248,6 +2652,12 @@ export function createSupervisorServer(options = {}) {
           service = await supervisor.restart(serviceId);
         } else if (action === "ensure-running") {
           service = await supervisor.ensureRunning(serviceId);
+        } else if (action === "provision") {
+          service = await supervisor.provision(serviceId);
+        } else if (action === "repair") {
+          service = await supervisor.repair(serviceId);
+        } else if (action === "recreate-environment") {
+          service = await supervisor.recreateEnvironment(serviceId);
         }
 
         sendJson(res, 200, {
@@ -2337,6 +2747,8 @@ export function loadServiceDefinitionsFromEnvironment() {
         startupTimeoutMs: normalizePositiveNumber(process.env.PYTHON_RUNTIME_STARTUP_TIMEOUT_MS, DEFAULT_STARTUP_TIMEOUT_MS),
         healthPollIntervalMs: normalizePositiveNumber(process.env.PYTHON_RUNTIME_HEALTH_POLL_INTERVAL_MS, DEFAULT_HEALTH_POLL_INTERVAL_MS),
         stopTimeoutMs: normalizePositiveNumber(process.env.SERVICE_SUPERVISOR_STOP_TIMEOUT_MS, DEFAULT_STOP_TIMEOUT_MS),
+        pythonVersion: process.env.PYTHON_RUNTIME_PYTHON_VERSION || DEFAULT_PYTHON_RUNTIME_VERSION,
+        pythonInterpreterPath: process.env.PYTHON_RUNTIME_INTERPRETER_PATH || undefined,
         metadata: {
           source: "builtin",
           kind: "python-runtime",

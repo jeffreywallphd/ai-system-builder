@@ -8,6 +8,8 @@ export interface PythonRuntimeConfigValues {
   readonly timeoutMs?: number;
   readonly authToken?: string;
   readonly pythonExecutable?: string;
+  readonly pythonVersion?: string;
+  readonly pythonInterpreterPath?: string;
   readonly runtimeWorkingDirectory?: string;
   readonly startupTimeoutMs?: number;
   readonly healthPollIntervalMs?: number;
@@ -21,6 +23,8 @@ export class PythonRuntimeConfig {
   public readonly timeoutMs: number;
   public readonly authToken?: string;
   public readonly pythonExecutable: string;
+  public readonly pythonVersion: string;
+  public readonly pythonInterpreterPath?: string;
   public readonly runtimeWorkingDirectory: string;
   public readonly startupTimeoutMs: number;
   public readonly healthPollIntervalMs: number;
@@ -33,6 +37,8 @@ export class PythonRuntimeConfig {
     this.timeoutMs = values.timeoutMs && values.timeoutMs > 0 ? values.timeoutMs : 15_000;
     this.authToken = values.authToken?.trim() || undefined;
     this.pythonExecutable = values.pythonExecutable?.trim() || "python";
+    this.pythonVersion = normalizePythonVersion(values.pythonVersion);
+    this.pythonInterpreterPath = values.pythonInterpreterPath?.trim() || undefined;
     this.runtimeWorkingDirectory = normalizePythonRuntimeWorkingDirectory(values.runtimeWorkingDirectory);
     this.startupTimeoutMs = values.startupTimeoutMs && values.startupTimeoutMs > 0 ? values.startupTimeoutMs : 20_000;
     this.healthPollIntervalMs =
@@ -62,6 +68,8 @@ export class PythonRuntimeConfig {
       timeoutMs: env.PYTHON_RUNTIME_TIMEOUT_MS ? Number(env.PYTHON_RUNTIME_TIMEOUT_MS) : undefined,
       authToken: env.PYTHON_RUNTIME_AUTH_TOKEN,
       pythonExecutable: env.PYTHON_RUNTIME_EXECUTABLE,
+      pythonVersion: env.PYTHON_RUNTIME_PYTHON_VERSION,
+      pythonInterpreterPath: env.PYTHON_RUNTIME_INTERPRETER_PATH,
       runtimeWorkingDirectory: env.PYTHON_RUNTIME_WORKDIR,
       startupTimeoutMs: env.PYTHON_RUNTIME_STARTUP_TIMEOUT_MS
         ? Number(env.PYTHON_RUNTIME_STARTUP_TIMEOUT_MS)
@@ -101,6 +109,15 @@ function validatePythonRuntimeConfig(config: PythonRuntimeConfig): void {
       "Python runtime mode 'external-http' cannot enable auto-start. Use 'managed-local' to supervise a local runtime."
     );
   }
+}
+
+function normalizePythonVersion(value: string | undefined): string {
+  const normalized = value?.trim();
+  if (!normalized) {
+    return "3.12";
+  }
+
+  return normalized;
 }
 
 function resolveSupervisorBaseUrl(supervisorBaseUrl: string | undefined, runtimeBaseUrl: string | undefined): string {

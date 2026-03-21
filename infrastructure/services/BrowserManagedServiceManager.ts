@@ -192,6 +192,21 @@ export class BrowserManagedServiceManager implements IManagedServiceManager, IMa
     return this.start(serviceId);
   }
 
+  public async provision(serviceId: string): Promise<ManagedServiceStatus> {
+    this.emitLog(serviceId, "info", "Provisioning is only available for managed local services.");
+    return this.refreshServiceStatus(serviceId);
+  }
+
+  public async repair(serviceId: string): Promise<ManagedServiceStatus> {
+    this.emitLog(serviceId, "info", "Repair is only available for managed local services.");
+    return this.refreshServiceStatus(serviceId);
+  }
+
+  public async recreateEnvironment(serviceId: string): Promise<ManagedServiceStatus> {
+    this.emitLog(serviceId, "info", "Environment recreation is only available for managed local services.");
+    return this.refreshServiceStatus(serviceId);
+  }
+
   private getRegistration(serviceId: string): BrowserManagedServiceRegistration {
     const registration = this.registrations.get(serviceId);
     if (!registration) {

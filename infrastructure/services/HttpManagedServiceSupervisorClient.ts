@@ -94,9 +94,21 @@ export class HttpManagedServiceSupervisorClient implements IManagedServiceSuperv
     return this.command(serviceId, "ensure-running");
   }
 
+  public provision(serviceId: string): Promise<ManagedSupervisorServiceResponse> {
+    return this.command(serviceId, "provision");
+  }
+
+  public repair(serviceId: string): Promise<ManagedSupervisorServiceResponse> {
+    return this.command(serviceId, "repair");
+  }
+
+  public recreateEnvironment(serviceId: string): Promise<ManagedSupervisorServiceResponse> {
+    return this.command(serviceId, "recreate-environment");
+  }
+
   private command(
     serviceId: string,
-    action: "start" | "stop" | "restart" | "ensure-running",
+    action: "start" | "stop" | "restart" | "ensure-running" | "provision" | "repair" | "recreate-environment",
   ): Promise<ManagedSupervisorServiceResponse> {
     return this.request<ManagedSupervisorServiceResponse>(
       "POST",

@@ -45,6 +45,35 @@ describe("HttpManagedServiceManager", () => {
       recentLogs: [
         { timestamp: "2026-03-20T00:00:00.000Z", level: "info", message: "Python runtime registered." },
       ],
+      processHistory: [],
+      metadata: { version: "dev", compatibility: {} },
+      diagnostics: {
+        lastError: null,
+        lastExit: null,
+        lastStart: null,
+        lastHealthProbe: null,
+        provisioning: {
+          state: "provisioned",
+          required: true,
+          requestedVersion: "3.12",
+          resolvedVersion: "3.12.7",
+          resolvedInterpreter: "/usr/bin/python3.12",
+          environmentPath: "python-runtime/.venv",
+          versionMismatch: false,
+          needsReprovision: false,
+          lastUpdatedAt: "2026-03-20T00:00:00.000Z",
+          lastError: null,
+        },
+        circuitBreaker: {
+          state: "closed",
+          openedAt: null,
+          retryAfter: null,
+          recentFailures: 0,
+          maxFailures: 3,
+          failureWindowMs: 60_000,
+          cooldownMs: 30_000,
+        },
+      },
     } as const;
 
     const store = new RuntimeEventBuffer();
@@ -74,6 +103,9 @@ describe("HttpManagedServiceManager", () => {
         stop: async () => ({ ok: true, service: snapshot }),
         restart: async () => ({ ok: true, service: snapshot }),
         ensureRunning: async () => ({ ok: true, service: snapshot }),
+        provision: async () => ({ ok: true, service: snapshot }),
+        repair: async () => ({ ok: true, service: snapshot }),
+        recreateEnvironment: async () => ({ ok: true, service: snapshot }),
       },
       eventSink: new NodeProcessRuntimeEventSink(store),
       registry: new InMemoryManagedServiceDefinitionRegistry([definition]),

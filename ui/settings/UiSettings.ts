@@ -38,6 +38,8 @@ export interface RuntimeSettings {
   readonly baseUrl: string;
   readonly authToken: string;
   readonly workingDirectory: string;
+  readonly pythonVersion: string;
+  readonly pythonInterpreterPath: string;
   readonly requestTimeoutMs: number;
   readonly startupTimeoutMs: number;
   readonly healthPollIntervalMs: number;
@@ -110,6 +112,8 @@ export function createDefaultUiSettings(config: AppRuntimeConfig): UiSettings {
       baseUrl: resolveDefaultRuntimeBaseUrl(),
       authToken: "",
       workingDirectory: resolveDefaultPythonRuntimeWorkingDirectory(),
+      pythonVersion: "3.12",
+      pythonInterpreterPath: "",
       requestTimeoutMs: 15_000,
       startupTimeoutMs: 20_000,
       healthPollIntervalMs: 500,
@@ -187,6 +191,14 @@ export function mergeUiSettings(
           defaults.runtime.workingDirectory
         )
       ),
+      pythonVersion: normalizePythonVersion(
+        overrides?.runtime?.pythonVersion,
+        defaults.runtime.pythonVersion,
+      ),
+      pythonInterpreterPath: normalizeString(
+        overrides?.runtime?.pythonInterpreterPath,
+        defaults.runtime.pythonInterpreterPath,
+      ),
       requestTimeoutMs: normalizePositiveNumber(
         overrides?.runtime?.requestTimeoutMs,
         defaults.runtime.requestTimeoutMs
@@ -229,6 +241,19 @@ export function mergeUiSettings(
       ),
     }),
   });
+}
+
+function normalizePythonVersion(value: unknown, fallback: string): string {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+
+  const normalized = value.trim();
+  if (normalized === "3.11" || normalized === "3.12") {
+    return normalized;
+  }
+
+  return fallback;
 }
 
 function normalizeDirectory(value: unknown, fallback: string): string {
