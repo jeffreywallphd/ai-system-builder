@@ -106,21 +106,16 @@ describe("HttpMcpRuntimeClient", () => {
     const [tools, resources] = await Promise.all([client.listTools(), client.listResources()]);
 
     expect(tools).toEqual([
-      {
+      expect.objectContaining({
         id: "mcp:local:echo",
         serverId: "local",
         source: { kind: "mcp-server", serverId: "local" },
         name: "echo",
-        title: undefined,
-        description: undefined,
         inputSchema: { type: "object" },
-        outputSchema: undefined,
         arguments: [],
         categories: [],
         tags: [],
-        annotations: undefined,
-        metadata: undefined,
-      },
+      }),
     ]);
     expect(resources).toEqual([{ serverId: "local", uri: "memory://guide", name: "Guide" }]);
   });

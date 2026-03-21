@@ -142,10 +142,26 @@ Managed-service notes:
 - The managed-service screen is designed to stay usable from smaller/mobile layouts for phone-driven monitoring and administration.
 - Python-specific HTTP clients still handle workflow and MCP execution, but lifecycle/state ownership now lives in the shared managed-service layer.
 
-### Local MCP server notes
+### MCP runtime architecture and source of truth
 
-- Workspace-authored local MCP tools are executed by the Python runtime using the saved provisioning state, so they do **not** need to install extra Python packages just to work inside AI Loom Studio.
-- If you want to run a generated `server.py` as a standalone external MCP stdio server outside AI Loom Studio, install the MCP Python package yourself in the environment that will launch that script.
+- MCP server configuration is now persisted by the Python runtime under the MCP workspace root, not in browser-only storage. The runtime owns the durable configuration source of truth, while the UI renders derived views of persisted definitions, live session state, and cached discovery snapshots.
+- The Python runtime now distinguishes **Python runtime health** from **MCP runtime health**. MCP health reflects dependency/install readiness, transport/session viability, and per-server connectivity rather than only whether the Python process itself is alive.
+- MCP transport/session behavior stays behind the Python boundary. The TypeScript app talks only to typed HTTP endpoints for CRUD, validation, test-connection, sync, diagnostics, import/export, and tool execution.
+- MCP capability publication is now truthful: MCP-backed tool capabilities are published into the unified tool layer only when the backing MCP tool is live. Stale descriptors keep provenance metadata but are not advertised as usable capabilities.
+
+### Local and remote MCP server notes
+
+- Workspace-authored local MCP tools are provisioned as workspace-local stdio MCP servers under the managed MCP workspace root. Edits create versioned provisioning metadata so runtime reloads can reflect authored changes cleanly.
+- Built-in local MCP servers and workspace-local authored MCP servers both run through the Python runtime’s stdio session layer.
+- Remote MCP servers can be configured through HTTP and SSE transports. HTTP uses JSON-RPC style request/response exchanges; SSE uses a streaming event channel plus POST-based request delivery.
+- The runtime attempts to auto-install configured MCP Python dependencies during local provisioning and records the result in provisioning metadata for diagnostics/repair flows. Local authored servers do not require that dependency to run inside AI Loom Studio because the generated server entrypoint is self-contained.
+- If you want to run a generated `server.py` as a standalone external MCP stdio server outside AI Loom Studio, install the MCP Python package yourself in the environment that will launch that script if your external workflow depends on it.
+
+### MCP diagnostics and troubleshooting
+
+- Use the MCP pages and runtime console to inspect per-server diagnostics, validation results, last sync time, transport/session failures, and tool invocation traces.
+- If a local authored server stops responding, reprovision or reconnect it from the UI; the runtime retains bounded diagnostics and invocation history per server to make failures actionable.
+- If MCP dependency installation fails during provisioning, the failure is recorded in server metadata and MCP runtime health so you can repair it from the managed runtime flow without dropping to a terminal.
 
 ### Podman container
 

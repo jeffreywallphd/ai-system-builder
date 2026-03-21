@@ -8,5 +8,6 @@ export interface LocalMcpServerCreateResult {
   readonly runtime: McpConnectionStatus;
   readonly checkedAt: string;
   readonly created: boolean;
+  readonly version?: Readonly<Record<string, unknown>>;
   readonly metadata?: Readonly<Record<string, unknown>>;
 }
