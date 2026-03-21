@@ -7,6 +7,8 @@ import type {
   ManagedSupervisorServiceResponse,
 } from "../../application/services/interfaces/IManagedServiceSupervisorClient";
 import type { ManagedServiceDefinition } from "../../application/services/ManagedServiceDefinition";
+import { bindSafeFetch } from "../../application/runtime/RuntimeDiagnostics";
+import { RuntimeDiagnosticsError } from "../../application/runtime/RuntimeDiagnosticsError";
 
 export interface HttpManagedServiceSupervisorClientOptions {
   readonly baseUrl: string;
@@ -26,13 +28,19 @@ export class HttpManagedServiceSupervisorClient implements IManagedServiceSuperv
   ) {
     const normalizedBaseUrl = options.baseUrl?.trim();
     if (!normalizedBaseUrl) {
-      throw new Error("Managed service supervisor baseUrl is required.");
+      throw new RuntimeDiagnosticsError("Managed service supervisor baseUrl is required.", {
+        name: "ManagedServiceSupervisorError",
+        subsystem: "managed-service-supervisor",
+        className: "HttpManagedServiceSupervisorClient",
+        methodName: "constructor",
+        operation: "configure-managed-service-supervisor-client",
+      });
     }
 
     this.baseUrl = normalizedBaseUrl.replace(/\/$/, "");
     this.timeoutMs = options.timeoutMs && options.timeoutMs > 0 ? options.timeoutMs : 15_000;
     this.authToken = options.authToken?.trim() || undefined;
-    this.fetchImpl = fetchImpl;
+    this.fetchImpl = bindSafeFetch(fetchImpl);
   }
 
   public health(): Promise<ManagedSupervisorHealthResponse> {
@@ -100,9 +108,10 @@ export class HttpManagedServiceSupervisorClient implements IManagedServiceSuperv
   private async request<T>(method: "GET" | "POST" | "PUT" | "DELETE", path: string, body?: unknown): Promise<T> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+    const target = `${this.baseUrl}${path}`;
 
     try {
-      const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
+      const response = await this.fetchImpl(target, {
         method,
         headers: {
           "content-type": "application/json",
@@ -114,24 +123,59 @@ export class HttpManagedServiceSupervisorClient implements IManagedServiceSuperv
 
       const payload = (await response.json().catch(() => ({}))) as Readonly<Record<string, unknown>>;
       if (!response.ok) {
-        throw new Error(
+        throw new RuntimeDiagnosticsError(
           typeof payload.message === "string"
             ? payload.message
             : `Managed service supervisor request failed (${response.status}).`,
+          {
+            name: "ManagedServiceSupervisorError",
+            cause: payload,
+            statusCode: response.status,
+            details: payload,
+            subsystem: "managed-service-supervisor",
+            className: "HttpManagedServiceSupervisorClient",
+            methodName: "request",
+            operation: "managed-service-supervisor-http-request",
+            target,
+            requestMethod: method,
+            failedBeforeResponse: false,
+          },
         );
       }
 
       return payload as T;
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") {
-        throw new Error(`Managed service supervisor request timed out after ${this.timeoutMs}ms.`);
-      }
-
-      if (error instanceof Error) {
+      if (error instanceof RuntimeDiagnosticsError) {
         throw error;
       }
 
-      throw new Error("Managed service supervisor request failed.");
+      if (error instanceof Error && error.name === "AbortError") {
+        throw new RuntimeDiagnosticsError(`Managed service supervisor request timed out after ${this.timeoutMs}ms.`, {
+          name: "ManagedServiceSupervisorError",
+          cause: error,
+          details: body,
+          subsystem: "managed-service-supervisor",
+          className: "HttpManagedServiceSupervisorClient",
+          methodName: "request",
+          operation: "managed-service-supervisor-http-request",
+          target,
+          requestMethod: method,
+          failedBeforeResponse: true,
+        });
+      }
+
+      throw new RuntimeDiagnosticsError("Managed service supervisor request failed.", {
+        name: "ManagedServiceSupervisorError",
+        cause: error,
+        details: body,
+        subsystem: "managed-service-supervisor",
+        className: "HttpManagedServiceSupervisorClient",
+        methodName: "request",
+        operation: "managed-service-supervisor-http-request",
+        target,
+        requestMethod: method,
+        failedBeforeResponse: true,
+      });
     } finally {
       clearTimeout(timeout);
     }

@@ -1,6 +1,11 @@
 import type { RuntimeEvent } from "../../../application/runtime/RuntimeEvent";
 import { useState } from "react";
-import type { RuntimeConsoleLogEntry, RuntimeConsoleTab, RuntimeHealthCheck } from "../../state/RuntimeConsoleStore";
+import type {
+  RuntimeConsoleLogEntry,
+  RuntimeConsoleTab,
+  RuntimeHealthCheck,
+} from "../../state/RuntimeConsoleStore";
+import type { RuntimeLogVerbosity } from "../../../application/runtime/RuntimeDiagnostics";
 import RuntimeConsoleToolbar from "./RuntimeConsoleToolbar";
 import RuntimeHealthList from "./RuntimeHealthList";
 import RuntimeLogsList, { type RuntimeConsoleLogFilter } from "./RuntimeLogsList";
@@ -8,6 +13,7 @@ import RuntimeLogsList, { type RuntimeConsoleLogFilter } from "./RuntimeLogsList
 export interface RuntimeConsoleDrawerProps {
   readonly isExpanded: boolean;
   readonly activeTab: RuntimeConsoleTab;
+  readonly logVerbosity: RuntimeLogVerbosity;
   readonly events: ReadonlyArray<RuntimeEvent>;
   readonly logs: ReadonlyArray<RuntimeConsoleLogEntry>;
   readonly healthChecks: ReadonlyArray<RuntimeHealthCheck>;
@@ -16,6 +22,7 @@ export interface RuntimeConsoleDrawerProps {
   readonly onClearLogs: () => void;
   readonly onRefreshHealth: () => void;
   readonly onSelectTab: (tab: RuntimeConsoleTab) => void;
+  readonly onLogVerbosityChange: (verbosity: RuntimeLogVerbosity) => void;
   readonly onRestartRuntime?: () => void;
   readonly canRestartRuntime?: boolean;
   readonly isRestartingRuntime?: boolean;
@@ -24,6 +31,7 @@ export interface RuntimeConsoleDrawerProps {
 export default function RuntimeConsoleDrawer({
   isExpanded,
   activeTab,
+  logVerbosity,
   events,
   logs,
   healthChecks,
@@ -32,6 +40,7 @@ export default function RuntimeConsoleDrawer({
   onClearLogs,
   onRefreshHealth,
   onSelectTab,
+  onLogVerbosityChange,
   onRestartRuntime,
   canRestartRuntime = false,
   isRestartingRuntime = false,
@@ -60,7 +69,9 @@ export default function RuntimeConsoleDrawer({
           <RuntimeLogsList
             logs={logs}
             activeFilter={activeLogFilter}
+            logVerbosity={logVerbosity}
             onFilterChange={setActiveLogFilter}
+            onLogVerbosityChange={onLogVerbosityChange}
             onClearLogs={onClearLogs}
             onRefreshHealth={onRefreshHealth}
             onRestartRuntime={onRestartRuntime}

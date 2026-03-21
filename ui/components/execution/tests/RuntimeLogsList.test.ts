@@ -10,8 +10,32 @@ const sampleLogs = Object.freeze([
     severity: "error" as const,
     source: "network" as const,
     message: "Failed to execute 'fetch' on 'Window': Illegal invocation.",
-    details: "Failed request while refreshing runtime health.",
-    stack: "Error: Illegal invocation\n    at refreshHealth",
+    details: "status 500 • refresh-runtime-health • Failed to execute 'fetch' on 'Window': Illegal invocation.",
+    stack: "Error: Illegal invocation\n    at refreshHealth\n    at phoneConsole",
+    stackPreview: "Error: Illegal invocation\n    at refreshHealth\n    at phoneConsole",
+    requestMethod: "GET",
+    target: "/mcp/status",
+    diagnostics: {
+      message: "Failed to execute 'fetch' on 'Window': Illegal invocation.",
+      stack: "Error: Illegal invocation\n    at refreshHealth\n    at phoneConsole",
+      cause: "Illegal invocation",
+      causeChain: [
+        {
+          message: "Illegal invocation",
+          name: "TypeError",
+          stack: "TypeError: Illegal invocation\n    at refreshHealth",
+        },
+      ],
+      subsystem: "mcp-runtime",
+      className: "RuntimeConsoleStore",
+      methodName: "refreshHealth",
+      operation: "refresh-runtime-health",
+      target: "/mcp/status",
+      requestMethod: "GET",
+      failedBeforeResponse: true,
+      details: { screen: "logs" },
+      name: "TypeError",
+    },
   },
   {
     id: "log-2",
@@ -30,12 +54,14 @@ const sampleLogs = Object.freeze([
 ]);
 
 describe("RuntimeLogsList", () => {
-  it("renders log cards with metadata, actions, and expandable error details", () => {
+  it("renders compact normal-mode logs with request context and mobile-friendly controls", () => {
     const html = renderToStaticMarkup(
       createElement(RuntimeLogsList, {
         logs: sampleLogs,
         activeFilter: "all",
+        logVerbosity: "normal",
         onFilterChange: () => undefined,
+        onLogVerbosityChange: () => undefined,
         onClearLogs: () => undefined,
         onRefreshHealth: () => undefined,
         onRestartRuntime: () => undefined,
@@ -48,9 +74,33 @@ describe("RuntimeLogsList", () => {
     expect(html).toContain("Refresh health");
     expect(html).toContain("Clear logs");
     expect(html).toContain("Restart runtime");
-    expect(html).toContain("Show error details");
+    expect(html).toContain("Verbosity");
+    expect(html).toContain("GET /mcp/status");
     expect(html).toContain("Failed to execute &#x27;fetch&#x27; on &#x27;Window&#x27;: Illegal invocation.");
-    expect(html).toContain("network");
+    expect(html).toContain("Error: Illegal invocation");
+    expect(html).not.toContain("Verbose diagnostics");
+  });
+
+  it("renders expanded verbose diagnostics when verbose mode is selected", () => {
+    const html = renderToStaticMarkup(
+      createElement(RuntimeLogsList, {
+        logs: sampleLogs,
+        activeFilter: "error",
+        logVerbosity: "verbose",
+        onFilterChange: () => undefined,
+        onLogVerbosityChange: () => undefined,
+        onClearLogs: () => undefined,
+        onRefreshHealth: () => undefined,
+        canRestartRuntime: false,
+      }),
+    );
+
+    expect(html).toContain("Verbose diagnostics");
+    expect(html).toContain("Cause chain");
+    expect(html).toContain("Full stack trace");
+    expect(html).toContain("refresh-runtime-health");
+    expect(html).toContain("RuntimeConsoleStore");
+    expect(html).toContain("TypeError");
   });
 
   it("filters logs by severity", () => {
@@ -58,22 +108,5 @@ describe("RuntimeLogsList", () => {
     expect(filterRuntimeLogs(sampleLogs, "error").map((log) => log.id)).toEqual(["log-1"]);
     expect(filterRuntimeLogs(sampleLogs, "warn").map((log) => log.id)).toEqual(["log-2"]);
     expect(filterRuntimeLogs(sampleLogs, "info").map((log) => log.id)).toEqual(["log-3"]);
-  });
-
-  it("keeps mobile-friendly controls visible in the rendered markup", () => {
-    const html = renderToStaticMarkup(
-      createElement(RuntimeLogsList, {
-        logs: sampleLogs,
-        activeFilter: "error",
-        onFilterChange: () => undefined,
-        onClearLogs: () => undefined,
-        onRefreshHealth: () => undefined,
-        canRestartRuntime: false,
-      }),
-    );
-
-    expect(html).toContain("aria-pressed=\"true\"");
-    expect(html).toContain("ui-runtime-console__filter");
-    expect(html).toContain("ui-runtime-console__log-card");
   });
 });

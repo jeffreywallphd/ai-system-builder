@@ -1,6 +1,10 @@
 import type { IMcpRuntimeClient } from "../../../application/ports/interfaces/IMcpRuntimeClient";
 import type { IRuntimeEventSink } from "../../../application/ports/interfaces/IRuntimeEventSink";
 import { RuntimeEventSources } from "../../../application/runtime/RuntimeEvent";
+import {
+  bindSafeFetch,
+  toRuntimeDiagnosticDetails,
+} from "../../../application/runtime/RuntimeDiagnostics";
 import type { McpConnectionStatus } from "../../../application/mcp/models/McpConnectionStatus";
 import type { McpResourceDescriptor } from "../../../application/mcp/models/McpResourceDescriptor";
 import {
@@ -36,13 +40,18 @@ export class HttpMcpRuntimeClient implements IMcpRuntimeClient {
     eventSink?: IRuntimeEventSink
   ) {
     if (!config.baseUrl) {
-      throw new PythonRuntimeError("Python runtime baseUrl is required.");
+      throw new PythonRuntimeError("Python runtime baseUrl is required.", {
+        subsystem: "mcp-runtime",
+        className: "HttpMcpRuntimeClient",
+        methodName: "constructor",
+        operation: "configure-mcp-runtime-client",
+      });
     }
 
     this.baseUrl = config.baseUrl.replace(/\/$/, "");
     this.timeoutMs = config.timeoutMs;
     this.authToken = config.authToken;
-    this.fetchImpl = fetchImpl;
+    this.fetchImpl = bindSafeFetch(fetchImpl);
     this.eventSink = eventSink;
   }
 
@@ -220,7 +229,12 @@ export class HttpMcpRuntimeClient implements IMcpRuntimeClient {
   public async getToolDescriptor(toolId: string): Promise<McpToolDescriptor | undefined> {
     const normalizedToolId = toolId.trim();
     if (!normalizedToolId) {
-      throw new PythonRuntimeError("MCP tool descriptor lookup requires a toolId.");
+      throw new PythonRuntimeError("MCP tool descriptor lookup requires a toolId.", {
+        subsystem: "mcp-runtime",
+        className: "HttpMcpRuntimeClient",
+        methodName: "getToolDescriptor",
+        operation: "mcp-tool-descriptor",
+      });
     }
 
     try {
@@ -273,9 +287,10 @@ export class HttpMcpRuntimeClient implements IMcpRuntimeClient {
   private async request<T>(method: "GET" | "POST", path: string, body?: unknown): Promise<T> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+    const target = `${this.baseUrl}${path}`;
 
     try {
-      const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
+      const response = await this.fetchImpl(target, {
         method,
         headers: {
           "content-type": "application/json",
@@ -289,8 +304,16 @@ export class HttpMcpRuntimeClient implements IMcpRuntimeClient {
 
       if (!response.ok) {
         throw new PythonRuntimeError(`Python runtime MCP request failed (${response.status}).`, {
+          cause: payload,
           statusCode: response.status,
           details: payload,
+          subsystem: "mcp-runtime",
+          className: "HttpMcpRuntimeClient",
+          methodName: "request",
+          operation: "mcp-runtime-http-request",
+          target,
+          requestMethod: method,
+          failedBeforeResponse: false,
         });
       }
 
@@ -301,11 +324,29 @@ export class HttpMcpRuntimeClient implements IMcpRuntimeClient {
       }
 
       if (error instanceof Error && error.name === "AbortError") {
-        throw new PythonRuntimeError(`Python runtime MCP request timed out after ${this.timeoutMs}ms.`);
+        throw new PythonRuntimeError(`Python runtime MCP request timed out after ${this.timeoutMs}ms.`, {
+          cause: error,
+          details: body,
+          subsystem: "mcp-runtime",
+          className: "HttpMcpRuntimeClient",
+          methodName: "request",
+          operation: "mcp-runtime-http-request",
+          target,
+          requestMethod: method,
+          failedBeforeResponse: true,
+        });
       }
 
       throw new PythonRuntimeError("Python runtime MCP request failed.", {
-        details: { cause: error instanceof Error ? error.message : String(error) },
+        cause: error,
+        details: body,
+        subsystem: "mcp-runtime",
+        className: "HttpMcpRuntimeClient",
+        methodName: "request",
+        operation: "mcp-runtime-http-request",
+        target,
+        requestMethod: method,
+        failedBeforeResponse: true,
       });
     } finally {
       clearTimeout(timeout);
@@ -331,10 +372,15 @@ export class HttpMcpRuntimeClient implements IMcpRuntimeClient {
     eventType: string,
     details?: Readonly<Record<string, unknown>>
   ): void {
-    this.emit("error", message, {
+    this.emit("error", message, toRuntimeDiagnosticDetails(error, {
+      message,
+      subsystem: "mcp-runtime",
+      className: "HttpMcpRuntimeClient",
+      methodName: "emitError",
+      operation: eventType,
+    }, {
       eventType,
       ...(details ?? {}),
-      cause: error instanceof Error ? error.message : String(error),
-    });
+    }));
   }
 }
