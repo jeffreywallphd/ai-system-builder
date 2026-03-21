@@ -1,5 +1,7 @@
 import type {
   IPythonRuntimeClient,
+  IPythonRuntimeDocumentConversionRequest,
+  IPythonRuntimeDocumentConversionResponse,
   IPythonRuntimeExecuteNodeRequest,
   IPythonRuntimeExecuteNodeResponse,
   IPythonRuntimeExecuteWorkflowRequest,
@@ -9,6 +11,18 @@ import type {
 import { bindSafeFetch } from "../../../application/runtime/RuntimeDiagnostics";
 import { PythonRuntimeConfig } from "../../config/PythonRuntimeConfig";
 import { PythonRuntimeError } from "./PythonRuntimeError";
+
+function toBase64(content: Uint8Array): string {
+  if (typeof Buffer !== "undefined") {
+    return Buffer.from(content).toString("base64");
+  }
+
+  let binary = "";
+  for (const byte of content) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary);
+}
 
 export class HttpPythonRuntimeClient implements IPythonRuntimeClient {
   private readonly baseUrl: string;
@@ -46,6 +60,17 @@ export class HttpPythonRuntimeClient implements IPythonRuntimeClient {
     request: IPythonRuntimeExecuteWorkflowRequest
   ): Promise<IPythonRuntimeExecuteWorkflowResponse> {
     return this.request<IPythonRuntimeExecuteWorkflowResponse>("POST", "/execute/workflow", request);
+  }
+
+  public async convertDocumentToMarkdown(
+    request: IPythonRuntimeDocumentConversionRequest,
+  ): Promise<IPythonRuntimeDocumentConversionResponse> {
+    return this.request<IPythonRuntimeDocumentConversionResponse>("POST", "/documents/convert/markdown", {
+      filename: request.filename,
+      declared_content_type: request.contentType,
+      output_format: request.outputFormat,
+      base64_content: toBase64(request.content),
+    });
   }
 
   private async request<T>(method: "GET" | "POST", path: string, body?: unknown): Promise<T> {

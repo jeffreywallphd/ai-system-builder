@@ -28,6 +28,46 @@ describe("HttpPythonRuntimeClient", () => {
     await expect(client.health()).resolves.toEqual({ status: "ok", runtime: "python" });
   });
 
+  it("posts base64 document conversions", async () => {
+    let receivedBody = "";
+    let receivedPath = "";
+    const client = new HttpPythonRuntimeClient(
+      new PythonRuntimeConfig({ mode: "local-http", baseUrl: "http://runtime" }),
+      (async (input, init) => {
+        receivedPath = String(input);
+        receivedBody = String(init?.body ?? "");
+        return new Response(JSON.stringify({
+          success: true,
+          filename: "notes.pdf",
+          contentType: "application/pdf",
+          extension: ".pdf",
+          sourceFormat: "pdf",
+          outputFormat: "markdown",
+          markdownContent: "# Notes",
+          converter: { id: "python-markitdown", version: "0.1.5" },
+          warnings: [],
+          metadata: {
+            strategy: "converted",
+            durationMs: 12,
+            detectedContentType: "application/pdf",
+            declaredContentType: "application/pdf",
+          },
+        }), { status: 200 });
+      }) as typeof fetch,
+    );
+
+    const response = await client.convertDocumentToMarkdown({
+      filename: "notes.pdf",
+      contentType: "application/pdf",
+      outputFormat: "markdown",
+      content: new Uint8Array([1, 2, 3]),
+    });
+
+    expect(receivedPath).toBe("http://runtime/documents/convert/markdown");
+    expect(receivedBody).toContain('"base64_content"');
+    expect(response.markdownContent).toBe("# Notes");
+  });
+
   it("throws on non-2xx response", async () => {
     const client = new HttpPythonRuntimeClient(
       new PythonRuntimeConfig({ mode: "local-http", baseUrl: "http://runtime" }),

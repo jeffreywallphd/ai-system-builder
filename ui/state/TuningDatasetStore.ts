@@ -188,6 +188,18 @@ export class TuningDatasetStore {
     }
   }
 
+  public async ingestSourceFiles(datasetId: string, versionId: string, createdBy: string, files: ReadonlyArray<{ name: string; content: Uint8Array; mimeType?: string; sizeInBytes: number; lastModifiedAt?: Date; metadata?: Readonly<Record<string, unknown>> }>): Promise<void> {
+    this.patch({ isMutating: true, error: undefined });
+    try {
+      await this.service.ingestSourceFiles({ datasetId, versionId, createdBy, files });
+      this.patch({ isMutating: false });
+      await this.selectDataset(datasetId, versionId);
+    } catch (error) {
+      this.patch({ isMutating: false, error: toErrorMessage(error) });
+      throw error;
+    }
+  }
+
   public async importSources(datasetId: string, versionId: string, createdBy: string, documents: ReadonlyArray<{ name: string; content: string; sourceType?: "manual_text" | "uploaded_text" | "uploaded_file"; mediaType?: string; metadata?: Readonly<Record<string, unknown>> }>): Promise<void> {
     this.patch({ isMutating: true, error: undefined });
     try {

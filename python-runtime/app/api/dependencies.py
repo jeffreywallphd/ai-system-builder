@@ -11,6 +11,7 @@ from app.execution.workflow_executor import WorkflowExecutor
 from app.mcp.registry import McpRegistry
 from app.mcp.service import McpService
 from app.mcp.session import McpSessionManager
+from app.services.document_conversion_service import DocumentConversionService
 from app.services.health_service import HealthService
 from app.services.runtime_service import RuntimeService
 
@@ -37,3 +38,8 @@ def get_runtime_service() -> RuntimeService:
     dispatcher = NodeDispatcher(mcp_service=get_mcp_service())
     workflow_executor = WorkflowExecutor(dispatcher)
     return RuntimeService(dispatcher=dispatcher, workflow_executor=workflow_executor)
+
+
+@lru_cache
+def get_document_conversion_service() -> DocumentConversionService:
+    return DocumentConversionService()

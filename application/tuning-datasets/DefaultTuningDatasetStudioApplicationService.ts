@@ -49,6 +49,7 @@ import type {
   GetDatasetDetailsQuery,
   GetExampleDetailsQuery,
   ImportSourceDocumentsCommand,
+  IngestDatasetSourceFilesCommand,
   ListDatasetsQuery,
   ListExamplesQuery,
   MoveWorkflowStageCommand,
@@ -61,6 +62,9 @@ import type {
   ValidateDatasetVersionCommand,
 } from "./contracts";
 import type { TuningDatasetStudioApplicationService } from "./TuningDatasetStudioApplicationService";
+import type { FileIngestionApplicationService } from "../ingestion/FileIngestionApplicationService";
+import type { FileIngestionProfile } from "../../domain/ingestion/interfaces/IFileIngestion";
+import { DatasetSourceIngestionProfile } from "./DatasetSourceIngestionProfile";
 
 interface ServiceOptions {
   readonly datasetRepository: DatasetRepository;
@@ -79,6 +83,8 @@ interface ServiceOptions {
   readonly lineageService?: DatasetLineageService;
   readonly releaseManifestService?: ReleaseManifestService;
   readonly createId?: (prefix: string) => string;
+  readonly fileIngestionService?: FileIngestionApplicationService;
+  readonly datasetSourceIngestionProfile?: FileIngestionProfile;
 }
 
 function defaultCreateId(prefix: string): string {
@@ -105,6 +111,8 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
   private readonly lineageService: DatasetLineageService;
   private readonly releaseManifestService: ReleaseManifestService;
   private readonly createId: (prefix: string) => string;
+  private readonly fileIngestionService?: FileIngestionApplicationService;
+  private readonly datasetSourceIngestionProfile: FileIngestionProfile;
 
   constructor(options: ServiceOptions) {
     this.datasetRepository = options.datasetRepository;
@@ -123,6 +131,8 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
     this.lineageService = options.lineageService ?? new DatasetLineageService();
     this.releaseManifestService = options.releaseManifestService ?? new ReleaseManifestService();
     this.createId = options.createId ?? defaultCreateId;
+    this.fileIngestionService = options.fileIngestionService;
+    this.datasetSourceIngestionProfile = options.datasetSourceIngestionProfile ?? DatasetSourceIngestionProfile;
   }
 
   public async createDataset(command: CreateDatasetCommand): Promise<DatasetDetails> {
@@ -364,6 +374,59 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
 
   public async getExampleDetails(query: GetExampleDetailsQuery): Promise<StudioExample | undefined> {
     return this.datasetVersionRepository.loadExample(query.datasetId, query.versionId, query.exampleId);
+  }
+
+  public async ingestSourceFiles(command: IngestDatasetSourceFilesCommand): Promise<ReadonlyArray<DatasetSourceDocument>> {
+    if (!this.fileIngestionService) {
+      throw new Error("File ingestion service is not configured.");
+    }
+
+    await this.ensureVersionMutable(command.datasetId, command.versionId);
+    const ingested = await this.fileIngestionService.ingestFiles(this.datasetSourceIngestionProfile, command.files.map((file) => Object.freeze({
+      file: Object.freeze({
+        name: file.name,
+        extension: file.name.includes(".") ? file.name.slice(file.name.lastIndexOf(".")) : undefined,
+        mimeType: file.mimeType,
+        sizeInBytes: file.sizeInBytes,
+        lastModifiedAt: file.lastModifiedAt,
+      }),
+      content: file.content,
+      provenance: Object.freeze({
+        source: "dataset-source-upload",
+        feature: "tuning-datasets",
+        actor: command.createdBy,
+        capturedAt: new Date(),
+        metadata: file.metadata,
+      }),
+    })));
+
+    return this.importSourceDocuments({
+      datasetId: command.datasetId,
+      versionId: command.versionId,
+      createdBy: command.createdBy,
+      documents: ingested.map((result) => ({
+        name: result.document.file.name,
+        content: result.document.markdown,
+        sourceType: "uploaded_file" as const,
+        mediaType: "text/markdown",
+        metadata: Object.freeze({
+          ingestionProfileId: result.profileId,
+          sourceFormat: result.document.sourceFormat,
+          outputFormat: result.document.outputFormat,
+          originalMimeType: result.document.file.mimeType,
+          originalExtension: result.document.file.extension,
+          warnings: result.warnings.map((warning) => ({ ...warning })),
+          conversion: { ...result.document.conversion },
+          provenance: {
+            source: result.document.provenance.source,
+            feature: result.document.provenance.feature,
+            actor: result.document.provenance.actor,
+            capturedAt: result.document.provenance.capturedAt.toISOString(),
+            metadata: result.document.provenance.metadata,
+          },
+        }),
+      })),
+    });
   }
 
   public async importSourceDocuments(command: ImportSourceDocumentsCommand): Promise<ReadonlyArray<DatasetSourceDocument>> {
