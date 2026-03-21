@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from app.mcp.persistence import McpDefinitionRepository
 from app.mcp.provisioning import (
     LocalMcpServerProvisioner,
     build_bootstrapped_mcp_runtime_config,
@@ -24,13 +25,16 @@ def get_health_service() -> HealthService:
 @lru_cache
 def get_mcp_service() -> McpService:
     config = build_bootstrapped_mcp_runtime_config()
-    registry = McpRegistry(config)
+    workspace_root = resolve_default_mcp_workspace_root()
+    repository = McpDefinitionRepository(workspace_root)
+    registry = McpRegistry(config, repository=repository)
     sessions = McpSessionManager(registry)
     provisioner = LocalMcpServerProvisioner(
-        workspace_root=resolve_default_mcp_workspace_root(),
+        workspace_root=workspace_root,
         python_executable=resolve_mcp_runtime_python_executable(),
+        runtime_package_spec=config.dependency_package_spec,
     )
-    return McpService(registry=registry, sessions=sessions, provisioner=provisioner)
+    return McpService(registry=registry, repository=repository, sessions=sessions, provisioner=provisioner)
 
 
 @lru_cache

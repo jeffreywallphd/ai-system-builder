@@ -1,9 +1,13 @@
+from __future__ import annotations
+
 from app.core.mcp_config import McpRuntimeConfig, McpServerConfig
+from app.mcp.persistence import McpDefinitionRepository
 
 
 class McpRegistry:
-    def __init__(self, config: McpRuntimeConfig) -> None:
+    def __init__(self, config: McpRuntimeConfig, repository: McpDefinitionRepository | None = None) -> None:
         self._config = config
+        self._repository = repository
         self._dynamic_servers: dict[str, McpServerConfig] = {}
 
     @property
@@ -27,10 +31,24 @@ class McpRegistry:
         normalized = server_id.strip()
         return any(server.id == normalized for server in self._merged_servers())
 
-    def upsert_server(self, server: McpServerConfig) -> None:
+    def upsert_server(self, server: McpServerConfig, persist: bool = True) -> McpServerConfig:
         self._dynamic_servers[server.id] = server
+        if persist and self._repository is not None and server.source_type != "builtin-local":
+            self._repository.upsert(server)
+        return server
+
+    def delete_server(self, server_id: str) -> bool:
+        normalized = server_id.strip()
+        self._dynamic_servers.pop(normalized, None)
+        deleted = False
+        if self._repository is not None:
+            deleted = self._repository.delete(normalized)
+        return deleted
 
     def _merged_servers(self) -> list[McpServerConfig]:
         merged = {server.id: server for server in self._config.servers}
+        if self._repository is not None:
+            for server in self._repository.list():
+                merged[server.id] = server
         merged.update(self._dynamic_servers)
         return list(merged.values())
