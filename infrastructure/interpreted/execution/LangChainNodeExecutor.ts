@@ -1,12 +1,16 @@
 import type { IModelExecutor } from "../../../application/ports/interfaces/IModelExecutor";
 import type { INodeExecutor, INodeExecutionResult } from "../../../application/ports/interfaces/INodeExecutor";
 import type { INodeExecutionContext } from "../../../application/ports/interfaces/INodeExecutionContextResolver";
+import type { IMcpRuntimeClient } from "../../../application/ports/interfaces/IMcpRuntimeClient";
+import type { IMcpServerCatalog } from "../../../application/ports/interfaces/IMcpServerCatalog";
 import type { IPythonRuntimeClient } from "../../../application/ports/interfaces/IPythonRuntimeClient";
 import { InspectContextAssemblyUseCase } from "../../../application/context/InspectContextAssemblyUseCase";
 import type { IAssembledContextFragment } from "../../../application/context/models/AssembledContext";
 import type { ContextFragmentKind } from "../../../application/context/models/ContextFragment";
 import type { IContextBudget } from "../../../application/context/models/ContextBudget";
 import type { IContextTrimmingPolicy } from "../../../application/context/models/ContextTrimmingPolicy";
+import { deriveMcpExecutionProvenance } from "../../../application/execution/ExecutionTruth";
+import { McpToolCallNodeConfigurationService } from "../../../application/mcp/McpToolCallNodeConfigurationService";
 import type { INode } from "../../../domain/nodes/interfaces/INode";
 import type {
   ChatMessage,
@@ -36,6 +40,7 @@ interface ToolRuntimeDefinition extends ToolDefinition {
 
 const messageHistoryStore = new Map<string, ChatMessage[]>();
 const inspectContextAssemblyUseCase = new InspectContextAssemblyUseCase();
+const mcpToolCallNodeConfigurationService = new McpToolCallNodeConfigurationService();
 
 interface ContextControlSettings {
   readonly trimmingPolicy: IContextTrimmingPolicy;
@@ -599,6 +604,8 @@ function normalizePythonOutputs(
 export class LangChainNodeExecutor implements INodeExecutor {
   private readonly modelExecutor?: IModelExecutor;
   private readonly pythonRuntimeClient?: IPythonRuntimeClient;
+  private readonly mcpRuntimeClient?: IMcpRuntimeClient;
+  private readonly mcpServerCatalog?: IMcpServerCatalog;
 
   constructor(
     modelExecutorOrOptions?:
@@ -606,6 +613,8 @@ export class LangChainNodeExecutor implements INodeExecutor {
       | {
           readonly modelExecutor?: IModelExecutor;
           readonly pythonRuntimeClient?: IPythonRuntimeClient;
+          readonly mcpRuntimeClient?: IMcpRuntimeClient;
+          readonly mcpServerCatalog?: IMcpServerCatalog;
         },
     pythonRuntimeClient?: IPythonRuntimeClient
   ) {
@@ -613,10 +622,14 @@ export class LangChainNodeExecutor implements INodeExecutor {
       modelExecutorOrOptions &&
       typeof modelExecutorOrOptions === "object" &&
       ("modelExecutor" in modelExecutorOrOptions ||
-        "pythonRuntimeClient" in modelExecutorOrOptions)
+        "pythonRuntimeClient" in modelExecutorOrOptions ||
+        "mcpRuntimeClient" in modelExecutorOrOptions ||
+        "mcpServerCatalog" in modelExecutorOrOptions)
     ) {
       this.modelExecutor = modelExecutorOrOptions.modelExecutor;
       this.pythonRuntimeClient = modelExecutorOrOptions.pythonRuntimeClient;
+      this.mcpRuntimeClient = modelExecutorOrOptions.mcpRuntimeClient;
+      this.mcpServerCatalog = modelExecutorOrOptions.mcpServerCatalog;
       return;
     }
 
@@ -716,6 +729,159 @@ export class LangChainNodeExecutor implements INodeExecutor {
           detail: response.status === "completed"
             ? "Node execution was delegated to the Python runtime."
             : "Python runtime could not complete delegated node execution.",
+        },
+      };
+    }
+
+    if (nodeType === "mcp.server_select") {
+      const serverId = String(inputs.selection ?? properties["serverId"] ?? "").trim();
+      if (!serverId) {
+        return {
+          nodeId: context.node.id,
+          status: "failed",
+          outputs: {},
+          messages: ["MCP server selection requires a configured server id."],
+          errorMessage: "MCP server selection requires a configured server id.",
+          provenance: {
+            classification: "unavailable",
+            runtime: "python",
+            executorId: "mcp-runtime-bridge",
+            detail: "MCP server selection could not resolve a configured server id.",
+            nodeType: context.node.definition.type,
+            mcp: deriveMcpExecutionProvenance({ serverId, detail: "No configured MCP server id was available." }),
+          },
+        };
+      }
+
+      const serverStatus = this.mcpServerCatalog ? await this.mcpServerCatalog.getServerStatus(serverId) : undefined;
+      const mcp = deriveMcpExecutionProvenance({ serverStatus, serverId, detail: serverStatus?.errorMessage });
+      return {
+        nodeId: context.node.id,
+        status: mcp.status === "unavailable" ? "failed" : "completed",
+        outputs: {
+          serverHandle: { serverId, status: serverStatus?.state ?? "unknown", sessionState: serverStatus?.sessionState ?? "disconnected" },
+          connectionStatus: serverStatus ?? { serverId, state: "disconnected", connected: false, checkedAt: new Date().toISOString() },
+        },
+        messages: [mcp.status === "live" ? `Selected MCP server '${serverId}'.` : `Selected MCP server '${serverId}' in ${mcp.status} state.`],
+        errorMessage: mcp.status === "unavailable" ? `MCP server '${serverId}' is unavailable.` : undefined,
+        provenance: {
+          classification: mcp.status === "live" ? "delegated" : mcp.status === "stale" ? "hybrid" : "unavailable",
+          runtime: "python",
+          executorId: "mcp-runtime-bridge",
+          detail: mcp.status === "live" ? "MCP server selection was resolved against the live runtime session." : `MCP server selection resolved with ${mcp.status} runtime state.`,
+          nodeType: context.node.definition.type,
+          mcp,
+        },
+      };
+    }
+
+    if (nodeType === "mcp.tool_catalog") {
+      const serverId = String((inputs.serverHandle as Record<string, unknown> | undefined)?.serverId ?? properties["serverId"] ?? "").trim();
+      if (!serverId || !this.mcpRuntimeClient) {
+        return {
+          nodeId: context.node.id,
+          status: "failed",
+          outputs: {},
+          messages: ["MCP tool discovery requires the runtime-backed MCP client and a selected server."],
+          errorMessage: "MCP tool discovery is unavailable.",
+          provenance: {
+            classification: "unavailable",
+            runtime: "python",
+            executorId: "mcp-runtime-bridge",
+            detail: "MCP tool discovery could not reach the runtime-backed MCP catalog.",
+            nodeType: context.node.definition.type,
+            mcp: deriveMcpExecutionProvenance({ serverId, detail: "MCP runtime client is unavailable." }),
+          },
+        };
+      }
+      const status = this.mcpServerCatalog ? await this.mcpServerCatalog.getServerStatus(serverId) : undefined;
+      const toolQuery = String(properties["query"] ?? "").trim() || undefined;
+      const result = await this.mcpRuntimeClient.searchTools({ query: toolQuery, serverIds: [serverId], limit: 50 });
+      const tools = result.tools.filter((tool) => tool.serverId === serverId);
+      const mcp = deriveMcpExecutionProvenance({ serverStatus: status, serverId, detail: status?.errorMessage });
+      return {
+        nodeId: context.node.id,
+        status: mcp.status === "unavailable" ? "failed" : "completed",
+        outputs: { tools, serverId, connectionStatus: status },
+        messages: [`Discovered ${tools.length} MCP tool(s) for '${serverId}'.`],
+        errorMessage: mcp.status === "unavailable" ? `MCP server '${serverId}' is unavailable.` : undefined,
+        provenance: {
+          classification: mcp.status === "live" ? "delegated" : mcp.status === "stale" ? "hybrid" : "unavailable",
+          runtime: "python",
+          executorId: "mcp-runtime-bridge",
+          detail: "MCP tool discovery was resolved against the runtime-backed catalog.",
+          nodeType: context.node.definition.type,
+          mcp,
+        },
+      };
+    }
+
+    if (nodeType === "mcp.tool_call") {
+      const serverHandle = (inputs.serverHandle as Record<string, unknown> | undefined);
+      const serverId = String(serverHandle?.serverId ?? properties["serverId"] ?? "").trim();
+      const descriptorFromInput = inputs.tool && typeof inputs.tool === "object" ? inputs.tool as Record<string, unknown> : undefined;
+      const toolDescriptor = descriptorFromInput?.serverId && descriptorFromInput?.name
+        ? descriptorFromInput as never
+        : mcpToolCallNodeConfigurationService.readStoredToolDescriptor(context.node);
+      const toolName = String(toolDescriptor?.name ?? properties["toolName"] ?? "").trim();
+      if (!serverId || !toolName || !this.mcpRuntimeClient) {
+        return {
+          nodeId: context.node.id,
+          status: "failed",
+          outputs: {},
+          messages: ["MCP tool execution requires a runtime-backed MCP client, server id, and tool name."],
+          errorMessage: "MCP tool execution is unavailable.",
+          provenance: {
+            classification: "unavailable",
+            runtime: "python",
+            executorId: "mcp-runtime-bridge",
+            detail: "MCP tool execution could not be prepared truthfully.",
+            nodeType: context.node.definition.type,
+            mcp: deriveMcpExecutionProvenance({ serverId, toolName, detail: "Missing server id, tool name, or MCP runtime client." }),
+          },
+        };
+      }
+      const serverStatus = this.mcpServerCatalog ? await this.mcpServerCatalog.getServerStatus(serverId) : undefined;
+      const configuredArgs = mcpToolCallNodeConfigurationService.serializeConfiguredArguments(context.node);
+      const inputArgs = inputs.arguments && typeof inputs.arguments === "object" ? inputs.arguments as Record<string, unknown> : {};
+      const argumentsRecord = Object.freeze({ ...configuredArgs, ...inputArgs });
+      const execution = await this.mcpRuntimeClient.executeTool({ serverId, toolName, arguments: argumentsRecord });
+      const stringifyResult = properties["stringifyResult"] !== false;
+      const mcp = deriveMcpExecutionProvenance({ serverStatus, toolDescriptor: toolDescriptor as never, serverId, toolName });
+      return {
+        nodeId: context.node.id,
+        status: execution.status === "completed" ? "completed" : "failed",
+        outputs: {
+          result: execution,
+          structuredResult: execution.structuredContent ?? {},
+          textResult: stringifyResult ? JSON.stringify(execution.structuredContent ?? execution.content, null, 2) : undefined,
+        },
+        messages: execution.status === "completed" ? [`Executed MCP tool '${toolName}'.`] : [execution.errorMessage ?? `MCP tool '${toolName}' failed.`],
+        errorMessage: execution.errorMessage,
+        provenance: {
+          classification: execution.status === "completed" && mcp.status === "live" ? "delegated" : execution.status === "completed" && mcp.status === "stale" ? "hybrid" : "unavailable",
+          runtime: "python",
+          executorId: "mcp-runtime-bridge",
+          detail: execution.status === "completed" ? "MCP tool execution was delegated to the live runtime-backed MCP session." : "MCP tool execution failed in the runtime-backed MCP session.",
+          nodeType: context.node.definition.type,
+          mcp,
+        },
+      };
+    }
+
+    if (nodeType === "test") {
+      return {
+        nodeId: context.node.id,
+        status: "completed",
+        outputs: { result: normalizeText(inputs.in ?? inputs.input ?? "value") },
+        messages: ["Test scaffold node completed deterministically."],
+        provenance: {
+          classification: "scaffolded",
+          runtime: "langchain",
+          executorId: "langchain-node-executor",
+          detail: "Generic test node executed through the scaffold interpreter.",
+          nodeType: context.node.definition.type,
+          fallback: { kind: "scaffold-interpreter", isActive: true, reason: "Generic test nodes only have scaffold behavior." },
         },
       };
     }

@@ -55,6 +55,15 @@ export default function WorkflowExecutionStatusPanel({
 
         {message ? <p className="ui-muted">{message}</p> : null}
         {provenance?.detail ? <p className="ui-muted">{provenance.detail}</p> : null}
+        {provenance?.fallback?.isActive ? (
+          <p className="ui-muted">Fallback: <strong>{provenance.fallback.kind}</strong> — {provenance.fallback.reason}</p>
+        ) : null}
+        {provenance?.mcp ? (
+          <p className="ui-muted">MCP: <strong>{provenance.mcp.status}</strong>{provenance.mcp.serverId ? ` (${provenance.mcp.serverId})` : ""}</p>
+        ) : null}
+        {provenance?.nodeCounts ? (
+          <p className="ui-muted">Node truthfulness — real: {provenance.nodeCounts.real ?? 0}, delegated: {provenance.nodeCounts.delegated ?? 0}, hybrid: {provenance.nodeCounts.hybrid ?? 0}, scaffolded: {provenance.nodeCounts.scaffolded ?? 0}, unavailable: {provenance.nodeCounts.unavailable ?? 0}.</p>
+        ) : null}
       </div>
     </section>
   );

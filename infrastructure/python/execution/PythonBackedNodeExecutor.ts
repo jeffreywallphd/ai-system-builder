@@ -48,6 +48,7 @@ export class PythonBackedNodeExecutor implements INodeExecutor {
           runtime: "python",
           executorId: "python-backed-node-executor",
           detail: "Node is not eligible for delegated Python execution.",
+          nodeType: context.node.definition.type,
         },
       };
     }
@@ -78,6 +79,7 @@ export class PythonBackedNodeExecutor implements INodeExecutor {
         detail: response.status === "completed"
           ? "Node execution was delegated to the Python runtime."
           : "Python runtime could not complete delegated node execution.",
+        nodeType: context.node.definition.type,
       },
     };
   }

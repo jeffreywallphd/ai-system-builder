@@ -136,7 +136,7 @@ export class AppRuntimeConfig {
 
     return new AppRuntimeConfig({
       runtimeMode: AppRuntimeModes.browserDevelopment,
-      workflowRepositoryMode: "browser-storage",
+      workflowRepositoryMode: "filesystem-indexed",
       workflowExecutorMode: "strategy",
       nodeCatalogMode: "registered",
       uiSettingsPersistenceMode: "local-storage",

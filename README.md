@@ -6,29 +6,29 @@ AI Loom Studio is a domain-first desktop and web workflow studio for composing A
 
 This repository now supports two explicit runtime modes:
 
-- **Development browser mode**: the existing Vite-first workflow remains the default.
+- **Development desktop mode**: Electron + the renderer now form the standard dev workflow and persist durable app state under `dev/`.
 - **Packaged desktop production mode**: Electron hosts the renderer, owns the local supervisor lifecycle, uses a private/bundled Python runtime path, and persists durable app state in SQLite-backed desktop storage.
 
 ## Development mode
 
 Development now has two clearly differentiated paths:
 
-- **Desktop-host development (`npm run dev:desktop`)** is the truthful operational path.
-- **Browser-only Vite development (`npm run dev`)** remains available as an authoring fallback when the desktop bridge is not present.
+- **Desktop-host development (`npm run dev`)** is now the standard truthful development path.
+- **Browser-only Vite development (`npm run dev:browser`)** remains available only as an explicit degraded fallback when the desktop bridge is not present.
 
-### Start the existing dev workflow
+### Start the standard dev workflow
 
 ```bash
 npm install
 npm run dev
 ```
 
-That starts the renderer in browser-only fallback mode. Workflows remain durable in browser storage, but this path does **not** provide the full dev filesystem + SQLite persistence foundation.
+That starts the renderer plus the Electron desktop host, which is the expected development path for durable `dev/` filesystem + SQLite persistence.
 
-### Optional desktop-host development
+### Explicit browser-only fallback
 
 ```bash
-npm run dev:desktop
+npm run dev:browser
 ```
 
 This starts:
@@ -152,7 +152,7 @@ The app no longer treats scaffold execution as if it were the primary production
 
 - The Electron packaging pipeline is fully wired, but **embedded Python binaries are not checked into this repository**. You must place a private Python runtime into `runtime-assets/python/<platform>-<arch>/...` before producing a distributable installer that is fully self-contained.
 - Code signing, notarization, auto-update hosting, and release publishing secrets are intentionally not claimed as configured.
-- The default `npm run dev` path remains browser-first by design so the existing developer workflow stays stable.
+- Browser-only development remains available, but it is now documented and surfaced as a degraded fallback rather than the ordinary development baseline.
 
 ## Repository highlights
 
@@ -162,3 +162,38 @@ The app no longer treats scaffold execution as if it were the primary production
 - `electron/**`: Electron main/preload host implementation
 - `ui/composition/**`: explicit dev-vs-desktop repository composition
 - `forge.config.ts`: Electron Forge packaging configuration
+
+## Node execution truthfulness categories
+
+Workflow and node execution now report structured truthfulness categories end to end:
+
+- **real** — executed by a real runtime/model-backed implementation
+- **delegated** — delegated across the runtime boundary (Python runtime or live MCP runtime)
+- **hybrid** — combined delegated/runtime-backed behavior with bounded scaffold support
+- **scaffolded** — deterministic scaffold/interpreted fallback only
+- **unavailable** — the requested behavior could not be performed truthfully
+
+Scaffold fallback is no longer implied. It is reported explicitly in workflow provenance, node provenance, logs, and UI status panels.
+
+## MCP truthfulness
+
+MCP-backed execution now reports runtime/session truth explicitly:
+
+- **live**
+- **stale**
+- **disconnected**
+- **unavailable**
+
+These states flow through MCP workflow nodes, capability execution metadata, and operational status surfaces so a capability cannot silently appear runnable when the runtime/session state says otherwise.
+
+## Model library truthfulness
+
+The Models area now distinguishes between:
+
+- **installed and verified**
+- **downloaded but not registered**
+- **registered metadata only**
+- **missing on disk**
+- **verification failed**
+
+When the app is running without the desktop model-file bridge, model installs remain in **browser-download fallback** mode and are presented as such rather than being treated as a fully managed local library.

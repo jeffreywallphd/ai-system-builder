@@ -77,6 +77,11 @@ export class TruthfulWorkflowExecutor implements IWorkflowExecutor {
       strategyId: descriptor.id,
       detail: `${descriptor.mode} execution via ${descriptor.id}.`,
       selectionReason: selection.reason,
+      fallback: descriptor.defaultProvenance === "scaffolded" ? {
+        kind: "scaffold-interpreter",
+        isActive: true,
+        reason: "The scaffold interpreter was selected as the truthful fallback path.",
+      } : undefined,
     };
 
     return new WorkflowExecutionResult({

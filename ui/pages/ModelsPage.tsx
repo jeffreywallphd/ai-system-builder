@@ -24,6 +24,7 @@ const fallbackState: IModelStoreState = Object.freeze({
   installedSearchCriteria: undefined,
   remoteSearchCriteria: undefined,
   installProgressByModelId: Object.freeze({}),
+  managedLibrary: undefined,
   isLoadingInstalled: false,
   isSearchingRemote: false,
   isInstalling: false,
@@ -73,11 +74,14 @@ export default function ModelsPage(): JSX.Element {
         <div className="ui-page__hero-copy">
           <h1 className="ui-page__title">Models</h1>
           <p className="ui-page__subtitle">
-            Download models for your workspace today, then prepare fine-tuned model variants from the models you already have on hand.
+            Manage the model library your workflows can actually use, and keep browser-only download fallbacks clearly separated from verified local installs.
           </p>
           <p className="ui-text-secondary ui-text-small">
-            New downloads currently go to <strong>{settingsState.settings.models.installDirectory}</strong>. Update this in{" "}
+            Managed library root: <strong>{state.managedLibrary?.location ?? settingsState.settings.models.installDirectory}</strong>. Update this in{" "}
             <Link to={ROUTE_PATHS.settings}>Settings</Link> whenever you want AI Loom Studio to share a library with other tools.
+          </p>
+          <p className="ui-text-secondary ui-text-small">
+            Library mode: <strong>{state.managedLibrary?.mode ?? "unknown"}</strong> — {state.managedLibrary?.detail ?? "Model library state has not been inspected yet."}
           </p>
         </div>
       </div>
@@ -88,7 +92,7 @@ export default function ModelsPage(): JSX.Element {
           {
             id: "download",
             label: "Download Models",
-            description: "Browse remote catalogs and manage installed models.",
+            description: "Browse remote catalogs and inspect truthful installed-model state.",
           },
           {
             id: "create",
@@ -99,6 +103,20 @@ export default function ModelsPage(): JSX.Element {
         activeTabId={activeTab}
         onChange={(tabId) => setActiveTab(tabId as ModelsTabId)}
       />
+
+      <div className="ui-card">
+        <div className="ui-card__body ui-stack ui-stack--sm">
+          <div>
+            <strong>Managed Model Library Truth</strong>
+            <div className="ui-text-secondary ui-text-small">{state.managedLibrary?.detail ?? "Model library inspection is pending."}</div>
+          </div>
+          <div className="ui-text-secondary ui-text-small">
+            {state.managedLibrary?.items.length
+              ? state.managedLibrary.items.map((item) => `${item.name}: ${item.state}`).join(" · ")
+              : "No managed model library entries have been detected yet."}
+          </div>
+        </div>
+      </div>
 
       <section
         id="page-tabpanel-download"
@@ -148,7 +166,7 @@ export default function ModelsPage(): JSX.Element {
           <div className="ui-card__body ui-empty-state">
             <h2>Create Models</h2>
             <p className="ui-text-secondary">
-              Fine-tuning downloaded models will live here. This tab is ready for that workflow, but the training flow is coming soon.
+              Fine-tuning and managed model creation will live here. The foundation now reports truthful model-library state, but training workflows are still not implemented.
             </p>
             <p className="ui-text-secondary ui-text-small">
               Download or manage your base models from the Download Models tab first so this area can build on assets already in your workspace.

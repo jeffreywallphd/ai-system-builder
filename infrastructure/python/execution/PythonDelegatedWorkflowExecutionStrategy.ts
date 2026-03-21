@@ -73,6 +73,7 @@ export class PythonDelegatedWorkflowExecutionStrategy implements IWorkflowExecut
         detail: response.status === "failed"
           ? "Python runtime could not complete delegated execution."
           : "Workflow execution was delegated to the Python runtime.",
+        fallback: response.status === "failed" ? { kind: "scaffold-interpreter", isActive: false, reason: "No scaffold fallback was used for this delegated execution." } : undefined,
       },
     });
 

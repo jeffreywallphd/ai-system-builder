@@ -22,6 +22,30 @@ function freezeMessages(messages?: ReadonlyArray<string>): ReadonlyArray<string>
   return messages ? Object.freeze([...messages]) : undefined;
 }
 
+function freezeNodeProvenanceMap(nodeProvenance?: Readonly<Record<string, INodeExecutionProvenance>>) {
+  if (!nodeProvenance) {
+    return undefined;
+  }
+
+  return Object.freeze(Object.fromEntries(
+    Object.entries(nodeProvenance).map(([key, value]) => [key, Object.freeze({ ...value })])
+  ));
+}
+
+function freezeProvenance(provenance?: IWorkflowExecutionProvenance): IWorkflowExecutionProvenance | undefined {
+  if (!provenance) {
+    return undefined;
+  }
+
+  return Object.freeze({
+    ...provenance,
+    fallback: provenance.fallback ? Object.freeze({ ...provenance.fallback }) : undefined,
+    nodeCounts: provenance.nodeCounts ? Object.freeze({ ...provenance.nodeCounts }) : undefined,
+    mcp: provenance.mcp ? Object.freeze({ ...provenance.mcp }) : undefined,
+    nodeProvenance: freezeNodeProvenanceMap(provenance.nodeProvenance),
+  });
+}
+
 export class WorkflowExecutionProgress implements IWorkflowExecutionProgress {
   public readonly executionId: string;
   public readonly status: IWorkflowExecutionProgress["status"];
@@ -86,6 +110,8 @@ export class WorkflowExecutionEvent implements IWorkflowExecutionEvent {
     progress?: IWorkflowExecutionProgress;
     message?: string;
     payload?: Readonly<Record<string, unknown>>;
+    provenance?: IWorkflowExecutionProvenance;
+    nodeProvenance?: INodeExecutionProvenance;
   }) {
     const executionId = params.executionId.trim();
 
@@ -103,14 +129,7 @@ export class WorkflowExecutionEvent implements IWorkflowExecutionEvent {
       : undefined;
     this.message = params.message?.trim() || undefined;
     this.payload = params.payload ? Object.freeze({ ...params.payload }) : undefined;
-    this.provenance = params.provenance
-      ? Object.freeze({
-          ...params.provenance,
-          nodeProvenance: params.provenance.nodeProvenance
-            ? Object.freeze({ ...params.provenance.nodeProvenance })
-            : undefined,
-        })
-      : undefined;
+    this.provenance = freezeProvenance(params.provenance);
     this.nodeProvenance = params.nodeProvenance
       ? Object.freeze({ ...params.nodeProvenance })
       : undefined;
@@ -146,6 +165,7 @@ export class WorkflowExecutionResult implements IWorkflowExecutionResult {
     outputAssets?: ReadonlyArray<IAsset>;
     messages?: ReadonlyArray<string>;
     errorMessage?: string;
+    provenance?: IWorkflowExecutionProvenance;
   }) {
     const executionId = params.executionId.trim();
 
@@ -158,14 +178,7 @@ export class WorkflowExecutionResult implements IWorkflowExecutionResult {
     this.outputAssets = freezeAssets(params.outputAssets);
     this.messages = freezeMessages(params.messages);
     this.errorMessage = params.errorMessage?.trim() || undefined;
-    this.provenance = params.provenance
-      ? Object.freeze({
-          ...params.provenance,
-          nodeProvenance: params.provenance.nodeProvenance
-            ? Object.freeze({ ...params.provenance.nodeProvenance })
-            : undefined,
-        })
-      : undefined;
+    this.provenance = freezeProvenance(params.provenance);
   }
 
   public static from(result: IWorkflowExecutionResult): WorkflowExecutionResult {

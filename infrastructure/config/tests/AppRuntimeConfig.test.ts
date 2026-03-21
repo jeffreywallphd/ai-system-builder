@@ -7,7 +7,7 @@ describe("AppRuntimeConfig", () => {
     const config = AppRuntimeConfig.forDevelopment();
 
     expect(config.runtimeMode).toBe(AppRuntimeModes.browserDevelopment);
-    expect(config.workflowRepositoryMode).toBe("browser-storage");
+    expect(config.workflowRepositoryMode).toBe("filesystem-indexed");
     expect(config.workflowExecutorMode).toBe("strategy");
     expect(config.nodeCatalogMode).toBe("registered");
     expect(config.uiSettingsPersistenceMode).toBe("local-storage");
