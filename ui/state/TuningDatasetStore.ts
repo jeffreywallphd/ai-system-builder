@@ -1,19 +1,31 @@
-import type { DatasetExportArtifact, DatasetStatistics, DatasetValidationResult } from "../../domain/tuning-datasets/interfaces/ITuningDatasetStudio";
-import type { QuestionAnsweringExample, SourceDocumentReference } from "../../domain/tuning-datasets/TuningDatasetEntities";
-import type { DatasetDetails, DatasetSummary } from "../../application/tuning-datasets/contracts";
+import type {
+  DatasetExportArtifact,
+  DatasetSourceDocument,
+  DatasetStatistics,
+  DatasetValidationResult,
+  DatasetWorkflowStage,
+  DatasetWorkflowState,
+  ExampleStatus,
+  ExportFormat,
+  SplitType,
+} from "../../domain/tuning-datasets/interfaces/ITuningDatasetStudio";
+import type { DatasetDetails, DatasetSummary, StudioExample } from "../../application/tuning-datasets/contracts";
 import { TuningDatasetService } from "../services/TuningDatasetService";
 
 export interface TuningDatasetStoreState {
   readonly datasets: ReadonlyArray<DatasetSummary>;
   readonly selectedDatasetId?: string;
+  readonly selectedVersionId?: string;
   readonly selectedDataset?: DatasetDetails;
-  readonly examples: ReadonlyArray<QuestionAnsweringExample>;
-  readonly sourceDocuments: ReadonlyArray<SourceDocumentReference>;
+  readonly examples: ReadonlyArray<StudioExample>;
+  readonly selectedExampleIds: ReadonlyArray<string>;
+  readonly sourceDocuments: ReadonlyArray<DatasetSourceDocument>;
   readonly validation?: DatasetValidationResult;
   readonly statistics?: DatasetStatistics;
   readonly exports: ReadonlyArray<DatasetExportArtifact>;
   readonly duplicates: ReadonlyArray<{ readonly fingerprint: string; readonly exampleIds: ReadonlyArray<string> }>;
-  readonly activeWorkspaceTab: "overview" | "sources" | "examples" | "validation" | "splits" | "versions" | "exports";
+  readonly workflow?: DatasetWorkflowState;
+  readonly currentWorkflowStage: DatasetWorkflowStage;
   readonly isLoading: boolean;
   readonly isMutating: boolean;
   readonly error?: string;
@@ -24,14 +36,17 @@ export type TuningDatasetStoreListener = (state: TuningDatasetStoreState) => voi
 const defaultState: TuningDatasetStoreState = Object.freeze({
   datasets: Object.freeze([]),
   selectedDatasetId: undefined,
+  selectedVersionId: undefined,
   selectedDataset: undefined,
   examples: Object.freeze([]),
+  selectedExampleIds: Object.freeze([]),
   sourceDocuments: Object.freeze([]),
   validation: undefined,
   statistics: undefined,
   exports: Object.freeze([]),
   duplicates: Object.freeze([]),
-  activeWorkspaceTab: "overview",
+  workflow: undefined,
+  currentWorkflowStage: "dataset_definition",
   isLoading: false,
   isMutating: false,
   error: undefined,
@@ -61,14 +76,16 @@ export class TuningDatasetStore {
     await this.refreshDatasets();
   }
 
-  public async refreshDatasets(selectedDatasetId?: string): Promise<void> {
+  public async refreshDatasets(selectedDatasetId?: string, selectedVersionId?: string): Promise<void> {
     this.patch({ isLoading: true, error: undefined });
     try {
       const datasets = await this.service.listDatasets();
       const nextSelectedDatasetId = selectedDatasetId ?? this.state.selectedDatasetId ?? datasets[0]?.dataset.id;
-      this.patch({ datasets, selectedDatasetId: nextSelectedDatasetId, isLoading: false });
+      const summary = datasets.find((entry) => entry.dataset.id === nextSelectedDatasetId);
+      const nextSelectedVersionId = selectedVersionId ?? summary?.selectedVersion?.id ?? summary?.latestVersion?.id;
+      this.patch({ datasets, selectedDatasetId: nextSelectedDatasetId, selectedVersionId: nextSelectedVersionId, isLoading: false });
       if (nextSelectedDatasetId) {
-        await this.selectDataset(nextSelectedDatasetId);
+        await this.selectDataset(nextSelectedDatasetId, nextSelectedVersionId);
       }
     } catch (error) {
       this.patch({ isLoading: false, error: toErrorMessage(error) });
@@ -76,28 +93,45 @@ export class TuningDatasetStore {
     }
   }
 
-  public async selectDataset(datasetId: string | undefined): Promise<void> {
+  public async selectDataset(datasetId: string | undefined, versionId?: string): Promise<void> {
     if (!datasetId) {
-      this.patch({ selectedDatasetId: undefined, selectedDataset: undefined, examples: Object.freeze([]), sourceDocuments: Object.freeze([]), validation: undefined, statistics: undefined, exports: Object.freeze([]), duplicates: Object.freeze([]) });
+      this.patch({
+        selectedDatasetId: undefined,
+        selectedVersionId: undefined,
+        selectedDataset: undefined,
+        examples: Object.freeze([]),
+        selectedExampleIds: Object.freeze([]),
+        sourceDocuments: Object.freeze([]),
+        validation: undefined,
+        statistics: undefined,
+        exports: Object.freeze([]),
+        duplicates: Object.freeze([]),
+        workflow: undefined,
+        currentWorkflowStage: "dataset_definition",
+      });
       return;
     }
 
-    this.patch({ isLoading: true, error: undefined, selectedDatasetId: datasetId });
+    this.patch({ isLoading: true, error: undefined, selectedDatasetId: datasetId, selectedVersionId: versionId ?? this.state.selectedVersionId });
     try {
-      const details = await this.service.getDatasetDetails(datasetId);
-      const latestVersionId = details.latestVersion?.id;
-      const examples = latestVersionId ? await this.service.listExamples({ datasetId, versionId: latestVersionId }) : [];
-      const duplicates = latestVersionId ? await this.service.detectDuplicates(datasetId, latestVersionId) : [];
-      const exports = latestVersionId ? await this.service.listExports(datasetId, latestVersionId) : [];
+      const details = await this.service.getDatasetDetails(datasetId, versionId ?? this.state.selectedVersionId);
+      const selectedVersionId = details.selectedVersion?.id;
+      const examples = selectedVersionId ? await this.service.listExamples({ datasetId, versionId: selectedVersionId }) : [];
+      const duplicates = selectedVersionId ? await this.service.detectDuplicates(datasetId, selectedVersionId) : [];
+      const exports = selectedVersionId ? await this.service.listExports(datasetId, selectedVersionId) : [];
       this.patch({
         selectedDataset: details,
         selectedDatasetId: datasetId,
+        selectedVersionId,
         sourceDocuments: Object.freeze([...details.sourceDocuments]),
         examples: Object.freeze([...examples]),
+        selectedExampleIds: Object.freeze([]),
         validation: details.validation,
         statistics: details.statistics,
         exports: Object.freeze([...exports]),
         duplicates: Object.freeze([...duplicates]),
+        workflow: details.workflow,
+        currentWorkflowStage: details.workflow.currentStage,
         isLoading: false,
       });
     } catch (error) {
@@ -106,55 +140,90 @@ export class TuningDatasetStore {
     }
   }
 
-  public setActiveWorkspaceTab(tab: TuningDatasetStoreState["activeWorkspaceTab"]): void {
-    this.patch({ activeWorkspaceTab: tab });
+  public async selectVersion(versionId: string): Promise<void> {
+    if (!this.state.selectedDatasetId) {
+      return;
+    }
+    this.patch({ isMutating: true, error: undefined });
+    try {
+      await this.service.selectDatasetVersion(this.state.selectedDatasetId, versionId);
+      this.patch({ isMutating: false });
+      await this.selectDataset(this.state.selectedDatasetId, versionId);
+    } catch (error) {
+      this.patch({ isMutating: false, error: toErrorMessage(error) });
+      throw error;
+    }
   }
 
-  public async createDataset(params: { name: string; description?: string; taskType: "question_answering" | "chat_completion" | "instruction_response" | "classification" | "extraction" | "preference" | "tool_calling"; tags?: ReadonlyArray<string>; createdBy: string }): Promise<void> {
+  public async createDataset(params: { name: string; description?: string; taskType: import("../../domain/tuning-datasets/interfaces/ITuningDatasetStudio").DatasetTaskType; tags?: ReadonlyArray<string>; createdBy: string }): Promise<void> {
     this.patch({ isMutating: true, error: undefined });
     try {
       const details = await this.service.createDataset({ ...params, initializeVersion: true });
       this.patch({ isMutating: false });
-      await this.refreshDatasets(details.dataset.id);
-      this.setActiveWorkspaceTab("overview");
+      await this.refreshDatasets(details.dataset.id, details.selectedVersion?.id);
     } catch (error) {
       this.patch({ isMutating: false, error: toErrorMessage(error) });
       throw error;
     }
   }
 
-  public async importSources(datasetId: string, versionId: string, createdBy: string, documents: ReadonlyArray<{ name: string; content: string }>): Promise<void> {
+  public async createSuccessorVersion(releasedVersionId: string, createdBy: string): Promise<void> {
+    if (!this.state.selectedDatasetId) {
+      return;
+    }
+    this.patch({ isMutating: true, error: undefined });
+    try {
+      const details = await this.service.createSuccessorDatasetVersion(this.state.selectedDatasetId, releasedVersionId, createdBy);
+      this.patch({ isMutating: false });
+      await this.refreshDatasets(details.dataset.id, details.selectedVersion?.id);
+    } catch (error) {
+      this.patch({ isMutating: false, error: toErrorMessage(error) });
+      throw error;
+    }
+  }
+
+  public async importSources(datasetId: string, versionId: string, createdBy: string, documents: ReadonlyArray<{ name: string; content: string; sourceType?: "manual_text" | "uploaded_text" | "uploaded_file"; mediaType?: string; metadata?: Readonly<Record<string, unknown>> }>): Promise<void> {
     this.patch({ isMutating: true, error: undefined });
     try {
       await this.service.importSourceDocuments({ datasetId, versionId, createdBy, documents });
       this.patch({ isMutating: false });
-      await this.selectDataset(datasetId);
-      this.setActiveWorkspaceTab("sources");
+      await this.selectDataset(datasetId, versionId);
     } catch (error) {
       this.patch({ isMutating: false, error: toErrorMessage(error) });
       throw error;
     }
   }
 
-  public async generateQaExamples(datasetId: string, versionId: string, createdBy: string, sourceDocumentIds: ReadonlyArray<string>): Promise<void> {
+  public async generateExamples(datasetId: string, versionId: string, createdBy: string, sourceDocumentIds: ReadonlyArray<string>): Promise<void> {
     this.patch({ isMutating: true, error: undefined });
     try {
-      await this.service.generateQaExamples({ datasetId, versionId, createdBy, sourceDocumentIds });
+      await this.service.generateExamples({ datasetId, versionId, createdBy, sourceDocumentIds, configuration: { strategy: "default-local" } });
       this.patch({ isMutating: false });
-      await this.selectDataset(datasetId);
-      this.setActiveWorkspaceTab("examples");
+      await this.selectDataset(datasetId, versionId);
     } catch (error) {
       this.patch({ isMutating: false, error: toErrorMessage(error) });
       throw error;
     }
   }
 
-  public async updateExample(datasetId: string, versionId: string, exampleId: string, updates: { question?: string; answer?: string; context?: string; split?: "train" | "validation" | "test"; status?: "draft" | "accepted" | "rejected" | "needs_review"; tags?: ReadonlyArray<string>; annotationNote?: string; updatedBy: string }): Promise<void> {
+  public async addExample(command: import("../../application/tuning-datasets/contracts").AddExampleCommand): Promise<void> {
     this.patch({ isMutating: true, error: undefined });
     try {
-      await this.service.updateExample({ datasetId, versionId, exampleId, ...updates });
+      await this.service.addExample(command);
       this.patch({ isMutating: false });
-      await this.selectDataset(datasetId);
+      await this.selectDataset(command.datasetId, command.versionId);
+    } catch (error) {
+      this.patch({ isMutating: false, error: toErrorMessage(error) });
+      throw error;
+    }
+  }
+
+  public async updateExample(command: import("../../application/tuning-datasets/contracts").UpdateExampleCommand): Promise<void> {
+    this.patch({ isMutating: true, error: undefined });
+    try {
+      await this.service.updateExample(command);
+      this.patch({ isMutating: false });
+      await this.selectDataset(command.datasetId, command.versionId);
     } catch (error) {
       this.patch({ isMutating: false, error: toErrorMessage(error) });
       throw error;
@@ -166,7 +235,39 @@ export class TuningDatasetStore {
     try {
       await this.service.deleteExample(datasetId, versionId, exampleId);
       this.patch({ isMutating: false });
-      await this.selectDataset(datasetId);
+      await this.selectDataset(datasetId, versionId);
+    } catch (error) {
+      this.patch({ isMutating: false, error: toErrorMessage(error) });
+      throw error;
+    }
+  }
+
+  public toggleExampleSelection(exampleId: string): void {
+    this.patch({
+      selectedExampleIds: this.state.selectedExampleIds.includes(exampleId)
+        ? this.state.selectedExampleIds.filter((id) => id !== exampleId)
+        : [...this.state.selectedExampleIds, exampleId],
+    });
+  }
+
+  public clearExampleSelection(): void {
+    this.patch({ selectedExampleIds: Object.freeze([]) });
+  }
+
+  public async bulkUpdateSelection(params: { status?: ExampleStatus; split?: SplitType; annotationNote?: string; updatedBy: string }): Promise<void> {
+    if (!this.state.selectedDatasetId || !this.state.selectedVersionId || this.state.selectedExampleIds.length === 0) {
+      return;
+    }
+    this.patch({ isMutating: true, error: undefined });
+    try {
+      await this.service.bulkUpdateExamples({
+        datasetId: this.state.selectedDatasetId,
+        versionId: this.state.selectedVersionId,
+        exampleIds: this.state.selectedExampleIds,
+        ...params,
+      });
+      this.patch({ isMutating: false, selectedExampleIds: Object.freeze([]) });
+      await this.selectDataset(this.state.selectedDatasetId, this.state.selectedVersionId);
     } catch (error) {
       this.patch({ isMutating: false, error: toErrorMessage(error) });
       throw error;
@@ -178,7 +279,7 @@ export class TuningDatasetStore {
     try {
       await this.service.reviewExample(datasetId, versionId, exampleId, status, reviewer, note);
       this.patch({ isMutating: false });
-      await this.selectDataset(datasetId);
+      await this.selectDataset(datasetId, versionId);
     } catch (error) {
       this.patch({ isMutating: false, error: toErrorMessage(error) });
       throw error;
@@ -190,8 +291,7 @@ export class TuningDatasetStore {
     try {
       await this.service.validateDatasetVersion(datasetId, versionId);
       this.patch({ isMutating: false });
-      await this.selectDataset(datasetId);
-      this.setActiveWorkspaceTab("validation");
+      await this.selectDataset(datasetId, versionId);
     } catch (error) {
       this.patch({ isMutating: false, error: toErrorMessage(error) });
       throw error;
@@ -203,20 +303,30 @@ export class TuningDatasetStore {
     try {
       await this.service.assignSplits(datasetId, versionId, actor);
       this.patch({ isMutating: false });
-      await this.selectDataset(datasetId);
-      this.setActiveWorkspaceTab("splits");
+      await this.selectDataset(datasetId, versionId);
     } catch (error) {
       this.patch({ isMutating: false, error: toErrorMessage(error) });
       throw error;
     }
   }
 
-  public async updateSplit(datasetId: string, versionId: string, exampleId: string, split: "train" | "validation" | "test", actor: string): Promise<void> {
+  public async updateSplit(datasetId: string, versionId: string, exampleId: string, split: SplitType, actor: string): Promise<void> {
     this.patch({ isMutating: true, error: undefined });
     try {
       await this.service.updateSplitAssignment(datasetId, versionId, exampleId, split, actor);
       this.patch({ isMutating: false });
-      await this.selectDataset(datasetId);
+      await this.selectDataset(datasetId, versionId);
+    } catch (error) {
+      this.patch({ isMutating: false, error: toErrorMessage(error) });
+      throw error;
+    }
+  }
+
+  public async moveWorkflowStage(datasetId: string, versionId: string, stage: DatasetWorkflowStage): Promise<void> {
+    this.patch({ isMutating: true, error: undefined });
+    try {
+      const workflow = await this.service.moveWorkflowStage(datasetId, versionId, stage);
+      this.patch({ isMutating: false, workflow, currentWorkflowStage: workflow.currentStage });
     } catch (error) {
       this.patch({ isMutating: false, error: toErrorMessage(error) });
       throw error;
@@ -228,21 +338,19 @@ export class TuningDatasetStore {
     try {
       await this.service.releaseDatasetVersion(datasetId, versionId, releaseNotes);
       this.patch({ isMutating: false });
-      await this.selectDataset(datasetId);
-      this.setActiveWorkspaceTab("versions");
+      await this.selectDataset(datasetId, versionId);
     } catch (error) {
       this.patch({ isMutating: false, error: toErrorMessage(error) });
       throw error;
     }
   }
 
-  public async exportVersion(datasetId: string, versionId: string, format: "canonical_json" | "canonical_jsonl" | "qa_jsonl"): Promise<DatasetExportArtifact> {
+  public async exportVersion(datasetId: string, versionId: string, format: ExportFormat): Promise<DatasetExportArtifact> {
     this.patch({ isMutating: true, error: undefined });
     try {
       const artifact = await this.service.exportDatasetVersion({ datasetId, versionId, format });
       this.patch({ isMutating: false });
-      await this.selectDataset(datasetId);
-      this.setActiveWorkspaceTab("exports");
+      await this.selectDataset(datasetId, versionId);
       return artifact;
     } catch (error) {
       this.patch({ isMutating: false, error: toErrorMessage(error) });
@@ -256,6 +364,7 @@ export class TuningDatasetStore {
       ...patch,
       datasets: patch.datasets ?? this.state.datasets,
       examples: patch.examples ?? this.state.examples,
+      selectedExampleIds: patch.selectedExampleIds ?? this.state.selectedExampleIds,
       sourceDocuments: patch.sourceDocuments ?? this.state.sourceDocuments,
       exports: patch.exports ?? this.state.exports,
       duplicates: patch.duplicates ?? this.state.duplicates,

@@ -19,6 +19,7 @@ interface DatasetRecord {
   readonly status: DatasetStatus;
   readonly tags: ReadonlyArray<string>;
   readonly latestVersionId?: string;
+  readonly selectedVersionId?: string;
   readonly createdBy: string;
   readonly createdAt: string;
   readonly updatedAt: string;
@@ -88,6 +89,7 @@ export class LocalStorageTuningDatasetRepository implements DatasetRepository {
       status: dataset.status,
       tags: dataset.tags,
       latestVersionId: dataset.latestVersionId,
+      selectedVersionId: dataset.selectedVersionId,
       createdBy: dataset.createdBy,
       createdAt: dataset.createdAt.toISOString(),
       updatedAt: dataset.updatedAt.toISOString(),
@@ -104,6 +106,7 @@ export class LocalStorageTuningDatasetRepository implements DatasetRepository {
       status: record.status,
       tags: record.tags,
       latestVersionId: record.latestVersionId,
+      selectedVersionId: record.selectedVersionId,
       createdBy: record.createdBy,
       createdAt: new Date(record.createdAt),
       updatedAt: new Date(record.updatedAt),

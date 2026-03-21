@@ -18,6 +18,14 @@ export const DATASET_STATUSES = Object.freeze([
 ] as const);
 export type DatasetStatus = (typeof DATASET_STATUSES)[number];
 
+export const DATASET_VERSION_KINDS = Object.freeze([
+  "initial_draft",
+  "successor_draft",
+  "branch_draft",
+  "released_snapshot",
+] as const);
+export type DatasetVersionKind = (typeof DATASET_VERSION_KINDS)[number];
+
 export const EXAMPLE_STATUSES = Object.freeze([
   "draft",
   "accepted",
@@ -32,6 +40,27 @@ export type SplitType = (typeof SPLIT_TYPES)[number];
 export const VALIDATION_SEVERITIES = Object.freeze(["error", "warning", "info"] as const);
 export type ValidationSeverity = (typeof VALIDATION_SEVERITIES)[number];
 
+export const DATASET_WORKFLOW_STAGES = Object.freeze([
+  "dataset_definition",
+  "source_ingestion",
+  "example_generation",
+  "review_editing",
+  "validation",
+  "split_assignment",
+  "release",
+  "export",
+] as const);
+export type DatasetWorkflowStage = (typeof DATASET_WORKFLOW_STAGES)[number];
+
+export const WORKFLOW_STAGE_STATUSES = Object.freeze(["pending", "current", "completed", "blocked"] as const);
+export type WorkflowStageStatus = (typeof WORKFLOW_STAGE_STATUSES)[number];
+
+export const SOURCE_INPUT_TYPES = Object.freeze(["manual_text", "uploaded_text", "uploaded_file"] as const);
+export type SourceInputType = (typeof SOURCE_INPUT_TYPES)[number];
+
+export const SOURCE_SEGMENT_KINDS = Object.freeze(["document", "paragraph", "sentence"] as const);
+export type SourceSegmentKind = (typeof SOURCE_SEGMENT_KINDS)[number];
+
 export const EXPORT_FORMATS = Object.freeze([
   "canonical_json",
   "canonical_jsonl",
@@ -43,6 +72,17 @@ export const EXPORT_FORMATS = Object.freeze([
 ] as const);
 export type ExportFormat = (typeof EXPORT_FORMATS)[number];
 
+export const CHAT_MESSAGE_ROLES = Object.freeze(["system", "user", "assistant"] as const);
+export type ChatMessageRole = (typeof CHAT_MESSAGE_ROLES)[number];
+
+export interface DatasetGenerationProvenance {
+  readonly provider: string;
+  readonly generatorId: string;
+  readonly generatorVersion: string;
+  readonly parameters: Readonly<Record<string, unknown>>;
+  readonly executedAt: Date;
+}
+
 export interface DatasetLineage {
   readonly sourceDocumentId?: string;
   readonly generatedFromExampleId?: string;
@@ -50,6 +90,7 @@ export interface DatasetLineage {
   readonly promptTemplateVersion?: string;
   readonly capturedAt: Date;
   readonly metadata?: Readonly<Record<string, unknown>>;
+  readonly generator?: DatasetGenerationProvenance;
 }
 
 export interface DatasetSplitAssignment {
@@ -73,6 +114,15 @@ export interface DatasetValidationIssue {
   readonly message: string;
   readonly exampleId?: string;
   readonly field?: string;
+  readonly stage?: DatasetWorkflowStage;
+}
+
+export interface DatasetReleaseReadiness {
+  readonly isReady: boolean;
+  readonly reviewReady: boolean;
+  readonly splitReady: boolean;
+  readonly exportReady: boolean;
+  readonly blockingReasons: ReadonlyArray<string>;
 }
 
 export interface DatasetValidationResult {
@@ -83,6 +133,7 @@ export interface DatasetValidationResult {
   readonly isValid: boolean;
   readonly blockingIssueCount: number;
   readonly warningCount: number;
+  readonly readiness: DatasetReleaseReadiness;
 }
 
 export interface DatasetExportArtifact {
@@ -112,6 +163,14 @@ export interface DatasetStatistics {
   readonly averageQuestionLength: number;
   readonly averageAnswerLength: number;
   readonly averageContextLength: number;
+  readonly averageMessageCount: number;
+}
+
+export interface DatasetExampleAnnotation {
+  readonly id: string;
+  readonly author: string;
+  readonly note: string;
+  readonly createdAt: Date;
 }
 
 export interface DatasetExample {
@@ -127,12 +186,12 @@ export interface DatasetExample {
   readonly updatedAt: Date;
   readonly lineage: DatasetLineage;
   readonly validationIssues: ReadonlyArray<DatasetValidationIssue>;
-  readonly annotations: ReadonlyArray<{
-    readonly id: string;
-    readonly author: string;
-    readonly note: string;
-    readonly createdAt: Date;
-  }>;
+  readonly annotations: ReadonlyArray<DatasetExampleAnnotation>;
+}
+
+export interface ChatCompletionMessage {
+  readonly role: ChatMessageRole;
+  readonly content: string;
 }
 
 export interface DatasetVersion {
@@ -140,6 +199,10 @@ export interface DatasetVersion {
   readonly datasetId: string;
   readonly versionNumber: number;
   readonly status: DatasetStatus;
+  readonly kind: DatasetVersionKind;
+  readonly parentVersionId?: string;
+  readonly sourceVersionId?: string;
+  readonly comparisonLabel?: string;
   readonly createdBy: string;
   readonly createdAt: Date;
   readonly updatedAt: Date;
@@ -151,6 +214,22 @@ export interface DatasetVersion {
   readonly isMutable: boolean;
 }
 
+export interface DatasetWorkflowStageState {
+  readonly stage: DatasetWorkflowStage;
+  readonly status: WorkflowStageStatus;
+}
+
+export interface DatasetWorkflowState {
+  readonly datasetId: string;
+  readonly versionId: string;
+  readonly currentStage: DatasetWorkflowStage;
+  readonly completedStages: ReadonlyArray<DatasetWorkflowStage>;
+  readonly stageStates: ReadonlyArray<DatasetWorkflowStageState>;
+  readonly progressPercent: number;
+  readonly lastVisitedStage: DatasetWorkflowStage;
+  readonly updatedAt: Date;
+}
+
 export interface Dataset {
   readonly id: string;
   readonly name: string;
@@ -159,10 +238,45 @@ export interface Dataset {
   readonly status: DatasetStatus;
   readonly tags: ReadonlyArray<string>;
   readonly latestVersionId?: string;
+  readonly selectedVersionId?: string;
   readonly createdBy: string;
   readonly createdAt: Date;
   readonly updatedAt: Date;
   readonly archivedAt?: Date;
+}
+
+export interface DatasetVersionComparison {
+  readonly versionId: string;
+  readonly comparedToVersionId?: string;
+  readonly derivedFromVersionId?: string;
+  readonly exampleDelta: number;
+  readonly sourceDocumentDelta: number;
+  readonly changedAt: Date;
+}
+
+export interface DatasetSourceSegment {
+  readonly id: string;
+  readonly sourceDocumentId: string;
+  readonly index: number;
+  readonly kind: SourceSegmentKind;
+  readonly text: string;
+  readonly checksum: string;
+}
+
+export interface DatasetSourceDocument {
+  readonly id: string;
+  readonly datasetId: string;
+  readonly versionId: string;
+  readonly name: string;
+  readonly content: string;
+  readonly normalizedContent: string;
+  readonly checksum: string;
+  readonly sourceType: SourceInputType;
+  readonly mediaType: string;
+  readonly createdBy: string;
+  readonly createdAt: Date;
+  readonly segments: ReadonlyArray<DatasetSourceSegment>;
+  readonly metadata?: Readonly<Record<string, unknown>>;
 }
 
 export interface DatasetFactory {
@@ -183,6 +297,10 @@ export interface DatasetFactory {
     readonly versionNumber: number;
     readonly createdBy: string;
     readonly createdAt?: Date;
+    readonly kind?: DatasetVersionKind;
+    readonly parentVersionId?: string;
+    readonly sourceVersionId?: string;
+    readonly comparisonLabel?: string;
   }): DatasetVersion;
 }
 
@@ -211,30 +329,14 @@ export interface DatasetVersionRepository {
     readonly status?: ExampleStatus;
     readonly split?: SplitType;
   }): Promise<ReadonlyArray<DatasetExample>>;
-  saveSourceDocument(document: {
-    readonly id: string;
-    readonly datasetId: string;
-    readonly versionId: string;
-    readonly name: string;
-    readonly content: string;
-    readonly createdBy: string;
-    readonly createdAt: Date;
-    readonly metadata?: Readonly<Record<string, unknown>>;
-  }): Promise<void>;
-  listSourceDocuments(datasetId: string, versionId: string): Promise<ReadonlyArray<{
-    readonly id: string;
-    readonly datasetId: string;
-    readonly versionId: string;
-    readonly name: string;
-    readonly content: string;
-    readonly createdBy: string;
-    readonly createdAt: Date;
-    readonly metadata?: Readonly<Record<string, unknown>>;
-  }>>;
+  saveSourceDocument(document: DatasetSourceDocument): Promise<void>;
+  listSourceDocuments(datasetId: string, versionId: string): Promise<ReadonlyArray<DatasetSourceDocument>>;
   saveValidationResult(result: DatasetValidationResult): Promise<DatasetValidationResult>;
   loadValidationResult(datasetId: string, versionId: string): Promise<DatasetValidationResult | undefined>;
   saveExportArtifact(artifact: DatasetExportArtifact): Promise<DatasetExportArtifact>;
   listExportArtifacts(datasetId: string, versionId: string): Promise<ReadonlyArray<DatasetExportArtifact>>;
+  saveWorkflowState(workflow: DatasetWorkflowState): Promise<DatasetWorkflowState>;
+  loadWorkflowState(datasetId: string, versionId: string): Promise<DatasetWorkflowState | undefined>;
 }
 
 export interface DatasetValidationService {
@@ -242,6 +344,7 @@ export interface DatasetValidationService {
     readonly dataset: Dataset;
     readonly version: DatasetVersion;
     readonly examples: ReadonlyArray<DatasetExample>;
+    readonly sourceDocuments: ReadonlyArray<DatasetSourceDocument>;
   }): DatasetValidationResult;
 }
 
@@ -249,56 +352,98 @@ export interface DatasetSplitService {
   assign(examples: ReadonlyArray<DatasetExample>, actor: string): ReadonlyArray<DatasetExample>;
 }
 
+export interface DatasetReleasePolicy {
+  evaluate(params: {
+    readonly dataset: Dataset;
+    readonly version: DatasetVersion;
+    readonly examples: ReadonlyArray<DatasetExample>;
+    readonly validation?: DatasetValidationResult;
+  }): DatasetReleaseReadiness;
+}
+
+export interface DatasetWorkflowService {
+  createInitial(datasetId: string, versionId: string): DatasetWorkflowState;
+  transition(workflow: DatasetWorkflowState, nextStage: DatasetWorkflowStage): DatasetWorkflowState;
+  reconcile(params: {
+    readonly datasetId: string;
+    readonly versionId: string;
+    readonly current?: DatasetWorkflowState;
+    readonly hasDefinition: boolean;
+    readonly sourceCount: number;
+    readonly exampleCount: number;
+    readonly validation?: DatasetValidationResult;
+    readonly version: DatasetVersion;
+    readonly exportCount: number;
+  }): DatasetWorkflowState;
+}
+
 export interface DatasetExportService {
   exportVersion(params: {
     readonly dataset: Dataset;
     readonly version: DatasetVersion;
     readonly examples: ReadonlyArray<DatasetExample>;
-    readonly sourceDocuments: ReadonlyArray<{
-      readonly id: string;
-      readonly name: string;
-      readonly content: string;
-    }>;
+    readonly sourceDocuments: ReadonlyArray<DatasetSourceDocument>;
     readonly format: ExportFormat;
     readonly manifest: { readonly id: string; readonly createdAt: Date; readonly checksum: string; readonly metadata: Readonly<Record<string, unknown>> };
   }): DatasetExportArtifact;
 }
 
+export interface SourceImportDocumentInput {
+  readonly id?: string;
+  readonly name: string;
+  readonly content: string;
+  readonly sourceType?: SourceInputType;
+  readonly mediaType?: string;
+  readonly metadata?: Readonly<Record<string, unknown>>;
+}
+
+export interface SourceImportRequest {
+  readonly datasetId: string;
+  readonly versionId: string;
+  readonly createdBy: string;
+  readonly documents: ReadonlyArray<SourceImportDocumentInput>;
+}
+
+export interface SourceImportResult {
+  readonly documents: ReadonlyArray<DatasetSourceDocument>;
+  readonly importedCount: number;
+  readonly duplicateCount: number;
+}
+
 export interface DatasetImportService {
-  importSourceDocuments(params: {
-    readonly datasetId: string;
-    readonly versionId: string;
-    readonly createdBy: string;
-    readonly documents: ReadonlyArray<{
-      readonly id: string;
-      readonly name: string;
-      readonly content: string;
-      readonly metadata?: Readonly<Record<string, unknown>>;
-    }>;
-  }): ReadonlyArray<{
-    readonly id: string;
-    readonly datasetId: string;
-    readonly versionId: string;
-    readonly name: string;
-    readonly content: string;
-    readonly createdBy: string;
-    readonly createdAt: Date;
-    readonly metadata?: Readonly<Record<string, unknown>>;
-  }>;
+  importSourceDocuments(params: SourceImportRequest): SourceImportResult;
+}
+
+export interface DatasetGenerationConfiguration {
+  readonly strategy: string;
+  readonly maxExamplesPerSource?: number;
+  readonly maxSegmentsPerSource?: number;
+}
+
+export interface DatasetGenerationRequest {
+  readonly datasetId: string;
+  readonly versionId: string;
+  readonly taskType: DatasetTaskType;
+  readonly createdBy: string;
+  readonly sourceDocuments: ReadonlyArray<DatasetSourceDocument>;
+  readonly existingExamples: ReadonlyArray<DatasetExample>;
+  readonly configuration?: DatasetGenerationConfiguration;
+}
+
+export interface DatasetGenerationResult {
+  readonly batchId: string;
+  readonly datasetId: string;
+  readonly versionId: string;
+  readonly taskType: DatasetTaskType;
+  readonly generatedAt: Date;
+  readonly examples: ReadonlyArray<DatasetExample>;
+  readonly provenance: DatasetGenerationProvenance;
+  readonly generatedCount: number;
+  readonly skippedCount: number;
 }
 
 export interface DatasetGenerationService {
-  generateQuestionAnsweringExamples(params: {
-    readonly datasetId: string;
-    readonly versionId: string;
-    readonly createdBy: string;
-    readonly sourceDocuments: ReadonlyArray<{
-      readonly id: string;
-      readonly name: string;
-      readonly content: string;
-    }>;
-    readonly existingExamples: ReadonlyArray<DatasetExample>;
-  }): ReadonlyArray<DatasetExample>;
+  generate(request: DatasetGenerationRequest): DatasetGenerationResult;
 }
 
 export interface DatasetReviewPolicy {
