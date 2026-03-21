@@ -1,4 +1,3 @@
-import type { IPythonRuntimeManager, PythonRuntimeManagerStatus, PythonRuntimeStatus } from "../../application/ports/interfaces/IPythonRuntimeManager";
 import type { IRuntimeEventStore } from "../../application/ports/interfaces/IRuntimeEventStore";
 import { RuntimeEventSources, type RuntimeEvent } from "../../application/runtime/RuntimeEvent";
 import type {
@@ -14,6 +13,15 @@ import {
   type ManagedServiceDefinitionInput,
 } from "../../application/services/ManagedServiceDefinition";
 import type { IManagedServiceDefinitionRepository } from "../../application/services/interfaces/IManagedServiceDefinitionRepository";
+import type { IManagedServiceManager } from "../../application/services/interfaces/IManagedServiceManager";
+import type { IManagedServiceStatusRefresher } from "../../application/services/interfaces/IManagedServiceStatusRefresher";
+import type { IManagedServiceSupervisor } from "../../application/services/interfaces/IManagedServiceSupervisor";
+import {
+  ManagedServiceOwnership,
+  ManagedServiceStates,
+  type ManagedServiceState,
+  type ManagedServiceStatus,
+} from "../../application/services/interfaces/ManagedServiceTypes";
 
 export interface ManagedServiceRecord {
   readonly id: string;
@@ -23,8 +31,8 @@ export interface ManagedServiceRecord {
   readonly source: ManagedServiceDefinition["source"];
   readonly startPolicy: ManagedServiceDefinition["autoStartPolicy"];
   readonly restartPolicy: ManagedServiceDefinition["restartPolicy"];
-  readonly state: PythonRuntimeStatus;
-  readonly ownership: PythonRuntimeManagerStatus["owner"];
+  readonly state: ManagedServiceState;
+  readonly ownership: ManagedServiceStatus["ownership"];
   readonly isAvailable: boolean;
   readonly transport: ManagedServiceDefinition["transport"];
   readonly baseUrl?: string;
@@ -44,7 +52,8 @@ export interface ManagedServiceRecord {
 }
 
 export interface ManagedServicesServiceOptions {
-  readonly pythonRuntimeManager: IPythonRuntimeManager;
+  readonly serviceManager: IManagedServiceManager;
+  readonly serviceSupervisor?: IManagedServiceSupervisor;
   readonly runtimeEventStore: IRuntimeEventStore;
   readonly builtinDefinitions: ReadonlyArray<ManagedServiceDefinition>;
   readonly definitionRepository: IManagedServiceDefinitionRepository;
@@ -52,14 +61,16 @@ export interface ManagedServicesServiceOptions {
 }
 
 export class ManagedServicesService {
-  private readonly pythonRuntimeManager: IPythonRuntimeManager;
+  private readonly serviceManager: IManagedServiceManager;
+  private readonly serviceSupervisor?: IManagedServiceSupervisor;
   private readonly runtimeEventStore: IRuntimeEventStore;
   private readonly builtinDefinitions = new Map<string, ManagedServiceDefinition>();
   private readonly definitionRepository: IManagedServiceDefinitionRepository;
   private readonly fetchImplementation: typeof fetch;
 
   constructor(options: ManagedServicesServiceOptions) {
-    this.pythonRuntimeManager = options.pythonRuntimeManager;
+    this.serviceManager = options.serviceManager;
+    this.serviceSupervisor = options.serviceSupervisor;
     this.runtimeEventStore = options.runtimeEventStore;
     this.definitionRepository = options.definitionRepository;
     this.fetchImplementation = options.fetchImplementation ?? fetch;
@@ -70,7 +81,7 @@ export class ManagedServicesService {
   }
 
   public async listServices(): Promise<ReadonlyArray<ManagedServiceRecord>> {
-    await this.refreshPythonRuntime();
+    await this.refreshManagedServices();
     return this.getServices();
   }
 
@@ -82,8 +93,8 @@ export class ManagedServicesService {
 
   public async refreshService(serviceId: string): Promise<ManagedServiceRecord> {
     const definition = await this.requireDefinition(serviceId);
-    if (definition.serviceId === this.getPythonRuntimeDefinition().serviceId) {
-      await this.refreshPythonRuntime();
+    if (this.isRegisteredManagedService(definition.serviceId)) {
+      await this.refreshManagedService(definition.serviceId);
     }
     return this.buildRecord(definition);
   }
@@ -148,8 +159,8 @@ export class ManagedServicesService {
   }
 
   public async startService(serviceId: string): Promise<ManagedServiceRecord> {
-    if (serviceId === this.getPythonRuntimeDefinition().serviceId) {
-      await this.pythonRuntimeManager.ensureRuntimeAvailability();
+    if (this.isRegisteredManagedService(serviceId)) {
+      await this.requireServiceSupervisor().start(serviceId);
       return this.getService(serviceId);
     }
 
@@ -157,23 +168,23 @@ export class ManagedServicesService {
   }
 
   public async stopService(serviceId: string): Promise<ManagedServiceRecord> {
-    if (serviceId === this.getPythonRuntimeDefinition().serviceId) {
-      await this.pythonRuntimeManager.stopManagedRuntime();
+    if (this.isRegisteredManagedService(serviceId)) {
+      await this.requireServiceSupervisor().stop(serviceId);
       return this.getService(serviceId);
     }
 
     const definition = await this.requireDefinition(serviceId);
     return this.buildCustomRecord(definition, {
-      status: "stopped",
+      state: ManagedServiceStates.stopped,
       isAvailable: false,
-      owner: "none",
+      ownership: ManagedServiceOwnership.none,
       detail: `${definition.displayName} stop must be handled outside the browser runtime.`,
     });
   }
 
   public async restartService(serviceId: string): Promise<ManagedServiceRecord> {
-    if (serviceId === this.getPythonRuntimeDefinition().serviceId) {
-      await this.pythonRuntimeManager.restartRuntime();
+    if (this.isRegisteredManagedService(serviceId)) {
+      await this.requireServiceSupervisor().restart(serviceId);
       return this.getService(serviceId);
     }
 
@@ -181,8 +192,8 @@ export class ManagedServicesService {
   }
 
   public async ensureRunning(serviceId: string): Promise<ManagedServiceRecord> {
-    if (serviceId === this.getPythonRuntimeDefinition().serviceId) {
-      await this.pythonRuntimeManager.ensureRuntimeAvailability();
+    if (this.isRegisteredManagedService(serviceId)) {
+      await this.requireServiceSupervisor().ensureRunning(serviceId);
       return this.getService(serviceId);
     }
 
@@ -204,6 +215,7 @@ export class ManagedServicesService {
     const fallbackSource = service.serviceId === this.getPythonRuntimeDefinition().serviceId
       ? ManagedServiceSources.builtin
       : ManagedServiceSources.custom;
+    const mappedState = mapSupervisorState(service.state);
 
     return Object.freeze({
       id: service.serviceId,
@@ -213,7 +225,7 @@ export class ManagedServicesService {
       source: definition?.source ?? fallbackSource,
       startPolicy: definition?.autoStartPolicy ?? "manual",
       restartPolicy: definition?.restartPolicy ?? "on-failure",
-      state: service.state,
+      state: mappedState,
       ownership: service.ownership,
       isAvailable: service.state === "healthy",
       transport: definition?.transport ?? "http",
@@ -228,7 +240,7 @@ export class ManagedServicesService {
       canRemove: definition?.source !== ManagedServiceSources.builtin,
       canManageLifecycle: true,
       lastCheckedAt: service.lastHealthCheckAt ?? service.startedAt ?? new Date().toISOString(),
-      lastErrorDetail: isServiceInErrorState(service.state) ? service.detail : undefined,
+      lastErrorDetail: isServiceInErrorState(mappedState) ? service.detail : undefined,
       detail: service.detail,
       recentLogs: Object.freeze(service.recentLogs.map((entry) => this.toRuntimeEvent(service.serviceId, entry))),
     });
@@ -254,16 +266,46 @@ export class ManagedServicesService {
     return definition;
   }
 
+  private isRegisteredManagedService(serviceId: string): boolean {
+    return this.serviceManager.listServices().some((service) => service.id === serviceId);
+  }
+
+  private async refreshManagedService(serviceId: string): Promise<void> {
+    if (!hasStatusRefresher(this.serviceManager)) {
+      return;
+    }
+
+    await this.serviceManager.refreshServiceStatus(serviceId);
+  }
+
+  private requireServiceSupervisor(): IManagedServiceSupervisor {
+    if (!this.serviceSupervisor) {
+      throw new Error("Managed service lifecycle supervision is not configured.");
+    }
+
+    return this.serviceSupervisor;
+  }
+
   private async buildRecord(definition: ManagedServiceDefinition): Promise<ManagedServiceRecord> {
-    if (definition.serviceId === this.getPythonRuntimeDefinition().serviceId) {
-      return this.buildPythonRuntimeRecord(definition, this.pythonRuntimeManager.getStatus());
+    if (this.isRegisteredManagedService(definition.serviceId)) {
+      return this.buildManagedRecord(
+        definition,
+        this.serviceManager.getServiceStatus(definition.serviceId) ?? createUnavailableManagedServiceStatus(definition),
+      );
     }
 
     return this.buildCustomRecord(definition);
   }
 
-  private async refreshPythonRuntime(): Promise<void> {
-    await this.pythonRuntimeManager.checkAvailability();
+  private async refreshManagedServices(): Promise<void> {
+    const manager = this.serviceManager;
+    if (!hasStatusRefresher(manager)) {
+      return;
+    }
+
+    await Promise.all(
+      manager.listServices().map((service) => manager.refreshServiceStatus(service.id)),
+    );
   }
 
   private getPythonRuntimeDefinition(): ManagedServiceDefinition {
@@ -274,12 +316,12 @@ export class ManagedServicesService {
     return definition;
   }
 
-  private buildPythonRuntimeRecord(
+  private buildManagedRecord(
     definition: ManagedServiceDefinition,
-    status: PythonRuntimeManagerStatus,
+    status: ManagedServiceStatus,
   ): ManagedServiceRecord {
-    const lastErrorDetail = isServiceInErrorState(status.status)
-      ? status.detail ?? "Runtime is not currently healthy."
+    const lastErrorDetail = isServiceInErrorState(status.state)
+      ? status.detail ?? "Service is not currently healthy."
       : undefined;
 
     return Object.freeze({
@@ -290,8 +332,8 @@ export class ManagedServicesService {
       source: definition.source ?? ManagedServiceSources.builtin,
       startPolicy: definition.autoStartPolicy,
       restartPolicy: definition.restartPolicy,
-      state: status.status,
-      ownership: status.owner,
+      state: status.state,
+      ownership: status.ownership,
       isAvailable: status.isAvailable,
       transport: definition.transport,
       baseUrl: definition.baseUrl,
@@ -302,22 +344,22 @@ export class ManagedServicesService {
       environmentVariables: definition.environmentVariables,
       startupTimeoutMs: definition.startupTimeoutMs,
       canEdit: true,
-      canRemove: false,
+      canRemove: definition.source !== ManagedServiceSources.builtin,
       canManageLifecycle: true,
       lastCheckedAt: status.lastUpdatedAt,
       lastErrorDetail,
       detail: status.detail,
-      recentLogs: Object.freeze(this.getRuntimeEvents()),
+      recentLogs: Object.freeze(this.getRuntimeEvents(definition.serviceId)),
     });
   }
 
   private async buildCustomRecord(
     definition: ManagedServiceDefinition,
-    overrideStatus?: Partial<PythonRuntimeManagerStatus>,
+    overrideStatus?: Partial<ManagedServiceStatus>,
   ): Promise<ManagedServiceRecord> {
     const healthUrl = getManagedServiceHealthUrl(definition);
     const probe = overrideStatus ?? await this.probeCustomService(definition, healthUrl);
-    const state = probe.status ?? "unavailable";
+    const state = probe.state ?? ManagedServiceStates.unavailable;
     const detail = probe.detail ?? (healthUrl
       ? `${definition.displayName} health probe did not succeed.`
       : "No health probe is configured for this service yet.");
@@ -331,7 +373,7 @@ export class ManagedServicesService {
       startPolicy: definition.autoStartPolicy,
       restartPolicy: definition.restartPolicy,
       state,
-      ownership: probe.owner ?? (probe.isAvailable ? "external" : "none"),
+      ownership: probe.ownership ?? (probe.isAvailable ? ManagedServiceOwnership.external : ManagedServiceOwnership.none),
       isAvailable: probe.isAvailable ?? false,
       transport: definition.transport,
       baseUrl: definition.baseUrl,
@@ -354,12 +396,12 @@ export class ManagedServicesService {
   private async probeCustomService(
     definition: ManagedServiceDefinition,
     healthUrl: string | undefined,
-  ): Promise<Partial<PythonRuntimeManagerStatus>> {
+  ): Promise<Partial<ManagedServiceStatus>> {
     if (!healthUrl) {
       return {
-        status: "unavailable",
+        state: ManagedServiceStates.unavailable,
         isAvailable: false,
-        owner: "none",
+        ownership: ManagedServiceOwnership.none,
         lastUpdatedAt: new Date().toISOString(),
         detail: definition.command
           ? `Run '${[definition.command, ...definition.args].join(" ")}' from '${definition.workingDirectory ?? "."}' and then refresh health.`
@@ -371,36 +413,39 @@ export class ManagedServicesService {
       const response = await this.fetchImplementation(healthUrl, { method: "GET" });
       if (response.ok) {
         return {
-          status: "healthy",
+          state: ManagedServiceStates.running,
           isAvailable: true,
-          owner: "external",
+          ownership: ManagedServiceOwnership.external,
           lastUpdatedAt: new Date().toISOString(),
           detail: `${definition.displayName} responded successfully at ${healthUrl}.`,
         };
       }
 
       return {
-        status: "unhealthy",
+        state: ManagedServiceStates.degraded,
         isAvailable: false,
-        owner: "none",
+        ownership: ManagedServiceOwnership.none,
         lastUpdatedAt: new Date().toISOString(),
         detail: `${definition.displayName} responded with HTTP ${response.status} at ${healthUrl}.`,
       };
     } catch {
       return {
-        status: "unavailable",
+        state: ManagedServiceStates.unavailable,
         isAvailable: false,
-        owner: "none",
+        ownership: ManagedServiceOwnership.none,
         lastUpdatedAt: new Date().toISOString(),
         detail: `${definition.displayName} is not reachable at ${healthUrl}.`,
       };
     }
   }
 
-  private getRuntimeEvents(): ReadonlyArray<RuntimeEvent> {
+  private getRuntimeEvents(serviceId: string): ReadonlyArray<RuntimeEvent> {
     return this.runtimeEventStore
       .list()
-      .filter((event) => event.source === RuntimeEventSources.pythonRuntime)
+      .filter((event) =>
+        event.details?.serviceId === serviceId
+        || (serviceId === this.getPythonRuntimeDefinition().serviceId && event.source === RuntimeEventSources.pythonRuntime),
+      )
       .slice(-40);
   }
 
@@ -419,6 +464,47 @@ export class ManagedServicesService {
   }
 }
 
+function hasStatusRefresher(
+  manager: IManagedServiceManager,
+): manager is IManagedServiceManager & IManagedServiceStatusRefresher {
+  return typeof (manager as Partial<IManagedServiceStatusRefresher>).refreshServiceStatus === "function";
+}
+
+function createUnavailableManagedServiceStatus(definition: ManagedServiceDefinition): ManagedServiceStatus {
+  return {
+    serviceId: definition.serviceId,
+    kind: definition.kind,
+    state: definition.autoStartPolicy === "disabled" ? ManagedServiceStates.disabled : ManagedServiceStates.unavailable,
+    isAvailable: false,
+    ownership: ManagedServiceOwnership.none,
+    startPolicy: definition.autoStartPolicy,
+    lastUpdatedAt: new Date().toISOString(),
+    detail: definition.autoStartPolicy === "disabled"
+      ? `${definition.displayName} is disabled in settings.`
+      : `${definition.displayName} is not connected.`,
+  };
+}
+
+function mapSupervisorState(state: ManagedSupervisorServiceRecord["state"]): ManagedServiceState {
+  switch (state) {
+    case "healthy":
+      return ManagedServiceStates.running;
+    case "unhealthy":
+      return ManagedServiceStates.degraded;
+    case "starting":
+      return ManagedServiceStates.starting;
+    case "failed":
+      return ManagedServiceStates.failed;
+    case "stopping":
+      return ManagedServiceStates.stopping;
+    case "stopped":
+      return ManagedServiceStates.stopped;
+    case "unavailable":
+    default:
+      return ManagedServiceStates.unavailable;
+  }
+}
+
 function summarizeEndpoints(definition: ManagedServiceDefinition): string | undefined {
   const healthUrl = getManagedServiceHealthUrl(definition);
   if (healthUrl) {
@@ -429,8 +515,8 @@ function summarizeEndpoints(definition: ManagedServiceDefinition): string | unde
   return baseUrl || undefined;
 }
 
-function isServiceInErrorState(status: PythonRuntimeManagerStatus["status"]): boolean {
-  return status === "failed" || status === "unhealthy" || status === "unavailable";
+function isServiceInErrorState(status: ManagedServiceRecord["state"]): boolean {
+  return status === "failed" || status === "degraded" || status === "unavailable";
 }
 
 function mapSupervisorLogLevelToRuntimeSeverity(

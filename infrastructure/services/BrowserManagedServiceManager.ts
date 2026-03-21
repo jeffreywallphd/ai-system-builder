@@ -267,6 +267,9 @@ export class BrowserManagedServiceManager implements IManagedServiceManager, IMa
         source: registration.runtimeEventSource ?? RuntimeEventSources.app,
         severity: level === "warning" ? "info" : level,
         message,
+        details: {
+          serviceId,
+        },
       });
     }
   }

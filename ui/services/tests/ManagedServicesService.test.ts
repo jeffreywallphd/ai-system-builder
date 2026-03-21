@@ -9,7 +9,12 @@ import {
 } from "../../../application/services/ManagedServiceDefinition";
 import { createPythonRuntimeServiceDefinition } from "../../../infrastructure/python/runtime/PythonRuntimeServiceDefinition";
 import { PythonRuntimeConfig } from "../../../infrastructure/config/PythonRuntimeConfig";
-import { ManagedServiceKinds, ManagedServiceStartPolicies } from "../../../application/services/interfaces/ManagedServiceTypes";
+import {
+  ManagedServiceKinds,
+  ManagedServiceOwnership,
+  ManagedServiceStartPolicies,
+  ManagedServiceStates,
+} from "../../../application/services/interfaces/ManagedServiceTypes";
 import { ManagedServicesService } from "../ManagedServicesService";
 
 function createRepository(initialDefinitions: ReadonlyArray<any> = []) {
@@ -30,29 +35,41 @@ function createRepository(initialDefinitions: ReadonlyArray<any> = []) {
 
 describe("ManagedServicesService", () => {
   it("lists built-in and custom service metadata, health, and recent logs while delegating lifecycle actions", async () => {
-    const checkAvailability = mock(async () => true);
-    const ensureRuntimeAvailability = mock(async () => ({
-      status: "healthy",
+    const pythonDefinition = createPythonRuntimeServiceDefinition(new PythonRuntimeConfig({
+      mode: "managed-local",
+      baseUrl: "http://127.0.0.1:8000",
+    }));
+    let currentStatus: any = {
+      serviceId: pythonDefinition.serviceId,
+      kind: pythonDefinition.kind,
+      state: ManagedServiceStates.running,
       isAvailable: true,
-      owner: "managed",
+      ownership: ManagedServiceOwnership.managed,
+      startPolicy: pythonDefinition.autoStartPolicy,
       lastUpdatedAt: "2026-03-20T10:15:00.000Z",
       detail: "Runtime is healthy.",
-    }));
-    const restartRuntime = mock(async () => ({
-      status: "healthy",
-      isAvailable: true,
-      owner: "managed",
-      lastUpdatedAt: "2026-03-20T10:16:00.000Z",
-      detail: "Runtime restarted.",
-    }));
-    const stopManagedRuntime = mock(async () => undefined);
-    const getStatus = mock(() => ({
-      status: "healthy",
-      isAvailable: true,
-      owner: "managed",
-      lastUpdatedAt: "2026-03-20T10:15:00.000Z",
-      detail: "Runtime is healthy.",
-    }));
+    } as const;
+    const refreshServiceStatus = mock(async () => currentStatus);
+    const start = mock(async () => currentStatus);
+    const restart = mock(async () => {
+      currentStatus = {
+        ...currentStatus,
+        lastUpdatedAt: "2026-03-20T10:16:00.000Z",
+        detail: "Runtime restarted.",
+      };
+      return currentStatus;
+    });
+    const stop = mock(async () => {
+      currentStatus = {
+        ...currentStatus,
+        state: ManagedServiceStates.stopped,
+        isAvailable: false,
+        ownership: ManagedServiceOwnership.none,
+        detail: "Runtime stopped.",
+      };
+      return currentStatus;
+    });
+    const ensureRunning = mock(async () => currentStatus);
     const runtimeEventStore = new RuntimeEventBuffer({
       initialEvents: [
         createRuntimeEvent({
@@ -83,18 +100,21 @@ describe("ManagedServicesService", () => {
     ]);
 
     const service = new ManagedServicesService({
-      pythonRuntimeManager: {
-        checkAvailability,
-        ensureRuntimeAvailability,
-        restartRuntime,
-        getStatus,
-        stopManagedRuntime,
-      },
+      serviceManager: {
+        listServices: () => ([{
+          id: pythonDefinition.serviceId,
+          kind: pythonDefinition.kind,
+          name: pythonDefinition.displayName,
+          startPolicy: pythonDefinition.autoStartPolicy,
+        }]),
+        getServiceStatus: () => currentStatus,
+        subscribeToStatus: () => () => undefined,
+        subscribeToLogs: () => () => undefined,
+        refreshServiceStatus,
+      } as any,
+      serviceSupervisor: { start, stop, restart, ensureRunning },
       runtimeEventStore,
-      builtinDefinitions: [createPythonRuntimeServiceDefinition(new PythonRuntimeConfig({
-        mode: "managed-local",
-        baseUrl: "http://127.0.0.1:8000",
-      }))],
+      builtinDefinitions: [pythonDefinition],
       definitionRepository: repository as any,
       fetchImplementation: mock(async (url: string) => ({ ok: url.includes("11434"), status: 200 })) as any,
     });
@@ -106,38 +126,100 @@ describe("ManagedServicesService", () => {
     await service.stopService("python-runtime");
     await service.ensureRunning("python-runtime");
 
-    expect(checkAvailability).toHaveBeenCalled();
+    expect(refreshServiceStatus).toHaveBeenCalled();
     expect(services).toHaveLength(2);
     expect(services[0]?.endpointSummary).toBe("http://127.0.0.1:8000/health");
     expect(services[0]?.ownership).toBe("managed");
+    expect(services[0]?.state).toBe("running");
     expect(services[0]?.recentLogs.map((event) => event.message)).toEqual([
       "Supervisor started python-runtime.",
       "stderr: trace line",
     ]);
     expect(services[1]?.endpointSummary).toBe("http://127.0.0.1:11434/health");
-    expect(refreshedCustom.state).toBe("healthy");
+    expect(refreshedCustom.state).toBe("running");
     expect(refreshedCustom.canManageLifecycle).toBeFalse();
-    expect(started.state).toBe("healthy");
-    expect(ensureRuntimeAvailability).toHaveBeenCalledTimes(2);
-    expect(restartRuntime).toHaveBeenCalledTimes(1);
-    expect(stopManagedRuntime).toHaveBeenCalledTimes(1);
+    expect(started.state).toBe("running");
+    expect(ensureRunning).toHaveBeenCalledTimes(1);
+    expect(restart).toHaveBeenCalledTimes(1);
+    expect(stop).toHaveBeenCalledTimes(1);
+    expect(start).toHaveBeenCalledTimes(1);
   });
 
   it("supports custom-service CRUD while protecting built-in services", async () => {
     const repository = createRepository();
+    const pythonDefinition = createPythonRuntimeServiceDefinition(new PythonRuntimeConfig({
+      mode: "managed-local",
+      baseUrl: "http://127.0.0.1:8000",
+    }));
     const service = new ManagedServicesService({
-      pythonRuntimeManager: {
-        checkAvailability: async () => true,
-        ensureRuntimeAvailability: async () => ({ status: "healthy", isAvailable: true, owner: "managed", lastUpdatedAt: "2026-03-20T10:15:00.000Z" }),
-        restartRuntime: async () => ({ status: "healthy", isAvailable: true, owner: "managed", lastUpdatedAt: "2026-03-20T10:15:00.000Z" }),
-        getStatus: () => ({ status: "healthy", isAvailable: true, owner: "managed", lastUpdatedAt: "2026-03-20T10:15:00.000Z" }),
-        stopManagedRuntime: async () => undefined,
+      serviceManager: {
+        listServices: () => ([{
+          id: pythonDefinition.serviceId,
+          kind: pythonDefinition.kind,
+          name: pythonDefinition.displayName,
+          startPolicy: pythonDefinition.autoStartPolicy,
+        }]),
+        getServiceStatus: () => ({
+          serviceId: pythonDefinition.serviceId,
+          kind: pythonDefinition.kind,
+          state: ManagedServiceStates.running,
+          isAvailable: true,
+          ownership: ManagedServiceOwnership.managed,
+          startPolicy: pythonDefinition.autoStartPolicy,
+          lastUpdatedAt: "2026-03-20T10:15:00.000Z",
+        }),
+        subscribeToStatus: () => () => undefined,
+        subscribeToLogs: () => () => undefined,
+        refreshServiceStatus: async () => ({
+          serviceId: pythonDefinition.serviceId,
+          kind: pythonDefinition.kind,
+          state: ManagedServiceStates.running,
+          isAvailable: true,
+          ownership: ManagedServiceOwnership.managed,
+          startPolicy: pythonDefinition.autoStartPolicy,
+          lastUpdatedAt: "2026-03-20T10:15:00.000Z",
+        }),
+      } as any,
+      serviceSupervisor: {
+        start: async () => ({
+          serviceId: pythonDefinition.serviceId,
+          kind: pythonDefinition.kind,
+          state: ManagedServiceStates.running,
+          isAvailable: true,
+          ownership: ManagedServiceOwnership.managed,
+          startPolicy: pythonDefinition.autoStartPolicy,
+          lastUpdatedAt: "2026-03-20T10:15:00.000Z",
+        }),
+        stop: async () => ({
+          serviceId: pythonDefinition.serviceId,
+          kind: pythonDefinition.kind,
+          state: ManagedServiceStates.stopped,
+          isAvailable: false,
+          ownership: ManagedServiceOwnership.none,
+          startPolicy: pythonDefinition.autoStartPolicy,
+          lastUpdatedAt: "2026-03-20T10:15:00.000Z",
+        }),
+        restart: async () => ({
+          serviceId: pythonDefinition.serviceId,
+          kind: pythonDefinition.kind,
+          state: ManagedServiceStates.running,
+          isAvailable: true,
+          ownership: ManagedServiceOwnership.managed,
+          startPolicy: pythonDefinition.autoStartPolicy,
+          lastUpdatedAt: "2026-03-20T10:15:00.000Z",
+        }),
+        ensureRunning: async () => ({
+          serviceId: pythonDefinition.serviceId,
+          kind: pythonDefinition.kind,
+          state: ManagedServiceStates.running,
+          isAvailable: true,
+          ownership: ManagedServiceOwnership.managed,
+          startPolicy: pythonDefinition.autoStartPolicy,
+          lastUpdatedAt: "2026-03-20T10:15:00.000Z",
+        }),
       },
       runtimeEventStore: new RuntimeEventBuffer({ capacity: 5 }),
-      builtinDefinitions: [createPythonRuntimeServiceDefinition(new PythonRuntimeConfig({
-        mode: "managed-local",
-        baseUrl: "http://127.0.0.1:8000",
-      }))],
+      builtinDefinitions: [pythonDefinition],
       definitionRepository: repository as any,
       fetchImplementation: mock(async () => ({ ok: true, status: 200 })) as any,
     });
