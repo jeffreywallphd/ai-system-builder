@@ -34,10 +34,11 @@ export class InterpretedWorkflowExecutionStrategy implements IWorkflowExecutionS
 
   public getDescriptor(): IWorkflowExecutionStrategyDescriptor {
     return {
-      id: `infra-interpreted-${this.runtime}`,
+      id: `infra-scaffold-${this.runtime}`,
       runtime: this.runtime,
       mode: "hybrid",
       supportsPartialDelegation: true,
+      defaultProvenance: "scaffolded",
     };
   }
 
@@ -54,13 +55,20 @@ export class InterpretedWorkflowExecutionStrategy implements IWorkflowExecutionS
   ): Promise<IWorkflowExecutionResult> {
     const executionId = `${this.runtime}-${input.workflow.id}`;
     const outputStore = this.outputStoreFactory();
+    const nodeProvenance: Record<string, NonNullable<IWorkflowExecutionResult["provenance"]>["nodeProvenance"][string]> = {};
 
     onEvent?.(
       new WorkflowExecutionEvent({
         executionId,
         kind: "workflow-started",
         status: "running",
-        message: `Interpreted execution started for runtime '${this.runtime}'.`,
+        message: `Scaffold execution started for runtime '${this.runtime}'.`,
+        provenance: {
+          classification: "scaffolded",
+          runtime: this.runtime,
+          strategyId: this.getDescriptor().id,
+          detail: "Running scaffold interpreter fallback.",
+        },
       })
     );
 
@@ -75,14 +83,53 @@ export class InterpretedWorkflowExecutionStrategy implements IWorkflowExecutionS
         executionMetadata: input.executionMetadata,
       });
       const nodeResult = await this.nodeExecutor.executeNode(context);
+      nodeProvenance[node.id] = nodeResult.provenance ?? {
+        classification: "scaffolded",
+        runtime: this.runtime,
+        executorId: "scaffold-node-executor",
+        detail: "Node completed through scaffold interpreter logic.",
+      };
       outputStore.setNodeOutput(node.id, nodeResult.outputs);
+
+      onEvent?.(new WorkflowExecutionEvent({
+        executionId,
+        kind: nodeResult.status === "failed" ? "node-failed" : "node-completed",
+        status: nodeResult.status === "failed" ? "failed" : "running",
+        nodeId: node.id,
+        message: nodeResult.errorMessage ?? nodeResult.messages?.join(" "),
+        nodeProvenance: nodeProvenance[node.id],
+      }));
+
+      if (nodeResult.status === "failed") {
+        return new WorkflowExecutionResult({
+          executionId,
+          status: "failed",
+          outputAssets: [],
+          messages: nodeResult.messages,
+          errorMessage: nodeResult.errorMessage ?? `Node '${node.id}' failed during scaffold execution.`,
+          provenance: {
+            classification: nodeProvenance[node.id]?.classification === "unavailable" ? "unavailable" : "hybrid",
+            runtime: this.runtime,
+            strategyId: this.getDescriptor().id,
+            detail: "Scaffold execution stopped after a node failure.",
+            nodeProvenance: Object.freeze({ ...nodeProvenance }),
+          },
+        });
+      }
     }
 
     const result = new WorkflowExecutionResult({
       executionId,
       status: "completed",
       outputAssets: [],
-      messages: ["Infrastructure interpreted execution completed."],
+      messages: ["Scaffold workflow execution completed."],
+      provenance: {
+        classification: aggregateClassification(nodeProvenance),
+        runtime: this.runtime,
+        strategyId: this.getDescriptor().id,
+        detail: "Workflow executed by the scaffold interpreter fallback.",
+        nodeProvenance: Object.freeze({ ...nodeProvenance }),
+      },
     });
 
     onEvent?.(
@@ -90,9 +137,31 @@ export class InterpretedWorkflowExecutionStrategy implements IWorkflowExecutionS
         executionId,
         kind: "workflow-completed",
         status: "completed",
+        provenance: result.provenance,
       })
     );
 
     return result;
   }
+}
+
+function aggregateClassification(
+  nodeProvenance: Record<string, NonNullable<IWorkflowExecutionResult["provenance"]>["nodeProvenance"][string]>
+): "scaffolded" | "hybrid" | "unavailable" {
+  const classifications = new Set(Object.values(nodeProvenance).map((item) => item.classification));
+
+  if (classifications.size === 0) {
+    return "scaffolded";
+  }
+
+  if (classifications.size === 1) {
+    const [only] = [...classifications];
+    return only === "unavailable" ? "unavailable" : "scaffolded";
+  }
+
+  if (classifications.size === 2 && classifications.has("scaffolded") && classifications.has("delegated")) {
+    return "hybrid";
+  }
+
+  return classifications.has("unavailable") ? "unavailable" : "hybrid";
 }

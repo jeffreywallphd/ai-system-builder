@@ -8,9 +8,9 @@ import {
 
 function createConfig(overrides: Partial<ConstructorParameters<typeof AppRuntimeConfig>[0]> = {}): AppRuntimeConfig {
   return new AppRuntimeConfig({
-    workflowRepositoryMode: "memory",
-    workflowExecutorMode: "preview",
-    nodeCatalogMode: "mock",
+    workflowRepositoryMode: "browser-storage",
+    workflowExecutorMode: "strategy",
+    nodeCatalogMode: "registered",
     seedStarterNode: true,
     isProductionMode: false,
     devSyncBaseUrl: "http://localhost:8787",

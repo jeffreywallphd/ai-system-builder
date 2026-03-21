@@ -5,12 +5,12 @@ describe("application execution interactions", () => {
   it("selects hybrid strategy when requested", () => {
     const selector = new WorkflowRuntimeSelector();
     const hybrid = {
-      getDescriptor: () => ({ id: "h", runtime: "langchain", mode: "hybrid" as const, supportsPartialDelegation: true }),
+      getDescriptor: () => ({ id: "h", runtime: "langchain", mode: "hybrid" as const, supportsPartialDelegation: true, defaultProvenance: "scaffolded" as const }),
       canHandle: () => true,
       execute: async () => ({ executionId: "h", status: "completed" as const, outputAssets: [] }),
     };
     const delegated = {
-      getDescriptor: () => ({ id: "d", runtime: "langchain", mode: "delegated" as const, supportsPartialDelegation: false }),
+      getDescriptor: () => ({ id: "d", runtime: "langchain", mode: "delegated" as const, supportsPartialDelegation: false, defaultProvenance: "delegated" as const }),
       canHandle: () => true,
       execute: async () => ({ executionId: "d", status: "completed" as const, outputAssets: [] }),
     };

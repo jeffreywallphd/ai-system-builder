@@ -35,7 +35,23 @@ export interface DesktopKeyValueStorageBridge {
   removeItem(key: string): void;
 }
 
+export interface DesktopWorkflowBridge {
+  saveWorkflowRecord(recordJson: string): void;
+  loadWorkflowRecord(id: string): string | null;
+  listWorkflowSummaries(): ReadonlyArray<string>;
+  deleteWorkflowRecord(id: string): void;
+  workflowExists(id: string): boolean;
+  getWorkflowPersistenceStatus(): {
+    readonly provider: string;
+    readonly workflowsDirectory: string;
+    readonly indexDatabasePath: string;
+    readonly degraded: boolean;
+    readonly detail: string;
+  };
+}
+
 export interface DesktopBridge {
   readonly bootstrap: DesktopBootstrapContext;
   readonly storage: DesktopKeyValueStorageBridge;
+  readonly workflows: DesktopWorkflowBridge;
 }

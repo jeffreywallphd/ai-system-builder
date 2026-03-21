@@ -1,4 +1,5 @@
 import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
+import type { IWorkflowRepository } from "../../application/ports/interfaces/IWorkflowRepository";
 import type {
   IWorkflowExecutionEvent,
   IWorkflowExecutionResult,
@@ -22,13 +23,6 @@ import {
   type IValidateWorkflowRequest,
   type IValidateWorkflowResult,
 } from "../../application/workflows/ValidateWorkflowUseCase";
-
-export interface IWorkflowRepository {
-  save(workflow: IWorkflow): Promise<void>;
-  load(id: string): Promise<IWorkflow | undefined>;
-  list(): Promise<ReadonlyArray<IWorkflow>>;
-  delete(id: string): Promise<boolean>;
-}
 
 export interface IWorkflowServiceOptions {
   readonly createWorkflowUseCase: CreateWorkflowUseCase;
@@ -68,12 +62,18 @@ export class WorkflowService {
   }
 
   public async listWorkflows(): Promise<ReadonlyArray<IWorkflow>> {
-    return this.workflowRepository.list();
+    const summaries = await this.workflowRepository.list();
+    const workflows = await Promise.all(
+      summaries.map(async (summary) => this.workflowRepository.load(summary.id))
+    );
+
+    return Object.freeze(
+      workflows.filter((workflow): workflow is IWorkflow => !!workflow)
+    );
   }
 
   public async saveWorkflow(workflow: IWorkflow): Promise<IWorkflow> {
-    await this.workflowRepository.save(workflow);
-    return workflow;
+    return this.workflowRepository.save(workflow);
   }
 
   public async deleteWorkflow(id: string): Promise<boolean> {
@@ -83,7 +83,9 @@ export class WorkflowService {
       throw new Error("WorkflowService.deleteWorkflow requires a non-empty id.");
     }
 
-    return this.workflowRepository.delete(workflowId);
+    const existed = await this.workflowRepository.exists(workflowId);
+    await this.workflowRepository.delete(workflowId);
+    return existed;
   }
 
   public validateWorkflow(

@@ -1,4 +1,5 @@
 import type {
+  ExecutionProvenanceKind,
   IWorkflowExecutionEvent,
   IWorkflowExecutionInput,
   IWorkflowExecutionResult,
@@ -11,6 +12,7 @@ export interface IWorkflowExecutionStrategyDescriptor {
   readonly runtime: string;
   readonly mode: WorkflowExecutionMode;
   readonly supportsPartialDelegation: boolean;
+  readonly defaultProvenance: Exclude<ExecutionProvenanceKind, "hybrid">;
 }
 
 export interface IWorkflowExecutionStrategy {

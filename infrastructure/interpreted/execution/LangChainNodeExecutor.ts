@@ -640,6 +640,12 @@ export class LangChainNodeExecutor implements INodeExecutor {
         status: "skipped",
         outputs: {},
         messages: [`Node '${context.node.id}' skipped due to runtime or enabled-state mismatch.`],
+        provenance: {
+          classification: "unavailable",
+          runtime: "langchain",
+          executorId: "langchain-node-executor",
+          detail: "Node skipped because it could not run in the current runtime/profile.",
+        },
       };
     }
 
@@ -657,6 +663,14 @@ export class LangChainNodeExecutor implements INodeExecutor {
         outputs: modelResult.outputs,
         messages: modelResult.messages,
         errorMessage: modelResult.errorMessage,
+        provenance: {
+          classification: modelResult.status === "completed" ? "real" : "unavailable",
+          runtime: "langchain",
+          executorId: "model-executor",
+          detail: modelResult.status === "completed"
+            ? "Node completed through the configured model executor."
+            : "Configured model executor could not complete the node.",
+        },
       };
     }
 
@@ -695,6 +709,14 @@ export class LangChainNodeExecutor implements INodeExecutor {
         outputs: normalizePythonOutputs(nodeType, response.outputs),
         messages: response.messages,
         errorMessage: response.errorMessage,
+        provenance: {
+          classification: response.status === "completed" ? "delegated" : "unavailable",
+          runtime: "python",
+          executorId: "python-runtime-node-bridge",
+          detail: response.status === "completed"
+            ? "Node execution was delegated to the Python runtime."
+            : "Python runtime could not complete delegated node execution.",
+        },
       };
     }
 
@@ -1744,14 +1766,16 @@ Used tool '${chosenTool?.name}' and observed: ${normalizeText(executedTool.toolR
 
     return {
       nodeId: context.node.id,
-      status: "completed",
-      outputs: {
-        result: context.resolvedInputs,
-        metadata: {
-          nodeType: context.node.definition.type,
-        },
+      status: "failed",
+      outputs: {},
+      messages: [`Node type '${context.node.definition.type}' does not have a truthful scaffold implementation.`],
+      errorMessage: `Node type '${context.node.definition.type}' is unavailable in scaffold execution.`,
+      provenance: {
+        classification: "unavailable",
+        runtime: "langchain",
+        executorId: "langchain-node-executor",
+        detail: "No truthful scaffold implementation exists for this node type.",
       },
-      messages: ["LangChain node executed with scaffold interpreter."],
     };
   }
 }

@@ -1,4 +1,4 @@
-import type { DesktopBootstrapContext } from "../../electron/shared/DesktopContracts";
+import type { DesktopBootstrapContext, DesktopWorkflowBridge } from "../../electron/shared/DesktopContracts";
 
 interface DesktopStorageBridge {
   getItem(key: string): string | null;
@@ -11,6 +11,7 @@ declare global {
     aiLoomDesktop?: {
       bootstrap: DesktopBootstrapContext;
       storage: DesktopStorageBridge;
+      workflows: DesktopWorkflowBridge;
     };
   }
 }

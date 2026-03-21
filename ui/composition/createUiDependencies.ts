@@ -20,7 +20,6 @@ import { NodeStore } from "../state/NodeStore";
 import { ModelStore } from "../state/ModelStore";
 import { AppRuntimeConfig } from "../../infrastructure/config/AppRuntimeConfig";
 import { InMemoryWorkflowRepository } from "../../infrastructure/mocks/repositories/InMemoryWorkflowRepository";
-import { InterpretedWorkflowExecutor } from "../../infrastructure/interpreted/execution/InterpretedWorkflowExecutor";
 import { MockNodeCatalogProvider } from "../../infrastructure/mocks/catalog/MockNodeCatalogProvider";
 import { CompositeNodeCatalogProvider } from "../../application/nodes/CompositeNodeCatalogProvider";
 import { createCompositeNodeImplementationRegistry } from "../../infrastructure/nodes/NodeProviderRegistryIndex";
@@ -119,23 +118,51 @@ import { DatasetSourceIngestionProfile } from "../../application/tuning-datasets
 import { BrowserDatasetImportService, DatasetStatisticsService, DatasetWorkflowProgressService, DefaultDatasetDuplicationPolicy, DefaultDatasetPrivacyPolicy, DefaultDatasetReleasePolicy, DefaultDatasetReviewPolicy, DeterministicDatasetSplitService, JsonTuningDatasetExportService, ProviderAgnosticDatasetGenerationService, TaskTypeAwareValidationService } from "../../domain/tuning-datasets/TuningDatasetServices";
 import { LocalStorageTuningDatasetRepository } from "../../infrastructure/browser/tuning-datasets/LocalStorageTuningDatasetRepository";
 import { LocalStorageTuningDatasetVersionRepository } from "../../infrastructure/browser/tuning-datasets/LocalStorageTuningDatasetVersionRepository";
-import { SqliteBackedWorkflowRepository } from "../../infrastructure/browser/workflows/SqliteBackedWorkflowRepository";
+import { BrowserStorageWorkflowRepository } from "../../infrastructure/browser/workflows/SqliteBackedWorkflowRepository";
+import { DesktopBridgeWorkflowRepository } from "../../infrastructure/browser/workflows/DesktopBridgeWorkflowRepository";
+import { resolveDesktopWorkflowBridge } from "./DesktopWorkflowBridgeAdapter";
+import { TruthfulWorkflowExecutor } from "../../infrastructure/execution/TruthfulWorkflowExecutor";
+import { InterpretedWorkflowExecutionStrategy } from "../../infrastructure/interpreted/execution/InterpretedWorkflowExecutionStrategy";
+import { DefaultNodeExecutionContextResolver } from "../../infrastructure/interpreted/execution/DefaultNodeExecutionContextResolver";
+import { DefaultNodeOutputStore } from "../../infrastructure/interpreted/execution/DefaultNodeOutputStore";
+import { LangChainNodeExecutor } from "../../infrastructure/interpreted/execution/LangChainNodeExecutor";
+import { PythonDelegatedWorkflowExecutionStrategy } from "../../infrastructure/python/execution/PythonDelegatedWorkflowExecutionStrategy";
 
 export function createUiDependencies(
   options: CreateUiDependenciesOptions = {}
 ): UiDependencies {
   const config = options.config ?? AppRuntimeConfig.resolveDefault();
   const desktopStorage = resolveDesktopStorageAdapter();
+  const desktopWorkflowBridge = resolveDesktopWorkflowBridge();
   const durableDesktopStorage = config.isPackagedDesktopHost ? desktopStorage : undefined;
   const settingsStore = new UiSettingsStore({
     config,
     storage: options.settingsStorage ?? createSettingsStorage(config, desktopStorage),
   });
   const settings = settingsStore.getSettings();
+  const pythonRuntimeConfig = new PythonRuntimeConfig({
+    mode: settings.runtime.mode,
+    baseUrl: settings.runtime.mode === "disabled" ? undefined : settings.runtime.baseUrl,
+    timeoutMs: settings.runtime.requestTimeoutMs,
+    authToken: settings.runtime.authToken,
+    pythonVersion: settings.runtime.pythonVersion,
+    pythonInterpreterPath: settings.runtime.pythonInterpreterPath || undefined,
+    runtimeWorkingDirectory: settings.runtime.workingDirectory,
+    startupTimeoutMs: settings.runtime.startupTimeoutMs,
+    healthPollIntervalMs: settings.runtime.healthPollIntervalMs,
+    autoStartEnabled: settings.runtime.autoStartEnabled,
+  });
+  const runtimeEventStore = new RuntimeEventBuffer({ capacity: 500 });
+  const runtimeEventSink = new NodeProcessRuntimeEventSink(runtimeEventStore);
+  const runtimeClient = pythonRuntimeConfig.isEnabled
+    ? new HttpPythonRuntimeClient(pythonRuntimeConfig)
+    : createDisabledRuntimeClient();
+  const workflowExecutorSelection = createWorkflowExecutor(config, runtimeClient, pythonRuntimeConfig.isEnabled);
+  const workflowExecutor = workflowExecutorSelection.executor;
 
-  const workflowRepository = createWorkflowRepository(config, desktopStorage);
-  const workflowExecutor = createWorkflowExecutor(config);
   const nodeCatalogProvider = createNodeCatalogProvider(config);
+  const workflowRepositorySelection = createWorkflowRepository(config, nodeCatalogProvider, desktopWorkflowBridge, desktopStorage);
+  const workflowRepository = workflowRepositorySelection.repository;
   const contextPackageRepository = new LocalStorageContextPackageRepository(undefined, durableDesktopStorage);
   const contextRecipeRepository = new LocalStorageContextRecipeRepository(undefined, durableDesktopStorage);
   const workflowContextService = new WorkflowContextService(contextPackageRepository, contextRecipeRepository);
@@ -239,23 +266,6 @@ export function createUiDependencies(
     healthPollIntervalMs: settings.runtime.healthPollIntervalMs,
     autoStartEnabled: settings.runtime.autoStartEnabled,
   }));
-  const pythonRuntimeConfig = new PythonRuntimeConfig({
-    mode: settings.runtime.mode,
-    baseUrl: settings.runtime.mode === "disabled" ? undefined : settings.runtime.baseUrl,
-    timeoutMs: settings.runtime.requestTimeoutMs,
-    authToken: settings.runtime.authToken,
-    pythonVersion: settings.runtime.pythonVersion,
-    pythonInterpreterPath: settings.runtime.pythonInterpreterPath || undefined,
-    runtimeWorkingDirectory: settings.runtime.workingDirectory,
-    startupTimeoutMs: settings.runtime.startupTimeoutMs,
-    healthPollIntervalMs: settings.runtime.healthPollIntervalMs,
-    autoStartEnabled: settings.runtime.autoStartEnabled,
-  });
-  const runtimeEventStore = new RuntimeEventBuffer({ capacity: 500 });
-  const runtimeEventSink = new NodeProcessRuntimeEventSink(runtimeEventStore);
-  const runtimeClient = pythonRuntimeConfig.isEnabled
-    ? new HttpPythonRuntimeClient(pythonRuntimeConfig)
-    : createDisabledRuntimeClient();
   const managedServiceSupervisorClient = pythonRuntimeConfig.isManagedLocal
     ? new HttpManagedServiceSupervisorClient({
       baseUrl: pythonRuntimeConfig.supervisorBaseUrl,
@@ -428,6 +438,11 @@ export function createUiDependencies(
 
   return Object.freeze({
     config,
+    operationalStatus: {
+      workflowPersistence: workflowRepositorySelection.status,
+      execution: workflowExecutorSelection.status,
+      nodeCatalog: describeNodeCatalogMode(config),
+    },
     workflowStore,
     nodeStore,
     modelStore,
@@ -480,26 +495,83 @@ function createDisabledRuntimeClient(): IPythonRuntimeClient {
   };
 }
 
-function createWorkflowRepository(config: AppRuntimeConfig, desktopStorage = resolveDesktopStorageAdapter()) {
-  switch (config.workflowRepositoryMode) {
-    case "sqlite":
-      if (!desktopStorage) {
-        throw new Error("Desktop SQLite workflow repository requires the desktop host storage bridge.");
-      }
-      return new SqliteBackedWorkflowRepository(createNodeCatalogProvider(config), desktopStorage);
-    case "memory":
-    default:
-      return new InMemoryWorkflowRepository(createSeedWorkflows());
+function createWorkflowRepository(
+  config: AppRuntimeConfig,
+  nodeCatalogProvider: ReturnType<typeof createNodeCatalogProvider>,
+  desktopWorkflowBridge = resolveDesktopWorkflowBridge(),
+  desktopStorage = resolveDesktopStorageAdapter()
+) {
+  if (desktopWorkflowBridge && config.workflowRepositoryMode === "filesystem-indexed") {
+    const desktopStatus = desktopWorkflowBridge.getWorkflowPersistenceStatus();
+    return {
+      repository: new DesktopBridgeWorkflowRepository(nodeCatalogProvider, desktopWorkflowBridge),
+      status: {
+        configuredMode: config.workflowRepositoryMode,
+        effectiveMode: desktopStatus.provider,
+        isDegraded: desktopStatus.degraded,
+        detail: desktopStatus.detail,
+        workflowsDirectory: desktopStatus.workflowsDirectory,
+        indexDatabasePath: desktopStatus.indexDatabasePath,
+      },
+    };
   }
+
+  if (config.workflowRepositoryMode === "browser-storage" || desktopStorage) {
+    const storage = desktopStorage ?? (typeof window !== "undefined" ? window.localStorage : undefined);
+    if (storage) {
+      return {
+        repository: new BrowserStorageWorkflowRepository(nodeCatalogProvider, storage, createSeedWorkflows()),
+        status: {
+          configuredMode: config.workflowRepositoryMode,
+          effectiveMode: "browser-storage-fallback",
+          isDegraded: true,
+          detail: "Workflow persistence is durable in browser storage only. Use desktop development for dev/ filesystem + SQLite persistence.",
+          workflowsDirectory: config.workflowStorageDirectory,
+          indexDatabasePath: config.workflowIndexDatabasePath,
+        },
+      };
+    }
+  }
+
+  return {
+    repository: new InMemoryWorkflowRepository(createSeedWorkflows()),
+    status: {
+      configuredMode: config.workflowRepositoryMode,
+      effectiveMode: "in-memory-fallback",
+      isDegraded: true,
+      detail: "No durable workflow persistence bridge is available in this environment.",
+      workflowsDirectory: config.workflowStorageDirectory,
+      indexDatabasePath: config.workflowIndexDatabasePath,
+    },
+  };
 }
 
-function createWorkflowExecutor(config: AppRuntimeConfig) {
-  switch (config.workflowExecutorMode) {
-    case "runtime":
-    case "preview":
-    default:
-      return new InterpretedWorkflowExecutor();
-  }
+function createWorkflowExecutor(config: AppRuntimeConfig, runtimeClient: IPythonRuntimeClient, runtimeEnabled: boolean) {
+  const executor = new TruthfulWorkflowExecutor({
+    strategies: [
+      new PythonDelegatedWorkflowExecutionStrategy(runtimeClient),
+      new InterpretedWorkflowExecutionStrategy({
+        runtime: "langchain",
+        nodeExecutor: new LangChainNodeExecutor(),
+        contextResolver: new DefaultNodeExecutionContextResolver(),
+        outputStoreFactory: () => new DefaultNodeOutputStore(),
+      }),
+    ],
+  });
+
+  return {
+    executor,
+    status: {
+      configuredMode: config.workflowExecutorMode,
+      effectiveMode: runtimeEnabled ? "delegated-with-scaffold-fallback" : "scaffold-fallback",
+      isDegraded: !runtimeEnabled || config.workflowExecutorMode === "scaffold",
+      detail: config.workflowExecutorMode === "scaffold"
+        ? "Execution is pinned to the scaffold interpreter."
+        : runtimeEnabled
+          ? "Workflow execution selects delegated Python runtime first and falls back to explicit scaffold execution when needed."
+          : "Python runtime is unavailable, so execution will run through the explicit scaffold fallback only.",
+    },
+  };
 }
 
 function createNodeCatalogProvider(config: AppRuntimeConfig) {
@@ -508,15 +580,46 @@ function createNodeCatalogProvider(config: AppRuntimeConfig) {
   );
 
   switch (config.nodeCatalogMode) {
-    case "composite":
+    case "registered":
       return new CompositeNodeCatalogProvider({
         providers: [implementationRegistryProvider],
+      });
+    case "seeded":
+      return new CompositeNodeCatalogProvider({
+        providers: [new MockNodeCatalogProvider(), implementationRegistryProvider],
       });
     case "mock":
     default:
       return new CompositeNodeCatalogProvider({
-        providers: [new MockNodeCatalogProvider(), implementationRegistryProvider],
+        providers: [new MockNodeCatalogProvider()],
       });
+  }
+}
+
+function describeNodeCatalogMode(config: AppRuntimeConfig) {
+  switch (config.nodeCatalogMode) {
+    case "registered":
+      return {
+        configuredMode: config.nodeCatalogMode,
+        effectiveMode: "registered",
+        isDegraded: false,
+        detail: "Node catalog comes from the registered implementation registry.",
+      };
+    case "seeded":
+      return {
+        configuredMode: config.nodeCatalogMode,
+        effectiveMode: "seeded",
+        isDegraded: true,
+        detail: "Seeded development nodes supplement the registered catalog.",
+      };
+    case "mock":
+    default:
+      return {
+        configuredMode: config.nodeCatalogMode,
+        effectiveMode: "mock",
+        isDegraded: true,
+        detail: "Mock catalog is enabled explicitly for fallback or test scenarios.",
+      };
   }
 }
 
