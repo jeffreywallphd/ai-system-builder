@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { TuningDatasetStore } from "../TuningDatasetStore";
 import { TuningDatasetService } from "../../services/TuningDatasetService";
 import { DefaultTuningDatasetStudioApplicationService } from "../../../application/tuning-datasets/DefaultTuningDatasetStudioApplicationService";
-import { BrowserDatasetImportService, DefaultDatasetDuplicationPolicy, DefaultDatasetPrivacyPolicy, DefaultDatasetReviewPolicy, DeterministicDatasetSplitService, HeuristicQuestionAnsweringGenerationService, JsonTuningDatasetExportService, QuestionAnsweringValidationService, DatasetStatisticsService } from "../../../domain/tuning-datasets/TuningDatasetServices";
+import { BrowserDatasetImportService, DatasetStatisticsService, DatasetWorkflowProgressService, DefaultDatasetDuplicationPolicy, DefaultDatasetPrivacyPolicy, DefaultDatasetReleasePolicy, DefaultDatasetReviewPolicy, DeterministicDatasetSplitService, JsonTuningDatasetExportService, ProviderAgnosticDatasetGenerationService, TaskTypeAwareValidationService } from "../../../domain/tuning-datasets/TuningDatasetServices";
 import { LocalStorageTuningDatasetRepository } from "../../../infrastructure/browser/tuning-datasets/LocalStorageTuningDatasetRepository";
 import { LocalStorageTuningDatasetVersionRepository } from "../../../infrastructure/browser/tuning-datasets/LocalStorageTuningDatasetVersionRepository";
 
@@ -20,14 +20,16 @@ function createStore(): TuningDatasetStore {
   const applicationService = new DefaultTuningDatasetStudioApplicationService({
     datasetRepository,
     datasetVersionRepository: versionRepository,
-    validationService: new QuestionAnsweringValidationService(duplicationPolicy),
+    validationService: new TaskTypeAwareValidationService(duplicationPolicy),
     splitService: new DeterministicDatasetSplitService(),
     exportService: new JsonTuningDatasetExportService(),
     importService: new BrowserDatasetImportService(new DefaultDatasetPrivacyPolicy()),
-    generationService: new HeuristicQuestionAnsweringGenerationService(),
+    generationService: new ProviderAgnosticDatasetGenerationService(),
     reviewPolicy: new DefaultDatasetReviewPolicy(),
     duplicationPolicy,
     statisticsService: new DatasetStatisticsService(duplicationPolicy),
+    releasePolicy: new DefaultDatasetReleasePolicy(),
+    workflowService: new DatasetWorkflowProgressService(),
     createId: (() => {
       let count = 0;
       return (prefix: string) => `${prefix}-${++count}`;
@@ -37,7 +39,7 @@ function createStore(): TuningDatasetStore {
 }
 
 describe("TuningDatasetStore", () => {
-  it("runs the generative QA workflow through store actions", async () => {
+  it("runs the wizard-oriented QA workflow through store actions", async () => {
     const store = createStore();
     await store.initialize();
     expect(store.getState().datasets).toEqual([]);
@@ -50,25 +52,30 @@ describe("TuningDatasetStore", () => {
     });
     const stateAfterCreate = store.getState();
     expect(stateAfterCreate.selectedDataset?.dataset.name).toBe("Store QA");
+    expect(stateAfterCreate.currentWorkflowStage).toBe("source_ingestion");
 
-    const versionId = stateAfterCreate.selectedDataset!.latestVersion!.id;
+    const versionId = stateAfterCreate.selectedVersionId!;
     await store.importSources(stateAfterCreate.selectedDataset!.dataset.id, versionId, "ui-user", [{
       name: "Store Doc",
-      content: "Store QA keeps datasets versioned. Store QA validates examples and exports JSONL artifacts.",
+      content: "Store QA keeps datasets versioned. Store QA validates examples and exports JSONL artifacts. Successor drafts clone released versions for further editing.",
     }]);
     expect(store.getState().sourceDocuments).toHaveLength(1);
+    expect(store.getState().currentWorkflowStage).toBe("example_generation");
 
-    await store.generateQaExamples(stateAfterCreate.selectedDataset!.dataset.id, versionId, "ui-user", [store.getState().sourceDocuments[0]!.id]);
+    await store.generateExamples(stateAfterCreate.selectedDataset!.dataset.id, versionId, "ui-user", [store.getState().sourceDocuments[0]!.id]);
     expect(store.getState().examples.length).toBeGreaterThan(0);
 
-    const exampleId = store.getState().examples[0]!.id;
-    await store.reviewExample(stateAfterCreate.selectedDataset!.dataset.id, versionId, exampleId, "accepted", "reviewer", "accept");
-    await store.validateDataset(stateAfterCreate.selectedDataset!.dataset.id, versionId);
+    for (const example of store.getState().examples) {
+      store.toggleExampleSelection(example.id);
+    }
+    await store.bulkUpdateSelection({ status: "accepted", split: "validation", annotationNote: "bulk", updatedBy: "reviewer" });
     await store.assignSplits(stateAfterCreate.selectedDataset!.dataset.id, versionId, "ui-user");
+    await store.validateDataset(stateAfterCreate.selectedDataset!.dataset.id, versionId);
     await store.releaseVersion(stateAfterCreate.selectedDataset!.dataset.id, versionId, "release");
     const artifact = await store.exportVersion(stateAfterCreate.selectedDataset!.dataset.id, versionId, "qa_jsonl");
 
-    expect(store.getState().selectedDataset?.latestVersion?.status).toBe("released");
+    expect(store.getState().selectedDataset?.selectedVersion?.status).toBe("released");
+    expect(store.getState().workflow?.currentStage).toBe("export");
     expect(artifact.format).toBe("qa_jsonl");
   });
 });

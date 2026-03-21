@@ -1,21 +1,26 @@
 import type {
+  ChatCompletionMessage,
   Dataset,
   DatasetExample,
   DatasetExportArtifact,
+  DatasetGenerationConfiguration,
+  DatasetSourceDocument,
   DatasetStatistics,
   DatasetStatus,
   DatasetTaskType,
   DatasetValidationResult,
   DatasetVersion,
+  DatasetWorkflowStage,
+  DatasetWorkflowState,
   ExampleStatus,
   ExportFormat,
   SplitType,
 } from "../../domain/tuning-datasets/interfaces/ITuningDatasetStudio";
-import type { QuestionAnsweringExample, SourceDocumentReference } from "../../domain/tuning-datasets/TuningDatasetEntities";
 
 export interface DatasetSummary {
   readonly dataset: Dataset;
   readonly latestVersion?: DatasetVersion;
+  readonly selectedVersion?: DatasetVersion;
   readonly statistics?: DatasetStatistics;
   readonly exampleCount: number;
 }
@@ -24,18 +29,12 @@ export interface DatasetDetails {
   readonly dataset: Dataset;
   readonly versions: ReadonlyArray<DatasetVersion>;
   readonly latestVersion?: DatasetVersion;
-  readonly sourceDocuments: ReadonlyArray<SourceDocumentReference>;
+  readonly selectedVersion?: DatasetVersion;
+  readonly sourceDocuments: ReadonlyArray<DatasetSourceDocument>;
   readonly statistics?: DatasetStatistics;
   readonly validation?: DatasetValidationResult;
   readonly exports: ReadonlyArray<DatasetExportArtifact>;
-}
-
-export interface ExampleListItem {
-  readonly example: QuestionAnsweringExample;
-  readonly validationSummary: {
-    readonly issueCount: number;
-    readonly blockingIssueCount: number;
-  };
+  readonly workflow: DatasetWorkflowState;
 }
 
 export interface CreateDatasetCommand {
@@ -51,6 +50,19 @@ export interface CreateDatasetCommand {
 export interface CreateDatasetVersionCommand {
   readonly datasetId: string;
   readonly createdBy: string;
+}
+
+export interface CreateSuccessorDatasetVersionCommand {
+  readonly datasetId: string;
+  readonly releasedVersionId: string;
+  readonly createdBy: string;
+  readonly cloneExamples?: boolean;
+  readonly cloneSources?: boolean;
+}
+
+export interface SelectDatasetVersionCommand {
+  readonly datasetId: string;
+  readonly versionId: string;
 }
 
 export interface ReleaseDatasetVersionCommand {
@@ -72,9 +84,11 @@ export interface ListDatasetsQuery {
 
 export interface GetDatasetDetailsQuery {
   readonly datasetId: string;
+  readonly versionId?: string;
 }
 
-export interface AddExampleCommand {
+export interface AddQuestionAnsweringExampleCommand {
+  readonly taskType: "question_answering";
   readonly datasetId: string;
   readonly versionId: string;
   readonly question: string;
@@ -87,7 +101,21 @@ export interface AddExampleCommand {
   readonly createdBy: string;
 }
 
-export interface UpdateExampleCommand {
+export interface AddChatCompletionExampleCommand {
+  readonly taskType: "chat_completion";
+  readonly datasetId: string;
+  readonly versionId: string;
+  readonly messages: ReadonlyArray<ChatCompletionMessage>;
+  readonly split?: SplitType;
+  readonly status?: ExampleStatus;
+  readonly tags?: ReadonlyArray<string>;
+  readonly createdBy: string;
+}
+
+export type AddExampleCommand = AddQuestionAnsweringExampleCommand | AddChatCompletionExampleCommand;
+
+export interface UpdateQuestionAnsweringExampleCommand {
+  readonly taskType?: "question_answering";
   readonly datasetId: string;
   readonly versionId: string;
   readonly exampleId: string;
@@ -101,26 +129,35 @@ export interface UpdateExampleCommand {
   readonly updatedBy: string;
 }
 
+export interface UpdateChatCompletionExampleCommand {
+  readonly taskType?: "chat_completion";
+  readonly datasetId: string;
+  readonly versionId: string;
+  readonly exampleId: string;
+  readonly messages?: ReadonlyArray<ChatCompletionMessage>;
+  readonly split?: SplitType;
+  readonly status?: ExampleStatus;
+  readonly tags?: ReadonlyArray<string>;
+  readonly annotationNote?: string;
+  readonly updatedBy: string;
+}
+
+export type UpdateExampleCommand = UpdateQuestionAnsweringExampleCommand | UpdateChatCompletionExampleCommand;
+
 export interface DeleteExampleCommand {
   readonly datasetId: string;
   readonly versionId: string;
   readonly exampleId: string;
 }
 
-export interface BulkAddExamplesCommand {
-  readonly datasetId: string;
-  readonly versionId: string;
-  readonly createdBy: string;
-  readonly examples: ReadonlyArray<Omit<AddExampleCommand, "datasetId" | "versionId" | "createdBy">>;
-}
-
-export interface BulkUpdateExampleStatusCommand {
+export interface BulkUpdateExamplesCommand {
   readonly datasetId: string;
   readonly versionId: string;
   readonly exampleIds: ReadonlyArray<string>;
-  readonly status: ExampleStatus;
-  readonly updatedBy: string;
+  readonly status?: ExampleStatus;
+  readonly split?: SplitType;
   readonly annotationNote?: string;
+  readonly updatedBy: string;
 }
 
 export interface ListExamplesQuery {
@@ -145,22 +182,18 @@ export interface ImportSourceDocumentsCommand {
     readonly id?: string;
     readonly name: string;
     readonly content: string;
+    readonly sourceType?: "manual_text" | "uploaded_text" | "uploaded_file";
+    readonly mediaType?: string;
     readonly metadata?: Readonly<Record<string, unknown>>;
   }>;
 }
 
-export interface GenerateQaExamplesFromSourceCommand {
+export interface GenerateExamplesFromSourceCommand {
   readonly datasetId: string;
   readonly versionId: string;
   readonly createdBy: string;
   readonly sourceDocumentIds: ReadonlyArray<string>;
-}
-
-export interface RegenerateQaExampleCommand {
-  readonly datasetId: string;
-  readonly versionId: string;
-  readonly exampleId: string;
-  readonly updatedBy: string;
+  readonly configuration?: DatasetGenerationConfiguration;
 }
 
 export interface ValidateDatasetVersionCommand {
@@ -191,8 +224,16 @@ export interface UpdateSplitAssignmentCommand {
   readonly actor: string;
 }
 
+export interface MoveWorkflowStageCommand {
+  readonly datasetId: string;
+  readonly versionId: string;
+  readonly stage: DatasetWorkflowStage;
+}
+
 export interface ExportDatasetVersionCommand {
   readonly datasetId: string;
   readonly versionId: string;
   readonly format: ExportFormat;
 }
+
+export type StudioExample = DatasetExample;
