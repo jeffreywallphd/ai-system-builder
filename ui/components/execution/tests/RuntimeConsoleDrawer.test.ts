@@ -9,11 +9,13 @@ describe("RuntimeConsoleDrawer", () => {
       createElement(RuntimeConsoleDrawer, {
         isExpanded: false,
         activeTab: "health",
+        logVerbosity: "normal",
         events: [],
         logs: [],
         healthChecks: [],
         onToggleExpanded: () => undefined,
         onSelectTab: () => undefined,
+        onLogVerbosityChange: () => undefined,
         onClearLogs: () => undefined,
         onRefreshHealth: () => undefined,
         onRestartRuntime: () => undefined,
@@ -27,11 +29,13 @@ describe("RuntimeConsoleDrawer", () => {
       createElement(RuntimeConsoleDrawer, {
         isExpanded: true,
         activeTab: "health",
+        logVerbosity: "normal",
         events: [],
         logs: [],
         healthChecks: [],
         onToggleExpanded: () => undefined,
         onSelectTab: () => undefined,
+        onLogVerbosityChange: () => undefined,
         onClearLogs: () => undefined,
         onRefreshHealth: () => undefined,
         onRestartRuntime: () => undefined,
@@ -46,11 +50,13 @@ describe("RuntimeConsoleDrawer", () => {
       createElement(RuntimeConsoleDrawer, {
         isExpanded: true,
         activeTab: "logs",
+        logVerbosity: "normal",
         events: [],
         logs: [],
         healthChecks: [],
         onToggleExpanded: () => undefined,
         onSelectTab: () => undefined,
+        onLogVerbosityChange: () => undefined,
         onClearLogs: () => undefined,
         onRefreshHealth: () => undefined,
         onRestartRuntime: () => undefined,
@@ -62,5 +68,6 @@ describe("RuntimeConsoleDrawer", () => {
     expect(logs).toContain("Runtime logs will appear here.");
     expect(logs).toContain("Refresh health");
     expect(logs).toContain("Restart runtime");
+    expect(logs).toContain("Runtime log verbosity");
   });
 });

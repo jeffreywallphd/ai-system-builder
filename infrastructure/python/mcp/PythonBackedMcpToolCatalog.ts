@@ -1,6 +1,7 @@
 import type { IMcpToolCatalog } from "../../../application/ports/interfaces/IMcpToolCatalog";
 import type { IRuntimeEventSink } from "../../../application/ports/interfaces/IRuntimeEventSink";
 import { RuntimeEventSources } from "../../../application/runtime/RuntimeEvent";
+import { toRuntimeDiagnosticDetails } from "../../../application/runtime/RuntimeDiagnostics";
 import type { IMcpRuntimeClient } from "../../../application/ports/interfaces/IMcpRuntimeClient";
 import type { McpConnectionStatus } from "../../../application/mcp/models/McpConnectionStatus";
 import type { McpResourceDescriptor } from "../../../application/mcp/models/McpResourceDescriptor";
@@ -33,10 +34,14 @@ export class PythonBackedMcpToolCatalog implements IMcpToolCatalog {
       });
       return normalizedTools;
     } catch (error) {
-      this.emit("error", "MCP tool discovery failed.", {
+      this.emit("error", "MCP tool discovery failed.", toRuntimeDiagnosticDetails(error, {
+        subsystem: "mcp-runtime",
+        className: "PythonBackedMcpToolCatalog",
+        methodName: "listTools",
+        operation: "mcp-tool-discovery",
+      }, {
         eventType: "mcp-tool-discovery",
-        cause: error instanceof Error ? error.message : String(error),
-      });
+      }));
       throw error;
     }
   }
@@ -56,10 +61,15 @@ export class PythonBackedMcpToolCatalog implements IMcpToolCatalog {
       });
       return Object.freeze({ ...result, tools: normalizedTools });
     } catch (error) {
-      this.emit("error", "MCP tool search failed.", {
+      this.emit("error", "MCP tool search failed.", toRuntimeDiagnosticDetails(error, {
+        subsystem: "mcp-runtime",
+        className: "PythonBackedMcpToolCatalog",
+        methodName: "searchTools",
+        operation: "mcp-tool-search",
+        details: query,
+      }, {
         eventType: "mcp-tool-search",
-        cause: error instanceof Error ? error.message : String(error),
-      });
+      }));
       throw error;
     }
   }
@@ -80,11 +90,16 @@ export class PythonBackedMcpToolCatalog implements IMcpToolCatalog {
       });
       return normalizedDescriptor;
     } catch (error) {
-      this.emit("error", "MCP tool descriptor lookup failed.", {
+      this.emit("error", "MCP tool descriptor lookup failed.", toRuntimeDiagnosticDetails(error, {
+        subsystem: "mcp-runtime",
+        className: "PythonBackedMcpToolCatalog",
+        methodName: "getToolDescriptor",
+        operation: "mcp-tool-descriptor",
+        details: { toolId },
+      }, {
         eventType: "mcp-tool-descriptor",
         toolId,
-        cause: error instanceof Error ? error.message : String(error),
-      });
+      }));
       throw error;
     }
   }

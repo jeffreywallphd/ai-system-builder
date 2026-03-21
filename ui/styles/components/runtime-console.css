@@ -175,7 +175,12 @@
 .ui-runtime-console__log-source,
 .ui-runtime-console__log-time,
 .ui-runtime-console__log-detail-copy,
-.ui-runtime-console__log-details summary {
+.ui-runtime-console__log-details summary,
+.ui-runtime-console__log-request,
+.ui-runtime-console__verbosity-label,
+.ui-runtime-console__verbose-label,
+.ui-runtime-console__diagnostic-grid dt,
+.ui-runtime-console__diagnostic-grid dd {
   color: var(--color-text-secondary);
   font-size: var(--font-size-xs);
 }
@@ -254,4 +259,67 @@
   .ui-runtime-console__logs {
     max-height: min(56vh, 28rem);
   }
+}
+
+.ui-runtime-console__log-request {
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-border-soft) 80%, transparent);
+}
+
+.ui-runtime-console__verbosity-control {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 8rem;
+}
+
+.ui-runtime-console__verbosity-select {
+  min-height: 2.5rem;
+}
+
+.ui-runtime-console__log-stack-preview,
+.ui-runtime-console__verbose-block {
+  margin-top: var(--space-2xs);
+}
+
+.ui-runtime-console__log-stack-preview {
+  max-height: 6rem;
+  overflow: auto;
+}
+
+.ui-runtime-console__verbose-block {
+  display: grid;
+  gap: var(--space-2xs);
+  padding-top: var(--space-2xs);
+  border-top: 1px solid var(--color-border-soft);
+}
+
+.ui-runtime-console__verbose-title {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+}
+
+.ui-runtime-console__verbose-section {
+  display: grid;
+  gap: var(--space-2xs);
+}
+
+.ui-runtime-console__diagnostic-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 8rem) minmax(0, 1fr);
+  gap: var(--space-2xs) var(--space-xs);
+  margin: 0;
+}
+
+.ui-runtime-console__diagnostic-grid dt,
+.ui-runtime-console__diagnostic-grid dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.ui-runtime-console__cause-chain {
+  margin: 0;
+  padding-left: 1rem;
+  display: grid;
+  gap: var(--space-2xs);
 }

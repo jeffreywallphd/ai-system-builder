@@ -24,6 +24,7 @@ function navLinkClassName(isActive: boolean): string {
 const fallbackConsoleState: RuntimeConsoleState = Object.freeze({
   isExpanded: false,
   activeTab: "health",
+  logVerbosity: "normal",
   events: Object.freeze([]),
   logs: Object.freeze([]),
   healthChecks: Object.freeze([]),
@@ -188,6 +189,7 @@ export default function AppLayout(): JSX.Element {
       <RuntimeConsoleDrawer
         isExpanded={runtimeConsoleState.isExpanded}
         activeTab={runtimeConsoleState.activeTab}
+        logVerbosity={runtimeConsoleState.logVerbosity}
         events={runtimeConsoleState.events}
         logs={runtimeConsoleState.logs}
         healthChecks={runtimeConsoleState.healthChecks}
@@ -196,6 +198,7 @@ export default function AppLayout(): JSX.Element {
         onClearLogs={() => runtimeConsoleStore.clearLogs()}
         onRefreshHealth={() => void runtimeConsoleStore.refreshHealth()}
         onSelectTab={(tab) => runtimeConsoleStore.setActiveTab(tab)}
+        onLogVerbosityChange={(verbosity) => runtimeConsoleStore.setLogVerbosity(verbosity)}
         onRestartRuntime={() => void runtimeConsoleStore.restartRuntime().catch(() => undefined)}
         canRestartRuntime={runtimeConsoleState.canRestartRuntime}
         isRestartingRuntime={runtimeConsoleState.isRestartingRuntime}

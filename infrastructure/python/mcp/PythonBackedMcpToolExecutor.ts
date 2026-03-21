@@ -2,6 +2,7 @@ import type { IMcpRuntimeClient } from "../../../application/ports/interfaces/IM
 import type { IMcpToolExecutor } from "../../../application/ports/interfaces/IMcpToolExecutor";
 import type { IRuntimeEventSink } from "../../../application/ports/interfaces/IRuntimeEventSink";
 import { RuntimeEventSources } from "../../../application/runtime/RuntimeEvent";
+import { toRuntimeDiagnosticDetails } from "../../../application/runtime/RuntimeDiagnostics";
 import type { McpToolExecutionRequest } from "../../../application/mcp/models/McpToolExecutionRequest";
 import type { McpToolExecutionResult } from "../../../application/mcp/models/McpToolExecutionResult";
 
@@ -49,12 +50,17 @@ export class PythonBackedMcpToolExecutor implements IMcpToolExecutor {
         source: RuntimeEventSources.pythonRuntime,
         severity: "error",
         message: "MCP tool execution failed.",
-        details: {
+        details: toRuntimeDiagnosticDetails(error, {
+          subsystem: "mcp-runtime",
+          className: "PythonBackedMcpToolExecutor",
+          methodName: "executeTool",
+          operation: "mcp-tool-execution",
+          details: request,
+        }, {
           eventType: "mcp-tool-execution-failure",
           serverId: request.serverId,
           toolName: request.toolName,
-          cause: error instanceof Error ? error.message : String(error),
-        },
+        }),
       });
       throw error;
     }

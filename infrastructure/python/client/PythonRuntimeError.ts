@@ -1,11 +1,13 @@
-export class PythonRuntimeError extends Error {
-  public readonly statusCode?: number;
-  public readonly details?: Readonly<Record<string, unknown>>;
+import {
+  RuntimeDiagnosticsError,
+  type RuntimeDiagnosticsErrorParams,
+} from "../../../application/runtime/RuntimeDiagnosticsError";
 
-  constructor(message: string, params: { statusCode?: number; details?: Readonly<Record<string, unknown>> } = {}) {
-    super(message);
-    this.name = "PythonRuntimeError";
-    this.statusCode = params.statusCode;
-    this.details = params.details;
+export class PythonRuntimeError extends RuntimeDiagnosticsError {
+  constructor(message: string, params: RuntimeDiagnosticsErrorParams = {}) {
+    super(message, {
+      ...params,
+      name: "PythonRuntimeError",
+    });
   }
 }
