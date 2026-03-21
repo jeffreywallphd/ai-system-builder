@@ -8,6 +8,14 @@ import {
 } from "../../application/ports/interfaces/IPythonRuntimeManager";
 import type { IRuntimeEventStore } from "../../application/ports/interfaces/IRuntimeEventStore";
 import type { RuntimeEvent } from "../../application/runtime/RuntimeEvent";
+import {
+  buildRuntimeDiagnosticSummary,
+  buildRuntimeStackPreview,
+  normalizeRuntimeError,
+  type RuntimeDiagnostics,
+  type RuntimeDiagnosticsContext,
+  type RuntimeLogVerbosity,
+} from "../../application/runtime/RuntimeDiagnostics";
 
 const DEFAULT_LOG_CAPACITY = 250;
 
@@ -43,11 +51,16 @@ export interface RuntimeConsoleLogEntry {
   readonly message: string;
   readonly details?: string;
   readonly stack?: string;
+  readonly stackPreview?: string;
+  readonly requestMethod?: string;
+  readonly target?: string;
+  readonly diagnostics?: RuntimeDiagnostics;
 }
 
 export interface RuntimeConsoleState {
   readonly isExpanded: boolean;
   readonly activeTab: RuntimeConsoleTab;
+  readonly logVerbosity: RuntimeLogVerbosity;
   readonly events: ReadonlyArray<RuntimeEvent>;
   readonly logs: ReadonlyArray<RuntimeConsoleLogEntry>;
   readonly healthChecks: ReadonlyArray<RuntimeHealthCheck>;
@@ -85,6 +98,7 @@ export class RuntimeConsoleStore {
   private state: RuntimeConsoleState = Object.freeze({
     isExpanded: false,
     activeTab: "health",
+    logVerbosity: "normal",
     events: Object.freeze([]),
     logs: Object.freeze([]),
     healthChecks: Object.freeze([]),
@@ -157,6 +171,14 @@ export class RuntimeConsoleStore {
     this.patch({ activeTab: tab });
   }
 
+  public setLogVerbosity(verbosity: RuntimeLogVerbosity): void {
+    if (this.state.logVerbosity === verbosity) {
+      return;
+    }
+
+    this.patch({ logVerbosity: verbosity });
+  }
+
   public clearEvents(): void {
     this.clearLogs();
   }
@@ -201,8 +223,14 @@ export class RuntimeConsoleStore {
         severity: "error",
         source: "python-runtime-manager",
         message: "Python runtime restart failed.",
-        details: message,
-        stack: toErrorStack(error),
+        error,
+        diagnosticsContext: {
+          message,
+          subsystem: "python-runtime-manager",
+          className: "RuntimeConsoleStore",
+          methodName: "restartRuntime",
+          operation: "restart-python-runtime",
+        },
       });
       this.patch({
         appState: "failed",
@@ -242,8 +270,14 @@ export class RuntimeConsoleStore {
             severity: "error",
             source: detectLogSource(message, error, "runtime-console"),
             message: "Runtime health refresh failed.",
-            details: message,
-            stack: toErrorStack(error),
+            error,
+            diagnosticsContext: {
+              message,
+              subsystem: "runtime-console",
+              className: "RuntimeConsoleStore",
+              methodName: "refreshHealth",
+              operation: "refresh-runtime-health",
+            },
           });
           this.patch({
             healthChecks: Object.freeze([
@@ -290,8 +324,14 @@ export class RuntimeConsoleStore {
         severity: "error",
         source: detectLogSource(message, error, "python-runtime-manager"),
         message: "Python runtime initialization failed.",
-        details: message,
-        stack: toErrorStack(error),
+        error,
+        diagnosticsContext: {
+          message,
+          subsystem: "python-runtime-manager",
+          className: "RuntimeConsoleStore",
+          methodName: "bootstrapRuntime",
+          operation: "initialize-python-runtime",
+        },
       });
       this.applyAppState(fallbackStatus, "startup-failed", message);
     }
@@ -345,8 +385,14 @@ export class RuntimeConsoleStore {
           severity: "error",
           source: detectLogSource(message, error, "python-runtime-manager"),
           message: "Managed runtime recovery failed.",
-          details: message,
-          stack: toErrorStack(error),
+          error,
+          diagnosticsContext: {
+            message,
+            subsystem: "python-runtime-manager",
+            className: "RuntimeConsoleStore",
+            methodName: "syncRuntimeState",
+            operation: "recover-python-runtime",
+          },
         });
         this.applyAppState(this.pythonRuntimeManager.getStatus(), "startup-failed", message);
         return this.pythonRuntimeManager.getStatus();
@@ -412,8 +458,14 @@ export class RuntimeConsoleStore {
             severity: "warn",
             source: detectLogSource(message, error, "mcp-runtime"),
             message: "Configured MCP servers could not be listed.",
-            details: message,
-            stack: toErrorStack(error),
+            error,
+            diagnosticsContext: {
+              message,
+              subsystem: "mcp-runtime",
+              className: "RuntimeConsoleStore",
+              methodName: "collectHealthChecks",
+              operation: "list-configured-mcp-servers",
+            },
           });
           return Object.freeze([]);
         }),
@@ -437,8 +489,14 @@ export class RuntimeConsoleStore {
         severity: "error",
         source: detectLogSource(message, error, "mcp-runtime"),
         message: "MCP runtime inspection failed.",
-        details: message,
-        stack: toErrorStack(error),
+        error,
+        diagnosticsContext: {
+          message,
+          subsystem: "mcp-runtime",
+          className: "RuntimeConsoleStore",
+          methodName: "collectHealthChecks",
+          operation: "inspect-mcp-runtime",
+        },
       });
       checks.push({
         id: "mcp-runtime",
@@ -542,8 +600,15 @@ export class RuntimeConsoleStore {
             severity: "warn",
             source: detectLogSource(message, error, "mcp-runtime"),
             message: `MCP server inspection failed for ${configuredServer.name}.`,
-            details: message,
-            stack: toErrorStack(error),
+            error,
+            diagnosticsContext: {
+              message,
+              subsystem: "mcp-runtime",
+              className: "RuntimeConsoleStore",
+              methodName: "collectServerStatuses",
+              operation: "inspect-mcp-server",
+              details: { serverId, serverName: configuredServer.name },
+            },
           });
           return this.createFallbackMcpServerStatus(configuredServer, error);
         }
@@ -553,15 +618,30 @@ export class RuntimeConsoleStore {
     return Object.freeze(statuses.filter((status): status is McpServerStatus => !!status));
   }
 
-  private appendLog(entry: Omit<RuntimeConsoleLogEntry, "id" | "timestamp"> & Partial<Pick<RuntimeConsoleLogEntry, "id" | "timestamp">>): void {
+  private appendLog(
+    entry: Omit<RuntimeConsoleLogEntry, "id" | "timestamp" | "stackPreview"> &
+      Partial<Pick<RuntimeConsoleLogEntry, "id" | "timestamp" | "stackPreview">> & {
+        readonly error?: unknown;
+        readonly diagnosticsContext?: RuntimeDiagnosticsContext;
+      },
+  ): void {
+    const diagnostics = entry.diagnostics
+      ?? (entry.error !== undefined ? normalizeRuntimeError(entry.error, entry.diagnosticsContext) : undefined);
+    const stack = entry.stack?.trim() || diagnostics?.stack?.trim() || undefined;
+    const details = entry.details?.trim() || buildRuntimeDiagnosticSummary(diagnostics) || undefined;
+    const stackPreview = entry.stackPreview?.trim() || buildRuntimeStackPreview(stack);
     const nextEntry = Object.freeze({
       id: entry.id?.trim() || createRuntimeConsoleLogId(),
       timestamp: entry.timestamp ?? new Date().toISOString(),
       severity: entry.severity,
       source: entry.source,
       message: entry.message.trim(),
-      details: entry.details?.trim() || undefined,
-      stack: entry.stack?.trim() || undefined,
+      details,
+      stack,
+      stackPreview,
+      requestMethod: entry.requestMethod ?? diagnostics?.requestMethod,
+      target: entry.target ?? diagnostics?.target,
+      diagnostics,
     });
 
     this.diagnosticLogs = Object.freeze([...this.diagnosticLogs, nextEntry].slice(-this.logCapacity));
@@ -583,13 +663,22 @@ export class RuntimeConsoleStore {
   }
 
   private mapRuntimeEventToLogEntry(event: RuntimeEvent): RuntimeConsoleLogEntry {
+    const eventDetails = event.details;
+    const diagnostics = readRuntimeDiagnostics(eventDetails);
+    const serializedEventDetails = eventDetails ? serializeEventDetails(eventDetails) : undefined;
+
     return Object.freeze({
       id: `event:${event.id}`,
       timestamp: event.timestamp,
       severity: mapRuntimeEventSeverity(event.severity),
       source: mapRuntimeEventSource(event.source),
       message: event.message,
-      details: event.details ? JSON.stringify(event.details) : undefined,
+      details: diagnostics ? buildRuntimeDiagnosticSummary(diagnostics) : serializedEventDetails,
+      stack: diagnostics?.stack,
+      stackPreview: buildRuntimeStackPreview(diagnostics?.stack),
+      requestMethod: diagnostics?.requestMethod,
+      target: diagnostics?.target,
+      diagnostics,
     });
   }
 
@@ -600,14 +689,25 @@ export class RuntimeConsoleStore {
 
     const onError = (event: Event): void => {
       const errorEvent = event as ErrorEvent;
-      const error = errorEvent.error;
+      const error = errorEvent.error ?? errorEvent;
       const message = errorEvent.message || toErrorMessage(error) || "Unexpected UI error.";
       this.appendLog({
         severity: "error",
         source: detectLogSource(message, error, "ui"),
         message: "Uncaught UI error during runtime management.",
-        details: message,
-        stack: errorEvent.error instanceof Error ? errorEvent.error.stack : undefined,
+        error,
+        diagnosticsContext: {
+          message,
+          subsystem: "ui",
+          className: "window",
+          methodName: "onerror",
+          operation: "ui-uncaught-error",
+          target: errorEvent.filename,
+          details: {
+            line: errorEvent.lineno,
+            column: errorEvent.colno,
+          },
+        },
       });
     };
 
@@ -617,8 +717,15 @@ export class RuntimeConsoleStore {
         severity: "error",
         source: detectLogSource(message, event.reason, "ui"),
         message: "Unhandled runtime management promise rejection.",
-        details: message,
-        stack: toErrorStack(event.reason),
+        error: event.reason,
+        diagnosticsContext: {
+          message,
+          subsystem: "ui",
+          className: "window",
+          methodName: "onunhandledrejection",
+          operation: "ui-unhandled-rejection",
+          details: event.reason,
+        },
       });
     };
 
@@ -811,6 +918,28 @@ function toErrorMessage(error: unknown): string | undefined {
 
 function toErrorStack(error: unknown): string | undefined {
   return error instanceof Error ? error.stack : undefined;
+}
+
+function readRuntimeDiagnostics(details: RuntimeEvent["details"]): RuntimeDiagnostics | undefined {
+  if (!details || typeof details !== "object" || !("diagnostics" in details)) {
+    return undefined;
+  }
+
+  const diagnostics = (details as { diagnostics?: RuntimeDiagnostics }).diagnostics;
+  return diagnostics && typeof diagnostics.message === "string" ? diagnostics : undefined;
+}
+
+function serializeEventDetails(details: RuntimeEvent["details"]): string | undefined {
+  if (!details) {
+    return undefined;
+  }
+
+  const entries = Object.entries(details).filter(([key]) => key !== "diagnostics");
+  if (entries.length === 0) {
+    return undefined;
+  }
+
+  return JSON.stringify(Object.fromEntries(entries));
 }
 
 function createRuntimeConsoleLogId(): string {

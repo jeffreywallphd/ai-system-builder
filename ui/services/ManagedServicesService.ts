@@ -1,4 +1,5 @@
 import type { IRuntimeEventStore } from "../../application/ports/interfaces/IRuntimeEventStore";
+import { bindSafeFetch } from "../../application/runtime/RuntimeDiagnostics";
 import { RuntimeEventSources, type RuntimeEvent } from "../../application/runtime/RuntimeEvent";
 import type {
   ManagedSupervisorServiceLogEntry,
@@ -89,7 +90,7 @@ export class ManagedServicesService {
     this.supervisorClient = options.supervisorClient;
     this.runtimeEventStore = options.runtimeEventStore;
     this.definitionRepository = options.definitionRepository;
-    this.fetchImplementation = options.fetchImplementation ?? fetch;
+    this.fetchImplementation = bindSafeFetch(options.fetchImplementation ?? fetch);
 
     for (const definition of options.builtinDefinitions) {
       this.builtinDefinitions.set(definition.serviceId, definition);

@@ -337,6 +337,165 @@ describe("RuntimeConsoleStore", () => {
     expect(refreshLog?.details).toContain("Illegal invocation");
   });
 
+  it("defaults to normal verbosity and lets the user switch to verbose mode", () => {
+    const store = new RuntimeConsoleStore({
+      runtimeEventStore: new RuntimeEventBuffer(),
+      pythonRuntimeManager: {
+        checkAvailability: async () => true,
+        ensureRuntimeAvailability: async () => ({
+          status: "healthy",
+          isAvailable: true,
+          owner: "external",
+          lastUpdatedAt: new Date().toISOString(),
+        }),
+        restartRuntime: async () => ({
+          status: "healthy",
+          isAvailable: true,
+          owner: "external",
+          lastUpdatedAt: new Date().toISOString(),
+        }),
+        getStatus: () => ({
+          status: "healthy",
+          isAvailable: true,
+          owner: "external",
+          lastUpdatedAt: new Date().toISOString(),
+        }),
+        stopManagedRuntime: async () => undefined,
+      },
+    });
+
+    expect(store.getState().logVerbosity).toBe("normal");
+
+    store.setLogVerbosity("verbose");
+
+    expect(store.getState().logVerbosity).toBe("verbose");
+  });
+
+  it("records uncaught promise rejections with preserved diagnostics", () => {
+    const previousWindow = (globalThis as typeof globalThis & { window?: unknown }).window;
+    const listeners = new Map<string, Set<(event: any) => void>>();
+    const fakeWindow = {
+      addEventListener(type: string, listener: (event: any) => void) {
+        const bucket = listeners.get(type) ?? new Set();
+        bucket.add(listener);
+        listeners.set(type, bucket);
+      },
+      removeEventListener(type: string, listener: (event: any) => void) {
+        listeners.get(type)?.delete(listener);
+      },
+    };
+    (globalThis as typeof globalThis & { window?: typeof fakeWindow }).window = fakeWindow;
+
+    try {
+      const store = new RuntimeConsoleStore({
+        runtimeEventStore: new RuntimeEventBuffer(),
+        pythonRuntimeManager: {
+          checkAvailability: async () => true,
+          ensureRuntimeAvailability: async () => ({
+            status: "healthy",
+            isAvailable: true,
+            owner: "external",
+            lastUpdatedAt: new Date().toISOString(),
+          }),
+          restartRuntime: async () => ({
+            status: "healthy",
+            isAvailable: true,
+            owner: "external",
+            lastUpdatedAt: new Date().toISOString(),
+          }),
+          getStatus: () => ({
+            status: "healthy",
+            isAvailable: true,
+            owner: "external",
+            lastUpdatedAt: new Date().toISOString(),
+          }),
+          stopManagedRuntime: async () => undefined,
+        },
+      });
+
+      const rootCause = new Error("Socket closed");
+      rootCause.name = "NetworkError";
+      rootCause.stack = "NetworkError: Socket closed\n    at fetch";
+      const rejection = new Error("Failed to execute 'fetch' on 'Window': Illegal invocation.", { cause: rootCause });
+      rejection.name = "TypeError";
+      rejection.stack = "TypeError: Failed to execute 'fetch' on 'Window': Illegal invocation.\n    at refreshHealth";
+
+      listeners.get("unhandledrejection")?.forEach((listener) => listener({ reason: rejection }));
+
+      const entry = store.getState().logs.find((log) => log.message === "Unhandled runtime management promise rejection.");
+      expect(entry).toBeDefined();
+      expect(entry?.source).toBe("network");
+      expect(entry?.diagnostics?.causeChain).toHaveLength(2);
+      expect(entry?.stack).toContain("Illegal invocation");
+
+      store.dispose();
+    } finally {
+      (globalThis as typeof globalThis & { window?: unknown }).window = previousWindow;
+    }
+  });
+
+  it("maps runtime event diagnostics into verbose-ready log entries", () => {
+    const eventStore = new RuntimeEventBuffer();
+    const store = new RuntimeConsoleStore({
+      runtimeEventStore: eventStore,
+      pythonRuntimeManager: {
+        checkAvailability: async () => true,
+        ensureRuntimeAvailability: async () => ({
+          status: "healthy",
+          isAvailable: true,
+          owner: "external",
+          lastUpdatedAt: new Date().toISOString(),
+        }),
+        restartRuntime: async () => ({
+          status: "healthy",
+          isAvailable: true,
+          owner: "external",
+          lastUpdatedAt: new Date().toISOString(),
+        }),
+        getStatus: () => ({
+          status: "healthy",
+          isAvailable: true,
+          owner: "external",
+          lastUpdatedAt: new Date().toISOString(),
+        }),
+        stopManagedRuntime: async () => undefined,
+      },
+    });
+
+    eventStore.append(createRuntimeEvent({
+      source: RuntimeEventSources.pythonRuntime,
+      severity: "error",
+      message: "MCP status check failed.",
+      details: {
+        diagnostics: {
+          message: "Failed to execute 'fetch' on 'Window': Illegal invocation.",
+          stack: "TypeError: Illegal invocation\n    at refreshHealth",
+          cause: "Illegal invocation",
+          causeChain: [
+            { message: "Illegal invocation", name: "TypeError", stack: "TypeError: Illegal invocation\n    at refreshHealth" },
+            { message: "Socket closed", name: "NetworkError", stack: "NetworkError: Socket closed\n    at fetch" },
+          ],
+          subsystem: "mcp-runtime",
+          className: "HttpMcpRuntimeClient",
+          methodName: "request",
+          operation: "refresh-runtime-health",
+          target: "/mcp/status",
+          requestMethod: "GET",
+          failedBeforeResponse: true,
+          details: { phase: "phone-debug" },
+          name: "TypeError",
+        },
+      },
+    }));
+
+    const entry = store.getState().logs.find((log) => log.message === "MCP status check failed.");
+    expect(entry).toBeDefined();
+    expect(entry?.requestMethod).toBe("GET");
+    expect(entry?.target).toBe("/mcp/status");
+    expect(entry?.stackPreview).toContain("Illegal invocation");
+    expect(entry?.diagnostics?.causeChain).toHaveLength(2);
+  });
+
   it("retains a bounded in-memory log buffer", () => {
     const eventStore = new RuntimeEventBuffer({ capacity: 10 });
     const store = new RuntimeConsoleStore({

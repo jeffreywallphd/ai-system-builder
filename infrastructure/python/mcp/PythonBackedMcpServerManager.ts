@@ -4,6 +4,7 @@ import type { IMcpServerCatalog } from "../../../application/ports/interfaces/IM
 import type { IMcpServerManager } from "../../../application/ports/interfaces/IMcpServerManager";
 import type { IRuntimeEventSink } from "../../../application/ports/interfaces/IRuntimeEventSink";
 import { RuntimeEventSources } from "../../../application/runtime/RuntimeEvent";
+import { toRuntimeDiagnosticDetails } from "../../../application/runtime/RuntimeDiagnostics";
 import type { McpServerConnectionRequest } from "../../../application/mcp/models/McpServerConnectionRequest";
 import type { McpServerConnectionResult } from "../../../application/mcp/models/McpServerConnectionResult";
 
@@ -82,12 +83,17 @@ export class PythonBackedMcpServerManager implements IMcpServerManager {
         source: RuntimeEventSources.pythonRuntime,
         severity: "error",
         message: "Local MCP server start inspection failed.",
-        details: {
+        details: toRuntimeDiagnosticDetails(error, {
+          subsystem: "mcp-runtime",
+          className: "PythonBackedMcpServerManager",
+          methodName: "emitLocalStartAttempt",
+          operation: "inspect-local-mcp-server-start",
+          details: { action, serverId: normalized },
+        }, {
           eventType: "mcp-connection-failure",
           action,
           serverId: normalized,
-          cause: error instanceof Error ? error.message : String(error),
-        },
+        }),
       });
     }
   }
