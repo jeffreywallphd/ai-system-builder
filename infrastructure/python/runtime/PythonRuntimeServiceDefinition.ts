@@ -42,6 +42,8 @@ export function createPythonRuntimeServiceDefinition(config: PythonRuntimeConfig
     autoStartPolicy: resolveAutoStartPolicy(config),
     restartPolicy: ManagedServiceRestartPolicies.onFailure,
     startupTimeoutMs: config.startupTimeoutMs,
+    pythonVersion: config.pythonVersion,
+    pythonInterpreterPath: config.pythonInterpreterPath,
     tags: ["builtin", "python", "runtime"],
     capabilities: ["workflow-execution", "node-execution", "mcp-runtime"],
   } satisfies ManagedServiceDefinition);

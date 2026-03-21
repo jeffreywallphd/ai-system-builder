@@ -122,7 +122,8 @@ The primary local-development path is now:
 1. Start the TypeScript app with `npm run dev`.
 2. Let the Vite dev server auto-start the generic local service supervisor for you.
 3. If you explicitly disable auto-start or need to run it manually, use `npm run service-supervisor`.
-4. Use **Managed Services** inside the app to launch and monitor the built-in Python runtime.
+4. Open **Settings** and choose the built-in Python version you want the managed runtime to use. Supported selectable versions currently include **Python 3.11** and **Python 3.12**, with **Python 3.12** selected by default.
+5. Use **Managed Services** inside the app to provision, repair, recreate, launch, and monitor the built-in Python runtime.
 
 This makes the Python runtime just one managed service in a broader local-service model that also supports future custom servers without requiring terminal-only administration.
 
@@ -136,7 +137,7 @@ Runtime endpoints:
 Managed-service notes:
 
 - The Python runtime is treated as a built-in managed service rather than a special-case lifecycle.
-- Service state, PID, uptime, ownership, recent logs, dependency readiness, start/stop/restart/ensure-running controls, and safe configuration editing all flow through the generic managed-service infrastructure.
+- Service state, provisioning state, PID, uptime, ownership, recent logs, dependency readiness, provision/repair/recreate/start/stop/restart/ensure-running controls, and safe configuration editing all flow through the generic managed-service infrastructure.
 - Custom managed services are persisted through the supervisor so they can be created from the UI and survive supervisor restarts.
 - The managed-service screen is designed to stay usable from smaller/mobile layouts for phone-driven monitoring and administration.
 - Python-specific HTTP clients still handle workflow and MCP execution, but lifecycle/state ownership now lives in the shared managed-service layer.
@@ -160,14 +161,9 @@ Then open `http://localhost:4173`.
 ### Python runtime troubleshooting
 
 - The managed service supervisor now launches the real Python runtime by default. Set `SERVICE_SUPERVISOR_STUB_MODE=true` only when you intentionally want the stubbed/test runtime behavior.
-- The runtime requires **Python 3.11+** and the packages listed in `python-runtime/requirements.txt`. A typical setup is:
-  ```bash
-  cd python-runtime
-  python3 -m venv .venv
-  source .venv/bin/activate
-  pip install -r requirements.txt
-  ```
-- If you create `python-runtime/.venv`, the supervisor will automatically prefer that interpreter the next time you run `npm run service-supervisor`.
+- Install a supported local Python interpreter first. The managed runtime currently supports **Python 3.11** and **Python 3.12**.
+- After that, use the app-managed provisioning flow instead of manually creating a venv or running `pip install -r requirements.txt`.
+- If provisioning fails, open **Managed Services** to inspect the provisioning logs. The supervisor now records the requested Python version, the resolved interpreter path, virtual-environment creation, pip upgrade output, requirements installation output, and compatibility errors directly in the in-app logs.
 - If you open the Vite UI from another device on your LAN, make sure the supervisor and Python runtime listen on the host machine. The defaults now do this automatically, but you can force it with:
   ```bash
   SERVICE_SUPERVISOR_HOST=0.0.0.0 PYTHON_RUNTIME_BIND_HOST=0.0.0.0 node infrastructure/runtime/service-supervisor.js

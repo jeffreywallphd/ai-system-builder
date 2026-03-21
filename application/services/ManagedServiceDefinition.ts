@@ -63,6 +63,8 @@ export interface ManagedServiceDefinition {
   readonly autoStartPolicy: ManagedServiceStartPolicy;
   readonly restartPolicy: ManagedServiceRestartPolicy;
   readonly startupTimeoutMs: number;
+  readonly pythonVersion?: string;
+  readonly pythonInterpreterPath?: string;
   readonly tags: ReadonlyArray<string>;
   readonly capabilities: ReadonlyArray<string>;
 }
@@ -85,6 +87,8 @@ export interface ManagedServiceDefinitionInput {
   readonly autoStartPolicy?: ManagedServiceStartPolicy;
   readonly restartPolicy?: ManagedServiceRestartPolicy;
   readonly startupTimeoutMs?: number;
+  readonly pythonVersion?: string;
+  readonly pythonInterpreterPath?: string;
   readonly tags?: ReadonlyArray<string>;
   readonly capabilities?: ReadonlyArray<string>;
 }
@@ -159,6 +163,8 @@ export function validateManagedServiceDefinition(
   const workingDirectory = normalizeOptionalValue(definition.workingDirectory);
   const command = normalizeOptionalValue(definition.command);
   const source = definition.source ?? ManagedServiceSources.custom;
+  const pythonVersion = normalizeOptionalValue(definition.pythonVersion);
+  const pythonInterpreterPath = normalizeOptionalValue(definition.pythonInterpreterPath);
 
   if (!Object.values(ManagedServiceSources).includes(source)) {
     throw new Error(`Managed service '${serviceId}' has unsupported source '${source}'.`);
@@ -236,6 +242,8 @@ export function validateManagedServiceDefinition(
     autoStartPolicy: definition.autoStartPolicy,
     restartPolicy: definition.restartPolicy,
     startupTimeoutMs: Math.round(definition.startupTimeoutMs),
+    pythonVersion,
+    pythonInterpreterPath,
     tags,
     capabilities,
   } satisfies ManagedServiceDefinition);
@@ -282,6 +290,8 @@ export function mergeBuiltinManagedServiceDefinition(
     autoStartPolicy: persistedDefinition.autoStartPolicy ?? builtinDefinition.autoStartPolicy,
     restartPolicy: builtinDefinition.restartPolicy,
     startupTimeoutMs: persistedDefinition.startupTimeoutMs ?? builtinDefinition.startupTimeoutMs,
+    pythonVersion: persistedDefinition.pythonVersion ?? builtinDefinition.pythonVersion,
+    pythonInterpreterPath: persistedDefinition.pythonInterpreterPath ?? builtinDefinition.pythonInterpreterPath,
     tags: builtinDefinition.tags,
     capabilities: builtinDefinition.capabilities,
   });

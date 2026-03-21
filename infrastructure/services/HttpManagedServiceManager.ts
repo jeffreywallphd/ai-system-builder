@@ -153,6 +153,21 @@ export class HttpManagedServiceManager
     return this.applyServiceSnapshot(serviceId, response.service);
   }
 
+  public async provision(serviceId: string): Promise<ManagedServiceStatus> {
+    const response = await this.client.provision(serviceId);
+    return this.applyServiceSnapshot(serviceId, response.service);
+  }
+
+  public async repair(serviceId: string): Promise<ManagedServiceStatus> {
+    const response = await this.client.repair(serviceId);
+    return this.applyServiceSnapshot(serviceId, response.service);
+  }
+
+  public async recreateEnvironment(serviceId: string): Promise<ManagedServiceStatus> {
+    const response = await this.client.recreateEnvironment(serviceId);
+    return this.applyServiceSnapshot(serviceId, response.service);
+  }
+
   private applyServiceSnapshot(
     serviceId: string,
     service: Awaited<ReturnType<IManagedServiceSupervisorClient["getService"]>>["service"],

@@ -10,6 +10,14 @@ export const ManagedSupervisorServiceStates = {
   stopped: "stopped",
 } as const;
 
+export const ManagedSupervisorProvisioningStates = {
+  unsupported: "unsupported",
+  unprovisioned: "unprovisioned",
+  provisioning: "provisioning",
+  provisioned: "provisioned",
+  provisionFailed: "provision-failed",
+} as const;
+
 export const ManagedSupervisorServiceOwnership = {
   none: "none",
   managed: "managed",
@@ -21,6 +29,9 @@ export type ManagedSupervisorServiceState =
 
 export type ManagedSupervisorServiceOwnership =
   (typeof ManagedSupervisorServiceOwnership)[keyof typeof ManagedSupervisorServiceOwnership];
+
+export type ManagedSupervisorProvisioningState =
+  (typeof ManagedSupervisorProvisioningStates)[keyof typeof ManagedSupervisorProvisioningStates];
 
 export interface ManagedSupervisorServiceLogEntry {
   readonly timestamp: string;
@@ -80,6 +91,23 @@ export interface ManagedSupervisorServiceDiagnostics {
     readonly errorCode: string | null;
   } | null;
   readonly circuitBreaker: ManagedSupervisorCircuitBreakerState;
+  readonly provisioning: {
+    readonly state: ManagedSupervisorProvisioningState;
+    readonly required: boolean;
+    readonly requestedVersion: string | null;
+    readonly resolvedVersion: string | null;
+    readonly resolvedInterpreter: string | null;
+    readonly environmentPath: string | null;
+    readonly versionMismatch: boolean;
+    readonly needsReprovision: boolean;
+    readonly lastUpdatedAt: string | null;
+    readonly lastError: {
+      readonly at: string;
+      readonly message: string;
+      readonly code: string | null;
+      readonly details: Readonly<Record<string, unknown>>;
+    } | null;
+  };
 }
 
 export interface ManagedSupervisorServiceMetadata {
@@ -155,4 +183,7 @@ export interface IManagedServiceSupervisorClient {
   stop(serviceId: string): Promise<ManagedSupervisorServiceResponse>;
   restart(serviceId: string): Promise<ManagedSupervisorServiceResponse>;
   ensureRunning(serviceId: string): Promise<ManagedSupervisorServiceResponse>;
+  provision(serviceId: string): Promise<ManagedSupervisorServiceResponse>;
+  repair(serviceId: string): Promise<ManagedSupervisorServiceResponse>;
+  recreateEnvironment(serviceId: string): Promise<ManagedSupervisorServiceResponse>;
 }

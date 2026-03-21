@@ -4,20 +4,26 @@ FastAPI service that executes Python-native and LangChain-backed workflow nodes.
 
 ## Local setup
 
-1. Create virtual environment:
-   ```bash
-   cd python-runtime
-   python -m venv .venv
-   source .venv/bin/activate
-   ```
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-3. Run service locally:
-   ```bash
-   uvicorn app.main:app --host 0.0.0.0 --port 8100 --reload
-   ```
+The preferred local-development path is now:
+
+1. Install a supported Python interpreter on your machine. AI Loom Studio currently supports **Python 3.11** and **Python 3.12** for the built-in runtime.
+2. Start the app and open **Settings** if you want to change the built-in Python version selection.
+3. Open **Managed Services** and use the built-in Python runtime card to **Provision**, **Repair**, or **Recreate env** as needed.
+4. Start the managed runtime from the app.
+
+Manual `python -m venv` and `pip install -r requirements.txt` steps are now an advanced fallback rather than the primary path.
+
+## Advanced manual fallback
+
+If you need to troubleshoot outside the supervisor, you can still provision the environment manually:
+
+```bash
+cd python-runtime
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8100 --reload
+```
 
 ## Local MCP authoring
 

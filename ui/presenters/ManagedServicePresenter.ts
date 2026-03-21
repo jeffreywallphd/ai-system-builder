@@ -3,6 +3,9 @@ import { toTitleCase } from "./PresenterFormatting";
 
 export class ManagedServicePresenter {
   public presentState(service: ManagedServiceRecord): string {
+    if (service.provisioning.required && service.provisioning.state !== "provisioned") {
+      return toTitleCase(service.provisioning.state);
+    }
     return toTitleCase(service.state);
   }
 

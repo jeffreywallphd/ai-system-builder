@@ -136,6 +136,18 @@ export class ManagedServicesStore {
     await this.runMutation(serviceId, (id) => this.managedServicesService.ensureRunning(id));
   }
 
+  public async provision(serviceId: string): Promise<void> {
+    await this.runMutation(serviceId, (id) => this.managedServicesService.provisionService(id));
+  }
+
+  public async repair(serviceId: string): Promise<void> {
+    await this.runMutation(serviceId, (id) => this.managedServicesService.repairService(id));
+  }
+
+  public async recreateEnvironment(serviceId: string): Promise<void> {
+    await this.runMutation(serviceId, (id) => this.managedServicesService.recreateEnvironment(id));
+  }
+
   public async startCapability(capabilityId: string): Promise<void> {
     this.patch({ isMutating: true, error: undefined });
 

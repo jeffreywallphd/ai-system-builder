@@ -19,6 +19,9 @@ export interface ManagedServicesPanelProps {
   readonly onStop: (serviceId: string) => void;
   readonly onRestart: (serviceId: string) => void;
   readonly onEnsureRunning: (serviceId: string) => void;
+  readonly onProvision: (serviceId: string) => void;
+  readonly onRepair: (serviceId: string) => void;
+  readonly onRecreateEnvironment: (serviceId: string) => void;
   readonly onStartCapability: (capabilityId: string) => void;
   readonly onCreateService: (definition: ManagedServiceDefinitionInput) => void;
   readonly onUpdateService: (serviceId: string, patch: ManagedServiceDefinitionInput) => void;
@@ -56,6 +59,9 @@ export default function ManagedServicesPanel({
   onStop,
   onRestart,
   onEnsureRunning,
+  onProvision,
+  onRepair,
+  onRecreateEnvironment,
   onStartCapability,
   onCreateService,
   onUpdateService,
@@ -344,6 +350,18 @@ export default function ManagedServicesPanel({
                       <span className="ui-meta-label">Readiness</span>
                       <span className="ui-meta-value">{selectedService.readiness.detail}</span>
                     </div>
+                    <div className="ui-meta-item">
+                      <span className="ui-meta-label">Provisioning</span>
+                      <span className="ui-meta-value">{selectedService.provisioning.detail}</span>
+                    </div>
+                    <div className="ui-meta-item">
+                      <span className="ui-meta-label">Python version</span>
+                      <span className="ui-meta-value">{selectedService.provisioning.requestedVersion ?? "Not managed"}</span>
+                    </div>
+                    <div className="ui-meta-item">
+                      <span className="ui-meta-label">Interpreter</span>
+                      <span className="ui-meta-value">{selectedService.provisioning.resolvedInterpreter ?? "Not resolved yet"}</span>
+                    </div>
                     <div className="ui-meta-item ui-managed-services__meta-item--full">
                       <span className="ui-meta-label">Last error detail</span>
                       <span className="ui-meta-value">{presenter.presentErrorDetail(selectedService)}</span>
@@ -351,7 +369,7 @@ export default function ManagedServicesPanel({
                   </div>
 
                   <div className="ui-managed-services__actions">
-                    <button type="button" className="ui-button ui-button--primary ui-button--sm" disabled={!selectedService.canManageLifecycle || isLoading || isMutating} onClick={() => onStart(selectedService.id)}>
+                    <button type="button" className="ui-button ui-button--primary ui-button--sm" disabled={!selectedService.canManageLifecycle || isLoading || isMutating || (selectedService.provisioning.required && (selectedService.provisioning.state !== "provisioned" || selectedService.provisioning.needsReprovision))} onClick={() => onStart(selectedService.id)}>
                       Start
                     </button>
                     <button type="button" className="ui-button ui-button--ghost ui-button--sm" disabled={!selectedService.canManageLifecycle || isLoading || isMutating} onClick={() => onStop(selectedService.id)}>
@@ -362,6 +380,30 @@ export default function ManagedServicesPanel({
                     </button>
                     <button type="button" className="ui-button ui-button--secondary ui-button--sm" disabled={isLoading || isMutating} onClick={() => onEnsureRunning(selectedService.id)}>
                       Check / ensure
+                    </button>
+                    <button
+                      type="button"
+                      className="ui-button ui-button--secondary ui-button--sm"
+                      disabled={isLoading || isMutating || !selectedService.provisioning.availableActions.includes("provision")}
+                      onClick={() => onProvision(selectedService.id)}
+                    >
+                      Provision
+                    </button>
+                    <button
+                      type="button"
+                      className="ui-button ui-button--secondary ui-button--sm"
+                      disabled={isLoading || isMutating || !selectedService.provisioning.availableActions.includes("repair")}
+                      onClick={() => onRepair(selectedService.id)}
+                    >
+                      Repair
+                    </button>
+                    <button
+                      type="button"
+                      className="ui-button ui-button--ghost ui-button--sm"
+                      disabled={isLoading || isMutating || !selectedService.provisioning.availableActions.includes("recreate-environment")}
+                      onClick={() => onRecreateEnvironment(selectedService.id)}
+                    >
+                      Recreate env
                     </button>
                     {selectedService.capabilities.map((capability) => (
                       <button
