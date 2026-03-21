@@ -39,8 +39,12 @@ export class AppRuntimeConfig {
   }
 
   private static readEnvVariable(key: string): string | undefined {
-    if (typeof process !== "undefined" && process?.env?.[key]) {
-      return process.env[key];
+    const processLike = typeof globalThis !== "undefined"
+      ? (globalThis as typeof globalThis & { process?: { env?: Record<string, string | undefined> } }).process
+      : undefined;
+
+    if (processLike?.env?.[key]) {
+      return processLike.env[key];
     }
 
     return import.meta.env?.[key];

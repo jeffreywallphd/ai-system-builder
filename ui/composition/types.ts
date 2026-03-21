@@ -6,6 +6,8 @@ import { WorkflowStore } from "../state/WorkflowStore";
 import { NodeStore } from "../state/NodeStore";
 import { ModelStore } from "../state/ModelStore";
 import { RuntimeConsoleStore } from "../state/RuntimeConsoleStore";
+import { ManagedServicesStore } from "../state/ManagedServicesStore";
+import type { IPythonRuntimeManager } from "../../application/ports/interfaces/IPythonRuntimeManager";
 import { ToolService } from "../services/ToolService";
 import { ToolStore } from "../state/ToolStore";
 import { McpService } from "../services/McpService";
@@ -15,6 +17,7 @@ import { ContextService } from "../services/ContextService";
 import { ContextStore } from "../state/ContextStore";
 import type { UiSettingsStorage } from "../settings/UiSettingsStore";
 import { UiSettingsStore } from "../settings/UiSettingsStore";
+import { ManagedServicesService } from "../services/ManagedServicesService";
 
 export interface UiDependencies {
   readonly config: AppRuntimeConfig;
@@ -25,6 +28,9 @@ export interface UiDependencies {
   readonly nodeService: NodeService;
   readonly modelService: ModelService;
   readonly runtimeConsoleStore: RuntimeConsoleStore;
+  readonly pythonRuntimeManager: IPythonRuntimeManager;
+  readonly managedServicesService: ManagedServicesService;
+  readonly managedServicesStore: ManagedServicesStore;
   readonly toolService: ToolService;
   readonly toolStore: ToolStore;
   readonly mcpService: McpService;

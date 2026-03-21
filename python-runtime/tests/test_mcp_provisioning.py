@@ -29,7 +29,7 @@ def test_local_mcp_server_provisioner_creates_default_calculator_server(tmp_path
     assert len(servers) == 1
     server = servers[0]
     server_root = tmp_path / server.id
-    assert installer.calls == [(['python-test', '-m', 'pip', 'install', 'mcp[cli]'], server_root)]
+    assert installer.calls == []
     assert server.command == 'python-test'
     assert server.args == [str(server_root / 'server.py')]
     assert server.connect_on_startup is True
@@ -66,6 +66,7 @@ def test_local_mcp_server_provisioner_can_create_workspace_authored_server(tmp_p
     assert server.connect_on_startup is False
     assert server.mock_tools[0]['name'] == 'summarize_notes'
     assert 'workspace-local' == server.metadata['serverKind']
+    assert installer.calls == []
     assert (tmp_path / 'workspace-helper' / 'server.py').read_text(encoding='utf-8').find('payload') >= 0
 
 

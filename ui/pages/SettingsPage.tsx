@@ -3,18 +3,21 @@ import { useUiDependencies } from "../composition/AppProviders";
 import { WorkspaceDataMode, type UiSettings } from "../settings/UiSettings";
 import type { UiSettingsState } from "../settings/UiSettingsStore";
 import type { McpStoreState } from "../state/McpStore";
+import type { RuntimeConsoleState } from "../state/RuntimeConsoleStore";
 import McpRuntimeStatusPanel from "../components/execution/McpRuntimeStatusPanel";
 
 export default function SettingsPage(): JSX.Element {
-  const { settingsStore, mcpStore } = useUiDependencies();
+  const { settingsStore, mcpStore, runtimeConsoleStore } = useUiDependencies();
   const [state, setState] = useState<UiSettingsState>(() => settingsStore.getState());
   const [mcpState, setMcpState] = useState<McpStoreState>(() => mcpStore.getState());
+  const [runtimeState, setRuntimeState] = useState<RuntimeConsoleState>(() => runtimeConsoleStore.getState());
   const [expandedAdvancedSections, setExpandedAdvancedSections] = useState<ReadonlyArray<string>>(
     Object.freeze(["runtime", "development"])
   );
 
   useEffect(() => settingsStore.subscribe(setState), [settingsStore]);
   useEffect(() => mcpStore.subscribe(setMcpState), [mcpStore]);
+  useEffect(() => runtimeConsoleStore.subscribe(setRuntimeState), [runtimeConsoleStore]);
 
   const saveStatus = useMemo(() => {
     if (state.saveError) {
@@ -181,11 +184,12 @@ export default function SettingsPage(): JSX.Element {
             <SelectField
               id="settings-runtime-mode"
               label="Runtime mode"
-              hint="Disable the runtime entirely or point the UI to a local HTTP service."
+              hint="Disable the runtime, connect to an external HTTP runtime, or supervise a managed local runtime."
               value={state.settings.runtime.mode}
               onChange={(value) => settingsStore.updateSection("runtime", { mode: value as UiSettings["runtime"]["mode"] })}
               options={[
-                { value: "local-http", label: "Local HTTP runtime" },
+                { value: "managed-local", label: "Managed local runtime" },
+                { value: "external-http", label: "External HTTP runtime" },
                 { value: "disabled", label: "Disabled" },
               ]}
             />
@@ -214,9 +218,13 @@ export default function SettingsPage(): JSX.Element {
             searchQuery={mcpState.searchQuery}
             isLoading={mcpState.isLoadingConfigured || mcpState.isSearching || mcpState.isMutating}
             error={mcpState.error}
+            runtimeAppState={runtimeState.appState}
+            runtimeAppStateDetail={runtimeState.appStateDetail}
+            isRuntimeUnavailable={runtimeState.appState !== "ready"}
             onSearchChange={(value) => void mcpStore.search({ query: value }).catch(() => undefined)}
             onConnectServer={(serverId, reconnect) => void mcpStore.connect(serverId, reconnect).catch(() => undefined)}
             onDisconnectServer={(serverId) => void mcpStore.disconnect(serverId).catch(() => undefined)}
+            onRestartRuntime={() => void runtimeConsoleStore.restartRuntime().catch(() => undefined)}
           />
 
           <AdvancedSection

@@ -38,7 +38,7 @@ import { RuntimeEventBuffer } from "../../application/runtime/RuntimeEventBuffer
 import { HttpPythonRuntimeClient } from "../../infrastructure/python/client/HttpPythonRuntimeClient";
 import { PythonRuntimeConfig } from "../../infrastructure/config/PythonRuntimeConfig";
 import { NodeProcessRuntimeEventSink } from "../../infrastructure/python/runtime/NodeProcessRuntimeEventSink";
-import { BrowserPythonRuntimeManager } from "../../infrastructure/python/runtime/BrowserPythonRuntimeManager";
+import { createPythonManagedService } from "../../infrastructure/python/runtime/createPythonManagedService";
 import { RuntimeConsoleStore } from "../state/RuntimeConsoleStore";
 import { McpService } from "../services/McpService";
 import { McpToolCallAuthoringService } from "../services/McpToolCallAuthoringService";
@@ -79,6 +79,10 @@ import { PreviewToolContextUseCase } from "../../application/context/PreviewTool
 import { PreviewAgentContextUseCase } from "../../application/context/PreviewAgentContextUseCase";
 import { LocalStorageContextPackageRepository } from "../../infrastructure/browser/context/LocalStorageContextPackageRepository";
 import { LocalStorageContextRecipeRepository } from "../../infrastructure/browser/context/LocalStorageContextRecipeRepository";
+import { createPythonRuntimeServiceDefinition } from "../../infrastructure/python/runtime/PythonRuntimeServiceDefinition";
+import { LocalStorageManagedServiceDefinitionRepository } from "../../infrastructure/browser/services/LocalStorageManagedServiceDefinitionRepository";
+import { HttpManagedServiceDefinitionRepository } from "../../infrastructure/services/HttpManagedServiceDefinitionRepository";
+import { HttpManagedServiceSupervisorClient } from "../../infrastructure/services/HttpManagedServiceSupervisorClient";
 
 import { WorkflowProjectionService } from "../../application/projection/WorkflowProjectionService";
 import { WorkflowToolProjectionService } from "../../application/projection/WorkflowToolProjectionService";
@@ -92,6 +96,9 @@ import { ToolService } from "../services/ToolService";
 import { ToolStore } from "../state/ToolStore";
 import { ContextService } from "../services/ContextService";
 import { ContextStore } from "../state/ContextStore";
+import { ManagedServicesService } from "../services/ManagedServicesService";
+import { ManagedServiceEventStream } from "../services/ManagedServiceEventStream";
+import { ManagedServicesStore } from "../state/ManagedServicesStore";
 import type { CreateUiDependenciesOptions, UiDependencies } from "./types";
 import { createSeedWorkflows } from "./seedWorkflows";
 import { CompositeToolCapabilityCatalog } from "../../infrastructure/tools/CompositeToolCapabilityCatalog";
@@ -207,6 +214,16 @@ export function createUiDependencies(
     modelService,
   });
 
+  const pythonRuntimeDefinition = createPythonRuntimeServiceDefinition(new PythonRuntimeConfig({
+    mode: settings.runtime.mode,
+    baseUrl: settings.runtime.mode === "disabled" ? undefined : settings.runtime.baseUrl,
+    timeoutMs: settings.runtime.requestTimeoutMs,
+    authToken: settings.runtime.authToken,
+    runtimeWorkingDirectory: settings.runtime.workingDirectory,
+    startupTimeoutMs: settings.runtime.startupTimeoutMs,
+    healthPollIntervalMs: settings.runtime.healthPollIntervalMs,
+    autoStartEnabled: settings.runtime.autoStartEnabled,
+  }));
   const pythonRuntimeConfig = new PythonRuntimeConfig({
     mode: settings.runtime.mode,
     baseUrl: settings.runtime.mode === "disabled" ? undefined : settings.runtime.baseUrl,
@@ -219,14 +236,23 @@ export function createUiDependencies(
   });
   const runtimeEventStore = new RuntimeEventBuffer({ capacity: 500 });
   const runtimeEventSink = new NodeProcessRuntimeEventSink(runtimeEventStore);
-  const runtimeClient = settings.runtime.mode === "disabled"
-    ? createDisabledRuntimeClient()
-    : new HttpPythonRuntimeClient(pythonRuntimeConfig);
-  const pythonRuntimeManager = new BrowserPythonRuntimeManager({
+  const runtimeClient = pythonRuntimeConfig.isEnabled
+    ? new HttpPythonRuntimeClient(pythonRuntimeConfig)
+    : createDisabledRuntimeClient();
+  const managedServiceSupervisorClient = pythonRuntimeConfig.isManagedLocal
+    ? new HttpManagedServiceSupervisorClient({
+      baseUrl: pythonRuntimeConfig.supervisorBaseUrl,
+      timeoutMs: pythonRuntimeConfig.timeoutMs,
+      authToken: pythonRuntimeConfig.authToken,
+    })
+    : undefined;
+  const pythonManagedService = createPythonManagedService({
+    config: pythonRuntimeConfig,
     client: runtimeClient,
     eventSink: runtimeEventSink,
-    config: pythonRuntimeConfig,
+    supervisorClient: managedServiceSupervisorClient,
   });
+  const pythonRuntimeManager = pythonManagedService.pythonRuntimeManager;
   const mcpClient = settings.runtime.mode === "disabled"
     ? createDisabledMcpRuntimeClient()
     : new HttpMcpRuntimeClient(pythonRuntimeConfig, fetch, runtimeEventSink);
@@ -300,7 +326,29 @@ export function createUiDependencies(
     runtimeEventStore,
     pythonRuntimeManager,
     mcpService,
+    runtimeManagement: {
+      isManagedLocal: pythonRuntimeConfig.isManagedLocal,
+      autoStartEnabled: pythonRuntimeConfig.autoStartEnabled,
+      healthPollIntervalMs: pythonRuntimeConfig.healthPollIntervalMs,
+    },
   });
+  const managedServiceDefinitionRepository = managedServiceSupervisorClient
+    ? new HttpManagedServiceDefinitionRepository(managedServiceSupervisorClient)
+    : new LocalStorageManagedServiceDefinitionRepository();
+  const managedServicesService = new ManagedServicesService({
+    serviceManager: pythonManagedService.manager,
+    serviceSupervisor: pythonManagedService.manager,
+    supervisorClient: managedServiceSupervisorClient,
+    runtimeEventStore,
+    builtinDefinitions: [pythonRuntimeDefinition],
+    definitionRepository: managedServiceDefinitionRepository,
+  });
+  const managedServiceEventStream = settings.runtime.mode === "disabled"
+    ? undefined
+    : new ManagedServiceEventStream({
+      baseUrl: pythonRuntimeConfig.supervisorBaseUrl,
+    });
+  const managedServicesStore = new ManagedServicesStore(managedServicesService, managedServiceEventStream);
   const mcpStore = new McpStore(mcpService);
   const previewWorkflowContextUseCase = new PreviewWorkflowContextUseCase(workflowContextService);
   const previewToolContextUseCase = new PreviewToolContextUseCase(
@@ -343,6 +391,9 @@ export function createUiDependencies(
     nodeService,
     modelService,
     runtimeConsoleStore,
+    pythonRuntimeManager,
+    managedServicesService,
+    managedServicesStore,
     toolService,
     toolStore: new ToolStore(toolService),
     mcpService,

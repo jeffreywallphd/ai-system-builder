@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { AppRuntimeConfig } from "../../../infrastructure/config/AppRuntimeConfig";
-import { readSource } from "../../tests/testUtils";
+import { ManagedServicePythonRuntimeManagerAdapter } from "../../../application/services/adapters/ManagedServicePythonRuntimeManagerAdapter";
 import { createUiDependencies } from "../createUiDependencies";
 
 describe("ui composition interactions", () => {
@@ -17,6 +17,7 @@ describe("ui composition interactions", () => {
     expect(dependencies.modelStore).toBeDefined();
     expect(dependencies.modelService).toBeDefined();
     expect(dependencies.runtimeConsoleStore).toBeDefined();
+    expect(dependencies.pythonRuntimeManager).toBeDefined();
     expect(dependencies.mcpService).toBeDefined();
     expect(dependencies.mcpStore).toBeDefined();
     expect(dependencies.settingsStore).toBeDefined();
@@ -38,22 +39,63 @@ describe("ui composition interactions", () => {
     expect(nodeTypeIds).toContain("mcp.tool_call");
   });
 
-
-  it("uses the browser-safe runtime manager in UI composition", () => {
-    const source = readSource("ui/composition/createUiDependencies.ts");
-
-    expect(source).toContain("BrowserPythonRuntimeManager");
-    expect(source).not.toContain("Node child process spawning is unavailable in browser composition.");
-    expect(source).not.toContain("new PythonRuntimeProcessManager");
-  });
-
-  it("keeps runtime console initialization safe when the browser runtime is unavailable", async () => {
+  it("adapts the external HTTP runtime through the managed-service lifecycle", () => {
     const dependencies = createUiDependencies({
       config: AppRuntimeConfig.forDevelopment(),
       settingsStorage: {
         load: () => ({
           runtime: {
-            mode: "local-http",
+            mode: "external-http",
+            baseUrl: "http://127.0.0.1:8000",
+          },
+        }),
+        save: () => undefined,
+      },
+    });
+
+    expect(dependencies.pythonRuntimeManager).toBeInstanceOf(ManagedServicePythonRuntimeManagerAdapter);
+  });
+
+  it("adapts the managed-local runtime through the managed-service lifecycle", () => {
+    const dependencies = createUiDependencies({
+      config: AppRuntimeConfig.forDevelopment(),
+      settingsStorage: {
+        load: () => ({
+          runtime: {
+            mode: "managed-local",
+            baseUrl: "http://127.0.0.1:8000",
+          },
+        }),
+        save: () => undefined,
+      },
+    });
+
+    expect(dependencies.pythonRuntimeManager).toBeInstanceOf(ManagedServicePythonRuntimeManagerAdapter);
+  });
+
+  it("adapts the disabled runtime through the managed-service lifecycle", () => {
+    const dependencies = createUiDependencies({
+      config: AppRuntimeConfig.forDevelopment(),
+      settingsStorage: {
+        load: () => ({
+          runtime: {
+            mode: "disabled",
+          },
+        }),
+        save: () => undefined,
+      },
+    });
+
+    expect(dependencies.pythonRuntimeManager).toBeInstanceOf(ManagedServicePythonRuntimeManagerAdapter);
+  });
+
+  it("keeps runtime console initialization safe when the runtime is unavailable", async () => {
+    const dependencies = createUiDependencies({
+      config: AppRuntimeConfig.forDevelopment(),
+      settingsStorage: {
+        load: () => ({
+          runtime: {
+            mode: "external-http",
             baseUrl: "http://127.0.0.1:1",
           },
         }),

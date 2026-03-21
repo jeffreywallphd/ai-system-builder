@@ -3,6 +3,7 @@ import { PythonRuntimeMode, parsePythonRuntimeMode, type PythonRuntimeMode as Py
 export interface PythonRuntimeConfigValues {
   readonly mode?: PythonRuntimeModeValue | string;
   readonly baseUrl?: string;
+  readonly supervisorBaseUrl?: string;
   readonly timeoutMs?: number;
   readonly authToken?: string;
   readonly pythonExecutable?: string;
@@ -17,8 +18,11 @@ function resolveDefaultRuntimeWorkingDirectory(): string {
     return "python-runtime";
   }
 
-  const cwd = typeof process !== "undefined" && typeof process.cwd === "function"
-    ? process.cwd()
+  const processLike = typeof globalThis !== "undefined"
+    ? (globalThis as typeof globalThis & { process?: { cwd?: () => string } }).process
+    : undefined;
+  const cwd = typeof processLike?.cwd === "function"
+    ? processLike.cwd()
     : ".";
   return `${cwd}/python-runtime`;
 }
@@ -26,6 +30,7 @@ function resolveDefaultRuntimeWorkingDirectory(): string {
 export class PythonRuntimeConfig {
   public readonly mode: PythonRuntimeModeValue;
   public readonly baseUrl?: string;
+  public readonly supervisorBaseUrl: string;
   public readonly timeoutMs: number;
   public readonly authToken?: string;
   public readonly pythonExecutable: string;
@@ -37,6 +42,7 @@ export class PythonRuntimeConfig {
   constructor(values: PythonRuntimeConfigValues = {}) {
     this.mode = parsePythonRuntimeMode(values.mode);
     this.baseUrl = values.baseUrl?.trim() || undefined;
+    this.supervisorBaseUrl = resolveSupervisorBaseUrl(values.supervisorBaseUrl, this.baseUrl);
     this.timeoutMs = values.timeoutMs && values.timeoutMs > 0 ? values.timeoutMs : 15_000;
     this.authToken = values.authToken?.trim() || undefined;
     this.pythonExecutable = values.pythonExecutable?.trim() || "python";
@@ -44,21 +50,28 @@ export class PythonRuntimeConfig {
     this.startupTimeoutMs = values.startupTimeoutMs && values.startupTimeoutMs > 0 ? values.startupTimeoutMs : 20_000;
     this.healthPollIntervalMs =
       values.healthPollIntervalMs && values.healthPollIntervalMs > 0 ? values.healthPollIntervalMs : 500;
-    this.autoStartEnabled = values.autoStartEnabled ?? true;
+    this.autoStartEnabled = resolveAutoStartEnabled(this.mode, values.autoStartEnabled);
 
-    if (this.isEnabled && !this.baseUrl) {
-      throw new Error("Python runtime requires baseUrl when enabled.");
-    }
+    validatePythonRuntimeConfig(this);
   }
 
   public get isEnabled(): boolean {
     return this.mode !== PythonRuntimeMode.disabled;
   }
 
+  public get isExternalHttp(): boolean {
+    return this.mode === PythonRuntimeMode.externalHttp;
+  }
+
+  public get isManagedLocal(): boolean {
+    return this.mode === PythonRuntimeMode.managedLocal;
+  }
+
   public static fromEnv(env: Readonly<Record<string, string | undefined>>): PythonRuntimeConfig {
     return new PythonRuntimeConfig({
       mode: env.PYTHON_RUNTIME_MODE,
       baseUrl: env.PYTHON_RUNTIME_BASE_URL,
+      supervisorBaseUrl: env.SERVICE_SUPERVISOR_BASE_URL,
       timeoutMs: env.PYTHON_RUNTIME_TIMEOUT_MS ? Number(env.PYTHON_RUNTIME_TIMEOUT_MS) : undefined,
       authToken: env.PYTHON_RUNTIME_AUTH_TOKEN,
       pythonExecutable: env.PYTHON_RUNTIME_EXECUTABLE,
@@ -73,5 +86,50 @@ export class PythonRuntimeConfig {
         ? ["1", "true", "yes", "on"].includes(env.PYTHON_RUNTIME_AUTO_START.trim().toLowerCase())
         : undefined,
     });
+  }
+}
+
+function resolveAutoStartEnabled(
+  mode: PythonRuntimeModeValue,
+  autoStartEnabled: boolean | undefined,
+): boolean {
+  if (typeof autoStartEnabled === "boolean") {
+    return autoStartEnabled;
+  }
+
+  return mode === PythonRuntimeMode.managedLocal;
+}
+
+function validatePythonRuntimeConfig(config: PythonRuntimeConfig): void {
+  if (config.isEnabled && !config.baseUrl) {
+    throw new Error(`Python runtime mode '${config.mode}' requires baseUrl.`);
+  }
+
+  if (config.mode === PythonRuntimeMode.disabled && config.autoStartEnabled) {
+    throw new Error("Python runtime mode 'disabled' cannot enable auto-start.");
+  }
+
+  if (config.mode === PythonRuntimeMode.externalHttp && config.autoStartEnabled) {
+    throw new Error(
+      "Python runtime mode 'external-http' cannot enable auto-start. Use 'managed-local' to supervise a local runtime."
+    );
+  }
+}
+
+function resolveSupervisorBaseUrl(supervisorBaseUrl: string | undefined, runtimeBaseUrl: string | undefined): string {
+  const explicit = supervisorBaseUrl?.trim();
+  if (explicit) {
+    return explicit.replace(/\/$/, "");
+  }
+
+  try {
+    const url = new URL(runtimeBaseUrl ?? "http://127.0.0.1:8000");
+    url.port = "8790";
+    url.pathname = "";
+    url.search = "";
+    url.hash = "";
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return "http://127.0.0.1:8790";
   }
 }

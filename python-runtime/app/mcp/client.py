@@ -1,4 +1,6 @@
+import json
 import uuid
+from pathlib import Path
 from typing import Any
 
 from app.core.mcp_config import McpServerConfig
@@ -240,6 +242,9 @@ class BoundedMcpClient:
         if tool_name not in available:
             raise ValueError(f"Unknown MCP tool '{tool_name}' for server '{self._server.id}'.")
 
+        if self._server.metadata.get("serverKind") == "workspace-local":
+            return self._execute_workspace_local_tool(request, execution_id, args)
+
         return McpToolExecutionResult(
             execution_id=execution_id,
             server_id=self._server.id,
@@ -247,6 +252,51 @@ class BoundedMcpClient:
             status="completed",
             content=[{"type": "json", "json": args}],
             structured_content={"arguments": args},
+        )
+
+    def _execute_workspace_local_tool(
+        self,
+        request: McpToolExecutionRequest,
+        execution_id: str,
+        args: dict[str, Any],
+    ) -> McpToolExecutionResult:
+        tool_state = self._load_workspace_local_state()
+        if tool_state.get("toolName") != request.tool_name:
+            return McpToolExecutionResult(
+                execution_id=execution_id,
+                server_id=self._server.id,
+                tool_name=request.tool_name,
+                status="failed",
+                content=[],
+                structured_content={},
+                error_message=f"Unknown workspace-local MCP tool '{request.tool_name}' for server '{self._server.id}'.",
+            )
+
+        try:
+            result = execute_workspace_local_code(
+                str(tool_state.get("code", "")),
+                args if isinstance(args, dict) else {"input": args},
+            )
+        except Exception as error:
+            return McpToolExecutionResult(
+                execution_id=execution_id,
+                server_id=self._server.id,
+                tool_name=request.tool_name,
+                status="failed",
+                content=[],
+                structured_content={},
+                metadata={"serverKind": "workspace-local"},
+                error_message=str(error),
+            )
+
+        return McpToolExecutionResult(
+            execution_id=execution_id,
+            server_id=self._server.id,
+            tool_name=request.tool_name,
+            status="completed",
+            content=[{"type": "json", "json": result}],
+            structured_content=result if isinstance(result, dict) else {"result": result},
+            metadata={"serverKind": "workspace-local"},
         )
 
     def _build_tool_descriptor(self, tool: dict[str, Any]) -> McpToolDescriptor:
@@ -293,6 +343,26 @@ class BoundedMcpClient:
         elif self._server.transport in {"http", "sse"}:
             metadata["connectionMode"] = "bounded-remote"
         return metadata
+
+    def _load_workspace_local_state(self) -> dict[str, Any]:
+        state_file = normalize_optional_string(self._server.metadata.get("provisioningStateFile"))
+        if not state_file:
+            raise ValueError(
+                f"Workspace-local MCP server '{self._server.id}' is missing provisioningStateFile metadata."
+            )
+
+        path = Path(state_file)
+        if not path.exists():
+            raise ValueError(
+                f"Workspace-local MCP server '{self._server.id}' could not find its state file at '{path}'."
+            )
+
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            raise ValueError(
+                f"Workspace-local MCP server '{self._server.id}' has an invalid provisioning state file."
+            )
+        return payload
 
 
 def build_argument_descriptors(input_schema: dict[str, Any], explicit_arguments: Any) -> list[McpToolArgumentDescriptor]:
@@ -386,3 +456,47 @@ def normalize_string_list(*groups: Any) -> list[str]:
             if normalized:
                 values.add(normalized)
     return sorted(values)
+
+
+def execute_workspace_local_code(code: str, payload: dict[str, Any]) -> Any:
+    source = "def __loom_workspace_tool__(payload):\n" + indent_code_block(code or "return {}")
+    globals_scope = {"__builtins__": WORKSPACE_LOCAL_BUILTINS}
+    locals_scope: dict[str, Any] = {}
+    exec(compile(source, "<workspace-local-mcp-tool>", "exec"), globals_scope, locals_scope)
+    return locals_scope["__loom_workspace_tool__"](payload)
+
+
+def indent_code_block(code: str) -> str:
+    lines = code.splitlines() or ["return {}"]
+    return "\n".join(f"    {line}" if line.strip() else "    " for line in lines)
+
+
+WORKSPACE_LOCAL_BUILTINS = {
+    "abs": abs,
+    "all": all,
+    "any": any,
+    "bool": bool,
+    "dict": dict,
+    "enumerate": enumerate,
+    "Exception": Exception,
+    "filter": filter,
+    "float": float,
+    "int": int,
+    "isinstance": isinstance,
+    "len": len,
+    "list": list,
+    "map": map,
+    "max": max,
+    "min": min,
+    "print": print,
+    "range": range,
+    "round": round,
+    "set": set,
+    "sorted": sorted,
+    "str": str,
+    "sum": sum,
+    "TypeError": TypeError,
+    "tuple": tuple,
+    "ValueError": ValueError,
+    "zip": zip,
+}

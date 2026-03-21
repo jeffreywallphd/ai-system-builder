@@ -19,6 +19,12 @@ FastAPI service that executes Python-native and LangChain-backed workflow nodes.
    uvicorn app.main:app --host 0.0.0.0 --port 8100 --reload
    ```
 
+## Local MCP authoring
+
+- The runtime can provision workspace-local MCP tools for AI Loom Studio.
+- Those workspace-local tools execute directly from their saved provisioning state inside the runtime, so provisioning no longer performs an automatic `pip install` step.
+- If you want to run a generated `server.py` file as a standalone MCP stdio process outside the runtime, install the MCP Python package in that environment first.
+
 ## Endpoints
 
 - `GET /health`
