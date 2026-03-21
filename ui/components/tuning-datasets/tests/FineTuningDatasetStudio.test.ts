@@ -6,6 +6,7 @@ describe("FineTuningDatasetStudio", () => {
     const source = readSource("ui/components/tuning-datasets/FineTuningDatasetStudio.tsx");
 
     expect(source).toContain("Wizard progress");
+    expect(source).toContain("LinearWizard");
     expect(source).toContain("Version management");
     expect(source).toContain("Selected working version");
     expect(source).toContain("Bulk accept");

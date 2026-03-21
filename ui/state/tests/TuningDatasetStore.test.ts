@@ -53,6 +53,7 @@ describe("TuningDatasetStore", () => {
     const stateAfterCreate = store.getState();
     expect(stateAfterCreate.selectedDataset?.dataset.name).toBe("Store QA");
     expect(stateAfterCreate.currentWorkflowStage).toBe("source_ingestion");
+    expect(stateAfterCreate.wizard.currentStepId).toBe("source_ingestion");
 
     const versionId = stateAfterCreate.selectedVersionId!;
     await store.importSources(stateAfterCreate.selectedDataset!.dataset.id, versionId, "ui-user", [{
@@ -61,6 +62,7 @@ describe("TuningDatasetStore", () => {
     }]);
     expect(store.getState().sourceDocuments).toHaveLength(1);
     expect(store.getState().currentWorkflowStage).toBe("example_generation");
+    expect(store.getState().wizard.previousStepId).toBe("source_ingestion");
 
     await store.generateExamples(stateAfterCreate.selectedDataset!.dataset.id, versionId, "ui-user", [store.getState().sourceDocuments[0]!.id]);
     expect(store.getState().examples.length).toBeGreaterThan(0);
