@@ -85,6 +85,22 @@ describe("UiSettingsStore", () => {
     expect(store.getSettings().runtime.mode).toBe("managed-local");
   });
 
+  it("migrates the legacy dev/python-runtime settings path", () => {
+    const store = new UiSettingsStore({
+      config: createConfig(),
+      storage: {
+        load: () => ({
+          runtime: {
+            workingDirectory: "./dev/python-runtime",
+          },
+        }),
+        save: () => undefined,
+      },
+    });
+
+    expect(store.getSettings().runtime.workingDirectory).toBe("python-runtime");
+  });
+
   it("defaults auto-start off for external-http mode", () => {
     const store = new UiSettingsStore({
       config: createConfig(),

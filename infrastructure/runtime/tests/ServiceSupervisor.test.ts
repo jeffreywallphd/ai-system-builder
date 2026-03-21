@@ -18,7 +18,7 @@ const fixtureScriptPath = path.join(
   "fixtures",
   "runtime-service.mjs",
 );
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
 const serversToClose: Array<{ close: () => Promise<unknown> }> = [];
 const processesToStop: Array<{ supervisor: InMemoryServiceSupervisor; serviceId: string }> = [];
@@ -794,6 +794,18 @@ describe("loadServiceDefinitionsFromEnvironment", () => {
     expect(definition.version).toBe("9.9.9");
     expect(definition.compatibility).toEqual({ supervisorApiVersion: 2, runtimeApiVersion: "beta" });
     expect(definition.args).toEqual(["-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8123"]);
+  });
+
+  it("migrates the legacy dev/python-runtime working directory for the built-in runtime", async () => {
+    const legacyWorkingDirectory = path.join(repoRoot, "dev", "python-runtime");
+    const supervisor = createManagedSupervisor(createRuntimeDefinition({
+      cwd: legacyWorkingDirectory,
+    }));
+
+    const started = await supervisor.start("python-runtime");
+
+    expect(supervisor.getDefinition("python-runtime")?.workingDirectory).toBe(path.join(repoRoot, "python-runtime"));
+    expect(started.state).toBe(ServiceStates.healthy);
   });
 
   it("parses JSON argument arrays for the built-in runtime", () => {
