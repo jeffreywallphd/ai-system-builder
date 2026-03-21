@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import json
+from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -9,15 +12,18 @@ class McpServerConfig(BaseModel):
     id: str
     name: str
     enabled: bool = True
+    source_type: Literal["builtin-local", "workspace-local", "external-remote", "imported"] = "external-remote"
     transport: Literal["stdio", "http", "sse", "inmemory"] = "stdio"
     command: Optional[str] = None
     args: List[str] = Field(default_factory=list)
     url: Optional[str] = None
     env: Dict[str, str] = Field(default_factory=dict)
+    headers: Dict[str, str] = Field(default_factory=dict)
     timeout_ms: Optional[int] = None
     connect_on_startup: Optional[bool] = None
     mock_tools: List[Dict[str, Any]] = Field(default_factory=list)
     mock_resources: List[Dict[str, Any]] = Field(default_factory=list)
+    mock_prompts: List[Dict[str, Any]] = Field(default_factory=list)
     metadata: Dict[str, Any] = Field(default_factory=dict)
     fail_connect: bool = False
 
@@ -44,9 +50,9 @@ class McpServerConfig(BaseModel):
             raise ValueError("MCP server timeout_ms must be positive when provided.")
         return value
 
-    @field_validator("env", mode="before")
+    @field_validator("env", "headers", mode="before")
     @classmethod
-    def normalize_env(cls, value: Optional[Dict[str, Any]]) -> Dict[str, str]:
+    def normalize_string_map(cls, value: Optional[Dict[str, Any]]) -> Dict[str, str]:
         if not value:
             return {}
         return {str(key): str(item) for key, item in value.items()}
@@ -65,6 +71,8 @@ class McpRuntimeConfig(BaseSettings):
     timeout_ms: int = 10000
     connect_on_startup: bool = False
     servers_json: str = "[]"
+    workspace_root: str = ""
+    dependency_package_spec: str = "mcp[cli]"
 
     model_config = SettingsConfigDict(env_prefix="MCP_RUNTIME_", extra="ignore")
 
@@ -83,6 +91,12 @@ class McpRuntimeConfig(BaseSettings):
             ids.add(server.id)
         return servers
 
+    @property
+    def resolved_workspace_root(self) -> Path:
+        if self.workspace_root.strip():
+            return Path(self.workspace_root.strip())
+        return Path(__file__).resolve().parents[3] / "user" / "workflow-data" / "mcp"
+
     def should_connect_on_startup(self, server: McpServerConfig) -> bool:
         if not server.enabled:
             return False
@@ -98,7 +112,8 @@ def load_mcp_runtime_config(env: Optional[Dict[str, str]] = None) -> McpRuntimeC
     return McpRuntimeConfig(
         enabled=env.get("MCP_RUNTIME_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"},
         timeout_ms=int(env.get("MCP_RUNTIME_TIMEOUT_MS", 10000)),
-        connect_on_startup=env.get("MCP_RUNTIME_CONNECT_ON_STARTUP", "false").strip().lower()
-        in {"1", "true", "yes", "on"},
+        connect_on_startup=env.get("MCP_RUNTIME_CONNECT_ON_STARTUP", "false").strip().lower() in {"1", "true", "yes", "on"},
         servers_json=env.get("MCP_RUNTIME_SERVERS_JSON", "[]"),
+        workspace_root=env.get("MCP_RUNTIME_WORKSPACE_ROOT", ""),
+        dependency_package_spec=env.get("MCP_RUNTIME_DEPENDENCY_PACKAGE_SPEC", "mcp[cli]"),
     )

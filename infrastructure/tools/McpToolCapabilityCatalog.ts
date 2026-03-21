@@ -27,7 +27,7 @@ export function mapMcpToolToCapability(tool: McpToolDescriptor): ToolCapabilityD
       toolName: tool.name,
     }),
     publication: Object.freeze({
-      isPublished: false,
+      isPublished: tool.live === true,
       title: tool.title ?? tool.name,
       description: tool.description,
       category:
@@ -43,6 +43,9 @@ export function mapMcpToolToCapability(tool: McpToolDescriptor): ToolCapabilityD
       descriptorId: tool.id,
       categoryCount: tool.categories.length,
       tagCount: tool.tags.length,
+      live: tool.live === true,
+      stale: tool.stale === true,
+      publicationState: tool.publicationState ?? (tool.live ? "published-live" : "published-stale"),
     }),
   });
 }
@@ -53,6 +56,6 @@ export class McpToolCapabilityCatalog implements IToolCapabilityCatalog {
   public async listCapabilities(): Promise<ReadonlyArray<ToolCapabilityDescriptor>> {
     const tools = await this.catalog.listTools();
 
-    return Object.freeze(tools.map((tool) => mapMcpToolToCapability(tool)));
+    return Object.freeze(tools.filter((tool) => tool.live === true).map((tool) => mapMcpToolToCapability(tool)));
   }
 }

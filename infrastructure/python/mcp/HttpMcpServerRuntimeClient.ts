@@ -1,261 +1,92 @@
 import type { IRuntimeEventSink } from "../../../application/ports/interfaces/IRuntimeEventSink";
-import { RuntimeEventSources } from "../../../application/runtime/RuntimeEvent";
-import {
-  bindSafeFetch,
-  toRuntimeDiagnosticDetails,
-} from "../../../application/runtime/RuntimeDiagnostics";
-import type { McpConnectionStatus } from "../../../application/mcp/models/McpConnectionStatus";
 import type { LocalMcpToolDraft } from "../../../application/mcp/models/LocalMcpToolDraft";
 import type { LocalMcpServerCreateResult } from "../../../application/mcp/models/LocalMcpServerCreateResult";
+import type { McpConnectionStatus } from "../../../application/mcp/models/McpConnectionStatus";
 import type { McpServerConnectionRequest } from "../../../application/mcp/models/McpServerConnectionRequest";
 import type { McpServerConnectionResult } from "../../../application/mcp/models/McpServerConnectionResult";
-import type { McpServerDescriptor } from "../../../application/mcp/models/McpServerDescriptor";
-import { PythonRuntimeError } from "../client/PythonRuntimeError";
+import type { McpServerDescriptor, McpServerValidationResult } from "../../../application/mcp/models/McpServerDescriptor";
+import type { McpServerDiagnosticsSnapshot } from "../../../application/mcp/models/McpServerDiagnosticsSnapshot";
+import type { McpServerTestConnectionResult } from "../../../application/mcp/models/McpServerTestConnectionResult";
+import type { McpSyncResult } from "../../../application/mcp/models/McpSyncResult";
+import type { McpExportResult, McpImportResult, McpServerImportExportRecord } from "../../../application/mcp/models/McpImportExport";
+import type { McpToolInvocationTrace } from "../../../application/mcp/models/McpToolExecutionResult";
+import { HttpMcpRuntimeClient } from "./HttpMcpRuntimeClient";
 import { PythonRuntimeConfig } from "../../config/PythonRuntimeConfig";
 
 interface ServerListResponse {
-  readonly query?: string;
-  readonly totalCount?: number;
-  readonly limit?: number;
   readonly servers: ReadonlyArray<McpServerDescriptor>;
   readonly status?: McpConnectionStatus;
 }
 
 export class HttpMcpServerRuntimeClient {
-  private readonly baseUrl: string;
-  private readonly timeoutMs: number;
-  private readonly authToken?: string;
-  private readonly fetchImpl: typeof fetch;
-  private readonly eventSink?: IRuntimeEventSink;
+  private readonly runtimeClient: HttpMcpRuntimeClient;
 
-  constructor(
-    config: PythonRuntimeConfig,
-    fetchImpl: typeof fetch = fetch,
-    eventSink?: IRuntimeEventSink,
-  ) {
-    if (!config.baseUrl) {
-      throw new PythonRuntimeError("Python runtime baseUrl is required.", {
-        subsystem: "mcp-runtime",
-        className: "HttpMcpServerRuntimeClient",
-        methodName: "constructor",
-        operation: "configure-mcp-server-runtime-client",
-      });
-    }
-
-    this.baseUrl = config.baseUrl.replace(/\/$/, "");
-    this.timeoutMs = config.timeoutMs;
-    this.authToken = config.authToken;
-    this.fetchImpl = bindSafeFetch(fetchImpl);
-    this.eventSink = eventSink;
+  constructor(config: PythonRuntimeConfig, fetchImpl: typeof fetch = fetch, eventSink?: IRuntimeEventSink) {
+    this.runtimeClient = new HttpMcpRuntimeClient(config, fetchImpl, eventSink);
   }
 
-  public async getConnectionStatus(): Promise<McpConnectionStatus> {
-    this.emit("info", "MCP server status check started.", { eventType: "mcp-status-check" });
-
-    try {
-      const status = await this.request<McpConnectionStatus>("GET", "/mcp/status");
-      this.emit("success", "MCP server status check completed.", {
-        eventType: "mcp-status-check",
-        state: status.state,
-        enabled: status.enabled,
-      });
-      return status;
-    } catch (error) {
-      this.emitError("MCP server status check failed.", error, "mcp-connection-failure");
-      throw error;
-    }
+  public getConnectionStatus(): Promise<McpConnectionStatus> {
+    return this.runtimeClient.getConnectionStatus();
   }
 
   public async listConfiguredServers(): Promise<ReadonlyArray<McpServerDescriptor>> {
-    this.emit("info", "MCP configured server catalog request started.", {
-      eventType: "mcp-server-catalog",
-    });
-
-    try {
-      const payload = await this.request<ServerListResponse>("GET", "/mcp/servers");
-      this.emit("success", "MCP configured server catalog request completed.", {
-        eventType: "mcp-server-catalog",
-        serverCount: payload.servers.length,
-      });
-      return Object.freeze([...payload.servers]);
-    } catch (error) {
-      this.emitError("MCP configured server catalog request failed.", error, "mcp-connection-failure");
-      throw error;
-    }
+    const payload = await this.runtimeClient.listServers() as ServerListResponse;
+    return payload.servers;
   }
 
-  public async connectServer(request: McpServerConnectionRequest): Promise<McpServerConnectionResult> {
-    return this.runLifecycleRequest(
-      "connect",
-      "/mcp/servers/connect",
-      { serverId: request.serverId },
-      { serverId: request.serverId },
-    );
+  public connectServer(request: McpServerConnectionRequest): Promise<McpServerConnectionResult> {
+    return this.runtimeClient.connectServer(request);
   }
 
-  public async disconnectServer(serverId: string): Promise<McpServerConnectionResult> {
-    return this.runLifecycleRequest(
-      "disconnect",
-      "/mcp/servers/disconnect",
-      { serverId },
-      { serverId },
-    );
+  public disconnectServer(serverId: string): Promise<McpServerConnectionResult> {
+    return this.runtimeClient.disconnectServer(serverId);
   }
 
-  public async reconnectServer(serverId: string): Promise<McpServerConnectionResult> {
-    return this.runLifecycleRequest(
-      "reconnect",
-      "/mcp/servers/reconnect",
-      { serverId },
-      { serverId },
-    );
+  public reconnectServer(serverId: string): Promise<McpServerConnectionResult> {
+    return this.runtimeClient.connectServer({ serverId, reconnect: true });
   }
 
-  public async createLocalServer(draft: LocalMcpToolDraft): Promise<LocalMcpServerCreateResult> {
-    this.emit("info", "Local MCP server provisioning started.", {
-      eventType: "mcp-local-server-provision",
-      serverId: draft.serverId,
-      toolName: draft.toolName,
-    });
-
-    try {
-      const result = await this.request<LocalMcpServerCreateResult>("POST", "/mcp/servers/local", draft);
-      this.emit("success", "Local MCP server provisioning completed.", {
-        eventType: "mcp-local-server-provision",
-        serverId: result.server.id,
-        created: result.created,
-      });
-      return result;
-    } catch (error) {
-      this.emitError("Local MCP server provisioning failed.", error, "mcp-local-server-provision", {
-        serverId: draft.serverId,
-      });
-      throw error;
-    }
+  public createLocalServer(draft: LocalMcpToolDraft): Promise<LocalMcpServerCreateResult> {
+    return (this.runtimeClient as unknown as { request<T>(method: "GET" | "POST" | "DELETE", path: string, body?: unknown): Promise<T> }).request("POST", "/mcp/servers/local", draft);
   }
 
-  private async runLifecycleRequest(
-    action: "connect" | "disconnect" | "reconnect",
-    path: string,
-    body: Readonly<Record<string, unknown>>,
-    details: Readonly<Record<string, unknown>>,
-  ): Promise<McpServerConnectionResult> {
-    this.emit("info", `MCP server ${action} attempt started.`, {
-      eventType: `mcp-server-${action}`,
-      ...details,
-    });
-
-    try {
-      const result = await this.request<McpServerConnectionResult>("POST", path, body);
-      this.emit("success", `MCP server ${action} attempt completed.`, {
-        eventType: `mcp-server-${action}`,
-        serverId: result.server.id,
-        serverStatus: result.status.state,
-      });
-      return result;
-    } catch (error) {
-      this.emitError(`MCP server ${action} attempt failed.`, error, "mcp-connection-failure", {
-        action,
-        ...details,
-      });
-      throw error;
-    }
+  public upsertServer(server: Readonly<Record<string, unknown>>): Promise<McpServerDescriptor> {
+    return this.runtimeClient.upsertServer!(server);
   }
 
-  private async request<T>(method: "GET" | "POST", path: string, body?: unknown): Promise<T> {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
-    const target = `${this.baseUrl}${path}`;
-
-    try {
-      const response = await this.fetchImpl(target, {
-        method,
-        headers: {
-          "content-type": "application/json",
-          ...(this.authToken ? { authorization: `Bearer ${this.authToken}` } : {}),
-        },
-        body: body ? JSON.stringify(body) : undefined,
-        signal: controller.signal,
-      });
-
-      const payload = (await response.json().catch(() => ({}))) as Readonly<Record<string, unknown>>;
-      if (!response.ok) {
-        throw new PythonRuntimeError(`Python runtime MCP server request failed (${response.status}).`, {
-          cause: payload,
-          statusCode: response.status,
-          details: payload,
-          subsystem: "mcp-runtime",
-          className: "HttpMcpServerRuntimeClient",
-          methodName: "request",
-          operation: "mcp-server-runtime-http-request",
-          target,
-          requestMethod: method,
-          failedBeforeResponse: false,
-        });
-      }
-
-      return payload as T;
-    } catch (error) {
-      if (error instanceof PythonRuntimeError) {
-        throw error;
-      }
-      if (error instanceof Error && error.name === "AbortError") {
-        throw new PythonRuntimeError(`Python runtime MCP server request timed out after ${this.timeoutMs}ms.`, {
-          cause: error,
-          details: body,
-          subsystem: "mcp-runtime",
-          className: "HttpMcpServerRuntimeClient",
-          methodName: "request",
-          operation: "mcp-server-runtime-http-request",
-          target,
-          requestMethod: method,
-          failedBeforeResponse: true,
-        });
-      }
-      throw new PythonRuntimeError("Python runtime MCP server request failed.", {
-        cause: error,
-        details: body,
-        subsystem: "mcp-runtime",
-        className: "HttpMcpServerRuntimeClient",
-        methodName: "request",
-        operation: "mcp-server-runtime-http-request",
-        target,
-        requestMethod: method,
-        failedBeforeResponse: true,
-      });
-    } finally {
-      clearTimeout(timeout);
-    }
+  public validateServer(server: Readonly<Record<string, unknown>>): Promise<McpServerValidationResult> {
+    return this.runtimeClient.validateServer!(server);
   }
 
-  private emit(
-    severity: "debug" | "info" | "warning" | "error" | "success",
-    message: string,
-    details?: Readonly<Record<string, unknown>>,
-  ): void {
-    this.eventSink?.emit({
-      source: RuntimeEventSources.pythonRuntime,
-      severity,
-      message,
-      details,
-    });
+  public testServer(server: Readonly<Record<string, unknown>>): Promise<McpServerTestConnectionResult> {
+    return this.runtimeClient.testServer!(server);
   }
 
-  private emitError(
-    message: string,
-    error: unknown,
-    eventType: string,
-    details?: Readonly<Record<string, unknown>>,
-  ): void {
-    this.emit("error", message, toRuntimeDiagnosticDetails(error, {
-      message,
-      subsystem: "mcp-runtime",
-      className: "HttpMcpServerRuntimeClient",
-      methodName: "emitError",
-      operation: eventType,
-    }, {
-      eventType,
-      ...(details ?? {}),
-    }));
+  public deleteServer(serverId: string): Promise<{ readonly serverId: string; readonly deleted: boolean; readonly checkedAt: string }> {
+    return this.runtimeClient.deleteServer!(serverId);
+  }
+
+  public duplicateServer(serverId: string, newServerId?: string, newName?: string): Promise<McpServerDescriptor> {
+    return this.runtimeClient.duplicateServer!(serverId, newServerId, newName);
+  }
+
+  public importServers(servers: ReadonlyArray<McpServerImportExportRecord>): Promise<McpImportResult> {
+    return this.runtimeClient.importServers!(servers);
+  }
+
+  public exportServers(): Promise<McpExportResult> {
+    return this.runtimeClient.exportServers!();
+  }
+
+  public syncServer(serverId: string): Promise<McpSyncResult> {
+    return this.runtimeClient.syncServer!(serverId);
+  }
+
+  public getDiagnostics(serverId: string): Promise<McpServerDiagnosticsSnapshot> {
+    return this.runtimeClient.getDiagnostics!(serverId);
+  }
+
+  public getInvocationHistory(serverId?: string): Promise<ReadonlyArray<McpToolInvocationTrace>> {
+    return this.runtimeClient.getInvocationHistory!(serverId);
   }
 }

@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.routes.documents import router as documents_router
 from app.api.routes.execute import router as execute_router
 from app.api.routes.health import router as health_router
 from app.api.routes.mcp import router as mcp_router
@@ -18,6 +19,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(health_router)
+app.include_router(documents_router)
 app.include_router(execute_router)
 app.include_router(workflows_router)
 app.include_router(mcp_router)

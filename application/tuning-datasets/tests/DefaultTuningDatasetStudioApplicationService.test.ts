@@ -1,6 +1,8 @@
 import { describe, expect, it } from "bun:test";
+import { DefaultFileIngestionApplicationService } from "../../ingestion/DefaultFileIngestionApplicationService";
 import { DefaultTuningDatasetStudioApplicationService } from "../DefaultTuningDatasetStudioApplicationService";
 import { BrowserDatasetImportService, DatasetStatisticsService, DatasetWorkflowProgressService, DefaultDatasetDuplicationPolicy, DefaultDatasetPrivacyPolicy, DefaultDatasetReleasePolicy, DefaultDatasetReviewPolicy, DeterministicDatasetSplitService, JsonTuningDatasetExportService, ProviderAgnosticDatasetGenerationService, TaskTypeAwareValidationService } from "../../../domain/tuning-datasets/TuningDatasetServices";
+import { FileIngestionPolicyService } from "../../../domain/ingestion/FileIngestionServices";
 import { LocalStorageTuningDatasetRepository } from "../../../infrastructure/browser/tuning-datasets/LocalStorageTuningDatasetRepository";
 import { LocalStorageTuningDatasetVersionRepository } from "../../../infrastructure/browser/tuning-datasets/LocalStorageTuningDatasetVersionRepository";
 
@@ -29,6 +31,25 @@ function createService() {
     statisticsService: new DatasetStatisticsService(duplicationPolicy),
     releasePolicy: new DefaultDatasetReleasePolicy(),
     workflowService: new DatasetWorkflowProgressService(),
+    fileIngestionService: new DefaultFileIngestionApplicationService(
+      new FileIngestionPolicyService(),
+      {
+        async convert(request) {
+          return {
+            markdown: `# Converted\n\n${request.file.name}`,
+            sourceFormat: request.file.extension?.replace(/^\./, "") ?? "unknown",
+            outputFormat: "markdown",
+            file: request.file,
+            conversion: {
+              strategy: "converted",
+              converterId: "stub-converter",
+              detectedSourceFormat: request.file.extension?.replace(/^\./, "") ?? "unknown",
+            },
+            warnings: [{ code: "conversion_performed", message: "converted" }],
+          };
+        },
+      },
+    ),
     createId: (() => {
       let count = 0;
       return (prefix: string) => `${prefix}-${++count}`;
@@ -123,5 +144,32 @@ describe("DefaultTuningDatasetStudioApplicationService", () => {
     await service.releaseDatasetVersion({ datasetId: dataset.dataset.id, versionId, releaseNotes: "chat release" });
     const artifact = await service.exportDatasetVersion({ datasetId: dataset.dataset.id, versionId, format: "openai_chat_jsonl" });
     expect(artifact.content).toContain('"messages"');
+  });
+
+  it("ingests uploaded files into normalized markdown for dataset sources", async () => {
+    const service = createService();
+    const dataset = await service.createDataset({
+      name: "Source Upload Dataset",
+      taskType: "question_answering",
+      createdBy: "tester",
+    });
+
+    const versionId = dataset.selectedVersion!.id;
+    const documents = await service.ingestSourceFiles({
+      datasetId: dataset.dataset.id,
+      versionId,
+      createdBy: "tester",
+      files: [{
+        name: "brief.pdf",
+        mimeType: "application/pdf",
+        sizeInBytes: 8,
+        content: new Uint8Array([1, 2, 3, 4]),
+      }],
+    });
+
+    expect(documents).toHaveLength(1);
+    expect(documents[0]?.content).toContain("Converted");
+    expect(documents[0]?.mediaType).toBe("text/markdown");
+    expect(documents[0]?.metadata?.sourceFormat).toBe("pdf");
   });
 });

@@ -29,6 +29,18 @@ export interface McpToolDescriptor {
   readonly tags: ReadonlyArray<string>;
   readonly annotations?: Readonly<Record<string, unknown>>;
   readonly metadata?: Readonly<Record<string, unknown>>;
+  readonly publicationState?: "unpublished" | "published-live" | "published-stale" | "disabled";
+  readonly live?: boolean;
+  readonly stale?: boolean;
+}
+
+export interface McpPromptDescriptor {
+  readonly serverId: string;
+  readonly name: string;
+  readonly title?: string;
+  readonly description?: string;
+  readonly arguments?: ReadonlyArray<McpToolArgumentDescriptor>;
+  readonly metadata?: Readonly<Record<string, unknown>>;
 }
 
 export function buildMcpToolDescriptorId(serverId: string, toolName: string): string {
@@ -76,13 +88,12 @@ export function normalizeMcpToolDescriptor(
       annotations?.category,
       annotations?.categories,
     ),
-    tags: normalizeStringList(
-      descriptor.tags,
-      metadata?.tags,
-      annotations?.tags,
-    ),
+    tags: normalizeStringList(descriptor.tags, metadata?.tags, annotations?.tags),
     annotations,
     metadata,
+    publicationState: descriptor.publicationState,
+    live: descriptor.live === true,
+    stale: descriptor.stale === true,
   });
 }
 
@@ -101,9 +112,7 @@ function normalizeArguments(
   const properties = ensurePlainRecord(inputSchema.properties);
   const requiredNames = new Set<string>(
     Array.isArray(inputSchema.required)
-      ? inputSchema.required
-        .map((value) => (typeof value === "string" ? value.trim() : ""))
-        .filter(Boolean)
+      ? inputSchema.required.map((value) => (typeof value === "string" ? value.trim() : "")).filter(Boolean)
       : []
   );
 
@@ -146,12 +155,10 @@ function normalizeType(value: unknown): string {
   if (typeof value === "string" && value.trim()) {
     return value.trim();
   }
-
   if (Array.isArray(value)) {
     const normalized = value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
     return normalized.join(" | ") || "unknown";
   }
-
   return "unknown";
 }
 
@@ -159,32 +166,23 @@ function normalizeEnumValues(value: unknown): ReadonlyArray<string | number | bo
   if (!Array.isArray(value)) {
     return undefined;
   }
-
   const normalized = value.filter(
     (item): item is string | number | boolean | null =>
       typeof item === "string" || typeof item === "number" || typeof item === "boolean" || item === null
   );
-
   return normalized.length > 0 ? Object.freeze([...normalized]) : undefined;
 }
 
 function normalizeStringList(...groups: ReadonlyArray<unknown>): ReadonlyArray<string> {
   const normalized = new Set<string>();
-
   for (const group of groups) {
     const values = Array.isArray(group) ? group : [group];
     for (const value of values) {
-      if (typeof value !== "string") {
-        continue;
-      }
-
+      if (typeof value !== "string") continue;
       const trimmed = value.trim();
-      if (trimmed) {
-        normalized.add(trimmed);
-      }
+      if (trimmed) normalized.add(trimmed);
     }
   }
-
   return Object.freeze([...normalized].sort((left, right) => left.localeCompare(right)));
 }
 
@@ -192,7 +190,6 @@ function ensureRecord(value: unknown): Readonly<Record<string, unknown>> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return Object.freeze({ type: "object" });
   }
-
   return Object.freeze(cloneUnknown(value) as Record<string, unknown>);
 }
 
@@ -200,7 +197,6 @@ function ensurePlainRecord(value: unknown): Readonly<Record<string, unknown>> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return Object.freeze({});
   }
-
   return Object.freeze(cloneUnknown(value) as Record<string, unknown>);
 }
 
@@ -208,15 +204,11 @@ function cloneRecord(value: unknown): Readonly<Record<string, unknown>> | undefi
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return undefined;
   }
-
   return Object.freeze(cloneUnknown(value) as Record<string, unknown>);
 }
 
 function cloneUnknown<T>(value: T): T {
-  if (value === undefined) {
-    return value;
-  }
-
+  if (value === undefined) return value;
   return JSON.parse(JSON.stringify(value)) as T;
 }
 

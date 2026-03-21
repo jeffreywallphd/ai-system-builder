@@ -22,6 +22,7 @@ import type {
   GetDatasetDetailsQuery,
   GetExampleDetailsQuery,
   ImportSourceDocumentsCommand,
+  IngestDatasetSourceFilesCommand,
   ListDatasetsQuery,
   ListExamplesQuery,
   MoveWorkflowStageCommand,
@@ -52,6 +53,7 @@ export interface TuningDatasetStudioApplicationService {
   getExampleDetails(query: GetExampleDetailsQuery): Promise<StudioExample | undefined>;
 
   importSourceDocuments(command: ImportSourceDocumentsCommand): Promise<ReadonlyArray<import("../../domain/tuning-datasets/interfaces/ITuningDatasetStudio").DatasetSourceDocument>>;
+  ingestSourceFiles(command: IngestDatasetSourceFilesCommand): Promise<ReadonlyArray<import("../../domain/tuning-datasets/interfaces/ITuningDatasetStudio").DatasetSourceDocument>>;
   generateExamplesFromSource(command: GenerateExamplesFromSourceCommand): Promise<ReadonlyArray<StudioExample>>;
   generateQaExamplesFromSource(command: GenerateExamplesFromSourceCommand): Promise<ReadonlyArray<QuestionAnsweringExample>>;
   generateChatExamplesFromSource(command: GenerateExamplesFromSourceCommand): Promise<ReadonlyArray<ChatCompletionExample>>;
