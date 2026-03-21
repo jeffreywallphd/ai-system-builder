@@ -531,14 +531,23 @@ export default function WorkflowEditorPage({
               <strong>Runtime {runtimeState.appState}</strong>
               <span className="ui-text-secondary ui-text-small">{runtimeState.appStateDetail}</span>
             </div>
-            <button
-              type="button"
-              className="ui-button ui-button--secondary ui-button--sm"
-              disabled={!runtimeState.canRestartRuntime || runtimeState.isRestartingRuntime}
-              onClick={() => void runtimeConsoleStore.restartRuntime().catch(() => undefined)}
-            >
-              {runtimeState.isRestartingRuntime ? "Restarting…" : "Restart runtime"}
-            </button>
+            <div className="ui-row ui-row--wrap" style={{ gap: "var(--space-xs)" }}>
+              <button
+                type="button"
+                className="ui-button ui-button--ghost ui-button--sm"
+                onClick={() => runtimeConsoleStore.openConsole("logs")}
+              >
+                View logs
+              </button>
+              <button
+                type="button"
+                className="ui-button ui-button--secondary ui-button--sm"
+                disabled={!runtimeState.canRestartRuntime || runtimeState.isRestartingRuntime}
+                onClick={() => void runtimeConsoleStore.restartRuntime().catch(() => undefined)}
+              >
+                {runtimeState.isRestartingRuntime ? "Restarting…" : "Restart runtime"}
+              </button>
+            </div>
           </div>
         </div>
       ) : null}

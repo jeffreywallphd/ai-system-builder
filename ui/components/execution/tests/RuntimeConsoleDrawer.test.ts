@@ -16,6 +16,9 @@ describe("RuntimeConsoleDrawer", () => {
         onSelectTab: () => undefined,
         onClearLogs: () => undefined,
         onRefreshHealth: () => undefined,
+        onRestartRuntime: () => undefined,
+        canRestartRuntime: true,
+        isRestartingRuntime: false,
       })
     );
     expect(collapsed).not.toContain("Server health");
@@ -31,6 +34,9 @@ describe("RuntimeConsoleDrawer", () => {
         onSelectTab: () => undefined,
         onClearLogs: () => undefined,
         onRefreshHealth: () => undefined,
+        onRestartRuntime: () => undefined,
+        canRestartRuntime: true,
+        isRestartingRuntime: false,
       })
     );
     expect(health).toContain("Server health");
@@ -47,9 +53,14 @@ describe("RuntimeConsoleDrawer", () => {
         onSelectTab: () => undefined,
         onClearLogs: () => undefined,
         onRefreshHealth: () => undefined,
+        onRestartRuntime: () => undefined,
+        canRestartRuntime: true,
+        isRestartingRuntime: false,
       })
     );
     expect(logs).toContain("Runtime logs");
     expect(logs).toContain("Runtime logs will appear here.");
+    expect(logs).toContain("Refresh health");
+    expect(logs).toContain("Restart runtime");
   });
 });

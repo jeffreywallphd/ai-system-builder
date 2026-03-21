@@ -1,8 +1,9 @@
 import type { RuntimeEvent } from "../../../application/runtime/RuntimeEvent";
+import { useState } from "react";
 import type { RuntimeConsoleLogEntry, RuntimeConsoleTab, RuntimeHealthCheck } from "../../state/RuntimeConsoleStore";
 import RuntimeConsoleToolbar from "./RuntimeConsoleToolbar";
 import RuntimeHealthList from "./RuntimeHealthList";
-import RuntimeLogsList from "./RuntimeLogsList";
+import RuntimeLogsList, { type RuntimeConsoleLogFilter } from "./RuntimeLogsList";
 
 export interface RuntimeConsoleDrawerProps {
   readonly isExpanded: boolean;
@@ -15,6 +16,9 @@ export interface RuntimeConsoleDrawerProps {
   readonly onClearLogs: () => void;
   readonly onRefreshHealth: () => void;
   readonly onSelectTab: (tab: RuntimeConsoleTab) => void;
+  readonly onRestartRuntime?: () => void;
+  readonly canRestartRuntime?: boolean;
+  readonly isRestartingRuntime?: boolean;
 }
 
 export default function RuntimeConsoleDrawer({
@@ -28,8 +32,12 @@ export default function RuntimeConsoleDrawer({
   onClearLogs,
   onRefreshHealth,
   onSelectTab,
+  onRestartRuntime,
+  canRestartRuntime = false,
+  isRestartingRuntime = false,
 }: RuntimeConsoleDrawerProps): JSX.Element {
   const logCount = Math.max(logs.length, events.length);
+  const [activeLogFilter, setActiveLogFilter] = useState<RuntimeConsoleLogFilter>("all");
 
   return (
     <section className={`ui-runtime-console${isExpanded ? " ui-runtime-console--expanded" : ""}`}>
@@ -49,7 +57,16 @@ export default function RuntimeConsoleDrawer({
             onRefresh={onRefreshHealth}
           />
         ) : (
-          <RuntimeLogsList logs={logs} />
+          <RuntimeLogsList
+            logs={logs}
+            activeFilter={activeLogFilter}
+            onFilterChange={setActiveLogFilter}
+            onClearLogs={onClearLogs}
+            onRefreshHealth={onRefreshHealth}
+            onRestartRuntime={onRestartRuntime}
+            canRestartRuntime={canRestartRuntime}
+            isRestartingRuntime={isRestartingRuntime}
+          />
         )
       ) : null}
     </section>
