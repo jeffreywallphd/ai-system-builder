@@ -19,6 +19,7 @@ describe("RuntimeConsoleToolbar", () => {
     expect(html).toContain("Hide Runtime Console");
     expect(html).toContain("Health");
     expect(html).toContain("Logs");
+    expect(html).toContain("aria-selected=\"true\"");
     expect(html).toContain("3 logs");
     expect(html).toContain("Clear logs");
   });

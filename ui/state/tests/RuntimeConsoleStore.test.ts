@@ -44,6 +44,10 @@ describe("RuntimeConsoleStore", () => {
     store.toggleExpanded();
     expect(store.getState().isExpanded).toBeTrue();
 
+    store.openConsole("health");
+    expect(store.getState().isExpanded).toBeTrue();
+    expect(store.getState().activeTab).toBe("health");
+
     store.clearLogs();
     expect(store.getState().events).toHaveLength(0);
     expect(store.getState().logs).toHaveLength(0);

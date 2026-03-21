@@ -138,6 +138,17 @@ export class RuntimeConsoleStore {
     }
   }
 
+  public openConsole(tab: RuntimeConsoleTab = this.state.activeTab): void {
+    this.patch({
+      isExpanded: true,
+      activeTab: tab,
+    });
+
+    if (tab === "health") {
+      void this.refreshHealth();
+    }
+  }
+
   public setActiveTab(tab: RuntimeConsoleTab): void {
     if (this.state.activeTab === tab) {
       return;

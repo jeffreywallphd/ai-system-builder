@@ -196,6 +196,9 @@ export default function AppLayout(): JSX.Element {
         onClearLogs={() => runtimeConsoleStore.clearLogs()}
         onRefreshHealth={() => void runtimeConsoleStore.refreshHealth()}
         onSelectTab={(tab) => runtimeConsoleStore.setActiveTab(tab)}
+        onRestartRuntime={() => void runtimeConsoleStore.restartRuntime().catch(() => undefined)}
+        canRestartRuntime={runtimeConsoleState.canRestartRuntime}
+        isRestartingRuntime={runtimeConsoleState.isRestartingRuntime}
       />
 
       <footer className="ui-app__footer">

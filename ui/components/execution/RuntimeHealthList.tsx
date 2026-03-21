@@ -12,16 +12,16 @@ export default function RuntimeHealthList({
   onRefresh,
 }: RuntimeHealthListProps): JSX.Element {
   return (
-    <section className="ui-runtime-console__health" aria-live="polite">
-      <div className="ui-runtime-console__health-header">
+    <section className="ui-runtime-console__panel" aria-live="polite">
+      <div className="ui-runtime-console__panel-header">
         <div>
-          <div className="ui-runtime-console__health-title">Server health</div>
-          <div className="ui-runtime-console__health-subtitle">
+          <div className="ui-runtime-console__panel-title">Server health</div>
+          <div className="ui-runtime-console__panel-subtitle">
             Current runtime and MCP server availability for this workspace.
           </div>
         </div>
         <button
-          className="ui-button ui-button--ghost ui-button--sm"
+          className="ui-button ui-button--ghost ui-button--sm ui-runtime-console__action-button"
           type="button"
           onClick={onRefresh}
           disabled={isRefreshing}
