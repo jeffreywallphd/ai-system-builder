@@ -1,3 +1,4 @@
+import { aggregateWorkflowProvenance, ensureNodeExecutionProvenance } from "../../../application/execution/ExecutionTruth";
 import { WorkflowExecutionEvent, WorkflowExecutionResult } from "../../../application/ports/WorkflowExecutor";
 import type {
   IWorkflowExecutionEvent,
@@ -83,12 +84,7 @@ export class InterpretedWorkflowExecutionStrategy implements IWorkflowExecutionS
         executionMetadata: input.executionMetadata,
       });
       const nodeResult = await this.nodeExecutor.executeNode(context);
-      nodeProvenance[node.id] = nodeResult.provenance ?? {
-        classification: "scaffolded",
-        runtime: this.runtime,
-        executorId: "scaffold-node-executor",
-        detail: "Node completed through scaffold interpreter logic.",
-      };
+      nodeProvenance[node.id] = ensureNodeExecutionProvenance(node, nodeResult.provenance, { delegatedRuntimeAvailable: true });
       outputStore.setNodeOutput(node.id, nodeResult.outputs);
 
       onEvent?.(new WorkflowExecutionEvent({
@@ -107,13 +103,13 @@ export class InterpretedWorkflowExecutionStrategy implements IWorkflowExecutionS
           outputAssets: [],
           messages: nodeResult.messages,
           errorMessage: nodeResult.errorMessage ?? `Node '${node.id}' failed during scaffold execution.`,
-          provenance: {
-            classification: nodeProvenance[node.id]?.classification === "unavailable" ? "unavailable" : "hybrid",
-            runtime: this.runtime,
+          provenance: aggregateWorkflowProvenance({
             strategyId: this.getDescriptor().id,
+            runtime: this.runtime,
             detail: "Scaffold execution stopped after a node failure.",
             nodeProvenance: Object.freeze({ ...nodeProvenance }),
-          },
+            fallback: { kind: "scaffold-interpreter", isActive: true, reason: "The interpreted scaffold fallback handled workflow execution." },
+          }),
         });
       }
     }
@@ -123,13 +119,14 @@ export class InterpretedWorkflowExecutionStrategy implements IWorkflowExecutionS
       status: "completed",
       outputAssets: [],
       messages: ["Scaffold workflow execution completed."],
-      provenance: {
-        classification: aggregateClassification(nodeProvenance),
-        runtime: this.runtime,
+      provenance: aggregateWorkflowProvenance({
         strategyId: this.getDescriptor().id,
+        runtime: this.runtime,
         detail: "Workflow executed by the scaffold interpreter fallback.",
+        selectionReason: "Scaffold interpreter fallback was selected for this workflow.",
         nodeProvenance: Object.freeze({ ...nodeProvenance }),
-      },
+        fallback: { kind: "scaffold-interpreter", isActive: true, reason: "The interpreted scaffold fallback handled workflow execution." },
+      }),
     });
 
     onEvent?.(
@@ -145,23 +142,3 @@ export class InterpretedWorkflowExecutionStrategy implements IWorkflowExecutionS
   }
 }
 
-function aggregateClassification(
-  nodeProvenance: Record<string, NonNullable<IWorkflowExecutionResult["provenance"]>["nodeProvenance"][string]>
-): "scaffolded" | "hybrid" | "unavailable" {
-  const classifications = new Set(Object.values(nodeProvenance).map((item) => item.classification));
-
-  if (classifications.size === 0) {
-    return "scaffolded";
-  }
-
-  if (classifications.size === 1) {
-    const [only] = [...classifications];
-    return only === "unavailable" ? "unavailable" : "scaffolded";
-  }
-
-  if (classifications.size === 2 && classifications.has("scaffolded") && classifications.has("delegated")) {
-    return "hybrid";
-  }
-
-  return classifications.has("unavailable") ? "unavailable" : "hybrid";
-}

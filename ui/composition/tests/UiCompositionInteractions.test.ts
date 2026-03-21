@@ -9,8 +9,9 @@ describe("ui composition interactions", () => {
       config: AppRuntimeConfig.forDevelopment(),
     });
 
-    expect(dependencies.config.workflowRepositoryMode).toBe("browser-storage");
+    expect(dependencies.config.workflowRepositoryMode).toBe("filesystem-indexed");
     expect(dependencies.operationalStatus.workflowPersistence.effectiveMode).toBe("in-memory-fallback");
+    expect(dependencies.operationalStatus.workflowPersistence.detail).toContain("Emergency fallback only");
     expect(dependencies.operationalStatus.nodeCatalog.effectiveMode).toBe("registered");
     expect(dependencies.workflowStore).toBeDefined();
     expect(dependencies.nodeStore).toBeDefined();
@@ -23,6 +24,7 @@ describe("ui composition interactions", () => {
     expect(dependencies.mcpService).toBeDefined();
     expect(dependencies.mcpStore).toBeDefined();
     expect(dependencies.settingsStore).toBeDefined();
+    expect(dependencies.operationalStatus.modelLibrary.effectiveMode).toBe("browser-download-fallback");
   });
 
   it("exposes registry-backed node definitions in the UI catalog", async () => {

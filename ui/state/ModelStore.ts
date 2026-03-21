@@ -1,4 +1,5 @@
 import type { IModel } from "../../domain/models/interfaces/IModel";
+import type { ManagedModelLibrarySnapshot } from "../../application/models/ManagedModelLibrary";
 import type { IInstalledModelSearchCriteria } from "../../application/ports/interfaces/IInstalledModelCatalog";
 import type {
   IRemoteModelCatalogItem,
@@ -15,6 +16,7 @@ export interface IModelStoreState {
   readonly installedSearchCriteria?: IInstalledModelSearchCriteria;
   readonly remoteSearchCriteria?: IRemoteModelCatalogSearchCriteria;
   readonly installProgressByModelId: Readonly<Record<string, IModelInstallProgress>>;
+  readonly managedLibrary?: ManagedModelLibrarySnapshot;
   readonly isLoadingInstalled: boolean;
   readonly isSearchingRemote: boolean;
   readonly isInstalling: boolean;
@@ -37,6 +39,7 @@ const defaultState: IModelStoreState = Object.freeze({
   installedSearchCriteria: undefined,
   remoteSearchCriteria: undefined,
   installProgressByModelId: Object.freeze({}),
+  managedLibrary: undefined,
   isLoadingInstalled: false,
   isSearchingRemote: false,
   isInstalling: false,
@@ -61,6 +64,7 @@ export class ModelStore {
       installProgressByModelId: Object.freeze({
         ...(options.initialState?.installProgressByModelId ?? {}),
       }),
+      managedLibrary: options.initialState?.managedLibrary,
     });
   }
 
@@ -87,10 +91,14 @@ export class ModelStore {
     });
 
     try {
-      const installedModels = await this.modelService.listInstalledModels(criteria);
+      const [installedModels, managedLibrary] = await Promise.all([
+        this.modelService.listInstalledModels(criteria),
+        this.modelService.inspectManagedLibrary(),
+      ]);
 
       this.setState({
         installedModels: Object.freeze([...installedModels]),
+        managedLibrary,
         isLoadingInstalled: false,
       });
     } catch (error: unknown) {

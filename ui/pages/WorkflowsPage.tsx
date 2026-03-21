@@ -163,7 +163,7 @@ export default function WorkflowsPage(): JSX.Element {
             {operationalStatus.workflowPersistence.workflowsDirectory
               ? `(${operationalStatus.workflowPersistence.workflowsDirectory})`
               : ""}. Execution: <strong>{operationalStatus.execution.effectiveMode}</strong>.{" "}
-            Catalog: <strong>{operationalStatus.nodeCatalog.effectiveMode}</strong>.
+            Catalog: <strong>{operationalStatus.nodeCatalog.effectiveMode}</strong>. MCP: <strong>{operationalStatus.mcp.effectiveMode}</strong>. Model library: <strong>{operationalStatus.modelLibrary.effectiveMode}</strong>.
           </p>
         </div>
       </div>

@@ -27,6 +27,7 @@ import { ImplementationRegistryNodeCatalogProvider } from "../../infrastructure/
 import { HuggingFaceApiClient } from "../../infrastructure/huggingface/HuggingFaceApiClient";
 import { HuggingFaceModelCatalog } from "../../infrastructure/huggingface/HuggingFaceModelCatalog";
 import { BrowserHuggingFaceModelDownloader } from "../../infrastructure/browser/models/BrowserHuggingFaceModelDownloader";
+import { BrowserDownloadModelLibrary } from "../../infrastructure/browser/models/BrowserDownloadModelLibrary";
 import { LocalStorageInstalledModelCatalog } from "../../infrastructure/browser/models/LocalStorageInstalledModelCatalog";
 import { ModelDownloader } from "../../application/ports/ModelDownloader";
 import { ModelInstaller } from "../../application/ports/ModelInstaller";
@@ -43,7 +44,9 @@ import { McpService } from "../services/McpService";
 import { McpToolCallAuthoringService } from "../services/McpToolCallAuthoringService";
 import { McpStore } from "../state/McpStore";
 import { LocalStorageUiSettingsStorage, UiSettingsStore } from "../settings/UiSettingsStore";
+import type { UiSettings } from "../settings/UiSettings";
 import { resolveDesktopStorageAdapter } from "./DesktopStorageAdapter";
+import { resolveDesktopModelFileBridge } from "./DesktopModelFileBridgeAdapter";
 import { HttpMcpRuntimeClient } from "../../infrastructure/python/mcp/HttpMcpRuntimeClient";
 import { HttpMcpServerRuntimeClient } from "../../infrastructure/python/mcp/HttpMcpServerRuntimeClient";
 import { RuntimeBackedMcpConfiguredServerRepository } from "../../infrastructure/python/mcp/RuntimeBackedMcpConfiguredServerRepository";
@@ -127,6 +130,10 @@ import { DefaultNodeExecutionContextResolver } from "../../infrastructure/interp
 import { DefaultNodeOutputStore } from "../../infrastructure/interpreted/execution/DefaultNodeOutputStore";
 import { LangChainNodeExecutor } from "../../infrastructure/interpreted/execution/LangChainNodeExecutor";
 import { PythonDelegatedWorkflowExecutionStrategy } from "../../infrastructure/python/execution/PythonDelegatedWorkflowExecutionStrategy";
+import { DesktopBridgeFileStorage } from "../../infrastructure/browser/filesystem/DesktopBridgeFileStorage";
+import { ManagedLocalModelLibrary } from "../../infrastructure/filesystem/ManagedLocalModelLibrary";
+import { HuggingFaceModelDownloader } from "../../infrastructure/huggingface/HuggingFaceModelDownloader";
+import { LocalModelRepository } from "../../infrastructure/filesystem/LocalModelRepository";
 
 export function createUiDependencies(
   options: CreateUiDependenciesOptions = {}
@@ -134,6 +141,7 @@ export function createUiDependencies(
   const config = options.config ?? AppRuntimeConfig.resolveDefault();
   const desktopStorage = resolveDesktopStorageAdapter();
   const desktopWorkflowBridge = resolveDesktopWorkflowBridge();
+  const desktopModelFileBridge = resolveDesktopModelFileBridge();
   const durableDesktopStorage = config.isPackagedDesktopHost ? desktopStorage : undefined;
   const settingsStore = new UiSettingsStore({
     config,
@@ -157,7 +165,16 @@ export function createUiDependencies(
   const runtimeClient = pythonRuntimeConfig.isEnabled
     ? new HttpPythonRuntimeClient(pythonRuntimeConfig)
     : createDisabledRuntimeClient();
-  const workflowExecutorSelection = createWorkflowExecutor(config, runtimeClient, pythonRuntimeConfig.isEnabled);
+  const mcpClient = settings.runtime.mode === "disabled"
+    ? createDisabledMcpRuntimeClient()
+    : new HttpMcpRuntimeClient(pythonRuntimeConfig, fetch, runtimeEventSink);
+  const mcpServerRuntimeClient = settings.runtime.mode === "disabled"
+    ? createDisabledMcpServerRuntimeClient()
+    : new HttpMcpServerRuntimeClient(pythonRuntimeConfig, fetch, runtimeEventSink);
+  const runtimeMcpServerCatalog = settings.runtime.mode === "disabled"
+    ? createDisabledMcpServerCatalog()
+    : new PythonBackedMcpServerCatalog(mcpServerRuntimeClient);
+  const workflowExecutorSelection = createWorkflowExecutor(config, runtimeClient, pythonRuntimeConfig.isEnabled, mcpClient, runtimeMcpServerCatalog);
   const workflowExecutor = workflowExecutorSelection.executor;
 
   const nodeCatalogProvider = createNodeCatalogProvider(config);
@@ -220,16 +237,28 @@ export function createUiDependencies(
   });
 
   const huggingFaceApiClient = new HuggingFaceApiClient();
-  const installedModelCatalog = new LocalStorageInstalledModelCatalog(undefined, durableDesktopStorage as never);
+  const desktopModelFileStorage = desktopModelFileBridge ? new DesktopBridgeFileStorage(desktopModelFileBridge) : undefined;
+  const installedModelCatalog = desktopModelFileStorage
+    ? new LocalModelRepository({
+      fileStorage: desktopModelFileStorage,
+      rootDirectory: config.modelInstallDirectory,
+    })
+    : new LocalStorageInstalledModelCatalog(undefined, durableDesktopStorage as never);
+  const managedModelLibrary = desktopModelFileStorage
+    ? new ManagedLocalModelLibrary(desktopModelFileStorage, installedModelCatalog, config.modelInstallDirectory)
+    : new BrowserDownloadModelLibrary(installedModelCatalog, config.modelInstallDirectory);
   const remoteModelCatalog = new HuggingFaceModelCatalog({
     apiClient: huggingFaceApiClient,
   });
   const modelInstaller = new ModelInstaller({
-    downloader: new ModelDownloader([
-      new BrowserHuggingFaceModelDownloader({
+    downloader: new ModelDownloader([desktopModelFileStorage
+      ? new HuggingFaceModelDownloader({
         apiClient: huggingFaceApiClient,
-      }),
-    ]),
+        fileStorage: desktopModelFileStorage,
+      })
+      : new BrowserHuggingFaceModelDownloader({
+        apiClient: huggingFaceApiClient,
+      })]),
   });
 
   const modelService = new ModelService({
@@ -248,6 +277,7 @@ export function createUiDependencies(
     ),
     searchRemoteModelsUseCase: new SearchRemoteModelsUseCase(remoteModelCatalog),
     installedModelCatalog,
+    managedModelLibrary,
   });
 
   const modelStore = new ModelStore({
@@ -280,15 +310,6 @@ export function createUiDependencies(
     supervisorClient: managedServiceSupervisorClient,
   });
   const pythonRuntimeManager = pythonManagedService.pythonRuntimeManager;
-  const mcpClient = settings.runtime.mode === "disabled"
-    ? createDisabledMcpRuntimeClient()
-    : new HttpMcpRuntimeClient(pythonRuntimeConfig, fetch, runtimeEventSink);
-  const mcpServerRuntimeClient = settings.runtime.mode === "disabled"
-    ? createDisabledMcpServerRuntimeClient()
-    : new HttpMcpServerRuntimeClient(pythonRuntimeConfig, fetch, runtimeEventSink);
-  const runtimeMcpServerCatalog = settings.runtime.mode === "disabled"
-    ? createDisabledMcpServerCatalog()
-    : new PythonBackedMcpServerCatalog(mcpServerRuntimeClient);
   const persistedMcpServerRepository = settings.runtime.mode === "disabled"
     ? undefined
     : new RuntimeBackedMcpConfiguredServerRepository(mcpServerRuntimeClient);
@@ -442,6 +463,8 @@ export function createUiDependencies(
       workflowPersistence: workflowRepositorySelection.status,
       execution: workflowExecutorSelection.status,
       nodeCatalog: describeNodeCatalogMode(config),
+      mcp: describeMcpOperationalStatus(settings.runtime.mode),
+      modelLibrary: describeModelLibraryOperationalStatus(managedModelLibrary),
     },
     workflowStore,
     nodeStore,
@@ -509,28 +532,30 @@ function createWorkflowRepository(
         configuredMode: config.workflowRepositoryMode,
         effectiveMode: desktopStatus.provider,
         isDegraded: desktopStatus.degraded,
-        detail: desktopStatus.detail,
+        detail: desktopStatus.degraded
+          ? `Expected dev persistence is filesystem + SQLite, but the desktop bridge reported degradation: ${desktopStatus.detail}`
+          : `Expected dev persistence is active at ${desktopStatus.workflowsDirectory} with SQLite index ${desktopStatus.indexDatabasePath}.`,
         workflowsDirectory: desktopStatus.workflowsDirectory,
         indexDatabasePath: desktopStatus.indexDatabasePath,
       },
     };
   }
 
-  if (config.workflowRepositoryMode === "browser-storage" || desktopStorage) {
-    const storage = desktopStorage ?? (typeof window !== "undefined" ? window.localStorage : undefined);
-    if (storage) {
-      return {
-        repository: new BrowserStorageWorkflowRepository(nodeCatalogProvider, storage, createSeedWorkflows()),
-        status: {
-          configuredMode: config.workflowRepositoryMode,
-          effectiveMode: "browser-storage-fallback",
-          isDegraded: true,
-          detail: "Workflow persistence is durable in browser storage only. Use desktop development for dev/ filesystem + SQLite persistence.",
-          workflowsDirectory: config.workflowStorageDirectory,
-          indexDatabasePath: config.workflowIndexDatabasePath,
-        },
-      };
-    }
+  const browserStorage = typeof window !== "undefined" ? window.localStorage : undefined;
+  if (browserStorage) {
+    return {
+      repository: new BrowserStorageWorkflowRepository(nodeCatalogProvider, browserStorage, createSeedWorkflows()),
+      status: {
+        configuredMode: config.workflowRepositoryMode,
+        effectiveMode: "browser-storage-fallback",
+        isDegraded: true,
+        detail: config.workflowRepositoryMode === "filesystem-indexed"
+          ? "Expected dev persistence is dev/ filesystem + SQLite, but the app is running in explicit browser fallback mode and is using browser storage instead."
+          : "Workflow persistence is using the explicit browser-storage fallback mode.",
+        workflowsDirectory: config.workflowStorageDirectory,
+        indexDatabasePath: config.workflowIndexDatabasePath,
+      },
+    };
   }
 
   return {
@@ -539,20 +564,24 @@ function createWorkflowRepository(
       configuredMode: config.workflowRepositoryMode,
       effectiveMode: "in-memory-fallback",
       isDegraded: true,
-      detail: "No durable workflow persistence bridge is available in this environment.",
+      detail: "Emergency fallback only: no desktop workflow bridge or browser storage is available in this environment.",
       workflowsDirectory: config.workflowStorageDirectory,
       indexDatabasePath: config.workflowIndexDatabasePath,
     },
   };
 }
 
-function createWorkflowExecutor(config: AppRuntimeConfig, runtimeClient: IPythonRuntimeClient, runtimeEnabled: boolean) {
+function createWorkflowExecutor(config: AppRuntimeConfig, runtimeClient: IPythonRuntimeClient, runtimeEnabled: boolean, mcpClient: ReturnType<typeof createDisabledMcpRuntimeClient> | HttpMcpRuntimeClient, mcpServerCatalog: ReturnType<typeof createDisabledMcpServerCatalog> | PythonBackedMcpServerCatalog) {
   const executor = new TruthfulWorkflowExecutor({
     strategies: [
       new PythonDelegatedWorkflowExecutionStrategy(runtimeClient),
       new InterpretedWorkflowExecutionStrategy({
         runtime: "langchain",
-        nodeExecutor: new LangChainNodeExecutor(),
+        nodeExecutor: new LangChainNodeExecutor({
+          pythonRuntimeClient: runtimeEnabled ? runtimeClient : undefined,
+          mcpRuntimeClient: runtimeEnabled ? mcpClient : undefined,
+          mcpServerCatalog: runtimeEnabled ? mcpServerCatalog : undefined,
+        }),
         contextResolver: new DefaultNodeExecutionContextResolver(),
         outputStoreFactory: () => new DefaultNodeOutputStore(),
       }),
@@ -563,12 +592,12 @@ function createWorkflowExecutor(config: AppRuntimeConfig, runtimeClient: IPython
     executor,
     status: {
       configuredMode: config.workflowExecutorMode,
-      effectiveMode: runtimeEnabled ? "delegated-with-scaffold-fallback" : "scaffold-fallback",
+      effectiveMode: runtimeEnabled ? "delegated-with-explicit-scaffold-fallback" : "scaffold-fallback-only",
       isDegraded: !runtimeEnabled || config.workflowExecutorMode === "scaffold",
       detail: config.workflowExecutorMode === "scaffold"
-        ? "Execution is pinned to the scaffold interpreter."
+        ? "Execution is pinned to the explicit scaffold interpreter fallback."
         : runtimeEnabled
-          ? "Workflow execution selects delegated Python runtime first and falls back to explicit scaffold execution when needed."
+          ? "Workflow execution prefers delegated Python runtime execution and records every scaffold fallback explicitly in structured provenance."
           : "Python runtime is unavailable, so execution will run through the explicit scaffold fallback only.",
     },
   };
@@ -624,6 +653,24 @@ function describeNodeCatalogMode(config: AppRuntimeConfig) {
 }
 
 
+
+function describeMcpOperationalStatus(runtimeMode: UiSettings["runtime"]["mode"]) {
+  return runtimeMode === "disabled"
+    ? { configuredMode: "disabled", effectiveMode: "disabled", isDegraded: true, detail: "MCP runtime is disabled in settings." }
+    : { configuredMode: "runtime-backed", effectiveMode: "runtime-backed", isDegraded: false, detail: "MCP nodes and capabilities resolve through the runtime-backed MCP subsystem." };
+}
+
+function describeModelLibraryOperationalStatus(managedModelLibrary: BrowserDownloadModelLibrary | ManagedLocalModelLibrary) {
+  const isBrowserFallback = managedModelLibrary instanceof BrowserDownloadModelLibrary;
+  return {
+    configuredMode: isBrowserFallback ? "browser-download-fallback" : "managed-local",
+    effectiveMode: isBrowserFallback ? "browser-download-fallback" : "managed-local",
+    isDegraded: isBrowserFallback,
+    detail: isBrowserFallback
+      ? "Model installs are running in browser-download fallback mode and are not treated as a fully managed local library."
+      : "Model installs are reconciled against a managed local library path with verification-aware status reporting.",
+  };
+}
 
 function createDisabledRuntimeStatus() {
 

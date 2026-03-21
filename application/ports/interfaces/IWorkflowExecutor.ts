@@ -32,11 +32,55 @@ export type ExecutionProvenanceKind =
   | "hybrid"
   | "unavailable";
 
+export type ExecutionFallbackKind =
+  | "scaffold-interpreter"
+  | "browser-storage"
+  | "in-memory"
+  | "browser-download";
+
+export type McpExecutionTruthStatus =
+  | "live"
+  | "stale"
+  | "disconnected"
+  | "scaffolded-fallback"
+  | "unavailable";
+
+export type ModelLibraryTruthState =
+  | "installed-and-verified"
+  | "downloaded-but-unregistered"
+  | "registered-metadata-only"
+  | "missing-on-disk"
+  | "verification-failed";
+
+export interface IExecutionFallbackInfo {
+  readonly kind: ExecutionFallbackKind;
+  readonly isActive: boolean;
+  readonly reason?: string;
+}
+
+export interface IMcpExecutionProvenance {
+  readonly status: McpExecutionTruthStatus;
+  readonly serverId?: string;
+  readonly toolName?: string;
+  readonly detail?: string;
+  readonly checkedAt?: string;
+}
+
+export interface IModelLibraryProvenance {
+  readonly state: ModelLibraryTruthState;
+  readonly location?: string;
+  readonly detail?: string;
+}
+
 export interface INodeExecutionProvenance {
   readonly classification: ExecutionProvenanceKind;
   readonly runtime?: string;
   readonly executorId: string;
   readonly detail?: string;
+  readonly nodeType?: string;
+  readonly fallback?: IExecutionFallbackInfo;
+  readonly mcp?: IMcpExecutionProvenance;
+  readonly modelLibrary?: IModelLibraryProvenance;
 }
 
 export interface IWorkflowExecutionProvenance {
@@ -45,6 +89,9 @@ export interface IWorkflowExecutionProvenance {
   readonly strategyId: string;
   readonly detail?: string;
   readonly selectionReason?: string;
+  readonly fallback?: IExecutionFallbackInfo;
+  readonly nodeCounts?: Readonly<Record<ExecutionProvenanceKind, number>>;
+  readonly mcp?: IMcpExecutionProvenance;
   readonly nodeProvenance?: Readonly<Record<string, INodeExecutionProvenance>>;
 }
 

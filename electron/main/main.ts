@@ -1,4 +1,5 @@
 import started from "electron-squirrel-startup";
+import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -26,6 +27,35 @@ let storageDatabase: DesktopStorageDatabase | undefined;
 let workflowPersistence: DesktopWorkflowPersistence | undefined;
 let serviceSupervisor: DesktopServiceSupervisor | undefined;
 let bootstrapContext: DesktopBootstrapContext | undefined;
+
+function toFileEntry(filePath: string) {
+  const stats = fs.statSync(filePath);
+  return {
+    path: filePath,
+    kind: stats.isDirectory() ? "directory" as const : "file" as const,
+    size: stats.isFile() ? stats.size : undefined,
+    modifiedAt: stats.mtime.toISOString(),
+  };
+}
+
+function listEntries(rootPath: string, recursive = false): ReadonlyArray<ReturnType<typeof toFileEntry>> {
+  if (!fs.existsSync(rootPath)) {
+    return [];
+  }
+
+  const results: ReturnType<typeof toFileEntry>[] = [];
+  const walk = (currentPath: string) => {
+    for (const entry of fs.readdirSync(currentPath, { withFileTypes: true })) {
+      const entryPath = path.join(currentPath, entry.name);
+      results.push(toFileEntry(entryPath));
+      if (recursive && entry.isDirectory()) {
+        walk(entryPath);
+      }
+    }
+  };
+  walk(rootPath);
+  return results;
+}
 
 async function createMainWindow(): Promise<void> {
   const window = new BrowserWindow({
@@ -150,6 +180,46 @@ async function bootstrapDesktopRuntime(): Promise<void> {
       degraded: true,
       detail: "Desktop workflow persistence service is unavailable.",
     };
+  });
+  ipcMain.on("ai-loom-desktop-model-files:exists", (event, targetPath: string) => {
+    event.returnValue = fs.existsSync(targetPath);
+  });
+  ipcMain.on("ai-loom-desktop-model-files:stat", (event, targetPath: string) => {
+    event.returnValue = toFileEntry(targetPath);
+  });
+  ipcMain.on("ai-loom-desktop-model-files:read", (event, targetPath: string) => {
+    event.returnValue = new Uint8Array(fs.readFileSync(targetPath));
+  });
+  ipcMain.on("ai-loom-desktop-model-files:write", (_event, request: { path: string; content: Uint8Array; overwrite?: boolean; createDirectories?: boolean }) => {
+    if (!request.overwrite && fs.existsSync(request.path)) {
+      throw new Error(`File '${request.path}' already exists.`);
+    }
+    if (request.createDirectories) {
+      fs.mkdirSync(path.dirname(request.path), { recursive: true });
+    }
+    fs.writeFileSync(request.path, Buffer.from(request.content));
+  });
+  ipcMain.on("ai-loom-desktop-model-files:delete", (_event, targetPath: string) => {
+    if (fs.existsSync(targetPath)) {
+      fs.rmSync(targetPath, { recursive: true, force: true });
+    }
+  });
+  ipcMain.on("ai-loom-desktop-model-files:list", (event, targetPath: string, options?: { recursive?: boolean }) => {
+    event.returnValue = listEntries(targetPath, options?.recursive === true);
+  });
+  ipcMain.on("ai-loom-desktop-model-files:move", (_event, request: { from: string; to: string; overwrite?: boolean }) => {
+    if (!request.overwrite && fs.existsSync(request.to)) {
+      throw new Error(`File '${request.to}' already exists.`);
+    }
+    fs.mkdirSync(path.dirname(request.to), { recursive: true });
+    fs.renameSync(request.from, request.to);
+  });
+  ipcMain.on("ai-loom-desktop-model-files:copy", (_event, request: { from: string; to: string; overwrite?: boolean }) => {
+    if (!request.overwrite && fs.existsSync(request.to)) {
+      throw new Error(`File '${request.to}' already exists.`);
+    }
+    fs.mkdirSync(path.dirname(request.to), { recursive: true });
+    fs.copyFileSync(request.from, request.to);
   });
 
   if (runtimeMode === "desktop-production" && !pythonRuntime.isAvailable) {
