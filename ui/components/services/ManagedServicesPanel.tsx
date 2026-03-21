@@ -19,6 +19,7 @@ export interface ManagedServicesPanelProps {
   readonly onStop: (serviceId: string) => void;
   readonly onRestart: (serviceId: string) => void;
   readonly onEnsureRunning: (serviceId: string) => void;
+  readonly onStartCapability: (capabilityId: string) => void;
   readonly onCreateService: (definition: ManagedServiceDefinitionInput) => void;
   readonly onUpdateService: (serviceId: string, patch: ManagedServiceDefinitionInput) => void;
   readonly onRemoveService: (serviceId: string) => void;
@@ -55,6 +56,7 @@ export default function ManagedServicesPanel({
   onStop,
   onRestart,
   onEnsureRunning,
+  onStartCapability,
   onCreateService,
   onUpdateService,
   onRemoveService,
@@ -255,6 +257,10 @@ export default function ManagedServicesPanel({
                     <span className="ui-meta-label">Endpoint</span>
                     <span className="ui-meta-value">{presenter.presentEndpointSummary(service)}</span>
                   </div>
+                  <div className="ui-meta-item">
+                    <span className="ui-meta-label">Dependencies</span>
+                    <span className="ui-meta-value">{service.dependencies.length > 0 ? service.dependencies.join(", ") : "None"}</span>
+                  </div>
                 </div>
               </button>
             );
@@ -302,6 +308,18 @@ export default function ManagedServicesPanel({
                       <span className="ui-meta-label">Working directory</span>
                       <span className="ui-meta-value">{selectedService.workingDirectory ?? "Not configured"}</span>
                     </div>
+                    <div className="ui-meta-item">
+                      <span className="ui-meta-label">Dependencies</span>
+                      <span className="ui-meta-value">{selectedService.dependencies.length > 0 ? selectedService.dependencies.join(", ") : "None"}</span>
+                    </div>
+                    <div className="ui-meta-item">
+                      <span className="ui-meta-label">Dependents</span>
+                      <span className="ui-meta-value">{selectedService.dependents.length > 0 ? selectedService.dependents.join(", ") : "None"}</span>
+                    </div>
+                    <div className="ui-meta-item">
+                      <span className="ui-meta-label">Readiness</span>
+                      <span className="ui-meta-value">{selectedService.readiness.detail}</span>
+                    </div>
                     <div className="ui-meta-item ui-managed-services__meta-item--full">
                       <span className="ui-meta-label">Last error detail</span>
                       <span className="ui-meta-value">{presenter.presentErrorDetail(selectedService)}</span>
@@ -321,6 +339,17 @@ export default function ManagedServicesPanel({
                     <button type="button" className="ui-button ui-button--secondary ui-button--sm" disabled={isLoading || isMutating} onClick={() => onEnsureRunning(selectedService.id)}>
                       Check / ensure
                     </button>
+                    {selectedService.capabilities.map((capability) => (
+                      <button
+                        key={capability}
+                        type="button"
+                        className="ui-button ui-button--secondary ui-button--sm"
+                        disabled={isLoading || isMutating}
+                        onClick={() => onStartCapability(capability)}
+                      >
+                        Start {capability}
+                      </button>
+                    ))}
                     <button
                       type="button"
                       className="ui-button ui-button--ghost ui-button--sm"

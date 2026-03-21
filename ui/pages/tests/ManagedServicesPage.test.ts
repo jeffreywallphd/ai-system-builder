@@ -12,6 +12,7 @@ describe("ManagedServicesPage", () => {
     expect(source).toContain("managedServicesStore.stop");
     expect(source).toContain("managedServicesStore.restart");
     expect(source).toContain("managedServicesStore.ensureRunning");
+    expect(source).toContain("managedServicesStore.startCapability");
     expect(source).toContain("phone-driven administration");
   });
 });

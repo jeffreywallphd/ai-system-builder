@@ -28,6 +28,9 @@ export interface ManagedServiceRecord {
   readonly name: string;
   readonly kind: ManagedServiceDefinition["kind"];
   readonly description?: string;
+  readonly capabilities: ReadonlyArray<string>;
+  readonly dependencies: ReadonlyArray<string>;
+  readonly dependents: ReadonlyArray<string>;
   readonly source: ManagedServiceDefinition["source"];
   readonly startPolicy: ManagedServiceDefinition["autoStartPolicy"];
   readonly restartPolicy: ManagedServiceDefinition["restartPolicy"];
@@ -48,6 +51,11 @@ export interface ManagedServiceRecord {
   readonly lastCheckedAt: string;
   readonly lastErrorDetail?: string;
   readonly detail?: string;
+  readonly readiness: {
+    readonly isReady: boolean;
+    readonly detail: string;
+    readonly blockedBy: ReadonlyArray<string>;
+  };
   readonly recentLogs: ReadonlyArray<RuntimeEvent>;
 }
 
@@ -200,6 +208,36 @@ export class ManagedServicesService {
     return this.refreshService(serviceId);
   }
 
+  public async startCapability(capabilityId: string): Promise<ReadonlyArray<ManagedServiceRecord>> {
+    const normalizedCapabilityId = capabilityId.trim();
+    if (!normalizedCapabilityId) {
+      return Object.freeze([]);
+    }
+
+    const definitions = await this.listDefinitions();
+    const roots = definitions.filter((definition) => definition.capabilities.includes(normalizedCapabilityId));
+    if (roots.length === 0) {
+      throw new Error(`Unknown managed service capability '${normalizedCapabilityId}'.`);
+    }
+
+    const orderedDefinitions = this.orderDefinitionsByDependencies(
+      this.collectDefinitionsForRoots(roots.map((definition) => definition.serviceId), definitions),
+    );
+    const results: ManagedServiceRecord[] = [];
+
+    for (const definition of orderedDefinitions) {
+      if (this.isRegisteredManagedService(definition.serviceId)) {
+        await this.requireServiceSupervisor().ensureRunning(definition.serviceId);
+      } else {
+        await this.refreshService(definition.serviceId);
+      }
+
+      results.push(await this.getService(definition.serviceId));
+    }
+
+    return Object.freeze(results);
+  }
+
   public async listServicesFromSupervisor(
     services: ReadonlyArray<ManagedSupervisorServiceRecord>,
   ): Promise<ReadonlyArray<ManagedServiceRecord>> {
@@ -222,6 +260,9 @@ export class ManagedServicesService {
       name: definition?.displayName ?? service.name,
       kind: definition?.kind ?? (service.serviceId === this.getPythonRuntimeDefinition().serviceId ? "python-runtime" : "custom"),
       description: definition?.description,
+      capabilities: Object.freeze([...(definition?.capabilities ?? [])]),
+      dependencies: Object.freeze([...(definition?.dependencies ?? service.dependencies ?? [])]),
+      dependents: Object.freeze([...(service.dependents ?? this.findDependents(service.serviceId, definitions))]),
       source: definition?.source ?? fallbackSource,
       startPolicy: definition?.autoStartPolicy ?? "manual",
       restartPolicy: definition?.restartPolicy ?? "on-failure",
@@ -242,6 +283,11 @@ export class ManagedServicesService {
       lastCheckedAt: service.lastHealthCheckAt ?? service.startedAt ?? new Date().toISOString(),
       lastErrorDetail: isServiceInErrorState(mappedState) ? service.detail : undefined,
       detail: service.detail,
+      readiness: Object.freeze({
+        isReady: service.readiness?.isReady ?? service.state === "healthy",
+        detail: service.readiness?.detail ?? service.detail ?? `${service.name} readiness is unknown.`,
+        blockedBy: Object.freeze([...(service.readiness?.blockedBy ?? [])]),
+      }),
       recentLogs: Object.freeze(service.recentLogs.map((entry) => this.toRuntimeEvent(service.serviceId, entry))),
     });
   }
@@ -287,14 +333,19 @@ export class ManagedServicesService {
   }
 
   private async buildRecord(definition: ManagedServiceDefinition): Promise<ManagedServiceRecord> {
+    const definitions = await this.listDefinitions();
     if (this.isRegisteredManagedService(definition.serviceId)) {
-      return this.buildManagedRecord(
+      return this.enrichRecord(
         definition,
-        this.serviceManager.getServiceStatus(definition.serviceId) ?? createUnavailableManagedServiceStatus(definition),
+        this.buildManagedRecord(
+          definition,
+          this.serviceManager.getServiceStatus(definition.serviceId) ?? createUnavailableManagedServiceStatus(definition),
+        ),
+        definitions,
       );
     }
 
-    return this.buildCustomRecord(definition);
+    return this.enrichRecord(definition, await this.buildCustomRecord(definition), definitions);
   }
 
   private async refreshManagedServices(): Promise<void> {
@@ -329,6 +380,9 @@ export class ManagedServicesService {
       name: definition.displayName,
       kind: definition.kind,
       description: definition.description,
+      capabilities: definition.capabilities,
+      dependencies: definition.dependencies,
+      dependents: Object.freeze([]),
       source: definition.source ?? ManagedServiceSources.builtin,
       startPolicy: definition.autoStartPolicy,
       restartPolicy: definition.restartPolicy,
@@ -349,6 +403,7 @@ export class ManagedServicesService {
       lastCheckedAt: status.lastUpdatedAt,
       lastErrorDetail,
       detail: status.detail,
+      readiness: this.buildReadiness(definition, status.state, status.detail),
       recentLogs: Object.freeze(this.getRuntimeEvents(definition.serviceId)),
     });
   }
@@ -369,6 +424,9 @@ export class ManagedServicesService {
       name: definition.displayName,
       kind: definition.kind,
       description: definition.description,
+      capabilities: definition.capabilities,
+      dependencies: definition.dependencies,
+      dependents: Object.freeze([]),
       source: definition.source ?? ManagedServiceSources.custom,
       startPolicy: definition.autoStartPolicy,
       restartPolicy: definition.restartPolicy,
@@ -389,8 +447,127 @@ export class ManagedServicesService {
       lastCheckedAt: probe.lastUpdatedAt ?? new Date().toISOString(),
       lastErrorDetail: isServiceInErrorState(state) ? detail : undefined,
       detail,
+      readiness: this.buildReadiness(definition, state, detail),
       recentLogs: Object.freeze([]),
     });
+  }
+
+  private buildReadiness(
+    definition: ManagedServiceDefinition,
+    state: ManagedServiceState,
+    detail?: string,
+  ): ManagedServiceRecord["readiness"] {
+    const blockedBy = definition.dependencies.filter((dependencyId) => {
+      const dependencyState = this.peekServiceState(dependencyId);
+      return dependencyState !== ManagedServiceStates.running;
+    });
+
+    return Object.freeze({
+      isReady: state === ManagedServiceStates.running && blockedBy.length === 0,
+      detail: blockedBy.length > 0
+        ? `${definition.displayName} is waiting on ${blockedBy.join(", ")}.`
+        : definition.dependencies.length > 0
+          ? `${definition.displayName} dependencies are satisfied.`
+        : detail ?? `${definition.displayName} readiness matches its lifecycle state.`,
+      blockedBy: Object.freeze(blockedBy),
+    });
+  }
+
+  private enrichRecord(
+    definition: ManagedServiceDefinition,
+    record: ManagedServiceRecord,
+    definitions: ReadonlyArray<ManagedServiceDefinition>,
+  ): ManagedServiceRecord {
+    const dependencies = Object.freeze([...definition.dependencies]);
+    const dependents = this.findDependents(definition.serviceId, definitions);
+    const readiness = this.buildReadiness(definition, record.state, record.detail);
+
+    return Object.freeze({
+      ...record,
+      dependencies,
+      dependents,
+      readiness,
+    });
+  }
+
+  private collectDefinitionsForRoots(
+    rootServiceIds: ReadonlyArray<string>,
+    definitions: ReadonlyArray<ManagedServiceDefinition>,
+  ): ReadonlyArray<ManagedServiceDefinition> {
+    const byId = new Map(definitions.map((definition) => [definition.serviceId, definition]));
+    const collected = new Map<string, ManagedServiceDefinition>();
+    const visit = (serviceId: string) => {
+      const definition = byId.get(serviceId);
+      if (!definition || collected.has(serviceId)) {
+        return;
+      }
+
+      collected.set(serviceId, definition);
+      for (const dependencyId of definition.dependencies) {
+        visit(dependencyId);
+      }
+    };
+
+    for (const serviceId of rootServiceIds) {
+      visit(serviceId);
+    }
+
+    return Object.freeze([...collected.values()]);
+  }
+
+  private orderDefinitionsByDependencies(
+    definitions: ReadonlyArray<ManagedServiceDefinition>,
+  ): ReadonlyArray<ManagedServiceDefinition> {
+    const byId = new Map(definitions.map((definition) => [definition.serviceId, definition]));
+    const ordered: ManagedServiceDefinition[] = [];
+    const visiting = new Set<string>();
+    const visited = new Set<string>();
+
+    const visit = (definition: ManagedServiceDefinition) => {
+      if (visited.has(definition.serviceId)) {
+        return;
+      }
+
+      if (visiting.has(definition.serviceId)) {
+        throw new Error(`Managed service dependency cycle detected at '${definition.serviceId}'.`);
+      }
+
+      visiting.add(definition.serviceId);
+      for (const dependencyId of definition.dependencies) {
+        const dependency = byId.get(dependencyId);
+        if (dependency) {
+          visit(dependency);
+        }
+      }
+      visiting.delete(definition.serviceId);
+      visited.add(definition.serviceId);
+      ordered.push(definition);
+    };
+
+    for (const definition of definitions) {
+      visit(definition);
+    }
+
+    return Object.freeze(ordered);
+  }
+
+  private findDependents(
+    serviceId: string,
+    definitions: ReadonlyArray<ManagedServiceDefinition>,
+  ): ReadonlyArray<string> {
+    return Object.freeze(
+      definitions
+        .filter((definition) => definition.dependencies.includes(serviceId))
+        .map((definition) => definition.serviceId),
+    );
+  }
+
+  private peekServiceState(serviceId: string): ManagedServiceState | undefined {
+    if (this.isRegisteredManagedService(serviceId)) {
+      return this.serviceManager.getServiceStatus(serviceId)?.state;
+    }
+
+    return undefined;
   }
 
   private async probeCustomService(

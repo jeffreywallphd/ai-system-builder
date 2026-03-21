@@ -150,6 +150,115 @@ function createManagedSupervisor(
 }
 
 describe("InMemoryServiceSupervisor", () => {
+  it("starts dependencies before dependents and reports dependency readiness", async () => {
+    const startOrder: string[] = [];
+    const runtime = {
+      async start(definition: any) {
+        startOrder.push(definition.serviceId);
+        return {
+          pid: startOrder.length,
+          startedAt: new Date().toISOString(),
+          detail: `Started ${definition.name}.`,
+          logs: [],
+          exitPromise: new Promise(() => undefined),
+        };
+      },
+      async stop(definition: any) {
+        return { detail: `Stopped ${definition.name}.`, logs: [] };
+      },
+      async checkHealth(definition: any) {
+        return {
+          healthy: true,
+          detail: `${definition.name} is healthy.`,
+          logs: [],
+          probe: {
+            at: new Date().toISOString(),
+            healthy: true,
+            detail: `${definition.name} is healthy.`,
+            url: null,
+            statusCode: 200,
+            durationMs: 1,
+            errorCode: null,
+          },
+        };
+      },
+    };
+    const supervisor = new InMemoryServiceSupervisor({
+      runtime,
+      services: [
+        createRuntimeDefinition({ serviceId: "python-runtime" }),
+        createRuntimeDefinition({ serviceId: "vector-store", name: "Vector store", dependencies: ["python-runtime"] }),
+        createRuntimeDefinition({ serviceId: "model-gateway", name: "Model gateway", dependencies: ["vector-store"] }),
+      ],
+    });
+
+    const started = await supervisor.start("model-gateway");
+
+    expect(startOrder).toEqual(["python-runtime", "vector-store", "model-gateway"]);
+    expect(started.dependencies).toEqual(["vector-store"]);
+    expect(started.readiness.isReady).toBeTrue();
+    expect(started.dependents).toEqual([]);
+    expect(supervisor.getService("python-runtime")?.dependents).toEqual(["vector-store", "model-gateway"]);
+  });
+
+  it("restarts dependent chains before returning the selected service", async () => {
+    const operations: string[] = [];
+    const runtime = {
+      async start(definition: any) {
+        operations.push(`start:${definition.serviceId}`);
+        return {
+          pid: operations.length,
+          startedAt: new Date().toISOString(),
+          detail: `Started ${definition.name}.`,
+          logs: [],
+          exitPromise: new Promise(() => undefined),
+        };
+      },
+      async stop(definition: any) {
+        operations.push(`stop:${definition.serviceId}`);
+        return { detail: `Stopped ${definition.name}.`, logs: [] };
+      },
+      async checkHealth(definition: any) {
+        return {
+          healthy: true,
+          detail: `${definition.name} is healthy.`,
+          logs: [],
+          probe: {
+            at: new Date().toISOString(),
+            healthy: true,
+            detail: `${definition.name} is healthy.`,
+            url: null,
+            statusCode: 200,
+            durationMs: 1,
+            errorCode: null,
+          },
+        };
+      },
+    };
+    const supervisor = new InMemoryServiceSupervisor({
+      runtime,
+      services: [
+        createRuntimeDefinition({ serviceId: "python-runtime" }),
+        createRuntimeDefinition({ serviceId: "vector-store", name: "Vector store", dependencies: ["python-runtime"] }),
+        createRuntimeDefinition({ serviceId: "model-gateway", name: "Model gateway", dependencies: ["vector-store"] }),
+      ],
+    });
+
+    await supervisor.start("model-gateway");
+    operations.length = 0;
+
+    await supervisor.restart("python-runtime");
+
+    expect(operations).toEqual([
+      "stop:model-gateway",
+      "stop:vector-store",
+      "stop:python-runtime",
+      "start:python-runtime",
+      "start:vector-store",
+      "start:model-gateway",
+    ]);
+  });
+
   it("starts the managed runtime, captures logs, and makes repeated start idempotent", async () => {
     const port = await getAvailablePort();
     const supervisor = createManagedSupervisor(createRuntimeDefinition({

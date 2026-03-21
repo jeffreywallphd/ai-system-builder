@@ -13,6 +13,8 @@ function createDefinition(serviceId: string, kind = ManagedServiceKinds.custom):
     kind,
     displayName: `${serviceId} service`,
     transport: ManagedServiceTransports.process,
+    dependencies: [],
+    command: "node",
     args: ["serve"],
     environmentVariables: {},
     autoStartPolicy: ManagedServiceStartPolicies.manual,

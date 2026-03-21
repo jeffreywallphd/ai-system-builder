@@ -50,6 +50,7 @@ export interface ManagedServiceDefinition {
   readonly kind: ManagedServiceKind;
   readonly displayName: string;
   readonly description?: string;
+  readonly dependencies: ReadonlyArray<string>;
   readonly transport: ManagedServiceTransport;
   readonly source?: ManagedServiceSource;
   readonly baseUrl?: string;
@@ -71,6 +72,7 @@ export interface ManagedServiceDefinitionInput {
   readonly kind: ManagedServiceKind;
   readonly displayName: string;
   readonly description?: string;
+  readonly dependencies?: ReadonlyArray<string>;
   readonly transport?: ManagedServiceTransport;
   readonly source?: ManagedServiceSource;
   readonly baseUrl?: string;
@@ -99,6 +101,7 @@ export function createManagedServiceDefinition(
     ...definition,
     transport: definition.transport ?? resolveTransport(definition),
     source: definition.source ?? ManagedServiceSources.custom,
+    dependencies: definition.dependencies ?? [],
     healthCheckPath: definition.healthCheckPath ?? resolveHealthCheckPath(definition),
     args: definition.args ?? [],
     environmentVariables: definition.environmentVariables ?? {},
@@ -122,6 +125,17 @@ export function validateManagedServiceDefinition(
 
   const displayName = requireTrimmedValue(definition.displayName, "displayName");
   const description = normalizeOptionalValue(definition.description);
+  const dependencies = Object.freeze(
+    [...new Set((definition.dependencies ?? []).map((dependency, index) => {
+      const normalized = requireTrimmedValue(dependency, `dependencies[${index}]`);
+      if (!SERVICE_ID_PATTERN.test(normalized)) {
+        throw new Error(
+          `Managed service '${serviceId}' dependency '${normalized}' must use lowercase letters, numbers, and hyphen-separated words.`,
+        );
+      }
+      return normalized;
+    }))],
+  );
   const baseUrl = normalizeUrl(definition.baseUrl, `Managed service '${serviceId}' has invalid baseUrl`);
   const healthCheckPath = normalizeOptionalValue(definition.healthCheckPath);
   const workingDirectory = normalizeOptionalValue(definition.workingDirectory);
@@ -144,6 +158,10 @@ export function validateManagedServiceDefinition(
 
   if (healthCheckPath && !healthCheckPath.startsWith("/")) {
     throw new Error(`Managed service '${serviceId}' healthCheckPath must start with '/'.`);
+  }
+
+  if (dependencies.includes(serviceId)) {
+    throw new Error(`Managed service '${serviceId}' cannot depend on itself.`);
   }
 
   if ((definition.transport === ManagedServiceTransports.process || definition.transport === ManagedServiceTransports.hybrid) && !command) {
@@ -187,6 +205,7 @@ export function validateManagedServiceDefinition(
     kind: definition.kind,
     displayName,
     description,
+    dependencies,
     transport: definition.transport,
     source,
     baseUrl,
@@ -228,6 +247,7 @@ export function mergeBuiltinManagedServiceDefinition(
     displayName: persistedDefinition.displayName || builtinDefinition.displayName,
     description: persistedDefinition.description ?? builtinDefinition.description,
     transport: builtinDefinition.transport,
+    dependencies: persistedDefinition.dependencies ?? builtinDefinition.dependencies,
     baseUrl: persistedDefinition.baseUrl ?? builtinDefinition.baseUrl,
     healthCheckPath: persistedDefinition.healthCheckPath ?? builtinDefinition.healthCheckPath,
     healthProbe: persistedDefinition.healthProbe ?? builtinDefinition.healthProbe,

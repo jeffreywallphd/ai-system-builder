@@ -91,6 +91,7 @@ describe("ManagedServicesService", () => {
         serviceId: "ollama-local",
         kind: ManagedServiceKinds.custom,
         displayName: "Ollama",
+        dependencies: ["python-runtime"],
         source: ManagedServiceSources.custom,
         transport: ManagedServiceTransports.http,
         baseUrl: "http://127.0.0.1:11434",
@@ -131,11 +132,14 @@ describe("ManagedServicesService", () => {
     expect(services[0]?.endpointSummary).toBe("http://127.0.0.1:8000/health");
     expect(services[0]?.ownership).toBe("managed");
     expect(services[0]?.state).toBe("running");
+    expect(services[0]?.dependents).toEqual(["ollama-local"]);
     expect(services[0]?.recentLogs.map((event) => event.message)).toEqual([
       "Supervisor started python-runtime.",
       "stderr: trace line",
     ]);
     expect(services[1]?.endpointSummary).toBe("http://127.0.0.1:11434/health");
+    expect(services[1]?.dependencies).toEqual(["python-runtime"]);
+    expect(services[1]?.readiness.isReady).toBeTrue();
     expect(refreshedCustom.state).toBe("running");
     expect(refreshedCustom.canManageLifecycle).toBeFalse();
     expect(started.state).toBe("running");
@@ -143,6 +147,93 @@ describe("ManagedServicesService", () => {
     expect(restart).toHaveBeenCalledTimes(1);
     expect(stop).toHaveBeenCalledTimes(1);
     expect(start).toHaveBeenCalledTimes(1);
+  });
+
+  it("starts all services required for a capability in dependency order", async () => {
+    const pythonDefinition = createPythonRuntimeServiceDefinition(new PythonRuntimeConfig({
+      mode: "managed-local",
+      baseUrl: "http://127.0.0.1:8000",
+    }));
+    const vectorDefinition = createManagedServiceDefinition({
+      serviceId: "vector-store",
+      kind: ManagedServiceKinds.custom,
+      displayName: "Vector store",
+      dependencies: ["python-runtime"],
+      source: ManagedServiceSources.custom,
+      transport: ManagedServiceTransports.http,
+      baseUrl: "http://127.0.0.1:6333",
+      autoStartPolicy: ManagedServiceStartPolicies.manual,
+      restartPolicy: ManagedServiceRestartPolicies.never,
+      capabilities: ["retrieval"],
+    });
+    const gatewayDefinition = createManagedServiceDefinition({
+      serviceId: "model-gateway",
+      kind: ManagedServiceKinds.custom,
+      displayName: "Model gateway",
+      dependencies: ["vector-store"],
+      source: ManagedServiceSources.custom,
+      transport: ManagedServiceTransports.http,
+      baseUrl: "http://127.0.0.1:11435",
+      autoStartPolicy: ManagedServiceStartPolicies.manual,
+      restartPolicy: ManagedServiceRestartPolicies.never,
+      capabilities: ["retrieval"],
+    });
+    const ensureRunningOrder: string[] = [];
+    const service = new ManagedServicesService({
+      serviceManager: {
+        listServices: () => ([
+          { id: pythonDefinition.serviceId, kind: pythonDefinition.kind, name: pythonDefinition.displayName, startPolicy: pythonDefinition.autoStartPolicy },
+        ]),
+        getServiceStatus: () => ({
+          serviceId: pythonDefinition.serviceId,
+          kind: pythonDefinition.kind,
+          state: ManagedServiceStates.running,
+          isAvailable: true,
+          ownership: ManagedServiceOwnership.managed,
+          startPolicy: pythonDefinition.autoStartPolicy,
+          lastUpdatedAt: "2026-03-20T10:15:00.000Z",
+          detail: "Runtime is healthy.",
+        }),
+        subscribeToStatus: () => () => undefined,
+        subscribeToLogs: () => () => undefined,
+        refreshServiceStatus: async () => ({
+          serviceId: pythonDefinition.serviceId,
+          kind: pythonDefinition.kind,
+          state: ManagedServiceStates.running,
+          isAvailable: true,
+          ownership: ManagedServiceOwnership.managed,
+          startPolicy: pythonDefinition.autoStartPolicy,
+          lastUpdatedAt: "2026-03-20T10:15:00.000Z",
+          detail: "Runtime is healthy.",
+        }),
+      } as any,
+      serviceSupervisor: {
+        start: async () => ({}) as any,
+        stop: async () => ({}) as any,
+        restart: async () => ({}) as any,
+        ensureRunning: async (serviceId: string) => {
+          ensureRunningOrder.push(serviceId);
+          return {
+            serviceId,
+            kind: pythonDefinition.kind,
+            state: ManagedServiceStates.running,
+            isAvailable: true,
+            ownership: ManagedServiceOwnership.managed,
+            startPolicy: pythonDefinition.autoStartPolicy,
+            lastUpdatedAt: "2026-03-20T10:15:00.000Z",
+          };
+        },
+      },
+      runtimeEventStore: new RuntimeEventBuffer({ capacity: 5 }),
+      builtinDefinitions: [pythonDefinition],
+      definitionRepository: createRepository([vectorDefinition, gatewayDefinition]) as any,
+      fetchImplementation: mock(async () => ({ ok: true, status: 200 })) as any,
+    });
+
+    const records = await service.startCapability("retrieval");
+
+    expect(ensureRunningOrder).toEqual(["python-runtime"]);
+    expect(records.map((record) => record.id)).toEqual(["python-runtime", "vector-store", "model-gateway"]);
   });
 
   it("supports custom-service CRUD while protecting built-in services", async () => {

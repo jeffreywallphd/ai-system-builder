@@ -18,6 +18,7 @@ describe("ManagedServiceDefinition", () => {
       source: ManagedServiceSources.builtin,
       displayName: " Python runtime ",
       description: " Built-in runtime ",
+      dependencies: [" mcp-gateway "],
       baseUrl: " http://127.0.0.1:8000 ",
       workingDirectory: " python-runtime ",
       command: " python ",
@@ -33,6 +34,7 @@ describe("ManagedServiceDefinition", () => {
     expect(definition.serviceId).toBe("python-runtime");
     expect(definition.displayName).toBe("Python runtime");
     expect(definition.baseUrl).toBe("http://127.0.0.1:8000");
+    expect(definition.dependencies).toEqual(["mcp-gateway"]);
     expect(definition.healthCheckPath).toBe("/health");
     expect(definition.healthProbe).toEqual({ kind: ManagedServiceHealthProbeKinds.http, url: "http://127.0.0.1:8000/health" });
     expect(definition.args).toEqual(["-m", "uvicorn"]);
@@ -69,6 +71,21 @@ describe("ManagedServiceDefinition", () => {
       tags: [],
       capabilities: [],
     })).toThrow("healthCheckPath");
+
+    expect(() => validateManagedServiceDefinition({
+      serviceId: "python-runtime",
+      kind: ManagedServiceKinds.pythonRuntime,
+      displayName: "Python runtime",
+      dependencies: ["python-runtime"],
+      transport: ManagedServiceTransports.http,
+      args: [],
+      environmentVariables: {},
+      autoStartPolicy: ManagedServiceStartPolicies.onDemand,
+      restartPolicy: ManagedServiceRestartPolicies.never,
+      startupTimeoutMs: 20_000,
+      tags: [],
+      capabilities: [],
+    })).toThrow("cannot depend on itself");
 
     expect(() => validateManagedServiceDefinition({
       serviceId: "python-runtime",
