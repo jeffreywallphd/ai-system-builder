@@ -15,6 +15,9 @@ describe("ManagedServicesPanel", () => {
             kind: "python-runtime",
             source: "builtin",
             description: "Local FastAPI worker",
+            capabilities: ["workflow-execution"],
+            dependencies: [],
+            dependents: ["vector-store"],
             startPolicy: "on-demand",
             restartPolicy: "on-failure",
             state: "running",
@@ -34,6 +37,11 @@ describe("ManagedServicesPanel", () => {
             lastCheckedAt: "2026-03-20T10:15:00.000Z",
             lastErrorDetail: undefined,
             detail: "Healthy",
+            readiness: {
+              isReady: true,
+              detail: "Python runtime is ready.",
+              blockedBy: [],
+            },
             recentLogs: [
               createRuntimeEvent({
                 source: RuntimeEventSources.pythonRuntime,
@@ -61,6 +69,7 @@ describe("ManagedServicesPanel", () => {
         onStop: () => undefined,
         onRestart: () => undefined,
         onEnsureRunning: () => undefined,
+        onStartCapability: () => undefined,
         onCreateService: () => undefined,
         onUpdateService: () => undefined,
         onRemoveService: () => undefined,
@@ -71,6 +80,10 @@ describe("ManagedServicesPanel", () => {
     expect(html).toContain("Add custom service");
     expect(html).toContain("Python runtime");
     expect(html).toContain("Current state");
+    expect(html).toContain("Dependencies");
+    expect(html).toContain("Dependents");
+    expect(html).toContain("Python runtime is ready.");
+    expect(html).toContain("Start workflow-execution");
     expect(html).toContain("Edit service");
     expect(html).toContain("Recent stdout/stderr and supervisor events");
     expect(html).toContain("stderr: traceback line");

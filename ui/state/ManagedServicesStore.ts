@@ -132,6 +132,32 @@ export class ManagedServicesStore {
     await this.runMutation(serviceId, (id) => this.managedServicesService.ensureRunning(id));
   }
 
+  public async startCapability(capabilityId: string): Promise<void> {
+    this.patch({ isMutating: true, error: undefined });
+
+    try {
+      const updatedServices = await this.managedServicesService.startCapability(capabilityId);
+      const serviceIds = new Set(updatedServices.map((service) => service.id));
+      const services = this.state.services
+        .map((service) => updatedServices.find((updated) => updated.id === service.id) ?? service)
+        .concat(updatedServices.filter((service) => !this.state.services.some((entry) => entry.id === service.id)))
+        .filter((service, index, entries) => entries.findIndex((entry) => entry.id === service.id) === index);
+      const selectedService = updatedServices.at(-1)
+        ?? services.find((service) => serviceIds.has(service.id))
+        ?? services[0];
+
+      this.patch({
+        services: Object.freeze([...services]),
+        selectedServiceId: selectedService?.id,
+        recentLogs: Object.freeze([...(selectedService?.recentLogs ?? [])]),
+        isMutating: false,
+      });
+    } catch (error) {
+      this.patch({ isMutating: false, error: toErrorMessage(error) });
+      throw error;
+    }
+  }
+
   private async runMutation(
     serviceId: string | undefined,
     action: (serviceId: string) => Promise<ManagedServiceRecord>,

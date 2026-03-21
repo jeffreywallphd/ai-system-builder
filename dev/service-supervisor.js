@@ -219,6 +219,24 @@ function normalizeCompatibilityMetadata(compatibility) {
   };
 }
 
+function normalizeDependencyList(rawDependencies, serviceId) {
+  if (!rawDependencies) {
+    return [];
+  }
+
+  if (!Array.isArray(rawDependencies)) {
+    throw new Error(`Service '${serviceId}' dependencies must be an array of service IDs.`);
+  }
+
+  return [...new Set(rawDependencies.map((dependencyId, index) => {
+    if (typeof dependencyId !== "string" || !dependencyId.trim()) {
+      throw new Error(`Service '${serviceId}' dependency at index ${index} must be a non-empty string.`);
+    }
+
+    return dependencyId.trim();
+  }))];
+}
+
 function assertNoUnsafeShellInterpolation(value, fieldName) {
   if (typeof value !== "string") {
     throw new Error(`${fieldName} must be a string.`);
@@ -402,6 +420,7 @@ function normalizeServiceDefinition(definition, options = {}) {
   const normalized = Object.freeze({
     serviceId,
     name: name || serviceId,
+    dependencies: Object.freeze(normalizeDependencyList(definition.dependencies, serviceId)),
     command: typeof definition.command === "string" && definition.command.trim()
       ? validateExecutable(definition.command.trim(), securityPolicy)
       : undefined,
@@ -448,6 +467,7 @@ function createInitialServiceState(definition, clock) {
     name: definition.name,
     command: definition.command,
     args: definition.args,
+    dependencies: definition.dependencies,
     cwd: definition.cwd,
     baseUrl: definition.baseUrl,
     pid: null,
@@ -842,7 +862,8 @@ export class InMemoryServiceSupervisor {
           cwd: process.cwd(),
           env: {},
           baseUrl: undefined,
-          healthCheckPath: DEFAULT_PYTHON_RUNTIME_HEALTH_PATH,
+      healthCheckPath: DEFAULT_PYTHON_RUNTIME_HEALTH_PATH,
+      dependencies: [],
           startupTimeoutMs: DEFAULT_STARTUP_TIMEOUT_MS,
           healthPollIntervalMs: DEFAULT_HEALTH_POLL_INTERVAL_MS,
           stopTimeoutMs: DEFAULT_STOP_TIMEOUT_MS,
@@ -891,26 +912,25 @@ export class InMemoryServiceSupervisor {
     return {
       type: "snapshot",
       payload: {
-        services: [...this.states.values()].map((state) => this.cloneState(state)),
+        services: [...this.states.values()].map((state) => this.toSummary(state.serviceId)),
       },
     };
   }
 
   getService(serviceId) {
-    const state = this.states.get(serviceId);
-    if (!state) {
+    if (!this.states.has(serviceId)) {
       return undefined;
     }
 
-    return this.cloneState(state);
+    return this.toSummary(serviceId);
   }
 
   async start(serviceId) {
-    return this.runLifecycleOperation(serviceId, "start", () => this.startInternal(serviceId));
+    return this.runLifecycleOperation(serviceId, "start", () => this.startWithDependencies(serviceId));
   }
 
   async stop(serviceId) {
-    return this.runLifecycleOperation(serviceId, "stop", () => this.stopInternal(serviceId));
+    return this.runLifecycleOperation(serviceId, "stop", () => this.stopWithDependents(serviceId));
   }
 
   async restart(serviceId) {
@@ -924,8 +944,23 @@ export class InMemoryServiceSupervisor {
           timestamp: createClockTimestamp(this.clock),
         },
       });
+      const restartChain = this.getOrderedDependents(serviceId);
+      const restartCandidates = [
+        serviceId,
+        ...restartChain.filter((dependencyId) => {
+          const state = this.requireState(dependencyId);
+          return state.state !== ServiceStates.stopped || state.ownership === ServiceOwnership.external;
+        }),
+      ];
+
+      for (const dependentId of [...restartChain].reverse()) {
+        await this.stopInternal(dependentId);
+      }
       await this.stopInternal(serviceId);
-      const restarted = await this.startInternal(serviceId);
+      const restarted = await this.startWithDependencies(serviceId);
+      for (const dependentId of restartCandidates.slice(1)) {
+        await this.ensureRunning(dependentId);
+      }
       this.emitEvent({
         type: "service-restart",
         payload: {
@@ -959,7 +994,7 @@ export class InMemoryServiceSupervisor {
         );
       }
 
-      return this.startInternal(serviceId);
+      return this.startWithDependencies(serviceId);
     });
   }
 
@@ -1040,6 +1075,88 @@ export class InMemoryServiceSupervisor {
     }
 
     return undefined;
+  }
+
+  getOrderedDependencies(serviceId, visiting = new Set(), ordered = []) {
+    if (visiting.has(serviceId)) {
+      throw new Error(`Service dependency cycle detected at '${serviceId}'.`);
+    }
+
+    const definition = this.requireDefinition(serviceId);
+    visiting.add(serviceId);
+    for (const dependencyId of definition.dependencies ?? []) {
+      if (!this.definitions.has(dependencyId)) {
+        throw new Error(`Service '${serviceId}' depends on unknown service '${dependencyId}'.`);
+      }
+      this.getOrderedDependencies(dependencyId, visiting, ordered);
+      if (!ordered.includes(dependencyId)) {
+        ordered.push(dependencyId);
+      }
+    }
+    visiting.delete(serviceId);
+    return ordered;
+  }
+
+  getOrderedDependents(serviceId) {
+    const ordered = [];
+    const visit = (candidateId) => {
+      for (const [dependentId, definition] of this.definitions.entries()) {
+        if (!definition.dependencies?.includes(candidateId)) {
+          continue;
+        }
+        if (!ordered.includes(dependentId)) {
+          ordered.push(dependentId);
+          visit(dependentId);
+        }
+      }
+    };
+
+    visit(serviceId);
+    return ordered;
+  }
+
+  getDependencyReadiness(serviceId) {
+    const definition = this.requireDefinition(serviceId);
+    const blockedBy = (definition.dependencies ?? []).filter((dependencyId) => {
+      const dependencyState = this.states.get(dependencyId);
+      return dependencyState?.state !== ServiceStates.healthy;
+    });
+    const state = this.requireState(serviceId);
+    const isReady = state.state === ServiceStates.healthy && blockedBy.length === 0;
+    return {
+      isReady,
+      blockedBy,
+      detail: blockedBy.length > 0
+        ? `${definition.name} is waiting on ${blockedBy.join(", ")}.`
+        : state.state === ServiceStates.healthy
+          ? `${definition.name} is ready.`
+          : `${definition.name} is not ready while ${state.state}.`,
+    };
+  }
+
+  async startWithDependencies(serviceId) {
+    for (const dependencyId of this.getOrderedDependencies(serviceId)) {
+      const dependencyStatus = await this.startInternal(dependencyId);
+      if (dependencyStatus.state !== ServiceStates.healthy) {
+        return this.failService(serviceId, this.requireDefinition(serviceId), {
+          category: "dependency",
+          detail: `${this.requireDefinition(serviceId).name} is blocked by dependency '${dependencyId}'.`,
+          error: new Error(`Dependency '${dependencyId}' is not healthy.`),
+          outcome: "dependency-blocked",
+          ownership: ServiceOwnership.none,
+        });
+      }
+    }
+
+    return this.startInternal(serviceId);
+  }
+
+  async stopWithDependents(serviceId) {
+    for (const dependentId of [...this.getOrderedDependents(serviceId)].reverse()) {
+      await this.stopInternal(dependentId);
+    }
+
+    return this.stopInternal(serviceId);
   }
 
   async startInternal(serviceId) {
@@ -1506,15 +1623,16 @@ export class InMemoryServiceSupervisor {
 
   recordHealth(serviceId, healthy, detail, logs = [], probe = null) {
     const state = this.requireState(serviceId);
+    const readiness = this.getDependencyReadiness(serviceId);
     const nextState = healthy
-      ? ServiceStates.healthy
+      ? readiness.blockedBy.length === 0 ? ServiceStates.healthy : ServiceStates.unhealthy
       : state.ownership === ServiceOwnership.external || Boolean(state.pid)
         ? ServiceStates.unhealthy
         : ServiceStates.stopped;
 
     return this.updateState(serviceId, {
       state: nextState,
-      detail,
+      detail: healthy && readiness.blockedBy.length > 0 ? readiness.detail : detail,
       lastHealthCheckAt: createClockTimestamp(this.clock),
       recentLogs: this.mergeLogs(state.recentLogs, logs),
       diagnostics: {
@@ -1539,7 +1657,7 @@ export class InMemoryServiceSupervisor {
       failureTimestamps: patch.failureTimestamps ?? current.failureTimestamps,
     };
     this.states.set(serviceId, next);
-    const clonedNext = this.cloneState(next);
+    const clonedNext = this.toSummary(serviceId);
     const previousState = current.state;
     const previousHealthCheckAt = current.lastHealthCheckAt;
 
@@ -1571,12 +1689,16 @@ export class InMemoryServiceSupervisor {
   }
 
   toSummary(serviceId) {
-    const service = this.getService(serviceId);
+    const service = this.cloneState(this.requireState(serviceId));
+    const definition = this.requireDefinition(serviceId);
+    const readiness = this.getDependencyReadiness(serviceId);
     return {
       serviceId: service.serviceId,
       name: service.name,
       command: service.command,
       args: service.args,
+      dependencies: [...(definition.dependencies ?? [])],
+      dependents: this.getOrderedDependents(serviceId).filter((dependentId, index, entries) => entries.indexOf(dependentId) === index),
       cwd: service.cwd,
       baseUrl: service.baseUrl,
       pid: service.pid,
@@ -1585,9 +1707,11 @@ export class InMemoryServiceSupervisor {
       state: service.state,
       ownership: service.ownership,
       detail: service.detail,
+      readiness,
       metadata: service.metadata,
       diagnostics: service.diagnostics,
       processHistory: service.processHistory,
+      recentLogs: service.recentLogs,
     };
   }
 

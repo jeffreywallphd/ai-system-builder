@@ -10,6 +10,9 @@ function createServiceRecord(overrides: Partial<ManagedServiceRecord> = {}): Man
     name: "Python runtime",
     kind: "python-runtime",
     source: "builtin",
+    capabilities: Object.freeze(["workflow-execution"]),
+    dependencies: Object.freeze([]),
+    dependents: Object.freeze([]),
     startPolicy: "on-demand",
     restartPolicy: "on-failure",
     state: "running",
@@ -29,6 +32,11 @@ function createServiceRecord(overrides: Partial<ManagedServiceRecord> = {}): Man
     lastCheckedAt: "2026-03-20T10:15:00.000Z",
     lastErrorDetail: undefined,
     detail: "Runtime is healthy.",
+    readiness: Object.freeze({
+      isReady: true,
+      detail: "Python runtime is ready.",
+      blockedBy: Object.freeze([]),
+    }),
     recentLogs: Object.freeze([
       createRuntimeEvent({
         source: RuntimeEventSources.pythonRuntime,
@@ -76,6 +84,24 @@ describe("ManagedServicesStore", () => {
     const stopService = mock(async () => createServiceRecord({ state: "stopped", ownership: "none", isAvailable: false }));
     const restartService = mock(async () => createServiceRecord({ state: "running", detail: "Restart complete." }));
     const ensureRunning = mock(async () => createServiceRecord({ state: "running", detail: "Already running." }));
+    const startCapability = mock(async () => Object.freeze([
+      createServiceRecord({ id: "python-runtime" }),
+      createServiceRecord({
+        id: "vector-store",
+        name: "Vector store",
+        kind: "custom",
+        source: "custom",
+        capabilities: Object.freeze(["retrieval"]),
+        dependencies: Object.freeze(["python-runtime"]),
+        canManageLifecycle: false,
+        canRemove: true,
+        readiness: Object.freeze({
+          isReady: false,
+          detail: "Vector store is waiting on python-runtime.",
+          blockedBy: Object.freeze(["python-runtime"]),
+        }),
+      }),
+    ]));
 
     const store = new ManagedServicesStore({
       listServices,
@@ -86,6 +112,7 @@ describe("ManagedServicesStore", () => {
       stopService,
       restartService,
       ensureRunning,
+      startCapability,
     } as any);
 
     await store.initialize();
@@ -96,6 +123,7 @@ describe("ManagedServicesStore", () => {
     await store.stop("python-runtime");
     await store.restart("python-runtime");
     await store.ensureRunning("python-runtime");
+    await store.startCapability("retrieval");
     await store.removeService("local-ollama");
 
     const state = store.getState();
@@ -107,6 +135,7 @@ describe("ManagedServicesStore", () => {
     expect(stopService).toHaveBeenCalledWith("python-runtime");
     expect(restartService).toHaveBeenCalledWith("python-runtime");
     expect(ensureRunning).toHaveBeenCalledWith("python-runtime");
+    expect(startCapability).toHaveBeenCalledWith("retrieval");
     expect(state.selectedServiceId).toBe("python-runtime");
     expect(state.recentLogs[0]?.message).toContain("runtime ready");
   });

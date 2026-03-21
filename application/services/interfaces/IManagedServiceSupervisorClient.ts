@@ -91,6 +91,8 @@ export interface ManagedSupervisorServiceRecord {
   readonly name: string;
   readonly command?: string;
   readonly args: ReadonlyArray<string>;
+  readonly dependencies?: ReadonlyArray<string>;
+  readonly dependents?: ReadonlyArray<string>;
   readonly cwd?: string;
   readonly baseUrl?: string;
   readonly pid: number | null;
@@ -99,6 +101,11 @@ export interface ManagedSupervisorServiceRecord {
   readonly state: ManagedSupervisorServiceState;
   readonly ownership: ManagedSupervisorServiceOwnership;
   readonly detail?: string;
+  readonly readiness?: {
+    readonly isReady: boolean;
+    readonly detail: string;
+    readonly blockedBy: ReadonlyArray<string>;
+  };
   readonly recentLogs: ReadonlyArray<ManagedSupervisorServiceLogEntry>;
   readonly processHistory: ReadonlyArray<ManagedSupervisorServiceProcessHistoryEntry>;
   readonly metadata: ManagedSupervisorServiceMetadata;
