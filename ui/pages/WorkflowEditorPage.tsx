@@ -29,6 +29,7 @@ import type { RuntimeConsoleState } from "../state/RuntimeConsoleStore";
 export interface WorkflowEditorPageProps {
   readonly workflowStore?: WorkflowStore;
   readonly nodeStore?: NodeStore;
+  readonly showHeader?: boolean;
 }
 
 const fallbackWorkflowState: IWorkflowStoreState = Object.freeze({
@@ -106,6 +107,7 @@ function getContextInspection(output: Readonly<Record<string, unknown>> | undefi
 export default function WorkflowEditorPage({
   workflowStore: workflowStoreProp,
   nodeStore: nodeStoreProp,
+  showHeader = true,
 }: WorkflowEditorPageProps): JSX.Element {
   const {
     workflowStore: injectedWorkflowStore,
@@ -498,7 +500,7 @@ export default function WorkflowEditorPage({
         isCanvasLocked ? " ui-page--editor-canvas-locked" : ""
       }`}
     >
-      {!isCanvasLocked ? (
+      {showHeader && !isCanvasLocked ? (
         <div className="ui-page__hero">
           <div className="ui-page__hero-copy">
             <h1 className="ui-page__title">Workflow Editor</h1>
@@ -511,7 +513,7 @@ export default function WorkflowEditorPage({
         </div>
       ) : null}
 
-      {!isCanvasLocked && (workflowState.error || nodeState.error) ? (
+      {(workflowState.error || nodeState.error) && !isCanvasLocked ? (
         <div className="ui-card">
           <div className="ui-card__body ui-stack ui-stack--xs">
             <div className="ui-row ui-row--wrap">
@@ -524,7 +526,7 @@ export default function WorkflowEditorPage({
         </div>
       ) : null}
 
-      {!isCanvasLocked && runtimeState.appState !== "ready" ? (
+      {runtimeState.appState !== "ready" && !isCanvasLocked ? (
         <div className="ui-card">
           <div className="ui-card__body ui-row ui-row--between ui-row--wrap" style={{ gap: "var(--space-sm)" }}>
             <div className="ui-stack ui-stack--2xs">

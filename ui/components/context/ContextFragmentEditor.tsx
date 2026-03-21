@@ -16,6 +16,27 @@ const fragmentKinds: ReadonlyArray<ContextFragmentKind> = Object.freeze([
   "formatting-constraints",
 ]);
 
+function friendlyFragmentKind(kind: ContextFragmentKind): string {
+  switch (kind) {
+    case "instructions":
+      return "Instructions";
+    case "persona":
+      return "Voice and tone";
+    case "domain-notes":
+      return "Reference notes";
+    case "retrieved-context":
+      return "Retrieved info";
+    case "examples":
+      return "Examples";
+    case "memory-snippets":
+      return "Saved memories";
+    case "formatting-constraints":
+      return "Formatting rules";
+    default:
+      return kind;
+  }
+}
+
 function metadataTagsToString(metadata?: Readonly<Record<string, unknown>>): string {
   const tags = Array.isArray(metadata?.tags)
     ? metadata?.tags.filter((tag): tag is string => typeof tag === "string" && tag.trim().length > 0)
@@ -40,14 +61,14 @@ export default function ContextFragmentEditor({
         <h4 className="ui-context-fragment-editor__title">{fragment.title || fragment.id}</h4>
         {onDelete ? (
           <button type="button" className="ui-button ui-button--ghost ui-button--sm" onClick={onDelete}>
-            Remove fragment
+            Remove section
           </button>
         ) : null}
       </div>
 
       <div className="ui-context-grid">
         <label className="ui-field">
-          <span className="ui-label">Fragment ID</span>
+          <span className="ui-label">Section ID</span>
           <input
             className="ui-input"
             value={fragment.id}
@@ -64,7 +85,7 @@ export default function ContextFragmentEditor({
           >
             {fragmentKinds.map((kind) => (
               <option key={kind} value={kind}>
-                {kind}
+                {friendlyFragmentKind(kind)}
               </option>
             ))}
           </select>
@@ -91,7 +112,7 @@ export default function ContextFragmentEditor({
       </div>
 
       <label className="ui-field">
-        <span className="ui-label">Metadata tags</span>
+        <span className="ui-label">Section tags</span>
         <input
           className="ui-input"
           value={metadataTagsToString(fragment.metadata)}

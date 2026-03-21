@@ -35,6 +35,6 @@ describe("ContextPackageBrowser", () => {
     expect(html).toContain("Context library");
     expect(html).toContain("Search reusable context by name, tags, and description.");
     expect(html).toContain("Persona Bank");
-    expect(html).toContain("Edit context package");
+    expect(html).toContain("Edit prompt pack");
   });
 });

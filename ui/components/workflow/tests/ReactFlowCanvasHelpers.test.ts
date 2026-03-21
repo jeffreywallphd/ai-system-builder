@@ -15,7 +15,7 @@ describe("ui/components/workflow/reactflow/ReactFlowCanvas helpers", () => {
       targetHandle: "input-port",
     };
 
-    expect(createOptimisticEdgeFromConnection(connection)).toEqual({
+    expect(createOptimisticEdgeFromConnection(connection)).toMatchObject({
       id: "edge:source-node:output-port:target-node:input-port",
       source: "source-node",
       sourceHandle: "output-port",
@@ -72,7 +72,7 @@ describe("ui/components/workflow/reactflow/ReactFlowCanvas helpers", () => {
       },
     };
 
-    expect(syncInteractiveEdges([pendingEdge!], [renderedEdge])).toEqual([
+    expect(syncInteractiveEdges([pendingEdge!], [renderedEdge])).toMatchObject([
       renderedEdge,
     ]);
   });

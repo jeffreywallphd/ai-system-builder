@@ -1,6 +1,4 @@
-import { Link } from "react-router-dom";
 import type { WorkflowListItemViewModel } from "../../presenters/WorkflowPresenter";
-import { ROUTE_PATHS } from "../../routes/RouteConfig";
 
 export interface WorkflowBrowserProps {
   readonly workflows: ReadonlyArray<WorkflowListItemViewModel>;
@@ -8,6 +6,8 @@ export interface WorkflowBrowserProps {
   readonly totalCount: number;
   readonly isLoading?: boolean;
   readonly onQueryChange: (query: string) => void;
+  readonly onLoadIntoCanvas?: (workflowId: string) => void;
+  readonly onLoadIntoExecutor?: (workflowId: string) => void;
 }
 
 export default function WorkflowBrowser({
@@ -16,6 +16,8 @@ export default function WorkflowBrowser({
   totalCount,
   isLoading = false,
   onQueryChange,
+  onLoadIntoCanvas,
+  onLoadIntoExecutor,
 }: WorkflowBrowserProps): JSX.Element {
   return (
     <div className="ui-stack ui-stack--md">
@@ -49,17 +51,34 @@ export default function WorkflowBrowser({
                   <span className="ui-text-secondary">{workflow.id}</span>
                 </div>
 
-                <Link
-                  className="ui-button ui-button--primary ui-button--sm"
-                  to={ROUTE_PATHS.workflowEditor.replace(":workflowId", workflow.id)}
-                >
-                  Load into Canvas
-                </Link>
+                <div className="ui-row ui-row--wrap">
+                  <button
+                    type="button"
+                    className="ui-button ui-button--primary ui-button--sm"
+                    onClick={() => onLoadIntoCanvas?.(workflow.id)}
+                  >
+                    Load into Canvas
+                  </button>
+                  <button
+                    type="button"
+                    className="ui-button ui-button--secondary ui-button--sm"
+                    disabled={workflow.nodeCount === 0}
+                    onClick={() => onLoadIntoExecutor?.(workflow.id)}
+                  >
+                    Load into Executor
+                  </button>
+                </div>
               </div>
 
               {workflow.description ? (
                 <p className="ui-text-secondary">{workflow.description}</p>
               ) : null}
+
+              <div className="ui-row ui-row--wrap ui-text-small ui-text-secondary">
+                <span>{workflow.nodeCount} node{workflow.nodeCount === 1 ? "" : "s"}</span>
+                <span>{workflow.connectionCount} connection{workflow.connectionCount === 1 ? "" : "s"}</span>
+                <span>{workflow.isExecutable ? "Ready to run" : "Needs setup"}</span>
+              </div>
             </div>
           </article>
         ))}

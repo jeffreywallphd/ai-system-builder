@@ -15,10 +15,10 @@ describe("ui/pages unit coverage", () => {
     expect(home).toContain("AI Loom Studio");
     expect(workflows).toContain("New Workflow");
     expect(editor).toContain("Workflow Editor");
-    expect(models).toContain("Search remote models");
-    expect(context).toContain("Treat context as a reusable authoring asset");
+    expect(models).toContain("Download Models");
+    expect(context).toContain("Reusable Instructions");
     expect(assets).toContain("Browse generated and stored workflow assets");
-    expect(mcp).toContain("Manage your MCP servers");
+    expect(mcp).toContain("Create new local MCP servers");
     expect(notFound).toContain("Page Not Found");
   });
 });

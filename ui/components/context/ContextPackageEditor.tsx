@@ -96,9 +96,9 @@ export default function ContextPackageEditor({
         <div className="ui-card__body ui-context-editor__section">
           <div className="ui-context-editor__header">
             <div>
-              <h2>{contextPackage ? "Edit context package" : "Create context package"}</h2>
+              <h2>{contextPackage ? "Edit prompt pack" : "Create prompt pack"}</h2>
               <p className="ui-text-secondary">
-                Manage reusable author-facing context assets, tags, references, and fragment order in one place.
+                Collect reusable instructions, examples, and reference notes in one place for your team.
               </p>
             </div>
             {contextPackage?.id && onDelete ? (
@@ -108,14 +108,14 @@ export default function ContextPackageEditor({
                 onClick={() => onDelete(contextPackage.id)}
                 disabled={isSaving}
               >
-                Delete package
+                Delete pack
               </button>
             ) : null}
           </div>
 
           <div className="ui-context-grid">
             <label className="ui-field">
-              <span className="ui-label">Package name</span>
+              <span className="ui-label">Pack name</span>
               <input className="ui-input" value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} />
             </label>
 
@@ -125,15 +125,16 @@ export default function ContextPackageEditor({
             </label>
           </div>
 
-          <label className="ui-field">
-            <span className="ui-label">Description</span>
-            <textarea
-              className="ui-input"
-              rows={3}
-              value={draft.description}
-              onChange={(event) => setDraft({ ...draft, description: event.target.value })}
-            />
-          </label>
+            <label className="ui-field">
+              <span className="ui-label">Description</span>
+              <textarea
+                className="ui-input"
+                rows={3}
+                value={draft.description}
+                onChange={(event) => setDraft({ ...draft, description: event.target.value })}
+                placeholder="Explain when this pack should be used."
+              />
+            </label>
 
           <div className="ui-context-grid">
             <label className="ui-field">
@@ -147,12 +148,12 @@ export default function ContextPackageEditor({
             </label>
 
             <label className="ui-field">
-              <span className="ui-label">References</span>
+              <span className="ui-label">Related packs</span>
               <input
                 className="ui-input"
                 value={draft.referenceIdsText}
                 onChange={(event) => setDraft({ ...draft, referenceIdsText: event.target.value })}
-                placeholder="base-persona, team-glossary"
+                placeholder="brand-voice, onboarding-guide"
               />
             </label>
           </div>
@@ -162,15 +163,15 @@ export default function ContextPackageEditor({
       <div className="ui-context-editor__section">
         <div className="ui-context-editor__fragments-header">
           <div>
-            <h3>Fragments</h3>
-            <p className="ui-text-secondary">Edit kind, title, content, ordering, and metadata tags for each fragment.</p>
+            <h3>Reusable sections</h3>
+            <p className="ui-text-secondary">Edit the type, title, content, order, and tags for each reusable section.</p>
           </div>
           <button
             type="button"
             className="ui-button ui-button--secondary ui-button--sm"
             onClick={() => setDraft({ ...draft, fragments: [...draft.fragments, createEmptyFragment(draft.fragments.length)] })}
           >
-            Add fragment
+            Add section
           </button>
         </div>
 
@@ -209,7 +210,7 @@ export default function ContextPackageEditor({
             disabled={isSaving}
             onClick={() => onUpdate?.(contextPackage.id, payload)}
           >
-            Save package
+            Save pack
           </button>
         ) : (
           <button
@@ -218,7 +219,7 @@ export default function ContextPackageEditor({
             disabled={isSaving}
             onClick={() => onCreate?.(payload)}
           >
-            Create package
+            Create pack
           </button>
         )}
       </div>
