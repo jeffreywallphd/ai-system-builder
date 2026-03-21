@@ -37,6 +37,16 @@ describe("PythonRuntimeConfig", () => {
     expect(config.runtimeWorkingDirectory.endsWith("python-runtime")).toBeTrue();
   });
 
+  it("normalizes the legacy dev/python-runtime working directory", () => {
+    const config = new PythonRuntimeConfig({
+      mode: "managed-local",
+      baseUrl: "http://localhost:8100",
+      runtimeWorkingDirectory: "./dev/python-runtime",
+    });
+
+    expect(config.runtimeWorkingDirectory).toBe("python-runtime");
+  });
+
   it("loads from env", () => {
     const config = PythonRuntimeConfig.fromEnv({
       PYTHON_RUNTIME_MODE: "managed-local",

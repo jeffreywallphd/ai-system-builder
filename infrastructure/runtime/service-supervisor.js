@@ -305,6 +305,23 @@ function isPathInsideAllowedRoots(targetPath, allowedRoots) {
   return false;
 }
 
+function sanitizeBuiltinPythonRuntimeWorkingDirectory(serviceId, cwd) {
+  if (serviceId !== "python-runtime" || typeof cwd !== "string" || !cwd.trim()) {
+    return cwd;
+  }
+
+  const trimmed = cwd.trim();
+  if (!/[\\/]dev[\\/]python-runtime$/.test(trimmed) && trimmed !== "dev/python-runtime" && trimmed !== "./dev/python-runtime") {
+    return trimmed;
+  }
+
+  if (trimmed === "dev/python-runtime" || trimmed === "./dev/python-runtime") {
+    return "python-runtime";
+  }
+
+  return trimmed.replace(/[\\/]dev[\\/]python-runtime$/, `${path.sep}python-runtime`);
+}
+
 function validateWorkingDirectory(cwd, securityPolicy) {
   const resolvedCwd = path.resolve(cwd);
   if (!isPathInsideAllowedRoots(resolvedCwd, securityPolicy.allowedPaths)) {
@@ -433,10 +450,11 @@ function normalizeServiceDefinition(definition, options = {}) {
       : [],
   );
   const workingDirectory = typeof definition.workingDirectory === "string" ? definition.workingDirectory.trim() : "";
+  const requestedCwd = typeof definition.cwd === "string" && definition.cwd.trim()
+    ? definition.cwd.trim()
+    : workingDirectory || process.cwd();
   const cwd = validateWorkingDirectory(
-    typeof definition.cwd === "string" && definition.cwd.trim()
-      ? definition.cwd.trim()
-      : workingDirectory || process.cwd(),
+    sanitizeBuiltinPythonRuntimeWorkingDirectory(serviceId, requestedCwd),
     securityPolicy,
   );
   const env = normalizeEnvironmentVariables(definition.env ?? definition.environmentVariables);
