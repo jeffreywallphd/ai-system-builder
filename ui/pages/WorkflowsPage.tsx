@@ -75,6 +75,7 @@ export default function WorkflowsPage(): JSX.Element {
     contextStore,
     modelStore,
     nodeStore,
+    operationalStatus,
   } = useUiDependencies();
   const [workflowState, setWorkflowState] = useState<IWorkflowStoreState>(fallbackWorkflowState);
   const [contextState, setContextState] = useState<ContextStoreState>(fallbackContextState);
@@ -156,6 +157,13 @@ export default function WorkflowsPage(): JSX.Element {
           <p className="ui-text-secondary ui-text-small">
             Workflow definitions are organized under <strong>{settingsState.settings.workspace.workflowsDirectory}</strong>. Update the path in{" "}
             <Link to={ROUTE_PATHS.settings}>Settings</Link> if your team stores projects elsewhere.
+          </p>
+          <p className="ui-text-secondary ui-text-small">
+            Persistence: <strong>{operationalStatus.workflowPersistence.effectiveMode}</strong>{" "}
+            {operationalStatus.workflowPersistence.workflowsDirectory
+              ? `(${operationalStatus.workflowPersistence.workflowsDirectory})`
+              : ""}. Execution: <strong>{operationalStatus.execution.effectiveMode}</strong>.{" "}
+            Catalog: <strong>{operationalStatus.nodeCatalog.effectiveMode}</strong>.
           </p>
         </div>
       </div>

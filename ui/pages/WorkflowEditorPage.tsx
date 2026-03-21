@@ -806,6 +806,7 @@ export default function WorkflowEditorPage({
                       executionId={workflowState.lastExecutionEvent?.executionId}
                       currentNodeId={workflowState.lastExecutionEvent?.nodeId}
                       progressPercent={workflowState.lastExecutionEvent?.progress?.percent}
+                      provenance={workflowState.lastExecutionEvent?.provenance}
                       message={
                         workflowState.lastExecutionEvent?.message ??
                         (workflowState.isExecuting ? "Execution is in progress." : undefined)

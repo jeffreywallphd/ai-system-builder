@@ -4,7 +4,7 @@ import type { IWorkflowExecutionStrategy } from "../interfaces/IWorkflowExecutio
 describe("IWorkflowExecutionStrategy contract", () => {
   it("exposes descriptor, canHandle, execute", async () => {
     const strategy: IWorkflowExecutionStrategy = {
-      getDescriptor: () => ({ id: "s1", runtime: "x", mode: "delegated", supportsPartialDelegation: false }),
+      getDescriptor: () => ({ id: "s1", runtime: "x", mode: "delegated", supportsPartialDelegation: false, defaultProvenance: "delegated" as const }),
       canHandle: () => true,
       execute: async () => ({ executionId: "e1", status: "completed", outputAssets: [] }),
     };

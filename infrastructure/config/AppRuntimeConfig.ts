@@ -6,9 +6,9 @@ import {
 } from "../../domain/runtime/AppRuntimeMode";
 import type { DesktopPythonRuntimeInfo, DesktopStoragePaths } from "../../electron/shared/DesktopContracts";
 
-export type WorkflowRepositoryMode = "memory" | "sqlite";
-export type WorkflowExecutorMode = "preview" | "runtime";
-export type NodeCatalogMode = "mock" | "composite";
+export type WorkflowRepositoryMode = "browser-storage" | "filesystem-indexed" | "memory";
+export type WorkflowExecutorMode = "scaffold" | "strategy";
+export type NodeCatalogMode = "mock" | "registered" | "seeded";
 export type UiSettingsPersistenceMode = "local-storage" | "desktop-sqlite";
 export type InstalledModelCatalogMode = "browser-local-storage" | "desktop-sqlite";
 
@@ -26,6 +26,8 @@ export interface AppRuntimeConfigValues {
   readonly modelInstallDirectory: string;
   readonly serviceSupervisorBaseUrl?: string;
   readonly serviceSupervisorPort?: number;
+  readonly workflowStorageDirectory?: string;
+  readonly workflowIndexDatabasePath?: string;
   readonly desktopStorage?: DesktopStoragePaths;
   readonly desktopPythonRuntime?: DesktopPythonRuntimeInfo;
 }
@@ -51,6 +53,8 @@ export class AppRuntimeConfig {
   public readonly modelInstallDirectory: string;
   public readonly serviceSupervisorBaseUrl?: string;
   public readonly serviceSupervisorPort?: number;
+  public readonly workflowStorageDirectory?: string;
+  public readonly workflowIndexDatabasePath?: string;
   public readonly desktopStorage?: DesktopStoragePaths;
   public readonly desktopPythonRuntime?: DesktopPythonRuntimeInfo;
 
@@ -68,6 +72,8 @@ export class AppRuntimeConfig {
     this.modelInstallDirectory = values.modelInstallDirectory.trim();
     this.serviceSupervisorBaseUrl = values.serviceSupervisorBaseUrl?.trim() || undefined;
     this.serviceSupervisorPort = values.serviceSupervisorPort;
+    this.workflowStorageDirectory = values.workflowStorageDirectory?.trim() || undefined;
+    this.workflowIndexDatabasePath = values.workflowIndexDatabasePath?.trim() || undefined;
     this.desktopStorage = values.desktopStorage;
     this.desktopPythonRuntime = values.desktopPythonRuntime;
   }
@@ -99,6 +105,8 @@ export class AppRuntimeConfig {
       modelInstallDirectory: this.modelInstallDirectory,
       serviceSupervisorBaseUrl: this.serviceSupervisorBaseUrl,
       serviceSupervisorPort: this.serviceSupervisorPort,
+      workflowStorageDirectory: this.workflowStorageDirectory,
+      workflowIndexDatabasePath: this.workflowIndexDatabasePath,
       desktopStorage: this.desktopStorage,
       desktopPythonRuntime: this.desktopPythonRuntime,
     });
@@ -128,9 +136,9 @@ export class AppRuntimeConfig {
 
     return new AppRuntimeConfig({
       runtimeMode: AppRuntimeModes.browserDevelopment,
-      workflowRepositoryMode: "memory",
-      workflowExecutorMode: "preview",
-      nodeCatalogMode: "mock",
+      workflowRepositoryMode: "browser-storage",
+      workflowExecutorMode: "strategy",
+      nodeCatalogMode: "registered",
       uiSettingsPersistenceMode: "local-storage",
       installedModelCatalogMode: "browser-local-storage",
       seedStarterNode: true,
@@ -138,15 +146,17 @@ export class AppRuntimeConfig {
       devSyncBaseUrl,
       devSyncToken,
       modelInstallDirectory,
+      workflowStorageDirectory: "dev/workflow-data/workflows",
+      workflowIndexDatabasePath: "dev/workflow-data/workflows/workflow-index.sqlite",
     });
   }
 
   public static forDesktopDevelopment(options: DesktopConfigOptions): AppRuntimeConfig {
     return new AppRuntimeConfig({
       runtimeMode: AppRuntimeModes.desktopDevelopment,
-      workflowRepositoryMode: "memory",
-      workflowExecutorMode: "preview",
-      nodeCatalogMode: "mock",
+      workflowRepositoryMode: "filesystem-indexed",
+      workflowExecutorMode: "strategy",
+      nodeCatalogMode: "registered",
       uiSettingsPersistenceMode: "local-storage",
       installedModelCatalogMode: "browser-local-storage",
       seedStarterNode: true,
@@ -154,6 +164,8 @@ export class AppRuntimeConfig {
       modelInstallDirectory: options.storage.modelsDirectory,
       serviceSupervisorBaseUrl: options.serviceSupervisorBaseUrl,
       serviceSupervisorPort: options.serviceSupervisorPort,
+      workflowStorageDirectory: "dev/workflow-data/workflows",
+      workflowIndexDatabasePath: "dev/workflow-data/workflows/workflow-index.sqlite",
       desktopStorage: options.storage,
       desktopPythonRuntime: options.pythonRuntime,
     });
@@ -162,9 +174,9 @@ export class AppRuntimeConfig {
   public static forDesktopProduction(options: DesktopConfigOptions): AppRuntimeConfig {
     return new AppRuntimeConfig({
       runtimeMode: AppRuntimeModes.desktopProduction,
-      workflowRepositoryMode: "sqlite",
-      workflowExecutorMode: "runtime",
-      nodeCatalogMode: "composite",
+      workflowRepositoryMode: "filesystem-indexed",
+      workflowExecutorMode: "strategy",
+      nodeCatalogMode: "registered",
       uiSettingsPersistenceMode: "desktop-sqlite",
       installedModelCatalogMode: "desktop-sqlite",
       seedStarterNode: false,
@@ -172,6 +184,8 @@ export class AppRuntimeConfig {
       modelInstallDirectory: options.storage.modelsDirectory,
       serviceSupervisorBaseUrl: options.serviceSupervisorBaseUrl,
       serviceSupervisorPort: options.serviceSupervisorPort,
+      workflowStorageDirectory: `${options.storage.appDataDirectory}/workflow-data/workflows`,
+      workflowIndexDatabasePath: `${options.storage.storageDirectory}/workflow-index.sqlite`,
       desktopStorage: options.storage,
       desktopPythonRuntime: options.pythonRuntime,
     });

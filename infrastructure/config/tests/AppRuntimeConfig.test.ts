@@ -7,9 +7,9 @@ describe("AppRuntimeConfig", () => {
     const config = AppRuntimeConfig.forDevelopment();
 
     expect(config.runtimeMode).toBe(AppRuntimeModes.browserDevelopment);
-    expect(config.workflowRepositoryMode).toBe("memory");
-    expect(config.workflowExecutorMode).toBe("preview");
-    expect(config.nodeCatalogMode).toBe("mock");
+    expect(config.workflowRepositoryMode).toBe("browser-storage");
+    expect(config.workflowExecutorMode).toBe("strategy");
+    expect(config.nodeCatalogMode).toBe("registered");
     expect(config.uiSettingsPersistenceMode).toBe("local-storage");
     expect(config.installedModelCatalogMode).toBe("browser-local-storage");
     expect(config.seedStarterNode).toBe(true);
@@ -18,6 +18,8 @@ describe("AppRuntimeConfig", () => {
     expect(config.devSyncToken).toBe("ai-loom-dev-sync");
     expect(config.isDevSyncEnabled).toBe(true);
     expect(config.modelInstallDirectory).toBe("dev/models");
+    expect(config.workflowStorageDirectory).toBe("dev/workflow-data/workflows");
+    expect(config.workflowIndexDatabasePath).toBe("dev/workflow-data/workflows/workflow-index.sqlite");
   });
 
   it("builds desktop production defaults around durable app storage", () => {
@@ -44,9 +46,9 @@ describe("AppRuntimeConfig", () => {
     });
 
     expect(config.runtimeMode).toBe(AppRuntimeModes.desktopProduction);
-    expect(config.workflowRepositoryMode).toBe("sqlite");
-    expect(config.workflowExecutorMode).toBe("runtime");
-    expect(config.nodeCatalogMode).toBe("composite");
+    expect(config.workflowRepositoryMode).toBe("filesystem-indexed");
+    expect(config.workflowExecutorMode).toBe("strategy");
+    expect(config.nodeCatalogMode).toBe("registered");
     expect(config.uiSettingsPersistenceMode).toBe("desktop-sqlite");
     expect(config.installedModelCatalogMode).toBe("desktop-sqlite");
     expect(config.isProductionMode).toBe(true);

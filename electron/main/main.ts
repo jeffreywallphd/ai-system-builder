@@ -7,6 +7,7 @@ import { InitializeProductionStorageUseCase } from "../../application/runtime/In
 import { ResolveAppRuntimeModeUseCase } from "../../application/runtime/ResolveAppRuntimeModeUseCase";
 import { resolveDesktopStoragePaths } from "../../infrastructure/desktop/DesktopAppPaths";
 import { DesktopStorageDatabase } from "../../infrastructure/desktop/DesktopStorageDatabase";
+import { DesktopWorkflowPersistence } from "../../infrastructure/desktop/DesktopWorkflowPersistence";
 import { resolveDesktopPythonRuntime } from "../../infrastructure/desktop/DesktopPythonRuntimeResolver";
 import { AppRuntimeConfig } from "../../infrastructure/config/AppRuntimeConfig";
 import { DesktopServiceSupervisor } from "./DesktopServiceSupervisor";
@@ -22,6 +23,7 @@ const rendererDevUrl = process.env.ELECTRON_RENDERER_URL || "http://127.0.0.1:51
 
 let mainWindow: BrowserWindow | undefined;
 let storageDatabase: DesktopStorageDatabase | undefined;
+let workflowPersistence: DesktopWorkflowPersistence | undefined;
 let serviceSupervisor: DesktopServiceSupervisor | undefined;
 let bootstrapContext: DesktopBootstrapContext | undefined;
 
@@ -114,6 +116,40 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   });
   ipcMain.on("ai-loom-desktop-storage:removeItem", (_event, key: string) => {
     storageDatabase?.removeItem(key);
+  });
+  const workflowsDirectory = runtimeConfig.workflowStorageDirectory
+    ? path.resolve(repoRoot, runtimeConfig.workflowStorageDirectory)
+    : path.resolve(repoRoot, "dev/workflow-data/workflows");
+  const workflowIndexDatabasePath = runtimeConfig.workflowIndexDatabasePath
+    ? path.resolve(repoRoot, runtimeConfig.workflowIndexDatabasePath)
+    : path.resolve(repoRoot, "dev/workflow-data/workflows/workflow-index.sqlite");
+  workflowPersistence = new DesktopWorkflowPersistence({
+    workflowsDirectory,
+    indexDatabasePath: workflowIndexDatabasePath,
+  });
+  ipcMain.on("ai-loom-desktop-workflows:save-record", (_event, recordJson: string) => {
+    workflowPersistence?.saveWorkflowRecord(recordJson);
+  });
+  ipcMain.on("ai-loom-desktop-workflows:load-record", (event, id: string) => {
+    event.returnValue = workflowPersistence?.loadWorkflowRecord(id) ?? null;
+  });
+  ipcMain.on("ai-loom-desktop-workflows:list-summaries", (event) => {
+    event.returnValue = workflowPersistence?.listWorkflowSummaries() ?? [];
+  });
+  ipcMain.on("ai-loom-desktop-workflows:delete-record", (_event, id: string) => {
+    workflowPersistence?.deleteWorkflowRecord(id);
+  });
+  ipcMain.on("ai-loom-desktop-workflows:exists", (event, id: string) => {
+    event.returnValue = workflowPersistence?.workflowExists(id) ?? false;
+  });
+  ipcMain.on("ai-loom-desktop-workflows:status", (event) => {
+    event.returnValue = workflowPersistence?.getWorkflowPersistenceStatus() ?? {
+      provider: "desktop-filesystem-indexed",
+      workflowsDirectory,
+      indexDatabasePath: workflowIndexDatabasePath,
+      degraded: true,
+      detail: "Desktop workflow persistence service is unavailable.",
+    };
   });
 
   if (runtimeMode === "desktop-production" && !pythonRuntime.isAvailable) {

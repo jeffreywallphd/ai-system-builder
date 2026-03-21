@@ -2,7 +2,13 @@ import { describe, expect, it } from "bun:test";
 import { WorkflowRuntimeSelector } from "../WorkflowRuntimeSelector";
 
 const mk = (runtime: string, mode: "delegated" | "interpreted" | "hybrid") => ({
-  getDescriptor: () => ({ id: `${runtime}-${mode}`, runtime, mode, supportsPartialDelegation: mode !== "delegated" }),
+  getDescriptor: () => ({
+    id: `${runtime}-${mode}`,
+    runtime,
+    mode,
+    supportsPartialDelegation: mode !== "delegated",
+    defaultProvenance: mode === "delegated" ? "delegated" : "scaffolded",
+  }),
   canHandle: () => true,
   execute: async () => ({ executionId: "e", status: "completed", outputAssets: [] as const }),
 });

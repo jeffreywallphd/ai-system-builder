@@ -25,6 +25,29 @@ export type WorkflowExecutionEventKind =
   | "log"
   | "custom";
 
+export type ExecutionProvenanceKind =
+  | "real"
+  | "delegated"
+  | "scaffolded"
+  | "hybrid"
+  | "unavailable";
+
+export interface INodeExecutionProvenance {
+  readonly classification: ExecutionProvenanceKind;
+  readonly runtime?: string;
+  readonly executorId: string;
+  readonly detail?: string;
+}
+
+export interface IWorkflowExecutionProvenance {
+  readonly classification: ExecutionProvenanceKind;
+  readonly runtime?: string;
+  readonly strategyId: string;
+  readonly detail?: string;
+  readonly selectionReason?: string;
+  readonly nodeProvenance?: Readonly<Record<string, INodeExecutionProvenance>>;
+}
+
 export interface IWorkflowExecutionTarget {
   /**
    * Requested execution engine/runtime.
@@ -139,6 +162,16 @@ export interface IWorkflowExecutionEvent {
    * Optional serializable event payload.
    */
   readonly payload?: Readonly<Record<string, unknown>>;
+
+  /**
+   * Optional workflow-level execution provenance.
+   */
+  readonly provenance?: IWorkflowExecutionProvenance;
+
+  /**
+   * Optional node-level provenance when the event is node-related.
+   */
+  readonly nodeProvenance?: INodeExecutionProvenance;
 }
 
 export interface IWorkflowExecutionResult {
@@ -162,6 +195,11 @@ export interface IWorkflowExecutionResult {
    * Optional failure/cancellation reason.
    */
   readonly errorMessage?: string;
+
+  /**
+   * Structured description of how execution actually ran.
+   */
+  readonly provenance?: IWorkflowExecutionProvenance;
 }
 
 export interface IWorkflowExecutionHandle {

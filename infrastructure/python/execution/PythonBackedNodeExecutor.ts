@@ -43,6 +43,12 @@ export class PythonBackedNodeExecutor implements INodeExecutor {
         status: "skipped",
         outputs: {},
         messages: ["Node not delegated to python runtime."],
+        provenance: {
+          classification: "unavailable",
+          runtime: "python",
+          executorId: "python-backed-node-executor",
+          detail: "Node is not eligible for delegated Python execution.",
+        },
       };
     }
 
@@ -65,6 +71,14 @@ export class PythonBackedNodeExecutor implements INodeExecutor {
       outputs: response.outputs,
       messages: response.messages,
       errorMessage: response.errorMessage,
+      provenance: {
+        classification: response.status === "completed" ? "delegated" : "unavailable",
+        runtime: "python",
+        executorId: "python-backed-node-executor",
+        detail: response.status === "completed"
+          ? "Node execution was delegated to the Python runtime."
+          : "Python runtime could not complete delegated node execution.",
+      },
     };
   }
 }

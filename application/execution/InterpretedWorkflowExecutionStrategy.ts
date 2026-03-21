@@ -71,6 +71,7 @@ export class InterpretedWorkflowExecutionStrategy implements IWorkflowExecutionS
       runtime: this.runtime,
       mode: "interpreted",
       supportsPartialDelegation: true,
+      defaultProvenance: "scaffolded",
     };
   }
 
