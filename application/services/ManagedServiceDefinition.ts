@@ -94,6 +94,24 @@ const DEFAULT_HEALTH_CHECK_PATH = "/health";
 const SERVICE_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const ENVIRONMENT_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
+const LEGACY_PYTHON_RUNTIME_WORKDIR_PATTERN = /(^|[\\/])dev[\\/]python-runtime$/;
+
+function sanitizeBuiltinPythonWorkingDirectory(
+  workingDirectory: string | undefined,
+  builtinDefinition: ManagedServiceDefinition,
+): string | undefined {
+  if (builtinDefinition.kind !== "python-runtime" || !workingDirectory) {
+    return workingDirectory;
+  }
+
+  const normalized = workingDirectory.trim();
+  if (!LEGACY_PYTHON_RUNTIME_WORKDIR_PATTERN.test(normalized)) {
+    return normalized;
+  }
+
+  return normalized.replace(/[\\/]dev[\\/]python-runtime$/, "/python-runtime").replace(/^\.\/python-runtime$/, "python-runtime");
+}
+
 export function createManagedServiceDefinition(
   definition: ManagedServiceDefinitionInput,
 ): ManagedServiceDefinition {
@@ -251,7 +269,10 @@ export function mergeBuiltinManagedServiceDefinition(
     baseUrl: persistedDefinition.baseUrl ?? builtinDefinition.baseUrl,
     healthCheckPath: persistedDefinition.healthCheckPath ?? builtinDefinition.healthCheckPath,
     healthProbe: persistedDefinition.healthProbe ?? builtinDefinition.healthProbe,
-    workingDirectory: persistedDefinition.workingDirectory ?? builtinDefinition.workingDirectory,
+    workingDirectory: sanitizeBuiltinPythonWorkingDirectory(
+      persistedDefinition.workingDirectory ?? builtinDefinition.workingDirectory,
+      builtinDefinition,
+    ),
     command: sanitizeBuiltinPythonCommand(persistedDefinition.command) ?? builtinDefinition.command,
     args: builtinDefinition.args,
     environmentVariables: {

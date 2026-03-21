@@ -11,8 +11,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "service-supervisor": "node dev/service-supervisor.js",
-    "test:dev-supervisor": "bun test dev/tests/ServiceSupervisor.test.ts"
+    "service-supervisor": "node infrastructure/runtime/service-supervisor.js",
+    "test:service-supervisor": "bun test infrastructure/runtime/tests/ServiceSupervisor.test.ts"
   },
   "dependencies": {
     "react": "^18.3.1",

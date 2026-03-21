@@ -1,5 +1,9 @@
 import type { AppRuntimeConfig } from "../../infrastructure/config/AppRuntimeConfig";
 import {
+  normalizePythonRuntimeWorkingDirectory,
+  resolveDefaultPythonRuntimeWorkingDirectory,
+} from "../../infrastructure/config/PythonRuntimeWorkingDirectory";
+import {
   PythonRuntimeMode,
   parsePythonRuntimeMode,
   type PythonRuntimeMode as PythonRuntimeModeValue,
@@ -65,20 +69,6 @@ export type DeepPartial<T> = {
   readonly [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K];
 };
 
-function resolveDefaultRuntimeWorkingDirectory(): string {
-  if (typeof window !== "undefined") {
-    return "python-runtime";
-  }
-
-  const processLike = typeof globalThis !== "undefined"
-    ? (globalThis as typeof globalThis & { process?: { cwd?: () => string } }).process
-    : undefined;
-  const cwd = typeof processLike?.cwd === "function"
-    ? processLike.cwd()
-    : ".";
-  return `${cwd}/python-runtime`;
-}
-
 function resolveDefaultRuntimeBaseUrl(): string {
   if (typeof window !== "undefined" && window.location?.hostname) {
     return `${window.location.protocol}//${window.location.hostname}:8100`;
@@ -119,7 +109,7 @@ export function createDefaultUiSettings(config: AppRuntimeConfig): UiSettings {
       mode: PythonRuntimeMode.managedLocal,
       baseUrl: resolveDefaultRuntimeBaseUrl(),
       authToken: "",
-      workingDirectory: resolveDefaultRuntimeWorkingDirectory(),
+      workingDirectory: resolveDefaultPythonRuntimeWorkingDirectory(),
       requestTimeoutMs: 15_000,
       startupTimeoutMs: 20_000,
       healthPollIntervalMs: 500,
@@ -191,9 +181,11 @@ export function mergeUiSettings(
       mode: runtimeMode,
       baseUrl: normalizeString(overrides?.runtime?.baseUrl, defaults.runtime.baseUrl),
       authToken: normalizeString(overrides?.runtime?.authToken, defaults.runtime.authToken),
-      workingDirectory: normalizeDirectory(
-        overrides?.runtime?.workingDirectory,
-        defaults.runtime.workingDirectory
+      workingDirectory: normalizePythonRuntimeWorkingDirectory(
+        normalizeDirectory(
+          overrides?.runtime?.workingDirectory,
+          defaults.runtime.workingDirectory
+        )
       ),
       requestTimeoutMs: normalizePositiveNumber(
         overrides?.runtime?.requestTimeoutMs,

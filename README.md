@@ -36,8 +36,8 @@ cp .env.example .env
 # 5) Start the web app
 npm run dev
 
-# 6) Start the managed service supervisor once
-node dev/service-supervisor.js
+# 6) (Optional) Manually start the managed service supervisor only if you disabled auto-start
+npm run service-supervisor
 ```
 
 Open the URL printed by Vite (typically `http://localhost:5174`).
@@ -92,13 +92,16 @@ After that, use **Managed Services** inside the TypeScript UI to start, stop, re
    - Wait for the terminal to show the local URL (usually `http://localhost:5174`).
    - Open that URL in your browser.
 
-7. **Start the managed local supervisor** (primary path)
-   - Open a **second terminal window**.
+7. **Start the app** (primary path)
    - From the project root, run:
    ```bash
-   node dev/service-supervisor.js
+   npm run dev
    ```
-   - Keep this terminal running while you use the app.
+   - The Vite development server now auto-starts the managed local supervisor unless you disable it with `AI_LOOM_SERVICE_SUPERVISOR_AUTOSTART=false`.
+   - If you prefer to launch the supervisor yourself, open a second terminal and run:
+   ```bash
+   npm run service-supervisor
+   ```
    - Ensure your root `.env` contains:
    ```bash
    PYTHON_RUNTIME_MODE=managed-local
@@ -117,8 +120,9 @@ After that, use **Managed Services** inside the TypeScript UI to start, stop, re
 The primary local-development path is now:
 
 1. Start the TypeScript app with `npm run dev`.
-2. Start the generic local service supervisor with `node dev/service-supervisor.js`.
-3. Use **Managed Services** inside the app to launch and monitor the built-in Python runtime.
+2. Let the Vite dev server auto-start the generic local service supervisor for you.
+3. If you explicitly disable auto-start or need to run it manually, use `npm run service-supervisor`.
+4. Use **Managed Services** inside the app to launch and monitor the built-in Python runtime.
 
 This makes the Python runtime just one managed service in a broader local-service model that also supports future custom servers without requiring terminal-only administration.
 
@@ -163,10 +167,10 @@ Then open `http://localhost:4173`.
   source .venv/bin/activate
   pip install -r requirements.txt
   ```
-- If you create `python-runtime/.venv`, the supervisor will automatically prefer that interpreter the next time you run `node dev/service-supervisor.js`.
+- If you create `python-runtime/.venv`, the supervisor will automatically prefer that interpreter the next time you run `npm run service-supervisor`.
 - If you open the Vite UI from another device on your LAN, make sure the supervisor and Python runtime listen on the host machine. The defaults now do this automatically, but you can force it with:
   ```bash
-  SERVICE_SUPERVISOR_HOST=0.0.0.0 PYTHON_RUNTIME_BIND_HOST=0.0.0.0 node dev/service-supervisor.js
+  SERVICE_SUPERVISOR_HOST=0.0.0.0 PYTHON_RUNTIME_BIND_HOST=0.0.0.0 node infrastructure/runtime/service-supervisor.js
   ```
 
 ## Resume
