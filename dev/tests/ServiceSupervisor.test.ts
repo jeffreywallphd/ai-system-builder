@@ -311,6 +311,7 @@ describe("InMemoryServiceSupervisor", () => {
     expect(status.detail).toContain("Last probe");
     expect(status.diagnostics.lastError?.category).toBe("start");
     expect(status.diagnostics.lastHealthProbe?.healthy).toBeFalse();
+    expect(status.recentLogs.filter((entry) => entry.message === "Health check failed for python-runtime.")).toHaveLength(0);
   });
 
   it("marks crashes during startup as failed and records exit diagnostics", async () => {

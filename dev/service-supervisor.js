@@ -1600,11 +1600,15 @@ export class InMemoryServiceSupervisor {
         });
       }
 
+      const nextDetail = result?.detail ?? `Waiting for ${definition.name} health check to pass.`;
+      const shouldAppendRetryLogs = current.state !== ServiceStates.starting;
       this.updateState(serviceId, {
         state: ServiceStates.starting,
-        detail: result?.detail ?? `Waiting for ${definition.name} health check to pass.`,
+        detail: nextDetail,
         lastHealthCheckAt: createClockTimestamp(this.clock),
-        recentLogs: this.mergeLogs(this.requireState(serviceId).recentLogs, result?.logs ?? []),
+        recentLogs: shouldAppendRetryLogs
+          ? this.mergeLogs(this.requireState(serviceId).recentLogs, result?.logs ?? [])
+          : this.requireState(serviceId).recentLogs,
         diagnostics: {
           ...this.requireState(serviceId).diagnostics,
           lastHealthProbe: result?.probe ?? this.requireState(serviceId).diagnostics.lastHealthProbe,

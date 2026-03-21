@@ -498,4 +498,83 @@ describe("ManagedServicesService", () => {
     expect(ensured.healthSummary).toBe("Vector store is ready.");
     expect(lifecycleCalls).toEqual(["ensure:vector-store"]);
   });
+
+  it("keeps python runtime retry messaging stable until the retry limit is reached", async () => {
+    const pythonDefinition = createPythonRuntimeServiceDefinition(new PythonRuntimeConfig({
+      mode: "managed-local",
+      baseUrl: "http://127.0.0.1:8000",
+    }));
+    const repository = createRepository([pythonDefinition]);
+    const retryingService = {
+      serviceId: "python-runtime",
+      name: "Python runtime",
+      args: ["-m", "uvicorn"],
+      dependencies: [],
+      dependents: [],
+      pid: null,
+      startedAt: null,
+      lastHealthCheckAt: "2026-03-20T10:16:00.000Z",
+      state: "failed",
+      ownership: "none",
+      detail: "Python runtime health check failed at http://127.0.0.1:8000/health.",
+      readiness: { isReady: false, detail: "Runtime failed.", blockedBy: [] },
+      recentLogs: [],
+      processHistory: [],
+      metadata: { version: "1.0.0", compatibility: {} },
+      diagnostics: {
+        lastError: null,
+        lastExit: null,
+        lastStart: null,
+        lastHealthProbe: null,
+        circuitBreaker: {
+          state: "closed",
+          openedAt: null,
+          retryAfter: null,
+          recentFailures: 1,
+          maxFailures: 3,
+          failureWindowMs: 60_000,
+          cooldownMs: 30_000,
+        },
+      },
+    } as const;
+
+    const service = new ManagedServicesService({
+      serviceManager: {
+        listServices: () => ([]),
+        getServiceStatus: () => undefined,
+        subscribeToStatus: () => () => undefined,
+        subscribeToLogs: () => () => undefined,
+      } as any,
+      serviceSupervisor: {
+        start: async () => ({}) as any,
+        stop: async () => ({}) as any,
+        restart: async () => ({}) as any,
+        ensureRunning: async () => ({}) as any,
+      },
+      supervisorClient: {
+        health: async () => ({ ok: true, mode: "service-supervisor", host: "127.0.0.1", port: 8790, serviceCount: 1, services: [retryingService] }),
+        listServices: async () => ({ ok: true, services: [retryingService] }),
+        getService: async () => ({ ok: true, service: retryingService }),
+        listDefinitions: async () => ({ ok: true, definitions: [pythonDefinition] }),
+        getDefinition: async () => ({ ok: true, definition: pythonDefinition }),
+        saveDefinition: async (definition) => ({ ok: true, definition }),
+        deleteDefinition: async () => undefined,
+        start: async () => ({ ok: true, service: retryingService }),
+        stop: async () => ({ ok: true, service: retryingService }),
+        restart: async () => ({ ok: true, service: retryingService }),
+        ensureRunning: async () => ({ ok: true, service: retryingService }),
+      },
+      runtimeEventStore: new RuntimeEventBuffer({ capacity: 5 }),
+      builtinDefinitions: [pythonDefinition],
+      definitionRepository: repository as any,
+      fetchImplementation: mock(async () => ({ ok: true, status: 200 })) as any,
+    });
+
+    const mapped = await service.getService("python-runtime");
+
+    expect(mapped.state).toBe("starting");
+    expect(mapped.detail).toBe("Trying to restart Python runtime (2 of 3).");
+    expect(mapped.lastErrorDetail).toBeUndefined();
+    expect(mapped.healthSummary).toBe("Trying to restart Python runtime (2 of 3).");
+  });
 });
