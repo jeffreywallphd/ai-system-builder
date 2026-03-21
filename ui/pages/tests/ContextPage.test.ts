@@ -2,17 +2,26 @@ import { describe, expect, it } from "bun:test";
 import { readSource } from "../../tests/testUtils";
 
 describe("ContextPage", () => {
-  it("renders reusable instructions tabs and context store actions", () => {
-    const source = readSource("ui/pages/ContextPage.tsx");
+  it("renders the new tabbed context workspace and preserves both authoring surfaces", () => {
+    const pageSource = readSource("ui/pages/ContextPage.tsx");
+    const engineeringSource = readSource("ui/components/context/ContextEngineeringLibrary.tsx");
+    const tuningSource = readSource("ui/components/tuning-datasets/FineTuningDatasetStudio.tsx");
 
-    expect(source).toContain("Reusable Instructions");
-    expect(source).toContain("Find Packs");
-    expect(source).toContain("Create Pack");
-    expect(source).toContain("ContextPackageEditor");
-    expect(source).toContain("contextStore.initialize()");
-    expect(source).toContain(".search({ query: searchQuery, tags: parseTags(searchTagsText) })");
-    expect(source).toContain("contextStore.createPackage");
-    expect(source).toContain("contextStore.updatePackage");
-    expect(source).toContain("contextStore.deletePackage");
+    expect(pageSource).toContain("Context Engineering");
+    expect(pageSource).toContain("Fine-Tuning Dataset");
+    expect(pageSource).toContain('useSearchParams');
+    expect(pageSource).toContain("ContextEngineeringLibrary");
+    expect(pageSource).toContain("FineTuningDatasetStudio");
+
+    expect(engineeringSource).toContain("Reusable instructions tabs");
+    expect(engineeringSource).toContain("Prompt pack library");
+    expect(engineeringSource).toContain("ContextPackageEditor");
+
+    expect(tuningSource).toContain("Fine-Tuning Dataset Studio");
+    expect(tuningSource).toContain("Generate QA examples");
+    expect(tuningSource).toContain("Run validation");
+    expect(tuningSource).toContain("Auto-assign splits");
+    expect(tuningSource).toContain("Release version");
+    expect(tuningSource).toContain("qa_jsonl");
   });
 });
