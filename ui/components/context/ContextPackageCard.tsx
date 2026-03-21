@@ -22,7 +22,7 @@ export default function ContextPackageCard({
           <h3 className="ui-context-card__title">{contextPackage.name}</h3>
           <p className="ui-context-card__id">{contextPackage.id}</p>
         </div>
-        <span className="ui-badge ui-badge--neutral">{contextPackage.fragmentCount} fragments</span>
+        <span className="ui-badge ui-badge--neutral">{contextPackage.fragmentCount} sections</span>
       </div>
 
       {contextPackage.description ? (

@@ -21,7 +21,7 @@ describe("ContextPackageCard", () => {
     );
 
     expect(html).toContain("Card Package");
-    expect(html).toContain("3 fragments");
+    expect(html).toContain("3 sections");
     expect(html).toContain("#shared");
   });
 });

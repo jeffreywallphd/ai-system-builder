@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import ModelBrowser from "../components/models/ModelBrowser";
+import PageTabs from "../components/navigation/PageTabs";
 import type { ModelSearchBarValue } from "../components/models/ModelSearchBar";
 import { useUiDependencies } from "../composition/AppProviders";
 import { Model, ModelArtifact } from "../../domain/models/Model";
@@ -12,6 +13,8 @@ import type { IModel } from "../../domain/models/interfaces/IModel";
 import type { RuntimeEngine } from "../../domain/models/interfaces/IModelCompatibility";
 import type { UiSettingsState } from "../settings/UiSettingsStore";
 import type { IRemoteModelCatalogItem } from "../../application/ports/interfaces/IRemoteModelCatalog";
+
+type ModelsTabId = "download" | "create";
 
 const fallbackState: IModelStoreState = Object.freeze({
   installedModels: Object.freeze([]),
@@ -34,6 +37,7 @@ export default function ModelsPage(): JSX.Element {
   const [searchParams, setSearchParams] = useSearchParams();
   const [state, setState] = useState<IModelStoreState>(fallbackState);
   const [settingsState, setSettingsState] = useState<UiSettingsState>(() => settingsStore.getState());
+  const [activeTab, setActiveTab] = useState<ModelsTabId>("download");
 
   useEffect(() => {
     return modelStore.subscribe(setState);
@@ -69,7 +73,7 @@ export default function ModelsPage(): JSX.Element {
         <div className="ui-page__hero-copy">
           <h1 className="ui-page__title">Models</h1>
           <p className="ui-page__subtitle">
-            Search remote models, manage installed assets, and inspect compatibility.
+            Download models for your workspace today, then prepare fine-tuned model variants from the models you already have on hand.
           </p>
           <p className="ui-text-secondary ui-text-small">
             New downloads currently go to <strong>{settingsState.settings.models.installDirectory}</strong>. Update this in{" "}
@@ -78,34 +82,80 @@ export default function ModelsPage(): JSX.Element {
         </div>
       </div>
 
-      <ModelBrowser
-        installedModels={installedModels}
-        remoteModels={remoteModels}
-        compatibility={compatibility}
-        searchValue={searchValue}
-        installProgressByModelId={state.installProgressByModelId}
-        isLoadingInstalled={state.isLoadingInstalled}
-        isSearchingRemote={state.isSearchingRemote}
-        isInstalling={state.isInstalling}
-        onSearch={(value) => {
-          setSearchParams(buildModelSearchParams(value));
-        }}
-        onClearSearch={() => {
-          setSearchParams(new URLSearchParams());
-        }}
-        onDownloadRemoteFiles={(modelId, files) => {
-          void installRemoteFiles(
-            modelStore,
-            state.remoteModels,
-            settingsState.settings.models,
-            modelId,
-            files
-          );
-        }}
-        onRemoveInstalled={(modelId) => {
-          console.log("Remove installed model", modelId);
-        }}
+      <PageTabs
+        label="Model tabs"
+        tabs={[
+          {
+            id: "download",
+            label: "Download Models",
+            description: "Browse remote catalogs and manage installed models.",
+          },
+          {
+            id: "create",
+            label: "Create Models",
+            description: "Prepare fine-tuned model variants from downloaded models.",
+          },
+        ]}
+        activeTabId={activeTab}
+        onChange={(tabId) => setActiveTab(tabId as ModelsTabId)}
       />
+
+      <section
+        id="page-tabpanel-download"
+        role="tabpanel"
+        aria-labelledby="page-tab-download"
+        className="ui-page-tab-panel"
+        hidden={activeTab !== "download"}
+      >
+        <ModelBrowser
+          installedModels={installedModels}
+          remoteModels={remoteModels}
+          compatibility={compatibility}
+          searchValue={searchValue}
+          installProgressByModelId={state.installProgressByModelId}
+          isLoadingInstalled={state.isLoadingInstalled}
+          isSearchingRemote={state.isSearchingRemote}
+          isInstalling={state.isInstalling}
+          onSearch={(value) => {
+            setSearchParams(buildModelSearchParams(value));
+          }}
+          onClearSearch={() => {
+            setSearchParams(new URLSearchParams());
+          }}
+          onDownloadRemoteFiles={(modelId, files) => {
+            void installRemoteFiles(
+              modelStore,
+              state.remoteModels,
+              settingsState.settings.models,
+              modelId,
+              files
+            );
+          }}
+          onRemoveInstalled={(modelId) => {
+            console.log("Remove installed model", modelId);
+          }}
+        />
+      </section>
+
+      <section
+        id="page-tabpanel-create"
+        role="tabpanel"
+        aria-labelledby="page-tab-create"
+        className="ui-page-tab-panel"
+        hidden={activeTab !== "create"}
+      >
+        <div className="ui-card">
+          <div className="ui-card__body ui-empty-state">
+            <h2>Create Models</h2>
+            <p className="ui-text-secondary">
+              Fine-tuning downloaded models will live here. This tab is ready for that workflow, but the training flow is coming soon.
+            </p>
+            <p className="ui-text-secondary ui-text-small">
+              Download or manage your base models from the Download Models tab first so this area can build on assets already in your workspace.
+            </p>
+          </div>
+        </div>
+      </section>
     </section>
   );
 }

@@ -19,9 +19,9 @@ describe("ContextFragmentEditor", () => {
       }),
     );
 
-    expect(html).toContain("Fragment ID");
-    expect(html).toContain("Metadata tags");
+    expect(html).toContain("Section ID");
+    expect(html).toContain("Section tags");
     expect(html).toContain("Helpful and precise");
-    expect(html).toContain("formatting-constraints");
+    expect(html).toContain("Formatting rules");
   });
 });

@@ -13,12 +13,13 @@ describe("ui/pages interactions", () => {
 
     expect(home).toContain('import { ROUTE_PATHS } from "../routes/RouteConfig"');
     expect(home).toContain("to={ROUTE_PATHS.workflows}");
-    expect(workflows).toContain("ROUTE_PATHS.workflows");
+    expect(workflows).toContain("Find Flows");
+    expect(workflows).toContain("WorkflowEditorPage");
     expect(workflows).toContain("WorkflowBrowser");
     expect(workflows).toContain("workflowStore.refreshWorkflows");
     expect(models).toContain("to={ROUTE_PATHS.settings}");
-    expect(context).toContain("ContextPackageBrowser");
-    expect(context).toContain("contextStore.search");
+    expect(context).toContain("ContextPackageCard");
+    expect(context).toContain(".search({ query: searchQuery, tags: parseTags(searchTagsText) })");
     expect(settings).toContain("Auto-save is enabled");
     expect(mcp).toContain("McpServerBrowser");
     expect(mcp).toContain("mcpStore.addConfiguredServer");
