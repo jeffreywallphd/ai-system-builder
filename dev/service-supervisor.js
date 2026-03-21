@@ -15,23 +15,33 @@ import process from "node:process";
 import { pathToFileURL } from "node:url";
 
 const DEFAULT_PORT = Number(process.env.SERVICE_SUPERVISOR_PORT || 8790);
-const DEFAULT_HOST = process.env.SERVICE_SUPERVISOR_HOST || "127.0.0.1";
+const DEFAULT_HOST = process.env.SERVICE_SUPERVISOR_HOST || "0.0.0.0";
 const DEFAULT_LOG_LIMIT = Number(process.env.SERVICE_SUPERVISOR_LOG_LIMIT || 200);
 const DEFAULT_METADATA_RETENTION_LIMIT = Number(process.env.SERVICE_SUPERVISOR_METADATA_RETENTION_LIMIT || 25);
-const DEFAULT_STUB_MODE = process.env.SERVICE_SUPERVISOR_STUB_MODE !== "false";
+const DEFAULT_STUB_MODE = process.env.SERVICE_SUPERVISOR_STUB_MODE === "true";
 const DEFAULT_STARTUP_TIMEOUT_MS = 20_000;
 const DEFAULT_HEALTH_POLL_INTERVAL_MS = 250;
 const DEFAULT_STOP_TIMEOUT_MS = 5_000;
 const DEFAULT_FETCH_TIMEOUT_MS = Number(process.env.SERVICE_SUPERVISOR_FETCH_TIMEOUT_MS || 2_000);
 const DEFAULT_PYTHON_RUNTIME_BASE_URL = "http://127.0.0.1:8100";
 const DEFAULT_PYTHON_RUNTIME_WORKDIR = `${process.cwd()}/python-runtime`;
-const DEFAULT_PYTHON_RUNTIME_EXECUTABLE = "python";
+const DEFAULT_PYTHON_RUNTIME_BIND_HOST = process.env.PYTHON_RUNTIME_BIND_HOST
+  || (DEFAULT_HOST === "0.0.0.0" ? "0.0.0.0" : "127.0.0.1");
+const DEFAULT_PYTHON_RUNTIME_EXECUTABLE = resolveDefaultPythonRuntimeExecutable();
+const DEFAULT_ALLOWED_EXECUTABLES = [
+  "python",
+  "python3",
+  "node",
+  "bun",
+  "uv",
+  process.execPath,
+  ...(path.isAbsolute(DEFAULT_PYTHON_RUNTIME_EXECUTABLE) ? [DEFAULT_PYTHON_RUNTIME_EXECUTABLE] : []),
+];
+const DEFAULT_ALLOWED_PATHS = [process.cwd(), DEFAULT_PYTHON_RUNTIME_WORKDIR];
 const DEFAULT_PYTHON_RUNTIME_HEALTH_PATH = "/health";
 const DEFAULT_PYTHON_RUNTIME_ENTRYPOINT = "app.main:app";
 const DEFAULT_DEFINITIONS_PATH = path.join(process.cwd(), ".ai-loom-studio", "managed-services.json");
 const DEFAULT_CONTROL_TOKEN = process.env.SERVICE_SUPERVISOR_CONTROL_TOKEN?.trim() || undefined;
-const DEFAULT_ALLOWED_EXECUTABLES = ["python", "python3", "node", "bun", "uv", process.execPath];
-const DEFAULT_ALLOWED_PATHS = [process.cwd(), DEFAULT_PYTHON_RUNTIME_WORKDIR];
 const DEFAULT_RESTART_POLICY = Object.freeze({
   maxFailures: normalizePositiveNumber(process.env.SERVICE_SUPERVISOR_MAX_RESTART_FAILURES, 3),
   failureWindowMs: normalizePositiveNumber(process.env.SERVICE_SUPERVISOR_RESTART_FAILURE_WINDOW_MS, 60_000),
@@ -39,6 +49,26 @@ const DEFAULT_RESTART_POLICY = Object.freeze({
 });
 const SHELL_INTERPOLATION_PATTERN = /(`|\$\(|\$\{|&&|\|\||[;<>])/;
 const CONTROL_HEADER_NAMES = ["authorization", "x-supervisor-token"];
+
+function resolveDefaultPythonRuntimeExecutable() {
+  const explicit = process.env.PYTHON_RUNTIME_EXECUTABLE?.trim();
+  if (explicit) {
+    return explicit;
+  }
+
+  const candidates = process.platform === "win32"
+    ? [
+      path.join(DEFAULT_PYTHON_RUNTIME_WORKDIR, ".venv", "Scripts", "python.exe"),
+      path.join(DEFAULT_PYTHON_RUNTIME_WORKDIR, "venv", "Scripts", "python.exe"),
+    ]
+    : [
+      path.join(DEFAULT_PYTHON_RUNTIME_WORKDIR, ".venv", "bin", "python"),
+      path.join(DEFAULT_PYTHON_RUNTIME_WORKDIR, "venv", "bin", "python"),
+    ];
+
+  const localPython = candidates.find((candidate) => existsSync(candidate));
+  return localPython || "python";
+}
 
 export const ServiceStates = Object.freeze({
   unavailable: "unavailable",
@@ -647,11 +677,11 @@ function resolveLaunchTarget(baseUrl) {
     const parsed = new URL(baseUrl || DEFAULT_PYTHON_RUNTIME_BASE_URL);
     const port = parsed.port ? Number(parsed.port) : (parsed.protocol === "https:" ? 443 : 80);
     return {
-      host: parsed.hostname || "127.0.0.1",
+      host: DEFAULT_PYTHON_RUNTIME_BIND_HOST,
       port: Number.isFinite(port) && port > 0 ? port : 8100,
     };
   } catch {
-    return { host: "127.0.0.1", port: 8100 };
+    return { host: DEFAULT_PYTHON_RUNTIME_BIND_HOST, port: 8100 };
   }
 }
 

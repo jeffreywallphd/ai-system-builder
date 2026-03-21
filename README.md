@@ -153,6 +153,22 @@ podman run --rm -it -p 4173:4173 -p 8100:8100 ai-loom-studio
 
 Then open `http://localhost:4173`.
 
+### Python runtime troubleshooting
+
+- The managed service supervisor now launches the real Python runtime by default. Set `SERVICE_SUPERVISOR_STUB_MODE=true` only when you intentionally want the stubbed/test runtime behavior.
+- The runtime requires **Python 3.11+** and the packages listed in `python-runtime/requirements.txt`. A typical setup is:
+  ```bash
+  cd python-runtime
+  python3 -m venv .venv
+  source .venv/bin/activate
+  pip install -r requirements.txt
+  ```
+- If you create `python-runtime/.venv`, the supervisor will automatically prefer that interpreter the next time you run `node dev/service-supervisor.js`.
+- If you open the Vite UI from another device on your LAN, make sure the supervisor and Python runtime listen on the host machine. The defaults now do this automatically, but you can force it with:
+  ```bash
+  SERVICE_SUPERVISOR_HOST=0.0.0.0 PYTHON_RUNTIME_BIND_HOST=0.0.0.0 node dev/service-supervisor.js
+  ```
+
 ## Resume
 
 - Bootstrapped Node.js project configuration with `package.json`, TypeScript (`tsconfig*.json`), Vite (`vite.config.ts`), and Node version pinning via `.nvmrc`.
