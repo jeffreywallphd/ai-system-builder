@@ -10,6 +10,8 @@ import type {
   SplitType,
 } from "../../domain/tuning-datasets/interfaces/ITuningDatasetStudio";
 import type { DatasetDetails, DatasetSummary, StudioExample } from "../../application/tuning-datasets/contracts";
+import { buildDatasetWorkflowWizard } from "../../application/tuning-datasets/buildDatasetWorkflowWizard";
+import type { LinearWizardDefinition } from "../../application/wizards/contracts";
 import { TuningDatasetService } from "../services/TuningDatasetService";
 
 export interface TuningDatasetStoreState {
@@ -25,6 +27,7 @@ export interface TuningDatasetStoreState {
   readonly exports: ReadonlyArray<DatasetExportArtifact>;
   readonly duplicates: ReadonlyArray<{ readonly fingerprint: string; readonly exampleIds: ReadonlyArray<string> }>;
   readonly workflow?: DatasetWorkflowState;
+  readonly wizard: LinearWizardDefinition<DatasetWorkflowStage>;
   readonly currentWorkflowStage: DatasetWorkflowStage;
   readonly isLoading: boolean;
   readonly isMutating: boolean;
@@ -46,6 +49,7 @@ const defaultState: TuningDatasetStoreState = Object.freeze({
   exports: Object.freeze([]),
   duplicates: Object.freeze([]),
   workflow: undefined,
+  wizard: buildDatasetWorkflowWizard({ currentStage: "dataset_definition" }),
   currentWorkflowStage: "dataset_definition",
   isLoading: false,
   isMutating: false,
@@ -107,6 +111,7 @@ export class TuningDatasetStore {
         exports: Object.freeze([]),
         duplicates: Object.freeze([]),
         workflow: undefined,
+        wizard: buildDatasetWorkflowWizard({ currentStage: "dataset_definition" }),
         currentWorkflowStage: "dataset_definition",
       });
       return;
@@ -131,6 +136,7 @@ export class TuningDatasetStore {
         exports: Object.freeze([...exports]),
         duplicates: Object.freeze([...duplicates]),
         workflow: details.workflow,
+        wizard: buildDatasetWorkflowWizard({ workflow: details.workflow }),
         currentWorkflowStage: details.workflow.currentStage,
         isLoading: false,
       });
@@ -322,11 +328,25 @@ export class TuningDatasetStore {
     }
   }
 
+  public async goToPreviousWorkflowStage(): Promise<void> {
+    if (!this.state.selectedDatasetId || !this.state.selectedVersionId || !this.state.wizard.previousStepId) {
+      return;
+    }
+    await this.moveWorkflowStage(this.state.selectedDatasetId, this.state.selectedVersionId, this.state.wizard.previousStepId);
+  }
+
+  public async goToNextWorkflowStage(): Promise<void> {
+    if (!this.state.selectedDatasetId || !this.state.selectedVersionId || !this.state.wizard.nextStepId) {
+      return;
+    }
+    await this.moveWorkflowStage(this.state.selectedDatasetId, this.state.selectedVersionId, this.state.wizard.nextStepId);
+  }
+
   public async moveWorkflowStage(datasetId: string, versionId: string, stage: DatasetWorkflowStage): Promise<void> {
     this.patch({ isMutating: true, error: undefined });
     try {
       const workflow = await this.service.moveWorkflowStage(datasetId, versionId, stage);
-      this.patch({ isMutating: false, workflow, currentWorkflowStage: workflow.currentStage });
+      this.patch({ isMutating: false, workflow, wizard: buildDatasetWorkflowWizard({ workflow }), currentWorkflowStage: workflow.currentStage });
     } catch (error) {
       this.patch({ isMutating: false, error: toErrorMessage(error) });
       throw error;

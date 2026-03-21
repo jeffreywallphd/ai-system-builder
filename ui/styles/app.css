@@ -15,6 +15,7 @@
 @import "./components/runtime-console.css";
 @import "./components/managed-services.css";
 @import "./components/context-library.css";
+@import "./components/wizard.css";
 
 @import "./layout/container.css";
 @import "./layout/grid.css";
