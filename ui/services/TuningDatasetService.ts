@@ -50,6 +50,10 @@ export class TuningDatasetService {
     return this.applicationService.importSourceDocuments(command);
   }
 
+  public ingestSourceFiles(command: import("../../application/tuning-datasets/contracts").IngestDatasetSourceFilesCommand): Promise<ReadonlyArray<DatasetSourceDocument>> {
+    return this.applicationService.ingestSourceFiles(command);
+  }
+
   public generateExamples(command: GenerateExamplesFromSourceCommand): Promise<ReadonlyArray<StudioExample>> {
     return this.applicationService.generateExamplesFromSource(command);
   }

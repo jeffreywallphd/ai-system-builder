@@ -55,6 +55,38 @@ export interface IPythonRuntimeExecuteWorkflowResponse {
   readonly errorMessage?: string;
 }
 
+export interface IPythonRuntimeDocumentConversionRequest {
+  readonly filename: string;
+  readonly contentType?: string;
+  readonly outputFormat: "markdown";
+  readonly content: Uint8Array;
+}
+
+export interface IPythonRuntimeDocumentConversionResponse {
+  readonly success: boolean;
+  readonly filename: string;
+  readonly contentType?: string;
+  readonly extension?: string;
+  readonly sourceFormat: string;
+  readonly outputFormat: "markdown";
+  readonly markdownContent: string;
+  readonly converter: {
+    readonly id: string;
+    readonly version?: string;
+  };
+  readonly warnings: ReadonlyArray<{
+    readonly code: string;
+    readonly message: string;
+    readonly details?: Readonly<Record<string, unknown>>;
+  }>;
+  readonly metadata: {
+    readonly strategy: "pass_through" | "converted";
+    readonly durationMs?: number;
+    readonly detectedContentType?: string;
+    readonly declaredContentType?: string;
+  };
+}
+
 export interface IPythonRuntimeClient {
   health(): Promise<IPythonRuntimeHealthResponse>;
   executeNode(
@@ -63,4 +95,7 @@ export interface IPythonRuntimeClient {
   executeWorkflow(
     request: IPythonRuntimeExecuteWorkflowRequest
   ): Promise<IPythonRuntimeExecuteWorkflowResponse>;
+  convertDocumentToMarkdown(
+    request: IPythonRuntimeDocumentConversionRequest
+  ): Promise<IPythonRuntimeDocumentConversionResponse>;
 }

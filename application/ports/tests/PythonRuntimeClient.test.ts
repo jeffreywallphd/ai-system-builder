@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import type { IPythonRuntimeClient } from "../interfaces/IPythonRuntimeClient";
 
 describe("IPythonRuntimeClient contract", () => {
-  it("supports health, node execution, and workflow execution", async () => {
+  it("supports health, execution, and document conversion", async () => {
     const client: IPythonRuntimeClient = {
       health: async () => ({ status: "ok", runtime: "python" }),
       executeNode: async (request) => ({
@@ -17,6 +17,18 @@ describe("IPythonRuntimeClient contract", () => {
         status: "completed",
         nodeResults: { n1: { result: "ok" } },
       }),
+      convertDocumentToMarkdown: async (request) => ({
+        success: true,
+        filename: request.filename,
+        contentType: request.contentType,
+        extension: ".md",
+        sourceFormat: "markdown",
+        outputFormat: "markdown",
+        markdownContent: "# Converted",
+        converter: { id: "test-converter" },
+        warnings: [],
+        metadata: { strategy: "pass_through" },
+      }),
     };
 
     expect((await client.health()).runtime).toBe("python");
@@ -26,5 +38,10 @@ describe("IPythonRuntimeClient contract", () => {
     expect((await client.executeWorkflow({ workflowId: "wf-1", nodes: [], connections: [] })).status).toBe(
       "completed"
     );
+    expect((await client.convertDocumentToMarkdown({
+      filename: "notes.md",
+      outputFormat: "markdown",
+      content: new Uint8Array(),
+    })).outputFormat).toBe("markdown");
   });
 });

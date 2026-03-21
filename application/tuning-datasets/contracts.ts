@@ -174,6 +174,22 @@ export interface GetExampleDetailsQuery {
   readonly exampleId: string;
 }
 
+export interface IngestDatasetSourceFileInput {
+  readonly name: string;
+  readonly content: Uint8Array;
+  readonly mimeType?: string;
+  readonly sizeInBytes: number;
+  readonly lastModifiedAt?: Date;
+  readonly metadata?: Readonly<Record<string, unknown>>;
+}
+
+export interface IngestDatasetSourceFilesCommand {
+  readonly datasetId: string;
+  readonly versionId: string;
+  readonly createdBy: string;
+  readonly files: ReadonlyArray<IngestDatasetSourceFileInput>;
+}
+
 export interface ImportSourceDocumentsCommand {
   readonly datasetId: string;
   readonly versionId: string;
