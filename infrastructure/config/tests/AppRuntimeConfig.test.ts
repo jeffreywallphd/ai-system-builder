@@ -1,13 +1,17 @@
 import { describe, expect, it } from "bun:test";
+import { AppRuntimeModes } from "../../../domain/runtime/AppRuntimeMode";
 import { AppRuntimeConfig } from "../AppRuntimeConfig";
 
 describe("AppRuntimeConfig", () => {
-  it("returns development defaults", () => {
+  it("returns browser development defaults", () => {
     const config = AppRuntimeConfig.forDevelopment();
 
+    expect(config.runtimeMode).toBe(AppRuntimeModes.browserDevelopment);
     expect(config.workflowRepositoryMode).toBe("memory");
     expect(config.workflowExecutorMode).toBe("preview");
     expect(config.nodeCatalogMode).toBe("mock");
+    expect(config.uiSettingsPersistenceMode).toBe("local-storage");
+    expect(config.installedModelCatalogMode).toBe("browser-local-storage");
     expect(config.seedStarterNode).toBe(true);
     expect(config.isProductionMode).toBe(false);
     expect(config.devSyncBaseUrl).toBe("http://192.168.1.100:8787");
@@ -16,70 +20,39 @@ describe("AppRuntimeConfig", () => {
     expect(config.modelInstallDirectory).toBe("dev/models");
   });
 
-
-  it("reads development defaults from environment variables when available", () => {
-    const originalBaseUrl = process.env.VITE_DEV_SYNC_BASE_URL;
-    const originalToken = process.env.VITE_DEV_SYNC_TOKEN;
-    const originalModelDirectory = process.env.VITE_MODEL_INSTALL_DIRECTORY;
-
-    process.env.VITE_DEV_SYNC_BASE_URL = "http://localhost:9999";
-    process.env.VITE_DEV_SYNC_TOKEN = "custom-token";
-    process.env.VITE_MODEL_INSTALL_DIRECTORY = "dev/custom-model-files";
-
-    const config = AppRuntimeConfig.forDevelopment();
-
-    expect(config.devSyncBaseUrl).toBe("http://localhost:9999");
-    expect(config.devSyncToken).toBe("custom-token");
-    expect(config.modelInstallDirectory).toBe("dev/custom-model-files");
-
-    if (typeof originalBaseUrl === "undefined") {
-      delete process.env.VITE_DEV_SYNC_BASE_URL;
-    } else {
-      process.env.VITE_DEV_SYNC_BASE_URL = originalBaseUrl;
-    }
-
-    if (typeof originalToken === "undefined") {
-      delete process.env.VITE_DEV_SYNC_TOKEN;
-    } else {
-      process.env.VITE_DEV_SYNC_TOKEN = originalToken;
-    }
-
-    if (typeof originalModelDirectory === "undefined") {
-      delete process.env.VITE_MODEL_INSTALL_DIRECTORY;
-    } else {
-      process.env.VITE_MODEL_INSTALL_DIRECTORY = originalModelDirectory;
-    }
-  });
-
-  it("normalizes optional dev sync values", () => {
-    const config = new AppRuntimeConfig({
-      workflowRepositoryMode: "memory",
-      workflowExecutorMode: "preview",
-      nodeCatalogMode: "mock",
-      seedStarterNode: false,
-      isProductionMode: false,
-      devSyncBaseUrl: "   ",
-      devSyncToken: "  token-123  ",
-      modelInstallDirectory: "  dev/test-models  ",
+  it("builds desktop production defaults around durable app storage", () => {
+    const config = AppRuntimeConfig.forDesktopProduction({
+      storage: {
+        appDataDirectory: "/tmp/ai-loom",
+        storageDirectory: "/tmp/ai-loom/storage",
+        databasePath: "/tmp/ai-loom/storage/app.sqlite",
+        runtimeDirectory: "/tmp/ai-loom/runtime",
+        logsDirectory: "/tmp/ai-loom/logs",
+        modelsDirectory: "/tmp/ai-loom/models",
+        assetsDirectory: "/tmp/ai-loom/assets",
+      },
+      pythonRuntime: {
+        mode: "packaged-private",
+        executablePath: "/tmp/python/bin/python3",
+        runtimeRoot: "/tmp/resources/runtime/python/linux-x64",
+        workspaceDirectory: "/tmp/ai-loom/runtime",
+        manifestPath: "/tmp/resources/runtime/python/linux-x64/manifest.json",
+        isAvailable: true,
+      },
+      serviceSupervisorBaseUrl: "http://127.0.0.1:8790",
+      serviceSupervisorPort: 8790,
     });
 
-    expect(config.devSyncBaseUrl).toBeUndefined();
-    expect(config.devSyncToken).toBe("token-123");
+    expect(config.runtimeMode).toBe(AppRuntimeModes.desktopProduction);
+    expect(config.workflowRepositoryMode).toBe("sqlite");
+    expect(config.workflowExecutorMode).toBe("runtime");
+    expect(config.nodeCatalogMode).toBe("composite");
+    expect(config.uiSettingsPersistenceMode).toBe("desktop-sqlite");
+    expect(config.installedModelCatalogMode).toBe("desktop-sqlite");
+    expect(config.isProductionMode).toBe(true);
+    expect(config.isDesktopHost).toBe(true);
+    expect(config.isPackagedDesktopHost).toBe(true);
     expect(config.isDevSyncEnabled).toBe(false);
-    expect(config.modelInstallDirectory).toBe("dev/test-models");
-  });
-
-  it("disables dev sync in production even when base url is present", () => {
-    const config = new AppRuntimeConfig({
-      workflowRepositoryMode: "memory",
-      workflowExecutorMode: "preview",
-      nodeCatalogMode: "mock",
-      seedStarterNode: false,
-      isProductionMode: true,
-      devSyncBaseUrl: "http://localhost:8787",
-      modelInstallDirectory: "dev/prod-models",
-    });
-
-    expect(config.isDevSyncEnabled).toBe(false);
+    expect(config.modelInstallDirectory).toBe("/tmp/ai-loom/models");
   });
 });

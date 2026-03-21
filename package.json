@@ -8,10 +8,16 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "dev:renderer": "vite",
+    "dev:desktop": "concurrently -k \"npm:dev:renderer\" \"wait-on tcp:5174 && electron-forge start\"",
+    "build": "npm run build:renderer",
+    "build:renderer": "tsc --noEmit && vite build",
+    "build:desktop": "electron-forge package",
+    "make:desktop": "electron-forge make",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "service-supervisor": "node infrastructure/runtime/service-supervisor.js",
+    "test": "bun test",
     "test:service-supervisor": "bun test infrastructure/runtime/tests/ServiceSupervisor.test.ts"
   },
   "dependencies": {
@@ -20,13 +26,25 @@
     "react-router-dom": "^6.30.1",
     "@xyflow/react": "^12.3.5",
     "dotenv": "^16.4.7",
-    "@huggingface/hub": "^2.6.1"
+    "@huggingface/hub": "^2.6.1",
+    "better-sqlite3": "^11.7.0",
+    "electron-squirrel-startup": "^1.0.1"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
     "typescript": "^5.7.2",
-    "vite": "^5.4.11"
-  }
+    "vite": "^5.4.11",
+    "@electron-forge/cli": "^7.7.0",
+    "@electron-forge/maker-dmg": "^7.7.0",
+    "@electron-forge/maker-squirrel": "^7.7.0",
+    "@electron-forge/maker-zip": "^7.7.0",
+    "@electron-forge/plugin-vite": "^7.7.0",
+    "@types/node": "^22.10.2",
+    "concurrently": "^9.1.2",
+    "electron": "^34.2.0",
+    "wait-on": "^8.0.1"
+  },
+  "main": ".vite/build/main.mjs"
 }
