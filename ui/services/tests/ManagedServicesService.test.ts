@@ -349,4 +349,153 @@ describe("ManagedServicesService", () => {
     expect(services.map((entry) => entry.id)).toEqual(["python-runtime"]);
     expect((await service.getService("python-runtime")).name).toContain("local");
   });
+
+  it("manages python and custom supervisor-backed services entirely through the managed-local supervisor", async () => {
+    const pythonDefinition = createPythonRuntimeServiceDefinition(new PythonRuntimeConfig({
+      mode: "managed-local",
+      baseUrl: "http://127.0.0.1:8000",
+    }));
+    const customDefinition = createManagedServiceDefinition({
+      serviceId: "vector-store",
+      kind: ManagedServiceKinds.custom,
+      displayName: "Vector store",
+      dependencies: ["python-runtime"],
+      source: ManagedServiceSources.custom,
+      transport: ManagedServiceTransports.hybrid,
+      baseUrl: "http://127.0.0.1:6333",
+      command: "node",
+      args: ["server.mjs"],
+      autoStartPolicy: ManagedServiceStartPolicies.manual,
+      restartPolicy: ManagedServiceRestartPolicies.onFailure,
+    });
+    const repository = createRepository([pythonDefinition, customDefinition]);
+    const supervisorServices = new Map<string, any>([
+      ["python-runtime", {
+        serviceId: "python-runtime",
+        name: "Python runtime",
+        args: ["-m", "uvicorn"],
+        dependencies: [],
+        dependents: ["vector-store"],
+        pid: 4100,
+        startedAt: "2026-03-20T10:15:00.000Z",
+        lastHealthCheckAt: "2026-03-20T10:16:00.000Z",
+        state: "healthy",
+        ownership: "managed",
+        detail: "Python runtime is healthy.",
+        readiness: { isReady: true, detail: "Python runtime is ready.", blockedBy: [] },
+        recentLogs: [],
+        processHistory: [],
+        metadata: { version: "1.0.0", compatibility: { supervisorApiVersion: 1 }, kind: "python-runtime" },
+        diagnostics: {
+          lastError: null,
+          lastExit: null,
+          lastStart: null,
+          lastHealthProbe: null,
+          circuitBreaker: {
+            state: "closed",
+            openedAt: null,
+            retryAfter: null,
+            recentFailures: 0,
+            maxFailures: 3,
+            failureWindowMs: 60_000,
+            cooldownMs: 30_000,
+          },
+        },
+      }],
+      ["vector-store", {
+        serviceId: "vector-store",
+        name: "Vector store",
+        command: "node",
+        args: ["server.mjs"],
+        dependencies: ["python-runtime"],
+        dependents: [],
+        cwd: "/workspace/ai-loom-studio",
+        baseUrl: "http://127.0.0.1:6333",
+        pid: 4200,
+        startedAt: "2026-03-20T10:16:00.000Z",
+        lastHealthCheckAt: "2026-03-20T10:16:30.000Z",
+        state: "healthy",
+        ownership: "managed",
+        detail: "Vector store is healthy.",
+        readiness: { isReady: true, detail: "Vector store is ready.", blockedBy: [] },
+        recentLogs: [],
+        processHistory: [],
+        metadata: { version: "1.0.0", compatibility: { supervisorApiVersion: 1 }, kind: "custom" },
+        diagnostics: {
+          lastError: null,
+          lastExit: null,
+          lastStart: null,
+          lastHealthProbe: null,
+          circuitBreaker: {
+            state: "closed",
+            openedAt: null,
+            retryAfter: null,
+            recentFailures: 0,
+            maxFailures: 3,
+            failureWindowMs: 60_000,
+            cooldownMs: 30_000,
+          },
+        },
+      }],
+    ]);
+    const lifecycleCalls: string[] = [];
+    const service = new ManagedServicesService({
+      serviceManager: {
+        listServices: () => ([{
+          id: pythonDefinition.serviceId,
+          kind: pythonDefinition.kind,
+          name: pythonDefinition.displayName,
+          startPolicy: pythonDefinition.autoStartPolicy,
+        }]),
+        getServiceStatus: () => undefined,
+        subscribeToStatus: () => () => undefined,
+        subscribeToLogs: () => () => undefined,
+      } as any,
+      serviceSupervisor: {
+        start: async () => ({}) as any,
+        stop: async () => ({}) as any,
+        restart: async () => ({}) as any,
+        ensureRunning: async () => ({}) as any,
+      },
+      supervisorClient: {
+        health: async () => ({ ok: true, mode: "service-supervisor", host: "127.0.0.1", port: 8790, serviceCount: supervisorServices.size, services: [...supervisorServices.values()] }),
+        listServices: async () => ({ ok: true, services: [...supervisorServices.values()] }),
+        getService: async (serviceId: string) => ({ ok: true, service: supervisorServices.get(serviceId) }),
+        listDefinitions: async () => ({ ok: true, definitions: [pythonDefinition, customDefinition] }),
+        getDefinition: async (serviceId: string) => ({ ok: true, definition: serviceId === "python-runtime" ? pythonDefinition : customDefinition }),
+        saveDefinition: async (definition) => ({ ok: true, definition }),
+        deleteDefinition: async () => undefined,
+        start: async (serviceId: string) => {
+          lifecycleCalls.push(`start:${serviceId}`);
+          return { ok: true, service: supervisorServices.get(serviceId) };
+        },
+        stop: async (serviceId: string) => {
+          lifecycleCalls.push(`stop:${serviceId}`);
+          return { ok: true, service: supervisorServices.get(serviceId) };
+        },
+        restart: async (serviceId: string) => {
+          lifecycleCalls.push(`restart:${serviceId}`);
+          return { ok: true, service: supervisorServices.get(serviceId) };
+        },
+        ensureRunning: async (serviceId: string) => {
+          lifecycleCalls.push(`ensure:${serviceId}`);
+          return { ok: true, service: supervisorServices.get(serviceId) };
+        },
+      },
+      runtimeEventStore: new RuntimeEventBuffer({ capacity: 5 }),
+      builtinDefinitions: [pythonDefinition],
+      definitionRepository: repository as any,
+      fetchImplementation: mock(async () => ({ ok: true, status: 200 })) as any,
+    });
+
+    const services = await service.listServices();
+    const ensured = await service.ensureRunning("vector-store");
+
+    expect(services).toHaveLength(2);
+    expect(services.find((entry) => entry.id === "python-runtime")?.pid).toBe(4100);
+    expect(services.find((entry) => entry.id === "vector-store")?.uptimeSeconds).toBeNumber();
+    expect(ensured.canManageLifecycle).toBeTrue();
+    expect(ensured.healthSummary).toBe("Vector store is ready.");
+    expect(lifecycleCalls).toEqual(["ensure:vector-store"]);
+  });
 });

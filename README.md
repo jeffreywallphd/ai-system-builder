@@ -7,7 +7,7 @@ An AI platform to weave together AI capabilities for powerful automation workflo
 - [Install](#install)
   - [Quick install (for technical users)](#quick-install-for-technical-users)
   - [Detailed install (for beginners)](#detailed-install-for-beginners)
-  - [Start the Python FastAPI runtime (required for workflow execution)](#start-the-python-fastapi-runtime-required-for-workflow-execution)
+  - [Managed local runtime onboarding (primary path)](#managed-local-runtime-onboarding-primary-path)
 - [Resume](#resume)
 - [Runtime/configuration setup](#runtimeconfiguration-setup)
 - [Project structure](#project-structure)
@@ -33,18 +33,16 @@ npm install
 # 4) Create local env file
 cp .env.example .env
 
-# 5) Start dev server
+# 5) Start the web app
 npm run dev
 
-# 6) In a second terminal, start the Python runtime
-cd python-runtime
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8100 --reload
+# 6) Start the managed service supervisor once
+node dev/service-supervisor.js
 ```
 
 Open the URL printed by Vite (typically `http://localhost:5174`).
+
+After that, use **Managed Services** inside the TypeScript UI to start, stop, restart, monitor, and reconfigure the built-in Python runtime or any future local services. Normal managed-local workflows no longer require a second terminal for the Python runtime.
 
 ### Detailed install (for beginners)
 
@@ -94,40 +92,35 @@ Open the URL printed by Vite (typically `http://localhost:5174`).
    - Wait for the terminal to show the local URL (usually `http://localhost:5174`).
    - Open that URL in your browser.
 
-7. **Start the Python FastAPI runtime** (needed for workflow execution endpoints)
+7. **Start the managed local supervisor** (primary path)
    - Open a **second terminal window**.
    - From the project root, run:
    ```bash
-   cd python-runtime
-   python3 -m venv .venv
-   source .venv/bin/activate
-   pip install -r requirements.txt
-   uvicorn app.main:app --host 0.0.0.0 --port 8100 --reload
+   node dev/service-supervisor.js
    ```
    - Keep this terminal running while you use the app.
    - Ensure your root `.env` contains:
    ```bash
-   PYTHON_RUNTIME_MODE=local-http
+   PYTHON_RUNTIME_MODE=managed-local
    PYTHON_RUNTIME_BASE_URL=http://localhost:8100
    MCP_RUNTIME_ENABLED=true
    ```
+   - Open **Managed Services** in the UI and use the built-in Python runtime card to start the runtime from the app. You can also add custom managed services there for future local servers, dependency chains, and health monitoring.
 
 8. **(Optional) Run tests**
    ```bash
    npm test
    ```
 
-### Start the Python FastAPI runtime (required for workflow execution)
+### Managed local runtime onboarding (primary path)
 
-The UI uses the Python runtime as its first built-in managed service. Workflow execution, MCP runtime features, and future local-runtime integrations all sit on the same managed-service lifecycle model.
+The primary local-development path is now:
 
-```bash
-cd python-runtime
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8100 --reload
-```
+1. Start the TypeScript app with `npm run dev`.
+2. Start the generic local service supervisor with `node dev/service-supervisor.js`.
+3. Use **Managed Services** inside the app to launch and monitor the built-in Python runtime.
+
+This makes the Python runtime just one managed service in a broader local-service model that also supports future custom servers without requiring terminal-only administration.
 
 Runtime endpoints:
 
@@ -139,7 +132,9 @@ Runtime endpoints:
 Managed-service notes:
 
 - The Python runtime is treated as a built-in managed service rather than a special-case lifecycle.
-- Service state, start/stop/restart operations, event streaming, and health-aware UI management flow through the generic managed-service infrastructure.
+- Service state, PID, uptime, ownership, recent logs, dependency readiness, start/stop/restart/ensure-running controls, and safe configuration editing all flow through the generic managed-service infrastructure.
+- Custom managed services are persisted through the supervisor so they can be created from the UI and survive supervisor restarts.
+- The managed-service screen is designed to stay usable from smaller/mobile layouts for phone-driven monitoring and administration.
 - Python-specific HTTP clients still handle workflow and MCP execution, but lifecycle/state ownership now lives in the shared managed-service layer.
 
 ### Local MCP server notes

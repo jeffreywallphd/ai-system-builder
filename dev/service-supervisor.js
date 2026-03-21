@@ -1,6 +1,14 @@
 import "dotenv/config";
 import http from "node:http";
-import { accessSync, constants as fsConstants, existsSync, statSync } from "node:fs";
+import {
+  accessSync,
+  constants as fsConstants,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { spawn } from "node:child_process";
 import path from "node:path";
 import process from "node:process";
@@ -20,6 +28,7 @@ const DEFAULT_PYTHON_RUNTIME_WORKDIR = `${process.cwd()}/python-runtime`;
 const DEFAULT_PYTHON_RUNTIME_EXECUTABLE = "python";
 const DEFAULT_PYTHON_RUNTIME_HEALTH_PATH = "/health";
 const DEFAULT_PYTHON_RUNTIME_ENTRYPOINT = "app.main:app";
+const DEFAULT_DEFINITIONS_PATH = path.join(process.cwd(), ".ai-loom-studio", "managed-services.json");
 const DEFAULT_CONTROL_TOKEN = process.env.SERVICE_SUPERVISOR_CONTROL_TOKEN?.trim() || undefined;
 const DEFAULT_ALLOWED_EXECUTABLES = ["python", "python3", "node", "bun", "uv", process.execPath];
 const DEFAULT_ALLOWED_PATHS = [process.cwd(), DEFAULT_PYTHON_RUNTIME_WORKDIR];
@@ -73,7 +82,7 @@ function sendJson(res, statusCode, payload, extraHeaders = {}) {
     "Content-Type": "application/json; charset=utf-8",
     "Content-Length": Buffer.byteLength(body),
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Supervisor-Token",
     ...extraHeaders,
   });
@@ -87,7 +96,7 @@ function sendEventStreamHeaders(res) {
     "Cache-Control": "no-cache, no-transform",
     Connection: "keep-alive",
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Supervisor-Token",
     "X-Accel-Buffering": "no",
   });
@@ -374,7 +383,10 @@ function normalizeServiceDefinition(definition, options = {}) {
   }
 
   const serviceId = typeof definition.serviceId === "string" ? definition.serviceId.trim() : "";
-  const name = typeof definition.name === "string" ? definition.name.trim() : serviceId;
+  const displayName = typeof definition.displayName === "string" ? definition.displayName.trim() : "";
+  const name = typeof definition.name === "string" && definition.name.trim()
+    ? definition.name.trim()
+    : displayName || serviceId;
 
   if (!serviceId) {
     throw new Error("Service definition serviceId is required.");
@@ -390,14 +402,31 @@ function normalizeServiceDefinition(definition, options = {}) {
       ? definition.args.filter((value) => typeof value === "string")
       : [],
   );
+  const workingDirectory = typeof definition.workingDirectory === "string" ? definition.workingDirectory.trim() : "";
   const cwd = validateWorkingDirectory(
-    typeof definition.cwd === "string" && definition.cwd.trim() ? definition.cwd.trim() : process.cwd(),
+    typeof definition.cwd === "string" && definition.cwd.trim()
+      ? definition.cwd.trim()
+      : workingDirectory || process.cwd(),
     securityPolicy,
   );
-  const env = normalizeEnvironmentVariables(definition.env);
+  const env = normalizeEnvironmentVariables(definition.env ?? definition.environmentVariables);
   const metadata = definition.metadata && typeof definition.metadata === "object" && !Array.isArray(definition.metadata)
     ? { ...definition.metadata }
     : {};
+  const transport = typeof definition.transport === "string" && definition.transport.trim()
+    ? definition.transport.trim()
+    : definition.command && baseUrl
+      ? "hybrid"
+      : definition.command
+        ? "process"
+        : baseUrl
+          ? "http"
+          : "none";
+  const description = typeof definition.description === "string" && definition.description.trim()
+    ? definition.description.trim()
+    : typeof metadata.description === "string" && metadata.description.trim()
+      ? metadata.description.trim()
+      : undefined;
   const version = typeof definition.version === "string" && definition.version.trim()
     ? definition.version.trim()
     : typeof metadata.version === "string" && metadata.version.trim()
@@ -434,6 +463,42 @@ function normalizeServiceDefinition(definition, options = {}) {
     stopTimeoutMs: normalizePositiveNumber(definition.stopTimeoutMs, DEFAULT_STOP_TIMEOUT_MS),
     metadata: {
       ...metadata,
+      kind: typeof definition.kind === "string" && definition.kind.trim()
+        ? definition.kind.trim()
+        : typeof metadata.kind === "string" && metadata.kind.trim()
+          ? metadata.kind.trim()
+          : serviceId === "python-runtime"
+            ? "python-runtime"
+            : "custom",
+      source: typeof definition.source === "string" && definition.source.trim()
+        ? definition.source.trim()
+        : typeof metadata.source === "string" && metadata.source.trim()
+          ? metadata.source.trim()
+          : serviceId === "python-runtime"
+            ? "builtin"
+            : "custom",
+      transport,
+      autoStartPolicy: typeof definition.autoStartPolicy === "string" && definition.autoStartPolicy.trim()
+        ? definition.autoStartPolicy.trim()
+        : typeof metadata.autoStartPolicy === "string" && metadata.autoStartPolicy.trim()
+          ? metadata.autoStartPolicy.trim()
+          : "manual",
+      restartPolicyName: typeof definition.restartPolicy === "string" && definition.restartPolicy.trim()
+        ? definition.restartPolicy.trim()
+        : typeof metadata.restartPolicyName === "string" && metadata.restartPolicyName.trim()
+          ? metadata.restartPolicyName.trim()
+          : "on-failure",
+      capabilities: Array.isArray(definition.capabilities)
+        ? definition.capabilities.filter((value) => typeof value === "string" && value.trim()).map((value) => value.trim())
+        : Array.isArray(metadata.capabilities)
+          ? metadata.capabilities.filter((value) => typeof value === "string" && value.trim()).map((value) => value.trim())
+          : [],
+      tags: Array.isArray(definition.tags)
+        ? definition.tags.filter((value) => typeof value === "string" && value.trim()).map((value) => value.trim())
+        : Array.isArray(metadata.tags)
+          ? metadata.tags.filter((value) => typeof value === "string" && value.trim()).map((value) => value.trim())
+          : [],
+      description,
       version,
       compatibility,
     },
@@ -441,6 +506,62 @@ function normalizeServiceDefinition(definition, options = {}) {
   });
 
   return normalized;
+}
+
+function toManagedServiceDefinition(definition) {
+  return Object.freeze({
+    serviceId: definition.serviceId,
+    kind: definition.metadata.kind ?? (definition.serviceId === "python-runtime" ? "python-runtime" : "custom"),
+    displayName: definition.name,
+    description: definition.metadata.description,
+    dependencies: [...(definition.dependencies ?? [])],
+    transport: definition.metadata.transport ?? (definition.command && definition.baseUrl
+      ? "hybrid"
+      : definition.command
+        ? "process"
+        : definition.baseUrl
+          ? "http"
+          : "none"),
+    source: definition.metadata.source ?? (definition.serviceId === "python-runtime" ? "builtin" : "custom"),
+    baseUrl: definition.baseUrl,
+    healthCheckPath: definition.healthCheckPath,
+    workingDirectory: definition.cwd,
+    command: definition.command,
+    args: [...definition.args],
+    environmentVariables: { ...definition.env },
+    autoStartPolicy: definition.metadata.autoStartPolicy ?? "manual",
+    restartPolicy: definition.metadata.restartPolicyName ?? "on-failure",
+    startupTimeoutMs: definition.startupTimeoutMs,
+    tags: [...(definition.metadata.tags ?? [])],
+    capabilities: [...(definition.metadata.capabilities ?? [])],
+  });
+}
+
+function readPersistedServiceDefinitions(definitionsPath) {
+  if (!definitionsPath || !existsSync(definitionsPath)) {
+    return [];
+  }
+
+  const raw = readFileSync(definitionsPath, "utf8");
+  if (!raw.trim()) {
+    return [];
+  }
+
+  const parsed = JSON.parse(raw);
+  if (!Array.isArray(parsed)) {
+    throw new Error("Persisted managed service definitions must be a JSON array.");
+  }
+
+  return parsed;
+}
+
+function persistServiceDefinitions(definitionsPath, definitions) {
+  if (!definitionsPath) {
+    return;
+  }
+
+  mkdirSync(path.dirname(definitionsPath), { recursive: true });
+  writeFileSync(definitionsPath, `${JSON.stringify(definitions, null, 2)}\n`, "utf8");
 }
 
 function createInitialDiagnostics(definition) {
@@ -836,7 +957,14 @@ export class InMemoryServiceSupervisor {
     this.operations = new Map();
     this.listeners = new Set();
     this.nextEventId = 1;
+    this.baseDefinitions = new Map();
+    this.persistedDefinitions = new Map();
     this.securityPolicy = parseSupervisorSecurityPolicy(options);
+    this.definitionsPath = typeof options.definitionsPath === "string" && options.definitionsPath.trim()
+      ? path.resolve(options.definitionsPath)
+      : process.env.SERVICE_SUPERVISOR_DEFINITIONS_PATH?.trim()
+        ? path.resolve(process.env.SERVICE_SUPERVISOR_DEFINITIONS_PATH.trim())
+        : undefined;
     this.controlToken = typeof options.controlToken === "string" && options.controlToken.trim()
       ? options.controlToken.trim()
       : DEFAULT_CONTROL_TOKEN;
@@ -847,8 +975,7 @@ export class InMemoryServiceSupervisor {
     for (const rawDefinition of options.services ?? []) {
       try {
         const definition = normalizeServiceDefinition(rawDefinition, { securityPolicy: this.securityPolicy });
-        this.definitions.set(definition.serviceId, definition);
-        this.states.set(definition.serviceId, createInitialServiceState(definition, this.clock));
+        this.baseDefinitions.set(definition.serviceId, definition);
       } catch (error) {
         const serviceId = typeof rawDefinition?.serviceId === "string" && rawDefinition.serviceId.trim()
           ? rawDefinition.serviceId.trim()
@@ -875,22 +1002,16 @@ export class InMemoryServiceSupervisor {
           invalid: true,
           invalidReason: toErrorMessage(error),
         });
-        this.definitions.set(serviceId, fallbackDefinition);
-        const state = createInitialServiceState(fallbackDefinition, this.clock);
-        state.state = ServiceStates.failed;
-        state.detail = `Invalid service configuration: ${toErrorMessage(error)}`;
-        state.diagnostics.lastError = createDiagnosticError(this.clock, "config", state.detail, {
-          ...toErrorDetails(error),
-          serviceId,
-        });
-        state.processHistory = appendRetainedItem(state.processHistory, createProcessHistoryEntry(this.clock, {
-          ownership: ServiceOwnership.none,
-          outcome: "config-rejected",
-          detail: state.detail,
-        }), this.metadataRetentionLimit);
-        this.states.set(serviceId, state);
+        this.baseDefinitions.set(serviceId, fallbackDefinition);
       }
     }
+
+    for (const rawDefinition of readPersistedServiceDefinitions(this.definitionsPath)) {
+      const definition = normalizeServiceDefinition(rawDefinition, { securityPolicy: this.securityPolicy });
+      this.persistedDefinitions.set(definition.serviceId, definition);
+    }
+
+    this.rebuildDefinitions();
   }
 
   nowMs() {
@@ -923,6 +1044,129 @@ export class InMemoryServiceSupervisor {
     }
 
     return this.toSummary(serviceId);
+  }
+
+  rebuildDefinitions() {
+    const mergedDefinitions = new Map(this.baseDefinitions);
+    for (const [serviceId, definition] of this.persistedDefinitions.entries()) {
+      mergedDefinitions.set(serviceId, definition);
+    }
+
+    this.definitions = mergedDefinitions;
+
+    for (const [serviceId, definition] of this.definitions.entries()) {
+      const existingState = this.states.get(serviceId);
+      if (!existingState) {
+        const nextState = createInitialServiceState(definition, this.clock);
+        if (definition.invalid) {
+          nextState.state = ServiceStates.failed;
+          nextState.detail = `Invalid service configuration: ${definition.invalidReason}`;
+          nextState.diagnostics.lastError = createDiagnosticError(this.clock, "config", nextState.detail, {
+            serviceId,
+          });
+          nextState.processHistory = appendRetainedItem(nextState.processHistory, createProcessHistoryEntry(this.clock, {
+            ownership: ServiceOwnership.none,
+            outcome: "config-rejected",
+            detail: nextState.detail,
+          }), this.metadataRetentionLimit);
+        }
+        this.states.set(serviceId, nextState);
+        continue;
+      }
+
+      this.states.set(serviceId, {
+        ...existingState,
+        name: definition.name,
+        command: definition.command,
+        args: definition.args,
+        dependencies: definition.dependencies,
+        cwd: definition.cwd,
+        baseUrl: definition.baseUrl,
+        metadata: definition.metadata,
+        diagnostics: {
+          ...existingState.diagnostics,
+          circuitBreaker: {
+            ...existingState.diagnostics.circuitBreaker,
+            maxFailures: definition.restartPolicy.maxFailures,
+            failureWindowMs: definition.restartPolicy.failureWindowMs,
+            cooldownMs: definition.restartPolicy.cooldownMs,
+          },
+        },
+      });
+    }
+
+    for (const serviceId of [...this.states.keys()]) {
+      if (!this.definitions.has(serviceId)) {
+        this.states.delete(serviceId);
+      }
+    }
+  }
+
+  persistDefinitions() {
+    persistServiceDefinitions(
+      this.definitionsPath,
+      [...this.persistedDefinitions.values()].map((definition) => toManagedServiceDefinition(definition)),
+    );
+  }
+
+  appendLog(serviceId, level, message) {
+    const state = this.requireState(serviceId);
+    const nextLogs = appendRecentLog(state.recentLogs, createLogEntry(this.clock, level, message), this.logLimit);
+    this.updateState(serviceId, {
+      recentLogs: nextLogs,
+      detail: message,
+    });
+  }
+
+  listDefinitions() {
+    return [...this.definitions.values()].map((definition) => toManagedServiceDefinition(definition));
+  }
+
+  getDefinition(serviceId) {
+    const definition = this.definitions.get(serviceId);
+    return definition ? toManagedServiceDefinition(definition) : undefined;
+  }
+
+  async saveDefinition(rawDefinition) {
+    const definition = normalizeServiceDefinition(rawDefinition, { securityPolicy: this.securityPolicy });
+    const existingService = this.getService(definition.serviceId);
+
+    this.persistedDefinitions.set(definition.serviceId, definition);
+    this.persistDefinitions();
+    this.rebuildDefinitions();
+
+    const updated = this.requireDefinition(definition.serviceId);
+    if (!existingService) {
+      this.appendLog(definition.serviceId, "success", `${updated.name} registered for managed supervision.`);
+    } else {
+      this.appendLog(definition.serviceId, "info", `${updated.name} configuration updated. Restart to apply process changes if needed.`);
+    }
+
+    this.emitEvent(this.createSnapshotEvent());
+    return toManagedServiceDefinition(updated);
+  }
+
+  async deleteDefinition(serviceId) {
+    if (this.baseDefinitions.has(serviceId)) {
+      this.persistedDefinitions.delete(serviceId);
+      this.persistDefinitions();
+      this.rebuildDefinitions();
+      this.appendLog(serviceId, "info", `${this.requireDefinition(serviceId).name} configuration reset to its built-in defaults.`);
+      this.emitEvent(this.createSnapshotEvent());
+      return;
+    }
+
+    if (!this.definitions.has(serviceId)) {
+      throw new Error(`Unknown service '${serviceId}'.`);
+    }
+
+    await this.stopInternal(serviceId);
+    this.persistedDefinitions.delete(serviceId);
+    this.persistDefinitions();
+    this.definitions.delete(serviceId);
+    this.states.delete(serviceId);
+    this.operations.delete(serviceId);
+    this.emitEvent(this.createSnapshotEvent());
   }
 
   async start(serviceId) {
@@ -1795,6 +2039,7 @@ export function createSupervisorServer(options = {}) {
     metadataRetentionLimit: options.metadataRetentionLimit,
     allowedExecutables: options.allowedExecutables,
     allowedPaths: options.allowedPaths,
+    definitionsPath: options.definitionsPath ?? process.env.SERVICE_SUPERVISOR_DEFINITIONS_PATH,
     controlToken: options.controlToken,
   });
   const host = options.host ?? DEFAULT_HOST;
@@ -1838,6 +2083,14 @@ export function createSupervisorServer(options = {}) {
         return;
       }
 
+      if (pathname === "/service-definitions" && req.method === "GET") {
+        sendJson(res, 200, {
+          ok: true,
+          definitions: supervisor.listDefinitions(),
+        });
+        return;
+      }
+
       if (pathname === "/events" && req.method === "GET") {
         sendEventStreamHeaders(res);
         res.write("retry: 1500\n\n");
@@ -1861,6 +2114,49 @@ export function createSupervisorServer(options = {}) {
       }
 
       const routeMatch = pathname.match(/^\/services\/([^/]+?)(?:\/(start|stop|restart|ensure-running))?$/);
+      const definitionRouteMatch = pathname.match(/^\/service-definitions\/([^/]+?)$/);
+
+      if (definitionRouteMatch) {
+        const [, rawServiceId] = definitionRouteMatch;
+        const serviceId = decodeURIComponent(rawServiceId);
+
+        if (req.method === "GET") {
+          const definition = supervisor.getDefinition(serviceId);
+          if (!definition) {
+            sendJson(res, 404, { ok: false, message: `Unknown service definition '${serviceId}'.` });
+            return;
+          }
+
+          sendJson(res, 200, { ok: true, definition });
+          return;
+        }
+
+        const authorization = authorizeControlRequest(req, controlToken);
+        if (!authorization.ok) {
+          sendJson(res, 401, authorization.payload, authorization.headers);
+          return;
+        }
+
+        if (req.method === "PUT") {
+          const body = await parseRequestBody(req);
+          const definition = await supervisor.saveDefinition({
+            ...body,
+            serviceId,
+          });
+          sendJson(res, 200, { ok: true, definition });
+          return;
+        }
+
+        if (req.method === "DELETE") {
+          await supervisor.deleteDefinition(serviceId);
+          sendJson(res, 200, { ok: true });
+          return;
+        }
+
+        sendJson(res, 405, { ok: false, message: "Method not allowed." });
+        return;
+      }
+
       if (!routeMatch) {
         sendJson(res, 404, { ok: false, message: "Route not found." });
         return;
@@ -1990,8 +2286,14 @@ export function loadServiceDefinitionsFromEnvironment() {
         healthPollIntervalMs: normalizePositiveNumber(process.env.PYTHON_RUNTIME_HEALTH_POLL_INTERVAL_MS, DEFAULT_HEALTH_POLL_INTERVAL_MS),
         stopTimeoutMs: normalizePositiveNumber(process.env.SERVICE_SUPERVISOR_STOP_TIMEOUT_MS, DEFAULT_STOP_TIMEOUT_MS),
         metadata: {
-          source: "default",
-          kind: "builtin-python-runtime",
+          source: "builtin",
+          kind: "python-runtime",
+          transport: "hybrid",
+          autoStartPolicy: "on-demand",
+          restartPolicyName: "on-failure",
+          capabilities: ["workflow-execution", "mcp-runtime"],
+          tags: ["builtin", "python"],
+          description: "Built-in Python runtime managed by the local service supervisor.",
         },
         version: process.env.PYTHON_RUNTIME_VERSION || "dev",
         compatibility: parseJsonObject(process.env.PYTHON_RUNTIME_COMPATIBILITY_JSON, { supervisorApiVersion: 1 }),
@@ -2032,7 +2334,10 @@ async function main() {
   const runtime = DEFAULT_STUB_MODE
     ? createStubProcessRuntime()
     : createNodeProcessRuntime();
-  const app = createSupervisorServer({ runtime });
+  const app = createSupervisorServer({
+    runtime,
+    definitionsPath: process.env.SERVICE_SUPERVISOR_DEFINITIONS_PATH ?? DEFAULT_DEFINITIONS_PATH,
+  });
   await app.listen();
   console.log(`[service-supervisor] listening on http://${app.host}:${app.port}`);
 }

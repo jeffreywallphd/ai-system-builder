@@ -81,6 +81,8 @@ import { LocalStorageContextPackageRepository } from "../../infrastructure/brows
 import { LocalStorageContextRecipeRepository } from "../../infrastructure/browser/context/LocalStorageContextRecipeRepository";
 import { createPythonRuntimeServiceDefinition } from "../../infrastructure/python/runtime/PythonRuntimeServiceDefinition";
 import { LocalStorageManagedServiceDefinitionRepository } from "../../infrastructure/browser/services/LocalStorageManagedServiceDefinitionRepository";
+import { HttpManagedServiceDefinitionRepository } from "../../infrastructure/services/HttpManagedServiceDefinitionRepository";
+import { HttpManagedServiceSupervisorClient } from "../../infrastructure/services/HttpManagedServiceSupervisorClient";
 
 import { WorkflowProjectionService } from "../../application/projection/WorkflowProjectionService";
 import { WorkflowToolProjectionService } from "../../application/projection/WorkflowToolProjectionService";
@@ -237,10 +239,18 @@ export function createUiDependencies(
   const runtimeClient = pythonRuntimeConfig.isEnabled
     ? new HttpPythonRuntimeClient(pythonRuntimeConfig)
     : createDisabledRuntimeClient();
+  const managedServiceSupervisorClient = pythonRuntimeConfig.isManagedLocal
+    ? new HttpManagedServiceSupervisorClient({
+      baseUrl: pythonRuntimeConfig.supervisorBaseUrl,
+      timeoutMs: pythonRuntimeConfig.timeoutMs,
+      authToken: pythonRuntimeConfig.authToken,
+    })
+    : undefined;
   const pythonManagedService = createPythonManagedService({
     config: pythonRuntimeConfig,
     client: runtimeClient,
     eventSink: runtimeEventSink,
+    supervisorClient: managedServiceSupervisorClient,
   });
   const pythonRuntimeManager = pythonManagedService.pythonRuntimeManager;
   const mcpClient = settings.runtime.mode === "disabled"
@@ -322,10 +332,13 @@ export function createUiDependencies(
       healthPollIntervalMs: pythonRuntimeConfig.healthPollIntervalMs,
     },
   });
-  const managedServiceDefinitionRepository = new LocalStorageManagedServiceDefinitionRepository();
+  const managedServiceDefinitionRepository = managedServiceSupervisorClient
+    ? new HttpManagedServiceDefinitionRepository(managedServiceSupervisorClient)
+    : new LocalStorageManagedServiceDefinitionRepository();
   const managedServicesService = new ManagedServicesService({
     serviceManager: pythonManagedService.manager,
     serviceSupervisor: pythonManagedService.manager,
+    supervisorClient: managedServiceSupervisorClient,
     runtimeEventStore,
     builtinDefinitions: [pythonRuntimeDefinition],
     definitionRepository: managedServiceDefinitionRepository,

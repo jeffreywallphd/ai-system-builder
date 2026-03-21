@@ -249,6 +249,14 @@ export default function ManagedServicesPanel({
                       <span className="ui-meta-value">{presenter.presentOwnership(service)}</span>
                     </div>
                     <div className="ui-meta-item">
+                      <span className="ui-meta-label">PID</span>
+                      <span className="ui-meta-value">{service.pid ?? "—"}</span>
+                    </div>
+                    <div className="ui-meta-item">
+                      <span className="ui-meta-label">Uptime</span>
+                      <span className="ui-meta-value">{formatUptime(service.uptimeSeconds)}</span>
+                    </div>
+                    <div className="ui-meta-item">
                       <span className="ui-meta-label">Availability</span>
                       <span className="ui-meta-value">{presenter.presentAvailability(service)}</span>
                     </div>
@@ -297,8 +305,24 @@ export default function ManagedServicesPanel({
                       <span className="ui-meta-value">{presenter.presentEndpointSummary(selectedService)}</span>
                     </div>
                     <div className="ui-meta-item">
+                      <span className="ui-meta-label">PID</span>
+                      <span className="ui-meta-value">{selectedService.pid ?? "No process"}</span>
+                    </div>
+                    <div className="ui-meta-item">
+                      <span className="ui-meta-label">Uptime</span>
+                      <span className="ui-meta-value">{formatUptime(selectedService.uptimeSeconds)}</span>
+                    </div>
+                    <div className="ui-meta-item">
+                      <span className="ui-meta-label">Health</span>
+                      <span className="ui-meta-value">{selectedService.healthSummary ?? selectedService.detail ?? "Unknown"}</span>
+                    </div>
+                    <div className="ui-meta-item">
                       <span className="ui-meta-label">Last checked</span>
                       <span className="ui-meta-value">{presenter.presentLastChecked(selectedService)}</span>
+                    </div>
+                    <div className="ui-meta-item">
+                      <span className="ui-meta-label">Health checked</span>
+                      <span className="ui-meta-value">{selectedService.healthCheckedAt ? new Date(selectedService.healthCheckedAt).toLocaleString() : "Not yet checked"}</span>
                     </div>
                     <div className="ui-meta-item">
                       <span className="ui-meta-label">Command</span>
@@ -410,6 +434,23 @@ export default function ManagedServicesPanel({
       </div>
     </div>
   );
+}
+
+function formatUptime(uptimeSeconds: number | undefined): string {
+  if (!uptimeSeconds || uptimeSeconds <= 0) {
+    return "Not running";
+  }
+
+  const hours = Math.floor(uptimeSeconds / 3600);
+  const minutes = Math.floor((uptimeSeconds % 3600) / 60);
+  const seconds = uptimeSeconds % 60;
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  }
+  return `${seconds}s`;
 }
 
 function presentStreamState(streamState: ManagedServicesPanelProps["streamState"]): string {

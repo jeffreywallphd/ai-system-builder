@@ -1,3 +1,5 @@
+import type { ManagedServiceDefinition } from "../ManagedServiceDefinition";
+
 export const ManagedSupervisorServiceStates = {
   unavailable: "unavailable",
   starting: "starting",
@@ -131,10 +133,24 @@ export interface ManagedSupervisorServiceResponse {
   readonly service: ManagedSupervisorServiceRecord;
 }
 
+export interface ManagedSupervisorServiceDefinitionListResponse {
+  readonly ok: boolean;
+  readonly definitions: ReadonlyArray<ManagedServiceDefinition>;
+}
+
+export interface ManagedSupervisorServiceDefinitionResponse {
+  readonly ok: boolean;
+  readonly definition: ManagedServiceDefinition;
+}
+
 export interface IManagedServiceSupervisorClient {
   health(): Promise<ManagedSupervisorHealthResponse>;
   listServices(): Promise<ManagedSupervisorServiceListResponse>;
   getService(serviceId: string): Promise<ManagedSupervisorServiceResponse>;
+  listDefinitions(): Promise<ManagedSupervisorServiceDefinitionListResponse>;
+  getDefinition(serviceId: string): Promise<ManagedSupervisorServiceDefinitionResponse>;
+  saveDefinition(definition: ManagedServiceDefinition): Promise<ManagedSupervisorServiceDefinitionResponse>;
+  deleteDefinition(serviceId: string): Promise<void>;
   start(serviceId: string): Promise<ManagedSupervisorServiceResponse>;
   stop(serviceId: string): Promise<ManagedSupervisorServiceResponse>;
   restart(serviceId: string): Promise<ManagedSupervisorServiceResponse>;
