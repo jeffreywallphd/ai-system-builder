@@ -774,11 +774,7 @@ function deriveAppState(
     && context.isManagedLocal
     && context.autoStartEnabled
     && (context.trigger === "monitor" || context.trigger === "refresh")
-    && (
-      status.status === PythonRuntimeStatuses.unavailable
-      || status.status === PythonRuntimeStatuses.starting
-      || status.status === PythonRuntimeStatuses.stopping
-    )
+    && shouldKeepRetryingPresentation(status)
   ) {
     return "reconnecting";
   }
@@ -801,6 +797,26 @@ function deriveAppState(
         ? "failed"
         : "degraded";
   }
+}
+
+function shouldKeepRetryingPresentation(status: PythonRuntimeManagerStatus): boolean {
+  if (isTerminalRetryFailure(status.detail)) {
+    return false;
+  }
+
+  return status.status === PythonRuntimeStatuses.unavailable
+    || status.status === PythonRuntimeStatuses.starting
+    || status.status === PythonRuntimeStatuses.stopping
+    || status.status === PythonRuntimeStatuses.unhealthy
+    || status.status === PythonRuntimeStatuses.failed
+    || status.status === PythonRuntimeStatuses.stopped;
+}
+
+function isTerminalRetryFailure(detail: string | undefined): boolean {
+  const normalizedDetail = detail?.toLowerCase() ?? "";
+  return normalizedDetail.includes("restart circuit is open")
+    || normalizedDetail.includes("max retries")
+    || normalizedDetail.includes("timed out waiting for runtime readiness");
 }
 
 function canRestartRuntime(status: PythonRuntimeManagerStatus): boolean {

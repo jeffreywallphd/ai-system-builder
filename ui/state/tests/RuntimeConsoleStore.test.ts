@@ -600,4 +600,64 @@ describe("RuntimeConsoleStore", () => {
     expect(store.getState().appState).toBe("reconnecting");
     expect(store.getState().appStateDetail).toBe("Trying to reconnect to the Python runtime…");
   });
+
+  it("keeps reconnecting state stable across retry failures until retries are exhausted", async () => {
+    let runtimeStatus: PythonRuntimeManagerStatus = {
+      status: "healthy",
+      isAvailable: true,
+      owner: "managed",
+      lastUpdatedAt: "2026-03-20T00:00:00.000Z",
+      detail: "Python runtime is healthy.",
+    };
+    const eventStore = new RuntimeEventBuffer();
+    const store = new RuntimeConsoleStore({
+      runtimeEventStore: eventStore,
+      pythonRuntimeManager: (() => {
+        let availabilityChecks = 0;
+        return {
+          checkAvailability: async () => {
+            availabilityChecks += 1;
+            if (availabilityChecks === 1) {
+              return true;
+            }
+
+            if (runtimeStatus.status === "healthy") {
+              runtimeStatus = {
+                ...runtimeStatus,
+                status: "failed",
+                isAvailable: false,
+                detail: "Python runtime health check failed.",
+              };
+            }
+            return false;
+          },
+          ensureRuntimeAvailability: async () => runtimeStatus,
+          restartRuntime: async () => runtimeStatus,
+          getStatus: () => runtimeStatus,
+          stopManagedRuntime: async () => undefined,
+        };
+      })(),
+      runtimeManagement: {
+        isManagedLocal: true,
+        autoStartEnabled: true,
+        healthPollIntervalMs: 5_000,
+      },
+    });
+
+    await store.initializeRuntime();
+    await store.refreshHealth();
+
+    expect(store.getState().appState).toBe("reconnecting");
+    expect(store.getState().appStateDetail).toBe("Trying to reconnect to the Python runtime…");
+
+    runtimeStatus = {
+      ...runtimeStatus,
+      detail: "Python runtime restart circuit is open until 2026-03-20T00:01:00.000Z.",
+    };
+
+    await store.refreshHealth();
+
+    expect(store.getState().appState).toBe("failed");
+    expect(store.getState().appStateDetail).toBe("Python runtime restart circuit is open until 2026-03-20T00:01:00.000Z.");
+  });
 });

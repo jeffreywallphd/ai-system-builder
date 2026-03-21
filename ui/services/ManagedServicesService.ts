@@ -305,6 +305,10 @@ export class ManagedServicesService {
       ? ManagedServiceSources.builtin
       : ManagedServiceSources.custom;
     const mappedState = mapSupervisorState(service.state);
+    const retryPresentation = deriveRetryPresentation(service, mappedState);
+    const effectiveState = retryPresentation?.state ?? mappedState;
+    const effectiveDetail = retryPresentation?.detail ?? service.detail;
+    const effectiveIsAvailable = retryPresentation?.isAvailable ?? (service.state === "healthy");
 
     return Object.freeze({
       id: service.serviceId,
@@ -317,9 +321,9 @@ export class ManagedServicesService {
       source: definition?.source ?? fallbackSource,
       startPolicy: definition?.autoStartPolicy ?? "manual",
       restartPolicy: definition?.restartPolicy ?? "on-failure",
-      state: mappedState,
+      state: effectiveState,
       ownership: service.ownership,
-      isAvailable: service.state === "healthy",
+      isAvailable: effectiveIsAvailable,
       transport: definition?.transport ?? "http",
       baseUrl: definition?.baseUrl ?? service.baseUrl,
       endpointSummary: definition ? summarizeEndpoints(definition) : service.baseUrl,
@@ -330,17 +334,17 @@ export class ManagedServicesService {
       startupTimeoutMs: definition?.startupTimeoutMs ?? 20_000,
       pid: service.pid,
       uptimeSeconds: service.startedAt ? Math.max(0, Math.round((Date.now() - new Date(service.startedAt).getTime()) / 1000)) : undefined,
-      healthSummary: service.readiness?.detail ?? service.detail,
+      healthSummary: retryPresentation?.detail ?? service.readiness?.detail ?? effectiveDetail,
       healthCheckedAt: service.lastHealthCheckAt ?? undefined,
       canEdit: true,
       canRemove: definition?.source !== ManagedServiceSources.builtin,
       canManageLifecycle: true,
       lastCheckedAt: service.lastHealthCheckAt ?? service.startedAt ?? new Date().toISOString(),
-      lastErrorDetail: isServiceInErrorState(mappedState) ? service.detail : undefined,
-      detail: service.detail,
+      lastErrorDetail: retryPresentation ? undefined : isServiceInErrorState(mappedState) ? service.detail : undefined,
+      detail: effectiveDetail,
       readiness: Object.freeze({
-        isReady: service.readiness?.isReady ?? service.state === "healthy",
-        detail: service.readiness?.detail ?? service.detail ?? `${service.name} readiness is unknown.`,
+        isReady: retryPresentation ? false : service.readiness?.isReady ?? service.state === "healthy",
+        detail: retryPresentation?.detail ?? service.readiness?.detail ?? effectiveDetail ?? `${service.name} readiness is unknown.`,
         blockedBy: Object.freeze([...(service.readiness?.blockedBy ?? [])]),
       }),
       recentLogs: collapseConsecutiveRuntimeEvents(
@@ -763,6 +767,36 @@ function summarizeEndpoints(definition: ManagedServiceDefinition): string | unde
 
 function isServiceInErrorState(status: ManagedServiceRecord["state"]): boolean {
   return status === "failed" || status === "degraded" || status === "unavailable";
+}
+
+function deriveRetryPresentation(
+  service: ManagedSupervisorServiceRecord,
+  mappedState: ManagedServiceState,
+): { state: ManagedServiceState; detail: string; isAvailable: boolean } | undefined {
+  if (service.serviceId !== "python-runtime") {
+    return undefined;
+  }
+
+  const circuit = service.diagnostics?.circuitBreaker;
+  if (!circuit || circuit.state === "open" || circuit.recentFailures <= 0 || service.state === "healthy") {
+    return undefined;
+  }
+
+  if (
+    mappedState !== ManagedServiceStates.failed
+    && mappedState !== ManagedServiceStates.degraded
+    && mappedState !== ManagedServiceStates.unavailable
+    && mappedState !== ManagedServiceStates.starting
+  ) {
+    return undefined;
+  }
+
+  const attemptNumber = Math.min(circuit.recentFailures + 1, circuit.maxFailures);
+  return {
+    state: ManagedServiceStates.starting,
+    detail: `Trying to restart ${service.name} (${attemptNumber} of ${circuit.maxFailures}).`,
+    isAvailable: false,
+  };
 }
 
 function mapSupervisorLogLevelToRuntimeSeverity(
