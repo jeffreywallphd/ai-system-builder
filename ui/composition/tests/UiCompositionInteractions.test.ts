@@ -9,7 +9,9 @@ describe("ui composition interactions", () => {
       config: AppRuntimeConfig.forDevelopment(),
     });
 
-    expect(dependencies.config.workflowRepositoryMode).toBe("memory");
+    expect(dependencies.config.workflowRepositoryMode).toBe("browser-storage");
+    expect(dependencies.operationalStatus.workflowPersistence.effectiveMode).toBe("in-memory-fallback");
+    expect(dependencies.operationalStatus.nodeCatalog.effectiveMode).toBe("registered");
     expect(dependencies.workflowStore).toBeDefined();
     expect(dependencies.nodeStore).toBeDefined();
     expect(dependencies.workflowService).toBeDefined();
@@ -107,7 +109,7 @@ describe("ui composition interactions", () => {
     expect(dependencies.runtimeConsoleStore.getState().events.length).toBeGreaterThan(0);
   });
 
-  it("seeds sample workflows with implemented nodes into the default in-memory repository", async () => {
+  it("seeds sample workflows into the active development repository fallback", async () => {
     const dependencies = createUiDependencies({
       config: AppRuntimeConfig.forDevelopment(),
     });

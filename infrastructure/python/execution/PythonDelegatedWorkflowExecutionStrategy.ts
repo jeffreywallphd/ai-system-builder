@@ -20,6 +20,7 @@ export class PythonDelegatedWorkflowExecutionStrategy implements IWorkflowExecut
       runtime: "python",
       mode: "delegated",
       supportsPartialDelegation: false,
+      defaultProvenance: "delegated",
     };
   }
 
@@ -65,9 +66,17 @@ export class PythonDelegatedWorkflowExecutionStrategy implements IWorkflowExecut
       outputAssets: [],
       messages: response.messages,
       errorMessage: response.errorMessage,
+      provenance: {
+        classification: response.status === "failed" ? "unavailable" : "delegated",
+        runtime: "python",
+        strategyId: this.getDescriptor().id,
+        detail: response.status === "failed"
+          ? "Python runtime could not complete delegated execution."
+          : "Workflow execution was delegated to the Python runtime.",
+      },
     });
 
-    onEvent?.(new WorkflowExecutionEvent({ executionId: result.executionId, kind: result.status === "completed" ? "workflow-completed" : "workflow-failed", status: result.status, message: result.errorMessage }));
+    onEvent?.(new WorkflowExecutionEvent({ executionId: result.executionId, kind: result.status === "completed" ? "workflow-completed" : "workflow-failed", status: result.status, message: result.errorMessage, provenance: result.provenance }));
 
     return result;
   }

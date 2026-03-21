@@ -11,7 +11,10 @@ This repository now supports two explicit runtime modes:
 
 ## Development mode
 
-Development stays source-driven and browser-based by default.
+Development now has two clearly differentiated paths:
+
+- **Desktop-host development (`npm run dev:desktop`)** is the truthful operational path.
+- **Browser-only Vite development (`npm run dev`)** remains available as an authoring fallback when the desktop bridge is not present.
 
 ### Start the existing dev workflow
 
@@ -20,7 +23,7 @@ npm install
 npm run dev
 ```
 
-That still starts the Vite dev server and preserves the current developer experience.
+That starts the renderer in browser-only fallback mode. Workflows remain durable in browser storage, but this path does **not** provide the full dev filesystem + SQLite persistence foundation.
 
 ### Optional desktop-host development
 
@@ -34,12 +37,13 @@ This starts:
 - an Electron shell that loads the dev server
 - the local service supervisor owned by the Electron main process
 
-Development mode intentionally keeps current dev-friendly behavior:
+Desktop development is now the main truthful development runtime:
 
-- workflow persistence defaults to the in-memory seed repository
-- local browser-style settings storage stays available
-- current Python/runtime expectations for developers remain supported
-- mock catalogs and preview execution remain available in dev
+- workflow JSON records persist under `dev/workflow-data/workflows/`
+- a SQLite workflow index is created at `dev/workflow-data/workflows/workflow-index.sqlite`
+- execution defaults to a **strategy-driven** path that prefers delegated Python runtime execution
+- scaffold execution remains available only as an explicit fallback path and is labeled as such in execution metadata
+- the primary node catalog is registry-backed rather than mock-only
 
 ## Production desktop mode
 
@@ -124,6 +128,25 @@ Packaged desktop mode creates a storage layout under the Electron user-data fold
 - `logs/`
 
 SQLite stores structured durable app state. Local filesystem paths remain the home for larger runtime assets, logs, and model/runtime working directories.
+
+In desktop development specifically:
+
+- canonical workflow definitions live in `dev/workflow-data/workflows/*.json`
+- SQLite indexes workflow summaries and lookup metadata in `dev/workflow-data/workflows/workflow-index.sqlite`
+- existing seeded/sample workflows are loaded from the same `dev/` workflow storage tree
+
+This keeps development persistence durable across restarts while preserving a clear source of truth: **workflow JSON on disk is canonical; SQLite is the indexed summary layer**.
+
+## Execution truthfulness
+
+Workflow execution now reports how a run actually happened:
+
+- **delegated** — execution was handed to the Python runtime
+- **scaffolded** — execution used the deterministic scaffold interpreter fallback
+- **hybrid** — a run mixed delegated and scaffolded behavior
+- **unavailable** — the requested behavior could not be implemented truthfully
+
+The app no longer treats scaffold execution as if it were the primary production-like path. When the Python runtime is unavailable, the UI and execution metadata now make that fallback explicit.
 
 ## Important current limitations
 

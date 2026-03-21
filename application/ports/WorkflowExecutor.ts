@@ -4,8 +4,10 @@ import type {
   IWorkflowExecutionHandle,
   IWorkflowExecutionInput,
   IWorkflowExecutionProgress,
+  IWorkflowExecutionProvenance,
   IWorkflowExecutionResult,
   IWorkflowExecutor,
+  INodeExecutionProvenance,
 } from "./interfaces/IWorkflowExecutor";
 
 function normalize(value: string): string {
@@ -72,6 +74,8 @@ export class WorkflowExecutionEvent implements IWorkflowExecutionEvent {
   public readonly progress?: IWorkflowExecutionProgress;
   public readonly message?: string;
   public readonly payload?: Readonly<Record<string, unknown>>;
+  public readonly provenance?: IWorkflowExecutionProvenance;
+  public readonly nodeProvenance?: INodeExecutionProvenance;
 
   constructor(params: {
     executionId: string;
@@ -99,6 +103,17 @@ export class WorkflowExecutionEvent implements IWorkflowExecutionEvent {
       : undefined;
     this.message = params.message?.trim() || undefined;
     this.payload = params.payload ? Object.freeze({ ...params.payload }) : undefined;
+    this.provenance = params.provenance
+      ? Object.freeze({
+          ...params.provenance,
+          nodeProvenance: params.provenance.nodeProvenance
+            ? Object.freeze({ ...params.provenance.nodeProvenance })
+            : undefined,
+        })
+      : undefined;
+    this.nodeProvenance = params.nodeProvenance
+      ? Object.freeze({ ...params.nodeProvenance })
+      : undefined;
   }
 
   public static from(event: IWorkflowExecutionEvent): WorkflowExecutionEvent {
@@ -111,6 +126,8 @@ export class WorkflowExecutionEvent implements IWorkflowExecutionEvent {
       progress: event.progress,
       message: event.message,
       payload: event.payload,
+      provenance: event.provenance,
+      nodeProvenance: event.nodeProvenance,
     });
   }
 }
@@ -121,6 +138,7 @@ export class WorkflowExecutionResult implements IWorkflowExecutionResult {
   public readonly outputAssets: ReadonlyArray<IAsset>;
   public readonly messages?: ReadonlyArray<string>;
   public readonly errorMessage?: string;
+  public readonly provenance?: IWorkflowExecutionProvenance;
 
   constructor(params: {
     executionId: string;
@@ -140,6 +158,14 @@ export class WorkflowExecutionResult implements IWorkflowExecutionResult {
     this.outputAssets = freezeAssets(params.outputAssets);
     this.messages = freezeMessages(params.messages);
     this.errorMessage = params.errorMessage?.trim() || undefined;
+    this.provenance = params.provenance
+      ? Object.freeze({
+          ...params.provenance,
+          nodeProvenance: params.provenance.nodeProvenance
+            ? Object.freeze({ ...params.provenance.nodeProvenance })
+            : undefined,
+        })
+      : undefined;
   }
 
   public static from(result: IWorkflowExecutionResult): WorkflowExecutionResult {
@@ -149,6 +175,7 @@ export class WorkflowExecutionResult implements IWorkflowExecutionResult {
       outputAssets: result.outputAssets,
       messages: result.messages,
       errorMessage: result.errorMessage,
+      provenance: result.provenance,
     });
   }
 }

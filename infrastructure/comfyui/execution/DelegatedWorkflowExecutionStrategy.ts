@@ -30,6 +30,7 @@ export class DelegatedWorkflowExecutionStrategy
       runtime: this.runtime,
       mode: "delegated",
       supportsPartialDelegation: false,
+      defaultProvenance: "delegated",
     };
   }
 
