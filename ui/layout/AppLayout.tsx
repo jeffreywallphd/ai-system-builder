@@ -23,7 +23,9 @@ function navLinkClassName(isActive: boolean): string {
 
 const fallbackConsoleState: RuntimeConsoleState = Object.freeze({
   isExpanded: false,
+  activeTab: "health",
   events: Object.freeze([]),
+  logs: Object.freeze([]),
   healthChecks: Object.freeze([]),
   isRefreshingHealth: false,
   appState: "starting",
@@ -185,12 +187,18 @@ export default function AppLayout(): JSX.Element {
 
       <RuntimeConsoleDrawer
         isExpanded={runtimeConsoleState.isExpanded}
+        activeTab={runtimeConsoleState.activeTab}
         events={runtimeConsoleState.events}
+        logs={runtimeConsoleState.logs}
         healthChecks={runtimeConsoleState.healthChecks}
         isRefreshingHealth={runtimeConsoleState.isRefreshingHealth}
         onToggleExpanded={() => runtimeConsoleStore.toggleExpanded()}
-        onClearEvents={() => runtimeConsoleStore.clearEvents()}
+        onClearLogs={() => runtimeConsoleStore.clearLogs()}
         onRefreshHealth={() => void runtimeConsoleStore.refreshHealth()}
+        onSelectTab={(tab) => runtimeConsoleStore.setActiveTab(tab)}
+        onRestartRuntime={() => void runtimeConsoleStore.restartRuntime().catch(() => undefined)}
+        canRestartRuntime={runtimeConsoleState.canRestartRuntime}
+        isRestartingRuntime={runtimeConsoleState.isRestartingRuntime}
       />
 
       <footer className="ui-app__footer">

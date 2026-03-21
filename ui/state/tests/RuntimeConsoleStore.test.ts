@@ -5,7 +5,7 @@ import type { PythonRuntimeManagerStatus } from "../../../application/ports/inte
 import { RuntimeConsoleStore } from "../RuntimeConsoleStore";
 
 describe("RuntimeConsoleStore", () => {
-  it("subscribes to runtime events and supports clear/toggle", () => {
+  it("subscribes to runtime events, tracks tabs, and supports clear/toggle", () => {
     const eventStore = new RuntimeEventBuffer();
     const store = new RuntimeConsoleStore({
       runtimeEventStore: eventStore,
@@ -35,12 +35,22 @@ describe("RuntimeConsoleStore", () => {
 
     eventStore.append(createRuntimeEvent({ source: RuntimeEventSources.app, severity: "info", message: "boot" }));
     expect(store.getState().events).toHaveLength(1);
+    expect(store.getState().logs).toHaveLength(1);
+    expect(store.getState().activeTab).toBe("health");
+
+    store.setActiveTab("logs");
+    expect(store.getState().activeTab).toBe("logs");
 
     store.toggleExpanded();
     expect(store.getState().isExpanded).toBeTrue();
 
-    store.clearEvents();
+    store.openConsole("health");
+    expect(store.getState().isExpanded).toBeTrue();
+    expect(store.getState().activeTab).toBe("health");
+
+    store.clearLogs();
     expect(store.getState().events).toHaveLength(0);
+    expect(store.getState().logs).toHaveLength(0);
   });
 
   it("initializes runtime once and reports a ready app state", async () => {
@@ -229,7 +239,7 @@ describe("RuntimeConsoleStore", () => {
     expect(store.getState().appStateDetail).toBe("Runtime recovered.");
   });
 
-  it("swallows runtime initialization failures and surfaces a failed app state", async () => {
+  it("creates log entries for runtime initialization failures", async () => {
     const store = new RuntimeConsoleStore({
       runtimeEventStore: new RuntimeEventBuffer(),
       pythonRuntimeManager: {
@@ -254,12 +264,14 @@ describe("RuntimeConsoleStore", () => {
         stopManagedRuntime: async () => undefined,
       },
       mcpService: {
-        getConnectionStatus: async () => {
-          throw new Error("mcp unavailable");
-        },
-        listConfiguredServers: async () => {
-          throw new Error("mcp unavailable");
-        },
+        getConnectionStatus: async () => ({
+          enabled: false,
+          state: "unavailable",
+          checkedAt: new Date().toISOString(),
+          servers: [],
+          capabilities: {},
+        }),
+        listConfiguredServers: async () => [],
         getServerStatus: async () => {
           throw new Error("mcp unavailable");
         },
@@ -272,7 +284,100 @@ describe("RuntimeConsoleStore", () => {
     });
 
     await expect(store.initializeRuntime()).resolves.toBeUndefined();
+
+    const initializationLog = store.getState().logs.find((entry) => entry.message === "Python runtime initialization failed.");
+    expect(initializationLog).toBeDefined();
+    expect(initializationLog?.severity).toBe("error");
+    expect(initializationLog?.details).toContain("runtime unavailable");
     expect(store.getState().appState).toBe("failed");
-    expect(store.getState().healthChecks.some((check) => check.label === "MCP runtime")).toBeTrue();
+  });
+
+  it("creates log entries for refresh failures", async () => {
+    const store = new RuntimeConsoleStore({
+      runtimeEventStore: new RuntimeEventBuffer(),
+      pythonRuntimeManager: {
+        checkAvailability: async () => true,
+        ensureRuntimeAvailability: async () => ({
+          status: "healthy" as const,
+          isAvailable: true,
+          owner: "external" as const,
+          lastUpdatedAt: "2026-03-20T00:00:00.000Z",
+        }),
+        restartRuntime: async () => ({
+          status: "healthy" as const,
+          isAvailable: true,
+          owner: "external" as const,
+          lastUpdatedAt: "2026-03-20T00:00:00.000Z",
+        }),
+        getStatus: () => ({
+          status: "healthy" as const,
+          isAvailable: true,
+          owner: "external" as const,
+          lastUpdatedAt: "2026-03-20T00:00:00.000Z",
+        }),
+        stopManagedRuntime: async () => undefined,
+      },
+      mcpService: {
+        getConnectionStatus: async () => {
+          throw new Error("Failed to execute 'fetch' on 'Window': Illegal invocation.");
+        },
+        listConfiguredServers: async () => [],
+        getServerStatus: async () => {
+          throw new Error("unexpected");
+        },
+      } as any,
+    });
+
+    await store.refreshHealth();
+
+    const refreshLog = store.getState().logs.find((entry) => entry.message === "MCP runtime inspection failed.");
+    expect(refreshLog).toBeDefined();
+    expect(refreshLog?.severity).toBe("error");
+    expect(refreshLog?.source).toBe("network");
+    expect(refreshLog?.details).toContain("Illegal invocation");
+  });
+
+  it("retains a bounded in-memory log buffer", () => {
+    const eventStore = new RuntimeEventBuffer({ capacity: 10 });
+    const store = new RuntimeConsoleStore({
+      runtimeEventStore: eventStore,
+      logCapacity: 3,
+      pythonRuntimeManager: {
+        checkAvailability: async () => true,
+        ensureRuntimeAvailability: async () => ({
+          status: "healthy",
+          isAvailable: true,
+          owner: "external",
+          lastUpdatedAt: new Date().toISOString(),
+        }),
+        restartRuntime: async () => ({
+          status: "healthy",
+          isAvailable: true,
+          owner: "external",
+          lastUpdatedAt: new Date().toISOString(),
+        }),
+        getStatus: () => ({
+          status: "healthy",
+          isAvailable: true,
+          owner: "external",
+          lastUpdatedAt: new Date().toISOString(),
+        }),
+        stopManagedRuntime: async () => undefined,
+      },
+    });
+
+    for (let index = 0; index < 5; index += 1) {
+      eventStore.append(
+        createRuntimeEvent({
+          source: RuntimeEventSources.app,
+          severity: "info",
+          message: `event-${index}`,
+          timestamp: `2026-03-20T00:00:0${index}.000Z`,
+        }),
+      );
+    }
+
+    expect(store.getState().logs).toHaveLength(3);
+    expect(store.getState().logs.map((entry) => entry.message)).toEqual(["event-2", "event-3", "event-4"]);
   });
 });

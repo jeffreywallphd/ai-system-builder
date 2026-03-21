@@ -9,7 +9,22 @@ import {
 import type { IRuntimeEventStore } from "../../application/ports/interfaces/IRuntimeEventStore";
 import type { RuntimeEvent } from "../../application/runtime/RuntimeEvent";
 
+const DEFAULT_LOG_CAPACITY = 250;
+
 export type RuntimeAppState = "starting" | "reconnecting" | "ready" | "degraded" | "failed";
+export type RuntimeConsoleTab = "health" | "logs";
+export type RuntimeConsoleLogSeverity = "info" | "warn" | "error";
+export type RuntimeConsoleLogSource =
+  | "python-runtime-manager"
+  | "runtime-console"
+  | "mcp-runtime"
+  | "ui"
+  | "network"
+  | "app"
+  | "workflow-execution"
+  | "comfyui"
+  | "models"
+  | "python-runtime";
 
 export interface RuntimeHealthCheck {
   readonly id: string;
@@ -20,9 +35,21 @@ export interface RuntimeHealthCheck {
   readonly checkedAt: string;
 }
 
+export interface RuntimeConsoleLogEntry {
+  readonly id: string;
+  readonly timestamp: string;
+  readonly severity: RuntimeConsoleLogSeverity;
+  readonly source: RuntimeConsoleLogSource;
+  readonly message: string;
+  readonly details?: string;
+  readonly stack?: string;
+}
+
 export interface RuntimeConsoleState {
   readonly isExpanded: boolean;
+  readonly activeTab: RuntimeConsoleTab;
   readonly events: ReadonlyArray<RuntimeEvent>;
+  readonly logs: ReadonlyArray<RuntimeConsoleLogEntry>;
   readonly healthChecks: ReadonlyArray<RuntimeHealthCheck>;
   readonly isRefreshingHealth: boolean;
   readonly appState: RuntimeAppState;
@@ -42,6 +69,7 @@ export interface RuntimeConsoleStoreOptions {
     readonly autoStartEnabled: boolean;
     readonly healthPollIntervalMs: number;
   };
+  readonly logCapacity?: number;
 }
 
 export class RuntimeConsoleStore {
@@ -51,9 +79,14 @@ export class RuntimeConsoleStore {
   private readonly runtimeManagement;
   private readonly listeners = new Set<RuntimeConsoleListener>();
   private readonly unsubscribeEventStore: () => void;
+  private readonly logCapacity: number;
+  private diagnosticLogs: ReadonlyArray<RuntimeConsoleLogEntry> = Object.freeze([]);
+  private removeGlobalErrorListeners?: () => void;
   private state: RuntimeConsoleState = Object.freeze({
     isExpanded: false,
+    activeTab: "health",
     events: Object.freeze([]),
+    logs: Object.freeze([]),
     healthChecks: Object.freeze([]),
     isRefreshingHealth: false,
     appState: "starting",
@@ -71,10 +104,16 @@ export class RuntimeConsoleStore {
     this.pythonRuntimeManager = options.pythonRuntimeManager;
     this.mcpService = options.mcpService;
     this.runtimeManagement = options.runtimeManagement;
+    this.logCapacity = options.logCapacity && options.logCapacity > 0 ? options.logCapacity : DEFAULT_LOG_CAPACITY;
     this.unsubscribeEventStore = this.runtimeEventStore.subscribe((events) => {
-      this.state = Object.freeze({ ...this.state, events: Object.freeze([...events]) });
+      this.state = Object.freeze({
+        ...this.state,
+        events: Object.freeze([...events]),
+        logs: this.buildCombinedLogs(events),
+      });
       this.notify();
     });
+    this.removeGlobalErrorListeners = this.attachGlobalErrorListeners();
   }
 
   public getState(): RuntimeConsoleState {
@@ -99,8 +138,33 @@ export class RuntimeConsoleStore {
     }
   }
 
+  public openConsole(tab: RuntimeConsoleTab = this.state.activeTab): void {
+    this.patch({
+      isExpanded: true,
+      activeTab: tab,
+    });
+
+    if (tab === "health") {
+      void this.refreshHealth();
+    }
+  }
+
+  public setActiveTab(tab: RuntimeConsoleTab): void {
+    if (this.state.activeTab === tab) {
+      return;
+    }
+
+    this.patch({ activeTab: tab });
+  }
+
   public clearEvents(): void {
+    this.clearLogs();
+  }
+
+  public clearLogs(): void {
+    this.diagnosticLogs = Object.freeze([]);
     this.runtimeEventStore.clear();
+    this.patch({ logs: Object.freeze([]) });
   }
 
   public initializeRuntime(): Promise<void> {
@@ -132,9 +196,17 @@ export class RuntimeConsoleStore {
       this.applyAppState(status, "manual-restart");
     } catch (error) {
       const checkedAt = new Date().toISOString();
+      const message = toErrorMessage(error) ?? "Runtime restart failed.";
+      this.appendLog({
+        severity: "error",
+        source: "python-runtime-manager",
+        message: "Python runtime restart failed.",
+        details: message,
+        stack: toErrorStack(error),
+      });
       this.patch({
         appState: "failed",
-        appStateDetail: toErrorMessage(error) ?? "Runtime restart failed.",
+        appStateDetail: message,
         healthChecks: Object.freeze([
           ...this.buildPythonRuntimeHealthChecks(this.pythonRuntimeManager.getStatus()),
           {
@@ -165,6 +237,14 @@ export class RuntimeConsoleStore {
         })
         .catch((error) => {
           const checkedAt = new Date().toISOString();
+          const message = toErrorMessage(error) || "Unable to inspect MCP server health.";
+          this.appendLog({
+            severity: "error",
+            source: detectLogSource(message, error, "runtime-console"),
+            message: "Runtime health refresh failed.",
+            details: message,
+            stack: toErrorStack(error),
+          });
           this.patch({
             healthChecks: Object.freeze([
               ...this.buildPythonRuntimeHealthChecks(this.pythonRuntimeManager.getStatus()),
@@ -173,7 +253,7 @@ export class RuntimeConsoleStore {
                 label: "MCP runtime",
                 kind: "mcp-runtime",
                 status: "offline",
-                detail: toErrorMessage(error) || "Unable to inspect MCP server health.",
+                detail: message,
                 checkedAt,
               },
             ]),
@@ -194,6 +274,7 @@ export class RuntimeConsoleStore {
       clearTimeout(this.monitorTimer);
       this.monitorTimer = undefined;
     }
+    this.removeGlobalErrorListeners?.();
     this.unsubscribeEventStore();
     this.listeners.clear();
   }
@@ -204,7 +285,15 @@ export class RuntimeConsoleStore {
       this.applyAppState(status, "startup");
     } catch (error) {
       const fallbackStatus = this.pythonRuntimeManager.getStatus();
-      this.applyAppState(fallbackStatus, "startup-failed", toErrorMessage(error));
+      const message = toErrorMessage(error);
+      this.appendLog({
+        severity: "error",
+        source: detectLogSource(message, error, "python-runtime-manager"),
+        message: "Python runtime initialization failed.",
+        details: message,
+        stack: toErrorStack(error),
+      });
+      this.applyAppState(fallbackStatus, "startup-failed", message);
     }
   }
 
@@ -251,7 +340,15 @@ export class RuntimeConsoleStore {
       try {
         status = await this.pythonRuntimeManager.ensureRuntimeAvailability();
       } catch (error) {
-        this.applyAppState(this.pythonRuntimeManager.getStatus(), "startup-failed", toErrorMessage(error));
+        const message = toErrorMessage(error);
+        this.appendLog({
+          severity: "error",
+          source: detectLogSource(message, error, "python-runtime-manager"),
+          message: "Managed runtime recovery failed.",
+          details: message,
+          stack: toErrorStack(error),
+        });
+        this.applyAppState(this.pythonRuntimeManager.getStatus(), "startup-failed", message);
         return this.pythonRuntimeManager.getStatus();
       }
     }
@@ -309,7 +406,17 @@ export class RuntimeConsoleStore {
     try {
       const [runtimeStatus, configuredServers] = await Promise.all([
         this.mcpService.getConnectionStatus(),
-        this.mcpService.listConfiguredServers().catch(() => Object.freeze([])),
+        this.mcpService.listConfiguredServers().catch((error) => {
+          const message = toErrorMessage(error) || "Unable to inspect configured MCP servers.";
+          this.appendLog({
+            severity: "warn",
+            source: detectLogSource(message, error, "mcp-runtime"),
+            message: "Configured MCP servers could not be listed.",
+            details: message,
+            stack: toErrorStack(error),
+          });
+          return Object.freeze([]);
+        }),
       ]);
 
       checks.push(this.mapMcpRuntimeHealthCheck(runtimeStatus));
@@ -325,12 +432,20 @@ export class RuntimeConsoleStore {
         ...statuses.map((status) => this.mapMcpServerHealthCheck(status)),
       ]);
     } catch (error) {
+      const message = toErrorMessage(error) || "Unable to inspect MCP server health.";
+      this.appendLog({
+        severity: "error",
+        source: detectLogSource(message, error, "mcp-runtime"),
+        message: "MCP runtime inspection failed.",
+        details: message,
+        stack: toErrorStack(error),
+      });
       checks.push({
         id: "mcp-runtime",
         label: "MCP runtime",
         kind: "mcp-runtime",
         status: "offline",
-        detail: toErrorMessage(error) || "Unable to inspect MCP server health.",
+        detail: message,
         checkedAt: new Date().toISOString(),
       });
       return Object.freeze(checks);
@@ -422,12 +537,98 @@ export class RuntimeConsoleStore {
         try {
           return await this.mcpService!.getServerStatus(serverId);
         } catch (error) {
+          const message = toErrorMessage(error) || `Unable to inspect MCP server ${serverId}.`;
+          this.appendLog({
+            severity: "warn",
+            source: detectLogSource(message, error, "mcp-runtime"),
+            message: `MCP server inspection failed for ${configuredServer.name}.`,
+            details: message,
+            stack: toErrorStack(error),
+          });
           return this.createFallbackMcpServerStatus(configuredServer, error);
         }
       }),
     );
 
     return Object.freeze(statuses.filter((status): status is McpServerStatus => !!status));
+  }
+
+  private appendLog(entry: Omit<RuntimeConsoleLogEntry, "id" | "timestamp"> & Partial<Pick<RuntimeConsoleLogEntry, "id" | "timestamp">>): void {
+    const nextEntry = Object.freeze({
+      id: entry.id?.trim() || createRuntimeConsoleLogId(),
+      timestamp: entry.timestamp ?? new Date().toISOString(),
+      severity: entry.severity,
+      source: entry.source,
+      message: entry.message.trim(),
+      details: entry.details?.trim() || undefined,
+      stack: entry.stack?.trim() || undefined,
+    });
+
+    this.diagnosticLogs = Object.freeze([...this.diagnosticLogs, nextEntry].slice(-this.logCapacity));
+    this.patch({ logs: this.buildCombinedLogs(this.state.events) });
+  }
+
+  private buildCombinedLogs(events: ReadonlyArray<RuntimeEvent>): ReadonlyArray<RuntimeConsoleLogEntry> {
+    return Object.freeze(
+      [...events.map((event) => this.mapRuntimeEventToLogEntry(event)), ...this.diagnosticLogs]
+        .sort((left, right) => {
+          if (left.timestamp === right.timestamp) {
+            return left.id.localeCompare(right.id);
+          }
+
+          return left.timestamp.localeCompare(right.timestamp);
+        })
+        .slice(-this.logCapacity),
+    );
+  }
+
+  private mapRuntimeEventToLogEntry(event: RuntimeEvent): RuntimeConsoleLogEntry {
+    return Object.freeze({
+      id: `event:${event.id}`,
+      timestamp: event.timestamp,
+      severity: mapRuntimeEventSeverity(event.severity),
+      source: mapRuntimeEventSource(event.source),
+      message: event.message,
+      details: event.details ? JSON.stringify(event.details) : undefined,
+    });
+  }
+
+  private attachGlobalErrorListeners(): (() => void) | undefined {
+    if (typeof window === "undefined" || typeof window.addEventListener !== "function") {
+      return undefined;
+    }
+
+    const onError = (event: Event): void => {
+      const errorEvent = event as ErrorEvent;
+      const error = errorEvent.error;
+      const message = errorEvent.message || toErrorMessage(error) || "Unexpected UI error.";
+      this.appendLog({
+        severity: "error",
+        source: detectLogSource(message, error, "ui"),
+        message: "Uncaught UI error during runtime management.",
+        details: message,
+        stack: errorEvent.error instanceof Error ? errorEvent.error.stack : undefined,
+      });
+    };
+
+    const onUnhandledRejection = (event: PromiseRejectionEvent): void => {
+      const message = toErrorMessage(event.reason) || "Unhandled promise rejection.";
+      this.appendLog({
+        severity: "error",
+        source: detectLogSource(message, event.reason, "ui"),
+        message: "Unhandled runtime management promise rejection.",
+        details: message,
+        stack: toErrorStack(event.reason),
+      });
+    };
+
+    window.addEventListener("error", onError);
+    window.addEventListener("unhandledrejection", onUnhandledRejection);
+
+    return () => {
+      window.removeEventListener("error", onError);
+      window.removeEventListener("unhandledrejection", onUnhandledRejection);
+    };
   }
 
   private patch(patch: Partial<RuntimeConsoleState>): void {
@@ -559,6 +760,59 @@ function describePythonRuntimeStatus(status: PythonRuntimeManagerStatus): string
   }
 }
 
+function mapRuntimeEventSeverity(severity: RuntimeEvent["severity"]): RuntimeConsoleLogSeverity {
+  switch (severity) {
+    case "error":
+      return "error";
+    case "warning":
+      return "warn";
+    default:
+      return "info";
+  }
+}
+
+function mapRuntimeEventSource(source: RuntimeEvent["source"]): RuntimeConsoleLogSource {
+  switch (source) {
+    case "app":
+      return "app";
+    case "workflow-execution":
+      return "workflow-execution";
+    case "comfyui":
+      return "comfyui";
+    case "models":
+      return "models";
+    case "python-runtime":
+    default:
+      return "python-runtime";
+  }
+}
+
+function detectLogSource(message: string | undefined, error: unknown, fallback: RuntimeConsoleLogSource): RuntimeConsoleLogSource {
+  const haystack = `${message ?? ""} ${toErrorMessage(error) ?? ""}`.toLowerCase();
+
+  if (haystack.includes("fetch") || haystack.includes("network") || haystack.includes("illegal invocation")) {
+    return "network";
+  }
+
+  if (haystack.includes("mcp")) {
+    return "mcp-runtime";
+  }
+
+  if (haystack.includes("runtime") || haystack.includes("python")) {
+    return "python-runtime-manager";
+  }
+
+  return fallback;
+}
+
 function toErrorMessage(error: unknown): string | undefined {
   return error instanceof Error ? error.message : typeof error === "string" ? error : undefined;
+}
+
+function toErrorStack(error: unknown): string | undefined {
+  return error instanceof Error ? error.stack : undefined;
+}
+
+function createRuntimeConsoleLogId(): string {
+  return `runtime-console-log-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
