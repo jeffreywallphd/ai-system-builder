@@ -793,7 +793,7 @@ describe("loadServiceDefinitionsFromEnvironment", () => {
     expect(definition.healthPollIntervalMs).toBe(123);
     expect(definition.version).toBe("9.9.9");
     expect(definition.compatibility).toEqual({ supervisorApiVersion: 2, runtimeApiVersion: "beta" });
-    expect(definition.args).toEqual(["-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8123"]);
+    expect(definition.args).toEqual(["-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8123"]);
   });
 
   it("parses JSON argument arrays for the built-in runtime", () => {
