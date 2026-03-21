@@ -1,6 +1,7 @@
 import type { IRuntimeEventStore } from "../../application/ports/interfaces/IRuntimeEventStore";
 import { bindSafeFetch } from "../../application/runtime/RuntimeDiagnostics";
 import { RuntimeEventSources, type RuntimeEvent } from "../../application/runtime/RuntimeEvent";
+import { collapseConsecutiveRuntimeEvents } from "../../application/runtime/RuntimeEventStability";
 import type {
   ManagedSupervisorServiceLogEntry,
   ManagedSupervisorServiceRecord,
@@ -342,7 +343,9 @@ export class ManagedServicesService {
         detail: service.readiness?.detail ?? service.detail ?? `${service.name} readiness is unknown.`,
         blockedBy: Object.freeze([...(service.readiness?.blockedBy ?? [])]),
       }),
-      recentLogs: Object.freeze(service.recentLogs.map((entry) => this.toRuntimeEvent(service.serviceId, entry))),
+      recentLogs: collapseConsecutiveRuntimeEvents(
+        service.recentLogs.map((entry) => this.toRuntimeEvent(service.serviceId, entry)),
+      ),
     });
   }
 
