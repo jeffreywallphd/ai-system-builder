@@ -1,5 +1,6 @@
 import type { IRuntimeEventStore } from "../ports/interfaces/IRuntimeEventStore";
 import type { RuntimeEvent } from "./RuntimeEvent";
+import { appendDistinctRuntimeEvent } from "./RuntimeEventStability";
 
 export type RuntimeEventListener = (events: ReadonlyArray<RuntimeEvent>) => void;
 
@@ -19,7 +20,12 @@ export class RuntimeEventBuffer implements IRuntimeEventStore {
   }
 
   public append(event: RuntimeEvent): void {
-    this.events = Object.freeze([...this.events, event].slice(-this.capacity));
+    const nextEvents = appendDistinctRuntimeEvent(this.events, event, this.capacity);
+    if (nextEvents === this.events) {
+      return;
+    }
+
+    this.events = nextEvents;
     this.notify();
   }
 
