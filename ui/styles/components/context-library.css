@@ -92,3 +92,14 @@
     grid-template-columns: 1fr;
   }
 }
+
+.ui-card--interactive {
+  width: 100%;
+  text-align: left;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.ui-card--interactive.is-selected {
+  border-color: rgba(79, 156, 249, 0.45);
+  box-shadow: 0 0 0 1px rgba(79, 156, 249, 0.18);
+}

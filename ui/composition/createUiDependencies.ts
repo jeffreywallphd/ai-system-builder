@@ -95,7 +95,9 @@ import { SearchCapabilitiesUseCase } from "../../application/research/SearchCapa
 import { ToolService } from "../services/ToolService";
 import { ToolStore } from "../state/ToolStore";
 import { ContextService } from "../services/ContextService";
+import { TuningDatasetService } from "../services/TuningDatasetService";
 import { ContextStore } from "../state/ContextStore";
+import { TuningDatasetStore } from "../state/TuningDatasetStore";
 import { ManagedServicesService } from "../services/ManagedServicesService";
 import { ManagedServiceEventStream } from "../services/ManagedServiceEventStream";
 import { ManagedServicesStore } from "../state/ManagedServicesStore";
@@ -109,6 +111,10 @@ import { McpToolCapabilityCatalog, MCP_TOOL_CAPABILITY_PROVIDER } from "../../in
 import { McpToolCapabilityExecutor } from "../../infrastructure/tools/McpToolCapabilityExecutor";
 import { WorkflowProjectedToolCapabilityCatalog, WORKFLOW_TOOL_CAPABILITY_PROVIDER } from "../../infrastructure/tools/WorkflowProjectedToolCapabilityCatalog";
 import { WorkflowToolCapabilityExecutor } from "../../infrastructure/tools/WorkflowToolCapabilityExecutor";
+import { DefaultTuningDatasetStudioApplicationService } from "../../application/tuning-datasets/DefaultTuningDatasetStudioApplicationService";
+import { BrowserDatasetImportService, DefaultDatasetDuplicationPolicy, DefaultDatasetPrivacyPolicy, DefaultDatasetReviewPolicy, DeterministicDatasetSplitService, HeuristicQuestionAnsweringGenerationService, JsonTuningDatasetExportService, QuestionAnsweringValidationService, DatasetStatisticsService } from "../../domain/tuning-datasets/TuningDatasetServices";
+import { LocalStorageTuningDatasetRepository } from "../../infrastructure/browser/tuning-datasets/LocalStorageTuningDatasetRepository";
+import { LocalStorageTuningDatasetVersionRepository } from "../../infrastructure/browser/tuning-datasets/LocalStorageTuningDatasetVersionRepository";
 
 export function createUiDependencies(
   options: CreateUiDependenciesOptions = {}
@@ -385,6 +391,23 @@ export function createUiDependencies(
     previewAgentContextUseCase,
   });
   const contextStore = new ContextStore(contextService);
+  const tuningDatasetRepository = new LocalStorageTuningDatasetRepository();
+  const tuningDatasetVersionRepository = new LocalStorageTuningDatasetVersionRepository();
+  const duplicationPolicy = new DefaultDatasetDuplicationPolicy();
+  const tuningDatasetApplicationService = new DefaultTuningDatasetStudioApplicationService({
+    datasetRepository: tuningDatasetRepository,
+    datasetVersionRepository: tuningDatasetVersionRepository,
+    validationService: new QuestionAnsweringValidationService(duplicationPolicy),
+    splitService: new DeterministicDatasetSplitService(),
+    exportService: new JsonTuningDatasetExportService(),
+    importService: new BrowserDatasetImportService(new DefaultDatasetPrivacyPolicy()),
+    generationService: new HeuristicQuestionAnsweringGenerationService(),
+    reviewPolicy: new DefaultDatasetReviewPolicy(),
+    duplicationPolicy,
+    statisticsService: new DatasetStatisticsService(duplicationPolicy),
+  });
+  const tuningDatasetService = new TuningDatasetService(tuningDatasetApplicationService);
+  const tuningDatasetStore = new TuningDatasetStore(tuningDatasetService);
 
   return Object.freeze({
     config,
@@ -404,6 +427,8 @@ export function createUiDependencies(
     mcpStore,
     contextService,
     contextStore,
+    tuningDatasetService,
+    tuningDatasetStore,
     workflowProjectionService,
     settingsStore,
   });
