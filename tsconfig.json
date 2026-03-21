@@ -17,6 +17,7 @@
     "application/**/*.ts",
     "domain/**/*.ts",
     "infrastructure/**/*.ts",
+    "electron/shared/**/*.ts",
     "ui/**/*.ts",
     "ui/**/*.tsx"
   ],
