@@ -17,7 +17,7 @@ describe("ManagedServicesPanel", () => {
             description: "Local FastAPI worker",
             startPolicy: "on-demand",
             restartPolicy: "on-failure",
-            state: "healthy",
+            state: "running",
             ownership: "managed",
             isAvailable: true,
             transport: "http",

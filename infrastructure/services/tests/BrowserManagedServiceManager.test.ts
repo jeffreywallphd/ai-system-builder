@@ -36,6 +36,7 @@ describe("BrowserManagedServiceManager", () => {
         kind: ManagedServiceKinds.custom,
         displayName: "Custom service",
         transport: ManagedServiceTransports.process,
+        command: "node",
         args: ["serve"],
         environmentVariables: {},
         autoStartPolicy: ManagedServiceStartPolicies.manual,

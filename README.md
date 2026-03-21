@@ -119,7 +119,7 @@ Open the URL printed by Vite (typically `http://localhost:5174`).
 
 ### Start the Python FastAPI runtime (required for workflow execution)
 
-The UI uses a local Python service for workflow execution and runtime capabilities.
+The UI uses the Python runtime as its first built-in managed service. Workflow execution, MCP runtime features, and future local-runtime integrations all sit on the same managed-service lifecycle model.
 
 ```bash
 cd python-runtime
@@ -135,6 +135,12 @@ Runtime endpoints:
 - `POST /execute/node`
 - `POST /execute/workflow`
 - `GET /workflows/capabilities`
+
+Managed-service notes:
+
+- The Python runtime is treated as a built-in managed service rather than a special-case lifecycle.
+- Service state, start/stop/restart operations, event streaming, and health-aware UI management flow through the generic managed-service infrastructure.
+- Python-specific HTTP clients still handle workflow and MCP execution, but lifecycle/state ownership now lives in the shared managed-service layer.
 
 ### Local MCP server notes
 

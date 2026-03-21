@@ -206,6 +206,9 @@ export class HttpManagedServiceManager
         source: registration?.runtimeEventSource ?? RuntimeEventSources.app,
         severity: level === "warning" ? "info" : level,
         message,
+        details: {
+          serviceId,
+        },
       });
     }
   }

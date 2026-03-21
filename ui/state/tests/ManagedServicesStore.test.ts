@@ -12,7 +12,7 @@ function createServiceRecord(overrides: Partial<ManagedServiceRecord> = {}): Man
     source: "builtin",
     startPolicy: "on-demand",
     restartPolicy: "on-failure",
-    state: "healthy",
+    state: "running",
     ownership: "managed",
     isAvailable: true,
     transport: "http",
@@ -74,8 +74,8 @@ describe("ManagedServicesStore", () => {
     const removeService = mock(async () => undefined);
     const startService = mock(async () => createServiceRecord({ state: "starting", detail: "Booting…" }));
     const stopService = mock(async () => createServiceRecord({ state: "stopped", ownership: "none", isAvailable: false }));
-    const restartService = mock(async () => createServiceRecord({ state: "healthy", detail: "Restart complete." }));
-    const ensureRunning = mock(async () => createServiceRecord({ state: "healthy", detail: "Already running." }));
+    const restartService = mock(async () => createServiceRecord({ state: "running", detail: "Restart complete." }));
+    const ensureRunning = mock(async () => createServiceRecord({ state: "running", detail: "Already running." }));
 
     const store = new ManagedServicesStore({
       listServices,
@@ -126,7 +126,7 @@ describe("ManagedServicesStore", () => {
     const mapSupervisorServiceRecord = mock(async (service: any) => createServiceRecord({
       id: service.serviceId,
       name: service.name,
-      state: service.state,
+      state: service.state === "healthy" ? "running" : service.state,
       ownership: service.ownership,
       isAvailable: service.state === "healthy",
       detail: service.detail,
@@ -176,6 +176,23 @@ describe("ManagedServicesStore", () => {
           level: "stdout",
           message: "runtime ready",
         }],
+        processHistory: [],
+        metadata: { version: "test", compatibility: {} },
+        diagnostics: {
+          lastError: null,
+          lastExit: null,
+          lastStart: null,
+          lastHealthProbe: null,
+          circuitBreaker: {
+            state: "closed",
+            openedAt: null,
+            retryAfter: null,
+            recentFailures: 0,
+            maxFailures: 5,
+            failureWindowMs: 30_000,
+            cooldownMs: 15_000,
+          },
+        },
       }],
     });
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -196,7 +213,7 @@ describe("ManagedServicesStore", () => {
     expect(listServicesFromSupervisor).toHaveBeenCalledTimes(1);
     expect(mapSupervisorServiceRecord).toHaveBeenCalledTimes(1);
     expect(state.streamState).toBe("reconnecting");
-    expect(state.services[0]?.state).toBe("healthy");
+    expect(state.services[0]?.state).toBe("running");
     expect(state.recentLogs.map((entry) => entry.message)).toEqual([
       "runtime ready",
       "traceback line",

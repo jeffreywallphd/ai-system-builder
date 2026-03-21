@@ -1,8 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { AppRuntimeConfig } from "../../../infrastructure/config/AppRuntimeConfig";
-import { DisabledPythonRuntimeManager } from "../../../infrastructure/python/runtime/DisabledPythonRuntimeManager";
-import { ExternalHttpPythonRuntimeManager } from "../../../infrastructure/python/runtime/ExternalHttpPythonRuntimeManager";
-import { ManagedLocalPythonRuntimeManager } from "../../../infrastructure/python/runtime/ManagedLocalPythonRuntimeManager";
+import { ManagedServicePythonRuntimeManagerAdapter } from "../../../application/services/adapters/ManagedServicePythonRuntimeManagerAdapter";
 import { createUiDependencies } from "../createUiDependencies";
 
 describe("ui composition interactions", () => {
@@ -41,7 +39,7 @@ describe("ui composition interactions", () => {
     expect(nodeTypeIds).toContain("mcp.tool_call");
   });
 
-  it("selects the external HTTP runtime manager when configured", () => {
+  it("adapts the external HTTP runtime through the managed-service lifecycle", () => {
     const dependencies = createUiDependencies({
       config: AppRuntimeConfig.forDevelopment(),
       settingsStorage: {
@@ -55,10 +53,10 @@ describe("ui composition interactions", () => {
       },
     });
 
-    expect(dependencies.pythonRuntimeManager).toBeInstanceOf(ExternalHttpPythonRuntimeManager);
+    expect(dependencies.pythonRuntimeManager).toBeInstanceOf(ManagedServicePythonRuntimeManagerAdapter);
   });
 
-  it("selects the managed-local runtime manager when configured", () => {
+  it("adapts the managed-local runtime through the managed-service lifecycle", () => {
     const dependencies = createUiDependencies({
       config: AppRuntimeConfig.forDevelopment(),
       settingsStorage: {
@@ -72,10 +70,10 @@ describe("ui composition interactions", () => {
       },
     });
 
-    expect(dependencies.pythonRuntimeManager).toBeInstanceOf(ManagedLocalPythonRuntimeManager);
+    expect(dependencies.pythonRuntimeManager).toBeInstanceOf(ManagedServicePythonRuntimeManagerAdapter);
   });
 
-  it("selects the disabled runtime manager when configured", () => {
+  it("adapts the disabled runtime through the managed-service lifecycle", () => {
     const dependencies = createUiDependencies({
       config: AppRuntimeConfig.forDevelopment(),
       settingsStorage: {
@@ -88,7 +86,7 @@ describe("ui composition interactions", () => {
       },
     });
 
-    expect(dependencies.pythonRuntimeManager).toBeInstanceOf(DisabledPythonRuntimeManager);
+    expect(dependencies.pythonRuntimeManager).toBeInstanceOf(ManagedServicePythonRuntimeManagerAdapter);
   });
 
   it("keeps runtime console initialization safe when the runtime is unavailable", async () => {
