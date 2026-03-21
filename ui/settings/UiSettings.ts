@@ -71,7 +71,11 @@ export type DeepPartial<T> = {
   readonly [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K];
 };
 
-function resolveDefaultRuntimeBaseUrl(): string {
+function resolveDefaultRuntimeBaseUrl(config?: AppRuntimeConfig): string {
+  if (config?.isDesktopHost) {
+    return "http://127.0.0.1:8100";
+  }
+
   if (typeof window !== "undefined" && window.location?.hostname) {
     return `${window.location.protocol}//${window.location.hostname}:8100`;
   }
@@ -109,9 +113,9 @@ export function createDefaultUiSettings(config: AppRuntimeConfig): UiSettings {
     }),
     runtime: Object.freeze({
       mode: PythonRuntimeMode.managedLocal,
-      baseUrl: resolveDefaultRuntimeBaseUrl(),
+      baseUrl: resolveDefaultRuntimeBaseUrl(config),
       authToken: "",
-      workingDirectory: resolveDefaultPythonRuntimeWorkingDirectory(),
+      workingDirectory: config.desktopPythonRuntime?.workspaceDirectory ?? resolveDefaultPythonRuntimeWorkingDirectory(),
       pythonVersion: "3.12",
       pythonInterpreterPath: "",
       requestTimeoutMs: 15_000,

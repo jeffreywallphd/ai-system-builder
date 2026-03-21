@@ -44,6 +44,7 @@ import { McpService } from "../services/McpService";
 import { McpToolCallAuthoringService } from "../services/McpToolCallAuthoringService";
 import { McpStore } from "../state/McpStore";
 import { LocalStorageUiSettingsStorage, UiSettingsStore } from "../settings/UiSettingsStore";
+import { resolveDesktopStorageAdapter } from "./DesktopStorageAdapter";
 import { HttpMcpRuntimeClient } from "../../infrastructure/python/mcp/HttpMcpRuntimeClient";
 import { HttpMcpServerRuntimeClient } from "../../infrastructure/python/mcp/HttpMcpServerRuntimeClient";
 import { RuntimeBackedMcpConfiguredServerRepository } from "../../infrastructure/python/mcp/RuntimeBackedMcpConfiguredServerRepository";
@@ -118,22 +119,25 @@ import { DatasetSourceIngestionProfile } from "../../application/tuning-datasets
 import { BrowserDatasetImportService, DatasetStatisticsService, DatasetWorkflowProgressService, DefaultDatasetDuplicationPolicy, DefaultDatasetPrivacyPolicy, DefaultDatasetReleasePolicy, DefaultDatasetReviewPolicy, DeterministicDatasetSplitService, JsonTuningDatasetExportService, ProviderAgnosticDatasetGenerationService, TaskTypeAwareValidationService } from "../../domain/tuning-datasets/TuningDatasetServices";
 import { LocalStorageTuningDatasetRepository } from "../../infrastructure/browser/tuning-datasets/LocalStorageTuningDatasetRepository";
 import { LocalStorageTuningDatasetVersionRepository } from "../../infrastructure/browser/tuning-datasets/LocalStorageTuningDatasetVersionRepository";
+import { SqliteBackedWorkflowRepository } from "../../infrastructure/browser/workflows/SqliteBackedWorkflowRepository";
 
 export function createUiDependencies(
   options: CreateUiDependenciesOptions = {}
 ): UiDependencies {
-  const config = options.config ?? AppRuntimeConfig.forDevelopment();
+  const config = options.config ?? AppRuntimeConfig.resolveDefault();
+  const desktopStorage = resolveDesktopStorageAdapter();
+  const durableDesktopStorage = config.isPackagedDesktopHost ? desktopStorage : undefined;
   const settingsStore = new UiSettingsStore({
     config,
-    storage: options.settingsStorage ?? new LocalStorageUiSettingsStorage(),
+    storage: options.settingsStorage ?? createSettingsStorage(config, desktopStorage),
   });
   const settings = settingsStore.getSettings();
 
-  const workflowRepository = createWorkflowRepository(config);
+  const workflowRepository = createWorkflowRepository(config, desktopStorage);
   const workflowExecutor = createWorkflowExecutor(config);
   const nodeCatalogProvider = createNodeCatalogProvider(config);
-  const contextPackageRepository = new LocalStorageContextPackageRepository();
-  const contextRecipeRepository = new LocalStorageContextRecipeRepository();
+  const contextPackageRepository = new LocalStorageContextPackageRepository(undefined, durableDesktopStorage);
+  const contextRecipeRepository = new LocalStorageContextRecipeRepository(undefined, durableDesktopStorage);
   const workflowContextService = new WorkflowContextService(contextPackageRepository, contextRecipeRepository);
 
   const modelCompatibilityService = new ModelCompatibilityService();
@@ -189,7 +193,7 @@ export function createUiDependencies(
   });
 
   const huggingFaceApiClient = new HuggingFaceApiClient();
-  const installedModelCatalog = new LocalStorageInstalledModelCatalog();
+  const installedModelCatalog = new LocalStorageInstalledModelCatalog(undefined, durableDesktopStorage as never);
   const remoteModelCatalog = new HuggingFaceModelCatalog({
     apiClient: huggingFaceApiClient,
   });
@@ -349,7 +353,7 @@ export function createUiDependencies(
   });
   const managedServiceDefinitionRepository = managedServiceSupervisorClient
     ? new HttpManagedServiceDefinitionRepository(managedServiceSupervisorClient)
-    : new LocalStorageManagedServiceDefinitionRepository();
+    : new LocalStorageManagedServiceDefinitionRepository(undefined, durableDesktopStorage);
   const managedServicesService = new ManagedServicesService({
     serviceManager: pythonManagedService.manager,
     serviceSupervisor: pythonManagedService.manager,
@@ -396,8 +400,8 @@ export function createUiDependencies(
     previewAgentContextUseCase,
   });
   const contextStore = new ContextStore(contextService);
-  const tuningDatasetRepository = new LocalStorageTuningDatasetRepository();
-  const tuningDatasetVersionRepository = new LocalStorageTuningDatasetVersionRepository();
+  const tuningDatasetRepository = new LocalStorageTuningDatasetRepository(undefined, durableDesktopStorage as never);
+  const tuningDatasetVersionRepository = new LocalStorageTuningDatasetVersionRepository(durableDesktopStorage as never);
   const duplicationPolicy = new DefaultDatasetDuplicationPolicy();
   const fileIngestionService = new DefaultFileIngestionApplicationService(
     new FileIngestionPolicyService(),
@@ -447,6 +451,18 @@ export function createUiDependencies(
   });
 }
 
+
+function createSettingsStorage(config: AppRuntimeConfig, desktopStorage = resolveDesktopStorageAdapter()) {
+  if (config.uiSettingsPersistenceMode === "desktop-sqlite") {
+    if (!desktopStorage) {
+      throw new Error("Desktop SQLite settings persistence requires the desktop host storage bridge.");
+    }
+    return new LocalStorageUiSettingsStorage(undefined, desktopStorage);
+  }
+
+  return new LocalStorageUiSettingsStorage();
+}
+
 function createDisabledRuntimeClient(): IPythonRuntimeClient {
   return {
     async health() {
@@ -464,8 +480,13 @@ function createDisabledRuntimeClient(): IPythonRuntimeClient {
   };
 }
 
-function createWorkflowRepository(config: AppRuntimeConfig) {
+function createWorkflowRepository(config: AppRuntimeConfig, desktopStorage = resolveDesktopStorageAdapter()) {
   switch (config.workflowRepositoryMode) {
+    case "sqlite":
+      if (!desktopStorage) {
+        throw new Error("Desktop SQLite workflow repository requires the desktop host storage bridge.");
+      }
+      return new SqliteBackedWorkflowRepository(createNodeCatalogProvider(config), desktopStorage);
     case "memory":
     default:
       return new InMemoryWorkflowRepository(createSeedWorkflows());
@@ -474,6 +495,7 @@ function createWorkflowRepository(config: AppRuntimeConfig) {
 
 function createWorkflowExecutor(config: AppRuntimeConfig) {
   switch (config.workflowExecutorMode) {
+    case "runtime":
     case "preview":
     default:
       return new InterpretedWorkflowExecutor();
@@ -486,6 +508,10 @@ function createNodeCatalogProvider(config: AppRuntimeConfig) {
   );
 
   switch (config.nodeCatalogMode) {
+    case "composite":
+      return new CompositeNodeCatalogProvider({
+        providers: [implementationRegistryProvider],
+      });
     case "mock":
     default:
       return new CompositeNodeCatalogProvider({
