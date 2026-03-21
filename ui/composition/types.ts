@@ -14,7 +14,9 @@ import { McpService } from "../services/McpService";
 import { McpStore } from "../state/McpStore";
 import { WorkflowProjectionService } from "../../application/projection/WorkflowProjectionService";
 import { ContextService } from "../services/ContextService";
+import { TuningDatasetService } from "../services/TuningDatasetService";
 import { ContextStore } from "../state/ContextStore";
+import { TuningDatasetStore } from "../state/TuningDatasetStore";
 import type { UiSettingsStorage } from "../settings/UiSettingsStore";
 import { UiSettingsStore } from "../settings/UiSettingsStore";
 import { ManagedServicesService } from "../services/ManagedServicesService";
@@ -37,6 +39,8 @@ export interface UiDependencies {
   readonly mcpStore: McpStore;
   readonly contextService: ContextService;
   readonly contextStore: ContextStore;
+  readonly tuningDatasetService: TuningDatasetService;
+  readonly tuningDatasetStore: TuningDatasetStore;
   readonly workflowProjectionService: WorkflowProjectionService;
   readonly settingsStore: UiSettingsStore;
 }
