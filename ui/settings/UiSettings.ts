@@ -79,6 +79,14 @@ function resolveDefaultRuntimeWorkingDirectory(): string {
   return `${cwd}/python-runtime`;
 }
 
+function resolveDefaultRuntimeBaseUrl(): string {
+  if (typeof window !== "undefined" && window.location?.hostname) {
+    return `${window.location.protocol}//${window.location.hostname}:8100`;
+  }
+
+  return "http://127.0.0.1:8100";
+}
+
 export function createWorkspaceDefaults(mode: WorkspaceDataMode): WorkspaceSettings {
   const workspaceRoot = mode === WorkspaceDataMode.production
     ? "user/workflow-data"
@@ -109,7 +117,7 @@ export function createDefaultUiSettings(config: AppRuntimeConfig): UiSettings {
     }),
     runtime: Object.freeze({
       mode: PythonRuntimeMode.managedLocal,
-      baseUrl: "http://127.0.0.1:8000",
+      baseUrl: resolveDefaultRuntimeBaseUrl(),
       authToken: "",
       workingDirectory: resolveDefaultRuntimeWorkingDirectory(),
       requestTimeoutMs: 15_000,

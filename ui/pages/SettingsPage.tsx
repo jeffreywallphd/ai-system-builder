@@ -199,7 +199,7 @@ export default function SettingsPage(): JSX.Element {
               hint="Used on the next app load when runtime mode is enabled."
               value={state.settings.runtime.baseUrl}
               onChange={(value) => settingsStore.updateSection("runtime", { baseUrl: value })}
-              placeholder="http://127.0.0.1:8000"
+              placeholder="http://127.0.0.1:8100"
             />
             <TextField
               id="settings-runtime-auth-token"

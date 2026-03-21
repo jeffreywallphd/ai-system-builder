@@ -32,6 +32,15 @@ describe("UiSettingsStore", () => {
     expect(store.getSettings().workspace.inputsDirectory).toBe("dev/workflow-data/inputs");
   });
 
+  it("defaults the runtime base url to the local Python runtime port", () => {
+    const store = new UiSettingsStore({
+      config: createConfig(),
+      storage: { load: () => undefined, save: () => undefined },
+    });
+
+    expect(store.getSettings().runtime.baseUrl).toBe("http://127.0.0.1:8100");
+  });
+
   it("defaults workspace data to user folders in production mode", () => {
     const store = new UiSettingsStore({
       config: createConfig({ isProductionMode: true }),
