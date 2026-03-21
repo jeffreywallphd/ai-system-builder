@@ -36,6 +36,8 @@ import {
   type ISearchRemoteModelsRequest,
   type ISearchRemoteModelsResult,
 } from "../../application/models/SearchRemoteModelsUseCase";
+import type { ManagedModelLibrarySnapshot } from "../../application/models/ManagedModelLibrary";
+import type { IManagedModelLibrary } from "../../application/ports/interfaces/IManagedModelLibrary";
 import type { IModelInstallProgress } from "../../application/ports/interfaces/IModelInstaller";
 
 export interface IModelServiceOptions {
@@ -45,6 +47,7 @@ export interface IModelServiceOptions {
   readonly resolveModelCompatibilityUseCase: ResolveModelCompatibilityUseCase;
   readonly searchRemoteModelsUseCase: SearchRemoteModelsUseCase;
   readonly installedModelCatalog: IInstalledModelCatalog;
+  readonly managedModelLibrary?: IManagedModelLibrary;
 }
 
 export class ModelService {
@@ -54,6 +57,7 @@ export class ModelService {
   private readonly resolveModelCompatibilityUseCase: ResolveModelCompatibilityUseCase;
   private readonly searchRemoteModelsUseCase: SearchRemoteModelsUseCase;
   private readonly installedModelCatalog: IInstalledModelCatalog;
+  private readonly managedModelLibrary?: IManagedModelLibrary;
 
   constructor(options: IModelServiceOptions) {
     this.installModelUseCase = options.installModelUseCase;
@@ -62,6 +66,7 @@ export class ModelService {
     this.resolveModelCompatibilityUseCase = options.resolveModelCompatibilityUseCase;
     this.searchRemoteModelsUseCase = options.searchRemoteModelsUseCase;
     this.installedModelCatalog = options.installedModelCatalog;
+    this.managedModelLibrary = options.managedModelLibrary;
   }
 
   public async listInstalledModels(
@@ -121,6 +126,10 @@ export class ModelService {
     request: IRemoveModelRequest
   ): Promise<IRemoveModelResult> {
     return this.removeModelUseCase.execute(request);
+  }
+
+  public async inspectManagedLibrary(): Promise<ManagedModelLibrarySnapshot | undefined> {
+    return this.managedModelLibrary?.inspectLibrary();
   }
 
   public resolveCompatibility(

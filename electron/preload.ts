@@ -41,4 +41,30 @@ contextBridge.exposeInMainWorld("aiLoomDesktop", {
       };
     },
   },
+  modelFiles: {
+    exists(path: string) {
+      return ipcRenderer.sendSync("ai-loom-desktop-model-files:exists", path) as boolean;
+    },
+    stat(path: string) {
+      return ipcRenderer.sendSync("ai-loom-desktop-model-files:stat", path) as { path: string; kind: "file" | "directory"; size?: number; modifiedAt?: string };
+    },
+    read(path: string) {
+      return ipcRenderer.sendSync("ai-loom-desktop-model-files:read", path) as Uint8Array;
+    },
+    write(request: { path: string; content: Uint8Array; overwrite?: boolean; createDirectories?: boolean }) {
+      ipcRenderer.sendSync("ai-loom-desktop-model-files:write", request);
+    },
+    delete(path: string) {
+      ipcRenderer.sendSync("ai-loom-desktop-model-files:delete", path);
+    },
+    list(path: string, options?: { recursive?: boolean }) {
+      return ipcRenderer.sendSync("ai-loom-desktop-model-files:list", path, options) as ReadonlyArray<{ path: string; kind: "file" | "directory"; size?: number; modifiedAt?: string }>;
+    },
+    move(request: { from: string; to: string; overwrite?: boolean }) {
+      ipcRenderer.sendSync("ai-loom-desktop-model-files:move", request);
+    },
+    copy(request: { from: string; to: string; overwrite?: boolean }) {
+      ipcRenderer.sendSync("ai-loom-desktop-model-files:copy", request);
+    },
+  },
 });

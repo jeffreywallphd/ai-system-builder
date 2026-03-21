@@ -37,6 +37,8 @@ export interface UiOperationalStatus {
   readonly workflowPersistence: WorkflowPersistenceStatus;
   readonly execution: OperationalModeStatus;
   readonly nodeCatalog: OperationalModeStatus;
+  readonly mcp: OperationalModeStatus;
+  readonly modelLibrary: OperationalModeStatus;
 }
 
 export interface UiDependencies {
