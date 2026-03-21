@@ -4,18 +4,22 @@ import { renderToStaticMarkup } from "react-dom/server";
 import RuntimeConsoleToolbar from "../RuntimeConsoleToolbar";
 
 describe("RuntimeConsoleToolbar", () => {
-  it("renders toggle, count, and clear actions", () => {
+  it("renders toggle, tabs, count, and clear actions", () => {
     const html = renderToStaticMarkup(
       createElement(RuntimeConsoleToolbar, {
-        isExpanded: false,
-        eventCount: 3,
+        isExpanded: true,
+        activeTab: "logs",
+        logCount: 3,
         onToggle: () => undefined,
-        onClear: () => undefined,
+        onSelectTab: () => undefined,
+        onClearLogs: () => undefined,
       })
     );
 
-    expect(html).toContain("Show Runtime Console");
-    expect(html).toContain("3 events");
-    expect(html).toContain("Clear");
+    expect(html).toContain("Hide Runtime Console");
+    expect(html).toContain("Health");
+    expect(html).toContain("Logs");
+    expect(html).toContain("3 logs");
+    expect(html).toContain("Clear logs");
   });
 });

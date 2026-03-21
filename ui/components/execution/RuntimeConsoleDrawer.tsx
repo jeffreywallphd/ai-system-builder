@@ -1,45 +1,56 @@
 import type { RuntimeEvent } from "../../../application/runtime/RuntimeEvent";
-import type { RuntimeHealthCheck } from "../../state/RuntimeConsoleStore";
+import type { RuntimeConsoleLogEntry, RuntimeConsoleTab, RuntimeHealthCheck } from "../../state/RuntimeConsoleStore";
 import RuntimeConsoleToolbar from "./RuntimeConsoleToolbar";
-import RuntimeEventList from "./RuntimeEventList";
 import RuntimeHealthList from "./RuntimeHealthList";
+import RuntimeLogsList from "./RuntimeLogsList";
 
 export interface RuntimeConsoleDrawerProps {
   readonly isExpanded: boolean;
+  readonly activeTab: RuntimeConsoleTab;
   readonly events: ReadonlyArray<RuntimeEvent>;
+  readonly logs: ReadonlyArray<RuntimeConsoleLogEntry>;
   readonly healthChecks: ReadonlyArray<RuntimeHealthCheck>;
   readonly isRefreshingHealth?: boolean;
   readonly onToggleExpanded: () => void;
-  readonly onClearEvents: () => void;
+  readonly onClearLogs: () => void;
   readonly onRefreshHealth: () => void;
+  readonly onSelectTab: (tab: RuntimeConsoleTab) => void;
 }
 
 export default function RuntimeConsoleDrawer({
   isExpanded,
+  activeTab,
   events,
+  logs,
   healthChecks,
   isRefreshingHealth = false,
   onToggleExpanded,
-  onClearEvents,
+  onClearLogs,
   onRefreshHealth,
+  onSelectTab,
 }: RuntimeConsoleDrawerProps): JSX.Element {
+  const logCount = Math.max(logs.length, events.length);
+
   return (
     <section className={`ui-runtime-console${isExpanded ? " ui-runtime-console--expanded" : ""}`}>
       <RuntimeConsoleToolbar
         isExpanded={isExpanded}
-        eventCount={events.length}
+        activeTab={activeTab}
+        logCount={logCount}
         onToggle={onToggleExpanded}
-        onClear={onClearEvents}
+        onClearLogs={onClearLogs}
+        onSelectTab={onSelectTab}
       />
       {isExpanded ? (
-        <>
+        activeTab === "health" ? (
           <RuntimeHealthList
             healthChecks={healthChecks}
             isRefreshing={isRefreshingHealth}
             onRefresh={onRefreshHealth}
           />
-          <RuntimeEventList events={events} />
-        </>
+        ) : (
+          <RuntimeLogsList logs={logs} />
+        )
       ) : null}
     </section>
   );

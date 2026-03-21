@@ -4,25 +4,52 @@ import { renderToStaticMarkup } from "react-dom/server";
 import RuntimeConsoleDrawer from "../RuntimeConsoleDrawer";
 
 describe("RuntimeConsoleDrawer", () => {
-  it("renders collapsed and expanded views", () => {
+  it("renders collapsed, health, and logs views", () => {
     const collapsed = renderToStaticMarkup(
       createElement(RuntimeConsoleDrawer, {
         isExpanded: false,
+        activeTab: "health",
         events: [],
+        logs: [],
+        healthChecks: [],
         onToggleExpanded: () => undefined,
-        onClearEvents: () => undefined,
+        onSelectTab: () => undefined,
+        onClearLogs: () => undefined,
+        onRefreshHealth: () => undefined,
       })
     );
-    expect(collapsed).not.toContain("Runtime events will appear here.");
+    expect(collapsed).not.toContain("Server health");
 
-    const expanded = renderToStaticMarkup(
+    const health = renderToStaticMarkup(
       createElement(RuntimeConsoleDrawer, {
         isExpanded: true,
+        activeTab: "health",
         events: [],
+        logs: [],
+        healthChecks: [],
         onToggleExpanded: () => undefined,
-        onClearEvents: () => undefined,
+        onSelectTab: () => undefined,
+        onClearLogs: () => undefined,
+        onRefreshHealth: () => undefined,
       })
     );
-    expect(expanded).toContain("Runtime events will appear here.");
+    expect(health).toContain("Server health");
+    expect(health).toContain("Health checks will appear here.");
+
+    const logs = renderToStaticMarkup(
+      createElement(RuntimeConsoleDrawer, {
+        isExpanded: true,
+        activeTab: "logs",
+        events: [],
+        logs: [],
+        healthChecks: [],
+        onToggleExpanded: () => undefined,
+        onSelectTab: () => undefined,
+        onClearLogs: () => undefined,
+        onRefreshHealth: () => undefined,
+      })
+    );
+    expect(logs).toContain("Runtime logs");
+    expect(logs).toContain("Runtime logs will appear here.");
   });
 });
