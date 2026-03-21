@@ -112,7 +112,7 @@ import { McpToolCapabilityExecutor } from "../../infrastructure/tools/McpToolCap
 import { WorkflowProjectedToolCapabilityCatalog, WORKFLOW_TOOL_CAPABILITY_PROVIDER } from "../../infrastructure/tools/WorkflowProjectedToolCapabilityCatalog";
 import { WorkflowToolCapabilityExecutor } from "../../infrastructure/tools/WorkflowToolCapabilityExecutor";
 import { DefaultTuningDatasetStudioApplicationService } from "../../application/tuning-datasets/DefaultTuningDatasetStudioApplicationService";
-import { BrowserDatasetImportService, DefaultDatasetDuplicationPolicy, DefaultDatasetPrivacyPolicy, DefaultDatasetReviewPolicy, DeterministicDatasetSplitService, HeuristicQuestionAnsweringGenerationService, JsonTuningDatasetExportService, QuestionAnsweringValidationService, DatasetStatisticsService } from "../../domain/tuning-datasets/TuningDatasetServices";
+import { BrowserDatasetImportService, DatasetStatisticsService, DatasetWorkflowProgressService, DefaultDatasetDuplicationPolicy, DefaultDatasetPrivacyPolicy, DefaultDatasetReleasePolicy, DefaultDatasetReviewPolicy, DeterministicDatasetSplitService, JsonTuningDatasetExportService, ProviderAgnosticDatasetGenerationService, TaskTypeAwareValidationService } from "../../domain/tuning-datasets/TuningDatasetServices";
 import { LocalStorageTuningDatasetRepository } from "../../infrastructure/browser/tuning-datasets/LocalStorageTuningDatasetRepository";
 import { LocalStorageTuningDatasetVersionRepository } from "../../infrastructure/browser/tuning-datasets/LocalStorageTuningDatasetVersionRepository";
 
@@ -397,14 +397,16 @@ export function createUiDependencies(
   const tuningDatasetApplicationService = new DefaultTuningDatasetStudioApplicationService({
     datasetRepository: tuningDatasetRepository,
     datasetVersionRepository: tuningDatasetVersionRepository,
-    validationService: new QuestionAnsweringValidationService(duplicationPolicy),
+    validationService: new TaskTypeAwareValidationService(duplicationPolicy),
     splitService: new DeterministicDatasetSplitService(),
     exportService: new JsonTuningDatasetExportService(),
     importService: new BrowserDatasetImportService(new DefaultDatasetPrivacyPolicy()),
-    generationService: new HeuristicQuestionAnsweringGenerationService(),
+    generationService: new ProviderAgnosticDatasetGenerationService(),
     reviewPolicy: new DefaultDatasetReviewPolicy(),
     duplicationPolicy,
     statisticsService: new DatasetStatisticsService(duplicationPolicy),
+    releasePolicy: new DefaultDatasetReleasePolicy(),
+    workflowService: new DatasetWorkflowProgressService(),
   });
   const tuningDatasetService = new TuningDatasetService(tuningDatasetApplicationService);
   const tuningDatasetStore = new TuningDatasetStore(tuningDatasetService);

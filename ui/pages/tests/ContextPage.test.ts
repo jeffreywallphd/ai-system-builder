@@ -18,10 +18,11 @@ describe("ContextPage", () => {
     expect(engineeringSource).toContain("ContextPackageEditor");
 
     expect(tuningSource).toContain("Fine-Tuning Dataset Studio");
+    expect(tuningSource).toContain("Wizard progress");
+    expect(tuningSource).toContain("Version management");
     expect(tuningSource).toContain("Generate QA examples");
-    expect(tuningSource).toContain("Run validation");
-    expect(tuningSource).toContain("Auto-assign splits");
-    expect(tuningSource).toContain("Release version");
-    expect(tuningSource).toContain("qa_jsonl");
+    expect(tuningSource).toContain("Bulk accept");
+    expect(tuningSource).toContain("chat_completion");
+    expect(tuningSource).toContain("openai_chat_jsonl");
   });
 });
