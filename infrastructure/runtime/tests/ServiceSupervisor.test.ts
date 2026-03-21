@@ -1,5 +1,5 @@
 import http from "node:http";
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,6 +9,7 @@ import {
   ServiceOwnership,
   ServiceStates,
   createNodeProcessRuntime,
+  createStubProcessRuntime,
   createSupervisorServer,
   loadServiceDefinitionsFromEnvironment,
 } from "../service-supervisor.js";
@@ -37,6 +38,8 @@ const envKeysToRestore = [
   "PYTHON_RUNTIME_HEALTH_PATH",
   "PYTHON_RUNTIME_STARTUP_TIMEOUT_MS",
   "PYTHON_RUNTIME_HEALTH_POLL_INTERVAL_MS",
+  "PYTHON_RUNTIME_PYTHON_VERSION",
+  "PYTHON_RUNTIME_INTERPRETER_PATH",
   "PYTHON_RUNTIME_VERSION",
   "PYTHON_RUNTIME_COMPATIBILITY_JSON",
 ] as const;
@@ -150,6 +153,108 @@ function createManagedSupervisor(
 }
 
 describe("InMemoryServiceSupervisor", () => {
+  it("tracks provisioning state transitions and provisions the built-in python runtime environment", async () => {
+    const tempRoot = mkdtempSync(path.join(os.tmpdir(), "python-runtime-provision-"));
+    const tempDir = path.join(tempRoot, "python-runtime");
+    mkdirSync(tempDir, { recursive: true });
+    tempDirectories.push(tempRoot);
+    writeFileSync(path.join(tempDir, "requirements.txt"), "fastapi==0.115.0\n", "utf8");
+    const commands: Array<{ command: string; args: string[] }> = [];
+    const runtime = {
+      async start(definition: any) {
+        return {
+          pid: 4100,
+          startedAt: new Date().toISOString(),
+          detail: `Started ${definition.name}.`,
+          logs: [],
+          exitPromise: new Promise(() => undefined),
+        };
+      },
+      async stop(definition: any) {
+        return { detail: `Stopped ${definition.name}.`, logs: [] };
+      },
+      async checkHealth(definition: any) {
+        return {
+          healthy: true,
+          detail: `${definition.name} is healthy.`,
+          logs: [],
+          probe: {
+            at: new Date().toISOString(),
+            healthy: true,
+            detail: `${definition.name} is healthy.`,
+            url: null,
+            statusCode: 200,
+            durationMs: 1,
+            errorCode: null,
+          },
+        };
+      },
+    };
+    const supervisor = new InMemoryServiceSupervisor({
+      runtime,
+      services: [createRuntimeDefinition({
+        command: "python",
+        cwd: tempDir,
+        pythonVersion: "3.12",
+      })],
+      allowedPaths: [repoRoot, tempRoot],
+    });
+    supervisor.resolvePythonInterpreter = async () => ({
+      command: "python3.12",
+      args: [],
+      executable: "/usr/bin/python3.12",
+      version: "3.12.7",
+      requestedVersion: "3.12",
+      label: "python3.12",
+    });
+    supervisor.runCommand = async (command: string, args: string[]) => {
+      commands.push({ command, args: [...args] });
+      if (args.includes("venv")) {
+        const venvPython = path.join(tempDir, ".venv", "bin", "python");
+        mkdirSync(path.dirname(venvPython), { recursive: true });
+        writeFileSync(venvPython, "#!/usr/bin/env python\n", "utf8");
+      }
+      return { code: 0, signal: null, stdout: "", stderr: "" };
+    };
+
+    expect(supervisor.getService("python-runtime")?.diagnostics.provisioning.state).toBe("unprovisioned");
+
+    const provisioned = await supervisor.provision("python-runtime");
+    const started = await supervisor.start("python-runtime");
+
+    expect(provisioned.diagnostics.provisioning.state).toBe("provisioned");
+    expect(provisioned.diagnostics.provisioning.resolvedVersion).toBe("3.12.7");
+    expect(commands.map((entry) => entry.args.join(" "))).toEqual([
+      "-m venv " + path.join(tempDir, ".venv"),
+      "-m pip install --upgrade pip",
+      "-m pip install -r " + path.join(tempDir, "requirements.txt"),
+    ]);
+    expect(started.state).toBe(ServiceStates.healthy);
+  });
+
+  it("fails provisioning with a clear error for unsupported python versions", async () => {
+    const tempRoot = mkdtempSync(path.join(os.tmpdir(), "python-runtime-provision-fail-"));
+    const tempDir = path.join(tempRoot, "python-runtime");
+    mkdirSync(tempDir, { recursive: true });
+    tempDirectories.push(tempRoot);
+    writeFileSync(path.join(tempDir, "requirements.txt"), "fastapi==0.115.0\n", "utf8");
+    const supervisor = new InMemoryServiceSupervisor({
+      runtime: createStubProcessRuntime(),
+      services: [createRuntimeDefinition({
+        command: "python",
+        cwd: tempDir,
+        pythonVersion: "3.10",
+      })],
+      allowedPaths: [repoRoot, tempRoot],
+    });
+
+    const result = await supervisor.provision("python-runtime");
+
+    expect(result.diagnostics.provisioning.state).toBe("provision-failed");
+    expect(result.detail).toContain("Unsupported Python version '3.10'");
+    expect(result.recentLogs.some((entry) => entry.message.includes("Unsupported Python version"))).toBeTrue();
+  });
+
   it("starts dependencies before dependents and reports dependency readiness", async () => {
     const startOrder: string[] = [];
     const runtime = {
@@ -778,6 +883,8 @@ describe("loadServiceDefinitionsFromEnvironment", () => {
     process.env.PYTHON_RUNTIME_HEALTH_PATH = "/healthz";
     process.env.PYTHON_RUNTIME_STARTUP_TIMEOUT_MS = "4321";
     process.env.PYTHON_RUNTIME_HEALTH_POLL_INTERVAL_MS = "123";
+    process.env.PYTHON_RUNTIME_PYTHON_VERSION = "3.11";
+    process.env.PYTHON_RUNTIME_INTERPRETER_PATH = "C:/Python311/python.exe";
     process.env.PYTHON_RUNTIME_VERSION = "9.9.9";
     process.env.PYTHON_RUNTIME_COMPATIBILITY_JSON = JSON.stringify({ supervisorApiVersion: 2, runtimeApiVersion: "beta" });
 
@@ -791,6 +898,8 @@ describe("loadServiceDefinitionsFromEnvironment", () => {
     expect(definition.healthCheckPath).toBe("/healthz");
     expect(definition.startupTimeoutMs).toBe(4321);
     expect(definition.healthPollIntervalMs).toBe(123);
+    expect(definition.pythonVersion).toBe("3.11");
+    expect(definition.pythonInterpreterPath).toBe("C:/Python311/python.exe");
     expect(definition.version).toBe("9.9.9");
     expect(definition.compatibility).toEqual({ supervisorApiVersion: 2, runtimeApiVersion: "beta" });
     expect(definition.args).toEqual(["-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8123"]);

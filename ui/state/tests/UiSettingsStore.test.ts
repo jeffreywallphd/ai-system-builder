@@ -39,6 +39,26 @@ describe("UiSettingsStore", () => {
     });
 
     expect(store.getSettings().runtime.baseUrl).toBe("http://127.0.0.1:8100");
+    expect(store.getSettings().runtime.pythonVersion).toBe("3.12");
+  });
+
+  it("persists the selected built-in python version", () => {
+    const saved: Array<string> = [];
+    const store = new UiSettingsStore({
+      config: createConfig(),
+      storage: {
+        load: () => undefined,
+        save: (settings) => {
+          saved.push(settings.runtime.pythonVersion);
+        },
+      },
+    });
+
+    store.updateSection("runtime", { pythonVersion: "3.11" });
+    store.dispose();
+
+    expect(store.getSettings().runtime.pythonVersion).toBe("3.11");
+    expect(saved).toEqual(["3.11"]);
   });
 
   it("defaults workspace data to user folders in production mode", () => {

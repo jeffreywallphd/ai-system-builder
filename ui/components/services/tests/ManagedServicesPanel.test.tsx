@@ -41,6 +41,17 @@ describe("ManagedServicesPanel", () => {
             lastCheckedAt: "2026-03-20T10:15:00.000Z",
             lastErrorDetail: undefined,
             detail: "Healthy",
+            provisioning: {
+              state: "provisioned",
+              required: true,
+              needsReprovision: false,
+              requestedVersion: "3.12",
+              resolvedVersion: "3.12.7",
+              resolvedInterpreter: "C:/Python312/python.exe",
+              environmentPath: "python-runtime/.venv",
+              detail: "Python runtime environment is provisioned.",
+              availableActions: ["repair", "recreate-environment"] as const,
+            },
             readiness: {
               isReady: true,
               detail: "Python runtime is ready.",
@@ -74,6 +85,9 @@ describe("ManagedServicesPanel", () => {
         onStop: () => undefined,
         onRestart: () => undefined,
         onEnsureRunning: () => undefined,
+        onProvision: () => undefined,
+        onRepair: () => undefined,
+        onRecreateEnvironment: () => undefined,
         onStartCapability: () => undefined,
         onCreateService: () => undefined,
         onUpdateService: () => undefined,
@@ -92,6 +106,9 @@ describe("ManagedServicesPanel", () => {
     expect(html).toContain("Uptime");
     expect(html).toContain("2m 5s");
     expect(html).toContain("Python runtime is ready.");
+    expect(html).toContain("Provisioning");
+    expect(html).toContain("3.12");
+    expect(html).toContain("Repair");
     expect(html).toContain("Start workflow-execution");
     expect(html).toContain("Edit service");
     expect(html).toContain("Recent stdout/stderr and supervisor events");

@@ -14,15 +14,25 @@ export function mapSupervisorServiceToManagedServiceStatus(
   definition: ManagedServiceDefinition,
   service: ManagedSupervisorServiceRecord,
 ): ManagedServiceStatus {
+  const provisioning = service.diagnostics?.provisioning;
+  const isProvisioned = !provisioning?.required || provisioning.state === "provisioned";
   return Object.freeze({
     serviceId: definition.serviceId,
     kind: definition.kind,
-    state: mapSupervisorStateToManagedServiceState(service.state),
-    isAvailable: service.state === "healthy",
+    state: isProvisioned
+      ? mapSupervisorStateToManagedServiceState(service.state)
+      : provisioning?.state === "provisioning"
+        ? ManagedServiceStates.starting
+        : ManagedServiceStates.unavailable,
+    isAvailable: isProvisioned && service.state === "healthy",
     ownership: mapSupervisorOwnership(service.ownership),
     startPolicy: definition.autoStartPolicy,
     lastUpdatedAt: service.lastHealthCheckAt ?? service.startedAt ?? new Date().toISOString(),
-    detail: service.detail?.trim() || undefined,
+    detail: (!isProvisioned
+      ? provisioning?.lastError?.message
+        ?? service.detail
+        ?? `${definition.displayName} must be provisioned before it can start.`
+      : service.detail)?.trim() || undefined,
   });
 }
 

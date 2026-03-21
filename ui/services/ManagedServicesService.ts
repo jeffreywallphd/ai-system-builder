@@ -21,7 +21,11 @@ import type { IManagedServiceSupervisor } from "../../application/services/inter
 import type { IManagedServiceSupervisorClient } from "../../application/services/interfaces/IManagedServiceSupervisorClient";
 import {
   ManagedServiceOwnership,
+  ManagedServiceProvisioningActions,
+  ManagedServiceProvisioningStates,
   ManagedServiceStates,
+  type ManagedServiceProvisioningAction,
+  type ManagedServiceProvisioningState,
   type ManagedServiceState,
   type ManagedServiceStatus,
 } from "../../application/services/interfaces/ManagedServiceTypes";
@@ -58,6 +62,17 @@ export interface ManagedServiceRecord {
   readonly lastCheckedAt: string;
   readonly lastErrorDetail?: string;
   readonly detail?: string;
+  readonly provisioning: {
+    readonly state: ManagedServiceProvisioningState;
+    readonly required: boolean;
+    readonly needsReprovision: boolean;
+    readonly requestedVersion?: string;
+    readonly resolvedVersion?: string;
+    readonly resolvedInterpreter?: string;
+    readonly environmentPath?: string;
+    readonly detail: string;
+    readonly availableActions: ReadonlyArray<ManagedServiceProvisioningAction>;
+  };
   readonly readiness: {
     readonly isReady: boolean;
     readonly detail: string;
@@ -200,6 +215,7 @@ export class ManagedServicesService {
   public async startService(serviceId: string): Promise<ManagedServiceRecord> {
     if (this.isRegisteredManagedService(serviceId)) {
       if (this.supervisorClient) {
+        await this.syncBuiltinDefinition(serviceId);
         const response = await this.supervisorClient.start(serviceId);
         return this.mapSupervisorServiceRecord(response.service);
       }
@@ -232,6 +248,7 @@ export class ManagedServicesService {
   public async restartService(serviceId: string): Promise<ManagedServiceRecord> {
     if (this.isRegisteredManagedService(serviceId)) {
       if (this.supervisorClient) {
+        await this.syncBuiltinDefinition(serviceId);
         const response = await this.supervisorClient.restart(serviceId);
         return this.mapSupervisorServiceRecord(response.service);
       }
@@ -245,6 +262,7 @@ export class ManagedServicesService {
   public async ensureRunning(serviceId: string): Promise<ManagedServiceRecord> {
     if (this.isRegisteredManagedService(serviceId)) {
       if (this.supervisorClient) {
+        await this.syncBuiltinDefinition(serviceId);
         const response = await this.supervisorClient.ensureRunning(serviceId);
         return this.mapSupervisorServiceRecord(response.service);
       }
@@ -253,6 +271,33 @@ export class ManagedServicesService {
     }
 
     return this.refreshService(serviceId);
+  }
+
+  public async provisionService(serviceId: string): Promise<ManagedServiceRecord> {
+    if (!this.supervisorClient) {
+      throw new Error("Managed service provisioning requires a supervisor-backed runtime.");
+    }
+    await this.syncBuiltinDefinition(serviceId);
+    const response = await this.supervisorClient.provision(serviceId);
+    return this.mapSupervisorServiceRecord(response.service);
+  }
+
+  public async repairService(serviceId: string): Promise<ManagedServiceRecord> {
+    if (!this.supervisorClient) {
+      throw new Error("Managed service repair requires a supervisor-backed runtime.");
+    }
+    await this.syncBuiltinDefinition(serviceId);
+    const response = await this.supervisorClient.repair(serviceId);
+    return this.mapSupervisorServiceRecord(response.service);
+  }
+
+  public async recreateEnvironment(serviceId: string): Promise<ManagedServiceRecord> {
+    if (!this.supervisorClient) {
+      throw new Error("Managed service environment recreation requires a supervisor-backed runtime.");
+    }
+    await this.syncBuiltinDefinition(serviceId);
+    const response = await this.supervisorClient.recreateEnvironment(serviceId);
+    return this.mapSupervisorServiceRecord(response.service);
   }
 
   public async startCapability(capabilityId: string): Promise<ReadonlyArray<ManagedServiceRecord>> {
@@ -309,6 +354,7 @@ export class ManagedServicesService {
     const effectiveState = retryPresentation?.state ?? mappedState;
     const effectiveDetail = retryPresentation?.detail ?? service.detail;
     const effectiveIsAvailable = retryPresentation?.isAvailable ?? (service.state === "healthy");
+    const provisioning = mapProvisioning(service);
 
     return Object.freeze({
       id: service.serviceId,
@@ -342,6 +388,7 @@ export class ManagedServicesService {
       lastCheckedAt: service.lastHealthCheckAt ?? service.startedAt ?? new Date().toISOString(),
       lastErrorDetail: retryPresentation ? undefined : isServiceInErrorState(mappedState) ? service.detail : undefined,
       detail: effectiveDetail,
+      provisioning,
       readiness: Object.freeze({
         isReady: retryPresentation ? false : service.readiness?.isReady ?? service.state === "healthy",
         detail: retryPresentation?.detail ?? service.readiness?.detail ?? effectiveDetail ?? `${service.name} readiness is unknown.`,
@@ -371,6 +418,15 @@ export class ManagedServicesService {
     }
 
     return definition;
+  }
+
+  private async syncBuiltinDefinition(serviceId: string): Promise<void> {
+    if (!this.supervisorClient || !this.builtinDefinitions.has(serviceId)) {
+      return;
+    }
+
+    const definition = await this.requireDefinition(serviceId);
+    await this.supervisorClient.saveDefinition(definition);
   }
 
   private isRegisteredManagedService(serviceId: string): boolean {
@@ -472,6 +528,13 @@ export class ManagedServicesService {
       lastCheckedAt: status.lastUpdatedAt,
       lastErrorDetail,
       detail: status.detail,
+      provisioning: Object.freeze({
+        state: ManagedServiceProvisioningStates.unsupported,
+        required: false,
+        needsReprovision: false,
+        detail: "Provisioning is not managed for this service in the current runtime mode.",
+        availableActions: Object.freeze([]),
+      }),
       readiness: this.buildReadiness(definition, status.state, status.detail),
       recentLogs: Object.freeze(this.getRuntimeEvents(definition.serviceId)),
     });
@@ -520,6 +583,13 @@ export class ManagedServicesService {
       lastCheckedAt: probe.lastUpdatedAt ?? new Date().toISOString(),
       lastErrorDetail: isServiceInErrorState(state) ? detail : undefined,
       detail,
+      provisioning: Object.freeze({
+        state: ManagedServiceProvisioningStates.unsupported,
+        required: false,
+        needsReprovision: false,
+        detail: "Provisioning is not managed for browser-only services.",
+        availableActions: Object.freeze([]),
+      }),
       readiness: this.buildReadiness(definition, state, detail),
       recentLogs: Object.freeze([]),
     });
@@ -797,6 +867,52 @@ function deriveRetryPresentation(
     detail: `Trying to restart ${service.name} (${attemptNumber} of ${circuit.maxFailures}).`,
     isAvailable: false,
   };
+}
+
+function mapProvisioning(
+  service: ManagedSupervisorServiceRecord,
+): ManagedServiceRecord["provisioning"] {
+  const provisioning = service.diagnostics?.provisioning;
+  if (!provisioning?.required) {
+    return Object.freeze({
+      state: ManagedServiceProvisioningStates.unsupported,
+      required: false,
+      needsReprovision: false,
+      detail: "Provisioning is not required for this managed service.",
+      availableActions: Object.freeze([]),
+    });
+  }
+
+  const actions: ManagedServiceProvisioningAction[] = [];
+  if (provisioning.state === "unprovisioned") {
+    actions.push(ManagedServiceProvisioningActions.provision);
+  } else if (provisioning.state === "provision-failed") {
+    actions.push(
+      ManagedServiceProvisioningActions.repair,
+      ManagedServiceProvisioningActions.recreateEnvironment,
+    );
+  } else {
+    actions.push(
+      ManagedServiceProvisioningActions.repair,
+      ManagedServiceProvisioningActions.recreateEnvironment,
+    );
+  }
+
+  return Object.freeze({
+    state: provisioning.state,
+    required: provisioning.required,
+    needsReprovision: provisioning.needsReprovision,
+    requestedVersion: provisioning.requestedVersion ?? undefined,
+    resolvedVersion: provisioning.resolvedVersion ?? undefined,
+    resolvedInterpreter: provisioning.resolvedInterpreter ?? undefined,
+    environmentPath: provisioning.environmentPath ?? undefined,
+    detail: provisioning.lastError?.message
+      ?? service.detail
+      ?? (provisioning.needsReprovision
+        ? "Configured runtime version changed; repair or recreate the environment before starting."
+        : `Provisioning state: ${provisioning.state}.`),
+    availableActions: Object.freeze(actions),
+  });
 }
 
 function mapSupervisorLogLevelToRuntimeSeverity(

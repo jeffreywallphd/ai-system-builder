@@ -20,6 +20,20 @@ export const ManagedServiceStates = {
   disabled: "disabled",
 } as const;
 
+export const ManagedServiceProvisioningStates = {
+  unsupported: "unsupported",
+  unprovisioned: "unprovisioned",
+  provisioning: "provisioning",
+  provisioned: "provisioned",
+  provisionFailed: "provision-failed",
+} as const;
+
+export const ManagedServiceProvisioningActions = {
+  provision: "provision",
+  repair: "repair",
+  recreateEnvironment: "recreate-environment",
+} as const;
+
 export const ManagedServiceStartPolicies = {
   disabled: "disabled",
   externalOnly: "external-only",
@@ -35,6 +49,12 @@ export type ManagedServiceOwnership =
 
 export type ManagedServiceState =
   (typeof ManagedServiceStates)[keyof typeof ManagedServiceStates];
+
+export type ManagedServiceProvisioningState =
+  (typeof ManagedServiceProvisioningStates)[keyof typeof ManagedServiceProvisioningStates];
+
+export type ManagedServiceProvisioningAction =
+  (typeof ManagedServiceProvisioningActions)[keyof typeof ManagedServiceProvisioningActions];
 
 export type ManagedServiceStartPolicy =
   (typeof ManagedServiceStartPolicies)[keyof typeof ManagedServiceStartPolicies];

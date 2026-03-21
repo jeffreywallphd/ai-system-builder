@@ -32,7 +32,7 @@ export default function ManagedServicesPage(): JSX.Element {
         <div className="ui-page__hero-copy">
           <h1 className="ui-page__title">Managed Services</h1>
           <p className="ui-page__subtitle">
-            Start, stop, restart, and inspect the built-in runtime services from the app, with a compact layout that also works for phone-driven administration.
+            Provision, repair, recreate, start, stop, restart, and inspect the built-in runtime services from the app, with a compact layout that also works for phone-driven administration.
           </p>
         </div>
       </div>
@@ -43,6 +43,7 @@ export default function ManagedServicesPage(): JSX.Element {
             <div className="ui-stack ui-stack--2xs">
               <strong>Runtime {runtimeState.appState}</strong>
               <span className="ui-text-secondary ui-text-small">{runtimeState.appStateDetail}</span>
+              <span className="ui-text-secondary ui-text-small">If the built-in Python runtime is unprovisioned or its configured version changed, open the Managed Services controls below and run Provision or Repair.</span>
             </div>
             <div className="ui-row ui-row--wrap" style={{ gap: "var(--space-xs)" }}>
               <button
@@ -79,6 +80,9 @@ export default function ManagedServicesPage(): JSX.Element {
         onStop={(serviceId) => void managedServicesStore.stop(serviceId).catch(() => undefined)}
         onRestart={(serviceId) => void managedServicesStore.restart(serviceId).catch(() => undefined)}
         onEnsureRunning={(serviceId) => void managedServicesStore.ensureRunning(serviceId).catch(() => undefined)}
+        onProvision={(serviceId) => void managedServicesStore.provision(serviceId).catch(() => undefined)}
+        onRepair={(serviceId) => void managedServicesStore.repair(serviceId).catch(() => undefined)}
+        onRecreateEnvironment={(serviceId) => void managedServicesStore.recreateEnvironment(serviceId).catch(() => undefined)}
         onStartCapability={(capabilityId) => void managedServicesStore.startCapability(capabilityId).catch(() => undefined)}
         onCreateService={(definition) => void managedServicesStore.createService(definition).catch(() => undefined)}
         onUpdateService={(serviceId, definition) => void managedServicesStore.updateService(serviceId, definition).catch(() => undefined)}
