@@ -75,12 +75,22 @@ export type ExportFormat = (typeof EXPORT_FORMATS)[number];
 export const CHAT_MESSAGE_ROLES = Object.freeze(["system", "user", "assistant"] as const);
 export type ChatMessageRole = (typeof CHAT_MESSAGE_ROLES)[number];
 
+export interface DatasetGenerationDiagnostic {
+  readonly code: string;
+  readonly level: "info" | "warning" | "error";
+  readonly message: string;
+}
+
 export interface DatasetGenerationProvenance {
   readonly provider: string;
   readonly generatorId: string;
   readonly generatorVersion: string;
+  readonly batchId: string;
+  readonly mode: "provider-backed" | "heuristic-fallback";
+  readonly detail?: string;
   readonly parameters: Readonly<Record<string, unknown>>;
   readonly executedAt: Date;
+  readonly diagnostics: ReadonlyArray<DatasetGenerationDiagnostic>;
 }
 
 export interface DatasetLineage {
@@ -443,7 +453,7 @@ export interface DatasetGenerationResult {
 }
 
 export interface DatasetGenerationService {
-  generate(request: DatasetGenerationRequest): DatasetGenerationResult;
+  generate(request: DatasetGenerationRequest): Promise<DatasetGenerationResult>;
 }
 
 export interface DatasetReviewPolicy {

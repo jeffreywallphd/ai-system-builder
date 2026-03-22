@@ -451,7 +451,7 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
       throw new Error("Select at least one source document for generation.");
     }
     const existingExamples = await this.datasetVersionRepository.listExamples({ datasetId: command.datasetId, versionId: command.versionId });
-    const generated = this.generationService.generate({
+    const generated = await this.generationService.generate({
       datasetId: command.datasetId,
       versionId: command.versionId,
       taskType: dataset.taskType,

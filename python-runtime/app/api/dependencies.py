@@ -15,6 +15,8 @@ from app.mcp.session import McpSessionManager
 from app.services.document_conversion_service import DocumentConversionService
 from app.services.health_service import HealthService
 from app.services.runtime_service import RuntimeService
+from app.services.model_training_service import ModelTrainingService
+from app.services.dataset_generation_service import DatasetGenerationService
 
 
 @lru_cache
@@ -47,3 +49,13 @@ def get_runtime_service() -> RuntimeService:
 @lru_cache
 def get_document_conversion_service() -> DocumentConversionService:
     return DocumentConversionService()
+
+
+@lru_cache
+def get_model_training_service() -> ModelTrainingService:
+    return ModelTrainingService()
+
+
+@lru_cache
+def get_dataset_generation_service() -> DatasetGenerationService:
+    return DatasetGenerationService()

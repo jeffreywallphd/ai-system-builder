@@ -5,7 +5,7 @@
 ### Domain
 - `domain/tuning-datasets/interfaces/ITuningDatasetStudio.ts` defines the canonical dataset task types, lifecycle statuses, example/split/validation/export contracts, repositories, policies, and services.
 - `domain/tuning-datasets/TuningDatasetEntities.ts` implements explicit governed-asset entities for datasets, immutable released versions, generative QA examples, source references, lineage, annotations, validation issues, release manifests, and export records.
-- `domain/tuning-datasets/TuningDatasetServices.ts` provides concrete policies/services for QA validation, duplicate detection, split assignment, privacy sanitization, source import, heuristic QA generation, release-manifest construction, statistics calculation, and canonical/QA export generation.
+- `domain/tuning-datasets/TuningDatasetServices.ts` provides concrete policies/services for QA validation, duplicate detection, split assignment, privacy sanitization, source import, provider-backed generation fallback orchestration, release-manifest construction, statistics calculation, and canonical/QA export generation.
 
 ### Application
 - `application/tuning-datasets/contracts.ts` contains explicit commands, queries, summaries, and detail DTOs for the studio workspace.
@@ -13,12 +13,13 @@
 - `application/tuning-datasets/DefaultTuningDatasetStudioApplicationService.ts` orchestrates repositories and domain services for the full generative QA vertical slice.
 
 ### Infrastructure
-- `infrastructure/browser/tuning-datasets/LocalStorageTuningDatasetRepository.ts` persists dataset metadata in browser storage.
-- `infrastructure/browser/tuning-datasets/LocalStorageTuningDatasetVersionRepository.ts` persists versions, examples, source documents, validations, and export artifacts in browser storage.
+- `infrastructure/browser/tuning-datasets/LocalStorageTuningDatasetRepository.ts` persists dataset metadata in browser storage or the desktop-backed durable key-value bridge when available.
+- `infrastructure/browser/tuning-datasets/LocalStorageTuningDatasetVersionRepository.ts` persists versions, examples, source documents, validations, and export artifacts in browser storage or the desktop-backed durable key-value bridge when available.
+- `infrastructure/python/tuning-datasets/PythonRuntimeDatasetGenerationService.ts` is the provider-backed generation adapter used by the default studio composition.
 - Export artifacts are stored as canonical internal records whose content can be re-downloaded later.
 
 ### Runtime / API wiring
-- `ui/composition/createUiDependencies.ts` wires the new repositories, domain services, application service, UI service, and store into the existing dependency composition path.
+- `ui/composition/createUiDependencies.ts` wires the new repositories, the Python runtime-backed generation adapter, fallback orchestration, application service, UI service, and store into the existing dependency composition path.
 - `ui/services/TuningDatasetService.ts` is the UI-facing API adapter used by the store and the dataset workspace.
 - `ui/state/TuningDatasetStore.ts` provides runtime orchestration, loading/mutation state, and view-ready data for the tabbed dataset studio.
 
@@ -41,23 +42,25 @@ The domain currently models these task types:
 ### Fully implemented now
 - Canonical domain modeling for all supported task types.
 - Full end-to-end UI/storage/export workflow for `question_answering` / generative QA.
+- Provider-backed runtime generation for `question_answering` and `chat_completion`, with explicit provenance and run history in the UI.
 - Source ingestion, example generation, review/editing, validation, split assignment, version release, and export (`canonical_json`, `canonical_jsonl`, `qa_jsonl`).
 
 ### Modeled for later
-- Non-QA dataset-specific generation, validation, export, and UI editors for the other task types.
-- Provider-backed generative example creation beyond the included local heuristic QA generator.
+- Dataset-specific generation, validation, export, and UI editors for the other task types.
+- Additional provider backends beyond the current Python runtime generation path.
 
-## Generative QA workflow
+## Provider-backed dataset workflow
 1. Open **Context**.
 2. Switch to **Fine-Tuning Dataset**.
-3. Create a dataset of type **Question Answering / Generative QA**.
+3. Create a dataset of type **Question Answering / Generative QA** or **Chat Completion**.
 4. Import one or more source documents.
-5. Select sources and generate QA examples.
-6. Review/edit generated examples, then accept/reject/mark needs review.
-7. Run validation to identify issues and duplicates.
-8. Auto-assign or manually edit train/validation/test splits.
-9. Release the validated version, making it immutable.
-10. Export the released version as `qa_jsonl`, `canonical_json`, or `canonical_jsonl`.
+5. Select sources and generate examples. The studio now attempts the **Python runtime provider-backed generation path first**.
+6. Inspect generation batch history, provider/path provenance, and any diagnostics or fallback warnings.
+7. Review/edit generated examples, then accept/reject/mark needs review.
+8. Run validation to identify issues and duplicates.
+9. Auto-assign or manually edit train/validation/test splits.
+10. Release the validated version, making it immutable.
+11. Export the released version as `qa_jsonl`, `canonical_json`, or `canonical_jsonl`.
 
 ## Export formats
 - `canonical_json`: rich canonical bundle with dataset/version metadata, manifest, sources, and examples.
@@ -65,10 +68,17 @@ The domain currently models these task types:
 - `qa_jsonl`: generative-QA oriented export with `question`, `answer`, `context`, and metadata.
 
 ## Configuration and environment notes
-- No new environment variables are required for this browser-backed implementation.
-- The studio currently uses local browser storage for persistence.
+- No new environment variables are required for the current Python runtime-backed generation path.
+- In browser-only fallback mode, persistence still uses browser storage. When the desktop bridge is available, the same repositories use the durable desktop-backed storage adapter instead.
 
 ## Extension points
 - Add task-specific example entities and validation/export services behind the existing contracts.
 - Replace or augment the heuristic QA generation service with a provider-backed implementation by swapping the `DatasetGenerationService` binding in composition.
 - Add alternate persistence backends by implementing `DatasetRepository` and `DatasetVersionRepository`.
+
+## Fallback and degraded semantics
+
+- **Primary path**: Python runtime provider-backed generation.
+- **Fallback path**: local/browser heuristic generation, explicitly labeled as `heuristic-fallback` in generation provenance.
+- **Runtime unavailable**: the fallback path records a warning diagnostic describing why the provider-backed path could not be used.
+- **Unsupported tasks**: unsupported task types are rejected explicitly instead of silently coercing them into another generation mode.

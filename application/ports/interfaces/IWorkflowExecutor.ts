@@ -47,10 +47,13 @@ export type McpExecutionTruthStatus =
 
 export type ModelLibraryTruthState =
   | "installed-and-verified"
-  | "downloaded-but-unregistered"
+  | "installed-but-unverified"
   | "registered-metadata-only"
   | "missing-on-disk"
-  | "verification-failed";
+  | "partially-installed"
+  | "corrupted-checksum-mismatch"
+  | "downloaded-but-unregistered"
+  | "browser-fallback-downloaded-only";
 
 export interface IExecutionFallbackInfo {
   readonly kind: ExecutionFallbackKind;

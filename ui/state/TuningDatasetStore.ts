@@ -215,7 +215,7 @@ export class TuningDatasetStore {
   public async generateExamples(datasetId: string, versionId: string, createdBy: string, sourceDocumentIds: ReadonlyArray<string>): Promise<void> {
     this.patch({ isMutating: true, error: undefined });
     try {
-      await this.service.generateExamples({ datasetId, versionId, createdBy, sourceDocumentIds, configuration: { strategy: "default-local" } });
+      await this.service.generateExamples({ datasetId, versionId, createdBy, sourceDocumentIds, configuration: { strategy: "provider-backed-default" } });
       this.patch({ isMutating: false });
       await this.selectDataset(datasetId, versionId);
     } catch (error) {
