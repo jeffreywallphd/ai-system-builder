@@ -13,15 +13,22 @@ export class BrowserDownloadModelLibrary implements IManagedModelLibrary {
     return Object.freeze({
       mode: "browser-download-fallback",
       location: this.location,
-      detail: "This browser-only path can register model metadata, but it does not manage a verified local model library.",
+      detail: "Browser-triggered downloads are not treated as managed local installs. The catalog can retain metadata, but verification, uninstall, and reconciliation are limited to registration state until a desktop-backed managed library is available.",
+      sourceOfTruth: "browser-download-fallback",
+      recordedAt: new Date(),
       items: Object.freeze(installed.map((model) => Object.freeze({
         id: model.id,
         name: model.name,
-        state: "registered-metadata-only" as const,
+        state: "browser-fallback-downloaded-only" as const,
         location: model.artifact.location,
-        detail: "Browser-triggered downloads are not treated as a managed local install pipeline.",
+        detail: "This model was downloaded via the browser fallback path. Only metadata deregistration is supported from this environment.",
         registered: true,
         verified: false,
+        sourceOfTruth: "browser-download-fallback" as const,
+        artifactCount: 1 + model.additionalArtifacts.length,
+        presentArtifactCount: 0,
+        missingArtifactCount: 0,
+        verificationErrors: Object.freeze([]),
       }))),
     });
   }

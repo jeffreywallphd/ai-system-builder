@@ -2,8 +2,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes.documents import router as documents_router
+from app.api.routes.datasets import router as datasets_router
 from app.api.routes.execute import router as execute_router
 from app.api.routes.health import router as health_router
+from app.api.routes.training import router as training_router
 from app.api.routes.mcp import router as mcp_router
 from app.api.routes.workflows import router as workflows_router
 from app.core.logging import configure_logging
@@ -20,6 +22,8 @@ app.add_middleware(
 )
 app.include_router(health_router)
 app.include_router(documents_router)
+app.include_router(datasets_router)
 app.include_router(execute_router)
 app.include_router(workflows_router)
 app.include_router(mcp_router)
+app.include_router(training_router)

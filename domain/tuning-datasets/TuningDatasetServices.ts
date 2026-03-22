@@ -586,8 +586,9 @@ class HeuristicQuestionAnsweringGenerator {
       }
     }
 
+    const batchId = createId("generation_batch");
     return Object.freeze({
-      batchId: createId("generation_batch"),
+      batchId,
       datasetId: request.datasetId,
       versionId: request.versionId,
       taskType: request.taskType,
@@ -597,8 +598,12 @@ class HeuristicQuestionAnsweringGenerator {
         provider: "local-browser",
         generatorId: "heuristic-question-answering",
         generatorVersion: "2.0.0",
+        batchId: batchId,
+        mode: "heuristic-fallback" as const,
+        detail: "The browser heuristic fallback generated examples because a provider-backed runtime path was unavailable or explicitly bypassed.",
         parameters: Object.freeze({ strategy: configuration?.strategy ?? "heuristic_qa", maxSegments }),
         executedAt: new Date(),
+        diagnostics: Object.freeze([]),
       }),
       generatedCount: examples.length,
       skippedCount: 0,
@@ -637,8 +642,9 @@ class HeuristicChatCompletionGenerator {
       }
     }
 
+    const batchId = createId("generation_batch");
     return Object.freeze({
-      batchId: createId("generation_batch"),
+      batchId,
       datasetId: request.datasetId,
       versionId: request.versionId,
       taskType: request.taskType,
@@ -648,8 +654,12 @@ class HeuristicChatCompletionGenerator {
         provider: "local-browser",
         generatorId: "heuristic-chat-completion",
         generatorVersion: "2.0.0",
+        batchId: batchId,
+        mode: "heuristic-fallback" as const,
+        detail: "The browser heuristic fallback generated examples because a provider-backed runtime path was unavailable or explicitly bypassed.",
         parameters: Object.freeze({ strategy: configuration?.strategy ?? "heuristic_chat", maxSegments }),
         executedAt: new Date(),
+        diagnostics: Object.freeze([]),
       }),
       generatedCount: examples.length,
       skippedCount: 0,
@@ -661,7 +671,7 @@ export class ProviderAgnosticDatasetGenerationService implements DatasetGenerati
   private readonly qaGenerator = new HeuristicQuestionAnsweringGenerator();
   private readonly chatGenerator = new HeuristicChatCompletionGenerator();
 
-  public generate(request: DatasetGenerationRequest): DatasetGenerationResult {
+  public async generate(request: DatasetGenerationRequest): Promise<DatasetGenerationResult> {
     if (request.taskType === "question_answering") {
       return this.qaGenerator.generate(request, request.configuration);
     }
@@ -669,6 +679,35 @@ export class ProviderAgnosticDatasetGenerationService implements DatasetGenerati
       return this.chatGenerator.generate(request, request.configuration);
     }
     throw new Error(`Task type '${request.taskType}' is not implemented for generation.`);
+  }
+}
+
+export class FallbackAwareDatasetGenerationService implements DatasetGenerationService {
+  constructor(
+    private readonly primary: DatasetGenerationService,
+    private readonly fallback: DatasetGenerationService,
+  ) {}
+
+  public async generate(request: DatasetGenerationRequest): Promise<DatasetGenerationResult> {
+    try {
+      return await this.primary.generate(request);
+    } catch (error) {
+      const fallbackResult = await this.fallback.generate(request);
+      return Object.freeze({
+        ...fallbackResult,
+        provenance: Object.freeze({
+          ...fallbackResult.provenance,
+          diagnostics: Object.freeze([
+            ...fallbackResult.provenance.diagnostics,
+            Object.freeze({
+              code: "provider_runtime_unavailable",
+              level: "warning" as const,
+              message: error instanceof Error ? error.message : "Provider-backed dataset generation was unavailable.",
+            }),
+          ]),
+        }),
+      });
+    }
   }
 }
 

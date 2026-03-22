@@ -17,6 +17,8 @@ import { ContextService } from "../services/ContextService";
 import { TuningDatasetService } from "../services/TuningDatasetService";
 import { ContextStore } from "../state/ContextStore";
 import { TuningDatasetStore } from "../state/TuningDatasetStore";
+import { ModelTrainingService } from "../services/ModelTrainingService";
+import { ModelTrainingStore } from "../state/ModelTrainingStore";
 import type { UiSettingsStorage } from "../settings/UiSettingsStore";
 import { UiSettingsStore } from "../settings/UiSettingsStore";
 import { ManagedServicesService } from "../services/ManagedServicesService";
@@ -62,6 +64,8 @@ export interface UiDependencies {
   readonly contextStore: ContextStore;
   readonly tuningDatasetService: TuningDatasetService;
   readonly tuningDatasetStore: TuningDatasetStore;
+  readonly modelTrainingService: ModelTrainingService;
+  readonly modelTrainingStore: ModelTrainingStore;
   readonly workflowProjectionService: WorkflowProjectionService;
   readonly settingsStore: UiSettingsStore;
 }

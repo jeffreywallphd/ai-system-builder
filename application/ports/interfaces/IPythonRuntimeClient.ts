@@ -87,6 +87,121 @@ export interface IPythonRuntimeDocumentConversionResponse {
   };
 }
 
+
+export interface IPythonRuntimeFineTuningJobRequest {
+  readonly job_id: string;
+  readonly job_name: string;
+  readonly backend: "python-runtime-manifest";
+  readonly base_model_id: string;
+  readonly base_model_name: string;
+  readonly dataset_id: string;
+  readonly dataset_name: string;
+  readonly dataset_version_id: string;
+  readonly dataset_version_number: number;
+  readonly created_by: string;
+  readonly configuration: {
+    readonly epochs: number;
+    readonly learning_rate: number;
+    readonly batch_size: number;
+    readonly notes?: string;
+  };
+}
+
+export interface IPythonRuntimeFineTuningJobResponse {
+  readonly job_id: string;
+  readonly job_name: string;
+  readonly backend: "python-runtime-manifest";
+  readonly base_model_id: string;
+  readonly dataset_id: string;
+  readonly dataset_version_id: string;
+  readonly created_by: string;
+  readonly created_at: string;
+  readonly updated_at: string;
+  readonly submitted_at: string;
+  readonly started_at?: string;
+  readonly completed_at?: string;
+  readonly status: "queued" | "running" | "completed" | "failed" | "unsupported";
+  readonly configuration: {
+    readonly epochs: number;
+    readonly learning_rate: number;
+    readonly batch_size: number;
+    readonly notes?: string;
+  };
+  readonly diagnostics: ReadonlyArray<{
+    readonly code: string;
+    readonly level: "info" | "warning" | "error";
+    readonly message: string;
+    readonly detail?: string;
+  }>;
+  readonly artifacts: ReadonlyArray<{
+    readonly id: string;
+    readonly kind: "training-manifest" | "adapter-bundle" | "checkpoint" | "log";
+    readonly label: string;
+    readonly location?: string;
+    readonly content_type?: string;
+    readonly created_at: string;
+    readonly metadata?: Readonly<Record<string, unknown>>;
+  }>;
+  readonly checkpoints: ReadonlyArray<{
+    readonly id: string;
+    readonly label: string;
+    readonly epoch: number;
+    readonly metric_name?: string;
+    readonly metric_value?: number;
+    readonly created_at: string;
+    readonly artifact_id?: string;
+  }>;
+  readonly output_model_name?: string;
+  readonly summary?: string;
+}
+
+export interface IPythonRuntimeDatasetGenerationRequest {
+  readonly dataset_id: string;
+  readonly version_id: string;
+  readonly task_type: string;
+  readonly created_by: string;
+  readonly source_documents: ReadonlyArray<{
+    readonly id: string;
+    readonly name: string;
+    readonly content: string;
+    readonly segments: ReadonlyArray<{
+      readonly id: string;
+      readonly index: number;
+      readonly kind: string;
+      readonly text: string;
+    }>;
+  }>;
+  readonly existing_examples: ReadonlyArray<Readonly<Record<string, unknown>>>;
+  readonly configuration?: {
+    readonly strategy: string;
+    readonly max_examples_per_source?: number;
+    readonly max_segments_per_source?: number;
+  };
+}
+
+export interface IPythonRuntimeDatasetGenerationResponse {
+  readonly batch_id: string;
+  readonly generated_at: string;
+  readonly generated_count: number;
+  readonly skipped_count: number;
+  readonly examples: ReadonlyArray<Readonly<Record<string, unknown>>>;
+  readonly provenance: {
+    readonly provider: string;
+    readonly generator_id: string;
+    readonly generator_version: string;
+    readonly batch_id: string;
+    readonly mode: "provider-backed" | "heuristic-fallback";
+    readonly detail?: string;
+    readonly parameters: Readonly<Record<string, unknown>>;
+    readonly executed_at: string;
+    readonly diagnostics: ReadonlyArray<{
+      readonly code: string;
+      readonly level: "info" | "warning" | "error";
+      readonly message: string;
+    }>;
+  };
+}
+
 export interface IPythonRuntimeClient {
   health(): Promise<IPythonRuntimeHealthResponse>;
   executeNode(
@@ -98,4 +213,10 @@ export interface IPythonRuntimeClient {
   convertDocumentToMarkdown(
     request: IPythonRuntimeDocumentConversionRequest
   ): Promise<IPythonRuntimeDocumentConversionResponse>;
+  submitFineTuningJob(
+    request: IPythonRuntimeFineTuningJobRequest
+  ): Promise<IPythonRuntimeFineTuningJobResponse>;
+  generateDatasetExamples(
+    request: IPythonRuntimeDatasetGenerationRequest
+  ): Promise<IPythonRuntimeDatasetGenerationResponse>;
 }

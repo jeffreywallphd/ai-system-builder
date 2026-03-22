@@ -10,6 +10,8 @@ describe("ModelStore truthfulness", () => {
           mode: "browser-download-fallback",
           location: "dev/models",
           detail: "Browser fallback only.",
+          sourceOfTruth: "browser-download-fallback",
+          recordedAt: new Date("2025-01-01T00:00:00.000Z"),
           items: [],
         }),
       } as never,

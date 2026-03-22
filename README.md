@@ -8,6 +8,7 @@ This repository now supports two explicit runtime modes:
 
 - **Development desktop mode**: Electron + the renderer now form the standard dev workflow and persist durable app state under `dev/`.
 - **Packaged desktop production mode**: Electron hosts the renderer, owns the local supervisor lifecycle, uses a private/bundled Python runtime path, and persists durable app state in SQLite-backed desktop storage.
+- **Desktop-backed model and dataset truth**: when the desktop bridge is available, installed-model metadata, managed model reconciliation, training-job metadata, and dataset studio persistence all prefer durable desktop-backed storage over browser-only records.
 
 ## Development mode
 
@@ -191,9 +192,40 @@ These states flow through MCP workflow nodes, capability execution metadata, and
 The Models area now distinguishes between:
 
 - **installed and verified**
-- **downloaded but not registered**
+- **installed but unverified**
 - **registered metadata only**
 - **missing on disk**
-- **verification failed**
+- **partially installed**
+- **corrupted / checksum mismatch**
+- **downloaded but not registered**
+- **browser-fallback downloaded only**
 
-When the app is running without the desktop model-file bridge, model installs remain in **browser-download fallback** mode and are presented as such rather than being treated as a fully managed local library.
+The source-of-truth architecture is now explicit:
+
+- **managed local files** are canonical whenever the desktop model-file bridge is available
+- the **installed-model catalog** is a durable index/registration layer that is reconciled against those managed files
+- **remote catalog results** are discovery-only and do not override local truth
+- **browser fallback downloads** remain visible, but only as degraded metadata/deregistration paths rather than as managed local installs
+
+The Models page now supports real end-to-end actions for download/install, refresh/reconcile, metadata-only removal, and managed uninstall when the underlying environment can actually perform those actions.
+
+## Fine-tuning workflow foundation
+
+The Create Models workspace is no longer placeholder text. It now provides a truthful first vertical slice for model creation:
+
+- select an installed base model from the managed library
+- select a tuning dataset/version from the dataset studio
+- submit a fine-tuning job to the **Python runtime manifest backend**
+- persist job metadata durably in desktop-backed storage when available
+- inspect returned diagnostics, checkpoints, and artifacts without pretending unsupported backends exist
+
+Today's supported backend is intentionally narrow: the Python runtime creates durable provider-ready manifests, adapter-bundle scaffolds, logs, and checkpoint metadata. Full provider-specific gradient training backends are still future work, and the UI labels that limitation explicitly rather than implying weight updates already happened.
+
+## Provider-backed dataset generation
+
+Dataset example generation now defaults to a **provider-backed Python runtime path** for supported dataset tasks:
+
+- `question_answering`
+- `chat_completion`
+
+The dataset studio records provenance for each generation batch, including provider, generator ID, batch ID, diagnostics, and whether the run was truly provider-backed or a heuristic fallback. Local/browser heuristic generation still exists only as an explicit degraded fallback when the runtime path is unavailable.

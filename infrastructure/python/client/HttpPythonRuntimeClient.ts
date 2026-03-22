@@ -1,11 +1,15 @@
 import type {
   IPythonRuntimeClient,
+  IPythonRuntimeDatasetGenerationRequest,
+  IPythonRuntimeDatasetGenerationResponse,
   IPythonRuntimeDocumentConversionRequest,
   IPythonRuntimeDocumentConversionResponse,
   IPythonRuntimeExecuteNodeRequest,
   IPythonRuntimeExecuteNodeResponse,
   IPythonRuntimeExecuteWorkflowRequest,
   IPythonRuntimeExecuteWorkflowResponse,
+  IPythonRuntimeFineTuningJobRequest,
+  IPythonRuntimeFineTuningJobResponse,
   IPythonRuntimeHealthResponse,
 } from "../../../application/ports/interfaces/IPythonRuntimeClient";
 import { bindSafeFetch } from "../../../application/runtime/RuntimeDiagnostics";
@@ -71,6 +75,18 @@ export class HttpPythonRuntimeClient implements IPythonRuntimeClient {
       output_format: request.outputFormat,
       base64_content: toBase64(request.content),
     });
+  }
+
+  public async submitFineTuningJob(
+    request: IPythonRuntimeFineTuningJobRequest,
+  ): Promise<IPythonRuntimeFineTuningJobResponse> {
+    return this.request<IPythonRuntimeFineTuningJobResponse>("POST", "/training/fine-tune", request);
+  }
+
+  public async generateDatasetExamples(
+    request: IPythonRuntimeDatasetGenerationRequest,
+  ): Promise<IPythonRuntimeDatasetGenerationResponse> {
+    return this.request<IPythonRuntimeDatasetGenerationResponse>("POST", "/datasets/generate", request);
   }
 
   private async request<T>(method: "GET" | "POST", path: string, body?: unknown): Promise<T> {
