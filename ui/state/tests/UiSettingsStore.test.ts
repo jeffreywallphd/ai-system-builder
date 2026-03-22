@@ -8,9 +8,12 @@ import {
 
 function createConfig(overrides: Partial<ConstructorParameters<typeof AppRuntimeConfig>[0]> = {}): AppRuntimeConfig {
   return new AppRuntimeConfig({
+    runtimeMode: "browser-development",
     workflowRepositoryMode: "browser-storage",
     workflowExecutorMode: "strategy",
     nodeCatalogMode: "registered",
+    uiSettingsPersistenceMode: "local-storage",
+    installedModelCatalogMode: "browser-local-storage",
     seedStarterNode: true,
     isProductionMode: false,
     devSyncBaseUrl: "http://localhost:8787",
@@ -32,14 +35,26 @@ describe("UiSettingsStore", () => {
     expect(store.getSettings().workspace.inputsDirectory).toBe("dev/workflow-data/inputs");
   });
 
-  it("defaults the runtime base url to the local Python runtime port", () => {
+  it("defaults browser mode runtime to managed-local auto-start while keeping the local runtime URL available", () => {
     const store = new UiSettingsStore({
-      config: createConfig(),
+      config: createConfig({ runtimeMode: "browser-development" }),
       storage: { load: () => undefined, save: () => undefined },
     });
 
+    expect(store.getSettings().runtime.mode).toBe("managed-local");
     expect(store.getSettings().runtime.baseUrl).toBe("http://127.0.0.1:8100");
     expect(store.getSettings().runtime.pythonVersion).toBe("3.12");
+    expect(store.getSettings().runtime.autoStartEnabled).toBeTrue();
+  });
+
+  it("defaults desktop mode runtime to managed-local auto-start", () => {
+    const store = new UiSettingsStore({
+      config: createConfig({ runtimeMode: "desktop-development" }),
+      storage: { load: () => undefined, save: () => undefined },
+    });
+
+    expect(store.getSettings().runtime.mode).toBe("managed-local");
+    expect(store.getSettings().runtime.autoStartEnabled).toBeTrue();
   });
 
 
@@ -123,7 +138,7 @@ describe("UiSettingsStore", () => {
       storage: {
         load: () => ({
           runtime: {
-            mode: "local-http",
+            mode: "local-http" as unknown as "managed-local",
           },
         }),
         save: () => undefined,
@@ -212,7 +227,7 @@ describe("UiSettingsStore", () => {
       setItem: (key: string, value: string) => {
         memoryStorage.set(key, value);
       },
-    });
+    } as Storage);
 
     const store = new UiSettingsStore({ config: createConfig(), storage: adapter });
     store.updateSection("development", { devSyncBaseUrl: "http://dev-sync.local" });
