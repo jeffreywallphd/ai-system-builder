@@ -31,6 +31,7 @@ import { ModelInstaller } from "../../application/ports/ModelInstaller";
 import type { IModel } from "../../domain/models/interfaces/IModel";
 import type { IPythonRuntimeClient } from "../../application/ports/interfaces/IPythonRuntimeClient";
 import type { IInstalledModelCatalog } from "../../application/ports/interfaces/IInstalledModelCatalog";
+import type { IManagedModelLibrary } from "../../application/ports/interfaces/IManagedModelLibrary";
 import { RuntimeEventBuffer } from "../../application/runtime/RuntimeEventBuffer";
 import { HttpPythonRuntimeClient } from "../../infrastructure/python/client/HttpPythonRuntimeClient";
 import { PythonRuntimeConfig } from "../../infrastructure/config/PythonRuntimeConfig";
@@ -134,6 +135,7 @@ import { ModelTrainingService } from "../services/ModelTrainingService";
 import { ModelTrainingStore } from "../state/ModelTrainingStore";
 import { PythonRuntimeModelTrainingGateway } from "../../infrastructure/python/model-training/PythonRuntimeModelTrainingGateway";
 import { createModelManagementDependencies } from "./modelManagementDependencies";
+import { BrowserDownloadModelLibrary } from "../../infrastructure/browser/models/BrowserDownloadModelLibrary";
 
 export function createUiDependencies(
   options: CreateUiDependenciesOptions = {}
@@ -674,7 +676,7 @@ function describeMcpOperationalStatus(runtimeMode: UiSettings["runtime"]["mode"]
     : { configuredMode: "runtime-backed", effectiveMode: "runtime-backed", isDegraded: false, detail: "MCP nodes and capabilities resolve through the runtime-backed MCP subsystem." };
 }
 
-function describeModelLibraryOperationalStatus(managedModelLibrary: BrowserDownloadModelLibrary | ManagedLocalModelLibrary) {
+function describeModelLibraryOperationalStatus(managedModelLibrary: IManagedModelLibrary) {
   const isBrowserFallback = managedModelLibrary instanceof BrowserDownloadModelLibrary;
   return {
     configuredMode: isBrowserFallback ? "browser-download-fallback" : "managed-local",
