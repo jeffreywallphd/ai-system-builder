@@ -71,12 +71,16 @@ export type DeepPartial<T> = {
   readonly [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K];
 };
 
-function resolveDefaultRuntimeBaseUrl(config?: AppRuntimeConfig): string {
-  if (config?.isDesktopHost) {
-    return "http://127.0.0.1:8100";
-  }
-
+function resolveDefaultRuntimeBaseUrl(_config?: AppRuntimeConfig): string {
   return "http://127.0.0.1:8100";
+}
+
+function resolveDefaultRuntimeMode(config: AppRuntimeConfig): PythonRuntimeModeValue {
+  return config.isDesktopHost ? PythonRuntimeMode.managedLocal : PythonRuntimeMode.disabled;
+}
+
+function resolveDefaultRuntimeAutoStartEnabled(config: AppRuntimeConfig): boolean {
+  return config.isDesktopHost;
 }
 
 export function createWorkspaceDefaults(mode: WorkspaceDataMode): WorkspaceSettings {
@@ -108,7 +112,7 @@ export function createDefaultUiSettings(config: AppRuntimeConfig): UiSettings {
       allowOverwrite: false,
     }),
     runtime: Object.freeze({
-      mode: PythonRuntimeMode.managedLocal,
+      mode: resolveDefaultRuntimeMode(config),
       baseUrl: resolveDefaultRuntimeBaseUrl(config),
       authToken: "",
       workingDirectory: config.desktopPythonRuntime?.workspaceDirectory ?? resolveDefaultPythonRuntimeWorkingDirectory(),
@@ -117,7 +121,7 @@ export function createDefaultUiSettings(config: AppRuntimeConfig): UiSettings {
       requestTimeoutMs: 15_000,
       startupTimeoutMs: 20_000,
       healthPollIntervalMs: 500,
-      autoStartEnabled: true,
+      autoStartEnabled: resolveDefaultRuntimeAutoStartEnabled(config),
     }),
     authoring: Object.freeze({
       defaultWorkflowViewMode: "canvas",
