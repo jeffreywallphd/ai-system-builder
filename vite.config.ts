@@ -78,11 +78,24 @@ function managedServiceSupervisorPlugin(): Plugin {
   };
 }
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react(), managedServiceSupervisorPlugin()],
+  resolve: {
+    alias: mode === "browser"
+      ? [
+          {
+            find: "./modelManagementDependencies",
+            replacement: path.resolve(
+              REPOSITORY_ROOT,
+              "ui/composition/modelManagementDependencies.browser.ts",
+            ),
+          },
+        ]
+      : [],
+  },
   server: {
     host: "0.0.0.0",
     port: 5174,
     strictPort: true,
   },
-});
+}));

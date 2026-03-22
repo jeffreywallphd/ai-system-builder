@@ -26,9 +26,6 @@ import { createCompositeNodeImplementationRegistry } from "../../infrastructure/
 import { ImplementationRegistryNodeCatalogProvider } from "../../infrastructure/nodes/ImplementationRegistryNodeCatalogProvider";
 import { HuggingFaceApiClient } from "../../infrastructure/huggingface/HuggingFaceApiClient";
 import { HuggingFaceModelCatalog } from "../../infrastructure/huggingface/HuggingFaceModelCatalog";
-import { BrowserHuggingFaceModelDownloader } from "../../infrastructure/browser/models/BrowserHuggingFaceModelDownloader";
-import { BrowserDownloadModelLibrary } from "../../infrastructure/browser/models/BrowserDownloadModelLibrary";
-import { LocalStorageInstalledModelCatalog } from "../../infrastructure/browser/models/LocalStorageInstalledModelCatalog";
 import { ModelDownloader } from "../../application/ports/ModelDownloader";
 import { ModelInstaller } from "../../application/ports/ModelInstaller";
 import type { IModel } from "../../domain/models/interfaces/IModel";
@@ -130,17 +127,13 @@ import { DefaultNodeExecutionContextResolver } from "../../infrastructure/interp
 import { DefaultNodeOutputStore } from "../../infrastructure/interpreted/execution/DefaultNodeOutputStore";
 import { LangChainNodeExecutor } from "../../infrastructure/interpreted/execution/LangChainNodeExecutor";
 import { PythonDelegatedWorkflowExecutionStrategy } from "../../infrastructure/python/execution/PythonDelegatedWorkflowExecutionStrategy";
-import { DesktopBridgeFileStorage } from "../../infrastructure/browser/filesystem/DesktopBridgeFileStorage";
-import { ManagedLocalModelLibrary } from "../../infrastructure/filesystem/ManagedLocalModelLibrary";
-import { HuggingFaceModelDownloader } from "../../infrastructure/huggingface/HuggingFaceModelDownloader";
-import { LocalModelRepository } from "../../infrastructure/filesystem/LocalModelRepository";
-import { FilesystemModelInstaller } from "../../infrastructure/filesystem/FilesystemModelInstaller";
 import { PythonRuntimeDatasetGenerationService } from "../../infrastructure/python/tuning-datasets/PythonRuntimeDatasetGenerationService";
 import { LocalStorageModelTrainingJobRepository } from "../../infrastructure/browser/model-training/LocalStorageModelTrainingJobRepository";
 import { DefaultModelTrainingApplicationService } from "../../application/model-training/DefaultModelTrainingApplicationService";
 import { ModelTrainingService } from "../services/ModelTrainingService";
 import { ModelTrainingStore } from "../state/ModelTrainingStore";
 import { PythonRuntimeModelTrainingGateway } from "../../infrastructure/python/model-training/PythonRuntimeModelTrainingGateway";
+import { createModelManagementDependencies } from "./modelManagementDependencies";
 
 export function createUiDependencies(
   options: CreateUiDependenciesOptions = {}
@@ -244,29 +237,21 @@ export function createUiDependencies(
   });
 
   const huggingFaceApiClient = new HuggingFaceApiClient();
-  const desktopModelFileStorage = desktopModelFileBridge ? new DesktopBridgeFileStorage(desktopModelFileBridge) : undefined;
-  const installedModelCatalog = desktopModelFileStorage
-    ? new LocalModelRepository({
-      fileStorage: desktopModelFileStorage,
-      rootDirectory: config.modelInstallDirectory,
-    })
-    : new LocalStorageInstalledModelCatalog(undefined, durableDesktopStorage as never);
-  const managedModelLibrary = desktopModelFileStorage
-    ? new ManagedLocalModelLibrary(desktopModelFileStorage, installedModelCatalog, config.modelInstallDirectory)
-    : new BrowserDownloadModelLibrary(installedModelCatalog, config.modelInstallDirectory);
+  const modelManagement = createModelManagementDependencies({
+    apiClient: huggingFaceApiClient,
+    desktopModelFileBridge: desktopModelFileBridge ?? undefined,
+    modelInstallDirectory: config.modelInstallDirectory,
+    durableStorage: durableDesktopStorage as never,
+  });
+  const desktopModelFileStorage = modelManagement.fileStorage;
+  const installedModelCatalog = modelManagement.installedModelCatalog;
+  const managedModelLibrary = modelManagement.managedModelLibrary;
   const remoteModelCatalog = new HuggingFaceModelCatalog({
     apiClient: huggingFaceApiClient,
   });
   const modelInstaller = new ModelInstaller({
-    providers: desktopModelFileStorage ? [new FilesystemModelInstaller(desktopModelFileStorage)] : [],
-    downloader: new ModelDownloader([desktopModelFileStorage
-      ? new HuggingFaceModelDownloader({
-        apiClient: huggingFaceApiClient,
-        fileStorage: desktopModelFileStorage,
-      })
-      : new BrowserHuggingFaceModelDownloader({
-        apiClient: huggingFaceApiClient,
-      })]),
+    providers: modelManagement.installers,
+    downloader: new ModelDownloader([modelManagement.downloader]),
   });
 
   const modelService = new ModelService({
