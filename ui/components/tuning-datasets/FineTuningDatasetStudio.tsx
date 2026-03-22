@@ -85,6 +85,27 @@ export default function FineTuningDatasetStudio(): JSX.Element {
   const workflow = state.workflow;
   const taskType = selectedDataset?.taskType ?? datasetType;
   const wizard = state.wizard;
+  const generationBatches = useMemo(() => {
+    const grouped = new Map<string, { id: string; provider: string; mode: string; detail?: string; count: number; diagnostics: string[] }>();
+    for (const example of state.examples) {
+      const generator = example.lineage.generator;
+      if (!generator) {
+        continue;
+      }
+      const existing = grouped.get(generator.batchId) ?? {
+        id: generator.batchId,
+        provider: generator.provider,
+        mode: generator.mode,
+        detail: generator.detail,
+        count: 0,
+        diagnostics: [],
+      };
+      existing.count += 1;
+      existing.diagnostics = [...existing.diagnostics, ...generator.diagnostics.map((diagnostic) => `${diagnostic.level}: ${diagnostic.message}`)];
+      grouped.set(generator.batchId, existing);
+    }
+    return [...grouped.values()];
+  }, [state.examples]);
 
   const exportOptions = useMemo(() => (taskType === "chat_completion"
     ? EXPORT_FORMATS.filter((format) => ["canonical_json", "canonical_jsonl", "openai_chat_jsonl"].includes(format))
@@ -214,7 +235,7 @@ export default function FineTuningDatasetStudio(): JSX.Element {
         return !selectedVersion ? <p className="ui-text-secondary">Create or select a dataset version first.</p> : (
           <div className="ui-stack ui-stack--md">
             <div className="ui-row ui-row--between ui-row--wrap">
-              <p className="ui-text-secondary">Provider-agnostic generation runtime with local deterministic strategies today and backend/provider seams ready for future models.</p>
+              <p className="ui-text-secondary">Provider-backed dataset generation is the default path. If the Python runtime cannot serve generation, the UI keeps any heuristic generation explicitly labeled as fallback provenance rather than presenting it as a managed install/runtime path.</p>
               <button
                 type="button"
                 className="ui-button ui-button--secondary ui-button--sm"
@@ -224,6 +245,24 @@ export default function FineTuningDatasetStudio(): JSX.Element {
                 {taskType === "chat_completion" ? "Generate chat examples" : "Generate QA examples"}
               </button>
             </div>
+            {generationBatches.length > 0 ? (
+              <div className="ui-stack ui-stack--sm">
+                <h4>Generation run history</h4>
+                {generationBatches.map((batch) => (
+                  <div key={batch.id} className="ui-card">
+                    <div className="ui-card__body ui-stack ui-stack--2xs">
+                      <div className="ui-row ui-row--between ui-row--wrap">
+                        <strong>{batch.id}</strong>
+                        <span className={`ui-badge ${batch.mode === "provider-backed" ? "ui-badge--success" : "ui-badge--warning"}`}>{batch.mode}</span>
+                      </div>
+                      <div className="ui-text-secondary ui-text-small">Provider: {batch.provider} · Examples: {batch.count}</div>
+                      {batch.detail ? <div className="ui-text-secondary ui-text-small">{batch.detail}</div> : null}
+                      {batch.diagnostics.length > 0 ? <div className="ui-text-secondary ui-text-small">Diagnostics: {batch.diagnostics.join(" · ")}</div> : null}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
             {taskType === "chat_completion" ? (
               <div className="ui-stack ui-stack--sm">
                 <label className="ui-field ui-stack ui-stack--2xs">

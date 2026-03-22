@@ -118,7 +118,7 @@ import { DefaultFileIngestionApplicationService } from "../../application/ingest
 import { FileIngestionPolicyService } from "../../domain/ingestion/FileIngestionServices";
 import { PythonRuntimeDocumentConversionGateway } from "../../infrastructure/ingestion/PythonRuntimeDocumentConversionGateway";
 import { DatasetSourceIngestionProfile } from "../../application/tuning-datasets/DatasetSourceIngestionProfile";
-import { BrowserDatasetImportService, DatasetStatisticsService, DatasetWorkflowProgressService, DefaultDatasetDuplicationPolicy, DefaultDatasetPrivacyPolicy, DefaultDatasetReleasePolicy, DefaultDatasetReviewPolicy, DeterministicDatasetSplitService, JsonTuningDatasetExportService, ProviderAgnosticDatasetGenerationService, TaskTypeAwareValidationService } from "../../domain/tuning-datasets/TuningDatasetServices";
+import { BrowserDatasetImportService, DatasetStatisticsService, DatasetWorkflowProgressService, DefaultDatasetDuplicationPolicy, DefaultDatasetPrivacyPolicy, DefaultDatasetReleasePolicy, DefaultDatasetReviewPolicy, DeterministicDatasetSplitService, FallbackAwareDatasetGenerationService, JsonTuningDatasetExportService, ProviderAgnosticDatasetGenerationService, TaskTypeAwareValidationService } from "../../domain/tuning-datasets/TuningDatasetServices";
 import { LocalStorageTuningDatasetRepository } from "../../infrastructure/browser/tuning-datasets/LocalStorageTuningDatasetRepository";
 import { LocalStorageTuningDatasetVersionRepository } from "../../infrastructure/browser/tuning-datasets/LocalStorageTuningDatasetVersionRepository";
 import { BrowserStorageWorkflowRepository } from "../../infrastructure/browser/workflows/SqliteBackedWorkflowRepository";
@@ -134,6 +134,13 @@ import { DesktopBridgeFileStorage } from "../../infrastructure/browser/filesyste
 import { ManagedLocalModelLibrary } from "../../infrastructure/filesystem/ManagedLocalModelLibrary";
 import { HuggingFaceModelDownloader } from "../../infrastructure/huggingface/HuggingFaceModelDownloader";
 import { LocalModelRepository } from "../../infrastructure/filesystem/LocalModelRepository";
+import { FilesystemModelInstaller } from "../../infrastructure/filesystem/FilesystemModelInstaller";
+import { PythonRuntimeDatasetGenerationService } from "../../infrastructure/python/tuning-datasets/PythonRuntimeDatasetGenerationService";
+import { LocalStorageModelTrainingJobRepository } from "../../infrastructure/browser/model-training/LocalStorageModelTrainingJobRepository";
+import { DefaultModelTrainingApplicationService } from "../../application/model-training/DefaultModelTrainingApplicationService";
+import { ModelTrainingService } from "../services/ModelTrainingService";
+import { ModelTrainingStore } from "../state/ModelTrainingStore";
+import { PythonRuntimeModelTrainingGateway } from "../../infrastructure/python/model-training/PythonRuntimeModelTrainingGateway";
 
 export function createUiDependencies(
   options: CreateUiDependenciesOptions = {}
@@ -142,7 +149,7 @@ export function createUiDependencies(
   const desktopStorage = resolveDesktopStorageAdapter();
   const desktopWorkflowBridge = resolveDesktopWorkflowBridge();
   const desktopModelFileBridge = resolveDesktopModelFileBridge();
-  const durableDesktopStorage = config.isPackagedDesktopHost ? desktopStorage : undefined;
+  const durableDesktopStorage = desktopStorage;
   const settingsStore = new UiSettingsStore({
     config,
     storage: options.settingsStorage ?? createSettingsStorage(config, desktopStorage),
@@ -251,6 +258,7 @@ export function createUiDependencies(
     apiClient: huggingFaceApiClient,
   });
   const modelInstaller = new ModelInstaller({
+    providers: desktopModelFileStorage ? [new FilesystemModelInstaller(desktopModelFileStorage)] : [],
     downloader: new ModelDownloader([desktopModelFileStorage
       ? new HuggingFaceModelDownloader({
         apiClient: huggingFaceApiClient,
@@ -445,7 +453,10 @@ export function createUiDependencies(
     splitService: new DeterministicDatasetSplitService(),
     exportService: new JsonTuningDatasetExportService(),
     importService: new BrowserDatasetImportService(new DefaultDatasetPrivacyPolicy()),
-    generationService: new ProviderAgnosticDatasetGenerationService(),
+    generationService: new FallbackAwareDatasetGenerationService(
+      new PythonRuntimeDatasetGenerationService(runtimeClient),
+      new ProviderAgnosticDatasetGenerationService(),
+    ),
     reviewPolicy: new DefaultDatasetReviewPolicy(),
     duplicationPolicy,
     statisticsService: new DatasetStatisticsService(duplicationPolicy),
@@ -456,6 +467,16 @@ export function createUiDependencies(
   });
   const tuningDatasetService = new TuningDatasetService(tuningDatasetApplicationService);
   const tuningDatasetStore = new TuningDatasetStore(tuningDatasetService);
+  const modelTrainingJobRepository = new LocalStorageModelTrainingJobRepository(undefined, durableDesktopStorage as never);
+  const modelTrainingApplicationService = new DefaultModelTrainingApplicationService(
+    installedModelCatalog,
+    tuningDatasetRepository,
+    tuningDatasetVersionRepository,
+    modelTrainingJobRepository,
+    new PythonRuntimeModelTrainingGateway(runtimeClient),
+  );
+  const modelTrainingService = new ModelTrainingService(modelTrainingApplicationService);
+  const modelTrainingStore = new ModelTrainingStore(modelTrainingService);
 
   return Object.freeze({
     config,
@@ -484,6 +505,8 @@ export function createUiDependencies(
     contextStore,
     tuningDatasetService,
     tuningDatasetStore,
+    modelTrainingService,
+    modelTrainingStore,
     workflowProjectionService,
     settingsStore,
   });
@@ -513,6 +536,12 @@ function createDisabledRuntimeClient(): IPythonRuntimeClient {
       throw new Error("Python runtime is disabled in settings.");
     },
     async convertDocumentToMarkdown() {
+      throw new Error("Python runtime is disabled in settings.");
+    },
+    async submitFineTuningJob() {
+      throw new Error("Python runtime is disabled in settings.");
+    },
+    async generateDatasetExamples() {
       throw new Error("Python runtime is disabled in settings.");
     },
   };

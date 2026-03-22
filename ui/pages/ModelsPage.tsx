@@ -9,10 +9,10 @@ import { ModelPresenter, type ModelDownloadFileViewModel } from "../presenters/M
 import { formatBytes } from "../presenters/PresenterFormatting";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import type { IModelStoreState, ModelStore } from "../state/ModelStore";
-import type { IModel } from "../../domain/models/interfaces/IModel";
-import type { RuntimeEngine } from "../../domain/models/interfaces/IModelCompatibility";
 import type { UiSettingsState } from "../settings/UiSettingsStore";
 import type { IRemoteModelCatalogItem } from "../../application/ports/interfaces/IRemoteModelCatalog";
+import type { ManagedModelLibraryItem } from "../../application/models/ManagedModelLibrary";
+import ModelTrainingStudio from "../components/models/ModelTrainingStudio";
 
 type ModelsTabId = "download" | "create";
 
@@ -34,20 +34,21 @@ const fallbackState: IModelStoreState = Object.freeze({
 
 export default function ModelsPage(): JSX.Element {
   const presenter = useMemo(() => new ModelPresenter(), []);
-  const { modelStore, settingsStore } = useUiDependencies();
+  const { modelStore, settingsStore, modelTrainingStore, tuningDatasetStore } = useUiDependencies();
   const [searchParams, setSearchParams] = useSearchParams();
   const [state, setState] = useState<IModelStoreState>(fallbackState);
   const [settingsState, setSettingsState] = useState<UiSettingsState>(() => settingsStore.getState());
   const [activeTab, setActiveTab] = useState<ModelsTabId>("download");
 
-  useEffect(() => {
-    return modelStore.subscribe(setState);
-  }, [modelStore]);
-
+  useEffect(() => modelStore.subscribe(setState), [modelStore]);
   useEffect(() => settingsStore.subscribe(setSettingsState), [settingsStore]);
 
   const remoteSearchLimit = settingsState.settings.models.remoteSearchLimit;
   const searchValue = useMemo(() => readModelSearchValue(searchParams), [searchParams]);
+  const libraryItemsById = useMemo(
+    () => new Map((state.managedLibrary?.items ?? []).map((item) => [item.id, item])),
+    [state.managedLibrary?.items],
+  );
 
   useEffect(() => {
     void modelStore.refreshInstalled();
@@ -74,7 +75,7 @@ export default function ModelsPage(): JSX.Element {
         <div className="ui-page__hero-copy">
           <h1 className="ui-page__title">Models</h1>
           <p className="ui-page__subtitle">
-            Manage the model library your workflows can actually use, and keep browser-only download fallbacks clearly separated from verified local installs.
+            Manage the model library your workflows can actually use, reconcile catalog metadata against managed files, and create truthful fine-tuning jobs from installed models and governed datasets.
           </p>
           <p className="ui-text-secondary ui-text-small">
             Managed library root: <strong>{state.managedLibrary?.location ?? settingsState.settings.models.installDirectory}</strong>. Update this in{" "}
@@ -92,12 +93,12 @@ export default function ModelsPage(): JSX.Element {
           {
             id: "download",
             label: "Download Models",
-            description: "Browse remote catalogs and inspect truthful installed-model state.",
+            description: "Browse remote catalogs, reconcile installs, and run real uninstall/remove actions.",
           },
           {
             id: "create",
             label: "Create Models",
-            description: "Prepare fine-tuned model variants from downloaded models.",
+            description: "Submit runtime-backed fine-tuning jobs against installed models and dataset versions.",
           },
         ]}
         activeTabId={activeTab}
@@ -106,9 +107,18 @@ export default function ModelsPage(): JSX.Element {
 
       <div className="ui-card">
         <div className="ui-card__body ui-stack ui-stack--sm">
-          <div>
-            <strong>Managed Model Library Truth</strong>
-            <div className="ui-text-secondary ui-text-small">{state.managedLibrary?.detail ?? "Model library inspection is pending."}</div>
+          <div className="ui-row ui-row--between ui-row--wrap">
+            <div>
+              <strong>Managed Model Library Truth</strong>
+              <div className="ui-text-secondary ui-text-small">{state.managedLibrary?.detail ?? "Model library inspection is pending."}</div>
+            </div>
+            <button className="ui-button ui-button--secondary ui-button--sm" type="button" onClick={() => void modelStore.refreshInstalled()}>
+              Refresh / reconcile
+            </button>
+          </div>
+          <div className="ui-text-secondary ui-text-small">
+            Source of truth: <strong>{state.managedLibrary?.sourceOfTruth ?? "unknown"}</strong>
+            {state.managedLibrary?.recordedAt ? ` · Checked ${state.managedLibrary.recordedAt.toLocaleString()}` : ""}
           </div>
           <div className="ui-text-secondary ui-text-small">
             {state.managedLibrary?.items.length
@@ -150,9 +160,106 @@ export default function ModelsPage(): JSX.Element {
             );
           }}
           onRemoveInstalled={(modelId) => {
-            console.log("Remove installed model", modelId);
+            const item = libraryItemsById.get(modelId);
+            if (!item) {
+              return;
+            }
+            const action = defaultRemovalAction(item);
+            if (typeof window !== "undefined" && !window.confirm(action.confirmationText)) {
+              return;
+            }
+            void modelStore.removeModel({
+              modelId,
+              removeArtifacts: action.removeArtifacts,
+              unregisterOnly: action.unregisterOnly,
+            });
           }}
         />
+
+        <div className="ui-card" style={{ marginTop: "1rem" }}>
+          <div className="ui-card__body ui-stack ui-stack--sm">
+            <div className="ui-row ui-row--between ui-row--wrap">
+              <div>
+                <h2>Installation diagnostics</h2>
+                <p className="ui-text-secondary ui-text-small">
+                  Inspect reconciliation state, verification results, and the exact removal path that is safe for each model entry.
+                </p>
+              </div>
+            </div>
+
+            {(state.managedLibrary?.items ?? []).length === 0 ? (
+              <div className="ui-empty-state">
+                <p className="ui-text-secondary">No managed library entries are available to inspect yet.</p>
+              </div>
+            ) : (
+              <div className="ui-stack ui-stack--sm">
+                {(state.managedLibrary?.items ?? []).map((item) => {
+                  const action = defaultRemovalAction(item);
+                  return (
+                    <article key={item.id} className="ui-panel ui-stack ui-stack--sm">
+                      <div className="ui-row ui-row--between ui-row--wrap">
+                        <div>
+                          <strong>{item.name}</strong>
+                          <div className="ui-text-secondary ui-text-small">{item.location ?? "No artifact path recorded"}</div>
+                        </div>
+                        <span className={`ui-badge ${badgeClassForLibraryState(item.state)}`}>{item.state}</span>
+                      </div>
+                      <div className="ui-text-secondary">{item.detail}</div>
+                      <div className="ui-text-secondary ui-text-small">
+                        Registration: <strong>{item.registered ? "catalog present" : "catalog missing"}</strong> · Verification: <strong>{item.verified ? "verified" : "not verified"}</strong> · Source: <strong>{item.sourceOfTruth}</strong>
+                      </div>
+                      <div className="ui-text-secondary ui-text-small">
+                        Artifacts: <strong>{item.presentArtifactCount ?? 0}</strong> present / <strong>{item.artifactCount ?? 0}</strong> recorded
+                        {item.missingArtifactCount ? ` · Missing ${item.missingArtifactCount}` : ""}
+                      </div>
+                      {item.verificationErrors && item.verificationErrors.length > 0 ? (
+                        <ul className="ui-text-secondary ui-text-small">
+                          {item.verificationErrors.map((error) => <li key={error}>{error}</li>)}
+                        </ul>
+                      ) : null}
+                      <div className="ui-row ui-row--wrap">
+                        <button className="ui-button ui-button--secondary ui-button--sm" type="button" onClick={() => void modelStore.refreshInstalled()}>
+                          Reconcile
+                        </button>
+                        <button
+                          className="ui-button ui-button--danger ui-button--sm"
+                          type="button"
+                          disabled={!item.registered}
+                          onClick={() => {
+                            if (typeof window !== "undefined" && !window.confirm(action.confirmationText)) {
+                              return;
+                            }
+                            void modelStore.removeModel({
+                              modelId: item.id,
+                              removeArtifacts: action.removeArtifacts,
+                              unregisterOnly: action.unregisterOnly,
+                            });
+                          }}
+                        >
+                          {action.label}
+                        </button>
+                        {item.registered && !action.unregisterOnly ? (
+                          <button
+                            className="ui-button ui-button--ghost ui-button--sm"
+                            type="button"
+                            onClick={() => {
+                              if (typeof window !== "undefined" && !window.confirm(`Remove only the '${item.name}' catalog entry and keep any managed files on disk?`)) {
+                                return;
+                              }
+                              void modelStore.removeModel({ modelId: item.id, unregisterOnly: true, removeArtifacts: false });
+                            }}
+                          >
+                            Remove metadata only
+                          </button>
+                        ) : null}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
       </section>
 
       <section
@@ -162,20 +269,64 @@ export default function ModelsPage(): JSX.Element {
         className="ui-page-tab-panel"
         hidden={activeTab !== "create"}
       >
-        <div className="ui-card">
-          <div className="ui-card__body ui-empty-state">
-            <h2>Create Models</h2>
-            <p className="ui-text-secondary">
-              Fine-tuning and managed model creation will live here. The foundation now reports truthful model-library state, but training workflows are still not implemented.
-            </p>
-            <p className="ui-text-secondary ui-text-small">
-              Download or manage your base models from the Download Models tab first so this area can build on assets already in your workspace.
-            </p>
-          </div>
-        </div>
+        <ModelTrainingStudio
+          modelState={state}
+          modelTrainingStore={modelTrainingStore}
+          tuningDatasetStore={tuningDatasetStore}
+        />
       </section>
     </section>
   );
+}
+
+function defaultRemovalAction(item: ManagedModelLibraryItem): {
+  readonly label: string;
+  readonly unregisterOnly: boolean;
+  readonly removeArtifacts: boolean;
+  readonly confirmationText: string;
+} {
+  switch (item.state) {
+    case "registered-metadata-only":
+    case "missing-on-disk":
+    case "browser-fallback-downloaded-only":
+      return {
+        label: "Remove metadata registration",
+        unregisterOnly: true,
+        removeArtifacts: false,
+        confirmationText: `Remove the '${item.name}' catalog entry? No managed local files will be deleted.`,
+      };
+    case "downloaded-but-unregistered":
+      return {
+        label: "Unregistered file only",
+        unregisterOnly: true,
+        removeArtifacts: false,
+        confirmationText: `The file '${item.name}' is not registered in the catalog. Reconcile again after manually removing the orphaned file if needed.`,
+      };
+    default:
+      return {
+        label: "Remove files and registration",
+        unregisterOnly: false,
+        removeArtifacts: true,
+        confirmationText: `Remove '${item.name}' from the installed-model catalog and delete its managed local files?`,
+      };
+  }
+}
+
+function badgeClassForLibraryState(state: ManagedModelLibraryItem["state"]): string {
+  switch (state) {
+    case "installed-and-verified":
+      return "ui-badge--success";
+    case "installed-but-unverified":
+      return "ui-badge--info";
+    case "missing-on-disk":
+    case "partially-installed":
+    case "browser-fallback-downloaded-only":
+      return "ui-badge--warning";
+    case "corrupted-checksum-mismatch":
+      return "ui-badge--danger";
+    default:
+      return "ui-badge--neutral";
+  }
 }
 
 async function installRemoteFiles(
@@ -240,121 +391,59 @@ function readModelSearchValue(searchParams: URLSearchParams): ModelSearchBarValu
   return Object.freeze({
     query: searchParams.get("query") ?? "",
     provider: searchParams.get("provider") ?? undefined,
-    mode: (searchParams.get("mode") as ModelSearchBarValue["mode"]) ?? "all",
+    mode: searchParams.get("mode") === "installed" || searchParams.get("mode") === "remote" ? searchParams.get("mode") as "installed" | "remote" : undefined,
     kind: searchParams.get("kind") ?? undefined,
     runtime: searchParams.get("runtime") ?? undefined,
   });
 }
 
-function buildDownloadFileViewModels(model: IModel): ReadonlyArray<ModelDownloadFileViewModel> {
-  return Object.freeze(
-    [model.artifact, ...model.additionalArtifacts].map((artifact, index) => ({
-      id: `${model.id}::${index}::${artifact.name}`,
-      name: artifact.name,
-      format: artifact.format,
-      extension: artifact.name.includes(".")
-        ? artifact.name.slice(artifact.name.lastIndexOf(".") + 1).toLowerCase()
-        : artifact.format,
-      sizeBytes: artifact.sizeBytes,
-      sizeLabel: formatBytes(artifact.sizeBytes),
-      isPrimary: index === 0,
-    }))
-  );
+async function searchModels(
+  modelStore: ModelStore,
+  searchValue: ModelSearchBarValue,
+  remoteSearchLimit: number
+): Promise<void> {
+  await modelStore.searchRemote({
+    query: searchValue.query.trim() || undefined,
+    providers: searchValue.provider ? [searchValue.provider] : undefined,
+    kinds: searchValue.kind ? [searchValue.kind as never] : undefined,
+    runtimes: searchValue.runtime ? [searchValue.runtime as never] : undefined,
+    limit: remoteSearchLimit,
+  });
+}
+
+function buildDownloadFileViewModels(model: IRemoteModelCatalogItem["model"]): ReadonlyArray<ModelDownloadFileViewModel> {
+  const artifacts = [model.artifact, ...model.additionalArtifacts];
+  return Object.freeze(artifacts.map((artifact, index) => Object.freeze({
+    id: `${model.id}::${index}::${artifact.name}`,
+    name: artifact.name,
+    format: artifact.format,
+    extension: artifact.name.includes(".") ? artifact.name.slice(artifact.name.lastIndexOf(".") + 1).toLowerCase() : artifact.format,
+    sizeBytes: artifact.sizeBytes,
+    sizeLabel: formatBytes(artifact.sizeBytes),
+    isPrimary: index === 0,
+  })));
 }
 
 function createInstallationModel(
-  model: IModel,
+  model: IRemoteModelCatalogItem["model"],
   files: ReadonlyArray<ModelDownloadFileViewModel>
-): IModel {
-  const selectedLocations = new Set(files.map((file) => file.name));
-  const selectedArtifacts = [model.artifact, ...model.additionalArtifacts].filter((artifact) =>
-    selectedLocations.has(artifact.name)
-  );
+): IRemoteModelCatalogItem["model"] {
+  const selectedArtifacts = files.map((file) => new ModelArtifact({
+    name: file.name,
+    accessMethod: "remote-download",
+    location: file.name,
+    format: file.format as never,
+    sizeBytes: file.sizeBytes,
+  }));
   const [primaryArtifact, ...additionalArtifacts] = selectedArtifacts;
 
-  if (!primaryArtifact) {
-    throw new Error(`No downloadable files were selected for '${model.id}'.`);
-  }
-
-  const cloned = Model.from(model);
-
   return new Model({
-    id: cloned.id,
-    name: cloned.name,
-    version: cloned.version,
-    variant: cloned.variant,
-    publisher: cloned.publisher,
-    kind: cloned.kind,
-    isRunnable: cloned.isRunnable,
-    status: cloned.status,
-    source: cloned.source,
-    artifact: new ModelArtifact({
-      name: primaryArtifact.name,
-      accessMethod: primaryArtifact.accessMethod,
-      location: primaryArtifact.location,
-      format: primaryArtifact.format,
-      sizeBytes: primaryArtifact.sizeBytes,
-      sha256: primaryArtifact.sha256,
-      contentType: primaryArtifact.contentType,
-    }),
-    additionalArtifacts: additionalArtifacts.map(
-      (artifact) =>
-        new ModelArtifact({
-          name: artifact.name,
-          accessMethod: artifact.accessMethod,
-          location: artifact.location,
-          format: artifact.format,
-          sizeBytes: artifact.sizeBytes,
-          sha256: artifact.sha256,
-          contentType: artifact.contentType,
-        })
-    ),
-    dependencies: cloned.dependencies,
-    precision: cloned.precision,
-    architectureFamily: cloned.architectureFamily,
-    architecture: cloned.architecture,
-    compatibility: cloned.compatibility,
-    requirements: cloned.requirements,
-    resourceProfile: cloned.resourceProfile,
-    description: cloned.description,
-    tags: cloned.tags,
-    license: cloned.license,
-    languageCodes: cloned.languageCodes,
-    requiresAuth: cloned.requiresAuth,
+    ...model,
+    artifact: primaryArtifact ?? model.artifact,
+    additionalArtifacts: additionalArtifacts.length > 0 ? additionalArtifacts : model.additionalArtifacts,
   });
 }
 
 function sanitizePathSegment(value: string): string {
-  return value.trim().replace(/[^a-zA-Z0-9._-]/g, "_") || "model";
-}
-
-async function searchModels(
-  modelStore: ModelStore,
-  value: ModelSearchBarValue,
-  remoteSearchLimit: number
-): Promise<void> {
-  if (value.mode === "installed") {
-    await modelStore.refreshInstalled({
-      query: value.query || undefined,
-      kinds: value.kind ? [value.kind as IModel["kind"]] : undefined,
-    });
-
-    return;
-  }
-
-  await modelStore.searchRemote({
-    query: value.query || undefined,
-    providers: value.provider ? [value.provider] : undefined,
-    kinds: value.kind ? [value.kind as IModel["kind"]] : undefined,
-    runtimes: value.runtime ? [value.runtime as RuntimeEngine] : undefined,
-    limit: remoteSearchLimit,
-  });
-
-  if (value.mode === "all") {
-    await modelStore.refreshInstalled({
-      query: value.query || undefined,
-      kinds: value.kind ? [value.kind as IModel["kind"]] : undefined,
-      runtimes: value.runtime ? [value.runtime as RuntimeEngine] : undefined,
-    });
-  }
+  return value.replace(/[^a-z0-9._-]+/gi, "-");
 }
