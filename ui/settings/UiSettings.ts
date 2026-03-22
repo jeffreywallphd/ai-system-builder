@@ -75,12 +75,12 @@ function resolveDefaultRuntimeBaseUrl(_config?: AppRuntimeConfig): string {
   return "http://127.0.0.1:8100";
 }
 
-function resolveDefaultRuntimeMode(config: AppRuntimeConfig): PythonRuntimeModeValue {
-  return config.isDesktopHost ? PythonRuntimeMode.managedLocal : PythonRuntimeMode.disabled;
+function resolveDefaultRuntimeMode(_config: AppRuntimeConfig): PythonRuntimeModeValue {
+  return PythonRuntimeMode.managedLocal;
 }
 
-function resolveDefaultRuntimeAutoStartEnabled(config: AppRuntimeConfig): boolean {
-  return config.isDesktopHost;
+function resolveDefaultRuntimeAutoStartEnabled(_config: AppRuntimeConfig): boolean {
+  return true;
 }
 
 export function createWorkspaceDefaults(mode: WorkspaceDataMode): WorkspaceSettings {

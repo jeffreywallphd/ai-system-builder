@@ -35,16 +35,16 @@ describe("UiSettingsStore", () => {
     expect(store.getSettings().workspace.inputsDirectory).toBe("dev/workflow-data/inputs");
   });
 
-  it("defaults browser mode runtime to disabled while keeping the local runtime URL available", () => {
+  it("defaults browser mode runtime to managed-local auto-start while keeping the local runtime URL available", () => {
     const store = new UiSettingsStore({
       config: createConfig({ runtimeMode: "browser-development" }),
       storage: { load: () => undefined, save: () => undefined },
     });
 
-    expect(store.getSettings().runtime.mode).toBe("disabled");
+    expect(store.getSettings().runtime.mode).toBe("managed-local");
     expect(store.getSettings().runtime.baseUrl).toBe("http://127.0.0.1:8100");
     expect(store.getSettings().runtime.pythonVersion).toBe("3.12");
-    expect(store.getSettings().runtime.autoStartEnabled).toBeFalse();
+    expect(store.getSettings().runtime.autoStartEnabled).toBeTrue();
   });
 
   it("defaults desktop mode runtime to managed-local auto-start", () => {
