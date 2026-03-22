@@ -47,6 +47,34 @@ describe("PythonRuntimeConfig", () => {
     expect(config.runtimeWorkingDirectory).toBe("python-runtime");
   });
 
+
+  it("defaults the supervisor to loopback even when the browser is served from a LAN host", () => {
+    const originalWindow = globalThis.window;
+    Object.defineProperty(globalThis, "window", {
+      value: {
+        location: {
+          protocol: "http:",
+          hostname: "192.168.1.36",
+        },
+      },
+      configurable: true,
+    });
+
+    try {
+      const config = new PythonRuntimeConfig({
+        mode: "managed-local",
+        baseUrl: "http://127.0.0.1:8100",
+      });
+
+      expect(config.supervisorBaseUrl).toBe("http://127.0.0.1:8790");
+    } finally {
+      Object.defineProperty(globalThis, "window", {
+        value: originalWindow,
+        configurable: true,
+      });
+    }
+  });
+
   it("loads from env", () => {
     const config = PythonRuntimeConfig.fromEnv({
       PYTHON_RUNTIME_MODE: "managed-local",

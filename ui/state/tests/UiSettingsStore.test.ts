@@ -42,6 +42,34 @@ describe("UiSettingsStore", () => {
     expect(store.getSettings().runtime.pythonVersion).toBe("3.12");
   });
 
+
+  it("keeps the browser runtime default pinned to loopback even when served from a LAN host", () => {
+    const originalWindow = globalThis.window;
+    Object.defineProperty(globalThis, "window", {
+      value: {
+        location: {
+          protocol: "http:",
+          hostname: "192.168.1.36",
+        },
+      },
+      configurable: true,
+    });
+
+    try {
+      const store = new UiSettingsStore({
+        config: createConfig(),
+        storage: { load: () => undefined, save: () => undefined },
+      });
+
+      expect(store.getSettings().runtime.baseUrl).toBe("http://127.0.0.1:8100");
+    } finally {
+      Object.defineProperty(globalThis, "window", {
+        value: originalWindow,
+        configurable: true,
+      });
+    }
+  });
+
   it("persists the selected built-in python version", () => {
     const saved: Array<string> = [];
     const store = new UiSettingsStore({
