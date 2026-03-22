@@ -126,12 +126,9 @@ function resolveSupervisorBaseUrl(supervisorBaseUrl: string | undefined, runtime
     return explicit.replace(/\/$/, "");
   }
 
-  if (typeof window !== "undefined" && window.location?.hostname) {
-    return `${window.location.protocol}//${window.location.hostname}:8790`;
-  }
-
   try {
-    const url = new URL(runtimeBaseUrl ?? "http://127.0.0.1:8000");
+    const url = new URL(runtimeBaseUrl ?? "http://127.0.0.1:8100");
+    url.hostname = "127.0.0.1";
     url.port = "8790";
     url.pathname = "";
     url.search = "";
