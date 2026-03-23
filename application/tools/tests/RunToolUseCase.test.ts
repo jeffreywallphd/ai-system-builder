@@ -9,13 +9,14 @@ import { WorkflowContextService } from "../../context/WorkflowContextService";
 import { InMemoryContextPackageRepository } from "../../../infrastructure/mocks/repositories/InMemoryContextPackageRepository";
 import { ContextPackage } from "../../context/models/ContextPackage";
 import { createWorkflowUnifiedExecutionEngine } from "../../../infrastructure/execution/createWorkflowUnifiedExecutionEngine";
+import { WorkflowExecutionHandle, WorkflowExecutionProgress, WorkflowExecutionResult } from "../../ports/WorkflowExecutor";
 
 describe("RunToolUseCase", () => {
   it("exposes execute api", () => {
     const repo = new InMemoryWorkflowRepository();
     const projection = new WorkflowToolProjectionService();
     const load = new LoadToolDefinitionUseCase(repo, projection);
-    const useCase = new RunToolUseCase(repo, projection, { execute: async () => ({ executionId: "x", status: "completed", outputAssets: [] }), startExecution: async () => { throw new Error("no"); }, canExecute: () => true } as any, load);
+    const useCase = new RunToolUseCase(repo, projection, { execute: async () => ({ executionId: "x", status: "completed", outputAssets: [] }), startExecution: async (input: any) => new WorkflowExecutionHandle({ executionId: "x", input, initialProgress: new WorkflowExecutionProgress({ executionId: "x", status: "queued" }), completionPromise: Promise.resolve(new WorkflowExecutionResult({ executionId: "x", status: "completed", outputAssets: [] })), cancel: async () => undefined }), canExecute: () => true } as any, load);
     expect(typeof useCase.execute).toBe("function");
   });
 
@@ -46,8 +47,15 @@ describe("RunToolUseCase", () => {
           },
         };
       },
-      startExecution: async () => {
-        throw new Error("not used");
+      startExecution: async (input: any) => {
+        executedWorkflowId = input.workflow.id;
+        return new WorkflowExecutionHandle({
+          executionId: "tool-exec-1",
+          input,
+          initialProgress: new WorkflowExecutionProgress({ executionId: "tool-exec-1", status: "queued" }),
+          completionPromise: Promise.resolve(new WorkflowExecutionResult({ executionId: "tool-exec-1", status: "completed", outputAssets: [], provenance: { classification: "delegated", runtime: "python", strategyId: "infra-delegated-python", detail: "Workflow execution was delegated to the Python runtime." } })),
+          cancel: async () => undefined,
+        });
       },
       canExecute: () => true,
     } as any;
@@ -99,9 +107,13 @@ describe("RunToolUseCase", () => {
           capturedMetadata = input.executionMetadata;
           return { executionId: "tool-exec", status: "completed", outputAssets: [] };
         },
-        startExecution: async () => {
-          throw new Error("not used");
-        },
+        startExecution: async (input) => new WorkflowExecutionHandle({
+          executionId: "tool-exec",
+          input,
+          initialProgress: new WorkflowExecutionProgress({ executionId: "tool-exec", status: "queued" }),
+          completionPromise: Promise.resolve(new WorkflowExecutionResult({ executionId: "tool-exec", status: "completed", outputAssets: [] })),
+          cancel: async () => undefined,
+        }),
         canExecute: () => true,
       } as any,
       load,

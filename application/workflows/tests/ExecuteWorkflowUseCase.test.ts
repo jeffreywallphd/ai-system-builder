@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { ExecutionStatuses } from "../../../domain/execution/ExecutionPlan";
 import { ExecuteWorkflowUseCase } from "../ExecuteWorkflowUseCase";
 import { makeNode, makeWorkflow } from "../../../domain/services/tests/testUtils";
 import { makeWorkflowExecutor, makeWorkflowValidator } from "./testUtils";
@@ -27,29 +28,37 @@ describe("ExecuteWorkflowUseCase", () => {
     const workflow = makeWorkflow({ nodes: [makeNode({ id: "n1" })] });
     let executedWorkflowId: string | undefined;
     const executor = makeWorkflowExecutor({
-      execute: async (input, onEvent) => {
+      startExecution: async (input) => {
         executedWorkflowId = input.workflow.id;
-        onEvent?.({
-          executionId: "exec",
-          kind: "workflow-completed",
-          status: "completed",
-          provenance: {
-            classification: "scaffolded",
-            runtime: "langchain",
-            strategyId: "infra-scaffold-langchain",
-            detail: "Workflow executed by the scaffold interpreter fallback.",
-          },
-        });
-
         return {
           executionId: "exec",
-          status: "completed",
-          outputAssets: [],
-          provenance: {
-            classification: "scaffolded",
-            runtime: "langchain",
-            strategyId: "infra-scaffold-langchain",
-            detail: "Workflow executed by the scaffold interpreter fallback.",
+          input,
+          getProgress: async () => ({ executionId: "exec", status: "running" as const }),
+          waitForCompletion: async () => ({
+            executionId: "exec",
+            status: "completed" as const,
+            outputAssets: [],
+            provenance: {
+              classification: "scaffolded",
+              runtime: "langchain",
+              strategyId: "infra-scaffold-langchain",
+              detail: "Workflow executed by the scaffold interpreter fallback.",
+            },
+          }),
+          cancel: async () => undefined,
+          subscribe: (listener) => {
+            listener({
+              executionId: "exec",
+              kind: "workflow-completed",
+              status: "completed",
+              provenance: {
+                classification: "scaffolded",
+                runtime: "langchain",
+                strategyId: "infra-scaffold-langchain",
+                detail: "Workflow executed by the scaffold interpreter fallback.",
+              },
+            });
+            return () => undefined;
           },
         };
       },
@@ -175,6 +184,72 @@ describe("ExecuteWorkflowUseCase", () => {
     } | undefined;
     expect(workflowContext?.inspection?.finalPromptText).toContain("Input:\nQ");
     expect(workflowContext?.assembledContext?.promptText).toContain("Output:\nA");
+  });
+
+
+  it("routes startExecution through the unified execution run seam", async () => {
+    const workflow = makeWorkflow({ nodes: [makeNode({ id: "n1" })] });
+    const executor = makeWorkflowExecutor({
+      startExecution: async (input) => ({
+        executionId: "exec-run",
+        input,
+        getProgress: async () => ({ executionId: "exec-run", status: "running" as const, percent: 50 }),
+        waitForCompletion: async () => ({
+          executionId: "exec-run",
+          status: "completed" as const,
+          outputAssets: [],
+          provenance: {
+            classification: "delegated",
+            runtime: "python",
+            strategyId: "infra-delegated-python",
+            detail: "Workflow execution was delegated to the Python runtime.",
+          },
+        }),
+        cancel: async () => undefined,
+        subscribe: (listener) => {
+          listener({
+            executionId: "exec-run",
+            kind: "workflow-progress",
+            status: "running",
+            progress: { executionId: "exec-run", status: "running", percent: 50 },
+            provenance: {
+              classification: "delegated",
+              runtime: "python",
+              strategyId: "infra-delegated-python",
+              detail: "Workflow execution was delegated to the Python runtime.",
+            },
+          });
+          return () => undefined;
+        },
+      }),
+    });
+    const runHistory = new Map<string, any>();
+    const useCase = new ExecuteWorkflowUseCase(
+      executor,
+      makeWorkflowValidator(),
+      undefined,
+      new UnifiedExecutionEngine([new WorkflowExecutionUnitHandler(executor)], {
+        saveRun: async (run) => {
+          runHistory.set(run.runId, run);
+          return run;
+        },
+        getRunById: async (runId) => runHistory.get(runId),
+        listRuns: async () => [...runHistory.values()],
+      })
+    );
+
+    const started = await useCase.startExecution({ workflow });
+    const events: string[] = [];
+    const unsubscribe = await started.handle.subscribe?.((event) => {
+      events.push(`${event.kind}:${event.status}`);
+    });
+    const completion = await started.handle.waitForCompletion();
+    await unsubscribe?.();
+
+    expect(started.handle.executionId).toContain(`workflow-run-${workflow.id}-run-`);
+    expect(completion.provenance?.classification).toBe("delegated");
+    expect(events).toEqual(["workflow-progress:running"]);
+    expect(runHistory.get(started.handle.executionId)?.status).toBe(ExecutionStatuses.completed);
   });
 
 });

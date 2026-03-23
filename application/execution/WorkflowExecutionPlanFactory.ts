@@ -1,11 +1,14 @@
 import { ExecutionPlan, ExecutionUnitKinds } from "../../domain/execution/ExecutionPlan";
-import type { IWorkflowExecutionInput, IWorkflowExecutionResult } from "../ports/interfaces/IWorkflowExecutor";
-import type { IExecutionPlanResult } from "./UnifiedExecutionEngine";
+import type { IWorkflowExecutionEvent, IWorkflowExecutionInput, IWorkflowExecutionResult } from "../ports/interfaces/IWorkflowExecutor";
+import type { IExecutionEngineEvent } from "./ExecutionContracts";
+import type { IExecutionPlanResult, IExecutionUnitExecutionResult } from "./UnifiedExecutionEngine";
+import { getWorkflowExecutionEvent, getWorkflowExecutionResult } from "./WorkflowExecutionAdapter";
 
 export interface IWorkflowExecutionPlanEnvelope {
   readonly unitId: string;
   readonly plan: ExecutionPlan;
   readonly unitInputs: Readonly<Record<string, unknown>>;
+  readonly metadata: Readonly<Record<string, unknown>>;
 }
 
 export function createWorkflowExecutionPlan(
@@ -28,6 +31,11 @@ export function createWorkflowExecutionPlan(
     unitInputs: Object.freeze({
       [unitId]: input,
     }),
+    metadata: Object.freeze({
+      executionKind: "workflow",
+      workflowId: input.workflow.id,
+      workflowName: input.workflow.metadata.name,
+    }),
   });
 }
 
@@ -35,11 +43,29 @@ export function requireWorkflowExecutionResult(
   planResult: IExecutionPlanResult,
   unitId: string,
 ): IWorkflowExecutionResult {
-  const workflowResult = planResult.unitResults[unitId]?.workflowResult;
+  const workflowResult = getWorkflowExecutionResult(planResult.unitResults[unitId]);
 
   if (!workflowResult) {
     throw new Error(`Execution plan '${planResult.planId}' did not return a workflow execution result.`);
   }
 
   return workflowResult;
+}
+
+export function requireWorkflowExecutionResultFromUnitResult(
+  result: IExecutionUnitExecutionResult,
+): IWorkflowExecutionResult {
+  const workflowResult = getWorkflowExecutionResult(result);
+
+  if (!workflowResult) {
+    throw new Error(`Execution unit '${result.unitId}' did not produce a workflow execution result.`);
+  }
+
+  return workflowResult;
+}
+
+export function getWorkflowExecutionEventFromEngineEvent(
+  event: IExecutionEngineEvent,
+): IWorkflowExecutionEvent | undefined {
+  return getWorkflowExecutionEvent(event);
 }

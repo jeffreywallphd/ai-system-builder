@@ -59,6 +59,7 @@ export class RunToolUseCase {
     const planResult = await this.executionEngine.execute({
       plan: executionPlan.plan,
       unitInputs: executionPlan.unitInputs,
+      metadata: executionPlan.metadata,
     });
 
     return requireWorkflowExecutionResult(planResult, executionPlan.unitId);

@@ -8,6 +8,8 @@ import { ModelCompatibilityService } from "../../domain/services/ModelCompatibil
 import { CreateWorkflowUseCase } from "../../application/workflows/CreateWorkflowUseCase";
 import { ExecuteWorkflowUseCase } from "../../application/workflows/ExecuteWorkflowUseCase";
 import { ValidateWorkflowUseCase } from "../../application/workflows/ValidateWorkflowUseCase";
+import { GetExecutionRunUseCase } from "../../application/execution/GetExecutionRunUseCase";
+import { ListExecutionRunsUseCase } from "../../application/execution/ListExecutionRunsUseCase";
 
 import { CreateNodeUseCase } from "../../application/nodes/CreateNodeUseCase";
 import { ConnectNodesUseCase } from "../../application/nodes/ConnectNodesUseCase";
@@ -52,8 +54,9 @@ import type { IMcpToolCatalog } from "../../application/ports/interfaces/IMcpToo
 import type { IMcpToolExecutor } from "../../application/ports/interfaces/IMcpToolExecutor";
 import type { IToolCapabilityCatalog } from "../../application/ports/interfaces/IToolCapabilityCatalog";
 import type { IToolCapabilityExecutor } from "../../application/ports/interfaces/IToolCapabilityExecutor";
+import type { IExecutionRunRepository } from "../../application/ports/interfaces/IExecutionRunRepository";
 import { WorkflowContextService } from "../../application/context/WorkflowContextService";
-import { createWorkflowUnifiedExecutionEngine } from "../execution/createWorkflowUnifiedExecutionEngine";
+import { UnifiedExecutionEngine } from "../../application/execution/UnifiedExecutionEngine";
 import type { IWorkflowValidator } from "../../domain/services/interfaces/IWorkflowValidator";
 import type { INodeCompatibilityService } from "../../domain/services/interfaces/INodeCompatibilityService";
 import type { IModelCompatibilityService } from "../../domain/services/interfaces/IModelCompatibilityService";
@@ -66,6 +69,8 @@ export const APPLICATION_TOKENS = Object.freeze({
   CreateWorkflowUseCase: Symbol("CreateWorkflowUseCase"),
   ExecuteWorkflowUseCase: Symbol("ExecuteWorkflowUseCase"),
   ValidateWorkflowUseCase: Symbol("ValidateWorkflowUseCase"),
+  GetExecutionRunUseCase: Symbol("GetExecutionRunUseCase"),
+  ListExecutionRunsUseCase: Symbol("ListExecutionRunsUseCase"),
 
   CreateNodeUseCase: Symbol("CreateNodeUseCase"),
   ConnectNodesUseCase: Symbol("ConnectNodesUseCase"),
@@ -154,8 +159,18 @@ export class ApplicationBootstrap {
             c.resolve<IContextPackageRepository>(TOKENS.ContextPackageRepository),
             c.resolve<IContextRecipeRepository>(TOKENS.ContextRecipeRepository)
           ),
-          createWorkflowUnifiedExecutionEngine(c.resolve<IWorkflowExecutor>(TOKENS.WorkflowExecutor))
+          c.resolve<UnifiedExecutionEngine>(TOKENS.UnifiedExecutionEngine)
         )
+    );
+
+    container.registerSingleton(
+      APPLICATION_TOKENS.GetExecutionRunUseCase,
+      (c) => new GetExecutionRunUseCase(c.resolve<IExecutionRunRepository>(TOKENS.ExecutionRunRepository))
+    );
+
+    container.registerSingleton(
+      APPLICATION_TOKENS.ListExecutionRunsUseCase,
+      (c) => new ListExecutionRunsUseCase(c.resolve<IExecutionRunRepository>(TOKENS.ExecutionRunRepository))
     );
 
     container.registerSingleton(

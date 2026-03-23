@@ -65,6 +65,11 @@ import type { TuningDatasetStudioApplicationService } from "./TuningDatasetStudi
 import type { FileIngestionApplicationService } from "../ingestion/FileIngestionApplicationService";
 import type { FileIngestionProfile } from "../../domain/ingestion/interfaces/IFileIngestion";
 import { DatasetSourceIngestionProfile } from "./DatasetSourceIngestionProfile";
+import type { UnifiedExecutionEngine } from "../execution/UnifiedExecutionEngine";
+import {
+  createDatasetGenerationExecutionPlan,
+  requireDatasetGenerationResult,
+} from "../execution/DatasetGenerationExecutionPlanFactory";
 
 interface ServiceOptions {
   readonly datasetRepository: DatasetRepository;
@@ -85,6 +90,7 @@ interface ServiceOptions {
   readonly createId?: (prefix: string) => string;
   readonly fileIngestionService?: FileIngestionApplicationService;
   readonly datasetSourceIngestionProfile?: FileIngestionProfile;
+  readonly executionEngine?: UnifiedExecutionEngine;
 }
 
 function defaultCreateId(prefix: string): string {
@@ -113,6 +119,7 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
   private readonly createId: (prefix: string) => string;
   private readonly fileIngestionService?: FileIngestionApplicationService;
   private readonly datasetSourceIngestionProfile: FileIngestionProfile;
+  private readonly executionEngine?: UnifiedExecutionEngine;
 
   constructor(options: ServiceOptions) {
     this.datasetRepository = options.datasetRepository;
@@ -133,6 +140,7 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
     this.createId = options.createId ?? defaultCreateId;
     this.fileIngestionService = options.fileIngestionService;
     this.datasetSourceIngestionProfile = options.datasetSourceIngestionProfile ?? DatasetSourceIngestionProfile;
+    this.executionEngine = options.executionEngine;
   }
 
   public async createDataset(command: CreateDatasetCommand): Promise<DatasetDetails> {
@@ -453,7 +461,7 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
       throw new Error("Select at least one source document for generation.");
     }
     const existingExamples = await this.datasetVersionRepository.listExamples({ datasetId: command.datasetId, versionId: command.versionId });
-    const generated = await this.generationService.generate({
+    const generationRequest = {
       datasetId: command.datasetId,
       versionId: command.versionId,
       taskType: dataset.taskType,
@@ -461,7 +469,10 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
       sourceDocuments: selectedDocuments,
       existingExamples,
       configuration: command.configuration,
-    });
+    };
+    const generated = this.executionEngine
+      ? await this.generateExamplesThroughExecutionEngine(generationRequest)
+      : await this.generationService.generate(generationRequest);
     const enrichedExamples = generated.examples.map((example) => this.attachGenerationProvenance(example, generated.provenance));
     const savedExamples = await Promise.all(enrichedExamples.map((example) => this.datasetVersionRepository.saveExample(example)));
     await this.datasetVersionRepository.saveGenerationBatch(Object.freeze({
@@ -478,6 +489,24 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
     }));
     await this.reconcileWorkflow(command.datasetId, command.versionId);
     return Object.freeze(savedExamples);
+  }
+
+
+  private async generateExamplesThroughExecutionEngine(
+    request: Parameters<DatasetGenerationService["generate"]>[0],
+  ) {
+    if (!this.executionEngine) {
+      return this.generationService.generate(request);
+    }
+
+    const executionPlan = createDatasetGenerationExecutionPlan(request);
+    const planResult = await this.executionEngine.execute({
+      plan: executionPlan.plan,
+      unitInputs: executionPlan.unitInputs,
+      metadata: executionPlan.metadata,
+    });
+
+    return requireDatasetGenerationResult(planResult, executionPlan.unitId);
   }
 
   public async generateQaExamplesFromSource(command: GenerateExamplesFromSourceCommand): Promise<ReadonlyArray<QuestionAnsweringExample>> {

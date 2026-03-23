@@ -1,5 +1,6 @@
 export const ExecutionUnitKinds = Object.freeze({
   workflow: "workflow",
+  datasetGeneration: "dataset-generation",
 });
 
 export type ExecutionUnitKind = typeof ExecutionUnitKinds[keyof typeof ExecutionUnitKinds];
@@ -11,6 +12,7 @@ export const ExecutionStatuses = Object.freeze({
   completed: "completed",
   failed: "failed",
   skipped: "skipped",
+  cancelled: "cancelled",
 });
 
 export type ExecutionStatus = typeof ExecutionStatuses[keyof typeof ExecutionStatuses];
@@ -24,7 +26,7 @@ export interface IExecutionUnitDefinition {
 
 export interface IExecutionUnitResultMetadata {
   readonly unitId: string;
-  readonly status: Extract<ExecutionStatus, "completed" | "failed" | "skipped">;
+  readonly status: Extract<ExecutionStatus, "completed" | "failed" | "skipped" | "cancelled">;
   readonly outputMetadata?: Readonly<Record<string, unknown>>;
   readonly errorMessage?: string;
 }

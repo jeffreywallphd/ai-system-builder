@@ -5,33 +5,44 @@ import {
   type ExecutionUnitDefinition,
 } from "../../domain/execution/ExecutionPlan";
 import type {
-  IWorkflowExecutionEvent,
-  IWorkflowExecutionProvenance,
-  IWorkflowExecutionResult,
-} from "../ports/interfaces/IWorkflowExecutor";
-
-export interface IExecutionEngineEvent {
-  readonly planId: string;
-  readonly unitId: string;
-  readonly status: ExecutionStatus;
-  readonly message?: string;
-  readonly provenance?: IWorkflowExecutionProvenance;
-  readonly workflowEvent?: IWorkflowExecutionEvent;
-}
+  IExecutionArtifact,
+  IExecutionDiagnostics,
+  IExecutionEngineEvent,
+  IExecutionProvenance,
+  IExecutionRunSnapshot,
+} from "./ExecutionContracts";
+import type {
+  IExecutionRunRecord,
+  IExecutionRunTransitionRecord,
+  IExecutionUnitRunRecord,
+} from "../../domain/execution/ExecutionRun";
+import type { IExecutionRunRepository } from "../ports/interfaces/IExecutionRunRepository";
+import { ExecutionRunHandle, type IExecutionRunHandle } from "./ExecutionRunHandle";
 
 export interface IExecutionUnitExecutionRequest {
   readonly plan: ExecutionPlan;
+  readonly runId: string;
   readonly unit: ExecutionUnitDefinition;
   readonly unitInputs?: Readonly<Record<string, unknown>>;
 }
 
 export interface IExecutionUnitExecutionResult {
   readonly unitId: string;
-  readonly status: Extract<ExecutionStatus, "completed" | "failed" | "skipped">;
+  readonly status: Extract<ExecutionStatus, "completed" | "failed" | "skipped" | "cancelled">;
   readonly outputMetadata?: Readonly<Record<string, unknown>>;
   readonly errorMessage?: string;
-  readonly provenance?: IWorkflowExecutionProvenance;
-  readonly workflowResult?: IWorkflowExecutionResult;
+  readonly provenance?: IExecutionProvenance;
+  readonly diagnostics?: ReadonlyArray<IExecutionDiagnostics>;
+  readonly artifacts?: ReadonlyArray<IExecutionArtifact>;
+}
+
+export interface IExecutionUnitRunHandle {
+  readonly unitId: string;
+  waitForCompletion(): Promise<IExecutionUnitExecutionResult>;
+  cancel(): Promise<void>;
+  subscribe?(
+    listener: (event: IExecutionEngineEvent) => void
+  ): Promise<() => void> | (() => void);
 }
 
 export interface IExecutionUnitHandler {
@@ -40,11 +51,16 @@ export interface IExecutionUnitHandler {
     request: IExecutionUnitExecutionRequest,
     onEvent?: (event: IExecutionEngineEvent) => void
   ): Promise<IExecutionUnitExecutionResult>;
+  startExecution?(
+    request: IExecutionUnitExecutionRequest,
+    onEvent?: (event: IExecutionEngineEvent) => void
+  ): Promise<IExecutionUnitRunHandle>;
 }
 
 export interface IExecutionPlanRequest {
   readonly plan: ExecutionPlan;
   readonly unitInputs?: Readonly<Record<string, unknown>>;
+  readonly metadata?: Readonly<Record<string, unknown>>;
 }
 
 export interface IExecutionUnitTransition {
@@ -52,25 +68,57 @@ export interface IExecutionUnitTransition {
   readonly fromStatus?: ExecutionStatus;
   readonly toStatus: ExecutionStatus;
   readonly message?: string;
-  readonly provenance?: IWorkflowExecutionProvenance;
+  readonly provenance?: IExecutionProvenance;
+  readonly diagnostics?: ReadonlyArray<IExecutionDiagnostics>;
+  readonly occurredAt: string;
 }
 
 export interface IExecutionPlanResult {
+  readonly runId: string;
   readonly planId: string;
-  readonly status: Extract<ExecutionStatus, "completed" | "failed">;
+  readonly status: Extract<ExecutionStatus, "completed" | "failed" | "cancelled">;
   readonly unitStatuses: Readonly<Record<string, ExecutionStatus>>;
   readonly transitions: ReadonlyArray<IExecutionUnitTransition>;
   readonly unitResults: Readonly<Record<string, IExecutionUnitExecutionResult>>;
+  readonly run: IExecutionRunSnapshot;
 }
 
 function freezeRecord<TValue>(value: Record<string, TValue>): Readonly<Record<string, TValue>> {
   return Object.freeze({ ...value });
 }
 
+function cloneArtifacts(artifacts?: ReadonlyArray<IExecutionArtifact>): ReadonlyArray<IExecutionArtifact> | undefined {
+  return artifacts
+    ? Object.freeze(artifacts.map((artifact) => Object.freeze({ ...artifact })))
+    : undefined;
+}
+
+function cloneDiagnostics(
+  diagnostics?: ReadonlyArray<IExecutionDiagnostics>,
+): ReadonlyArray<IExecutionDiagnostics> | undefined {
+  return diagnostics
+    ? Object.freeze(diagnostics.map((diagnostic) => Object.freeze({ ...diagnostic })))
+    : undefined;
+}
+
+function cloneProvenance(provenance?: IExecutionProvenance): IExecutionProvenance | undefined {
+  return provenance
+    ? Object.freeze({
+        ...provenance,
+        fallback: provenance.fallback ? Object.freeze({ ...provenance.fallback }) : undefined,
+        diagnostics: cloneDiagnostics(provenance.diagnostics),
+        metadata: provenance.metadata ? Object.freeze({ ...provenance.metadata }) : undefined,
+      })
+    : undefined;
+}
+
 export class UnifiedExecutionEngine {
   private readonly handlers: ReadonlyArray<IExecutionUnitHandler>;
 
-  constructor(handlers: ReadonlyArray<IExecutionUnitHandler>) {
+  constructor(
+    handlers: ReadonlyArray<IExecutionUnitHandler>,
+    private readonly executionRunRepository?: IExecutionRunRepository,
+  ) {
     this.handlers = Object.freeze([...handlers]);
   }
 
@@ -78,16 +126,184 @@ export class UnifiedExecutionEngine {
     request: IExecutionPlanRequest,
     onEvent?: (event: IExecutionEngineEvent) => void
   ): Promise<IExecutionPlanResult> {
+    const handle = await this.startExecution(request, onEvent);
+    return handle.waitForCompletion();
+  }
+
+  public async startExecution(
+    request: IExecutionPlanRequest,
+    onEvent?: (event: IExecutionEngineEvent) => void,
+  ): Promise<IExecutionRunHandle> {
+    const runId = this.createRunId(request.plan.id);
+    const listeners = new Set<(event: IExecutionEngineEvent) => void>();
     const statuses = request.plan.units.reduce<Record<string, ExecutionStatus>>((acc, unit) => {
       acc[unit.id] = unit.dependsOn.length === 0 ? ExecutionStatuses.ready : ExecutionStatuses.pending;
       return acc;
     }, {});
-    const transitions: IExecutionUnitTransition[] = [];
+    let cancellationRequested = false;
+    let activeUnitHandle: IExecutionUnitRunHandle | undefined;
+
+    const emit = (event: IExecutionEngineEvent) => {
+      onEvent?.(event);
+      for (const listener of listeners) {
+        listener(event);
+      }
+    };
+
+    const buildRunRecord = (params: {
+      readonly unitResults: Readonly<Record<string, IExecutionUnitExecutionResult>>;
+      readonly transitions: ReadonlyArray<IExecutionRunTransitionRecord>;
+      readonly startedAt: string;
+      readonly status?: ExecutionStatus;
+      readonly completedAt?: string;
+      readonly cancellationSupported: boolean;
+      readonly metadata?: Readonly<Record<string, unknown>>;
+    }): IExecutionRunRecord => {
+      const units = request.plan.units.reduce<Record<string, IExecutionUnitRunRecord>>((acc, unit) => {
+        const unitResult = params.unitResults[unit.id];
+        const matchingTransitions = params.transitions.filter((transition) => transition.unitId === unit.id);
+        const runningTransition = matchingTransitions.find((transition) => transition.toStatus === ExecutionStatuses.running);
+        const terminalTransition = [...matchingTransitions].reverse().find((transition) =>
+          transition.toStatus === ExecutionStatuses.completed
+          || transition.toStatus === ExecutionStatuses.failed
+          || transition.toStatus === ExecutionStatuses.skipped
+          || transition.toStatus === ExecutionStatuses.cancelled,
+        );
+        const latestTransition = matchingTransitions[matchingTransitions.length - 1];
+
+        acc[unit.id] = Object.freeze({
+          unitId: unit.id,
+          kind: unit.kind,
+          label: unit.label,
+          dependsOn: Object.freeze([...unit.dependsOn]),
+          status: statuses[unit.id],
+          outputMetadata: unitResult?.outputMetadata ? Object.freeze({ ...unitResult.outputMetadata }) : undefined,
+          errorMessage: unitResult?.errorMessage,
+          provenance: cloneProvenance(unitResult?.provenance),
+          diagnostics: cloneDiagnostics(unitResult?.diagnostics),
+          artifacts: cloneArtifacts(unitResult?.artifacts),
+          startedAt: runningTransition?.occurredAt,
+          completedAt: terminalTransition?.occurredAt,
+          updatedAt: latestTransition?.occurredAt ?? params.startedAt,
+        });
+        return acc;
+      }, {});
+      const finalStatus = params.status ?? this.derivePlanStatus(statuses, cancellationRequested);
+
+      return Object.freeze({
+        runId,
+        planId: request.plan.id,
+        status: finalStatus,
+        unitIds: Object.freeze(request.plan.units.map((unit) => unit.id)),
+        units: freezeRecord(units),
+        transitions: Object.freeze(params.transitions.map((transition) => Object.freeze({ ...transition }))),
+        startedAt: params.startedAt,
+        updatedAt: params.completedAt ?? params.transitions[params.transitions.length - 1]?.occurredAt ?? params.startedAt,
+        completedAt: params.completedAt,
+        cancellationSupported: params.cancellationSupported,
+        metadata: params.metadata ? Object.freeze({ ...params.metadata }) : undefined,
+        finalErrorMessage: this.resolveFinalErrorMessage(finalStatus, params.unitResults),
+      });
+    };
+
+    const startedAt = new Date().toISOString();
+    const transitions: IExecutionRunTransitionRecord[] = [];
     const unitResults: Record<string, IExecutionUnitExecutionResult> = {};
+    const supportsCancellation = request.plan.units.every((unit) => {
+      const handler = this.resolveHandler(unit);
+      return typeof handler.startExecution === "function";
+    });
+
+    let currentRun = buildRunRecord({
+      unitResults,
+      transitions,
+      startedAt,
+      cancellationSupported: supportsCancellation,
+      metadata: request.metadata,
+    });
+    await this.persistRun(currentRun);
+
+    let handleRef: ExecutionRunHandle | undefined;
+
+    const handle = new ExecutionRunHandle({
+      runId,
+      planId: request.plan.id,
+      initialSnapshot: currentRun,
+      cancel: async () => {
+        cancellationRequested = true;
+        if (activeUnitHandle) {
+          await activeUnitHandle.cancel();
+        }
+      },
+      subscribe: (listener) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+      completionPromise: Promise.resolve().then(() => this.executeRun({
+        request,
+        runId,
+        statuses,
+        startedAt,
+        transitions,
+        unitResults,
+        buildRunRecord,
+        setCurrentRun: async (run) => {
+          currentRun = run;
+          handleRef?.updateSnapshot(run);
+          await this.persistRun(run);
+        },
+        emit,
+        isCancellationRequested: () => cancellationRequested,
+        setActiveUnitHandle: (nextHandle) => {
+          activeUnitHandle = nextHandle;
+        },
+      })),
+    });
+
+    handleRef = handle;
+
+    return handle;
+  }
+
+  private async executeRun(params: {
+    readonly request: IExecutionPlanRequest;
+    readonly runId: string;
+    readonly statuses: Record<string, ExecutionStatus>;
+    readonly startedAt: string;
+    readonly transitions: IExecutionRunTransitionRecord[];
+    readonly unitResults: Record<string, IExecutionUnitExecutionResult>;
+    readonly buildRunRecord: (params: {
+      readonly unitResults: Readonly<Record<string, IExecutionUnitExecutionResult>>;
+      readonly transitions: ReadonlyArray<IExecutionRunTransitionRecord>;
+      readonly startedAt: string;
+      readonly status?: ExecutionStatus;
+      readonly completedAt?: string;
+      readonly cancellationSupported: boolean;
+      readonly metadata?: Readonly<Record<string, unknown>>;
+    }) => IExecutionRunRecord;
+    readonly setCurrentRun: (run: IExecutionRunRecord) => Promise<void>;
+    readonly emit: (event: IExecutionEngineEvent) => void;
+    readonly isCancellationRequested: () => boolean;
+    readonly setActiveUnitHandle: (handle: IExecutionUnitRunHandle | undefined) => void;
+  }): Promise<IExecutionPlanResult> {
+    const cancellationSupported = params.request.plan.units.every((unit) => {
+      const handler = this.resolveHandler(unit);
+      return typeof handler.startExecution === "function";
+    });
 
     while (true) {
-      const readyUnits = request.plan.getReadyUnits(statuses);
-      const nextUnit = readyUnits.find((unit) => statuses[unit.id] === ExecutionStatuses.ready)
+      if (params.isCancellationRequested()) {
+        return this.finishRun({
+          ...params,
+          finalStatus: ExecutionStatuses.cancelled,
+          message: "Execution run was cancelled before the next unit started.",
+          failedUnitId: undefined,
+          cancellationSupported,
+        });
+      }
+
+      const readyUnits = params.request.plan.getReadyUnits(params.statuses);
+      const nextUnit = readyUnits.find((unit) => params.statuses[unit.id] === ExecutionStatuses.ready)
         ?? readyUnits[0];
 
       if (!nextUnit) {
@@ -95,81 +311,211 @@ export class UnifiedExecutionEngine {
       }
 
       this.recordTransition({
-        transitions,
-        statuses,
+        transitions: params.transitions,
+        statuses: params.statuses,
         unitId: nextUnit.id,
         toStatus: ExecutionStatuses.running,
       });
-      onEvent?.({
-        planId: request.plan.id,
+      await params.setCurrentRun(params.buildRunRecord({
+        unitResults: params.unitResults,
+        transitions: params.transitions,
+        startedAt: params.startedAt,
+        cancellationSupported,
+        metadata: params.request.metadata,
+      }));
+      params.emit({
+        planId: params.request.plan.id,
+        runId: params.runId,
         unitId: nextUnit.id,
         status: ExecutionStatuses.running,
         message: `Running execution unit '${nextUnit.id}'.`,
       });
 
       const handler = this.resolveHandler(nextUnit);
-      const result = await handler.execute(
-        {
-          plan: request.plan,
+      const result = await this.executeUnit({
+        handler,
+        request: {
+          plan: params.request.plan,
+          runId: params.runId,
           unit: nextUnit,
-          unitInputs: request.unitInputs,
+          unitInputs: params.request.unitInputs,
         },
-        onEvent,
-      );
-      unitResults[nextUnit.id] = Object.freeze({ ...result });
+        onEvent: params.emit,
+        setActiveUnitHandle: params.setActiveUnitHandle,
+      });
+      params.unitResults[nextUnit.id] = Object.freeze({
+        ...result,
+        outputMetadata: result.outputMetadata ? Object.freeze({ ...result.outputMetadata }) : undefined,
+        provenance: cloneProvenance(result.provenance),
+        diagnostics: cloneDiagnostics(result.diagnostics),
+        artifacts: cloneArtifacts(result.artifacts),
+      });
       this.recordTransition({
-        transitions,
-        statuses,
+        transitions: params.transitions,
+        statuses: params.statuses,
         unitId: nextUnit.id,
         toStatus: result.status,
         message: result.errorMessage,
         provenance: result.provenance,
+        diagnostics: result.diagnostics,
       });
+      await params.setCurrentRun(params.buildRunRecord({
+        unitResults: params.unitResults,
+        transitions: params.transitions,
+        startedAt: params.startedAt,
+        cancellationSupported,
+        metadata: params.request.metadata,
+      }));
 
-      if (result.status === ExecutionStatuses.failed) {
-        this.skipRemainingUnits({
-          plan: request.plan,
-          statuses,
-          transitions,
+      if (result.status === ExecutionStatuses.failed || result.status === ExecutionStatuses.cancelled) {
+        return this.finishRun({
+          ...params,
+          finalStatus: result.status,
+          message: result.errorMessage,
           failedUnitId: nextUnit.id,
-        });
-
-        return Object.freeze({
-          planId: request.plan.id,
-          status: ExecutionStatuses.failed,
-          unitStatuses: freezeRecord(statuses),
-          transitions: Object.freeze([...transitions]),
-          unitResults: freezeRecord(unitResults),
+          cancellationSupported,
         });
       }
 
-      this.refreshReadyStatuses(request.plan, statuses, transitions);
+      this.refreshReadyStatuses(params.request.plan, params.statuses, params.transitions);
+      await params.setCurrentRun(params.buildRunRecord({
+        unitResults: params.unitResults,
+        transitions: params.transitions,
+        startedAt: params.startedAt,
+        cancellationSupported,
+        metadata: params.request.metadata,
+      }));
     }
 
-    const hasIncompleteUnits = request.plan.units.some((unit) => {
-      const status = statuses[unit.id];
+    const hasIncompleteUnits = params.request.plan.units.some((unit) => {
+      const status = params.statuses[unit.id];
       return status !== ExecutionStatuses.completed && status !== ExecutionStatuses.skipped;
     });
 
     if (hasIncompleteUnits) {
       throw new Error(
-        `Execution plan '${request.plan.id}' could not resolve the next executable unit.`,
+        `Execution plan '${params.request.plan.id}' could not resolve the next executable unit.`,
       );
     }
 
-    return Object.freeze({
-      planId: request.plan.id,
+    const completedAt = new Date().toISOString();
+    const run = params.buildRunRecord({
+      unitResults: params.unitResults,
+      transitions: params.transitions,
+      startedAt: params.startedAt,
       status: ExecutionStatuses.completed,
-      unitStatuses: freezeRecord(statuses),
-      transitions: Object.freeze([...transitions]),
-      unitResults: freezeRecord(unitResults),
+      completedAt,
+      cancellationSupported,
+      metadata: params.request.metadata,
+    });
+    await params.setCurrentRun(run);
+
+    return Object.freeze({
+      runId: params.runId,
+      planId: params.request.plan.id,
+      status: ExecutionStatuses.completed,
+      unitStatuses: freezeRecord(params.statuses),
+      transitions: Object.freeze(params.transitions.map((transition) => Object.freeze({ ...transition }))),
+      unitResults: freezeRecord(params.unitResults),
+      run,
+    });
+  }
+
+  private async executeUnit(params: {
+    readonly handler: IExecutionUnitHandler;
+    readonly request: IExecutionUnitExecutionRequest;
+    readonly onEvent: (event: IExecutionEngineEvent) => void;
+    readonly setActiveUnitHandle: (handle: IExecutionUnitRunHandle | undefined) => void;
+  }): Promise<IExecutionUnitExecutionResult> {
+    if (typeof params.handler.startExecution !== "function") {
+      params.setActiveUnitHandle(undefined);
+      return params.handler.execute(params.request, params.onEvent);
+    }
+
+    const unitHandle = await params.handler.startExecution(params.request, params.onEvent);
+    params.setActiveUnitHandle(unitHandle);
+
+    try {
+      let unsubscribe: (() => void) | undefined;
+      if (typeof unitHandle.subscribe === "function") {
+        const maybeUnsubscribe = await unitHandle.subscribe((event) => params.onEvent(event));
+        unsubscribe = typeof maybeUnsubscribe === "function" ? maybeUnsubscribe : undefined;
+      }
+
+      try {
+        return await unitHandle.waitForCompletion();
+      } finally {
+        unsubscribe?.();
+      }
+    } finally {
+      params.setActiveUnitHandle(undefined);
+    }
+  }
+
+  private async finishRun(params: {
+    readonly request: IExecutionPlanRequest;
+    readonly runId: string;
+    readonly statuses: Record<string, ExecutionStatus>;
+    readonly startedAt: string;
+    readonly transitions: IExecutionRunTransitionRecord[];
+    readonly unitResults: Record<string, IExecutionUnitExecutionResult>;
+    readonly buildRunRecord: (params: {
+      readonly unitResults: Readonly<Record<string, IExecutionUnitExecutionResult>>;
+      readonly transitions: ReadonlyArray<IExecutionRunTransitionRecord>;
+      readonly startedAt: string;
+      readonly status?: ExecutionStatus;
+      readonly completedAt?: string;
+      readonly cancellationSupported: boolean;
+      readonly metadata?: Readonly<Record<string, unknown>>;
+    }) => IExecutionRunRecord;
+    readonly setCurrentRun: (run: IExecutionRunRecord) => Promise<void>;
+    readonly emit: (event: IExecutionEngineEvent) => void;
+    readonly finalStatus: Extract<ExecutionStatus, "failed" | "cancelled">;
+    readonly message?: string;
+    readonly failedUnitId?: string;
+    readonly cancellationSupported: boolean;
+  }): Promise<IExecutionPlanResult> {
+    this.skipRemainingUnits({
+      plan: params.request.plan,
+      statuses: params.statuses,
+      transitions: params.transitions,
+      failedUnitId: params.failedUnitId,
+      finalStatus: params.finalStatus,
+    });
+    const completedAt = new Date().toISOString();
+    const run = params.buildRunRecord({
+      unitResults: params.unitResults,
+      transitions: params.transitions,
+      startedAt: params.startedAt,
+      status: params.finalStatus,
+      completedAt,
+      cancellationSupported: params.cancellationSupported,
+      metadata: params.request.metadata,
+    });
+    await params.setCurrentRun(run);
+    params.emit({
+      planId: params.request.plan.id,
+      runId: params.runId,
+      unitId: params.failedUnitId ?? params.request.plan.units[0]?.id ?? "plan",
+      status: params.finalStatus,
+      message: params.message,
+    });
+
+    return Object.freeze({
+      runId: params.runId,
+      planId: params.request.plan.id,
+      status: params.finalStatus,
+      unitStatuses: freezeRecord(params.statuses),
+      transitions: Object.freeze(params.transitions.map((transition) => Object.freeze({ ...transition }))),
+      unitResults: freezeRecord(params.unitResults),
+      run,
     });
   }
 
   private refreshReadyStatuses(
     plan: ExecutionPlan,
     statuses: Record<string, ExecutionStatus>,
-    transitions: IExecutionUnitTransition[],
+    transitions: IExecutionRunTransitionRecord[],
   ): void {
     for (const unit of plan.getReadyUnits(statuses)) {
       if (statuses[unit.id] === ExecutionStatuses.pending) {
@@ -186,12 +532,18 @@ export class UnifiedExecutionEngine {
   private skipRemainingUnits(params: {
     readonly plan: ExecutionPlan;
     readonly statuses: Record<string, ExecutionStatus>;
-    readonly transitions: IExecutionUnitTransition[];
-    readonly failedUnitId: string;
+    readonly transitions: IExecutionRunTransitionRecord[];
+    readonly failedUnitId?: string;
+    readonly finalStatus: Extract<ExecutionStatus, "failed" | "cancelled">;
   }): void {
     for (const unit of params.plan.units) {
       const status = params.statuses[unit.id];
-      if (status === ExecutionStatuses.completed || status === ExecutionStatuses.failed || status === ExecutionStatuses.skipped) {
+      if (
+        status === ExecutionStatuses.completed
+        || status === ExecutionStatuses.failed
+        || status === ExecutionStatuses.skipped
+        || status === ExecutionStatuses.cancelled
+      ) {
         continue;
       }
 
@@ -199,8 +551,10 @@ export class UnifiedExecutionEngine {
         transitions: params.transitions,
         statuses: params.statuses,
         unitId: unit.id,
-        toStatus: ExecutionStatuses.skipped,
-        message: `Skipped after '${params.failedUnitId}' failed.`,
+        toStatus: params.finalStatus === ExecutionStatuses.cancelled ? ExecutionStatuses.cancelled : ExecutionStatuses.skipped,
+        message: params.finalStatus === ExecutionStatuses.cancelled
+          ? `Cancelled after '${params.failedUnitId ?? "run"}' stopped the plan.`
+          : `Skipped after '${params.failedUnitId}' failed.`,
       });
     }
   }
@@ -216,12 +570,13 @@ export class UnifiedExecutionEngine {
   }
 
   private recordTransition(params: {
-    readonly transitions: IExecutionUnitTransition[];
+    readonly transitions: IExecutionRunTransitionRecord[];
     readonly statuses: Record<string, ExecutionStatus>;
     readonly unitId: string;
     readonly toStatus: ExecutionStatus;
     readonly message?: string;
-    readonly provenance?: IWorkflowExecutionProvenance;
+    readonly provenance?: IExecutionProvenance;
+    readonly diagnostics?: ReadonlyArray<IExecutionDiagnostics>;
   }): void {
     const fromStatus = params.statuses[params.unitId];
     params.statuses[params.unitId] = params.toStatus;
@@ -231,8 +586,58 @@ export class UnifiedExecutionEngine {
         fromStatus,
         toStatus: params.toStatus,
         message: params.message,
-        provenance: params.provenance,
+        provenance: cloneProvenance(params.provenance),
+        diagnostics: cloneDiagnostics(params.diagnostics),
+        occurredAt: new Date().toISOString(),
       })
     );
+  }
+
+  private derivePlanStatus(
+    statuses: Readonly<Record<string, ExecutionStatus>>,
+    cancellationRequested: boolean,
+  ): ExecutionStatus {
+    if (Object.values(statuses).some((status) => status === ExecutionStatuses.failed)) {
+      return ExecutionStatuses.failed;
+    }
+    if (
+      cancellationRequested
+      || Object.values(statuses).some((status) => status === ExecutionStatuses.cancelled)
+    ) {
+      return ExecutionStatuses.cancelled;
+    }
+    if (Object.values(statuses).every((status) => status === ExecutionStatuses.completed || status === ExecutionStatuses.skipped)) {
+      return ExecutionStatuses.completed;
+    }
+    if (Object.values(statuses).some((status) => status === ExecutionStatuses.running)) {
+      return ExecutionStatuses.running;
+    }
+    if (Object.values(statuses).some((status) => status === ExecutionStatuses.ready)) {
+      return ExecutionStatuses.ready;
+    }
+    return ExecutionStatuses.pending;
+  }
+
+  private resolveFinalErrorMessage(
+    finalStatus: ExecutionStatus,
+    unitResults: Readonly<Record<string, IExecutionUnitExecutionResult>>,
+  ): string | undefined {
+    if (finalStatus === ExecutionStatuses.completed) {
+      return undefined;
+    }
+
+    const terminalResult = Object.values(unitResults).find((result) => result.status === finalStatus)
+      ?? Object.values(unitResults).find((result) => result.errorMessage);
+
+    return terminalResult?.errorMessage;
+  }
+
+  private async persistRun(run: IExecutionRunRecord): Promise<void> {
+    await this.executionRunRepository?.saveRun(run);
+  }
+
+  private createRunId(planId: string): string {
+    const normalizedPlanId = planId.trim().replace(/[^a-zA-Z0-9_-]+/g, "-");
+    return `${normalizedPlanId}-run-${Date.now()}`;
   }
 }

@@ -16,42 +16,41 @@ This is one of the strongest architectural choices in the repository because it 
 
 ## Unified execution engine slice
 
-The repository now has a thin unified execution engine slice for **workflow execution only**.
+The repository now has a thin unified execution engine slice whose **primary contract is execution-native rather than workflow-specific**.
 
-The purpose of this slice is not to replace the current truthful workflow runtime stack. Instead, it adds a small inner execution abstraction that can become the canonical seam for future execution work while preserving the current workflow runtime behavior.
+The purpose of this slice is still not to replace the current truthful workflow runtime stack. Instead, it provides a small inner execution abstraction that now acts as a reusable execution substrate while preserving the current workflow runtime behavior through adapters.
 
 ### New inner-layer execution concepts
 
-The domain layer now defines a narrow execution model in `domain/execution/ExecutionPlan.ts`:
+The execution slice now uses two small execution-native contract families:
 
-- `ExecutionUnitDefinition` describes a unit of work
-- `ExecutionPlan` describes an ordered/dependency-aware set of units
-- `ExecutionStatuses` provides plan-level status values such as `pending`, `ready`, `running`, `completed`, `failed`, and `skipped`
-- `ExecutionUnitResultMetadata` separates execution results from unit definitions
+- `domain/execution/ExecutionPlan.ts` for plan/unit identity, dependency ordering, and statuses (`pending`, `ready`, `running`, `completed`, `failed`, `skipped`, `cancelled`)
+- `domain/execution/ExecutionRun.ts` plus `application/execution/ExecutionContracts.ts` for run snapshots, unit transitions, execution-native provenance, diagnostics, and result/event attachments
 
-This taxonomy is intentionally small. It is sufficient for workflow execution plans today without overcommitting the system to speculative dataset/model/MCP shapes.
+This taxonomy is intentionally small. It is sufficient for workflow execution plans and persisted run history today without overcommitting the system to speculative dataset/model/MCP shapes.
 
 ### New application-layer engine
 
-`application/execution/UnifiedExecutionEngine.ts` executes an `ExecutionPlan` by:
+`application/execution/UnifiedExecutionEngine.ts` now executes and starts `ExecutionPlan` runs by:
 
 - determining which units are ready based on dependency completion
-- delegating each unit to a matching handler
-- collecting unit transitions and unit results
-- carrying forward workflow provenance/truthfulness when the unit handler produces it
+- delegating each unit to a matching execution-unit handler
+- collecting unit transitions, unit results, and execution-native events
+- persisting durable execution-run snapshots when an execution-run repository is configured
+- carrying forward truthful provenance when a unit handler produces it
 
-The engine currently runs units sequentially and is intentionally conservative. It is a clean seam, not a scheduler or distributed orchestration layer.
+The engine still runs units sequentially and is intentionally conservative. It is a clean seam and durable run coordinator, not a scheduler or distributed orchestration layer.
 
 ### Workflow path now routed through the engine
 
-`application/workflows/ExecuteWorkflowUseCase.ts` now builds a one-unit execution plan for the immediate workflow run path and submits it to the unified execution engine.
+`application/workflows/ExecuteWorkflowUseCase.ts` now builds a one-unit execution plan for **both** the immediate workflow run path and the `startExecution(...)` path, then submits that plan to the unified execution engine.
 
-The migrated path is deliberately narrow:
+The migrated path is still deliberately narrow:
 
-- **migrated now:** direct workflow execution from `ExecuteWorkflowUseCase.execute(...)` and direct tool execution from `RunToolUseCase.execute(...)`
-- **not yet migrated:** dataset generation, model creation/training, MCP orchestration, or broader asynchronous/scheduled execution paths
+- **migrated now:** direct workflow execution from `ExecuteWorkflowUseCase.execute(...)`, workflow `startExecution(...)`, direct tool execution from `RunToolUseCase.execute(...)`, and tuning-dataset example generation from `DefaultTuningDatasetStudioApplicationService.generateExamplesFromSource(...)`
+- **not yet migrated:** model creation/training, MCP orchestration, or broader asynchronous/scheduled execution paths
 
-This gives the codebase one real production path through the new abstraction without forcing a broad refactor.
+This gives the codebase one real production seam for synchronous workflow runs, started workflow runs, and a second non-workflow execution-backed product area without forcing a broad refactor.
 
 ## Execution flow for workflows
 
@@ -68,16 +67,17 @@ In the renderer, stores call services such as `ui/services/WorkflowService.ts`, 
 
 This remains the central orchestration point for workflow runs.
 
-### 3. The execution engine delegates workflow work to the workflow adapter
-`infrastructure/execution/WorkflowExecutionUnitHandler.ts` is the first real execution-unit handler.
+### 3. The execution engine delegates product-specific work to thin adapters
+`infrastructure/execution/WorkflowExecutionUnitHandler.ts` is the workflow execution-unit handler, and `infrastructure/execution/DatasetGenerationExecutionUnitHandler.ts` is the dataset-generation execution-unit handler.
 
-Its job is intentionally thin:
-- accept a workflow execution unit from the engine
-- adapt the unit input back into `IWorkflowExecutionInput`
-- call the existing `IWorkflowExecutor`
-- forward workflow events/result provenance back through the engine without rewriting strategy internals
+Their job is intentionally thin:
+- accept an execution unit from the engine
+- adapt that unit back into the existing product-specific request type (`IWorkflowExecutionInput` or `DatasetGenerationRequest`)
+- call the existing product-specific runtime service
+- map truthful product-specific provenance into execution-native engine contracts
+- preserve original product-specific payloads as attached artifacts for product-facing callers
 
-This preserves the existing runtime-aware execution stack while establishing a canonical execution seam above it.
+This preserves the existing runtime-aware execution stacks while establishing a canonical execution seam above them.
 
 ### 4. The executor chooses a strategy
 `infrastructure/execution/TruthfulWorkflowExecutor.ts` still selects an execution strategy via `WorkflowRuntimeSelector`.
@@ -94,14 +94,16 @@ Today the main strategies are:
 
 The delegated strategy serializes workflow nodes/connections into the Python runtime request. The interpreted strategy topologically sorts the graph, resolves node execution context, runs nodes one at a time, and accumulates outputs/provenance.
 
-### 6. Provenance is returned truthfully
-The unified execution engine does **not** replace existing provenance language. Instead, the workflow unit handler carries the existing workflow provenance through the engine so the caller can still tell whether execution was:
+### 6. Provenance and run history stay truthful
+The unified execution engine does **not** replace existing provenance language. Instead, the workflow unit handler maps workflow provenance into execution-native provenance fields and preserves workflow-specific payloads as attached artifacts so the caller can still tell whether execution was:
 - delegated
 - scaffolded/interpreted
 - hybrid
 - unavailable or degraded
 
-That matters because the new abstraction is meant to standardize execution flow without flattening the truthfulness model.
+Plan-backed runs are also now persisted as durable execution-run records. Those records capture run identity, plan identity, unit states, status transitions, timestamps, final status, error details, and truthful execution provenance metadata. Lightweight application query use cases can now list and load those run records without reaching into infrastructure directly.
+
+That matters because the abstraction is meant to standardize execution flow without flattening the truthfulness model or discarding execution history.
 
 ## Why the executor is called "truthful"
 
@@ -196,12 +198,12 @@ The new execution engine slice starts in the domain/application layers and adapt
 
 ## Recommended next migration steps
 
-1. Revisit whether `startExecution(...)` should gain a plan-aware handle abstraction after there are at least two real plan-backed execution paths.
-2. Introduce additional execution-unit handlers only when a second real product area is ready to migrate, such as dataset generation or model preparation.
-3. Expand the current UI execution summary projection only if authors need more than the existing workflow-status surface now provides.
-4. Keep converging composition helpers so unified execution-engine wiring does not drift across renderer, registry, and bootstrap entry points.
+1. Migrate the next real execution-backed product area after dataset generation, most likely model-training preparation or another runtime-backed preparation path.
+2. Surface the new execution-run query use cases into whichever UI/reporting flows need durable history beyond existing dataset generation batch views.
+3. Expand cancellation/progress modeling only where an actual runtime can report richer unit-level state truthfully.
+4. Keep converging composition helpers so unified execution-engine wiring and execution-run persistence continue to share one path across renderer, registry, and bootstrap entry points.
 
 ## TODO
 
-- Tool running and workflow execution currently share architecture well, but the surrounding composition is duplicated between `infrastructure/composition/InfrastructureRegistry.ts` and `ui/composition/createUiDependencies.ts`. Converging those registrations would reduce drift in this critical slice.
+- Tool running and workflow execution now share the same engine seam and persisted run model, but broader composition still has multiple roots. Further convergence should happen incrementally instead of through a giant rewrite.
 - The interpreted fallback is clearly useful, but the product docs should eventually define which node types are expected to be fully trustworthy under scaffold execution versus only under delegated runtimes.
