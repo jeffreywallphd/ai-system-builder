@@ -1,0 +1,155 @@
+# Layers and Boundaries
+
+This document explains the intended clean-architecture boundaries in AI Loom Studio and how those boundaries are realized in the current implementation.
+
+## Dependency rule
+
+The codebase mostly follows the classic dependency direction:
+
+- `domain/` should not know about application services, UI, Electron, browser storage, or Python runtime adapters.
+- `application/` can depend on `domain/`, but should depend on external systems only through ports/interfaces.
+- `infrastructure/` implements those ports and composes concrete adapters.
+- `ui/` and `electron/` sit at the outside edge and drive the system.
+
+In other words: **policy points inward, detail points outward**.
+
+## Domain layer responsibilities
+
+The domain layer holds the durable product concepts and validation rules.
+
+### What belongs here
+- immutable-style aggregates and value objects
+- workflow graph semantics
+- model compatibility logic
+- connection and node validation rules
+- service compatibility rules
+- tuning dataset domain policies and release semantics
+
+### Example: workflow aggregate
+`domain/workflows/Workflow.ts` models the workflow as the root aggregate. It owns metadata, status, runtime profile, execution policy, nodes, and connections, and exposes mutation methods that return updated workflow instances rather than mutating internal state in place.
+
+That design matters because it gives the rest of the system a stable business object independent from storage, rendering, or runtime implementation.
+
+### Example: workflow validation
+`domain/services/WorkflowValidator.ts` performs layered validation over the workflow graph, nodes, connections, runtime policy, and execution policy. This is important architecturally because the rules for whether a workflow is valid live in the domain/service layer rather than inside UI components or infrastructure adapters.
+
+## Application layer responsibilities
+
+The application layer translates user/system intent into domain operations.
+
+### What belongs here
+- explicit use cases
+- application services
+- DTOs and request/response objects
+- projection/translation helpers
+- ports/interfaces that describe required external capabilities
+
+### Example: use-case orchestration
+`application/workflows/ExecuteWorkflowUseCase.ts` does not execute workflows itself. Instead, it:
+- applies property overrides
+- optionally validates the workflow
+- resolves workflow context metadata
+- delegates execution to an `IWorkflowExecutor`
+
+This is a textbook application-layer role: orchestrate policy and external dependencies without becoming an infrastructure adapter.
+
+### Example: tools as projected workflows
+The tool system in `application/tools/RunToolUseCase.ts` and `application/projection/WorkflowToolProjectionService.ts` is especially important architecturally. The code treats a published workflow as a workflow-first artifact that can also be projected into a tool surface. That keeps the core authoring model centered on workflows rather than inventing a second disconnected execution model for tools.
+
+## Infrastructure layer responsibilities
+
+Infrastructure contains the "how" of the system.
+
+### What belongs here
+- repositories backed by filesystem, SQLite, browser storage, or bridges
+- runtime clients and network adapters
+- Python and MCP integration
+- execution strategies
+- dependency registration and object graphs
+- node implementation registries
+
+### Example: repositories
+The same application port can be implemented several ways:
+- `infrastructure/filesystem/LocalWorkflowRepository.ts`
+- `infrastructure/browser/workflows/DesktopBridgeWorkflowRepository.ts`
+- `infrastructure/browser/workflows/SqliteBackedWorkflowRepository.ts`
+
+The application sees `IWorkflowRepository`; the host/runtime decides which implementation is active.
+
+### Example: runtime strategies
+Execution is split into explicit strategy objects:
+- `infrastructure/python/execution/PythonDelegatedWorkflowExecutionStrategy.ts`
+- `infrastructure/interpreted/execution/InterpretedWorkflowExecutionStrategy.ts`
+
+That is a strong architectural decision because it keeps runtime selection outside the core use case and makes degraded behavior explicit.
+
+## Presentation/host responsibilities
+
+The outer layers are split between the renderer and the desktop host.
+
+### UI (`ui/`)
+The UI layer contains:
+- React components and routes
+- stores for view state and asynchronous orchestration
+- UI-facing service wrappers around use cases
+- runtime-aware composition helpers
+
+The UI is not purely passive. It owns meaningful orchestration through stores and UI services, but those services usually delegate downward into application-layer use cases.
+
+### Electron (`electron/`)
+The Electron host provides:
+- desktop bootstrap and runtime discovery
+- preload contracts
+- durable storage bridge
+- workflow persistence bridge
+- model file bridge
+- service-supervisor lifecycle wiring
+
+This lets the renderer stay mostly web-like while still accessing native/local capabilities through a controlled boundary.
+
+## Boundary examples that are implemented well
+
+### Good boundary: application ports
+The `application/ports/interfaces/` directory provides a clear seam between orchestration and implementation. Examples include:
+- `IWorkflowRepository`
+- `IWorkflowExecutor`
+- `IMcpToolCatalog`
+- `IContextPackageRepository`
+- `IModelInstaller`
+
+These interfaces make the codebase much easier to evolve per host/runtime.
+
+### Good boundary: domain validation vs UI validation
+Validation logic lives primarily in domain/application services rather than React components. That keeps workflow correctness rules reusable across UI, tests, and future host surfaces.
+
+### Good boundary: desktop bridge contracts
+`electron/shared/DesktopContracts.ts` defines the renderer-visible contract separately from the Electron main process implementation. That is cleaner than scattering IPC string knowledge through the UI.
+
+## Boundary areas that are more pragmatic than pure
+
+### UI services sometimes work directly with domain objects
+`ui/services/WorkflowService.ts` and `ui/services/NodeService.ts` contain convenience operations such as renaming workflows, changing node properties, moving nodes, and removing nodes by directly manipulating domain aggregates. This is convenient and not inherently wrong, but it means some application-style behavior is living in the UI layer rather than as dedicated application use cases.
+
+### Two separate composition styles
+The system has:
+- a reusable dependency container and bootstrap in `infrastructure/composition/`
+- a large manual renderer composition function in `ui/composition/createUiDependencies.ts`
+
+That means the architectural boundaries are conceptually clean, but object construction is not fully centralized.
+
+## Practical rule of thumb for contributors
+
+When adding or changing behavior:
+
+- Put **business rules** in `domain/`.
+- Put **user/system operations** in `application/`.
+- Put **storage/runtime/API adapters** in `infrastructure/`.
+- Put **rendering, store orchestration, and route/page behavior** in `ui/`.
+- Put **desktop-specific host wiring** in `electron/`.
+
+If a change needs data from the outside world, prefer adding or using an **application port** rather than importing infrastructure directly into a use case.
+
+## TODO
+
+- Several convenience mutations still live in UI services instead of dedicated application use cases. If the goal is a stricter clean architecture, those write operations should gradually move inward.
+- The codebase would be easier to reason about if the manual renderer composition and the container-based infrastructure composition shared more of the same registration path or abstractions.
