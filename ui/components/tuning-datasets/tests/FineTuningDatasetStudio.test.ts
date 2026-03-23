@@ -12,6 +12,9 @@ describe("FineTuningDatasetStudio", () => {
     expect(source).toContain("Bulk accept");
     expect(source).toContain("chat_completion");
     expect(source).toContain("openai_chat_jsonl");
+    expect(source).toContain("python-runtime-local generator");
+    expect(source).toContain("provider/model identity, diagnostics, and fallback reasons");
+    expect(source).toContain("Execution kind:");
     expect(source).toContain("Guided supervised tuning workflow");
   });
 });

@@ -32,11 +32,40 @@ export class DefaultModelTrainingApplicationService implements ModelTrainingAppl
     }
 
     const jobs = await this.jobRepository.listJobs();
-    return Object.freeze([...jobs].sort((left, right) => {
-      const rightTime = right.submittedAt?.getTime() ?? right.createdAt.getTime();
-      const leftTime = left.submittedAt?.getTime() ?? left.createdAt.getTime();
-      return rightTime - leftTime;
-    }));
+    return this.sortJobs(jobs);
+  }
+
+  public async getJob(jobId: string): Promise<ModelTrainingJob | undefined> {
+    const runtimeJob = await this.runtime.getJob(jobId).catch(() => undefined);
+    if (runtimeJob) {
+      await this.jobRepository.saveJob(runtimeJob);
+      return runtimeJob;
+    }
+    return this.jobRepository.getJobById(jobId);
+  }
+
+  public async refreshJob(jobId: string): Promise<ModelTrainingJob | undefined> {
+    const runtimeJob = await this.runtime.refreshJob(jobId).catch(() => undefined);
+    if (runtimeJob) {
+      await this.jobRepository.saveJob(runtimeJob);
+      return runtimeJob;
+    }
+    return this.jobRepository.getJobById(jobId);
+  }
+
+  public async reconcileJob(jobId: string): Promise<ModelTrainingJob | undefined> {
+    const runtimeJob = await this.runtime.reconcileJob(jobId).catch(() => undefined);
+    if (runtimeJob) {
+      await this.jobRepository.saveJob(runtimeJob);
+      return runtimeJob;
+    }
+    return this.jobRepository.getJobById(jobId);
+  }
+
+  public async cancelJob(jobId: string): Promise<ModelTrainingJob> {
+    const job = await this.runtime.cancelJob(jobId);
+    await this.jobRepository.saveJob(job);
+    return job;
   }
 
   public async getStudioSummary(): Promise<ModelTrainingStudioSummary> {
@@ -48,10 +77,16 @@ export class DefaultModelTrainingApplicationService implements ModelTrainingAppl
     if (!baseModel) {
       throw new Error(`Base model '${command.baseModelId}' is not installed.`);
     }
+    if (baseModel.artifact.accessMethod !== "local-file") {
+      throw new Error("Real local training currently requires a base model with a local-file artifact.");
+    }
 
     const dataset = await this.datasetRepository.load(command.datasetId);
     if (!dataset) {
       throw new Error(`Dataset '${command.datasetId}' was not found.`);
+    }
+    if (!["question_answering", "chat_completion"].includes(dataset.taskType)) {
+      throw new Error(`Local training currently supports only question_answering or chat_completion datasets, received '${dataset.taskType}'.`);
     }
 
     const version = await this.datasetVersionRepository.loadVersion(command.datasetId, command.datasetVersionId);
@@ -68,10 +103,21 @@ export class DefaultModelTrainingApplicationService implements ModelTrainingAppl
       throw new Error("Training requires at least one non-rejected dataset example.");
     }
 
+    const executionKind = command.executionKind ?? "local-gradient-training";
+    if (executionKind === "local-gradient-training" && command.configuration.epochs < 1) {
+      throw new Error("Real local training requires epochs >= 1.");
+    }
+    if (command.configuration.batchSize < 1) {
+      throw new Error("Training batch size must be >= 1.");
+    }
+    if (command.configuration.learningRate <= 0) {
+      throw new Error("Training learning rate must be > 0.");
+    }
+
     const job = await this.runtime.submitJob({
       id: command.id?.trim() || this.createId(),
       name: command.name,
-      executionKind: command.executionKind ?? "local-gradient-training",
+      executionKind,
       baseModelId: baseModel.id,
       baseModelName: baseModel.name,
       baseModelLocation: baseModel.artifact.location,
@@ -108,5 +154,13 @@ export class DefaultModelTrainingApplicationService implements ModelTrainingAppl
 
     await this.jobRepository.saveJob(job);
     return job;
+  }
+
+  private sortJobs(jobs: ReadonlyArray<ModelTrainingJob>): ReadonlyArray<ModelTrainingJob> {
+    return Object.freeze([...jobs].sort((left, right) => {
+      const rightTime = right.submittedAt?.getTime() ?? right.createdAt.getTime();
+      const leftTime = left.submittedAt?.getTime() ?? left.createdAt.getTime();
+      return rightTime - leftTime;
+    }));
   }
 }

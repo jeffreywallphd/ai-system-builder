@@ -79,10 +79,12 @@ export interface DatasetGenerationDiagnostic {
   readonly code: string;
   readonly level: "info" | "warning" | "error";
   readonly message: string;
+  readonly detail?: string;
 }
 
-export type DatasetGenerationMode = "provider-model-backed" | "runtime-local-deterministic" | "heuristic-fallback";
-export type DatasetGenerationStatus = "completed" | "partial" | "failed";
+export type DatasetGenerationMode = "provider-model-backed" | "python-runtime-local" | "heuristic-fallback";
+export type DatasetGenerationStatus = "completed" | "partial" | "failed" | "cancelled" | "degraded";
+export type DatasetGenerationExecutionKind = "provider-model-backed" | "python-runtime-local" | "heuristic-fallback";
 
 export interface DatasetGenerationFallback {
   readonly fromMode?: DatasetGenerationMode;
@@ -97,13 +99,18 @@ export interface DatasetGenerationProvenance {
   readonly generatorVersion: string;
   readonly batchId: string;
   readonly mode: DatasetGenerationMode;
+  readonly executionKind: DatasetGenerationExecutionKind;
   readonly status: DatasetGenerationStatus;
+  readonly path: string;
+  readonly isFallback: boolean;
+  readonly isDegraded: boolean;
   readonly detail?: string;
   readonly parameters: Readonly<Record<string, unknown>>;
   readonly startedAt: Date;
   readonly executedAt: Date;
   readonly durationMs?: number;
   readonly diagnostics: ReadonlyArray<DatasetGenerationDiagnostic>;
+  readonly fallbackReason?: string;
   readonly fallback?: DatasetGenerationFallback;
 }
 

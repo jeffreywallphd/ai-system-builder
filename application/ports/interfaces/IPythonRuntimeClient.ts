@@ -132,7 +132,7 @@ export interface IPythonRuntimeFineTuningJobResponse {
   readonly submitted_at?: string;
   readonly started_at?: string;
   readonly completed_at?: string;
-  readonly status: "preparing" | "prepared" | "submitted" | "running" | "completed" | "failed" | "cancelled";
+  readonly status: "submitted" | "queued" | "running" | "completed" | "failed" | "cancelled" | "reconciliation-needed" | "partially-completed" | "exported-without-training";
   readonly configuration: {
     readonly epochs: number;
     readonly learning_rate: number;
@@ -147,7 +147,7 @@ export interface IPythonRuntimeFineTuningJobResponse {
   }>;
   readonly artifacts: ReadonlyArray<{
     readonly id: string;
-    readonly kind: "training-manifest" | "prepared-bundle" | "checkpoint" | "trained-model" | "metrics" | "log";
+    readonly kind: "training-manifest" | "prepared-bundle" | "checkpoint" | "trained-model" | "metrics" | "log" | "diagnostic";
     readonly label: string;
     readonly location?: string;
     readonly content_type?: string;
@@ -178,12 +178,23 @@ export interface IPythonRuntimeFineTuningJobResponse {
   readonly provenance: {
     readonly execution_kind: "preparation-only" | "local-gradient-training";
     readonly backend: "python-runtime-local" | "python-runtime-manifest";
-    readonly truthfulness: "preparation-only" | "local-training-job";
+    readonly truthfulness: "preparation-only" | "real-execution" | "exported-without-training" | "fallback";
     readonly runtime: "python-runtime";
+    readonly run_mode: "preparation-only" | "local-gradient-training";
     readonly supports_gradient_training: boolean;
     readonly is_preparation_only: boolean;
     readonly provider?: string;
     readonly model_identity?: string;
+    readonly path: string;
+    readonly fallback_reason?: string;
+    readonly diagnostics: ReadonlyArray<{
+      readonly code: string;
+      readonly level: "info" | "warning" | "error";
+      readonly message: string;
+      readonly detail?: string;
+    }>;
+    readonly started_at?: string;
+    readonly completed_at?: string;
     readonly detail?: string;
   };
 }
@@ -227,8 +238,12 @@ export interface IPythonRuntimeDatasetGenerationResponse {
     readonly generator_id: string;
     readonly generator_version: string;
     readonly batch_id: string;
-    readonly mode: "provider-model-backed" | "runtime-local-deterministic" | "heuristic-fallback";
-    readonly status: "completed" | "partial" | "failed";
+    readonly mode: "provider-model-backed" | "python-runtime-local" | "heuristic-fallback";
+    readonly status: "completed" | "partial" | "failed" | "cancelled" | "degraded";
+    readonly execution_kind: "provider-model-backed" | "python-runtime-local" | "heuristic-fallback";
+    readonly path: string;
+    readonly is_fallback: boolean;
+    readonly is_degraded: boolean;
     readonly detail?: string;
     readonly parameters: Readonly<Record<string, unknown>>;
     readonly started_at: string;
@@ -238,9 +253,11 @@ export interface IPythonRuntimeDatasetGenerationResponse {
       readonly code: string;
       readonly level: "info" | "warning" | "error";
       readonly message: string;
+      readonly detail?: string;
     }>;
+    readonly fallback_reason?: string;
     readonly fallback?: {
-      readonly from_mode?: "provider-model-backed" | "runtime-local-deterministic" | "heuristic-fallback";
+      readonly from_mode?: "provider-model-backed" | "python-runtime-local" | "heuristic-fallback";
       readonly reason: string;
     };
   };
@@ -261,6 +278,8 @@ export interface IPythonRuntimeClient {
     request: IPythonRuntimeFineTuningJobRequest
   ): Promise<IPythonRuntimeFineTuningJobResponse>;
   getFineTuningJob(jobId: string): Promise<IPythonRuntimeFineTuningJobResponse>;
+  refreshFineTuningJob(jobId: string): Promise<IPythonRuntimeFineTuningJobResponse>;
+  reconcileFineTuningJob(jobId: string): Promise<IPythonRuntimeFineTuningJobResponse>;
   listFineTuningJobs(): Promise<ReadonlyArray<IPythonRuntimeFineTuningJobResponse>>;
   cancelFineTuningJob(jobId: string): Promise<IPythonRuntimeFineTuningJobResponse>;
   generateDatasetExamples(

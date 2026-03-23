@@ -37,6 +37,28 @@ def get_training_job(
         raise HTTPException(status_code=404, detail=f"Training job '{job_id}' was not found.") from error
 
 
+@router.post("/jobs/{job_id}/refresh", response_model=FineTuningJobResponse)
+def refresh_training_job(
+    job_id: str,
+    service: ModelTrainingService = Depends(get_model_training_service),
+) -> FineTuningJobResponse:
+    try:
+        return service.refresh_job(job_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=f"Training job '{job_id}' was not found.") from error
+
+
+@router.post("/jobs/{job_id}/reconcile", response_model=FineTuningJobResponse)
+def reconcile_training_job(
+    job_id: str,
+    service: ModelTrainingService = Depends(get_model_training_service),
+) -> FineTuningJobResponse:
+    try:
+        return service.reconcile_job(job_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=f"Training job '{job_id}' was not found.") from error
+
+
 @router.post("/jobs/{job_id}/cancel", response_model=FineTuningJobResponse)
 def cancel_training_job(
     job_id: str,

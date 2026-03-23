@@ -51,13 +51,18 @@ export class PythonRuntimeDatasetGenerationService implements DatasetGenerationS
         generatorVersion: response.provenance.generator_version,
         batchId: response.provenance.batch_id,
         mode: response.provenance.mode,
+        executionKind: response.provenance.execution_kind,
         status: response.provenance.status,
+        path: response.provenance.path,
+        isFallback: response.provenance.is_fallback,
+        isDegraded: response.provenance.is_degraded,
         detail: response.provenance.detail,
         parameters: response.provenance.parameters,
         startedAt: new Date(response.provenance.started_at),
         executedAt: new Date(response.provenance.executed_at),
         durationMs: response.provenance.duration_ms,
         diagnostics: Object.freeze(response.provenance.diagnostics.map((diagnostic) => Object.freeze({ ...diagnostic }))),
+        fallbackReason: response.provenance.fallback_reason,
         fallback: response.provenance.fallback ? Object.freeze({ ...response.provenance.fallback }) : undefined,
       }),
       generatedCount: response.generated_count,
@@ -78,8 +83,8 @@ function toDomainExample(
     sourceDocumentId: typeof example.sourceDocumentId === "string" ? example.sourceDocumentId : undefined,
     generationMethod: generationMode === "provider-model-backed"
       ? "provider-model-backed-generation"
-      : generationMode === "runtime-local-deterministic"
-        ? "runtime-local-deterministic-generation"
+      : generationMode === "python-runtime-local"
+        ? "python-runtime-local-generation"
         : "heuristic-fallback-generation",
     capturedAt: new Date(),
     metadata: Object.freeze({

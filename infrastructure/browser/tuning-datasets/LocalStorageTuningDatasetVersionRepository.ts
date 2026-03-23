@@ -16,6 +16,7 @@ import type {
   DatasetExample,
   DatasetExportArtifact,
   DatasetGenerationBatch,
+  DatasetGenerationProvenance,
   DatasetSourceDocument,
   DatasetSourceSegment,
   DatasetValidationResult,
@@ -75,23 +76,7 @@ interface ExampleRecord {
     readonly promptTemplateVersion?: string;
     readonly capturedAt: string;
     readonly metadata?: Readonly<Record<string, unknown>>;
-    readonly generator?: {
-      readonly provider: string;
-      readonly modelId?: string;
-      readonly modelDisplayName?: string;
-      readonly generatorId: string;
-      readonly generatorVersion: string;
-      readonly batchId: string;
-      readonly mode: "provider-model-backed" | "runtime-local-deterministic" | "heuristic-fallback";
-      readonly status: "completed" | "partial" | "failed";
-      readonly detail?: string;
-      readonly parameters: Readonly<Record<string, unknown>>;
-      readonly startedAt: string;
-      readonly executedAt: string;
-      readonly durationMs?: number;
-      readonly diagnostics: ReadonlyArray<{ readonly code: string; readonly level: "info" | "warning" | "error"; readonly message: string }>;
-      readonly fallback?: { readonly fromMode?: "provider-model-backed" | "runtime-local-deterministic" | "heuristic-fallback"; readonly reason: string };
-    };
+    readonly generator?: Omit<DatasetGenerationProvenance, "startedAt" | "executedAt"> & { readonly startedAt: string; readonly executedAt: string };
   };
   readonly validationIssues: ReadonlyArray<SerializedValidationIssue>;
   readonly annotations: ReadonlyArray<{ readonly id: string; readonly author: string; readonly note: string; readonly createdAt: string }>;

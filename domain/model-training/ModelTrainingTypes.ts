@@ -11,13 +11,15 @@ export const MODEL_TRAINING_EXECUTION_KINDS = Object.freeze([
 export type ModelTrainingExecutionKind = (typeof MODEL_TRAINING_EXECUTION_KINDS)[number];
 
 export const MODEL_TRAINING_JOB_STATUSES = Object.freeze([
-  "preparing",
-  "prepared",
   "submitted",
+  "queued",
   "running",
   "completed",
   "failed",
   "cancelled",
+  "reconciliation-needed",
+  "partially-completed",
+  "exported-without-training",
 ] as const);
 export type ModelTrainingJobStatus = (typeof MODEL_TRAINING_JOB_STATUSES)[number];
 
@@ -28,6 +30,7 @@ export const MODEL_TRAINING_ARTIFACT_KINDS = Object.freeze([
   "trained-model",
   "metrics",
   "log",
+  "diagnostic",
 ] as const);
 export type ModelTrainingArtifactKind = (typeof MODEL_TRAINING_ARTIFACT_KINDS)[number];
 
@@ -78,15 +81,24 @@ export interface ModelTrainingProgress {
   readonly statusDetail?: string;
 }
 
+export type ModelTrainingTruthfulness = "preparation-only" | "real-execution" | "exported-without-training" | "fallback";
+export type ModelTrainingRunMode = "preparation-only" | "local-gradient-training";
+
 export interface ModelTrainingProvenance {
   readonly executionKind: ModelTrainingExecutionKind;
   readonly backend: ModelTrainingBackend;
-  readonly truthfulness: "preparation-only" | "local-training-job";
+  readonly truthfulness: ModelTrainingTruthfulness;
   readonly runtime: "python-runtime";
+  readonly runMode: ModelTrainingRunMode;
   readonly supportsGradientTraining: boolean;
   readonly isPreparationOnly: boolean;
   readonly provider?: string;
   readonly modelIdentity?: string;
+  readonly path: string;
+  readonly fallbackReason?: string;
+  readonly diagnostics: ReadonlyArray<ModelTrainingDiagnostic>;
+  readonly startedAt?: Date;
+  readonly completedAt?: Date;
   readonly detail?: string;
 }
 
