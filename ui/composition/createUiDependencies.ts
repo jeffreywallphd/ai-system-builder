@@ -30,6 +30,9 @@ import { ModelDownloader } from "../../application/ports/ModelDownloader";
 import { ModelInstaller } from "../../application/ports/ModelInstaller";
 import type { IModel } from "../../domain/models/interfaces/IModel";
 import type { IPythonRuntimeClient } from "../../application/ports/interfaces/IPythonRuntimeClient";
+import { PythonRuntimeStatuses, type PythonRuntimeManagerStatus } from "../../application/ports/interfaces/IPythonRuntimeManager";
+import type { IMcpRuntimeClient } from "../../application/ports/interfaces/IMcpRuntimeClient";
+import type { IMcpServerCatalog } from "../../application/ports/interfaces/IMcpServerCatalog";
 import type { IInstalledModelCatalog } from "../../application/ports/interfaces/IInstalledModelCatalog";
 import type { IManagedModelLibrary } from "../../application/ports/interfaces/IManagedModelLibrary";
 import { RuntimeEventBuffer } from "../../application/runtime/RuntimeEventBuffer";
@@ -45,13 +48,6 @@ import { LocalStorageUiSettingsStorage, UiSettingsStore } from "../settings/UiSe
 import type { UiSettings } from "../settings/UiSettings";
 import { resolveDesktopStorageAdapter } from "./DesktopStorageAdapter";
 import { resolveDesktopModelFileBridge } from "./DesktopModelFileBridgeAdapter";
-import { HttpMcpRuntimeClient } from "../../infrastructure/python/mcp/HttpMcpRuntimeClient";
-import { HttpMcpServerRuntimeClient } from "../../infrastructure/python/mcp/HttpMcpServerRuntimeClient";
-import { RuntimeBackedMcpConfiguredServerRepository } from "../../infrastructure/python/mcp/RuntimeBackedMcpConfiguredServerRepository";
-import { PythonBackedMcpServerCatalog } from "../../infrastructure/python/mcp/PythonBackedMcpServerCatalog";
-import { PythonBackedMcpServerManager } from "../../infrastructure/python/mcp/PythonBackedMcpServerManager";
-import { PythonBackedMcpToolCatalog } from "../../infrastructure/python/mcp/PythonBackedMcpToolCatalog";
-import { PythonBackedMcpToolExecutor } from "../../infrastructure/python/mcp/PythonBackedMcpToolExecutor";
 import { ListConfiguredMcpServersUseCase } from "../../application/mcp/ListConfiguredMcpServersUseCase";
 import { SearchMcpServersUseCase } from "../../application/mcp/SearchMcpServersUseCase";
 import { AddConfiguredMcpServerUseCase } from "../../application/mcp/AddConfiguredMcpServerUseCase";
@@ -80,6 +76,8 @@ import { PreviewAgentContextUseCase } from "../../application/context/PreviewAge
 import { LocalStorageContextPackageRepository } from "../../infrastructure/browser/context/LocalStorageContextPackageRepository";
 import { LocalStorageContextRecipeRepository } from "../../infrastructure/browser/context/LocalStorageContextRecipeRepository";
 import { createPythonRuntimeServiceDefinition } from "../../infrastructure/python/runtime/PythonRuntimeServiceDefinition";
+import { createMcpRuntimeIntegration } from "../../infrastructure/python/mcp/createMcpRuntimeIntegration";
+import { DefaultRuntimeDependencyOrchestrator } from "../../infrastructure/runtime/DefaultRuntimeDependencyOrchestrator";
 import { LocalStorageManagedServiceDefinitionRepository } from "../../infrastructure/browser/services/LocalStorageManagedServiceDefinitionRepository";
 import { HttpManagedServiceDefinitionRepository } from "../../infrastructure/services/HttpManagedServiceDefinitionRepository";
 import { HttpManagedServiceSupervisorClient } from "../../infrastructure/services/HttpManagedServiceSupervisorClient";
@@ -137,6 +135,7 @@ import { PythonRuntimeModelTrainingGateway } from "../../infrastructure/python/m
 import { RuntimeAwareModelCreationEnvironmentGateway } from "../../infrastructure/python/model-training/RuntimeAwareModelCreationEnvironmentGateway";
 import { createModelManagementDependencies } from "./modelManagementDependencies";
 import { BrowserDownloadModelLibrary } from "../../infrastructure/browser/models/BrowserDownloadModelLibrary";
+import { RuntimeDependencyIds } from "../../application/runtime/RuntimeDependencyOrchestrator";
 
 export function createUiDependencies(
   options: CreateUiDependenciesOptions = {}
@@ -168,15 +167,68 @@ export function createUiDependencies(
   const runtimeClient = pythonRuntimeConfig.isEnabled
     ? new HttpPythonRuntimeClient(pythonRuntimeConfig)
     : createDisabledRuntimeClient();
-  const mcpClient = settings.runtime.mode === "disabled"
-    ? createDisabledMcpRuntimeClient()
-    : new HttpMcpRuntimeClient(pythonRuntimeConfig, fetch, runtimeEventSink);
-  const mcpServerRuntimeClient = settings.runtime.mode === "disabled"
-    ? createDisabledMcpServerRuntimeClient()
-    : new HttpMcpServerRuntimeClient(pythonRuntimeConfig, fetch, runtimeEventSink);
-  const runtimeMcpServerCatalog = settings.runtime.mode === "disabled"
-    ? createDisabledMcpServerCatalog()
-    : new PythonBackedMcpServerCatalog(mcpServerRuntimeClient);
+  const pythonRuntimeDefinition = createPythonRuntimeServiceDefinition(new PythonRuntimeConfig({
+    mode: settings.runtime.mode,
+    baseUrl: settings.runtime.mode === "disabled" ? undefined : settings.runtime.baseUrl,
+    timeoutMs: settings.runtime.requestTimeoutMs,
+    authToken: settings.runtime.authToken,
+    pythonVersion: settings.runtime.pythonVersion,
+    pythonInterpreterPath: settings.runtime.pythonInterpreterPath || undefined,
+    runtimeWorkingDirectory: settings.runtime.workingDirectory,
+    startupTimeoutMs: settings.runtime.startupTimeoutMs,
+    healthPollIntervalMs: settings.runtime.healthPollIntervalMs,
+    autoStartEnabled: settings.runtime.autoStartEnabled,
+  }));
+  const managedServiceSupervisorClient = pythonRuntimeConfig.isManagedLocal
+    ? new HttpManagedServiceSupervisorClient({
+      baseUrl: pythonRuntimeConfig.supervisorBaseUrl,
+      timeoutMs: pythonRuntimeConfig.timeoutMs,
+      authToken: pythonRuntimeConfig.authToken,
+    })
+    : undefined;
+  const pythonManagedService = createPythonManagedService({
+    config: pythonRuntimeConfig,
+    client: runtimeClient,
+    eventSink: runtimeEventSink,
+    supervisorClient: managedServiceSupervisorClient,
+  });
+  const pythonRuntimeManager = pythonManagedService.pythonRuntimeManager;
+  const runtimeDependencyOrchestrator = new DefaultRuntimeDependencyOrchestrator({
+    registrations: [
+      {
+        dependencyId: RuntimeDependencyIds.pythonRuntime,
+        providerId: "python-runtime-manager",
+        ensureAvailable: async () => {
+          const status = await pythonRuntimeManager.ensureRuntimeAvailability();
+          return {
+            available: isPythonRuntimeAvailableForDependents(status),
+            detail: status.detail,
+            metadata: {
+              owner: status.owner,
+              status: status.status,
+            },
+          };
+        },
+      },
+      {
+        dependencyId: RuntimeDependencyIds.mcpRuntime,
+        providerId: "mcp-runtime-orchestration-gate",
+        dependsOn: [RuntimeDependencyIds.pythonRuntime],
+        ensureAvailable: async () => ({
+          available: true,
+          detail: "MCP runtime dependency gate passed.",
+        }),
+      },
+    ],
+  });
+  const mcpRuntimeIntegration = createMcpRuntimeIntegration(
+    pythonRuntimeConfig,
+    runtimeEventSink,
+    fetch,
+    runtimeDependencyOrchestrator,
+  );
+  const mcpClient = mcpRuntimeIntegration.runtimeClient;
+  const runtimeMcpServerCatalog = mcpRuntimeIntegration.serverCatalog;
   const workflowExecutorSelection = createWorkflowExecutor(config, runtimeClient, pythonRuntimeConfig.isEnabled, mcpClient, runtimeMcpServerCatalog);
   const workflowExecutor = workflowExecutorSelection.executor;
 
@@ -280,40 +332,10 @@ export function createUiDependencies(
     modelService,
   });
 
-  const pythonRuntimeDefinition = createPythonRuntimeServiceDefinition(new PythonRuntimeConfig({
-    mode: settings.runtime.mode,
-    baseUrl: settings.runtime.mode === "disabled" ? undefined : settings.runtime.baseUrl,
-    timeoutMs: settings.runtime.requestTimeoutMs,
-    authToken: settings.runtime.authToken,
-    pythonVersion: settings.runtime.pythonVersion,
-    pythonInterpreterPath: settings.runtime.pythonInterpreterPath || undefined,
-    runtimeWorkingDirectory: settings.runtime.workingDirectory,
-    startupTimeoutMs: settings.runtime.startupTimeoutMs,
-    healthPollIntervalMs: settings.runtime.healthPollIntervalMs,
-    autoStartEnabled: settings.runtime.autoStartEnabled,
-  }));
-  const managedServiceSupervisorClient = pythonRuntimeConfig.isManagedLocal
-    ? new HttpManagedServiceSupervisorClient({
-      baseUrl: pythonRuntimeConfig.supervisorBaseUrl,
-      timeoutMs: pythonRuntimeConfig.timeoutMs,
-      authToken: pythonRuntimeConfig.authToken,
-    })
-    : undefined;
-  const pythonManagedService = createPythonManagedService({
-    config: pythonRuntimeConfig,
-    client: runtimeClient,
-    eventSink: runtimeEventSink,
-    supervisorClient: managedServiceSupervisorClient,
-  });
-  const pythonRuntimeManager = pythonManagedService.pythonRuntimeManager;
-  const persistedMcpServerRepository = settings.runtime.mode === "disabled"
-    ? undefined
-    : new RuntimeBackedMcpConfiguredServerRepository(mcpServerRuntimeClient);
+  const persistedMcpServerRepository = mcpRuntimeIntegration.configuredServerRepository;
   const mcpServerCatalog = runtimeMcpServerCatalog;
-  const mcpServerManager = settings.runtime.mode === "disabled"
-    ? createDisabledMcpServerManager()
-    : new PythonBackedMcpServerManager(mcpServerRuntimeClient, runtimeMcpServerCatalog, runtimeEventSink);
-  const pythonBackedMcpToolCatalog = new PythonBackedMcpToolCatalog(mcpClient, runtimeEventSink);
+  const mcpServerManager = mcpRuntimeIntegration.serverManager;
+  const pythonBackedMcpToolCatalog = mcpRuntimeIntegration.toolCatalog;
   const toolCapabilityCatalog = new CompositeToolCapabilityCatalog([
     new WorkflowProjectedToolCapabilityCatalog(workflowRepository, workflowToolProjectionService),
     new StaticLocalToolCapabilityCatalog([]),
@@ -333,7 +355,7 @@ export function createUiDependencies(
     {
       providerKind: MCP_TOOL_CAPABILITY_PROVIDER.kind,
       providerId: MCP_TOOL_CAPABILITY_PROVIDER.id,
-      executor: new McpToolCapabilityExecutor(new PythonBackedMcpToolExecutor(mcpClient, runtimeEventSink)),
+      executor: new McpToolCapabilityExecutor(mcpRuntimeIntegration.toolExecutor),
     },
   ]);
   const toolService = new ToolService(
@@ -587,15 +609,16 @@ function createWorkflowRepository(
 
   const browserStorage = typeof window !== "undefined" ? window.localStorage : undefined;
   if (browserStorage) {
+    const usingExplicitBrowserStorage = config.workflowRepositoryMode === "browser-storage";
     return {
       repository: new BrowserStorageWorkflowRepository(nodeCatalogProvider, browserStorage, createSeedWorkflows()),
       status: {
         configuredMode: config.workflowRepositoryMode,
-        effectiveMode: "browser-storage-fallback",
-        isDegraded: true,
-        detail: config.workflowRepositoryMode === "filesystem-indexed"
-          ? "Expected dev persistence is dev/ filesystem + SQLite, but the app is running in explicit browser fallback mode and is using browser storage instead."
-          : "Workflow persistence is using the explicit browser-storage fallback mode.",
+        effectiveMode: usingExplicitBrowserStorage ? "browser-storage" : "browser-storage-fallback",
+        isDegraded: !usingExplicitBrowserStorage,
+        detail: usingExplicitBrowserStorage
+          ? "Workflow persistence is aligned with the browser-hosted architecture and is using browser storage directly."
+          : "Expected dev persistence is dev/ filesystem + SQLite, but the app is running in explicit browser fallback mode and is using browser storage instead.",
         workflowsDirectory: config.workflowStorageDirectory,
         indexDatabasePath: config.workflowIndexDatabasePath,
       },
@@ -615,7 +638,7 @@ function createWorkflowRepository(
   };
 }
 
-function createWorkflowExecutor(config: AppRuntimeConfig, runtimeClient: IPythonRuntimeClient, runtimeEnabled: boolean, mcpClient: ReturnType<typeof createDisabledMcpRuntimeClient> | HttpMcpRuntimeClient, mcpServerCatalog: ReturnType<typeof createDisabledMcpServerCatalog> | PythonBackedMcpServerCatalog) {
+function createWorkflowExecutor(config: AppRuntimeConfig, runtimeClient: IPythonRuntimeClient, runtimeEnabled: boolean, mcpClient: IMcpRuntimeClient, mcpServerCatalog: IMcpServerCatalog) {
   const executor = new TruthfulWorkflowExecutor({
     strategies: [
       new PythonDelegatedWorkflowExecutionStrategy(runtimeClient),
@@ -716,174 +739,9 @@ function describeModelLibraryOperationalStatus(managedModelLibrary: IManagedMode
   };
 }
 
-function createDisabledRuntimeStatus() {
 
-  return {
-    enabled: false,
-    state: "disabled" as const,
-    checkedAt: new Date().toISOString(),
-    servers: [],
-    capabilities: { tools: false, resources: false, toolExecution: false },
-    metadata: { reason: "python-runtime-disabled" },
-  };
-}
-
-function createDisabledServerDescriptor(serverId: string) {
-  return {
-    id: serverId,
-    name: serverId,
-    transport: "inmemory" as const,
-    enabled: false,
-    status: "error" as const,
-    connected: false,
-    toolCount: 0,
-    resourceCount: 0,
-    capabilities: { tools: false, resources: false, toolExecution: false },
-    errorMessage: "Python runtime is disabled.",
-  };
-}
-
-function createDisabledServerStatus(serverId: string) {
-  return {
-    serverId,
-    name: serverId,
-    transport: "inmemory" as const,
-    configured: false,
-    enabled: false,
-    state: "error" as const,
-    connected: false,
-    checkedAt: new Date().toISOString(),
-    toolCount: 0,
-    resourceCount: 0,
-    capabilities: { tools: false, resources: false, toolExecution: false },
-    errorMessage: "Python runtime is disabled.",
-  };
-}
-
-function createDisabledConnectionResult(serverId: string, action: "connect" | "disconnect" | "reconnect") {
-  return {
-    action,
-    checkedAt: new Date().toISOString(),
-    server: createDisabledServerDescriptor(serverId),
-    status: createDisabledServerStatus(serverId),
-    runtime: createDisabledRuntimeStatus(),
-    metadata: { reason: "python-runtime-disabled" },
-  };
-}
-
-function createDisabledMcpRuntimeClient() {
-  const disabledStatus = () => createDisabledRuntimeStatus();
-
-  return {
-    async getConnectionStatus() {
-      return disabledStatus();
-    },
-    async listServers() {
-      return { query: "", totalCount: 0, limit: 20, servers: [], status: disabledStatus() };
-    },
-    async searchServers(criteria?: { query?: string; limit?: number }) {
-      return {
-        query: criteria?.query?.trim() || "",
-        totalCount: 0,
-        limit: criteria?.limit ?? 20,
-        servers: [],
-        status: disabledStatus(),
-      };
-    },
-    async connectServer(request: { serverId: string; reconnect?: boolean }) {
-      return createDisabledConnectionResult(request.serverId, request.reconnect ? "reconnect" : "connect");
-    },
-    async disconnectServer(serverId: string) {
-      return createDisabledConnectionResult(serverId, "disconnect");
-    },
-    async listTools() {
-      return [];
-    },
-    async searchTools(criteria?: { query?: string; limit?: number }) {
-      return { query: criteria?.query?.trim() || "", totalCount: 0, limit: criteria?.limit ?? 20, tools: [] };
-    },
-    async getToolDescriptor() {
-      return undefined;
-    },
-    async listResources() {
-      return [];
-    },
-    async executeTool(request: { serverId: string; toolName: string; executionId?: string }) {
-      return {
-        executionId: request.executionId?.trim() || "mcp-disabled",
-        serverId: request.serverId,
-        toolName: request.toolName,
-        status: "failed" as const,
-        content: [],
-        structuredContent: {},
-        errorMessage: "Python runtime is disabled.",
-      };
-    },
-  };
-}
-
-function createDisabledMcpServerRuntimeClient() {
-  return {
-    async getConnectionStatus() {
-      return createDisabledRuntimeStatus();
-    },
-    async listConfiguredServers() {
-      return [];
-    },
-    async connectServer(request: { serverId: string }) {
-      return createDisabledConnectionResult(request.serverId, "connect");
-    },
-    async disconnectServer(serverId: string) {
-      return createDisabledConnectionResult(serverId, "disconnect");
-    },
-    async reconnectServer(serverId: string) {
-      return createDisabledConnectionResult(serverId, "reconnect");
-    },
-    async createLocalServer(draft: { serverId: string }) {
-      return {
-        server: createDisabledServerDescriptor(draft.serverId),
-        status: createDisabledServerStatus(draft.serverId),
-        runtime: createDisabledRuntimeStatus(),
-        checkedAt: new Date().toISOString(),
-        created: false,
-      };
-    },
-  };
-}
-
-function createDisabledMcpServerCatalog() {
-  return {
-    async getConnectionStatus() {
-      return createDisabledRuntimeStatus();
-    },
-    async listConfiguredServers() {
-      return [];
-    },
-    async getServerStatus(serverId: string) {
-      return createDisabledServerStatus(serverId);
-    },
-  };
-}
-
-function createDisabledMcpServerManager() {
-  return {
-    async connectServer(request: { serverId: string }) {
-      return createDisabledConnectionResult(request.serverId, "connect");
-    },
-    async disconnectServer(serverId: string) {
-      return createDisabledConnectionResult(serverId, "disconnect");
-    },
-    async reconnectServer(serverId: string) {
-      return createDisabledConnectionResult(serverId, "reconnect");
-    },
-    async createLocalServer(draft: { serverId: string }) {
-      return {
-        server: createDisabledServerDescriptor(draft.serverId),
-        status: createDisabledServerStatus(draft.serverId),
-        runtime: createDisabledRuntimeStatus(),
-        checkedAt: new Date().toISOString(),
-        created: false,
-      };
-    },
-  };
+function isPythonRuntimeAvailableForDependents(status: PythonRuntimeManagerStatus): boolean {
+  return status.status !== PythonRuntimeStatuses.unavailable
+    && status.status !== PythonRuntimeStatuses.failed
+    && status.status !== PythonRuntimeStatuses.stopped;
 }

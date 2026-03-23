@@ -36,6 +36,9 @@ export interface AppRuntimeProfile {
   readonly rendererDeliveryMode: RendererDeliveryMode;
   readonly usesDesktopBridge: boolean;
   readonly usesDurableDesktopStorage: boolean;
+  readonly supportsManagedLocalRuntime: boolean;
+  readonly supportsLocalWorkspaceFilesystem: boolean;
+  readonly supportsBrowserWorkspaceStorage: boolean;
 }
 
 const runtimeProfiles = Object.freeze<Record<AppRuntimeMode, AppRuntimeProfile>>({
@@ -47,6 +50,9 @@ const runtimeProfiles = Object.freeze<Record<AppRuntimeMode, AppRuntimeProfile>>
     rendererDeliveryMode: RendererDeliveryModes.devServer,
     usesDesktopBridge: false,
     usesDurableDesktopStorage: false,
+    supportsManagedLocalRuntime: true,
+    supportsLocalWorkspaceFilesystem: false,
+    supportsBrowserWorkspaceStorage: true,
   }),
   [AppRuntimeModes.desktopDevelopment]: Object.freeze({
     mode: AppRuntimeModes.desktopDevelopment,
@@ -56,6 +62,9 @@ const runtimeProfiles = Object.freeze<Record<AppRuntimeMode, AppRuntimeProfile>>
     rendererDeliveryMode: RendererDeliveryModes.devServer,
     usesDesktopBridge: true,
     usesDurableDesktopStorage: false,
+    supportsManagedLocalRuntime: true,
+    supportsLocalWorkspaceFilesystem: true,
+    supportsBrowserWorkspaceStorage: false,
   }),
   [AppRuntimeModes.desktopProduction]: Object.freeze({
     mode: AppRuntimeModes.desktopProduction,
@@ -65,6 +74,9 @@ const runtimeProfiles = Object.freeze<Record<AppRuntimeMode, AppRuntimeProfile>>
     rendererDeliveryMode: RendererDeliveryModes.packagedAssets,
     usesDesktopBridge: true,
     usesDurableDesktopStorage: true,
+    supportsManagedLocalRuntime: true,
+    supportsLocalWorkspaceFilesystem: true,
+    supportsBrowserWorkspaceStorage: false,
   }),
 });
 
