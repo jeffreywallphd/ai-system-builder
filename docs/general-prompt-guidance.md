@@ -4,6 +4,8 @@ Use this document as a compact instruction set for software implementation promp
 
 ## Core expectations
 - Preserve the existing architecture before introducing new abstractions.
+- Check the codebase and docs for architectural guidance. If the docs provide a .ai.md version of the document, use that version.
+- Keep all docs .ai.md and .md fiels up-to-date with any changes made to the system.
 - Prefer small, targeted changes over broad refactors unless the task explicitly requires restructuring.
 - Follow established naming, file organization, dependency direction, and code style already present in the codebase.
 - Keep UI styling consistent with existing design tokens, spacing, typography, component patterns, and accessibility practices.
@@ -14,6 +16,7 @@ Use this document as a compact instruction set for software implementation promp
 
 ## Implementation guidance
 - Inspect nearby code before editing so the solution matches local conventions.
+- Do not create mocks or placeholders unless requested to do so. Favor complete solutions.
 - Reuse existing utilities, components, services, and patterns before creating new ones.
 - Keep boundaries clean: business logic should stay out of presentation code, and infrastructure details should not leak into core logic unless the architecture already expects it.
 - Choose names that are specific, stable, and consistent with the surrounding domain language.
@@ -27,12 +30,7 @@ Use this document as a compact instruction set for software implementation promp
 
 ## Final self-review
 Before finishing, evaluate the implementation and briefly report:
-1. Whether the change preserved architecture and conventions.
-2. Any naming, styling, or structural decisions that were made to stay consistent.
-3. What was tested and any remaining risks or gaps.
-4. One concrete improvement that should happen next if work continues.
-
-## Continuous improvement prompt
-Include a short follow-up prompt such as:
-
-> Based on the implemented change, identify the highest-value next improvement that would strengthen architecture, consistency, test coverage, or maintainability, and explain why it should be prioritized.
+1. Core work completed.
+2. Whether the change preserved architecture and conventions.
+3. Remaining risks or gaps.
+4. Concrete improvements that should happen next if work continues in a prioritized list.
