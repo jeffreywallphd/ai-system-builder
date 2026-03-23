@@ -18,6 +18,8 @@ describe("InfrastructureRegistry", () => {
     expect(c.isRegistered(TOKENS.FileStorage)).toBe(true);
     expect(c.isRegistered(TOKENS.AssetCatalog)).toBe(true);
     expect(c.isRegistered(TOKENS.WorkflowRepository)).toBe(true);
+    expect(c.isRegistered(TOKENS.ExecutionRunRepository)).toBe(true);
+    expect(c.isRegistered(TOKENS.UnifiedExecutionEngine)).toBe(true);
     expect(c.isRegistered(TOKENS.NodeImplementationRegistry)).toBe(true);
     expect(c.isRegistered(TOKENS.McpRuntimeConfig)).toBe(true);
     expect(c.isRegistered(TOKENS.McpServerCatalog)).toBe(true);

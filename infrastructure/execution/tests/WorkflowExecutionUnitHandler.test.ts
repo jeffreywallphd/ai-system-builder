@@ -63,7 +63,7 @@ describe("WorkflowExecutionUnitHandler", () => {
 
     expect(result.status).toBe(ExecutionStatuses.completed);
     expect(result.provenance?.classification).toBe("delegated");
-    expect(result.workflowResult?.provenance?.strategyId).toBe("infra-delegated-python");
+    expect(result.artifacts?.[0]?.kind).toBe("workflow-result");
     expect(events).toEqual(["running:delegated"]);
   });
 });

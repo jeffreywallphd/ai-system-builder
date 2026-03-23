@@ -132,9 +132,11 @@ import { LangChainNodeExecutor } from "../../infrastructure/interpreted/executio
 import { WorkflowRuntimeSelector } from "../../application/execution/WorkflowRuntimeSelector";
 import { PythonDelegatedWorkflowExecutionStrategy } from "../../infrastructure/python/execution/PythonDelegatedWorkflowExecutionStrategy";
 import { createWorkflowUnifiedExecutionEngine } from "../../infrastructure/execution/createWorkflowUnifiedExecutionEngine";
+import { createUnifiedExecutionEngine } from "../../infrastructure/execution/createUnifiedExecutionEngine";
 import { PythonRuntimeDatasetGenerationService } from "../../infrastructure/python/tuning-datasets/PythonRuntimeDatasetGenerationService";
 import { OrchestratedDatasetGenerationService } from "../../infrastructure/python/tuning-datasets/OrchestratedDatasetGenerationService";
 import { LocalStorageModelTrainingJobRepository } from "../../infrastructure/browser/model-training/LocalStorageModelTrainingJobRepository";
+import { LocalStorageExecutionRunRepository } from "../../infrastructure/browser/execution/LocalStorageExecutionRunRepository";
 import { DefaultModelTrainingApplicationService } from "../../application/model-training/DefaultModelTrainingApplicationService";
 import { ModelTrainingService } from "../services/ModelTrainingService";
 import { ModelTrainingStore } from "../state/ModelTrainingStore";
@@ -284,8 +286,20 @@ export function createUiDependencies(
   );
   const workflowValidator = new WorkflowValidator(nodeCompatibilityService);
 
+  const datasetGenerationService = new FallbackAwareDatasetGenerationService(
+    new OrchestratedDatasetGenerationService(
+      new PythonRuntimeDatasetGenerationService(runtimeClient),
+      runtimeDependencyOrchestrator,
+    ),
+    new ProviderAgnosticDatasetGenerationService(),
+  );
   const createWorkflowUseCase = new CreateWorkflowUseCase();
-  const executionEngine = createWorkflowUnifiedExecutionEngine(workflowExecutor);
+  const executionRunRepository = new LocalStorageExecutionRunRepository(undefined, durableDesktopStorage);
+  const executionEngine = createUnifiedExecutionEngine({
+    workflowExecutor,
+    executionRunRepository,
+    datasetGenerationService,
+  });
   const executeWorkflowUseCase = new ExecuteWorkflowUseCase(
     workflowExecutor,
     workflowValidator,
@@ -513,13 +527,8 @@ export function createUiDependencies(
     splitService: new DeterministicDatasetSplitService(),
     exportService: new JsonTuningDatasetExportService(),
     importService: new BrowserDatasetImportService(new DefaultDatasetPrivacyPolicy()),
-    generationService: new FallbackAwareDatasetGenerationService(
-      new OrchestratedDatasetGenerationService(
-        new PythonRuntimeDatasetGenerationService(runtimeClient),
-        runtimeDependencyOrchestrator,
-      ),
-      new ProviderAgnosticDatasetGenerationService(),
-    ),
+    generationService: datasetGenerationService,
+    executionEngine,
     reviewPolicy: new DefaultDatasetReviewPolicy(),
     duplicationPolicy,
     statisticsService: new DatasetStatisticsService(duplicationPolicy),

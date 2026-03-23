@@ -8,6 +8,7 @@ import { LocalFileStorage } from "../filesystem/LocalFileStorage";
 import { LocalAssetRepository } from "../filesystem/LocalAssetRepository";
 import { LocalModelRepository } from "../filesystem/LocalModelRepository";
 import { LocalWorkflowRepository } from "../filesystem/LocalWorkflowRepository";
+import { LocalExecutionRunRepository } from "../filesystem/execution/LocalExecutionRunRepository";
 import { LocalContextPackageRepository } from "../filesystem/LocalContextPackageRepository";
 import { LocalContextRecipeRepository } from "../filesystem/LocalContextRecipeRepository";
 import { DependencyContainer, type DependencyToken } from "./DependencyContainer";
@@ -31,6 +32,8 @@ import type { IModelDownloader } from "../../application/ports/interfaces/IModel
 import type { IRemoteModelCatalog } from "../../application/ports/interfaces/IRemoteModelCatalog";
 import type { IModelInstaller } from "../../application/ports/interfaces/IModelInstaller";
 import type { IWorkflowExecutor } from "../../application/ports/interfaces/IWorkflowExecutor";
+import type { IWorkflowRepository } from "../../application/ports/interfaces/IWorkflowRepository";
+import type { IExecutionRunRepository } from "../../application/ports/interfaces/IExecutionRunRepository";
 import type { IContextPackageRepository } from "../../application/ports/interfaces/IContextPackageRepository";
 import type { IContextRecipeRepository } from "../../application/ports/interfaces/IContextRecipeRepository";
 import type { IWorkflowSerializer } from "../../application/ports/interfaces/IWorkflowSerializer";
@@ -58,6 +61,7 @@ import { WorkflowToolProjectionService } from "../../application/projection/Work
 import { LoadToolDefinitionUseCase } from "../../application/tools/LoadToolDefinitionUseCase";
 import { RunToolUseCase } from "../../application/tools/RunToolUseCase";
 import { createWorkflowUnifiedExecutionEngine } from "../execution/createWorkflowUnifiedExecutionEngine";
+import { UnifiedExecutionEngine } from "../../application/execution/UnifiedExecutionEngine";
 import { WorkflowContextService } from "../../application/context/WorkflowContextService";
 import { RuntimeDependencyOperationalStates, type IRuntimeDependencyOrchestrator } from "../../application/runtime/RuntimeDependencyOrchestrator";
 
@@ -83,6 +87,8 @@ export const TOKENS = Object.freeze({
   ModelInstaller: Symbol("ModelInstaller"),
   WorkflowExecutor: Symbol("WorkflowExecutor"),
   WorkflowSerializer: Symbol("WorkflowSerializer"),
+  UnifiedExecutionEngine: Symbol("UnifiedExecutionEngine"),
+  ExecutionRunRepository: Symbol("ExecutionRunRepository"),
   WorkflowRepository: Symbol("WorkflowRepository"),
   ContextPackageRepository: Symbol("ContextPackageRepository"),
   ContextRecipeRepository: Symbol("ContextRecipeRepository"),
@@ -95,6 +101,7 @@ export interface IInfrastructureRegistryPaths {
   readonly workflowsDirectory: string;
   readonly assetsDirectory: string;
   readonly modelsDirectory: string;
+  readonly executionRunsDirectory?: string;
 }
 
 export interface IInfrastructureRegistryOptions {
@@ -236,7 +243,7 @@ export class InfrastructureRegistry {
     });
 
     container.registerSingleton<IToolCapabilityExecutor>(TOKENS.ToolCapabilityExecutor, (c) => {
-      const workflowRepository = c.resolve(TOKENS.WorkflowRepository);
+      const workflowRepository = c.resolve<IWorkflowRepository>(TOKENS.WorkflowRepository);
       const workflowToolProjectionService = new WorkflowToolProjectionService();
       const loadToolDefinitionUseCase = new LoadToolDefinitionUseCase(
         workflowRepository,
@@ -253,7 +260,7 @@ export class InfrastructureRegistry {
         workflowExecutor,
         loadToolDefinitionUseCase,
         workflowContextService,
-        createWorkflowUnifiedExecutionEngine(workflowExecutor)
+        c.resolve<UnifiedExecutionEngine>(TOKENS.UnifiedExecutionEngine)
       );
 
       return new CompositeToolCapabilityExecutor([
@@ -389,6 +396,20 @@ export class InfrastructureRegistry {
         return new WorkflowSerializer(options.workflowSerializers ?? []);
       }
     );
+
+    container.registerSingleton<IExecutionRunRepository>(TOKENS.ExecutionRunRepository, (c) => {
+      return new LocalExecutionRunRepository({
+        fileStorage: c.resolve<IFileStorage>(TOKENS.FileStorage),
+        rootDirectory: options.paths.executionRunsDirectory ?? `${options.paths.workflowsDirectory}/../execution-runs`,
+      });
+    });
+
+    container.registerSingleton<UnifiedExecutionEngine>(TOKENS.UnifiedExecutionEngine, (c) => {
+      return createWorkflowUnifiedExecutionEngine(
+        c.resolve<IWorkflowExecutor>(TOKENS.WorkflowExecutor),
+        c.resolve<IExecutionRunRepository>(TOKENS.ExecutionRunRepository),
+      );
+    });
 
     container.registerSingleton(TOKENS.WorkflowRepository, (c) => {
       return new LocalWorkflowRepository({

@@ -26,7 +26,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 
 ## Architectural caveats to remember
 - The architecture is clean-architecture-flavored, not strict/academic.
-- The UI composition is manual and still duplicates some infrastructure bootstrap logic, although runtime dependency orchestration is now shared across both composition roots.
+- The UI composition is manual and still duplicates some infrastructure bootstrap logic, although runtime dependency orchestration plus more of the execution-engine wiring are now shared across both composition roots.
 - Browser fallback adapters still matter even though the product intent is desktop-first.
 - Electron preload currently exposes synchronous IPC-based bridges.
 

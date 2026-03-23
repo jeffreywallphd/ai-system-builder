@@ -73,4 +73,71 @@ describe("UnifiedExecutionEngine", () => {
       run: ExecutionStatuses.skipped,
     });
   });
+
+  it("persists durable execution run history with truthful provenance", async () => {
+    const savedRuns: any[] = [];
+    const handler: IExecutionUnitHandler = {
+      canHandle: () => true,
+      startExecution: async ({ unit, runId }) => ({
+        unitId: unit.id,
+        cancel: async () => undefined,
+        subscribe: (listener) => {
+          listener({
+            planId: "plan-3",
+            runId,
+            unitId: unit.id,
+            status: ExecutionStatuses.running,
+            provenance: {
+              classification: "delegated",
+              executorId: "infra-delegated-python",
+              runtime: "python",
+              detail: "Delegated to Python.",
+              sourceKind: "workflow",
+            },
+          });
+          return () => undefined;
+        },
+        waitForCompletion: async () => ({
+          unitId: unit.id,
+          status: ExecutionStatuses.completed,
+          provenance: {
+            classification: "delegated",
+            executorId: "infra-delegated-python",
+            runtime: "python",
+            detail: "Delegated to Python.",
+            sourceKind: "workflow",
+          },
+          outputMetadata: { executionId: "exec-1" },
+        }),
+      }),
+      execute: async () => ({
+        unitId: "workflow:wf-1",
+        status: ExecutionStatuses.completed,
+      }),
+    };
+    const engine = new UnifiedExecutionEngine([handler], {
+      saveRun: async (run) => {
+        savedRuns.push(run);
+        return run;
+      },
+      getRunById: async () => undefined,
+      listRuns: async () => [],
+    });
+
+    const result = await engine.execute({
+      plan: new ExecutionPlan({
+        id: "plan-3",
+        units: [{ id: "workflow:wf-1", kind: ExecutionUnitKinds.workflow }],
+      }),
+      metadata: { executionKind: "workflow", workflowId: "wf-1" },
+    });
+
+    expect(result.runId).toContain("plan-3-run-");
+    expect(savedRuns.length).toBeGreaterThan(1);
+    expect(savedRuns.at(-1)?.status).toBe(ExecutionStatuses.completed);
+    expect(savedRuns.at(-1)?.metadata).toEqual({ executionKind: "workflow", workflowId: "wf-1" });
+    expect(savedRuns.at(-1)?.units["workflow:wf-1"]?.provenance?.classification).toBe("delegated");
+    expect(savedRuns.at(-1)?.transitions.some((transition: any) => transition.toStatus === ExecutionStatuses.running)).toBe(true);
+  });
+
 });
