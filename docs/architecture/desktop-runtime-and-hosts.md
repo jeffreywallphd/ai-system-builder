@@ -1,0 +1,102 @@
+# Desktop Runtime and Hosts
+
+This document explains how AI Loom Studio is delivered as desktop tooling and how the runtime/host model is implemented.
+
+## Desktop-first architecture
+
+The repository is clearly optimized for desktop use even though it preserves some browser-style fallbacks. The Electron host is responsible for creating the durable local environment that the renderer can use without becoming Node-aware.
+
+The architectural split is:
+- **Electron main process** = host bootstrap, local services, filesystem access, runtime discovery
+- **Electron preload** = explicit bridge contract
+- **React renderer** = product UI and dependency composition
+
+## Electron main-process responsibilities
+
+`electron/main/main.ts` is the main desktop composition point.
+
+It is responsible for:
+- creating the `BrowserWindow`
+- resolving storage paths
+- initializing production storage
+- resolving the desktop Python runtime
+- starting the desktop service supervisor
+- building the bootstrap context exposed to the renderer
+- registering IPC handlers for storage, workflow persistence, and model-file operations
+
+This makes Electron the host-level boundary where local capabilities become available.
+
+## Preload bridge responsibilities
+
+`electron/preload.ts` exposes a single `aiLoomDesktop` object into the renderer. The bridge includes:
+- bootstrap information
+- key/value storage access
+- workflow persistence operations
+- model-file operations
+
+`electron/shared/DesktopContracts.ts` defines the TypeScript contracts for those capabilities, which is a good practice because it creates a typed interface between host and renderer.
+
+## Why this matters architecturally
+
+The renderer composition can stay mostly platform-agnostic because desktop-only features are surfaced through typed bridge adapters rather than direct Node/Electron imports. That keeps host-specific logic concentrated in the outer layer.
+
+## Workflow persistence across host modes
+
+The workflow repository is host-aware.
+
+### Desktop path
+In desktop mode, the main process creates `DesktopWorkflowPersistence`, which stores:
+- canonical workflow JSON files on disk
+- workflow summaries in a SQLite index
+
+The renderer then uses `DesktopBridgeWorkflowRepository` through the preload contract.
+
+### Browser/degraded path
+If the desktop workflow bridge is unavailable or the runtime mode is browser-oriented, the renderer can fall back to `BrowserStorageWorkflowRepository`, which stores workflow records in browser storage.
+
+This means the host architecture is not just about display; it directly affects persistence durability and operational guarantees.
+
+## Runtime orchestration and managed services
+
+The product also has a managed runtime story, especially for Python-backed capabilities.
+
+### Python runtime
+The UI composition builds a `PythonRuntimeConfig`, runtime client, runtime manager, and service-definition wiring. The desktop host also resolves a desktop Python runtime and starts the service supervisor.
+
+### Runtime dependency orchestration
+Both the infrastructure bootstrap and UI composition instantiate a `DefaultRuntimeDependencyOrchestrator`. This object models runtime prerequisites such as:
+- Python runtime availability
+- MCP runtime gating on Python availability
+
+This is an architectural sign that runtime availability is considered part of the application's operational model, not an incidental implementation detail.
+
+### Managed services
+Managed service definitions, supervisor access, health status, and event streaming are modeled as a distinct subsystem. That fits the desktop-tooling intention well because local runtimes are treated as governable services rather than invisible helper processes.
+
+## Host/runtime modes in practice
+
+The code supports multiple practical modes:
+
+- **Desktop development**
+- **Desktop production**
+- **Browser development**
+- **Disabled runtime / degraded local behavior**
+
+Configuration objects such as `AppRuntimeConfig`, `PythonRuntimeConfig`, and related storage/runtime settings drive those modes.
+
+## Strengths of the current host model
+
+### Clear outer boundary
+Electron is kept at the edge, with typed contracts into the renderer.
+
+### Durable desktop persistence
+Desktop workflow persistence intentionally combines filesystem JSON with SQLite indexing, which is a strong fit for local authoring tools.
+
+### Runtime-aware product design
+The system acknowledges runtime health, startup, ownership, supervision, and degradation, which is essential for trustworthy desktop tooling.
+
+## TODO
+
+- The preload bridge currently relies on synchronous IPC for many operations. That is simple and works, but it can become a scaling and responsiveness concern as payloads or operation frequency grow.
+- Model-file operations currently expose a broad host capability surface through the preload bridge. If the product evolves toward stronger trust boundaries, this area may need tighter scoping and policy controls.
+- Runtime/bootstrap composition is split between the Electron host and the renderer composition; the long-term architecture would benefit from a clearer statement of what must be host-owned versus renderer-owned.
