@@ -29,6 +29,8 @@ export interface SubmitModelTrainingJobRequest {
 export interface IModelTrainingRuntime {
   submitJob(request: SubmitModelTrainingJobRequest): Promise<ModelTrainingJob>;
   getJob(jobId: string): Promise<ModelTrainingJob | undefined>;
+  refreshJob(jobId: string): Promise<ModelTrainingJob | undefined>;
+  reconcileJob(jobId: string): Promise<ModelTrainingJob | undefined>;
   listJobs(): Promise<ReadonlyArray<ModelTrainingJob>>;
   cancelJob(jobId: string): Promise<ModelTrainingJob>;
 }

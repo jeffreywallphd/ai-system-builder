@@ -213,15 +213,15 @@ The Models page now supports real end-to-end actions for download/install, refre
 
 The Create Models workspace now exposes two truthful model-creation paths:
 
-- **Prepare export-only bundle** — validates the selected base model + dataset version and writes a durable manifest/bundle for later use. This ends in `prepared`, not `completed training`.
+- **Prepare export-only bundle** — validates the selected base model + dataset version and writes a durable manifest/bundle for later use. This ends in `exported-without-training`, not `completed training`.
 - **Submit real local training job** — submits a Python-runtime local training job that performs real NumPy gradient updates for a lightweight text-adapter backend.
 
 The current supported training backend is intentionally narrow but real:
 
 - supported execution backend: **Python runtime local gradient trainer** (`python-runtime-local`)
 - supported preparation backend: **Python runtime manifest/export path** (`python-runtime-manifest`)
-- persisted lifecycle states: `prepared`, `submitted`, `running`, `completed`, `failed`, `cancelled`
-- durable outputs: manifest, checkpoints, metrics, logs, and a final trained local-adapter artifact when training completes
+- persisted lifecycle states: `submitted`, `queued`, `running`, `completed`, `failed`, `cancelled`, `reconciliation-needed`, `partially-completed`, and `exported-without-training`
+- durable outputs: manifest, checkpoints, metrics, logs, a diagnostic artifact on failure, and a final trained local-adapter artifact when training completes
 
 This is still **not** the same thing as provider-hosted LoRA or remote foundation-model fine-tuning. Unsupported provider backends remain explicit rather than being faked.
 
@@ -230,12 +230,12 @@ This is still **not** the same thing as provider-hosted LoRA or remote foundatio
 Dataset example generation now prefers a **true provider/model-backed Python runtime path** when a supported provider is configured, and otherwise falls back truthfully:
 
 - `provider-model-backed` — a real provider/model completion API generated the examples
-- `runtime-local-deterministic` — the Python runtime generated examples locally without calling a provider model
-- `heuristic-fallback` — an explicit degraded fallback path generated examples heuristically
+- `python-runtime-local` — the explicit Python runtime local generator produced the examples without claiming provider backing
+- `heuristic-fallback` — an explicit degraded browser fallback path generated examples heuristically
 
 Supported dataset tasks remain:
 
 - `question_answering`
 - `chat_completion`
 
-Each generation batch persists provenance and diagnostics, including provider/model identity when available, execution timing, batch status (`completed` / `partial` / `failed`), and fallback reasons. Browser heuristic generation still exists only as an explicit degraded fallback path.
+Each generation batch persists provenance and diagnostics, including provider/model identity when available, execution path, execution kind, timing, batch status (`completed` / `partial` / `failed` / `degraded`), and fallback reasons. Browser heuristic generation still exists only as an explicit degraded fallback path, while the Python runtime local generator is labeled separately from provider-backed execution.

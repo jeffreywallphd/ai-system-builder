@@ -216,7 +216,7 @@ export default function FineTuningDatasetStudio(): JSX.Element {
         return !selectedVersion ? <p className="ui-text-secondary">Create or select a dataset version first.</p> : (
           <div className="ui-stack ui-stack--md">
             <div className="ui-row ui-row--between ui-row--wrap">
-              <p className="ui-text-secondary">Provider/model-backed generation is preferred when configured and available. If that path is unavailable, the runtime records whether examples came from a runtime-local deterministic generator or a heuristic fallback, along with diagnostics and fallback reasons.</p>
+              <p className="ui-text-secondary">Provider/model-backed generation is preferred when configured and available. If that path is unavailable, the app records whether examples came from the explicit python-runtime-local generator or a heuristic fallback, along with provider/model identity, diagnostics, and fallback reasons.</p>
               <button
                 type="button"
                 className="ui-button ui-button--secondary ui-button--sm"
@@ -234,12 +234,13 @@ export default function FineTuningDatasetStudio(): JSX.Element {
                     <div className="ui-card__body ui-stack ui-stack--2xs">
                       <div className="ui-row ui-row--between ui-row--wrap">
                         <strong>{batch.id}</strong>
-                        <span className={`ui-badge ${batch.provenance.mode === "provider-model-backed" ? "ui-badge--success" : batch.provenance.mode === "runtime-local-deterministic" ? "ui-badge--info" : "ui-badge--warning"}`}>{batch.provenance.mode}</span>
+                        <span className={`ui-badge ${batch.provenance.mode === "provider-model-backed" ? "ui-badge--success" : batch.provenance.mode === "python-runtime-local" ? "ui-badge--info" : "ui-badge--warning"}`}>{batch.provenance.mode}</span>
                       </div>
-                      <div className="ui-text-secondary ui-text-small">Provider: {batch.provenance.provider} · Model: {batch.provenance.modelDisplayName ?? batch.provenance.modelId ?? "—"} · Examples: {batch.generatedCount} · Status: {batch.status}</div>
+                      <div className="ui-text-secondary ui-text-small">Provider: {batch.provenance.provider} · Model: {batch.provenance.modelDisplayName ?? batch.provenance.modelId ?? "—"} · Examples: {batch.generatedCount} · Status: {batch.status} · Path: {batch.provenance.path}</div>
                       {batch.provenance.detail ? <div className="ui-text-secondary ui-text-small">{batch.provenance.detail}</div> : null}
+                      <div className="ui-text-secondary ui-text-small">Execution kind: {batch.provenance.executionKind} · Fallback: {batch.provenance.isFallback ? "yes" : "no"} · Degraded: {batch.provenance.isDegraded ? "yes" : "no"}</div>
                       {batch.provenance.fallback ? <div className="ui-text-secondary ui-text-small">Fallback: {batch.provenance.fallback.fromMode ?? "provider-model-backed"} → {batch.provenance.mode} · {batch.provenance.fallback.reason}</div> : null}
-                      {batch.provenance.diagnostics.length > 0 ? <div className="ui-text-secondary ui-text-small">Diagnostics: {batch.provenance.diagnostics.map((diagnostic) => `${diagnostic.level}: ${diagnostic.message}`).join(" · ")}</div> : null}
+                      {batch.provenance.diagnostics.length > 0 ? <div className="ui-text-secondary ui-text-small">Diagnostics: {batch.provenance.diagnostics.map((diagnostic) => `${diagnostic.level}: ${diagnostic.message}${diagnostic.detail ? ` (${diagnostic.detail})` : ""}`).join(" · ")}</div> : null}
                     </div>
                   </div>
                 ))}

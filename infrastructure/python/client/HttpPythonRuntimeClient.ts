@@ -87,6 +87,14 @@ export class HttpPythonRuntimeClient implements IPythonRuntimeClient {
     return this.request<IPythonRuntimeFineTuningJobResponse>("GET", `/training/jobs/${encodeURIComponent(jobId)}`);
   }
 
+  public async refreshFineTuningJob(jobId: string): Promise<IPythonRuntimeFineTuningJobResponse> {
+    return this.request<IPythonRuntimeFineTuningJobResponse>("POST", `/training/jobs/${encodeURIComponent(jobId)}/refresh`);
+  }
+
+  public async reconcileFineTuningJob(jobId: string): Promise<IPythonRuntimeFineTuningJobResponse> {
+    return this.request<IPythonRuntimeFineTuningJobResponse>("POST", `/training/jobs/${encodeURIComponent(jobId)}/reconcile`);
+  }
+
   public async listFineTuningJobs(): Promise<ReadonlyArray<IPythonRuntimeFineTuningJobResponse>> {
     return this.request<ReadonlyArray<IPythonRuntimeFineTuningJobResponse>>("GET", "/training/jobs");
   }

@@ -38,9 +38,13 @@ interface ModelTrainingStudioProps {
 }
 
 function statusBadgeClass(status: string): string {
-  if (status === "completed" || status === "prepared") return "ui-badge--success";
-  if (status === "failed" || status === "cancelled") return "ui-badge--danger";
+  if (["completed", "exported-without-training"].includes(status)) return "ui-badge--success";
+  if (["failed", "cancelled", "reconciliation-needed", "partially-completed"].includes(status)) return "ui-badge--warning";
   return "ui-badge--info";
+}
+
+function canCancel(status: string): boolean {
+  return ["submitted", "queued", "running"].includes(status);
 }
 
 export default function ModelTrainingStudio({
@@ -67,7 +71,7 @@ export default function ModelTrainingStudio({
   }, [modelTrainingStore, tuningDatasetStore]);
 
   const baseModelOptions = useMemo(
-    () => modelState.installedModels.filter((model) => model.isAvailable()),
+    () => modelState.installedModels.filter((model) => model.isAvailable() && model.artifact.accessMethod === "local-file"),
     [modelState.installedModels],
   );
 
@@ -84,7 +88,9 @@ export default function ModelTrainingStudio({
             key: `${entry.dataset.id}::${entry.selectedVersion.id}`,
             datasetId: entry.dataset.id,
             datasetName: entry.dataset.name,
+            datasetTaskType: entry.dataset.taskType,
             versionId: entry.selectedVersion.id,
+            versionNumber: entry.selectedVersion.versionNumber,
             versionLabel: `v${entry.selectedVersion.versionNumber}`,
           }]
         : [],
@@ -99,9 +105,35 @@ export default function ModelTrainingStudio({
   }, [datasetVersionKey, datasetVersionOptions]);
 
   const selectedDatasetVersion = datasetVersionOptions.find((option) => option.key === datasetVersionKey);
+  const selectedModel = baseModelOptions.find((model) => model.id === baseModelId);
+  const numericEpochs = Number.parseInt(epochs, 10) || 0;
+  const numericLearningRate = Number.parseFloat(learningRate) || 0;
+  const numericBatchSize = Number.parseInt(batchSize, 10) || 0;
+
+  const unsupportedReason = useMemo(() => {
+    if (!selectedModel) {
+      return "Select an installed base model with a local-file artifact to run the real python-runtime-local trainer.";
+    }
+    if (!selectedDatasetVersion) {
+      return "Select a dataset version before submitting a training or export-only job.";
+    }
+    if (!["question_answering", "chat_completion"].includes(selectedDatasetVersion.datasetTaskType)) {
+      return `The current local trainer only supports question_answering and chat_completion datasets, not ${selectedDatasetVersion.datasetTaskType}.`;
+    }
+    if (numericEpochs < 1) {
+      return "Real local training requires epochs >= 1.";
+    }
+    if (numericLearningRate <= 0) {
+      return "Learning rate must be greater than 0.";
+    }
+    if (numericBatchSize < 1) {
+      return "Batch size must be at least 1.";
+    }
+    return undefined;
+  }, [numericBatchSize, numericEpochs, numericLearningRate, selectedDatasetVersion, selectedModel]);
 
   const submitJob = (executionKind: "preparation-only" | "local-gradient-training") => {
-    if (!selectedDatasetVersion) {
+    if (!selectedDatasetVersion || !selectedModel) {
       return;
     }
     void modelTrainingStore.submitJob({
@@ -112,9 +144,9 @@ export default function ModelTrainingStudio({
       createdBy: "studio-user",
       executionKind,
       configuration: {
-        epochs: Number.parseInt(epochs, 10) || 1,
-        learningRate: Number.parseFloat(learningRate) || 0.05,
-        batchSize: Number.parseInt(batchSize, 10) || 1,
+        epochs: executionKind === "preparation-only" ? Math.max(numericEpochs, 1) : numericEpochs,
+        learningRate: Math.max(numericLearningRate, 0.000001),
+        batchSize: Math.max(numericBatchSize, 1),
         notes,
       },
     });
@@ -127,7 +159,9 @@ export default function ModelTrainingStudio({
           <div>
             <h2>Train or prepare a managed model</h2>
             <p className="ui-text-secondary">
-              The studio now separates <strong>preparation/export-only</strong> jobs from <strong>real local training jobs</strong>. Preparation writes reviewable manifests and bundles only. Local training submits a real Python-runtime NumPy training job and reports truthful submitted/running/completed/failed state.
+              The studio separates <strong>preparation/export-only</strong> jobs from <strong>real local training jobs</strong>.
+              Export-only work writes durable manifests and bundles without claiming a trained model. Real local training only appears for the
+              supported <code>python-runtime-local</code> NumPy adapter backend and reports truthful submitted → queued → running → terminal lifecycle states.
             </p>
           </div>
           <div className="ui-grid ui-grid--2col" style={{ gap: "1rem" }}>
@@ -147,7 +181,7 @@ export default function ModelTrainingStudio({
               <span className="ui-field__label">Dataset version</span>
               <select className="ui-input" value={datasetVersionKey} onChange={(event) => setDatasetVersionKey(event.target.value)}>
                 {datasetVersionOptions.map((option) => (
-                  <option key={option.key} value={option.key}>{option.datasetName} · {option.versionLabel}</option>
+                  <option key={option.key} value={option.key}>{option.datasetName} · {option.versionLabel} · {option.datasetTaskType}</option>
                 ))}
               </select>
             </label>
@@ -168,11 +202,12 @@ export default function ModelTrainingStudio({
             <span className="ui-field__label">Training notes</span>
             <textarea className="ui-input" rows={4} value={notes} onChange={(event) => setNotes(event.target.value)} />
           </label>
+          {unsupportedReason ? <p className="ui-text-danger">{unsupportedReason}</p> : null}
           <div className="ui-row ui-row--wrap" style={{ gap: "0.75rem" }}>
             <button
               className="ui-button ui-button--primary"
               type="button"
-              disabled={!baseModelId || !selectedDatasetVersion || trainingState.isSubmitting}
+              disabled={Boolean(unsupportedReason) || trainingState.isSubmitting}
               onClick={() => submitJob("local-gradient-training")}
             >
               {trainingState.isSubmitting ? "Submitting…" : "Submit real training job"}
@@ -180,13 +215,16 @@ export default function ModelTrainingStudio({
             <button
               className="ui-button ui-button--secondary"
               type="button"
-              disabled={!baseModelId || !selectedDatasetVersion || trainingState.isSubmitting}
+              disabled={!selectedModel || !selectedDatasetVersion || trainingState.isSubmitting}
               onClick={() => submitJob("preparation-only")}
             >
               Prepare export-only bundle
             </button>
             <button className="ui-button ui-button--secondary" type="button" onClick={() => void modelTrainingStore.refresh()}>
-              Refresh job state
+              Refresh all jobs
+            </button>
+            <button className="ui-button ui-button--secondary" type="button" onClick={() => void modelTrainingStore.refreshActiveJobs()}>
+              Refresh active jobs
             </button>
           </div>
           {trainingState.error ? <p className="ui-text-danger">{trainingState.error}</p> : null}
@@ -199,7 +237,8 @@ export default function ModelTrainingStudio({
             <div>
               <h3>Training jobs</h3>
               <p className="ui-text-secondary ui-text-small">
-                Jobs mirror persisted backend truth. Preparation-only runs are not shown as completed training, and running jobs reconcile from the runtime on refresh.
+                Jobs mirror persisted backend truth. Export-only runs stay separate from trained models, and running jobs can be refreshed or reconciled
+                against durable runtime artifacts.
               </p>
             </div>
             <div className="ui-text-secondary ui-text-small">{trainingState.isLoading ? "Loading…" : `${trainingState.jobs.length} jobs`}</div>
@@ -224,14 +263,19 @@ export default function ModelTrainingStudio({
                     </div>
                   </div>
                   <div className="ui-text-secondary ui-text-small">
-                    Backend: <strong>{job.backend}</strong> · Truth: <strong>{job.provenance.truthfulness}</strong> · Dataset version: <strong>{job.datasetVersionId}</strong>
+                    Backend: <strong>{job.backend}</strong> · Truth: <strong>{job.provenance.truthfulness}</strong> · Run mode: <strong>{job.provenance.runMode}</strong> · Dataset version: <strong>{job.datasetVersionId}</strong>
+                  </div>
+                  <div className="ui-text-secondary ui-text-small">
+                    Provider: {job.provenance.provider ?? "—"} · Model identity: {job.provenance.modelIdentity ?? "—"} · Durable path: {job.provenance.path}
                   </div>
                   {job.summary ? <p className="ui-text-secondary">{job.summary}</p> : null}
                   {job.progress ? (
                     <div className="ui-stack ui-stack--2xs">
                       <strong>Progress</strong>
                       <div className="ui-text-secondary ui-text-small">
-                        {job.progress.percent}%{job.progress.currentEpoch ? ` · epoch ${job.progress.currentEpoch}/${job.progress.totalEpochs ?? job.configuration.epochs}` : ""}
+                        {job.progress.percent}%
+                        {job.progress.currentEpoch ? ` · epoch ${job.progress.currentEpoch}/${job.progress.totalEpochs ?? job.configuration.epochs}` : ""}
+                        {job.progress.currentStep ? ` · step ${job.progress.currentStep}/${job.progress.totalSteps ?? "—"}` : ""}
                         {job.progress.latestMetricName ? ` · ${job.progress.latestMetricName}: ${job.progress.latestMetricValue}` : ""}
                       </div>
                       {job.progress.statusDetail ? <div className="ui-text-secondary ui-text-small">{job.progress.statusDetail}</div> : null}
@@ -241,19 +285,32 @@ export default function ModelTrainingStudio({
                     <div className="ui-stack ui-stack--2xs">
                       <strong>Diagnostics</strong>
                       {job.diagnostics.map((diagnostic) => (
-                        <div key={`${job.id}:${diagnostic.code}`} className="ui-text-secondary ui-text-small">
+                        <div key={`${job.id}:${diagnostic.code}:${diagnostic.detail ?? ""}`} className="ui-text-secondary ui-text-small">
                           {diagnostic.level.toUpperCase()} · {diagnostic.message}
                           {diagnostic.detail ? ` — ${diagnostic.detail}` : ""}
                         </div>
                       ))}
                     </div>
                   ) : null}
+                  <div className="ui-row ui-row--wrap" style={{ gap: "0.5rem" }}>
+                    <button className="ui-button ui-button--secondary ui-button--sm" type="button" onClick={() => void modelTrainingStore.refreshJob(job.id)}>
+                      Refresh
+                    </button>
+                    <button className="ui-button ui-button--secondary ui-button--sm" type="button" onClick={() => void modelTrainingStore.reconcileJob(job.id)}>
+                      Reconcile
+                    </button>
+                    {canCancel(job.status) ? (
+                      <button className="ui-button ui-button--secondary ui-button--sm" type="button" onClick={() => void modelTrainingStore.cancelJob(job.id)}>
+                        Cancel
+                      </button>
+                    ) : null}
+                  </div>
                   <div className="ui-grid ui-grid--2col" style={{ gap: "1rem" }}>
                     <div>
                       <strong>Artifacts</strong>
                       <ul>
                         {job.artifacts.map((artifact) => (
-                          <li key={artifact.id}>{artifact.label}{artifact.location ? ` — ${artifact.location}` : ""}</li>
+                          <li key={artifact.id}>{artifact.kind} · {artifact.label}{artifact.location ? ` — ${artifact.location}` : ""}</li>
                         ))}
                       </ul>
                     </div>

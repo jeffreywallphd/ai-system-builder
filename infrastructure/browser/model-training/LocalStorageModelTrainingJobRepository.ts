@@ -43,10 +43,16 @@ interface PersistedJob {
     readonly backend: ModelTrainingJob["backend"];
     readonly truthfulness: ModelTrainingJob["provenance"]["truthfulness"];
     readonly runtime: ModelTrainingJob["provenance"]["runtime"];
+    readonly runMode: ModelTrainingJob["provenance"]["runMode"];
     readonly supportsGradientTraining: boolean;
     readonly isPreparationOnly: boolean;
     readonly provider?: string;
     readonly modelIdentity?: string;
+    readonly path: string;
+    readonly fallbackReason?: string;
+    readonly diagnostics: ReadonlyArray<ModelTrainingDiagnostic>;
+    readonly startedAt?: string;
+    readonly completedAt?: string;
     readonly detail?: string;
   };
 }

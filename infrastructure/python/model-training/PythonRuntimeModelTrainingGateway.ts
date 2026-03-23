@@ -46,6 +46,22 @@ export class PythonRuntimeModelTrainingGateway implements IModelTrainingRuntime 
     return toDomainJob(await this.client.getFineTuningJob(normalizedJobId));
   }
 
+  public async refreshJob(jobId: string): Promise<ModelTrainingJob | undefined> {
+    const normalizedJobId = jobId.trim();
+    if (!normalizedJobId) {
+      return undefined;
+    }
+    return toDomainJob(await this.client.refreshFineTuningJob(normalizedJobId));
+  }
+
+  public async reconcileJob(jobId: string): Promise<ModelTrainingJob | undefined> {
+    const normalizedJobId = jobId.trim();
+    if (!normalizedJobId) {
+      return undefined;
+    }
+    return toDomainJob(await this.client.reconcileFineTuningJob(normalizedJobId));
+  }
+
   public async listJobs(): Promise<ReadonlyArray<ModelTrainingJob>> {
     const response = await this.client.listFineTuningJobs();
     return Object.freeze(response.map((job) => toDomainJob(job)));
@@ -121,10 +137,21 @@ function toDomainJob(response: IPythonRuntimeFineTuningJobResponse): ModelTraini
       backend: response.provenance.backend,
       truthfulness: response.provenance.truthfulness,
       runtime: response.provenance.runtime,
+      runMode: response.provenance.run_mode,
       supportsGradientTraining: response.provenance.supports_gradient_training,
       isPreparationOnly: response.provenance.is_preparation_only,
       provider: response.provenance.provider,
       modelIdentity: response.provenance.model_identity,
+      path: response.provenance.path,
+      fallbackReason: response.provenance.fallback_reason,
+      diagnostics: Object.freeze(response.provenance.diagnostics.map((diagnostic) => Object.freeze({
+        code: diagnostic.code,
+        level: diagnostic.level,
+        message: diagnostic.message,
+        detail: diagnostic.detail,
+      }))),
+      startedAt: response.provenance.started_at ? new Date(response.provenance.started_at) : undefined,
+      completedAt: response.provenance.completed_at ? new Date(response.provenance.completed_at) : undefined,
       detail: response.provenance.detail,
     }),
   });

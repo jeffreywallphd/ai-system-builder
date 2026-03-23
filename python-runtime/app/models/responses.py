@@ -36,7 +36,7 @@ class FineTuningJobDiagnostic(BaseModel):
 
 class FineTuningJobArtifact(BaseModel):
     id: str
-    kind: Literal["training-manifest", "prepared-bundle", "checkpoint", "trained-model", "metrics", "log"]
+    kind: Literal["training-manifest", "prepared-bundle", "checkpoint", "trained-model", "metrics", "log", "diagnostic"]
     label: str
     location: Optional[str] = None
     content_type: Optional[str] = None
@@ -69,12 +69,18 @@ class FineTuningJobProvenance(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
     execution_kind: Literal["preparation-only", "local-gradient-training"]
     backend: Literal["python-runtime-local", "python-runtime-manifest"]
-    truthfulness: Literal["preparation-only", "local-training-job"]
+    truthfulness: Literal["preparation-only", "real-execution", "exported-without-training", "fallback"]
     runtime: Literal["python-runtime"]
+    run_mode: Literal["preparation-only", "local-gradient-training"]
     supports_gradient_training: bool
     is_preparation_only: bool
     provider: Optional[str] = None
     model_identity: Optional[str] = None
+    path: str
+    fallback_reason: Optional[str] = None
+    diagnostics: List[FineTuningJobDiagnostic] = Field(default_factory=list)
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
     detail: Optional[str] = None
 
 
@@ -92,7 +98,7 @@ class FineTuningJobResponse(BaseModel):
     submitted_at: Optional[str] = None
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
-    status: Literal["preparing", "prepared", "submitted", "running", "completed", "failed", "cancelled"]
+    status: Literal["submitted", "queued", "running", "completed", "failed", "cancelled", "reconciliation-needed", "partially-completed", "exported-without-training"]
     configuration: Dict[str, Any]
     diagnostics: List[FineTuningJobDiagnostic] = Field(default_factory=list)
     artifacts: List[FineTuningJobArtifact] = Field(default_factory=list)
@@ -107,10 +113,11 @@ class DatasetGenerationProvenanceDiagnostic(BaseModel):
     code: str
     level: Literal["info", "warning", "error"]
     message: str
+    detail: Optional[str] = None
 
 
 class DatasetGenerationFallbackResponse(BaseModel):
-    from_mode: Optional[Literal["provider-model-backed", "runtime-local-deterministic", "heuristic-fallback"]] = None
+    from_mode: Optional[Literal["provider-model-backed", "python-runtime-local", "heuristic-fallback"]] = None
     reason: str
 
 
@@ -122,14 +129,19 @@ class DatasetGenerationProvenanceResponse(BaseModel):
     generator_id: str
     generator_version: str
     batch_id: str
-    mode: Literal["provider-model-backed", "runtime-local-deterministic", "heuristic-fallback"]
-    status: Literal["completed", "partial", "failed"]
+    mode: Literal["provider-model-backed", "python-runtime-local", "heuristic-fallback"]
+    execution_kind: Literal["provider-model-backed", "python-runtime-local", "heuristic-fallback"]
+    status: Literal["completed", "partial", "failed", "cancelled", "degraded"]
+    path: str
+    is_fallback: bool = False
+    is_degraded: bool = False
     detail: Optional[str] = None
     parameters: Dict[str, Any] = Field(default_factory=dict)
     started_at: str
     executed_at: str
     duration_ms: Optional[int] = None
     diagnostics: List[DatasetGenerationProvenanceDiagnostic] = Field(default_factory=list)
+    fallback_reason: Optional[str] = None
     fallback: Optional[DatasetGenerationFallbackResponse] = None
 
 
