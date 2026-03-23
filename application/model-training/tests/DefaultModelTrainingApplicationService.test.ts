@@ -1,10 +1,11 @@
 import { describe, expect, it } from "bun:test";
 import { DefaultModelTrainingApplicationService } from "../DefaultModelTrainingApplicationService";
 import { Model, ModelArtifact, ModelSource } from "../../../domain/models/Model";
-import { TuningDataset, TuningDatasetVersion } from "../../../domain/tuning-datasets/TuningDatasetEntities";
+import { ExampleLineage, QuestionAnsweringExample, TuningDataset, TuningDatasetVersion } from "../../../domain/tuning-datasets/TuningDatasetEntities";
+
 
 describe("DefaultModelTrainingApplicationService", () => {
-  it("submits a fine-tuning job against an installed base model and dataset version", async () => {
+  it("submits a truthful local training job against an installed base model and dataset version", async () => {
     const model = new Model({
       id: "base-1",
       name: "Base One",
@@ -15,6 +16,16 @@ describe("DefaultModelTrainingApplicationService", () => {
     });
     const dataset = new TuningDataset({ id: "dataset-1", name: "Support QA", taskType: "question_answering", createdBy: "tester" });
     const version = new TuningDatasetVersion({ id: "version-1", datasetId: dataset.id, versionNumber: 1, status: "draft", kind: "initial_draft", createdBy: "tester", schema: { taskType: "question_answering", schemaVersion: "1.0", canonicalExampleType: "qa", requiredFields: ["question", "answer", "context"] } });
+    const example = new QuestionAnsweringExample({
+      id: "qa-1",
+      datasetId: dataset.id,
+      versionId: version.id,
+      question: "What is AI Loom Studio?",
+      answer: "A workflow studio.",
+      context: "AI Loom Studio is a workflow studio.",
+      createdBy: "tester",
+      lineage: new ExampleLineage({ generationMethod: "manual-authoring" }),
+    });
     const saved: unknown[] = [];
 
     const service = new DefaultModelTrainingApplicationService(
@@ -33,6 +44,7 @@ describe("DefaultModelTrainingApplicationService", () => {
       } as never,
       {
         loadVersion: async () => version,
+        listExamples: async () => [example],
       } as never,
       {
         listJobs: async () => [],
@@ -43,7 +55,8 @@ describe("DefaultModelTrainingApplicationService", () => {
         submitJob: async (request) => ({
           id: request.id,
           name: request.name,
-          backend: "python-runtime-manifest",
+          backend: "python-runtime-local",
+          executionKind: request.executionKind,
           baseModelId: request.baseModelId,
           datasetId: request.datasetId,
           datasetVersionId: request.datasetVersionId,
@@ -51,16 +64,30 @@ describe("DefaultModelTrainingApplicationService", () => {
           createdAt: new Date("2025-01-01T00:00:00.000Z"),
           updatedAt: new Date("2025-01-01T00:00:01.000Z"),
           submittedAt: new Date("2025-01-01T00:00:00.000Z"),
-          startedAt: new Date("2025-01-01T00:00:00.500Z"),
-          completedAt: new Date("2025-01-01T00:00:01.000Z"),
-          status: "completed",
+          startedAt: undefined,
+          completedAt: undefined,
+          status: "submitted",
           configuration: request.configuration,
           diagnostics: [],
           artifacts: [],
           checkpoints: [],
-          outputModelName: "Tuned model",
-          summary: "done",
+          outputModelName: undefined,
+          summary: "submitted",
+          progress: { percent: 0, currentEpoch: 0, totalEpochs: request.configuration.epochs },
+          provenance: {
+            executionKind: request.executionKind,
+            backend: "python-runtime-local",
+            truthfulness: "local-training-job",
+            runtime: "python-runtime",
+            supportsGradientTraining: true,
+            isPreparationOnly: false,
+            provider: "python-runtime-local",
+            modelIdentity: request.baseModelName,
+          },
         }),
+        getJob: async () => undefined,
+        listJobs: async () => [],
+        cancelJob: async () => { throw new Error("not implemented"); },
       },
       () => "training-job-1",
     );

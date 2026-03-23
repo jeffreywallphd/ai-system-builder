@@ -1,6 +1,36 @@
-export type ModelTrainingBackend = "python-runtime-manifest";
-export type ModelTrainingJobStatus = "queued" | "running" | "completed" | "failed" | "unsupported";
-export type ModelTrainingArtifactKind = "training-manifest" | "adapter-bundle" | "checkpoint" | "log";
+export const MODEL_TRAINING_BACKENDS = Object.freeze([
+  "python-runtime-local",
+  "python-runtime-manifest",
+] as const);
+export type ModelTrainingBackend = (typeof MODEL_TRAINING_BACKENDS)[number];
+
+export const MODEL_TRAINING_EXECUTION_KINDS = Object.freeze([
+  "preparation-only",
+  "local-gradient-training",
+] as const);
+export type ModelTrainingExecutionKind = (typeof MODEL_TRAINING_EXECUTION_KINDS)[number];
+
+export const MODEL_TRAINING_JOB_STATUSES = Object.freeze([
+  "preparing",
+  "prepared",
+  "submitted",
+  "running",
+  "completed",
+  "failed",
+  "cancelled",
+] as const);
+export type ModelTrainingJobStatus = (typeof MODEL_TRAINING_JOB_STATUSES)[number];
+
+export const MODEL_TRAINING_ARTIFACT_KINDS = Object.freeze([
+  "training-manifest",
+  "prepared-bundle",
+  "checkpoint",
+  "trained-model",
+  "metrics",
+  "log",
+] as const);
+export type ModelTrainingArtifactKind = (typeof MODEL_TRAINING_ARTIFACT_KINDS)[number];
+
 export type ModelTrainingDiagnosticLevel = "info" | "warning" | "error";
 
 export interface ModelTrainingConfiguration {
@@ -37,17 +67,41 @@ export interface ModelTrainingDiagnostic {
   readonly detail?: string;
 }
 
+export interface ModelTrainingProgress {
+  readonly percent: number;
+  readonly currentEpoch?: number;
+  readonly totalEpochs?: number;
+  readonly currentStep?: number;
+  readonly totalSteps?: number;
+  readonly latestMetricName?: string;
+  readonly latestMetricValue?: number;
+  readonly statusDetail?: string;
+}
+
+export interface ModelTrainingProvenance {
+  readonly executionKind: ModelTrainingExecutionKind;
+  readonly backend: ModelTrainingBackend;
+  readonly truthfulness: "preparation-only" | "local-training-job";
+  readonly runtime: "python-runtime";
+  readonly supportsGradientTraining: boolean;
+  readonly isPreparationOnly: boolean;
+  readonly provider?: string;
+  readonly modelIdentity?: string;
+  readonly detail?: string;
+}
+
 export interface ModelTrainingJob {
   readonly id: string;
   readonly name: string;
   readonly backend: ModelTrainingBackend;
+  readonly executionKind: ModelTrainingExecutionKind;
   readonly baseModelId: string;
   readonly datasetId: string;
   readonly datasetVersionId: string;
   readonly createdBy: string;
   readonly createdAt: Date;
   readonly updatedAt: Date;
-  readonly submittedAt: Date;
+  readonly submittedAt?: Date;
   readonly startedAt?: Date;
   readonly completedAt?: Date;
   readonly status: ModelTrainingJobStatus;
@@ -57,4 +111,6 @@ export interface ModelTrainingJob {
   readonly checkpoints: ReadonlyArray<ModelTrainingCheckpoint>;
   readonly outputModelName?: string;
   readonly summary?: string;
+  readonly progress?: ModelTrainingProgress;
+  readonly provenance: ModelTrainingProvenance;
 }

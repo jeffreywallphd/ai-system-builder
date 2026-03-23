@@ -528,6 +528,15 @@ function createDisabledRuntimeClient(): IPythonRuntimeClient {
     async submitFineTuningJob() {
       throw new Error("Python runtime is disabled in settings.");
     },
+    async getFineTuningJob() {
+      throw new Error("Python runtime is disabled in settings.");
+    },
+    async listFineTuningJobs() {
+      throw new Error("Python runtime is disabled in settings.");
+    },
+    async cancelFineTuningJob() {
+      throw new Error("Python runtime is disabled in settings.");
+    },
     async generateDatasetExamples() {
       throw new Error("Python runtime is disabled in settings.");
     },

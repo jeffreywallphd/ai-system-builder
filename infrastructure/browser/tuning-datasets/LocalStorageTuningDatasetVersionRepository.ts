@@ -15,6 +15,7 @@ import type {
   ChatCompletionMessage,
   DatasetExample,
   DatasetExportArtifact,
+  DatasetGenerationBatch,
   DatasetSourceDocument,
   DatasetSourceSegment,
   DatasetValidationResult,
@@ -76,10 +77,20 @@ interface ExampleRecord {
     readonly metadata?: Readonly<Record<string, unknown>>;
     readonly generator?: {
       readonly provider: string;
+      readonly modelId?: string;
+      readonly modelDisplayName?: string;
       readonly generatorId: string;
       readonly generatorVersion: string;
+      readonly batchId: string;
+      readonly mode: "provider-model-backed" | "runtime-local-deterministic" | "heuristic-fallback";
+      readonly status: "completed" | "partial" | "failed";
+      readonly detail?: string;
       readonly parameters: Readonly<Record<string, unknown>>;
+      readonly startedAt: string;
       readonly executedAt: string;
+      readonly durationMs?: number;
+      readonly diagnostics: ReadonlyArray<{ readonly code: string; readonly level: "info" | "warning" | "error"; readonly message: string }>;
+      readonly fallback?: { readonly fromMode?: "provider-model-backed" | "runtime-local-deterministic" | "heuristic-fallback"; readonly reason: string };
     };
   };
   readonly validationIssues: ReadonlyArray<SerializedValidationIssue>;
@@ -136,6 +147,19 @@ interface SerializedValidationResult {
   };
 }
 
+interface GenerationBatchRecord {
+  readonly id: string;
+  readonly datasetId: string;
+  readonly versionId: string;
+  readonly taskType: DatasetGenerationBatch["taskType"];
+  readonly generatedAt: string;
+  readonly generatedCount: number;
+  readonly skippedCount: number;
+  readonly status: DatasetGenerationBatch["status"];
+  readonly provenance: ExampleRecord["lineage"]["generator"] & { readonly batchId: string };
+  readonly exampleIds: ReadonlyArray<string>;
+}
+
 interface WorkflowRecord {
   readonly datasetId: string;
   readonly versionId: string;
@@ -164,6 +188,7 @@ const versionStorageKey = "ai-loom-studio.tuning-dataset-versions";
 const exampleStorageKey = "ai-loom-studio.tuning-dataset-examples";
 const sourceStorageKey = "ai-loom-studio.tuning-dataset-sources";
 const validationStorageKey = "ai-loom-studio.tuning-dataset-validations";
+const generationBatchStorageKey = "ai-loom-studio.tuning-dataset-generation-batches";
 const exportStorageKey = "ai-loom-studio.tuning-dataset-exports";
 const workflowStorageKey = "ai-loom-studio.tuning-dataset-workflows";
 
@@ -246,6 +271,20 @@ export class LocalStorageTuningDatasetVersionRepository implements DatasetVersio
     const record = this.readCollection<SerializedValidationResult>(validationStorageKey)
       .find((entry) => entry.datasetId === datasetId && entry.versionId === versionId);
     return record ? this.toValidationResult(record) : undefined;
+  }
+
+  public async saveGenerationBatch(batch: DatasetGenerationBatch): Promise<DatasetGenerationBatch> {
+    const batches = this.readCollection<GenerationBatchRecord>(generationBatchStorageKey);
+    const record = this.toGenerationBatchRecord(batch);
+    this.upsert(batches, record, (current) => current.id === batch.id, generationBatchStorageKey);
+    return this.toGenerationBatch(record);
+  }
+
+  public async listGenerationBatches(datasetId: string, versionId: string): Promise<ReadonlyArray<DatasetGenerationBatch>> {
+    return Object.freeze(this.readCollection<GenerationBatchRecord>(generationBatchStorageKey)
+      .filter((record) => record.datasetId === datasetId && record.versionId === versionId)
+      .sort((left, right) => right.generatedAt.localeCompare(left.generatedAt))
+      .map((record) => this.toGenerationBatch(record)));
   }
 
   public async saveExportArtifact(artifact: DatasetExportArtifact): Promise<DatasetExportArtifact> {
@@ -376,6 +415,7 @@ export class LocalStorageTuningDatasetVersionRepository implements DatasetVersio
         metadata: example.lineage.metadata,
         generator: example.lineage.generator ? {
           ...example.lineage.generator,
+          startedAt: example.lineage.generator.startedAt.toISOString(),
           executedAt: example.lineage.generator.executedAt.toISOString(),
         } : undefined,
       },
@@ -407,7 +447,10 @@ export class LocalStorageTuningDatasetVersionRepository implements DatasetVersio
       metadata: record.lineage.metadata,
       generator: record.lineage.generator ? {
         ...record.lineage.generator,
+        startedAt: new Date(record.lineage.generator.startedAt),
         executedAt: new Date(record.lineage.generator.executedAt),
+        diagnostics: Object.freeze(record.lineage.generator.diagnostics.map((diagnostic) => Object.freeze({ ...diagnostic }))),
+        fallback: record.lineage.generator.fallback ? Object.freeze({ ...record.lineage.generator.fallback }) : undefined,
       } : undefined,
     });
     const annotations = record.annotations.map((annotation) => new ExampleAnnotation({
@@ -538,6 +581,47 @@ export class LocalStorageTuningDatasetVersionRepository implements DatasetVersio
         ...record.readiness,
         blockingReasons: Object.freeze([...record.readiness.blockingReasons]),
       }),
+    });
+  }
+
+  private toGenerationBatchRecord(batch: DatasetGenerationBatch): GenerationBatchRecord {
+    return {
+      id: batch.id,
+      datasetId: batch.datasetId,
+      versionId: batch.versionId,
+      taskType: batch.taskType,
+      generatedAt: batch.generatedAt.toISOString(),
+      generatedCount: batch.generatedCount,
+      skippedCount: batch.skippedCount,
+      status: batch.status,
+      provenance: {
+        ...batch.provenance,
+        startedAt: batch.provenance.startedAt.toISOString(),
+        executedAt: batch.provenance.executedAt.toISOString(),
+      },
+      exampleIds: batch.exampleIds,
+    };
+  }
+
+  private toGenerationBatch(record: GenerationBatchRecord): DatasetGenerationBatch {
+    return Object.freeze({
+      id: record.id,
+      datasetId: record.datasetId,
+      versionId: record.versionId,
+      taskType: record.taskType,
+      generatedAt: new Date(record.generatedAt),
+      generatedCount: record.generatedCount,
+      skippedCount: record.skippedCount,
+      status: record.status,
+      provenance: Object.freeze({
+        ...record.provenance,
+        startedAt: new Date(record.provenance.startedAt),
+        executedAt: new Date(record.provenance.executedAt),
+        parameters: Object.freeze({ ...record.provenance.parameters }),
+        diagnostics: Object.freeze(record.provenance.diagnostics.map((diagnostic) => Object.freeze({ ...diagnostic }))),
+        fallback: record.provenance.fallback ? Object.freeze({ ...record.provenance.fallback }) : undefined,
+      }),
+      exampleIds: Object.freeze([...record.exampleIds]),
     });
   }
 

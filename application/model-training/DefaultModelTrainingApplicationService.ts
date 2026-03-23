@@ -2,6 +2,7 @@ import type { IInstalledModelCatalog } from "../ports/interfaces/IInstalledModel
 import type { IModelTrainingJobRepository } from "../ports/interfaces/IModelTrainingJobRepository";
 import type { IModelTrainingRuntime } from "../ports/interfaces/IModelTrainingRuntime";
 import type { DatasetRepository, DatasetVersionRepository } from "../../domain/tuning-datasets/interfaces/ITuningDatasetStudio";
+import { ChatCompletionExample, QuestionAnsweringExample } from "../../domain/tuning-datasets/TuningDatasetEntities";
 import type { ModelTrainingJob } from "../../domain/model-training/ModelTrainingTypes";
 import type { ModelTrainingApplicationService } from "./ModelTrainingApplicationService";
 import type { ModelTrainingStudioSummary, SubmitModelTrainingJobCommand } from "./contracts";
@@ -25,8 +26,17 @@ export class DefaultModelTrainingApplicationService implements ModelTrainingAppl
   ) {}
 
   public async listJobs(): Promise<ReadonlyArray<ModelTrainingJob>> {
+    const runtimeJobs = await this.runtime.listJobs().catch(() => [] as ReadonlyArray<ModelTrainingJob>);
+    for (const job of runtimeJobs) {
+      await this.jobRepository.saveJob(job);
+    }
+
     const jobs = await this.jobRepository.listJobs();
-    return Object.freeze([...jobs].sort((left, right) => right.submittedAt.getTime() - left.submittedAt.getTime()));
+    return Object.freeze([...jobs].sort((left, right) => {
+      const rightTime = right.submittedAt?.getTime() ?? right.createdAt.getTime();
+      const leftTime = left.submittedAt?.getTime() ?? left.createdAt.getTime();
+      return rightTime - leftTime;
+    }));
   }
 
   public async getStudioSummary(): Promise<ModelTrainingStudioSummary> {
@@ -49,17 +59,51 @@ export class DefaultModelTrainingApplicationService implements ModelTrainingAppl
       throw new Error(`Dataset version '${command.datasetVersionId}' was not found.`);
     }
 
+    const examples = await this.datasetVersionRepository.listExamples({
+      datasetId: dataset.id,
+      versionId: version.id,
+    });
+    const eligibleExamples = examples.filter((example) => example.status !== "rejected");
+    if (eligibleExamples.length === 0) {
+      throw new Error("Training requires at least one non-rejected dataset example.");
+    }
+
     const job = await this.runtime.submitJob({
       id: command.id?.trim() || this.createId(),
       name: command.name,
+      executionKind: command.executionKind ?? "local-gradient-training",
       baseModelId: baseModel.id,
       baseModelName: baseModel.name,
+      baseModelLocation: baseModel.artifact.location,
       datasetId: dataset.id,
       datasetName: dataset.name,
       datasetVersionId: version.id,
       datasetVersionNumber: version.versionNumber,
+      datasetTaskType: dataset.taskType,
       createdBy: command.createdBy,
       configuration: command.configuration,
+      examples: eligibleExamples.map((example) => {
+        if (example instanceof QuestionAnsweringExample) {
+          return Object.freeze({
+            id: example.id,
+            taskType: example.taskType,
+            inputText: `Question: ${example.question}\n\nContext: ${example.context}`,
+            targetText: example.answer,
+            sourceDocumentId: example.sourceDocumentId,
+          });
+        }
+
+        const chatExample = example as ChatCompletionExample;
+        const promptMessages = chatExample.messages.filter((message) => message.role !== "assistant");
+        const assistantMessages = chatExample.messages.filter((message) => message.role === "assistant");
+        return Object.freeze({
+          id: chatExample.id,
+          taskType: chatExample.taskType,
+          inputText: promptMessages.map((message) => `${message.role}: ${message.content}`).join("\n"),
+          targetText: assistantMessages.map((message) => message.content).join("\n"),
+          sourceDocumentId: chatExample.lineage.sourceDocumentId,
+        });
+      }),
     });
 
     await this.jobRepository.saveJob(job);

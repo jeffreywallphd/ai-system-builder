@@ -271,6 +271,7 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
     const validation = selectedVersion ? await this.datasetVersionRepository.loadValidationResult(dataset.id, selectedVersion.id) : undefined;
     const statistics = selectedVersion ? await this.computeDatasetStatistics(dataset.id, selectedVersion.id).catch(() => undefined) : undefined;
     const exports = selectedVersion ? await this.datasetVersionRepository.listExportArtifacts(dataset.id, selectedVersion.id) : [];
+    const generationBatches = selectedVersion ? await this.datasetVersionRepository.listGenerationBatches(dataset.id, selectedVersion.id) : [];
     const workflow = selectedVersion
       ? await this.loadWorkflow(dataset.id, selectedVersion.id)
       : this.workflowService.createInitial(dataset.id, "uninitialized");
@@ -284,6 +285,7 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
       statistics,
       validation,
       exports,
+      generationBatches,
       workflow,
     });
   }
@@ -461,9 +463,21 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
       configuration: command.configuration,
     });
     const enrichedExamples = generated.examples.map((example) => this.attachGenerationProvenance(example, generated.provenance));
-    await Promise.all(enrichedExamples.map((example) => this.datasetVersionRepository.saveExample(example)));
+    const savedExamples = await Promise.all(enrichedExamples.map((example) => this.datasetVersionRepository.saveExample(example)));
+    await this.datasetVersionRepository.saveGenerationBatch(Object.freeze({
+      id: generated.batchId,
+      datasetId: generated.datasetId,
+      versionId: generated.versionId,
+      taskType: generated.taskType,
+      generatedAt: generated.generatedAt,
+      generatedCount: generated.generatedCount,
+      skippedCount: generated.skippedCount,
+      status: generated.status,
+      provenance: generated.provenance,
+      exampleIds: Object.freeze(savedExamples.map((example) => example.id)),
+    }));
     await this.reconcileWorkflow(command.datasetId, command.versionId);
-    return Object.freeze(enrichedExamples);
+    return Object.freeze(savedExamples);
   }
 
   public async generateQaExamplesFromSource(command: GenerateExamplesFromSourceCommand): Promise<ReadonlyArray<QuestionAnsweringExample>> {

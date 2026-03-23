@@ -80,7 +80,19 @@ export class HttpPythonRuntimeClient implements IPythonRuntimeClient {
   public async submitFineTuningJob(
     request: IPythonRuntimeFineTuningJobRequest,
   ): Promise<IPythonRuntimeFineTuningJobResponse> {
-    return this.request<IPythonRuntimeFineTuningJobResponse>("POST", "/training/fine-tune", request);
+    return this.request<IPythonRuntimeFineTuningJobResponse>("POST", "/training/jobs", request);
+  }
+
+  public async getFineTuningJob(jobId: string): Promise<IPythonRuntimeFineTuningJobResponse> {
+    return this.request<IPythonRuntimeFineTuningJobResponse>("GET", `/training/jobs/${encodeURIComponent(jobId)}`);
+  }
+
+  public async listFineTuningJobs(): Promise<ReadonlyArray<IPythonRuntimeFineTuningJobResponse>> {
+    return this.request<ReadonlyArray<IPythonRuntimeFineTuningJobResponse>>("GET", "/training/jobs");
+  }
+
+  public async cancelFineTuningJob(jobId: string): Promise<IPythonRuntimeFineTuningJobResponse> {
+    return this.request<IPythonRuntimeFineTuningJobResponse>("POST", `/training/jobs/${encodeURIComponent(jobId)}/cancel`);
   }
 
   public async generateDatasetExamples(

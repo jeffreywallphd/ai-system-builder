@@ -586,13 +586,15 @@ class HeuristicQuestionAnsweringGenerator {
       }
     }
 
+    const startedAt = new Date();
     const batchId = createId("generation_batch");
+    const executedAt = new Date();
     return Object.freeze({
       batchId,
       datasetId: request.datasetId,
       versionId: request.versionId,
       taskType: request.taskType,
-      generatedAt: new Date(),
+      generatedAt: executedAt,
       examples: Object.freeze(examples),
       provenance: Object.freeze({
         provider: "local-browser",
@@ -600,13 +602,18 @@ class HeuristicQuestionAnsweringGenerator {
         generatorVersion: "2.0.0",
         batchId: batchId,
         mode: "heuristic-fallback" as const,
-        detail: "The browser heuristic fallback generated examples because a provider-backed runtime path was unavailable or explicitly bypassed.",
+        status: "completed" as const,
+        detail: "The browser heuristic fallback generated examples because provider/model-backed generation was unavailable or explicitly bypassed.",
         parameters: Object.freeze({ strategy: configuration?.strategy ?? "heuristic_qa", maxSegments }),
-        executedAt: new Date(),
+        startedAt,
+        executedAt,
+        durationMs: Math.max(executedAt.getTime() - startedAt.getTime(), 0),
         diagnostics: Object.freeze([]),
+        fallback: Object.freeze({ fromMode: "provider-model-backed" as const, reason: "Provider/model-backed generation was unavailable or bypassed." }),
       }),
       generatedCount: examples.length,
       skippedCount: 0,
+      status: "completed" as const,
     });
   }
 }
@@ -642,13 +649,15 @@ class HeuristicChatCompletionGenerator {
       }
     }
 
+    const startedAt = new Date();
     const batchId = createId("generation_batch");
+    const executedAt = new Date();
     return Object.freeze({
       batchId,
       datasetId: request.datasetId,
       versionId: request.versionId,
       taskType: request.taskType,
-      generatedAt: new Date(),
+      generatedAt: executedAt,
       examples: Object.freeze(examples),
       provenance: Object.freeze({
         provider: "local-browser",
@@ -656,13 +665,18 @@ class HeuristicChatCompletionGenerator {
         generatorVersion: "2.0.0",
         batchId: batchId,
         mode: "heuristic-fallback" as const,
-        detail: "The browser heuristic fallback generated examples because a provider-backed runtime path was unavailable or explicitly bypassed.",
+        status: "completed" as const,
+        detail: "The browser heuristic fallback generated examples because provider/model-backed generation was unavailable or explicitly bypassed.",
         parameters: Object.freeze({ strategy: configuration?.strategy ?? "heuristic_chat", maxSegments }),
-        executedAt: new Date(),
+        startedAt,
+        executedAt,
+        durationMs: Math.max(executedAt.getTime() - startedAt.getTime(), 0),
         diagnostics: Object.freeze([]),
+        fallback: Object.freeze({ fromMode: "provider-model-backed" as const, reason: "Provider/model-backed generation was unavailable or bypassed." }),
       }),
       generatedCount: examples.length,
       skippedCount: 0,
+      status: "completed" as const,
     });
   }
 }
@@ -695,16 +709,22 @@ export class FallbackAwareDatasetGenerationService implements DatasetGenerationS
       const fallbackResult = await this.fallback.generate(request);
       return Object.freeze({
         ...fallbackResult,
+        status: fallbackResult.examples.length > 0 ? "partial" : "failed",
         provenance: Object.freeze({
           ...fallbackResult.provenance,
+          status: fallbackResult.examples.length > 0 ? "partial" : "failed",
           diagnostics: Object.freeze([
             ...fallbackResult.provenance.diagnostics,
             Object.freeze({
               code: "provider_runtime_unavailable",
               level: "warning" as const,
-              message: error instanceof Error ? error.message : "Provider-backed dataset generation was unavailable.",
+              message: error instanceof Error ? error.message : "Provider/model-backed dataset generation was unavailable.",
             }),
           ]),
+          fallback: Object.freeze({
+            fromMode: "provider-model-backed" as const,
+            reason: error instanceof Error ? error.message : "Provider/model-backed dataset generation was unavailable.",
+          }),
         }),
       });
     }

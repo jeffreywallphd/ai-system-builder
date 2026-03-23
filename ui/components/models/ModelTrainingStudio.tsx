@@ -21,6 +21,7 @@ const fallbackDatasetState: TuningDatasetStoreState = Object.freeze({
   validation: undefined,
   statistics: undefined,
   exports: Object.freeze([]),
+  generationBatches: Object.freeze([]),
   duplicates: Object.freeze([]),
   workflow: undefined,
   wizard: { steps: Object.freeze([]), currentStepId: "dataset_definition" } as never,
@@ -36,6 +37,12 @@ interface ModelTrainingStudioProps {
   readonly tuningDatasetStore: TuningDatasetStore;
 }
 
+function statusBadgeClass(status: string): string {
+  if (status === "completed" || status === "prepared") return "ui-badge--success";
+  if (status === "failed" || status === "cancelled") return "ui-badge--danger";
+  return "ui-badge--info";
+}
+
 export default function ModelTrainingStudio({
   modelState,
   modelTrainingStore,
@@ -43,13 +50,13 @@ export default function ModelTrainingStudio({
 }: ModelTrainingStudioProps): JSX.Element {
   const [trainingState, setTrainingState] = useState<ModelTrainingStoreState>(fallbackTrainingState);
   const [datasetState, setDatasetState] = useState<TuningDatasetStoreState>(fallbackDatasetState);
-  const [jobName, setJobName] = useState("Managed fine-tune job");
+  const [jobName, setJobName] = useState("Managed local training job");
   const [baseModelId, setBaseModelId] = useState("");
   const [datasetVersionKey, setDatasetVersionKey] = useState("");
   const [epochs, setEpochs] = useState("3");
-  const [learningRate, setLearningRate] = useState("0.0001");
-  const [batchSize, setBatchSize] = useState("2");
-  const [notes, setNotes] = useState("Produce a provider-ready adapter bundle and manifest for managed review.");
+  const [learningRate, setLearningRate] = useState("0.05");
+  const [batchSize, setBatchSize] = useState("1");
+  const [notes, setNotes] = useState("Run the truthful local NumPy adapter trainer against the selected dataset.");
 
   useEffect(() => modelTrainingStore.subscribe(setTrainingState), [modelTrainingStore]);
   useEffect(() => tuningDatasetStore.subscribe(setDatasetState), [tuningDatasetStore]);
@@ -80,7 +87,8 @@ export default function ModelTrainingStudio({
             versionId: entry.selectedVersion.id,
             versionLabel: `v${entry.selectedVersion.versionNumber}`,
           }]
-        : []),
+        : [],
+    ),
     [datasetState.datasets],
   );
 
@@ -92,14 +100,34 @@ export default function ModelTrainingStudio({
 
   const selectedDatasetVersion = datasetVersionOptions.find((option) => option.key === datasetVersionKey);
 
+  const submitJob = (executionKind: "preparation-only" | "local-gradient-training") => {
+    if (!selectedDatasetVersion) {
+      return;
+    }
+    void modelTrainingStore.submitJob({
+      name: jobName,
+      baseModelId,
+      datasetId: selectedDatasetVersion.datasetId,
+      datasetVersionId: selectedDatasetVersion.versionId,
+      createdBy: "studio-user",
+      executionKind,
+      configuration: {
+        epochs: Number.parseInt(epochs, 10) || 1,
+        learningRate: Number.parseFloat(learningRate) || 0.05,
+        batchSize: Number.parseInt(batchSize, 10) || 1,
+        notes,
+      },
+    });
+  };
+
   return (
     <section className="ui-stack ui-stack--md" data-testid="model-training-studio">
       <div className="ui-card">
         <div className="ui-card__body ui-stack ui-stack--sm">
           <div>
-            <h2>Fine-tune a managed model</h2>
+            <h2>Train or prepare a managed model</h2>
             <p className="ui-text-secondary">
-              This first supported path submits a truthful fine-tuning job to the Python runtime manifest backend, persists the job durably, and records diagnostics, checkpoints, and output artifacts for review.
+              The studio now separates <strong>preparation/export-only</strong> jobs from <strong>real local training jobs</strong>. Preparation writes reviewable manifests and bundles only. Local training submits a real Python-runtime NumPy training job and reports truthful submitted/running/completed/failed state.
             </p>
           </div>
           <div className="ui-grid ui-grid--2col" style={{ gap: "1rem" }}>
@@ -140,31 +168,22 @@ export default function ModelTrainingStudio({
             <span className="ui-field__label">Training notes</span>
             <textarea className="ui-input" rows={4} value={notes} onChange={(event) => setNotes(event.target.value)} />
           </label>
-          <div className="ui-row ui-row--wrap">
+          <div className="ui-row ui-row--wrap" style={{ gap: "0.75rem" }}>
             <button
               className="ui-button ui-button--primary"
               type="button"
               disabled={!baseModelId || !selectedDatasetVersion || trainingState.isSubmitting}
-              onClick={() => {
-                if (!selectedDatasetVersion) {
-                  return;
-                }
-                void modelTrainingStore.submitJob({
-                  name: jobName,
-                  baseModelId,
-                  datasetId: selectedDatasetVersion.datasetId,
-                  datasetVersionId: selectedDatasetVersion.versionId,
-                  createdBy: "studio-user",
-                  configuration: {
-                    epochs: Number.parseInt(epochs, 10) || 1,
-                    learningRate: Number.parseFloat(learningRate) || 0.0001,
-                    batchSize: Number.parseInt(batchSize, 10) || 1,
-                    notes,
-                  },
-                });
-              }}
+              onClick={() => submitJob("local-gradient-training")}
             >
-              {trainingState.isSubmitting ? "Submitting…" : "Submit fine-tuning job"}
+              {trainingState.isSubmitting ? "Submitting…" : "Submit real training job"}
+            </button>
+            <button
+              className="ui-button ui-button--secondary"
+              type="button"
+              disabled={!baseModelId || !selectedDatasetVersion || trainingState.isSubmitting}
+              onClick={() => submitJob("preparation-only")}
+            >
+              Prepare export-only bundle
             </button>
             <button className="ui-button ui-button--secondary" type="button" onClick={() => void modelTrainingStore.refresh()}>
               Refresh job state
@@ -178,9 +197,9 @@ export default function ModelTrainingStudio({
         <div className="ui-card__body ui-stack ui-stack--sm">
           <div className="ui-row ui-row--between ui-row--wrap">
             <div>
-              <h3>Fine-tuning jobs</h3>
+              <h3>Training jobs</h3>
               <p className="ui-text-secondary ui-text-small">
-                Jobs are persisted durably and mirror the Python runtime backend response rather than optimistic UI-only state.
+                Jobs mirror persisted backend truth. Preparation-only runs are not shown as completed training, and running jobs reconcile from the runtime on refresh.
               </p>
             </div>
             <div className="ui-text-secondary ui-text-small">{trainingState.isLoading ? "Loading…" : `${trainingState.jobs.length} jobs`}</div>
@@ -188,7 +207,7 @@ export default function ModelTrainingStudio({
 
           {trainingState.jobs.length === 0 ? (
             <div className="ui-empty-state">
-              <p className="ui-text-secondary">No fine-tuning jobs have been submitted yet.</p>
+              <p className="ui-text-secondary">No model-preparation or training jobs have been submitted yet.</p>
             </div>
           ) : (
             <div className="ui-stack ui-stack--sm">
@@ -199,18 +218,32 @@ export default function ModelTrainingStudio({
                       <strong>{job.name}</strong>
                       <div className="ui-text-secondary ui-text-small">{job.outputModelName ?? job.baseModelId}</div>
                     </div>
-                    <span className={`ui-badge ${job.status === "completed" ? "ui-badge--success" : job.status === "failed" ? "ui-badge--danger" : "ui-badge--info"}`}>{job.status}</span>
+                    <div className="ui-row ui-row--wrap" style={{ gap: "0.5rem" }}>
+                      <span className={`ui-badge ${job.provenance.isPreparationOnly ? "ui-badge--warning" : "ui-badge--info"}`}>{job.executionKind}</span>
+                      <span className={`ui-badge ${statusBadgeClass(job.status)}`}>{job.status}</span>
+                    </div>
                   </div>
                   <div className="ui-text-secondary ui-text-small">
-                    Backend: <strong>{job.backend}</strong> · Dataset version: <strong>{job.datasetVersionId}</strong>
+                    Backend: <strong>{job.backend}</strong> · Truth: <strong>{job.provenance.truthfulness}</strong> · Dataset version: <strong>{job.datasetVersionId}</strong>
                   </div>
                   {job.summary ? <p className="ui-text-secondary">{job.summary}</p> : null}
+                  {job.progress ? (
+                    <div className="ui-stack ui-stack--2xs">
+                      <strong>Progress</strong>
+                      <div className="ui-text-secondary ui-text-small">
+                        {job.progress.percent}%{job.progress.currentEpoch ? ` · epoch ${job.progress.currentEpoch}/${job.progress.totalEpochs ?? job.configuration.epochs}` : ""}
+                        {job.progress.latestMetricName ? ` · ${job.progress.latestMetricName}: ${job.progress.latestMetricValue}` : ""}
+                      </div>
+                      {job.progress.statusDetail ? <div className="ui-text-secondary ui-text-small">{job.progress.statusDetail}</div> : null}
+                    </div>
+                  ) : null}
                   {job.diagnostics.length > 0 ? (
                     <div className="ui-stack ui-stack--2xs">
                       <strong>Diagnostics</strong>
                       {job.diagnostics.map((diagnostic) => (
                         <div key={`${job.id}:${diagnostic.code}`} className="ui-text-secondary ui-text-small">
                           {diagnostic.level.toUpperCase()} · {diagnostic.message}
+                          {diagnostic.detail ? ` — ${diagnostic.detail}` : ""}
                         </div>
                       ))}
                     </div>
