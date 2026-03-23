@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+import json
+import os
+import re
+import time
+import urllib.error
+import urllib.request
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Tuple
 from uuid import uuid4
@@ -17,94 +23,57 @@ def _pick_topic(text: str, fallback: str) -> str:
     return words[0] if words else fallback
 
 
-def _qa_examples(request: DatasetGenerationRequest, batch_id: str) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-    examples: List[Dict[str, Any]] = []
-    diagnostics: List[Dict[str, Any]] = []
-    max_segments = request.configuration.max_segments_per_source if request.configuration else 4
-
-    for document in request.source_documents:
-        segments = document.segments or [
-            {
-                "id": f"{document.id}-0",
-                "index": 0,
-                "kind": "paragraph",
-                "text": document.content,
-            }
-        ]
-        for segment in segments[: max_segments or 4]:
-            segment_text = segment.text if hasattr(segment, "text") else segment["text"]
-            segment_index = segment.index if hasattr(segment, "index") else segment.get("index", 0)
-            if len(segment_text.strip()) < 40:
-                diagnostics.append({
-                    "code": "segment_too_short",
-                    "level": "warning",
-                    "message": f"Skipped short source segment from {document.name}.",
-                })
-                continue
-            topic = _pick_topic(segment_text, document.name)
-            examples.append({
-                "taskType": "question_answering",
-                "question": f"What guidance should a model preserve about {topic}?",
-                "answer": segment_text[:320].rstrip(),
-                "context": segment_text,
-                "sourceDocumentId": document.id,
-                "sourceMetadata": {"sourceName": document.name, "chunkIndex": segment_index},
-                "lineageMetadata": {"batchId": batch_id},
-            })
-
-    return examples, diagnostics
+def _sentences(text: str) -> List[str]:
+    return [segment.strip() for segment in re.split(r"(?<=[.!?])\s+", text) if segment.strip()]
 
 
-def _chat_examples(request: DatasetGenerationRequest, batch_id: str) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-    examples: List[Dict[str, Any]] = []
-    diagnostics: List[Dict[str, Any]] = []
-    max_segments = request.configuration.max_segments_per_source if request.configuration else 4
-
-    for document in request.source_documents:
-        segments = document.segments or [
-            {
-                "id": f"{document.id}-0",
-                "index": 0,
-                "kind": "paragraph",
-                "text": document.content,
-            }
-        ]
-        for segment in segments[: max_segments or 4]:
-            segment_text = segment.text if hasattr(segment, "text") else segment["text"]
-            segment_index = segment.index if hasattr(segment, "index") else segment.get("index", 0)
-            if len(segment_text.strip()) < 40:
-                diagnostics.append({
-                    "code": "segment_too_short",
-                    "level": "warning",
-                    "message": f"Skipped short source segment from {document.name}.",
-                })
-                continue
-            topic = _pick_topic(segment_text, document.name)
-            examples.append({
-                "taskType": "chat_completion",
-                "messages": [
-                    {"role": "system", "content": f"Ground your answer in {document.name}."},
-                    {"role": "user", "content": f"Summarize the most important guidance about {topic}."},
-                    {"role": "assistant", "content": segment_text[:320].rstrip()},
-                ],
-                "lineageMetadata": {"batchId": batch_id, "sourceName": document.name},
-            })
-
-    return examples, diagnostics
+class ProviderUnavailableError(RuntimeError):
+    pass
 
 
 class DatasetGenerationService:
     def generate(self, request: DatasetGenerationRequest) -> DatasetGenerationResponse:
+        started_at = time.perf_counter()
+        started_at_iso = _now_iso()
         batch_id = f"generation_batch_{uuid4().hex[:12]}"
-        if request.task_type == "question_answering":
-            examples, diagnostics = _qa_examples(request, batch_id)
-            generator_id = "python-runtime-qa-generator"
-        elif request.task_type == "chat_completion":
-            examples, diagnostics = _chat_examples(request, batch_id)
-            generator_id = "python-runtime-chat-generator"
-        else:
-            raise ValueError(f"Task type '{request.task_type}' is not supported by the Python runtime dataset generator.")
+        strategy = request.configuration.strategy if request.configuration else "provider-preferred"
+        diagnostics: List[Dict[str, Any]] = []
 
+        try:
+            if strategy != "runtime-local-only":
+                examples, provider_diagnostics, provider_name, model_id = self._generate_provider_backed(request, batch_id)
+                diagnostics.extend(provider_diagnostics)
+                executed_at = _now_iso()
+                return DatasetGenerationResponse(
+                    batch_id=batch_id,
+                    generated_at=executed_at,
+                    generated_count=len(examples),
+                    skipped_count=0,
+                    examples=examples,
+                    provenance={
+                        "provider": provider_name,
+                        "model_id": model_id,
+                        "model_display_name": model_id,
+                        "generator_id": "openai-compatible-dataset-generator",
+                        "generator_version": "2.0.0",
+                        "batch_id": batch_id,
+                        "mode": "provider-model-backed",
+                        "status": "completed",
+                        "detail": "Examples were generated by a real provider/model-backed completion API.",
+                        "parameters": request.configuration.model_dump() if request.configuration else {},
+                        "started_at": started_at_iso,
+                        "executed_at": executed_at,
+                        "duration_ms": int((time.perf_counter() - started_at) * 1000),
+                        "diagnostics": diagnostics,
+                    },
+                )
+        except ProviderUnavailableError as error:
+            diagnostics.append({"code": "provider_unavailable", "level": "warning", "message": str(error)})
+        except Exception as error:  # noqa: BLE001
+            diagnostics.append({"code": "provider_generation_failed", "level": "warning", "message": str(error)})
+
+        examples, deterministic_diagnostics = self._generate_runtime_local(request, batch_id)
+        diagnostics.extend(deterministic_diagnostics)
         executed_at = _now_iso()
         return DatasetGenerationResponse(
             batch_id=batch_id,
@@ -114,13 +83,178 @@ class DatasetGenerationService:
             examples=examples,
             provenance={
                 "provider": "python-runtime",
-                "generator_id": generator_id,
-                "generator_version": "1.0.0",
+                "generator_id": "runtime-local-deterministic-generator",
+                "generator_version": "2.0.0",
                 "batch_id": batch_id,
-                "mode": "provider-backed",
-                "detail": "Examples were generated by the Python runtime provider-backed generation backend.",
+                "mode": "runtime-local-deterministic",
+                "status": "partial" if diagnostics else "completed",
+                "detail": "Examples were generated by the Python runtime deterministic local generator because provider/model-backed generation was unavailable.",
                 "parameters": request.configuration.model_dump() if request.configuration else {},
+                "started_at": started_at_iso,
                 "executed_at": executed_at,
+                "duration_ms": int((time.perf_counter() - started_at) * 1000),
                 "diagnostics": diagnostics,
+                "fallback": {
+                    "from_mode": "provider-model-backed",
+                    "reason": diagnostics[0]["message"] if diagnostics else "Provider/model-backed generation was unavailable.",
+                } if diagnostics else None,
             },
         )
+
+    def _generate_provider_backed(
+        self,
+        request: DatasetGenerationRequest,
+        batch_id: str,
+    ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], str, str]:
+        api_key = os.getenv("AI_LOOM_OPENAI_API_KEY")
+        if not api_key:
+            raise ProviderUnavailableError("No AI_LOOM_OPENAI_API_KEY is configured for provider/model-backed generation.")
+
+        provider_name = request.configuration.provider if request.configuration and request.configuration.provider else os.getenv("AI_LOOM_DATASET_PROVIDER", "openai-compatible")
+        model_id = request.configuration.model if request.configuration and request.configuration.model else os.getenv("AI_LOOM_OPENAI_MODEL", "gpt-4.1-mini")
+        base_url = os.getenv("AI_LOOM_OPENAI_BASE_URL", "https://api.openai.com/v1")
+        max_segments = request.configuration.max_segments_per_source if request.configuration and request.configuration.max_segments_per_source else 3
+
+        examples: List[Dict[str, Any]] = []
+        diagnostics: List[Dict[str, Any]] = []
+        for document in request.source_documents:
+            segments = document.segments or [{"id": f"{document.id}-0", "index": 0, "kind": "paragraph", "text": document.content}]
+            for segment in segments[: max_segments or 3]:
+                segment_text = segment.text if hasattr(segment, "text") else segment["text"]
+                segment_index = segment.index if hasattr(segment, "index") else segment.get("index", 0)
+                response_payload = self._call_openai_compatible(
+                    base_url=base_url,
+                    api_key=api_key,
+                    model=model_id,
+                    task_type=request.task_type,
+                    source_name=document.name,
+                    source_text=segment_text,
+                )
+                example = self._provider_payload_to_example(request.task_type, document.id, document.name, segment_index, segment_text, response_payload, batch_id)
+                examples.append(example)
+                diagnostics.append({
+                    "code": "provider_generation_completed",
+                    "level": "info",
+                    "message": f"Generated examples for {document.name} using {provider_name}/{model_id}.",
+                })
+        return examples, diagnostics, provider_name, model_id
+
+    def _call_openai_compatible(self, *, base_url: str, api_key: str, model: str, task_type: str, source_name: str, source_text: str) -> Dict[str, Any]:
+        prompt = (
+            "Return exactly one JSON object with fields for a supervised fine-tuning example. "
+            "Do not wrap the response in markdown fences. "
+        )
+        if task_type == "question_answering":
+            prompt += (
+                f"Use the source text from '{source_name}' to create a grounded question_answering example. "
+                "Return keys: question, answer, context. "
+            )
+        else:
+            prompt += (
+                f"Use the source text from '{source_name}' to create a grounded chat_completion example. "
+                "Return a key named messages containing an array of role/content objects."
+            )
+
+        payload = json.dumps({
+            "model": model,
+            "messages": [
+                {"role": "system", "content": "You create grounded supervised fine-tuning examples and respond with strict JSON only."},
+                {"role": "user", "content": f"{prompt}\n\nSource text:\n{source_text}"},
+            ],
+            "temperature": 0.2,
+        }).encode("utf-8")
+        request = urllib.request.Request(
+            f"{base_url.rstrip('/')}/chat/completions",
+            data=payload,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_key}",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                result = json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as error:
+            raise ProviderUnavailableError(f"Provider/model-backed generation request failed with HTTP {error.code}.") from error
+        except urllib.error.URLError as error:
+            raise ProviderUnavailableError(f"Provider/model-backed generation request failed: {error.reason}.") from error
+
+        content = result.get("choices", [{}])[0].get("message", {}).get("content", "{}")
+        return json.loads(content)
+
+    def _provider_payload_to_example(
+        self,
+        task_type: str,
+        source_document_id: str,
+        source_name: str,
+        segment_index: int,
+        segment_text: str,
+        payload: Dict[str, Any],
+        batch_id: str,
+    ) -> Dict[str, Any]:
+        if task_type == "question_answering":
+            return {
+                "taskType": "question_answering",
+                "question": str(payload.get("question", f"What guidance should a model preserve about {_pick_topic(segment_text, source_name)}?")),
+                "answer": str(payload.get("answer", segment_text[:320].rstrip())),
+                "context": str(payload.get("context", segment_text)),
+                "sourceDocumentId": source_document_id,
+                "sourceMetadata": {"sourceName": source_name, "chunkIndex": segment_index},
+                "lineageMetadata": {"batchId": batch_id, "mode": "provider-model-backed"},
+            }
+        messages = payload.get("messages")
+        if not isinstance(messages, list) or not messages:
+            messages = [
+                {"role": "system", "content": f"Ground your answer in {source_name}."},
+                {"role": "user", "content": f"Summarize the most important guidance about {_pick_topic(segment_text, source_name)}."},
+                {"role": "assistant", "content": segment_text[:320].rstrip()},
+            ]
+        return {
+            "taskType": "chat_completion",
+            "messages": messages,
+            "sourceDocumentId": source_document_id,
+            "lineageMetadata": {"batchId": batch_id, "mode": "provider-model-backed", "sourceName": source_name},
+        }
+
+    def _generate_runtime_local(self, request: DatasetGenerationRequest, batch_id: str) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        examples: List[Dict[str, Any]] = []
+        diagnostics: List[Dict[str, Any]] = []
+        max_segments = request.configuration.max_segments_per_source if request.configuration else 4
+
+        for document in request.source_documents:
+            segments = document.segments or [{"id": f"{document.id}-0", "index": 0, "kind": "paragraph", "text": document.content}]
+            for segment in segments[: max_segments or 4]:
+                segment_text = segment.text if hasattr(segment, "text") else segment["text"]
+                segment_index = segment.index if hasattr(segment, "index") else segment.get("index", 0)
+                extracted = _sentences(segment_text)[:2]
+                if not extracted:
+                    diagnostics.append({
+                        "code": "segment_empty_after_normalization",
+                        "level": "warning",
+                        "message": f"Skipped an empty source segment from {document.name}.",
+                    })
+                    continue
+                topic = _pick_topic(segment_text, document.name)
+                if request.task_type == "question_answering":
+                    examples.append({
+                        "taskType": "question_answering",
+                        "question": f"What should a model preserve about {topic}?",
+                        "answer": " ".join(extracted)[:320].rstrip(),
+                        "context": segment_text,
+                        "sourceDocumentId": document.id,
+                        "sourceMetadata": {"sourceName": document.name, "chunkIndex": segment_index},
+                        "lineageMetadata": {"batchId": batch_id, "mode": "runtime-local-deterministic"},
+                    })
+                else:
+                    examples.append({
+                        "taskType": "chat_completion",
+                        "messages": [
+                            {"role": "system", "content": f"Ground your answer in {document.name}."},
+                            {"role": "user", "content": f"Summarize the most important guidance about {topic}."},
+                            {"role": "assistant", "content": " ".join(extracted)[:320].rstrip()},
+                        ],
+                        "sourceDocumentId": document.id,
+                        "lineageMetadata": {"batchId": batch_id, "mode": "runtime-local-deterministic", "sourceName": document.name},
+                    })
+        return examples, diagnostics

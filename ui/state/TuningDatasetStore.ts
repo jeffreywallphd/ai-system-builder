@@ -25,6 +25,7 @@ export interface TuningDatasetStoreState {
   readonly validation?: DatasetValidationResult;
   readonly statistics?: DatasetStatistics;
   readonly exports: ReadonlyArray<DatasetExportArtifact>;
+  readonly generationBatches: ReadonlyArray<import("../../domain/tuning-datasets/interfaces/ITuningDatasetStudio").DatasetGenerationBatch>;
   readonly duplicates: ReadonlyArray<{ readonly fingerprint: string; readonly exampleIds: ReadonlyArray<string> }>;
   readonly workflow?: DatasetWorkflowState;
   readonly wizard: LinearWizardDefinition<DatasetWorkflowStage>;
@@ -47,6 +48,7 @@ const defaultState: TuningDatasetStoreState = Object.freeze({
   validation: undefined,
   statistics: undefined,
   exports: Object.freeze([]),
+  generationBatches: Object.freeze([]),
   duplicates: Object.freeze([]),
   workflow: undefined,
   wizard: buildDatasetWorkflowWizard({ currentStage: "dataset_definition" }),
@@ -109,6 +111,7 @@ export class TuningDatasetStore {
         validation: undefined,
         statistics: undefined,
         exports: Object.freeze([]),
+        generationBatches: Object.freeze([]),
         duplicates: Object.freeze([]),
         workflow: undefined,
         wizard: buildDatasetWorkflowWizard({ currentStage: "dataset_definition" }),
@@ -134,6 +137,7 @@ export class TuningDatasetStore {
         validation: details.validation,
         statistics: details.statistics,
         exports: Object.freeze([...exports]),
+        generationBatches: Object.freeze([...details.generationBatches]),
         duplicates: Object.freeze([...duplicates]),
         workflow: details.workflow,
         wizard: buildDatasetWorkflowWizard({ workflow: details.workflow }),
@@ -215,7 +219,7 @@ export class TuningDatasetStore {
   public async generateExamples(datasetId: string, versionId: string, createdBy: string, sourceDocumentIds: ReadonlyArray<string>): Promise<void> {
     this.patch({ isMutating: true, error: undefined });
     try {
-      await this.service.generateExamples({ datasetId, versionId, createdBy, sourceDocumentIds, configuration: { strategy: "provider-backed-default" } });
+      await this.service.generateExamples({ datasetId, versionId, createdBy, sourceDocumentIds, configuration: { strategy: "provider-preferred" } });
       this.patch({ isMutating: false });
       await this.selectDataset(datasetId, versionId);
     } catch (error) {

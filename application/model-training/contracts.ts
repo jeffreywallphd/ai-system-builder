@@ -1,4 +1,8 @@
-import type { ModelTrainingConfiguration, ModelTrainingJob } from "../../domain/model-training/ModelTrainingTypes";
+import type {
+  ModelTrainingConfiguration,
+  ModelTrainingExecutionKind,
+  ModelTrainingJob,
+} from "../../domain/model-training/ModelTrainingTypes";
 
 export interface SubmitModelTrainingJobCommand {
   readonly id?: string;
@@ -8,6 +12,7 @@ export interface SubmitModelTrainingJobCommand {
   readonly datasetVersionId: string;
   readonly createdBy: string;
   readonly configuration: ModelTrainingConfiguration;
+  readonly executionKind?: ModelTrainingExecutionKind;
 }
 
 export interface ModelTrainingStudioSummary {

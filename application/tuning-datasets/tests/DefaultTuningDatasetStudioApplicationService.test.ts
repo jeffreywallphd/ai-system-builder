@@ -87,6 +87,8 @@ describe("DefaultTuningDatasetStudioApplicationService", () => {
       sourceDocumentIds: [(await service.getDatasetDetails({ datasetId: dataset.dataset.id, versionId })).sourceDocuments[0]!.id],
     });
     expect(generated.length).toBeGreaterThan(0);
+    const generationDetails = await service.getDatasetDetails({ datasetId: dataset.dataset.id, versionId });
+    expect(generationDetails.generationBatches[0]?.provenance.mode).toBe("heuristic-fallback");
 
     await service.bulkUpdateExamples({
       datasetId: dataset.dataset.id,

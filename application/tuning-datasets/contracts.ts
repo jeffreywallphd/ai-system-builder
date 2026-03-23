@@ -3,6 +3,7 @@ import type {
   Dataset,
   DatasetExample,
   DatasetExportArtifact,
+  DatasetGenerationBatch,
   DatasetGenerationConfiguration,
   DatasetSourceDocument,
   DatasetStatistics,
@@ -34,6 +35,7 @@ export interface DatasetDetails {
   readonly statistics?: DatasetStatistics;
   readonly validation?: DatasetValidationResult;
   readonly exports: ReadonlyArray<DatasetExportArtifact>;
+  readonly generationBatches: ReadonlyArray<DatasetGenerationBatch>;
   readonly workflow: DatasetWorkflowState;
 }
 

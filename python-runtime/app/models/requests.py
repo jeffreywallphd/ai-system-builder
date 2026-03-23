@@ -29,24 +29,38 @@ class FineTuningJobConfiguration(BaseModel):
     notes: Optional[str] = None
 
 
+class FineTuningTrainingExample(BaseModel):
+    id: str
+    task_type: str
+    input_text: str
+    target_text: str
+    source_document_id: Optional[str] = None
+
+
 class FineTuningJobRequest(BaseModel):
     job_id: str
     job_name: str
-    backend: Literal["python-runtime-manifest"]
+    execution_kind: Literal["preparation-only", "local-gradient-training"]
+    backend: Literal["python-runtime-local", "python-runtime-manifest"]
     base_model_id: str
     base_model_name: str
+    base_model_location: Optional[str] = None
     dataset_id: str
     dataset_name: str
     dataset_version_id: str
     dataset_version_number: int
+    dataset_task_type: str
     created_by: str
+    examples: List[FineTuningTrainingExample] = Field(default_factory=list)
     configuration: FineTuningJobConfiguration
 
 
 class DatasetGenerationConfiguration(BaseModel):
-    strategy: str = "provider-backed-default"
+    strategy: str = "provider-preferred"
     max_examples_per_source: Optional[int] = None
     max_segments_per_source: Optional[int] = None
+    provider: Optional[str] = None
+    model: Optional[str] = None
 
 
 class DatasetGenerationSegment(BaseModel):

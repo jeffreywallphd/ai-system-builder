@@ -32,7 +32,7 @@ const DATASET_WORKFLOW_STEP_COPY = Object.freeze<Record<DatasetWorkflowStage, { 
   },
   export: {
     title: "Export",
-    description: "Download provider-ready artifacts after releasing the version.",
+    description: "Download released artifacts after releasing the version.",
   },
 });
 

@@ -7,7 +7,8 @@ describe("ModelsPage studio workflow", () => {
     const studioSource = readSource("ui/components/models/ModelTrainingStudio.tsx");
 
     expect(pageSource).toContain("ModelTrainingStudio");
-    expect(studioSource).toContain("Submit fine-tuning job");
-    expect(studioSource).toContain("Fine-tuning jobs");
+    expect(studioSource).toContain("Submit real training job");
+    expect(studioSource).toContain("Prepare export-only bundle");
+    expect(studioSource).toContain("Training jobs");
   });
 });

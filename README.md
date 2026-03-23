@@ -211,21 +211,31 @@ The Models page now supports real end-to-end actions for download/install, refre
 
 ## Fine-tuning workflow foundation
 
-The Create Models workspace is no longer placeholder text. It now provides a truthful first vertical slice for model creation:
+The Create Models workspace now exposes two truthful model-creation paths:
 
-- select an installed base model from the managed library
-- select a tuning dataset/version from the dataset studio
-- submit a fine-tuning job to the **Python runtime manifest backend**
-- persist job metadata durably in desktop-backed storage when available
-- inspect returned diagnostics, checkpoints, and artifacts without pretending unsupported backends exist
+- **Prepare export-only bundle** — validates the selected base model + dataset version and writes a durable manifest/bundle for later use. This ends in `prepared`, not `completed training`.
+- **Submit real local training job** — submits a Python-runtime local training job that performs real NumPy gradient updates for a lightweight text-adapter backend.
 
-Today's supported backend is intentionally narrow: the Python runtime creates durable provider-ready manifests, adapter-bundle scaffolds, logs, and checkpoint metadata. Full provider-specific gradient training backends are still future work, and the UI labels that limitation explicitly rather than implying weight updates already happened.
+The current supported training backend is intentionally narrow but real:
 
-## Provider-backed dataset generation
+- supported execution backend: **Python runtime local gradient trainer** (`python-runtime-local`)
+- supported preparation backend: **Python runtime manifest/export path** (`python-runtime-manifest`)
+- persisted lifecycle states: `prepared`, `submitted`, `running`, `completed`, `failed`, `cancelled`
+- durable outputs: manifest, checkpoints, metrics, logs, and a final trained local-adapter artifact when training completes
 
-Dataset example generation now defaults to a **provider-backed Python runtime path** for supported dataset tasks:
+This is still **not** the same thing as provider-hosted LoRA or remote foundation-model fine-tuning. Unsupported provider backends remain explicit rather than being faked.
+
+## Dataset generation truthfulness
+
+Dataset example generation now prefers a **true provider/model-backed Python runtime path** when a supported provider is configured, and otherwise falls back truthfully:
+
+- `provider-model-backed` — a real provider/model completion API generated the examples
+- `runtime-local-deterministic` — the Python runtime generated examples locally without calling a provider model
+- `heuristic-fallback` — an explicit degraded fallback path generated examples heuristically
+
+Supported dataset tasks remain:
 
 - `question_answering`
 - `chat_completion`
 
-The dataset studio records provenance for each generation batch, including provider, generator ID, batch ID, diagnostics, and whether the run was truly provider-backed or a heuristic fallback. Local/browser heuristic generation still exists only as an explicit degraded fallback when the runtime path is unavailable.
+Each generation batch persists provenance and diagnostics, including provider/model identity when available, execution timing, batch status (`completed` / `partial` / `failed`), and fallback reasons. Browser heuristic generation still exists only as an explicit degraded fallback path.
