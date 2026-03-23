@@ -17,7 +17,7 @@ describe("AppRuntimeConfig", () => {
     expect(config.lifecycleStage).toBe(AppLifecycleStages.development);
     expect(config.distributionTarget).toBe(AppDistributionTargets.viteBrowser);
     expect(config.rendererDeliveryMode).toBe(RendererDeliveryModes.devServer);
-    expect(config.workflowRepositoryMode).toBe("filesystem-indexed");
+    expect(config.workflowRepositoryMode).toBe("browser-storage");
     expect(config.workflowExecutorMode).toBe("strategy");
     expect(config.nodeCatalogMode).toBe("registered");
     expect(config.uiSettingsPersistenceMode).toBe("local-storage");
@@ -29,7 +29,7 @@ describe("AppRuntimeConfig", () => {
     expect(config.isDevSyncEnabled).toBe(true);
     expect(config.modelInstallDirectory).toBe("dev/models");
     expect(config.workflowStorageDirectory).toBe("dev/workflow-data/workflows");
-    expect(config.workflowIndexDatabasePath).toBe("dev/workflow-data/workflows/workflow-index.sqlite");
+    expect(config.workflowIndexDatabasePath).toBeUndefined();
   });
 
   it("builds desktop production defaults around durable app storage", () => {

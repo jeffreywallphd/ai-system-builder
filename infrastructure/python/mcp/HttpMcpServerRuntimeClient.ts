@@ -47,7 +47,7 @@ export class HttpMcpServerRuntimeClient {
   }
 
   public createLocalServer(draft: LocalMcpToolDraft): Promise<LocalMcpServerCreateResult> {
-    return (this.runtimeClient as unknown as { request<T>(method: "GET" | "POST" | "DELETE", path: string, body?: unknown): Promise<T> }).request("POST", "/mcp/servers/local", draft);
+    return this.runtimeClient.createLocalServer(draft);
   }
 
   public upsertServer(server: Readonly<Record<string, unknown>>): Promise<McpServerDescriptor> {

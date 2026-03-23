@@ -9,7 +9,7 @@ describe("ui composition interactions", () => {
       config: AppRuntimeConfig.forDevelopment(),
     });
 
-    expect(dependencies.config.workflowRepositoryMode).toBe("filesystem-indexed");
+    expect(dependencies.config.workflowRepositoryMode).toBe("browser-storage");
     expect(dependencies.operationalStatus.workflowPersistence.effectiveMode).toBe("in-memory-fallback");
     expect(dependencies.operationalStatus.workflowPersistence.detail).toContain("Emergency fallback only");
     expect(dependencies.operationalStatus.nodeCatalog.effectiveMode).toBe("registered");

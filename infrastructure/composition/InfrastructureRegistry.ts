@@ -1,5 +1,7 @@
 import { EnvironmentConfig } from "../config/EnvironmentConfig";
 import { EnvironmentConfigProvider } from "../config/EnvironmentConfigProvider";
+import { HttpPythonRuntimeClient } from "../python/client/HttpPythonRuntimeClient";
+import { DefaultRuntimeDependencyOrchestrator } from "../runtime/DefaultRuntimeDependencyOrchestrator";
 import { McpRuntimeConfig } from "../config/McpRuntimeConfig";
 import { PythonRuntimeConfig } from "../config/PythonRuntimeConfig";
 import { LocalFileStorage } from "../filesystem/LocalFileStorage";
@@ -42,13 +44,8 @@ import type { IToolCapabilityExecutor } from "../../application/ports/interfaces
 import type { IRuntimeEventSink } from "../../application/ports/interfaces/IRuntimeEventSink";
 import type { INodeImplementationRegistry } from "../nodes/shared/INodeImplementationRegistry";
 import { CompositeNodeImplementationRegistry } from "../nodes/CompositeNodeImplementationRegistry";
+import { createMcpRuntimeIntegration } from "../python/mcp/createMcpRuntimeIntegration";
 import { createCompositeNodeImplementationRegistry } from "../nodes/NodeProviderRegistryIndex";
-import { HttpMcpRuntimeClient } from "../python/mcp/HttpMcpRuntimeClient";
-import { HttpMcpServerRuntimeClient } from "../python/mcp/HttpMcpServerRuntimeClient";
-import { PythonBackedMcpServerCatalog } from "../python/mcp/PythonBackedMcpServerCatalog";
-import { PythonBackedMcpServerManager } from "../python/mcp/PythonBackedMcpServerManager";
-import { PythonBackedMcpToolCatalog } from "../python/mcp/PythonBackedMcpToolCatalog";
-import { PythonBackedMcpToolExecutor } from "../python/mcp/PythonBackedMcpToolExecutor";
 import { CompositeToolCapabilityCatalog } from "../tools/CompositeToolCapabilityCatalog";
 import { StaticLocalToolCapabilityCatalog, LOCAL_TOOL_CAPABILITY_PROVIDER } from "../tools/StaticLocalToolCapabilityCatalog";
 import { CompositeToolCapabilityExecutor } from "../tools/CompositeToolCapabilityExecutor";
@@ -61,11 +58,14 @@ import { WorkflowToolProjectionService } from "../../application/projection/Work
 import { LoadToolDefinitionUseCase } from "../../application/tools/LoadToolDefinitionUseCase";
 import { RunToolUseCase } from "../../application/tools/RunToolUseCase";
 import { WorkflowContextService } from "../../application/context/WorkflowContextService";
+import { RuntimeDependencyIds, type IRuntimeDependencyOrchestrator } from "../../application/runtime/RuntimeDependencyOrchestrator";
 
 export const TOKENS = Object.freeze({
   EnvironmentConfig: Symbol("EnvironmentConfig"),
   EnvironmentConfigProvider: Symbol("EnvironmentConfigProvider"),
   McpRuntimeConfig: Symbol("McpRuntimeConfig"),
+  McpRuntimeIntegration: Symbol("McpRuntimeIntegration"),
+  RuntimeDependencyOrchestrator: Symbol("RuntimeDependencyOrchestrator"),
   McpRuntimeClient: Symbol("McpRuntimeClient"),
   McpServerCatalog: Symbol("McpServerCatalog"),
   McpServerManager: Symbol("McpServerManager"),
@@ -146,61 +146,86 @@ export class InfrastructureRegistry {
       return McpRuntimeConfig.fromEnv(toStringEnv(config.toObject()));
     });
 
-    container.registerSingleton<IMcpRuntimeClient>(TOKENS.McpRuntimeClient, (c) => {
+    container.registerSingleton<IRuntimeDependencyOrchestrator>(TOKENS.RuntimeDependencyOrchestrator, (c) => {
+      const config = c.resolve<EnvironmentConfig>(TOKENS.EnvironmentConfig);
+      const pythonRuntimeConfig = PythonRuntimeConfig.fromEnv(toStringEnv(config.toObject()));
+      const pythonRuntimeClient = pythonRuntimeConfig.isEnabled
+        ? new HttpPythonRuntimeClient(pythonRuntimeConfig)
+        : undefined;
+
+      return new DefaultRuntimeDependencyOrchestrator({
+        registrations: [
+          {
+            dependencyId: RuntimeDependencyIds.pythonRuntime,
+            providerId: "python-runtime-http-health",
+            ensureAvailable: async () => {
+              if (!pythonRuntimeConfig.isEnabled || !pythonRuntimeClient) {
+                return {
+                  available: false,
+                  detail: "Python runtime is disabled in settings.",
+                };
+              }
+
+              try {
+                const health = await pythonRuntimeClient.health();
+                return {
+                  available: health.status !== "unavailable",
+                  detail: health.status === "unavailable"
+                    ? "Python runtime is unavailable, so dependent runtimes remain gated."
+                    : "Python runtime dependency is reachable.",
+                  metadata: health.details,
+                };
+              } catch (error) {
+                return {
+                  available: false,
+                  detail: error instanceof Error ? error.message : "Python runtime health check failed.",
+                };
+              }
+            },
+          },
+          {
+            dependencyId: RuntimeDependencyIds.mcpRuntime,
+            providerId: "mcp-runtime-orchestration-gate",
+            dependsOn: [RuntimeDependencyIds.pythonRuntime],
+            ensureAvailable: async () => ({
+              available: true,
+              detail: "MCP runtime dependency gate passed.",
+            }),
+          },
+        ],
+      });
+    });
+
+    container.registerSingleton(TOKENS.McpRuntimeIntegration, (c) => {
       const config = c.resolve<EnvironmentConfig>(TOKENS.EnvironmentConfig);
       const pythonRuntimeConfig = PythonRuntimeConfig.fromEnv(toStringEnv(config.toObject()));
       const eventSink = c.tryResolve<IRuntimeEventSink>(Symbol.for("RuntimeEventSink"));
+      return createMcpRuntimeIntegration(
+        pythonRuntimeConfig,
+        eventSink,
+        fetch,
+        c.resolve<IRuntimeDependencyOrchestrator>(TOKENS.RuntimeDependencyOrchestrator),
+      );
+    });
 
-      if (!pythonRuntimeConfig.isEnabled) {
-        return createDisabledMcpRuntimeClient();
-      }
-
-      return new HttpMcpRuntimeClient(pythonRuntimeConfig, fetch, eventSink);
+    container.registerSingleton<IMcpRuntimeClient>(TOKENS.McpRuntimeClient, (c) => {
+      return c.resolve<ReturnType<typeof createMcpRuntimeIntegration>>(TOKENS.McpRuntimeIntegration).runtimeClient;
     });
 
     container.registerSingleton<IMcpServerCatalog>(TOKENS.McpServerCatalog, (c) => {
-      const config = c.resolve<EnvironmentConfig>(TOKENS.EnvironmentConfig);
-      const pythonRuntimeConfig = PythonRuntimeConfig.fromEnv(toStringEnv(config.toObject()));
-      const eventSink = c.tryResolve<IRuntimeEventSink>(Symbol.for("RuntimeEventSink"));
-
-      if (!pythonRuntimeConfig.isEnabled) {
-        return createDisabledMcpServerCatalog();
-      }
-
-      return new PythonBackedMcpServerCatalog(
-        new HttpMcpServerRuntimeClient(pythonRuntimeConfig, fetch, eventSink)
-      );
+      return c.resolve<ReturnType<typeof createMcpRuntimeIntegration>>(TOKENS.McpRuntimeIntegration).serverCatalog;
     });
 
     container.registerSingleton<IMcpServerManager>(TOKENS.McpServerManager, (c) => {
-      const config = c.resolve<EnvironmentConfig>(TOKENS.EnvironmentConfig);
-      const pythonRuntimeConfig = PythonRuntimeConfig.fromEnv(toStringEnv(config.toObject()));
-      const eventSink = c.tryResolve<IRuntimeEventSink>(Symbol.for("RuntimeEventSink"));
-
-      if (!pythonRuntimeConfig.isEnabled) {
-        return createDisabledMcpServerManager();
-      }
-
-      const client = new HttpMcpServerRuntimeClient(pythonRuntimeConfig, fetch, eventSink);
-      return new PythonBackedMcpServerManager(
-        client,
-        c.resolve<IMcpServerCatalog>(TOKENS.McpServerCatalog),
-        eventSink,
-      );
+      return c.resolve<ReturnType<typeof createMcpRuntimeIntegration>>(TOKENS.McpRuntimeIntegration).serverManager;
     });
 
     container.registerSingleton<IMcpToolCatalog>(TOKENS.McpToolCatalog, (c) => {
-      return new PythonBackedMcpToolCatalog(
-        c.resolve<IMcpRuntimeClient>(TOKENS.McpRuntimeClient),
-        c.tryResolve<IRuntimeEventSink>(Symbol.for("RuntimeEventSink"))
-      );
+      return c.resolve<ReturnType<typeof createMcpRuntimeIntegration>>(TOKENS.McpRuntimeIntegration).toolCatalog;
     });
 
     container.registerSingleton<IMcpToolExecutor>(TOKENS.McpToolExecutor, (c) => {
-      return new PythonBackedMcpToolExecutor(
-        c.resolve<IMcpRuntimeClient>(TOKENS.McpRuntimeClient),
-        c.tryResolve<IRuntimeEventSink>(Symbol.for("RuntimeEventSink"))
-      );
+      return c.resolve<ReturnType<typeof createMcpRuntimeIntegration>>(TOKENS.McpRuntimeIntegration).toolExecutor;
     });
 
     container.registerSingleton<IToolCapabilityCatalog>(TOKENS.ToolCapabilityCatalog, (c) => {
@@ -377,109 +402,3 @@ export class InfrastructureRegistry {
   }
 }
 
-
-function createDisabledMcpRuntimeClient(): IMcpRuntimeClient {
-  const runtime = createDisabledRuntimeStatus();
-
-  return {
-    getConnectionStatus: async () => runtime,
-    listServers: async () => ({ query: "", totalCount: 0, limit: 20, servers: [], status: runtime }),
-    searchServers: async (criteria) => ({
-      query: criteria?.query?.trim() || "",
-      totalCount: 0,
-      limit: criteria?.limit ?? 20,
-      servers: [],
-      status: runtime,
-    }),
-    connectServer: async (request) => createDisabledConnectionResult(request.serverId, request.reconnect ? "reconnect" : "connect"),
-    disconnectServer: async (serverId) => createDisabledConnectionResult(serverId, "disconnect"),
-    listTools: async () => [],
-    searchTools: async (criteria) => ({
-      query: criteria?.query?.trim() || "",
-      totalCount: 0,
-      limit: criteria?.limit ?? 20,
-      tools: [],
-    }),
-    getToolDescriptor: async () => undefined,
-    listResources: async () => [],
-    executeTool: async (request) => ({
-      executionId: request.executionId?.trim() || "mcp-disabled",
-      serverId: request.serverId,
-      toolName: request.toolName,
-      status: "failed",
-      content: [],
-      structuredContent: {},
-      errorMessage: "Python runtime is disabled.",
-    }),
-  };
-}
-
-function createDisabledMcpServerCatalog(): IMcpServerCatalog {
-  return {
-    getConnectionStatus: async () => createDisabledRuntimeStatus(),
-    listConfiguredServers: async () => [],
-    getServerStatus: async (serverId: string) => createDisabledServerStatus(serverId),
-  };
-}
-
-function createDisabledMcpServerManager(): IMcpServerManager {
-  return {
-    connectServer: async (request) => createDisabledConnectionResult(request.serverId, "connect"),
-    disconnectServer: async (serverId) => createDisabledConnectionResult(serverId, "disconnect"),
-    reconnectServer: async (serverId) => createDisabledConnectionResult(serverId, "reconnect"),
-  };
-}
-
-function createDisabledRuntimeStatus() {
-  return {
-    enabled: false,
-    state: "disabled" as const,
-    checkedAt: new Date().toISOString(),
-    servers: [],
-    capabilities: { tools: false, resources: false, toolExecution: false },
-    metadata: { reason: "python-runtime-disabled" },
-  };
-}
-
-function createDisabledServerDescriptor(serverId: string) {
-  return {
-    id: serverId,
-    name: serverId,
-    transport: "inmemory" as const,
-    enabled: false,
-    status: "error" as const,
-    connected: false,
-    toolCount: 0,
-    resourceCount: 0,
-    capabilities: { tools: false, resources: false, toolExecution: false },
-    errorMessage: "Python runtime is disabled.",
-  };
-}
-
-function createDisabledServerStatus(serverId: string) {
-  return {
-    serverId,
-    name: serverId,
-    transport: "inmemory" as const,
-    configured: false,
-    enabled: false,
-    state: "error" as const,
-    connected: false,
-    checkedAt: new Date().toISOString(),
-    toolCount: 0,
-    resourceCount: 0,
-    capabilities: { tools: false, resources: false, toolExecution: false },
-    errorMessage: "Python runtime is disabled.",
-  };
-}
-
-function createDisabledConnectionResult(serverId: string, action: "connect" | "disconnect" | "reconnect") {
-  return {
-    action,
-    checkedAt: new Date().toISOString(),
-    server: createDisabledServerDescriptor(serverId),
-    status: createDisabledServerStatus(serverId),
-    runtime: createDisabledRuntimeStatus(),
-    metadata: { reason: "python-runtime-disabled" },
-  };
-}

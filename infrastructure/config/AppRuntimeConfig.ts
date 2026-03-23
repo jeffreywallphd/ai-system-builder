@@ -179,6 +179,8 @@ export class AppRuntimeConfig {
   }
 
   public static forDevelopment(): AppRuntimeConfig {
+    const runtimeMode = "browser-development" as const;
+    const profile = getAppRuntimeProfile(runtimeMode);
     const devSyncBaseUrl =
       AppRuntimeConfig.readEnvVariable("VITE_DEV_SYNC_BASE_URL") ||
       "http://192.168.1.100:8787";
@@ -188,8 +190,8 @@ export class AppRuntimeConfig {
       AppRuntimeConfig.readEnvVariable("VITE_MODEL_INSTALL_DIRECTORY") ||
       "dev/models";
 
-    return new AppRuntimeConfig(AppRuntimeConfig.createValues("browser-development", {
-      workflowRepositoryMode: "filesystem-indexed",
+    return new AppRuntimeConfig(AppRuntimeConfig.createValues(runtimeMode, {
+      workflowRepositoryMode: profile.supportsLocalWorkspaceFilesystem ? "filesystem-indexed" : "browser-storage",
       workflowExecutorMode: "strategy",
       nodeCatalogMode: "registered",
       uiSettingsPersistenceMode: "local-storage",
@@ -199,7 +201,9 @@ export class AppRuntimeConfig {
       devSyncToken,
       modelInstallDirectory,
       workflowStorageDirectory: "dev/workflow-data/workflows",
-      workflowIndexDatabasePath: "dev/workflow-data/workflows/workflow-index.sqlite",
+      workflowIndexDatabasePath: profile.supportsLocalWorkspaceFilesystem
+        ? "dev/workflow-data/workflows/workflow-index.sqlite"
+        : undefined,
     }));
   }
 
