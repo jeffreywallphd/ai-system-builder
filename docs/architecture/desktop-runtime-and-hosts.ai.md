@@ -8,11 +8,12 @@ Electron is the desktop host boundary; the renderer accesses desktop capabilitie
 - Preload bridge: `electron/preload.ts`
 - Bridge contracts: `electron/shared/DesktopContracts.ts`
 - Desktop workflow persistence: `infrastructure/desktop/DesktopWorkflowPersistence.ts`
+- Desktop execution-run persistence: `infrastructure/filesystem/execution/SqliteExecutionRunRepository.ts`
 - Desktop-backed workflow repo used by renderer: `infrastructure/browser/workflows/DesktopBridgeWorkflowRepository.ts`
 
 ## Storage modes to mention
-- Desktop canonical path: filesystem JSON + SQLite index
-- Fallback path: browser/local storage repository
+- Desktop canonical path: filesystem JSON + SQLite workflow index plus SQLite execution-run history
+- Fallback path: browser/local storage repositories
 
 ## Runtime modes to mention
 - desktop development

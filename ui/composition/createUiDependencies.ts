@@ -124,6 +124,7 @@ import { LocalStorageTuningDatasetVersionRepository } from "../../infrastructure
 import { BrowserStorageWorkflowRepository } from "../../infrastructure/browser/workflows/SqliteBackedWorkflowRepository";
 import { DesktopBridgeWorkflowRepository } from "../../infrastructure/browser/workflows/DesktopBridgeWorkflowRepository";
 import { resolveDesktopWorkflowBridge } from "./DesktopWorkflowBridgeAdapter";
+import { resolveDesktopExecutionRunBridge } from "./DesktopExecutionRunBridgeAdapter";
 import { TruthfulWorkflowExecutor } from "../../infrastructure/execution/TruthfulWorkflowExecutor";
 import { InterpretedWorkflowExecutionStrategy } from "../../infrastructure/interpreted/execution/InterpretedWorkflowExecutionStrategy";
 import { DefaultNodeExecutionContextResolver } from "../../infrastructure/interpreted/execution/DefaultNodeExecutionContextResolver";
@@ -131,18 +132,19 @@ import { DefaultNodeOutputStore } from "../../infrastructure/interpreted/executi
 import { LangChainNodeExecutor } from "../../infrastructure/interpreted/execution/LangChainNodeExecutor";
 import { WorkflowRuntimeSelector } from "../../application/execution/WorkflowRuntimeSelector";
 import { PythonDelegatedWorkflowExecutionStrategy } from "../../infrastructure/python/execution/PythonDelegatedWorkflowExecutionStrategy";
-import { createWorkflowUnifiedExecutionEngine } from "../../infrastructure/execution/createWorkflowUnifiedExecutionEngine";
-import { createUnifiedExecutionEngine } from "../../infrastructure/execution/createUnifiedExecutionEngine";
+import { createExecutionRunRepository, createUnifiedExecutionInfrastructure } from "../../infrastructure/execution/createExecutionInfrastructure";
 import { PythonRuntimeDatasetGenerationService } from "../../infrastructure/python/tuning-datasets/PythonRuntimeDatasetGenerationService";
 import { OrchestratedDatasetGenerationService } from "../../infrastructure/python/tuning-datasets/OrchestratedDatasetGenerationService";
 import { LocalStorageModelTrainingJobRepository } from "../../infrastructure/browser/model-training/LocalStorageModelTrainingJobRepository";
-import { LocalStorageExecutionRunRepository } from "../../infrastructure/browser/execution/LocalStorageExecutionRunRepository";
 import { DefaultModelTrainingApplicationService } from "../../application/model-training/DefaultModelTrainingApplicationService";
 import { ModelTrainingService } from "../services/ModelTrainingService";
 import { ModelTrainingStore } from "../state/ModelTrainingStore";
 import { PythonRuntimeModelTrainingGateway } from "../../infrastructure/python/model-training/PythonRuntimeModelTrainingGateway";
 import { OrchestratedModelTrainingRuntime } from "../../infrastructure/python/model-training/OrchestratedModelTrainingRuntime";
 import { RuntimeAwareModelCreationEnvironmentGateway } from "../../infrastructure/python/model-training/RuntimeAwareModelCreationEnvironmentGateway";
+import { ExecutionRunProjectionService } from "../../application/execution/ExecutionRunProjectionService";
+import { ListExecutionRunsUseCase } from "../../application/execution/ListExecutionRunsUseCase";
+import { ExecutionHistoryService } from "../services/ExecutionHistoryService";
 import { createModelManagementDependencies } from "./modelManagementDependencies";
 import { BrowserDownloadModelLibrary } from "../../infrastructure/browser/models/BrowserDownloadModelLibrary";
 import { RuntimeDependencyIds, RuntimeDependencyOperationalStates, type IRuntimeDependencyOrchestrator } from "../../application/runtime/RuntimeDependencyOrchestrator";
@@ -153,6 +155,7 @@ export function createUiDependencies(
   const config = options.config ?? AppRuntimeConfig.resolveDefault();
   const desktopStorage = resolveDesktopStorageAdapter();
   const desktopWorkflowBridge = resolveDesktopWorkflowBridge();
+  const desktopExecutionRunBridge = resolveDesktopExecutionRunBridge();
   const desktopModelFileBridge = resolveDesktopModelFileBridge();
   const durableDesktopStorage = desktopStorage;
   const settingsStore = new UiSettingsStore({
@@ -293,13 +296,26 @@ export function createUiDependencies(
     ),
     new ProviderAgnosticDatasetGenerationService(),
   );
+  const modelTrainingRuntime = new OrchestratedModelTrainingRuntime(
+    new PythonRuntimeModelTrainingGateway(runtimeClient),
+    runtimeDependencyOrchestrator,
+  );
   const createWorkflowUseCase = new CreateWorkflowUseCase();
-  const executionRunRepository = new LocalStorageExecutionRunRepository(undefined, durableDesktopStorage);
-  const executionEngine = createUnifiedExecutionEngine({
+  const executionRunRepository = createExecutionRunRepository({
+    desktopExecutionRunBridge,
+    storage: durableDesktopStorage,
+  });
+  const executionEngine = createUnifiedExecutionInfrastructure({
     workflowExecutor,
     executionRunRepository,
     datasetGenerationService,
+    modelTrainingRuntime,
   });
+  const executionRunProjectionService = new ExecutionRunProjectionService();
+  const executionHistoryService = new ExecutionHistoryService(
+    new ListExecutionRunsUseCase(executionRunRepository),
+    executionRunProjectionService,
+  );
   const executeWorkflowUseCase = new ExecuteWorkflowUseCase(
     workflowExecutor,
     workflowValidator,
@@ -545,10 +561,7 @@ export function createUiDependencies(
     tuningDatasetRepository,
     tuningDatasetVersionRepository,
     modelTrainingJobRepository,
-    new OrchestratedModelTrainingRuntime(
-      new PythonRuntimeModelTrainingGateway(runtimeClient),
-      runtimeDependencyOrchestrator,
-    ),
+    modelTrainingRuntime,
     new RuntimeAwareModelCreationEnvironmentGateway(
       config,
       runtimeClient,
@@ -562,6 +575,7 @@ export function createUiDependencies(
       runtimeDependencyOrchestrator,
     ),
     desktopModelFileStorage,
+    executionEngine,
   );
   const modelTrainingService = new ModelTrainingService(modelTrainingApplicationService);
   const modelTrainingStore = new ModelTrainingStore(modelTrainingService);
@@ -595,6 +609,7 @@ export function createUiDependencies(
     tuningDatasetStore,
     modelTrainingService,
     modelTrainingStore,
+    executionHistoryService,
     workflowProjectionService,
     settingsStore,
   });

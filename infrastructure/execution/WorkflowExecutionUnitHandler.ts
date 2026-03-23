@@ -58,6 +58,22 @@ function toUnitResult(unitId: string, workflowResult: IWorkflowExecutionResult):
       outputAssetCount: workflowResult.outputAssets.length,
       workflowStatus: workflowResult.status,
     }),
+    outputSummary: Object.freeze({
+      headline: workflowResult.status === "completed"
+        ? "Workflow run completed"
+        : workflowResult.status === "cancelled"
+          ? "Workflow run cancelled"
+          : "Workflow run failed",
+      detail: workflowResult.errorMessage
+        ?? workflowResult.messages?.[workflowResult.messages.length - 1]
+        ?? (workflowResult.outputAssets.length > 0
+          ? `${workflowResult.outputAssets.length} output asset${workflowResult.outputAssets.length === 1 ? "" : "s"} captured.`
+          : "No output assets were captured."),
+      metadata: Object.freeze({
+        outputAssetCount: workflowResult.outputAssets.length,
+        executionId: workflowResult.executionId,
+      }),
+    }),
     errorMessage: workflowResult.errorMessage,
     provenance: toExecutionProvenance(workflowResult.provenance),
     artifacts: Object.freeze([createExecutionArtifact(WorkflowExecutionArtifacts.workflowResult, workflowResult)]),

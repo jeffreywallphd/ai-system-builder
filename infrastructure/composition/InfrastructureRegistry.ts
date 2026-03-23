@@ -8,7 +8,6 @@ import { LocalFileStorage } from "../filesystem/LocalFileStorage";
 import { LocalAssetRepository } from "../filesystem/LocalAssetRepository";
 import { LocalModelRepository } from "../filesystem/LocalModelRepository";
 import { LocalWorkflowRepository } from "../filesystem/LocalWorkflowRepository";
-import { LocalExecutionRunRepository } from "../filesystem/execution/LocalExecutionRunRepository";
 import { LocalContextPackageRepository } from "../filesystem/LocalContextPackageRepository";
 import { LocalContextRecipeRepository } from "../filesystem/LocalContextRecipeRepository";
 import { DependencyContainer, type DependencyToken } from "./DependencyContainer";
@@ -60,7 +59,7 @@ import { WorkflowToolCapabilityExecutor } from "../tools/WorkflowToolCapabilityE
 import { WorkflowToolProjectionService } from "../../application/projection/WorkflowToolProjectionService";
 import { LoadToolDefinitionUseCase } from "../../application/tools/LoadToolDefinitionUseCase";
 import { RunToolUseCase } from "../../application/tools/RunToolUseCase";
-import { createWorkflowUnifiedExecutionEngine } from "../execution/createWorkflowUnifiedExecutionEngine";
+import { createExecutionRunRepository, createUnifiedExecutionInfrastructure } from "../execution/createExecutionInfrastructure";
 import { UnifiedExecutionEngine } from "../../application/execution/UnifiedExecutionEngine";
 import { WorkflowContextService } from "../../application/context/WorkflowContextService";
 import { RuntimeDependencyOperationalStates, type IRuntimeDependencyOrchestrator } from "../../application/runtime/RuntimeDependencyOrchestrator";
@@ -102,6 +101,7 @@ export interface IInfrastructureRegistryPaths {
   readonly assetsDirectory: string;
   readonly modelsDirectory: string;
   readonly executionRunsDirectory?: string;
+  readonly executionRunDatabasePath?: string;
 }
 
 export interface IInfrastructureRegistryOptions {
@@ -397,19 +397,16 @@ export class InfrastructureRegistry {
       }
     );
 
-    container.registerSingleton<IExecutionRunRepository>(TOKENS.ExecutionRunRepository, (c) => {
-      return new LocalExecutionRunRepository({
-        fileStorage: c.resolve<IFileStorage>(TOKENS.FileStorage),
-        rootDirectory: options.paths.executionRunsDirectory ?? `${options.paths.workflowsDirectory}/../execution-runs`,
-      });
-    });
+    container.registerSingleton<IExecutionRunRepository>(TOKENS.ExecutionRunRepository, (c) => createExecutionRunRepository({
+      sqliteDatabasePath: options.paths.executionRunDatabasePath,
+      fileStorage: options.paths.executionRunDatabasePath ? undefined : c.resolve<IFileStorage>(TOKENS.FileStorage),
+      rootDirectory: options.paths.executionRunDatabasePath ? undefined : (options.paths.executionRunsDirectory ?? `${options.paths.workflowsDirectory}/../execution-runs`),
+    }));
 
-    container.registerSingleton<UnifiedExecutionEngine>(TOKENS.UnifiedExecutionEngine, (c) => {
-      return createWorkflowUnifiedExecutionEngine(
-        c.resolve<IWorkflowExecutor>(TOKENS.WorkflowExecutor),
-        c.resolve<IExecutionRunRepository>(TOKENS.ExecutionRunRepository),
-      );
-    });
+    container.registerSingleton<UnifiedExecutionEngine>(TOKENS.UnifiedExecutionEngine, (c) => createUnifiedExecutionInfrastructure({
+      workflowExecutor: c.resolve<IWorkflowExecutor>(TOKENS.WorkflowExecutor),
+      executionRunRepository: c.resolve<IExecutionRunRepository>(TOKENS.ExecutionRunRepository),
+    }));
 
     container.registerSingleton(TOKENS.WorkflowRepository, (c) => {
       return new LocalWorkflowRepository({

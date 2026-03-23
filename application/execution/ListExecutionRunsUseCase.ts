@@ -14,23 +14,12 @@ export class ListExecutionRunsUseCase {
   constructor(private readonly executionRunRepository: IExecutionRunRepository) {}
 
   public async execute(query: IListExecutionRunsQuery = {}): Promise<ReadonlyArray<IExecutionRunRecord>> {
-    const runs = await this.executionRunRepository.listRuns({ planId: query.planId, limit: undefined });
-    const filtered = runs
-      .filter((run) => !query.status || run.status === query.status)
-      .filter((run) => !query.executionKind || run.metadata?.executionKind === query.executionKind)
-      .filter((run) => this.matchesMetadata(run, query.metadata));
-
-    return Object.freeze(query.limit ? filtered.slice(0, query.limit) : filtered);
-  }
-
-  private matchesMetadata(
-    run: IExecutionRunRecord,
-    metadata?: Readonly<Record<string, string | number | boolean>>,
-  ): boolean {
-    if (!metadata) {
-      return true;
-    }
-
-    return Object.entries(metadata).every(([key, value]) => run.metadata?.[key] === value);
+    return this.executionRunRepository.listRuns({
+      planId: query.planId,
+      status: query.status,
+      executionKind: query.executionKind,
+      metadata: query.metadata,
+      limit: query.limit,
+    });
   }
 }

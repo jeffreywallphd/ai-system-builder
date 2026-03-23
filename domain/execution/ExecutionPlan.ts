@@ -1,6 +1,7 @@
 export const ExecutionUnitKinds = Object.freeze({
   workflow: "workflow",
   datasetGeneration: "dataset-generation",
+  modelPreparation: "model-preparation",
 });
 
 export type ExecutionUnitKind = typeof ExecutionUnitKinds[keyof typeof ExecutionUnitKinds];

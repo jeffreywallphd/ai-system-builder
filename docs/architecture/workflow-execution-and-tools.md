@@ -27,7 +27,7 @@ The execution slice now uses two small execution-native contract families:
 - `domain/execution/ExecutionPlan.ts` for plan/unit identity, dependency ordering, and statuses (`pending`, `ready`, `running`, `completed`, `failed`, `skipped`, `cancelled`)
 - `domain/execution/ExecutionRun.ts` plus `application/execution/ExecutionContracts.ts` for run snapshots, unit transitions, execution-native provenance, diagnostics, and result/event attachments
 
-This taxonomy is intentionally small. It is sufficient for workflow execution plans and persisted run history today without overcommitting the system to speculative dataset/model/MCP shapes.
+This taxonomy is intentionally small. It is sufficient for workflow execution plans, model-preparation runs, and persisted run history today without overcommitting the system to speculative dataset/model/MCP shapes.
 
 ### New application-layer engine
 
@@ -47,8 +47,8 @@ The engine still runs units sequentially and is intentionally conservative. It i
 
 The migrated path is still deliberately narrow:
 
-- **migrated now:** direct workflow execution from `ExecuteWorkflowUseCase.execute(...)`, workflow `startExecution(...)`, direct tool execution from `RunToolUseCase.execute(...)`, and tuning-dataset example generation from `DefaultTuningDatasetStudioApplicationService.generateExamplesFromSource(...)`
-- **not yet migrated:** model creation/training, MCP orchestration, or broader asynchronous/scheduled execution paths
+- **migrated now:** direct workflow execution from `ExecuteWorkflowUseCase.execute(...)`, workflow `startExecution(...)`, direct tool execution from `RunToolUseCase.execute(...)`, tuning-dataset example generation from `DefaultTuningDatasetStudioApplicationService.generateExamplesFromSource(...)`, and preparation-only model creation from `DefaultModelTrainingApplicationService.submitJob(...)`
+- **not yet migrated:** the full model-training lifecycle after preparation, MCP orchestration, or broader asynchronous/scheduled execution paths
 
 This gives the codebase one real production seam for synchronous workflow runs, started workflow runs, and a second non-workflow execution-backed product area without forcing a broad refactor.
 
@@ -101,9 +101,27 @@ The unified execution engine does **not** replace existing provenance language. 
 - hybrid
 - unavailable or degraded
 
-Plan-backed runs are also now persisted as durable execution-run records. Those records capture run identity, plan identity, unit states, status transitions, timestamps, final status, error details, and truthful execution provenance metadata. Lightweight application query use cases can now list and load those run records without reaching into infrastructure directly.
+Plan-backed runs are also now persisted as durable execution-run records. In desktop-backed modes the preferred structured source of truth is now a SQLite execution-run repository reached either directly in outer-layer Node/Electron composition or through the desktop preload bridge. Browser/local-storage and filesystem JSON repositories remain degraded fallbacks. The records capture run identity, plan identity, unit states, status transitions, timestamps, final status, cancellation support, filtering metadata, engine-native terminal/diagnostic summaries, and truthful execution provenance metadata. Lightweight application query use cases can now list and load those run records without reaching into infrastructure directly.
 
 That matters because the abstraction is meant to standardize execution flow without flattening the truthfulness model or discarding execution history.
+
+## Execution-native projection and history surfaces
+
+The application layer now includes an execution-run projection service that derives UI-facing summaries such as:
+- current active unit label/id
+- completed units vs total units
+- progress labels and percentages
+- terminal/error/diagnostic summaries
+- execution-path truthfulness summaries
+- duration and metadata context summaries
+
+The renderer consumes those projected summaries through a thin `ExecutionHistoryService` and a reusable `ExecutionHistoryPanel` instead of reconstructing run semantics ad hoc inside feature pages. Workflow editor history, dataset-generation history, and model-preparation history now all read from the same durable execution-run query path.
+
+## Artifact guidance inside the execution engine
+
+Artifacts are still preserved because product-specific callers sometimes need the original workflow result, dataset-generation result, or model-preparation job payload. But artifacts are no longer the main reporting surface for general orchestration and UI history.
+
+Execution-unit results and durable run records now also carry engine-native summaries (`outputSummary`, `terminalSummary`, `diagnosticsSummary`) plus structured provenance/metadata. That means reporting, storage, filtering, and history views can rely on execution-native fields first, while artifacts remain optional rich attachments for feature reconstruction.
 
 ## Why the executor is called "truthful"
 
@@ -198,8 +216,8 @@ The new execution engine slice starts in the domain/application layers and adapt
 
 ## Recommended next migration steps
 
-1. Migrate the next real execution-backed product area after dataset generation, most likely model-training preparation or another runtime-backed preparation path.
-2. Surface the new execution-run query use cases into whichever UI/reporting flows need durable history beyond existing dataset generation batch views.
+1. Migrate the remaining long-running model-training lifecycle stages only where truthful progress/cancellation semantics can be preserved.
+2. Extend execution-run history/projection usage into any remaining runtime-backed reporting surfaces that still assemble summaries ad hoc.
 3. Expand cancellation/progress modeling only where an actual runtime can report richer unit-level state truthfully.
 4. Keep converging composition helpers so unified execution-engine wiring and execution-run persistence continue to share one path across renderer, registry, and bootstrap entry points.
 

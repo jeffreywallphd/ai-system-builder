@@ -3,8 +3,10 @@ import { EXPORT_FORMATS, type ChatCompletionMessage, type ExampleStatus, type Sp
 import { buildDatasetWorkflowWizard } from "../../../application/tuning-datasets/buildDatasetWorkflowWizard";
 import { ChatCompletionExample, QuestionAnsweringExample } from "../../../domain/tuning-datasets/TuningDatasetEntities";
 import { useUiDependencies } from "../../composition/AppProviders";
+import ExecutionHistoryPanel from "../execution/ExecutionHistoryPanel";
 import LinearWizard from "../wizard/LinearWizard";
 import type { TuningDatasetStoreState } from "../../state/TuningDatasetStore";
+import type { ExecutionRunProjection } from "../../../application/execution/ExecutionRunProjectionService";
 
 const fallbackState: TuningDatasetStoreState = Object.freeze({
   datasets: Object.freeze([]),
@@ -57,7 +59,7 @@ function parseChatMessages(value: string): ReadonlyArray<ChatCompletionMessage> 
 }
 
 export default function FineTuningDatasetStudio(): JSX.Element {
-  const { tuningDatasetStore } = useUiDependencies();
+  const { tuningDatasetStore, executionHistoryService } = useUiDependencies();
   const [state, setState] = useState<TuningDatasetStoreState>(() => tuningDatasetStore.getState() || fallbackState);
   const [datasetName, setDatasetName] = useState("");
   const [datasetDescription, setDatasetDescription] = useState("");
@@ -70,6 +72,7 @@ export default function FineTuningDatasetStudio(): JSX.Element {
   const [qaDraft, setQaDraft] = useState({ question: "", answer: "", context: "" });
   const [bulkNote, setBulkNote] = useState("Bulk reviewed in dataset studio");
   const [draftEdits, setDraftEdits] = useState<Record<string, { question?: string; answer?: string; context?: string; status: ExampleStatus; split: SplitType; messagesText?: string }>>({});
+  const [executionHistory, setExecutionHistory] = useState<ReadonlyArray<ExecutionRunProjection>>([]);
 
   useEffect(() => tuningDatasetStore.subscribe(setState), [tuningDatasetStore]);
 
@@ -82,6 +85,22 @@ export default function FineTuningDatasetStudio(): JSX.Element {
   }, [state.sourceDocuments]);
 
   const selectedVersion = state.selectedDataset?.selectedVersion;
+
+  useEffect(() => {
+    if (!state.selectedDataset?.dataset.id || !selectedVersion?.id) {
+      setExecutionHistory([]);
+      return;
+    }
+
+    void executionHistoryService.listHistory({
+      executionKind: "dataset-generation",
+      metadata: {
+        datasetId: state.selectedDataset.dataset.id,
+        versionId: selectedVersion.id,
+      },
+      limit: 6,
+    }).then(setExecutionHistory).catch(() => setExecutionHistory([]));
+  }, [executionHistoryService, selectedVersion?.id, state.isMutating, state.selectedDataset?.dataset.id]);
   const selectedDataset = state.selectedDataset?.dataset;
   const workflow = state.workflow;
   const taskType = selectedDataset?.taskType ?? datasetType;
@@ -226,6 +245,12 @@ export default function FineTuningDatasetStudio(): JSX.Element {
                 {taskType === "chat_completion" ? "Generate chat examples" : "Generate QA examples"}
               </button>
             </div>
+            <ExecutionHistoryPanel
+              title="Generation execution history"
+              subtitle="Durable execution-engine records for dataset example generation."
+              items={executionHistory}
+              emptyMessage="No dataset-generation execution runs have been recorded yet."
+            />
             {generationBatches.length > 0 ? (
               <div className="ui-stack ui-stack--sm">
                 <h4>Generation run history</h4>

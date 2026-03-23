@@ -13,6 +13,7 @@ import type {
 } from "./ExecutionContracts";
 import type {
   IExecutionRunRecord,
+  IExecutionRunSummary,
   IExecutionRunTransitionRecord,
   IExecutionUnitRunRecord,
 } from "../../domain/execution/ExecutionRun";
@@ -30,6 +31,7 @@ export interface IExecutionUnitExecutionResult {
   readonly unitId: string;
   readonly status: Extract<ExecutionStatus, "completed" | "failed" | "skipped" | "cancelled">;
   readonly outputMetadata?: Readonly<Record<string, unknown>>;
+  readonly outputSummary?: IExecutionRunSummary;
   readonly errorMessage?: string;
   readonly provenance?: IExecutionProvenance;
   readonly diagnostics?: ReadonlyArray<IExecutionDiagnostics>;
@@ -98,6 +100,15 @@ function cloneDiagnostics(
 ): ReadonlyArray<IExecutionDiagnostics> | undefined {
   return diagnostics
     ? Object.freeze(diagnostics.map((diagnostic) => Object.freeze({ ...diagnostic })))
+    : undefined;
+}
+
+function cloneSummary(summary?: IExecutionRunSummary): IExecutionRunSummary | undefined {
+  return summary
+    ? Object.freeze({
+        ...summary,
+        metadata: summary.metadata ? Object.freeze({ ...summary.metadata }) : undefined,
+      })
     : undefined;
 }
 
@@ -178,6 +189,7 @@ export class UnifiedExecutionEngine {
           dependsOn: Object.freeze([...unit.dependsOn]),
           status: statuses[unit.id],
           outputMetadata: unitResult?.outputMetadata ? Object.freeze({ ...unitResult.outputMetadata }) : undefined,
+          outputSummary: cloneSummary(unitResult?.outputSummary),
           errorMessage: unitResult?.errorMessage,
           provenance: cloneProvenance(unitResult?.provenance),
           diagnostics: cloneDiagnostics(unitResult?.diagnostics),
@@ -202,6 +214,8 @@ export class UnifiedExecutionEngine {
         completedAt: params.completedAt,
         cancellationSupported: params.cancellationSupported,
         metadata: params.metadata ? Object.freeze({ ...params.metadata }) : undefined,
+        terminalSummary: this.resolveTerminalSummary(finalStatus, params.unitResults),
+        diagnosticsSummary: this.resolveDiagnosticsSummary(params.unitResults),
         finalErrorMessage: this.resolveFinalErrorMessage(finalStatus, params.unitResults),
       });
     };
@@ -346,6 +360,7 @@ export class UnifiedExecutionEngine {
       params.unitResults[nextUnit.id] = Object.freeze({
         ...result,
         outputMetadata: result.outputMetadata ? Object.freeze({ ...result.outputMetadata }) : undefined,
+        outputSummary: cloneSummary(result.outputSummary),
         provenance: cloneProvenance(result.provenance),
         diagnostics: cloneDiagnostics(result.diagnostics),
         artifacts: cloneArtifacts(result.artifacts),
@@ -616,6 +631,58 @@ export class UnifiedExecutionEngine {
       return ExecutionStatuses.ready;
     }
     return ExecutionStatuses.pending;
+  }
+
+  private resolveTerminalSummary(
+    finalStatus: ExecutionStatus,
+    unitResults: Readonly<Record<string, IExecutionUnitExecutionResult>>,
+  ): IExecutionRunSummary | undefined {
+    const results = Object.values(unitResults);
+    const terminalResult = [...results].reverse().find((result) => result.status === finalStatus)
+      ?? [...results].reverse().find((result) => result.outputSummary || result.errorMessage);
+
+    if (finalStatus === ExecutionStatuses.failed) {
+      return Object.freeze({
+        headline: terminalResult?.outputSummary?.headline ?? "Execution failed",
+        detail: terminalResult?.errorMessage ?? terminalResult?.outputSummary?.detail ?? "One or more execution units failed.",
+      });
+    }
+
+    if (finalStatus === ExecutionStatuses.cancelled) {
+      return Object.freeze({
+        headline: terminalResult?.outputSummary?.headline ?? "Execution cancelled",
+        detail: terminalResult?.errorMessage ?? terminalResult?.outputSummary?.detail ?? "Execution stopped before all units completed.",
+      });
+    }
+
+    const completedCount = results.filter((result) => result.status === ExecutionStatuses.completed).length;
+    return Object.freeze({
+      headline: terminalResult?.outputSummary?.headline ?? "Execution completed",
+      detail: terminalResult?.outputSummary?.detail ?? `${completedCount} execution unit${completedCount === 1 ? "" : "s"} completed successfully.`,
+    });
+  }
+
+  private resolveDiagnosticsSummary(
+    unitResults: Readonly<Record<string, IExecutionUnitExecutionResult>>,
+  ): IExecutionRunSummary | undefined {
+    const diagnostics = Object.values(unitResults).flatMap((result) => result.diagnostics ?? []);
+    if (diagnostics.length === 0) {
+      return undefined;
+    }
+
+    const severityOrder = { error: 3, warning: 2, info: 1 } as const;
+    const topDiagnostic = [...diagnostics].sort((left, right) => severityOrder[right.severity] - severityOrder[left.severity])[0];
+
+    const counts = diagnostics.reduce<Record<string, number>>((acc, diagnostic) => {
+      acc[diagnostic.severity] = (acc[diagnostic.severity] ?? 0) + 1;
+      return acc;
+    }, {});
+
+    return Object.freeze({
+      headline: `${diagnostics.length} diagnostic${diagnostics.length === 1 ? "" : "s"} recorded`,
+      detail: topDiagnostic ? `${topDiagnostic.severity}: ${topDiagnostic.message}` : undefined,
+      metadata: Object.freeze({ ...counts }),
+    });
   }
 
   private resolveFinalErrorMessage(

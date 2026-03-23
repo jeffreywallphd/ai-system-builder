@@ -41,6 +41,17 @@ contextBridge.exposeInMainWorld("aiLoomDesktop", {
       };
     },
   },
+  executionRuns: {
+    saveExecutionRun(runJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-execution-runs:save", runJson);
+    },
+    loadExecutionRun(runId: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-execution-runs:load", runId) as Promise<string | null>;
+    },
+    listExecutionRuns(criteriaJson?: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-execution-runs:list", criteriaJson) as Promise<ReadonlyArray<string>>;
+    },
+  },
   modelFiles: {
     exists(path: string) {
       return ipcRenderer.sendSync("ai-loom-desktop-model-files:exists", path) as boolean;

@@ -3,6 +3,8 @@ import { DefaultModelTrainingApplicationService } from "../DefaultModelTrainingA
 import { Model, ModelArtifact, ModelSource } from "../../../domain/models/Model";
 import { ExampleLineage, QuestionAnsweringExample, TuningDataset, TuningDatasetVersion } from "../../../domain/tuning-datasets/TuningDatasetEntities";
 import { AppRuntimeModes } from "../../../domain/runtime/AppRuntimeMode";
+import { createUnifiedExecutionInfrastructure } from "../../../infrastructure/execution/createExecutionInfrastructure";
+import type { ModelTrainingJob } from "../../../domain/model-training/ModelTrainingTypes";
 
 function makeModel(params: { id?: string; accessMethod?: "local-file" | "remote-download" } = {}) {
   return new Model({
@@ -49,7 +51,7 @@ function makeExample(datasetId: string, versionId: string) {
   });
 }
 
-function makeJob(overrides: Partial<Parameters<NonNullable<DefaultModelTrainingApplicationService["submitJob"]>>[0]> = {}) {
+function makeJob(overrides: Partial<ModelTrainingJob> = {}) {
   return Object.freeze({
     id: "training-job-1",
     name: "Support fine-tune",
@@ -148,6 +150,7 @@ describe("DefaultModelTrainingApplicationService", () => {
         }),
       },
       undefined,
+      undefined,
       () => "training-job-1",
     );
 
@@ -163,6 +166,109 @@ describe("DefaultModelTrainingApplicationService", () => {
     expect(job.id).toBe("training-job-1");
     expect(saved).toHaveLength(1);
     expect(saved[0]).toEqual(job);
+  });
+
+  it("routes preparation-only model creation through the unified execution engine", async () => {
+    const model = makeModel();
+    const dataset = makeDataset();
+    const version = makeVersion(dataset.id);
+    const example = makeExample(dataset.id, version.id);
+    const submitJob = mock(async () => ({
+      ...makeJob({
+        executionKind: "preparation-only" as const,
+        backend: "python-runtime-manifest" as const,
+        status: "exported-without-training" as const,
+        summary: "Prepared bundle without training.",
+        provenance: {
+          executionKind: "preparation-only" as const,
+          backend: "python-runtime-manifest" as const,
+          truthfulness: "exported-without-training" as const,
+          runtime: "python-runtime" as const,
+          runMode: "preparation-only" as const,
+          supportsGradientTraining: false,
+          isPreparationOnly: true,
+          path: "/tmp/training-job-prepare",
+          diagnostics: [],
+          detail: "Prepared a truthful bundle without gradient training.",
+        },
+      }),
+    }));
+
+    const engine = createUnifiedExecutionInfrastructure({
+      workflowExecutor: {
+        canExecute: () => true,
+        execute: async () => { throw new Error("workflow path not used"); },
+        startExecution: async () => { throw new Error("workflow path not used"); },
+      },
+      modelTrainingRuntime: {
+        submitJob,
+        getJob: async () => undefined,
+        refreshJob: async () => undefined,
+        reconcileJob: async () => undefined,
+        listJobs: async () => [],
+        cancelJob: async () => { throw new Error("not used"); },
+      },
+    });
+
+    const service = new DefaultModelTrainingApplicationService(
+      {
+        listInstalled: async () => [model],
+        getInstalledById: async () => model,
+        saveInstalled: async () => undefined,
+        removeInstalled: async () => true,
+        isInstalled: async () => true,
+      },
+      {
+        list: async () => [dataset],
+        load: async () => dataset,
+        save: async () => dataset,
+        delete: async () => undefined,
+      } as never,
+      {
+        loadVersion: async () => version,
+        listVersions: async () => [version],
+        listExamples: async () => [example],
+      } as never,
+      {
+        listJobs: async () => [],
+        getJobById: async () => undefined,
+        saveJob: async () => undefined,
+      },
+      {
+        submitJob,
+        getJob: async () => undefined,
+        refreshJob: async () => undefined,
+        reconcileJob: async () => undefined,
+        listJobs: async () => [],
+        cancelJob: async () => { throw new Error("not used"); },
+      },
+      {
+        getEnvironment: async () => ({
+          runtimeMode: AppRuntimeModes.desktopDevelopment,
+          runtimeStatus: "ready",
+          desktopBridgeAvailable: true,
+          canAccessLocalArtifacts: true,
+          canRegisterPromotedModels: true,
+        }),
+      },
+      undefined,
+      engine,
+      () => "training-job-prepare",
+    );
+
+    const job = await service.submitJob({
+      name: "Support export bundle",
+      baseModelId: model.id,
+      datasetId: dataset.id,
+      datasetVersionId: version.id,
+      createdBy: "tester",
+      executionKind: "preparation-only",
+      configuration: { epochs: 1, learningRate: 0.0001, batchSize: 1 },
+    });
+
+    expect(job.executionKind).toBe("preparation-only");
+    expect(job.status).toBe("exported-without-training");
+    expect(submitJob).toHaveBeenCalledTimes(1);
   });
 
   it("builds a truthful studio summary for browser fallback mode", async () => {

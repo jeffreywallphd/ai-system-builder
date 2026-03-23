@@ -56,7 +56,13 @@ describe("Execution run query use cases", () => {
     const useCase = new ListExecutionRunsUseCase({
       saveRun: async (run) => run,
       getRunById: async () => undefined,
-      listRuns: async () => runs,
+      listRuns: async (criteria) => runs.filter((run) => {
+        if (criteria?.planId && run.planId !== criteria.planId) return false;
+        if (criteria?.status && run.status !== criteria.status) return false;
+        if (criteria?.executionKind && run.metadata?.executionKind !== criteria.executionKind) return false;
+        if (criteria?.metadata && !Object.entries(criteria.metadata).every(([key, value]) => run.metadata?.[key] === value)) return false;
+        return true;
+      }),
     });
 
     const result = await useCase.execute({
