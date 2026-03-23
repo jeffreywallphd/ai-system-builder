@@ -89,6 +89,8 @@ export interface ModelCreationEnvironment {
   readonly runtimeMode: AppRuntimeMode;
   readonly runtimeStatus: ModelCreationRuntimeStatus;
   readonly runtimeDetail?: string;
+  readonly runtimeDependencyStatus?: Readonly<Record<string, unknown>>;
+  readonly runtimeRemediationHints?: ReadonlyArray<string>;
   readonly desktopBridgeAvailable: boolean;
   readonly desktopBridgeDetail?: string;
   readonly canAccessLocalArtifacts: boolean;

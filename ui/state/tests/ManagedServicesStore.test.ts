@@ -172,6 +172,42 @@ describe("ManagedServicesStore", () => {
     expect(store.getState().error).toBe("Supervisor offline");
   });
 
+  it("invalidates runtime dependency orchestration when python runtime lifecycle changes occur", async () => {
+    const invalidate = mock(() => undefined);
+    let streamListener: ManagedServiceEventStreamListener | undefined;
+    const store = new ManagedServicesStore(
+      {
+        listServices: mock(async () => Object.freeze([createServiceRecord()])),
+        startService: mock(async () => createServiceRecord({ state: "starting", detail: "Booting…" })),
+        mapSupervisorServiceRecord: mock(async () => createServiceRecord()),
+      } as any,
+      {
+        connect(listener: ManagedServiceEventStreamListener) {
+          streamListener = listener;
+          return () => undefined;
+        },
+      } as any,
+      { invalidate },
+    );
+
+    await store.initialize();
+    await store.start("python-runtime");
+    streamListener?.onHealthChange?.({
+      serviceId: "python-runtime",
+      changedAt: "2026-03-20T10:15:02.000Z",
+      service: {
+        serviceId: "python-runtime",
+        name: "Python runtime",
+        state: "healthy",
+        ownership: "managed",
+        detail: "Runtime is healthy.",
+      } as any,
+    });
+
+    expect(invalidate).toHaveBeenCalledWith("python-runtime");
+    expect(invalidate.mock.calls.length).toBeGreaterThanOrEqual(3);
+  });
+
   it("synchronizes live supervisor snapshots, logs, and reconnect state", async () => {
     let streamListener: ManagedServiceEventStreamListener | undefined;
     const listServices = mock(async () => Object.freeze([createServiceRecord({ state: "starting", detail: "Booting…" })]));

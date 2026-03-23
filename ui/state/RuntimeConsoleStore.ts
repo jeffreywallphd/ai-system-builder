@@ -17,6 +17,12 @@ import {
   type RuntimeLogVerbosity,
 } from "../../application/runtime/RuntimeDiagnostics";
 import { collapseConsecutiveRuntimeEvents } from "../../application/runtime/RuntimeEventStability";
+import {
+  RuntimeDependencyIds,
+  describeRuntimeDependencyResolution,
+  isRuntimeDependencyResolution,
+  type IRuntimeDependencyOrchestrator,
+} from "../../application/runtime/RuntimeDependencyOrchestrator";
 
 const DEFAULT_LOG_CAPACITY = 250;
 
@@ -84,6 +90,7 @@ export interface RuntimeConsoleStoreOptions {
     readonly healthPollIntervalMs: number;
   };
   readonly logCapacity?: number;
+  readonly runtimeDependencyOrchestrator?: Pick<IRuntimeDependencyOrchestrator, "refresh">;
 }
 
 export class RuntimeConsoleStore {
@@ -94,6 +101,7 @@ export class RuntimeConsoleStore {
   private readonly listeners = new Set<RuntimeConsoleListener>();
   private readonly unsubscribeEventStore: () => void;
   private readonly logCapacity: number;
+  private readonly runtimeDependencyOrchestrator?: Pick<IRuntimeDependencyOrchestrator, "refresh">;
   private diagnosticLogs: ReadonlyArray<RuntimeConsoleLogEntry> = Object.freeze([]);
   private removeGlobalErrorListeners?: () => void;
   private state: RuntimeConsoleState = Object.freeze({
@@ -120,6 +128,7 @@ export class RuntimeConsoleStore {
     this.mcpService = options.mcpService;
     this.runtimeManagement = options.runtimeManagement;
     this.logCapacity = options.logCapacity && options.logCapacity > 0 ? options.logCapacity : DEFAULT_LOG_CAPACITY;
+    this.runtimeDependencyOrchestrator = options.runtimeDependencyOrchestrator;
     this.unsubscribeEventStore = this.runtimeEventStore.subscribe((events) => {
       const stableEvents = collapseConsecutiveRuntimeEvents(events);
       this.state = Object.freeze({
@@ -217,6 +226,7 @@ export class RuntimeConsoleStore {
 
     try {
       const status = await this.pythonRuntimeManager.restartRuntime();
+      await this.refreshRuntimeDependencyGraph();
       this.applyAppState(status, "manual-restart");
     } catch (error) {
       const checkedAt = new Date().toISOString();
@@ -318,6 +328,7 @@ export class RuntimeConsoleStore {
   private async bootstrapRuntime(): Promise<void> {
     try {
       const status = await this.pythonRuntimeManager.ensureRuntimeAvailability();
+      await this.refreshRuntimeDependencyGraph();
       this.applyAppState(status, "startup");
     } catch (error) {
       const fallbackStatus = this.pythonRuntimeManager.getStatus();
@@ -447,8 +458,13 @@ export class RuntimeConsoleStore {
     return "Checking Python runtime availability…";
   }
 
+  private async refreshRuntimeDependencyGraph(): Promise<void> {
+    await this.runtimeDependencyOrchestrator?.refresh(RuntimeDependencyIds.pythonRuntime).catch(() => undefined);
+  }
+
   private async collectHealthChecks(): Promise<ReadonlyArray<RuntimeHealthCheck>> {
     await this.syncRuntimeState("refresh");
+    await this.refreshRuntimeDependencyGraph();
     const checks = [...this.buildPythonRuntimeHealthChecks(this.pythonRuntimeManager.getStatus())];
 
     if (!this.mcpService) {
@@ -873,6 +889,10 @@ function mapMcpRuntimeHealthStatus(status: McpConnectionStatus): RuntimeHealthCh
 }
 
 function describeMcpRuntimeStatus(status: McpConnectionStatus): string {
+  if (isRuntimeDependencyResolution(status.dependencyStatus)) {
+    return describeRuntimeDependencyResolution(status.dependencyStatus);
+  }
+
   if (!status.enabled) {
     return "MCP runtime is disabled.";
   }

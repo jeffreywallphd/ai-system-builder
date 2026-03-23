@@ -6,7 +6,7 @@ import { DefaultNodeOutputStore } from "../DefaultNodeOutputStore";
 import { LangChainNodeExecutor } from "../LangChainNodeExecutor";
 
 describe("Runtime selector interpreted interactions", () => {
-  it("selects interpreted strategy for langchain workflows", () => {
+  it("selects interpreted strategy for langchain workflows", async () => {
     const selector = new WorkflowRuntimeSelector();
     const interpreted = new InterpretedWorkflowExecutionStrategy({
       nodeExecutor: new LangChainNodeExecutor(),
@@ -14,7 +14,7 @@ describe("Runtime selector interpreted interactions", () => {
       outputStoreFactory: () => new DefaultNodeOutputStore(),
     });
 
-    const selected = selector.selectStrategy(
+    const selected = await selector.selectStrategy(
       { workflow: { id: "wf", runtimeProfile: { preferredRuntime: "langchain" } } as never },
       [interpreted]
     );

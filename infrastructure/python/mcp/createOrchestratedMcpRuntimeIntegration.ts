@@ -14,8 +14,14 @@ import type { IMcpConfiguredServerRepository } from "../../../application/ports/
 import type { IMcpRuntimeClient } from "../../../application/ports/interfaces/IMcpRuntimeClient";
 import type { IMcpServerCatalog } from "../../../application/ports/interfaces/IMcpServerCatalog";
 import type { IMcpServerManager } from "../../../application/ports/interfaces/IMcpServerManager";
-import type { IRuntimeDependencyOrchestrator, RuntimeDependencyResolution } from "../../../application/runtime/RuntimeDependencyOrchestrator";
-import { RuntimeDependencyIds, RuntimeDependencyUnavailableError } from "../../../application/runtime/RuntimeDependencyOrchestrator";
+import {
+  RuntimeDependencyIds,
+  RuntimeDependencyOperationalStates,
+  RuntimeDependencyUnavailableError,
+  type IRuntimeDependencyOrchestrator,
+  type RuntimeDependencyResolution,
+} from "../../../application/runtime/RuntimeDependencyOrchestrator";
+import { createRuntimeDependencyDetail, createRuntimeDependencyMetadata } from "../../runtime/RuntimeDependencyDiagnostics";
 
 export function createOrchestratedMcpRuntimeClient(
   delegate: IMcpRuntimeClient,
@@ -25,7 +31,7 @@ export function createOrchestratedMcpRuntimeClient(
     getConnectionStatus: async () => {
       const resolution = await ensureMcpRuntimeDependency(orchestrator);
       if (!resolution.available) {
-        return createUnavailableRuntimeStatus(resolution);
+        return createRuntimeStatusFromResolution(resolution);
       }
       return delegate.getConnectionStatus();
     },
@@ -37,7 +43,7 @@ export function createOrchestratedMcpRuntimeClient(
           totalCount: 0,
           limit: 20,
           servers: [],
-          status: createUnavailableRuntimeStatus(resolution),
+          status: createRuntimeStatusFromResolution(resolution),
         } satisfies McpServerSearchResult;
       }
       return delegate.listServers();
@@ -50,7 +56,7 @@ export function createOrchestratedMcpRuntimeClient(
           totalCount: 0,
           limit: criteria?.limit ?? 20,
           servers: [],
-          status: createUnavailableRuntimeStatus(resolution),
+          status: createRuntimeStatusFromResolution(resolution),
         } satisfies McpServerSearchResult;
       }
       return delegate.searchServers(criteria);
@@ -181,7 +187,7 @@ export function createOrchestratedMcpServerCatalog(
   return {
     getConnectionStatus: async () => {
       const resolution = await ensureMcpRuntimeDependency(orchestrator);
-      return resolution.available ? delegate.getConnectionStatus() : createUnavailableRuntimeStatus(resolution);
+      return resolution.available ? delegate.getConnectionStatus() : createRuntimeStatusFromResolution(resolution);
     },
     listConfiguredServers: async () => {
       const resolution = await ensureMcpRuntimeDependency(orchestrator);
@@ -248,27 +254,26 @@ async function ensureMcpRuntimeDependencyOrThrow(
   if (!resolution.available) {
     throw new RuntimeDependencyUnavailableError(
       resolution,
-      resolution.detail ?? `Cannot ${operation} because the MCP runtime dependency chain is unavailable.`,
+      createRuntimeDependencyDetail(resolution, `Cannot ${operation} because the MCP runtime dependency chain is ${resolution.state}.`),
     );
   }
   return resolution;
 }
 
-function createUnavailableRuntimeStatus(resolution: RuntimeDependencyResolution): McpConnectionStatus {
+function createRuntimeStatusFromResolution(resolution: RuntimeDependencyResolution): McpConnectionStatus {
+  const runtimeState = mapResolutionToMcpRuntimeState(resolution);
+
   return {
-    enabled: true,
-    state: "unavailable",
-    healthState: "unavailable",
+    enabled: resolution.state !== RuntimeDependencyOperationalStates.disabled,
+    state: runtimeState,
+    healthState: runtimeState === "degraded" ? "degraded" : runtimeState === "unavailable" ? "unavailable" : "disabled",
     checkedAt: resolution.checkedAt,
-    pythonRuntimeHealthy: false,
-    mcpRuntimeHealthy: false,
+    pythonRuntimeHealthy: resolution.health === "healthy",
+    mcpRuntimeHealthy: resolution.health === "healthy",
     dependencyStatus: resolution,
     servers: [],
     capabilities: { tools: false, resources: false, toolExecution: false },
-    metadata: {
-      reason: "runtime-dependency-unavailable",
-      dependency: resolution,
-    },
+    metadata: createRuntimeDependencyMetadata(resolution),
   };
 }
 
@@ -283,10 +288,8 @@ function createUnavailableServerDescriptor(serverId: string, resolution: Runtime
     toolCount: 0,
     resourceCount: 0,
     capabilities: { tools: false, resources: false, toolExecution: false },
-    errorMessage: resolution.detail ?? "MCP runtime dependency chain is unavailable.",
-    metadata: {
-      dependency: resolution,
-    },
+    errorMessage: createRuntimeDependencyDetail(resolution, `MCP runtime dependency chain is ${resolution.state}.`),
+    metadata: createRuntimeDependencyMetadata(resolution),
   };
 }
 
@@ -303,10 +306,8 @@ function createUnavailableServerStatus(serverId: string, resolution: RuntimeDepe
     toolCount: 0,
     resourceCount: 0,
     capabilities: { tools: false, resources: false, toolExecution: false },
-    errorMessage: resolution.detail ?? "MCP runtime dependency chain is unavailable.",
-    metadata: {
-      dependency: resolution,
-    },
+    errorMessage: createRuntimeDependencyDetail(resolution, `MCP runtime dependency chain is ${resolution.state}.`),
+    metadata: createRuntimeDependencyMetadata(resolution),
   };
 }
 
@@ -320,11 +321,8 @@ function createUnavailableConnectionResult(
     checkedAt: resolution.checkedAt,
     server: createUnavailableServerDescriptor(serverId, resolution),
     status: createUnavailableServerStatus(serverId, resolution),
-    runtime: createUnavailableRuntimeStatus(resolution),
-    metadata: {
-      reason: "runtime-dependency-unavailable",
-      dependency: resolution,
-    },
+    runtime: createRuntimeStatusFromResolution(resolution),
+    metadata: createRuntimeDependencyMetadata(resolution),
   };
 }
 
@@ -335,7 +333,7 @@ function createUnavailableLocalServerResult(
   return {
     server: createUnavailableServerDescriptor(serverId, resolution),
     status: createUnavailableServerStatus(serverId, resolution),
-    runtime: createUnavailableRuntimeStatus(resolution),
+    runtime: createRuntimeStatusFromResolution(resolution),
     checkedAt: resolution.checkedAt,
     created: false,
   };
@@ -352,9 +350,26 @@ function createUnavailableToolExecutionResult(
     status: "failed",
     content: [],
     structuredContent: {},
-    metadata: {
-      dependency: resolution,
-    },
-    errorMessage: resolution.detail ?? "MCP runtime dependency chain is unavailable.",
+    metadata: createRuntimeDependencyMetadata(resolution),
+    errorMessage: createRuntimeDependencyDetail(resolution, `MCP runtime dependency chain is ${resolution.state}.`),
   };
+}
+
+function mapResolutionToMcpRuntimeState(
+  resolution: RuntimeDependencyResolution,
+): McpConnectionStatus["state"] {
+  if (resolution.state === RuntimeDependencyOperationalStates.disabled) {
+    return "disabled";
+  }
+
+  if (
+    resolution.state === RuntimeDependencyOperationalStates.starting
+    || resolution.state === RuntimeDependencyOperationalStates.provisioning
+    || resolution.state === RuntimeDependencyOperationalStates.degraded
+    || resolution.state === RuntimeDependencyOperationalStates.unknown
+  ) {
+    return "degraded";
+  }
+
+  return "unavailable";
 }

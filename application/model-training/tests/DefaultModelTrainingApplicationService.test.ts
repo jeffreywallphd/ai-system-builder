@@ -274,6 +274,61 @@ describe("DefaultModelTrainingApplicationService", () => {
     expect(summary.runtimeDetail).toContain("disabled");
   });
 
+  it("surfaces runtime remediation hints in readiness and warning diagnostics", async () => {
+    const model = makeModel();
+    const dataset = makeDataset();
+    const version = makeVersion(dataset.id);
+    const service = new DefaultModelTrainingApplicationService(
+      {
+        listInstalled: async () => [model],
+        getInstalledById: async () => model,
+        saveInstalled: async () => undefined,
+        removeInstalled: async () => true,
+        isInstalled: async () => true,
+      },
+      {
+        list: async () => [dataset],
+        load: async () => dataset,
+        save: async () => dataset,
+        delete: async () => undefined,
+      } as never,
+      {
+        loadVersion: async () => version,
+        listVersions: async () => [version],
+        listExamples: async () => [makeExample(dataset.id, version.id)],
+      } as never,
+      {
+        listJobs: async () => [],
+        getJobById: async () => undefined,
+        saveJob: async () => undefined,
+      },
+      {
+        submitJob: async () => makeJob(),
+        getJob: async () => undefined,
+        refreshJob: async () => undefined,
+        reconcileJob: async () => undefined,
+        listJobs: async () => [],
+        cancelJob: async () => makeJob(),
+      },
+      {
+        getEnvironment: async () => ({
+          runtimeMode: AppRuntimeModes.desktopDevelopment,
+          runtimeStatus: "degraded",
+          runtimeDetail: "Model training runtime is starting.",
+          runtimeRemediationHints: ["Wait for the runtime to finish starting."],
+          desktopBridgeAvailable: true,
+          canAccessLocalArtifacts: true,
+          canRegisterPromotedModels: true,
+        }),
+      },
+    );
+
+    const summary = await service.getStudioSummary({ selectedBaseModelId: model.id, selectedDatasetId: dataset.id, selectedDatasetVersionId: version.id });
+
+    expect(summary.readinessChecks.find((entry) => entry.id === "runtime")?.detail).toContain("Wait for the runtime to finish starting.");
+    expect(summary.modeWarnings).toContain("Wait for the runtime to finish starting.");
+  });
+
   it("registers a completed training output when promotion is supported", async () => {
     const model = makeModel();
     const job = makeJob();

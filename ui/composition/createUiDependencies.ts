@@ -77,7 +77,10 @@ import { LocalStorageContextPackageRepository } from "../../infrastructure/brows
 import { LocalStorageContextRecipeRepository } from "../../infrastructure/browser/context/LocalStorageContextRecipeRepository";
 import { createPythonRuntimeServiceDefinition } from "../../infrastructure/python/runtime/PythonRuntimeServiceDefinition";
 import { createMcpRuntimeIntegration } from "../../infrastructure/python/mcp/createMcpRuntimeIntegration";
-import { DefaultRuntimeDependencyOrchestrator } from "../../infrastructure/runtime/DefaultRuntimeDependencyOrchestrator";
+import {
+  createDependentRuntimeCapabilityRegistration,
+  createRuntimeDependencyOrchestrator,
+} from "../../infrastructure/runtime/RuntimeDependencyComposition";
 import { LocalStorageManagedServiceDefinitionRepository } from "../../infrastructure/browser/services/LocalStorageManagedServiceDefinitionRepository";
 import { HttpManagedServiceDefinitionRepository } from "../../infrastructure/services/HttpManagedServiceDefinitionRepository";
 import { HttpManagedServiceSupervisorClient } from "../../infrastructure/services/HttpManagedServiceSupervisorClient";
@@ -113,6 +116,7 @@ import { DefaultTuningDatasetStudioApplicationService } from "../../application/
 import { DefaultFileIngestionApplicationService } from "../../application/ingestion/DefaultFileIngestionApplicationService";
 import { FileIngestionPolicyService } from "../../domain/ingestion/FileIngestionServices";
 import { PythonRuntimeDocumentConversionGateway } from "../../infrastructure/ingestion/PythonRuntimeDocumentConversionGateway";
+import { OrchestratedDocumentConversionGateway } from "../../infrastructure/ingestion/OrchestratedDocumentConversionGateway";
 import { DatasetSourceIngestionProfile } from "../../application/tuning-datasets/DatasetSourceIngestionProfile";
 import { BrowserDatasetImportService, DatasetStatisticsService, DatasetWorkflowProgressService, DefaultDatasetDuplicationPolicy, DefaultDatasetPrivacyPolicy, DefaultDatasetReleasePolicy, DefaultDatasetReviewPolicy, DeterministicDatasetSplitService, FallbackAwareDatasetGenerationService, JsonTuningDatasetExportService, ProviderAgnosticDatasetGenerationService, TaskTypeAwareValidationService } from "../../domain/tuning-datasets/TuningDatasetServices";
 import { LocalStorageTuningDatasetRepository } from "../../infrastructure/browser/tuning-datasets/LocalStorageTuningDatasetRepository";
@@ -125,17 +129,20 @@ import { InterpretedWorkflowExecutionStrategy } from "../../infrastructure/inter
 import { DefaultNodeExecutionContextResolver } from "../../infrastructure/interpreted/execution/DefaultNodeExecutionContextResolver";
 import { DefaultNodeOutputStore } from "../../infrastructure/interpreted/execution/DefaultNodeOutputStore";
 import { LangChainNodeExecutor } from "../../infrastructure/interpreted/execution/LangChainNodeExecutor";
+import { WorkflowRuntimeSelector } from "../../application/execution/WorkflowRuntimeSelector";
 import { PythonDelegatedWorkflowExecutionStrategy } from "../../infrastructure/python/execution/PythonDelegatedWorkflowExecutionStrategy";
 import { PythonRuntimeDatasetGenerationService } from "../../infrastructure/python/tuning-datasets/PythonRuntimeDatasetGenerationService";
+import { OrchestratedDatasetGenerationService } from "../../infrastructure/python/tuning-datasets/OrchestratedDatasetGenerationService";
 import { LocalStorageModelTrainingJobRepository } from "../../infrastructure/browser/model-training/LocalStorageModelTrainingJobRepository";
 import { DefaultModelTrainingApplicationService } from "../../application/model-training/DefaultModelTrainingApplicationService";
 import { ModelTrainingService } from "../services/ModelTrainingService";
 import { ModelTrainingStore } from "../state/ModelTrainingStore";
 import { PythonRuntimeModelTrainingGateway } from "../../infrastructure/python/model-training/PythonRuntimeModelTrainingGateway";
+import { OrchestratedModelTrainingRuntime } from "../../infrastructure/python/model-training/OrchestratedModelTrainingRuntime";
 import { RuntimeAwareModelCreationEnvironmentGateway } from "../../infrastructure/python/model-training/RuntimeAwareModelCreationEnvironmentGateway";
 import { createModelManagementDependencies } from "./modelManagementDependencies";
 import { BrowserDownloadModelLibrary } from "../../infrastructure/browser/models/BrowserDownloadModelLibrary";
-import { RuntimeDependencyIds } from "../../application/runtime/RuntimeDependencyOrchestrator";
+import { RuntimeDependencyIds, RuntimeDependencyOperationalStates, type IRuntimeDependencyOrchestrator } from "../../application/runtime/RuntimeDependencyOrchestrator";
 
 export function createUiDependencies(
   options: CreateUiDependenciesOptions = {}
@@ -193,32 +200,56 @@ export function createUiDependencies(
     supervisorClient: managedServiceSupervisorClient,
   });
   const pythonRuntimeManager = pythonManagedService.pythonRuntimeManager;
-  const runtimeDependencyOrchestrator = new DefaultRuntimeDependencyOrchestrator({
-    registrations: [
-      {
-        dependencyId: RuntimeDependencyIds.pythonRuntime,
-        providerId: "python-runtime-manager",
-        ensureAvailable: async () => {
-          const status = await pythonRuntimeManager.ensureRuntimeAvailability();
-          return {
-            available: isPythonRuntimeAvailableForDependents(status),
-            detail: status.detail,
-            metadata: {
-              owner: status.owner,
-              status: status.status,
-            },
-          };
-        },
+  const runtimeDependencyOrchestrator = createRuntimeDependencyOrchestrator({
+    pythonRuntime: {
+      providerId: "python-runtime-manager",
+      ensureAvailable: async () => {
+        const status = await pythonRuntimeManager.ensureRuntimeAvailability();
+        return {
+          state: mapPythonRuntimeStatusToDependencyState(status),
+          isDegraded: status.status === PythonRuntimeStatuses.unhealthy,
+          detail: status.detail,
+          metadata: {
+            owner: status.owner,
+            status: status.status,
+          },
+          remediationHints: createPythonRuntimeRemediationHints(status),
+        };
       },
-      {
-        dependencyId: RuntimeDependencyIds.mcpRuntime,
-        providerId: "mcp-runtime-orchestration-gate",
-        dependsOn: [RuntimeDependencyIds.pythonRuntime],
+    },
+    additionalRegistrations: [
+      createDependentRuntimeCapabilityRegistration({
+        dependencyId: RuntimeDependencyIds.workflowExecutionRuntime,
+        providerId: "workflow-execution-orchestration-gate",
         ensureAvailable: async () => ({
-          available: true,
-          detail: "MCP runtime dependency gate passed.",
+          state: RuntimeDependencyOperationalStates.healthy,
+          detail: "Workflow execution dependency gate passed.",
         }),
-      },
+      }),
+      createDependentRuntimeCapabilityRegistration({
+        dependencyId: RuntimeDependencyIds.documentConversionRuntime,
+        providerId: "document-conversion-orchestration-gate",
+        ensureAvailable: async () => ({
+          state: RuntimeDependencyOperationalStates.healthy,
+          detail: "Document conversion dependency gate passed.",
+        }),
+      }),
+      createDependentRuntimeCapabilityRegistration({
+        dependencyId: RuntimeDependencyIds.datasetGenerationRuntime,
+        providerId: "dataset-generation-orchestration-gate",
+        ensureAvailable: async () => ({
+          state: RuntimeDependencyOperationalStates.healthy,
+          detail: "Dataset generation dependency gate passed.",
+        }),
+      }),
+      createDependentRuntimeCapabilityRegistration({
+        dependencyId: RuntimeDependencyIds.modelTrainingRuntime,
+        providerId: "model-training-orchestration-gate",
+        ensureAvailable: async () => ({
+          state: RuntimeDependencyOperationalStates.healthy,
+          detail: "Model training dependency gate passed.",
+        }),
+      }),
     ],
   });
   const mcpRuntimeIntegration = createMcpRuntimeIntegration(
@@ -229,7 +260,14 @@ export function createUiDependencies(
   );
   const mcpClient = mcpRuntimeIntegration.runtimeClient;
   const runtimeMcpServerCatalog = mcpRuntimeIntegration.serverCatalog;
-  const workflowExecutorSelection = createWorkflowExecutor(config, runtimeClient, pythonRuntimeConfig.isEnabled, mcpClient, runtimeMcpServerCatalog);
+  const workflowExecutorSelection = createWorkflowExecutor(
+    config,
+    runtimeClient,
+    pythonRuntimeConfig.isEnabled,
+    mcpClient,
+    runtimeMcpServerCatalog,
+    runtimeDependencyOrchestrator,
+  );
   const workflowExecutor = workflowExecutorSelection.executor;
 
   const nodeCatalogProvider = createNodeCatalogProvider(config);
@@ -394,6 +432,7 @@ export function createUiDependencies(
     runtimeEventStore,
     pythonRuntimeManager,
     mcpService,
+    runtimeDependencyOrchestrator,
     runtimeManagement: {
       isManagedLocal: pythonRuntimeConfig.isManagedLocal,
       autoStartEnabled: pythonRuntimeConfig.autoStartEnabled,
@@ -416,7 +455,11 @@ export function createUiDependencies(
     : new ManagedServiceEventStream({
       baseUrl: pythonRuntimeConfig.supervisorBaseUrl,
     });
-  const managedServicesStore = new ManagedServicesStore(managedServicesService, managedServiceEventStream);
+  const managedServicesStore = new ManagedServicesStore(
+    managedServicesService,
+    managedServiceEventStream,
+    runtimeDependencyOrchestrator,
+  );
   const mcpStore = new McpStore(mcpService);
   const previewWorkflowContextUseCase = new PreviewWorkflowContextUseCase(workflowContextService);
   const previewToolContextUseCase = new PreviewToolContextUseCase(
@@ -454,7 +497,10 @@ export function createUiDependencies(
   const duplicationPolicy = new DefaultDatasetDuplicationPolicy();
   const fileIngestionService = new DefaultFileIngestionApplicationService(
     new FileIngestionPolicyService(),
-    new PythonRuntimeDocumentConversionGateway(runtimeClient),
+    new OrchestratedDocumentConversionGateway(
+      new PythonRuntimeDocumentConversionGateway(runtimeClient),
+      runtimeDependencyOrchestrator,
+    ),
   );
   const tuningDatasetApplicationService = new DefaultTuningDatasetStudioApplicationService({
     datasetRepository: tuningDatasetRepository,
@@ -464,7 +510,10 @@ export function createUiDependencies(
     exportService: new JsonTuningDatasetExportService(),
     importService: new BrowserDatasetImportService(new DefaultDatasetPrivacyPolicy()),
     generationService: new FallbackAwareDatasetGenerationService(
-      new PythonRuntimeDatasetGenerationService(runtimeClient),
+      new OrchestratedDatasetGenerationService(
+        new PythonRuntimeDatasetGenerationService(runtimeClient),
+        runtimeDependencyOrchestrator,
+      ),
       new ProviderAgnosticDatasetGenerationService(),
     ),
     reviewPolicy: new DefaultDatasetReviewPolicy(),
@@ -483,7 +532,10 @@ export function createUiDependencies(
     tuningDatasetRepository,
     tuningDatasetVersionRepository,
     modelTrainingJobRepository,
-    new PythonRuntimeModelTrainingGateway(runtimeClient),
+    new OrchestratedModelTrainingRuntime(
+      new PythonRuntimeModelTrainingGateway(runtimeClient),
+      runtimeDependencyOrchestrator,
+    ),
     new RuntimeAwareModelCreationEnvironmentGateway(
       config,
       runtimeClient,
@@ -494,6 +546,7 @@ export function createUiDependencies(
         : config.runtimeMode === "browser-development"
           ? "Browser fallback mode does not expose the desktop model-file bridge."
           : "The desktop model-file bridge is not available in this runtime.",
+      runtimeDependencyOrchestrator,
     ),
     desktopModelFileStorage,
   );
@@ -638,8 +691,16 @@ function createWorkflowRepository(
   };
 }
 
-function createWorkflowExecutor(config: AppRuntimeConfig, runtimeClient: IPythonRuntimeClient, runtimeEnabled: boolean, mcpClient: IMcpRuntimeClient, mcpServerCatalog: IMcpServerCatalog) {
+function createWorkflowExecutor(
+  config: AppRuntimeConfig,
+  runtimeClient: IPythonRuntimeClient,
+  runtimeEnabled: boolean,
+  mcpClient: IMcpRuntimeClient,
+  mcpServerCatalog: IMcpServerCatalog,
+  runtimeDependencyOrchestrator: Pick<IRuntimeDependencyOrchestrator, "ensureAvailable">,
+) {
   const executor = new TruthfulWorkflowExecutor({
+    selector: new WorkflowRuntimeSelector({ runtimeDependencyOrchestrator }),
     strategies: [
       new PythonDelegatedWorkflowExecutionStrategy(runtimeClient),
       new InterpretedWorkflowExecutionStrategy({
@@ -740,8 +801,40 @@ function describeModelLibraryOperationalStatus(managedModelLibrary: IManagedMode
 }
 
 
-function isPythonRuntimeAvailableForDependents(status: PythonRuntimeManagerStatus): boolean {
-  return status.status !== PythonRuntimeStatuses.unavailable
-    && status.status !== PythonRuntimeStatuses.failed
-    && status.status !== PythonRuntimeStatuses.stopped;
+
+function mapPythonRuntimeStatusToDependencyState(status: PythonRuntimeManagerStatus) {
+  switch (status.status) {
+    case PythonRuntimeStatuses.healthy:
+      return RuntimeDependencyOperationalStates.healthy;
+    case PythonRuntimeStatuses.unhealthy:
+      return RuntimeDependencyOperationalStates.degraded;
+    case PythonRuntimeStatuses.starting:
+      return RuntimeDependencyOperationalStates.starting;
+    case PythonRuntimeStatuses.stopping:
+      return RuntimeDependencyOperationalStates.stopped;
+    case PythonRuntimeStatuses.stopped:
+      return RuntimeDependencyOperationalStates.stopped;
+    case PythonRuntimeStatuses.failed:
+      return RuntimeDependencyOperationalStates.failed;
+    case PythonRuntimeStatuses.unavailable:
+    default:
+      return RuntimeDependencyOperationalStates.unavailable;
+  }
+}
+
+function createPythonRuntimeRemediationHints(status: PythonRuntimeManagerStatus): ReadonlyArray<string> {
+  switch (status.status) {
+    case PythonRuntimeStatuses.starting:
+      return Object.freeze(["Wait for the managed runtime startup sequence to finish, then refresh runtime-backed capabilities."]);
+    case PythonRuntimeStatuses.unhealthy:
+      return Object.freeze(["Inspect the runtime console for probe failures and restart the managed runtime if health does not recover."]);
+    case PythonRuntimeStatuses.failed:
+      return Object.freeze(["Restart the Python runtime and review runtime console errors for the failure cause."]);
+    case PythonRuntimeStatuses.stopped:
+      return Object.freeze(["Start the managed runtime before using runtime-backed capabilities."]);
+    case PythonRuntimeStatuses.unavailable:
+      return Object.freeze(["Configure or enable a Python runtime endpoint before using runtime-backed capabilities."]);
+    default:
+      return Object.freeze([]);
+  }
 }

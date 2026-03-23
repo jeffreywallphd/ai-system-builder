@@ -30,7 +30,7 @@ export class TruthfulWorkflowExecutor implements IWorkflowExecutor {
   }
 
   public async startExecution(input: IWorkflowExecutionInput): Promise<IWorkflowExecutionHandle> {
-    const selection = this.selector.selectStrategy(input, this.strategies);
+    const selection = await this.selector.selectStrategy(input, this.strategies);
     const executionId = `${selection.strategy.getDescriptor().id}-${input.workflow.id}-${Date.now()}`;
     const listeners = new Set<(event: IWorkflowExecutionEvent) => void>();
 
@@ -68,7 +68,7 @@ export class TruthfulWorkflowExecutor implements IWorkflowExecutor {
     input: IWorkflowExecutionInput,
     onEvent?: (event: IWorkflowExecutionEvent) => void,
   ): Promise<IWorkflowExecutionResult> {
-    const selection = this.selector.selectStrategy(input, this.strategies);
+    const selection = await this.selector.selectStrategy(input, this.strategies);
     const result = await selection.strategy.execute(input, onEvent);
     const descriptor = selection.strategy.getDescriptor();
     const provenance: IWorkflowExecutionProvenance = result.provenance ?? {

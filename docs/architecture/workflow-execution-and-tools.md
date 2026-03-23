@@ -33,6 +33,8 @@ This is the central orchestration point for workflow runs.
 
 This is important because the system does **not** assume one runtime path. Instead, it chooses a compatible strategy and records why that strategy was selected.
 
+The selector is now orchestration-aware for delegated execution. When the shared runtime dependency orchestrator reports that delegated workflow execution is still starting, unavailable, or otherwise not ready, the selector can skip that delegated path and truthfully fall back to a compatible interpreted strategy.
+
 ### 4. A concrete strategy runs the workflow
 Today the main strategies are:
 
@@ -56,6 +58,7 @@ The naming in `TruthfulWorkflowExecutor` is not cosmetic. The design intent is t
 That principle shows up in several ways:
 - strategy descriptors advertise their default provenance
 - the selector returns a selection reason
+- delegated selection can now include orchestration-backed skip/fallback reasons
 - delegated failures can still report that no fallback actually ran
 - scaffolded execution reports itself as scaffolded fallback
 

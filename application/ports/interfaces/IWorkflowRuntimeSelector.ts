@@ -10,5 +10,5 @@ export interface IWorkflowRuntimeSelector {
   selectStrategy(
     input: IWorkflowExecutionInput,
     strategies: ReadonlyArray<IWorkflowExecutionStrategy>
-  ): IWorkflowRuntimeSelection;
+  ): Promise<IWorkflowRuntimeSelection>;
 }

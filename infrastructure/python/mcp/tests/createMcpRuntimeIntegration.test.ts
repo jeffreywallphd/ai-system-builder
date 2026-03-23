@@ -1,6 +1,10 @@
 import { describe, expect, it } from "bun:test";
 import { RuntimeEventBuffer } from "../../../../application/runtime/RuntimeEventBuffer";
-import { RuntimeDependencyIds } from "../../../../application/runtime/RuntimeDependencyOrchestrator";
+import {
+  RuntimeDependencyIds,
+  RuntimeDependencyOperationalStates,
+  RuntimeDependencyUnavailableError,
+} from "../../../../application/runtime/RuntimeDependencyOrchestrator";
 import { NodeProcessRuntimeEventSink } from "../../runtime/NodeProcessRuntimeEventSink";
 import { PythonRuntimeConfig } from "../../../config/PythonRuntimeConfig";
 import { DefaultRuntimeDependencyOrchestrator } from "../../../runtime/DefaultRuntimeDependencyOrchestrator";
@@ -39,7 +43,8 @@ describe("createMcpRuntimeIntegration", () => {
     expect(typeof integration.toolCatalog.listTools).toBe("function");
     expect(typeof integration.toolExecutor.executeTool).toBe("function");
   });
-  it("short-circuits MCP operations when the Python dependency chain is unavailable", async () => {
+
+  it("returns degraded MCP read responses while the dependency chain is still starting", async () => {
     const integration = createMcpRuntimeIntegration(
       new PythonRuntimeConfig({ mode: "managed-local", baseUrl: "http://127.0.0.1:8100" }),
       new NodeProcessRuntimeEventSink(new RuntimeEventBuffer()),
@@ -50,8 +55,9 @@ describe("createMcpRuntimeIntegration", () => {
             dependencyId: RuntimeDependencyIds.pythonRuntime,
             providerId: "python-test",
             ensureAvailable: async () => ({
-              available: false,
-              detail: "Python runtime is unavailable.",
+              state: RuntimeDependencyOperationalStates.starting,
+              detail: "Python runtime is still starting.",
+              remediationHints: ["Wait for startup to finish."],
             }),
           },
           {
@@ -59,7 +65,7 @@ describe("createMcpRuntimeIntegration", () => {
             providerId: "mcp-test",
             dependsOn: [RuntimeDependencyIds.pythonRuntime],
             ensureAvailable: async () => ({
-              available: true,
+              state: RuntimeDependencyOperationalStates.healthy,
             }),
           },
         ],
@@ -69,10 +75,53 @@ describe("createMcpRuntimeIntegration", () => {
     const status = await integration.runtimeClient.getConnectionStatus();
     const connectResult = await integration.serverManager.connectServer({ serverId: "demo" });
 
-    expect(status.state).toBe("unavailable");
+    expect(status.state).toBe("degraded");
+    expect(status.healthState).toBe("degraded");
     expect(status.dependencyStatus).toBeDefined();
-    expect(connectResult.runtime.state).toBe("unavailable");
-    expect(connectResult.metadata?.reason).toBe("runtime-dependency-unavailable");
+    expect(connectResult.runtime.state).toBe("degraded");
+    expect(connectResult.metadata?.state).toBe(RuntimeDependencyOperationalStates.starting);
   });
 
+  it("throws for mutating repository operations when the runtime chain is unavailable", async () => {
+    const integration = createMcpRuntimeIntegration(
+      new PythonRuntimeConfig({ mode: "managed-local", baseUrl: "http://127.0.0.1:8100" }),
+      new NodeProcessRuntimeEventSink(new RuntimeEventBuffer()),
+      fetch,
+      new DefaultRuntimeDependencyOrchestrator({
+        registrations: [
+          {
+            dependencyId: RuntimeDependencyIds.pythonRuntime,
+            providerId: "python-test",
+            ensureAvailable: async () => ({
+              state: RuntimeDependencyOperationalStates.failed,
+              detail: "Python runtime crashed.",
+              remediationHints: ["Restart the Python runtime."],
+            }),
+          },
+          {
+            dependencyId: RuntimeDependencyIds.mcpRuntime,
+            providerId: "mcp-test",
+            dependsOn: [RuntimeDependencyIds.pythonRuntime],
+            ensureAvailable: async () => ({
+              state: RuntimeDependencyOperationalStates.healthy,
+            }),
+          },
+        ],
+      }),
+    );
+
+    await expect(
+      integration.configuredServerRepository?.saveConfiguredServer({
+        id: "demo",
+        name: "Demo",
+        transport: "http",
+        enabled: true,
+        status: "error",
+        connected: false,
+        toolCount: 0,
+        resourceCount: 0,
+        capabilities: { tools: false, resources: false, toolExecution: false },
+      }),
+    ).rejects.toBeInstanceOf(RuntimeDependencyUnavailableError);
+  });
 });

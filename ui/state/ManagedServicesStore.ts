@@ -6,6 +6,8 @@ import {
 import type { ManagedServiceDefinitionInput } from "../../application/services/ManagedServiceDefinition";
 import type { ManagedServiceRecord, ManagedServicesService } from "../services/ManagedServicesService";
 import type { ManagedServiceEventStream } from "../services/ManagedServiceEventStream";
+import { PYTHON_RUNTIME_MANAGED_SERVICE_ID } from "../../application/services/ManagedServiceIds";
+import { RuntimeDependencyIds, type IRuntimeDependencyOrchestrator } from "../../application/runtime/RuntimeDependencyOrchestrator";
 
 export interface ManagedServicesStoreState {
   readonly services: ReadonlyArray<ManagedServiceRecord>;
@@ -39,6 +41,7 @@ export class ManagedServicesStore {
   constructor(
     private readonly managedServicesService: ManagedServicesService,
     eventStream?: ManagedServiceEventStream,
+    private readonly runtimeDependencyOrchestrator?: Pick<IRuntimeDependencyOrchestrator, "invalidate">,
   ) {
     this.eventStream = eventStream;
   }
@@ -74,6 +77,7 @@ export class ManagedServicesStore {
         ? services.find((service) => service.id === selectedServiceId)
         : services[0];
 
+      this.invalidateRuntimeDependenciesForServices(services.map((service) => service.id));
       this.patch({
         services: Object.freeze([...services]),
         selectedServiceId: selectedService?.id,
@@ -111,6 +115,7 @@ export class ManagedServicesStore {
 
     try {
       await this.managedServicesService.removeService(serviceId);
+      this.invalidateRuntimeDependenciesForService(serviceId);
       const nextSelected = this.state.selectedServiceId === serviceId ? undefined : this.state.selectedServiceId;
       this.patch({ isMutating: false });
       await this.refresh(nextSelected);
@@ -164,6 +169,7 @@ export class ManagedServicesStore {
         ?? services.find((service) => serviceIds.has(service.id))
         ?? services[0];
 
+      this.invalidateRuntimeDependenciesForServices(services.map((service) => service.id));
       this.patch({
         services: Object.freeze([...services]),
         selectedServiceId: selectedService?.id,
@@ -184,10 +190,12 @@ export class ManagedServicesStore {
 
     try {
       const updatedService = await action(serviceId ?? "");
+      this.invalidateRuntimeDependenciesForService(updatedService.id);
       const existing = this.state.services.some((service) => service.id === updatedService.id);
       const services = existing
         ? this.state.services.map((service) => service.id === updatedService.id ? updatedService : service)
         : [...this.state.services, updatedService];
+      this.invalidateRuntimeDependenciesForServices(services.map((service) => service.id));
       this.patch({
         services: Object.freeze([...services]),
         selectedServiceId: updatedService.id,
@@ -198,6 +206,21 @@ export class ManagedServicesStore {
       this.patch({ isMutating: false, error: toErrorMessage(error) });
       throw error;
     }
+  }
+
+
+  private invalidateRuntimeDependenciesForServices(serviceIds: ReadonlyArray<string>): void {
+    for (const serviceId of serviceIds) {
+      this.invalidateRuntimeDependenciesForService(serviceId);
+    }
+  }
+
+  private invalidateRuntimeDependenciesForService(serviceId: string | undefined): void {
+    if (!serviceId || serviceId !== PYTHON_RUNTIME_MANAGED_SERVICE_ID) {
+      return;
+    }
+
+    this.runtimeDependencyOrchestrator?.invalidate(RuntimeDependencyIds.pythonRuntime);
   }
 
   private patch(patch: Partial<ManagedServicesStoreState>): void {
@@ -226,12 +249,15 @@ export class ManagedServicesStore {
 
     this.unsubscribeEventStream = this.eventStream.connect({
       onSnapshot: (event) => {
+        this.invalidateRuntimeDependenciesForServices(event.services.map((service) => service.serviceId));
         void this.syncSupervisorSnapshot(event.services);
       },
       onStateChange: (event) => {
+        this.invalidateRuntimeDependenciesForService(event.service.serviceId);
         void this.upsertSupervisorService(event.service);
       },
       onLog: (event) => {
+        this.invalidateRuntimeDependenciesForService(event.serviceId);
         void this.upsertSupervisorService(event.service).then(() => {
           if (!event.service) {
             this.appendLogToSelectedService(event.serviceId, event.entry);
@@ -239,11 +265,13 @@ export class ManagedServicesStore {
         });
       },
       onRestart: (event) => {
+        this.invalidateRuntimeDependenciesForService(event.serviceId);
         if (event.service) {
           void this.upsertSupervisorService(event.service);
         }
       },
       onHealthChange: (event) => {
+        this.invalidateRuntimeDependenciesForService(event.service.serviceId);
         void this.upsertSupervisorService(event.service);
       },
       onConnectionStateChange: (state) => {

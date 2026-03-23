@@ -14,7 +14,12 @@ Published tools are projected workflows, not a separate execution system.
 - Node execution adapter: `infrastructure/interpreted/execution/LangChainNodeExecutor.ts`
 
 ## Short execution narrative
-Workflow -> ExecuteWorkflowUseCase -> WorkflowExecutor -> strategy selection -> Python delegated or interpreted fallback -> provenance-rich result.
+Workflow -> ExecuteWorkflowUseCase -> WorkflowExecutor -> orchestration-aware strategy selection -> Python delegated or interpreted fallback -> provenance-rich result.
+
+## Runtime orchestration update
+- Delegated workflow execution selection can now consult the shared runtime dependency orchestrator before choosing a delegated strategy.
+- When the delegated workflow runtime gate is unavailable, selection falls back to a compatible interpreted strategy instead of pretending delegated execution is still ready.
+- Selection reasons now surface skipped delegated paths and orchestration detail so workflow provenance stays truthful about why fallback execution was chosen.
 
 ## Important phrasing
 Use "workflow-first" and "tool projection" when describing the product design.
