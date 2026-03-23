@@ -11,6 +11,7 @@ import { LocalExecutionRunRepository } from "../filesystem/execution/LocalExecut
 import { SqliteExecutionRunRepository } from "../filesystem/execution/SqliteExecutionRunRepository";
 import { DatasetGenerationExecutionUnitHandler } from "./DatasetGenerationExecutionUnitHandler";
 import { ModelPreparationExecutionUnitHandler } from "./ModelPreparationExecutionUnitHandler";
+import { ModelTrainingExecutionUnitHandler } from "./ModelTrainingExecutionUnitHandler";
 import { WorkflowExecutionUnitHandler } from "./WorkflowExecutionUnitHandler";
 
 interface StorageLike {
@@ -66,6 +67,7 @@ export function createUnifiedExecutionInfrastructure(
 
   if (options.modelTrainingRuntime) {
     handlers.push(new ModelPreparationExecutionUnitHandler(options.modelTrainingRuntime));
+    handlers.push(new ModelTrainingExecutionUnitHandler(options.modelTrainingRuntime));
   }
 
   return new UnifiedExecutionEngine(handlers, options.executionRunRepository);

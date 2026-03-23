@@ -10,7 +10,7 @@ The renderer uses manual composition plus class-based stores/services; it is not
 - Router: `ui/routes/AppRouter.tsx`
 - UI service examples: `ui/services/WorkflowService.ts`, `ui/services/ToolService.ts`
 - Execution-status presenter: `ui/presenters/WorkflowExecutionPresenter.ts`
-- Durable history projection surface: `ui/services/ExecutionHistoryService.ts`, `ui/components/execution/ExecutionHistoryPanel.tsx`
+- Durable history/detail projection surface: `ui/services/ExecutionHistoryService.ts`, `ui/components/execution/ExecutionHistoryPanel.tsx`, `ui/components/execution/ExecutionRunDetailPanel.tsx`
 
 ## Key wording
 Describe stores as "page-facing state managers" and UI services as "presentation-facing adapters over application use cases and repositories."
@@ -18,7 +18,7 @@ Describe stores as "page-facing state managers" and UI services as "presentation
 ## Important caveat
 `createUiDependencies.ts` is one of the most important architecture files in the repo because it reflects real renderer wiring, even though there is also a generic DI bootstrap elsewhere.
 
-Execution-state wording for the workflow editor is now intentionally projected through `ui/presenters/WorkflowExecutionPresenter.ts`, and durable execution history wording is now intentionally projected through the application execution-run projection plus `ui/services/ExecutionHistoryService.ts` instead of being assembled ad hoc inside the page/component tree.
+Execution-state wording for the workflow editor is now intentionally projected through `ui/presenters/WorkflowExecutionPresenter.ts`, and durable execution history/detail wording is now intentionally projected through the application execution-run list/detail projections plus `ui/services/ExecutionHistoryService.ts` instead of being assembled ad hoc inside the page/component tree.
 
 ## TODO
 - If asked for the renderer's main composition root, answer `ui/composition/createUiDependencies.ts`, not the infrastructure bootstrap.

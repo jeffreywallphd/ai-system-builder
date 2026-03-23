@@ -52,6 +52,8 @@ In desktop mode, the main process creates `DesktopWorkflowPersistence`, which st
 
 The main process now also exposes a SQLite-backed execution-run repository through the preload bridge, using the desktop storage database as the durable structured source of truth for plan-backed execution history.
 
+That repository now uses explicit schema versioning and forward migrations via SQLite `user_version`, along with startup version checks. The intent is pragmatic rather than framework-heavy: repeated startup should be safe, legacy unversioned execution-run tables can be adopted and migrated in place, and newer unsupported schemas fail clearly instead of being used silently.
+
 The renderer then uses `DesktopBridgeWorkflowRepository` for workflows and a desktop execution-run bridge repository for durable run history.
 
 ### Browser/degraded path
@@ -119,7 +121,7 @@ Configuration objects such as `AppRuntimeConfig`, `PythonRuntimeConfig`, and rel
 Electron is kept at the edge, with typed contracts into the renderer.
 
 ### Durable desktop persistence
-Desktop workflow persistence intentionally combines filesystem JSON with SQLite indexing, and desktop execution-run persistence now uses SQLite as the preferred structured source of truth with browser/local-storage fallbacks only when the desktop bridge is unavailable. That is a strong fit for local authoring tools that need truthful history and filtering.
+Desktop workflow persistence intentionally combines filesystem JSON with SQLite indexing, and desktop execution-run persistence now uses SQLite as the preferred structured source of truth with browser/local-storage fallbacks only when the desktop bridge is unavailable. The execution-run schema now also stores query-friendly run summaries beside the canonical JSON snapshot so history/detail surfaces can rely on engine-native fields first without decoding feature-specific artifacts. That is a strong fit for local authoring tools that need truthful history, filtering, and durable inspection.
 
 ### Runtime-aware product design
 The system acknowledges runtime health, startup, ownership, supervision, and degradation, which is essential for trustworthy desktop tooling.

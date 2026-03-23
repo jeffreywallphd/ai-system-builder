@@ -18,7 +18,7 @@ This is one of the strongest architectural choices in the repository because it 
 
 The repository now has a thin unified execution engine slice whose **primary contract is execution-native rather than workflow-specific**.
 
-The purpose of this slice is still not to replace the current truthful workflow runtime stack. Instead, it provides a small inner execution abstraction that now acts as a reusable execution substrate while preserving the current workflow runtime behavior through adapters.
+The purpose of this slice is still not to replace the current truthful workflow runtime stack. Instead, it provides a small inner execution abstraction that now acts as a reusable execution substrate while preserving the current workflow runtime behavior through adapters. The same substrate now also carries the truthful local model-training lifecycle when the runtime can honestly report submission, progress, cancellation, and terminal state.
 
 ### New inner-layer execution concepts
 
@@ -47,8 +47,8 @@ The engine still runs units sequentially and is intentionally conservative. It i
 
 The migrated path is still deliberately narrow:
 
-- **migrated now:** direct workflow execution from `ExecuteWorkflowUseCase.execute(...)`, workflow `startExecution(...)`, direct tool execution from `RunToolUseCase.execute(...)`, tuning-dataset example generation from `DefaultTuningDatasetStudioApplicationService.generateExamplesFromSource(...)`, and preparation-only model creation from `DefaultModelTrainingApplicationService.submitJob(...)`
-- **not yet migrated:** the full model-training lifecycle after preparation, MCP orchestration, or broader asynchronous/scheduled execution paths
+- **migrated now:** direct workflow execution from `ExecuteWorkflowUseCase.execute(...)`, workflow `startExecution(...)`, direct tool execution from `RunToolUseCase.execute(...)`, tuning-dataset example generation from `DefaultTuningDatasetStudioApplicationService.generateExamplesFromSource(...)`, preparation-only model creation from `DefaultModelTrainingApplicationService.submitJob(...)`, and truthful local-gradient model-training runs from that same service when the Python runtime can report real lifecycle state
+- **not yet migrated:** MCP orchestration or broader asynchronous/scheduled/distributed execution paths outside the current truthful local-training/runtime-backed slice
 
 This gives the codebase one real production seam for synchronous workflow runs, started workflow runs, and a second non-workflow execution-backed product area without forcing a broad refactor.
 
@@ -115,13 +115,13 @@ The application layer now includes an execution-run projection service that deri
 - execution-path truthfulness summaries
 - duration and metadata context summaries
 
-The renderer consumes those projected summaries through a thin `ExecutionHistoryService` and a reusable `ExecutionHistoryPanel` instead of reconstructing run semantics ad hoc inside feature pages. Workflow editor history, dataset-generation history, and model-preparation history now all read from the same durable execution-run query path.
+The renderer consumes those projected summaries through a thin `ExecutionHistoryService`, a reusable `ExecutionHistoryPanel`, and a reusable execution-run detail panel instead of reconstructing run semantics ad hoc inside feature pages. Workflow editor history, dataset-generation history, and model-training history now all read from the same durable execution-run query path and can drill into unit-level/timeline detail from the persisted run record.
 
 ## Artifact guidance inside the execution engine
 
 Artifacts are still preserved because product-specific callers sometimes need the original workflow result, dataset-generation result, or model-preparation job payload. But artifacts are no longer the main reporting surface for general orchestration and UI history.
 
-Execution-unit results and durable run records now also carry engine-native summaries (`outputSummary`, `terminalSummary`, `diagnosticsSummary`) plus structured provenance/metadata. That means reporting, storage, filtering, and history views can rely on execution-native fields first, while artifacts remain optional rich attachments for feature reconstruction.
+Execution-unit results and durable run records now also carry engine-native summaries (`outputSummary`, `terminalSummary`, `diagnosticsSummary`), lightweight unit metadata (for example truthful model-training progress/checkpoint/artifact counts), and structured provenance/metadata. That means reporting, storage, filtering, and history/detail views can rely on execution-native fields first, while artifacts remain optional rich attachments for feature reconstruction.
 
 ## Why the executor is called "truthful"
 
@@ -217,7 +217,7 @@ The new execution engine slice starts in the domain/application layers and adapt
 ## Recommended next migration steps
 
 1. Migrate the remaining long-running model-training lifecycle stages only where truthful progress/cancellation semantics can be preserved.
-2. Extend execution-run history/projection usage into any remaining runtime-backed reporting surfaces that still assemble summaries ad hoc.
+2. Extend execution-run history/detail usage into any remaining runtime-backed reporting surfaces that still assemble summaries ad hoc.
 3. Expand cancellation/progress modeling only where an actual runtime can report richer unit-level state truthfully.
 4. Keep converging composition helpers so unified execution-engine wiring and execution-run persistence continue to share one path across renderer, registry, and bootstrap entry points.
 

@@ -845,6 +845,7 @@ export default function WorkflowEditorPage({
                       subtitle="Durable plan-backed workflow runs for this workflow."
                       items={executionHistory}
                       emptyMessage="No durable workflow runs have been recorded yet."
+                      executionHistoryService={executionHistoryService}
                     />
 
                     <NodePalette

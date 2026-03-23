@@ -19,6 +19,11 @@ import {
   createModelPreparationExecutionPlan,
   requireModelPreparationJob,
 } from "../execution/ModelPreparationExecutionPlanFactory";
+import {
+  createModelTrainingExecutionPlan,
+  requireModelTrainingJobFromUnitResult,
+} from "../execution/ModelTrainingExecutionPlanFactory";
+import { getModelTrainingJobFromEvent } from "../execution/ModelTrainingExecutionAdapter";
 import type {
   GetModelTrainingStudioSummaryQuery,
   ModelTrainingDatasetVersionOption,
@@ -377,7 +382,9 @@ export class DefaultModelTrainingApplicationService implements ModelTrainingAppl
 
     const job = executionKind === "preparation-only" && this.executionEngine
       ? await this.submitPreparationThroughExecutionEngine(submitRequest)
-      : await this.runtime.submitJob(submitRequest);
+      : executionKind === "local-gradient-training" && this.executionEngine
+        ? await this.submitTrainingThroughExecutionEngine(submitRequest)
+        : await this.runtime.submitJob(submitRequest);
 
     await this.jobRepository.saveJob(job);
     return job;
@@ -397,6 +404,57 @@ export class DefaultModelTrainingApplicationService implements ModelTrainingAppl
       metadata: planEnvelope.metadata,
     });
     return requireModelPreparationJob(result, planEnvelope.unitId);
+  }
+
+  private async submitTrainingThroughExecutionEngine(
+    request: import("../ports/interfaces/IModelTrainingRuntime").SubmitModelTrainingJobRequest,
+  ): Promise<ModelTrainingJob> {
+    if (!this.executionEngine) {
+      return this.runtime.submitJob(request);
+    }
+
+    const planEnvelope = createModelTrainingExecutionPlan(request);
+    let initialJob: ModelTrainingJob | undefined;
+    let resolveInitialJob!: (job: ModelTrainingJob) => void;
+    const initialJobPromise = new Promise<ModelTrainingJob>((resolve) => {
+      resolveInitialJob = resolve;
+    });
+
+    const handle = await this.executionEngine.startExecution({
+      plan: planEnvelope.plan,
+      unitInputs: planEnvelope.unitInputs,
+      metadata: planEnvelope.metadata,
+    }, (event) => {
+      const job = getModelTrainingJobFromEvent(event);
+      if (!job) {
+        return;
+      }
+
+      initialJob ??= job;
+      resolveInitialJob(job);
+      void this.jobRepository.saveJob(job);
+    });
+
+    void handle.waitForCompletion()
+      .then((result) => this.jobRepository.saveJob(requireModelTrainingJobFromUnitResult(result.unitResults[planEnvelope.unitId]!)))
+      .catch(() => undefined);
+
+    return await Promise.race([
+      initialJobPromise,
+      this.waitForModelTrainingJob(request.id),
+    ]);
+  }
+
+  private async waitForModelTrainingJob(jobId: string): Promise<ModelTrainingJob> {
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const job = await this.runtime.getJob(jobId).catch(() => undefined);
+      if (job) {
+        return job;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+
+    throw new Error(`Model training job '${jobId}' was submitted but the runtime did not expose an initial durable snapshot in time.`);
   }
 
   private async toStudioJobSummary(

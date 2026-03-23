@@ -116,4 +116,128 @@ describe("execution infrastructure composition", () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it("builds a unified execution engine with truthful model-training handlers when that runtime is enabled", async () => {
+    const savedRuns: unknown[] = [];
+    let refreshCount = 0;
+    const repository = {
+      saveRun: async (run: unknown) => { savedRuns.push(run); return run; },
+      getRunById: async () => undefined,
+      listRuns: async () => [],
+    };
+    const engine = createUnifiedExecutionInfrastructure({
+      workflowExecutor: {
+        canExecute: () => true,
+        execute: async () => { throw new Error("workflow path not used"); },
+        startExecution: async () => { throw new Error("workflow path not used"); },
+      },
+      executionRunRepository: repository,
+      modelTrainingRuntime: {
+        submitJob: async (request) => Object.freeze({
+          id: request.id,
+          name: request.name,
+          backend: "python-runtime-local" as const,
+          executionKind: "local-gradient-training" as const,
+          baseModelId: request.baseModelId,
+          datasetId: request.datasetId,
+          datasetVersionId: request.datasetVersionId,
+          createdBy: request.createdBy,
+          createdAt: new Date("2026-03-23T00:00:00.000Z"),
+          updatedAt: new Date("2026-03-23T00:00:00.000Z"),
+          submittedAt: new Date("2026-03-23T00:00:00.000Z"),
+          status: "submitted" as const,
+          configuration: request.configuration,
+          diagnostics: [],
+          artifacts: [],
+          checkpoints: [],
+          summary: "Submitted a real local training job.",
+          progress: { percent: 0, currentEpoch: 0, totalEpochs: 1, currentStep: 0, totalSteps: 1, statusDetail: "Submitted." },
+          provenance: {
+            executionKind: "local-gradient-training" as const,
+            backend: "python-runtime-local" as const,
+            truthfulness: "real-execution" as const,
+            runtime: "python-runtime" as const,
+            runMode: "local-gradient-training" as const,
+            supportsGradientTraining: true,
+            isPreparationOnly: false,
+            path: "/tmp/job-1",
+            diagnostics: [],
+            detail: "Real local gradient training.",
+          },
+        }),
+        getJob: async () => undefined,
+        refreshJob: async (jobId) => {
+          refreshCount += 1;
+          return Object.freeze({
+            id: jobId,
+            name: "Train adapter",
+            backend: "python-runtime-local" as const,
+            executionKind: "local-gradient-training" as const,
+            baseModelId: "base-1",
+            datasetId: "dataset-1",
+            datasetVersionId: "version-1",
+            createdBy: "tester",
+            createdAt: new Date("2026-03-23T00:00:00.000Z"),
+            updatedAt: new Date("2026-03-23T00:00:01.000Z"),
+            submittedAt: new Date("2026-03-23T00:00:00.000Z"),
+            completedAt: refreshCount >= 1 ? new Date("2026-03-23T00:00:01.000Z") : undefined,
+            status: refreshCount >= 1 ? "completed" as const : "running" as const,
+            configuration: { epochs: 1, learningRate: 0.0001, batchSize: 1 },
+            diagnostics: [],
+            artifacts: [],
+            checkpoints: [],
+            summary: refreshCount >= 1 ? "Completed a real local training run." : "Training in progress.",
+            progress: { percent: refreshCount >= 1 ? 100 : 50, currentEpoch: 1, totalEpochs: 1, currentStep: 1, totalSteps: 1, statusDetail: refreshCount >= 1 ? "Training completed." : "Running epoch 1/1." },
+            provenance: {
+              executionKind: "local-gradient-training" as const,
+              backend: "python-runtime-local" as const,
+              truthfulness: "real-execution" as const,
+              runtime: "python-runtime" as const,
+              runMode: "local-gradient-training" as const,
+              supportsGradientTraining: true,
+              isPreparationOnly: false,
+              path: "/tmp/job-1",
+              diagnostics: [],
+              detail: "Real local gradient training.",
+            },
+          });
+        },
+        reconcileJob: async () => undefined,
+        listJobs: async () => [],
+        cancelJob: async () => { throw new Error("not used"); },
+      },
+    });
+
+    const handle = await engine.startExecution({
+      plan: new ExecutionPlan({
+        id: "model-training:job-1",
+        units: [{ id: "model-training:job-1", kind: ExecutionUnitKinds.modelTraining, label: "Train adapter" }],
+      }),
+      unitInputs: {
+        "model-training:job-1": {
+          id: "job-1",
+          name: "Train adapter",
+          executionKind: "local-gradient-training",
+          baseModelId: "base-1",
+          baseModelName: "Base One",
+          datasetId: "dataset-1",
+          datasetName: "Support QA",
+          datasetVersionId: "version-1",
+          datasetVersionNumber: 1,
+          datasetTaskType: "question_answering",
+          createdBy: "tester",
+          configuration: { epochs: 1, learningRate: 0.0001, batchSize: 1 },
+          examples: [{ id: "example-1", taskType: "question_answering", inputText: "Q", targetText: "A" }],
+        },
+      },
+      metadata: { executionKind: "model-training", baseModelId: "base-1" },
+    });
+
+    const result = await handle.waitForCompletion();
+
+    expect(result.status).toBe(ExecutionStatuses.completed);
+    expect(result.run.metadata?.executionKind).toBe("model-training");
+    expect(result.run.units["model-training:job-1"]?.outputSummary?.headline).toContain("Local training");
+    expect(savedRuns.length).toBeGreaterThan(1);
+  });
 });

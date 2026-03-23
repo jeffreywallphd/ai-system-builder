@@ -34,7 +34,7 @@ It creates and wires together:
 - workflow repository selection
 - context repositories/services
 - workflow/node/model/tool/MCP services
-- execution-history projection/query services for durable run history
+- execution-history projection/query services for durable run history and run detail
 - stores for workflows, models, tools, context, managed services, tuning datasets, and model training
 
 Architecturally, this file is extremely important because it shows what the product actually instantiates in the renderer today.
@@ -91,7 +91,7 @@ The architecture is therefore both layered and feature-oriented: each feature ha
 ### Presentation-side execution summaries
 The workflow editor still uses a dedicated presentation projection (`ui/presenters/WorkflowExecutionPresenter.ts`) to turn raw execution events, provenance, and output counts into a UI-friendly status summary for `ui/components/execution/WorkflowExecutionStatusPanel.tsx`.
 
-Durable execution history now follows the same pattern through an application-layer `ExecutionRunProjectionService`, a thin renderer `ExecutionHistoryService`, and a reusable `ui/components/execution/ExecutionHistoryPanel.tsx`. Workflow editor history, dataset-generation history, and model-preparation history all consume those projected summaries instead of reconstructing plan semantics in page components.
+Durable execution history now follows the same pattern through application-layer list/detail projections (`ExecutionRunProjectionService` and `ExecutionRunDetailProjectionService`), a thin renderer `ExecutionHistoryService`, and reusable `ui/components/execution/ExecutionHistoryPanel.tsx` / `ExecutionRunDetailPanel.tsx` surfaces. Workflow editor history, dataset-generation history, and model-training history all consume those projected summaries/details instead of reconstructing plan semantics in page components or decoding feature-specific artifacts in the UI.
 
 That keeps display wording, badge tone, fallback wording, progress summaries, and truthfulness summaries out of the page/component tree while still leaving execution business logic in the application/infrastructure layers.
 

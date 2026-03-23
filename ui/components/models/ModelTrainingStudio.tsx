@@ -57,7 +57,7 @@ export default function ModelTrainingStudio({
   const [learningRate, setLearningRate] = useState("0.0001");
   const [batchSize, setBatchSize] = useState("1");
   const [notes, setNotes] = useState("Use the selected dataset version to prepare a truthful bundle or run a narrow local training job.");
-  const [preparationHistory, setPreparationHistory] = useState<ReadonlyArray<ExecutionRunProjection>>([]);
+  const [executionHistory, setExecutionHistory] = useState<ReadonlyArray<ExecutionRunProjection>>([]);
 
   useEffect(() => modelTrainingStore.subscribe(setTrainingState), [modelTrainingStore]);
 
@@ -89,19 +89,18 @@ export default function ModelTrainingStudio({
 
   useEffect(() => {
     if (!executionHistoryService || !summary?.selectedBaseModelId || !summary.selectedDatasetId || !summary.selectedDatasetVersionId) {
-      setPreparationHistory([]);
+      setExecutionHistory([]);
       return;
     }
 
     void executionHistoryService.listHistory({
-      executionKind: "model-preparation",
       metadata: {
         baseModelId: summary.selectedBaseModelId,
         datasetId: summary.selectedDatasetId,
         datasetVersionId: summary.selectedDatasetVersionId,
       },
-      limit: 6,
-    }).then(setPreparationHistory).catch(() => setPreparationHistory([]));
+      limit: 8,
+    }).then(setExecutionHistory).catch(() => setExecutionHistory([]));
   }, [
     executionHistoryService,
     summary?.selectedBaseModelId,
@@ -119,7 +118,7 @@ export default function ModelTrainingStudio({
   }, [numericBatchSize, numericEpochs, numericLearningRate]);
 
   const submitJob = (executionKind: "preparation-only" | "local-gradient-training") => {
-    if (!executionHistoryService || !summary?.selectedBaseModelId || !summary.selectedDatasetId || !summary.selectedDatasetVersionId) {
+    if (!summary?.selectedBaseModelId || !summary.selectedDatasetId || !summary.selectedDatasetVersionId) {
       return;
     }
     void modelTrainingStore.submitJob({
@@ -233,10 +232,11 @@ export default function ModelTrainingStudio({
       </div>
 
       <ExecutionHistoryPanel
-        title="Preparation execution history"
-        subtitle="Durable execution-engine runs for bundle preparation and export-only model creation."
-        items={preparationHistory}
-        emptyMessage="No model-preparation execution runs have been recorded for this selection yet."
+        title="Execution history"
+        subtitle="Durable execution-engine runs for truthful bundle preparation and local training lifecycles."
+        items={executionHistory}
+        emptyMessage="No durable execution-engine runs have been recorded for this model-training selection yet."
+        executionHistoryService={executionHistoryService}
       />
 
       <div className="ui-card">

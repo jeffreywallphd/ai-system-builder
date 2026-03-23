@@ -85,6 +85,16 @@ export interface IExecutionPlanResult {
   readonly run: IExecutionRunSnapshot;
 }
 
+interface IExecutionUnitRuntimeState {
+  readonly outputMetadata?: Readonly<Record<string, unknown>>;
+  readonly outputSummary?: IExecutionRunSummary;
+  readonly provenance?: IExecutionProvenance;
+  readonly diagnostics?: ReadonlyArray<IExecutionDiagnostics>;
+  readonly artifacts?: ReadonlyArray<IExecutionArtifact>;
+  readonly errorMessage?: string;
+  readonly updatedAt: string;
+}
+
 function freezeRecord<TValue>(value: Record<string, TValue>): Readonly<Record<string, TValue>> {
   return Object.freeze({ ...value });
 }
@@ -153,8 +163,15 @@ export class UnifiedExecutionEngine {
     }, {});
     let cancellationRequested = false;
     let activeUnitHandle: IExecutionUnitRunHandle | undefined;
+    const runtimeStates: Record<string, IExecutionUnitRuntimeState | undefined> = {};
+    let persistCurrentRun: ((reason?: string) => Promise<void>) | undefined;
 
     const emit = (event: IExecutionEngineEvent) => {
+      const nextRuntimeState = this.toRuntimeState(event);
+      if (nextRuntimeState) {
+        runtimeStates[event.unitId] = nextRuntimeState;
+        void persistCurrentRun?.("event");
+      }
       onEvent?.(event);
       for (const listener of listeners) {
         listener(event);
@@ -172,6 +189,7 @@ export class UnifiedExecutionEngine {
     }): IExecutionRunRecord => {
       const units = request.plan.units.reduce<Record<string, IExecutionUnitRunRecord>>((acc, unit) => {
         const unitResult = params.unitResults[unit.id];
+        const runtimeState = runtimeStates[unit.id];
         const matchingTransitions = params.transitions.filter((transition) => transition.unitId === unit.id);
         const runningTransition = matchingTransitions.find((transition) => transition.toStatus === ExecutionStatuses.running);
         const terminalTransition = [...matchingTransitions].reverse().find((transition) =>
@@ -188,15 +206,19 @@ export class UnifiedExecutionEngine {
           label: unit.label,
           dependsOn: Object.freeze([...unit.dependsOn]),
           status: statuses[unit.id],
-          outputMetadata: unitResult?.outputMetadata ? Object.freeze({ ...unitResult.outputMetadata }) : undefined,
-          outputSummary: cloneSummary(unitResult?.outputSummary),
-          errorMessage: unitResult?.errorMessage,
-          provenance: cloneProvenance(unitResult?.provenance),
-          diagnostics: cloneDiagnostics(unitResult?.diagnostics),
-          artifacts: cloneArtifacts(unitResult?.artifacts),
+          outputMetadata: unitResult?.outputMetadata
+            ? Object.freeze({ ...unitResult.outputMetadata })
+            : runtimeState?.outputMetadata
+              ? Object.freeze({ ...runtimeState.outputMetadata })
+              : undefined,
+          outputSummary: cloneSummary(unitResult?.outputSummary ?? runtimeState?.outputSummary),
+          errorMessage: unitResult?.errorMessage ?? runtimeState?.errorMessage,
+          provenance: cloneProvenance(unitResult?.provenance ?? runtimeState?.provenance),
+          diagnostics: cloneDiagnostics(unitResult?.diagnostics ?? runtimeState?.diagnostics),
+          artifacts: cloneArtifacts(unitResult?.artifacts ?? runtimeState?.artifacts),
           startedAt: runningTransition?.occurredAt,
           completedAt: terminalTransition?.occurredAt,
-          updatedAt: latestTransition?.occurredAt ?? params.startedAt,
+          updatedAt: runtimeState?.updatedAt ?? latestTransition?.occurredAt ?? params.startedAt,
         });
         return acc;
       }, {});
@@ -236,6 +258,18 @@ export class UnifiedExecutionEngine {
       metadata: request.metadata,
     });
     await this.persistRun(currentRun);
+    persistCurrentRun = async () => {
+      const nextRun = buildRunRecord({
+        unitResults,
+        transitions,
+        startedAt,
+        cancellationSupported: supportsCancellation,
+        metadata: request.metadata,
+      });
+      currentRun = nextRun;
+      handleRef?.updateSnapshot(nextRun);
+      await this.persistRun(nextRun);
+    };
 
     let handleRef: ExecutionRunHandle | undefined;
 
@@ -701,6 +735,38 @@ export class UnifiedExecutionEngine {
 
   private async persistRun(run: IExecutionRunRecord): Promise<void> {
     await this.executionRunRepository?.saveRun(run);
+  }
+
+  private toRuntimeState(event: IExecutionEngineEvent): IExecutionUnitRuntimeState | undefined {
+    if (
+      !event.outputMetadata
+      && !event.outputSummary
+      && !event.provenance
+      && !event.diagnostics
+      && !event.artifacts
+      && !event.detail
+      && !event.message
+    ) {
+      return undefined;
+    }
+
+    const artifacts = event.artifacts
+      ? cloneArtifacts(event.artifacts)
+      : event.detail
+        ? Object.freeze([Object.freeze({ ...event.detail })])
+        : undefined;
+
+    return Object.freeze({
+      outputMetadata: event.outputMetadata ? Object.freeze({ ...event.outputMetadata }) : undefined,
+      outputSummary: cloneSummary(event.outputSummary),
+      provenance: cloneProvenance(event.provenance),
+      diagnostics: cloneDiagnostics(event.diagnostics),
+      artifacts,
+      errorMessage: event.status === ExecutionStatuses.failed || event.status === ExecutionStatuses.cancelled
+        ? event.message
+        : undefined,
+      updatedAt: new Date().toISOString(),
+    });
   }
 
   private createRunId(planId: string): string {
