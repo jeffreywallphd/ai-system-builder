@@ -80,4 +80,34 @@ describe("ExecutionRunProjectionService", () => {
     expect(projection.errorSummary).toBe("Dataset manifest was invalid.");
     expect(projection.durationSummary).toBe("30s");
   });
+
+  it("prefers truthful runtime-reported progress when the active unit exposes it", () => {
+    const projection = new ExecutionRunProjectionService().project(makeRun({
+      unitIds: Object.freeze(["model-training:job-1"]),
+      units: Object.freeze({
+        "model-training:job-1": Object.freeze({
+          unitId: "model-training:job-1",
+          kind: ExecutionUnitKinds.modelTraining,
+          label: "Train adapter",
+          dependsOn: Object.freeze([]),
+          status: ExecutionStatuses.running,
+          updatedAt: "2026-03-23T00:00:20.000Z",
+          outputMetadata: Object.freeze({
+            progressPercent: 50,
+            currentEpoch: 1,
+            totalEpochs: 2,
+            currentStep: 20,
+            totalSteps: 40,
+            jobStatus: "running",
+          }),
+        }),
+      }),
+      metadata: Object.freeze({ executionKind: "model-training", baseModelName: "Base One" }),
+    }));
+
+    expect(projection.progressPercent).toBe(50);
+    expect(projection.progressLabel).toContain("50%");
+    expect(projection.progressLabel).toContain("epoch 1/2");
+    expect(projection.progressLabel).toContain("step 20/40");
+  });
 });

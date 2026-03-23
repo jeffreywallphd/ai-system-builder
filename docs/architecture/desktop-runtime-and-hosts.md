@@ -69,7 +69,7 @@ The product also has a managed runtime story, especially for Python-backed capab
 The UI composition builds a `PythonRuntimeConfig`, runtime client, runtime manager, and service-definition wiring. The desktop host also resolves a desktop Python runtime and starts the service supervisor.
 
 ### Runtime dependency orchestration
-The infrastructure bootstrap and UI composition now share a centralized runtime-dependency composition module that builds the core `Python runtime -> MCP runtime` graph and can append other runtime-backed capability registrations such as document conversion and model training while still letting each outer-layer composition root inject its own health adapter.
+The infrastructure bootstrap and UI composition now share a centralized runtime-dependency composition module that builds the core `Python runtime -> MCP runtime` graph and can append other runtime-backed capability registrations such as document conversion, model training, and narrow MCP server-operation execution while still letting each outer-layer composition root inject its own health adapter.
 
 The orchestration layer is responsible for:
 - registering runtime-backed dependencies in one reusable outer-layer composition entry point

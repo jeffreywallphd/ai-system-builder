@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { ConnectMcpServerUseCase } from "../ConnectMcpServerUseCase";
+import { createUnifiedExecutionInfrastructure } from "../../../infrastructure/execution/createExecutionInfrastructure";
 import type { IMcpServerManager } from "../../ports/interfaces/IMcpServerManager";
 
 function buildResult(serverId: string) {
@@ -79,5 +80,46 @@ describe("ConnectMcpServerUseCase", () => {
     };
 
     await expect(new ConnectMcpServerUseCase(manager).execute({ serverId: "  " })).rejects.toThrow("serverId");
+  });
+
+  it("routes MCP server connects through the unified execution engine when configured", async () => {
+    const savedRuns: unknown[] = [];
+    const manager: IMcpServerManager = {
+      connectServer: async (request) => buildResult(request.serverId),
+      disconnectServer: async () => buildResult("unused"),
+      reconnectServer: async () => buildResult("unused"),
+      createLocalServer: async () => {
+        throw new Error("unused");
+      },
+    };
+    const executionEngine = createUnifiedExecutionInfrastructure({
+      workflowExecutor: {
+        canExecute: () => true,
+        execute: async () => {
+          throw new Error("workflow path not used");
+        },
+        startExecution: async () => {
+          throw new Error("workflow path not used");
+        },
+      },
+      executionRunRepository: {
+        saveRun: async (run) => {
+          savedRuns.push(run);
+          return run;
+        },
+        getRunById: async () => undefined,
+        listRuns: async () => [],
+      },
+      mcpServerManager: manager,
+    });
+
+    const result = await new ConnectMcpServerUseCase(manager, executionEngine).execute({ serverId: " local " });
+
+    expect(result.status.serverId).toBe("local");
+    expect(savedRuns.length).toBeGreaterThan(0);
+    const latestRun = savedRuns.at(-1) as { metadata?: Record<string, unknown>; units?: Record<string, { outputMetadata?: Record<string, unknown> }> };
+    expect(latestRun.metadata?.executionKind).toBe("mcp-server-operation");
+    expect(latestRun.metadata?.mcpAction).toBe("connect");
+    expect(latestRun.units?.["mcp-server-operation:connect:local"]?.outputMetadata?.serverState).toBe("connected");
   });
 });

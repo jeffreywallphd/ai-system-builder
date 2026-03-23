@@ -406,6 +406,7 @@ export class InfrastructureRegistry {
     container.registerSingleton<UnifiedExecutionEngine>(TOKENS.UnifiedExecutionEngine, (c) => createUnifiedExecutionInfrastructure({
       workflowExecutor: c.resolve<IWorkflowExecutor>(TOKENS.WorkflowExecutor),
       executionRunRepository: c.resolve<IExecutionRunRepository>(TOKENS.ExecutionRunRepository),
+      mcpServerManager: c.resolve<IMcpServerManager>(TOKENS.McpServerManager),
     }));
 
     container.registerSingleton(TOKENS.WorkflowRepository, (c) => {
@@ -417,4 +418,3 @@ export class InfrastructureRegistry {
     });
   }
 }
-

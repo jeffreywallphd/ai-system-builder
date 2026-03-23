@@ -240,4 +240,85 @@ describe("execution infrastructure composition", () => {
     expect(result.run.units["model-training:job-1"]?.outputSummary?.headline).toContain("Local training");
     expect(savedRuns.length).toBeGreaterThan(1);
   });
+
+  it("builds a unified execution engine with MCP server-operation handlers when that runtime manager is enabled", async () => {
+    const savedRuns: unknown[] = [];
+    const engine = createUnifiedExecutionInfrastructure({
+      workflowExecutor: {
+        canExecute: () => true,
+        execute: async () => { throw new Error("workflow path not used"); },
+        startExecution: async () => { throw new Error("workflow path not used"); },
+      },
+      executionRunRepository: {
+        saveRun: async (run: unknown) => {
+          savedRuns.push(run);
+          return run;
+        },
+        getRunById: async () => undefined,
+        listRuns: async () => [],
+      },
+      mcpServerManager: {
+        connectServer: async ({ serverId }) => ({
+          action: "connect" as const,
+          checkedAt: "2026-03-23T00:00:00.000Z",
+          server: {
+            id: serverId,
+            name: "Local MCP",
+            transport: "stdio" as const,
+            enabled: true,
+            status: "connected" as const,
+            connected: true,
+            toolCount: 2,
+            resourceCount: 0,
+            capabilities: { tools: true, resources: false, toolExecution: true },
+          },
+          status: {
+            serverId,
+            name: "Local MCP",
+            transport: "stdio" as const,
+            configured: true,
+            enabled: true,
+            state: "connected" as const,
+            lifecycleState: "running" as const,
+            sessionState: "connected" as const,
+            connected: true,
+            checkedAt: "2026-03-23T00:00:00.000Z",
+            toolCount: 2,
+            resourceCount: 0,
+            capabilities: { tools: true, resources: false, toolExecution: true },
+          },
+          runtime: {
+            enabled: true,
+            state: "ready" as const,
+            healthState: "healthy" as const,
+            checkedAt: "2026-03-23T00:00:00.000Z",
+            servers: [],
+            capabilities: { tools: true, resources: false, toolExecution: true },
+          },
+        }),
+        disconnectServer: async () => { throw new Error("unused"); },
+        reconnectServer: async () => { throw new Error("unused"); },
+        createLocalServer: async () => { throw new Error("unused"); },
+      },
+    });
+
+    const result = await engine.execute({
+      plan: new ExecutionPlan({
+        id: "mcp-server-operation:connect:local",
+        units: [{ id: "mcp-server-operation:connect:local", kind: ExecutionUnitKinds.mcpServerOperation, label: "Connect MCP server" }],
+      }),
+      unitInputs: {
+        "mcp-server-operation:connect:local": {
+          action: "connect",
+          serverId: "local",
+        },
+      },
+      metadata: { executionKind: "mcp-server-operation", mcpAction: "connect", serverId: "local" },
+    });
+
+    expect(result.status).toBe(ExecutionStatuses.completed);
+    expect(result.run.metadata?.executionKind).toBe("mcp-server-operation");
+    expect(result.run.units["mcp-server-operation:connect:local"]?.outputSummary?.headline).toContain("connected");
+    expect(savedRuns.length).toBeGreaterThan(0);
+  });
 });

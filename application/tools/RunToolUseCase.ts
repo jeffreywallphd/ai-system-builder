@@ -29,14 +29,21 @@ export class RunToolUseCase {
 
     const effectiveWorkflow = this.workflowToolProjectionService.applyToolInput(workflow, request.values);
     const executionMetadata = await this.resolveExecutionMetadata(effectiveWorkflow);
-    const result = await this.executeWorkflowInput({
+    const executed = await this.executeWorkflowInput({
       workflow: effectiveWorkflow,
       parameters: Object.freeze({ ...request.values }),
       executionMetadata,
+      planMetadata: Object.freeze({
+        toolId: definition.id,
+        toolTitle: definition.title,
+        executionSurface: "tool-run",
+      }),
     });
+    const result = executed.result;
 
     return {
       toolId: definition.id,
+      runId: executed.runId,
       executionId: result.executionId,
       status: result.status,
       messages: Object.freeze([...(result.messages ?? []), ...(result.errorMessage ? [result.errorMessage] : [])]),
@@ -49,20 +56,30 @@ export class RunToolUseCase {
       readonly workflow: IWorkflow;
       readonly parameters: Readonly<Record<string, unknown>>;
       readonly executionMetadata?: Readonly<Record<string, unknown>>;
+      readonly planMetadata?: Readonly<Record<string, unknown>>;
     }
-  ): Promise<IWorkflowExecutionResult> {
+  ): Promise<{ readonly result: IWorkflowExecutionResult; readonly runId?: string }> {
     if (!this.executionEngine) {
-      return this.workflowExecutor.execute(input);
+      return {
+        result: await this.workflowExecutor.execute(input),
+        runId: undefined,
+      };
     }
 
     const executionPlan = createWorkflowExecutionPlan(input);
     const planResult = await this.executionEngine.execute({
       plan: executionPlan.plan,
       unitInputs: executionPlan.unitInputs,
-      metadata: executionPlan.metadata,
+      metadata: Object.freeze({
+        ...executionPlan.metadata,
+        ...(input.planMetadata ? input.planMetadata : {}),
+      }),
     });
 
-    return requireWorkflowExecutionResult(planResult, executionPlan.unitId);
+    return Object.freeze({
+      result: requireWorkflowExecutionResult(planResult, executionPlan.unitId),
+      runId: planResult.runId,
+    });
   }
 
   private async resolveExecutionMetadata(

@@ -328,17 +328,26 @@ export class ApplicationBootstrap {
 
     container.registerSingleton(
       APPLICATION_TOKENS.ConnectMcpServerUseCase,
-      (c) => new ConnectMcpServerUseCase(c.resolve<IMcpServerManager>(TOKENS.McpServerManager))
+      (c) => new ConnectMcpServerUseCase(
+        c.resolve<IMcpServerManager>(TOKENS.McpServerManager),
+        c.resolve<UnifiedExecutionEngine>(TOKENS.UnifiedExecutionEngine),
+      )
     );
 
     container.registerSingleton(
       APPLICATION_TOKENS.DisconnectMcpServerUseCase,
-      (c) => new DisconnectMcpServerUseCase(c.resolve<IMcpServerManager>(TOKENS.McpServerManager))
+      (c) => new DisconnectMcpServerUseCase(
+        c.resolve<IMcpServerManager>(TOKENS.McpServerManager),
+        c.resolve<UnifiedExecutionEngine>(TOKENS.UnifiedExecutionEngine),
+      )
     );
 
     container.registerSingleton(
       APPLICATION_TOKENS.ReconnectMcpServerUseCase,
-      (c) => new ReconnectMcpServerUseCase(c.resolve<IMcpServerManager>(TOKENS.McpServerManager))
+      (c) => new ReconnectMcpServerUseCase(
+        c.resolve<IMcpServerManager>(TOKENS.McpServerManager),
+        c.resolve<UnifiedExecutionEngine>(TOKENS.UnifiedExecutionEngine),
+      )
     );
 
     container.registerSingleton(

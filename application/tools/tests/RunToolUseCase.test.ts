@@ -59,20 +59,30 @@ describe("RunToolUseCase", () => {
       },
       canExecute: () => true,
     } as any;
+    const savedRuns: unknown[] = [];
     const useCase = new RunToolUseCase(
       workflowRepository as any,
       projection,
       workflowExecutor,
       load,
       undefined,
-      createWorkflowUnifiedExecutionEngine(workflowExecutor)
+      createWorkflowUnifiedExecutionEngine(workflowExecutor, {
+        saveRun: async (run) => {
+          savedRuns.push(run);
+          return run;
+        },
+        getRunById: async () => undefined,
+        listRuns: async () => [],
+      } as any)
     );
 
     const result = await useCase.execute({ toolId: "wf-tool", values: { prompt: "hello" } });
 
     expect(executedWorkflowId).toBe("wf-tool");
+    expect(result.runId).toBeDefined();
     expect(result.executionId).toBe("tool-exec-1");
     expect(result.provenance?.classification).toBe("delegated");
+    expect((savedRuns.at(-1) as { metadata?: Record<string, unknown> })?.metadata?.toolId).toBe("wf-tool");
   });
 
   it("runs a published workflow tool with assembled workflow context metadata", async () => {

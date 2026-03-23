@@ -1,3 +1,8 @@
+import type { UnifiedExecutionEngine } from "../execution/UnifiedExecutionEngine";
+import {
+  createMcpServerOperationExecutionPlan,
+  requireMcpServerOperationResult,
+} from "../execution/McpServerOperationExecutionPlanFactory";
 import type { IMcpServerManager } from "../ports/interfaces/IMcpServerManager";
 import type { LocalMcpToolDraft } from "./models/LocalMcpToolDraft";
 import type { LocalMcpServerCreateResult } from "./models/LocalMcpServerCreateResult";
@@ -7,10 +12,19 @@ export interface ICreateLocalMcpServerRequest {
 }
 
 export class CreateLocalMcpServerUseCase {
-  constructor(private readonly serverManager: IMcpServerManager) {}
+  constructor(
+    private readonly serverManager: IMcpServerManager,
+    private readonly executionEngine?: UnifiedExecutionEngine,
+  ) {}
 
   public async execute(request: ICreateLocalMcpServerRequest): Promise<LocalMcpServerCreateResult> {
     const draft = normalizeDraft(request.draft);
+    if (this.executionEngine) {
+      const executionPlan = createMcpServerOperationExecutionPlan({ action: "create-local-server", draft });
+      const result = await this.executionEngine.execute(executionPlan);
+      return requireMcpServerOperationResult(result, executionPlan.unitId) as LocalMcpServerCreateResult;
+    }
+
     return this.serverManager.createLocalServer(draft);
   }
 }

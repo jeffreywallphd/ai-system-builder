@@ -10,5 +10,7 @@ describe("McpPage", () => {
     expect(source).toContain("mcpStore.createLocalServer");
     expect(source).toContain("mcpStore.connect");
     expect(source).toContain("mcpStore.disconnect");
+    expect(source).toContain("MCP server operation history");
+    expect(source).toContain('executionKind: "mcp-server-operation"');
   });
 });

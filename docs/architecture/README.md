@@ -128,5 +128,5 @@ The runtime is not a single path. The system currently supports multiple executi
 
 ## TODO
 
-- The repository still contains **two composition stories**: the generic DI bootstrap in `infrastructure/composition/` and the renderer-specific manual composition in `ui/composition/createUiDependencies.ts`. Execution-engine wiring, execution-run persistence, and execution-history/detail projection services now share more of the same outer-layer path across those roots, but broader composition convergence is still future work.
+- The repository still contains **two composition stories**: the generic DI bootstrap in `infrastructure/composition/` and the renderer-specific manual composition in `ui/composition/createUiDependencies.ts`. Execution-engine wiring, execution-run persistence, MCP server-operation handler registration, and execution-history/detail projection services now share more of the same outer-layer path across those roots, but broader composition convergence is still future work.
 - The product intent appears desktop-first, yet a meaningful amount of durability and orchestration still routes through browser-style adapters. That is practical, but the desired "source of truth" between desktop-native persistence and browser fallback should be documented in product terms more explicitly.
