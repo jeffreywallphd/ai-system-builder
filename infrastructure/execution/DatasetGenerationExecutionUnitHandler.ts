@@ -56,6 +56,15 @@ export class DatasetGenerationExecutionUnitHandler implements IExecutionUnitHand
         skippedCount: result.skippedCount,
         taskType: result.taskType,
       }),
+      outputSummary: Object.freeze({
+        headline: `Generated ${result.generatedCount} ${result.taskType.replace(/_/g, " ")} example${result.generatedCount === 1 ? "" : "s"}` ,
+        detail: result.provenance.detail ?? `Skipped ${result.skippedCount} source document${result.skippedCount === 1 ? "" : "s"}.`,
+        metadata: Object.freeze({
+          batchId: result.batchId,
+          generatedCount: result.generatedCount,
+          skippedCount: result.skippedCount,
+        }),
+      }),
       provenance: toDatasetGenerationExecutionProvenance(result.provenance),
       artifacts: Object.freeze([
         createDatasetGenerationExecutionArtifact(DatasetGenerationExecutionArtifacts.datasetGenerationResult, result),

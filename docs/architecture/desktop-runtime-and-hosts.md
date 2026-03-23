@@ -22,7 +22,7 @@ It is responsible for:
 - resolving the desktop Python runtime
 - starting the desktop service supervisor
 - building the bootstrap context exposed to the renderer
-- registering IPC handlers for storage, workflow persistence, and model-file operations
+- registering IPC handlers for storage, workflow persistence, execution-run history, and model-file operations
 
 This makes Electron the host-level boundary where local capabilities become available.
 
@@ -32,6 +32,7 @@ This makes Electron the host-level boundary where local capabilities become avai
 - bootstrap information
 - key/value storage access
 - workflow persistence operations
+- execution-run history operations
 - model-file operations
 
 `electron/shared/DesktopContracts.ts` defines the TypeScript contracts for those capabilities, which is a good practice because it creates a typed interface between host and renderer.
@@ -49,7 +50,9 @@ In desktop mode, the main process creates `DesktopWorkflowPersistence`, which st
 - canonical workflow JSON files on disk
 - workflow summaries in a SQLite index
 
-The renderer then uses `DesktopBridgeWorkflowRepository` through the preload contract.
+The main process now also exposes a SQLite-backed execution-run repository through the preload bridge, using the desktop storage database as the durable structured source of truth for plan-backed execution history.
+
+The renderer then uses `DesktopBridgeWorkflowRepository` for workflows and a desktop execution-run bridge repository for durable run history.
 
 ### Browser/degraded path
 If the desktop workflow bridge is unavailable or the runtime mode is browser-oriented, the renderer can fall back to `BrowserStorageWorkflowRepository`, which stores workflow records in browser storage.
@@ -116,7 +119,7 @@ Configuration objects such as `AppRuntimeConfig`, `PythonRuntimeConfig`, and rel
 Electron is kept at the edge, with typed contracts into the renderer.
 
 ### Durable desktop persistence
-Desktop workflow persistence intentionally combines filesystem JSON with SQLite indexing, which is a strong fit for local authoring tools.
+Desktop workflow persistence intentionally combines filesystem JSON with SQLite indexing, and desktop execution-run persistence now uses SQLite as the preferred structured source of truth with browser/local-storage fallbacks only when the desktop bridge is unavailable. That is a strong fit for local authoring tools that need truthful history and filtering.
 
 ### Runtime-aware product design
 The system acknowledges runtime health, startup, ownership, supervision, and degradation, which is essential for trustworthy desktop tooling.

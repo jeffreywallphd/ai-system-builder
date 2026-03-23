@@ -20,10 +20,10 @@ Published tools are projected workflows, not a separate execution system.
 Workflow -> `ExecuteWorkflowUseCase` -> one-unit `ExecutionPlan` -> `UnifiedExecutionEngine` -> `WorkflowExecutionUnitHandler` -> `TruthfulWorkflowExecutor` -> orchestration-aware strategy selection -> Python delegated or interpreted fallback -> provenance-rich result.
 
 ## Unified execution engine slice
-- The current migration now covers the immediate workflow execution path, workflow `startExecution(...)`, the direct tool execution path, and tuning-dataset example generation.
-- The engine understands dependency-aware execution units, persisted execution runs, plan transitions, and lightweight history query use cases.
+- The current migration now covers the immediate workflow execution path, workflow `startExecution(...)`, the direct tool execution path, tuning-dataset example generation, and preparation-only model creation.
+- The engine understands dependency-aware execution units, persisted execution runs, SQLite-backed desktop history, plan transitions, execution-run projections, and lightweight history query use cases.
 - The workflow adapter wraps the existing workflow executor instead of rewriting runtime selection or strategy internals.
-- Workflow-specific events/results are preserved as attached artifacts while the engine boundary itself stays execution-native.
+- Workflow/model/dataset-specific payloads are still preserved as artifacts, but execution-native summaries now carry the data that generic history/reporting flows need first.
 
 ## Runtime orchestration update
 - Delegated workflow execution selection can now consult the shared runtime dependency orchestrator before choosing a delegated strategy.
@@ -32,11 +32,11 @@ Workflow -> `ExecuteWorkflowUseCase` -> one-unit `ExecutionPlan` -> `UnifiedExec
 - The unified execution engine preserves delegated/scaffolded/hybrid/unavailable provenance instead of replacing it with generic plan state.
 
 ## What is not migrated yet
-- Model creation/training, MCP orchestration, scheduling, and distributed execution are still outside this slice even though plan-backed workflow runs and dataset generation runs are now durable.
+- The full model-training lifecycle, MCP orchestration, scheduling, and distributed execution are still outside this slice even though plan-backed workflow runs, dataset generation runs, and model-preparation runs are now durable.
 
 ## Important phrasing
 Use "workflow-first", "tool projection", and "truthful execution provenance" when describing the product design.
 
 ## TODO
 - If asked whether tools and workflows are separate bounded contexts, answer: "not really; tools are primarily a projected and published workflow surface in the current implementation."
-- If asked what should migrate next, answer: the next real runtime-backed product area after dataset generation, most likely model-training preparation.
+- If asked what should migrate next, answer: the remaining truthful long-running model-training lifecycle after the now-migrated model-preparation path.

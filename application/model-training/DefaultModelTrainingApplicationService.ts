@@ -9,11 +9,16 @@ import type { IModelTrainingJobRepository } from "../ports/interfaces/IModelTrai
 import type { IModelTrainingRuntime } from "../ports/interfaces/IModelTrainingRuntime";
 import type { IModelCreationEnvironmentGateway } from "../ports/interfaces/IModelCreationEnvironmentGateway";
 import type { IFileStorage } from "../ports/interfaces/IFileStorage";
+import type { UnifiedExecutionEngine } from "../execution/UnifiedExecutionEngine";
 import type { DatasetRepository, DatasetVersionRepository, DatasetTaskType } from "../../domain/tuning-datasets/interfaces/ITuningDatasetStudio";
 import { ChatCompletionExample, QuestionAnsweringExample } from "../../domain/tuning-datasets/TuningDatasetEntities";
 import type { IModel } from "../../domain/models/interfaces/IModel";
 import type { ModelTrainingArtifact, ModelTrainingJob } from "../../domain/model-training/ModelTrainingTypes";
 import type { ModelTrainingApplicationService } from "./ModelTrainingApplicationService";
+import {
+  createModelPreparationExecutionPlan,
+  requireModelPreparationJob,
+} from "../execution/ModelPreparationExecutionPlanFactory";
 import type {
   GetModelTrainingStudioSummaryQuery,
   ModelTrainingDatasetVersionOption,
@@ -51,6 +56,7 @@ export class DefaultModelTrainingApplicationService implements ModelTrainingAppl
     private readonly runtime: IModelTrainingRuntime,
     private readonly environmentGateway: IModelCreationEnvironmentGateway,
     private readonly fileStorage?: IFileStorage,
+    private readonly executionEngine?: UnifiedExecutionEngine,
     private readonly createId: () => string = defaultCreateId,
   ) {
     this.capabilityPolicy = new ModelCreationCapabilityPolicy();
@@ -331,7 +337,7 @@ export class DefaultModelTrainingApplicationService implements ModelTrainingAppl
       throw new Error("Training learning rate must be > 0.");
     }
 
-    const job = await this.runtime.submitJob({
+    const submitRequest = {
       id: command.id?.trim() || this.createId(),
       name: command.name,
       executionKind,
@@ -367,10 +373,30 @@ export class DefaultModelTrainingApplicationService implements ModelTrainingAppl
           sourceDocumentId: chatExample.lineage.sourceDocumentId,
         });
       }),
-    });
+    } as const;
+
+    const job = executionKind === "preparation-only" && this.executionEngine
+      ? await this.submitPreparationThroughExecutionEngine(submitRequest)
+      : await this.runtime.submitJob(submitRequest);
 
     await this.jobRepository.saveJob(job);
     return job;
+  }
+
+  private async submitPreparationThroughExecutionEngine(
+    request: import("../ports/interfaces/IModelTrainingRuntime").SubmitModelTrainingJobRequest,
+  ): Promise<ModelTrainingJob> {
+    if (!this.executionEngine) {
+      return this.runtime.submitJob(request);
+    }
+
+    const planEnvelope = createModelPreparationExecutionPlan(request);
+    const result = await this.executionEngine.execute({
+      plan: planEnvelope.plan,
+      unitInputs: planEnvelope.unitInputs,
+      metadata: planEnvelope.metadata,
+    });
+    return requireModelPreparationJob(result, planEnvelope.unitId);
   }
 
   private async toStudioJobSummary(

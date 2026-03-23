@@ -34,7 +34,7 @@ const fallbackState: IModelStoreState = Object.freeze({
 
 export default function ModelsPage(): JSX.Element {
   const presenter = useMemo(() => new ModelPresenter(), []);
-  const { modelStore, settingsStore, modelTrainingStore } = useUiDependencies();
+  const { modelStore, settingsStore, modelTrainingStore, executionHistoryService } = useUiDependencies();
   const [searchParams, setSearchParams] = useSearchParams();
   const [state, setState] = useState<IModelStoreState>(fallbackState);
   const [settingsState, setSettingsState] = useState<UiSettingsState>(() => settingsStore.getState());
@@ -271,6 +271,7 @@ export default function ModelsPage(): JSX.Element {
       >
         <ModelTrainingStudio
           modelTrainingStore={modelTrainingStore}
+          executionHistoryService={executionHistoryService}
         />
       </section>
     </section>

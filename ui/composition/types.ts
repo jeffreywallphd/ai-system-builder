@@ -22,6 +22,7 @@ import { ModelTrainingStore } from "../state/ModelTrainingStore";
 import type { UiSettingsStorage } from "../settings/UiSettingsStore";
 import { UiSettingsStore } from "../settings/UiSettingsStore";
 import { ManagedServicesService } from "../services/ManagedServicesService";
+import { ExecutionHistoryService } from "../services/ExecutionHistoryService";
 
 export interface OperationalModeStatus {
   readonly configuredMode: string;
@@ -66,6 +67,7 @@ export interface UiDependencies {
   readonly tuningDatasetStore: TuningDatasetStore;
   readonly modelTrainingService: ModelTrainingService;
   readonly modelTrainingStore: ModelTrainingStore;
+  readonly executionHistoryService: ExecutionHistoryService;
   readonly workflowProjectionService: WorkflowProjectionService;
   readonly settingsStore: UiSettingsStore;
 }

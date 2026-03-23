@@ -2,6 +2,7 @@ import path from "node:path";
 import type { IExecutionRunRepository, IExecutionRunRepositoryListCriteria } from "../../../application/ports/interfaces/IExecutionRunRepository";
 import type { IFileStorage } from "../../../application/ports/interfaces/IFileStorage";
 import type { IExecutionRunRecord } from "../../../domain/execution/ExecutionRun";
+import { freezeExecutionRunRecord } from "../../../application/execution/freezeExecutionRunRecord";
 
 export class LocalExecutionRunRepository implements IExecutionRunRepository {
   constructor(
@@ -27,7 +28,7 @@ export class LocalExecutionRunRepository implements IExecutionRunRepository {
       return undefined;
     }
 
-    return JSON.parse(await this.params.fileStorage.readText(filePath, "utf-8")) as IExecutionRunRecord;
+    return freezeExecutionRunRecord(JSON.parse(await this.params.fileStorage.readText(filePath, "utf-8")) as IExecutionRunRecord);
   }
 
   public async listRuns(criteria?: IExecutionRunRepositoryListCriteria): Promise<ReadonlyArray<IExecutionRunRecord>> {
@@ -46,8 +47,17 @@ export class LocalExecutionRunRepository implements IExecutionRunRepository {
         continue;
       }
 
-      const run = JSON.parse(await this.params.fileStorage.readText(entry.path, "utf-8")) as IExecutionRunRecord;
+      const run = freezeExecutionRunRecord(JSON.parse(await this.params.fileStorage.readText(entry.path, "utf-8")) as IExecutionRunRecord);
       if (criteria?.planId && run.planId !== criteria.planId) {
+        continue;
+      }
+      if (criteria?.status && run.status !== criteria.status) {
+        continue;
+      }
+      if (criteria?.executionKind && run.metadata?.executionKind !== criteria.executionKind) {
+        continue;
+      }
+      if (!matchesMetadata(run, criteria?.metadata)) {
         continue;
       }
       runs.push(run);
@@ -65,4 +75,15 @@ export class LocalExecutionRunRepository implements IExecutionRunRepository {
 
     return path.join(this.params.rootDirectory, `${normalizedRunId}.json`);
   }
+}
+
+function matchesMetadata(
+  run: IExecutionRunRecord,
+  metadata?: Readonly<Record<string, string | number | boolean>>,
+): boolean {
+  if (!metadata) {
+    return true;
+  }
+
+  return Object.entries(metadata).every(([key, value]) => run.metadata?.[key] === value);
 }

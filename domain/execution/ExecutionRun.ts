@@ -31,6 +31,12 @@ export interface IExecutionRunArtifact<TValue = unknown> {
   readonly value: TValue;
 }
 
+export interface IExecutionRunSummary {
+  readonly headline: string;
+  readonly detail?: string;
+  readonly metadata?: Readonly<Record<string, unknown>>;
+}
+
 export interface IExecutionUnitRunRecord {
   readonly unitId: string;
   readonly kind: ExecutionUnitKind;
@@ -38,6 +44,7 @@ export interface IExecutionUnitRunRecord {
   readonly dependsOn: ReadonlyArray<string>;
   readonly status: ExecutionStatus;
   readonly outputMetadata?: Readonly<Record<string, unknown>>;
+  readonly outputSummary?: IExecutionRunSummary;
   readonly errorMessage?: string;
   readonly provenance?: IExecutionRunProvenance;
   readonly diagnostics?: ReadonlyArray<IExecutionRunDiagnostics>;
@@ -69,5 +76,7 @@ export interface IExecutionRunRecord {
   readonly completedAt?: string;
   readonly cancellationSupported: boolean;
   readonly metadata?: Readonly<Record<string, unknown>>;
+  readonly terminalSummary?: IExecutionRunSummary;
+  readonly diagnosticsSummary?: IExecutionRunSummary;
   readonly finalErrorMessage?: string;
 }

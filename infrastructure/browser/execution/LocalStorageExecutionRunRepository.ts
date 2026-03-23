@@ -1,5 +1,6 @@
 import type { IExecutionRunRepository, IExecutionRunRepositoryListCriteria } from "../../../application/ports/interfaces/IExecutionRunRepository";
 import type { IExecutionRunRecord } from "../../../domain/execution/ExecutionRun";
+import { freezeExecutionRunRecord } from "../../../application/execution/freezeExecutionRunRecord";
 
 interface StorageLike {
   getItem(key: string): string | null;
@@ -25,7 +26,7 @@ export class LocalStorageExecutionRunRepository implements IExecutionRunReposito
 
   public async saveRun(run: IExecutionRunRecord): Promise<IExecutionRunRecord> {
     const records = this.read();
-    records.set(run.runId, freezeRun(run));
+    records.set(run.runId, freezeExecutionRunRecord(run));
     this.write(records);
     return run;
   }
@@ -37,6 +38,9 @@ export class LocalStorageExecutionRunRepository implements IExecutionRunReposito
   public async listRuns(criteria?: IExecutionRunRepositoryListCriteria): Promise<ReadonlyArray<IExecutionRunRecord>> {
     const runs = [...this.read().values()]
       .filter((run) => !criteria?.planId || run.planId === criteria.planId)
+      .filter((run) => !criteria?.status || run.status === criteria.status)
+      .filter((run) => !criteria?.executionKind || run.metadata?.executionKind === criteria.executionKind)
+      .filter((run) => matchesMetadata(run, criteria?.metadata))
       .sort((left, right) => right.startedAt.localeCompare(left.startedAt));
 
     return Object.freeze(criteria?.limit ? runs.slice(0, criteria.limit) : runs);
@@ -50,7 +54,7 @@ export class LocalStorageExecutionRunRepository implements IExecutionRunReposito
 
     try {
       const parsed = JSON.parse(raw) as ReadonlyArray<IExecutionRunRecord>;
-      return new Map(parsed.map((run) => [run.runId, freezeRun(run)]));
+      return new Map(parsed.map((run) => [run.runId, freezeExecutionRunRecord(run)]));
     } catch {
       return new Map<string, IExecutionRunRecord>();
     }
@@ -67,35 +71,13 @@ export class LocalStorageExecutionRunRepository implements IExecutionRunReposito
   }
 }
 
-function freezeRun(run: IExecutionRunRecord): IExecutionRunRecord {
-  return Object.freeze({
-    ...run,
-    unitIds: Object.freeze([...(run.unitIds ?? [])]),
-    units: Object.freeze(Object.fromEntries(
-      Object.entries(run.units).map(([unitId, unit]) => [unitId, Object.freeze({
-        ...unit,
-        dependsOn: Object.freeze([...(unit.dependsOn ?? [])]),
-        outputMetadata: unit.outputMetadata ? Object.freeze({ ...unit.outputMetadata }) : undefined,
-        provenance: unit.provenance ? Object.freeze({
-          ...unit.provenance,
-          fallback: unit.provenance.fallback ? Object.freeze({ ...unit.provenance.fallback }) : undefined,
-          diagnostics: unit.provenance.diagnostics ? Object.freeze(unit.provenance.diagnostics.map((diagnostic) => Object.freeze({ ...diagnostic }))) : undefined,
-          metadata: unit.provenance.metadata ? Object.freeze({ ...unit.provenance.metadata }) : undefined,
-        }) : undefined,
-        diagnostics: unit.diagnostics ? Object.freeze(unit.diagnostics.map((diagnostic) => Object.freeze({ ...diagnostic }))) : undefined,
-        artifacts: unit.artifacts ? Object.freeze(unit.artifacts.map((artifact) => Object.freeze({ ...artifact }))) : undefined,
-      })])
-    )),
-    transitions: Object.freeze(run.transitions.map((transition) => Object.freeze({
-      ...transition,
-      provenance: transition.provenance ? Object.freeze({
-        ...transition.provenance,
-        fallback: transition.provenance.fallback ? Object.freeze({ ...transition.provenance.fallback }) : undefined,
-        diagnostics: transition.provenance.diagnostics ? Object.freeze(transition.provenance.diagnostics.map((diagnostic) => Object.freeze({ ...diagnostic }))) : undefined,
-        metadata: transition.provenance.metadata ? Object.freeze({ ...transition.provenance.metadata }) : undefined,
-      }) : undefined,
-      diagnostics: transition.diagnostics ? Object.freeze(transition.diagnostics.map((diagnostic) => Object.freeze({ ...diagnostic }))) : undefined,
-    }))),
-    metadata: run.metadata ? Object.freeze({ ...run.metadata }) : undefined,
-  });
+function matchesMetadata(
+  run: IExecutionRunRecord,
+  metadata?: Readonly<Record<string, string | number | boolean>>,
+): boolean {
+  if (!metadata) {
+    return true;
+  }
+
+  return Object.entries(metadata).every(([key, value]) => run.metadata?.[key] === value);
 }

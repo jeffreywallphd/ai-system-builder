@@ -24,6 +24,7 @@ describe("ui composition interactions", () => {
     expect(dependencies.mcpService).toBeDefined();
     expect(dependencies.mcpStore).toBeDefined();
     expect(dependencies.settingsStore).toBeDefined();
+    expect(dependencies.executionHistoryService).toBeDefined();
     expect(dependencies.operationalStatus.modelLibrary.effectiveMode).toBe("browser-download-fallback");
   });
 

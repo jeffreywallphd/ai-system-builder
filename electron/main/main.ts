@@ -8,6 +8,7 @@ import { InitializeProductionStorageUseCase } from "../../application/runtime/In
 import { resolveDesktopStoragePaths } from "../../infrastructure/desktop/DesktopAppPaths";
 import { DesktopStorageDatabase } from "../../infrastructure/desktop/DesktopStorageDatabase";
 import { DesktopWorkflowPersistence } from "../../infrastructure/desktop/DesktopWorkflowPersistence";
+import { SqliteExecutionRunRepository } from "../../infrastructure/filesystem/execution/SqliteExecutionRunRepository";
 import { resolveDesktopPythonRuntime } from "../../infrastructure/desktop/DesktopPythonRuntimeResolver";
 import { AppRuntimeConfig } from "../../infrastructure/config/AppRuntimeConfig";
 import { RendererDeliveryModes } from "../../domain/runtime/AppRuntimeProfile";
@@ -25,6 +26,7 @@ const rendererDevUrl = process.env.ELECTRON_RENDERER_URL || "http://127.0.0.1:51
 let mainWindow: BrowserWindow | undefined;
 let storageDatabase: DesktopStorageDatabase | undefined;
 let workflowPersistence: DesktopWorkflowPersistence | undefined;
+let executionRunRepository: SqliteExecutionRunRepository | undefined;
 let serviceSupervisor: DesktopServiceSupervisor | undefined;
 let bootstrapContext: DesktopBootstrapContext | undefined;
 
@@ -153,6 +155,7 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     workflowsDirectory,
     indexDatabasePath: workflowIndexDatabasePath,
   });
+  executionRunRepository = new SqliteExecutionRunRepository(storagePaths.databasePath);
   ipcMain.on("ai-loom-desktop-workflows:save-record", (_event, recordJson: string) => {
     workflowPersistence?.saveWorkflowRecord(recordJson);
   });
@@ -176,6 +179,21 @@ async function bootstrapDesktopRuntime(): Promise<void> {
       degraded: true,
       detail: "Desktop workflow persistence service is unavailable.",
     };
+  });
+  ipcMain.handle("ai-loom-desktop-execution-runs:save", async (_event, runJson: string) => {
+    if (!executionRunRepository) {
+      return;
+    }
+    await executionRunRepository.saveRun(JSON.parse(runJson));
+  });
+  ipcMain.handle("ai-loom-desktop-execution-runs:load", async (_event, runId: string) => {
+    const run = await executionRunRepository?.getRunById(runId);
+    return run ? JSON.stringify(run) : null;
+  });
+  ipcMain.handle("ai-loom-desktop-execution-runs:list", async (_event, criteriaJson?: string) => {
+    const criteria = criteriaJson ? JSON.parse(criteriaJson) : undefined;
+    const runs = await executionRunRepository?.listRuns(criteria);
+    return (runs ?? []).map((run) => JSON.stringify(run));
   });
   ipcMain.on("ai-loom-desktop-model-files:exists", (event, targetPath: string) => {
     event.returnValue = fs.existsSync(targetPath);
@@ -248,4 +266,5 @@ app.on("window-all-closed", () => {
 app.on("before-quit", async () => {
   await serviceSupervisor?.stop();
   storageDatabase?.dispose();
+  executionRunRepository?.dispose();
 });

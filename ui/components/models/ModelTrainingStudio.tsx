@@ -2,8 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import type { ModelCreationPathSupport, ModelCreationSupportState } from "../../../domain/model-training/ModelCreationSupport";
 import type { ModelTrainingJobStudioSummary } from "../../../application/model-training/contracts";
+import type { ExecutionRunProjection } from "../../../application/execution/ExecutionRunProjectionService";
 import type { ModelTrainingStore, ModelTrainingStoreState } from "../../state/ModelTrainingStore";
 import { ROUTE_PATHS } from "../../routes/RouteConfig";
+import ExecutionHistoryPanel from "../execution/ExecutionHistoryPanel";
+import type { ExecutionHistoryService } from "../../services/ExecutionHistoryService";
 
 const fallbackTrainingState: ModelTrainingStoreState = Object.freeze({
   jobs: Object.freeze([]),
@@ -20,6 +23,7 @@ const fallbackTrainingState: ModelTrainingStoreState = Object.freeze({
 
 interface ModelTrainingStudioProps {
   readonly modelTrainingStore: ModelTrainingStore;
+  readonly executionHistoryService?: ExecutionHistoryService;
 }
 
 function supportBadgeClass(state: ModelCreationSupportState): string {
@@ -45,6 +49,7 @@ function canCancel(status: string): boolean {
 
 export default function ModelTrainingStudio({
   modelTrainingStore,
+  executionHistoryService,
 }: ModelTrainingStudioProps): JSX.Element {
   const [trainingState, setTrainingState] = useState<ModelTrainingStoreState>(fallbackTrainingState);
   const [jobName, setJobName] = useState("Local support-model run");
@@ -52,6 +57,7 @@ export default function ModelTrainingStudio({
   const [learningRate, setLearningRate] = useState("0.0001");
   const [batchSize, setBatchSize] = useState("1");
   const [notes, setNotes] = useState("Use the selected dataset version to prepare a truthful bundle or run a narrow local training job.");
+  const [preparationHistory, setPreparationHistory] = useState<ReadonlyArray<ExecutionRunProjection>>([]);
 
   useEffect(() => modelTrainingStore.subscribe(setTrainingState), [modelTrainingStore]);
 
@@ -81,6 +87,30 @@ export default function ModelTrainingStudio({
   const numericLearningRate = Number.parseFloat(learningRate) || 0;
   const numericBatchSize = Number.parseInt(batchSize, 10) || 0;
 
+  useEffect(() => {
+    if (!executionHistoryService || !summary?.selectedBaseModelId || !summary.selectedDatasetId || !summary.selectedDatasetVersionId) {
+      setPreparationHistory([]);
+      return;
+    }
+
+    void executionHistoryService.listHistory({
+      executionKind: "model-preparation",
+      metadata: {
+        baseModelId: summary.selectedBaseModelId,
+        datasetId: summary.selectedDatasetId,
+        datasetVersionId: summary.selectedDatasetVersionId,
+      },
+      limit: 6,
+    }).then(setPreparationHistory).catch(() => setPreparationHistory([]));
+  }, [
+    executionHistoryService,
+    summary?.selectedBaseModelId,
+    summary?.selectedDatasetId,
+    summary?.selectedDatasetVersionId,
+    trainingState.jobs,
+    trainingState.isSubmitting,
+  ]);
+
   const trainingConfigError = useMemo(() => {
     if (numericEpochs < 1) return "Epochs must be at least 1.";
     if (numericLearningRate <= 0) return "Learning rate must be greater than 0.";
@@ -89,7 +119,7 @@ export default function ModelTrainingStudio({
   }, [numericBatchSize, numericEpochs, numericLearningRate]);
 
   const submitJob = (executionKind: "preparation-only" | "local-gradient-training") => {
-    if (!summary?.selectedBaseModelId || !summary.selectedDatasetId || !summary.selectedDatasetVersionId) {
+    if (!executionHistoryService || !summary?.selectedBaseModelId || !summary.selectedDatasetId || !summary.selectedDatasetVersionId) {
       return;
     }
     void modelTrainingStore.submitJob({
@@ -201,6 +231,13 @@ export default function ModelTrainingStudio({
           </div>
         </div>
       </div>
+
+      <ExecutionHistoryPanel
+        title="Preparation execution history"
+        subtitle="Durable execution-engine runs for bundle preparation and export-only model creation."
+        items={preparationHistory}
+        emptyMessage="No model-preparation execution runs have been recorded for this selection yet."
+      />
 
       <div className="ui-card">
         <div className="ui-card__body ui-stack ui-stack--sm">

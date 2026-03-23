@@ -51,6 +51,12 @@ export interface DesktopWorkflowBridge {
 }
 
 
+export interface DesktopExecutionRunBridge {
+  saveExecutionRun(runJson: string): Promise<void>;
+  loadExecutionRun(runId: string): Promise<string | null>;
+  listExecutionRuns(criteriaJson?: string): Promise<ReadonlyArray<string>>;
+}
+
 export interface DesktopModelFileBridge {
   exists(path: string): boolean;
   stat(path: string): { readonly path: string; readonly kind: "file" | "directory"; readonly size?: number; readonly modifiedAt?: string };
@@ -66,5 +72,6 @@ export interface DesktopBridge {
   readonly bootstrap: DesktopBootstrapContext;
   readonly storage: DesktopKeyValueStorageBridge;
   readonly workflows: DesktopWorkflowBridge;
+  readonly executionRuns: DesktopExecutionRunBridge;
   readonly modelFiles: DesktopModelFileBridge;
 }
