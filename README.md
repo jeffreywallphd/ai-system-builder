@@ -109,6 +109,15 @@ The app now differentiates between:
 - `desktop-development`
 - `desktop-production`
 
+Under the hood those runtime modes are now treated as **runtime profiles** composed from smaller architectural axes:
+
+- **host kind** — browser vs desktop
+- **lifecycle stage** — development vs production
+- **distribution target** — the delivery technology currently responsible for the renderer/host pairing (today `vite-browser` or `electron`)
+- **renderer delivery mode** — dev server vs packaged assets
+
+That separation matters because “Vite”, “Electron Forge”, and similar tools are better understood here as **distribution tooling choices**, not the core runtime model. The runtime profile owns the application-facing contract, while the current toolchain plugs into it.
+
 This runtime choice drives:
 
 - renderer asset loading

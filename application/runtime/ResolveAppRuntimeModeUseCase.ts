@@ -1,7 +1,5 @@
-import {
-  AppRuntimeModes,
-  type AppRuntimeMode,
-} from "../../domain/runtime/AppRuntimeMode";
+import { type AppRuntimeMode } from "../../domain/runtime/AppRuntimeMode";
+import { getAppRuntimeProfile } from "../../domain/runtime/AppRuntimeProfile";
 
 export interface ResolveAppRuntimeModeRequest {
   readonly hasDesktopHost: boolean;
@@ -10,12 +8,8 @@ export interface ResolveAppRuntimeModeRequest {
 
 export class ResolveAppRuntimeModeUseCase {
   public execute(request: ResolveAppRuntimeModeRequest): AppRuntimeMode {
-    if (!request.hasDesktopHost) {
-      return AppRuntimeModes.browserDevelopment;
-    }
-
-    return request.isPackagedDesktopHost
-      ? AppRuntimeModes.desktopProduction
-      : AppRuntimeModes.desktopDevelopment;
+    return getAppRuntimeProfile(request.hasDesktopHost
+      ? (request.isPackagedDesktopHost ? "desktop-production" : "desktop-development")
+      : "browser-development").mode;
   }
 }

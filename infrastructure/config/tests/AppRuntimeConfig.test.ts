@@ -1,5 +1,11 @@
 import { describe, expect, it } from "bun:test";
 import { AppRuntimeModes } from "../../../domain/runtime/AppRuntimeMode";
+import {
+  AppDistributionTargets,
+  AppHostKinds,
+  AppLifecycleStages,
+  RendererDeliveryModes,
+} from "../../../domain/runtime/AppRuntimeProfile";
 import { AppRuntimeConfig } from "../AppRuntimeConfig";
 
 describe("AppRuntimeConfig", () => {
@@ -7,6 +13,10 @@ describe("AppRuntimeConfig", () => {
     const config = AppRuntimeConfig.forDevelopment();
 
     expect(config.runtimeMode).toBe(AppRuntimeModes.browserDevelopment);
+    expect(config.hostKind).toBe(AppHostKinds.browser);
+    expect(config.lifecycleStage).toBe(AppLifecycleStages.development);
+    expect(config.distributionTarget).toBe(AppDistributionTargets.viteBrowser);
+    expect(config.rendererDeliveryMode).toBe(RendererDeliveryModes.devServer);
     expect(config.workflowRepositoryMode).toBe("filesystem-indexed");
     expect(config.workflowExecutorMode).toBe("strategy");
     expect(config.nodeCatalogMode).toBe("registered");
@@ -46,6 +56,10 @@ describe("AppRuntimeConfig", () => {
     });
 
     expect(config.runtimeMode).toBe(AppRuntimeModes.desktopProduction);
+    expect(config.hostKind).toBe(AppHostKinds.desktop);
+    expect(config.lifecycleStage).toBe(AppLifecycleStages.production);
+    expect(config.distributionTarget).toBe(AppDistributionTargets.electron);
+    expect(config.rendererDeliveryMode).toBe(RendererDeliveryModes.packagedAssets);
     expect(config.workflowRepositoryMode).toBe("filesystem-indexed");
     expect(config.workflowExecutorMode).toBe("strategy");
     expect(config.nodeCatalogMode).toBe("registered");
