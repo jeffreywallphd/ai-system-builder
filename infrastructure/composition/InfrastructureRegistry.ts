@@ -1,7 +1,7 @@
 import { EnvironmentConfig } from "../config/EnvironmentConfig";
 import { EnvironmentConfigProvider } from "../config/EnvironmentConfigProvider";
 import { HttpPythonRuntimeClient } from "../python/client/HttpPythonRuntimeClient";
-import { DefaultRuntimeDependencyOrchestrator } from "../runtime/DefaultRuntimeDependencyOrchestrator";
+import { createRuntimeDependencyOrchestrator } from "../runtime/RuntimeDependencyComposition";
 import { McpRuntimeConfig } from "../config/McpRuntimeConfig";
 import { PythonRuntimeConfig } from "../config/PythonRuntimeConfig";
 import { LocalFileStorage } from "../filesystem/LocalFileStorage";
@@ -58,7 +58,7 @@ import { WorkflowToolProjectionService } from "../../application/projection/Work
 import { LoadToolDefinitionUseCase } from "../../application/tools/LoadToolDefinitionUseCase";
 import { RunToolUseCase } from "../../application/tools/RunToolUseCase";
 import { WorkflowContextService } from "../../application/context/WorkflowContextService";
-import { RuntimeDependencyIds, type IRuntimeDependencyOrchestrator } from "../../application/runtime/RuntimeDependencyOrchestrator";
+import { RuntimeDependencyOperationalStates, type IRuntimeDependencyOrchestrator } from "../../application/runtime/RuntimeDependencyOrchestrator";
 
 export const TOKENS = Object.freeze({
   EnvironmentConfig: Symbol("EnvironmentConfig"),
@@ -153,46 +153,41 @@ export class InfrastructureRegistry {
         ? new HttpPythonRuntimeClient(pythonRuntimeConfig)
         : undefined;
 
-      return new DefaultRuntimeDependencyOrchestrator({
-        registrations: [
-          {
-            dependencyId: RuntimeDependencyIds.pythonRuntime,
-            providerId: "python-runtime-http-health",
-            ensureAvailable: async () => {
-              if (!pythonRuntimeConfig.isEnabled || !pythonRuntimeClient) {
-                return {
-                  available: false,
-                  detail: "Python runtime is disabled in settings.",
-                };
-              }
+      return createRuntimeDependencyOrchestrator({
+        pythonRuntime: {
+          providerId: "python-runtime-http-health",
+          ensureAvailable: async () => {
+            if (!pythonRuntimeConfig.isEnabled || !pythonRuntimeClient) {
+              return {
+                state: RuntimeDependencyOperationalStates.disabled,
+                detail: "Python runtime is disabled in settings.",
+                remediationHints: ["Enable the Python runtime to unlock MCP-backed capabilities."],
+              };
+            }
 
-              try {
-                const health = await pythonRuntimeClient.health();
-                return {
-                  available: health.status !== "unavailable",
-                  detail: health.status === "unavailable"
-                    ? "Python runtime is unavailable, so dependent runtimes remain gated."
-                    : "Python runtime dependency is reachable.",
-                  metadata: health.details,
-                };
-              } catch (error) {
-                return {
-                  available: false,
-                  detail: error instanceof Error ? error.message : "Python runtime health check failed.",
-                };
-              }
-            },
+            try {
+              const health = await pythonRuntimeClient.health();
+              return {
+                state: health.status === "unavailable"
+                  ? RuntimeDependencyOperationalStates.unavailable
+                  : RuntimeDependencyOperationalStates.healthy,
+                detail: health.status === "unavailable"
+                  ? "Python runtime is unavailable, so dependent runtimes remain gated."
+                  : "Python runtime dependency is reachable.",
+                metadata: health.details,
+                remediationHints: health.status === "unavailable"
+                  ? ["Start the configured Python runtime endpoint or verify the runtime base URL."]
+                  : [],
+              };
+            } catch (error) {
+              return {
+                state: RuntimeDependencyOperationalStates.failed,
+                detail: error instanceof Error ? error.message : "Python runtime health check failed.",
+                remediationHints: ["Verify network connectivity to the configured Python runtime endpoint."],
+              };
+            }
           },
-          {
-            dependencyId: RuntimeDependencyIds.mcpRuntime,
-            providerId: "mcp-runtime-orchestration-gate",
-            dependsOn: [RuntimeDependencyIds.pythonRuntime],
-            ensureAvailable: async () => ({
-              available: true,
-              detail: "MCP runtime dependency gate passed.",
-            }),
-          },
-        ],
+        },
       });
     });
 

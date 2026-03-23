@@ -205,6 +205,7 @@ export class DefaultModelTrainingApplicationService implements ModelTrainingAppl
       availableActions,
       modeWarnings: Object.freeze([
         ...capability.warnings,
+        ...(environment.runtimeRemediationHints ?? []),
         ...capability.paths.flatMap((path) => path.blockers.filter((entry) => entry.state === "degraded").map((entry) => entry.message)),
       ]),
       recommendedNextSteps: capability.recommendedNextSteps,
@@ -458,7 +459,10 @@ function buildReadinessChecks(params: {
         : params.environment.runtimeStatus === "degraded"
           ? "degraded"
           : "unavailable",
-      detail: params.environment.runtimeDetail ?? "Runtime status unknown.",
+      detail: [
+        params.environment.runtimeDetail ?? "Runtime status unknown.",
+        ...(params.environment.runtimeRemediationHints ?? []),
+      ].filter(Boolean).join(" "),
     },
     {
       id: "base-model",

@@ -64,9 +64,35 @@ The product also has a managed runtime story, especially for Python-backed capab
 The UI composition builds a `PythonRuntimeConfig`, runtime client, runtime manager, and service-definition wiring. The desktop host also resolves a desktop Python runtime and starts the service supervisor.
 
 ### Runtime dependency orchestration
-Both the infrastructure bootstrap and UI composition instantiate a `DefaultRuntimeDependencyOrchestrator`. This object models runtime prerequisites such as:
-- Python runtime availability
-- MCP runtime gating on Python availability
+The infrastructure bootstrap and UI composition now share a centralized runtime-dependency composition module that builds the core `Python runtime -> MCP runtime` graph and can append other runtime-backed capability registrations such as document conversion and model training while still letting each outer-layer composition root inject its own health adapter.
+
+The orchestration layer is responsible for:
+- registering runtime-backed dependencies in one reusable outer-layer composition entry point
+- resolving dependency chains with fallback and cycle detection
+- caching operational checks with explicit refresh/invalidation controls
+- returning an operational resolution model instead of a binary availability flag
+
+The operational state model is intentionally richer than before. A runtime dependency can resolve as:
+- `disabled`
+- `unavailable`
+- `provisioning`
+- `starting`
+- `healthy`
+- `degraded`
+- `failed`
+- `stopped`
+- `unknown`
+
+Each resolution also carries dependency-chain information, fallback usage, checked timestamps, metadata, detail text, and remediation hints. That makes the orchestration layer a shared operational foundation for runtime-backed features without pushing infrastructure details into the application contracts.
+
+The current rollout now directly gates:
+- MCP runtime access
+- delegated workflow execution selection
+- Python-backed document conversion
+- Python-backed dataset generation
+- Python-backed model training and model-creation environment checks
+
+Managed-runtime lifecycle surfaces such as the runtime console and managed-services store now also trigger targeted orchestration refresh/invalidation so downstream runtime-backed checks recompute after Python runtime changes. Higher-level diagnostics in MCP status, document-conversion failures, and model-training environment reporting now surface orchestration detail and remediation hints more consistently.
 
 This is an architectural sign that runtime availability is considered part of the application's operational model, not an incidental implementation detail.
 
@@ -94,6 +120,21 @@ Desktop workflow persistence intentionally combines filesystem JSON with SQLite 
 
 ### Runtime-aware product design
 The system acknowledges runtime health, startup, ownership, supervision, and degradation, which is essential for trustworthy desktop tooling.
+
+
+## What is intentionally still out of scope
+
+This orchestration work is still deliberately narrow. It now provides a stronger shared foundation for runtime-backed capabilities, but it does **not** yet orchestrate every subsystem that might eventually depend on runtime state. In particular, model-file bridge capability policies remain a future expansion area rather than part of the current orchestration rollout.
+
+Keeping the scope limited avoids turning runtime orchestration into a broad repo-wide refactor before the core contracts and MCP integration settle.
+
+## Recommended next steps
+
+The most natural next architectural steps are:
+1. extend the shared orchestration model into model-file bridge capability policies and any other runtime-backed desktop-only permissions
+2. keep tightening lifecycle-triggered orchestration recomputation so more host/supervisor events can invalidate the smallest necessary runtime dependency subgraph
+3. standardize orchestration-aware diagnostics in more user-facing capability summaries and future runtime-backed tools
+4. decide whether the remaining composition duplication between renderer and infrastructure should be reduced further once more runtime-backed flows adopt the shared orchestration layer
 
 ## TODO
 

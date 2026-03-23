@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { WorkflowRuntimeSelector } from "../WorkflowRuntimeSelector";
 
 describe("application execution interactions", () => {
-  it("selects hybrid strategy when requested", () => {
+  it("selects hybrid strategy when requested", async () => {
     const selector = new WorkflowRuntimeSelector();
     const hybrid = {
       getDescriptor: () => ({ id: "h", runtime: "langchain", mode: "hybrid" as const, supportsPartialDelegation: true, defaultProvenance: "scaffolded" as const }),
@@ -15,7 +15,7 @@ describe("application execution interactions", () => {
       execute: async () => ({ executionId: "d", status: "completed" as const, outputAssets: [] }),
     };
 
-    const selected = selector.selectStrategy(
+    const selected = await selector.selectStrategy(
       { workflow: { id: "wf" } as never, parameters: { executionMode: "hybrid" } },
       [delegated, hybrid]
     );

@@ -180,6 +180,84 @@ describe("RuntimeConsoleStore", () => {
     expect(store.getState().healthChecks[2]?.status).toBe("healthy");
   });
 
+  it("refreshes runtime dependency orchestration before collecting MCP health details", async () => {
+    const refresh = mock(async () => ({
+      requestedDependencyId: "python-runtime",
+      resolvedDependencyId: "python-runtime",
+      providerId: "python-runtime-manager",
+      state: "healthy",
+      health: "healthy",
+      availability: "available",
+      available: true,
+      degraded: false,
+      checkedAt: "2026-03-20T10:15:00.000Z",
+      dependencyChain: ["python-runtime"],
+      fallbackDependencyIds: [],
+      usedFallback: false,
+      remediationHints: [],
+    }));
+    const store = new RuntimeConsoleStore({
+      runtimeEventStore: new RuntimeEventBuffer(),
+      pythonRuntimeManager: {
+        checkAvailability: async () => true,
+        ensureRuntimeAvailability: async () => ({
+          status: "healthy" as const,
+          isAvailable: true,
+          owner: "managed" as const,
+          lastUpdatedAt: "2026-03-20T10:15:00.000Z",
+          detail: "Runtime is healthy.",
+        }),
+        restartRuntime: async () => ({
+          status: "healthy" as const,
+          isAvailable: true,
+          owner: "managed" as const,
+          lastUpdatedAt: "2026-03-20T10:15:00.000Z",
+        }),
+        getStatus: () => ({
+          status: "healthy" as const,
+          isAvailable: true,
+          owner: "managed" as const,
+          lastUpdatedAt: "2026-03-20T10:15:00.000Z",
+          detail: "Runtime is healthy.",
+        }),
+        stopManagedRuntime: async () => undefined,
+      },
+      runtimeDependencyOrchestrator: { refresh },
+      mcpService: {
+        getConnectionStatus: async () => ({
+          enabled: true,
+          state: "degraded" as const,
+          checkedAt: "2026-03-20T10:15:01.000Z",
+          dependencyStatus: {
+            requestedDependencyId: "mcp-runtime",
+            resolvedDependencyId: "mcp-runtime",
+            providerId: "mcp-runtime-orchestration-gate",
+            state: "starting",
+            health: "degraded",
+            availability: "degraded",
+            available: false,
+            degraded: false,
+            checkedAt: "2026-03-20T10:15:01.000Z",
+            dependencyChain: ["python-runtime", "mcp-runtime"],
+            fallbackDependencyIds: [],
+            usedFallback: false,
+            detail: "MCP runtime is still starting.",
+            remediationHints: ["Wait for startup to complete."],
+          },
+          servers: [],
+          capabilities: { tools: false, resources: false, toolExecution: false },
+        }),
+        listConfiguredServers: async () => [],
+        getServerStatus: async () => { throw new Error("unused"); },
+      },
+    });
+
+    await store.refreshHealth();
+
+    expect(refresh).toHaveBeenCalledWith("python-runtime");
+    expect(store.getState().healthChecks[1]?.detail).toContain("Wait for startup to complete.");
+  });
+
   it("attempts managed-local recovery after an unexpected runtime loss", async () => {
     let runtimeStatus: PythonRuntimeManagerStatus = {
       status: "healthy" as const,
