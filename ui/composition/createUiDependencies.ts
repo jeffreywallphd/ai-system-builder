@@ -143,7 +143,9 @@ import { PythonRuntimeModelTrainingGateway } from "../../infrastructure/python/m
 import { OrchestratedModelTrainingRuntime } from "../../infrastructure/python/model-training/OrchestratedModelTrainingRuntime";
 import { RuntimeAwareModelCreationEnvironmentGateway } from "../../infrastructure/python/model-training/RuntimeAwareModelCreationEnvironmentGateway";
 import { ExecutionRunProjectionService } from "../../application/execution/ExecutionRunProjectionService";
+import { ExecutionRunDetailProjectionService } from "../../application/execution/ExecutionRunDetailProjectionService";
 import { ListExecutionRunsUseCase } from "../../application/execution/ListExecutionRunsUseCase";
+import { GetExecutionRunDetailUseCase } from "../../application/execution/GetExecutionRunDetailUseCase";
 import { ExecutionHistoryService } from "../services/ExecutionHistoryService";
 import { createModelManagementDependencies } from "./modelManagementDependencies";
 import { BrowserDownloadModelLibrary } from "../../infrastructure/browser/models/BrowserDownloadModelLibrary";
@@ -312,9 +314,11 @@ export function createUiDependencies(
     modelTrainingRuntime,
   });
   const executionRunProjectionService = new ExecutionRunProjectionService();
+  const executionRunDetailProjectionService = new ExecutionRunDetailProjectionService(executionRunProjectionService);
   const executionHistoryService = new ExecutionHistoryService(
     new ListExecutionRunsUseCase(executionRunRepository),
     executionRunProjectionService,
+    new GetExecutionRunDetailUseCase(executionRunRepository, executionRunDetailProjectionService),
   );
   const executeWorkflowUseCase = new ExecuteWorkflowUseCase(
     workflowExecutor,

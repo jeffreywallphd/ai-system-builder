@@ -9,6 +9,7 @@ import { resolveDesktopStoragePaths } from "../../infrastructure/desktop/Desktop
 import { DesktopStorageDatabase } from "../../infrastructure/desktop/DesktopStorageDatabase";
 import { DesktopWorkflowPersistence } from "../../infrastructure/desktop/DesktopWorkflowPersistence";
 import { SqliteExecutionRunRepository } from "../../infrastructure/filesystem/execution/SqliteExecutionRunRepository";
+import { createExecutionRunRepository } from "../../infrastructure/execution/createExecutionInfrastructure";
 import { resolveDesktopPythonRuntime } from "../../infrastructure/desktop/DesktopPythonRuntimeResolver";
 import { AppRuntimeConfig } from "../../infrastructure/config/AppRuntimeConfig";
 import { RendererDeliveryModes } from "../../domain/runtime/AppRuntimeProfile";
@@ -155,7 +156,9 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     workflowsDirectory,
     indexDatabasePath: workflowIndexDatabasePath,
   });
-  executionRunRepository = new SqliteExecutionRunRepository(storagePaths.databasePath);
+  executionRunRepository = createExecutionRunRepository({
+    sqliteDatabasePath: storagePaths.databasePath,
+  }) as SqliteExecutionRunRepository;
   ipcMain.on("ai-loom-desktop-workflows:save-record", (_event, recordJson: string) => {
     workflowPersistence?.saveWorkflowRecord(recordJson);
   });

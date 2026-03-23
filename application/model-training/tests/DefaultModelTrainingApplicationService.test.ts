@@ -540,4 +540,110 @@ describe("DefaultModelTrainingApplicationService", () => {
 
     await expect(service.promoteJob({ jobId: job.id })).rejects.toThrow("cannot register completed training outputs");
   });
+
+  it("starts truthful local training through the unified execution engine and saves background job updates", async () => {
+    const model = makeModel();
+    const dataset = makeDataset();
+    const version = makeVersion(dataset.id);
+    const example = makeExample(dataset.id, version.id);
+    const saved: ModelTrainingJob[] = [];
+    let refreshCount = 0;
+    const submittedJob = makeJob({
+      id: "training-job-engine",
+      status: "submitted",
+      completedAt: undefined,
+      progress: { percent: 0, currentEpoch: 0, totalEpochs: 2, currentStep: 0, totalSteps: 2, statusDetail: "Submitted." },
+      summary: "Submitted a real local training job.",
+    });
+    const completedJob = makeJob({
+      id: "training-job-engine",
+      summary: "Completed a real local training run.",
+    });
+
+    const engine = createUnifiedExecutionInfrastructure({
+      workflowExecutor: {
+        canExecute: () => true,
+        execute: async () => { throw new Error("workflow path not used"); },
+        startExecution: async () => { throw new Error("workflow path not used"); },
+      },
+      modelTrainingRuntime: {
+        submitJob: async () => submittedJob,
+        getJob: async (jobId) => jobId === submittedJob.id ? submittedJob : undefined,
+        refreshJob: async () => {
+          refreshCount += 1;
+          return refreshCount >= 1 ? completedJob : submittedJob;
+        },
+        reconcileJob: async () => completedJob,
+        listJobs: async () => [],
+        cancelJob: async () => ({ ...submittedJob, status: "cancelled" }),
+      },
+    });
+
+    const service = new DefaultModelTrainingApplicationService(
+      {
+        listInstalled: async () => [model],
+        getInstalledById: async () => model,
+        saveInstalled: async () => undefined,
+        removeInstalled: async () => true,
+        isInstalled: async () => true,
+      },
+      {
+        list: async () => [dataset],
+        load: async () => dataset,
+        save: async () => dataset,
+        delete: async () => undefined,
+      } as never,
+      {
+        loadVersion: async () => version,
+        listVersions: async () => [version],
+        listExamples: async () => [example],
+      } as never,
+      {
+        listJobs: async () => saved,
+        getJobById: async (id) => saved.find((job) => job.id === id),
+        saveJob: async (job) => {
+          const existingIndex = saved.findIndex((entry) => entry.id === job.id);
+          if (existingIndex >= 0) {
+            saved[existingIndex] = job;
+          } else {
+            saved.push(job);
+          }
+        },
+      },
+      {
+        submitJob: async () => submittedJob,
+        getJob: async (jobId) => jobId === submittedJob.id ? submittedJob : undefined,
+        refreshJob: async () => completedJob,
+        reconcileJob: async () => completedJob,
+        listJobs: async () => [],
+        cancelJob: async () => ({ ...submittedJob, status: "cancelled" }),
+      },
+      {
+        getEnvironment: async () => ({
+          runtimeMode: AppRuntimeModes.desktopDevelopment,
+          runtimeStatus: "ready",
+          desktopBridgeAvailable: true,
+          canAccessLocalArtifacts: true,
+          canRegisterPromotedModels: true,
+        }),
+      },
+      undefined,
+      engine,
+      () => "training-job-engine",
+    );
+
+    const job = await service.submitJob({
+      name: "Support local training",
+      baseModelId: model.id,
+      datasetId: dataset.id,
+      datasetVersionId: version.id,
+      createdBy: "tester",
+      configuration: { epochs: 2, learningRate: 0.0001, batchSize: 1 },
+    });
+
+    expect(job.status).toBe("submitted");
+
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    expect(saved.some((entry) => entry.status === "completed")).toBe(true);
+  });
 });

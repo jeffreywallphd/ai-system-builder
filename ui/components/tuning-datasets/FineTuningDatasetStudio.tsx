@@ -250,6 +250,7 @@ export default function FineTuningDatasetStudio(): JSX.Element {
               subtitle="Durable execution-engine records for dataset example generation."
               items={executionHistory}
               emptyMessage="No dataset-generation execution runs have been recorded yet."
+              executionHistoryService={executionHistoryService}
             />
             {generationBatches.length > 0 ? (
               <div className="ui-stack ui-stack--sm">

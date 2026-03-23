@@ -4,6 +4,7 @@ import type {
   IExecutionRunDiagnostics,
   IExecutionRunProvenance,
   IExecutionRunRecord,
+  IExecutionRunSummary,
 } from "../../domain/execution/ExecutionRun";
 
 export type IExecutionDiagnostics = IExecutionRunDiagnostics;
@@ -19,5 +20,8 @@ export interface IExecutionEngineEvent {
   readonly message?: string;
   readonly provenance?: IExecutionProvenance;
   readonly diagnostics?: ReadonlyArray<IExecutionDiagnostics>;
+  readonly outputMetadata?: Readonly<Record<string, unknown>>;
+  readonly outputSummary?: IExecutionRunSummary;
+  readonly artifacts?: ReadonlyArray<IExecutionArtifact>;
   readonly detail?: IExecutionArtifact;
 }

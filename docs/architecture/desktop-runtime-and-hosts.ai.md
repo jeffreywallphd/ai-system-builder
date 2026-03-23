@@ -12,7 +12,7 @@ Electron is the desktop host boundary; the renderer accesses desktop capabilitie
 - Desktop-backed workflow repo used by renderer: `infrastructure/browser/workflows/DesktopBridgeWorkflowRepository.ts`
 
 ## Storage modes to mention
-- Desktop canonical path: filesystem JSON + SQLite workflow index plus SQLite execution-run history
+- Desktop canonical path: filesystem JSON + SQLite workflow index plus SQLite execution-run history with explicit schema versioning/migration via SQLite `user_version`
 - Fallback path: browser/local storage repositories
 
 ## Runtime modes to mention

@@ -9,6 +9,54 @@ interface ExecutionRunRow {
   readonly run_json: string;
 }
 
+const EXECUTION_RUN_SCHEMA_VERSION = 2;
+
+const EXECUTION_RUN_MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
+  [1, `
+    CREATE TABLE execution_runs (
+      run_id TEXT PRIMARY KEY,
+      plan_id TEXT NOT NULL,
+      status TEXT NOT NULL,
+      execution_kind TEXT,
+      started_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      completed_at TEXT,
+      cancellation_supported INTEGER NOT NULL,
+      final_error_message TEXT,
+      primary_classification TEXT,
+      primary_executor_id TEXT,
+      primary_runtime TEXT,
+      primary_source_kind TEXT,
+      metadata_json TEXT NOT NULL,
+      units_json TEXT NOT NULL,
+      transitions_json TEXT NOT NULL,
+      terminal_summary_json TEXT,
+      diagnostics_summary_json TEXT,
+      run_json TEXT NOT NULL
+    );
+    CREATE INDEX execution_runs_plan_idx ON execution_runs(plan_id, started_at DESC);
+    CREATE INDEX execution_runs_status_idx ON execution_runs(status, started_at DESC);
+    CREATE INDEX execution_runs_kind_idx ON execution_runs(execution_kind, started_at DESC);
+    CREATE INDEX execution_runs_updated_idx ON execution_runs(updated_at DESC);
+    CREATE TABLE execution_run_metadata (
+      run_id TEXT NOT NULL,
+      key TEXT NOT NULL,
+      value_text TEXT,
+      value_number REAL,
+      value_boolean INTEGER,
+      PRIMARY KEY (run_id, key),
+      FOREIGN KEY (run_id) REFERENCES execution_runs(run_id) ON DELETE CASCADE
+    );
+    CREATE INDEX execution_run_metadata_lookup_idx ON execution_run_metadata(key, value_text, value_number, value_boolean);
+  `],
+  [2, `
+    ALTER TABLE execution_runs ADD COLUMN terminal_headline TEXT;
+    ALTER TABLE execution_runs ADD COLUMN terminal_detail TEXT;
+    ALTER TABLE execution_runs ADD COLUMN diagnostics_headline TEXT;
+    ALTER TABLE execution_runs ADD COLUMN diagnostics_detail TEXT;
+    CREATE INDEX IF NOT EXISTS execution_runs_detail_idx ON execution_runs(execution_kind, status, updated_at DESC);
+  `],
+]);
 
 export class SqliteExecutionRunRepository implements IExecutionRunRepository {
   private database?: Database.Database;
@@ -41,6 +89,10 @@ export class SqliteExecutionRunRepository implements IExecutionRunRepository {
           transitions_json,
           terminal_summary_json,
           diagnostics_summary_json,
+          terminal_headline,
+          terminal_detail,
+          diagnostics_headline,
+          diagnostics_detail,
           run_json
         ) VALUES (
           @runId,
@@ -61,6 +113,10 @@ export class SqliteExecutionRunRepository implements IExecutionRunRepository {
           @transitionsJson,
           @terminalSummaryJson,
           @diagnosticsSummaryJson,
+          @terminalHeadline,
+          @terminalDetail,
+          @diagnosticsHeadline,
+          @diagnosticsDetail,
           @runJson
         )
         ON CONFLICT(run_id) DO UPDATE SET
@@ -81,6 +137,10 @@ export class SqliteExecutionRunRepository implements IExecutionRunRepository {
           transitions_json = excluded.transitions_json,
           terminal_summary_json = excluded.terminal_summary_json,
           diagnostics_summary_json = excluded.diagnostics_summary_json,
+          terminal_headline = excluded.terminal_headline,
+          terminal_detail = excluded.terminal_detail,
+          diagnostics_headline = excluded.diagnostics_headline,
+          diagnostics_detail = excluded.diagnostics_detail,
           run_json = excluded.run_json
       `).run({
         runId: run.runId,
@@ -101,6 +161,10 @@ export class SqliteExecutionRunRepository implements IExecutionRunRepository {
         transitionsJson: JSON.stringify(run.transitions),
         terminalSummaryJson: run.terminalSummary ? JSON.stringify(run.terminalSummary) : null,
         diagnosticsSummaryJson: run.diagnosticsSummary ? JSON.stringify(run.diagnosticsSummary) : null,
+        terminalHeadline: run.terminalSummary?.headline ?? null,
+        terminalDetail: run.terminalSummary?.detail ?? null,
+        diagnosticsHeadline: run.diagnosticsSummary?.headline ?? null,
+        diagnosticsDetail: run.diagnosticsSummary?.detail ?? null,
         runJson: JSON.stringify(run),
       });
 
@@ -213,43 +277,40 @@ export class SqliteExecutionRunRepository implements IExecutionRunRepository {
   }
 
   private initialize(db: Database.Database): void {
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS execution_runs (
-        run_id TEXT PRIMARY KEY,
-        plan_id TEXT NOT NULL,
-        status TEXT NOT NULL,
-        execution_kind TEXT,
-        started_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        completed_at TEXT,
-        cancellation_supported INTEGER NOT NULL,
-        final_error_message TEXT,
-        primary_classification TEXT,
-        primary_executor_id TEXT,
-        primary_runtime TEXT,
-        primary_source_kind TEXT,
-        metadata_json TEXT NOT NULL,
-        units_json TEXT NOT NULL,
-        transitions_json TEXT NOT NULL,
-        terminal_summary_json TEXT,
-        diagnostics_summary_json TEXT,
-        run_json TEXT NOT NULL
+    const currentVersion = Number(db.pragma("user_version", { simple: true }) ?? 0);
+    const hasLegacySchema = this.hasLegacySchema(db);
+    const effectiveCurrentVersion = currentVersion === 0 && hasLegacySchema ? 1 : currentVersion;
+
+    if (effectiveCurrentVersion > EXECUTION_RUN_SCHEMA_VERSION) {
+      throw new Error(
+        `Execution run database schema version ${effectiveCurrentVersion} is newer than this application supports (${EXECUTION_RUN_SCHEMA_VERSION}).`,
       );
-      CREATE INDEX IF NOT EXISTS execution_runs_plan_idx ON execution_runs(plan_id, started_at DESC);
-      CREATE INDEX IF NOT EXISTS execution_runs_status_idx ON execution_runs(status, started_at DESC);
-      CREATE INDEX IF NOT EXISTS execution_runs_kind_idx ON execution_runs(execution_kind, started_at DESC);
-      CREATE INDEX IF NOT EXISTS execution_runs_updated_idx ON execution_runs(updated_at DESC);
-      CREATE TABLE IF NOT EXISTS execution_run_metadata (
-        run_id TEXT NOT NULL,
-        key TEXT NOT NULL,
-        value_text TEXT,
-        value_number REAL,
-        value_boolean INTEGER,
-        PRIMARY KEY (run_id, key),
-        FOREIGN KEY (run_id) REFERENCES execution_runs(run_id) ON DELETE CASCADE
-      );
-      CREATE INDEX IF NOT EXISTS execution_run_metadata_lookup_idx ON execution_run_metadata(key, value_text, value_number, value_boolean);
-    `);
+    }
+
+    for (const [version, migrationSql] of EXECUTION_RUN_MIGRATIONS) {
+      if (version <= effectiveCurrentVersion) {
+        continue;
+      }
+
+      db.transaction(() => {
+        db.exec(migrationSql);
+        db.pragma(`user_version = ${version}`);
+      })();
+    }
+
+    if (effectiveCurrentVersion === 1 && currentVersion === 0) {
+      db.pragma(`user_version = ${effectiveCurrentVersion}`);
+    }
+  }
+
+  private hasLegacySchema(db: Database.Database): boolean {
+    const rows = db.prepare(`
+      SELECT name
+      FROM sqlite_master
+      WHERE type = 'table' AND name IN ('execution_runs', 'execution_run_metadata')
+    `).all() as ReadonlyArray<{ readonly name: string }>;
+
+    return rows.some((row) => row.name === "execution_runs");
   }
 }
 
