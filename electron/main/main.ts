@@ -5,12 +5,12 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { app, BrowserWindow, ipcMain } from "electron";
 import { InitializeProductionStorageUseCase } from "../../application/runtime/InitializeProductionStorageUseCase";
-import { ResolveAppRuntimeModeUseCase } from "../../application/runtime/ResolveAppRuntimeModeUseCase";
 import { resolveDesktopStoragePaths } from "../../infrastructure/desktop/DesktopAppPaths";
 import { DesktopStorageDatabase } from "../../infrastructure/desktop/DesktopStorageDatabase";
 import { DesktopWorkflowPersistence } from "../../infrastructure/desktop/DesktopWorkflowPersistence";
 import { resolveDesktopPythonRuntime } from "../../infrastructure/desktop/DesktopPythonRuntimeResolver";
 import { AppRuntimeConfig } from "../../infrastructure/config/AppRuntimeConfig";
+import { RendererDeliveryModes } from "../../domain/runtime/AppRuntimeProfile";
 import { DesktopServiceSupervisor } from "./DesktopServiceSupervisor";
 import type { DesktopBootstrapContext } from "../shared/DesktopContracts";
 
@@ -73,7 +73,8 @@ async function createMainWindow(): Promise<void> {
   mainWindow = window;
   window.once("ready-to-show", () => window.show());
 
-  if (isPackaged) {
+  const runtimeConfig = bootstrapContext?.runtimeConfig;
+  if (runtimeConfig?.rendererDeliveryMode === RendererDeliveryModes.packagedAssets) {
     await window.loadFile(path.join(__dirname, "../../dist/index.html"));
   } else {
     await window.loadURL(rendererDevUrl);
@@ -105,11 +106,6 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     pythonRuntime,
   });
   await serviceSupervisor.start();
-
-  const runtimeMode = new ResolveAppRuntimeModeUseCase().execute({
-    hasDesktopHost: true,
-    isPackagedDesktopHost: isPackaged,
-  });
 
   const runtimeConfig = isPackaged
     ? AppRuntimeConfig.forDesktopProduction({
@@ -222,7 +218,7 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     fs.copyFileSync(request.from, request.to);
   });
 
-  if (runtimeMode === "desktop-production" && !pythonRuntime.isAvailable) {
+  if (runtimeConfig.isPackagedDesktopHost && !pythonRuntime.isAvailable) {
     console.warn(
       `[ai-loom] Packaged private Python runtime was not found at '${pythonRuntime.executablePath ?? pythonRuntime.runtimeRoot}'.`,
     );
