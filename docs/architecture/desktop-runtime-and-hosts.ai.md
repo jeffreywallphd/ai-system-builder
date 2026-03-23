@@ -23,7 +23,7 @@ Electron is the desktop host boundary; the renderer accesses desktop capabilitie
 
 ## Runtime orchestration update
 - Runtime dependency graph composition is now centralized in a reusable outer-layer module instead of being duplicated ad hoc in the infrastructure registry and UI composition.
-- The shared graph now covers `python-runtime -> mcp-runtime` plus appended runtime-backed capability gates for delegated workflow execution, document conversion, dataset generation, and model training in the UI composition.
+- The shared graph now covers `python-runtime -> mcp-runtime` plus appended runtime-backed capability gates for delegated workflow execution, document conversion, dataset generation, model training, and narrow MCP server-operation execution in the UI composition.
 - Resolutions now carry an operational state model (`disabled`, `unavailable`, `provisioning`, `starting`, `healthy`, `degraded`, `failed`, `stopped`, `unknown`), fallback information, timestamps, metadata, and remediation hints.
 - The orchestrator also supports explicit `refresh`, single-dependency invalidation, and global invalidation so runtime-backed capabilities can recompute status after managed-runtime changes; the runtime console and managed-services store now use those hooks.
 

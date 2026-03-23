@@ -3,6 +3,7 @@ export const ExecutionUnitKinds = Object.freeze({
   datasetGeneration: "dataset-generation",
   modelPreparation: "model-preparation",
   modelTraining: "model-training",
+  mcpServerOperation: "mcp-server-operation",
 });
 
 export type ExecutionUnitKind = typeof ExecutionUnitKinds[keyof typeof ExecutionUnitKinds];

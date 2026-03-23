@@ -6,6 +6,8 @@ describe("ToolRunPage", () => {
     const source = readSource("ui/pages/ToolRunPage.tsx");
     expect(source).toContain("loadTool");
     expect(source).toContain("Preparing tool…");
+    expect(source).toContain("Tool execution history");
+    expect(source).toContain('toolId: selectedTool.id');
     expect(source).not.toContain("Loading workflow");
     expect(source).not.toContain("ContextInspectionPanel");
   });

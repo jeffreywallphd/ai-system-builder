@@ -132,7 +132,11 @@ import { DefaultNodeOutputStore } from "../../infrastructure/interpreted/executi
 import { LangChainNodeExecutor } from "../../infrastructure/interpreted/execution/LangChainNodeExecutor";
 import { WorkflowRuntimeSelector } from "../../application/execution/WorkflowRuntimeSelector";
 import { PythonDelegatedWorkflowExecutionStrategy } from "../../infrastructure/python/execution/PythonDelegatedWorkflowExecutionStrategy";
-import { createExecutionRunRepository, createUnifiedExecutionInfrastructure } from "../../infrastructure/execution/createExecutionInfrastructure";
+import {
+  createExecutionHistoryInfrastructure,
+  createExecutionRunRepository,
+  createUnifiedExecutionInfrastructure,
+} from "../../infrastructure/execution/createExecutionInfrastructure";
 import { PythonRuntimeDatasetGenerationService } from "../../infrastructure/python/tuning-datasets/PythonRuntimeDatasetGenerationService";
 import { OrchestratedDatasetGenerationService } from "../../infrastructure/python/tuning-datasets/OrchestratedDatasetGenerationService";
 import { LocalStorageModelTrainingJobRepository } from "../../infrastructure/browser/model-training/LocalStorageModelTrainingJobRepository";
@@ -142,10 +146,6 @@ import { ModelTrainingStore } from "../state/ModelTrainingStore";
 import { PythonRuntimeModelTrainingGateway } from "../../infrastructure/python/model-training/PythonRuntimeModelTrainingGateway";
 import { OrchestratedModelTrainingRuntime } from "../../infrastructure/python/model-training/OrchestratedModelTrainingRuntime";
 import { RuntimeAwareModelCreationEnvironmentGateway } from "../../infrastructure/python/model-training/RuntimeAwareModelCreationEnvironmentGateway";
-import { ExecutionRunProjectionService } from "../../application/execution/ExecutionRunProjectionService";
-import { ExecutionRunDetailProjectionService } from "../../application/execution/ExecutionRunDetailProjectionService";
-import { ListExecutionRunsUseCase } from "../../application/execution/ListExecutionRunsUseCase";
-import { GetExecutionRunDetailUseCase } from "../../application/execution/GetExecutionRunDetailUseCase";
 import { ExecutionHistoryService } from "../services/ExecutionHistoryService";
 import { createModelManagementDependencies } from "./modelManagementDependencies";
 import { BrowserDownloadModelLibrary } from "../../infrastructure/browser/models/BrowserDownloadModelLibrary";
@@ -312,13 +312,13 @@ export function createUiDependencies(
     executionRunRepository,
     datasetGenerationService,
     modelTrainingRuntime,
+    mcpServerManager: mcpRuntimeIntegration.serverManager,
   });
-  const executionRunProjectionService = new ExecutionRunProjectionService();
-  const executionRunDetailProjectionService = new ExecutionRunDetailProjectionService(executionRunProjectionService);
+  const executionHistoryInfrastructure = createExecutionHistoryInfrastructure(executionRunRepository);
   const executionHistoryService = new ExecutionHistoryService(
-    new ListExecutionRunsUseCase(executionRunRepository),
-    executionRunProjectionService,
-    new GetExecutionRunDetailUseCase(executionRunRepository, executionRunDetailProjectionService),
+    executionHistoryInfrastructure.listExecutionRunsUseCase,
+    executionHistoryInfrastructure.executionRunProjectionService,
+    executionHistoryInfrastructure.getExecutionRunDetailUseCase,
   );
   const executeWorkflowUseCase = new ExecuteWorkflowUseCase(
     workflowExecutor,
@@ -451,12 +451,12 @@ export function createUiDependencies(
     new AddConfiguredMcpServerUseCase(persistedMcpServerRepository ?? { saveConfiguredServer: async (server) => server, listConfiguredServers: async () => [] }),
     new GetMcpConnectionStatusUseCase(mcpServerCatalog),
     new GetMcpServerStatusUseCase(mcpServerCatalog),
-    new ConnectMcpServerUseCase(mcpServerManager),
-    new DisconnectMcpServerUseCase(mcpServerManager),
-    new ReconnectMcpServerUseCase(mcpServerManager),
+    new ConnectMcpServerUseCase(mcpServerManager, executionEngine),
+    new DisconnectMcpServerUseCase(mcpServerManager, executionEngine),
+    new ReconnectMcpServerUseCase(mcpServerManager, executionEngine),
     new SearchMcpToolsUseCase(pythonBackedMcpToolCatalog),
     new GetMcpToolDescriptorUseCase(pythonBackedMcpToolCatalog),
-    new CreateLocalMcpServerUseCase(mcpServerManager),
+    new CreateLocalMcpServerUseCase(mcpServerManager, executionEngine),
     new GenerateLocalMcpToolDraftUseCase(),
   );
   const mcpToolCallAuthoringService = new McpToolCallAuthoringService(mcpService);

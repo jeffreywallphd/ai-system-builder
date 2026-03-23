@@ -32,7 +32,9 @@ export class ExecutionRunProjectionService {
     const currentUnit = this.resolveCurrentUnit(run);
     const completedUnits = units.filter((unit) => unit.status === ExecutionStatuses.completed).length;
     const totalUnits = units.length;
-    const progressPercent = totalUnits > 0 ? Math.round((completedUnits / totalUnits) * 100) : 0;
+    const truthfullyReportedProgress = resolveTruthfulProgress(run, currentUnit);
+    const progressPercent = truthfullyReportedProgress?.percent
+      ?? (totalUnits > 0 ? Math.round((completedUnits / totalUnits) * 100) : 0);
     const executionPath = this.resolveExecutionPath(run, units.map((unit) => unit.provenance).filter(Boolean) as IExecutionRunProvenance[]);
 
     return Object.freeze({
@@ -47,7 +49,12 @@ export class ExecutionRunProjectionService {
       completedUnits,
       totalUnits,
       progressPercent,
-      progressLabel: `${completedUnits}/${totalUnits} units${run.status === ExecutionStatuses.running ? ` • ${progressPercent}%` : ""}`,
+      progressLabel: describeProgressLabel(run, {
+        completedUnits,
+        totalUnits,
+        progressPercent,
+        truthfulProgress: truthfullyReportedProgress,
+      }),
       terminalSummary: run.terminalSummary
         ? [run.terminalSummary.headline, run.terminalSummary.detail].filter(Boolean).join(" — ")
         : undefined,
@@ -119,6 +126,74 @@ export class ExecutionRunProjectionService {
         return { label: "Real execution", detail };
     }
   }
+}
+
+interface TruthfulProgressSummary {
+  readonly percent?: number;
+  readonly label?: string;
+}
+
+function resolveTruthfulProgress(
+  run: IExecutionRunRecord,
+  currentUnit: IExecutionRunRecord["units"][string] | undefined,
+): TruthfulProgressSummary | undefined {
+  if (!currentUnit || run.status !== ExecutionStatuses.running) {
+    return undefined;
+  }
+
+  const metadata = currentUnit.outputMetadata;
+  const progressPercent = typeof metadata?.progressPercent === "number"
+    && Number.isFinite(metadata.progressPercent)
+    ? Math.max(0, Math.min(100, Math.round(metadata.progressPercent)))
+    : undefined;
+  const currentEpoch = typeof metadata?.currentEpoch === "number" ? metadata.currentEpoch : undefined;
+  const totalEpochs = typeof metadata?.totalEpochs === "number" ? metadata.totalEpochs : undefined;
+  const currentStep = typeof metadata?.currentStep === "number" ? metadata.currentStep : undefined;
+  const totalSteps = typeof metadata?.totalSteps === "number" ? metadata.totalSteps : undefined;
+  const jobStatus = typeof metadata?.jobStatus === "string" ? metadata.jobStatus : undefined;
+  const lifecycleState = typeof metadata?.lifecycleState === "string" ? metadata.lifecycleState : undefined;
+  const sessionState = typeof metadata?.sessionState === "string" ? metadata.sessionState : undefined;
+  const serverState = typeof metadata?.serverState === "string" ? metadata.serverState : undefined;
+
+  const label = [
+    progressPercent !== undefined ? `${progressPercent}%` : undefined,
+    currentEpoch !== undefined && totalEpochs !== undefined ? `epoch ${currentEpoch}/${totalEpochs}` : undefined,
+    currentStep !== undefined && totalSteps !== undefined ? `step ${currentStep}/${totalSteps}` : undefined,
+    jobStatus ? jobStatus.replace(/-/g, " ") : undefined,
+    lifecycleState ? `lifecycle ${lifecycleState}` : undefined,
+    sessionState ? `session ${sessionState}` : undefined,
+    serverState ? `server ${serverState}` : undefined,
+  ].filter((value): value is string => Boolean(value)).join(" • ");
+
+  if (progressPercent === undefined && !label) {
+    return undefined;
+  }
+
+  return Object.freeze({
+    percent: progressPercent,
+    label: label || undefined,
+  });
+}
+
+function describeProgressLabel(
+  run: IExecutionRunRecord,
+  params: {
+    readonly completedUnits: number;
+    readonly totalUnits: number;
+    readonly progressPercent: number;
+    readonly truthfulProgress?: TruthfulProgressSummary;
+  },
+): string {
+  const baseline = `${params.completedUnits}/${params.totalUnits} units`;
+  if (run.status !== ExecutionStatuses.running) {
+    return baseline;
+  }
+
+  if (params.truthfulProgress?.label) {
+    return `${baseline} • ${params.truthfulProgress.label}`;
+  }
+
+  return `${baseline} • ${params.progressPercent}%`;
 }
 
 function summarizeMetadata(run: IExecutionRunRecord): string | undefined {

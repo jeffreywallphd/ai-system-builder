@@ -27,7 +27,7 @@ The execution slice now uses two small execution-native contract families:
 - `domain/execution/ExecutionPlan.ts` for plan/unit identity, dependency ordering, and statuses (`pending`, `ready`, `running`, `completed`, `failed`, `skipped`, `cancelled`)
 - `domain/execution/ExecutionRun.ts` plus `application/execution/ExecutionContracts.ts` for run snapshots, unit transitions, execution-native provenance, diagnostics, and result/event attachments
 
-This taxonomy is intentionally small. It is sufficient for workflow execution plans, model-preparation runs, and persisted run history today without overcommitting the system to speculative dataset/model/MCP shapes.
+This taxonomy is intentionally small. It is sufficient for workflow execution plans, truthful model/dataset runtime-backed runs, persisted run history, and a narrow MCP server-operation slice today without overcommitting the system to a speculative generalized MCP orchestration framework.
 
 ### New application-layer engine
 
@@ -47,8 +47,10 @@ The engine still runs units sequentially and is intentionally conservative. It i
 
 The migrated path is still deliberately narrow:
 
-- **migrated now:** direct workflow execution from `ExecuteWorkflowUseCase.execute(...)`, workflow `startExecution(...)`, direct tool execution from `RunToolUseCase.execute(...)`, tuning-dataset example generation from `DefaultTuningDatasetStudioApplicationService.generateExamplesFromSource(...)`, preparation-only model creation from `DefaultModelTrainingApplicationService.submitJob(...)`, and truthful local-gradient model-training runs from that same service when the Python runtime can report real lifecycle state
-- **not yet migrated:** MCP orchestration or broader asynchronous/scheduled/distributed execution paths outside the current truthful local-training/runtime-backed slice
+- **migrated now:** direct workflow execution from `ExecuteWorkflowUseCase.execute(...)`, workflow `startExecution(...)`, direct tool execution from `RunToolUseCase.execute(...)`, tuning-dataset example generation from `DefaultTuningDatasetStudioApplicationService.generateExamplesFromSource(...)`, preparation-only model creation from `DefaultModelTrainingApplicationService.submitJob(...)`, truthful local-gradient model-training runs from that same service when the Python runtime can report real lifecycle state, and the narrow MCP server-operation slice (`connect`, `reconnect`, `disconnect`, and local-server creation) when those actions run through the Python-backed MCP runtime manager
+- **not yet migrated:** broader MCP tool orchestration, MCP discovery/catalog refresh flows, or broader asynchronous/scheduled/distributed execution paths outside the current truthful runtime-backed slices
+
+The remaining MCP areas stay out of scope for Direction 1 because the current runtime integration can report a single server-operation result honestly, but it does not yet expose a richer durable lifecycle for broader MCP discovery/catalog/tool orchestration without inventing progress or cancellation semantics.
 
 This gives the codebase one real production seam for synchronous workflow runs, started workflow runs, and a second non-workflow execution-backed product area without forcing a broad refactor.
 
@@ -68,7 +70,7 @@ In the renderer, stores call services such as `ui/services/WorkflowService.ts`, 
 This remains the central orchestration point for workflow runs.
 
 ### 3. The execution engine delegates product-specific work to thin adapters
-`infrastructure/execution/WorkflowExecutionUnitHandler.ts` is the workflow execution-unit handler, and `infrastructure/execution/DatasetGenerationExecutionUnitHandler.ts` is the dataset-generation execution-unit handler.
+`infrastructure/execution/WorkflowExecutionUnitHandler.ts` is the workflow execution-unit handler, `infrastructure/execution/DatasetGenerationExecutionUnitHandler.ts` is the dataset-generation execution-unit handler, and `infrastructure/execution/McpServerOperationExecutionUnitHandler.ts` is the narrow MCP server-operation handler.
 
 Their job is intentionally thin:
 - accept an execution unit from the engine
@@ -110,18 +112,19 @@ That matters because the abstraction is meant to standardize execution flow with
 The application layer now includes an execution-run projection service that derives UI-facing summaries such as:
 - current active unit label/id
 - completed units vs total units
-- progress labels and percentages
+- progress labels and percentages, preferring runtime-reported progress when a truthful long-running runtime actually exposes it
 - terminal/error/diagnostic summaries
 - execution-path truthfulness summaries
 - duration and metadata context summaries
 
 The renderer consumes those projected summaries through a thin `ExecutionHistoryService`, a reusable `ExecutionHistoryPanel`, and a reusable execution-run detail panel instead of reconstructing run semantics ad hoc inside feature pages. Workflow editor history, dataset-generation history, and model-training history now all read from the same durable execution-run query path and can drill into unit-level/timeline detail from the persisted run record.
+The MCP page now uses that same durable history/detail path for runtime-backed server operations instead of relying only on transient page-local mutation state.
 
 ## Artifact guidance inside the execution engine
 
 Artifacts are still preserved because product-specific callers sometimes need the original workflow result, dataset-generation result, or model-preparation job payload. But artifacts are no longer the main reporting surface for general orchestration and UI history.
 
-Execution-unit results and durable run records now also carry engine-native summaries (`outputSummary`, `terminalSummary`, `diagnosticsSummary`), lightweight unit metadata (for example truthful model-training progress/checkpoint/artifact counts), and structured provenance/metadata. That means reporting, storage, filtering, and history/detail views can rely on execution-native fields first, while artifacts remain optional rich attachments for feature reconstruction.
+Execution-unit results and durable run records now also carry engine-native summaries (`outputSummary`, `terminalSummary`, `diagnosticsSummary`), lightweight unit metadata (for example truthful model-training progress/checkpoint/artifact counts and MCP runtime/server state facts), and structured provenance/metadata. That means reporting, storage, filtering, and history/detail views can rely on execution-native fields first, while artifacts remain optional rich attachments for feature reconstruction.
 
 ## Why the executor is called "truthful"
 
@@ -216,12 +219,14 @@ The new execution engine slice starts in the domain/application layers and adapt
 
 ## Recommended next migration steps
 
-1. Migrate the remaining long-running model-training lifecycle stages only where truthful progress/cancellation semantics can be preserved.
+1. Keep MCP migration narrow and truthful: extend only the next MCP/runtime-backed operation that can honestly report start/result/failure without inventing lifecycle detail.
 2. Extend execution-run history/detail usage into any remaining runtime-backed reporting surfaces that still assemble summaries ad hoc.
 3. Expand cancellation/progress modeling only where an actual runtime can report richer unit-level state truthfully.
 4. Keep converging composition helpers so unified execution-engine wiring and execution-run persistence continue to share one path across renderer, registry, and bootstrap entry points.
 
+That is "done enough" for Direction 1: the unified execution engine is no longer limited to workflows/model-training/dataset generation, the next truthful MCP-backed slice now persists through the same durable substrate, and generic history/detail surfaces can inspect it without feature-specific summary logic. The next likely architectural focus is Direction 2 work above this substrate rather than broadening Direction 1 into speculative orchestration.
+
 ## TODO
 
-- Tool running and workflow execution now share the same engine seam and persisted run model, but broader composition still has multiple roots. Further convergence should happen incrementally instead of through a giant rewrite.
+- Tool running, model/dataset runs, and the narrow MCP server-operation slice now share the same engine seam and persisted run model, but broader composition still has multiple roots. Further convergence should happen incrementally instead of through a giant rewrite.
 - The interpreted fallback is clearly useful, but the product docs should eventually define which node types are expected to be fully trustworthy under scaffold execution versus only under delegated runtimes.

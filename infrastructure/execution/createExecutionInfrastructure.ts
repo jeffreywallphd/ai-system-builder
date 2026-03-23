@@ -1,5 +1,10 @@
 import { UnifiedExecutionEngine, type IExecutionUnitHandler } from "../../application/execution/UnifiedExecutionEngine";
+import { ExecutionRunDetailProjectionService } from "../../application/execution/ExecutionRunDetailProjectionService";
+import { ExecutionRunProjectionService } from "../../application/execution/ExecutionRunProjectionService";
+import { GetExecutionRunDetailUseCase } from "../../application/execution/GetExecutionRunDetailUseCase";
+import { ListExecutionRunsUseCase } from "../../application/execution/ListExecutionRunsUseCase";
 import type { IExecutionRunRepository } from "../../application/ports/interfaces/IExecutionRunRepository";
+import type { IMcpServerManager } from "../../application/ports/interfaces/IMcpServerManager";
 import type { IWorkflowExecutor } from "../../application/ports/interfaces/IWorkflowExecutor";
 import type { IFileStorage } from "../../application/ports/interfaces/IFileStorage";
 import type { DatasetGenerationService } from "../../domain/tuning-datasets/interfaces/ITuningDatasetStudio";
@@ -10,6 +15,7 @@ import { DesktopBridgeExecutionRunRepository } from "../browser/execution/Deskto
 import { LocalExecutionRunRepository } from "../filesystem/execution/LocalExecutionRunRepository";
 import { SqliteExecutionRunRepository } from "../filesystem/execution/SqliteExecutionRunRepository";
 import { DatasetGenerationExecutionUnitHandler } from "./DatasetGenerationExecutionUnitHandler";
+import { McpServerOperationExecutionUnitHandler } from "./McpServerOperationExecutionUnitHandler";
 import { ModelPreparationExecutionUnitHandler } from "./ModelPreparationExecutionUnitHandler";
 import { ModelTrainingExecutionUnitHandler } from "./ModelTrainingExecutionUnitHandler";
 import { WorkflowExecutionUnitHandler } from "./WorkflowExecutionUnitHandler";
@@ -54,6 +60,7 @@ export interface CreateUnifiedExecutionInfrastructureOptions {
   readonly executionRunRepository?: IExecutionRunRepository;
   readonly datasetGenerationService?: DatasetGenerationService;
   readonly modelTrainingRuntime?: IModelTrainingRuntime;
+  readonly mcpServerManager?: IMcpServerManager;
 }
 
 export function createUnifiedExecutionInfrastructure(
@@ -70,5 +77,33 @@ export function createUnifiedExecutionInfrastructure(
     handlers.push(new ModelTrainingExecutionUnitHandler(options.modelTrainingRuntime));
   }
 
+  if (options.mcpServerManager) {
+    handlers.push(new McpServerOperationExecutionUnitHandler(options.mcpServerManager));
+  }
+
   return new UnifiedExecutionEngine(handlers, options.executionRunRepository);
+}
+
+export interface ExecutionHistoryInfrastructure {
+  readonly executionRunProjectionService: ExecutionRunProjectionService;
+  readonly executionRunDetailProjectionService: ExecutionRunDetailProjectionService;
+  readonly listExecutionRunsUseCase: ListExecutionRunsUseCase;
+  readonly getExecutionRunDetailUseCase: GetExecutionRunDetailUseCase;
+}
+
+export function createExecutionHistoryInfrastructure(
+  executionRunRepository: IExecutionRunRepository,
+): ExecutionHistoryInfrastructure {
+  const executionRunProjectionService = new ExecutionRunProjectionService();
+  const executionRunDetailProjectionService = new ExecutionRunDetailProjectionService(executionRunProjectionService);
+
+  return Object.freeze({
+    executionRunProjectionService,
+    executionRunDetailProjectionService,
+    listExecutionRunsUseCase: new ListExecutionRunsUseCase(executionRunRepository),
+    getExecutionRunDetailUseCase: new GetExecutionRunDetailUseCase(
+      executionRunRepository,
+      executionRunDetailProjectionService,
+    ),
+  });
 }
