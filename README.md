@@ -213,17 +213,26 @@ The Models page now supports real end-to-end actions for download/install, refre
 
 The Create Models workspace now exposes two truthful model-creation paths:
 
-- **Prepare export-only bundle** — validates the selected base model + dataset version and writes a durable manifest/bundle for later use. This ends in `exported-without-training`, not `completed training`.
-- **Submit real local training job** — submits a Python-runtime local training job that performs real NumPy gradient updates for a lightweight text-adapter backend.
+- **Prepare bundle only** — validates the selected base model + dataset version and writes a manifest/bundle for later use. This ends in `exported-without-training`, not `completed training`.
+- **Start local training** — submits a Python-runtime local training job that performs real local work when the current runtime mode, base model, and dataset version all support it.
+
+The studio is now explicitly mode-aware:
+
+- **desktop development** — bundle preparation and real local training can both be available when the Python runtime is healthy, the desktop model-file bridge is connected, a local-file base model is selected, and the dataset version uses a supported task type
+- **desktop production** — the same truthful local capabilities apply, with promotion back into the installed model library available when completed artifacts exist on disk
+- **browser fallback** — the UI no longer pretends that full local training is available; it guides the user toward bundle preparation only and explains why desktop mode is needed for real training and promotion
+- **runtime disabled or unavailable** — the workspace switches to a guided fallback, clearly explaining what is blocked and which next action is required
 
 The current supported training backend is intentionally narrow but real:
 
 - supported execution backend: **Python runtime local gradient trainer** (`python-runtime-local`)
 - supported preparation backend: **Python runtime manifest/export path** (`python-runtime-manifest`)
+- supported dataset tasks for real local training: `question_answering` and `chat_completion`
 - persisted lifecycle states: `submitted`, `queued`, `running`, `completed`, `failed`, `cancelled`, `reconciliation-needed`, `partially-completed`, and `exported-without-training`
-- durable outputs: manifest, checkpoints, metrics, logs, a diagnostic artifact on failure, and a final trained local-adapter artifact when training completes
+- durable outputs: manifest, checkpoints, metrics, logs, a diagnostic artifact on failure, and a final trained artifact when training completes
+- post-training lifecycle: completed outputs can be inspected immediately, and in desktop file-backed modes they can be promoted into the installed model library without faking installation in browser fallback mode
 
-This is still **not** the same thing as provider-hosted LoRA or remote foundation-model fine-tuning. Unsupported provider backends remain explicit rather than being faked.
+This is still **not** the same thing as provider-hosted LoRA, QLoRA, or remote foundation-model fine-tuning. Unsupported provider backends remain explicit rather than being faked.
 
 ## Dataset generation truthfulness
 

@@ -1,5 +1,9 @@
 import type { ModelTrainingApplicationService } from "../../application/model-training/ModelTrainingApplicationService";
-import type { SubmitModelTrainingJobCommand } from "../../application/model-training/contracts";
+import type {
+  GetModelTrainingStudioSummaryQuery,
+  PromoteModelTrainingJobCommand,
+  SubmitModelTrainingJobCommand,
+} from "../../application/model-training/contracts";
 
 export class ModelTrainingService {
   constructor(private readonly applicationService: ModelTrainingApplicationService) {}
@@ -22,6 +26,14 @@ export class ModelTrainingService {
 
   public cancelJob(jobId: string) {
     return this.applicationService.cancelJob(jobId);
+  }
+
+  public getStudioSummary(query?: GetModelTrainingStudioSummaryQuery) {
+    return this.applicationService.getStudioSummary(query);
+  }
+
+  public promoteJob(command: PromoteModelTrainingJobCommand) {
+    return this.applicationService.promoteJob(command);
   }
 
   public submitJob(command: SubmitModelTrainingJobCommand) {

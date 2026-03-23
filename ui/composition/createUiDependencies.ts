@@ -134,6 +134,7 @@ import { DefaultModelTrainingApplicationService } from "../../application/model-
 import { ModelTrainingService } from "../services/ModelTrainingService";
 import { ModelTrainingStore } from "../state/ModelTrainingStore";
 import { PythonRuntimeModelTrainingGateway } from "../../infrastructure/python/model-training/PythonRuntimeModelTrainingGateway";
+import { RuntimeAwareModelCreationEnvironmentGateway } from "../../infrastructure/python/model-training/RuntimeAwareModelCreationEnvironmentGateway";
 import { createModelManagementDependencies } from "./modelManagementDependencies";
 import { BrowserDownloadModelLibrary } from "../../infrastructure/browser/models/BrowserDownloadModelLibrary";
 
@@ -461,6 +462,18 @@ export function createUiDependencies(
     tuningDatasetVersionRepository,
     modelTrainingJobRepository,
     new PythonRuntimeModelTrainingGateway(runtimeClient),
+    new RuntimeAwareModelCreationEnvironmentGateway(
+      config,
+      runtimeClient,
+      pythonRuntimeConfig.isEnabled,
+      desktopModelFileStorage,
+      desktopModelFileStorage
+        ? "Desktop model-file bridge is connected."
+        : config.runtimeMode === "browser-development"
+          ? "Browser fallback mode does not expose the desktop model-file bridge."
+          : "The desktop model-file bridge is not available in this runtime.",
+    ),
+    desktopModelFileStorage,
   );
   const modelTrainingService = new ModelTrainingService(modelTrainingApplicationService);
   const modelTrainingStore = new ModelTrainingStore(modelTrainingService);

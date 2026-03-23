@@ -2,14 +2,14 @@ import { describe, expect, it } from "bun:test";
 import { readSource } from "../../../tests/testUtils";
 
 describe("ModelTrainingStudio truthfulness", () => {
-  it("keeps real training, export-only, and reconciliation language explicit", () => {
+  it("keeps real training, bundle-only preparation, browser fallback guidance, and promotion language explicit", () => {
     const source = readSource("ui/components/models/ModelTrainingStudio.tsx");
 
-    expect(source).toContain("Submit real training job");
-    expect(source).toContain("Prepare export-only bundle");
-    expect(source).toContain("Refresh active jobs");
-    expect(source).toContain("Reconcile");
-    expect(source).toContain("Export-only work writes durable manifests and bundles without claiming a trained model");
-    expect(source).toContain("submitted → queued → running → terminal lifecycle states");
+    expect(source).toContain("Start local training");
+    expect(source).toContain("Prepare bundle only");
+    expect(source).toContain("Browser fallback mode is guided and limited");
+    expect(source).toContain("Post-training next step");
+    expect(source).toContain("Technical details");
+    expect(source).toContain("Adding to library…");
   });
 });
