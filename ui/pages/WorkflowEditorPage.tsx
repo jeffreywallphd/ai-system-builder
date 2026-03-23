@@ -15,6 +15,7 @@ import type { WorkflowViewMode } from "../state/WorkflowViewMode";
 import { useUiDependencies } from "../composition/AppProviders";
 import { NodePresenter } from "../presenters/NodePresenter";
 import { WorkflowPresenter } from "../presenters/WorkflowPresenter";
+import { WorkflowExecutionPresenter } from "../presenters/WorkflowExecutionPresenter";
 import { WorkflowOutputPresenter } from "../presenters/WorkflowOutputPresenter";
 import { ValidationPresenter } from "../presenters/ValidationPresenter";
 import { NodeStore, type INodeStoreState } from "../state/NodeStore";
@@ -152,6 +153,7 @@ export default function WorkflowEditorPage({
 
   const nodePresenter = useMemo(() => new NodePresenter(), []);
   const workflowPresenter = useMemo(() => new WorkflowPresenter(), []);
+  const workflowExecutionPresenter = useMemo(() => new WorkflowExecutionPresenter(), []);
   const workflowOutputPresenter = useMemo(() => new WorkflowOutputPresenter(), []);
   const validationPresenter = useMemo(() => new ValidationPresenter(), []);
 
@@ -314,6 +316,16 @@ export default function WorkflowEditorPage({
   );
 
   const validationSummary = validationPresenter.present(workflowState.validation);
+  const executionStatusViewModel = useMemo(() => workflowExecutionPresenter.present({
+    isExecuting: workflowState.isExecuting,
+    lastExecutionEvent: workflowState.lastExecutionEvent,
+    outputAssets: workflowState.outputAssets,
+  }), [
+    workflowExecutionPresenter,
+    workflowState.isExecuting,
+    workflowState.lastExecutionEvent,
+    workflowState.outputAssets,
+  ]);
   const availableModels = useMemo(() => buildInstalledModelOptions(modelState.installedModels), [modelState.installedModels]);
   const validateButtonLabel = useMemo(() => {
     if (!workflowState.validation) {
@@ -802,15 +814,7 @@ export default function WorkflowEditorPage({
                     <WorkflowValidationPanel validation={validationSummary} />
 
                     <WorkflowExecutionStatusPanel
-                      status={workflowState.lastExecutionEvent?.status ?? "queued"}
-                      executionId={workflowState.lastExecutionEvent?.executionId}
-                      currentNodeId={workflowState.lastExecutionEvent?.nodeId}
-                      progressPercent={workflowState.lastExecutionEvent?.progress?.percent}
-                      provenance={workflowState.lastExecutionEvent?.provenance}
-                      message={
-                        workflowState.lastExecutionEvent?.message ??
-                        (workflowState.isExecuting ? "Execution is in progress." : undefined)
-                      }
+                      viewModel={executionStatusViewModel}
                     />
 
                     <NodePalette

@@ -6,6 +6,8 @@ import { WorkflowMetadata } from "../../../domain/workflows/WorkflowMetadata";
 import { ContextPackage } from "../../context/models/ContextPackage";
 import { InMemoryContextPackageRepository } from "../../../infrastructure/mocks/repositories/InMemoryContextPackageRepository";
 import { WorkflowContextService } from "../../context/WorkflowContextService";
+import { UnifiedExecutionEngine } from "../../execution/UnifiedExecutionEngine";
+import { WorkflowExecutionUnitHandler } from "../../../infrastructure/execution/WorkflowExecutionUnitHandler";
 
 describe("ExecuteWorkflowUseCase", () => {
   it("executes workflow and applies property overrides", async () => {
@@ -19,6 +21,54 @@ describe("ExecuteWorkflowUseCase", () => {
 
     expect(result.effectiveWorkflow.getNode("n1")?.getProperty("required")?.value).toBe("override");
     expect(result.result.status).toBe("completed");
+  });
+
+  it("routes immediate workflow execution through the unified execution engine", async () => {
+    const workflow = makeWorkflow({ nodes: [makeNode({ id: "n1" })] });
+    let executedWorkflowId: string | undefined;
+    const executor = makeWorkflowExecutor({
+      execute: async (input, onEvent) => {
+        executedWorkflowId = input.workflow.id;
+        onEvent?.({
+          executionId: "exec",
+          kind: "workflow-completed",
+          status: "completed",
+          provenance: {
+            classification: "scaffolded",
+            runtime: "langchain",
+            strategyId: "infra-scaffold-langchain",
+            detail: "Workflow executed by the scaffold interpreter fallback.",
+          },
+        });
+
+        return {
+          executionId: "exec",
+          status: "completed",
+          outputAssets: [],
+          provenance: {
+            classification: "scaffolded",
+            runtime: "langchain",
+            strategyId: "infra-scaffold-langchain",
+            detail: "Workflow executed by the scaffold interpreter fallback.",
+          },
+        };
+      },
+    });
+    const useCase = new ExecuteWorkflowUseCase(
+      executor,
+      makeWorkflowValidator(),
+      undefined,
+      new UnifiedExecutionEngine([new WorkflowExecutionUnitHandler(executor)])
+    );
+    const observedEvents: string[] = [];
+
+    const result = await useCase.execute({ workflow }, (event) => {
+      observedEvents.push(`${event.kind}:${event.provenance?.classification}`);
+    });
+
+    expect(executedWorkflowId).toBe(workflow.id);
+    expect(result.result.provenance?.classification).toBe("scaffolded");
+    expect(observedEvents).toEqual(["workflow-completed:scaffolded"]);
   });
 
   it("starts execution", async () => {

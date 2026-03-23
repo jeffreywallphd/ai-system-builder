@@ -78,8 +78,14 @@ export default function ToolRunView({
 
       {result ? (
         <div className="ui-card">
-          <div className="ui-card__body">
-            {result.status}: {result.messages.join(" | ")}
+          <div className="ui-card__body ui-stack ui-stack--2xs">
+            <div>{result.status}: {result.messages.join(" | ")}</div>
+            {result.provenance ? (
+              <div className="ui-text-secondary ui-text-small">
+                Execution path: {result.provenance.classification}
+                {result.provenance.selectionReason ? ` • ${result.provenance.selectionReason}` : ""}
+              </div>
+            ) : null}
           </div>
         </div>
       ) : null}

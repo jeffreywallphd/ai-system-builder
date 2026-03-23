@@ -53,6 +53,7 @@ import type { IMcpToolExecutor } from "../../application/ports/interfaces/IMcpTo
 import type { IToolCapabilityCatalog } from "../../application/ports/interfaces/IToolCapabilityCatalog";
 import type { IToolCapabilityExecutor } from "../../application/ports/interfaces/IToolCapabilityExecutor";
 import { WorkflowContextService } from "../../application/context/WorkflowContextService";
+import { createWorkflowUnifiedExecutionEngine } from "../execution/createWorkflowUnifiedExecutionEngine";
 import type { IWorkflowValidator } from "../../domain/services/interfaces/IWorkflowValidator";
 import type { INodeCompatibilityService } from "../../domain/services/interfaces/INodeCompatibilityService";
 import type { IModelCompatibilityService } from "../../domain/services/interfaces/IModelCompatibilityService";
@@ -152,7 +153,8 @@ export class ApplicationBootstrap {
           new WorkflowContextService(
             c.resolve<IContextPackageRepository>(TOKENS.ContextPackageRepository),
             c.resolve<IContextRecipeRepository>(TOKENS.ContextRecipeRepository)
-          )
+          ),
+          createWorkflowUnifiedExecutionEngine(c.resolve<IWorkflowExecutor>(TOKENS.WorkflowExecutor))
         )
     );
 

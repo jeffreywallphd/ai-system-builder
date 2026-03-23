@@ -11,6 +11,8 @@ import type {
 } from "../../domain/services/interfaces/IWorkflowValidator";
 import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
 import type { WorkflowContextService } from "../context/WorkflowContextService";
+import type { UnifiedExecutionEngine } from "../execution/UnifiedExecutionEngine";
+import { createWorkflowExecutionPlan, requireWorkflowExecutionResult } from "../execution/WorkflowExecutionPlanFactory";
 
 export interface IExecuteWorkflowRequest {
   readonly workflow: IWorkflow;
@@ -30,14 +32,17 @@ export interface IExecuteWorkflowResult {
 export class ExecuteWorkflowUseCase {
   private readonly workflowExecutor: IWorkflowExecutor;
   private readonly workflowValidator: IWorkflowValidator;
+  private readonly executionEngine?: UnifiedExecutionEngine;
 
   constructor(
     workflowExecutor: IWorkflowExecutor,
     workflowValidator: IWorkflowValidator,
-    private readonly workflowContextService?: WorkflowContextService
+    private readonly workflowContextService?: WorkflowContextService,
+    executionEngine?: UnifiedExecutionEngine,
   ) {
     this.workflowExecutor = workflowExecutor;
     this.workflowValidator = workflowValidator;
+    this.executionEngine = executionEngine;
   }
 
   public async execute(
@@ -64,17 +69,18 @@ export class ExecuteWorkflowUseCase {
       );
     }
 
-    const result = await this.workflowExecutor.execute(
-      {
-        workflow: effectiveWorkflow,
-        target: request.target,
-        propertyOverrides: request.propertyOverrides,
-        inputAssets: request.inputAssets,
-        parameters: request.parameters,
-        executionMetadata,
-      },
-      onEvent
-    );
+    const executionInput: IWorkflowExecutionInput = {
+      workflow: effectiveWorkflow,
+      target: request.target,
+      propertyOverrides: request.propertyOverrides,
+      inputAssets: request.inputAssets,
+      parameters: request.parameters,
+      executionMetadata,
+    };
+
+    const result = this.executionEngine
+      ? await this.executeThroughPlan(executionInput, onEvent)
+      : await this.workflowExecutor.execute(executionInput, onEvent);
 
     return Object.freeze({
       effectiveWorkflow,
@@ -156,6 +162,29 @@ export class ExecuteWorkflowUseCase {
     }
 
     return effectiveWorkflow;
+  }
+
+  private async executeThroughPlan(
+    executionInput: IWorkflowExecutionInput,
+    onEvent?: (event: IWorkflowExecutionEvent) => void
+  ): Promise<IWorkflowExecutionResult> {
+    if (!this.executionEngine) {
+      return this.workflowExecutor.execute(executionInput, onEvent);
+    }
+
+    const executionPlan = createWorkflowExecutionPlan(executionInput);
+    const planResult = await this.executionEngine.execute(
+      {
+        plan: executionPlan.plan,
+        unitInputs: executionPlan.unitInputs,
+      },
+      (event) => {
+        if (event.workflowEvent) {
+          onEvent?.(event.workflowEvent);
+        }
+      }
+    );
+    return requireWorkflowExecutionResult(planResult, executionPlan.unitId);
   }
 
   private async resolveExecutionMetadata(

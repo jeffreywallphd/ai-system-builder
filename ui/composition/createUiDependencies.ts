@@ -131,6 +131,7 @@ import { DefaultNodeOutputStore } from "../../infrastructure/interpreted/executi
 import { LangChainNodeExecutor } from "../../infrastructure/interpreted/execution/LangChainNodeExecutor";
 import { WorkflowRuntimeSelector } from "../../application/execution/WorkflowRuntimeSelector";
 import { PythonDelegatedWorkflowExecutionStrategy } from "../../infrastructure/python/execution/PythonDelegatedWorkflowExecutionStrategy";
+import { createWorkflowUnifiedExecutionEngine } from "../../infrastructure/execution/createWorkflowUnifiedExecutionEngine";
 import { PythonRuntimeDatasetGenerationService } from "../../infrastructure/python/tuning-datasets/PythonRuntimeDatasetGenerationService";
 import { OrchestratedDatasetGenerationService } from "../../infrastructure/python/tuning-datasets/OrchestratedDatasetGenerationService";
 import { LocalStorageModelTrainingJobRepository } from "../../infrastructure/browser/model-training/LocalStorageModelTrainingJobRepository";
@@ -284,10 +285,12 @@ export function createUiDependencies(
   const workflowValidator = new WorkflowValidator(nodeCompatibilityService);
 
   const createWorkflowUseCase = new CreateWorkflowUseCase();
+  const executionEngine = createWorkflowUnifiedExecutionEngine(workflowExecutor);
   const executeWorkflowUseCase = new ExecuteWorkflowUseCase(
     workflowExecutor,
     workflowValidator,
-    workflowContextService
+    workflowContextService,
+    executionEngine,
   );
   const validateWorkflowUseCase = new ValidateWorkflowUseCase(workflowValidator);
 
@@ -322,7 +325,8 @@ export function createUiDependencies(
     workflowToolProjectionService,
     workflowExecutor,
     loadToolDefinitionUseCase,
-    workflowContextService
+    workflowContextService,
+    executionEngine,
   );
 
   const nodeStore = new NodeStore({
