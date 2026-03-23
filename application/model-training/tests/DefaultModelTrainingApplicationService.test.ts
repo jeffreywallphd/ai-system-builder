@@ -1,31 +1,109 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, mock } from "bun:test";
 import { DefaultModelTrainingApplicationService } from "../DefaultModelTrainingApplicationService";
 import { Model, ModelArtifact, ModelSource } from "../../../domain/models/Model";
 import { ExampleLineage, QuestionAnsweringExample, TuningDataset, TuningDatasetVersion } from "../../../domain/tuning-datasets/TuningDatasetEntities";
+import { AppRuntimeModes } from "../../../domain/runtime/AppRuntimeMode";
 
+function makeModel(params: { id?: string; accessMethod?: "local-file" | "remote-download" } = {}) {
+  return new Model({
+    id: params.id ?? "base-1",
+    name: "Base One",
+    kind: "completion-model",
+    status: "installed",
+    source: new ModelSource({ type: "local" }),
+    artifact: new ModelArtifact({
+      name: "weights.gguf",
+      accessMethod: params.accessMethod ?? "local-file",
+      location: params.accessMethod === "remote-download" ? undefined : "/tmp/weights.gguf",
+      format: "gguf",
+    }),
+  });
+}
+
+function makeDataset(taskType: "question_answering" | "classification" = "question_answering") {
+  return new TuningDataset({ id: "dataset-1", name: "Support QA", taskType, createdBy: "tester" });
+}
+
+function makeVersion(datasetId: string) {
+  return new TuningDatasetVersion({
+    id: "version-1",
+    datasetId,
+    versionNumber: 1,
+    status: "draft",
+    kind: "initial_draft",
+    createdBy: "tester",
+    schema: { taskType: "question_answering", schemaVersion: "1.0", canonicalExampleType: "qa", requiredFields: ["question", "answer", "context"] },
+  });
+}
+
+function makeExample(datasetId: string, versionId: string) {
+  return new QuestionAnsweringExample({
+    id: "qa-1",
+    datasetId,
+    versionId,
+    question: "What is AI Loom Studio?",
+    answer: "A workflow studio.",
+    context: "AI Loom Studio is a workflow studio.",
+    createdBy: "tester",
+    lineage: new ExampleLineage({ generationMethod: "manual-authoring" }),
+  });
+}
+
+function makeJob(overrides: Partial<Parameters<NonNullable<DefaultModelTrainingApplicationService["submitJob"]>>[0]> = {}) {
+  return Object.freeze({
+    id: "training-job-1",
+    name: "Support fine-tune",
+    backend: "python-runtime-local" as const,
+    executionKind: "local-gradient-training" as const,
+    baseModelId: "base-1",
+    datasetId: "dataset-1",
+    datasetVersionId: "version-1",
+    createdBy: "tester",
+    createdAt: new Date("2025-01-01T00:00:00.000Z"),
+    updatedAt: new Date("2025-01-01T00:00:01.000Z"),
+    submittedAt: new Date("2025-01-01T00:00:00.000Z"),
+    startedAt: new Date("2025-01-01T00:00:05.000Z"),
+    completedAt: new Date("2025-01-01T00:05:00.000Z"),
+    status: "completed" as const,
+    configuration: { epochs: 2, learningRate: 0.0001, batchSize: 1 },
+    diagnostics: [],
+    artifacts: [
+      {
+        id: "artifact-1",
+        kind: "trained-model" as const,
+        label: "adapter.safetensors",
+        location: "/tmp/adapter.safetensors",
+        contentType: "application/octet-stream",
+        createdAt: new Date("2025-01-01T00:05:00.000Z"),
+      },
+    ],
+    checkpoints: [],
+    outputModelName: "Support Adapter",
+    summary: "completed",
+    progress: { percent: 100, currentEpoch: 2, totalEpochs: 2 },
+    provenance: {
+      executionKind: "local-gradient-training" as const,
+      backend: "python-runtime-local" as const,
+      truthfulness: "real-execution" as const,
+      runtime: "python-runtime" as const,
+      runMode: "local-gradient-training" as const,
+      supportsGradientTraining: true,
+      isPreparationOnly: false,
+      provider: "python-runtime-local",
+      modelIdentity: "Base One",
+      path: "/tmp/training-job-1",
+      diagnostics: [],
+    },
+    ...overrides,
+  });
+}
 
 describe("DefaultModelTrainingApplicationService", () => {
   it("submits a truthful local training job against an installed base model and dataset version", async () => {
-    const model = new Model({
-      id: "base-1",
-      name: "Base One",
-      kind: "completion-model",
-      status: "installed",
-      source: new ModelSource({ type: "local" }),
-      artifact: new ModelArtifact({ name: "weights.gguf", accessMethod: "local-file", location: "/tmp/weights.gguf", format: "gguf" }),
-    });
-    const dataset = new TuningDataset({ id: "dataset-1", name: "Support QA", taskType: "question_answering", createdBy: "tester" });
-    const version = new TuningDatasetVersion({ id: "version-1", datasetId: dataset.id, versionNumber: 1, status: "draft", kind: "initial_draft", createdBy: "tester", schema: { taskType: "question_answering", schemaVersion: "1.0", canonicalExampleType: "qa", requiredFields: ["question", "answer", "context"] } });
-    const example = new QuestionAnsweringExample({
-      id: "qa-1",
-      datasetId: dataset.id,
-      versionId: version.id,
-      question: "What is AI Loom Studio?",
-      answer: "A workflow studio.",
-      context: "AI Loom Studio is a workflow studio.",
-      createdBy: "tester",
-      lineage: new ExampleLineage({ generationMethod: "manual-authoring" }),
-    });
+    const model = makeModel();
+    const dataset = makeDataset();
+    const version = makeVersion(dataset.id);
+    const example = makeExample(dataset.id, version.id);
     const saved: unknown[] = [];
 
     const service = new DefaultModelTrainingApplicationService(
@@ -44,6 +122,7 @@ describe("DefaultModelTrainingApplicationService", () => {
       } as never,
       {
         loadVersion: async () => version,
+        listVersions: async () => [version],
         listExamples: async () => [example],
       } as never,
       {
@@ -52,51 +131,23 @@ describe("DefaultModelTrainingApplicationService", () => {
         saveJob: async (job) => { saved.push(job); },
       },
       {
-        submitJob: async (request) => ({
-          id: request.id,
-          name: request.name,
-          backend: "python-runtime-local",
-          executionKind: request.executionKind,
-          baseModelId: request.baseModelId,
-          datasetId: request.datasetId,
-          datasetVersionId: request.datasetVersionId,
-          createdBy: request.createdBy,
-          createdAt: new Date("2025-01-01T00:00:00.000Z"),
-          updatedAt: new Date("2025-01-01T00:00:01.000Z"),
-          submittedAt: new Date("2025-01-01T00:00:00.000Z"),
-          startedAt: undefined,
-          completedAt: undefined,
-          status: "submitted",
-          configuration: request.configuration,
-          diagnostics: [],
-          artifacts: [],
-          checkpoints: [],
-          outputModelName: undefined,
-          summary: "submitted",
-          progress: { percent: 0, currentEpoch: 0, totalEpochs: request.configuration.epochs },
-          provenance: {
-            executionKind: request.executionKind,
-            backend: "python-runtime-local",
-            truthfulness: "real-execution",
-            runtime: "python-runtime",
-            runMode: request.executionKind,
-            supportsGradientTraining: true,
-            isPreparationOnly: false,
-            provider: "python-runtime-local",
-            modelIdentity: request.baseModelName,
-            path: "/tmp/training-job-1",
-            fallbackReason: undefined,
-            diagnostics: [],
-            startedAt: undefined,
-            completedAt: undefined,
-          },
-        }),
+        submitJob: async (request) => ({ ...makeJob(), id: request.id, name: request.name, executionKind: request.executionKind, configuration: request.configuration, status: "submitted", completedAt: undefined }),
         getJob: async () => undefined,
         refreshJob: async () => undefined,
         reconcileJob: async () => undefined,
         listJobs: async () => [],
         cancelJob: async () => { throw new Error("not implemented"); },
       },
+      {
+        getEnvironment: async () => ({
+          runtimeMode: AppRuntimeModes.desktopDevelopment,
+          runtimeStatus: "ready",
+          desktopBridgeAvailable: true,
+          canAccessLocalArtifacts: true,
+          canRegisterPromotedModels: true,
+        }),
+      },
+      undefined,
       () => "training-job-1",
     );
 
@@ -112,5 +163,220 @@ describe("DefaultModelTrainingApplicationService", () => {
     expect(job.id).toBe("training-job-1");
     expect(saved).toHaveLength(1);
     expect(saved[0]).toEqual(job);
+  });
+
+  it("builds a truthful studio summary for browser fallback mode", async () => {
+    const model = makeModel({ accessMethod: "remote-download" });
+    const dataset = makeDataset();
+    const version = makeVersion(dataset.id);
+    const service = new DefaultModelTrainingApplicationService(
+      {
+        listInstalled: async () => [model],
+        getInstalledById: async () => model,
+        saveInstalled: async () => undefined,
+        removeInstalled: async () => true,
+        isInstalled: async () => true,
+      },
+      {
+        list: async () => [dataset],
+        load: async () => dataset,
+        save: async () => dataset,
+        delete: async () => undefined,
+      } as never,
+      {
+        loadVersion: async () => version,
+        listVersions: async () => [version],
+        listExamples: async () => [makeExample(dataset.id, version.id)],
+      } as never,
+      {
+        listJobs: async () => [],
+        getJobById: async () => undefined,
+        saveJob: async () => undefined,
+      },
+      {
+        submitJob: async () => makeJob(),
+        getJob: async () => undefined,
+        refreshJob: async () => undefined,
+        reconcileJob: async () => undefined,
+        listJobs: async () => [],
+        cancelJob: async () => makeJob(),
+      },
+      {
+        getEnvironment: async () => ({
+          runtimeMode: AppRuntimeModes.browserDevelopment,
+          runtimeStatus: "ready",
+          desktopBridgeAvailable: false,
+          canAccessLocalArtifacts: false,
+          canRegisterPromotedModels: false,
+          runtimeDetail: "Runtime is healthy.",
+        }),
+      },
+    );
+
+    const summary = await service.getStudioSummary({ selectedBaseModelId: model.id, selectedDatasetId: dataset.id, selectedDatasetVersionId: version.id });
+
+    expect(summary.capability.paths.find((entry) => entry.path === "export-preparation-only")?.state).toBe("available");
+    expect(summary.capability.paths.find((entry) => entry.path === "local-training")?.state).toBe("unavailable");
+    expect(summary.modeWarnings.join(" ")).toContain("Browser fallback mode");
+  });
+
+  it("shows disabled runtime gating in the studio summary", async () => {
+    const model = makeModel();
+    const dataset = makeDataset();
+    const version = makeVersion(dataset.id);
+    const service = new DefaultModelTrainingApplicationService(
+      {
+        listInstalled: async () => [model],
+        getInstalledById: async () => model,
+        saveInstalled: async () => undefined,
+        removeInstalled: async () => true,
+        isInstalled: async () => true,
+      },
+      {
+        list: async () => [dataset],
+        load: async () => dataset,
+        save: async () => dataset,
+        delete: async () => undefined,
+      } as never,
+      {
+        loadVersion: async () => version,
+        listVersions: async () => [version],
+        listExamples: async () => [makeExample(dataset.id, version.id)],
+      } as never,
+      {
+        listJobs: async () => [],
+        getJobById: async () => undefined,
+        saveJob: async () => undefined,
+      },
+      {
+        submitJob: async () => makeJob(),
+        getJob: async () => undefined,
+        refreshJob: async () => undefined,
+        reconcileJob: async () => undefined,
+        listJobs: async () => [],
+        cancelJob: async () => makeJob(),
+      },
+      {
+        getEnvironment: async () => ({
+          runtimeMode: AppRuntimeModes.desktopProduction,
+          runtimeStatus: "disabled",
+          runtimeDetail: "Python runtime is disabled in Settings.",
+          desktopBridgeAvailable: true,
+          canAccessLocalArtifacts: true,
+          canRegisterPromotedModels: true,
+        }),
+      },
+    );
+
+    const summary = await service.getStudioSummary({ selectedBaseModelId: model.id, selectedDatasetId: dataset.id, selectedDatasetVersionId: version.id });
+
+    expect(summary.capability.state).toBe("unavailable");
+    expect(summary.runtimeDetail).toContain("disabled");
+  });
+
+  it("registers a completed training output when promotion is supported", async () => {
+    const model = makeModel();
+    const job = makeJob();
+    const saveInstalled = mock(async () => undefined);
+    const service = new DefaultModelTrainingApplicationService(
+      {
+        listInstalled: async () => [model],
+        getInstalledById: async () => model,
+        saveInstalled,
+        removeInstalled: async () => true,
+        isInstalled: async () => true,
+      },
+      {
+        list: async () => [],
+        load: async () => undefined,
+        save: async () => { throw new Error("not used"); },
+        delete: async () => undefined,
+      } as never,
+      {
+        loadVersion: async () => undefined,
+        listVersions: async () => [],
+        listExamples: async () => [],
+      } as never,
+      {
+        listJobs: async () => [job],
+        getJobById: async () => job,
+        saveJob: async () => undefined,
+      },
+      {
+        submitJob: async () => job,
+        getJob: async () => job,
+        refreshJob: async () => job,
+        reconcileJob: async () => job,
+        listJobs: async () => [job],
+        cancelJob: async () => job,
+      },
+      {
+        getEnvironment: async () => ({
+          runtimeMode: AppRuntimeModes.desktopDevelopment,
+          runtimeStatus: "ready",
+          desktopBridgeAvailable: true,
+          canAccessLocalArtifacts: true,
+          canRegisterPromotedModels: true,
+        }),
+      },
+      {
+        exists: async () => true,
+      } as never,
+    );
+
+    const result = await service.promoteJob({ jobId: job.id });
+
+    expect(result.status).toBe("registered");
+    expect(result.modelName).toBe("Support Adapter");
+    expect(saveInstalled).toHaveBeenCalled();
+  });
+
+  it("keeps promotion unavailable in unsupported modes", async () => {
+    const model = makeModel();
+    const job = makeJob();
+    const service = new DefaultModelTrainingApplicationService(
+      {
+        listInstalled: async () => [model],
+        getInstalledById: async () => model,
+        saveInstalled: async () => undefined,
+        removeInstalled: async () => true,
+        isInstalled: async () => true,
+      },
+      {
+        list: async () => [],
+        load: async () => undefined,
+        save: async () => { throw new Error("not used"); },
+        delete: async () => undefined,
+      } as never,
+      {
+        loadVersion: async () => undefined,
+        listVersions: async () => [],
+        listExamples: async () => [],
+      } as never,
+      {
+        listJobs: async () => [job],
+        getJobById: async () => job,
+        saveJob: async () => undefined,
+      },
+      {
+        submitJob: async () => job,
+        getJob: async () => job,
+        refreshJob: async () => job,
+        reconcileJob: async () => job,
+        listJobs: async () => [job],
+        cancelJob: async () => job,
+      },
+      {
+        getEnvironment: async () => ({
+          runtimeMode: AppRuntimeModes.browserDevelopment,
+          runtimeStatus: "ready",
+          desktopBridgeAvailable: false,
+          canAccessLocalArtifacts: false,
+          canRegisterPromotedModels: false,
+        }),
+      },
+    );
+
+    await expect(service.promoteJob({ jobId: job.id })).rejects.toThrow("cannot register completed training outputs");
   });
 });

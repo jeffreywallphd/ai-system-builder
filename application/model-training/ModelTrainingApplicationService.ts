@@ -1,4 +1,10 @@
-import type { ModelTrainingStudioSummary, SubmitModelTrainingJobCommand } from "./contracts";
+import type {
+  GetModelTrainingStudioSummaryQuery,
+  ModelTrainingStudioSummary,
+  PromoteModelTrainingJobCommand,
+  PromoteModelTrainingJobResult,
+  SubmitModelTrainingJobCommand,
+} from "./contracts";
 import type { ModelTrainingJob } from "../../domain/model-training/ModelTrainingTypes";
 
 export interface ModelTrainingApplicationService {
@@ -8,5 +14,6 @@ export interface ModelTrainingApplicationService {
   refreshJob(jobId: string): Promise<ModelTrainingJob | undefined>;
   reconcileJob(jobId: string): Promise<ModelTrainingJob | undefined>;
   cancelJob(jobId: string): Promise<ModelTrainingJob>;
-  getStudioSummary(): Promise<ModelTrainingStudioSummary>;
+  getStudioSummary(query?: GetModelTrainingStudioSummaryQuery): Promise<ModelTrainingStudioSummary>;
+  promoteJob(command: PromoteModelTrainingJobCommand): Promise<PromoteModelTrainingJobResult>;
 }
