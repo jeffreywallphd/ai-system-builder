@@ -86,6 +86,12 @@ The product is organized into page-level workspaces rather than a single monolit
 
 The architecture is therefore both layered and feature-oriented: each feature has pages/components/stores/services, but most features still rely on the same application/domain infrastructure beneath them.
 
+
+### Presentation-side execution summaries
+The workflow editor now uses a dedicated presentation projection (`ui/presenters/WorkflowExecutionPresenter.ts`) to turn raw execution events, provenance, and output counts into a UI-friendly status summary for `ui/components/execution/WorkflowExecutionStatusPanel.tsx`.
+
+That keeps display wording, badge tone, fallback wording, and truthfulness summaries out of the page/component tree while still leaving execution business logic in the application/infrastructure layers.
+
 ## Why this presentation architecture fits desktop tooling
 
 For a sophisticated desktop tool, the renderer needs more than passive CRUD components. It has to coordinate:

@@ -57,6 +57,7 @@ import { WorkflowToolCapabilityExecutor } from "../tools/WorkflowToolCapabilityE
 import { WorkflowToolProjectionService } from "../../application/projection/WorkflowToolProjectionService";
 import { LoadToolDefinitionUseCase } from "../../application/tools/LoadToolDefinitionUseCase";
 import { RunToolUseCase } from "../../application/tools/RunToolUseCase";
+import { createWorkflowUnifiedExecutionEngine } from "../execution/createWorkflowUnifiedExecutionEngine";
 import { WorkflowContextService } from "../../application/context/WorkflowContextService";
 import { RuntimeDependencyOperationalStates, type IRuntimeDependencyOrchestrator } from "../../application/runtime/RuntimeDependencyOrchestrator";
 
@@ -245,12 +246,14 @@ export class InfrastructureRegistry {
         c.resolve<IContextPackageRepository>(TOKENS.ContextPackageRepository),
         c.resolve<IContextRecipeRepository>(TOKENS.ContextRecipeRepository)
       );
+      const workflowExecutor = c.resolve<IWorkflowExecutor>(TOKENS.WorkflowExecutor);
       const runToolUseCase = new RunToolUseCase(
         workflowRepository,
         workflowToolProjectionService,
-        c.resolve<IWorkflowExecutor>(TOKENS.WorkflowExecutor),
+        workflowExecutor,
         loadToolDefinitionUseCase,
-        workflowContextService
+        workflowContextService,
+        createWorkflowUnifiedExecutionEngine(workflowExecutor)
       );
 
       return new CompositeToolCapabilityExecutor([

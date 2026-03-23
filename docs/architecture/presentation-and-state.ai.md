@@ -9,12 +9,15 @@ The renderer uses manual composition plus class-based stores/services; it is not
 - Main composition root: `ui/composition/createUiDependencies.ts`
 - Router: `ui/routes/AppRouter.tsx`
 - UI service examples: `ui/services/WorkflowService.ts`, `ui/services/ToolService.ts`
+- Execution-status presenter: `ui/presenters/WorkflowExecutionPresenter.ts`
 
 ## Key wording
 Describe stores as "page-facing state managers" and UI services as "presentation-facing adapters over application use cases and repositories."
 
 ## Important caveat
 `createUiDependencies.ts` is one of the most important architecture files in the repo because it reflects real renderer wiring, even though there is also a generic DI bootstrap elsewhere.
+
+Execution-state wording for the workflow editor is now intentionally projected through `ui/presenters/WorkflowExecutionPresenter.ts` instead of being assembled ad hoc inside the page/component tree.
 
 ## TODO
 - If asked for the renderer's main composition root, answer `ui/composition/createUiDependencies.ts`, not the infrastructure bootstrap.
