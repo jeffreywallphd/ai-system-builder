@@ -54,6 +54,9 @@ import type { IMcpServerCatalog } from "../../application/ports/interfaces/IMcpS
 import type { IMcpServerManager } from "../../application/ports/interfaces/IMcpServerManager";
 import type { IMcpToolCatalog } from "../../application/ports/interfaces/IMcpToolCatalog";
 import type { IMcpToolExecutor } from "../../application/ports/interfaces/IMcpToolExecutor";
+import type { IMcpToolRegistryRepository } from "../../application/ports/interfaces/IMcpToolRegistryRepository";
+import type { IMcpToolSecretRepository } from "../../application/ports/interfaces/IMcpToolSecretRepository";
+import type { IMcpToolExecutionAuditSink } from "../../application/ports/interfaces/IMcpToolExecutionAuditSink";
 import type { IToolCapabilityCatalog } from "../../application/ports/interfaces/IToolCapabilityCatalog";
 import type { IToolCapabilityExecutor } from "../../application/ports/interfaces/IToolCapabilityExecutor";
 import type { IExecutionRunRepository } from "../../application/ports/interfaces/IExecutionRunRepository";
@@ -358,7 +361,13 @@ export class ApplicationBootstrap {
       APPLICATION_TOKENS.ExecuteMcpToolUseCase,
       (c) =>
         new ExecuteMcpToolUseCase(
-          c.resolve<IMcpToolExecutor>(TOKENS.McpToolExecutor)
+          c.resolve<IMcpToolExecutor>(TOKENS.McpToolExecutor),
+          undefined,
+          c.resolve<IMcpToolRegistryRepository>(TOKENS.McpToolRegistryRepository),
+          undefined,
+          c.resolve<IMcpToolSecretRepository>(TOKENS.McpToolSecretRepository),
+          undefined,
+          c.resolve<IMcpToolExecutionAuditSink>(TOKENS.McpToolExecutionAuditSink),
         )
     );
 

@@ -50,6 +50,9 @@ import type { IRuntimeEventSink } from "../../application/ports/interfaces/IRunt
 import type { INodeImplementationRegistry } from "../nodes/shared/INodeImplementationRegistry";
 import { CompositeNodeImplementationRegistry } from "../nodes/CompositeNodeImplementationRegistry";
 import { createMcpRuntimeIntegration } from "../python/mcp/createMcpRuntimeIntegration";
+import { LocalStorageMcpToolRegistryRepository } from "../browser/mcp/LocalStorageMcpToolRegistryRepository";
+import { LocalStorageMcpToolSecretRepository } from "../browser/mcp/LocalStorageMcpToolSecretRepository";
+import { LocalStorageMcpToolExecutionAuditSink } from "../browser/mcp/LocalStorageMcpToolExecutionAuditSink";
 import { createCompositeNodeImplementationRegistry } from "../nodes/NodeProviderRegistryIndex";
 import { CompositeToolCapabilityCatalog } from "../tools/CompositeToolCapabilityCatalog";
 import { StaticLocalToolCapabilityCatalog, LOCAL_TOOL_CAPABILITY_PROVIDER } from "../tools/StaticLocalToolCapabilityCatalog";
@@ -78,6 +81,9 @@ import { ProjectArtifactToAssetSystemUseCase } from "../../application/assets-sy
 import { ExecutionAssetLineageRecorder } from "../../application/assets-system/ExecutionAssetLineageRecorder";
 import { CanonicalAssetIdentityService } from "../../application/assets-system/CanonicalAssetIdentityService";
 import { PublishDurableEntityToAssetSystemUseCase } from "../../application/assets-system/PublishDurableEntityToAssetSystemUseCase";
+import type { IMcpToolRegistryRepository } from "../../application/ports/interfaces/IMcpToolRegistryRepository";
+import type { IMcpToolSecretRepository } from "../../application/ports/interfaces/IMcpToolSecretRepository";
+import type { IMcpToolExecutionAuditSink } from "../../application/ports/interfaces/IMcpToolExecutionAuditSink";
 
 export const TOKENS = Object.freeze({
   EnvironmentConfig: Symbol("EnvironmentConfig"),
@@ -90,6 +96,9 @@ export const TOKENS = Object.freeze({
   McpServerManager: Symbol("McpServerManager"),
   McpToolCatalog: Symbol("McpToolCatalog"),
   McpToolExecutor: Symbol("McpToolExecutor"),
+  McpToolRegistryRepository: Symbol("McpToolRegistryRepository"),
+  McpToolSecretRepository: Symbol("McpToolSecretRepository"),
+  McpToolExecutionAuditSink: Symbol("McpToolExecutionAuditSink"),
   ToolCapabilityCatalog: Symbol("ToolCapabilityCatalog"),
   ToolCapabilityExecutor: Symbol("ToolCapabilityExecutor"),
   FileStorage: Symbol("FileStorage"),
@@ -250,6 +259,18 @@ export class InfrastructureRegistry {
 
     container.registerSingleton<IMcpToolExecutor>(TOKENS.McpToolExecutor, (c) => {
       return c.resolve<ReturnType<typeof createMcpRuntimeIntegration>>(TOKENS.McpRuntimeIntegration).toolExecutor;
+    });
+
+    container.registerSingleton<IMcpToolRegistryRepository>(TOKENS.McpToolRegistryRepository, () => {
+      return new LocalStorageMcpToolRegistryRepository();
+    });
+
+    container.registerSingleton<IMcpToolSecretRepository>(TOKENS.McpToolSecretRepository, () => {
+      return new LocalStorageMcpToolSecretRepository();
+    });
+
+    container.registerSingleton<IMcpToolExecutionAuditSink>(TOKENS.McpToolExecutionAuditSink, () => {
+      return new LocalStorageMcpToolExecutionAuditSink();
     });
 
     container.registerSingleton<IToolCapabilityCatalog>(TOKENS.ToolCapabilityCatalog, (c) => {

@@ -124,6 +124,19 @@ The MCP layer now has an explicit inner-layer contract for installed tool defini
 
 This keeps MCP tools on the same inner-layer-first path as other first-class capabilities and creates a clean seam for later workflow-node integration, permissions, and agent/planner selection behavior.
 
+## Direction 3 update: MCP trust foundation (stories 4–5)
+
+The MCP inner-layer model now adds an explicit trust/governance foundation:
+- capability contracts can now declare structured credential fields and explicit permission scopes (`asset.read`, `asset.write`, `network.access`, filesystem/system scopes) in addition to side-effect class.
+- installed-tool records now carry explicit granted-permission policy state so policy can be associated with each installed tool, not inferred ad hoc at call sites.
+- application-layer auth/secret seams now flow through a dedicated secret repository port and an auth service that reports credential status (configured/missing required fields) without returning raw secret values in normal read models.
+- execution-time policy now runs through a dedicated permission-policy service and yields explicit allow/deny decisions with structured denied scopes; denials are surfaced as structured registry errors (`permission-denied`, `missing-auth-configuration`, `auth-resolution-failed`).
+- execution decisions are now emitted through an audit sink port with non-secret decision payloads, creating a seam for later trust/audit UX without forcing enterprise IAM scope in this slice.
+
+Current limitations (intentional for this pass):
+- local persistence is a desktop/local seam (local storage in the current slice), not cloud secret-manager integration.
+- policy enforcement is application/runtime policy gating, not OS/container sandboxing yet.
+
 ## TODO
 
 - Some concepts currently live more in the application layer than the domain layer because they are orchestration-heavy. That is reasonable, but over time the team may want to clarify which context-engineering rules are true domain policy versus application assembly policy.

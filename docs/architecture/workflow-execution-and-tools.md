@@ -245,3 +245,18 @@ That is "done enough" for Direction 1: the unified execution engine now includes
 
 - Tool running, model/dataset runs, and the narrow MCP server-operation slice now share the same engine seam and persisted run model, but broader composition still has multiple roots. Further convergence should happen incrementally instead of through a giant rewrite.
 - The interpreted fallback is clearly useful, but the product docs should eventually define which node types are expected to be fully trustworthy under scaffold execution versus only under delegated runtimes.
+
+## Direction 3 trust update: MCP auth/secrets and permission policy
+
+The MCP execution path now includes explicit trust controls in the standard use-case flow:
+
+1. Resolve installed-tool binding and status.
+2. Validate input contract.
+3. Resolve auth configuration through a dedicated secret-repository seam.
+4. Evaluate required permissions against installed-tool grants and request/runtime grants.
+5. Emit an execution audit decision event with non-secret payload.
+6. Invoke runtime execution.
+
+Auth and permission denials are explicit, structured outcomes (`missing-auth-configuration`, `auth-resolution-failed`, `permission-denied`) instead of implicit runtime failures.
+
+This slice enforces policy in the application/runtime orchestration layer (bounded sandbox policy) and creates seams for future stronger process/OS sandboxing and user-consent UX.

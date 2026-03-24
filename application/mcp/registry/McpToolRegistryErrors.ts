@@ -6,7 +6,11 @@ export type McpToolRegistryErrorCode =
   | "invalid-transition"
   | "unsafe-removal"
   | "invalid-input-contract"
-  | "invalid-output-contract";
+  | "invalid-output-contract"
+  | "missing-auth-configuration"
+  | "invalid-auth-configuration"
+  | "auth-resolution-failed"
+  | "permission-denied";
 
 export class McpToolRegistryError extends Error {
   constructor(

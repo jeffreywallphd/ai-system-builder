@@ -3,6 +3,7 @@ import { ExecuteMcpToolUseCase } from "../ExecuteMcpToolUseCase";
 import type { IMcpToolExecutor } from "../../ports/interfaces/IMcpToolExecutor";
 import { ExecutionContextEnvelope } from "../../context/models/ExecutionContextEnvelope";
 import { ExecutionContextToolPolicyService } from "../../context/ExecutionContextToolPolicyService";
+import type { IMcpToolSecretRepository } from "../../ports/interfaces/IMcpToolSecretRepository";
 
 const executionContext = new ExecutionContextEnvelope({
   packageReferences: [{ packageId: "pkg-mcp", alias: "MCP policy" }],
@@ -118,6 +119,7 @@ describe("ExecuteMcpToolUseCase", () => {
           installedAt: "2026-03-24T00:00:00.000Z",
           updatedAt: "2026-03-24T00:00:00.000Z",
           source: Object.freeze({ kind: "inline" as const, location: "inline:test" }),
+          grantedPermissions: Object.freeze([]),
           definition: Object.freeze({
             id: "mcp:local:echo",
             version: "1.0.0",
@@ -161,6 +163,7 @@ describe("ExecuteMcpToolUseCase", () => {
           installedAt: "2026-03-24T00:00:00.000Z",
           updatedAt: "2026-03-24T00:00:00.000Z",
           source: Object.freeze({ kind: "inline" as const, location: "inline:test" }),
+          grantedPermissions: Object.freeze([]),
           definition: Object.freeze({
             id: "mcp:local:echo",
             version: "1.0.0",
@@ -184,6 +187,156 @@ describe("ExecuteMcpToolUseCase", () => {
         arguments: {},
       }),
     ).rejects.toMatchObject({ code: "tool-disabled" });
+  });
+
+  it("denies execution when required credentials are missing", async () => {
+    const executor: IMcpToolExecutor = {
+      executeTool: async () => {
+        throw new Error("should not run");
+      },
+    };
+    const registry = {
+      listInstalledTools: async () => [],
+      getInstalledTool: async () => undefined,
+      findInstalledToolByBinding: async () =>
+        Object.freeze({
+          toolId: "mcp:local:secure-weather",
+          status: "enabled" as const,
+          installedAt: "2026-03-24T00:00:00.000Z",
+          updatedAt: "2026-03-24T00:00:00.000Z",
+          source: Object.freeze({ kind: "inline" as const, location: "inline:test" }),
+          grantedPermissions: Object.freeze(["network.access"] as const),
+          definition: Object.freeze({
+            id: "mcp:local:secure-weather",
+            version: "1.0.0",
+            displayName: "Secure Weather",
+            sideEffects: "network" as const,
+            auth: Object.freeze({
+              kind: "required" as const,
+              credentialFields: Object.freeze([{ key: "apiKey", label: "API Key", secret: true, required: true }]),
+            }),
+            permissions: Object.freeze(["network.access"] as const),
+            tags: Object.freeze([]),
+            categories: Object.freeze([]),
+            binding: Object.freeze({ serverId: "local", toolName: "secure-weather" }),
+            inputSchema: Object.freeze({ type: "object" }),
+          }),
+        }),
+      saveInstalledTool: async (record: never) => record,
+      removeInstalledTool: async () => false,
+    };
+    const secretRepository: IMcpToolSecretRepository = {
+      getSecretReference: async () => undefined,
+      resolveSecret: async () => undefined,
+      upsertSecret: async () => ({ toolId: "x", fields: [], updatedAt: new Date().toISOString() }),
+      removeSecret: async () => false,
+    };
+
+    await expect(
+      new ExecuteMcpToolUseCase(executor, new ExecutionContextToolPolicyService(), registry, undefined, secretRepository).execute({
+        serverId: "local",
+        toolName: "secure-weather",
+      }),
+    ).rejects.toMatchObject({ code: "missing-auth-configuration" });
+  });
+
+  it("allows execution when required credentials and permission grants are configured", async () => {
+    const requests: unknown[] = [];
+    const executor: IMcpToolExecutor = {
+      executeTool: async (request) => {
+        requests.push(request);
+        return {
+          executionId: "exec-allow-1",
+          serverId: request.serverId,
+          toolName: request.toolName,
+          status: "completed",
+          content: [{ ok: true }],
+          structuredContent: { ok: true },
+        };
+      },
+    };
+    const registry = {
+      listInstalledTools: async () => [],
+      getInstalledTool: async () => undefined,
+      findInstalledToolByBinding: async () =>
+        Object.freeze({
+          toolId: "mcp:local:secure-weather",
+          status: "enabled" as const,
+          installedAt: "2026-03-24T00:00:00.000Z",
+          updatedAt: "2026-03-24T00:00:00.000Z",
+          source: Object.freeze({ kind: "inline" as const, location: "inline:test" }),
+          grantedPermissions: Object.freeze(["network.access"] as const),
+          definition: Object.freeze({
+            id: "mcp:local:secure-weather",
+            version: "1.0.0",
+            displayName: "Secure Weather",
+            sideEffects: "network" as const,
+            auth: Object.freeze({
+              kind: "required" as const,
+              credentialFields: Object.freeze([{ key: "apiKey", label: "API Key", secret: true, required: true }]),
+            }),
+            permissions: Object.freeze(["network.access"] as const),
+            tags: Object.freeze([]),
+            categories: Object.freeze([]),
+            binding: Object.freeze({ serverId: "local", toolName: "secure-weather" }),
+            inputSchema: Object.freeze({ type: "object" }),
+            outputSchema: Object.freeze({ type: "object", properties: { ok: { type: "boolean" } } }),
+          }),
+        }),
+      saveInstalledTool: async (record: never) => record,
+      removeInstalledTool: async () => false,
+    };
+    const secretRepository: IMcpToolSecretRepository = {
+      getSecretReference: async () => ({ toolId: "mcp:local:secure-weather", fields: [], updatedAt: "2026-03-24T00:00:00.000Z" }),
+      resolveSecret: async () =>
+        ({ toolId: "mcp:local:secure-weather", values: { apiKey: "super-secret" }, updatedAt: "2026-03-24T00:00:00.000Z" }),
+      upsertSecret: async () => ({ toolId: "x", fields: [], updatedAt: new Date().toISOString() }),
+      removeSecret: async () => false,
+    };
+
+    await new ExecuteMcpToolUseCase(executor, new ExecutionContextToolPolicyService(), registry, undefined, secretRepository).execute({
+      serverId: "local",
+      toolName: "secure-weather",
+    });
+
+    expect((requests[0] as { resolvedCredentials?: unknown }).resolvedCredentials).toEqual({ apiKey: "super-secret" });
+  });
+
+  it("denies execution when required permissions are not granted", async () => {
+    const executor: IMcpToolExecutor = { executeTool: async () => ({ executionId: "x", serverId: "local", toolName: "fs", status: "completed", content: [] }) };
+    const registry = {
+      listInstalledTools: async () => [],
+      getInstalledTool: async () => undefined,
+      findInstalledToolByBinding: async () =>
+        Object.freeze({
+          toolId: "mcp:local:fs-write",
+          status: "enabled" as const,
+          installedAt: "2026-03-24T00:00:00.000Z",
+          updatedAt: "2026-03-24T00:00:00.000Z",
+          source: Object.freeze({ kind: "inline" as const, location: "inline:test" }),
+          grantedPermissions: Object.freeze(["filesystem.read"] as const),
+          definition: Object.freeze({
+            id: "mcp:local:fs-write",
+            version: "1.0.0",
+            displayName: "FS write",
+            sideEffects: "system" as const,
+            auth: Object.freeze({ kind: "none" as const }),
+            tags: Object.freeze([]),
+            categories: Object.freeze([]),
+            binding: Object.freeze({ serverId: "local", toolName: "fs-write" }),
+            inputSchema: Object.freeze({ type: "object" }),
+          }),
+        }),
+      saveInstalledTool: async (record: never) => record,
+      removeInstalledTool: async () => false,
+    };
+
+    await expect(
+      new ExecuteMcpToolUseCase(executor, new ExecutionContextToolPolicyService(), registry).execute({
+        serverId: "local",
+        toolName: "fs-write",
+      }),
+    ).rejects.toMatchObject({ code: "permission-denied" });
   });
 
 });
