@@ -102,13 +102,7 @@ export class LoadCanonicalAssetManagementSnapshotUseCase {
       });
     }));
 
-    const lifecycleSummary = Object.freeze({
-      healthy: versionsWithState.filter((entry) => entry.dependencyState.state === "healthy").length,
-      impacted: versionsWithState.filter((entry) => entry.dependencyState.state === "impacted").length,
-      stale: versionsWithState.filter((entry) => entry.dependencyState.state === "stale").length,
-      partiallyTrusted: versionsWithState.filter((entry) => entry.dependencyState.state === "partially-trusted").length,
-      reconciliationNeeded: versionsWithState.filter((entry) => entry.dependencyState.state === "reconciliation-needed").length,
-    });
+    const lifecycleSummary = this.buildLifecycleSummary(versionsWithState);
 
     const existenceExplanation = detail.latestVersion
       ? await this.explainVersionExistenceUseCase.execute(detail.latestVersion.versionId)
@@ -173,5 +167,42 @@ export class LoadCanonicalAssetManagementSnapshotUseCase {
       explanation: `${unhealthy.length} version(s) in this chain require dependency attention.`,
       recommendedActions: Object.freeze(actions.slice(0, 5)),
     });
+  }
+
+  private buildLifecycleSummary(versions: ReadonlyArray<{
+    readonly dependencyState: {
+      readonly state: "healthy" | "impacted" | "stale" | "partially-trusted" | "reconciliation-needed";
+    };
+  }>): CanonicalAssetManagementSnapshot["dependencyLifecycleSummary"] {
+    const summary = versions.reduce(
+      (counts, version) => {
+        switch (version.dependencyState.state) {
+          case "healthy":
+            counts.healthy += 1;
+            break;
+          case "impacted":
+            counts.impacted += 1;
+            break;
+          case "stale":
+            counts.stale += 1;
+            break;
+          case "partially-trusted":
+            counts.partiallyTrusted += 1;
+            break;
+          case "reconciliation-needed":
+            counts.reconciliationNeeded += 1;
+            break;
+        }
+        return counts;
+      },
+      {
+        healthy: 0,
+        impacted: 0,
+        stale: 0,
+        partiallyTrusted: 0,
+        reconciliationNeeded: 0,
+      },
+    );
+    return Object.freeze(summary);
   }
 }

@@ -73,7 +73,7 @@ import {
 import type { PublishDurableEntityToAssetSystemUseCase } from "../assets-system/PublishDurableEntityToAssetSystemUseCase";
 import type { CanonicalAssetIdentityService } from "../assets-system/CanonicalAssetIdentityService";
 import type { CanonicalEntityReadResolver } from "../assets-system/CanonicalEntityReadResolver";
-import { CanonicalEntityOperationalReadService } from "../assets-system/CanonicalEntityOperationalReadService";
+import { CanonicalEntityOperationalReadService, type CanonicalOperationalReadSummary } from "../assets-system/CanonicalEntityOperationalReadService";
 
 interface ServiceOptions {
   readonly datasetRepository: DatasetRepository;
@@ -290,7 +290,7 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
         exampleCount: statistics?.exampleCount ?? 0,
         canonicalSelectedVersion: selectedVersion
           ? await this.resolveCanonicalDatasetVersion(dataset.id, selectedVersion.id)
-          : Object.freeze({ preferred: false, fallbackReason: "Dataset has no selected version." }),
+          : this.createUnavailableCanonicalDatasetSummary("Dataset has no selected version."),
       });
     })));
   }
@@ -356,6 +356,20 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
       fallbackWhenUnavailable: "Canonical resolver is not configured for dataset-version reads.",
     });
     return resolved;
+  }
+
+  private createUnavailableCanonicalDatasetSummary(reason: string): CanonicalOperationalReadSummary {
+    return Object.freeze({
+      preferred: false,
+      operationalStatus: Object.freeze({
+        trust: "attention-needed",
+        explanation: reason,
+        recommendedNextSteps: Object.freeze([
+          "Select or create a dataset version before running canonical operational checks.",
+        ]),
+      }),
+      fallbackReason: reason,
+    });
   }
 
   public async addExample(command: AddExampleCommand): Promise<StudioExample> {
