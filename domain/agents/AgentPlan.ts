@@ -120,6 +120,19 @@ function normalizeStep(input: AgentPlanStep): AgentPlanStep {
   });
 }
 
+
+function validateStepOutputReferenceCompatibility(step: AgentPlanStep, referencedStep: AgentPlanStep, reference: AgentPlanStepOutputInputReference): void {
+  const declaredOutputKey = referencedStep.intent.expectedOutputKey;
+  if (!declaredOutputKey) {
+    return;
+  }
+  if (declaredOutputKey !== reference.outputKey) {
+    throw new Error(
+      `Agent plan step '${step.stepId}' references outputKey '${reference.outputKey}' from step '${reference.stepId}', but that step declares expectedOutputKey '${declaredOutputKey}'.`,
+    );
+  }
+}
+
 export function normalizeAgentPlan(input: AgentPlan): AgentPlan {
   const steps = Object.freeze((input.steps ?? []).map((step) => normalizeStep(step)));
   if (steps.length === 0) {
@@ -132,6 +145,7 @@ export function normalizeAgentPlan(input: AgentPlan): AgentPlan {
   }
 
   const expectedOutputKeys = new Set<string>();
+  const stepById = new Map(steps.map((step) => [step.stepId, step] as const));
   for (const step of steps) {
     if (step.dependsOnStepIds.includes(step.stepId)) {
       throw new Error(`Agent plan step '${step.stepId}' cannot depend on itself.`);
@@ -151,6 +165,11 @@ export function normalizeAgentPlan(input: AgentPlan): AgentPlan {
         if (!step.dependsOnStepIds.includes(reference.stepId)) {
           throw new Error(`Agent plan step '${step.stepId}' must depend on step '${reference.stepId}' when consuming its output.`);
         }
+        const referencedStep = stepById.get(reference.stepId);
+        if (!referencedStep) {
+          throw new Error(`Agent plan step '${step.stepId}' references unknown step output '${reference.stepId}'.`);
+        }
+        validateStepOutputReferenceCompatibility(step, referencedStep, reference);
       }
     }
 

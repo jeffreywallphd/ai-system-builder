@@ -133,8 +133,8 @@ The runtime is not a single path. The system currently supports multiple executi
 - Agent execution now has a bounded mapping seam into the unified execution backbone (`application/agents/contracts/AgentExecutionMapping.ts`) that yields `ExecutionPlan` units plus per-unit payload correlation data, rather than introducing a second runtime model.
 - This remains a foundation slice only: no studio UI, no autonomous replanning loop, and no parallel orchestration stack.
 
-- Direction 4 (Phase 2 inner-foundation slice) now includes an execution-oriented agent planning contract: validated dependency-aware plan/step models in `domain/agents/AgentPlan.ts`, planning strategy contracts in `application/agents/services/AgentPlanningInterface.ts`, and bounded evaluation/replan signal contracts in `application/agents/contracts/AgentPlanningLoop.ts`.
-- Agent/execution bridging remains unified-engine-native via `application/agents/contracts/AgentExecutionMapping.ts`, including direct mapping from `AgentPlan` into `ExecutionPlan` units plus per-unit payload metadata.
+- Direction 4 (Phase 2 inner-foundation slice) now includes an execution-oriented agent planning contract: validated dependency-aware plan/step models in `domain/agents/AgentPlan.ts`, planning strategy contracts in `application/agents/contracts/AgentPlanningStrategy.ts` + `application/agents/services/DeterministicAgentPlanningStrategy.ts`, and bounded evaluation/replan signal contracts in `application/agents/contracts/AgentPlanningLoop.ts`.
+- Agent/execution bridging remains unified-engine-native via `application/agents/contracts/AgentExecutionMapping.ts`, including direct mapping from `AgentPlan` into `ExecutionPlan` units plus per-unit payload metadata (asset inputs and step-output references).
 
 ## TODO
 
