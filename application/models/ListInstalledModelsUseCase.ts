@@ -5,7 +5,7 @@ import type {
 } from "../ports/interfaces/IInstalledModelCatalog";
 import type { CanonicalAssetIdentityService } from "../assets-system/CanonicalAssetIdentityService";
 import type { CanonicalEntityReadResolver } from "../assets-system/CanonicalEntityReadResolver";
-import { CanonicalEntityOperationalReadService } from "../assets-system/CanonicalEntityOperationalReadService";
+import { CanonicalEntityOperationalReadService, type CanonicalOperationalReadSummary } from "../assets-system/CanonicalEntityOperationalReadService";
 
 export interface IListInstalledModelsRequest {
   readonly criteria?: IInstalledModelSearchCriteria;
@@ -13,29 +13,7 @@ export interface IListInstalledModelsRequest {
 
 export interface IListInstalledModelsResult {
   readonly models: ReadonlyArray<IModel>;
-  readonly canonicalByModelId?: Readonly<Record<string, {
-    readonly preferred: boolean;
-    readonly assetId?: string;
-    readonly pinnedVersionId?: string;
-    readonly latestVersionId?: string;
-    readonly provenance?: {
-      readonly directUpstreamCount: number;
-      readonly directDownstreamCount: number;
-      readonly producingTransformationCount: number;
-      readonly lineageConfidence: "exact" | "partial";
-    };
-    readonly dependencyState?: {
-      readonly state: "healthy" | "impacted" | "stale" | "partially-trusted" | "reconciliation-needed";
-      readonly reasons: ReadonlyArray<string>;
-      readonly nextActions: ReadonlyArray<string>;
-    };
-    readonly operationalStatus?: {
-      readonly trust: "trusted" | "attention-needed";
-      readonly explanation: string;
-      readonly recommendedNextSteps: ReadonlyArray<string>;
-    };
-    readonly fallbackReason?: string;
-  }>>;
+  readonly canonicalByModelId?: Readonly<Record<string, CanonicalOperationalReadSummary>>;
 }
 
 export class ListInstalledModelsUseCase {
@@ -88,6 +66,18 @@ export class ListInstalledModelsUseCase {
     return Object.freeze({
       models: Object.freeze([...models]),
       canonicalByModelId,
+    });
+  }
+
+  public async resolveCanonicalModelSummary(modelId: string): Promise<CanonicalOperationalReadSummary> {
+    const normalizedModelId = modelId.trim();
+    if (!normalizedModelId) {
+      throw new Error("ListInstalledModelsUseCase.resolveCanonicalModelSummary requires a non-empty modelId.");
+    }
+    return this.canonicalReadService.resolveSummary({
+      entityType: "installed-model",
+      entityId: normalizedModelId,
+      fallbackWhenUnavailable: "Canonical resolver is not configured for installed-model reads.",
     });
   }
 }

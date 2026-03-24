@@ -2,6 +2,7 @@ import type { GetCanonicalDependencyStateUseCase } from "./CanonicalDependencySt
 import type { ExplainCanonicalVersionExistenceUseCase, LoadCanonicalAssetDetailUseCase } from "./CanonicalAssetReadUseCases";
 import type { GetAssetVersionHistoryUseCase } from "./GetAssetVersionHistoryUseCase";
 import type { VerifyAssetGraphProjectionUseCase } from "./VerifyAssetGraphProjectionUseCase";
+import { ProjectionTrustReadModelService } from "./ProjectionTrustReadModelService";
 
 export interface CanonicalAssetManagementSnapshot {
   readonly asset: {
@@ -54,13 +55,18 @@ export interface CanonicalAssetManagementSnapshot {
 }
 
 export class LoadCanonicalAssetManagementSnapshotUseCase {
+  private readonly projectionTrustReadModelService: ProjectionTrustReadModelService;
+
   constructor(
     private readonly loadAssetDetailUseCase: LoadCanonicalAssetDetailUseCase,
     private readonly getVersionHistoryUseCase: GetAssetVersionHistoryUseCase,
     private readonly dependencyStateUseCase: GetCanonicalDependencyStateUseCase,
     private readonly explainVersionExistenceUseCase: ExplainCanonicalVersionExistenceUseCase,
     private readonly verifyProjectionUseCase?: VerifyAssetGraphProjectionUseCase,
-  ) {}
+    projectionTrustReadModelService?: ProjectionTrustReadModelService,
+  ) {
+    this.projectionTrustReadModelService = projectionTrustReadModelService ?? new ProjectionTrustReadModelService();
+  }
 
   public async execute(params: {
     readonly assetId: string;
@@ -113,15 +119,18 @@ export class LoadCanonicalAssetManagementSnapshotUseCase {
       ? await this.verifyProjectionUseCase.execute({
         assetId: normalizedAssetId,
         versionIdsInScope: params.versionIdsInProjectionScope,
-      }).then((verification) => Object.freeze({
-        matched: verification.matched,
-        trustState: verification.trust.state,
-        trustExplanation: verification.trust.explanation,
-        failedChecks: Object.freeze(verification.checks.filter((entry) => !entry.matched).map((entry) => `${entry.code}: ${entry.message}`)),
-        edgeCount: verification.projectionSummary.edgeCount,
-        scopedVersionCount: verification.projectionSummary.scopedVersionCount,
-        mismatchedVersionIds: Object.freeze(verification.mismatches.map((entry) => entry.versionId)),
-      }))
+      }).then((verification) => {
+        const projection = this.projectionTrustReadModelService.summarize(verification);
+        return Object.freeze({
+          matched: projection.matched,
+          trustState: projection.trustState ?? "mismatch-detected",
+          trustExplanation: projection.trustExplanation ?? "Projection trust state is unavailable.",
+          failedChecks: projection.failedChecks,
+          edgeCount: projection.edgeCount,
+          scopedVersionCount: projection.scopedVersionCount,
+          mismatchedVersionIds: projection.mismatchedVersionIds ?? Object.freeze([]),
+        });
+      })
       : undefined;
 
     return Object.freeze({

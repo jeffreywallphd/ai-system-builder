@@ -54,4 +54,15 @@ export interface CanonicalProjectionVerificationReadModel {
   readonly scopedVersionCount: number;
   readonly failedChecks: ReadonlyArray<string>;
   readonly mismatchedVersionIds?: ReadonlyArray<string>;
+  readonly comparison?: {
+    readonly scopedVersionIdsCompared: number;
+    readonly mismatchedScopedVersions: number;
+    readonly missingEdgeReferences: number;
+    readonly unexpectedEdgeReferences: number;
+  };
+  readonly remediation?: {
+    readonly status: "none-needed" | "replay-recommended";
+    readonly explanation: string;
+    readonly actions: ReadonlyArray<string>;
+  };
 }
