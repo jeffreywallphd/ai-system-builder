@@ -252,8 +252,12 @@ That is "done enough" for Direction 1: the unified execution engine now includes
 - Asset-aware execution now records both consumed input asset references and produced output assets in execution metadata so downstream projections can treat MCP runs as deterministic `asset -> execution/tool -> asset` provenance events.
 - Raw-only behavior is now explicit and bounded: when `assetIo.allowsRawInputs` is `false`, undeclared raw input fields are rejected; when `assetIo.allowsRawOutputs` is `false`, missing declared asset outputs are treated as contract violations.
 - Transformation-history reads for assets now have a canonical application seam (`GetAssetTransformationHistoryUseCase`) that uses repository-native asset-scoped queries when available and version-based fallback otherwise.
-- Registry read models now include minimal marketplace-ready metadata (`description`, `author`, `version`, `categories`) and normalize/validate author metadata in the domain contract.
-- MCP tool registry import/export is now explicit and machine-readable (`ai-loom.mcp-tools.v1`) with bounded local-first semantics (export installed records, import with optional overwrite, no remote platform coupling).
+- Registry read models now include minimal marketplace-ready metadata (`description`, `author`, `version`, `categories`) as a normalized domain projection, so higher layers do not parse raw definition JSON.
+- Metadata validation is now explicit and bounded in the MCP domain contract: required core fields remain strict, `description`/`author` are optional but bounded when provided, and categories are normalized (trimmed, lower-cased, deduped, stable order).
+- Version normalization now removes optional leading `v` for semver-like values to stay aligned with existing lifecycle/update transition logic.
+- MCP tool registry import/export now has two explicit machine-readable contracts:
+  - `ai-loom.mcp-tools.v1` for installed-registry transfer (status/source/definition/lifecycle with overwrite controls).
+  - `ai-loom.mcp-tool-definitions.v1` for shareable definition export/import flows (definition + source only; no runtime approvals/secrets/operational trust state).
 
 ## TODO
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { normalizeMcpToolDefinition, validateMcpToolDefinition } from "../McpToolCapability";
+import { normalizeMcpToolDefinition, toMcpToolMetadata, validateMcpToolDefinition } from "../McpToolCapability";
 
 describe("McpToolCapability", () => {
   it("validates required MCP tool contract fields", () => {
@@ -22,7 +22,7 @@ describe("McpToolCapability", () => {
   it("normalizes binding and category/tag metadata", () => {
     const normalized = normalizeMcpToolDefinition({
       id: " weather.lookup ",
-      version: " 1.0.0 ",
+      version: " v1.0.0 ",
       displayName: " Weather Lookup ",
       author: "  Loom Labs  ",
       sideEffects: "read",
@@ -32,18 +32,21 @@ describe("McpToolCapability", () => {
         credentialFields: [{ key: " apiKey ", label: " API Key ", secret: true, required: true }],
       },
       permissions: [" network.access "],
-      tags: [" weather "],
-      categories: [" data "],
+      tags: [" weather ", "weather"],
+      categories: [" Data ", "data", "FORECAST "],
       inputSchema: { type: "object" },
       binding: { serverId: " local ", toolName: " weather ", },
     });
 
     expect(normalized.id).toBe("weather.lookup");
+    expect(normalized.version).toBe("1.0.0");
     expect(normalized.author).toBe("Loom Labs");
     expect(normalized.binding?.serverId).toBe("local");
     expect(normalized.auth.scopes).toEqual(["weather.read"]);
     expect(normalized.auth.credentialFields).toEqual([{ key: "apiKey", label: "API Key", secret: true, required: true, format: undefined, description: undefined }]);
     expect(normalized.permissions).toEqual(["network.access"]);
+    expect(normalized.tags).toEqual(["weather"]);
+    expect(normalized.categories).toEqual(["data", "forecast"]);
   });
 
   it("rejects blank author metadata when provided", () => {
@@ -60,6 +63,42 @@ describe("McpToolCapability", () => {
     });
     expect(validation.valid).toBe(false);
     expect(validation.issues.map((issue) => issue.code)).toContain("invalid-metadata");
+  });
+
+  it("validates bounded metadata and non-empty categories", () => {
+    const validation = validateMcpToolDefinition({
+      id: "weather.lookup",
+      version: "1.0.0",
+      displayName: "Weather Lookup",
+      description: " ",
+      author: "A".repeat(121),
+      sideEffects: "read",
+      auth: { kind: "none" },
+      tags: [],
+      categories: ["weather", " "],
+      inputSchema: { type: "object" },
+    });
+
+    expect(validation.valid).toBe(false);
+    expect(validation.issues.map((issue) => issue.path)).toContain("description");
+    expect(validation.issues.map((issue) => issue.path)).toContain("author");
+    expect(validation.issues.map((issue) => issue.path)).toContain("categories");
+  });
+
+  it("projects normalized stable metadata read model", () => {
+    const metadata = toMcpToolMetadata({
+      description: "  Weather and forecast retrieval  ",
+      author: "  Loom Labs ",
+      version: " v2.1.0 ",
+      categories: [" Forecast ", "weather", "forecast"],
+    });
+
+    expect(metadata).toEqual({
+      description: "Weather and forecast retrieval",
+      author: "Loom Labs",
+      version: "2.1.0",
+      categories: ["forecast", "weather"],
+    });
   });
 
   it("validates and normalizes asset I/O contract metadata", () => {
