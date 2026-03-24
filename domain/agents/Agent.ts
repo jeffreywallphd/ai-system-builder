@@ -2,6 +2,7 @@ import type { AgentGoal } from "./AgentGoal";
 import { normalizeAgentGoal } from "./AgentGoal";
 import type { AgentPolicy } from "./AgentPolicy";
 import { normalizeAgentPolicy } from "./AgentPolicy";
+import type { AgentToolAccessPolicy } from "./AgentPolicy";
 import type { AgentMemoryConfiguration } from "./AgentMemory";
 import { normalizeAgentMemoryConfiguration } from "./AgentMemory";
 
@@ -32,6 +33,7 @@ export interface Agent {
   readonly description?: string;
   readonly goals: ReadonlyArray<AgentGoal>;
   readonly policy: AgentPolicy;
+  readonly toolAccess: AgentToolAccessPolicy;
   readonly planningStrategy: AgentPlanningStrategy;
   readonly memory: AgentMemoryConfiguration;
   readonly execution: AgentExecutionConfiguration;
@@ -47,6 +49,7 @@ export interface AgentReadModel {
   readonly status: AgentLifecycleStatus;
   readonly goals: ReadonlyArray<AgentGoal>;
   readonly policy: AgentPolicy;
+  readonly toolAccess: AgentToolAccessPolicy;
   readonly planningStrategy: AgentPlanningStrategy;
   readonly memory: {
     readonly revision: number;
@@ -166,6 +169,7 @@ export function createAgent(input: {
     description: input.description?.trim() || undefined,
     goals,
     policy,
+    toolAccess: policy.toolAccess,
     planningStrategy,
     memory,
     execution,
@@ -214,6 +218,7 @@ export function toAgentReadModel(agent: Agent): AgentReadModel {
     status: agent.status,
     goals: Object.freeze([...agent.goals].sort((left, right) => left.priorityOrder - right.priorityOrder)),
     policy: agent.policy,
+    toolAccess: agent.toolAccess,
     planningStrategy: agent.planningStrategy,
     memory: Object.freeze({
       revision: agent.memory.revision,

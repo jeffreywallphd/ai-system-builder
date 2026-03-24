@@ -60,7 +60,7 @@ describe("Agent foundation services", () => {
         restrictedActions: [],
         costLimits: {},
         executionLimits: {},
-        safetyConstraints: { requiredApprovals: [], deniedPermissionIds: [], sandbox: { network: "deny", filesystem: "deny", assets: "read-only", allowEnvironmentVariables: [] } },
+        safetyConstraints: { requiredApprovals: [], deniedPermissionIds: [], sandbox: { network: { allowed: false }, filesystem: { allowed: false }, assets: { read: true, write: false }, environment: { mode: "none" } } },
       },
       memory: {
         agentId: "agent-a",
@@ -136,8 +136,9 @@ describe("Agent foundation services", () => {
         restrictedActions: [],
         costLimits: {},
         executionLimits: { maxSteps: 1 },
-        safetyConstraints: { requiredApprovals: [], deniedPermissionIds: [], sandbox: { network: "deny", filesystem: "deny", assets: "read-only", allowEnvironmentVariables: [] } },
+        safetyConstraints: { requiredApprovals: [], deniedPermissionIds: [], sandbox: { network: { allowed: false }, filesystem: { allowed: false }, assets: { read: true, write: false }, environment: { mode: "none" } } },
       },
+      toolAccess: { allowedToolIds: ["mcp:local:get_weather"], scopeConstraints: [{ toolId: "mcp:local:get_weather", allowedScopes: ["forecast.read"] }] },
       memory: {
         agentId: "agent-plan",
         assets: [{ assetId: new AssetId("asset:memory:plan"), memoryType: "semantic" }],
@@ -211,8 +212,9 @@ describe("Agent foundation services", () => {
         restrictedActions: [],
         costLimits: {},
         executionLimits: { maxSteps: 1 },
-        safetyConstraints: { requiredApprovals: [], deniedPermissionIds: [], sandbox: { network: "deny", filesystem: "deny", assets: "read-only", allowEnvironmentVariables: [] } },
+        safetyConstraints: { requiredApprovals: [], deniedPermissionIds: [], sandbox: { network: { allowed: false }, filesystem: { allowed: false }, assets: { read: true, write: false }, environment: { mode: "none" } } },
       },
+      toolAccess: { allowedToolIds: ["mcp:local:echo"], scopeConstraints: [] },
       memory: {
         agentId: "agent-exec",
         assets: [{ assetId: new AssetId("asset:memory:1"), memoryType: "working" }],

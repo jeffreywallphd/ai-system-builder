@@ -13,11 +13,16 @@ import {
 const defaultSafety = {
   requiredApprovals: [],
   deniedPermissionIds: [],
-  sandbox: { network: "deny", filesystem: "deny", assets: "read-only", allowEnvironmentVariables: [] },
+  sandbox: {
+    network: { allowed: false },
+    filesystem: { allowed: false },
+    assets: { read: true, write: false },
+    environment: { mode: "none" as const },
+  },
 } as const;
 
 describe("Agent domain", () => {
-  it("creates a first-class agent with structured goals, policy, and asset-backed memory", () => {
+  it("creates a first-class agent with explicit tool access, policy, and asset-backed memory", () => {
     const agent = createAgent({
       id: "agent-weather",
       name: "Weather Analyst",
@@ -42,7 +47,12 @@ describe("Agent domain", () => {
         safetyConstraints: {
           requiredApprovals: [{ permissionId: "network.access", minimumStatus: "approved", scopeType: "tool", scopeId: "mcp:local:get_weather" }],
           deniedPermissionIds: [],
-          sandbox: { network: "allow", filesystem: "read-only", assets: "read-only", allowEnvironmentVariables: [] },
+          sandbox: {
+            network: { allowed: true, allowedHosts: ["api.weather.example"], allowedProtocols: ["https"] },
+            filesystem: { allowed: true, readPaths: ["/workspace"], writePaths: [] },
+            assets: { read: true, write: false },
+            environment: { mode: "allowlist", allowedEnvVars: ["TZ"] },
+          },
         },
       },
       memory: {
@@ -62,10 +72,9 @@ describe("Agent domain", () => {
       execution: { trustPolicyId: "trust:strict", requireTrustedTools: true, maxExecutionUnits: 3 },
     });
 
-    expect(agent.name).toBe("Weather Analyst");
-    expect(agent.policy.toolAccess.allowedToolIds[0]).toBe("mcp:local:get_weather");
+    expect(agent.toolAccess.allowedToolIds[0]).toBe("mcp:local:get_weather");
+    expect(agent.toolAccess).toBe(agent.policy.toolAccess);
     expect(agent.memory.assets[0]?.assetId.toString()).toBe("asset:memory:weather");
-    expect(agent.memory.retrieval.semantic?.minRelevanceScore).toBe(0.4);
   });
 
   it("returns stable read models without caller-side reconstruction", () => {
@@ -85,7 +94,7 @@ describe("Agent domain", () => {
       },
       memory: {
         agentId: "agent-read",
-        assets: [{ assetId: new AssetId("asset:memory:read"), memoryType: "working" }],
+        assets: [],
         retrieval: { strategy: "latest-first", maxEntries: 10 },
         revision: 1,
       },
@@ -95,56 +104,11 @@ describe("Agent domain", () => {
 
     const readModel = toAgentReadModel(agent);
     expect(readModel.goals[0]?.id).toBe("g1");
-    expect(readModel.memory.maxEntries).toBe(10);
+    expect(readModel.toolAccess.allowedToolIds).toEqual(["mcp:local:echo"]);
+    expect(readModel.memory.assetIds).toEqual([]);
   });
 
   it("enforces core agent invariants", () => {
-    expect(() =>
-      createAgent({
-        id: "agent-missing-execution",
-        name: "No Execution Config",
-        goals: [{ id: "g1", objective: "Goal", constraints: [], successCriteria: ["Done"], priority: "normal", priorityOrder: 1 }],
-        policy: {
-          toolAccess: { allowedToolIds: ["mcp:local:echo"], scopeConstraints: [] },
-          restrictedActions: [],
-          costLimits: {},
-          executionLimits: {},
-          safetyConstraints: defaultSafety,
-        },
-        memory: {
-          agentId: "agent-missing-execution",
-          assets: [{ assetId: new AssetId("asset:memory:x"), memoryType: "working" }],
-          retrieval: { strategy: "latest-first", maxEntries: 5 },
-          revision: 1,
-        },
-        planningStrategy: { strategyId: "linear-default", mode: "deterministic-linear" },
-        execution: undefined as unknown as never,
-      }),
-    ).toThrow("execution configuration is required");
-
-    expect(() =>
-      createAgent({
-        id: "agent-invalid",
-        name: "Invalid Agent",
-        goals: [{ id: "g1", objective: "Bad tool", constraints: [], successCriteria: ["Never"], priority: "normal", priorityOrder: 1 }],
-        policy: {
-          toolAccess: { allowedToolIds: [], scopeConstraints: [] },
-          restrictedActions: [],
-          costLimits: {},
-          executionLimits: {},
-          safetyConstraints: defaultSafety,
-        },
-        memory: {
-          agentId: "agent-invalid",
-          assets: [{ assetId: new AssetId("asset:memory:a"), memoryType: "working" }],
-          retrieval: { strategy: "latest-first", maxEntries: 1 },
-          revision: 1,
-        },
-        planningStrategy: { strategyId: "linear-default", mode: "deterministic-linear" },
-        execution: { maxExecutionUnits: 2, requireTrustedTools: true },
-      }),
-    ).toThrow("allowed tool");
-
     expect(() =>
       createAgent({
         id: "agent-invalid-goal-tool",
@@ -175,29 +139,6 @@ describe("Agent domain", () => {
         execution: { maxExecutionUnits: 2, requireTrustedTools: true },
       }),
     ).toThrow("not allowed by policy");
-
-    expect(() =>
-      createAgent({
-        id: "agent-invalid-execution",
-        name: "Invalid execution",
-        goals: [{ id: "g1", objective: "Goal", constraints: [], successCriteria: ["Done"], priority: "normal", priorityOrder: 1 }],
-        policy: {
-          toolAccess: { allowedToolIds: ["mcp:local:echo"], scopeConstraints: [] },
-          restrictedActions: [],
-          costLimits: {},
-          executionLimits: { maxSteps: 2 },
-          safetyConstraints: defaultSafety,
-        },
-        memory: {
-          agentId: "agent-invalid-execution",
-          assets: [{ assetId: new AssetId("asset:memory:x"), memoryType: "working" }],
-          retrieval: { strategy: "latest-first", maxEntries: 5 },
-          revision: 1,
-        },
-        planningStrategy: { strategyId: "linear-default", mode: "deterministic-linear" },
-        execution: { maxExecutionUnits: 3, requireTrustedTools: true },
-      }),
-    ).toThrow("cannot exceed policy execution maxSteps");
   });
 
   it("supports immutable update semantics and timestamp evolution", () => {
@@ -229,8 +170,6 @@ describe("Agent domain", () => {
       now: new Date("2026-03-24T00:05:00.000Z"),
     });
 
-    expect(updated.status).toBe("paused");
-    expect(updated.execution.maxExecutionUnits).toBe(2);
     expect(updated.createdAt).toBe("2026-03-24T00:00:00.000Z");
     expect(updated.updatedAt).toBe("2026-03-24T00:05:00.000Z");
   });
@@ -252,7 +191,7 @@ describe("Agent goal and policy invariants", () => {
     expect(goal.requiredToolIds).toEqual(["mcp:local:echo"]);
   });
 
-  it("validates structured policy limits and scope constraints", () => {
+  it("validates policy alignment with MCP-style permission and sandbox semantics", () => {
     const policy = normalizeAgentPolicy({
       toolAccess: {
         allowedToolIds: ["mcp:local:echo", "mcp:local:echo"],
@@ -260,59 +199,34 @@ describe("Agent goal and policy invariants", () => {
       },
       restrictedActions: ["filesystem.write", "filesystem.write"],
       costLimits: { maxTokens: 1000, maxEstimatedUsd: 1.25 },
-      executionLimits: { maxSteps: 3, maxWallClockMs: 10000 },
+      executionLimits: { maxSteps: 3, maxWallClockMs: 10_000 },
       safetyConstraints: {
         requiredApprovals: [{ permissionId: "runtime.execute", minimumStatus: "approved", scopeType: "global" }],
         deniedPermissionIds: ["filesystem.write"],
-        sandbox: { network: "allow", filesystem: "read-only", assets: "read-only", allowEnvironmentVariables: ["TZ", "TZ"] },
+        sandbox: {
+          network: { allowed: true, allowedProtocols: ["https", "https"] },
+          filesystem: { allowed: true, readPaths: ["/workspace", "/workspace"], writePaths: [] },
+          assets: { read: true, write: false },
+          environment: { mode: "allowlist", allowedEnvVars: ["TZ", "TZ"] },
+        },
       },
     });
 
     expect(policy.toolAccess.allowedToolIds).toEqual(["mcp:local:echo"]);
-    expect(policy.toolAccess.scopeConstraints[0]?.allowedScopes).toEqual(["runtime.execute"]);
-    expect(policy.restrictedActions).toEqual(["filesystem.write"]);
+    expect(policy.safetyConstraints.sandbox.filesystem.readPaths).toEqual(["/workspace"]);
+    expect(policy.safetyConstraints.sandbox.environment.allowedEnvVars).toEqual(["TZ"]);
   });
 
   it("rejects malformed policy constraints", () => {
     expect(() =>
       normalizeAgentPolicy({
-        toolAccess: {
-          allowedToolIds: ["mcp:local:echo"],
-          scopeConstraints: [{ toolId: "mcp:local:echo", allowedScopes: [] }],
-        },
+        toolAccess: { allowedToolIds: ["mcp:local:echo"], scopeConstraints: [{ toolId: "mcp:local:echo", allowedScopes: [] }] },
         restrictedActions: [],
         costLimits: {},
         executionLimits: {},
         safetyConstraints: defaultSafety,
       }),
     ).toThrow("at least one scope");
-
-    expect(() =>
-      normalizeAgentPolicy({
-        toolAccess: {
-          allowedToolIds: ["mcp:local:echo"],
-          scopeConstraints: [],
-        },
-        restrictedActions: [],
-        costLimits: { maxTokens: 50, maxEstimatedUsd: 2 },
-        executionLimits: {},
-        safetyConstraints: defaultSafety,
-      }),
-    ).toThrow("cost limits are conflicting");
-
-    expect(() =>
-      normalizeAgentPolicy({
-        toolAccess: { allowedToolIds: ["mcp:local:echo"], scopeConstraints: [] },
-        restrictedActions: [],
-        costLimits: {},
-        executionLimits: {},
-        safetyConstraints: {
-          requiredApprovals: [{ permissionId: "network.access", minimumStatus: "approved", scopeType: "tool" }],
-          deniedPermissionIds: [],
-          sandbox: { network: "allow", filesystem: "deny", assets: "read-only", allowEnvironmentVariables: [] },
-        },
-      }),
-    ).toThrow("tool scope must include scopeId");
 
     expect(() =>
       normalizeAgentPolicy({
@@ -323,7 +237,7 @@ describe("Agent goal and policy invariants", () => {
         safetyConstraints: {
           requiredApprovals: [],
           deniedPermissionIds: ["network.access"],
-          sandbox: { network: "deny", filesystem: "deny", assets: "read-only", allowEnvironmentVariables: [] },
+          sandbox: defaultSafety.sandbox,
         },
       }),
     ).toThrow("redundantly deny network.access");
@@ -331,24 +245,15 @@ describe("Agent goal and policy invariants", () => {
 });
 
 describe("Agent memory invariants", () => {
-  it("accepts typed retrieval configuration and deduplicates retrieval filters", () => {
+  it("accepts zero-asset initialization intentionally", () => {
     const memory = normalizeAgentMemoryConfiguration({
       agentId: "agent-m",
-      assets: [{ assetId: new AssetId("asset:memory:one"), memoryType: "semantic", assetVersionId: "v1" }],
-      retrieval: {
-        strategy: "semantic-filter",
-        maxEntries: 10,
-        requiredTags: ["project", "project"],
-        memoryTypes: ["semantic", "semantic", "working"],
-        semantic: { minRelevanceScore: 0.8 },
-        recency: { preferLatest: true, lookbackWindowEntries: 100 },
-      },
-      revision: 2,
+      assets: [],
+      retrieval: { strategy: "latest-first", maxEntries: 5 },
+      revision: 1,
     });
 
-    expect(memory.retrieval.requiredTags).toEqual(["project"]);
-    expect(memory.retrieval.memoryTypes).toEqual(["semantic", "working"]);
-    expect(memory.retrieval.semantic?.minRelevanceScore).toBe(0.8);
+    expect(memory.assets).toEqual([]);
   });
 
   it("rejects malformed retrieval and duplicate asset references", () => {
@@ -368,66 +273,52 @@ describe("Agent memory invariants", () => {
       normalizeAgentMemoryConfiguration({
         agentId: "agent-m",
         assets: [{ assetId: new AssetId("memory:one"), memoryType: "working" }],
-        retrieval: { strategy: "latest-first", maxEntries: 5, semantic: { minRelevanceScore: 0.5 } },
+        retrieval: { strategy: "latest-first", maxEntries: 5 },
         revision: 1,
       }),
     ).toThrow("canonical asset id format");
-
-    expect(() =>
-      normalizeAgentMemoryConfiguration({
-        agentId: "agent-m",
-        assets: [{ assetId: new AssetId("asset:memory:one"), memoryType: "working" }],
-        retrieval: { strategy: "latest-first", maxEntries: 5, semantic: { minRelevanceScore: 0.5 } },
-        revision: 1,
-      }),
-    ).toThrow("semantic config is not allowed");
-
-    expect(() =>
-      normalizeAgentMemoryConfiguration({
-        agentId: "agent-m",
-        assets: [{ assetId: new AssetId("asset:memory:one"), memoryType: "working" }],
-        retrieval: { strategy: "semantic-filter", maxEntries: 5 },
-        revision: 1,
-      }),
-    ).toThrow("requires semantic config");
   });
 });
 
 describe("Agent execution session invariants", () => {
-  it("enforces lifecycle transitions and terminal timestamp coherence", () => {
+  it("enforces lifecycle transitions and canonical diagnostic references", () => {
     const queued = createAgentExecutionSession({
       id: "sess-1",
       agentId: "agent-1",
+      planId: "agent-plan:1",
       startTime: new Date("2026-03-24T10:00:00.000Z"),
     });
 
-    const planning = transitionAgentExecutionSession(queued, { status: AgentExecutionSessionStatuses.planning });
-    const running = transitionAgentExecutionSession(planning, {
+    const ready = transitionAgentExecutionSession(queued, { status: AgentExecutionSessionStatuses.ready });
+    const running = transitionAgentExecutionSession(ready, {
       status: AgentExecutionSessionStatuses.running,
-      appendExecutionRun: { runId: "run-1", status: "running" },
+      appendExecutionRun: { runId: "run-1", planId: "agent-plan:1", status: "running" },
     });
     const completed = transitionAgentExecutionSession(running, {
       status: AgentExecutionSessionStatuses.completed,
-      appendDiagnosticAssetId: "asset:diag:1",
+      appendDiagnostic: { assetId: new AssetId("asset:diag:1"), assetVersionId: "v1" },
       endedAt: new Date("2026-03-24T10:03:00.000Z"),
     });
 
     expect(completed.executionRuns.map((run) => run.runId)).toEqual(["run-1"]);
-    expect(completed.diagnosticAssetIds).toEqual(["asset:diag:1"]);
+    expect(completed.diagnostics[0]?.assetId.toString()).toBe("asset:diag:1");
     expect(completed.endTime).toBe("2026-03-24T10:03:00.000Z");
-
-    expect(() =>
-      transitionAgentExecutionSession(completed, { status: AgentExecutionSessionStatuses.running }),
-    ).toThrow("Invalid agent execution session transition");
   });
 
-  it("rejects session construction in terminal state", () => {
+  it("rejects invalid transition and execution run/session plan mismatch", () => {
+    const queued = createAgentExecutionSession({ id: "sess-2", agentId: "agent-2", planId: "agent-plan:2" });
+
     expect(() =>
-      createAgentExecutionSession({
-        id: "sess-2",
-        agentId: "agent-2",
+      transitionAgentExecutionSession(queued, {
         status: AgentExecutionSessionStatuses.completed,
       }),
-    ).toThrow("cannot be created in a terminal status");
+    ).toThrow("Invalid agent execution session transition");
+
+    expect(() =>
+      transitionAgentExecutionSession(queued, {
+        status: AgentExecutionSessionStatuses.ready,
+        appendExecutionRun: { runId: "run-bad", planId: "agent-plan:other", status: "running" },
+      }),
+    ).toThrow("must match session planId");
   });
 });

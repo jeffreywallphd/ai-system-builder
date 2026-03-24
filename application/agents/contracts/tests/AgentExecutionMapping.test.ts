@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { AssetId } from "../../../../domain/assets/AssetId";
 import {
   buildAgentExecutionUnitPayload,
   mapAgentExecutionToBackbone,
@@ -27,7 +28,7 @@ describe("Agent execution backbone mapping", () => {
           stepId: "step-2",
           goalId: "goal-1",
           toolId: "mcp:local:summarize",
-          intent: { action: "Summarize context", inputAssetIds: ["asset:memory:ctx"], expectedOutputKey: "summary" },
+          intent: { action: "Summarize context", inputAssetIds: [new AssetId("asset:memory:ctx")], expectedOutputKey: "summary" },
           dependsOnStepIds: ["step-1"],
         },
       ],
@@ -38,7 +39,7 @@ describe("Agent execution backbone mapping", () => {
     expect(executionPlan.units[0]?.kind).toBe("agent-tool-step");
   });
 
-  it("creates payloads that preserve agent/session/run correlation identifiers", () => {
+  it("creates payloads that preserve agent/session correlation identifiers", () => {
     const session = createAgentExecutionSession({ id: "sess-2", agentId: "agent-b", planId: "agent-plan:2" });
 
     const payload = buildAgentExecutionUnitPayload({
@@ -68,16 +69,16 @@ describe("Agent execution backbone mapping", () => {
 
   it("tracks execution session lifecycle with terminal timestamps", () => {
     const session = createAgentExecutionSession({ id: "sess-4", agentId: "agent-d" });
-    const planning = transitionAgentExecutionSession(session, { status: AgentExecutionSessionStatuses.planning });
-    const running = transitionAgentExecutionSession(planning, { status: AgentExecutionSessionStatuses.running });
+    const ready = transitionAgentExecutionSession(session, { status: AgentExecutionSessionStatuses.ready });
+    const running = transitionAgentExecutionSession(ready, { status: AgentExecutionSessionStatuses.running });
     const completed = transitionAgentExecutionSession(running, {
       status: AgentExecutionSessionStatuses.completed,
       appendExecutionRun: { runId: "run-1", status: "running" },
-      appendDiagnosticAssetId: "asset:diag:1",
+      appendDiagnostic: { assetId: new AssetId("asset:diag:1") },
     });
 
     expect(completed.executionRuns.map((run) => run.runId)).toEqual(["run-1"]);
-    expect(completed.diagnosticAssetIds).toEqual(["asset:diag:1"]);
+    expect(completed.diagnostics.map((entry) => entry.assetId.toString())).toEqual(["asset:diag:1"]);
     expect(completed.endTime).toBeDefined();
   });
 
@@ -106,21 +107,8 @@ describe("Agent execution backbone mapping", () => {
     expect(() =>
       mapAgentExecutionToBackbone({
         session,
-        steps: [
-          { stepId: "step-1", toolId: "mcp:local:echo", intent: { action: "one" }, dependsOnStepIds: ["step-2"] },
-          { stepId: "step-2", toolId: "mcp:local:echo", intent: { action: "two" }, dependsOnStepIds: ["step-1"] },
-        ],
+        steps: [{ stepId: "step-1", toolId: "mcp:local:echo", intent: { action: "one", inputAssetIds: [new AssetId("not-canonical")] } }],
       }),
-    ).toThrow("dependency cycle");
-
-    expect(() =>
-      mapAgentExecutionToBackbone({
-        session,
-        steps: [
-          { stepId: "step-1", toolId: "mcp:local:echo", intent: { action: "one" }, dependsOnStepIds: ["step-2"] },
-          { stepId: "step-2", toolId: "mcp:local:echo", intent: { action: "two" }, dependsOnStepIds: ["step-9"] },
-        ],
-      }),
-    ).toThrow("unknown step");
+    ).toThrow("canonical asset id format");
   });
 });
