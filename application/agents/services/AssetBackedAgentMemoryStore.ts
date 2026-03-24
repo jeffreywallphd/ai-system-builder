@@ -1,7 +1,7 @@
 import { Asset } from "../../../domain/assets/Asset";
 import { AssetLocation, AssetSourceInfo } from "../../../domain/assets/AssetMetadata";
 import { AssetVersion } from "../../../domain/assets/AssetVersion";
-import type { AgentMemoryEntryReference, AgentMemoryQuery, AgentMemoryStore } from "../../../domain/agents/AgentMemory";
+import type { AgentMemoryEntryReference, AgentMemoryQuery, AgentMemoryStore, AgentMemoryType } from "../../../domain/agents/AgentMemory";
 import type { IAssetCatalog } from "../../ports/interfaces/IAssetCatalog";
 import type { IAssetVersionRepository } from "../../ports/interfaces/IAssetVersionRepository";
 
@@ -69,6 +69,7 @@ export class AssetBackedAgentMemoryStore implements AgentMemoryStore {
         type: "agent-memory-entry",
         agentId: normalizedAgentId,
         tags,
+        memoryType: entry.memoryType ?? "working",
         entryMetadata: metadata,
       },
       reproducibilitySummary: {
@@ -81,6 +82,7 @@ export class AssetBackedAgentMemoryStore implements AgentMemoryStore {
     const normalizedAgentId = agentId.trim();
     const assetIds = (criteria.assetIds ?? []).map((entry) => entry.trim()).filter(Boolean);
     const tagFilter = new Set(normalizeTags(criteria.tags));
+    const memoryTypeFilter = new Set<AgentMemoryType>(criteria.memoryTypes ?? []);
     const maxEntries = Math.max(1, Math.trunc(criteria.maxEntries ?? 10));
     const responses: AgentMemoryEntryReference[] = [];
 
@@ -103,9 +105,17 @@ export class AssetBackedAgentMemoryStore implements AgentMemoryStore {
       const versions = await this.versionRepository.listVersionsByAssetId(assetId);
       const latest = [...versions].sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())[0];
 
+      const storedMemoryType = typeof latest?.metadata?.memoryType === "string"
+        ? (latest.metadata.memoryType as AgentMemoryType)
+        : undefined;
+      if (memoryTypeFilter.size > 0 && (!storedMemoryType || !memoryTypeFilter.has(storedMemoryType))) {
+        continue;
+      }
+
       responses.push(Object.freeze({
         assetId,
         assetVersionId: latest?.versionId,
+        memoryType: storedMemoryType,
         tags: assetTags,
         metadata: latest?.metadata,
       }));

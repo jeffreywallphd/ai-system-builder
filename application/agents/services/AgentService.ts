@@ -3,13 +3,13 @@ import {
   toAgentReadModel,
   updateAgent,
   type Agent,
-  type AgentExecutionPolicy,
-  type AgentGoal,
-  type AgentMemoryConfig,
-  type AgentPlanningStrategyReference,
+  type AgentExecutionConfiguration,
+  type AgentPlanningStrategy,
   type AgentReadModel,
-  type AgentToolReference,
 } from "../../../domain/agents/Agent";
+import type { AgentGoal } from "../../../domain/agents/AgentGoal";
+import type { AgentPolicy } from "../../../domain/agents/AgentPolicy";
+import type { AgentMemoryConfiguration } from "../../../domain/agents/AgentMemory";
 import type { IAgentRepository } from "../../ports/interfaces/IAgentRepository";
 
 export class AgentService {
@@ -18,11 +18,12 @@ export class AgentService {
   public async createAgent(input: {
     readonly id: string;
     readonly name: string;
+    readonly description?: string;
     readonly goals: ReadonlyArray<AgentGoal>;
-    readonly allowedTools: ReadonlyArray<AgentToolReference>;
-    readonly memoryConfig: AgentMemoryConfig;
-    readonly planningStrategy: AgentPlanningStrategyReference;
-    readonly executionPolicy?: AgentExecutionPolicy;
+    readonly policy: AgentPolicy;
+    readonly planningStrategy: AgentPlanningStrategy;
+    readonly memory: AgentMemoryConfiguration;
+    readonly execution?: AgentExecutionConfiguration;
   }): Promise<Agent> {
     const existing = await this.repository.get(input.id.trim());
     if (existing) {
@@ -36,11 +37,12 @@ export class AgentService {
     id: string,
     changes: {
       readonly name?: string;
+      readonly description?: string;
       readonly goals?: ReadonlyArray<AgentGoal>;
-      readonly allowedTools?: ReadonlyArray<AgentToolReference>;
-      readonly memoryConfig?: AgentMemoryConfig;
-      readonly planningStrategy?: AgentPlanningStrategyReference;
-      readonly executionPolicy?: AgentExecutionPolicy;
+      readonly policy?: AgentPolicy;
+      readonly memory?: AgentMemoryConfiguration;
+      readonly planningStrategy?: AgentPlanningStrategy;
+      readonly execution?: AgentExecutionConfiguration;
       readonly status?: Agent["status"];
     },
   ): Promise<Agent> {

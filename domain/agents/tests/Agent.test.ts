@@ -1,22 +1,43 @@
 import { describe, expect, it } from "bun:test";
+import { AssetId } from "../../assets/AssetId";
 import { createAgent, toAgentReadModel, updateAgent } from "../Agent";
 
 describe("Agent domain", () => {
-  it("creates an agent with goals, policy, MCP tools, and memory assets", () => {
+  it("creates a first-class agent with structured goals, policy, and asset-backed memory", () => {
     const agent = createAgent({
       id: "agent-weather",
       name: "Weather Analyst",
-      goals: [{ goalId: "g1", title: "Fetch weather", successCriteria: ["Returns forecast"], requiredToolIds: ["mcp:local:get_weather"] }],
-      allowedTools: [{ toolId: "mcp:local:get_weather" }],
-      memoryConfig: { memoryAssetIds: ["asset:memory:weather"], retrieval: { tags: ["weather"], maxEntries: 5 } },
+      description: "Analyzes weather and reports risk.",
+      goals: [{
+        id: "g1",
+        objective: "Retrieve weather and summarize risks",
+        constraints: ["Use approved weather tools only"],
+        successCriteria: ["Forecast includes severe-weather guidance"],
+        priority: "high",
+        priorityOrder: 1,
+        requiredToolIds: ["mcp:local:get_weather"],
+      }],
+      policy: {
+        allowedTools: ["mcp:local:get_weather"],
+        toolScopeConstraints: [{ toolId: "mcp:local:get_weather", allowedScopes: ["forecast.read"] }],
+        restrictedActions: ["filesystem.write"],
+        costLimits: { maxTokens: 12_000 },
+        executionLimits: { maxSteps: 3, maxWallClockMs: 30_000 },
+        safetyConstraints: { requiredApprovals: ["weather-data"], deniedPermissions: ["network.open"] },
+      },
+      memory: {
+        agentId: "agent-weather",
+        assets: [{ assetId: new AssetId("asset:memory:weather"), memoryType: "episodic", lineageTag: "seed" }],
+        retrieval: { strategy: "hybrid", maxEntries: 5, requiredTags: ["weather"] },
+        revision: 1,
+      },
       planningStrategy: { strategyId: "linear-default", mode: "deterministic-linear" },
-      executionPolicy: { trustPolicyId: "trust:strict", requireTrustedTools: true, maxExecutionSteps: 3 },
+      execution: { trustPolicyId: "trust:strict", requireTrustedTools: true, maxExecutionSteps: 3 },
     });
 
     expect(agent.name).toBe("Weather Analyst");
-    expect(agent.status).toBe("ready");
-    expect(agent.allowedTools[0]?.toolId).toBe("mcp:local:get_weather");
-    expect(agent.memoryConfig.memoryAssetIds).toEqual(["asset:memory:weather"]);
+    expect(agent.policy.allowedTools[0]).toBe("mcp:local:get_weather");
+    expect(agent.memory.assets[0]?.assetId.toString()).toBe("asset:memory:weather");
   });
 
   it("returns stable read models without caller-side reconstruction", () => {
@@ -24,61 +45,117 @@ describe("Agent domain", () => {
       id: "agent-read",
       name: "Read Model Agent",
       goals: [
-        { goalId: "g2", title: "Secondary", successCriteria: ["done"], priority: 20 },
-        { goalId: "g1", title: "Primary", successCriteria: ["done"], priority: 1 },
+        { id: "g2", objective: "Secondary", constraints: [], successCriteria: ["done"], priority: "normal", priorityOrder: 20 },
+        { id: "g1", objective: "Primary", constraints: [], successCriteria: ["done"], priority: "critical", priorityOrder: 1 },
       ],
-      allowedTools: [{ toolId: "mcp:local:echo" }],
-      memoryConfig: { memoryAssetIds: ["asset:memory:read"] },
+      policy: {
+        allowedTools: ["mcp:local:echo"],
+        toolScopeConstraints: [],
+        restrictedActions: [],
+        costLimits: {},
+        executionLimits: {},
+        safetyConstraints: { requiredApprovals: [], deniedPermissions: [] },
+      },
+      memory: {
+        agentId: "agent-read",
+        assets: [{ assetId: new AssetId("asset:memory:read"), memoryType: "working" }],
+        retrieval: { strategy: "latest-first", maxEntries: 10 },
+        revision: 1,
+      },
       planningStrategy: { strategyId: "deterministic", mode: "deterministic-linear" },
     });
 
     const readModel = toAgentReadModel(agent);
-    expect(readModel.goals[0]?.goalId).toBe("g1");
-    expect(readModel.memory.retrievalMaxEntries).toBe(10);
+    expect(readModel.goals[0]?.id).toBe("g1");
+    expect(readModel.memory.maxEntries).toBe(10);
   });
 
-  it("rejects invalid allowed tool and memory configuration", () => {
+  it("rejects invalid policy and memory configuration", () => {
     expect(() =>
       createAgent({
         id: "agent-invalid",
         name: "Invalid Agent",
-        goals: [{ goalId: "g1", title: "Bad tool", successCriteria: ["Never"] }],
-        allowedTools: [{ toolId: "workflow:tool-a" }],
-        memoryConfig: { memoryAssetIds: [] },
+        goals: [{ id: "g1", objective: "Bad tool", constraints: [], successCriteria: ["Never"], priority: "normal", priorityOrder: 1 }],
+        policy: {
+          allowedTools: [],
+          toolScopeConstraints: [],
+          restrictedActions: [],
+          costLimits: {},
+          executionLimits: {},
+          safetyConstraints: { requiredApprovals: [], deniedPermissions: [] },
+        },
+        memory: {
+          agentId: "agent-invalid",
+          assets: [],
+          retrieval: { strategy: "latest-first", maxEntries: 1 },
+          revision: 1,
+        },
         planningStrategy: { strategyId: "linear-default", mode: "deterministic-linear" },
       }),
-    ).toThrow("mcp:");
+    ).toThrow("allowed tool");
   });
 
-  it("rejects goals requiring tools outside allowed set", () => {
+  it("rejects goals requiring tools outside allowed policy", () => {
     expect(() =>
       createAgent({
         id: "agent-invalid-goal-tool",
         name: "Invalid Goal Tool Agent",
-        goals: [{ goalId: "g1", title: "Use secret tool", successCriteria: ["Done"], requiredToolIds: ["mcp:local:secret"] }],
-        allowedTools: [{ toolId: "mcp:local:echo" }],
-        memoryConfig: { memoryAssetIds: ["asset:memory:a"] },
+        goals: [{
+          id: "g1",
+          objective: "Use secret tool",
+          constraints: [],
+          successCriteria: ["Done"],
+          priority: "normal",
+          priorityOrder: 1,
+          requiredToolIds: ["mcp:local:secret"],
+        }],
+        policy: {
+          allowedTools: ["mcp:local:echo"],
+          toolScopeConstraints: [],
+          restrictedActions: [],
+          costLimits: {},
+          executionLimits: {},
+          safetyConstraints: { requiredApprovals: [], deniedPermissions: [] },
+        },
+        memory: {
+          agentId: "agent-invalid-goal-tool",
+          assets: [{ assetId: new AssetId("asset:memory:a"), memoryType: "working" }],
+          retrieval: { strategy: "latest-first", maxEntries: 5 },
+          revision: 1,
+        },
         planningStrategy: { strategyId: "linear-default", mode: "deterministic-linear" },
       }),
-    ).toThrow("not in allowedTools");
+    ).toThrow("not allowed by policy");
   });
 
   it("updates lifecycle status and validates changes", () => {
     const existing = createAgent({
       id: "agent-update",
       name: "Agent Update",
-      goals: [{ goalId: "g1", title: "Goal", successCriteria: ["done"] }],
-      allowedTools: [{ toolId: "mcp:local:echo" }],
-      memoryConfig: { memoryAssetIds: ["asset:memory:update"] },
+      goals: [{ id: "g1", objective: "Goal", constraints: [], successCriteria: ["done"], priority: "normal", priorityOrder: 1 }],
+      policy: {
+        allowedTools: ["mcp:local:echo"],
+        toolScopeConstraints: [],
+        restrictedActions: [],
+        costLimits: {},
+        executionLimits: {},
+        safetyConstraints: { requiredApprovals: [], deniedPermissions: [] },
+      },
+      memory: {
+        agentId: "agent-update",
+        assets: [{ assetId: new AssetId("asset:memory:update"), memoryType: "working" }],
+        retrieval: { strategy: "latest-first", maxEntries: 5 },
+        revision: 1,
+      },
       planningStrategy: { strategyId: "linear-default", mode: "deterministic-linear" },
     });
 
     const updated = updateAgent(existing, {
       status: "paused",
-      executionPolicy: { maxExecutionSteps: 2 },
+      execution: { maxExecutionSteps: 2, requireTrustedTools: true },
     });
 
     expect(updated.status).toBe("paused");
-    expect(updated.executionPolicy.maxExecutionSteps).toBe(2);
+    expect(updated.execution.maxExecutionSteps).toBe(2);
   });
 });

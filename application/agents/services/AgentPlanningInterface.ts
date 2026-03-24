@@ -30,33 +30,35 @@ export class DeterministicAgentPlanningService implements AgentPlanningInterface
   public async plan(agent: Agent): Promise<AgentExecutionPlan> {
     const capabilities = await this.catalog.listCapabilities();
     const capabilityIds = new Set(capabilities.map((capability) => capability.id));
-    const allowedTools = agent.allowedTools
-      .map((reference) => reference.toolId)
-      .filter((toolId) => capabilityIds.has(toolId));
+    const allowedTools = agent.policy.allowedTools.filter((toolId) => capabilityIds.has(toolId));
 
     if (allowedTools.length === 0) {
       throw new Error(`Agent '${agent.id}' has no executable allowed tools in the current catalog.`);
     }
 
     const memoryEntries = await this.memoryStore.query(agent.id, {
-      assetIds: agent.memoryConfig.memoryAssetIds,
-      tags: agent.memoryConfig.retrieval?.tags,
-      maxEntries: agent.memoryConfig.retrieval?.maxEntries,
+      assetIds: agent.memory.assets.map((entry) => entry.assetId.toString()),
+      memoryTypes: [...new Set(agent.memory.assets.map((entry) => entry.memoryType))],
+      tags: agent.memory.retrieval.requiredTags,
+      maxEntries: agent.memory.retrieval.maxEntries,
     });
 
-    const maxSteps = agent.executionPolicy.maxExecutionSteps ?? agent.goals.length;
-    const prioritizedGoals = [...agent.goals].sort((left, right) => (left.priority ?? 100) - (right.priority ?? 100)).slice(0, maxSteps);
+    const maxSteps = agent.execution.maxExecutionSteps ?? agent.policy.executionLimits.maxSteps ?? agent.goals.length;
+    const prioritizedGoals = [...agent.goals]
+      .sort((left, right) => left.priorityOrder - right.priorityOrder)
+      .slice(0, maxSteps);
+
     const steps = prioritizedGoals.map((goal, index) => {
       const goalTool = goal.requiredToolIds?.find((candidate) => allowedTools.includes(candidate));
       const toolId = goalTool ?? allowedTools[index % allowedTools.length];
       if (!toolId) {
-        throw new Error(`Agent planning could not resolve a tool for goal '${goal.goalId}'.`);
+        throw new Error(`Agent planning could not resolve a tool for goal '${goal.id}'.`);
       }
       return Object.freeze({
-        stepId: `plan:${agent.id}:${goal.goalId}:${index + 1}`,
-        goalId: goal.goalId,
+        stepId: `plan:${agent.id}:${goal.id}:${index + 1}`,
+        goalId: goal.id,
         toolId,
-        action: goal.title,
+        action: goal.objective,
         memoryContext: Object.freeze(memoryEntries),
       });
     });
