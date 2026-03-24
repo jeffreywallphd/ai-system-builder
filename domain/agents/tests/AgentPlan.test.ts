@@ -92,5 +92,34 @@ describe("AgentPlan", () => {
         },
       ],
     })).toThrow("dependency cycle");
+
+
+    expect(() => normalizeAgentPlan({
+      planId: "p",
+      agentId: "a",
+      strategyId: "s",
+      createdAt: new Date().toISOString(),
+      steps: [
+        {
+          stepId: "s1",
+          toolId: "mcp:local:echo",
+          dependsOnStepIds: [],
+          intent: {
+            action: "collect",
+            expectedOutputKey: "collect.result",
+            inputReferences: [],
+          },
+        },
+        {
+          stepId: "s2",
+          toolId: "mcp:local:echo",
+          dependsOnStepIds: ["s1"],
+          intent: {
+            action: "use",
+            inputReferences: [{ kind: "step-output", stepId: "s1", outputKey: "different.result" }],
+          },
+        },
+      ],
+    })).toThrow("declares expectedOutputKey");
   });
 });

@@ -2,7 +2,7 @@ import type { AgentMemoryStore } from "../../../domain/agents/AgentMemory";
 import type { Agent } from "../../../domain/agents/Agent";
 import type { AgentExecutionResult } from "../models/AgentExecutionResult";
 import type { ExecuteAgentToolsUseCase } from "../ExecuteAgentToolsUseCase";
-import type { AgentPlanningInterface } from "./AgentPlanningInterface";
+import type { AgentPlanningInterface } from "../contracts/AgentPlanningStrategy";
 import type { AgentPlan } from "../../../domain/agents/AgentPlan";
 
 export interface AgentExecutionStepOutcome {

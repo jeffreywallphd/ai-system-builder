@@ -3,6 +3,11 @@ import type { AgentExecutionSession } from "../../../domain/agents/AgentExecutio
 import { AssetId } from "../../../domain/assets/AssetId";
 import type { AgentPlan, AgentPlanStep } from "../../../domain/agents/AgentPlan";
 
+export interface AgentPlanStepOutputReference {
+  readonly stepId: string;
+  readonly outputKey: string;
+}
+
 export interface AgentPlanStepMappingInput {
   readonly stepId: string;
   readonly goalId?: string;
@@ -10,6 +15,7 @@ export interface AgentPlanStepMappingInput {
   readonly intent: {
     readonly action: string;
     readonly inputAssetIds?: ReadonlyArray<AssetId>;
+    readonly inputStepOutputs?: ReadonlyArray<AgentPlanStepOutputReference>;
     readonly expectedOutputKey?: string;
   };
   readonly dependsOnStepIds?: ReadonlyArray<string>;
@@ -29,6 +35,7 @@ export interface AgentExecutionUnitPayload {
   readonly toolId: string;
   readonly action: string;
   readonly inputAssetIds: ReadonlyArray<AssetId>;
+  readonly inputStepOutputs: ReadonlyArray<AgentPlanStepOutputReference>;
   readonly expectedOutputKey?: string;
 }
 
@@ -60,6 +67,13 @@ function normalizeExpectedOutputKey(value: string | undefined): string | undefin
   return normalized;
 }
 
+function normalizeStepOutputReference(reference: AgentPlanStepOutputReference): AgentPlanStepOutputReference {
+  return Object.freeze({
+    stepId: normalizeRequired(reference.stepId, "Agent plan step-output reference stepId"),
+    outputKey: normalizeRequired(normalizeExpectedOutputKey(reference.outputKey) ?? "", "Agent plan step-output reference outputKey"),
+  });
+}
+
 function normalizeStep(step: AgentPlanStepMappingInput): AgentPlanStepMappingInput {
   return Object.freeze({
     stepId: normalizeRequired(step.stepId, "Agent plan step id"),
@@ -74,6 +88,7 @@ function normalizeStep(step: AgentPlanStepMappingInput): AgentPlanStepMappingInp
         }
         return normalizedAssetId;
       })),
+      inputStepOutputs: Object.freeze((step.intent?.inputStepOutputs ?? []).map((reference) => normalizeStepOutputReference(reference))),
       expectedOutputKey: normalizeExpectedOutputKey(step.intent?.expectedOutputKey),
     }),
     dependsOnStepIds: Object.freeze(
@@ -95,6 +110,15 @@ function validateDependencies(steps: ReadonlyArray<AgentPlanStepMappingInput>): 
     for (const dependencyId of step.dependsOnStepIds ?? []) {
       if (!stepIdSet.has(dependencyId)) {
         throw new Error(`Agent execution mapping step '${step.stepId}' depends on unknown step '${dependencyId}'.`);
+      }
+    }
+
+    for (const inputReference of step.intent.inputStepOutputs ?? []) {
+      if (!stepIdSet.has(inputReference.stepId)) {
+        throw new Error(`Agent execution mapping step '${step.stepId}' references unknown step output '${inputReference.stepId}'.`);
+      }
+      if (!(step.dependsOnStepIds ?? []).includes(inputReference.stepId)) {
+        throw new Error(`Agent execution mapping step '${step.stepId}' must depend on '${inputReference.stepId}' when consuming its output.`);
       }
     }
   }
@@ -123,15 +147,28 @@ function validateDependencies(steps: ReadonlyArray<AgentPlanStepMappingInput>): 
 
 function validateResultWiring(steps: ReadonlyArray<AgentPlanStepMappingInput>): void {
   const seenOutputKeys = new Set<string>();
+  const stepById = new Map(steps.map((step) => [step.stepId, step] as const));
   for (const step of steps) {
     const outputKey = step.intent.expectedOutputKey;
-    if (!outputKey) {
-      continue;
+    if (outputKey) {
+      if (seenOutputKeys.has(outputKey)) {
+        throw new Error(`Agent execution mapping expectedOutputKey '${outputKey}' must be unique across steps.`);
+      }
+      seenOutputKeys.add(outputKey);
     }
-    if (seenOutputKeys.has(outputKey)) {
-      throw new Error(`Agent execution mapping expectedOutputKey '${outputKey}' must be unique across steps.`);
+
+    for (const reference of step.intent.inputStepOutputs ?? []) {
+      const referencedStep = stepById.get(reference.stepId);
+      if (!referencedStep) {
+        throw new Error(`Agent execution mapping step '${step.stepId}' references unknown step output '${reference.stepId}'.`);
+      }
+      const referencedOutputKey = referencedStep.intent.expectedOutputKey;
+      if (referencedOutputKey && reference.outputKey !== referencedOutputKey) {
+        throw new Error(
+          `Agent execution mapping step '${step.stepId}' references outputKey '${reference.outputKey}' from '${reference.stepId}', but that step declares expectedOutputKey '${referencedOutputKey}'.`,
+        );
+      }
     }
-    seenOutputKeys.add(outputKey);
   }
 }
 
@@ -148,6 +185,11 @@ function toMappingStep(step: AgentPlanStep): AgentPlanStepMappingInput {
         step.intent.inputReferences
           .filter((reference) => reference.kind === "asset")
           .map((reference) => reference.assetId),
+      ),
+      inputStepOutputs: Object.freeze(
+        step.intent.inputReferences
+          .filter((reference) => reference.kind === "step-output")
+          .map((reference) => Object.freeze({ stepId: reference.stepId, outputKey: reference.outputKey })),
       ),
     }),
   });
@@ -190,6 +232,7 @@ export function buildAgentExecutionUnitPayload(input: {
     toolId: normalizedStep.toolId,
     action: normalizedStep.intent.action,
     inputAssetIds: normalizedStep.intent.inputAssetIds ?? [],
+    inputStepOutputs: normalizedStep.intent.inputStepOutputs ?? [],
     expectedOutputKey: normalizedStep.intent.expectedOutputKey,
   });
 }
