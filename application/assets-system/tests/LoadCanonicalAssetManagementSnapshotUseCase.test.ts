@@ -40,6 +40,8 @@ describe("LoadCanonicalAssetManagementSnapshotUseCase", () => {
       {
         execute: async () => ({
           matched: false,
+          trust: { state: "mismatch-detected", explanation: "mismatch", recommendedActions: ["repair"] },
+          mismatches: [{ versionId: "v1" }],
           checks: [
             { code: "EDGE_COUNT", matched: false, message: "missing" },
           ],
@@ -52,7 +54,10 @@ describe("LoadCanonicalAssetManagementSnapshotUseCase", () => {
     expect(snapshot?.asset.assetId).toBe("asset-1");
     expect(snapshot?.versions).toHaveLength(2);
     expect(snapshot?.dependencyLifecycleSummary.stale).toBe(1);
+    expect(snapshot?.operationalSummary.status).toBe("attention-needed");
     expect(snapshot?.projectionHealth?.matched).toBeFalse();
+    expect(snapshot?.projectionHealth?.trustState).toBe("mismatch-detected");
+    expect(snapshot?.projectionHealth?.mismatchedVersionIds).toEqual(["v1"]);
     expect(snapshot?.projectionHealth?.failedChecks[0]).toContain("EDGE_COUNT");
   });
 

@@ -29,6 +29,11 @@ export interface IListInstalledModelsResult {
       readonly reasons: ReadonlyArray<string>;
       readonly nextActions: ReadonlyArray<string>;
     };
+    readonly operationalStatus?: {
+      readonly trust: "trusted" | "attention-needed";
+      readonly explanation: string;
+      readonly recommendedNextSteps: ReadonlyArray<string>;
+    };
     readonly fallbackReason?: string;
   }>>;
 }
@@ -67,6 +72,13 @@ export class ListInstalledModelsUseCase {
               state: resolved.dependencyState.state,
               reasons: resolved.dependencyState.reasons,
               nextActions: resolved.dependencyState.nextActions,
+            })
+            : undefined,
+          operationalStatus: resolved.operationalStatus
+            ? Object.freeze({
+              trust: resolved.operationalStatus.trust,
+              explanation: resolved.operationalStatus.explanation,
+              recommendedNextSteps: resolved.operationalStatus.recommendedNextSteps,
             })
             : undefined,
           fallbackReason: resolved.fallbackReason,

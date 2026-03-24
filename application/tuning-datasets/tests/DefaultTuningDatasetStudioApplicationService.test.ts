@@ -138,6 +138,11 @@ describe("DefaultTuningDatasetStudioApplicationService", () => {
             staleBecauseUpstreamAdvanced: [],
             nextActions: ["Replay scoped graph projection for this asset/version to verify lineage edges."],
           },
+          operationalStatus: {
+            trust: "attention-needed",
+            explanation: "Canonical dependency-state is 'reconciliation-needed'.",
+            recommendedNextSteps: ["Replay scoped graph projection for this asset/version to verify lineage edges."],
+          },
         }),
       } as any,
     });
@@ -150,6 +155,7 @@ describe("DefaultTuningDatasetStudioApplicationService", () => {
     const selected = details.selectedVersion!;
     expect(details.canonicalByVersionId?.[selected.id]?.preferred).toBeTrue();
     expect(details.canonicalByVersionId?.[selected.id]?.dependencyState?.state).toBe("reconciliation-needed");
+    expect(details.canonicalByVersionId?.[selected.id]?.operationalStatus?.trust).toBe("attention-needed");
   });
   it("runs the version-aware QA workflow from import through release and successor draft creation", async () => {
     const service = createService();

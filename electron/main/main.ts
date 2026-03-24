@@ -411,9 +411,12 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     return JSON.stringify({
       assetId: verification.assetId,
       matched: verification.matched,
+      trustState: verification.trust.state,
+      trustExplanation: verification.trust.explanation,
       edgeCount: verification.projectionSummary.edgeCount,
       scopedVersionCount: verification.projectionSummary.scopedVersionCount,
       failedChecks: verification.checks.filter((entry) => !entry.matched).map((entry) => `${entry.code}: ${entry.message}`),
+      mismatchedVersionIds: verification.mismatches.map((entry) => entry.versionId),
     });
   });
   ipcMain.handle("ai-loom-desktop-canonical-assets:rebuild-scopes", async (_event, requestJson: string) => {

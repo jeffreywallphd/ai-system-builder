@@ -10,6 +10,7 @@ describe("CanonicalEntityOperationalReadService", () => {
     });
     expect(summary.preferred).toBeFalse();
     expect(summary.fallbackReason).toBe("Canonical resolver missing.");
+    expect(summary.operationalStatus?.trust).toBe("attention-needed");
   });
 
   it("projects dependency-state and provenance from canonical resolver", async () => {
@@ -43,6 +44,7 @@ describe("CanonicalEntityOperationalReadService", () => {
     expect(summary.preferred).toBeTrue();
     expect(summary.dependencyState?.state).toBe("impacted");
     expect(summary.provenance?.lineageConfidence).toBe("partial");
+    expect(summary.operationalStatus?.trust).toBe("attention-needed");
   });
 
   it("returns identity-backed canonical summary when resolver is unavailable", async () => {
@@ -66,5 +68,6 @@ describe("CanonicalEntityOperationalReadService", () => {
     expect(summary.preferred).toBeTrue();
     expect(summary.assetId).toBe("installed-model:model-1");
     expect(summary.fallbackReason).toContain("identity-only");
+    expect(summary.operationalStatus?.trust).toBe("attention-needed");
   });
 });

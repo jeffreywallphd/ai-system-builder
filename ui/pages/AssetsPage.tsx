@@ -145,7 +145,9 @@ export default function AssetsPage(): JSX.Element {
                       entityId,
                       versionId: versionId || undefined,
                     }],
+                    verifyBeforeReplay: true,
                     verifyAfterReplay: true,
+                    replayMismatchedVersionsOnly: true,
                   });
                   if (!result) {
                     setStatusMessage("Scoped rebuild orchestration is unavailable in this runtime.");
@@ -191,9 +193,21 @@ export default function AssetsPage(): JSX.Element {
                 {managementSnapshot.projectionHealth ? (
                   <p className="ui-text-small ui-text-secondary">
                     <strong>Projection health:</strong> {managementSnapshot.projectionHealth.matched
-                      ? "matched"
-                      : `mismatch (${managementSnapshot.projectionHealth.failedChecks.length} check(s) failed)`}
+                      ? `matched (${managementSnapshot.projectionHealth.trustState})`
+                      : `mismatch (${managementSnapshot.projectionHealth.failedChecks.length} check(s) failed, ${managementSnapshot.projectionHealth.mismatchedVersionIds.length} mismatched version(s))`}
                   </p>
+                ) : null}
+                <p className="ui-text-small ui-text-secondary">
+                  <strong>Operational summary:</strong> {managementSnapshot.operationalSummary.explanation}
+                </p>
+                {managementSnapshot.operationalSummary.recommendedActions.length > 0 ? (
+                  <ul className="ui-stack ui-stack--xs">
+                    {managementSnapshot.operationalSummary.recommendedActions.map((action) => (
+                      <li key={action} className="ui-text-small ui-text-secondary">
+                        {action}
+                      </li>
+                    ))}
+                  </ul>
                 ) : null}
               </div>
             ) : null}
