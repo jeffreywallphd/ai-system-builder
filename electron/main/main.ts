@@ -21,7 +21,7 @@ import { DesktopServiceSupervisor } from "./DesktopServiceSupervisor";
 import type { DesktopBootstrapContext } from "../shared/DesktopContracts";
 import { SqliteAssetSystemRepository } from "../../infrastructure/filesystem/SqliteAssetSystemRepository";
 import { InMemoryAssetLineageGraphProjectionSink } from "../../infrastructure/filesystem/InMemoryAssetLineageGraphProjectionSink";
-import { ListCanonicalAssetsUseCase, LoadCanonicalAssetDetailUseCase } from "../../application/assets-system/CanonicalAssetReadUseCases";
+import { ExplainCanonicalVersionExistenceUseCase, ListCanonicalAssetsUseCase, LoadCanonicalAssetDetailUseCase } from "../../application/assets-system/CanonicalAssetReadUseCases";
 import { GetAssetVersionHistoryUseCase } from "../../application/assets-system/GetAssetVersionHistoryUseCase";
 import { GetCanonicalDependencyStateUseCase } from "../../application/assets-system/CanonicalDependencyStateUseCase";
 import { GetAssetDependencyHealthUseCase } from "../../application/assets-system/GetAssetDependencyHealthUseCase";
@@ -31,6 +31,7 @@ import { ReconcileCanonicalIdentityMappingsUseCase, ReplayScopedAssetGraphProjec
 import { ReplayAssetGraphProjectionUseCase } from "../../application/assets-system/ReplayAssetGraphProjectionUseCase";
 import { VerifyAssetGraphProjectionUseCase } from "../../application/assets-system/VerifyAssetGraphProjectionUseCase";
 import { ProjectionRebuildOrchestrationUseCase } from "../../application/assets-system/ProjectionRebuildOrchestrationUseCase";
+import { LoadCanonicalAssetManagementSnapshotUseCase } from "../../application/assets-system/LoadCanonicalAssetManagementSnapshotUseCase";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 if (started) {
@@ -273,6 +274,10 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     canonicalAssetSystemRepository,
   );
   const getVersionHistoryUseCase = new GetAssetVersionHistoryUseCase(canonicalAssetSystemRepository);
+  const explainVersionExistenceUseCase = new ExplainCanonicalVersionExistenceUseCase(
+    new GetCanonicalProvenanceSummaryUseCase(canonicalAssetSystemRepository, canonicalAssetSystemRepository, canonicalAssetSystemRepository),
+    canonicalAssetSystemRepository,
+  );
   const dependencyStateUseCase = new GetCanonicalDependencyStateUseCase(
     canonicalAssetSystemRepository,
     canonicalAssetSystemRepository,
@@ -287,6 +292,13 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   const rebuildProjectionOrchestrationUseCase = new ProjectionRebuildOrchestrationUseCase(
     replayScopedProjectionUseCase,
     replayProjectionUseCase,
+    verifyProjectionUseCase,
+  );
+  const loadManagementSnapshotUseCase = new LoadCanonicalAssetManagementSnapshotUseCase(
+    loadCanonicalAssetDetailUseCase,
+    getVersionHistoryUseCase,
+    dependencyStateUseCase,
+    explainVersionExistenceUseCase,
     verifyProjectionUseCase,
   );
 
@@ -331,7 +343,7 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     if (!canonicalAssetSystemRepository?.isAvailable) {
       return [];
     }
-    const chain = await getVersionHistoryUseCase.execute({ assetId });
+    const chain = await getVersionHistoryUseCase.execute(assetId);
     const withState = await Promise.all(chain.map(async (version) => {
       const dependencyState = await dependencyStateUseCase.execute({
         versionId: version.versionId,
@@ -342,7 +354,13 @@ async function bootstrapDesktopRuntime(): Promise<void> {
         parentVersionId: version.parentVersionId,
         createdAt: version.createdAt.toISOString(),
         label: version.versionLabel,
-        dependencyState: dependencyState?.state,
+        dependencyState: dependencyState
+          ? {
+            state: dependencyState.state,
+            reasons: dependencyState.reasons,
+            nextActions: dependencyState.nextActions,
+          }
+          : undefined,
       });
     }));
     return withState;
@@ -359,6 +377,11 @@ async function bootstrapDesktopRuntime(): Promise<void> {
       versionId: summary.versionId,
       state: summary.state,
       lineageConfidence: summary.lineageConfidence,
+      lifecycle: {
+        source: summary.lifecycle.source,
+        computedAt: summary.lifecycle.computedAt.toISOString(),
+        reason: summary.lifecycle.reason,
+      },
       reasons: summary.reasons,
       nextActions: summary.nextActions,
     });
@@ -400,6 +423,26 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     const request = JSON.parse(requestJson) as Parameters<ProjectionRebuildOrchestrationUseCase["execute"]>[0];
     const result = await rebuildProjectionOrchestrationUseCase.execute(request);
     return JSON.stringify(result);
+  });
+  ipcMain.handle("ai-loom-desktop-canonical-assets:management-snapshot", async (_event, assetId: string, includeProjectionHealth = true, versionIdsInProjectionScope?: ReadonlyArray<string>) => {
+    if (!canonicalAssetSystemRepository?.isAvailable) {
+      return null;
+    }
+    const snapshot = await loadManagementSnapshotUseCase.execute({
+      assetId,
+      includeProjectionHealth,
+      versionIdsInProjectionScope,
+    });
+    if (!snapshot) {
+      return null;
+    }
+    return JSON.stringify({
+      ...snapshot,
+      versions: snapshot.versions.map((entry) => ({
+        ...entry,
+        createdAt: entry.createdAt.toISOString(),
+      })),
+    });
   });
 
   if (runtimeConfig.isPackagedDesktopHost && !pythonRuntime.isAvailable) {

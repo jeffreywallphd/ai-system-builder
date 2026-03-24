@@ -18,6 +18,7 @@ export class VerifyAssetGraphProjectionUseCase {
     readonly fromVersionId?: string;
     readonly toVersionId?: string;
     readonly expectedEdgeCountAtLeast?: number;
+    readonly strictEdgeParityInScope?: boolean;
   }): Promise<{
     readonly assetId: string;
     readonly matched: boolean;
@@ -35,6 +36,7 @@ export class VerifyAssetGraphProjectionUseCase {
     const checks: Array<{ code: string; matched: boolean; message: string; }> = [];
     const minEdgeCount = params.expectedEdgeCountAtLeast ?? 1;
     const scopedVersionIds = [...new Set((params.versionIdsInScope ?? []).map((entry) => entry.trim()).filter(Boolean))];
+    const strictEdgeParityInScope = params.strictEdgeParityInScope ?? true;
     checks.push({
       code: "EDGE_COUNT",
       matched: edges.length >= minEdgeCount,
@@ -55,6 +57,18 @@ export class VerifyAssetGraphProjectionUseCase {
         matched: this.isSetEqual(downstreamFromRepo, downstreamFromProjection),
         message: `Downstream adjacency parity for '${versionId}' repository=${downstreamFromRepo.size} projection=${downstreamFromProjection.size}.`,
       });
+
+      if (strictEdgeParityInScope) {
+        const missingDownstream = [...downstreamFromRepo].filter((id) => !downstreamFromProjection.has(id));
+        const unexpectedDownstream = [...downstreamFromProjection].filter((id) => !downstreamFromRepo.has(id));
+        checks.push({
+          code: `SCOPE_EDGE_PARITY_DETAIL:${versionId}`,
+          matched: missingDownstream.length === 0 && unexpectedDownstream.length === 0,
+          message: missingDownstream.length === 0 && unexpectedDownstream.length === 0
+            ? `Scoped edge parity for '${versionId}' is exact.`
+            : `Scoped edge parity mismatch for '${versionId}' missing=[${missingDownstream.join(", ")}] unexpected=[${unexpectedDownstream.join(", ")}].`,
+        });
+      }
     }
 
     if (params.fromVersionId && params.toVersionId) {

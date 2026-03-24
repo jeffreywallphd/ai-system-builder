@@ -70,6 +70,8 @@ describe("Dependency health and graph projection", () => {
         changedUpstreamVersionIds: ["missing-upstream"],
       });
       expect(refreshed.summary.state).toBe("reconciliation-needed");
+      expect(refreshed.explanation.length).toBeGreaterThan(0);
+      expect(refreshed.remediationHint.length).toBeGreaterThan(0);
 
       await repository.upsertIdentity({
         entityType: "dataset-version",

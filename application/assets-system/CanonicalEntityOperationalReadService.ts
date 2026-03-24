@@ -1,4 +1,5 @@
 import type { CanonicalEntityType } from "../ports/interfaces/ICanonicalAssetIdentityRepository";
+import type { CanonicalAssetIdentityService } from "./CanonicalAssetIdentityService";
 import type { CanonicalEntityReadResolver } from "./CanonicalEntityReadResolver";
 
 export interface CanonicalOperationalReadSummary {
@@ -21,7 +22,10 @@ export interface CanonicalOperationalReadSummary {
 }
 
 export class CanonicalEntityOperationalReadService {
-  constructor(private readonly resolver?: CanonicalEntityReadResolver) {}
+  constructor(
+    private readonly resolver?: CanonicalEntityReadResolver,
+    private readonly identityService?: CanonicalAssetIdentityService,
+  ) {}
 
   public async resolveSummary(params: {
     readonly entityType: CanonicalEntityType;
@@ -31,6 +35,21 @@ export class CanonicalEntityOperationalReadService {
     readonly fallbackWhenUnavailable: string;
   }): Promise<CanonicalOperationalReadSummary> {
     if (!this.resolver) {
+      if (this.identityService) {
+        const identity = await this.identityService.resolveIdentity(params.entityType, params.entityId);
+        if (identity) {
+          const latestVersionId = identity.latestVersionId
+            ?? await this.identityService.resolveLatestVersionId(params.entityType, params.entityId);
+          return Object.freeze({
+            preferred: true,
+            assetId: identity.assetId,
+            pinnedVersionId: identity.latestVersionId,
+            latestVersionId,
+            fallbackReason: "Canonical resolver is not configured; returning identity-only canonical summary.",
+          });
+        }
+      }
+
       return Object.freeze({
         preferred: false,
         fallbackReason: params.fallbackWhenUnavailable,

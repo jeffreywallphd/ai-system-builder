@@ -50,6 +50,7 @@ describe("GetCanonicalDependencyStateUseCase", () => {
       ).execute({ versionId: "downstream:v1", maxDownstreamDepth: 2 });
 
       expect(summary.state).toBe("stale");
+      expect(summary.lifecycle.source).toBe("recomputed");
       expect(summary.staleBecauseUpstreamAdvanced[0]?.latestVersionId).toBe("upstream:v2");
       expect(summary.nextActions.some((action) => action.includes("successor"))).toBeTrue();
     } finally {
@@ -90,6 +91,7 @@ describe("GetCanonicalDependencyStateUseCase", () => {
       });
       const cached = await useCase.execute({ versionId: "cache:v1", preferPersistedIfFreshMs: 60_000 });
       expect(cached.state).toBe("healthy");
+      expect(cached.lifecycle.source).toBe("persisted-fresh");
       expect(cached.reasons).toEqual(["cached-state"]);
     } finally {
       await rm(root, { recursive: true, force: true });

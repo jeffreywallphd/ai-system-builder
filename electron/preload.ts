@@ -103,5 +103,8 @@ contextBridge.exposeInMainWorld("aiLoomDesktop", {
     rebuildProjectionScopes(requestJson: string) {
       return ipcRenderer.invoke("ai-loom-desktop-canonical-assets:rebuild-scopes", requestJson) as Promise<string>;
     },
+    loadManagementSnapshot(assetId: string, includeProjectionHealth = true, versionIdsInProjectionScope?: ReadonlyArray<string>) {
+      return ipcRenderer.invoke("ai-loom-desktop-canonical-assets:management-snapshot", assetId, includeProjectionHealth, versionIdsInProjectionScope) as Promise<string | null>;
+    },
   },
 });
