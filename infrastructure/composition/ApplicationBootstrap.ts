@@ -38,6 +38,7 @@ import { ExecuteMcpToolUseCase } from "../../application/mcp/ExecuteMcpToolUseCa
 import { ListToolCapabilitiesUseCase } from "../../application/tools/ListToolCapabilitiesUseCase";
 import { InvokeToolCapabilityUseCase } from "../../application/tools/InvokeToolCapabilityUseCase";
 import { PublishDurableEntityToAssetSystemUseCase } from "../../application/assets-system/PublishDurableEntityToAssetSystemUseCase";
+import { CanonicalAssetIdentityService } from "../../application/assets-system/CanonicalAssetIdentityService";
 
 import type { INodeCatalogProvider } from "../../application/ports/interfaces/INodeCatalogProvider";
 import type { IWorkflowExecutor } from "../../application/ports/interfaces/IWorkflowExecutor";
@@ -227,7 +228,8 @@ export class ApplicationBootstrap {
       APPLICATION_TOKENS.ListInstalledModelsUseCase,
       (c) =>
         new ListInstalledModelsUseCase(
-          c.resolve<IInstalledModelCatalog>(TOKENS.InstalledModelCatalog)
+          c.resolve<IInstalledModelCatalog>(TOKENS.InstalledModelCatalog),
+          c.resolve<CanonicalAssetIdentityService>(TOKENS.CanonicalAssetIdentityService),
         )
     );
 

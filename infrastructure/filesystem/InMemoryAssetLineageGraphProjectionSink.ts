@@ -21,4 +21,33 @@ export class InMemoryAssetLineageGraphProjectionSink implements IAssetLineageGra
   public get publishedEdges(): ReadonlyArray<AssetLineageEdge> {
     return Object.freeze([...this.publishedEdgesStore]);
   }
+
+  public hasVersionPath(fromVersionId: string, toVersionId: string, maxDepth = 6): boolean {
+    const adjacency = new Map<string, Set<string>>();
+    for (const edge of this.publishedEdgesStore) {
+      const next = adjacency.get(edge.fromVersionId) ?? new Set<string>();
+      next.add(edge.toVersionId);
+      adjacency.set(edge.fromVersionId, next);
+    }
+
+    const queue: Array<{ readonly versionId: string; readonly depth: number }> = [{ versionId: fromVersionId, depth: 0 }];
+    const visited = new Set<string>([fromVersionId]);
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      if (current.versionId === toVersionId) {
+        return true;
+      }
+      if (current.depth >= maxDepth) {
+        continue;
+      }
+      for (const adjacent of adjacency.get(current.versionId) ?? []) {
+        if (visited.has(adjacent)) {
+          continue;
+        }
+        visited.add(adjacent);
+        queue.push({ versionId: adjacent, depth: current.depth + 1 });
+      }
+    }
+    return false;
+  }
 }

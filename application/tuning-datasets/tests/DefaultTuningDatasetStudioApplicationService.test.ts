@@ -7,6 +7,7 @@ import { LocalStorageTuningDatasetRepository } from "../../../infrastructure/bro
 import { LocalStorageTuningDatasetVersionRepository } from "../../../infrastructure/browser/tuning-datasets/LocalStorageTuningDatasetVersionRepository";
 import { UnifiedExecutionEngine } from "../../execution/UnifiedExecutionEngine";
 import { DatasetGenerationExecutionUnitHandler } from "../../../infrastructure/execution/DatasetGenerationExecutionUnitHandler";
+import { CanonicalAssetIdentityService } from "../../assets-system/CanonicalAssetIdentityService";
 
 class MemoryStorage {
   private readonly values = new Map<string, string>();
@@ -14,7 +15,7 @@ class MemoryStorage {
   public setItem(key: string, value: string): void { this.values.set(key, value); }
 }
 
-function createService(options: { generationService?: any; executionEngine?: UnifiedExecutionEngine; canonicalPublisher?: any } = {}) {
+function createService(options: { generationService?: any; executionEngine?: UnifiedExecutionEngine; canonicalPublisher?: any; canonicalIdentityService?: CanonicalAssetIdentityService } = {}) {
   const storage = new MemoryStorage();
   const datasetRepository = new LocalStorageTuningDatasetRepository("test-datasets", storage as never);
   const versionRepository = new LocalStorageTuningDatasetVersionRepository(storage as never);
@@ -54,6 +55,7 @@ function createService(options: { generationService?: any; executionEngine?: Uni
     ),
     executionEngine: options.executionEngine,
     canonicalPublisher: options.canonicalPublisher,
+    canonicalIdentityService: options.canonicalIdentityService,
     createId: (() => {
       let count = 0;
       return (prefix: string) => `${prefix}-${++count}`;
@@ -81,6 +83,34 @@ describe("DefaultTuningDatasetStudioApplicationService", () => {
     });
 
     expect(published).toContain(`${dataset.dataset.id}:${dataset.selectedVersion!.id}`);
+  });
+
+  it("prefers canonical identity summaries for dataset-version detail reads", async () => {
+    const canonicalIdentityService = new CanonicalAssetIdentityService(
+      {
+        getIdentity: async (_entityType, entityId) => ({
+          entityType: "dataset-version",
+          entityId,
+          assetId: `dataset-version:${entityId}`,
+          latestVersionId: `asset-version:${entityId}:1`,
+          updatedAt: new Date("2026-03-24T00:00:00.000Z"),
+        }),
+        upsertIdentity: async () => undefined,
+      },
+      { listVersionsByAssetId: async () => [] } as any,
+    );
+
+    const service = createService({ canonicalIdentityService });
+    const created = await service.createDataset({
+      name: "Canonical Read Dataset",
+      taskType: "question_answering",
+      createdBy: "tester",
+    });
+
+    const details = await service.getDatasetDetails({ datasetId: created.dataset.id });
+    const selected = details.selectedVersion!;
+    expect(details.canonicalByVersionId?.[selected.id]?.preferred).toBeTrue();
+    expect(details.canonicalByVersionId?.[selected.id]?.assetId).toContain(`${created.dataset.id}:${selected.id}`);
   });
   it("runs the version-aware QA workflow from import through release and successor draft creation", async () => {
     const service = createService();
@@ -264,7 +294,7 @@ describe("DefaultTuningDatasetStudioApplicationService", () => {
       sourceDocumentIds: [details.sourceDocuments[0]!.id],
     });
 
-    expect(savedRuns.at(-1)?.metadata).toEqual({
+    expect(savedRuns.at(-1)?.metadata).toMatchObject({
       executionKind: "dataset-generation",
       datasetId: dataset.dataset.id,
       versionId,

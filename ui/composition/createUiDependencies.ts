@@ -4,6 +4,7 @@ import { ModelCompatibilityService } from "../../domain/services/ModelCompatibil
 import { CreateWorkflowUseCase } from "../../application/workflows/CreateWorkflowUseCase";
 import { ExecuteWorkflowUseCase } from "../../application/workflows/ExecuteWorkflowUseCase";
 import { ValidateWorkflowUseCase } from "../../application/workflows/ValidateWorkflowUseCase";
+import { LoadWorkflowUseCase } from "../../application/workflows/LoadWorkflowUseCase";
 import { CreateNodeUseCase } from "../../application/nodes/CreateNodeUseCase";
 import { ConnectNodesUseCase } from "../../application/nodes/ConnectNodesUseCase";
 import { ListAvailableNodesUseCase } from "../../application/nodes/ListAvailableNodesUseCase";
@@ -327,6 +328,7 @@ export function createUiDependencies(
     executionEngine,
   );
   const validateWorkflowUseCase = new ValidateWorkflowUseCase(workflowValidator);
+  const loadWorkflowUseCase = new LoadWorkflowUseCase(workflowRepository, workflowValidator);
 
   const createNodeUseCase = new CreateNodeUseCase(nodeCatalogProvider);
   const connectNodesUseCase = new ConnectNodesUseCase(nodeCompatibilityService);
@@ -339,6 +341,7 @@ export function createUiDependencies(
     executeWorkflowUseCase,
     validateWorkflowUseCase,
     workflowRepository,
+    loadWorkflowUseCase,
   });
 
   const nodeService = new NodeService({

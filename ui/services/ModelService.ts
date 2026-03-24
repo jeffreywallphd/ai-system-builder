@@ -72,11 +72,15 @@ export class ModelService {
   public async listInstalledModels(
     criteria?: IInstalledModelSearchCriteria
   ): Promise<ReadonlyArray<IModel>> {
-    const request: IListInstalledModelsRequest = { criteria };
-    const result: IListInstalledModelsResult =
-      await this.listInstalledModelsUseCase.execute(request);
-
+    const result = await this.listInstalledModelsReadModel(criteria);
     return result.models;
+  }
+
+  public async listInstalledModelsReadModel(
+    criteria?: IInstalledModelSearchCriteria
+  ): Promise<IListInstalledModelsResult> {
+    const request: IListInstalledModelsRequest = { criteria };
+    return this.listInstalledModelsUseCase.execute(request);
   }
 
   public async getInstalledModelById(id: string): Promise<IModel | undefined> {
