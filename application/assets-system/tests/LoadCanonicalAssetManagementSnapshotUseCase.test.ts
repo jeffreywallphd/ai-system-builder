@@ -71,4 +71,51 @@ describe("LoadCanonicalAssetManagementSnapshotUseCase", () => {
 
     expect(snapshot).toBeUndefined();
   });
+
+  it("builds dependency lifecycle counts consistently across all lifecycle states", async () => {
+    const snapshot = await new LoadCanonicalAssetManagementSnapshotUseCase(
+      {
+        execute: async () => ({
+          assetId: "asset-2",
+          name: "Asset 2",
+          kind: "dataset-version",
+          status: "available",
+          latestVersion: { versionId: "v5" },
+          versionCount: 5,
+          transformationCount: 0,
+          lineageEdgeCount: 0,
+        }),
+      } as any,
+      {
+        execute: async () => ([
+          { versionId: "v5", createdAt: new Date("2026-03-24T00:00:00.000Z"), versionLabel: "v5" },
+          { versionId: "v4", createdAt: new Date("2026-03-23T00:00:00.000Z"), versionLabel: "v4" },
+          { versionId: "v3", createdAt: new Date("2026-03-22T00:00:00.000Z"), versionLabel: "v3" },
+          { versionId: "v2", createdAt: new Date("2026-03-21T00:00:00.000Z"), versionLabel: "v2" },
+          { versionId: "v1", createdAt: new Date("2026-03-20T00:00:00.000Z"), versionLabel: "v1" },
+        ]),
+      } as any,
+      {
+        execute: async ({ versionId }: { versionId: string }) => ({
+          versionId,
+          state: ({ v5: "healthy", v4: "impacted", v3: "stale", v2: "partially-trusted", v1: "reconciliation-needed" } as const)[versionId],
+          lineageConfidence: "exact",
+          lifecycle: { source: "persisted-fresh", computedAt: new Date(), reason: "cached" },
+          reasons: ["reason"],
+          impactedByUpstreamVersionIds: [],
+          staleBecauseUpstreamAdvanced: [],
+          nextActions: ["action"],
+        }),
+      } as any,
+      { execute: async () => undefined } as any,
+    ).execute({ assetId: "asset-2" });
+
+    expect(snapshot?.dependencyLifecycleSummary).toEqual({
+      healthy: 1,
+      impacted: 1,
+      stale: 1,
+      partiallyTrusted: 1,
+      reconciliationNeeded: 1,
+    });
+  });
 });

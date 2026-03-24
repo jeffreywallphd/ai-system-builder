@@ -157,6 +157,24 @@ describe("DefaultTuningDatasetStudioApplicationService", () => {
     expect(details.canonicalByVersionId?.[selected.id]?.dependencyState?.state).toBe("reconciliation-needed");
     expect(details.canonicalByVersionId?.[selected.id]?.operationalStatus?.trust).toBe("attention-needed");
   });
+
+  it("returns an explicit operational fallback summary when no dataset version is selected", async () => {
+    const service = createService();
+    const created = await service.createDataset({
+      name: "No Version Dataset",
+      taskType: "question_answering",
+      createdBy: "tester",
+      initializeVersion: false,
+    });
+
+    const datasets = await service.listDatasets();
+    const summary = datasets.find((entry) => entry.dataset.id === created.dataset.id);
+    expect(summary?.canonicalSelectedVersion?.preferred).toBeFalse();
+    expect(summary?.canonicalSelectedVersion?.fallbackReason).toBe("Dataset has no selected version.");
+    expect(summary?.canonicalSelectedVersion?.operationalStatus?.trust).toBe("attention-needed");
+    expect(summary?.canonicalSelectedVersion?.operationalStatus?.recommendedNextSteps[0]).toContain("Select or create a dataset version");
+  });
+
   it("runs the version-aware QA workflow from import through release and successor draft creation", async () => {
     const service = createService();
     const dataset = await service.createDataset({

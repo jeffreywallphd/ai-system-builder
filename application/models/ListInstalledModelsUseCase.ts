@@ -34,33 +34,8 @@ export class ListInstalledModelsUseCase {
   ): Promise<IListInstalledModelsResult> {
     const models = await this.installedModelCatalog.listInstalled(request.criteria);
     const canonicalByModelId = Object.freeze(Object.fromEntries(await Promise.all(models.map(async (model) => {
-        const resolved = await this.canonicalReadService.resolveSummary({
-          entityType: "installed-model",
-          entityId: model.id,
-          fallbackWhenUnavailable: "Canonical resolver is not configured for installed-model reads.",
-        });
-        return [model.id, Object.freeze({
-          preferred: resolved.preferred,
-          assetId: resolved.assetId,
-          pinnedVersionId: resolved.pinnedVersionId,
-          latestVersionId: resolved.latestVersionId,
-          provenance: resolved.provenance,
-          dependencyState: resolved.dependencyState
-            ? Object.freeze({
-              state: resolved.dependencyState.state,
-              reasons: resolved.dependencyState.reasons,
-              nextActions: resolved.dependencyState.nextActions,
-            })
-            : undefined,
-          operationalStatus: resolved.operationalStatus
-            ? Object.freeze({
-              trust: resolved.operationalStatus.trust,
-              explanation: resolved.operationalStatus.explanation,
-              recommendedNextSteps: resolved.operationalStatus.recommendedNextSteps,
-            })
-            : undefined,
-          fallbackReason: resolved.fallbackReason,
-        })] as const;
+        const summary = await this.resolveCanonicalModelSummary(model.id);
+        return [model.id, summary] as const;
       }))));
 
     return Object.freeze({
