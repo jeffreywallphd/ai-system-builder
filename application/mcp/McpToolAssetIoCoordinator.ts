@@ -13,6 +13,7 @@ import type { IAssetVersionRepository } from "../ports/interfaces/IAssetVersionR
 export interface McpToolAssetIoPreparation {
   readonly arguments: Readonly<Record<string, unknown>>;
   readonly inputVersionIds: ReadonlyArray<string>;
+  readonly consumedAssets: ReadonlyArray<Readonly<Record<string, unknown>>>;
 }
 
 export interface McpToolAssetIoFinalization {
@@ -44,13 +45,14 @@ export class McpToolAssetIoCoordinator {
   ): Promise<McpToolAssetIoPreparation> {
     const contracts = installedTool.definition.assetIo?.inputs ?? [];
     if (contracts.length === 0) {
-      return Object.freeze({ arguments: argumentsValue, inputVersionIds: Object.freeze([]) });
+      return Object.freeze({ arguments: argumentsValue, inputVersionIds: Object.freeze([]), consumedAssets: Object.freeze([]) });
     }
+    this.assertRawInputPolicy(contracts, installedTool, argumentsValue);
 
     const nextArguments = deepClone(argumentsValue);
     const resolvedInputs: ResolvedAssetInput[] = [];
 
-    for (const contract of contracts) {
+    for (const contract of [...contracts].sort((left, right) => left.path.localeCompare(right.path))) {
       const rawValue = readAtPath(nextArguments, contract.path);
       if (rawValue === undefined) {
         if (contract.required === false) {
@@ -69,7 +71,19 @@ export class McpToolAssetIoCoordinator {
 
     return Object.freeze({
       arguments: Object.freeze(nextArguments),
-      inputVersionIds: Object.freeze([...new Set(resolvedInputs.map((entry) => entry.versionId).filter((value): value is string => Boolean(value)))]),
+      inputVersionIds: Object.freeze(
+        [...new Set(resolvedInputs.map((entry) => entry.versionId).filter((value): value is string => Boolean(value)))].sort((left, right) => left.localeCompare(right)),
+      ),
+      consumedAssets: Object.freeze(
+        resolvedInputs.map((entry) => Object.freeze({
+          path: entry.contract.path,
+          assetId: entry.asset.id,
+          versionId: entry.versionId,
+          kind: entry.asset.kind,
+          resolution: entry.contract.resolution,
+          valueKind: entry.contract.valueKind,
+        })),
+      ),
     });
   }
 
@@ -93,6 +107,13 @@ export class McpToolAssetIoCoordinator {
       const contract = assetOutputs[index]!;
       const extracted = extractOutputPayload(contract, params.structuredContent, params.fallbackOutput);
       if (extracted === undefined) {
+        if (params.installedTool.definition.assetIo?.allowsRawOutputs === false) {
+          throw new McpToolRegistryError(
+            "invalid-output-contract",
+            `Asset output '${contract.path ?? "<root>"}' is missing and raw-output fallback is disabled.`,
+            { toolId: params.installedTool.toolId, outputPath: contract.path ?? "<root>" },
+          );
+        }
         continue;
       }
 
@@ -320,6 +341,29 @@ export class McpToolAssetIoCoordinator {
           kind: resolved.asset.kind,
           location: resolved.asset.location.location,
         });
+    }
+  }
+
+  private assertRawInputPolicy(
+    contracts: ReadonlyArray<McpToolAssetInputContract>,
+    installedTool: InstalledMcpToolRecord,
+    argumentsValue: Readonly<Record<string, unknown>>,
+  ): void {
+    if (installedTool.definition.assetIo?.allowsRawInputs !== false) {
+      return;
+    }
+    const allowedRootKeys = new Set(
+      contracts
+        .map((contract) => contract.path.split(".").map((segment) => segment.trim()).filter(Boolean)[0])
+        .filter((value): value is string => !!value),
+    );
+    const unknownKeys = Object.keys(argumentsValue).filter((key) => !allowedRootKeys.has(key));
+    if (unknownKeys.length > 0) {
+      throw new McpToolRegistryError(
+        "invalid-input-contract",
+        "Tool asset I/O contract disallows raw inputs; only declared asset input paths are allowed.",
+        { toolId: installedTool.toolId, unknownPaths: unknownKeys.sort() },
+      );
     }
   }
 }

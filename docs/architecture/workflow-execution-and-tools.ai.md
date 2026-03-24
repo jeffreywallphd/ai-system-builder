@@ -90,6 +90,12 @@ Use "workflow-first", "tool projection", and "truthful execution provenance" whe
 - MCP node failures now always degrade into structured node-level failure outputs (`outputs.mcpError`) with bounded category/code/detail payloads (including runtime-declared failures and availability/precondition failures), so workflow-level results/events can surface useful diagnostics without opaque crashes.
 - Workflow persistence hydration no longer needs MCP-only load branches; dynamic MCP argument properties are restored through the same node property hydration pass used for all nodes, with MCP-specific expansion isolated behind the node configuration service seam.
 - MCP outputs now expose workflow-consistent node outputs (`toolResult`, `resultText`) while preserving compatibility aliases used by existing downstream consumers.
+- For installed MCP tools that declare non-raw `assetIo.outputs`, canonical asset persistence is now mandatory: execution fails if asset-I/O coordination is not configured.
+- Asset-aware MCP execution metadata now carries consumed input asset references and produced output assets, making provenance queries deterministic for `asset -> execution/tool -> asset` chains.
+- Raw bypass behavior is explicit and bounded: `allowsRawInputs=false` rejects undeclared raw fields; `allowsRawOutputs=false` rejects executions that omit declared asset outputs.
+- Asset transformation history now has a canonical read seam (`GetAssetTransformationHistoryUseCase`) with repository-native asset-level querying plus version-based fallback.
+- Installed-tool read models expose minimal marketplace-ready metadata (`description`, `author`, `version`, `categories`), and MCP definition normalization/validation now includes author metadata checks.
+- Local-first MCP tool definition sharing now includes explicit registry export/import contracts (`ai-loom.mcp-tools.v1`) with bounded overwrite semantics and no remote-registry coupling.
 
 ## TODO
 - If asked whether tools and workflows are separate bounded contexts, answer: "not really; tools are primarily a projected and published workflow surface in the current implementation."

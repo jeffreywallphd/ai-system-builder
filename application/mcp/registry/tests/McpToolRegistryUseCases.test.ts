@@ -4,8 +4,10 @@ import type { IMcpToolRegistryRepository } from "../../../ports/interfaces/IMcpT
 import type { InstalledMcpToolRecord } from "../../../../domain/mcp/InstalledMcpTool";
 import {
   ApplyMcpToolUpdateUseCase,
+  ExportInstalledMcpToolsUseCase,
   GetMcpToolLifecycleSummaryUseCase,
   GetInstalledMcpToolUseCase,
+  ImportMcpToolRegistryUseCase,
   InstallMcpToolUseCase,
   ListInstalledMcpToolsUseCase,
   ListMcpToolLifecycleHistoryUseCase,
@@ -299,5 +301,42 @@ describe("McpToolRegistryUseCases", () => {
     const repository = makeRepository([toolRecord("mcp:local:weather")]);
     const record = await new GetInstalledMcpToolUseCase(repository).execute("mcp:local:weather");
     expect(record.version).toBe("1.0.0");
+    expect(record.metadata.categories).toEqual(["lookup"]);
+  });
+
+  it("exports installed tool definitions in machine-readable format", async () => {
+    const repository = makeRepository([toolRecord("mcp:local:weather"), toolRecord("mcp:local:disabled", "1.0.0", "disabled")]);
+    const exportPayload = await new ExportInstalledMcpToolsUseCase(repository).execute();
+    expect(exportPayload.format).toBe("ai-loom.mcp-tools.v1");
+    expect(exportPayload.tools.map((tool) => tool.toolId)).toEqual(["mcp:local:weather"]);
+  });
+
+  it("imports tool definitions and supports overwrite behavior", async () => {
+    const repository = makeRepository([toolRecord("mcp:local:weather", "1.0.0")]);
+    const importer = new ImportMcpToolRegistryUseCase(repository);
+    const result = await importer.execute({
+      overwriteExisting: false,
+      envelope: {
+        format: "ai-loom.mcp-tools.v1",
+        exportedAt: "2026-03-24T00:00:00.000Z",
+        tools: [
+          {
+            toolId: "mcp:local:weather",
+            status: "enabled",
+            source: { kind: "inline", location: "inline:test" },
+            definition: { ...toolRecord("mcp:local:weather", "2.0.0").definition, author: "A. Loom" },
+          },
+          {
+            toolId: "mcp:local:new-tool",
+            status: "enabled",
+            source: { kind: "inline", location: "inline:test" },
+            definition: { ...toolRecord("mcp:local:new-tool", "1.0.0").definition, author: "A. Loom" },
+          },
+        ],
+      },
+    });
+
+    expect(result.skippedToolIds).toContain("mcp:local:weather");
+    expect(result.importedToolIds).toContain("mcp:local:new-tool");
   });
 });

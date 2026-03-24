@@ -24,6 +24,7 @@ describe("McpToolCapability", () => {
       id: " weather.lookup ",
       version: " 1.0.0 ",
       displayName: " Weather Lookup ",
+      author: "  Loom Labs  ",
       sideEffects: "read",
       auth: {
         kind: "required",
@@ -38,10 +39,27 @@ describe("McpToolCapability", () => {
     });
 
     expect(normalized.id).toBe("weather.lookup");
+    expect(normalized.author).toBe("Loom Labs");
     expect(normalized.binding?.serverId).toBe("local");
     expect(normalized.auth.scopes).toEqual(["weather.read"]);
     expect(normalized.auth.credentialFields).toEqual([{ key: "apiKey", label: "API Key", secret: true, required: true, format: undefined, description: undefined }]);
     expect(normalized.permissions).toEqual(["network.access"]);
+  });
+
+  it("rejects blank author metadata when provided", () => {
+    const validation = validateMcpToolDefinition({
+      id: "weather.lookup",
+      version: "1.0.0",
+      displayName: "Weather Lookup",
+      author: "   ",
+      sideEffects: "read",
+      auth: { kind: "none" },
+      tags: [],
+      categories: [],
+      inputSchema: { type: "object" },
+    });
+    expect(validation.valid).toBe(false);
+    expect(validation.issues.map((issue) => issue.code)).toContain("invalid-metadata");
   });
 
   it("validates and normalizes asset I/O contract metadata", () => {

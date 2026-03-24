@@ -1175,4 +1175,155 @@ describe("ExecuteMcpToolUseCase", () => {
     expect(versions.size).toBe(1);
   });
 
+  it("fails when asset outputs are declared but canonical asset persistence is not configured", async () => {
+    const executor: IMcpToolExecutor = {
+      executeTool: async () => ({
+        executionId: "exec-asset-required",
+        serverId: "local",
+        toolName: "asset-required",
+        status: "completed",
+        content: [{ result: {} }],
+        structuredContent: { result: {} },
+      }),
+    };
+
+    const registry = {
+      listInstalledTools: async () => [],
+      getInstalledTool: async () => undefined,
+      findInstalledToolByBinding: async () => Object.freeze({
+        ...(toolRecordForAsset("asset-required", {
+          outputs: [{ path: "result", mode: "asset-create", assetKind: "json" }],
+        }) as any),
+      }),
+      saveInstalledTool: async (record: never) => record,
+      removeInstalledTool: async () => false,
+    };
+
+    await expect(new ExecuteMcpToolUseCase(executor, new ExecutionContextToolPolicyService(), registry).execute({
+      serverId: "local",
+      toolName: "asset-required",
+      arguments: {},
+    })).rejects.toMatchObject({ code: "invalid-output-contract" });
+  });
+
+  it("records consumed asset metadata alongside produced assets when asset-aware execution succeeds", async () => {
+    const assets = new Map<string, any>([
+      ["asset-input", {
+        id: "asset-input",
+        name: "Input",
+        kind: "json",
+        status: "available",
+        source: { type: "uploaded" },
+        location: { accessMethod: "memory", location: "memory://input.json", format: "json", contentType: "application/json" },
+        relationships: [],
+      }],
+    ]);
+    const versions = new Map<string, AssetVersion>([
+      ["asset-input:version:seed", new AssetVersion({ assetId: "asset-input", versionId: "asset-input:version:seed" })],
+    ]);
+    const coordinator = new McpToolAssetIoCoordinator(
+      {
+        save: async (asset) => { assets.set(asset.id, asset); },
+        getById: async (assetId) => assets.get(assetId),
+        list: async () => [...assets.values()],
+        exists: async (assetId) => assets.has(assetId),
+      },
+      {
+        saveVersion: async (version) => { versions.set(version.versionId, version); },
+        getByVersionId: async (versionId) => versions.get(versionId),
+        listVersionsByAssetId: async (assetId) => [...versions.values()].filter((version) => version.assetId.value === assetId),
+      },
+      new RecordAssetTransformationUseCase(
+        { saveTransformation: async () => undefined, getById: async () => undefined, listByVersionId: async () => [] },
+        { saveEdge: async () => undefined, listEdgesByVersionId: async () => [] },
+      ),
+    );
+    const executor: IMcpToolExecutor = {
+      executeTool: async () => ({
+        executionId: "exec-asset-meta",
+        serverId: "local",
+        toolName: "asset-meta",
+        status: "completed",
+        content: [{ result: { ok: true } }],
+        structuredContent: { result: { ok: true } },
+      }),
+    };
+    const registry = {
+      listInstalledTools: async () => [],
+      getInstalledTool: async () => undefined,
+      findInstalledToolByBinding: async () => Object.freeze({
+        ...(toolRecordForAsset("asset-meta", {
+          inputs: [{ path: "source", valueKind: "asset-id", resolution: "location", assetKinds: ["json"] }],
+          outputs: [{ path: "result", mode: "asset-create", assetKind: "json" }],
+        }) as any),
+      }),
+      saveInstalledTool: async (record: never) => record,
+      removeInstalledTool: async () => false,
+    };
+
+    const result = await new ExecuteMcpToolUseCase(
+      executor,
+      new ExecutionContextToolPolicyService(),
+      registry,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      coordinator,
+    ).execute({
+      serverId: "local",
+      toolName: "asset-meta",
+      arguments: { source: "asset-input" },
+    });
+
+    expect((result.metadata?.assetIo as Record<string, unknown>)?.consumedAssets).toBeDefined();
+  });
+
 });
+
+function toolRecordForAsset(
+  toolName: string,
+  assetIo: { inputs?: ReadonlyArray<Record<string, unknown>>; outputs?: ReadonlyArray<Record<string, unknown>> },
+): Record<string, unknown> {
+  return {
+    toolId: `mcp:local:${toolName}`,
+    status: "enabled",
+    installedAt: "2026-03-24T00:00:00.000Z",
+    updatedAt: "2026-03-24T00:00:00.000Z",
+    source: { kind: "inline", location: "inline:test" },
+    grantedPermissions: ["asset.read", "asset.write"],
+    permissionApprovals: [
+      {
+        approvalId: `approval-${toolName}-asset-read`,
+        permission: "asset.read",
+        scope: { scopeType: "global" },
+        status: "approved",
+        requestedAt: "2026-03-24T00:00:00.000Z",
+        updatedAt: "2026-03-24T00:00:00.000Z",
+      },
+      {
+        approvalId: `approval-${toolName}-asset-write`,
+        permission: "asset.write",
+        scope: { scopeType: "global" },
+        status: "approved",
+        requestedAt: "2026-03-24T00:00:00.000Z",
+        updatedAt: "2026-03-24T00:00:00.000Z",
+      },
+    ],
+    definition: {
+      id: `mcp:local:${toolName}`,
+      version: "1.0.0",
+      displayName: toolName,
+      sideEffects: "read",
+      auth: { kind: "none" },
+      tags: [],
+      categories: [],
+      binding: { serverId: "local", toolName },
+      inputSchema: { type: "object" },
+      outputSchema: { type: "object" },
+      assetIo,
+    },
+  };
+}

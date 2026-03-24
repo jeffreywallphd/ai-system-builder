@@ -162,6 +162,38 @@ export interface InstalledMcpToolReadModel {
     lastEventAt?: string;
   }>;
   readonly updatePosture: "stable" | "risky-change-observed" | "breaking-change-observed";
+  readonly metadata: Readonly<{
+    description?: string;
+    author?: string;
+    version: string;
+    categories: ReadonlyArray<string>;
+  }>;
+}
+
+export interface McpToolRegistryExportEnvelope {
+  readonly format: "ai-loom.mcp-tools.v1";
+  readonly exportedAt: string;
+  readonly tools: ReadonlyArray<Readonly<{
+    toolId: string;
+    status: InstalledMcpToolRecord["status"];
+    source: McpToolDefinitionSource;
+    definition: McpToolDefinition;
+    lifecycle?: InstalledMcpToolLifecycle;
+  }>>;
+}
+
+export interface ExportInstalledMcpToolsRequest {
+  readonly includeDisabled?: boolean;
+}
+
+export interface ImportMcpToolRegistryRequest {
+  readonly envelope: McpToolRegistryExportEnvelope;
+  readonly overwriteExisting?: boolean;
+}
+
+export interface ImportMcpToolRegistryResult {
+  readonly importedToolIds: ReadonlyArray<string>;
+  readonly skippedToolIds: ReadonlyArray<string>;
 }
 
 export interface RemoveMcpToolResult {
@@ -526,6 +558,83 @@ export class RemoveMcpToolUseCase {
     await this.repository.removeInstalledTool(normalizedId);
 
     return Object.freeze({ status: "removed", toolId: normalizedId, references: Object.freeze([]) });
+  }
+}
+
+export class ExportInstalledMcpToolsUseCase {
+  constructor(private readonly repository: IMcpToolRegistryRepository) {}
+
+  public async execute(request: ExportInstalledMcpToolsRequest = {}): Promise<McpToolRegistryExportEnvelope> {
+    const tools = await this.repository.listInstalledTools();
+    const filtered = request.includeDisabled === true
+      ? tools
+      : tools.filter((tool) => tool.status === "enabled");
+
+    return Object.freeze({
+      format: "ai-loom.mcp-tools.v1",
+      exportedAt: new Date().toISOString(),
+      tools: Object.freeze(
+        filtered
+          .map((tool) => Object.freeze({
+            toolId: tool.toolId,
+            status: tool.status,
+            source: tool.source,
+            definition: tool.definition,
+            lifecycle: tool.lifecycle,
+          }))
+          .sort((left, right) => left.toolId.localeCompare(right.toolId)),
+      ),
+    });
+  }
+}
+
+export class ImportMcpToolRegistryUseCase {
+  constructor(private readonly repository: IMcpToolRegistryRepository) {}
+
+  public async execute(request: ImportMcpToolRegistryRequest): Promise<ImportMcpToolRegistryResult> {
+    if (request.envelope.format !== "ai-loom.mcp-tools.v1") {
+      throw new McpToolRegistryError("invalid-definition", "Unsupported MCP tool import format.", { format: request.envelope.format });
+    }
+
+    const importedToolIds: string[] = [];
+    const skippedToolIds: string[] = [];
+
+    for (const incoming of request.envelope.tools) {
+      const normalized = normalizeMcpToolDefinition(incoming.definition);
+      const validation = validateMcpToolDefinition(normalized);
+      if (!validation.valid) {
+        throw new McpToolRegistryError("invalid-definition", "Imported MCP tool definition is invalid.", {
+          toolId: incoming.toolId,
+          issues: validation.issues,
+        });
+      }
+      const existing = await this.repository.getInstalledTool(normalized.id);
+      if (existing && request.overwriteExisting !== true) {
+        skippedToolIds.push(normalized.id);
+        continue;
+      }
+      const record: InstalledMcpToolRecord = existing
+        ? Object.freeze({
+            ...existing,
+            status: incoming.status,
+            source: incoming.source,
+            definition: normalized,
+            lifecycle: incoming.lifecycle ?? existing.lifecycle,
+            updatedAt: new Date().toISOString(),
+          })
+        : createInstalledMcpToolRecord({
+            definition: normalized,
+            source: incoming.source,
+            status: incoming.status,
+          });
+      await this.repository.saveInstalledTool(record);
+      importedToolIds.push(normalized.id);
+    }
+
+    return Object.freeze({
+      importedToolIds: Object.freeze(importedToolIds.sort((left, right) => left.localeCompare(right))),
+      skippedToolIds: Object.freeze(skippedToolIds.sort((left, right) => left.localeCompare(right))),
+    });
   }
 }
 
@@ -1140,6 +1249,12 @@ function toInstalledToolReadModel(record: InstalledMcpToolRecord): InstalledMcpT
       lastEventAt: lastEvent?.occurredAt,
     }),
     updatePosture,
+    metadata: Object.freeze({
+      description: record.definition.description,
+      author: record.definition.author,
+      version: record.definition.version,
+      categories: record.definition.categories,
+    }),
   });
 }
 
