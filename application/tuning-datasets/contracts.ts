@@ -27,7 +27,19 @@ export interface DatasetSummary {
   readonly canonicalSelectedVersion?: {
     readonly preferred: boolean;
     readonly assetId?: string;
+    readonly pinnedVersionId?: string;
     readonly latestVersionId?: string;
+    readonly provenance?: {
+      readonly directUpstreamCount: number;
+      readonly directDownstreamCount: number;
+      readonly producingTransformationCount: number;
+      readonly lineageConfidence: "exact" | "partial";
+    };
+    readonly dependencyState?: {
+      readonly state: "healthy" | "impacted" | "stale" | "partially-trusted" | "reconciliation-needed";
+      readonly reasons: ReadonlyArray<string>;
+      readonly nextActions: ReadonlyArray<string>;
+    };
     readonly fallbackReason?: string;
   };
 }
@@ -46,7 +58,19 @@ export interface DatasetDetails {
   readonly canonicalByVersionId?: Readonly<Record<string, {
     readonly preferred: boolean;
     readonly assetId?: string;
+    readonly pinnedVersionId?: string;
     readonly latestVersionId?: string;
+    readonly provenance?: {
+      readonly directUpstreamCount: number;
+      readonly directDownstreamCount: number;
+      readonly producingTransformationCount: number;
+      readonly lineageConfidence: "exact" | "partial";
+    };
+    readonly dependencyState?: {
+      readonly state: "healthy" | "impacted" | "stale" | "partially-trusted" | "reconciliation-needed";
+      readonly reasons: ReadonlyArray<string>;
+      readonly nextActions: ReadonlyArray<string>;
+    };
     readonly fallbackReason?: string;
   }>>;
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { AssetTransformation } from "../../../domain/assets/AssetTransformation";
 import { AssetLineageEdge, AssetLineageRelationshipType } from "../../../domain/assets/AssetLineageEdge";
 import { InMemoryAssetLineageGraphProjectionSink } from "../../../infrastructure/filesystem/InMemoryAssetLineageGraphProjectionSink";
+import { VerifyAssetGraphProjectionUseCase } from "../VerifyAssetGraphProjectionUseCase";
 
 describe("InMemoryAssetLineageGraphProjectionSink", () => {
   it("captures transformation and edge projections for graph-ready publication", async () => {
@@ -30,5 +31,36 @@ describe("InMemoryAssetLineageGraphProjectionSink", () => {
     expect(sink.publishedEdges).toHaveLength(1);
     expect(sink.publishedEdges[0]?.edgeId).toBe("e-1");
     expect(sink.hasVersionPath("in:v1", "out:v1")).toBeTrue();
+    expect(sink.listOutgoingVersionIds("in:v1")).toContain("out:v1");
+    expect(sink.listIncomingVersionIds("out:v1")).toContain("in:v1");
+  });
+
+  it("verifies projected path/edge expectations for a canonical scope", async () => {
+    const sink = new InMemoryAssetLineageGraphProjectionSink();
+    await sink.publishEdge(new AssetLineageEdge({
+      edgeId: "e-verify",
+      fromVersionId: "left:v1",
+      toVersionId: "right:v1",
+      type: AssetLineageRelationshipType.DERIVED_FROM,
+    }));
+    const verification = await new VerifyAssetGraphProjectionUseCase(
+      {
+        listLineageEdgesByAssetId: async () => [new AssetLineageEdge({
+          edgeId: "e-verify",
+          fromVersionId: "left:v1",
+          toVersionId: "right:v1",
+          type: AssetLineageRelationshipType.DERIVED_FROM,
+        })],
+      } as any,
+      sink,
+    ).execute({
+      assetId: "asset-x",
+      fromVersionId: "left:v1",
+      toVersionId: "right:v1",
+      expectedEdgeCountAtLeast: 1,
+    });
+
+    expect(verification.matched).toBeTrue();
+    expect(verification.checks.some((check) => check.code === "PATH_EXISTS" && check.matched)).toBeTrue();
   });
 });

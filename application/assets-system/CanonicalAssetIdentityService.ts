@@ -12,6 +12,10 @@ export class CanonicalAssetIdentityService {
     return identity?.assetId;
   }
 
+  public async resolveIdentity(entityType: CanonicalEntityType, entityId: string) {
+    return this.identityRepository.getIdentity(entityType, entityId);
+  }
+
   public async resolveLatestVersionId(entityType: CanonicalEntityType, entityId: string): Promise<string | undefined> {
     const identity = await this.identityRepository.getIdentity(entityType, entityId);
     if (!identity) {

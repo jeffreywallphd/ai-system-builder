@@ -16,7 +16,7 @@ describe("ui/pages unit coverage", () => {
     expect(workflows).toContain("New Workflow");
     expect(editor).toContain("Workflow Editor");
     expect(models).toContain("Download Models");
-    expect(context).toContain("Reusable Instructions");
+    expect(context).toContain("Context Engineering");
     expect(assets).toContain("Browse generated and stored workflow assets");
     expect(mcp).toContain("Create new local MCP servers");
     expect(notFound).toContain("Page Not Found");

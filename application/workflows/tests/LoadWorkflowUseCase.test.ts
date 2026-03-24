@@ -50,12 +50,29 @@ describe("LoadWorkflowUseCase", () => {
       makeWorkflowValidator(),
       {
         canonicalIdentityService,
+        identityRepository: {
+          getIdentity: async () => ({
+            entityType: "workflow-definition",
+            entityId: "wf-canonical",
+            assetId: "workflow-definition:wf-canonical",
+            latestVersionId: "asset-version:wf",
+            updatedAt: new Date("2026-03-24T00:00:00.000Z"),
+          }),
+          upsertIdentity: async () => undefined,
+        },
         assetRepository: {
           getById: async () => ({ id: "workflow-definition:wf-canonical", name: "WF", kind: "workflow-definition", status: "available" }),
         } as any,
         versionRepository: {
+          getByVersionId: async () => ({ versionId: "asset-version:wf", assetId: { value: "workflow-definition:wf-canonical" } }),
           listVersionsByAssetId: async () => ([{ versionId: "asset-version:wf" }]),
           getLatestVersionForAsset: async () => ({ versionId: "asset-version:wf" }),
+        } as any,
+        lineageRepository: {
+          listEdgesByVersionId: async () => [],
+        } as any,
+        transformationRepository: {
+          listByVersionId: async () => [],
         } as any,
       },
     ).execute({ workflowId: "wf-canonical" });

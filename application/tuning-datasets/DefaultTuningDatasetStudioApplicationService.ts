@@ -331,6 +331,7 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
   private async resolveCanonicalDatasetVersion(datasetId: string, versionId: string): Promise<{
     readonly preferred: boolean;
     readonly assetId?: string;
+    readonly pinnedVersionId?: string;
     readonly latestVersionId?: string;
     readonly fallbackReason?: string;
   }> {
@@ -342,7 +343,8 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
     }
 
     const entityId = `${datasetId}:${versionId}`;
-    const assetId = await this.canonicalIdentityService.resolveAssetId("dataset-version", entityId);
+    const identity = await this.canonicalIdentityService.resolveIdentity("dataset-version", entityId);
+    const assetId = identity?.assetId;
     if (!assetId) {
       return Object.freeze({
         preferred: false,
@@ -354,6 +356,7 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
     return Object.freeze({
       preferred: true,
       assetId,
+      pinnedVersionId: identity?.latestVersionId,
       latestVersionId,
     });
   }
