@@ -55,6 +55,9 @@ Use this file as the shortest reliable orientation before reading the human arch
   - Session working memory model: `domain/agents/AgentWorkingMemory.ts` + `application/agents/services/AgentWorkingMemoryService.ts`.
   - Bounded write pipeline: `application/agents/services/AgentMemoryWriteService.ts`.
   - Explicit memory policy controls now live in `domain/agents/AgentMemory.ts` (`retrievableTypes`, `writableTypes`, `sessionOnlyTypes`, bounded retention settings).
+  - Retrieval semantics are deterministic and policy-bounded (type/tag/metadata/recency filters over asset-version-backed entries), and session-only memory types are excluded from durable retrieval.
+  - Execution read models now carry working-memory snapshots and write outcomes so planning/evaluation consumers can reuse bounded session context without a second runtime.
+  - Write policy is now enforced operationally (writable/session-only checks + bounded durable retention gating).
 
 ## TODO
 - If asked for the "single" architecture entry point, explain that there are currently multiple composition roots and name them explicitly.

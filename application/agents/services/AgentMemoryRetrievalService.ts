@@ -8,16 +8,20 @@ function normalizeList(values: ReadonlyArray<string> | undefined): ReadonlyArray
 function resolveRequestedTypes(request: AgentMemoryRetrievalRequest): ReadonlyArray<AgentMemoryType> | undefined {
   const requested = request.memoryTypes ?? request.agent.memory.retrieval.memoryTypes;
   const retrievable = request.agent.memory.policy.retrievableTypes;
+  const sessionOnly = new Set(request.agent.memory.policy.sessionOnlyTypes ?? []);
   if (!retrievable || retrievable.length === 0) {
-    return requested;
+    if (!requested || requested.length === 0) {
+      return requested;
+    }
+    return Object.freeze(requested.filter((type) => !sessionOnly.has(type)));
   }
 
   if (!requested || requested.length === 0) {
-    return retrievable;
+    return Object.freeze(retrievable.filter((type) => !sessionOnly.has(type)));
   }
 
   const allowed = new Set(retrievable);
-  return Object.freeze(requested.filter((type) => allowed.has(type)));
+  return Object.freeze(requested.filter((type) => allowed.has(type) && !sessionOnly.has(type)));
 }
 
 export class DefaultAgentMemoryRetrievalService implements AgentMemoryRetrievalService {
@@ -38,6 +42,7 @@ export class DefaultAgentMemoryRetrievalService implements AgentMemoryRetrievalS
       assetIds,
       memoryTypes,
       tags,
+      metadata: request.metadata,
       maxEntries,
       beforeTimestamp: request.beforeTimestamp,
     });

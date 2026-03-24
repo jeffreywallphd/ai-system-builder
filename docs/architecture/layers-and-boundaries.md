@@ -156,6 +156,7 @@ If a change needs data from the outside world, prefer adding or using an **appli
 
 - Direction 4 Phase 2 now starts at the inner layers only: planning structures are domain/application contracts (`domain/agents/AgentPlan.ts`, `application/agents/contracts/AgentPlanningStrategy.ts` + `application/agents/services/DeterministicAgentPlanningStrategy.ts`, `application/agents/contracts/AgentPlanningLoop.ts`) and intentionally do not introduce a second runtime, orchestration stack, or UI loop.
 - Direction 4 Phase 3 continues inner-layer-first: memory retrieval/write/session behavior is now modeled as domain/application seams (`domain/agents/AgentMemory.ts`, `domain/agents/AgentWorkingMemory.ts`, `application/agents/contracts/AgentMemoryRetrieval.ts`, `application/agents/services/AgentMemoryRetrievalService.ts`, `application/agents/services/AgentMemoryWriteService.ts`, `application/agents/services/AgentWorkingMemoryService.ts`) and remains asset-backed rather than transcript/chat-wrapper-driven.
+- The Phase 3 implementation now enforces policy at runtime (retrievable/writable/session-only/retention limits) in those same inner-layer services rather than leaving policy as configuration-only metadata.
 
 ## TODO
 

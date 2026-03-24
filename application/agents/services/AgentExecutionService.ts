@@ -5,7 +5,9 @@ import type { AgentPlanningInterface } from "../contracts/AgentPlanningStrategy"
 import type { AgentPlan } from "../../../domain/agents/AgentPlan";
 import type { AgentMemoryRetrievalService } from "../contracts/AgentMemoryRetrieval";
 import { AgentWorkingMemoryService } from "./AgentWorkingMemoryService";
-import { AgentMemoryWriteService } from "./AgentMemoryWriteService";
+import { AgentMemoryWriteService, type AgentMemoryWriteResult } from "./AgentMemoryWriteService";
+import type { AgentWorkingMemory } from "../../../domain/agents/AgentWorkingMemory";
+import { AssetId } from "../../../domain/assets/AssetId";
 
 export interface AgentExecutionStepOutcome {
   readonly stepId: string;
@@ -14,6 +16,7 @@ export interface AgentExecutionStepOutcome {
   readonly action: string;
   readonly status: "completed" | "failed" | "cancelled";
   readonly output?: string;
+  readonly outputAssetId?: AssetId;
   readonly errorMessage?: string;
 }
 
@@ -24,6 +27,8 @@ export interface AgentExecutionReadModel {
   readonly status: "completed" | "failed" | "cancelled";
   readonly outcomes: ReadonlyArray<AgentExecutionStepOutcome>;
   readonly finalOutput?: string;
+  readonly workingMemory: AgentWorkingMemory;
+  readonly memoryWrite: AgentMemoryWriteResult;
 }
 
 export class AgentExecutionService {
@@ -72,6 +77,10 @@ export class AgentExecutionService {
       });
 
       const stepOutput = stepResult.finalOutput ?? stepResult.steps[0]?.resultText;
+      const outputAssetIdRaw = typeof stepResult.metadata?.outputAssetId === "string"
+        ? stepResult.metadata.outputAssetId
+        : undefined;
+      const outputAssetId = outputAssetIdRaw ? AssetId.from(outputAssetIdRaw) : undefined;
       outcomes.push(Object.freeze({
         stepId: step.stepId,
         goalId: step.goalId,
@@ -79,8 +88,16 @@ export class AgentExecutionService {
         action: step.intent.action,
         status: stepResult.status,
         output: stepOutput,
+        outputAssetId,
         errorMessage: stepResult.errorMessage,
       }));
+      workingMemory = this.workingMemoryService.appendExecutionOutcome(workingMemory, {
+        stepId: step.stepId,
+        status: stepResult.status,
+        output: stepOutput,
+        outputAssetId,
+        errorMessage: stepResult.errorMessage,
+      });
       finalOutput = [finalOutput, stepOutput].filter(Boolean).join("\n");
 
       if (stepResult.status !== "completed") {
@@ -89,18 +106,25 @@ export class AgentExecutionService {
       }
     }
 
-    const readModel = Object.freeze({
+    const memoryWrite = await this.memoryWriteService.writeExecutionOutcome(agent, plan, {
       agentId: agent.id,
       executionId: `agent:${agent.id}:${plan.planId}`,
       planId: plan.planId,
       status: finalStatus,
       outcomes: Object.freeze(outcomes),
       finalOutput: finalOutput || undefined,
-    } satisfies AgentExecutionReadModel);
+      workingMemory,
+    });
 
-    await this.memoryWriteService.writeExecutionOutcome(agent, plan, readModel);
-    workingMemory = this.workingMemoryService.appendExecutionOutcome(workingMemory, readModel);
-    void workingMemory;
-    return readModel;
+    return Object.freeze({
+      agentId: agent.id,
+      executionId: `agent:${agent.id}:${plan.planId}`,
+      planId: plan.planId,
+      status: finalStatus,
+      outcomes: Object.freeze(outcomes),
+      finalOutput: finalOutput || undefined,
+      workingMemory,
+      memoryWrite,
+    } satisfies AgentExecutionReadModel);
   }
 }

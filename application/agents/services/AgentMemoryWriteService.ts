@@ -1,7 +1,7 @@
 import type { Agent } from "../../../domain/agents/Agent";
 import type { AgentMemoryEntryReference, AgentMemoryStore, AgentMemoryType } from "../../../domain/agents/AgentMemory";
 import type { AgentPlan } from "../../../domain/agents/AgentPlan";
-import type { AgentExecutionReadModel } from "./AgentExecutionService";
+import type { AgentWorkingMemory } from "../../../domain/agents/AgentWorkingMemory";
 
 export interface AgentMemoryWriteCandidate {
   readonly memoryType: AgentMemoryType;
@@ -14,6 +14,22 @@ export interface AgentMemoryWriteCandidate {
 export interface AgentMemoryWriteResult {
   readonly persisted: ReadonlyArray<AgentMemoryEntryReference>;
   readonly skipped: ReadonlyArray<{ readonly reason: string; readonly candidate: AgentMemoryWriteCandidate }>;
+}
+
+export interface AgentExecutionMemoryWriteInput {
+  readonly agentId: string;
+  readonly executionId: string;
+  readonly planId: string;
+  readonly status: "completed" | "failed" | "cancelled";
+  readonly outcomes: ReadonlyArray<{
+    readonly stepId: string;
+    readonly status: "completed" | "failed" | "cancelled";
+    readonly output?: string;
+    readonly errorMessage?: string;
+    readonly outputAssetId?: AgentMemoryEntryReference["assetId"];
+  }>;
+  readonly finalOutput?: string;
+  readonly workingMemory: AgentWorkingMemory;
 }
 
 function normalizePrimitiveMetadata(
@@ -42,6 +58,19 @@ export class AgentMemoryWriteService {
     const skipped: Array<{ reason: string; candidate: AgentMemoryWriteCandidate }> = [];
     const writable = new Set(agent.memory.policy.writableTypes);
     const sessionOnly = new Set(agent.memory.policy.sessionOnlyTypes);
+    const durableTypes = (agent.memory.policy.writableTypes ?? []).filter((type) => !sessionOnly.has(type));
+    const retentionLimit = agent.memory.policy.retention.mode === "bounded"
+      ? agent.memory.policy.retention.maxDurableEntries
+      : undefined;
+    let remainingDurableCapacity = Number.POSITIVE_INFINITY;
+    if (retentionLimit !== undefined) {
+      const existing = await this.memoryStore.query(agent.id, {
+        assetIds: agent.memory.assets.map((entry) => entry.assetId),
+        memoryTypes: durableTypes.length > 0 ? durableTypes : undefined,
+        maxEntries: retentionLimit,
+      });
+      remainingDurableCapacity = Math.max(0, retentionLimit - existing.length);
+    }
 
     for (const candidate of candidates) {
       if (writable.size > 0 && !writable.has(candidate.memoryType)) {
@@ -50,6 +79,10 @@ export class AgentMemoryWriteService {
       }
       if (sessionOnly.has(candidate.memoryType)) {
         skipped.push({ reason: `session-only-memory-type:${candidate.memoryType}`, candidate });
+        continue;
+      }
+      if (remainingDurableCapacity <= 0) {
+        skipped.push({ reason: "retention-cap-reached", candidate });
         continue;
       }
 
@@ -70,12 +103,13 @@ export class AgentMemoryWriteService {
 
       await this.memoryStore.add(agent.id, entry);
       persisted.push(entry);
+      remainingDurableCapacity -= 1;
     }
 
     return Object.freeze({ persisted: Object.freeze(persisted), skipped: Object.freeze(skipped) });
   }
 
-  public async writeExecutionOutcome(agent: Agent, plan: AgentPlan, execution: AgentExecutionReadModel): Promise<AgentMemoryWriteResult> {
+  public async writeExecutionOutcome(agent: Agent, plan: AgentPlan, execution: AgentExecutionMemoryWriteInput): Promise<AgentMemoryWriteResult> {
     const candidate: AgentMemoryWriteCandidate = {
       memoryType: "episodic",
       tags: ["agent-execution", execution.status],
@@ -85,6 +119,9 @@ export class AgentMemoryWriteService {
         status: execution.status,
         stepCount: execution.outcomes.length,
         finalOutput: execution.finalOutput ?? null,
+        executionId: execution.executionId,
+        workingMemorySessionId: execution.workingMemory.sessionId,
+        workingMemoryEntries: execution.workingMemory.retrievedMemory.length,
       },
     };
     return this.writeEntries(agent, [candidate]);

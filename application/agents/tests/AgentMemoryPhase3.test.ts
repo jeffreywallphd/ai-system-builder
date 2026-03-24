@@ -62,35 +62,100 @@ const baseAgent: Agent = {
 };
 
 describe("Agent memory phase 3 services", () => {
-  it("retrieves with policy-bounded types and limits", async () => {
+  it("retrieves with policy-bounded types, metadata filters, and recency", async () => {
     const repo = new InMemoryAssetRepo();
     const store = new AssetBackedAgentMemoryStore(repo, repo);
-    await store.add(baseAgent.id, { assetId: new AssetId("asset:memory:semantic"), memoryType: "semantic", tags: ["planning"] });
+    await store.add(baseAgent.id, {
+      assetId: new AssetId("asset:memory:semantic"),
+      memoryType: "semantic",
+      tags: ["planning"],
+      assetVersionId: "v-old",
+      metadata: { topic: "weather", tenant: "north" },
+    });
+    await store.add(baseAgent.id, {
+      assetId: new AssetId("asset:memory:semantic"),
+      memoryType: "semantic",
+      tags: ["planning"],
+      assetVersionId: "v-new",
+      metadata: { topic: "finance", tenant: "north" },
+    });
     await store.add(baseAgent.id, { assetId: new AssetId("asset:memory:episodic"), memoryType: "episodic", tags: ["planning"] });
 
     const retrieval = new DefaultAgentMemoryRetrievalService(store);
+    const beforeLatest = new Date(Date.now() + 1).toISOString();
     const entries = await retrieval.retrieveMemory({
       agent: baseAgent,
       memoryTypes: ["episodic", "semantic"],
       maxEntries: 10,
+      beforeTimestamp: beforeLatest,
+      metadata: { tenant: "north", topic: "finance" },
     });
 
     expect(entries).toHaveLength(1);
     expect(entries[0]?.memoryType).toBe("semantic");
+    expect(entries[0]?.assetVersionId).toBe("v-new");
   });
 
-  it("writes only policy-allowed durable memory types", async () => {
+  it("excludes session-only types from retrieval queries", async () => {
+    const repo = new InMemoryAssetRepo();
+    const store = new AssetBackedAgentMemoryStore(repo, repo);
+    const retrieval = new DefaultAgentMemoryRetrievalService(store);
+
+    const entries = await retrieval.retrieveMemory({
+      agent: {
+        ...baseAgent,
+        memory: {
+          ...baseAgent.memory,
+          policy: {
+            ...baseAgent.memory.policy,
+            retrievableTypes: ["semantic", "working"],
+            sessionOnlyTypes: ["working"],
+          },
+        },
+      },
+      memoryTypes: ["working", "semantic"],
+    });
+
+    expect(entries).toEqual([]);
+  });
+
+  it("writes only policy-allowed durable memory types and enforces retention caps", async () => {
     const repo = new InMemoryAssetRepo();
     const store = new AssetBackedAgentMemoryStore(repo, repo);
     const writer = new AgentMemoryWriteService(store);
 
-    const result = await writer.writeEntries(baseAgent, [
+    await store.add(baseAgent.id, {
+      assetId: new AssetId("asset:memory:episodic"),
+      memoryType: "episodic",
+      tags: ["result"],
+      assetVersionId: "existing-1",
+    });
+    await store.add(baseAgent.id, {
+      assetId: new AssetId("asset:memory:episodic"),
+      memoryType: "episodic",
+      tags: ["result"],
+      assetVersionId: "existing-2",
+    });
+
+    const retentionBoundedAgent: Agent = {
+      ...baseAgent,
+      memory: {
+        ...baseAgent.memory,
+        policy: {
+          ...baseAgent.memory.policy,
+          retention: { mode: "bounded", maxDurableEntries: 2 },
+        },
+      },
+    };
+
+    const result = await writer.writeEntries(retentionBoundedAgent, [
       { memoryType: "working", tags: ["session"] },
       { memoryType: "episodic", tags: ["result"], metadata: { planId: "p1", score: 1 } },
     ]);
 
-    expect(result.persisted).toHaveLength(1);
-    expect(result.skipped).toHaveLength(1);
+    expect(result.persisted).toHaveLength(0);
+    expect(result.skipped).toHaveLength(2);
     expect(result.skipped[0]?.reason).toContain("memory-type-not-writable");
+    expect(result.skipped[1]?.reason).toBe("retention-cap-reached");
   });
 });
