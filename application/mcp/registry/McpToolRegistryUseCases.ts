@@ -1,4 +1,13 @@
-import { createInstalledMcpToolRecord, type InstalledMcpToolRecord, type McpToolDefinitionSource } from "../../../domain/mcp/InstalledMcpTool";
+import {
+  createInstalledMcpToolRecord,
+  type InstalledMcpToolLifecycleEvent,
+  type InstalledMcpToolLifecycle,
+  type InstalledMcpToolRecord,
+  type McpToolDefinitionSource,
+  type McpToolLifecycleAction,
+  type McpToolVersionPolicy,
+  type McpToolVersionTransitionKind,
+} from "../../../domain/mcp/InstalledMcpTool";
 import {
   normalizeMcpToolDefinition,
   validateMcpToolDefinition,
@@ -6,7 +15,7 @@ import {
   type McpToolSideEffectClass,
 } from "../../../domain/mcp/McpToolCapability";
 import type { IMcpToolDefinitionSourceLoader } from "../../ports/interfaces/IMcpToolDefinitionSourceLoader";
-import type { IMcpToolDependencyScanner } from "../../ports/interfaces/IMcpToolDependencyScanner";
+import type { IMcpToolDependencyScanner, McpToolDependencyReference } from "../../ports/interfaces/IMcpToolDependencyScanner";
 import type { IMcpToolRegistryRepository } from "../../ports/interfaces/IMcpToolRegistryRepository";
 import { McpToolRegistryError } from "./McpToolRegistryErrors";
 
@@ -14,6 +23,107 @@ export interface InstallMcpToolRequest {
   readonly source?: McpToolDefinitionSource;
   readonly definition?: McpToolDefinition;
   readonly overwrite?: boolean;
+  readonly versionPolicy?: McpToolVersionPolicy;
+}
+
+export interface PreviewMcpToolUpdateRequest {
+  readonly toolId: string;
+  readonly source?: McpToolDefinitionSource;
+  readonly definition?: McpToolDefinition;
+}
+
+export interface ApplyMcpToolUpdateRequest extends PreviewMcpToolUpdateRequest {
+  readonly force?: boolean;
+  readonly allowDowngrade?: boolean;
+  readonly allowReplace?: boolean;
+  readonly versionPolicy?: McpToolVersionPolicy;
+  readonly policyProfile?: McpToolCompatibilityPolicyProfile;
+  readonly approval?: McpToolUpdateApproval;
+}
+
+interface ObjectChange<TValue> {
+  readonly changed: boolean;
+  readonly from: TValue;
+  readonly to: TValue;
+}
+
+interface CollectionChange {
+  readonly changed: boolean;
+  readonly added: ReadonlyArray<string>;
+  readonly removed: ReadonlyArray<string>;
+}
+
+export interface McpToolDefinitionChangeSummary {
+  readonly version: ObjectChange<string>;
+  readonly binding: ObjectChange<McpToolDefinition["binding"]>;
+  readonly inputSchema: ObjectChange<Readonly<Record<string, unknown>>>;
+  readonly outputSchema: ObjectChange<Readonly<Record<string, unknown>> | undefined>;
+  readonly sideEffects: ObjectChange<McpToolSideEffectClass>;
+  readonly auth: ObjectChange<McpToolDefinition["auth"]>;
+  readonly tags: CollectionChange;
+  readonly categories: CollectionChange;
+}
+
+export interface PreviewMcpToolUpdateResult {
+  readonly toolId: string;
+  readonly action: McpToolLifecycleAction;
+  readonly transition: McpToolVersionTransitionKind;
+  readonly compatibility: "compatible" | "risky" | "breaking";
+  readonly dependencyReferences: ReadonlyArray<{ readonly kind: string; readonly id: string; readonly label: string; readonly detail?: string }>;
+  readonly changeSummary: McpToolDefinitionChangeSummary;
+  readonly warnings: ReadonlyArray<string>;
+  readonly remediationSuggestions: ReadonlyArray<McpToolUpdateRemediationSuggestion>;
+}
+
+export interface ApplyMcpToolUpdateResult {
+  readonly status: "updated" | "blocked";
+  readonly toolId: string;
+  readonly action: McpToolLifecycleAction;
+  readonly transition: McpToolVersionTransitionKind;
+  readonly compatibility: "compatible" | "risky" | "breaking";
+  readonly changeSummary: McpToolDefinitionChangeSummary;
+  readonly references: ReadonlyArray<{ readonly kind: string; readonly id: string; readonly label: string; readonly detail?: string }>;
+  readonly warnings: ReadonlyArray<string>;
+  readonly remediationSuggestions: ReadonlyArray<McpToolUpdateRemediationSuggestion>;
+  readonly record?: InstalledMcpToolRecord;
+}
+
+export type McpToolCompatibilityPolicyProfile = "strict" | "balanced" | "permissive";
+
+export interface McpToolUpdateApproval {
+  readonly acknowledgedRisk?: boolean;
+  readonly acknowledgedBreaking?: boolean;
+}
+
+export interface McpToolUpdateRemediationSuggestion {
+  readonly code: "review-workflow-inputs" | "revalidate-output-contract" | "review-permissions-auth" | "plan-downgrade-mitigation";
+  readonly title: string;
+  readonly detail: string;
+}
+
+export interface McpToolLifecycleHistoryEntryReadModel {
+  readonly toolId: string;
+  readonly occurredAt: string;
+  readonly action: McpToolLifecycleAction;
+  readonly transition: McpToolVersionTransitionKind;
+  readonly fromVersion?: string;
+  readonly toVersion: string;
+  readonly reason?: string;
+}
+
+export interface McpToolLifecycleSummaryReadModel {
+  readonly toolId: string;
+  readonly version: string;
+  readonly status: InstalledMcpToolRecord["status"];
+  readonly versionPolicy: McpToolVersionPolicy;
+  readonly counters: Readonly<{
+    installCount: number;
+    reinstallCount: number;
+    updateCount: number;
+    downgradeCount: number;
+    replaceCount: number;
+  }>;
+  readonly lastEvent?: McpToolLifecycleHistoryEntryReadModel;
 }
 
 export interface RemoveMcpToolResult {
@@ -47,7 +157,7 @@ export class InstallMcpToolUseCase {
   ) {}
 
   public async execute(request: InstallMcpToolRequest): Promise<InstalledMcpToolRecord> {
-    const definition = await this.resolveDefinition(request);
+    const definition = await resolveDefinition(request, this.sourceLoader);
     const validation = validateMcpToolDefinition(definition);
     if (!validation.valid) {
       throw new McpToolRegistryError("invalid-definition", "MCP tool definition is invalid.", { issues: validation.issues });
@@ -55,6 +165,12 @@ export class InstallMcpToolUseCase {
 
     const normalizedDefinition = normalizeMcpToolDefinition(definition);
     const existing = await this.repository.getInstalledTool(normalizedDefinition.id);
+    const transition = classifyVersionTransition(existing?.definition.version, normalizedDefinition.version);
+    if (existing && request.overwrite !== true && transition !== "same-version") {
+      throw new McpToolRegistryError("invalid-transition", `MCP tool '${normalizedDefinition.id}' requires explicit update flow.`, {
+        transition,
+      });
+    }
     if (existing && request.overwrite !== true) {
       throw new McpToolRegistryError("duplicate-install", `MCP tool '${normalizedDefinition.id}' is already installed.`);
     }
@@ -65,23 +181,146 @@ export class InstallMcpToolUseCase {
           definition: normalizedDefinition,
           updatedAt: new Date().toISOString(),
           source: request.source ?? existing.source,
+          lifecycle: nextLifecycle({
+            current: existing.lifecycle,
+            action: "replace",
+            transition,
+            currentVersion: existing.definition.version,
+            nextVersion: normalizedDefinition.version,
+            versionPolicy: request.versionPolicy ?? existing.lifecycle?.versionPolicy,
+            reason: "install-overwrite",
+          }),
         })
       : createInstalledMcpToolRecord({
           definition: normalizedDefinition,
           source: request.source ?? { kind: "inline", location: "inline:manual" },
+          versionPolicy: request.versionPolicy,
         });
 
     return this.repository.saveInstalledTool(record);
   }
+}
 
-  private async resolveDefinition(request: InstallMcpToolRequest): Promise<McpToolDefinition> {
-    if (request.definition) {
-      return request.definition;
+export class PreviewMcpToolUpdateUseCase {
+  constructor(
+    private readonly repository: IMcpToolRegistryRepository,
+    private readonly dependencyScanner: IMcpToolDependencyScanner,
+    private readonly sourceLoader?: IMcpToolDefinitionSourceLoader,
+  ) {}
+
+  public async execute(request: PreviewMcpToolUpdateRequest): Promise<PreviewMcpToolUpdateResult> {
+    const existing = await this.repository.getInstalledTool(request.toolId.trim());
+    if (!existing) {
+      throw new McpToolRegistryError("tool-not-found", `MCP tool '${request.toolId}' was not found.`);
     }
-    if (!request.source || !this.sourceLoader) {
-      throw new McpToolRegistryError("invalid-definition", "Tool install requires either definition or a loadable source.");
+
+    const candidate = await loadValidatedCandidate(request, this.sourceLoader, existing.toolId);
+    const changeSummary = summarizeDefinitionChanges(existing.definition, candidate);
+    const transition = classifyVersionTransition(existing.definition.version, candidate.version);
+    const action = classifyUpdateAction(transition);
+    const compatibility = classifyCompatibility(changeSummary, transition, "balanced");
+    const dependencyReferences = await this.dependencyScanner.scanToolReferences(existing.toolId);
+    const remediationSuggestions = buildRemediationSuggestions(compatibility, changeSummary, transition, dependencyReferences.length > 0);
+
+    return Object.freeze({
+      toolId: existing.toolId,
+      action,
+      transition,
+      compatibility,
+      dependencyReferences,
+      changeSummary,
+      warnings: buildUpdateWarnings(transition, compatibility, dependencyReferences.length > 0),
+      remediationSuggestions,
+    });
+  }
+}
+
+export class ApplyMcpToolUpdateUseCase {
+  constructor(
+    private readonly repository: IMcpToolRegistryRepository,
+    private readonly dependencyScanner: IMcpToolDependencyScanner,
+    private readonly sourceLoader?: IMcpToolDefinitionSourceLoader,
+  ) {}
+
+  public async execute(request: ApplyMcpToolUpdateRequest): Promise<ApplyMcpToolUpdateResult> {
+    const existing = await this.repository.getInstalledTool(request.toolId.trim());
+    if (!existing) {
+      throw new McpToolRegistryError("tool-not-found", `MCP tool '${request.toolId}' was not found.`);
     }
-    return this.sourceLoader.load(request.source);
+
+    const candidate = await loadValidatedCandidate(request, this.sourceLoader, existing.toolId);
+    const changeSummary = summarizeDefinitionChanges(existing.definition, candidate);
+    const transition = classifyVersionTransition(existing.definition.version, candidate.version);
+    const action = classifyUpdateAction(transition);
+    const compatibility = classifyCompatibility(changeSummary, transition, request.policyProfile ?? "balanced");
+    const references = await this.dependencyScanner.scanToolReferences(existing.toolId);
+    const warnings = buildUpdateWarnings(transition, compatibility, references.length > 0);
+    const remediationSuggestions = buildRemediationSuggestions(compatibility, changeSummary, transition, references.length > 0);
+
+    if (transition === "downgrade" && request.allowDowngrade !== true && request.force !== true) {
+      return blockedUpdateResult(existing.toolId, action, transition, compatibility, changeSummary, references, [
+        ...warnings,
+        "Downgrade is blocked unless allowDowngrade or force is set.",
+      ], remediationSuggestions);
+    }
+
+    if (transition === "incomparable" && request.allowReplace !== true && request.force !== true) {
+      return blockedUpdateResult(existing.toolId, action, transition, compatibility, changeSummary, references, [
+        ...warnings,
+        "Incomparable version transition is blocked unless allowReplace or force is set.",
+      ], remediationSuggestions);
+    }
+
+    if (compatibility === "risky" && request.approval?.acknowledgedRisk !== true && request.force !== true) {
+      return blockedUpdateResult(existing.toolId, action, transition, compatibility, changeSummary, references, [
+        ...warnings,
+        "Risky update requires explicit risk acknowledgement.",
+      ], remediationSuggestions);
+    }
+
+    if (compatibility === "breaking" && request.approval?.acknowledgedBreaking !== true && request.force !== true) {
+      return blockedUpdateResult(existing.toolId, action, transition, compatibility, changeSummary, references, [
+        ...warnings,
+        "Breaking update requires explicit breaking-change acknowledgement.",
+      ], remediationSuggestions);
+    }
+
+    if (references.length > 0 && compatibility !== "compatible" && request.force !== true) {
+      return blockedUpdateResult(existing.toolId, action, transition, compatibility, changeSummary, references, [
+        ...warnings,
+        "Update is blocked because dependent workflows exist and compatibility is risky/breaking.",
+      ], remediationSuggestions);
+    }
+
+    const next = Object.freeze({
+      ...existing,
+      definition: candidate,
+      source: request.source ?? existing.source,
+      updatedAt: new Date().toISOString(),
+      lifecycle: nextLifecycle({
+        current: existing.lifecycle,
+        action,
+        transition,
+        currentVersion: existing.definition.version,
+        nextVersion: candidate.version,
+        versionPolicy: request.versionPolicy ?? existing.lifecycle?.versionPolicy,
+        reason: `apply-${action}`,
+      }),
+    });
+    const saved = await this.repository.saveInstalledTool(next);
+
+    return Object.freeze({
+      status: "updated",
+      toolId: saved.toolId,
+      action,
+      transition,
+      compatibility,
+      changeSummary,
+      references,
+      warnings,
+      remediationSuggestions,
+      record: saved,
+    });
   }
 }
 
@@ -102,6 +341,73 @@ export class GetInstalledMcpToolUseCase {
       throw new McpToolRegistryError("tool-not-found", `MCP tool '${toolId}' was not found.`);
     }
     return record;
+  }
+}
+
+export class ListMcpToolLifecycleHistoryUseCase {
+  constructor(private readonly repository: IMcpToolRegistryRepository) {}
+
+  public async execute(toolId: string): Promise<ReadonlyArray<McpToolLifecycleHistoryEntryReadModel>> {
+    const record = await this.repository.getInstalledTool(toolId.trim());
+    if (!record) {
+      throw new McpToolRegistryError("tool-not-found", `MCP tool '${toolId}' was not found.`);
+    }
+    return Object.freeze(
+      [...(record.lifecycle?.history ?? [])]
+        .map((event) => this.toReadModel(record.toolId, event))
+        .sort((left, right) => right.occurredAt.localeCompare(left.occurredAt)),
+    );
+  }
+
+  private toReadModel(toolId: string, event: InstalledMcpToolLifecycleEvent): McpToolLifecycleHistoryEntryReadModel {
+    return Object.freeze({
+      toolId,
+      occurredAt: event.occurredAt,
+      action: event.action,
+      transition: event.transition,
+      fromVersion: event.fromVersion,
+      toVersion: event.toVersion,
+      reason: event.reason,
+    });
+  }
+}
+
+export class GetMcpToolLifecycleSummaryUseCase {
+  constructor(private readonly repository: IMcpToolRegistryRepository) {}
+
+  public async execute(toolId: string): Promise<McpToolLifecycleSummaryReadModel> {
+    const record = await this.repository.getInstalledTool(toolId.trim());
+    if (!record) {
+      throw new McpToolRegistryError("tool-not-found", `MCP tool '${toolId}' was not found.`);
+    }
+    const lifecycle = record.lifecycle;
+    const fallbackPolicy: McpToolVersionPolicy = "pinned";
+    const history = lifecycle?.history ?? [];
+    const lastEvent = history.length > 0 ? history[history.length - 1] : undefined;
+    return Object.freeze({
+      toolId: record.toolId,
+      version: record.definition.version,
+      status: record.status,
+      versionPolicy: lifecycle?.versionPolicy ?? fallbackPolicy,
+      counters: Object.freeze({
+        installCount: lifecycle?.installCount ?? 1,
+        reinstallCount: lifecycle?.reinstallCount ?? 0,
+        updateCount: lifecycle?.updateCount ?? 0,
+        downgradeCount: lifecycle?.downgradeCount ?? 0,
+        replaceCount: lifecycle?.replaceCount ?? 0,
+      }),
+      lastEvent: lastEvent
+        ? Object.freeze({
+            toolId: record.toolId,
+            occurredAt: lastEvent.occurredAt,
+            action: lastEvent.action,
+            transition: lastEvent.transition,
+            fromVersion: lastEvent.fromVersion,
+            toVersion: lastEvent.toVersion,
+            reason: lastEvent.reason,
+          })
+        : undefined,
+    });
   }
 }
 
@@ -362,4 +668,349 @@ function sideEffectSeverity(sideEffects: McpToolSideEffectClass): number {
     default:
       return 99;
   }
+}
+
+function classifyVersionTransition(currentVersion: string | undefined, candidateVersion: string): McpToolVersionTransitionKind {
+  if (!currentVersion) {
+    return "initial-install";
+  }
+  if (currentVersion === candidateVersion) {
+    return "same-version";
+  }
+  const comparison = compareLooseSemver(currentVersion, candidateVersion);
+  if (comparison === undefined) {
+    return "incomparable";
+  }
+  return comparison < 0 ? "upgrade" : "downgrade";
+}
+
+function compareLooseSemver(left: string, right: string): -1 | 0 | 1 | undefined {
+  const parse = (value: string): readonly [number, number, number] | undefined => {
+    const normalized = value.trim().replace(/^v/i, "");
+    const matched = /^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/.exec(normalized);
+    if (!matched) {
+      return undefined;
+    }
+    return [Number(matched[1]), Number(matched[2]), Number(matched[3])] as const;
+  };
+
+  const leftParsed = parse(left);
+  const rightParsed = parse(right);
+  if (!leftParsed || !rightParsed) {
+    return undefined;
+  }
+
+  for (let index = 0; index < leftParsed.length; index += 1) {
+    if (leftParsed[index] < rightParsed[index]) {
+      return -1;
+    }
+    if (leftParsed[index] > rightParsed[index]) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
+function classifyUpdateAction(transition: McpToolVersionTransitionKind): McpToolLifecycleAction {
+  switch (transition) {
+    case "same-version":
+      return "reinstall";
+    case "upgrade":
+      return "update";
+    case "downgrade":
+      return "downgrade";
+    case "incomparable":
+      return "replace";
+    case "initial-install":
+    default:
+      return "install";
+  }
+}
+
+function summarizeDefinitionChanges(current: McpToolDefinition, candidate: McpToolDefinition): McpToolDefinitionChangeSummary {
+  return Object.freeze({
+    version: objectChange(current.version, candidate.version),
+    binding: objectChange(current.binding, candidate.binding),
+    inputSchema: objectChange(current.inputSchema, candidate.inputSchema),
+    outputSchema: objectChange(current.outputSchema, candidate.outputSchema),
+    sideEffects: objectChange(current.sideEffects, candidate.sideEffects),
+    auth: objectChange(current.auth, candidate.auth),
+    tags: collectionChange(current.tags, candidate.tags),
+    categories: collectionChange(current.categories, candidate.categories),
+  });
+}
+
+function classifyCompatibility(
+  changes: McpToolDefinitionChangeSummary,
+  transition: McpToolVersionTransitionKind,
+  profile: McpToolCompatibilityPolicyProfile,
+): "compatible" | "risky" | "breaking" {
+  if (transition === "downgrade") {
+    return "breaking";
+  }
+
+  const schemaRisk = classifySchemaRisk(changes.inputSchema.from, changes.inputSchema.to, changes.outputSchema.from, changes.outputSchema.to);
+  if (changes.binding.changed || changes.auth.changed || schemaRisk === "breaking") {
+    return "breaking";
+  }
+  if (
+    profile === "strict" &&
+    (schemaRisk === "risky" || changes.sideEffects.changed || changes.tags.changed || changes.categories.changed || transition === "incomparable")
+  ) {
+    return "breaking";
+  }
+  if (schemaRisk === "risky" || changes.sideEffects.changed || changes.tags.changed || changes.categories.changed || transition === "incomparable") {
+    return "risky";
+  }
+  return "compatible";
+}
+
+function classifySchemaRisk(
+  previousInput: Readonly<Record<string, unknown>>,
+  nextInput: Readonly<Record<string, unknown>>,
+  previousOutput: Readonly<Record<string, unknown>> | undefined,
+  nextOutput: Readonly<Record<string, unknown>> | undefined,
+): "compatible" | "risky" | "breaking" {
+  const inputDelta = summarizeSchemaDelta(previousInput, nextInput);
+  const outputDelta = summarizeSchemaDelta(previousOutput, nextOutput);
+
+  if (inputDelta.requiredAdded.length > 0 || inputDelta.requiredRemoved.length > 0) {
+    return "breaking";
+  }
+  if (inputDelta.typeChanges.length > 0 || outputDelta.typeChanges.length > 0) {
+    return "breaking";
+  }
+  if (inputDelta.propertyRemoved.length > 0 || outputDelta.propertyRemoved.length > 0) {
+    return "breaking";
+  }
+  if (inputDelta.propertyAdded.length > 0 || outputDelta.propertyAdded.length > 0) {
+    return "risky";
+  }
+  return "compatible";
+}
+
+function buildUpdateWarnings(
+  transition: McpToolVersionTransitionKind,
+  compatibility: "compatible" | "risky" | "breaking",
+  hasDependencies: boolean,
+): ReadonlyArray<string> {
+  const warnings: string[] = [];
+
+  if (transition === "downgrade") {
+    warnings.push("Candidate version is older than installed version.");
+  }
+  if (transition === "incomparable") {
+    warnings.push("Version transition is incomparable with loose semver rules.");
+  }
+  if (compatibility === "risky") {
+    warnings.push("Candidate definition has metadata changes that may affect trust/discovery behavior.");
+  }
+  if (compatibility === "breaking") {
+    warnings.push("Candidate definition includes potentially breaking contract changes.");
+  }
+  if (hasDependencies && compatibility !== "compatible") {
+    warnings.push("Dependent workflows reference this tool and may break after update.");
+  }
+
+  return Object.freeze(warnings);
+}
+
+function objectChange<TValue>(from: TValue, to: TValue): ObjectChange<TValue> {
+  return Object.freeze({
+    changed: JSON.stringify(from) !== JSON.stringify(to),
+    from,
+    to,
+  });
+}
+
+function collectionChange(from: ReadonlyArray<string>, to: ReadonlyArray<string>): CollectionChange {
+  const fromSet = new Set(from);
+  const toSet = new Set(to);
+  return Object.freeze({
+    changed: JSON.stringify(from) !== JSON.stringify(to),
+    added: Object.freeze(to.filter((entry) => !fromSet.has(entry))),
+    removed: Object.freeze(from.filter((entry) => !toSet.has(entry))),
+  });
+}
+
+function summarizeSchemaDelta(
+  from: Readonly<Record<string, unknown>> | undefined,
+  to: Readonly<Record<string, unknown>> | undefined,
+): Readonly<{
+  requiredAdded: ReadonlyArray<string>;
+  requiredRemoved: ReadonlyArray<string>;
+  propertyAdded: ReadonlyArray<string>;
+  propertyRemoved: ReadonlyArray<string>;
+  typeChanges: ReadonlyArray<string>;
+}> {
+  if (!from && !to) {
+    return Object.freeze({
+      requiredAdded: Object.freeze([]),
+      requiredRemoved: Object.freeze([]),
+      propertyAdded: Object.freeze([]),
+      propertyRemoved: Object.freeze([]),
+      typeChanges: Object.freeze([]),
+    });
+  }
+
+  const fromProperties = asSchemaRecord(from?.properties) ?? {};
+  const toProperties = asSchemaRecord(to?.properties) ?? {};
+  const fromKeys = new Set(Object.keys(fromProperties));
+  const toKeys = new Set(Object.keys(toProperties));
+  const propertyAdded = Object.freeze([...toKeys].filter((key) => !fromKeys.has(key)));
+  const propertyRemoved = Object.freeze([...fromKeys].filter((key) => !toKeys.has(key)));
+  const requiredFrom = new Set(Array.isArray(from?.required) ? from.required.filter((entry): entry is string => typeof entry === "string") : []);
+  const requiredTo = new Set(Array.isArray(to?.required) ? to.required.filter((entry): entry is string => typeof entry === "string") : []);
+  const requiredAdded = Object.freeze([...requiredTo].filter((key) => !requiredFrom.has(key)));
+  const requiredRemoved = Object.freeze([...requiredFrom].filter((key) => !requiredTo.has(key)));
+  const typeChanges = Object.freeze(
+    [...fromKeys]
+      .filter((key) => toKeys.has(key))
+      .filter((key) => {
+        const fromType = typeof asSchemaRecord(fromProperties[key])?.type === "string" ? asSchemaRecord(fromProperties[key])?.type : undefined;
+        const toType = typeof asSchemaRecord(toProperties[key])?.type === "string" ? asSchemaRecord(toProperties[key])?.type : undefined;
+        return fromType !== toType;
+      }),
+  );
+  return Object.freeze({ requiredAdded, requiredRemoved, propertyAdded, propertyRemoved, typeChanges });
+}
+
+function buildRemediationSuggestions(
+  compatibility: "compatible" | "risky" | "breaking",
+  changes: McpToolDefinitionChangeSummary,
+  transition: McpToolVersionTransitionKind,
+  hasDependencies: boolean,
+): ReadonlyArray<McpToolUpdateRemediationSuggestion> {
+  const suggestions: McpToolUpdateRemediationSuggestion[] = [];
+
+  if (changes.inputSchema.changed && hasDependencies) {
+    suggestions.push(
+      Object.freeze({
+        code: "review-workflow-inputs",
+        title: "Review workflow MCP node inputs",
+        detail: "Validate stored MCP node argument mappings against the candidate input schema before applying this update.",
+      }),
+    );
+  }
+  if (changes.outputSchema.changed && hasDependencies) {
+    suggestions.push(
+      Object.freeze({
+        code: "revalidate-output-contract",
+        title: "Revalidate downstream output usage",
+        detail: "Check downstream nodes and prompts that consume MCP output fields because output schema shape changed.",
+      }),
+    );
+  }
+  if (changes.auth.changed || changes.sideEffects.changed) {
+    suggestions.push(
+      Object.freeze({
+        code: "review-permissions-auth",
+        title: "Review trust policy and credentials",
+        detail: "Confirm credential fields and granted permissions still match the updated tool contract.",
+      }),
+    );
+  }
+  if (transition === "downgrade" || compatibility === "breaking") {
+    suggestions.push(
+      Object.freeze({
+        code: "plan-downgrade-mitigation",
+        title: "Plan rollback and mitigation",
+        detail: "Capture a rollback plan and test impacted workflows before promoting this transition.",
+      }),
+    );
+  }
+
+  return Object.freeze(suggestions);
+}
+
+function nextLifecycle(params: {
+  readonly current?: InstalledMcpToolLifecycle;
+  readonly action: McpToolLifecycleAction;
+  readonly transition: McpToolVersionTransitionKind;
+  readonly currentVersion: string;
+  readonly nextVersion: string;
+  readonly versionPolicy?: McpToolVersionPolicy;
+  readonly reason?: string;
+}): InstalledMcpToolLifecycle {
+  const current = params.current;
+  const baselineInstallCount = current?.installCount ?? 1;
+  return Object.freeze({
+    versionPolicy: params.versionPolicy ?? current?.versionPolicy ?? "pinned",
+    lastAction: params.action,
+    lastTransition: params.transition,
+    installCount: baselineInstallCount + (params.action === "install" ? 1 : 0),
+    reinstallCount: (current?.reinstallCount ?? 0) + (params.action === "reinstall" ? 1 : 0),
+    updateCount: (current?.updateCount ?? 0) + (params.action === "update" ? 1 : 0),
+    downgradeCount: (current?.downgradeCount ?? 0) + (params.action === "downgrade" ? 1 : 0),
+    replaceCount: (current?.replaceCount ?? 0) + (params.action === "replace" ? 1 : 0),
+    previousVersion: params.currentVersion !== params.nextVersion ? params.currentVersion : current?.previousVersion,
+    lastResolvedVersion: params.nextVersion,
+    history: Object.freeze([
+      ...(current?.history ?? []),
+      Object.freeze({
+        occurredAt: new Date().toISOString(),
+        action: params.action,
+        transition: params.transition,
+        fromVersion: params.currentVersion !== params.nextVersion ? params.currentVersion : undefined,
+        toVersion: params.nextVersion,
+        reason: params.reason,
+      }),
+    ]),
+  });
+}
+
+async function resolveDefinition(
+  request: { readonly source?: McpToolDefinitionSource; readonly definition?: McpToolDefinition },
+  sourceLoader?: IMcpToolDefinitionSourceLoader,
+): Promise<McpToolDefinition> {
+  if (request.definition) {
+    return request.definition;
+  }
+  if (!request.source || !sourceLoader) {
+    throw new McpToolRegistryError("invalid-definition", "Tool install/update requires either definition or a loadable source.");
+  }
+  return sourceLoader.load(request.source);
+}
+
+async function loadValidatedCandidate(
+  request: PreviewMcpToolUpdateRequest,
+  sourceLoader: IMcpToolDefinitionSourceLoader | undefined,
+  expectedToolId: string,
+): Promise<McpToolDefinition> {
+  const raw = await resolveDefinition(request, sourceLoader);
+  const validation = validateMcpToolDefinition(raw);
+  if (!validation.valid) {
+    throw new McpToolRegistryError("invalid-definition", "MCP tool definition is invalid.", { issues: validation.issues });
+  }
+  const normalized = normalizeMcpToolDefinition(raw);
+  if (normalized.id !== expectedToolId) {
+    throw new McpToolRegistryError("invalid-transition", "Update candidate id does not match installed tool id.", {
+      expectedToolId,
+      candidateToolId: normalized.id,
+    });
+  }
+  return normalized;
+}
+
+function blockedUpdateResult(
+  toolId: string,
+  action: McpToolLifecycleAction,
+  transition: McpToolVersionTransitionKind,
+  compatibility: "compatible" | "risky" | "breaking",
+  changeSummary: McpToolDefinitionChangeSummary,
+  references: ReadonlyArray<McpToolDependencyReference>,
+  warnings: ReadonlyArray<string>,
+  remediationSuggestions: ReadonlyArray<McpToolUpdateRemediationSuggestion>,
+): ApplyMcpToolUpdateResult {
+  return Object.freeze({
+    status: "blocked",
+    toolId,
+    action,
+    transition,
+    compatibility,
+    changeSummary,
+    references,
+    warnings,
+    remediationSuggestions,
+  });
 }
