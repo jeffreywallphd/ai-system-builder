@@ -53,6 +53,9 @@ export class McpToolAssetIoCoordinator {
     for (const contract of contracts) {
       const rawValue = readAtPath(nextArguments, contract.path);
       if (rawValue === undefined) {
+        if (contract.required === false) {
+          continue;
+        }
         throw new McpToolRegistryError("invalid-input-contract", `Asset input '${contract.path}' is required by MCP tool asset I/O contract.`, {
           toolId: installedTool.toolId,
           path: contract.path,
@@ -166,22 +169,12 @@ export class McpToolAssetIoCoordinator {
 
     const latest = existing ? await this.getLatestVersionId(existing.id) : undefined;
     const versionId = `${baseAssetId}:version:${params.executionId}:${params.outputIndex}`;
-    await this.createAssetVersionUseCase.execute({
+    const persistedVersion = await this.ensureOutputVersion({
       assetId: baseAssetId,
       versionId,
-      parentVersionId: params.outputContract.mode === "asset-transform" ? latest : undefined,
-      createdAt: timestamp,
-      upstreamVersionIds: params.inputVersionIds,
-      metadata: {
-        toolId: params.installedTool.toolId,
-        executionId: params.executionId,
-        outputPath: params.outputContract.path,
-        payload: params.payload,
-      },
-      reproducibilitySummary: {
-        toolId: params.installedTool.toolId,
-        version: params.installedTool.definition.version,
-      },
+      latestVersionId: latest,
+      params,
+      timestamp,
     });
 
     await this.recordTransformationUseCase.execute({
@@ -189,7 +182,7 @@ export class McpToolAssetIoCoordinator {
       transformationType: params.outputContract.mode === "asset-transform" ? "mcp-tool-transform" : "mcp-tool-generate",
       status: "success",
       inputVersionIds: params.inputVersionIds,
-      outputVersionIds: [versionId],
+      outputVersionIds: [persistedVersion.versionId],
       executionId: params.executionId,
       provider: "mcp",
       runtime: "mcp",
@@ -205,7 +198,7 @@ export class McpToolAssetIoCoordinator {
 
     return Object.freeze({
       assetId: baseAssetId,
-      versionId,
+      versionId: persistedVersion.versionId,
       mode: params.outputContract.mode,
       assetKind: kind,
     });
@@ -249,11 +242,52 @@ export class McpToolAssetIoCoordinator {
     }
 
     versionId = reference.versionId ?? await this.getLatestVersionId(asset.id);
-    if (contract.valueKind === "asset-version-id" && !versionId) {
+    if ((contract.valueKind === "asset-version-id" || contract.versionRequirement === "required") && !versionId) {
       throw new McpToolRegistryError("invalid-input-contract", `Asset version id is required for '${contract.path}'.`, { path: contract.path });
     }
 
     return Object.freeze({ contract, asset, versionId });
+  }
+
+  private async ensureOutputVersion(params: {
+    readonly assetId: string;
+    readonly versionId: string;
+    readonly latestVersionId?: string;
+    readonly params: {
+      readonly installedTool: InstalledMcpToolRecord;
+      readonly executionId: string;
+      readonly inputVersionIds: ReadonlyArray<string>;
+      readonly outputContract: McpToolAssetOutputContract;
+      readonly payload: unknown;
+    };
+    readonly timestamp: Date;
+  }): Promise<{ readonly versionId: string }> {
+    if (params.params.outputContract.persistence === "ensure-execution-version") {
+      const existing = await this.versionRepository.getByVersionId(params.versionId);
+      if (existing) {
+        return { versionId: existing.versionId };
+      }
+    }
+    await this.createAssetVersionUseCase.execute({
+      assetId: params.assetId,
+      versionId: params.versionId,
+      parentVersionId: params.params.outputContract.mode === "asset-transform" ? params.latestVersionId : undefined,
+      createdAt: params.timestamp,
+      upstreamVersionIds: params.params.inputVersionIds,
+      metadata: {
+        toolId: params.params.installedTool.toolId,
+        executionId: params.params.executionId,
+        outputPath: params.params.outputContract.path,
+        outputMode: params.params.outputContract.mode,
+        persistence: params.params.outputContract.persistence ?? "create-version",
+        payload: params.params.payload,
+      },
+      reproducibilitySummary: {
+        toolId: params.params.installedTool.toolId,
+        version: params.params.installedTool.definition.version,
+      },
+    });
+    return { versionId: params.versionId };
   }
 
   private async resolveAsset(assetId: string): Promise<IAsset> {

@@ -30,17 +30,22 @@ export interface McpToolExecutionBinding {
 export type McpToolAssetInputValueKind = "asset-id" | "asset-version-id" | "asset-reference";
 export type McpToolAssetInputResolution = "asset-id" | "version-id" | "location" | "asset-record";
 export type McpToolAssetOutputMode = "raw" | "asset-create" | "asset-transform";
+export type McpToolAssetInputVersionRequirement = "none" | "preferred" | "required";
+export type McpToolAssetOutputPersistenceMode = "create-version" | "ensure-execution-version";
 
 export interface McpToolAssetInputContract {
   readonly path: string;
   readonly valueKind: McpToolAssetInputValueKind;
   readonly resolution: McpToolAssetInputResolution;
+  readonly required?: boolean;
+  readonly versionRequirement?: McpToolAssetInputVersionRequirement;
   readonly assetKinds?: ReadonlyArray<AssetKind>;
 }
 
 export interface McpToolAssetOutputContract {
   readonly path?: string;
   readonly mode: McpToolAssetOutputMode;
+  readonly persistence?: McpToolAssetOutputPersistenceMode;
   readonly assetKind?: AssetKind;
   readonly targetInputPath?: string;
   readonly name?: string;
@@ -51,6 +56,8 @@ export interface McpToolAssetOutputContract {
 export interface McpToolAssetIoContract {
   readonly inputs?: ReadonlyArray<McpToolAssetInputContract>;
   readonly outputs?: ReadonlyArray<McpToolAssetOutputContract>;
+  readonly allowsRawInputs?: boolean;
+  readonly allowsRawOutputs?: boolean;
 }
 
 export interface McpToolDefinition {
@@ -156,7 +163,8 @@ export function validateMcpToolDefinition(
           definition.assetIo.inputs.some((entry) =>
             !entry?.path?.trim()
             || !["asset-id", "asset-version-id", "asset-reference"].includes(entry.valueKind)
-            || !["asset-id", "version-id", "location", "asset-record"].includes(entry.resolution),
+            || !["asset-id", "version-id", "location", "asset-record"].includes(entry.resolution)
+            || (entry.versionRequirement !== undefined && !["none", "preferred", "required"].includes(entry.versionRequirement))
           )
         ) {
           issues.push({ code: "invalid-asset-io", message: "Each assetIo input requires path, valueKind, and resolution.", path: "assetIo.inputs" });
@@ -170,6 +178,7 @@ export function validateMcpToolDefinition(
           definition.assetIo.outputs.some((entry) =>
             !entry
             || !["raw", "asset-create", "asset-transform"].includes(entry.mode)
+            || (entry.persistence !== undefined && !["create-version", "ensure-execution-version"].includes(entry.persistence))
             || ((entry.mode === "asset-create" || entry.mode === "asset-transform") && !entry.assetKind)
             || (entry.mode === "asset-transform" && !entry.targetInputPath?.trim()),
           )
@@ -244,6 +253,8 @@ export function normalizeMcpToolDefinition(definition: McpToolDefinition): McpTo
                 path: entry.path.trim(),
                 valueKind: entry.valueKind,
                 resolution: entry.resolution,
+                required: entry.required !== false,
+                versionRequirement: entry.versionRequirement ?? "preferred",
                 assetKinds: Object.freeze([...(entry.assetKinds ?? [])].map((kind) => kind.trim() as AssetKind).filter(Boolean)),
               }))
               .filter((entry) => entry.path),
@@ -253,6 +264,7 @@ export function normalizeMcpToolDefinition(definition: McpToolDefinition): McpTo
               .map((entry) => Object.freeze({
                 path: entry.path?.trim() || undefined,
                 mode: entry.mode,
+                persistence: entry.persistence ?? "create-version",
                 assetKind: entry.assetKind,
                 targetInputPath: entry.targetInputPath?.trim() || undefined,
                 name: entry.name?.trim() || undefined,
@@ -260,6 +272,8 @@ export function normalizeMcpToolDefinition(definition: McpToolDefinition): McpTo
                 format: entry.format?.trim() || undefined,
               })),
           ),
+          allowsRawInputs: definition.assetIo.allowsRawInputs !== false,
+          allowsRawOutputs: definition.assetIo.allowsRawOutputs !== false,
         })
       : undefined,
   });

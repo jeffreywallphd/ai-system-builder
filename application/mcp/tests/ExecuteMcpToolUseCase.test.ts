@@ -465,4 +465,112 @@ describe("ExecuteMcpToolUseCase", () => {
     expect(transformations.size).toBeGreaterThan(0);
   });
 
+  it("supports mixed raw + asset-backed inputs with required version semantics", async () => {
+    const assets = new Map<string, any>([
+      ["asset-input", {
+        id: "asset-input",
+        name: "Input",
+        kind: "json",
+        status: "available",
+        source: { type: "uploaded" },
+        location: { accessMethod: "memory", location: "memory://input.json", format: "json", contentType: "application/json" },
+        relationships: [],
+      }],
+    ]);
+    const versions = new Map<string, AssetVersion>();
+    const assetRepo: IAssetRecordRepository = {
+      save: async (asset) => { assets.set(asset.id, asset); },
+      getById: async (assetId) => assets.get(assetId),
+      list: async () => [...assets.values()],
+      exists: async (assetId) => assets.has(assetId),
+    };
+    const versionRepo: IAssetVersionRepository = {
+      saveVersion: async (version) => { versions.set(version.versionId, version); },
+      getByVersionId: async (versionId) => versions.get(versionId),
+      listVersionsByAssetId: async (assetId) => [...versions.values()].filter((version) => version.assetId.value === assetId),
+    };
+    const transformationRepo: IAssetTransformationRepository = { saveTransformation: async () => undefined, getById: async () => undefined, listByVersionId: async () => [] };
+    const lineageRepo: IAssetLineageRepository = { saveEdge: async () => undefined, listEdgesByVersionId: async () => [] };
+    const coordinator = new McpToolAssetIoCoordinator(assetRepo, versionRepo, new RecordAssetTransformationUseCase(transformationRepo, lineageRepo));
+
+    const executor: IMcpToolExecutor = {
+      executeTool: async () => ({ executionId: "exec", serverId: "local", toolName: "asset-mixed", status: "completed", content: [{}], structuredContent: {} }),
+    };
+    const registry = {
+      listInstalledTools: async () => [],
+      getInstalledTool: async () => undefined,
+      findInstalledToolByBinding: async () => Object.freeze({
+        ...(({
+          toolId: "mcp:local:asset-mixed",
+          status: "enabled",
+          installedAt: "2026-03-24T00:00:00.000Z",
+          updatedAt: "2026-03-24T00:00:00.000Z",
+          source: { kind: "inline", location: "inline:test" },
+          definition: {
+            id: "mcp:local:asset-mixed",
+            version: "1.0.0",
+            displayName: "Asset Mixed",
+            sideEffects: "read",
+            auth: { kind: "none" },
+            tags: [],
+            categories: [],
+            binding: { serverId: "local", toolName: "asset-mixed" },
+            inputSchema: { type: "object", required: ["source", "prompt"], properties: { source: { type: "object" }, prompt: { type: "string" } } },
+            outputSchema: { type: "object" },
+            assetIo: { allowsRawInputs: true, inputs: [{ path: "source", valueKind: "asset-id", resolution: "asset-record", versionRequirement: "required" }] },
+          },
+        }) as any),
+      }),
+      saveInstalledTool: async (record: never) => record,
+      removeInstalledTool: async () => false,
+    };
+
+    await expect(new ExecuteMcpToolUseCase(executor, new ExecutionContextToolPolicyService(), registry, undefined, undefined, undefined, undefined, coordinator).execute({
+      serverId: "local",
+      toolName: "asset-mixed",
+      arguments: { source: "asset-input", prompt: "hello" },
+    })).rejects.toMatchObject({ code: "invalid-input-contract" });
+  });
+
+  it("keeps asset output persistence idempotent when ensure-execution-version is configured", async () => {
+    const versions = new Map<string, AssetVersion>();
+    const assetRepo: IAssetRecordRepository = {
+      save: async () => undefined,
+      getById: async () => undefined,
+      list: async () => [],
+      exists: async () => false,
+    };
+    const versionRepo: IAssetVersionRepository = {
+      saveVersion: async (version) => { versions.set(version.versionId, version); },
+      getByVersionId: async (versionId) => versions.get(versionId),
+      listVersionsByAssetId: async () => [],
+    };
+    const transformationRepo: IAssetTransformationRepository = { saveTransformation: async () => undefined, getById: async () => undefined, listByVersionId: async () => [] };
+    const lineageRepo: IAssetLineageRepository = { saveEdge: async () => undefined, listEdgesByVersionId: async () => [] };
+    const coordinator = new McpToolAssetIoCoordinator(assetRepo, versionRepo, new RecordAssetTransformationUseCase(transformationRepo, lineageRepo));
+    const installedTool: any = {
+      toolId: "mcp:local:asset-create",
+      definition: {
+        version: "1.0.0",
+        displayName: "Asset Create",
+        assetIo: { outputs: [{ path: "result", mode: "asset-create", assetKind: "json", persistence: "ensure-execution-version" }] },
+      },
+    };
+    await coordinator.finalizeOutput({
+      installedTool,
+      executionId: "exec-idempotent",
+      requestArguments: {},
+      inputVersionIds: [],
+      structuredContent: { result: { x: 1 } },
+    });
+    await coordinator.finalizeOutput({
+      installedTool,
+      executionId: "exec-idempotent",
+      requestArguments: {},
+      inputVersionIds: [],
+      structuredContent: { result: { x: 1 } },
+    });
+    expect(versions.size).toBe(1);
+  });
+
 });
