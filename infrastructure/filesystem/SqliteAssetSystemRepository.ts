@@ -1,0 +1,420 @@
+import fs from "node:fs";
+import path from "node:path";
+import Database from "better-sqlite3";
+import { Asset } from "../../domain/assets/Asset";
+import { AssetAuditInfo, AssetLocation, AssetSemanticMetadata, AssetSourceInfo, AssetTechnicalMetadata } from "../../domain/assets/AssetMetadata";
+import { AssetLineageEdge } from "../../domain/assets/AssetLineageEdge";
+import { AssetTransformation } from "../../domain/assets/AssetTransformation";
+import { AssetVersion } from "../../domain/assets/AssetVersion";
+import type { IAsset } from "../../domain/assets/interfaces/IAsset";
+import type { AssetLineageDirection, IAssetLineageRepository } from "../../application/ports/interfaces/IAssetLineageRepository";
+import type { IAssetRecordRepository } from "../../application/ports/interfaces/IAssetRecordRepository";
+import type { IAssetTransformationRepository } from "../../application/ports/interfaces/IAssetTransformationRepository";
+import type { IAssetVersionRepository } from "../../application/ports/interfaces/IAssetVersionRepository";
+
+interface AssetRow { readonly asset_json: string; }
+interface AssetVersionRow { readonly version_json: string; }
+interface LineageRow { readonly edge_json: string; }
+interface TransformationRow { readonly transformation_json: string; }
+
+const SCHEMA_VERSION = 1;
+const MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
+  [1, `
+    CREATE TABLE asset_system_migrations (
+      version INTEGER PRIMARY KEY,
+      applied_at TEXT NOT NULL
+    );
+    CREATE TABLE assets (
+      asset_id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      status TEXT NOT NULL,
+      source_type TEXT NOT NULL,
+      updated_at TEXT,
+      asset_json TEXT NOT NULL
+    );
+    CREATE TABLE asset_versions (
+      version_id TEXT PRIMARY KEY,
+      asset_id TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      content_sha256 TEXT,
+      version_json TEXT NOT NULL,
+      FOREIGN KEY(asset_id) REFERENCES assets(asset_id) ON DELETE CASCADE
+    );
+    CREATE INDEX asset_versions_asset_idx ON asset_versions(asset_id, created_at DESC);
+    CREATE TABLE asset_lineage_edges (
+      edge_id TEXT PRIMARY KEY,
+      from_version_id TEXT NOT NULL,
+      to_version_id TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      transformation_id TEXT,
+      created_at TEXT NOT NULL,
+      edge_json TEXT NOT NULL,
+      FOREIGN KEY(from_version_id) REFERENCES asset_versions(version_id) ON DELETE CASCADE,
+      FOREIGN KEY(to_version_id) REFERENCES asset_versions(version_id) ON DELETE CASCADE
+    );
+    CREATE INDEX asset_lineage_from_idx ON asset_lineage_edges(from_version_id, created_at DESC);
+    CREATE INDEX asset_lineage_to_idx ON asset_lineage_edges(to_version_id, created_at DESC);
+    CREATE TABLE asset_transformations (
+      transformation_id TEXT PRIMARY KEY,
+      kind TEXT NOT NULL,
+      status TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      transformation_json TEXT NOT NULL
+    );
+    CREATE TABLE asset_transformation_versions (
+      transformation_id TEXT NOT NULL,
+      version_id TEXT NOT NULL,
+      role TEXT NOT NULL,
+      PRIMARY KEY(transformation_id, version_id, role),
+      FOREIGN KEY(transformation_id) REFERENCES asset_transformations(transformation_id) ON DELETE CASCADE,
+      FOREIGN KEY(version_id) REFERENCES asset_versions(version_id) ON DELETE CASCADE
+    );
+    CREATE INDEX asset_transform_versions_idx ON asset_transformation_versions(version_id, role);
+  `],
+]);
+
+export class SqliteAssetSystemRepository implements
+  IAssetRecordRepository,
+  IAssetVersionRepository,
+  IAssetLineageRepository,
+  IAssetTransformationRepository {
+  private database?: Database.Database;
+  private initialized = false;
+
+  constructor(private readonly databasePath: string) {}
+
+  public async save(asset: IAsset): Promise<void> {
+    const db = this.getDatabase();
+    db.prepare(`
+      INSERT INTO assets (asset_id, name, kind, status, source_type, updated_at, asset_json)
+      VALUES (@assetId, @name, @kind, @status, @sourceType, @updatedAt, @assetJson)
+      ON CONFLICT(asset_id) DO UPDATE SET
+        name = excluded.name,
+        kind = excluded.kind,
+        status = excluded.status,
+        source_type = excluded.source_type,
+        updated_at = excluded.updated_at,
+        asset_json = excluded.asset_json
+    `).run({
+      assetId: asset.id,
+      name: asset.name,
+      kind: asset.kind,
+      status: asset.status,
+      sourceType: asset.source.type,
+      updatedAt: asset.audit?.updatedAt?.toISOString() ?? new Date().toISOString(),
+      assetJson: JSON.stringify(asset),
+    });
+  }
+
+  public async getById(assetId: string): Promise<IAsset | undefined> {
+    const row = this.getDatabase()
+      .prepare("SELECT asset_json FROM assets WHERE asset_id = ?")
+      .get(assetId.trim()) as AssetRow | undefined;
+
+    return row ? this.parseAsset(row.asset_json) : undefined;
+  }
+
+  public async list(): Promise<ReadonlyArray<IAsset>> {
+    const rows = this.getDatabase()
+      .prepare("SELECT asset_json FROM assets ORDER BY name COLLATE NOCASE ASC")
+      .all() as AssetRow[];
+
+    return Object.freeze(rows.map((row) => this.parseAsset(row.asset_json)));
+  }
+
+  public async exists(assetId: string): Promise<boolean> {
+    const row = this.getDatabase().prepare("SELECT asset_id FROM assets WHERE asset_id = ?").get(assetId.trim()) as { asset_id: string } | undefined;
+    return !!row;
+  }
+
+  public async saveVersion(version: AssetVersion): Promise<void> {
+    this.assertAssetExists(version.assetId.value);
+
+    this.getDatabase().prepare(`
+      INSERT INTO asset_versions (version_id, asset_id, created_at, content_sha256, version_json)
+      VALUES (@versionId, @assetId, @createdAt, @contentSha256, @versionJson)
+      ON CONFLICT(version_id) DO UPDATE SET
+        asset_id = excluded.asset_id,
+        created_at = excluded.created_at,
+        content_sha256 = excluded.content_sha256,
+        version_json = excluded.version_json
+    `).run({
+      versionId: version.versionId,
+      assetId: version.assetId.value,
+      createdAt: version.createdAt.toISOString(),
+      contentSha256: version.contentSha256,
+      versionJson: JSON.stringify(version),
+    });
+  }
+
+  public async getByVersionId(versionId: string): Promise<AssetVersion | undefined> {
+    const row = this.getDatabase().prepare("SELECT version_json FROM asset_versions WHERE version_id = ?").get(versionId.trim()) as AssetVersionRow | undefined;
+    return row ? this.parseVersion(row.version_json) : undefined;
+  }
+
+  public async listVersionsByAssetId(assetId: string): Promise<ReadonlyArray<AssetVersion>> {
+    const rows = this.getDatabase()
+      .prepare("SELECT version_json FROM asset_versions WHERE asset_id = ? ORDER BY created_at DESC")
+      .all(assetId.trim()) as AssetVersionRow[];
+
+    return Object.freeze(rows.map((row) => this.parseVersion(row.version_json)));
+  }
+
+  public async saveEdge(edge: AssetLineageEdge): Promise<void> {
+    this.assertVersionExists(edge.fromVersionId);
+    this.assertVersionExists(edge.toVersionId);
+
+    this.getDatabase().prepare(`
+      INSERT INTO asset_lineage_edges (edge_id, from_version_id, to_version_id, kind, transformation_id, created_at, edge_json)
+      VALUES (@edgeId, @fromVersionId, @toVersionId, @kind, @transformationId, @createdAt, @edgeJson)
+      ON CONFLICT(edge_id) DO UPDATE SET
+        from_version_id = excluded.from_version_id,
+        to_version_id = excluded.to_version_id,
+        kind = excluded.kind,
+        transformation_id = excluded.transformation_id,
+        created_at = excluded.created_at,
+        edge_json = excluded.edge_json
+    `).run({
+      edgeId: edge.edgeId,
+      fromVersionId: edge.fromVersionId,
+      toVersionId: edge.toVersionId,
+      kind: edge.kind,
+      transformationId: edge.transformationId,
+      createdAt: edge.createdAt.toISOString(),
+      edgeJson: JSON.stringify(edge),
+    });
+  }
+
+  public async listEdgesByVersionId(versionId: string, direction: AssetLineageDirection = "both"): Promise<ReadonlyArray<AssetLineageEdge>> {
+    const normalizedVersionId = versionId.trim();
+    let sql = "SELECT edge_json FROM asset_lineage_edges WHERE from_version_id = @versionId OR to_version_id = @versionId ORDER BY created_at DESC";
+    if (direction === "upstream") {
+      sql = "SELECT edge_json FROM asset_lineage_edges WHERE to_version_id = @versionId ORDER BY created_at DESC";
+    } else if (direction === "downstream") {
+      sql = "SELECT edge_json FROM asset_lineage_edges WHERE from_version_id = @versionId ORDER BY created_at DESC";
+    }
+
+    const rows = this.getDatabase().prepare(sql).all({ versionId: normalizedVersionId }) as LineageRow[];
+    return Object.freeze(rows.map((row) => this.parseLineageEdge(row.edge_json)));
+  }
+
+  public async saveTransformation(transformation: AssetTransformation): Promise<void> {
+    const db = this.getDatabase();
+    const transaction = db.transaction(() => {
+      db.prepare(`
+        INSERT INTO asset_transformations (transformation_id, kind, status, created_at, transformation_json)
+        VALUES (@transformationId, @kind, @status, @createdAt, @transformationJson)
+        ON CONFLICT(transformation_id) DO UPDATE SET
+          kind = excluded.kind,
+          status = excluded.status,
+          created_at = excluded.created_at,
+          transformation_json = excluded.transformation_json
+      `).run({
+        transformationId: transformation.transformationId,
+        kind: transformation.kind,
+        status: transformation.status,
+        createdAt: transformation.createdAt.toISOString(),
+        transformationJson: JSON.stringify(transformation),
+      });
+
+      db.prepare("DELETE FROM asset_transformation_versions WHERE transformation_id = ?").run(transformation.transformationId);
+      const insert = db.prepare(`
+        INSERT INTO asset_transformation_versions (transformation_id, version_id, role)
+        VALUES (@transformationId, @versionId, @role)
+      `);
+
+      for (const versionId of transformation.inputVersionIds) {
+        this.assertVersionExists(versionId);
+        insert.run({ transformationId: transformation.transformationId, versionId, role: "input" });
+      }
+
+      for (const versionId of transformation.outputVersionIds) {
+        this.assertVersionExists(versionId);
+        insert.run({ transformationId: transformation.transformationId, versionId, role: "output" });
+      }
+    });
+
+    transaction();
+  }
+
+  public async getById(transformationId: string): Promise<AssetTransformation | undefined> {
+    const row = this.getDatabase().prepare("SELECT transformation_json FROM asset_transformations WHERE transformation_id = ?").get(transformationId.trim()) as TransformationRow | undefined;
+    return row ? this.parseTransformation(row.transformation_json) : undefined;
+  }
+
+  public async listByVersionId(versionId: string): Promise<ReadonlyArray<AssetTransformation>> {
+    const rows = this.getDatabase().prepare(`
+      SELECT DISTINCT t.transformation_json
+      FROM asset_transformations t
+      JOIN asset_transformation_versions tv ON tv.transformation_id = t.transformation_id
+      WHERE tv.version_id = ?
+      ORDER BY t.created_at DESC
+    `).all(versionId.trim()) as TransformationRow[];
+
+    return Object.freeze(rows.map((row) => this.parseTransformation(row.transformation_json)));
+  }
+
+
+  public get isAvailable(): boolean {
+    try {
+      const probe = new Database(":memory:");
+      probe.close();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  private getDatabase(): Database.Database {
+    if (!this.database) {
+      fs.mkdirSync(path.dirname(this.databasePath), { recursive: true });
+      this.database = new Database(this.databasePath);
+      this.database.pragma("journal_mode = WAL");
+      this.database.pragma("foreign_keys = ON");
+    }
+
+    if (!this.initialized) {
+      const db = this.database;
+      db.exec("CREATE TABLE IF NOT EXISTS asset_system_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL);");
+      const applied = new Set((db.prepare("SELECT version FROM asset_system_migrations").all() as Array<{ version: number }>).map((row) => row.version));
+
+      for (const [version, sql] of MIGRATIONS) {
+        if (applied.has(version)) {
+          continue;
+        }
+
+        const transaction = db.transaction(() => {
+          db.exec(sql);
+          db.prepare("INSERT INTO asset_system_migrations (version, applied_at) VALUES (?, ?)").run(version, new Date().toISOString());
+        });
+        transaction();
+      }
+
+      const latestVersion = (db.prepare("SELECT MAX(version) AS version FROM asset_system_migrations").get() as { version?: number } | undefined)?.version ?? 0;
+      if (latestVersion < SCHEMA_VERSION) {
+        throw new Error(`Asset system schema expected version ${SCHEMA_VERSION} but found ${latestVersion}.`);
+      }
+
+      this.initialized = true;
+    }
+
+    return this.database;
+  }
+
+  private assertAssetExists(assetId: string): void {
+    const exists = this.getDatabase().prepare("SELECT asset_id FROM assets WHERE asset_id = ?").get(assetId) as { asset_id: string } | undefined;
+    if (!exists) {
+      throw new Error(`Asset '${assetId}' was not found before saving version metadata.`);
+    }
+  }
+
+  private assertVersionExists(versionId: string): void {
+    const exists = this.getDatabase().prepare("SELECT version_id FROM asset_versions WHERE version_id = ?").get(versionId) as { version_id: string } | undefined;
+    if (!exists) {
+      throw new Error(`Asset version '${versionId}' was not found.`);
+    }
+  }
+
+  private parseAsset(json: string): IAsset {
+    const parsed = JSON.parse(json) as IAsset;
+    return new Asset({
+      ...parsed,
+      source: new AssetSourceInfo(parsed.source),
+      location: new AssetLocation(parsed.location),
+      technicalMetadata: parsed.technicalMetadata ? new AssetTechnicalMetadata(parsed.technicalMetadata) : undefined,
+      semanticMetadata: parsed.semanticMetadata ? new AssetSemanticMetadata(parsed.semanticMetadata) : undefined,
+      audit: parsed.audit ? new AssetAuditInfo({
+        createdAt: parsed.audit.createdAt ? new Date(parsed.audit.createdAt) : undefined,
+        updatedAt: parsed.audit.updatedAt ? new Date(parsed.audit.updatedAt) : undefined,
+      }) : undefined,
+    });
+  }
+
+  private parseVersion(json: string): AssetVersion {
+    const parsed = JSON.parse(json) as {
+      readonly assetId: { readonly value: string } | string;
+      readonly versionId: string;
+      readonly createdAt: string;
+      readonly createdBy?: string;
+      readonly contentSha256?: string;
+      readonly contentLengthBytes?: number;
+      readonly upstreamVersionIds?: ReadonlyArray<string>;
+      readonly metadata?: Readonly<Record<string, unknown>>;
+      readonly reproducibilitySummary?: Readonly<Record<string, unknown>>;
+    };
+
+    return new AssetVersion({
+      assetId: typeof parsed.assetId === "string" ? parsed.assetId : parsed.assetId.value,
+      versionId: parsed.versionId,
+      createdAt: new Date(parsed.createdAt),
+      createdBy: parsed.createdBy,
+      contentSha256: parsed.contentSha256,
+      contentLengthBytes: parsed.contentLengthBytes,
+      upstreamVersionIds: parsed.upstreamVersionIds,
+      metadata: parsed.metadata,
+      reproducibilitySummary: parsed.reproducibilitySummary,
+    });
+  }
+
+  private parseLineageEdge(json: string): AssetLineageEdge {
+    const parsed = JSON.parse(json) as {
+      readonly edgeId: string;
+      readonly fromVersionId: string;
+      readonly toVersionId: string;
+      readonly kind: string;
+      readonly transformationId?: string;
+      readonly createdAt: string;
+      readonly metadata?: Readonly<Record<string, unknown>>;
+    };
+
+    return new AssetLineageEdge({
+      edgeId: parsed.edgeId,
+      fromVersionId: parsed.fromVersionId,
+      toVersionId: parsed.toVersionId,
+      kind: parsed.kind,
+      transformationId: parsed.transformationId,
+      createdAt: new Date(parsed.createdAt),
+      metadata: parsed.metadata,
+    });
+  }
+
+  private parseTransformation(json: string): AssetTransformation {
+    const parsed = JSON.parse(json) as {
+      readonly transformationId: string;
+      readonly kind: string;
+      readonly status: "queued" | "running" | "completed" | "failed" | "cancelled";
+      readonly inputVersionIds: ReadonlyArray<string>;
+      readonly outputVersionIds: ReadonlyArray<string>;
+      readonly workflowId?: string;
+      readonly nodeId?: string;
+      readonly executionId?: string;
+      readonly runtime?: string;
+      readonly provider?: string;
+      readonly modelId?: string;
+      readonly diagnostics?: Readonly<Record<string, unknown>>;
+      readonly metadata?: Readonly<Record<string, unknown>>;
+      readonly startedAt?: string;
+      readonly completedAt?: string;
+      readonly createdAt: string;
+    };
+
+    return new AssetTransformation({
+      transformationId: parsed.transformationId,
+      kind: parsed.kind,
+      status: parsed.status,
+      inputVersionIds: parsed.inputVersionIds,
+      outputVersionIds: parsed.outputVersionIds,
+      workflowId: parsed.workflowId,
+      nodeId: parsed.nodeId,
+      executionId: parsed.executionId,
+      runtime: parsed.runtime,
+      provider: parsed.provider,
+      modelId: parsed.modelId,
+      diagnostics: parsed.diagnostics,
+      metadata: parsed.metadata,
+      startedAt: parsed.startedAt ? new Date(parsed.startedAt) : undefined,
+      completedAt: parsed.completedAt ? new Date(parsed.completedAt) : undefined,
+      createdAt: new Date(parsed.createdAt),
+    });
+  }
+}

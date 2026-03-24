@@ -10,6 +10,8 @@ import { LocalModelRepository } from "../filesystem/LocalModelRepository";
 import { LocalWorkflowRepository } from "../filesystem/LocalWorkflowRepository";
 import { LocalContextPackageRepository } from "../filesystem/LocalContextPackageRepository";
 import { LocalContextRecipeRepository } from "../filesystem/LocalContextRecipeRepository";
+import { SqliteAssetSystemRepository } from "../filesystem/SqliteAssetSystemRepository";
+import { NoopAssetLineageGraphProjectionSink } from "../filesystem/NoopAssetLineageGraphProjectionSink";
 import { DependencyContainer, type DependencyToken } from "./DependencyContainer";
 
 import { AssetCatalog } from "../../application/ports/AssetCatalog";
@@ -63,6 +65,17 @@ import { createExecutionApplicationInfrastructure, createExecutionRunRepository 
 import { UnifiedExecutionEngine } from "../../application/execution/UnifiedExecutionEngine";
 import { WorkflowContextService } from "../../application/context/WorkflowContextService";
 import { RuntimeDependencyOperationalStates, type IRuntimeDependencyOrchestrator } from "../../application/runtime/RuntimeDependencyOrchestrator";
+import type { IAssetRecordRepository } from "../../application/ports/interfaces/IAssetRecordRepository";
+import type { IAssetVersionRepository } from "../../application/ports/interfaces/IAssetVersionRepository";
+import type { IAssetLineageRepository } from "../../application/ports/interfaces/IAssetLineageRepository";
+import type { IAssetTransformationRepository } from "../../application/ports/interfaces/IAssetTransformationRepository";
+import type { IAssetLineageGraphProjectionSink } from "../../application/ports/interfaces/IAssetLineageGraphProjectionSink";
+import { RegisterAssetUseCase } from "../../application/assets-system/RegisterAssetUseCase";
+import { CreateAssetVersionUseCase } from "../../application/assets-system/CreateAssetVersionUseCase";
+import { LinkAssetLineageUseCase } from "../../application/assets-system/LinkAssetLineageUseCase";
+import { RecordAssetTransformationUseCase } from "../../application/assets-system/RecordAssetTransformationUseCase";
+import { ProjectArtifactToAssetSystemUseCase } from "../../application/assets-system/ProjectArtifactToAssetSystemUseCase";
+import { ExecutionAssetLineageRecorder } from "../../application/assets-system/ExecutionAssetLineageRecorder";
 
 export const TOKENS = Object.freeze({
   EnvironmentConfig: Symbol("EnvironmentConfig"),
@@ -95,6 +108,9 @@ export const TOKENS = Object.freeze({
   ModelRepository: Symbol("ModelRepository"),
   NodeImplementationRegistry: Symbol("NodeImplementationRegistry"),
   ExecutionApplicationInfrastructure: Symbol("ExecutionApplicationInfrastructure"),
+  AssetSystemRepository: Symbol("AssetSystemRepository"),
+  AssetLineageGraphProjectionSink: Symbol("AssetLineageGraphProjectionSink"),
+  ExecutionAssetLineageRecorder: Symbol("ExecutionAssetLineageRecorder"),
 }) satisfies Record<string, DependencyToken>;
 
 export interface IInfrastructureRegistryPaths {
@@ -319,6 +335,28 @@ export class InfrastructureRegistry {
       });
     });
 
+    container.registerSingleton(TOKENS.AssetSystemRepository, () => {
+      return new SqliteAssetSystemRepository(`${options.paths.assetsDirectory}/asset-system.sqlite`);
+    });
+
+    container.registerSingleton<IAssetLineageGraphProjectionSink>(TOKENS.AssetLineageGraphProjectionSink, () => new NoopAssetLineageGraphProjectionSink());
+
+    container.registerSingleton<ExecutionAssetLineageRecorder>(TOKENS.ExecutionAssetLineageRecorder, (c) => {
+      const systemRepository = c.resolve<SqliteAssetSystemRepository>(TOKENS.AssetSystemRepository);
+      const registerAssetUseCase = new RegisterAssetUseCase(systemRepository);
+      const createAssetVersionUseCase = new CreateAssetVersionUseCase(systemRepository);
+      const recordTransformationUseCase = new RecordAssetTransformationUseCase(systemRepository, c.resolve<IAssetLineageGraphProjectionSink>(TOKENS.AssetLineageGraphProjectionSink));
+      const linkAssetLineageUseCase = new LinkAssetLineageUseCase(systemRepository, c.resolve<IAssetLineageGraphProjectionSink>(TOKENS.AssetLineageGraphProjectionSink));
+      const projectionUseCase = new ProjectArtifactToAssetSystemUseCase(
+        registerAssetUseCase,
+        createAssetVersionUseCase,
+        recordTransformationUseCase,
+        linkAssetLineageUseCase,
+      );
+
+      return new ExecutionAssetLineageRecorder(projectionUseCase);
+    });
+
     container.registerSingleton(TOKENS.ModelRepository, (c) => {
       return new LocalModelRepository({
         fileStorage: c.resolve<IFileStorage>(TOKENS.FileStorage),
@@ -408,6 +446,7 @@ export class InfrastructureRegistry {
       workflowExecutor: c.resolve<IWorkflowExecutor>(TOKENS.WorkflowExecutor),
       executionRunRepository: c.resolve<IExecutionRunRepository>(TOKENS.ExecutionRunRepository),
       mcpServerManager: c.resolve<IMcpServerManager>(TOKENS.McpServerManager),
+      executionAssetLineageRecorder: c.resolve<ExecutionAssetLineageRecorder>(TOKENS.ExecutionAssetLineageRecorder),
     }));
 
     container.registerSingleton<UnifiedExecutionEngine>(

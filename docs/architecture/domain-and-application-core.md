@@ -115,3 +115,44 @@ AI Loom Studio is not just a thin GUI over a runtime. It is an authoring and gov
 
 - Some concepts currently live more in the application layer than the domain layer because they are orchestration-heavy. That is reasonable, but over time the team may want to clarify which context-engineering rules are true domain policy versus application assembly policy.
 - The workflow aggregate is clearly central, but some adjacent concepts—especially tool publication metadata and certain authoring concerns—could eventually deserve stronger domain-level abstractions if they continue to grow.
+
+## Asset system foundation (Direction 2, first slice)
+
+The asset layer is now moving from a simple catalog toward a cross-cutting system-of-record envelope for durable artifacts.
+
+### New canonical concepts
+
+The domain now includes explicit types for:
+- stable asset identity (`AssetId`)
+- immutable revisions (`AssetVersion`)
+- typed lineage relationships (`AssetLineageEdge`)
+- derivation/transformation records (`AssetTransformation`)
+
+These concepts are persistence-agnostic and model reproducibility/traceability directly instead of relying only on loose `version`, `parentAssetId`, or generic relationship strings.
+
+### Canonical vs projected
+
+Current canonical storage for this slice is:
+- existing asset catalog (`LocalAssetRepository`) for backward-compatible asset listing/edit flows
+- new SQLite asset system repository for version/lineage/transformation history
+
+Projected sources currently supported:
+- uploaded files (projected as uploaded assets + first version)
+- dataset exports (projected as dataset assets + version + derivation transformation)
+- workflow execution outputs (projected as generated assets + version + transformation + lineage edges)
+
+Projection is additive and migration-friendly; no existing flow was removed.
+
+### Lineage and execution seam
+
+Execution infrastructure now has an optional `ExecutionAssetLineageRecorder` seam. When supported workflow execution paths produce output assets, they can emit structured asset-system records without altering workflow execution truthfulness semantics.
+
+Partial provenance remains explicit: when upstream version truth is unavailable, lineage edges are not invented.
+
+### Neo4j readiness
+
+A graph projection port (`IAssetLineageGraphProjectionSink`) was introduced and wired to a no-op local implementation for now. This keeps the domain and application contracts ready for a future Neo4j projection layer without making graph infrastructure mandatory today.
+
+### Next chunk focus
+
+Future work should expand projection breadth and tighten identity contracts across model outputs, dataset versions, and execution artifacts while gradually migrating read/query surfaces to the canonical versioned lineage layer.

@@ -20,6 +20,7 @@ import { McpServerOperationExecutionUnitHandler } from "./McpServerOperationExec
 import { ModelPreparationExecutionUnitHandler } from "./ModelPreparationExecutionUnitHandler";
 import { ModelTrainingExecutionUnitHandler } from "./ModelTrainingExecutionUnitHandler";
 import { WorkflowExecutionUnitHandler } from "./WorkflowExecutionUnitHandler";
+import type { ExecutionAssetLineageRecorder } from "../../application/assets-system/ExecutionAssetLineageRecorder";
 
 interface StorageLike {
   getItem(key: string): string | null;
@@ -62,12 +63,13 @@ export interface CreateUnifiedExecutionInfrastructureOptions {
   readonly datasetGenerationService?: DatasetGenerationService;
   readonly modelTrainingRuntime?: IModelTrainingRuntime;
   readonly mcpServerManager?: IMcpServerManager;
+  readonly executionAssetLineageRecorder?: ExecutionAssetLineageRecorder;
 }
 
 export function createUnifiedExecutionInfrastructure(
   options: CreateUnifiedExecutionInfrastructureOptions,
 ): UnifiedExecutionEngine {
-  const handlers: IExecutionUnitHandler[] = [new WorkflowExecutionUnitHandler(options.workflowExecutor)];
+  const handlers: IExecutionUnitHandler[] = [new WorkflowExecutionUnitHandler(options.workflowExecutor, options.executionAssetLineageRecorder)];
 
   if (options.datasetGenerationService) {
     handlers.push(new DatasetGenerationExecutionUnitHandler(options.datasetGenerationService));
@@ -129,6 +131,7 @@ export function createExecutionApplicationInfrastructure(
     datasetGenerationService: options.datasetGenerationService,
     modelTrainingRuntime: options.modelTrainingRuntime,
     mcpServerManager: options.mcpServerManager,
+    executionAssetLineageRecorder: options.executionAssetLineageRecorder,
   });
   const history = createExecutionHistoryInfrastructure(options.executionRunRepository);
 

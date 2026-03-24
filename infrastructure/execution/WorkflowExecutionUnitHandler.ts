@@ -12,6 +12,7 @@ import type {
   IWorkflowExecutionResult,
   IWorkflowExecutor,
 } from "../../application/ports/interfaces/IWorkflowExecutor";
+import type { ExecutionAssetLineageRecorder } from "../../application/assets-system/ExecutionAssetLineageRecorder";
 import {
   createExecutionArtifact,
   toExecutionProvenance,
@@ -98,7 +99,10 @@ function toExecutionEvent(
 export class WorkflowExecutionUnitHandler implements IExecutionUnitHandler {
   private readonly workflowExecutor: IWorkflowExecutor;
 
-  constructor(workflowExecutor: IWorkflowExecutor) {
+  constructor(
+    workflowExecutor: IWorkflowExecutor,
+    private readonly executionAssetLineageRecorder?: ExecutionAssetLineageRecorder,
+  ) {
     this.workflowExecutor = workflowExecutor;
   }
 
@@ -120,6 +124,11 @@ export class WorkflowExecutionUnitHandler implements IExecutionUnitHandler {
       onEvent?.(toExecutionEvent(request, workflowEvent));
     });
 
+    await this.executionAssetLineageRecorder?.recordWorkflowExecution({
+      input,
+      result: workflowResult,
+    });
+
     return toUnitResult(request.unit.id, workflowResult);
   }
 
@@ -139,6 +148,10 @@ export class WorkflowExecutionUnitHandler implements IExecutionUnitHandler {
       unitId: request.unit.id,
       waitForCompletion: async () => {
         const workflowResult = await workflowHandle.waitForCompletion();
+        await this.executionAssetLineageRecorder?.recordWorkflowExecution({
+          input,
+          result: workflowResult,
+        });
         return toUnitResult(request.unit.id, workflowResult);
       },
       cancel: async () => {
