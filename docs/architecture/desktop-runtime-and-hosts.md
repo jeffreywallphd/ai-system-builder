@@ -59,6 +59,8 @@ The renderer then uses `DesktopBridgeWorkflowRepository` for workflows and a des
 ### Browser/degraded path
 If the desktop workflow bridge is unavailable or the runtime mode is browser-oriented, the renderer can fall back to `BrowserStorageWorkflowRepository`, which stores workflow records in browser storage.
 
+For the current Direction 3 MCP registry slice, installed MCP tool records are also intentionally persisted via browser `localStorage` (`LocalStorageMcpToolRegistryRepository`) to match the existing renderer-side fallback persistence pattern instead of introducing a new desktop-only storage seam yet.
+
 This means the host architecture is not just about display; it directly affects persistence durability and operational guarantees.
 
 ## Runtime orchestration and managed services

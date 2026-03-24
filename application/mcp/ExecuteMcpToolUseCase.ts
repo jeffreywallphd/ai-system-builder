@@ -61,6 +61,15 @@ export class ExecuteMcpToolUseCase {
       : undefined;
 
     if (installedTool) {
+      if (installedTool.status !== "enabled") {
+        throw new McpToolRegistryError("tool-disabled", "MCP tool is installed but currently disabled.", {
+          toolId: installedTool.toolId,
+          serverId: normalizedRequest.serverId,
+          toolName: normalizedRequest.toolName,
+          status: installedTool.status,
+        });
+      }
+
       const inputValidation = this.contractValidationService.validateInput(installedTool.definition, normalizedRequest.arguments ?? {});
       if (!inputValidation.valid) {
         throw new McpToolRegistryError("invalid-input-contract", "MCP tool input does not satisfy installed contract.", {

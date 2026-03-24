@@ -237,9 +237,9 @@ That is "done enough" for Direction 1: the unified execution engine now includes
 ## MCP registry and capability foundation (Direction 3, first slice)
 - MCP tools now have a first-class registry foundation (install/register, list/detail, enable/disable, and safe removal with dependency blocking).
 - Tool definitions now use a machine-readable capability contract that includes stable identity, display metadata, version, input/output schema, side-effect class, auth requirements, optional cost/execution metadata, tags/categories, and optional runtime binding (`serverId` + `toolName`).
-- Registration validates definition contracts before persistence; runtime execution can validate input/output contracts against installed definitions at the use-case boundary.
-- Capability introspection query use cases can filter tools by schema type, side effects, auth requirements, tags, categories, and enabled status to support future planner/agent selection.
-- Safe removal currently blocks uninstall when persisted workflows reference a tool (via MCP tool-call node descriptor or server/tool mapping), returning structured `unsafe-removal` errors for UI surfacing.
+- Registration validates definition contracts before persistence; runtime execution validates input/output contracts against installed definitions at the use-case boundary and refuses execution when the installed tool status is `disabled`.
+- Capability introspection query use cases now support bounded deeper semantics for future planner/agent selection: schema-path type checks (including array item paths), side-effect ceilings, explicit auth-kind filters, and configurable tag/category match modes.
+- Safe removal now returns an explicit structured result (`removed` or `blocked`) with dependency references, so UI/adapters can render unsafe-removal state without exception parsing.
 
 ## TODO
 

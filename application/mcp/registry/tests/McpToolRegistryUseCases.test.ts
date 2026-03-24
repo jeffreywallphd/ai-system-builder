@@ -85,7 +85,7 @@ describe("McpToolRegistryUseCases", () => {
     expect(enabled.status).toBe("enabled");
   });
 
-  it("blocks safe removal when references exist", async () => {
+  it("returns blocked safe-removal status when references exist", async () => {
     const repository = makeRepository([toolRecord("mcp:local:weather")]);
     const scanner: IMcpToolDependencyScanner = {
       scanToolReferences: async () => [
@@ -93,9 +93,18 @@ describe("McpToolRegistryUseCases", () => {
       ],
     };
 
-    await expect(new RemoveMcpToolUseCase(repository, scanner).execute("mcp:local:weather")).rejects.toMatchObject({
-      code: "unsafe-removal",
-    } satisfies Partial<McpToolRegistryError>);
+    const result = await new RemoveMcpToolUseCase(repository, scanner).execute("mcp:local:weather");
+    expect(result.status).toBe("blocked");
+    expect(result.references).toHaveLength(1);
+    expect(await repository.getInstalledTool("mcp:local:weather")).toBeDefined();
+  });
+
+  it("removes a tool when no references are found", async () => {
+    const repository = makeRepository([toolRecord("mcp:local:weather")]);
+    const scanner: IMcpToolDependencyScanner = { scanToolReferences: async () => [] };
+    const result = await new RemoveMcpToolUseCase(repository, scanner).execute("mcp:local:weather");
+    expect(result).toEqual({ status: "removed", toolId: "mcp:local:weather", references: [] });
+    expect(await repository.getInstalledTool("mcp:local:weather")).toBeUndefined();
   });
 
   it("queries capabilities by auth, side effects, and schema type", async () => {
@@ -120,6 +129,46 @@ describe("McpToolRegistryUseCases", () => {
 
     expect(results).toHaveLength(1);
     expect(results[0]?.toolId).toBe("mcp:local:charge");
+  });
+
+  it("supports deeper capability filtering semantics", async () => {
+    const repository = makeRepository([
+      Object.freeze({
+        ...toolRecord("mcp:local:json-array"),
+        definition: Object.freeze({
+          ...toolRecord("mcp:local:json-array").definition,
+          tags: Object.freeze(["json", "transform"]),
+          categories: Object.freeze(["utility", "conversion"]),
+          auth: Object.freeze({ kind: "optional" as const }),
+          sideEffects: "read" as const,
+          inputSchema: Object.freeze({
+            type: "object",
+            properties: {
+              records: {
+                type: "array",
+                items: { type: "object", properties: { id: { type: "integer" }, name: { type: "string" } } },
+              },
+            },
+          }),
+        }),
+      }),
+    ]);
+    const useCase = new QueryMcpToolCapabilitiesUseCase(repository);
+
+    const results = await useCase.execute({
+      inputType: "number",
+      inputPath: "records.*.id",
+      ioMatchMode: "assignable",
+      tagMatchMode: "any",
+      tags: ["nonexistent", "json"],
+      categoryMatchMode: "all",
+      categories: ["utility", "conversion"],
+      authKinds: ["optional"],
+      maxSideEffectClass: "read",
+    });
+
+    expect(results).toHaveLength(1);
+    expect(results[0]?.toolId).toBe("mcp:local:json-array");
   });
 
   it("gets details for a single installed tool", async () => {

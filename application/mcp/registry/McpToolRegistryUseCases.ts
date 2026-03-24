@@ -25,11 +25,18 @@ export interface RemoveMcpToolResult {
 export interface QueryMcpCapabilitiesRequest {
   readonly inputType?: string;
   readonly outputType?: string;
+  readonly inputPath?: string;
+  readonly outputPath?: string;
+  readonly ioMatchMode?: "exact" | "assignable";
   readonly includeSideEffects?: boolean;
+  readonly maxSideEffectClass?: McpToolSideEffectClass;
   readonly requiresAuth?: boolean;
+  readonly authKinds?: ReadonlyArray<"none" | "optional" | "required">;
   readonly sideEffects?: ReadonlyArray<McpToolSideEffectClass>;
   readonly tags?: ReadonlyArray<string>;
+  readonly tagMatchMode?: "all" | "any";
   readonly categories?: ReadonlyArray<string>;
+  readonly categoryMatchMode?: "all" | "any";
   readonly enabledOnly?: boolean;
 }
 
@@ -142,9 +149,19 @@ export class RemoveMcpToolUseCase {
 
     const references = await this.dependencyScanner.scanToolReferences(normalizedId);
     if (references.length > 0) {
-      throw new McpToolRegistryError("unsafe-removal", `Cannot remove MCP tool '${normalizedId}' because it is in use.`, {
+      return Object.freeze({
+        status: "blocked",
         toolId: normalizedId,
-        references,
+        references: Object.freeze(
+          references.map((reference) =>
+            Object.freeze({
+              kind: reference.kind,
+              id: reference.id,
+              label: reference.label,
+              detail: reference.detail,
+            }),
+          ),
+        ),
       });
     }
 
@@ -168,11 +185,11 @@ export class QueryMcpToolCapabilitiesUseCase {
       return false;
     }
 
-    if (filters.inputType && !schemaSupportsType(tool.definition.inputSchema, filters.inputType)) {
+    if (filters.inputType && !schemaSupportsType(tool.definition.inputSchema, filters.inputType, filters.inputPath, filters.ioMatchMode)) {
       return false;
     }
 
-    if (filters.outputType && !schemaSupportsType(tool.definition.outputSchema, filters.outputType)) {
+    if (filters.outputType && !schemaSupportsType(tool.definition.outputSchema, filters.outputType, filters.outputPath, filters.ioMatchMode)) {
       return false;
     }
 
@@ -184,18 +201,30 @@ export class QueryMcpToolCapabilitiesUseCase {
       return false;
     }
 
+    if (filters.authKinds && filters.authKinds.length > 0 && !filters.authKinds.includes(tool.definition.auth.kind)) {
+      return false;
+    }
+
     if (filters.sideEffects && filters.sideEffects.length > 0 && !filters.sideEffects.includes(tool.definition.sideEffects)) {
       return false;
     }
 
-    if (filters.tags && filters.tags.length > 0 && !filters.tags.every((tag) => tool.definition.tags.includes(tag))) {
+    if (filters.maxSideEffectClass && sideEffectSeverity(tool.definition.sideEffects) > sideEffectSeverity(filters.maxSideEffectClass)) {
+      return false;
+    }
+
+    if (
+      filters.tags &&
+      filters.tags.length > 0 &&
+      !matchStringSet(tool.definition.tags, filters.tags, filters.tagMatchMode ?? "all")
+    ) {
       return false;
     }
 
     if (
       filters.categories &&
       filters.categories.length > 0 &&
-      !filters.categories.some((category) => tool.definition.categories.includes(category))
+      !matchStringSet(tool.definition.categories, filters.categories, filters.categoryMatchMode ?? "any")
     ) {
       return false;
     }
@@ -204,23 +233,133 @@ export class QueryMcpToolCapabilitiesUseCase {
   }
 }
 
-function schemaSupportsType(schema: Readonly<Record<string, unknown>> | undefined, type: string): boolean {
+function schemaSupportsType(
+  schema: Readonly<Record<string, unknown>> | undefined,
+  type: string,
+  path?: string,
+  matchMode: "exact" | "assignable" = "assignable",
+): boolean {
   if (!schema) {
     return false;
   }
-  if (schema.type === type) {
-    return true;
-  }
+  const targetSchema = resolveSchemaPath(schema, path);
+  return schemaNodeSupportsType(targetSchema, type, matchMode);
+}
 
-  const properties = schema.properties;
-  if (!properties || typeof properties !== "object" || Array.isArray(properties)) {
+function schemaNodeSupportsType(
+  schema: Readonly<Record<string, unknown>> | undefined,
+  expectedType: string,
+  matchMode: "exact" | "assignable",
+): boolean {
+  if (!schema) {
     return false;
   }
 
-  return Object.values(properties).some((property) => {
-    if (!property || typeof property !== "object" || Array.isArray(property)) {
-      return false;
+  if (schemaTypeMatches(schema, expectedType, matchMode)) {
+    return true;
+  }
+
+  const properties = asSchemaRecord(schema.properties);
+  if (properties && Object.values(properties).some((property) => schemaNodeSupportsType(asSchemaRecord(property), expectedType, matchMode))) {
+    return true;
+  }
+
+  if (Array.isArray(schema.anyOf) && schema.anyOf.some((entry) => schemaNodeSupportsType(asSchemaRecord(entry), expectedType, matchMode))) {
+    return true;
+  }
+
+  if (Array.isArray(schema.oneOf) && schema.oneOf.some((entry) => schemaNodeSupportsType(asSchemaRecord(entry), expectedType, matchMode))) {
+    return true;
+  }
+
+  const items = asSchemaRecord(schema.items);
+  if (items && schemaNodeSupportsType(items, expectedType, matchMode)) {
+    return true;
+  }
+
+  return false;
+}
+
+function resolveSchemaPath(schema: Readonly<Record<string, unknown>>, path?: string): Readonly<Record<string, unknown>> | undefined {
+  if (!path?.trim()) {
+    return schema;
+  }
+
+  const segments = path
+    .split(".")
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+  let current: Readonly<Record<string, unknown>> | undefined = schema;
+  for (const segment of segments) {
+    if (segment === "*") {
+      current = asSchemaRecord(current?.items);
+      continue;
     }
-    return (property as Record<string, unknown>).type === type;
-  });
+    current = asSchemaRecord(asSchemaRecord(current?.properties)?.[segment]);
+    if (!current) {
+      return undefined;
+    }
+  }
+
+  return current;
+}
+
+function schemaTypeMatches(
+  schema: Readonly<Record<string, unknown>>,
+  expectedType: string,
+  matchMode: "exact" | "assignable",
+): boolean {
+  const schemaType = typeof schema.type === "string" ? schema.type : undefined;
+  if (!schemaType) {
+    return false;
+  }
+  if (matchMode === "exact") {
+    return schemaType === expectedType;
+  }
+  return schemaType === expectedType || isAssignableSchemaType(schemaType, expectedType);
+}
+
+function isAssignableSchemaType(schemaType: string, expectedType: string): boolean {
+  if (expectedType === "number" && schemaType === "integer") {
+    return true;
+  }
+  if (expectedType === "array" && schemaType === "object") {
+    return false;
+  }
+  return false;
+}
+
+function asSchemaRecord(value: unknown): Readonly<Record<string, unknown>> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+  return value as Readonly<Record<string, unknown>>;
+}
+
+function matchStringSet(
+  haystack: ReadonlyArray<string>,
+  needles: ReadonlyArray<string>,
+  mode: "all" | "any",
+): boolean {
+  if (mode === "any") {
+    return needles.some((needle) => haystack.includes(needle));
+  }
+  return needles.every((needle) => haystack.includes(needle));
+}
+
+function sideEffectSeverity(sideEffects: McpToolSideEffectClass): number {
+  switch (sideEffects) {
+    case "none":
+      return 0;
+    case "read":
+      return 1;
+    case "write":
+      return 2;
+    case "network":
+      return 3;
+    case "system":
+      return 4;
+    default:
+      return 99;
+  }
 }
