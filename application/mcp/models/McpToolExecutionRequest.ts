@@ -11,4 +11,8 @@ export interface McpToolExecutionRequest {
   readonly metadata?: Readonly<Record<string, unknown>>;
   readonly runtimePermissions?: ReadonlyArray<McpToolPermissionScope>;
   readonly resolvedCredentials?: Readonly<Record<string, string>>;
+  readonly credentialContext?: {
+    readonly projectId?: string;
+    readonly userId?: string;
+  };
 }

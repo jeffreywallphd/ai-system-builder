@@ -337,7 +337,7 @@ describe("ExecuteMcpToolUseCase", () => {
     const secretRepository: IMcpToolSecretRepository = {
       getSecretReference: async () => undefined,
       resolveSecret: async () => undefined,
-      upsertSecret: async () => ({ toolId: "x", fields: [], updatedAt: new Date().toISOString() }),
+      upsertSecret: async () => ({ toolId: "x", scopeType: "global", fields: [], updatedAt: new Date().toISOString() }),
       removeSecret: async () => false,
     };
 
@@ -396,10 +396,10 @@ describe("ExecuteMcpToolUseCase", () => {
       removeInstalledTool: async () => false,
     };
     const secretRepository: IMcpToolSecretRepository = {
-      getSecretReference: async () => ({ toolId: "mcp:local:secure-weather", fields: [], updatedAt: "2026-03-24T00:00:00.000Z" }),
+      getSecretReference: async () => ({ toolId: "mcp:local:secure-weather", scopeType: "global", fields: [], updatedAt: "2026-03-24T00:00:00.000Z" }),
       resolveSecret: async () =>
-        ({ toolId: "mcp:local:secure-weather", values: { apiKey: "super-secret" }, updatedAt: "2026-03-24T00:00:00.000Z" }),
-      upsertSecret: async () => ({ toolId: "x", fields: [], updatedAt: new Date().toISOString() }),
+        ({ toolId: "mcp:local:secure-weather", scopeType: "global", values: { apiKey: "super-secret" }, updatedAt: "2026-03-24T00:00:00.000Z" }),
+      upsertSecret: async () => ({ toolId: "x", scopeType: "global", fields: [], updatedAt: new Date().toISOString() }),
       removeSecret: async () => false,
     };
 
@@ -409,6 +409,106 @@ describe("ExecuteMcpToolUseCase", () => {
     });
 
     expect((requests[0] as { resolvedCredentials?: unknown }).resolvedCredentials).toEqual({ apiKey: "super-secret" });
+  });
+
+  it("resolves credentials in project -> user -> global priority order", async () => {
+    const requests: unknown[] = [];
+    const executor: IMcpToolExecutor = {
+      executeTool: async (request) => {
+        requests.push(request);
+        return { executionId: "exec-priority-1", serverId: request.serverId, toolName: request.toolName, status: "completed", content: [{}], structuredContent: {} };
+      },
+    };
+    const registry = {
+      listInstalledTools: async () => [],
+      getInstalledTool: async () => undefined,
+      findInstalledToolByBinding: async () =>
+        Object.freeze({
+          toolId: "mcp:local:secure-weather",
+          status: "enabled" as const,
+          installedAt: "2026-03-24T00:00:00.000Z",
+          updatedAt: "2026-03-24T00:00:00.000Z",
+          source: Object.freeze({ kind: "inline" as const, location: "inline:test" }),
+          grantedPermissions: Object.freeze(["network.access"] as const),
+          definition: Object.freeze({
+            id: "mcp:local:secure-weather",
+            version: "1.0.0",
+            displayName: "Secure Weather",
+            sideEffects: "network" as const,
+            auth: Object.freeze({ kind: "required" as const, credentialFields: Object.freeze([{ key: "apiKey", label: "API Key", secret: true, required: true }]) }),
+            permissions: Object.freeze(["network.access"] as const),
+            tags: Object.freeze([]),
+            categories: Object.freeze([]),
+            binding: Object.freeze({ serverId: "local", toolName: "secure-weather" }),
+            inputSchema: Object.freeze({ type: "object" }),
+            outputSchema: Object.freeze({ type: "object" }),
+          }),
+        }),
+      saveInstalledTool: async (record: never) => record,
+      removeInstalledTool: async () => false,
+    };
+    const secretRepository: IMcpToolSecretRepository = {
+      getSecretReference: async () => undefined,
+      resolveSecret: async (_toolId, scope) => {
+        if (scope?.scopeType === "project") {
+          return { toolId: "mcp:local:secure-weather", scopeType: "project", scopeId: scope.scopeId, values: { apiKey: "project-secret" }, updatedAt: "2026-03-24T00:00:00.000Z" };
+        }
+        if (scope?.scopeType === "user") {
+          return { toolId: "mcp:local:secure-weather", scopeType: "user", scopeId: scope.scopeId, values: { apiKey: "user-secret" }, updatedAt: "2026-03-24T00:00:00.000Z" };
+        }
+        return { toolId: "mcp:local:secure-weather", scopeType: "global", values: { apiKey: "global-secret" }, updatedAt: "2026-03-24T00:00:00.000Z" };
+      },
+      upsertSecret: async () => ({ toolId: "x", scopeType: "global", fields: [], updatedAt: new Date().toISOString() }),
+      removeSecret: async () => false,
+    };
+    await new ExecuteMcpToolUseCase(executor, new ExecutionContextToolPolicyService(), registry, undefined, secretRepository).execute({
+      serverId: "local",
+      toolName: "secure-weather",
+      credentialContext: { projectId: "project-a", userId: "user-1" },
+    });
+    expect((requests[0] as { resolvedCredentials?: Record<string, string> }).resolvedCredentials?.apiKey).toBe("project-secret");
+  });
+
+  it("classifies malformed required credentials as invalid-credentials", async () => {
+    const executor: IMcpToolExecutor = {
+      executeTool: async () => ({ executionId: "should-not-run", serverId: "local", toolName: "secure-weather", status: "completed", content: [] }),
+    };
+    const registry = {
+      listInstalledTools: async () => [],
+      getInstalledTool: async () => undefined,
+      findInstalledToolByBinding: async () => Object.freeze({
+        toolId: "mcp:local:secure-weather",
+        status: "enabled" as const,
+        installedAt: "2026-03-24T00:00:00.000Z",
+        updatedAt: "2026-03-24T00:00:00.000Z",
+        source: Object.freeze({ kind: "inline" as const, location: "inline:test" }),
+        grantedPermissions: Object.freeze(["network.access"] as const),
+        definition: Object.freeze({
+          id: "mcp:local:secure-weather",
+          version: "1.0.0",
+          displayName: "Secure Weather",
+          sideEffects: "network" as const,
+          auth: Object.freeze({ kind: "required" as const, credentialFields: Object.freeze([{ key: "apiKey", label: "API Key", secret: true, required: true, format: "token" as const }]) }),
+          permissions: Object.freeze(["network.access"] as const),
+          tags: Object.freeze([]),
+          categories: Object.freeze([]),
+          binding: Object.freeze({ serverId: "local", toolName: "secure-weather" }),
+          inputSchema: Object.freeze({ type: "object" }),
+        }),
+      }),
+      saveInstalledTool: async (record: never) => record,
+      removeInstalledTool: async () => false,
+    };
+    const secretRepository: IMcpToolSecretRepository = {
+      getSecretReference: async () => undefined,
+      resolveSecret: async () => ({ toolId: "mcp:local:secure-weather", scopeType: "global", values: { apiKey: "bad token" }, updatedAt: "2026-03-24T00:00:00.000Z" }),
+      upsertSecret: async () => ({ toolId: "x", scopeType: "global", fields: [], updatedAt: new Date().toISOString() }),
+      removeSecret: async () => false,
+    };
+    await expect(new ExecuteMcpToolUseCase(executor, new ExecutionContextToolPolicyService(), registry, undefined, secretRepository).execute({
+      serverId: "local",
+      toolName: "secure-weather",
+    })).rejects.toMatchObject({ code: "invalid-credentials" });
   });
 
   it("denies execution when required permissions are not granted", async () => {

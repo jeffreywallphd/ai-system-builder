@@ -67,6 +67,7 @@ Use "workflow-first", "tool projection", and "truthful execution provenance" whe
   6. runtime execution
 - Permission denials and auth misconfiguration now use structured errors instead of implicit fallback behavior.
 - Secret values are resolved only at execution boundary and are intentionally excluded from ordinary installed-tool projections and audit payloads.
+- Credential resolution now returns structured status (`success`/`missing`/`partial`/`invalid`/`failed`) so execution can distinguish missing vs malformed configuration and map to consistent auth error classes.
 
 ## MCP workflow-native node integration (Direction 3 stories 3.1–3.5)
 - `mcp.tool_call` is now treated as a first-class workflow node in the standard node catalog/definition/persistence surfaces, including a stable `toolId` property (`mcp:<serverId>:<toolName>`) alongside server/tool binding and descriptor snapshot fields.

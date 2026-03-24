@@ -9,6 +9,7 @@ export type McpToolRegistryErrorCode =
   | "invalid-output-contract"
   | "missing-auth-configuration"
   | "invalid-auth-configuration"
+  | "invalid-credentials"
   | "auth-resolution-failed"
   | "permission-denied";
 

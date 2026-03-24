@@ -25,6 +25,14 @@ export interface McpToolCredentialStatus {
   readonly updatedAt?: string;
 }
 
+export interface McpToolCredentialValidationResult {
+  readonly toolId: string;
+  readonly status: "valid" | "missing" | "partial" | "invalid";
+  readonly missingFields: ReadonlyArray<string>;
+  readonly malformedFields: ReadonlyArray<string>;
+  readonly classification: "missing-auth-configuration" | "invalid-credentials" | "authorized";
+}
+
 export interface McpToolExecutionPermissionDecision {
   readonly allowed: boolean;
   readonly requiredPermissions: ReadonlyArray<McpToolPermissionScope>;

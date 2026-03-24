@@ -150,7 +150,8 @@ The MCP inner-layer model now adds an explicit trust/governance foundation:
 - execution decisions are now emitted through an audit sink port with non-secret decision payloads, creating a seam for later trust/audit UX without forcing enterprise IAM scope in this slice.
 
 Current limitations (intentional for this pass):
-- local persistence is a desktop/local seam (local storage in the current slice), not cloud secret-manager integration.
+- secret persistence is still local-first, but now uses secure desktop encryption (`safeStorage` bridge) when available and encrypted local fallback otherwise.
+- scope is intentionally bounded to global/project with a user-scope extension seam; this is not a full identity/tenant system.
 - policy enforcement is application/runtime policy gating, not OS/container sandboxing yet.
 
 ## TODO

@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, ipcMain, safeStorage } from "electron";
 import { InitializeProductionStorageUseCase } from "../../application/runtime/InitializeProductionStorageUseCase";
 import { GetExecutionRunUseCase } from "../../application/execution/GetExecutionRunUseCase";
 import { resolveDesktopStoragePaths } from "../../infrastructure/desktop/DesktopAppPaths";
@@ -167,6 +167,32 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   });
   ipcMain.on("ai-loom-desktop-storage:removeItem", (_event, key: string) => {
     storageDatabase?.removeItem(key);
+  });
+  ipcMain.on("ai-loom-desktop-secrets:is-available", (event) => {
+    event.returnValue = safeStorage.isEncryptionAvailable();
+  });
+  ipcMain.on("ai-loom-desktop-secrets:get", (event, key: string) => {
+    const encoded = storageDatabase?.getItem(`secure:${key}`) ?? null;
+    if (!encoded) {
+      event.returnValue = null;
+      return;
+    }
+    try {
+      const decrypted = safeStorage.decryptString(Buffer.from(encoded, "base64"));
+      event.returnValue = decrypted;
+    } catch {
+      event.returnValue = null;
+    }
+  });
+  ipcMain.on("ai-loom-desktop-secrets:set", (_event, key: string, value: string) => {
+    if (!safeStorage.isEncryptionAvailable()) {
+      return;
+    }
+    const encrypted = safeStorage.encryptString(value).toString("base64");
+    storageDatabase?.setItem(`secure:${key}`, encrypted);
+  });
+  ipcMain.on("ai-loom-desktop-secrets:remove", (_event, key: string) => {
+    storageDatabase?.removeItem(`secure:${key}`);
   });
   const workflowsDirectory = runtimeConfig.workflowStorageDirectory
     ? path.resolve(repoRoot, runtimeConfig.workflowStorageDirectory)
