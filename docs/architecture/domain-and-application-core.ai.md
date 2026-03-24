@@ -1,22 +1,158 @@
-# AI Companion: Domain and Application Core
+# Domain and Application Core
 
-## Core fact
-The inner architecture is centered on stable domain models plus explicit application use cases and ports.
+This document goes deeper into the inner layers of the system: the domain model and the application orchestration built around it.
 
-## Main files
-- Workflow aggregate: `domain/workflows/Workflow.ts`
-- Workflow contract: `domain/workflows/interfaces/IWorkflow.ts`
-- Workflow validator: `domain/services/WorkflowValidator.ts`
-- Execution orchestration: `application/workflows/ExecuteWorkflowUseCase.ts`
-- Context orchestration: `application/context/WorkflowContextService.ts`
-- Tool run orchestration: `application/tools/RunToolUseCase.ts`
-- Port contracts: `application/ports/interfaces/*`
+## Why these layers matter most
 
-## Key framing
-Say the product has a "stable inner core" and "runtime/host adapters around it."
+If the infrastructure changed tomorrow—different storage, different runtime transport, different host shell—the product should still mean the same things:
+- a workflow is still a workflow
+- a node is still a node
+- model compatibility rules still apply
+- context packages and recipes still mean the same thing
+- tool publication is still attached to workflows
 
-## Caveat
-Not every concept is modeled in a perfectly pure way; context and projections are strongly application-layer concerns, and some UI-layer convenience logic still exists.
+Those stable meanings live in the **domain** and **application** layers.
+
+## Domain core
+
+### Workflows as the central aggregate
+The workflow aggregate (`domain/workflows/Workflow.ts`) is the most important domain object in the codebase. It owns:
+- identity
+- metadata
+- lifecycle state
+- runtime profile
+- execution policy
+- nodes
+- connections
+
+The aggregate exposes operations like `addNode`, `updateNode`, `removeNode`, `addConnection`, and `withMetadata`, each returning a new workflow instance. That gives the architecture a relatively immutable domain style that is useful for correctness, undo/redo-friendly thinking, and controlled mutation.
+
+### Graph semantics stay in the core
+The workflow can be converted to a graph (`toGraph()`), but graph-specific behavior is separated into graph/domain services rather than being buried in the UI. That keeps graph reasoning reusable and testable.
+
+### Validation as business policy
+`domain/services/WorkflowValidator.ts` combines graph checks, node validation, connection validation, and runtime-policy checks. This is the correct place for those rules because workflow validity is a business concern, not a view concern.
+
+### Compatibility services
+The domain also contains compatibility logic such as:
+- `NodeCompatibilityService`
+- `ModelCompatibilityService`
+- service compatibility helpers
+
+This reinforces that "can these parts work together?" is core product policy.
+
+## Application core
+
+### Use cases organize behavior around intent
+The application layer translates intents into orchestrated actions. The naming is explicit and readable:
+- create workflow
+- save workflow
+- load workflow
+- validate workflow
+- execute workflow
+- create node
+- connect nodes
+- install model
+- list tool capabilities
+- execute MCP tool
+- preview workflow/tool/agent context
+
+This gives the system an operation-centered API rather than a generic service blob.
+
+### Ports define required capabilities
+The application layer declares interfaces for capabilities it needs from the outside world, for example:
+- repositories
+- executors
+- runtime clients
+- tool catalogs
+- context repositories
+- model installers/downloaders
+
+That is the main clean-architecture mechanism that decouples use cases from storage and runtime details.
+
+### Workflow execution orchestration
+`ExecuteWorkflowUseCase` shows the inner architecture well. It:
+- receives the workflow and optional overrides
+- computes the effective workflow
+- resolves execution metadata, especially workflow context
+- validates according to runtime and dependency rules
+- delegates execution to an external executor port
+
+This is a strong separation because the use case owns the policy of execution preparation, while infrastructure owns the mechanics of actual execution.
+
+### Context as an application concern
+The context system is mostly modeled in the application layer rather than the pure domain layer. That is sensible because context assembly is highly orchestration-heavy:
+- loading packages and recipes
+- merging explicit and derived selections
+- assembling dynamic context sources
+- trimming/budgeting
+- generating execution envelopes and inspection outputs
+
+`application/context/WorkflowContextService.ts` is therefore a central application-layer service.
+
+### Projection services are application translators
+Projection services translate the rich internal workflow model into alternate surfaces such as forms and tools. They are not domain rules and not infrastructure details; application is the right layer for them.
+
+## How the inner layers support feature slices
+
+The same inner-layer approach is reused across multiple slices:
+- workflows and nodes
+- context engineering
+- tools and published tools
+- MCP use cases
+- model management
+- managed services
+- tuning dataset studio
+- model training
+
+This consistency is one of the healthier signs in the codebase: even as features expand, the inner architecture still tends to express them as domain models plus application orchestration.
+
+## Why this is a good fit for the product
+
+AI Loom Studio is not just a thin GUI over a runtime. It is an authoring and governance environment for workflows, tools, context, and local AI operations. That kind of product benefits from a strong inner core because the rules of the authoring model need to remain stable even when runtimes and integrations change.
 
 ## TODO
-- If asked what the most central business object is, answer: the workflow aggregate.
+
+- Some concepts currently live more in the application layer than the domain layer because they are orchestration-heavy. That is reasonable, but over time the team may want to clarify which context-engineering rules are true domain policy versus application assembly policy.
+- The workflow aggregate is clearly central, but some adjacent concepts—especially tool publication metadata and certain authoring concerns—could eventually deserve stronger domain-level abstractions if they continue to grow.
+
+## Asset system foundation (Direction 2, first slice)
+
+The asset layer is now moving from a simple catalog toward a cross-cutting system-of-record envelope for durable artifacts.
+
+### New canonical concepts
+
+The domain now includes explicit types for:
+- stable asset identity (`AssetId`)
+- immutable revisions (`AssetVersion`)
+- typed lineage relationships (`AssetLineageEdge`)
+- derivation/transformation records (`AssetTransformation`)
+
+These concepts are persistence-agnostic and model reproducibility/traceability directly instead of relying only on loose `version`, `parentAssetId`, or generic relationship strings.
+
+### Canonical vs projected
+
+Current canonical storage for this slice is:
+- existing asset catalog (`LocalAssetRepository`) for backward-compatible asset listing/edit flows
+- new SQLite asset system repository for version/lineage/transformation history
+
+Projected sources currently supported:
+- uploaded files (projected as uploaded assets + first version)
+- dataset exports (projected as dataset assets + version + derivation transformation)
+- workflow execution outputs (projected as generated assets + version + transformation + lineage edges)
+
+Projection is additive and migration-friendly; no existing flow was removed.
+
+### Lineage and execution seam
+
+Execution infrastructure now has an optional `ExecutionAssetLineageRecorder` seam. When supported workflow execution paths produce output assets, they can emit structured asset-system records without altering workflow execution truthfulness semantics.
+
+Partial provenance remains explicit: when upstream version truth is unavailable, lineage edges are not invented.
+
+### Neo4j readiness
+
+A graph projection port (`IAssetLineageGraphProjectionSink`) was introduced and wired to a no-op local implementation for now. This keeps the domain and application contracts ready for a future Neo4j projection layer without making graph infrastructure mandatory today.
+
+### Next chunk focus
+
+Future work should expand projection breadth and tighten identity contracts across model outputs, dataset versions, and execution artifacts while gradually migrating read/query surfaces to the canonical versioned lineage layer.
