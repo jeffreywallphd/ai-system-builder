@@ -165,4 +165,32 @@ A graph projection port (`IAssetLineageGraphProjectionSink`) was introduced and 
 
 Future work should tighten identity contracts across model outputs, dataset versions, and execution artifacts while gradually migrating read/query surfaces to the canonical versioned lineage layer.
 
+## Direction 2 update: canonical durable-entity unification (current slice)
+
+This slice expands canonical asset-system participation beyond execution outputs:
+- workflow definitions now publish canonical `workflow-definition:{workflowId}` assets with immutable versions.
+- installed/base models now publish canonical `installed-model:{modelId}` assets and bind both `installed-model` and `base-model` identities.
+- dataset versions now publish canonical `dataset-version:{datasetId}:{versionId}` assets and immutable versions.
+
+Identity resolution now flows through explicit canonical identity contracts (`ICanonicalAssetIdentityRepository` + `CanonicalAssetIdentityService`) so application paths can resolve:
+- canonical asset id for workflow/model/dataset-version entities
+- latest canonical version id when truthfully known
+- explicit pinned version ids when needed
+
+Canonical read/query surfaces now include dedicated application use cases for:
+- loading canonical asset summary by asset id
+- listing canonical assets by durable kind/source/status
+- listing versions and latest version per canonical asset
+- loading transformation history for an asset or version
+- loading direct dependencies/dependents for a version
+
+Bounded impact analysis is now available through `GetAssetImpactAnalysisUseCase` and returns explainable direct/transitive downstream version impact, transformation consumers, and explicit partial-lineage warning signals.
+
+SQLite asset-system persistence now includes canonical identity mappings and normalized query paths/indexes for durable filters (`kind/source/status`), latest-version lookup, transformation lookup by asset, and adjacency traversal.
+
+What remains for next chunks:
+- broaden canonical-read adoption across additional legacy catalog/repository UI paths
+- expand graph sink projection wiring from in-memory/local proof toward pluggable Neo4j-backed projection (still optional)
+- add richer partial-lineage diagnostics and UI-driven impact exploration without requiring full graph mode.
+
 SQLite storage now also carries normalized `asset_versions.version_label` and `asset_versions.parent_version_id` columns (plus legacy JSON payload compatibility) so version-chain queries can progressively move from blob parsing to explicit relational reads.

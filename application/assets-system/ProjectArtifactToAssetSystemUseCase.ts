@@ -103,7 +103,7 @@ export class ProjectArtifactToAssetSystemUseCase {
       kind: artifact.projectionKind === "dataset-export"
         ? "dataset"
         : artifact.projectionKind === "model-artifact"
-          ? "model"
+          ? "model-output"
         : resolveAssetKindFromContentType(artifact.contentType),
       status: "available",
       source: new AssetSourceInfo({

@@ -14,7 +14,7 @@ class MemoryStorage {
   public setItem(key: string, value: string): void { this.values.set(key, value); }
 }
 
-function createService(options: { generationService?: any; executionEngine?: UnifiedExecutionEngine } = {}) {
+function createService(options: { generationService?: any; executionEngine?: UnifiedExecutionEngine; canonicalPublisher?: any } = {}) {
   const storage = new MemoryStorage();
   const datasetRepository = new LocalStorageTuningDatasetRepository("test-datasets", storage as never);
   const versionRepository = new LocalStorageTuningDatasetVersionRepository(storage as never);
@@ -53,6 +53,7 @@ function createService(options: { generationService?: any; executionEngine?: Uni
       },
     ),
     executionEngine: options.executionEngine,
+    canonicalPublisher: options.canonicalPublisher,
     createId: (() => {
       let count = 0;
       return (prefix: string) => `${prefix}-${++count}`;
@@ -61,6 +62,26 @@ function createService(options: { generationService?: any; executionEngine?: Uni
 }
 
 describe("DefaultTuningDatasetStudioApplicationService", () => {
+
+  it("publishes canonical dataset-version identities when versions are persisted", async () => {
+    const published: string[] = [];
+    const service = createService({
+      canonicalPublisher: {
+        publishDatasetVersion: async (params: { datasetId: string; version: { id: string } }) => {
+          published.push(`${params.datasetId}:${params.version.id}`);
+          return { assetId: `dataset-version:${params.datasetId}:${params.version.id}`, versionId: `asset-version:${params.version.id}:1` } as const;
+        },
+      },
+    });
+
+    const dataset = await service.createDataset({
+      name: "Canonical Dataset",
+      taskType: "question_answering",
+      createdBy: "tester",
+    });
+
+    expect(published).toContain(`${dataset.dataset.id}:${dataset.selectedVersion!.id}`);
+  });
   it("runs the version-aware QA workflow from import through release and successor draft creation", async () => {
     const service = createService();
     const dataset = await service.createDataset({

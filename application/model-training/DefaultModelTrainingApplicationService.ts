@@ -10,6 +10,7 @@ import type { IModelTrainingRuntime } from "../ports/interfaces/IModelTrainingRu
 import type { IModelCreationEnvironmentGateway } from "../ports/interfaces/IModelCreationEnvironmentGateway";
 import type { IFileStorage } from "../ports/interfaces/IFileStorage";
 import type { UnifiedExecutionEngine } from "../execution/UnifiedExecutionEngine";
+import type { CanonicalAssetIdentityService } from "../assets-system/CanonicalAssetIdentityService";
 import type { DatasetRepository, DatasetVersionRepository, DatasetTaskType } from "../../domain/tuning-datasets/interfaces/ITuningDatasetStudio";
 import { ChatCompletionExample, QuestionAnsweringExample } from "../../domain/tuning-datasets/TuningDatasetEntities";
 import type { IModel } from "../../domain/models/interfaces/IModel";
@@ -65,6 +66,7 @@ export class DefaultModelTrainingApplicationService implements ModelTrainingAppl
     private readonly fileStorage?: IFileStorage,
     private readonly executionEngine?: UnifiedExecutionEngine,
     private readonly createId: () => string = defaultCreateId,
+    private readonly canonicalIdentityService?: CanonicalAssetIdentityService,
   ) {
     this.capabilityPolicy = new ModelCreationCapabilityPolicy();
   }
@@ -344,6 +346,13 @@ export class DefaultModelTrainingApplicationService implements ModelTrainingAppl
       throw new Error("Training learning rate must be > 0.");
     }
 
+    const datasetVersionAssetId = await this.canonicalIdentityService?.resolveAssetId("dataset-version", `${dataset.id}:${version.id}`);
+    const baseModelAssetId = await this.canonicalIdentityService?.resolveAssetId("base-model", baseModel.id);
+    const explicitSourceVersionIds = [
+      await this.canonicalIdentityService?.resolveLatestVersionId("dataset-version", `${dataset.id}:${version.id}`),
+      await this.canonicalIdentityService?.resolveLatestVersionId("base-model", baseModel.id),
+    ].filter((entry): entry is string => typeof entry === "string" && !!entry.trim());
+
     const submitRequest = {
       id: command.id?.trim() || this.createId(),
       name: command.name,
@@ -358,6 +367,11 @@ export class DefaultModelTrainingApplicationService implements ModelTrainingAppl
       datasetTaskType: dataset.taskType,
       createdBy: command.createdBy,
       configuration: command.configuration,
+      assetLineage: {
+        datasetVersionAssetId,
+        baseModelAssetId,
+        sourceVersionIds: explicitSourceVersionIds,
+      },
       examples: eligibleExamples.map((example) => {
         if (example instanceof QuestionAnsweringExample) {
           return Object.freeze({

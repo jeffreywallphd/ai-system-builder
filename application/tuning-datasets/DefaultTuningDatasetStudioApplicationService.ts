@@ -70,6 +70,7 @@ import {
   createDatasetGenerationExecutionPlan,
   requireDatasetGenerationResult,
 } from "../execution/DatasetGenerationExecutionPlanFactory";
+import type { PublishDurableEntityToAssetSystemUseCase } from "../assets-system/PublishDurableEntityToAssetSystemUseCase";
 
 interface ServiceOptions {
   readonly datasetRepository: DatasetRepository;
@@ -91,6 +92,7 @@ interface ServiceOptions {
   readonly fileIngestionService?: FileIngestionApplicationService;
   readonly datasetSourceIngestionProfile?: FileIngestionProfile;
   readonly executionEngine?: UnifiedExecutionEngine;
+  readonly canonicalPublisher?: PublishDurableEntityToAssetSystemUseCase;
 }
 
 function defaultCreateId(prefix: string): string {
@@ -120,6 +122,7 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
   private readonly fileIngestionService?: FileIngestionApplicationService;
   private readonly datasetSourceIngestionProfile: FileIngestionProfile;
   private readonly executionEngine?: UnifiedExecutionEngine;
+  private readonly canonicalPublisher?: PublishDurableEntityToAssetSystemUseCase;
 
   constructor(options: ServiceOptions) {
     this.datasetRepository = options.datasetRepository;
@@ -141,6 +144,7 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
     this.fileIngestionService = options.fileIngestionService;
     this.datasetSourceIngestionProfile = options.datasetSourceIngestionProfile ?? DatasetSourceIngestionProfile;
     this.executionEngine = options.executionEngine;
+    this.canonicalPublisher = options.canonicalPublisher;
   }
 
   public async createDataset(command: CreateDatasetCommand): Promise<DatasetDetails> {
@@ -175,6 +179,11 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
       kind: versions.length === 0 ? "initial_draft" : "branch_draft",
     }) as TuningDatasetVersion;
     const savedVersion = await this.datasetVersionRepository.saveVersion(version);
+    await this.canonicalPublisher?.publishDatasetVersion({
+      datasetId: dataset.id,
+      datasetName: dataset.name,
+      version: savedVersion,
+    });
     await this.datasetVersionRepository.saveWorkflowState(this.workflowService.createInitial(dataset.id, savedVersion.id));
     await this.datasetRepository.save((dataset as TuningDataset).withVersionPointers(savedVersion as TuningDatasetVersion));
     await this.reconcileWorkflow(dataset.id, savedVersion.id);
@@ -193,7 +202,12 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
       versionNumber: versions.length + 1,
       createdBy: command.createdBy,
     });
-    await this.datasetVersionRepository.saveVersion(successor);
+    const savedSuccessor = await this.datasetVersionRepository.saveVersion(successor);
+    await this.canonicalPublisher?.publishDatasetVersion({
+      datasetId: dataset.id,
+      datasetName: dataset.name,
+      version: savedSuccessor,
+    });
     if (command.cloneSources ?? true) {
       const sourceDocuments = await this.datasetVersionRepository.listSourceDocuments(command.datasetId, releasedVersion.id);
       await Promise.all(sourceDocuments.map((document) => this.datasetVersionRepository.saveSourceDocument({
@@ -235,6 +249,11 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
     }
     const releasedVersion = (version as TuningDatasetVersion).release({ releaseNotes: command.releaseNotes, validationResult: validation, statistics });
     const savedVersion = await this.datasetVersionRepository.saveVersion(releasedVersion);
+    await this.canonicalPublisher?.publishDatasetVersion({
+      datasetId: dataset.id,
+      datasetName: dataset.name,
+      version: savedVersion,
+    });
     await this.datasetRepository.save((dataset as TuningDataset).withVersionPointers(savedVersion as TuningDatasetVersion, savedVersion.id));
     const manifest = this.releaseManifestService.create({ dataset, version: savedVersion, examples, sourceDocumentCount: sourceDocuments.length });
     const canonicalJson = this.exportService.exportVersion({ dataset, version: savedVersion, examples, sourceDocuments, format: "canonical_json", manifest });

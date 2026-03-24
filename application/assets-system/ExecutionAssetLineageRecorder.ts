@@ -5,6 +5,7 @@ import type { IAssetVersionRepository } from "../ports/interfaces/IAssetVersionR
 import type { DatasetGenerationRequest, DatasetGenerationResult } from "../../domain/tuning-datasets/interfaces/ITuningDatasetStudio";
 import type { ModelTrainingJob } from "../../domain/model-training/ModelTrainingTypes";
 import type { SubmitModelTrainingJobRequest } from "../ports/interfaces/IModelTrainingRuntime";
+import type { CanonicalAssetIdentityService } from "./CanonicalAssetIdentityService";
 
 function toAssetId(executionId: string, assetId: string): string {
   return `workflow-output:${executionId}:${assetId}`;
@@ -14,6 +15,7 @@ export class ExecutionAssetLineageRecorder {
   constructor(
     private readonly projectionUseCase: ProjectArtifactToAssetSystemUseCase,
     private readonly versionRepository: IAssetVersionRepository,
+    private readonly canonicalIdentityService?: CanonicalAssetIdentityService,
   ) {}
 
   public async recordWorkflowExecution(params: {
@@ -148,9 +150,14 @@ export class ExecutionAssetLineageRecorder {
       }
     }
 
+    const resolvedDatasetVersionAssetId = request.assetLineage?.datasetVersionAssetId
+      ?? await this.canonicalIdentityService?.resolveAssetId("dataset-version", `${request.datasetId}:${request.datasetVersionId}`);
+    const resolvedBaseModelAssetId = request.assetLineage?.baseModelAssetId
+      ?? await this.canonicalIdentityService?.resolveAssetId("base-model", request.baseModelId);
+
     const candidateAssetIds = [
-      request.assetLineage?.datasetVersionAssetId,
-      request.assetLineage?.baseModelAssetId,
+      resolvedDatasetVersionAssetId,
+      resolvedBaseModelAssetId,
       `dataset-version:${request.datasetId}:${request.datasetVersionId}`,
     ];
 

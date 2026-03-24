@@ -37,6 +37,7 @@ import { ReconnectMcpServerUseCase } from "../../application/mcp/ReconnectMcpSer
 import { ExecuteMcpToolUseCase } from "../../application/mcp/ExecuteMcpToolUseCase";
 import { ListToolCapabilitiesUseCase } from "../../application/tools/ListToolCapabilitiesUseCase";
 import { InvokeToolCapabilityUseCase } from "../../application/tools/InvokeToolCapabilityUseCase";
+import { PublishDurableEntityToAssetSystemUseCase } from "../../application/assets-system/PublishDurableEntityToAssetSystemUseCase";
 
 import type { INodeCatalogProvider } from "../../application/ports/interfaces/INodeCatalogProvider";
 import type { IWorkflowExecutor } from "../../application/ports/interfaces/IWorkflowExecutor";
@@ -218,6 +219,7 @@ export class ApplicationBootstrap {
           remoteModelCatalog: c.resolve<IRemoteModelCatalog>(
             TOKENS.RemoteModelCatalog
           ),
+          canonicalPublisher: c.resolve<PublishDurableEntityToAssetSystemUseCase>(TOKENS.DurableAssetPublisher),
         })
     );
 

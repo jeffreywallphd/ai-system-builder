@@ -75,6 +75,8 @@ import { CreateAssetVersionUseCase } from "../../application/assets-system/Creat
 import { RecordAssetTransformationUseCase } from "../../application/assets-system/RecordAssetTransformationUseCase";
 import { ProjectArtifactToAssetSystemUseCase } from "../../application/assets-system/ProjectArtifactToAssetSystemUseCase";
 import { ExecutionAssetLineageRecorder } from "../../application/assets-system/ExecutionAssetLineageRecorder";
+import { CanonicalAssetIdentityService } from "../../application/assets-system/CanonicalAssetIdentityService";
+import { PublishDurableEntityToAssetSystemUseCase } from "../../application/assets-system/PublishDurableEntityToAssetSystemUseCase";
 
 export const TOKENS = Object.freeze({
   EnvironmentConfig: Symbol("EnvironmentConfig"),
@@ -110,6 +112,8 @@ export const TOKENS = Object.freeze({
   AssetSystemRepository: Symbol("AssetSystemRepository"),
   AssetLineageGraphProjectionSink: Symbol("AssetLineageGraphProjectionSink"),
   ExecutionAssetLineageRecorder: Symbol("ExecutionAssetLineageRecorder"),
+  CanonicalAssetIdentityService: Symbol("CanonicalAssetIdentityService"),
+  DurableAssetPublisher: Symbol("DurableAssetPublisher"),
 }) satisfies Record<string, DependencyToken>;
 
 export interface IInfrastructureRegistryPaths {
@@ -340,6 +344,20 @@ export class InfrastructureRegistry {
 
     container.registerSingleton<IAssetLineageGraphProjectionSink>(TOKENS.AssetLineageGraphProjectionSink, () => new NoopAssetLineageGraphProjectionSink());
 
+    container.registerSingleton<CanonicalAssetIdentityService>(TOKENS.CanonicalAssetIdentityService, (c) => {
+      const systemRepository = c.resolve<SqliteAssetSystemRepository>(TOKENS.AssetSystemRepository);
+      return new CanonicalAssetIdentityService(systemRepository, systemRepository);
+    });
+
+    container.registerSingleton<PublishDurableEntityToAssetSystemUseCase>(TOKENS.DurableAssetPublisher, (c) => {
+      const systemRepository = c.resolve<SqliteAssetSystemRepository>(TOKENS.AssetSystemRepository);
+      return new PublishDurableEntityToAssetSystemUseCase(
+        new RegisterAssetUseCase(systemRepository),
+        new CreateAssetVersionUseCase(systemRepository),
+        systemRepository,
+      );
+    });
+
     container.registerSingleton<ExecutionAssetLineageRecorder>(TOKENS.ExecutionAssetLineageRecorder, (c) => {
       const systemRepository = c.resolve<SqliteAssetSystemRepository>(TOKENS.AssetSystemRepository);
       const registerAssetUseCase = new RegisterAssetUseCase(systemRepository);
@@ -355,7 +373,7 @@ export class InfrastructureRegistry {
         recordTransformationUseCase,
       );
 
-      return new ExecutionAssetLineageRecorder(projectionUseCase, systemRepository);
+      return new ExecutionAssetLineageRecorder(projectionUseCase, systemRepository, c.resolve<CanonicalAssetIdentityService>(TOKENS.CanonicalAssetIdentityService));
     });
 
     container.registerSingleton(TOKENS.ModelRepository, (c) => {
