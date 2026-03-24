@@ -30,7 +30,7 @@ export class DeterministicAgentPlanningService implements AgentPlanningInterface
   public async plan(agent: Agent): Promise<AgentExecutionPlan> {
     const capabilities = await this.catalog.listCapabilities();
     const capabilityIds = new Set(capabilities.map((capability) => capability.id));
-    const allowedTools = agent.policy.toolAccess.allowedToolIds.filter((toolId) => capabilityIds.has(toolId));
+    const allowedTools = agent.toolAccess.allowedToolIds.filter((toolId) => capabilityIds.has(toolId));
 
     if (allowedTools.length === 0) {
       throw new Error(`Agent '${agent.id}' has no executable allowed tools in the current catalog.`);

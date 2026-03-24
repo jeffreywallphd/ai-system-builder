@@ -1,5 +1,6 @@
 import { ExecutionPlan, ExecutionUnitKinds, type IExecutionUnitDefinition } from "../../../domain/execution/ExecutionPlan";
 import type { AgentExecutionSession } from "../../../domain/agents/AgentExecutionSession";
+import { AssetId } from "../../../domain/assets/AssetId";
 
 export interface AgentPlanStepMappingInput {
   readonly stepId: string;
@@ -7,7 +8,7 @@ export interface AgentPlanStepMappingInput {
   readonly toolId: string;
   readonly intent: {
     readonly action: string;
-    readonly inputAssetIds?: ReadonlyArray<string>;
+    readonly inputAssetIds?: ReadonlyArray<AssetId>;
     readonly expectedOutputKey?: string;
   };
   readonly dependsOnStepIds?: ReadonlyArray<string>;
@@ -26,7 +27,7 @@ export interface AgentExecutionUnitPayload {
   readonly goalId?: string;
   readonly toolId: string;
   readonly action: string;
-  readonly inputAssetIds: ReadonlyArray<string>;
+  readonly inputAssetIds: ReadonlyArray<AssetId>;
   readonly expectedOutputKey?: string;
 }
 
@@ -54,7 +55,13 @@ function normalizeStep(step: AgentPlanStepMappingInput): AgentPlanStepMappingInp
     toolId: normalizeRequired(step.toolId, "Agent plan step toolId"),
     intent: Object.freeze({
       action: normalizeRequired(step.intent?.action ?? "", "Agent plan step action"),
-      inputAssetIds: Object.freeze((step.intent?.inputAssetIds ?? []).map((assetId) => normalizeRequired(assetId, "Agent plan step inputAssetId"))),
+      inputAssetIds: Object.freeze((step.intent?.inputAssetIds ?? []).map((assetId) => {
+        const normalizedAssetId = AssetId.from(assetId);
+        if (!normalizedAssetId.toString().startsWith("asset:")) {
+          throw new Error(`Agent plan step inputAssetId '${normalizedAssetId.toString()}' must use canonical asset id format.`);
+        }
+        return normalizedAssetId;
+      })),
       expectedOutputKey: step.intent?.expectedOutputKey?.trim() || undefined,
     }),
     dependsOnStepIds: Object.freeze((step.dependsOnStepIds ?? []).map((dependency) => normalizeRequired(dependency, "Agent plan dependency id"))),

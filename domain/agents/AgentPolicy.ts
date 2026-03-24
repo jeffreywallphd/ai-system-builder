@@ -1,4 +1,8 @@
-import type { McpToolPermissionScope, McpToolPermissionApprovalStatus } from "../mcp/McpToolTrust";
+import type {
+  McpToolPermissionScope,
+  McpToolPermissionApprovalStatus,
+  McpToolSandboxPolicy,
+} from "../mcp/McpToolTrust";
 
 export const AgentApprovalStatuses = Object.freeze({
   pending: "pending",
@@ -9,7 +13,16 @@ export const AgentApprovalStatuses = Object.freeze({
 
 export type AgentApprovalStatus = typeof AgentApprovalStatuses[keyof typeof AgentApprovalStatuses];
 
-export type AgentPermissionId = McpToolPermissionScope | "runtime.execute" | "workspace.read" | "workspace.write";
+export const AgentExtendedPermissionIds = Object.freeze({
+  runtimeExecute: "runtime.execute",
+  workspaceRead: "workspace.read",
+  workspaceWrite: "workspace.write",
+});
+
+export type AgentExtendedPermissionId =
+  typeof AgentExtendedPermissionIds[keyof typeof AgentExtendedPermissionIds];
+
+export type AgentPermissionId = McpToolPermissionScope | AgentExtendedPermissionId;
 
 export interface AgentToolScopeConstraint {
   readonly toolId: string;
@@ -39,12 +52,7 @@ export interface AgentSafetyConstraint {
     readonly scopeId?: string;
   }>;
   readonly deniedPermissionIds: ReadonlyArray<AgentPermissionId>;
-  readonly sandbox: {
-    readonly network: "deny" | "allow";
-    readonly filesystem: "deny" | "read-only" | "read-write";
-    readonly assets: "deny" | "read-only" | "read-write";
-    readonly allowEnvironmentVariables: ReadonlyArray<string>;
-  };
+  readonly sandbox: McpToolSandboxPolicy;
 }
 
 export interface AgentPolicy {
@@ -142,7 +150,12 @@ export function normalizeAgentPolicy(policy: AgentPolicy): AgentPolicy {
   const safetyInput = policy.safetyConstraints ?? {
     requiredApprovals: [],
     deniedPermissionIds: [],
-    sandbox: { network: "deny", filesystem: "deny", assets: "read-only", allowEnvironmentVariables: [] },
+    sandbox: {
+      network: { allowed: false },
+      filesystem: { allowed: false },
+      assets: { read: true, write: false },
+      environment: { mode: "none" },
+    },
   };
   const requiredApprovals = Object.freeze((safetyInput.requiredApprovals ?? []).map((entry) => Object.freeze({
     permissionId: normalizePermissionId(entry.permissionId),
@@ -151,20 +164,15 @@ export function normalizeAgentPolicy(policy: AgentPolicy): AgentPolicy {
     scopeId: entry.scopeId?.trim() || undefined,
   })));
   const deniedPermissionIds = Object.freeze((safetyInput.deniedPermissionIds ?? []).map((permissionId) => normalizePermissionId(permissionId)));
-  const sandbox = Object.freeze({
-    network: normalizeSandboxNetworkMode(safetyInput.sandbox?.network),
-    filesystem: normalizeSandboxFilesystemMode(safetyInput.sandbox?.filesystem),
-    assets: normalizeSandboxAssetsMode(safetyInput.sandbox?.assets),
-    allowEnvironmentVariables: normalizeList(safetyInput.sandbox?.allowEnvironmentVariables),
-  });
+  const sandbox = normalizeSandboxPolicy(safetyInput.sandbox);
 
-  if (sandbox.network === "deny" && deniedPermissionIds.includes("network.access")) {
+  if (!sandbox.network.allowed && deniedPermissionIds.includes("network.access")) {
     throw new Error("Agent policy should not redundantly deny network.access when sandbox.network is deny.");
   }
-  if (sandbox.network === "deny" && requiredApprovals.some((entry) => entry.permissionId === "network.access")) {
+  if (!sandbox.network.allowed && requiredApprovals.some((entry) => entry.permissionId === "network.access")) {
     throw new Error("Agent policy sandbox denies network access but approvals require network.access.");
   }
-  if (sandbox.filesystem === "deny" && requiredApprovals.some((entry) => entry.permissionId.startsWith("filesystem."))) {
+  if (!sandbox.filesystem.allowed && requiredApprovals.some((entry) => entry.permissionId.startsWith("filesystem."))) {
     throw new Error("Agent policy sandbox denies filesystem access but approvals require filesystem permissions.");
   }
   for (const approval of requiredApprovals) {
@@ -226,9 +234,9 @@ function normalizePermissionId(value: string): AgentPermissionId {
     "filesystem.read",
     "filesystem.write",
     "system.exec",
-    "runtime.execute",
-    "workspace.read",
-    "workspace.write",
+    AgentExtendedPermissionIds.runtimeExecute,
+    AgentExtendedPermissionIds.workspaceRead,
+    AgentExtendedPermissionIds.workspaceWrite,
   ];
   if (!supported.includes(normalized)) {
     throw new Error(`Agent permissionId '${normalized}' is unsupported.`);
@@ -236,30 +244,47 @@ function normalizePermissionId(value: string): AgentPermissionId {
   return normalized;
 }
 
-function normalizeSandboxNetworkMode(value: AgentSafetyConstraint["sandbox"]["network"] | undefined): AgentSafetyConstraint["sandbox"]["network"] {
-  const normalized = value ?? "deny";
-  if (!["deny", "allow"].includes(normalized)) {
-    throw new Error("Agent sandbox network mode must be allow or deny.");
-  }
-  return normalized;
-}
+function normalizeSandboxPolicy(value: McpToolSandboxPolicy | undefined): McpToolSandboxPolicy {
+  const sandbox = value ?? {
+    network: { allowed: false },
+    filesystem: { allowed: false },
+    assets: { read: true, write: false },
+    environment: { mode: "none" as const },
+  };
 
-function normalizeSandboxFilesystemMode(
-  value: AgentSafetyConstraint["sandbox"]["filesystem"] | undefined,
-): AgentSafetyConstraint["sandbox"]["filesystem"] {
-  const normalized = value ?? "deny";
-  if (!["deny", "read-only", "read-write"].includes(normalized)) {
-    throw new Error("Agent sandbox filesystem mode must be deny, read-only, or read-write.");
+  if (!sandbox.network) {
+    throw new Error("Agent sandbox network policy is required.");
   }
-  return normalized;
-}
+  if (sandbox.network.allowedHosts && sandbox.network.allowedHosts.some((host) => !host.trim())) {
+    throw new Error("Agent sandbox network allowedHosts must not contain empty entries.");
+  }
+  if (sandbox.filesystem.allowed && !(sandbox.filesystem.readPaths?.length || sandbox.filesystem.writePaths?.length)) {
+    throw new Error("Agent sandbox filesystem policy requires readPaths or writePaths when filesystem is allowed.");
+  }
+  if (sandbox.environment.mode === "allowlist" && (sandbox.environment.allowedEnvVars?.length ?? 0) === 0) {
+    throw new Error("Agent sandbox environment allowlist mode requires allowedEnvVars.");
+  }
 
-function normalizeSandboxAssetsMode(value: AgentSafetyConstraint["sandbox"]["assets"] | undefined): AgentSafetyConstraint["sandbox"]["assets"] {
-  const normalized = value ?? "read-only";
-  if (!["deny", "read-only", "read-write"].includes(normalized)) {
-    throw new Error("Agent sandbox assets mode must be deny, read-only, or read-write.");
-  }
-  return normalized;
+  return Object.freeze({
+    network: Object.freeze({
+      allowed: sandbox.network.allowed,
+      allowedHosts: normalizeList(sandbox.network.allowedHosts),
+      allowedProtocols: Object.freeze([...(sandbox.network.allowedProtocols ?? [])]),
+    }),
+    filesystem: Object.freeze({
+      allowed: sandbox.filesystem.allowed,
+      readPaths: normalizeList(sandbox.filesystem.readPaths),
+      writePaths: normalizeList(sandbox.filesystem.writePaths),
+    }),
+    assets: Object.freeze({
+      read: Boolean(sandbox.assets.read),
+      write: Boolean(sandbox.assets.write),
+    }),
+    environment: Object.freeze({
+      mode: sandbox.environment.mode,
+      allowedEnvVars: normalizeList(sandbox.environment.allowedEnvVars),
+    }),
+  });
 }
 
 function normalizePositiveInt(value: number | undefined, label: string): number | undefined {

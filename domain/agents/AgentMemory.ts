@@ -133,10 +133,6 @@ export function normalizeAgentMemoryConfiguration(config: AgentMemoryConfigurati
     return normalizedEntry;
   }));
 
-  if (assets.length === 0) {
-    throw new Error("Agent memory configuration must include at least one asset reference.");
-  }
-
   if (!Number.isInteger(config.revision) || config.revision < 1) {
     throw new Error("Agent memory configuration revision must be a positive integer.");
   }

@@ -1,8 +1,9 @@
 import { ExecutionStatuses, type ExecutionStatus } from "../execution/ExecutionPlan";
+import { AssetId } from "../assets/AssetId";
 
 export const AgentExecutionSessionStatuses = Object.freeze({
+  pending: ExecutionStatuses.pending,
   ready: ExecutionStatuses.ready,
-  planning: "planning",
   running: ExecutionStatuses.running,
   completed: ExecutionStatuses.completed,
   failed: ExecutionStatuses.failed,
@@ -17,7 +18,13 @@ export interface AgentExecutionPlanReference {
 
 export interface AgentExecutionRunReference {
   readonly runId: string;
+  readonly planId?: string;
   readonly status?: ExecutionStatus;
+}
+
+export interface AgentExecutionDiagnosticReference {
+  readonly assetId: AssetId;
+  readonly assetVersionId?: string;
 }
 
 export interface AgentExecutionSession {
@@ -26,7 +33,7 @@ export interface AgentExecutionSession {
   readonly executionPlan?: AgentExecutionPlanReference;
   readonly status: AgentExecutionSessionStatus;
   readonly executionRuns: ReadonlyArray<AgentExecutionRunReference>;
-  readonly diagnosticAssetIds: ReadonlyArray<string>;
+  readonly diagnostics: ReadonlyArray<AgentExecutionDiagnosticReference>;
   readonly startTime: string;
   readonly endTime?: string;
 }
@@ -39,15 +46,45 @@ function normalizeRequired(value: string, field: string): string {
   return normalized;
 }
 
-function normalizeList(values: ReadonlyArray<string> | undefined): ReadonlyArray<string> {
+function normalizeDiagnostics(
+  values: ReadonlyArray<AgentExecutionDiagnosticReference> | undefined,
+): ReadonlyArray<AgentExecutionDiagnosticReference> {
   const deduped = new Set<string>();
+  const normalized: AgentExecutionDiagnosticReference[] = [];
   for (const value of values ?? []) {
-    const normalized = value.trim();
-    if (normalized) {
-      deduped.add(normalized);
+    const assetId = AssetId.from(value.assetId);
+    if (!assetId.toString().startsWith("asset:")) {
+      throw new Error(`Agent diagnostic asset id '${assetId.toString()}' must use canonical asset id format.`);
+    }
+    const assetVersionId = value.assetVersionId?.trim() || undefined;
+    if (assetVersionId !== undefined && !/^[a-zA-Z0-9:_-]+$/.test(assetVersionId)) {
+      throw new Error(`Agent diagnostic assetVersionId '${assetVersionId}' is malformed.`);
+    }
+    const diagnosticKey = [assetId.toString(), assetVersionId ?? "latest"].join("|");
+    if (diagnosticKey) {
+      if (!deduped.has(diagnosticKey)) {
+        deduped.add(diagnosticKey);
+        normalized.push(Object.freeze({
+          assetId,
+          assetVersionId,
+        }));
+      }
     }
   }
-  return Object.freeze([...deduped]);
+  return Object.freeze(normalized);
+}
+
+function normalizeExecutionRun(entry: AgentExecutionRunReference, sessionPlanId?: string): AgentExecutionRunReference {
+  const runId = normalizeRequired(entry.runId, "Agent execution run id");
+  const planId = entry.planId?.trim() || undefined;
+  if (planId && sessionPlanId && planId !== sessionPlanId) {
+    throw new Error(`Agent execution run '${runId}' planId '${planId}' must match session planId '${sessionPlanId}'.`);
+  }
+  return Object.freeze({
+    runId,
+    planId,
+    status: entry.status,
+  });
 }
 
 function isTerminalStatus(status: AgentExecutionSessionStatus): boolean {
@@ -61,8 +98,8 @@ function assertValidLifecycleTransition(
   to: AgentExecutionSessionStatus,
 ): void {
   const allowedTransitions: Readonly<Record<AgentExecutionSessionStatus, ReadonlyArray<AgentExecutionSessionStatus>>> = {
-    ready: Object.freeze([AgentExecutionSessionStatuses.planning, AgentExecutionSessionStatuses.running, AgentExecutionSessionStatuses.cancelled]),
-    planning: Object.freeze([AgentExecutionSessionStatuses.running, AgentExecutionSessionStatuses.failed, AgentExecutionSessionStatuses.cancelled]),
+    pending: Object.freeze([AgentExecutionSessionStatuses.ready, AgentExecutionSessionStatuses.running, AgentExecutionSessionStatuses.failed, AgentExecutionSessionStatuses.cancelled]),
+    ready: Object.freeze([AgentExecutionSessionStatuses.running, AgentExecutionSessionStatuses.failed, AgentExecutionSessionStatuses.cancelled]),
     running: Object.freeze([AgentExecutionSessionStatuses.completed, AgentExecutionSessionStatuses.failed, AgentExecutionSessionStatuses.cancelled]),
     completed: Object.freeze([]),
     failed: Object.freeze([]),
@@ -84,11 +121,11 @@ export function createAgentExecutionSession(input: {
   readonly planId?: string;
   readonly status?: AgentExecutionSessionStatus;
   readonly executionRuns?: ReadonlyArray<AgentExecutionRunReference>;
-  readonly diagnosticAssetIds?: ReadonlyArray<string>;
+  readonly diagnostics?: ReadonlyArray<AgentExecutionDiagnosticReference>;
   readonly startTime?: Date;
 }): AgentExecutionSession {
   const start = input.startTime ?? new Date();
-  const status = input.status ?? AgentExecutionSessionStatuses.ready;
+  const status = input.status ?? AgentExecutionSessionStatuses.pending;
 
   if (!Object.values(AgentExecutionSessionStatuses).includes(status)) {
     throw new Error("Agent execution session status is invalid.");
@@ -98,8 +135,9 @@ export function createAgentExecutionSession(input: {
     throw new Error("Agent execution sessions cannot be created in a terminal status.");
   }
 
-  const executionPlan = input.planId?.trim()
-    ? Object.freeze({ planId: input.planId.trim() })
+  const planId = input.planId?.trim() || undefined;
+  const executionPlan = planId
+    ? Object.freeze({ planId })
     : undefined;
 
   return Object.freeze({
@@ -107,11 +145,8 @@ export function createAgentExecutionSession(input: {
     agentId: normalizeRequired(input.agentId, "Agent execution session agentId"),
     executionPlan,
     status,
-    executionRuns: Object.freeze((input.executionRuns ?? []).map((entry) => Object.freeze({
-      runId: normalizeRequired(entry.runId, "Agent execution run id"),
-      status: entry.status,
-    }))),
-    diagnosticAssetIds: normalizeList(input.diagnosticAssetIds),
+    executionRuns: Object.freeze((input.executionRuns ?? []).map((entry) => normalizeExecutionRun(entry, planId))),
+    diagnostics: normalizeDiagnostics(input.diagnostics),
     startTime: start.toISOString(),
     endTime: undefined,
   });
@@ -122,7 +157,7 @@ export function transitionAgentExecutionSession(
   transition: {
     readonly status: AgentExecutionSessionStatus;
     readonly appendExecutionRun?: AgentExecutionRunReference;
-    readonly appendDiagnosticAssetId?: string;
+    readonly appendDiagnostic?: AgentExecutionDiagnosticReference;
     readonly endedAt?: Date;
   },
 ): AgentExecutionSession {
@@ -133,15 +168,12 @@ export function transitionAgentExecutionSession(
   assertValidLifecycleTransition(session.status, transition.status);
 
   const executionRuns = transition.appendExecutionRun
-    ? Object.freeze([...session.executionRuns, Object.freeze({
-      runId: normalizeRequired(transition.appendExecutionRun.runId, "Agent execution run id"),
-      status: transition.appendExecutionRun.status,
-    })])
+    ? Object.freeze([...session.executionRuns, normalizeExecutionRun(transition.appendExecutionRun, session.executionPlan?.planId)])
     : session.executionRuns;
 
-  const diagnosticAssetIds = transition.appendDiagnosticAssetId
-    ? normalizeList([...session.diagnosticAssetIds, normalizeRequired(transition.appendDiagnosticAssetId, "Agent diagnostic asset id")])
-    : session.diagnosticAssetIds;
+  const diagnostics = transition.appendDiagnostic
+    ? normalizeDiagnostics([...session.diagnostics, transition.appendDiagnostic])
+    : session.diagnostics;
 
   const terminalStatus = isTerminalStatus(transition.status);
   const endTime = terminalStatus ? (transition.endedAt ?? new Date()).toISOString() : undefined;
@@ -154,7 +186,7 @@ export function transitionAgentExecutionSession(
     ...session,
     status: transition.status,
     executionRuns,
-    diagnosticAssetIds,
+    diagnostics,
     endTime,
   });
 }
