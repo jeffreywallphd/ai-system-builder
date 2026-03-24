@@ -24,6 +24,13 @@ export default defineConfig(({ mode }) => {
                 "ui/composition/modelManagementDependencies.browser.ts",
               ),
             },
+            {
+              find: "../../infrastructure/execution/createExecutionInfrastructure",
+              replacement: path.resolve(
+                REPOSITORY_ROOT,
+                "infrastructure/execution/createExecutionInfrastructure.browser.ts",
+              ),
+            },
           ]
         : [],
     },
