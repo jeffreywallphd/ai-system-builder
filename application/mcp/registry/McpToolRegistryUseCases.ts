@@ -60,6 +60,7 @@ export interface McpToolDefinitionChangeSummary {
   readonly outputSchema: ObjectChange<Readonly<Record<string, unknown>> | undefined>;
   readonly sideEffects: ObjectChange<McpToolSideEffectClass>;
   readonly auth: ObjectChange<McpToolDefinition["auth"]>;
+  readonly assetIo: ObjectChange<McpToolDefinition["assetIo"]>;
   readonly tags: CollectionChange;
   readonly categories: CollectionChange;
 }
@@ -148,6 +149,9 @@ export interface QueryMcpCapabilitiesRequest {
   readonly categories?: ReadonlyArray<string>;
   readonly categoryMatchMode?: "all" | "any";
   readonly enabledOnly?: boolean;
+  readonly acceptsAssetKind?: string;
+  readonly producesAssetKind?: string;
+  readonly assetOutputMode?: "asset-create" | "asset-transform";
 }
 
 export class InstallMcpToolUseCase {
@@ -499,6 +503,30 @@ export class QueryMcpToolCapabilitiesUseCase {
       return false;
     }
 
+    if (filters.acceptsAssetKind) {
+      const acceptedKinds = tool.definition.assetIo?.inputs?.flatMap((entry) => entry.assetKinds ?? []) ?? [];
+      if (!acceptedKinds.some((kind) => kind === filters.acceptsAssetKind)) {
+        return false;
+      }
+    }
+
+    if (filters.producesAssetKind) {
+      const producedKinds = tool.definition.assetIo?.outputs
+        ?.filter((entry) => entry.mode !== "raw")
+        .map((entry) => entry.assetKind)
+        .filter((kind) => typeof kind === "string") ?? [];
+      if (!producedKinds.some((kind) => kind === filters.producesAssetKind)) {
+        return false;
+      }
+    }
+
+    if (filters.assetOutputMode) {
+      const modes = tool.definition.assetIo?.outputs?.map((entry) => entry.mode) ?? [];
+      if (!modes.includes(filters.assetOutputMode)) {
+        return false;
+      }
+    }
+
     if (filters.includeSideEffects === false && tool.definition.sideEffects !== "none") {
       return false;
     }
@@ -735,6 +763,7 @@ function summarizeDefinitionChanges(current: McpToolDefinition, candidate: McpTo
     outputSchema: objectChange(current.outputSchema, candidate.outputSchema),
     sideEffects: objectChange(current.sideEffects, candidate.sideEffects),
     auth: objectChange(current.auth, candidate.auth),
+    assetIo: objectChange(current.assetIo, candidate.assetIo),
     tags: collectionChange(current.tags, candidate.tags),
     categories: collectionChange(current.categories, candidate.categories),
   });
@@ -750,7 +779,7 @@ function classifyCompatibility(
   }
 
   const schemaRisk = classifySchemaRisk(changes.inputSchema.from, changes.inputSchema.to, changes.outputSchema.from, changes.outputSchema.to);
-  if (changes.binding.changed || changes.auth.changed || schemaRisk === "breaking") {
+  if (changes.binding.changed || changes.auth.changed || changes.assetIo.changed || schemaRisk === "breaking") {
     return "breaking";
   }
   if (
@@ -901,7 +930,7 @@ function buildRemediationSuggestions(
       }),
     );
   }
-  if (changes.auth.changed || changes.sideEffects.changed) {
+  if (changes.auth.changed || changes.sideEffects.changed || changes.assetIo.changed) {
     suggestions.push(
       Object.freeze({
         code: "review-permissions-auth",

@@ -10,6 +10,7 @@ import type { McpToolExecutionResult } from "./models/McpToolExecutionResult";
 import { McpToolAuthService } from "./security/McpToolAuthService";
 import { McpToolPermissionPolicyService } from "./security/McpToolPermissionPolicyService";
 import type { McpToolPermissionScope } from "../../domain/mcp/McpToolTrust";
+import type { McpToolAssetIoCoordinator } from "./McpToolAssetIoCoordinator";
 
 export class ExecuteMcpToolUseCase {
   private readonly executor: IMcpToolExecutor;
@@ -22,6 +23,7 @@ export class ExecuteMcpToolUseCase {
     private readonly secretRepository?: IMcpToolSecretRepository,
     private readonly permissionPolicyService: McpToolPermissionPolicyService = new McpToolPermissionPolicyService(),
     private readonly auditSink: IMcpToolExecutionAuditSink = { record: async () => undefined },
+    private readonly assetIoCoordinator?: McpToolAssetIoCoordinator,
   ) {
     this.executor = executor;
   }
@@ -168,9 +170,15 @@ export class ExecuteMcpToolUseCase {
     request: McpToolExecutionRequest,
     installedTool?: Awaited<ReturnType<IMcpToolRegistryRepository["findInstalledToolByBinding"]>>,
   ): Promise<McpToolExecutionResult> {
+    const preparation = installedTool && this.assetIoCoordinator
+      ? await this.assetIoCoordinator.prepareInput(installedTool, request.arguments ?? {})
+      : undefined;
+    const executionRequest = preparation
+      ? Object.freeze({ ...request, arguments: preparation.arguments })
+      : request;
     const result = await this.executor.executeTool({
-      ...request,
-      metadata: request.metadata && Object.keys(request.metadata).length > 0 ? request.metadata : undefined,
+      ...executionRequest,
+      metadata: executionRequest.metadata && Object.keys(executionRequest.metadata).length > 0 ? executionRequest.metadata : undefined,
     });
 
     if (installedTool && result.status === "completed") {
@@ -180,6 +188,26 @@ export class ExecuteMcpToolUseCase {
           toolId: installedTool.toolId,
           issues: outputValidation.issues,
         });
+      }
+
+      if (this.assetIoCoordinator) {
+        const finalization = await this.assetIoCoordinator.finalizeOutput({
+          installedTool,
+          executionId: result.executionId,
+          requestArguments: executionRequest.arguments ?? {},
+          inputVersionIds: preparation?.inputVersionIds ?? [],
+          structuredContent: result.structuredContent,
+          fallbackOutput: result.content[0],
+        });
+        if (finalization.resultMetadata) {
+          return Object.freeze({
+            ...result,
+            metadata: Object.freeze({
+              ...(result.metadata ?? {}),
+              ...finalization.resultMetadata,
+            }),
+          });
+        }
       }
     }
     return result;
