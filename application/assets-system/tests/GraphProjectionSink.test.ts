@@ -51,6 +51,10 @@ describe("InMemoryAssetLineageGraphProjectionSink", () => {
           toVersionId: "right:v1",
           type: AssetLineageRelationshipType.DERIVED_FROM,
         })],
+        listAdjacentVersionIds: async (versionId: string, direction: "upstream" | "downstream") =>
+          direction === "upstream"
+            ? (versionId === "right:v1" ? ["left:v1"] : [])
+            : (versionId === "left:v1" ? ["right:v1"] : []),
       } as any,
       sink,
     ).execute({
@@ -58,9 +62,11 @@ describe("InMemoryAssetLineageGraphProjectionSink", () => {
       fromVersionId: "left:v1",
       toVersionId: "right:v1",
       expectedEdgeCountAtLeast: 1,
+      versionIdsInScope: ["left:v1", "right:v1"],
     });
 
     expect(verification.matched).toBeTrue();
+    expect(verification.projectionSummary.scopedVersionCount).toBe(2);
     expect(verification.checks.some((check) => check.code === "PATH_EXISTS" && check.matched)).toBeTrue();
   });
 });

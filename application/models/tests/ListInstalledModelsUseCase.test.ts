@@ -75,4 +75,21 @@ describe("ListInstalledModelsUseCase", () => {
     expect(result.canonicalByModelId?.m?.latestVersionId).toBe("asset-version:m:2");
     expect(result.canonicalByModelId?.m?.dependencyState?.state).toBe("healthy");
   });
+
+  it("preserves explicit resolver fallback reason when canonical identity is missing", async () => {
+    const result = await new ListInstalledModelsUseCase(
+      makeInstalledModelCatalog({ listInstalled: async () => [makeModel("m")] }),
+      {
+        resolveIdentity: async () => undefined,
+        resolveLatestVersionId: async () => undefined,
+      } as any,
+      {
+        resolve: async () => ({
+          preferred: false,
+          fallbackReason: "No canonical identity mapping found for installed-model 'm'.",
+        }),
+      } as any,
+    ).execute();
+    expect(result.canonicalByModelId?.m?.fallbackReason).toContain("No canonical identity mapping");
+  });
 });

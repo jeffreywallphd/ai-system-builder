@@ -1,19 +1,33 @@
 import type { CanonicalEntityType, ICanonicalAssetIdentityRepository } from "../ports/interfaces/ICanonicalAssetIdentityRepository";
 import type { IAssetSystemQueryRepository } from "../ports/interfaces/IAssetSystemQueryRepository";
 import type { IAssetVersionRepository } from "../ports/interfaces/IAssetVersionRepository";
+import type { ICanonicalDependencyStateRepository } from "../ports/interfaces/ICanonicalDependencyStateRepository";
 import { GetCanonicalDependencyStateUseCase } from "./CanonicalDependencyStateUseCase";
 
 export class RefreshCanonicalDependencyStateUseCase {
-  constructor(private readonly dependencyStateUseCase: GetCanonicalDependencyStateUseCase) {}
+  constructor(
+    private readonly dependencyStateUseCase: GetCanonicalDependencyStateUseCase,
+    private readonly dependencyStateRepository?: ICanonicalDependencyStateRepository,
+  ) {}
 
   public async execute(params: {
     readonly versionId: string;
     readonly changedUpstreamVersionIds?: ReadonlyArray<string>;
     readonly maxDownstreamDepth?: number;
+    readonly allowPersistedIfFreshMs?: number;
+    readonly forceRefresh?: boolean;
   }) {
-    const summary = await this.dependencyStateUseCase.execute(params);
+    const summary = await this.dependencyStateUseCase.execute({
+      ...params,
+      preferPersistedIfFreshMs: params.allowPersistedIfFreshMs,
+      forceRefresh: params.forceRefresh,
+    });
+    const persisted = this.dependencyStateRepository
+      ? await this.dependencyStateRepository.getDependencyState(params.versionId)
+      : undefined;
     return Object.freeze({
-      refreshedAt: new Date(),
+      refreshedAt: persisted?.computedAt ?? new Date(),
+      persisted: !!persisted,
       summary,
     });
   }
@@ -111,7 +125,7 @@ export class ReplayScopedAssetGraphProjectionUseCase {
       });
     }
 
-    await this.replayUseCase.execute({
+    const replaySummary = await this.replayUseCase.execute({
       assetIds: [identity.assetId],
       versionIds: params.versionId ? [params.versionId] : undefined,
       includeIdentityAssets: false,
@@ -123,6 +137,7 @@ export class ReplayScopedAssetGraphProjectionUseCase {
       entityId: params.entityId,
       assetId: identity.assetId,
       versionId: params.versionId,
+      projectionSummary: replaySummary,
     });
   }
 }

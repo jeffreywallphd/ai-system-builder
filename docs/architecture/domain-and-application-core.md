@@ -189,8 +189,10 @@ Canonical read/query surfaces now include dedicated application use cases for:
 
 Canonical read preference is now integrated into three durable real flows (with explicit fallback semantics when canonical identity is missing):
 - `LoadWorkflowUseCase` now routes canonical resolution through a shared resolver and returns canonical identity/version metadata plus bounded provenance and dependency-state hints.
-- `ListInstalledModelsUseCase` now returns canonical installed-model identity/version summaries per listed model using the same canonical resolver path when configured.
-- `DefaultTuningDatasetStudioApplicationService` now returns canonical dataset-version identity/version summaries in dataset details/listing responses, including explicit pinned-version metadata.
+- `ListInstalledModelsUseCase` now defaults to the same shared canonical operational resolver path (with legacy identity lookup only as fallback detail provider), reducing duplicated summary stitching.
+- `DefaultTuningDatasetStudioApplicationService` now supports the same canonical resolver path for dataset-version detail/list responses and only falls back to identity-only summaries when resolver infrastructure is unavailable.
+
+Canonical read consolidation now has a dedicated application helper (`CanonicalEntityOperationalReadService`) so higher-level flows do not each hand-roll canonical + fallback semantics.
 
 Dependency-health capability now includes both bounded impact analysis and a direct operational summary (`GetAssetDependencyHealthUseCase`) that distinguishes:
 - direct upstream/downstream dependencies
@@ -199,27 +201,32 @@ Dependency-health capability now includes both bounded impact analysis and a dir
 - transformation consumers and stale-exposure explanations for downstream assets/versions
 
 SQLite asset-system persistence now includes canonical identity mappings and normalized query paths/indexes for durable filters (`kind/source/status`), latest-version lookup, version-chain queries, transformation lookup by asset, adjacency traversal, and identity lookup/index coverage for durable entity mappings.
+It now also persists canonical dependency-state snapshots (`canonical_dependency_state`) so dependency-state can be reused operationally (fresh cached reads) or re-derived truthfully when forced/refreshed.
 
 Graph-projection readiness now moves beyond a no-op seam:
 - projection replay is now supported from canonical storage (`ReplayAssetGraphProjectionUseCase`) with bounded scoping by asset/version/transformation ids.
 - the in-memory projection sink can now answer simple path checks (`hasVersionPath`) to prove graph-oriented behavior without requiring Neo4j.
+- projection verification now supports scoped version-adjacency parity checks between canonical storage and projection traversal (`VerifyAssetGraphProjectionUseCase`) with explicit verification summaries.
 - a concrete Neo4j-targeted sink contract (`Neo4jAssetLineageGraphProjectionSink` + `INeo4jCypherExecutor`) now exists as the default graph-db projection target in composition, while still using a local no-op executor unless a real driver adapter is configured.
 
 Dependency lifecycle semantics now include explicit application-layer states (`healthy`, `impacted`, `stale`, `partially-trusted`, `reconciliation-needed`) via `GetCanonicalDependencyStateUseCase`, plus bounded reconciliation/refresh helpers:
-- `RefreshCanonicalDependencyStateUseCase` to recompute dependency-state summaries.
+- `RefreshCanonicalDependencyStateUseCase` to recompute dependency-state summaries with explicit persisted-vs-refresh behavior.
 - `ReconcileCanonicalIdentityMappingsUseCase` to heal stale/missing pinned version references.
 - `ReplayScopedAssetGraphProjectionUseCase` for scoped graph replay by canonical entity mapping.
+- `ProjectionRebuildOrchestrationUseCase` for bounded multi-scope replay + optional verification (entity and asset scopes).
 
 Broader canonical-read adoption now also includes legacy UI service seams:
 - `WorkflowService` now routes load/list reads through `LoadWorkflowUseCase` when available, so canonical-read preference metadata can be surfaced without page-level lookup duplication.
 - `ModelService` now exposes a full installed-model read-model response (`listInstalledModelsReadModel`) so callers can consume canonical identity summaries directly.
-- `CanonicalAssetManagementService` now provides a dedicated UI-facing seam for canonical asset detail, dependency-state checks, scoped graph replay, and identity reconciliation actions.
+- `CanonicalAssetManagementService` now provides a dedicated UI-facing seam for canonical asset detail, dependency-state checks, scoped graph replay, identity reconciliation actions, projection verification, and multi-scope rebuild orchestration.
+- renderer composition now wires that seam to desktop runtime-backed canonical repositories by default via the desktop preload bridge (`canonicalAssets`) when available.
 
 Partial-lineage diagnostics now include a bounded application read model (`GetAssetLineageDiagnosticsUseCase`) designed for future UI exploration without requiring graph infrastructure at render time.
 
 What remains for next chunks:
-- wire the canonical asset-management UI seam to runtime-backed canonical repositories in renderer/desktop composition by default.
-- expand projection replay/sink verification contracts from local proof toward richer Neo4j traversal adapters (still optional)
+- expand canonical asset-management UI usage beyond the current bounded controls (detail/history/verification/rebuild actions are wired; broader UX unification is still pending).
+- expand projection replay/sink verification contracts from local proof toward richer Neo4j traversal adapters (still optional) and cover broader entity-scoped rebuild workflows.
 - add richer partial-lineage diagnostics and UI-driven impact exploration without requiring full graph mode.
+- unify additional legacy-first reads (outside workflow/model/dataset detail/list paths) onto the same canonical operational resolver seam.
 
 SQLite storage now also carries normalized `asset_versions.version_label` and `asset_versions.parent_version_id` columns (plus legacy JSON payload compatibility) so version-chain queries can progressively move from blob parsing to explicit relational reads.

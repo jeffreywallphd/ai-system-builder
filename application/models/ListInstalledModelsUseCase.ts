@@ -5,6 +5,7 @@ import type {
 } from "../ports/interfaces/IInstalledModelCatalog";
 import type { CanonicalAssetIdentityService } from "../assets-system/CanonicalAssetIdentityService";
 import type { CanonicalEntityReadResolver } from "../assets-system/CanonicalEntityReadResolver";
+import { CanonicalEntityOperationalReadService } from "../assets-system/CanonicalEntityOperationalReadService";
 
 export interface IListInstalledModelsRequest {
   readonly criteria?: IInstalledModelSearchCriteria;
@@ -35,7 +36,7 @@ export interface IListInstalledModelsResult {
 export class ListInstalledModelsUseCase {
   private readonly installedModelCatalog: IInstalledModelCatalog;
   private readonly canonicalIdentityService?: CanonicalAssetIdentityService;
-  private readonly canonicalReadResolver?: CanonicalEntityReadResolver;
+  private readonly canonicalReadService: CanonicalEntityOperationalReadService;
 
   constructor(
     installedModelCatalog: IInstalledModelCatalog,
@@ -44,7 +45,7 @@ export class ListInstalledModelsUseCase {
   ) {
     this.installedModelCatalog = installedModelCatalog;
     this.canonicalIdentityService = canonicalIdentityService;
-    this.canonicalReadResolver = canonicalReadResolver;
+    this.canonicalReadService = new CanonicalEntityOperationalReadService(canonicalReadResolver);
   }
 
   public async execute(
@@ -53,26 +54,28 @@ export class ListInstalledModelsUseCase {
     const models = await this.installedModelCatalog.listInstalled(request.criteria);
     const canonicalByModelId = this.canonicalIdentityService
       ? Object.freeze(Object.fromEntries(await Promise.all(models.map(async (model) => {
-        const resolved = this.canonicalReadResolver
-          ? await this.canonicalReadResolver.resolve({ entityType: "installed-model", entityId: model.id })
-          : undefined;
+        const resolved = await this.canonicalReadService.resolveSummary({
+          entityType: "installed-model",
+          entityId: model.id,
+          fallbackWhenUnavailable: "Canonical resolver is not configured for installed-model reads.",
+        });
         const identity = await this.canonicalIdentityService!.resolveIdentity("installed-model", model.id);
-        const assetId = resolved?.assetId ?? identity?.assetId;
-        const latestVersionId = resolved?.latestVersionId ?? await this.canonicalIdentityService!.resolveLatestVersionId("installed-model", model.id);
+        const assetId = resolved.assetId ?? identity?.assetId;
+        const latestVersionId = resolved.latestVersionId ?? await this.canonicalIdentityService!.resolveLatestVersionId("installed-model", model.id);
         return [model.id, Object.freeze({
           preferred: !!assetId,
           assetId,
-          pinnedVersionId: resolved?.pinnedVersionId ?? identity?.latestVersionId,
+          pinnedVersionId: resolved.pinnedVersionId ?? identity?.latestVersionId,
           latestVersionId,
-          provenance: resolved?.provenance,
-          dependencyState: resolved?.dependencyState
+          provenance: resolved.provenance,
+          dependencyState: resolved.dependencyState
             ? Object.freeze({
               state: resolved.dependencyState.state,
               reasons: resolved.dependencyState.reasons,
               nextActions: resolved.dependencyState.nextActions,
             })
             : undefined,
-          fallbackReason: resolved?.fallbackReason ?? (assetId ? undefined : `No canonical identity mapping found for installed model '${model.id}'.`),
+          fallbackReason: resolved.fallbackReason ?? (assetId ? undefined : `No canonical identity mapping found for installed model '${model.id}'.`),
         })] as const;
       }))))
       : undefined;

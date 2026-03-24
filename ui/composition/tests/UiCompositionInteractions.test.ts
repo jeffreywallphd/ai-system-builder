@@ -152,4 +152,43 @@ describe("ui composition interactions", () => {
     ]);
     expect(ragWorkflow?.connections).toHaveLength(7);
   });
+
+  it("wires canonical asset management service to desktop canonical bridge when available", async () => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const previousBridge = window.aiLoomDesktop;
+    window.aiLoomDesktop = {
+      ...(previousBridge ?? {}),
+      canonicalAssets: {
+        listAssets: async () => [JSON.stringify({
+          assetId: "workflow-definition:wf-1",
+          name: "wf-1",
+          kind: "workflow-definition",
+          status: "available",
+          latestVersionId: "wf:v1",
+          versionCount: 1,
+          transformationCount: 0,
+          lineageEdgeCount: 0,
+        })],
+        loadAssetDetail: async () => null,
+        listVersionChain: async () => [],
+        evaluateDependencyState: async () => null,
+        reconcileIdentity: async () => null,
+        replayScopedProjection: async () => JSON.stringify({ replayed: false, reason: "n/a" }),
+        verifyProjection: async () => null,
+        rebuildProjectionScopes: async () => JSON.stringify({ totalScopes: 0, replayedScopes: 0, verifiedScopes: 0, results: [] }),
+      },
+    } as any;
+
+    try {
+      const dependencies = createUiDependencies({
+        config: AppRuntimeConfig.forDevelopment(),
+      });
+      const assets = await dependencies.canonicalAssetManagementService.listAssets();
+      expect(assets[0]?.assetId).toBe("workflow-definition:wf-1");
+    } finally {
+      window.aiLoomDesktop = previousBridge;
+    }
+  });
 });

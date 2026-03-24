@@ -14,12 +14,17 @@ export class VerifyAssetGraphProjectionUseCase {
 
   public async execute(params: {
     readonly assetId: string;
+    readonly versionIdsInScope?: ReadonlyArray<string>;
     readonly fromVersionId?: string;
     readonly toVersionId?: string;
     readonly expectedEdgeCountAtLeast?: number;
   }): Promise<{
     readonly assetId: string;
     readonly matched: boolean;
+    readonly projectionSummary: {
+      readonly edgeCount: number;
+      readonly scopedVersionCount: number;
+    };
     readonly checks: ReadonlyArray<{
       readonly code: string;
       readonly matched: boolean;
@@ -29,11 +34,28 @@ export class VerifyAssetGraphProjectionUseCase {
     const edges = await this.queryRepository.listLineageEdgesByAssetId(params.assetId);
     const checks: Array<{ code: string; matched: boolean; message: string; }> = [];
     const minEdgeCount = params.expectedEdgeCountAtLeast ?? 1;
+    const scopedVersionIds = [...new Set((params.versionIdsInScope ?? []).map((entry) => entry.trim()).filter(Boolean))];
     checks.push({
       code: "EDGE_COUNT",
       matched: edges.length >= minEdgeCount,
       message: `Projected edge count=${edges.length}; expected >= ${minEdgeCount}.`,
     });
+    for (const versionId of scopedVersionIds) {
+      const upstreamFromRepo = new Set(await this.queryRepository.listAdjacentVersionIds(versionId, "upstream"));
+      const downstreamFromRepo = new Set(await this.queryRepository.listAdjacentVersionIds(versionId, "downstream"));
+      const upstreamFromProjection = new Set(this.traversalReader.listIncomingVersionIds(versionId));
+      const downstreamFromProjection = new Set(this.traversalReader.listOutgoingVersionIds(versionId));
+      checks.push({
+        code: `SCOPE_ADJACENCY_UPSTREAM:${versionId}`,
+        matched: this.isSetEqual(upstreamFromRepo, upstreamFromProjection),
+        message: `Upstream adjacency parity for '${versionId}' repository=${upstreamFromRepo.size} projection=${upstreamFromProjection.size}.`,
+      });
+      checks.push({
+        code: `SCOPE_ADJACENCY_DOWNSTREAM:${versionId}`,
+        matched: this.isSetEqual(downstreamFromRepo, downstreamFromProjection),
+        message: `Downstream adjacency parity for '${versionId}' repository=${downstreamFromRepo.size} projection=${downstreamFromProjection.size}.`,
+      });
+    }
 
     if (params.fromVersionId && params.toVersionId) {
       const pathMatched = this.traversalReader.hasVersionPath(params.fromVersionId, params.toVersionId, 8);
@@ -61,7 +83,23 @@ export class VerifyAssetGraphProjectionUseCase {
     return Object.freeze({
       assetId: params.assetId,
       matched: checks.every((check) => check.matched),
+      projectionSummary: Object.freeze({
+        edgeCount: edges.length,
+        scopedVersionCount: scopedVersionIds.length,
+      }),
       checks: Object.freeze(checks.map((entry) => Object.freeze(entry))),
     });
+  }
+
+  private isSetEqual(left: ReadonlySet<string>, right: ReadonlySet<string>): boolean {
+    if (left.size !== right.size) {
+      return false;
+    }
+    for (const value of left) {
+      if (!right.has(value)) {
+        return false;
+      }
+    }
+    return true;
   }
 }

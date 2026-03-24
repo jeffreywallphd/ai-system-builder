@@ -30,6 +30,7 @@ export default function AssetsPage(): JSX.Element {
   const [entityType, setEntityType] = useState<"workflow-definition" | "installed-model" | "dataset-version">("workflow-definition");
   const [entityId, setEntityId] = useState("");
   const [versionId, setVersionId] = useState("");
+  const [assetId, setAssetId] = useState("");
 
   return (
     <section className="ui-page">
@@ -85,6 +86,10 @@ export default function AssetsPage(): JSX.Element {
               Version id (optional)
               <input value={versionId} onChange={(event) => setVersionId(event.target.value)} placeholder="version id" />
             </label>
+            <label className="ui-text-small">
+              Canonical asset id (for verification)
+              <input value={assetId} onChange={(event) => setAssetId(event.target.value)} placeholder="asset id" />
+            </label>
             <div className="ui-row">
               <button
                 type="button"
@@ -107,6 +112,49 @@ export default function AssetsPage(): JSX.Element {
                 disabled={!entityId.trim()}
               >
                 Replay scoped projection
+              </button>
+              <button
+                type="button"
+                className="ui-button ui-button--secondary"
+                onClick={async () => {
+                  const result = await canonicalAssetManagementService.verifyProjection({
+                    assetId,
+                    versionIdsInScope: versionId ? [versionId] : undefined,
+                  });
+                  if (!result) {
+                    setStatusMessage("Projection verification is unavailable in this runtime.");
+                    return;
+                  }
+                  setStatusMessage(result.matched
+                    ? `Projection verification passed for '${assetId}'.`
+                    : `Projection verification failed with ${result.failedChecks.length} issue(s).`);
+                }}
+                disabled={!assetId.trim()}
+              >
+                Verify projection
+              </button>
+              <button
+                type="button"
+                className="ui-button ui-button--secondary"
+                onClick={async () => {
+                  const result = await canonicalAssetManagementService.rebuildProjectionScopes({
+                    scopes: [{
+                      scopeType: "entity",
+                      entityType,
+                      entityId,
+                      versionId: versionId || undefined,
+                    }],
+                    verifyAfterReplay: true,
+                  });
+                  if (!result) {
+                    setStatusMessage("Scoped rebuild orchestration is unavailable in this runtime.");
+                    return;
+                  }
+                  setStatusMessage(`Scoped rebuild processed ${result.totalScopes} scope(s), replayed ${result.replayedScopes}, verified ${result.verifiedScopes}.`);
+                }}
+                disabled={!entityId.trim()}
+              >
+                Rebuild + verify scope
               </button>
             </div>
           </div>
