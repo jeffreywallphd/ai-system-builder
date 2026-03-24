@@ -111,6 +111,16 @@ This consistency is one of the healthier signs in the codebase: even as features
 
 AI Loom Studio is not just a thin GUI over a runtime. It is an authoring and governance environment for workflows, tools, context, and local AI operations. That kind of product benefits from a strong inner core because the rules of the authoring model need to remain stable even when runtimes and integrations change.
 
+
+## Direction 3 update: MCP plugin registry/capability contracts (current slice)
+
+The MCP layer now has an explicit inner-layer contract for installed tool definitions:
+- domain-level MCP tool capability schema (`id`, `version`, display metadata, I/O schemas, side effects, auth metadata, cost/execution hints, tags/categories, optional runtime binding).
+- application-layer registry use cases for install/register, list/detail, enable/disable transitions, safe uninstall, and capability introspection queries.
+- structured registry errors (`invalid-definition`, `duplicate-install`, `unsafe-removal`, contract violations) to keep UI and automation error handling deterministic.
+
+This keeps MCP tools on the same inner-layer-first path as other first-class capabilities and creates a clean seam for later workflow-node integration, permissions, and agent/planner selection behavior.
+
 ## TODO
 
 - Some concepts currently live more in the application layer than the domain layer because they are orchestration-heavy. That is reasonable, but over time the team may want to clarify which context-engineering rules are true domain policy versus application assembly policy.

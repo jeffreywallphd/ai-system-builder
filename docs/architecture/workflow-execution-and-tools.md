@@ -233,6 +233,14 @@ The new execution engine slice starts in the domain/application layers and adapt
 
 That is "done enough" for Direction 1: the unified execution engine now includes at least one real dependency-aware multi-unit production path, execution capability claims are explicit, and durable history filtering is stronger for lineage/debugging/reporting without turning Direction 1 into a scheduler/analytics rewrite. The next likely architectural focus is Direction 2 work above this substrate rather than broadening Direction 1 into speculative orchestration.
 
+
+## MCP registry and capability foundation (Direction 3, first slice)
+- MCP tools now have a first-class registry foundation (install/register, list/detail, enable/disable, and safe removal with dependency blocking).
+- Tool definitions now use a machine-readable capability contract that includes stable identity, display metadata, version, input/output schema, side-effect class, auth requirements, optional cost/execution metadata, tags/categories, and optional runtime binding (`serverId` + `toolName`).
+- Registration validates definition contracts before persistence; runtime execution can validate input/output contracts against installed definitions at the use-case boundary.
+- Capability introspection query use cases can filter tools by schema type, side effects, auth requirements, tags, categories, and enabled status to support future planner/agent selection.
+- Safe removal currently blocks uninstall when persisted workflows reference a tool (via MCP tool-call node descriptor or server/tool mapping), returning structured `unsafe-removal` errors for UI surfacing.
+
 ## TODO
 
 - Tool running, model/dataset runs, and the narrow MCP server-operation slice now share the same engine seam and persisted run model, but broader composition still has multiple roots. Further convergence should happen incrementally instead of through a giant rewrite.

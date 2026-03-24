@@ -41,6 +41,14 @@ Workflow -> `ExecuteWorkflowUseCase` -> one-unit `ExecutionPlan` -> `UnifiedExec
 ## Important phrasing
 Use "workflow-first", "tool projection", and "truthful execution provenance" when describing the product design.
 
+
+## MCP registry and capability foundation (Direction 3, first slice)
+- MCP tools now have a first-class registry foundation (install/register, list/detail, enable/disable, and safe removal with dependency blocking).
+- Tool definitions now use a machine-readable capability contract that includes stable identity, display metadata, version, input/output schema, side-effect class, auth requirements, optional cost/execution metadata, tags/categories, and optional runtime binding (`serverId` + `toolName`).
+- Registration validates definition contracts before persistence; runtime execution can validate input/output contracts against installed definitions at the use-case boundary.
+- Capability introspection query use cases can filter tools by schema type, side effects, auth requirements, tags, categories, and enabled status to support future planner/agent selection.
+- Safe removal currently blocks uninstall when persisted workflows reference a tool (via MCP tool-call node descriptor or server/tool mapping), returning structured `unsafe-removal` errors for UI surfacing.
+
 ## TODO
 - If asked whether tools and workflows are separate bounded contexts, answer: "not really; tools are primarily a projected and published workflow surface in the current implementation."
 - If asked what should migrate next, answer: execution areas that still cannot report real progress/cancellation truthfully yet, especially MCP/runtime-backed orchestration beyond the current narrow server-operation slice.
