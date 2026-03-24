@@ -4,6 +4,7 @@ import type { IMcpToolRegistryRepository } from "../../../ports/interfaces/IMcpT
 import type { InstalledMcpToolRecord } from "../../../../domain/mcp/InstalledMcpTool";
 import {
   ApplyMcpToolUpdateUseCase,
+  ExportMcpToolDefinitionsUseCase,
   ExportInstalledMcpToolsUseCase,
   GetMcpToolLifecycleSummaryUseCase,
   GetInstalledMcpToolUseCase,
@@ -304,11 +305,51 @@ describe("McpToolRegistryUseCases", () => {
     expect(record.metadata.categories).toEqual(["lookup"]);
   });
 
+  it("returns normalized metadata through installed-tool read models", async () => {
+    const repository = makeRepository([
+      Object.freeze({
+        ...toolRecord("mcp:local:weather"),
+        definition: Object.freeze({
+          ...toolRecord("mcp:local:weather").definition,
+          version: "v1.0.0",
+          author: "  A. Loom  ",
+          description: "  Local weather metadata.  ",
+          categories: Object.freeze([" Forecast ", "forecast", "DATA"]),
+        }),
+      }),
+    ]);
+
+    const record = await new GetInstalledMcpToolUseCase(repository).execute("mcp:local:weather");
+    expect(record.metadata).toEqual({
+      description: "Local weather metadata.",
+      author: "A. Loom",
+      version: "1.0.0",
+      categories: ["data", "forecast"],
+    });
+  });
+
   it("exports installed tool definitions in machine-readable format", async () => {
     const repository = makeRepository([toolRecord("mcp:local:weather"), toolRecord("mcp:local:disabled", "1.0.0", "disabled")]);
     const exportPayload = await new ExportInstalledMcpToolsUseCase(repository).execute();
     expect(exportPayload.format).toBe("ai-loom.mcp-tools.v1");
     expect(exportPayload.tools.map((tool) => tool.toolId)).toEqual(["mcp:local:weather"]);
+  });
+
+  it("exports shareable tool definitions without runtime-only state", async () => {
+    const repository = makeRepository([
+      Object.freeze({
+        ...toolRecord("mcp:local:weather"),
+        grantedPermissions: Object.freeze(["network.access"]),
+      }),
+    ]);
+
+    const exported = await new ExportMcpToolDefinitionsUseCase(repository).execute();
+    expect(exported.format).toBe("ai-loom.mcp-tool-definitions.v1");
+    expect(exported.tools).toHaveLength(1);
+    expect(exported.tools[0]?.toolId).toBe("mcp:local:weather");
+    expect(exported.tools[0]).not.toHaveProperty("status");
+    expect(exported.tools[0]).not.toHaveProperty("lifecycle");
+    expect(JSON.stringify(exported)).not.toContain("grantedPermissions");
   });
 
   it("imports tool definitions and supports overwrite behavior", async () => {
@@ -338,5 +379,39 @@ describe("McpToolRegistryUseCases", () => {
 
     expect(result.skippedToolIds).toContain("mcp:local:weather");
     expect(result.importedToolIds).toContain("mcp:local:new-tool");
+  });
+
+  it("round-trips shareable export through registry import", async () => {
+    const seedRecord = Object.freeze({
+      ...toolRecord("mcp:local:weather", "1.2.0"),
+      definition: Object.freeze({
+        ...toolRecord("mcp:local:weather", "1.2.0").definition,
+        author: "A. Loom",
+        description: "Weather forecast retrieval.",
+        categories: Object.freeze(["forecast", "weather"]),
+      }),
+    });
+    const sourceRepository = makeRepository([seedRecord]);
+    const shareable = await new ExportMcpToolDefinitionsUseCase(sourceRepository).execute();
+
+    const targetRepository = makeRepository();
+    const importResult = await new ImportMcpToolRegistryUseCase(targetRepository).execute({
+      overwriteExisting: false,
+      envelope: {
+        format: "ai-loom.mcp-tools.v1",
+        exportedAt: shareable.exportedAt,
+        tools: shareable.tools.map((tool) => ({
+          toolId: tool.toolId,
+          status: "enabled" as const,
+          source: tool.source,
+          definition: tool.definition,
+        })),
+      },
+    });
+    expect(importResult.importedToolIds).toEqual(["mcp:local:weather"]);
+
+    const imported = await new GetInstalledMcpToolUseCase(targetRepository).execute("mcp:local:weather");
+    expect(imported.metadata.author).toBe("A. Loom");
+    expect(imported.metadata.categories).toEqual(["forecast", "weather"]);
   });
 });

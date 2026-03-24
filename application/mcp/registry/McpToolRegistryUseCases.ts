@@ -10,6 +10,7 @@ import {
 } from "../../../domain/mcp/InstalledMcpTool";
 import {
   normalizeMcpToolDefinition,
+  toMcpToolMetadata,
   validateMcpToolDefinition,
   type McpToolDefinition,
   type McpToolSideEffectClass,
@@ -182,8 +183,22 @@ export interface McpToolRegistryExportEnvelope {
   }>>;
 }
 
+export interface McpToolShareExportEnvelope {
+  readonly format: "ai-loom.mcp-tool-definitions.v1";
+  readonly exportedAt: string;
+  readonly tools: ReadonlyArray<Readonly<{
+    toolId: string;
+    source: McpToolDefinitionSource;
+    definition: McpToolDefinition;
+  }>>;
+}
+
 export interface ExportInstalledMcpToolsRequest {
   readonly includeDisabled?: boolean;
+}
+
+export interface ExportMcpToolDefinitionsRequest {
+  readonly toolIds?: ReadonlyArray<string>;
 }
 
 export interface ImportMcpToolRegistryRequest {
@@ -581,6 +596,33 @@ export class ExportInstalledMcpToolsUseCase {
             source: tool.source,
             definition: tool.definition,
             lifecycle: tool.lifecycle,
+          }))
+          .sort((left, right) => left.toolId.localeCompare(right.toolId)),
+      ),
+    });
+  }
+}
+
+export class ExportMcpToolDefinitionsUseCase {
+  constructor(private readonly repository: IMcpToolRegistryRepository) {}
+
+  public async execute(request: ExportMcpToolDefinitionsRequest = {}): Promise<McpToolShareExportEnvelope> {
+    const selectedIds = request.toolIds?.map((toolId) => toolId.trim()).filter(Boolean);
+    const selectedSet = selectedIds && selectedIds.length > 0 ? new Set(selectedIds) : undefined;
+    const tools = await this.repository.listInstalledTools();
+    const filtered = selectedSet
+      ? tools.filter((tool) => selectedSet.has(tool.toolId))
+      : tools;
+
+    return Object.freeze({
+      format: "ai-loom.mcp-tool-definitions.v1",
+      exportedAt: new Date().toISOString(),
+      tools: Object.freeze(
+        filtered
+          .map((tool) => Object.freeze({
+            toolId: tool.toolId,
+            source: tool.source,
+            definition: tool.definition,
           }))
           .sort((left, right) => left.toolId.localeCompare(right.toolId)),
       ),
@@ -1249,12 +1291,7 @@ function toInstalledToolReadModel(record: InstalledMcpToolRecord): InstalledMcpT
       lastEventAt: lastEvent?.occurredAt,
     }),
     updatePosture,
-    metadata: Object.freeze({
-      description: record.definition.description,
-      author: record.definition.author,
-      version: record.definition.version,
-      categories: record.definition.categories,
-    }),
+    metadata: toMcpToolMetadata(record.definition),
   });
 }
 

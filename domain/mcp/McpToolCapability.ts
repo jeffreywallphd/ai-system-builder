@@ -80,6 +80,13 @@ export interface McpToolDefinition {
   readonly assetIo?: McpToolAssetIoContract;
 }
 
+export interface McpToolMetadata {
+  readonly description?: string;
+  readonly author?: string;
+  readonly version: string;
+  readonly categories: ReadonlyArray<string>;
+}
+
 export interface McpToolDefinitionValidationIssue {
   readonly code:
     | "missing-id"
@@ -117,8 +124,27 @@ export function validateMcpToolDefinition(
   if (!definition.displayName?.trim()) {
     issues.push({ code: "missing-display-name", message: "Tool definition requires a displayName.", path: "displayName" });
   }
-  if (definition.author !== undefined && !definition.author.trim()) {
-    issues.push({ code: "invalid-metadata", message: "Tool author must be a non-empty string when provided.", path: "author" });
+  if (definition.version && definition.version.trim().length > 64) {
+    issues.push({ code: "invalid-metadata", message: "Tool version must be 64 characters or fewer.", path: "version" });
+  }
+  if (definition.description !== undefined) {
+    if (!definition.description.trim()) {
+      issues.push({ code: "invalid-metadata", message: "Tool description must be non-empty when provided.", path: "description" });
+    } else if (definition.description.trim().length > 2000) {
+      issues.push({ code: "invalid-metadata", message: "Tool description must be 2000 characters or fewer.", path: "description" });
+    }
+  }
+  if (definition.author !== undefined) {
+    if (!definition.author.trim()) {
+      issues.push({ code: "invalid-metadata", message: "Tool author must be a non-empty string when provided.", path: "author" });
+    } else if (definition.author.trim().length > 120) {
+      issues.push({ code: "invalid-metadata", message: "Tool author must be 120 characters or fewer.", path: "author" });
+    }
+  }
+  if (!Array.isArray(definition.categories)) {
+    issues.push({ code: "invalid-metadata", message: "Tool categories must be an array.", path: "categories" });
+  } else if (definition.categories.some((category) => typeof category !== "string" || !category.trim())) {
+    issues.push({ code: "invalid-metadata", message: "Tool categories must contain non-empty strings.", path: "categories" });
   }
   if (!isSchemaRecord(definition.inputSchema)) {
     issues.push({ code: "invalid-input-schema", message: "Tool definition requires an object-shaped input schema.", path: "inputSchema" });
@@ -204,7 +230,7 @@ export function validateMcpToolDefinition(
 export function normalizeMcpToolDefinition(definition: McpToolDefinition): McpToolDefinition {
   return Object.freeze({
     id: definition.id.trim(),
-    version: definition.version.trim(),
+    version: normalizeMcpToolVersion(definition.version),
     displayName: definition.displayName.trim(),
     description: definition.description?.trim() || undefined,
     author: definition.author?.trim() || undefined,
@@ -231,8 +257,8 @@ export function normalizeMcpToolDefinition(definition: McpToolDefinition): McpTo
       ),
     }),
     permissions: Object.freeze([...(definition.permissions ?? [])].map((value) => value.trim()).filter(Boolean)),
-    tags: Object.freeze([...definition.tags].map((value) => value.trim()).filter(Boolean)),
-    categories: Object.freeze([...definition.categories].map((value) => value.trim()).filter(Boolean)),
+    tags: normalizeStringSet(definition.tags),
+    categories: normalizeCategories(definition.categories),
     execution: definition.execution
       ? Object.freeze({
           expectedLatencyMs: normalizePositiveInt(definition.execution.expectedLatencyMs),
@@ -285,6 +311,15 @@ export function normalizeMcpToolDefinition(definition: McpToolDefinition): McpTo
   });
 }
 
+export function toMcpToolMetadata(definition: Pick<McpToolDefinition, "description" | "author" | "version" | "categories">): McpToolMetadata {
+  return Object.freeze({
+    description: definition.description?.trim() || undefined,
+    author: definition.author?.trim() || undefined,
+    version: normalizeMcpToolVersion(definition.version),
+    categories: normalizeCategories(definition.categories),
+  });
+}
+
 function isSchemaRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
@@ -305,4 +340,25 @@ function normalizePositiveInt(value: unknown): number | undefined {
     return undefined;
   }
   return Math.floor(value);
+}
+
+function normalizeStringSet(values: ReadonlyArray<string>): ReadonlyArray<string> {
+  return Object.freeze([...new Set(values.map((value) => value.trim()).filter(Boolean))]);
+}
+
+function normalizeCategories(categories: ReadonlyArray<string>): ReadonlyArray<string> {
+  return Object.freeze(
+    [...new Set(categories.map((category) => category.trim().toLowerCase()).filter(Boolean))].sort((left, right) =>
+      left.localeCompare(right),
+    ),
+  );
+}
+
+function normalizeMcpToolVersion(version: string): string {
+  const trimmed = version.trim();
+  const semverWithV = /^v(\d+\.\d+\.\d+(?:[-+].*)?)$/i.exec(trimmed);
+  if (semverWithV) {
+    return semverWithV[1];
+  }
+  return trimmed;
 }
