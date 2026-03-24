@@ -5,6 +5,8 @@ import { AssetBackedAgentMemoryStore } from "../services/AssetBackedAgentMemoryS
 import { AgentExecutionService } from "../services/AgentExecutionService";
 import { DeterministicAgentPlanningService } from "../services/AgentPlanningInterface";
 import { AgentService } from "../services/AgentService";
+import { DefaultAgentMemoryRetrievalService } from "../services/AgentMemoryRetrievalService";
+import { AgentMemoryWriteService } from "../services/AgentMemoryWriteService";
 import { ExecuteAgentToolsUseCase } from "../ExecuteAgentToolsUseCase";
 import type { IAgentRepository } from "../../ports/interfaces/IAgentRepository";
 import type { IToolCapabilityCatalog } from "../../ports/interfaces/IToolCapabilityCatalog";
@@ -66,6 +68,10 @@ describe("Agent foundation services", () => {
         agentId: "agent-a",
         assets: [{ assetId: new AssetId("asset:memory:a"), memoryType: "working" }],
         retrieval: { strategy: "latest-first", maxEntries: 10 },
+        policy: {
+          writableTypes: ["episodic", "semantic", "working"],
+          retention: { mode: "bounded", maxDurableEntries: 100 },
+        },
         revision: 1,
       },
       planningStrategy: { strategyId: "deterministic", mode: "deterministic-linear" },
@@ -143,6 +149,11 @@ describe("Agent foundation services", () => {
         agentId: "agent-plan",
         assets: [{ assetId: new AssetId("asset:memory:plan"), memoryType: "semantic" }],
         retrieval: { strategy: "hybrid", requiredTags: ["weather"], maxEntries: 2 },
+        policy: {
+          retrievableTypes: ["semantic"],
+          writableTypes: ["episodic", "semantic"],
+          retention: { mode: "bounded", maxDurableEntries: 20 },
+        },
         revision: 1,
       },
       planningStrategy: { strategyId: "deterministic", mode: "deterministic-linear" },
@@ -202,7 +213,12 @@ describe("Agent foundation services", () => {
 
     const useCase = new ExecuteAgentToolsUseCase(catalog, orchestrator);
     const planner = new DeterministicAgentPlanningService(catalog, memoryStore);
-    const service = new AgentExecutionService(planner, useCase, memoryStore);
+    const service = new AgentExecutionService(
+      planner,
+      useCase,
+      new DefaultAgentMemoryRetrievalService(memoryStore),
+      new AgentMemoryWriteService(memoryStore),
+    );
     const agent: Agent = {
       id: "agent-exec",
       name: "Exec Agent",
@@ -219,6 +235,11 @@ describe("Agent foundation services", () => {
         agentId: "agent-exec",
         assets: [{ assetId: new AssetId("asset:memory:1"), memoryType: "working" }],
         retrieval: { strategy: "latest-first", maxEntries: 10 },
+        policy: {
+          retrievableTypes: ["working"],
+          writableTypes: ["episodic", "working"],
+          retention: { mode: "bounded", maxDurableEntries: 30 },
+        },
         revision: 1,
       },
       planningStrategy: { strategyId: "deterministic", mode: "deterministic-linear" },

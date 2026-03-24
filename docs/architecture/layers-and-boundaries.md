@@ -155,6 +155,7 @@ If a change needs data from the outside world, prefer adding or using an **appli
 - No agent runtime adapters or UI pages were added in this phase; infrastructure and UI remain outer-layer concerns for later slices.
 
 - Direction 4 Phase 2 now starts at the inner layers only: planning structures are domain/application contracts (`domain/agents/AgentPlan.ts`, `application/agents/contracts/AgentPlanningStrategy.ts` + `application/agents/services/DeterministicAgentPlanningStrategy.ts`, `application/agents/contracts/AgentPlanningLoop.ts`) and intentionally do not introduce a second runtime, orchestration stack, or UI loop.
+- Direction 4 Phase 3 continues inner-layer-first: memory retrieval/write/session behavior is now modeled as domain/application seams (`domain/agents/AgentMemory.ts`, `domain/agents/AgentWorkingMemory.ts`, `application/agents/contracts/AgentMemoryRetrieval.ts`, `application/agents/services/AgentMemoryRetrievalService.ts`, `application/agents/services/AgentMemoryWriteService.ts`, `application/agents/services/AgentWorkingMemoryService.ts`) and remains asset-backed rather than transcript/chat-wrapper-driven.
 
 ## TODO
 

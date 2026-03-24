@@ -38,10 +38,29 @@ export interface AgentMemoryRetrievalConfig {
   };
 }
 
+export const AgentMemoryRetentionModes = Object.freeze({
+  disabled: "disabled",
+  bounded: "bounded",
+});
+
+export type AgentMemoryRetentionMode = typeof AgentMemoryRetentionModes[keyof typeof AgentMemoryRetentionModes];
+
+export interface AgentMemoryPolicy {
+  readonly maxRetrievalEntries?: number;
+  readonly retrievableTypes?: ReadonlyArray<AgentMemoryType>;
+  readonly writableTypes?: ReadonlyArray<AgentMemoryType>;
+  readonly sessionOnlyTypes?: ReadonlyArray<AgentMemoryType>;
+  readonly retention: {
+    readonly mode: AgentMemoryRetentionMode;
+    readonly maxDurableEntries?: number;
+  };
+}
+
 export interface AgentMemoryConfiguration {
   readonly agentId: string;
   readonly assets: ReadonlyArray<AgentMemoryAssetRef>;
   readonly retrieval: AgentMemoryRetrievalConfig;
+  readonly policy: AgentMemoryPolicy;
   readonly revision: number;
 }
 
@@ -58,6 +77,7 @@ export interface AgentMemoryQuery {
   readonly memoryTypes?: ReadonlyArray<AgentMemoryType>;
   readonly tags?: ReadonlyArray<string>;
   readonly maxEntries?: number;
+  readonly beforeTimestamp?: string;
 }
 
 export interface AgentMemoryStore {
@@ -97,6 +117,19 @@ function normalizeMemoryTypes(values: ReadonlyArray<AgentMemoryType> | undefined
     }
   }
   return Object.freeze(deduped);
+}
+
+function assertSubset(
+  subset: ReadonlyArray<AgentMemoryType>,
+  superset: ReadonlyArray<AgentMemoryType>,
+  label: string,
+): void {
+  const allowed = new Set(superset);
+  for (const value of subset) {
+    if (!allowed.has(value)) {
+      throw new Error(`${label} includes '${value}' which is not allowed by writableTypes.`);
+    }
+  }
 }
 
 export function normalizeAgentMemoryConfiguration(config: AgentMemoryConfiguration): AgentMemoryConfiguration {
@@ -158,6 +191,16 @@ export function normalizeAgentMemoryConfiguration(config: AgentMemoryConfigurati
         })
       : undefined,
   });
+  const policy = Object.freeze({
+    maxRetrievalEntries: normalizePositiveInt(config.policy?.maxRetrievalEntries, "Agent memory policy maxRetrievalEntries"),
+    retrievableTypes: normalizeMemoryTypes(config.policy?.retrievableTypes),
+    writableTypes: normalizeMemoryTypes(config.policy?.writableTypes),
+    sessionOnlyTypes: normalizeMemoryTypes(config.policy?.sessionOnlyTypes),
+    retention: Object.freeze({
+      mode: config.policy?.retention?.mode ?? AgentMemoryRetentionModes.bounded,
+      maxDurableEntries: normalizePositiveInt(config.policy?.retention?.maxDurableEntries, "Agent memory policy retention maxDurableEntries"),
+    }),
+  });
 
   if (!Object.values(AgentMemoryRetrievalStrategies).includes(retrieval.strategy)) {
     throw new Error("Agent memory retrieval strategy must be latest-first, semantic-filter, or hybrid.");
@@ -176,11 +219,24 @@ export function normalizeAgentMemoryConfiguration(config: AgentMemoryConfigurati
   if (retrieval.strategy === "hybrid" && !retrieval.recency && !retrieval.semantic) {
     throw new Error("Agent memory retrieval hybrid strategy requires semantic or recency config.");
   }
+  if (!Object.values(AgentMemoryRetentionModes).includes(policy.retention.mode)) {
+    throw new Error("Agent memory policy retention mode must be disabled or bounded.");
+  }
+  if (policy.retention.mode === AgentMemoryRetentionModes.disabled && policy.retention.maxDurableEntries !== undefined) {
+    throw new Error("Agent memory policy retention maxDurableEntries is not allowed when retention mode is disabled.");
+  }
+  if (policy.maxRetrievalEntries !== undefined && policy.maxRetrievalEntries > retrieval.maxEntries) {
+    throw new Error("Agent memory policy maxRetrievalEntries cannot exceed retrieval maxEntries.");
+  }
+  if (policy.writableTypes.length > 0 && policy.sessionOnlyTypes.length > 0) {
+    assertSubset(policy.sessionOnlyTypes, policy.writableTypes, "Agent memory policy sessionOnlyTypes");
+  }
 
   return Object.freeze({
     agentId,
     assets,
     retrieval,
+    policy,
     revision: config.revision,
   });
 }

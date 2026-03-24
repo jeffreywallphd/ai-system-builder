@@ -50,6 +50,11 @@ Use this file as the shortest reliable orientation before reading the human arch
 - This remains a foundation slice only: no studio UI, no autonomous replanning loop, and no parallel orchestration stack.
 
 - Direction 4 (Phase 2, inner foundation only) now includes an execution-oriented planning contract: `domain/agents/AgentPlan.ts` (dependency-aware plan/step model + validation), `application/agents/contracts/AgentPlanningStrategy.ts` (strategy contract/descriptor seam) plus `application/agents/services/DeterministicAgentPlanningStrategy.ts` (first deterministic strategy), and bounded planning-loop evaluation contracts in `application/agents/contracts/AgentPlanningLoop.ts` without adding a parallel runtime or UI loop.
+- Direction 4 (Phase 3, memory system inner slice) now adds explicit memory retrieval/write seams and session working memory:
+  - Retrieval contract: `application/agents/contracts/AgentMemoryRetrieval.ts` + `application/agents/services/AgentMemoryRetrievalService.ts`.
+  - Session working memory model: `domain/agents/AgentWorkingMemory.ts` + `application/agents/services/AgentWorkingMemoryService.ts`.
+  - Bounded write pipeline: `application/agents/services/AgentMemoryWriteService.ts`.
+  - Explicit memory policy controls now live in `domain/agents/AgentMemory.ts` (`retrievableTypes`, `writableTypes`, `sessionOnlyTypes`, bounded retention settings).
 
 ## TODO
 - If asked for the "single" architecture entry point, explain that there are currently multiple composition roots and name them explicitly.

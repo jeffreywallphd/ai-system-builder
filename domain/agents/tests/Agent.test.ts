@@ -66,6 +66,13 @@ describe("Agent domain", () => {
           semantic: { minRelevanceScore: 0.4 },
           recency: { preferLatest: true, lookbackWindowEntries: 20 },
         },
+        policy: {
+          maxRetrievalEntries: 5,
+          retrievableTypes: ["episodic", "semantic"],
+          writableTypes: ["episodic", "working"],
+          sessionOnlyTypes: ["working"],
+          retention: { mode: "bounded", maxDurableEntries: 200 },
+        },
         revision: 1,
       },
       planningStrategy: { strategyId: "linear-default", mode: "deterministic-linear" },
@@ -96,6 +103,10 @@ describe("Agent domain", () => {
         agentId: "agent-read",
         assets: [],
         retrieval: { strategy: "latest-first", maxEntries: 10 },
+        policy: {
+          writableTypes: ["episodic", "semantic", "working"],
+          retention: { mode: "bounded", maxDurableEntries: 200 },
+        },
         revision: 1,
       },
       planningStrategy: { strategyId: "deterministic", mode: "deterministic-linear" },
@@ -133,6 +144,11 @@ describe("Agent domain", () => {
           agentId: "agent-invalid-goal-tool",
           assets: [{ assetId: new AssetId("asset:memory:a"), memoryType: "working" }],
           retrieval: { strategy: "latest-first", maxEntries: 5 },
+          policy: {
+            writableTypes: ["working"],
+            sessionOnlyTypes: ["working"],
+            retention: { mode: "bounded", maxDurableEntries: 50 },
+          },
           revision: 1,
         },
         planningStrategy: { strategyId: "linear-default", mode: "deterministic-linear" },
@@ -157,6 +173,11 @@ describe("Agent domain", () => {
         agentId: "agent-update",
         assets: [{ assetId: new AssetId("asset:memory:update"), memoryType: "working" }],
         retrieval: { strategy: "latest-first", maxEntries: 5 },
+        policy: {
+          writableTypes: ["working"],
+          sessionOnlyTypes: ["working"],
+          retention: { mode: "bounded", maxDurableEntries: 20 },
+        },
         revision: 1,
       },
       planningStrategy: { strategyId: "linear-default", mode: "deterministic-linear" },
@@ -250,6 +271,10 @@ describe("Agent memory invariants", () => {
       agentId: "agent-m",
       assets: [],
       retrieval: { strategy: "latest-first", maxEntries: 5 },
+      policy: {
+        writableTypes: ["episodic", "semantic", "working"],
+        retention: { mode: "bounded", maxDurableEntries: 20 },
+      },
       revision: 1,
     });
 
@@ -265,6 +290,7 @@ describe("Agent memory invariants", () => {
           { assetId: new AssetId("asset:memory:one"), memoryType: "semantic", assetVersionId: "v1" },
         ],
         retrieval: { strategy: "semantic-filter", maxEntries: 10, semantic: { minRelevanceScore: 1.5 } },
+        policy: { writableTypes: ["semantic"], retention: { mode: "bounded", maxDurableEntries: 20 } },
         revision: 1,
       }),
     ).toThrow("duplicate asset reference");
@@ -274,9 +300,29 @@ describe("Agent memory invariants", () => {
         agentId: "agent-m",
         assets: [{ assetId: new AssetId("memory:one"), memoryType: "working" }],
         retrieval: { strategy: "latest-first", maxEntries: 5 },
+        policy: {
+          writableTypes: ["working"],
+          sessionOnlyTypes: ["working"],
+          retention: { mode: "bounded", maxDurableEntries: 20 },
+        },
         revision: 1,
       }),
     ).toThrow("canonical asset id format");
+
+    expect(() =>
+      normalizeAgentMemoryConfiguration({
+        agentId: "agent-m",
+        assets: [{ assetId: new AssetId("asset:memory:one"), memoryType: "working" }],
+        retrieval: { strategy: "latest-first", maxEntries: 5 },
+        policy: {
+          maxRetrievalEntries: 10,
+          writableTypes: ["working"],
+          sessionOnlyTypes: ["semantic"],
+          retention: { mode: "disabled", maxDurableEntries: 5 },
+        },
+        revision: 1,
+      }),
+    ).toThrow("retention maxDurableEntries");
   });
 });
 
