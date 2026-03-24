@@ -95,3 +95,11 @@ Use "workflow-first", "tool projection", and "truthful execution provenance" whe
 - If asked whether tools and workflows are separate bounded contexts, answer: "not really; tools are primarily a projected and published workflow surface in the current implementation."
 - If asked what should migrate next, answer: execution areas that still cannot report real progress/cancellation truthfully yet, especially MCP/runtime-backed orchestration beyond the current narrow server-operation slice.
 - If asked whether Direction 1 is finished, answer: "done enough that the execution substrate is no longer the obvious bottleneck; the next focus should likely move to Direction 2 unless a new truthful runtime-backed slice is clearly ready."
+
+## Direction 4 update: agent execution placement (bounded first implementation)
+- Agent planning/execution sits above the existing execution backbone; it does not introduce a second runtime.
+- Planner output is a bounded ordered step plan (`toolId` + goal/action) that is executed through existing tool capability execution seams.
+- For MCP steps, execution still flows through MCP execution use cases, preserving trust policy/auth/approval/sandbox/audit behavior.
+- For workflow-projected tools, execution still flows through workflow tool execution (`RunToolUseCase` path).
+- Agent memory writes/reads are asset-backed and versioned so execution outcomes can be persisted and reused by later planning.
+- Current limits are intentional: deterministic single-agent planning, bounded step counts, no autonomous long-horizon control loop.

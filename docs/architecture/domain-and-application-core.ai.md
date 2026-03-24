@@ -286,12 +286,33 @@ Direction 2 is now considered strong enough to hand off to Direction 3:
 
 SQLite storage now also carries normalized `asset_versions.version_label` and `asset_versions.parent_version_id` columns (plus legacy JSON payload compatibility) so version-chain queries can progressively move from blob parsing to explicit relational reads.
 
-## Direction 4 start: agent inner-layer foundations (stories 6.1–6.4, initial)
+## Direction 4 update: first bounded real agent slice (stories 6.1–6.4)
 
-- A minimal domain `Agent` model now exists with stable id, structured goals, MCP `allowedTools` references, asset-backed `memoryConfig`, and planning-strategy references.
-- Agent memory is modeled as an inner-layer contract (`AgentMemoryStore`) that records/retrieves memory entries as asset/version references plus optional tags/metadata.
-- Application layer now exposes foundational services:
-  - `AgentService` (`createAgent`, `updateAgent`, `getAgent`, `listAgents`)
-  - `AgentPlanningInterface` with deterministic baseline implementation
-  - `AgentExecutionService` for simple linear execution-graph construction and bounded execution wiring via existing agent/tool execution seams.
-- Scope is intentionally foundation-only: no full autonomous planning loop, no UI orchestration surface, and no speculative LLM orchestration stack in this slice.
+- `Agent` is now a fuller domain concept (not just a config bag):
+  - stable identity + explicit display name
+  - structured prioritized goals with optional required-tool constraints
+  - MCP-registry-aligned `allowedTools` (`mcp:<serverId>:<toolName>`)
+  - asset-backed memory configuration (scoped asset ids + retrieval policy)
+  - planning strategy reference
+  - execution policy/trust linkage (`trustPolicyId`, trusted-tool posture, bounded max steps)
+  - lifecycle status (`draft`/`ready`/`paused`/`archived`)
+  - stable agent read models so callers do not reconstruct state manually.
+- Validation invariants were tightened for create/update:
+  - non-empty id/name/goals/tool set
+  - strict MCP tool identity format
+  - memory config must reference at least one asset id
+  - per-goal required tools must be inside the allowed tool set
+  - bounded retrieval/execution numeric policies.
+- Planning moved from trivial pass-through to explicit deterministic planning service:
+  - planner inspects prioritized goals + allowed tools + memory-query context
+  - planner filters allowed tools against currently available capability catalog entries
+  - planner produces a machine-readable bounded plan (`planId`, ordered steps, selected tool id per step, attached memory context).
+- Agent memory now has a real asset-backed implementation:
+  - `AssetBackedAgentMemoryStore` persists memory through asset catalog + immutable asset versions
+  - memory entries are scoped by agent, tagged, metadata-capable, and queryable for planning/execution.
+- Agent execution now composes planning + execution + memory persistence:
+  - `AgentExecutionService` builds a bounded execution graph from planner output
+  - executes each planned step via existing tool execution pathways (`ExecuteAgentToolsUseCase` and underlying MCP/workflow executors, preserving trust/policy enforcement)
+  - returns stable per-step outcomes
+  - persists execution outcomes back to agent memory assets.
+- This remains intentionally bounded: deterministic single-agent planning only, no speculative autonomous loops, and no separate execution engine.
