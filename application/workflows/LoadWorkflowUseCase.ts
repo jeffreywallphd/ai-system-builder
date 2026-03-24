@@ -14,7 +14,7 @@ import { GetAssetDependencyHealthUseCase } from "../assets-system/GetAssetDepend
 import { GetAssetImpactAnalysisUseCase } from "../assets-system/GetAssetImpactAnalysisUseCase";
 import { GetCanonicalDependencyStateUseCase } from "../assets-system/CanonicalDependencyStateUseCase";
 import { CanonicalEntityReadResolver } from "../assets-system/CanonicalEntityReadResolver";
-import { CanonicalEntityOperationalReadService } from "../assets-system/CanonicalEntityOperationalReadService";
+import { CanonicalEntityOperationalReadService, type CanonicalOperationalReadSummary } from "../assets-system/CanonicalEntityOperationalReadService";
 import type { ICanonicalAssetIdentityRepository } from "../ports/interfaces/ICanonicalAssetIdentityRepository";
 import type { IAssetLineageRepository } from "../ports/interfaces/IAssetLineageRepository";
 import type { IAssetTransformationRepository } from "../ports/interfaces/IAssetTransformationRepository";
@@ -46,29 +46,7 @@ export interface ILoadWorkflowRequest {
 export interface ILoadWorkflowResult {
   readonly workflow?: IWorkflow;
   readonly validation?: IWorkflowValidationResult;
-  readonly canonicalRead?: {
-    readonly preferred: boolean;
-    readonly assetId?: string;
-    readonly pinnedVersionId?: string;
-    readonly latestVersionId?: string;
-    readonly provenance?: {
-      readonly directUpstreamCount: number;
-      readonly directDownstreamCount: number;
-      readonly producingTransformationCount: number;
-      readonly lineageConfidence: "exact" | "partial";
-    };
-    readonly dependencyState?: {
-      readonly state: "healthy" | "impacted" | "stale" | "partially-trusted" | "reconciliation-needed";
-      readonly reasons: ReadonlyArray<string>;
-      readonly nextActions: ReadonlyArray<string>;
-    };
-    readonly operationalStatus?: {
-      readonly trust: "trusted" | "attention-needed";
-      readonly explanation: string;
-      readonly recommendedNextSteps: ReadonlyArray<string>;
-    };
-    readonly fallbackReason?: string;
-  };
+  readonly canonicalRead?: CanonicalOperationalReadSummary;
 }
 
 export class LoadWorkflowUseCase {

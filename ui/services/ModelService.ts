@@ -114,7 +114,8 @@ export class ModelService {
 
     return Object.freeze({
       model: fallback,
-      canonical: readModel.canonicalByModelId?.[modelId],
+      canonical: readModel.canonicalByModelId?.[modelId]
+        ?? await this.listInstalledModelsUseCase.resolveCanonicalModelSummary(modelId),
     });
   }
 
