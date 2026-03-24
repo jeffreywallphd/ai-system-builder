@@ -7,6 +7,7 @@ import type {
 } from "../ports/interfaces/IModelInstaller";
 import type { IInstalledModelCatalog } from "../ports/interfaces/IInstalledModelCatalog";
 import type { IRemoteModelCatalog } from "../ports/interfaces/IRemoteModelCatalog";
+import type { PublishDurableEntityToAssetSystemUseCase } from "../assets-system/PublishDurableEntityToAssetSystemUseCase";
 
 export interface IInstallModelRequest {
   readonly model?: IModel;
@@ -28,15 +29,18 @@ export class InstallModelUseCase {
   private readonly modelInstaller: IModelInstaller;
   private readonly installedModelCatalog: IInstalledModelCatalog;
   private readonly remoteModelCatalog?: IRemoteModelCatalog;
+  private readonly canonicalPublisher?: PublishDurableEntityToAssetSystemUseCase;
 
   constructor(params: {
     modelInstaller: IModelInstaller;
     installedModelCatalog: IInstalledModelCatalog;
     remoteModelCatalog?: IRemoteModelCatalog;
+    canonicalPublisher?: PublishDurableEntityToAssetSystemUseCase;
   }) {
     this.modelInstaller = params.modelInstaller;
     this.installedModelCatalog = params.installedModelCatalog;
     this.remoteModelCatalog = params.remoteModelCatalog;
+    this.canonicalPublisher = params.canonicalPublisher;
   }
 
   public async execute(
@@ -61,6 +65,7 @@ export class InstallModelUseCase {
 
     if ((request.registerInstalled ?? true) && installResult.status === "completed") {
       await this.installedModelCatalog.saveInstalled(installedModel);
+      await this.canonicalPublisher?.publishInstalledModel(installedModel);
     }
 
     return Object.freeze({

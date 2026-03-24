@@ -28,6 +28,24 @@ describe("InstallModelUseCase", () => {
     expect(result.model.id).toBe("remote");
   });
 
+
+  it("publishes installed model canonical identity when registration succeeds", async () => {
+    const published: string[] = [];
+    const useCase = new InstallModelUseCase({
+      modelInstaller: makeModelInstaller(),
+      installedModelCatalog: makeInstalledModelCatalog(),
+      canonicalPublisher: {
+        publishInstalledModel: async (model) => {
+          published.push(model.id);
+          return { assetId: `installed-model:${model.id}`, versionId: `asset-version:${model.id}:1` } as const;
+        },
+      } as any,
+    });
+
+    await useCase.execute({ model: makeModel("m-publish"), destination: "/models/m-publish" });
+    expect(published).toEqual(["m-publish"]);
+  });
+
   it("throws when remote id is requested without remote catalog", async () => {
     const useCase = new InstallModelUseCase({
       modelInstaller: makeModelInstaller(),
