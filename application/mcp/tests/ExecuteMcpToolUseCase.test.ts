@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { ExecuteMcpToolUseCase } from "../ExecuteMcpToolUseCase";
 import type { IMcpToolExecutor } from "../../ports/interfaces/IMcpToolExecutor";
 import { ExecutionContextEnvelope } from "../../context/models/ExecutionContextEnvelope";
+import { ExecutionContextToolPolicyService } from "../../context/ExecutionContextToolPolicyService";
 
 const executionContext = new ExecutionContextEnvelope({
   packageReferences: [{ packageId: "pkg-mcp", alias: "MCP policy" }],
@@ -94,4 +95,53 @@ describe("ExecuteMcpToolUseCase", () => {
       })
     ).rejects.toThrow("Execution context policy blocked the requested MCP tool invocation.");
   });
+
+  it("validates installed tool input and output contracts", async () => {
+    const executor: IMcpToolExecutor = {
+      executeTool: async () => ({
+        executionId: "exec-2",
+        serverId: "local",
+        toolName: "echo",
+        status: "completed",
+        content: [{ ok: true }],
+        structuredContent: { ok: true },
+      }),
+    };
+
+    const registry = {
+      listInstalledTools: async () => [],
+      getInstalledTool: async () => undefined,
+      findInstalledToolByBinding: async () =>
+        Object.freeze({
+          toolId: "mcp:local:echo",
+          status: "enabled" as const,
+          installedAt: "2026-03-24T00:00:00.000Z",
+          updatedAt: "2026-03-24T00:00:00.000Z",
+          source: Object.freeze({ kind: "inline" as const, location: "inline:test" }),
+          definition: Object.freeze({
+            id: "mcp:local:echo",
+            version: "1.0.0",
+            displayName: "Echo",
+            sideEffects: "none" as const,
+            auth: Object.freeze({ kind: "none" as const }),
+            tags: Object.freeze([]),
+            categories: Object.freeze([]),
+            binding: Object.freeze({ serverId: "local", toolName: "echo" }),
+            inputSchema: Object.freeze({ type: "object", required: ["message"], properties: { message: { type: "string" } } }),
+            outputSchema: Object.freeze({ type: "object", required: ["text"], properties: { text: { type: "string" } } }),
+          }),
+        }),
+      saveInstalledTool: async (record: never) => record,
+      removeInstalledTool: async () => false,
+    };
+
+    await expect(
+      new ExecuteMcpToolUseCase(executor, new ExecutionContextToolPolicyService(), registry).execute({
+        serverId: "local",
+        toolName: "echo",
+        arguments: { message: "hi" },
+      }),
+    ).rejects.toThrow("output violates");
+  });
+
 });

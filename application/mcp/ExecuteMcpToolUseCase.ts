@@ -1,5 +1,8 @@
 import { ExecutionContextToolPolicyService } from "../context/ExecutionContextToolPolicyService";
 import type { IMcpToolExecutor } from "../ports/interfaces/IMcpToolExecutor";
+import type { IMcpToolRegistryRepository } from "../ports/interfaces/IMcpToolRegistryRepository";
+import { McpToolContractValidationService } from "./registry/McpToolContractValidationService";
+import { McpToolRegistryError } from "./registry/McpToolRegistryErrors";
 import type { McpToolExecutionRequest } from "./models/McpToolExecutionRequest";
 import type { McpToolExecutionResult } from "./models/McpToolExecutionResult";
 
@@ -8,7 +11,9 @@ export class ExecuteMcpToolUseCase {
 
   constructor(
     executor: IMcpToolExecutor,
-    private readonly policyService: ExecutionContextToolPolicyService = new ExecutionContextToolPolicyService()
+    private readonly policyService: ExecutionContextToolPolicyService = new ExecutionContextToolPolicyService(),
+    private readonly registryRepository?: IMcpToolRegistryRepository,
+    private readonly contractValidationService: McpToolContractValidationService = new McpToolContractValidationService(),
   ) {
     this.executor = executor;
   }
@@ -51,9 +56,35 @@ export class ExecuteMcpToolUseCase {
       normalizedRequest.context
     );
 
-    return this.executor.executeTool({
+    const installedTool = this.registryRepository
+      ? await this.registryRepository.findInstalledToolByBinding(normalizedRequest.serverId, normalizedRequest.toolName)
+      : undefined;
+
+    if (installedTool) {
+      const inputValidation = this.contractValidationService.validateInput(installedTool.definition, normalizedRequest.arguments ?? {});
+      if (!inputValidation.valid) {
+        throw new McpToolRegistryError("invalid-input-contract", "MCP tool input does not satisfy installed contract.", {
+          toolId: installedTool.toolId,
+          issues: inputValidation.issues,
+        });
+      }
+    }
+
+    const result = await this.executor.executeTool({
       ...normalizedRequest,
       metadata: Object.keys(normalizedRequest.metadata).length > 0 ? normalizedRequest.metadata : undefined,
     });
+
+    if (installedTool && result.status === "completed") {
+      const outputValidation = this.contractValidationService.validateOutput(installedTool.definition, result.structuredContent ?? (result.content[0] as unknown));
+      if (!outputValidation.valid) {
+        throw new McpToolRegistryError("invalid-output-contract", "MCP tool output violates installed contract.", {
+          toolId: installedTool.toolId,
+          issues: outputValidation.issues,
+        });
+      }
+    }
+
+    return result;
   }
 }
