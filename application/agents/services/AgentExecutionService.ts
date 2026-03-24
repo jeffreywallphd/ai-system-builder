@@ -1,45 +1,115 @@
-import type { ExecuteAgentToolsUseCase } from "../ExecuteAgentToolsUseCase";
+import type { AgentMemoryStore } from "../../../domain/agents/AgentMemory";
 import type { Agent } from "../../../domain/agents/Agent";
 import type { AgentExecutionResult } from "../models/AgentExecutionResult";
+import type { ExecuteAgentToolsUseCase } from "../ExecuteAgentToolsUseCase";
+import type { AgentExecutionPlan, AgentPlanningInterface } from "./AgentPlanningInterface";
 
-export interface AgentExecutionGraph {
+export interface AgentExecutionStepOutcome {
+  readonly stepId: string;
+  readonly goalId: string;
+  readonly toolId: string;
+  readonly action: string;
+  readonly status: "completed" | "failed" | "cancelled";
+  readonly output?: string;
+  readonly errorMessage?: string;
+}
+
+export interface AgentExecutionReadModel {
   readonly agentId: string;
-  readonly steps: ReadonlyArray<{
-    readonly stepId: string;
-    readonly goalId: string;
-    readonly toolId?: string;
-  }>;
+  readonly executionId: string;
+  readonly planId: string;
+  readonly status: "completed" | "failed" | "cancelled";
+  readonly outcomes: ReadonlyArray<AgentExecutionStepOutcome>;
+  readonly finalOutput?: string;
 }
 
 export class AgentExecutionService {
-  constructor(private readonly executeAgentToolsUseCase: ExecuteAgentToolsUseCase) {}
+  constructor(
+    private readonly planner: AgentPlanningInterface,
+    private readonly executeAgentToolsUseCase: ExecuteAgentToolsUseCase,
+    private readonly memoryStore: AgentMemoryStore,
+  ) {}
 
-  public buildExecutionGraph(agent: Agent): AgentExecutionGraph {
+  public async buildExecutionGraph(agent: Agent): Promise<AgentExecutionPlan> {
+    return this.planner.plan(agent);
+  }
+
+  public async execute(agent: Agent): Promise<AgentExecutionReadModel> {
+    const plan = await this.planner.plan(agent);
+    const outcomes: AgentExecutionStepOutcome[] = [];
+    let finalStatus: AgentExecutionReadModel["status"] = "completed";
+    let finalOutput = "";
+
+    for (const step of plan.steps) {
+      const stepResult: AgentExecutionResult = await this.executeAgentToolsUseCase.execute({
+        input: step.action,
+        executionId: `agent:${agent.id}:${step.stepId}`,
+        maxIterations: 1,
+        toolSelection: {
+          mode: "capabilityIds",
+          capabilityIds: [step.toolId],
+        },
+        metadata: Object.freeze({
+          origin: "agent-execution-service",
+          agentId: agent.id,
+          planId: plan.planId,
+          stepId: step.stepId,
+          memoryAssetIds: agent.memoryConfig.memoryAssetIds,
+        }),
+      });
+
+      const stepOutput = stepResult.finalOutput ?? stepResult.steps[0]?.resultText;
+      outcomes.push(Object.freeze({
+        stepId: step.stepId,
+        goalId: step.goalId,
+        toolId: step.toolId,
+        action: step.action,
+        status: stepResult.status,
+        output: stepOutput,
+        errorMessage: stepResult.errorMessage,
+      }));
+      finalOutput = [finalOutput, stepOutput].filter(Boolean).join("\n");
+
+      if (stepResult.status !== "completed") {
+        finalStatus = stepResult.status;
+        break;
+      }
+    }
+
+    await this.persistExecutionMemory(agent, plan, outcomes, finalStatus, finalOutput || undefined);
+
     return Object.freeze({
       agentId: agent.id,
-      steps: Object.freeze(agent.goals.map((goal, index) => Object.freeze({
-        stepId: `agent-step-${index + 1}`,
-        goalId: goal.goalId,
-        toolId: agent.allowedTools[index]?.toolId ?? agent.allowedTools[0]?.toolId,
-      }))),
+      executionId: `agent:${agent.id}:${plan.planId}`,
+      planId: plan.planId,
+      status: finalStatus,
+      outcomes: Object.freeze(outcomes),
+      finalOutput: finalOutput || undefined,
     });
   }
 
-  public async execute(agent: Agent): Promise<AgentExecutionResult> {
-    const linearPrompt = agent.goals.map((goal) => goal.title).join(" and then ");
-    return this.executeAgentToolsUseCase.execute({
-      input: linearPrompt,
-      executionId: `agent:${agent.id}`,
-      maxIterations: Math.max(1, agent.goals.length),
-      toolSelection: {
-        mode: "capabilityIds",
-        capabilityIds: agent.allowedTools.map((tool) => tool.toolId),
+  private async persistExecutionMemory(
+    agent: Agent,
+    plan: AgentExecutionPlan,
+    outcomes: ReadonlyArray<AgentExecutionStepOutcome>,
+    status: AgentExecutionReadModel["status"],
+    finalOutput?: string,
+  ): Promise<void> {
+    const memoryAssetId = agent.memoryConfig.memoryAssetIds[0];
+    if (!memoryAssetId) {
+      return;
+    }
+
+    await this.memoryStore.add(agent.id, {
+      assetId: memoryAssetId,
+      tags: ["agent-execution", status],
+      metadata: {
+        planId: plan.planId,
+        strategyId: plan.strategyId,
+        status,
+        outcomes,
+        finalOutput,
       },
-      metadata: Object.freeze({
-        origin: "agent-execution-service",
-        agentId: agent.id,
-        memoryAssetIds: agent.memoryConfig.memoryAssetIds,
-      }),
     });
   }
 }

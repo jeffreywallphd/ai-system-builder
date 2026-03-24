@@ -295,3 +295,11 @@ Audit schema now records administrative approval transitions plus decision denia
 - Runtime-declared MCP execution failures are normalized into that same workflow error envelope, so node results now remain `success with output` **or** `failure with structured error`, never mixed.
 - Workflow load/hydration no longer uses MCP-only persistence conditionals; dynamic MCP argument properties now restore through the same generic node-property hydration path, with MCP-specific expansion isolated behind the node configuration service seam.
 - MCP node outputs now align with native workflow output contracts (`toolResult`, `resultText`) while preserving compatibility aliases to avoid breaking existing downstream nodes.
+
+## Direction 4 update: agent execution placement (bounded first implementation)
+- Agent planning/execution sits above the existing execution backbone; it does not introduce a second runtime.
+- Planner output is a bounded ordered step plan (`toolId` + goal/action) that is executed through existing tool capability execution seams.
+- For MCP steps, execution still flows through MCP execution use cases, preserving trust policy/auth/approval/sandbox/audit behavior.
+- For workflow-projected tools, execution still flows through workflow tool execution (`RunToolUseCase` path).
+- Agent memory writes/reads are asset-backed and versioned so execution outcomes can be persisted and reused by later planning.
+- Current limits are intentional: deterministic single-agent planning, bounded step counts, no autonomous long-horizon control loop.
