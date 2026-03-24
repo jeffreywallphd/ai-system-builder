@@ -43,9 +43,15 @@ Use "workflow-first", "tool projection", and "truthful execution provenance" whe
 
 
 ## MCP registry and capability foundation (Direction 3, first slice)
-- MCP tools now have a first-class registry foundation (install/register, list/detail, enable/disable, and safe removal with dependency blocking).
+- MCP tools now have a first-class registry foundation (install/register, list/detail, enable/disable, safe removal with dependency blocking, and explicit update preview/apply lifecycle use cases).
 - Tool definitions now use a machine-readable capability contract that includes stable identity, display metadata, version, input/output schema, side-effect class, auth requirements, optional cost/execution metadata, tags/categories, and optional runtime binding (`serverId` + `toolName`).
 - Registration validates definition contracts before persistence; runtime execution validates input/output contracts against installed definitions at the use-case boundary and refuses execution when the installed tool status is `disabled`.
+- Update lifecycle now classifies transitions (`same-version`, `upgrade`, `downgrade`, `incomparable`) and actions (`reinstall`, `update`, `downgrade`, `replace`) explicitly instead of treating overwrite-install as the only path.
+- Update preview surfaces a machine-readable change summary (version, binding identity, schemas, side effects, auth, tags/categories) plus compatibility risk (`compatible`, `risky`, `breaking`).
+- Update apply performs bounded dependency safety checks: risky/breaking updates are blocked when dependent workflows reference the tool unless explicit override flags are supplied.
+- Compatibility risk now uses bounded contract-depth heuristics (required-property deltas, property add/remove, type changes) and optional policy profiles (`strict`, `balanced`, `permissive`).
+- Update flow now includes explicit acknowledgement gates for risky/breaking transitions and emits remediation suggestions suitable for UI/API preflight guidance.
+- Installed-tool lifecycle metadata now includes durable lifecycle event history and dedicated read models for lifecycle summary/history inspection.
 - Capability introspection query use cases now support bounded deeper semantics for future planner/agent selection: schema-path type checks (including array item paths), side-effect ceilings, explicit auth-kind filters, and configurable tag/category match modes.
 - Safe removal now returns an explicit structured result (`removed` or `blocked`) with dependency references, so UI/adapters can render unsafe-removal state without exception parsing.
 
