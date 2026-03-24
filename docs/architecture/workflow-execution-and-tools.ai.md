@@ -101,8 +101,8 @@ Use "workflow-first", "tool projection", and "truthful execution provenance" whe
   - `ai-loom.mcp-tool-definitions.v1` for shareable definitions (definition + source only), explicitly excluding runtime-only trust/approval/secret state.
 
 ## Direction 4 Phase 1 execution alignment
-- Agent execution sessions now use execution-native lifecycle states in `domain/agents/AgentExecutionSession.ts`.
-- `application/agents/contracts/AgentExecutionMapping.ts` maps agent steps into unified `ExecutionPlan` units (`agent-tool-step`) to keep Direction 4 on the shared execution backbone.
+- Agent execution sessions now use execution-native lifecycle states in `domain/agents/AgentExecutionSession.ts`, with explicit transition guards and start/end-time coherence checks.
+- `application/agents/contracts/AgentExecutionMapping.ts` maps agent steps into unified `ExecutionPlan` units (`agent-tool-step`) and exposes per-unit payload contracts to keep Direction 4 on the shared execution backbone.
 - This is a contract slice only (no second runtime, no autonomous loop in Phase 1).
 
 ## TODO

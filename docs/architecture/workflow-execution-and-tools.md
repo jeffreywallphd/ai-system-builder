@@ -260,8 +260,8 @@ That is "done enough" for Direction 1: the unified execution engine now includes
   - `ai-loom.mcp-tool-definitions.v1` for shareable definition export/import flows (definition + source only; no runtime approvals/secrets/operational trust state).
 
 ## Direction 4 Phase 1 execution alignment
-- Agent execution sessions now use execution-native lifecycle language (`queued/planning/running/completed/failed/cancelled`) via `domain/agents/AgentExecutionSession.ts`.
-- A compact mapping seam (`application/agents/contracts/AgentExecutionMapping.ts`) maps agent plan steps into `ExecutionPlan` units (`agent-tool-step`) so future agent execution flows through the same unified engine substrate.
+- Agent execution sessions now use execution-native lifecycle language (`queued/planning/running/completed/failed/cancelled`) via `domain/agents/AgentExecutionSession.ts`, with explicit transition and timestamp coherence invariants.
+- A compact mapping seam (`application/agents/contracts/AgentExecutionMapping.ts`) maps agent plan steps into `ExecutionPlan` units (`agent-tool-step`) and provides per-unit payload mapping so future agent execution flows through the same unified engine substrate.
 - This does not add a second orchestration engine: it only establishes a durable contract for later planner/runner slices.
 
 ## TODO

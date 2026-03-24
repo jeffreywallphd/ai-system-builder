@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   buildAgentExecutionUnitPayload,
+  mapAgentExecutionToBackbone,
   mapAgentExecutionToExecutionPlan,
 } from "../AgentExecutionMapping";
 import {
@@ -21,8 +22,14 @@ describe("Agent execution backbone mapping", () => {
     const executionPlan = mapAgentExecutionToExecutionPlan({
       session,
       steps: [
-        { stepId: "step-1", toolId: "mcp:local:echo", objective: "Collect context" },
-        { stepId: "step-2", toolId: "mcp:local:summarize", objective: "Summarize context", dependsOnStepIds: ["step-1"] },
+        { stepId: "step-1", goalId: "goal-1", toolId: "mcp:local:echo", objective: "Collect context" },
+        {
+          stepId: "step-2",
+          goalId: "goal-1",
+          toolId: "mcp:local:summarize",
+          objective: "Summarize context",
+          dependsOnStepIds: ["step-1"],
+        },
       ],
     });
 
@@ -36,17 +43,32 @@ describe("Agent execution backbone mapping", () => {
 
     const payload = buildAgentExecutionUnitPayload({
       session,
-      step: { stepId: "step-1", toolId: "mcp:local:echo", objective: "Ping" },
+      step: { stepId: "step-1", goalId: "goal-2", toolId: "mcp:local:echo", objective: "Ping" },
     });
 
     expect(payload.planId).toBe("agent-plan:2");
     expect(payload.agentId).toBe("agent-b");
     expect(payload.toolId).toBe("mcp:local:echo");
+    expect(payload.goalId).toBe("goal-2");
+  });
+
+  it("exposes an explicit mapping seam with payloads keyed by execution unit id", () => {
+    const session = createAgentExecutionSession({ id: "sess-3", agentId: "agent-c" });
+
+    const mapped = mapAgentExecutionToBackbone({
+      session,
+      steps: [{ stepId: "step-1", toolId: "mcp:local:echo", objective: "Ping" }],
+    });
+
+    expect(mapped.plan.id).toBe("agent-plan:sess-3");
+    expect(Object.keys(mapped.unitPayloadByUnitId)).toEqual(["step-1"]);
+    expect(mapped.unitPayloadByUnitId["step-1"]?.planId).toBe("agent-plan:sess-3");
   });
 
   it("tracks execution session lifecycle with terminal timestamps", () => {
-    const session = createAgentExecutionSession({ id: "sess-3", agentId: "agent-c" });
-    const running = transitionAgentExecutionSession(session, { status: AgentExecutionSessionStatuses.running });
+    const session = createAgentExecutionSession({ id: "sess-4", agentId: "agent-d" });
+    const planning = transitionAgentExecutionSession(session, { status: AgentExecutionSessionStatuses.planning });
+    const running = transitionAgentExecutionSession(planning, { status: AgentExecutionSessionStatuses.running });
     const completed = transitionAgentExecutionSession(running, {
       status: AgentExecutionSessionStatuses.completed,
       appendExecutionRunId: "run-1",
@@ -56,5 +78,18 @@ describe("Agent execution backbone mapping", () => {
     expect(completed.executionRunIds).toEqual(["run-1"]);
     expect(completed.diagnosticAssetIds).toEqual(["asset:diag:1"]);
     expect(completed.endTime).toBeDefined();
+  });
+
+  it("rejects malformed mapping inputs and incompatible assumptions", () => {
+    const session = createAgentExecutionSession({ id: "sess-5", agentId: "agent-e" });
+
+    expect(() => mapAgentExecutionToBackbone({ session, steps: [] })).toThrow("requires at least one step");
+
+    expect(() =>
+      mapAgentExecutionToBackbone({
+        session,
+        steps: [{ stepId: "step-1", toolId: "", objective: "Ping" }],
+      }),
+    ).toThrow("toolId is required");
   });
 });
