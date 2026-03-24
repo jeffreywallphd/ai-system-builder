@@ -198,6 +198,106 @@ describe("ExecuteMcpToolUseCase", () => {
     ).rejects.toMatchObject({ code: "tool-disabled" });
   });
 
+  it("resolves installed tools by stable tool identity when toolId is provided", async () => {
+    const requests: unknown[] = [];
+    const executor: IMcpToolExecutor = {
+      executeTool: async (request) => {
+        requests.push(request);
+        return {
+          executionId: "exec-tool-id-1",
+          serverId: request.serverId,
+          toolName: request.toolName,
+          status: "completed",
+          content: [{ ok: true }],
+          structuredContent: { ok: true },
+        };
+      },
+    };
+
+    const installedTool = Object.freeze({
+      toolId: "mcp:local:echo",
+      status: "enabled" as const,
+      installedAt: "2026-03-24T00:00:00.000Z",
+      updatedAt: "2026-03-24T00:00:00.000Z",
+      source: Object.freeze({ kind: "inline" as const, location: "inline:test" }),
+      grantedPermissions: Object.freeze([] as const),
+      definition: Object.freeze({
+        id: "mcp:local:echo",
+        version: "1.0.0",
+        displayName: "Echo",
+        sideEffects: "none" as const,
+        auth: Object.freeze({ kind: "none" as const }),
+        tags: Object.freeze([]),
+        categories: Object.freeze([]),
+        provider: Object.freeze({ serverId: "local", toolName: "echo" }),
+        binding: Object.freeze({ serverId: "local", toolName: "echo" }),
+        inputSchema: Object.freeze({ type: "object" }),
+        outputSchema: Object.freeze({ type: "object", properties: { ok: { type: "boolean" } } }),
+      }),
+    });
+
+    const registry = {
+      listInstalledTools: async () => [],
+      getInstalledTool: async (toolId: string) => (toolId === "mcp:local:echo" ? installedTool : undefined),
+      findInstalledToolByBinding: async () => undefined,
+      saveInstalledTool: async (record: never) => record,
+      removeInstalledTool: async () => false,
+    };
+
+    await new ExecuteMcpToolUseCase(executor, new ExecutionContextToolPolicyService(), registry).execute({
+      toolId: "mcp:local:echo",
+      serverId: "local",
+      toolName: "echo",
+      arguments: { message: "hi" },
+    });
+
+    expect((requests[0] as { serverId: string; toolName: string }).serverId).toBe("local");
+    expect((requests[0] as { serverId: string; toolName: string }).toolName).toBe("echo");
+  });
+
+  it("fails early when provided toolId does not match server/tool binding", async () => {
+    const executor: IMcpToolExecutor = {
+      executeTool: async () => {
+        throw new Error("should not execute");
+      },
+    };
+
+    const registry = {
+      listInstalledTools: async () => [],
+      getInstalledTool: async () =>
+        Object.freeze({
+          toolId: "mcp:local:echo",
+          status: "enabled" as const,
+          installedAt: "2026-03-24T00:00:00.000Z",
+          updatedAt: "2026-03-24T00:00:00.000Z",
+          source: Object.freeze({ kind: "inline" as const, location: "inline:test" }),
+          definition: Object.freeze({
+            id: "mcp:local:echo",
+            version: "1.0.0",
+            displayName: "Echo",
+            sideEffects: "none" as const,
+            auth: Object.freeze({ kind: "none" as const }),
+            tags: Object.freeze([]),
+            categories: Object.freeze([]),
+            provider: Object.freeze({ serverId: "local", toolName: "echo" }),
+            binding: Object.freeze({ serverId: "local", toolName: "echo" }),
+            inputSchema: Object.freeze({ type: "object" }),
+          }),
+        }),
+      findInstalledToolByBinding: async () => undefined,
+      saveInstalledTool: async (record: never) => record,
+      removeInstalledTool: async () => false,
+    };
+
+    await expect(
+      new ExecuteMcpToolUseCase(executor, new ExecutionContextToolPolicyService(), registry).execute({
+        toolId: "mcp:local:echo",
+        serverId: "local",
+        toolName: "different-tool",
+      }),
+    ).rejects.toMatchObject({ code: "invalid-input-contract" });
+  });
+
   it("denies execution when required credentials are missing", async () => {
     const executor: IMcpToolExecutor = {
       executeTool: async () => {

@@ -2,6 +2,7 @@ import type { ExecutionContextEnvelope } from "../../context/models/ExecutionCon
 import type { McpToolPermissionScope } from "../../../domain/mcp/McpToolTrust";
 
 export interface McpToolExecutionRequest {
+  readonly toolId?: string;
   readonly context?: ExecutionContextEnvelope;
   readonly serverId: string;
   readonly toolName: string;
