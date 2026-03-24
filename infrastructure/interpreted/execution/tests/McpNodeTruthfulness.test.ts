@@ -254,4 +254,53 @@ describe("MCP node truthfulness", () => {
     expect((observedRequests[0]?.source as Record<string, unknown>).assetId).toBe("asset-input");
     expect((observedRequests[0]?.source as Record<string, unknown>).versionId).toBe("asset-input:v1");
   });
+
+  it("normalizes runtime-declared MCP failures into workflow error outputs", async () => {
+    const executeMcpToolUseCase = new ExecuteMcpToolUseCase({
+      executeTool: async () => ({
+        executionId: "exec-5",
+        serverId: "local",
+        toolName: "echo",
+        status: "failed",
+        content: [],
+        errorMessage: "Runtime timeout",
+      }),
+    });
+    const executor = new LangChainNodeExecutor({
+      executeMcpToolUseCase,
+      mcpRuntimeClient: {
+        getConnectionStatus: async () => ({ enabled: true, state: "ready", checkedAt: "2026-03-21T00:00:00.000Z", servers: [], capabilities: {} }),
+        listServers: async () => ({ query: "", totalCount: 0, limit: 20, servers: [], status: { enabled: true, state: "ready", checkedAt: "2026-03-21T00:00:00.000Z", servers: [], capabilities: {} } }),
+        searchServers: async () => ({ query: "", totalCount: 0, limit: 20, servers: [], status: { enabled: true, state: "ready", checkedAt: "2026-03-21T00:00:00.000Z", servers: [], capabilities: {} } }),
+        connectServer: async () => { throw new Error("not used"); },
+        disconnectServer: async () => { throw new Error("not used"); },
+        listTools: async () => [],
+        searchTools: async () => ({ query: "", totalCount: 0, limit: 20, tools: [] }),
+        getToolDescriptor: async () => undefined,
+        executeTool: async () => ({ executionId: "exec-5", serverId: "local", toolName: "echo", status: "failed", content: [], errorMessage: "Runtime timeout" }),
+      },
+      mcpServerCatalog: {
+        listConfiguredServers: async () => [],
+        getConnectionStatus: async () => ({ enabled: true, state: "ready", checkedAt: "2026-03-21T00:00:00.000Z", servers: [], capabilities: {} }),
+        getServerStatus: async () => ({ serverId: "local", name: "Local", transport: "stdio", configured: true, enabled: true, state: "connected", sessionState: "connected", connected: true, checkedAt: "2026-03-21T00:00:00.000Z", toolCount: 1, resourceCount: 0, capabilities: {} }),
+      },
+    });
+
+    const result = await executor.executeNode({
+      workflow: { id: "wf-5" } as never,
+      node: makeNode("mcp-tool", "mcp.tool_call", [
+        new NodeProperty({ id: "serverId", name: "Server", type: "text", value: "local" }),
+        new NodeProperty({ id: "toolName", name: "Tool", type: "text", value: "echo" }),
+      ]),
+      inputAssets: [],
+      workflowInputs: {},
+      upstreamOutputs: {},
+      resolvedInputs: {},
+    });
+
+    expect(result.status).toBe("failed");
+    expect(result.outputs.toolResult).toBeUndefined();
+    expect((result.outputs.mcpError as Record<string, unknown>).code).toBe("execution-failed");
+    expect((result.outputs.mcpError as Record<string, unknown>).category).toBe("runtime");
+  });
 });

@@ -75,7 +75,8 @@ Use "workflow-first", "tool projection", and "truthful execution provenance" whe
 - This means workflow MCP execution can reuse the existing MCP enforcement pipeline (status checks, contract validation, auth/secret resolution, permission policy, audit, and optional asset-I/O coordination) instead of duplicating runtime semantics inside the node executor.
 - Workflow MCP execution now forwards stable node identity (`toolId`) to the MCP execution use case and fails early if the stable identity and runtime binding (`serverId`/`toolName`) diverge.
 - MCP node inputs follow standard workflow binding semantics: configured constants (`arg.*` node properties), upstream graph payloads (`arguments` input port), and asset reference payloads can be merged into one validated MCP argument object.
-- MCP node failures now degrade into structured node-level failure outputs (`outputs.mcpError`) with bounded category/code/detail payloads, so workflow-level results/events can surface useful diagnostics without opaque crashes.
+- MCP node failures now always degrade into structured node-level failure outputs (`outputs.mcpError`) with bounded category/code/detail payloads (including runtime-declared failures and availability/precondition failures), so workflow-level results/events can surface useful diagnostics without opaque crashes.
+- Workflow persistence hydration no longer needs MCP-only load branches; dynamic MCP argument properties are restored through the same node property hydration pass used for all nodes, with MCP-specific expansion isolated behind the node configuration service seam.
 - MCP outputs now expose workflow-consistent node outputs (`toolResult`, `resultText`) while preserving compatibility aliases used by existing downstream consumers.
 
 ## TODO
