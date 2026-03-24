@@ -55,7 +55,7 @@ export class PythonBackedMcpToolExecutor implements IMcpToolExecutor {
           className: "PythonBackedMcpToolExecutor",
           methodName: "executeTool",
           operation: "mcp-tool-execution",
-          details: request,
+          details: sanitizeExecutionRequestForDiagnostics(request),
         }, {
           eventType: "mcp-tool-execution-failure",
           serverId: request.serverId,
@@ -65,4 +65,15 @@ export class PythonBackedMcpToolExecutor implements IMcpToolExecutor {
       throw error;
     }
   }
+}
+
+function sanitizeExecutionRequestForDiagnostics(request: McpToolExecutionRequest): Readonly<Record<string, unknown>> {
+  return Object.freeze({
+    serverId: request.serverId,
+    toolName: request.toolName,
+    executionId: request.executionId,
+    metadata: request.metadata,
+    hasArguments: !!request.arguments && Object.keys(request.arguments).length > 0,
+    credentialKeys: request.resolvedCredentials ? Object.keys(request.resolvedCredentials) : [],
+  });
 }

@@ -16,6 +16,7 @@ Electron is the desktop host boundary; the renderer accesses desktop capabilitie
 - Fallback path: browser/local storage repositories
 - Execution-run queries now also support unit-kind/provenance/flow/time filtering in addition to status/execution-kind/metadata filters, and non-SQLite repositories persist an explicit query-index envelope so those filters remain available in fallback modes.
 - MCP installed-tool registry persistence is intentionally in browser `localStorage` in the current slice (`LocalStorageMcpToolRegistryRepository`), matching other renderer fallback repositories; this is a staging seam until/if registry durability needs to move to desktop bridge persistence.
+- MCP trust-policy persistence in the current slice is also local-first: credential records and execution audit decisions are persisted through dedicated local-storage-backed seams (`LocalStorageMcpToolSecretRepository`, `LocalStorageMcpToolExecutionAuditSink`), while ordinary MCP installed-tool read models remain secret-free.
 
 ## Runtime modes to mention
 - desktop development

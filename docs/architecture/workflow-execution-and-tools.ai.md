@@ -49,6 +49,17 @@ Use "workflow-first", "tool projection", and "truthful execution provenance" whe
 - Capability introspection query use cases now support bounded deeper semantics for future planner/agent selection: schema-path type checks (including array item paths), side-effect ceilings, explicit auth-kind filters, and configurable tag/category match modes.
 - Safe removal now returns an explicit structured result (`removed` or `blocked`) with dependency references, so UI/adapters can render unsafe-removal state without exception parsing.
 
+## MCP trust and governance foundation (Direction 3 stories 4–5)
+- MCP tool execution now enforces a structured trust pipeline in the standard execution path:
+  1. installed tool lookup/binding
+  2. installed status + contract checks
+  3. auth credential resolution through secret-repository/auth-service seam
+  4. permission policy decision (required scopes vs granted scopes)
+  5. execution audit event emission (allow/deny, non-secret payload)
+  6. runtime execution
+- Permission denials and auth misconfiguration now use structured errors instead of implicit fallback behavior.
+- Secret values are resolved only at execution boundary and are intentionally excluded from ordinary installed-tool projections and audit payloads.
+
 ## TODO
 - If asked whether tools and workflows are separate bounded contexts, answer: "not really; tools are primarily a projected and published workflow surface in the current implementation."
 - If asked what should migrate next, answer: execution areas that still cannot report real progress/cancellation truthfully yet, especially MCP/runtime-backed orchestration beyond the current narrow server-operation slice.

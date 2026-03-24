@@ -1,9 +1,12 @@
+import type { McpToolCredentialFieldRequirement, McpToolPermissionScope } from "./McpToolTrust";
+
 export type McpToolSideEffectClass = "none" | "read" | "write" | "network" | "system";
 
 export interface McpToolAuthRequirement {
   readonly kind: "none" | "optional" | "required";
   readonly scheme?: string;
   readonly scopes?: ReadonlyArray<string>;
+  readonly credentialFields?: ReadonlyArray<McpToolCredentialFieldRequirement>;
 }
 
 export interface McpToolCostProfile {
@@ -32,6 +35,7 @@ export interface McpToolDefinition {
   readonly outputSchema?: Readonly<Record<string, unknown>>;
   readonly sideEffects: McpToolSideEffectClass;
   readonly auth: McpToolAuthRequirement;
+  readonly permissions?: ReadonlyArray<McpToolPermissionScope>;
   readonly tags: ReadonlyArray<string>;
   readonly categories: ReadonlyArray<string>;
   readonly execution?: McpToolExecutionCharacteristics;
@@ -48,7 +52,9 @@ export interface McpToolDefinitionValidationIssue {
     | "invalid-input-schema"
     | "invalid-output-schema"
     | "invalid-auth"
+    | "invalid-auth-credentials"
     | "invalid-side-effects"
+    | "invalid-permissions"
     | "invalid-binding";
   readonly message: string;
   readonly path?: string;
@@ -83,9 +89,25 @@ export function validateMcpToolDefinition(
   if (!definition.auth || !["none", "optional", "required"].includes(definition.auth.kind)) {
     issues.push({ code: "invalid-auth", message: "Tool auth.kind must be none, optional, or required.", path: "auth.kind" });
   }
+  if (definition.auth?.credentialFields !== undefined) {
+    if (!Array.isArray(definition.auth.credentialFields)) {
+      issues.push({ code: "invalid-auth-credentials", message: "Tool auth credential fields must be an array when provided.", path: "auth.credentialFields" });
+    } else if (
+      definition.auth.credentialFields.some((field) => !field.key?.trim() || !field.label?.trim() || typeof field.secret !== "boolean")
+    ) {
+      issues.push({
+        code: "invalid-auth-credentials",
+        message: "Each auth credential field requires key, label, and secret metadata.",
+        path: "auth.credentialFields",
+      });
+    }
+  }
 
   if (!definition.sideEffects || !["none", "read", "write", "network", "system"].includes(definition.sideEffects)) {
     issues.push({ code: "invalid-side-effects", message: "Tool sideEffects is invalid.", path: "sideEffects" });
+  }
+  if (definition.permissions !== undefined && !Array.isArray(definition.permissions)) {
+    issues.push({ code: "invalid-permissions", message: "Tool permissions must be an array when provided.", path: "permissions" });
   }
 
   if (definition.binding) {
@@ -110,7 +132,22 @@ export function normalizeMcpToolDefinition(definition: McpToolDefinition): McpTo
       kind: definition.auth.kind,
       scheme: definition.auth.scheme?.trim() || undefined,
       scopes: Object.freeze([...(definition.auth.scopes ?? [])].map((value) => value.trim()).filter(Boolean)),
+      credentialFields: Object.freeze(
+        [...(definition.auth.credentialFields ?? [])]
+          .map((field) =>
+            Object.freeze({
+              key: field.key.trim(),
+              label: field.label.trim(),
+              secret: field.secret,
+              required: field.required,
+              format: field.format,
+              description: field.description?.trim() || undefined,
+            }),
+          )
+          .filter((field) => field.key && field.label),
+      ),
     }),
+    permissions: Object.freeze([...(definition.permissions ?? [])].map((value) => value.trim()).filter(Boolean)),
     tags: Object.freeze([...definition.tags].map((value) => value.trim()).filter(Boolean)),
     categories: Object.freeze([...definition.categories].map((value) => value.trim()).filter(Boolean)),
     execution: definition.execution

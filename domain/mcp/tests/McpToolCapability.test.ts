@@ -25,7 +25,12 @@ describe("McpToolCapability", () => {
       version: " 1.0.0 ",
       displayName: " Weather Lookup ",
       sideEffects: "read",
-      auth: { kind: "required", scopes: ["  weather.read  "] },
+      auth: {
+        kind: "required",
+        scopes: ["  weather.read  "],
+        credentialFields: [{ key: " apiKey ", label: " API Key ", secret: true, required: true }],
+      },
+      permissions: [" network.access "],
       tags: [" weather "],
       categories: [" data "],
       inputSchema: { type: "object" },
@@ -35,5 +40,7 @@ describe("McpToolCapability", () => {
     expect(normalized.id).toBe("weather.lookup");
     expect(normalized.binding?.serverId).toBe("local");
     expect(normalized.auth.scopes).toEqual(["weather.read"]);
+    expect(normalized.auth.credentialFields).toEqual([{ key: "apiKey", label: "API Key", secret: true, required: true, format: undefined, description: undefined }]);
+    expect(normalized.permissions).toEqual(["network.access"]);
   });
 });

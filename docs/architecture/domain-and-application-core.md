@@ -124,6 +124,21 @@ The MCP layer now has an explicit inner-layer contract for installed tool defini
 
 This keeps MCP tools on the same inner-layer-first path as other first-class capabilities and creates a clean seam for later workflow-node integration, permissions, and agent/planner selection behavior.
 
+## Direction 3 update: MCP trust foundation (stories 4–5)
+
+The MCP inner/application layers now include a bounded but real trust foundation:
+
+- capability contracts can declare structured auth credential fields and explicit permission scopes alongside side-effect class.
+- installed tool records carry explicit granted-permission policy state.
+- credential storage/resolution uses a dedicated secret repository port instead of passing secrets through ad hoc tool metadata/read models.
+- execution orchestration resolves credential state through an auth service, performs explicit permission-policy checks, and returns structured denials for missing auth or blocked permissions.
+- execution decisions now emit non-secret audit events through a dedicated audit sink port.
+
+This slice is intentionally local-first and bounded:
+- it does not implement enterprise IAM/RBAC.
+- it does not perform OS/container sandboxing yet.
+- it creates a stable seam so stronger secret backends, consent UX, and process sandboxing can layer in later without redesigning core contracts.
+
 ## TODO
 
 - Some concepts currently live more in the application layer than the domain layer because they are orchestration-heavy. That is reasonable, but over time the team may want to clarify which context-engineering rules are true domain policy versus application assembly policy.

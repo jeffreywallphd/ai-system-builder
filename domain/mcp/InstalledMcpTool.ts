@@ -1,4 +1,5 @@
 import type { McpToolDefinition } from "./McpToolCapability";
+import type { McpToolPermissionScope } from "./McpToolTrust";
 
 export type InstalledMcpToolStatus = "enabled" | "disabled";
 export type McpToolDefinitionSourceKind = "inline" | "local" | "remote";
@@ -15,6 +16,7 @@ export interface InstalledMcpToolRecord {
   readonly installedAt: string;
   readonly updatedAt: string;
   readonly source: McpToolDefinitionSource;
+  readonly grantedPermissions?: ReadonlyArray<McpToolPermissionScope>;
 }
 
 export function createInstalledMcpToolRecord(params: {
@@ -34,5 +36,6 @@ export function createInstalledMcpToolRecord(params: {
       kind: params.source.kind,
       location: params.source.location.trim(),
     }),
+    grantedPermissions: Object.freeze([]),
   });
 }
