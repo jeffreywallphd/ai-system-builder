@@ -34,4 +34,36 @@ describe("PythonBackedMcpToolExecutor", () => {
       "mcp-tool-execution-success",
     ]);
   });
+
+  it("fails fast when a sandbox denial is already present in trust metadata", async () => {
+    const executor = new PythonBackedMcpToolExecutor({
+      getConnectionStatus: async () => ({
+        enabled: true,
+        state: "ready",
+        checkedAt: "2026-03-19T00:00:00.000Z",
+        capabilities: { tools: true },
+        servers: [],
+      }),
+      listTools: async () => [],
+      executeTool: async () => {
+        throw new Error("runtime should not execute when sandbox is denied");
+      },
+    });
+
+    const result = await executor.executeTool({
+      serverId: "server",
+      toolName: "echo",
+      metadata: {
+        trust: {
+          sandboxDecision: {
+            allowed: false,
+            deniedCapabilities: ["network"],
+          },
+        },
+      },
+    });
+
+    expect(result.status).toBe("failed");
+    expect(result.errorMessage).toContain("Sandbox denied");
+  });
 });

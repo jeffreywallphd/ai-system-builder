@@ -11,7 +11,7 @@ import { McpToolAuthService } from "./security/McpToolAuthService";
 import { McpToolApprovalPolicyService } from "./security/McpToolApprovalPolicyService";
 import { McpToolPermissionPolicyService } from "./security/McpToolPermissionPolicyService";
 import { McpToolSandboxPolicyService } from "./security/McpToolSandboxPolicyService";
-import type { McpToolPermissionScope, McpToolSandboxCapabilityRequest } from "../../domain/mcp/McpToolTrust";
+import type { McpToolPermissionScope, McpToolSandboxCapabilityRequest, McpToolSandboxPolicy } from "../../domain/mcp/McpToolTrust";
 import type { McpToolAssetIoCoordinator } from "./McpToolAssetIoCoordinator";
 import type { McpCredentialResolutionContext } from "./security/McpCredentialResolution";
 
@@ -68,6 +68,7 @@ export class ExecuteMcpToolUseCase {
           : {}),
       }),
     };
+    const sanitizedExecutionContext = sanitizeExecutionContextForAudit(normalizedRequest);
 
     this.policyService.assertInvocationAllowed(
       "mcp",
@@ -121,6 +122,7 @@ export class ExecuteMcpToolUseCase {
           occurredAt: new Date().toISOString(),
           outcome: "denied",
           reason: "tool-disabled",
+          metadata: sanitizedExecutionContext,
         });
         throw new McpToolRegistryError("tool-disabled", "MCP tool is installed but currently disabled.", {
           toolId: installedTool.toolId,
@@ -175,6 +177,7 @@ export class ExecuteMcpToolUseCase {
             malformedFields: credentialResolution.malformedFields,
             scopeType: credentialResolution.scope.scopeType,
             scopeId: credentialResolution.scope.scopeId,
+            ...sanitizedExecutionContext,
           }),
         });
         throw new McpToolRegistryError("invalid-credentials", "MCP tool credentials are malformed.", {
@@ -210,6 +213,7 @@ export class ExecuteMcpToolUseCase {
           permissionDecision,
           approvalDecision,
           sandboxDecision,
+          metadata: sanitizedExecutionContext,
         });
         throw new McpToolRegistryError("permission-denied", "MCP tool invocation denied by permission policy.", {
           toolId: installedTool.toolId,
@@ -241,6 +245,7 @@ export class ExecuteMcpToolUseCase {
           permissionDecision,
           approvalDecision,
           sandboxDecision,
+          metadata: sanitizedExecutionContext,
         });
         throw new McpToolRegistryError("approval-required", "MCP tool invocation requires explicit permission approval.", {
           toolId: installedTool.toolId,
@@ -262,6 +267,10 @@ export class ExecuteMcpToolUseCase {
           permissionDecision,
           approvalDecision,
           sandboxDecision,
+          metadata: Object.freeze({
+            ...sanitizedExecutionContext,
+            sandboxPolicy: sanitizeSandboxPolicySnapshot(sandboxDecision.policy),
+          }),
         });
         throw new McpToolRegistryError("sandbox-denied", "MCP tool invocation denied by sandbox policy.", {
           toolId: installedTool.toolId,
@@ -281,6 +290,7 @@ export class ExecuteMcpToolUseCase {
         permissionDecision,
         approvalDecision,
         sandboxDecision,
+        metadata: sanitizedExecutionContext,
       });
 
       const executionRequest: McpToolExecutionRequest = resolvedCredentials
@@ -395,4 +405,23 @@ function sanitizeMcpResultErrors(result: McpToolExecutionResult): McpToolExecuti
   }
   const sanitized = result.errorMessage.replace(/(api[-_ ]?key|token|secret|password)\s*[:=]\s*([^\s,;]+)/gi, "$1=[REDACTED]");
   return Object.freeze({ ...result, errorMessage: sanitized });
+}
+
+function sanitizeExecutionContextForAudit(request: McpToolExecutionRequest): Readonly<Record<string, unknown>> {
+  return Object.freeze({
+    executionId: request.executionId,
+    hasArguments: Object.keys(request.arguments ?? {}).length > 0,
+    runtimePermissions: request.runtimePermissions ?? [],
+    hasSandboxRequest: !!request.sandboxRequest,
+    credentialScope: request.credentialContext
+      ? Object.freeze({
+          projectId: request.credentialContext.projectId,
+          userId: request.credentialContext.userId,
+        })
+      : undefined,
+  });
+}
+
+function sanitizeSandboxPolicySnapshot(policy: McpToolSandboxPolicy): Readonly<Record<string, unknown>> {
+  return Object.freeze(JSON.parse(JSON.stringify(policy)));
 }

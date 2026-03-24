@@ -277,11 +277,11 @@ Approval lifecycle is now complete and persisted per `(tool, permission, scopeTy
 
 MCP execution trust flow is now deterministic across paths: contract validation -> credential resolution -> permission policy -> approval policy -> sandbox policy -> execution.
 
-Sandbox contract now includes explicit request-vs-policy posture for network (hosts/protocols), filesystem (read/write path sets), asset actions (read/write), and environment variable exposure; request overreach fails with `sandbox-denied`.
+Sandbox contract now uses an explicit policy object (`network.allowed + allowlists`, `filesystem.allowed + read/write paths`, `assets.read/write`, `environment.allowedEnvVars`) and includes request-vs-policy posture for network (hosts/protocols), filesystem (read/write path sets), asset actions (read/write), and environment variable exposure; request overreach fails with `sandbox-denied`.
 
 Trust read models are split for direct consumption (`getToolTrustState`, `getMissingApprovals`, `getEffectivePermissions`, `getSandboxPosture`) so callers do not reconstruct approval/sandbox logic manually.
 
-Audit schema now records administrative approval transitions plus decision denials (`approval-required`, `permission-denied`, `sandbox-denied`) and execution allows (`policy-allowed`) with non-secret payloads only.
+Audit schema now records administrative approval transitions plus decision denials (`approval-required`, `permission-denied`, `sandbox-denied`) and execution allows (`policy-allowed`) with non-secret payloads only. Sandbox denials now include sanitized policy/context metadata for audit consumers.
 
 ## Direction 3 workflow-native update: MCP nodes inside workflow execution (stories 3.1–3.5)
 

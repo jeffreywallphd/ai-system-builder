@@ -703,11 +703,11 @@ describe("ExecuteMcpToolUseCase", () => {
           updatedAt: "2026-03-24T00:00:00.000Z",
         }]),
           sandboxPolicy: Object.freeze({
-            networkAccess: "deny" as const,
-            networkAllowlist: Object.freeze({ hosts: Object.freeze([]), protocols: Object.freeze(["http", "https"] as const) }),
-            filesystemAccess: Object.freeze({ mode: "read-write" as const, readAllowedPaths: Object.freeze([]), writeAllowedPaths: Object.freeze([]) }),
-            assetAccess: "read-write" as const,
-            environmentExposure: Object.freeze({ mode: "inherit-runtime" as const, allowlist: Object.freeze([]) }),
+            network: Object.freeze({ allowed: false, allowedHosts: Object.freeze(["safe.internal"]), allowedProtocols: Object.freeze(["https"] as const) }),
+            
+            filesystem: Object.freeze({ allowed: true, readPaths: Object.freeze([]), writePaths: Object.freeze([]) }),
+            assets: Object.freeze({ read: true, write: true }),
+            environment: Object.freeze({ mode: "inherit-runtime" as const, allowedEnvVars: Object.freeze([]) }),
           }),
         definition: Object.freeze({
           id: "mcp:local:net",
@@ -745,11 +745,11 @@ describe("ExecuteMcpToolUseCase", () => {
         grantedPermissions: Object.freeze([] as const),
         permissionApprovals: Object.freeze([]),
         sandboxPolicy: Object.freeze({
-          networkAccess: "deny" as const,
-          networkAllowlist: Object.freeze({ hosts: Object.freeze(["safe.internal"]), protocols: Object.freeze(["https"] as const) }),
-          filesystemAccess: Object.freeze({ mode: "read-write" as const, readAllowedPaths: Object.freeze([]), writeAllowedPaths: Object.freeze([]) }),
-          assetAccess: "read-write" as const,
-          environmentExposure: Object.freeze({ mode: "none" as const }),
+          network: Object.freeze({ allowed: false, allowedHosts: Object.freeze(["safe.internal"]), allowedProtocols: Object.freeze(["https"] as const) }),
+          
+          filesystem: Object.freeze({ allowed: true, readPaths: Object.freeze([]), writePaths: Object.freeze([]) }),
+          assets: Object.freeze({ read: true, write: true }),
+          environment: Object.freeze({ mode: "none" as const, allowedEnvVars: Object.freeze([]) }),
         }),
         definition: Object.freeze({
           id: "mcp:local:net",
@@ -800,11 +800,11 @@ describe("ExecuteMcpToolUseCase", () => {
           updatedAt: "2026-03-24T00:00:00.000Z",
         }]),
         sandboxPolicy: Object.freeze({
-          networkAccess: "allow" as const,
-          networkAllowlist: Object.freeze({ hosts: Object.freeze(["api.weather.local"]), protocols: Object.freeze(["https"] as const) }),
-          filesystemAccess: Object.freeze({ mode: "read-write" as const, readAllowedPaths: Object.freeze([]), writeAllowedPaths: Object.freeze([]) }),
-          assetAccess: "read-write" as const,
-          environmentExposure: Object.freeze({ mode: "inherit-runtime" as const }),
+          network: Object.freeze({ allowed: true, allowedHosts: Object.freeze(["api.weather.local"]), allowedProtocols: Object.freeze(["https"] as const) }),
+          
+          filesystem: Object.freeze({ allowed: true, readPaths: Object.freeze([]), writePaths: Object.freeze([]) }),
+          assets: Object.freeze({ read: true, write: true }),
+          environment: Object.freeze({ mode: "inherit-runtime" as const, allowedEnvVars: Object.freeze([]) }),
         }),
         definition: Object.freeze({
           id: "mcp:local:net",
@@ -827,6 +827,106 @@ describe("ExecuteMcpToolUseCase", () => {
       toolName: "net",
       sandboxRequest: { network: { hosts: ["api.weather.local"], protocols: ["http"] } },
     })).rejects.toMatchObject({ code: "sandbox-denied" });
+  });
+
+  it("denies filesystem capability when sandbox disables filesystem access", async () => {
+    const executor: IMcpToolExecutor = { executeTool: async () => ({ executionId: "x", serverId: "local", toolName: "read-file", status: "completed", content: [] }) };
+    const registry = {
+      listInstalledTools: async () => [],
+      getInstalledTool: async () => undefined,
+      findInstalledToolByBinding: async () => Object.freeze({
+        toolId: "mcp:local:read-file",
+        status: "enabled" as const,
+        installedAt: "2026-03-24T00:00:00.000Z",
+        updatedAt: "2026-03-24T00:00:00.000Z",
+        source: Object.freeze({ kind: "inline" as const, location: "inline:test" }),
+        grantedPermissions: Object.freeze(["filesystem.read"] as const),
+        permissionApprovals: Object.freeze([{ approvalId: "approval-fs", permission: "filesystem.read" as const, scope: Object.freeze({ scopeType: "global" as const }), status: "approved" as const, requestedAt: "2026-03-24T00:00:00.000Z", updatedAt: "2026-03-24T00:00:00.000Z" }]),
+        sandboxPolicy: Object.freeze({
+          network: Object.freeze({ allowed: true, allowedHosts: Object.freeze([]), allowedProtocols: Object.freeze(["https"] as const) }),
+          filesystem: Object.freeze({ allowed: false, readPaths: Object.freeze([]), writePaths: Object.freeze([]) }),
+          assets: Object.freeze({ read: true, write: true }),
+          environment: Object.freeze({ mode: "inherit-runtime" as const, allowedEnvVars: Object.freeze([]) }),
+        }),
+        definition: Object.freeze({
+          id: "mcp:local:read-file",
+          version: "1.0.0",
+          displayName: "Read File",
+          sideEffects: "none" as const,
+          permissions: Object.freeze(["filesystem.read"] as const),
+          auth: Object.freeze({ kind: "none" as const }),
+          tags: Object.freeze([]),
+          categories: Object.freeze([]),
+          binding: Object.freeze({ serverId: "local", toolName: "read-file" }),
+          inputSchema: Object.freeze({ type: "object" }),
+        }),
+      }),
+      saveInstalledTool: async (record: never) => record,
+      removeInstalledTool: async () => false,
+    };
+
+    await expect(new ExecuteMcpToolUseCase(executor, new ExecutionContextToolPolicyService(), registry).execute({
+      serverId: "local",
+      toolName: "read-file",
+      sandboxRequest: { filesystem: { readPaths: ["/workspace/secret.txt"] } },
+    })).rejects.toMatchObject({ code: "sandbox-denied", category: "sandbox" });
+  });
+
+  it("denies asset writes when sandbox is read-only and records sandbox-denied audit reason", async () => {
+    const auditEvents: Array<{ reason: string; metadata?: Readonly<Record<string, unknown>> }> = [];
+    const executor: IMcpToolExecutor = { executeTool: async () => ({ executionId: "x", serverId: "local", toolName: "write-asset", status: "completed", content: [] }) };
+    const registry = {
+      listInstalledTools: async () => [],
+      getInstalledTool: async () => undefined,
+      findInstalledToolByBinding: async () => Object.freeze({
+        toolId: "mcp:local:write-asset",
+        status: "enabled" as const,
+        installedAt: "2026-03-24T00:00:00.000Z",
+        updatedAt: "2026-03-24T00:00:00.000Z",
+        source: Object.freeze({ kind: "inline" as const, location: "inline:test" }),
+        grantedPermissions: Object.freeze(["asset.write"] as const),
+        permissionApprovals: Object.freeze([{ approvalId: "approval-asset", permission: "asset.write" as const, scope: Object.freeze({ scopeType: "global" as const }), status: "approved" as const, requestedAt: "2026-03-24T00:00:00.000Z", updatedAt: "2026-03-24T00:00:00.000Z" }]),
+        sandboxPolicy: Object.freeze({
+          network: Object.freeze({ allowed: true, allowedHosts: Object.freeze([]), allowedProtocols: Object.freeze(["https"] as const) }),
+          filesystem: Object.freeze({ allowed: true, readPaths: Object.freeze([]), writePaths: Object.freeze([]) }),
+          assets: Object.freeze({ read: true, write: false }),
+          environment: Object.freeze({ mode: "inherit-runtime" as const, allowedEnvVars: Object.freeze([]) }),
+        }),
+        definition: Object.freeze({
+          id: "mcp:local:write-asset",
+          version: "1.0.0",
+          displayName: "Write Asset",
+          sideEffects: "write" as const,
+          permissions: Object.freeze(["asset.write"] as const),
+          auth: Object.freeze({ kind: "none" as const }),
+          tags: Object.freeze([]),
+          categories: Object.freeze([]),
+          binding: Object.freeze({ serverId: "local", toolName: "write-asset" }),
+          inputSchema: Object.freeze({ type: "object" }),
+        }),
+      }),
+      saveInstalledTool: async (record: never) => record,
+      removeInstalledTool: async () => false,
+    };
+    const auditSink = { record: async (event: any) => { auditEvents.push(event); } };
+
+    await expect(new ExecuteMcpToolUseCase(
+      executor,
+      new ExecutionContextToolPolicyService(),
+      registry,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      auditSink,
+    ).execute({
+      serverId: "local",
+      toolName: "write-asset",
+      sandboxRequest: { asset: { actions: ["write"] } },
+    })).rejects.toMatchObject({ code: "sandbox-denied", category: "sandbox" });
+
+    expect(auditEvents.at(-1)?.reason).toBe("sandbox-denied");
   });
 
   it("resolves asset-backed inputs and persists asset outputs", async () => {

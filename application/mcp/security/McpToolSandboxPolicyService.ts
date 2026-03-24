@@ -26,23 +26,23 @@ export class McpToolSandboxPolicyService {
     if (requiredPermissions.includes("asset.read") || requiredPermissions.includes("asset.write")) {
       declaredCapabilities.add("asset");
     }
-    if (policy.environmentExposure.mode !== "none") {
+    if (policy.environment.mode !== "none") {
       declaredCapabilities.add("environment");
     }
 
     const deniedCapabilities: Array<"network" | "filesystem" | "asset" | "environment"> = [];
 
-    if (declaredCapabilities.has("network") && policy.networkAccess === "deny") {
+    if (declaredCapabilities.has("network") && !policy.network.allowed) {
       deniedCapabilities.push("network");
     }
     if (!deniedCapabilities.includes("network") && declaredCapabilities.has("network")) {
       const requestedHosts = request.network?.hosts ?? [];
-      const allowedHosts = policy.networkAllowlist?.hosts ?? [];
+      const allowedHosts = policy.network.allowedHosts ?? [];
       if (allowedHosts.length > 0 && requestedHosts.some((host) => !allowedHosts.includes(host))) {
         deniedCapabilities.push("network");
       }
       const requestedProtocols = request.network?.protocols ?? [];
-      const allowedProtocols = policy.networkAllowlist?.protocols ?? [];
+      const allowedProtocols = policy.network.allowedProtocols ?? [];
       if (allowedProtocols.length > 0 && requestedProtocols.some((protocol) => !allowedProtocols.includes(protocol))) {
         deniedCapabilities.push("network");
       }
@@ -50,16 +50,14 @@ export class McpToolSandboxPolicyService {
 
     const requiresFsRead = requiredPermissions.includes("filesystem.read");
     const requiresFsWrite = requiredPermissions.includes("filesystem.write") || requiredPermissions.includes("system.exec");
-    if ((requiresFsRead || requiresFsWrite) && policy.filesystemAccess.mode === "deny") {
-      deniedCapabilities.push("filesystem");
-    } else if (requiresFsWrite && policy.filesystemAccess.mode === "read-only") {
+    if ((requiresFsRead || requiresFsWrite) && !policy.filesystem.allowed) {
       deniedCapabilities.push("filesystem");
     }
     if (!deniedCapabilities.includes("filesystem")) {
       const requestedReadPaths = request.filesystem?.readPaths ?? [];
       const requestedWritePaths = request.filesystem?.writePaths ?? [];
-      const allowedReadPaths = policy.filesystemAccess.readAllowedPaths ?? [];
-      const allowedWritePaths = policy.filesystemAccess.writeAllowedPaths ?? [];
+      const allowedReadPaths = policy.filesystem.readPaths ?? [];
+      const allowedWritePaths = policy.filesystem.writePaths ?? [];
       if (allowedReadPaths.length > 0 && requestedReadPaths.some((path) => !allowedReadPaths.includes(path))) {
         deniedCapabilities.push("filesystem");
       }
@@ -70,27 +68,25 @@ export class McpToolSandboxPolicyService {
 
     const requiresAssetRead = requiredPermissions.includes("asset.read");
     const requiresAssetWrite = requiredPermissions.includes("asset.write");
-    if ((requiresAssetRead || requiresAssetWrite) && policy.assetAccess === "deny") {
-      deniedCapabilities.push("asset");
-    } else if (requiresAssetWrite && policy.assetAccess === "read-only") {
+    if ((requiresAssetRead && !policy.assets.read) || (requiresAssetWrite && !policy.assets.write)) {
       deniedCapabilities.push("asset");
     }
     if (!deniedCapabilities.includes("asset")) {
       const requestedActions = request.asset?.actions ?? [];
-      if (requestedActions.includes("write") && policy.assetAccess !== "read-write") {
+      if (requestedActions.includes("write") && !policy.assets.write) {
         deniedCapabilities.push("asset");
-      } else if (requestedActions.includes("read") && policy.assetAccess === "deny") {
+      } else if (requestedActions.includes("read") && !policy.assets.read) {
         deniedCapabilities.push("asset");
       }
     }
 
-    if (request.environment?.variableNames?.length && policy.environmentExposure.mode === "none") {
+    if (request.environment?.variableNames?.length && policy.environment.mode === "none") {
       deniedCapabilities.push("environment");
     } else if (
       request.environment?.variableNames?.length
-      && policy.environmentExposure.mode === "allowlist"
-      && (policy.environmentExposure.allowlist?.length ?? 0) > 0
-      && request.environment.variableNames.some((name) => !(policy.environmentExposure.allowlist ?? []).includes(name))
+      && policy.environment.mode === "allowlist"
+      && (policy.environment.allowedEnvVars?.length ?? 0) > 0
+      && request.environment.variableNames.some((name) => !(policy.environment.allowedEnvVars ?? []).includes(name))
     ) {
       deniedCapabilities.push("environment");
     }

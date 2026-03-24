@@ -122,17 +122,17 @@ describe("McpToolTrustUseCases", () => {
     await new SetMcpToolSandboxPolicyUseCase(registry).execute({
       toolId: tool.toolId,
       policy: {
-        networkAccess: "deny",
-        networkAllowlist: { hosts: ["api.safe.local"], protocols: ["https"] },
-        filesystemAccess: { mode: "read-only", readAllowedPaths: ["/workspace/safe"], writeAllowedPaths: [] },
-        environmentExposure: { mode: "allowlist", allowlist: ["SAFE_ENV"] },
+        network: { allowed: false, allowedHosts: ["api.safe.local"], allowedProtocols: ["https"] },
+        
+        filesystem: { allowed: true, readPaths: ["/workspace/safe"], writePaths: [] },
+        environment: { mode: "allowlist", allowedEnvVars: ["SAFE_ENV"] },
       },
     });
     const trust = await new GetMcpToolTrustStateUseCase(registry).execute({ toolId: tool.toolId });
-    expect(trust.sandbox.policy.networkAccess).toBe("deny");
-    expect(trust.sandbox.policy.networkAllowlist?.hosts).toEqual(["api.safe.local"]);
+    expect(trust.sandbox.policy.network.allowed).toBe(false);
+    expect(trust.sandbox.policy.network.allowedHosts).toEqual(["api.safe.local"]);
     expect(trust.approval.statusByPermission[0]?.status).toBe("missing");
-    expect(trust.sandbox.enforcement.environmentExposure).toBe("declared-only");
+    expect(trust.sandbox.enforcement.environment).toBe("declared-only");
   });
 
   it("provides dedicated approval/permission/sandbox read models", async () => {
@@ -161,6 +161,6 @@ describe("McpToolTrustUseCases", () => {
     expect(effectivePermissions.allowed).toBe(true);
 
     const sandboxPosture = await new GetMcpToolSandboxPostureUseCase(registry).execute({ toolId: tool.toolId });
-    expect(sandboxPosture.policy.networkAccess).toBe("allow");
+    expect(sandboxPosture.policy.network.allowed).toBe(true);
   });
 });

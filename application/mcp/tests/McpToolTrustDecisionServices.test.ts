@@ -49,15 +49,14 @@ describe("Mcp trust decision services", () => {
   it("returns declared-only environment enforcement while enforcing network/asset/filesystem policy gates", () => {
     const decision = new McpToolSandboxPolicyService().evaluate(makeTool({
       sandboxPolicy: Object.freeze({
-        networkAccess: "deny",
-        networkAllowlist: Object.freeze({ hosts: Object.freeze([]), protocols: Object.freeze(["https"]) }),
-        filesystemAccess: Object.freeze({ mode: "deny", readAllowedPaths: Object.freeze([]), writeAllowedPaths: Object.freeze([]) }),
-        assetAccess: "deny",
-        environmentExposure: Object.freeze({ mode: "allowlist", allowlist: Object.freeze(["SAFE_ENV"]) }),
+        network: Object.freeze({ allowed: false, allowedHosts: Object.freeze([]), allowedProtocols: Object.freeze(["https"] as const) }),
+        filesystem: Object.freeze({ allowed: false, readPaths: Object.freeze([]), writePaths: Object.freeze([]) }),
+        assets: Object.freeze({ read: false, write: false }),
+        environment: Object.freeze({ mode: "allowlist", allowedEnvVars: Object.freeze(["SAFE_ENV"]) }),
       }),
     }));
     expect(decision.allowed).toBe(false);
     expect(decision.deniedCapabilities).toContain("network");
-    expect(decision.enforcement.environmentExposure).toBe("declared-only");
+    expect(decision.enforcement.environment).toBe("declared-only");
   });
 });

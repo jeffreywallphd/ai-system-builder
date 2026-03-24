@@ -233,18 +233,18 @@ export class SetMcpToolSandboxPolicyUseCase {
   public async execute(request: {
     readonly toolId: string;
     readonly policy: {
-      readonly networkAccess?: "allow" | "deny";
-      readonly networkAllowlist?: {
-        readonly hosts?: ReadonlyArray<string>;
-        readonly protocols?: ReadonlyArray<McpSandboxNetworkProtocol>;
+      readonly network?: {
+        readonly allowed?: boolean;
+        readonly allowedHosts?: ReadonlyArray<string>;
+        readonly allowedProtocols?: ReadonlyArray<McpSandboxNetworkProtocol>;
       };
-      readonly filesystemAccess?: {
-        readonly mode: "deny" | "read-only" | "read-write";
-        readonly readAllowedPaths?: ReadonlyArray<string>;
-        readonly writeAllowedPaths?: ReadonlyArray<string>;
+      readonly filesystem?: {
+        readonly allowed?: boolean;
+        readonly readPaths?: ReadonlyArray<string>;
+        readonly writePaths?: ReadonlyArray<string>;
       };
-      readonly assetAccess?: "deny" | "read-only" | "read-write";
-      readonly environmentExposure?: { readonly mode: McpSandboxEnvironmentMode; readonly allowlist?: ReadonlyArray<string> };
+      readonly assets?: { readonly read?: boolean; readonly write?: boolean };
+      readonly environment?: { readonly mode?: McpSandboxEnvironmentMode; readonly allowedEnvVars?: ReadonlyArray<string> };
     };
   }) {
     const tool = await this.registryRepository.getInstalledTool(request.toolId.trim());
@@ -253,20 +253,23 @@ export class SetMcpToolSandboxPolicyUseCase {
     }
     const current = tool.sandboxPolicy ?? createDefaultMcpToolSandboxPolicy();
     const nextPolicy: McpToolSandboxPolicy = Object.freeze({
-      networkAccess: request.policy.networkAccess ?? current.networkAccess,
-      networkAllowlist: Object.freeze({
-        hosts: Object.freeze(request.policy.networkAllowlist?.hosts ?? current.networkAllowlist?.hosts ?? []),
-        protocols: Object.freeze(request.policy.networkAllowlist?.protocols ?? current.networkAllowlist?.protocols ?? []),
+      network: Object.freeze({
+        allowed: request.policy.network?.allowed ?? current.network.allowed,
+        allowedHosts: Object.freeze(request.policy.network?.allowedHosts ?? current.network.allowedHosts ?? []),
+        allowedProtocols: Object.freeze(request.policy.network?.allowedProtocols ?? current.network.allowedProtocols ?? []),
       }),
-      filesystemAccess: Object.freeze({
-        mode: request.policy.filesystemAccess?.mode ?? current.filesystemAccess.mode,
-        readAllowedPaths: Object.freeze(request.policy.filesystemAccess?.readAllowedPaths ?? current.filesystemAccess.readAllowedPaths ?? []),
-        writeAllowedPaths: Object.freeze(request.policy.filesystemAccess?.writeAllowedPaths ?? current.filesystemAccess.writeAllowedPaths ?? []),
+      filesystem: Object.freeze({
+        allowed: request.policy.filesystem?.allowed ?? current.filesystem.allowed,
+        readPaths: Object.freeze(request.policy.filesystem?.readPaths ?? current.filesystem.readPaths ?? []),
+        writePaths: Object.freeze(request.policy.filesystem?.writePaths ?? current.filesystem.writePaths ?? []),
       }),
-      assetAccess: request.policy.assetAccess ?? current.assetAccess,
-      environmentExposure: Object.freeze({
-        mode: request.policy.environmentExposure?.mode ?? current.environmentExposure.mode,
-        allowlist: Object.freeze(request.policy.environmentExposure?.allowlist ?? current.environmentExposure.allowlist ?? []),
+      assets: Object.freeze({
+        read: request.policy.assets?.read ?? current.assets.read,
+        write: request.policy.assets?.write ?? current.assets.write,
+      }),
+      environment: Object.freeze({
+        mode: request.policy.environment?.mode ?? current.environment.mode,
+        allowedEnvVars: Object.freeze(request.policy.environment?.allowedEnvVars ?? current.environment.allowedEnvVars ?? []),
       }),
     });
     return this.registryRepository.saveInstalledTool(Object.freeze({
@@ -294,7 +297,7 @@ export interface McpToolTrustStateReadModel {
   readonly sandbox: {
     readonly declaredCapabilities: ReadonlyArray<"network" | "filesystem" | "asset" | "environment">;
     readonly policy: McpToolSandboxPolicy;
-    readonly enforcement: Readonly<Record<"networkAccess" | "filesystemAccess" | "assetAccess" | "environmentExposure", "enforced" | "declared-only">>;
+    readonly enforcement: Readonly<Record<"network" | "filesystem" | "assets" | "environment", "enforced" | "declared-only">>;
     readonly deniedCapabilities: ReadonlyArray<"network" | "filesystem" | "asset" | "environment">;
   };
   readonly executionReadiness: {

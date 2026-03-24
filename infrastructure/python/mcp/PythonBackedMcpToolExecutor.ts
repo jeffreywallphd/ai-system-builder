@@ -13,6 +13,18 @@ export class PythonBackedMcpToolExecutor implements IMcpToolExecutor {
   ) {}
 
   public async executeTool(request: McpToolExecutionRequest): Promise<McpToolExecutionResult> {
+    const trustSandboxDecision = (request.metadata?.trust as { sandboxDecision?: { allowed?: boolean; deniedCapabilities?: ReadonlyArray<string> } } | undefined)?.sandboxDecision;
+    if (trustSandboxDecision?.allowed === false) {
+      return Object.freeze({
+        executionId: request.executionId ?? "mcp-sandbox-denied",
+        serverId: request.serverId,
+        toolName: request.toolName,
+        status: "failed",
+        content: Object.freeze([]),
+        errorMessage: `Sandbox denied MCP execution at runtime (capabilities: ${(trustSandboxDecision.deniedCapabilities ?? []).join(", ") || "unknown"}).`,
+      });
+    }
+
     this.eventSink?.emit({
       source: RuntimeEventSources.pythonRuntime,
       severity: "info",
