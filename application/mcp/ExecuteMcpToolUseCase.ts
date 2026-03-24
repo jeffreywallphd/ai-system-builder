@@ -8,7 +8,9 @@ import { McpToolRegistryError } from "./registry/McpToolRegistryErrors";
 import type { McpToolExecutionRequest } from "./models/McpToolExecutionRequest";
 import type { McpToolExecutionResult } from "./models/McpToolExecutionResult";
 import { McpToolAuthService } from "./security/McpToolAuthService";
+import { McpToolApprovalPolicyService } from "./security/McpToolApprovalPolicyService";
 import { McpToolPermissionPolicyService } from "./security/McpToolPermissionPolicyService";
+import { McpToolSandboxPolicyService } from "./security/McpToolSandboxPolicyService";
 import type { McpToolPermissionScope } from "../../domain/mcp/McpToolTrust";
 import type { McpToolAssetIoCoordinator } from "./McpToolAssetIoCoordinator";
 import type { McpCredentialResolutionContext } from "./security/McpCredentialResolution";
@@ -22,7 +24,9 @@ export class ExecuteMcpToolUseCase {
     private readonly registryRepository?: IMcpToolRegistryRepository,
     private readonly contractValidationService: McpToolContractValidationService = new McpToolContractValidationService(),
     private readonly secretRepository?: IMcpToolSecretRepository,
+    private readonly approvalPolicyService: McpToolApprovalPolicyService = new McpToolApprovalPolicyService(),
     private readonly permissionPolicyService: McpToolPermissionPolicyService = new McpToolPermissionPolicyService(),
+    private readonly sandboxPolicyService: McpToolSandboxPolicyService = new McpToolSandboxPolicyService(),
     private readonly auditSink: IMcpToolExecutionAuditSink = { record: async () => undefined },
     private readonly assetIoCoordinator?: McpToolAssetIoCoordinator,
   ) {
@@ -90,12 +94,12 @@ export class ExecuteMcpToolUseCase {
       } else {
 
         if (
-          installedById.definition.provider.serverId !== normalizedRequest.serverId
-          || installedById.definition.provider.toolName !== normalizedRequest.toolName
+          installedById.definition.binding?.serverId !== normalizedRequest.serverId
+          || installedById.definition.binding?.toolName !== normalizedRequest.toolName
         ) {
           throw new McpToolRegistryError("invalid-input-contract", "MCP tool identity does not match requested server/tool binding.", {
             toolId: normalizedRequest.toolId,
-            expected: installedById.definition.provider,
+            expected: installedById.definition.binding,
             actual: Object.freeze({
               serverId: normalizedRequest.serverId,
               toolName: normalizedRequest.toolName,
@@ -188,6 +192,38 @@ export class ExecuteMcpToolUseCase {
         installedTool,
         normalizedRequest.runtimePermissions ?? extractContextGrantedPermissions(normalizedRequest.metadata),
       );
+      const approvalDecision = this.approvalPolicyService.evaluate(
+        installedTool,
+        resolveApprovalScope(normalizedRequest),
+        normalizedRequest.runtimePermissions ?? extractContextGrantedPermissions(normalizedRequest.metadata),
+      );
+      const sandboxDecision = this.sandboxPolicyService.evaluate(installedTool);
+      const effectiveTrust = Object.freeze({
+        permissionDecision,
+        approvalDecision,
+        sandboxDecision,
+      });
+
+      if (!approvalDecision.allowed) {
+        await this.auditSink.record({
+          toolId: installedTool.toolId,
+          serverId: normalizedRequest.serverId,
+          toolName: normalizedRequest.toolName,
+          occurredAt: new Date().toISOString(),
+          outcome: "denied",
+          reason: "approval-required",
+          permissionDecision,
+          approvalDecision,
+          sandboxDecision,
+        });
+        throw new McpToolRegistryError("approval-required", "MCP tool invocation requires explicit permission approval.", {
+          toolId: installedTool.toolId,
+          missingApprovals: approvalDecision.missingApprovals,
+          deniedApprovals: approvalDecision.deniedApprovals,
+          approvalScope: approvalDecision.approvalScope,
+        });
+      }
+
       if (!permissionDecision.allowed) {
         await this.auditSink.record({
           toolId: installedTool.toolId,
@@ -197,11 +233,33 @@ export class ExecuteMcpToolUseCase {
           outcome: "denied",
           reason: "permission-denied",
           permissionDecision,
+          approvalDecision,
+          sandboxDecision,
         });
         throw new McpToolRegistryError("permission-denied", "MCP tool invocation denied by permission policy.", {
           toolId: installedTool.toolId,
           deniedPermissions: permissionDecision.deniedPermissions,
           requiredPermissions: permissionDecision.requiredPermissions,
+        });
+      }
+
+      if (!sandboxDecision.allowed) {
+        await this.auditSink.record({
+          toolId: installedTool.toolId,
+          serverId: normalizedRequest.serverId,
+          toolName: normalizedRequest.toolName,
+          occurredAt: new Date().toISOString(),
+          outcome: "denied",
+          reason: "sandbox-denied",
+          permissionDecision,
+          approvalDecision,
+          sandboxDecision,
+        });
+        throw new McpToolRegistryError("sandbox-denied", "MCP tool invocation denied by sandbox policy.", {
+          toolId: installedTool.toolId,
+          deniedCapabilities: sandboxDecision.deniedCapabilities,
+          sandboxPolicy: sandboxDecision.policy,
+          sandboxEnforcement: sandboxDecision.enforcement,
         });
       }
 
@@ -213,11 +271,17 @@ export class ExecuteMcpToolUseCase {
         outcome: "allowed",
         reason: "policy-allowed",
         permissionDecision,
+        approvalDecision,
+        sandboxDecision,
       });
 
       const executionRequest: McpToolExecutionRequest = resolvedCredentials
-        ? Object.freeze({ ...normalizedRequest, resolvedCredentials: resolvedCredentials.values })
-        : normalizedRequest;
+        ? Object.freeze({
+            ...normalizedRequest,
+            resolvedCredentials: resolvedCredentials.values,
+            metadata: Object.freeze({ ...(normalizedRequest.metadata ?? {}), trust: effectiveTrust }),
+          })
+        : Object.freeze({ ...normalizedRequest, metadata: Object.freeze({ ...(normalizedRequest.metadata ?? {}), trust: effectiveTrust }) });
       return this.executeWithOutputValidation(executionRequest, installedTool);
     }
 
@@ -270,6 +334,21 @@ export class ExecuteMcpToolUseCase {
     }
     return sanitizeMcpResultErrors(result);
   }
+}
+
+function resolveApprovalScope(request: McpToolExecutionRequest): { readonly scopeType: "global" | "project" | "user"; readonly scopeId?: string } {
+  const metadataContext = request.metadata?.credentialContext as { projectId?: unknown; userId?: unknown } | undefined;
+  const projectId = request.credentialContext?.projectId
+    ?? (typeof metadataContext?.projectId === "string" ? metadataContext.projectId : undefined);
+  if (projectId) {
+    return Object.freeze({ scopeType: "project", scopeId: projectId });
+  }
+  const userId = request.credentialContext?.userId
+    ?? (typeof metadataContext?.userId === "string" ? metadataContext.userId : undefined);
+  if (userId) {
+    return Object.freeze({ scopeType: "user", scopeId: userId });
+  }
+  return Object.freeze({ scopeType: "global" });
 }
 
 function extractContextGrantedPermissions(metadata: Readonly<Record<string, unknown>> | undefined): ReadonlyArray<McpToolPermissionScope> {

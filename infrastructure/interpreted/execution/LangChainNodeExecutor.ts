@@ -571,6 +571,8 @@ function supportsNodeType(nodeType: string, ...types: string[]): boolean {
 function deriveMcpErrorCategory(code: string): "permission" | "auth" | "contract" | "asset" | "runtime" {
   switch (code) {
     case "permission-denied":
+    case "approval-required":
+    case "sandbox-denied":
       return "permission";
     case "missing-auth-configuration":
     case "auth-resolution-failed":

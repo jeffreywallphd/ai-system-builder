@@ -524,6 +524,24 @@ describe("ExecuteMcpToolUseCase", () => {
           updatedAt: "2026-03-24T00:00:00.000Z",
           source: Object.freeze({ kind: "inline" as const, location: "inline:test" }),
           grantedPermissions: Object.freeze(["filesystem.read"] as const),
+          permissionApprovals: Object.freeze([
+            Object.freeze({
+              approvalId: "approval-fs-write",
+              permission: "filesystem.write" as const,
+              scope: Object.freeze({ scopeType: "global" as const }),
+              status: "approved" as const,
+              requestedAt: "2026-03-24T00:00:00.000Z",
+              updatedAt: "2026-03-24T00:00:00.000Z",
+            }),
+            Object.freeze({
+              approvalId: "approval-system-exec",
+              permission: "system.exec" as const,
+              scope: Object.freeze({ scopeType: "global" as const }),
+              status: "approved" as const,
+              requestedAt: "2026-03-24T00:00:00.000Z",
+              updatedAt: "2026-03-24T00:00:00.000Z",
+            }),
+          ]),
           definition: Object.freeze({
             id: "mcp:local:fs-write",
             version: "1.0.0",
@@ -546,6 +564,145 @@ describe("ExecuteMcpToolUseCase", () => {
         toolName: "fs-write",
       }),
     ).rejects.toMatchObject({ code: "permission-denied" });
+  });
+
+  it("denies execution when approval is required but missing", async () => {
+    const executor: IMcpToolExecutor = { executeTool: async () => ({ executionId: "x", serverId: "local", toolName: "net", status: "completed", content: [] }) };
+    const registry = {
+      listInstalledTools: async () => [],
+      getInstalledTool: async () => undefined,
+      findInstalledToolByBinding: async () => Object.freeze({
+        toolId: "mcp:local:net",
+        status: "enabled" as const,
+        installedAt: "2026-03-24T00:00:00.000Z",
+        updatedAt: "2026-03-24T00:00:00.000Z",
+        source: Object.freeze({ kind: "inline" as const, location: "inline:test" }),
+        grantedPermissions: Object.freeze([] as const),
+        permissionApprovals: Object.freeze([]),
+        definition: Object.freeze({
+          id: "mcp:local:net",
+          version: "1.0.0",
+          displayName: "Net",
+          sideEffects: "network" as const,
+          auth: Object.freeze({ kind: "none" as const }),
+          tags: Object.freeze([]),
+          categories: Object.freeze([]),
+          binding: Object.freeze({ serverId: "local", toolName: "net" }),
+          inputSchema: Object.freeze({ type: "object" }),
+        }),
+      }),
+      saveInstalledTool: async (record: never) => record,
+      removeInstalledTool: async () => false,
+    };
+    await expect(new ExecuteMcpToolUseCase(executor, new ExecutionContextToolPolicyService(), registry).execute({
+      serverId: "local",
+      toolName: "net",
+    })).rejects.toMatchObject({ code: "approval-required" });
+  });
+
+  it("allows execution when approval exists and denies after revocation", async () => {
+    let callCount = 0;
+    const executor: IMcpToolExecutor = {
+      executeTool: async () => {
+        callCount += 1;
+        return { executionId: "x", serverId: "local", toolName: "net", status: "completed", content: [{}], structuredContent: {} };
+      },
+    };
+    const approval = Object.freeze({
+      approvalId: "approval-1",
+      permission: "network.access" as const,
+      scope: Object.freeze({ scopeType: "global" as const }),
+      status: "approved" as const,
+      requestedAt: "2026-03-24T00:00:00.000Z",
+      updatedAt: "2026-03-24T00:00:00.000Z",
+    });
+    const base = Object.freeze({
+      toolId: "mcp:local:net",
+      status: "enabled" as const,
+      installedAt: "2026-03-24T00:00:00.000Z",
+      updatedAt: "2026-03-24T00:00:00.000Z",
+      source: Object.freeze({ kind: "inline" as const, location: "inline:test" }),
+      grantedPermissions: Object.freeze(["network.access"] as const),
+      definition: Object.freeze({
+        id: "mcp:local:net",
+        version: "1.0.0",
+        displayName: "Net",
+        sideEffects: "network" as const,
+        auth: Object.freeze({ kind: "none" as const }),
+        tags: Object.freeze([]),
+        categories: Object.freeze([]),
+        binding: Object.freeze({ serverId: "local", toolName: "net" }),
+        inputSchema: Object.freeze({ type: "object" }),
+        outputSchema: Object.freeze({ type: "object" }),
+      }),
+    });
+    let record: any = Object.freeze({ ...base, permissionApprovals: Object.freeze([approval]) });
+    const registry = {
+      listInstalledTools: async () => [record],
+      getInstalledTool: async () => record,
+      findInstalledToolByBinding: async () => record,
+      saveInstalledTool: async (next: any) => {
+        record = next;
+        return next;
+      },
+      removeInstalledTool: async () => false,
+    };
+
+    await new ExecuteMcpToolUseCase(executor, new ExecutionContextToolPolicyService(), registry).execute({ serverId: "local", toolName: "net" });
+    record = Object.freeze({
+      ...record,
+      permissionApprovals: Object.freeze([{ ...approval, status: "revoked" as const, updatedAt: "2026-03-24T01:00:00.000Z" }]),
+    });
+    await expect(new ExecuteMcpToolUseCase(executor, new ExecutionContextToolPolicyService(), registry).execute({ serverId: "local", toolName: "net" }))
+      .rejects.toMatchObject({ code: "approval-required" });
+    expect(callCount).toBe(1);
+  });
+
+  it("denies execution when sandbox policy blocks declared capabilities", async () => {
+    const executor: IMcpToolExecutor = { executeTool: async () => ({ executionId: "x", serverId: "local", toolName: "net", status: "completed", content: [] }) };
+    const registry = {
+      listInstalledTools: async () => [],
+      getInstalledTool: async () => undefined,
+      findInstalledToolByBinding: async () => Object.freeze({
+        toolId: "mcp:local:net",
+        status: "enabled" as const,
+        installedAt: "2026-03-24T00:00:00.000Z",
+        updatedAt: "2026-03-24T00:00:00.000Z",
+        source: Object.freeze({ kind: "inline" as const, location: "inline:test" }),
+        grantedPermissions: Object.freeze(["network.access"] as const),
+        permissionApprovals: Object.freeze([{
+          approvalId: "approval-1",
+          permission: "network.access" as const,
+          scope: Object.freeze({ scopeType: "global" as const }),
+          status: "approved" as const,
+          requestedAt: "2026-03-24T00:00:00.000Z",
+          updatedAt: "2026-03-24T00:00:00.000Z",
+        }]),
+        sandboxPolicy: Object.freeze({
+          networkAccess: "deny" as const,
+          filesystemAccess: Object.freeze({ mode: "read-write" as const, allowedPaths: Object.freeze([]) }),
+          assetAccess: "read-write" as const,
+          environmentExposure: Object.freeze({ mode: "inherit-runtime" as const, allowlist: Object.freeze([]) }),
+        }),
+        definition: Object.freeze({
+          id: "mcp:local:net",
+          version: "1.0.0",
+          displayName: "Net",
+          sideEffects: "network" as const,
+          auth: Object.freeze({ kind: "none" as const }),
+          tags: Object.freeze([]),
+          categories: Object.freeze([]),
+          binding: Object.freeze({ serverId: "local", toolName: "net" }),
+          inputSchema: Object.freeze({ type: "object" }),
+        }),
+      }),
+      saveInstalledTool: async (record: never) => record,
+      removeInstalledTool: async () => false,
+    };
+    await expect(new ExecuteMcpToolUseCase(executor, new ExecutionContextToolPolicyService(), registry).execute({
+      serverId: "local",
+      toolName: "net",
+    })).rejects.toMatchObject({ code: "sandbox-denied" });
   });
 
   it("resolves asset-backed inputs and persists asset outputs", async () => {
@@ -652,6 +809,8 @@ describe("ExecuteMcpToolUseCase", () => {
       undefined,
       undefined,
       undefined,
+      undefined,
+      undefined,
       coordinator,
     ).execute({
       serverId: "local",
@@ -725,7 +884,18 @@ describe("ExecuteMcpToolUseCase", () => {
       removeInstalledTool: async () => false,
     };
 
-    await expect(new ExecuteMcpToolUseCase(executor, new ExecutionContextToolPolicyService(), registry, undefined, undefined, undefined, undefined, coordinator).execute({
+    await expect(new ExecuteMcpToolUseCase(
+      executor,
+      new ExecutionContextToolPolicyService(),
+      registry,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      coordinator,
+    ).execute({
       serverId: "local",
       toolName: "asset-mixed",
       arguments: { source: "asset-input", prompt: "hello" },

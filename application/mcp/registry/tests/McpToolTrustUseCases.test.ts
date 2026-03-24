@@ -5,7 +5,11 @@ import type { InstalledMcpToolRecord } from "../../../../domain/mcp/InstalledMcp
 import {
   ConfigureMcpToolCredentialsUseCase,
   GetMcpToolCredentialStatusUseCase,
+  GetMcpToolTrustStateUseCase,
+  RevokeMcpToolPermissionApprovalUseCase,
+  SetMcpToolPermissionApprovalUseCase,
   SetMcpToolPermissionsUseCase,
+  SetMcpToolSandboxPolicyUseCase,
 } from "../McpToolTrustUseCases";
 
 function makeTool(): InstalledMcpToolRecord {
@@ -25,7 +29,7 @@ function makeTool(): InstalledMcpToolRecord {
         kind: "required",
         credentialFields: Object.freeze([{ key: "apiKey", label: "API Key", secret: true, required: true }]),
       }),
-      permissions: Object.freeze(["network.access"]),
+      permissions: Object.freeze(["network.access"] as const),
       tags: Object.freeze([]),
       categories: Object.freeze([]),
       inputSchema: Object.freeze({ type: "object" }),
@@ -84,5 +88,40 @@ describe("McpToolTrustUseCases", () => {
     });
 
     expect(updated.grantedPermissions).toEqual(["network.access"]);
+  });
+
+  it("tracks approval lifecycle and revocation", async () => {
+    const tool = makeTool();
+    const registry = makeRegistry(tool);
+
+    const granted = await new SetMcpToolPermissionApprovalUseCase(registry).execute({
+      toolId: tool.toolId,
+      permissions: ["network.access"],
+      status: "approved",
+      actor: "tester",
+      reason: "accepted",
+    });
+    expect(granted.permissionApprovals?.[0]?.status).toBe("approved");
+
+    const revoked = await new RevokeMcpToolPermissionApprovalUseCase(registry).execute({
+      toolId: tool.toolId,
+      permissions: ["network.access"],
+      actor: "tester",
+      reason: "removed",
+    });
+    expect(revoked.permissionApprovals?.[0]?.status).toBe("revoked");
+    expect((revoked.approvalHistory ?? []).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("updates sandbox policy and exposes trust read model posture", async () => {
+    const tool = makeTool();
+    const registry = makeRegistry(tool);
+    await new SetMcpToolSandboxPolicyUseCase(registry).execute({
+      toolId: tool.toolId,
+      policy: { networkAccess: "deny", environmentExposure: { mode: "allowlist", allowlist: ["SAFE_ENV"] } },
+    });
+    const trust = await new GetMcpToolTrustStateUseCase(registry).execute({ toolId: tool.toolId });
+    expect(trust.sandbox.policy.networkAccess).toBe("deny");
+    expect(trust.sandbox.enforcement.environmentExposure).toBe("declared-only");
   });
 });
