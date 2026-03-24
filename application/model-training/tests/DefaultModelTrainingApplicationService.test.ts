@@ -560,6 +560,7 @@ describe("DefaultModelTrainingApplicationService", () => {
       summary: "Completed a real local training run.",
     });
 
+    const engineSubmitRequests: string[] = [];
     const engine = createUnifiedExecutionInfrastructure({
       workflowExecutor: {
         canExecute: () => true,
@@ -567,7 +568,28 @@ describe("DefaultModelTrainingApplicationService", () => {
         startExecution: async () => { throw new Error("workflow path not used"); },
       },
       modelTrainingRuntime: {
-        submitJob: async () => submittedJob,
+        submitJob: async (request) => {
+          engineSubmitRequests.push(`${request.id}:${request.executionKind}`);
+          return request.executionKind === "preparation-only"
+            ? makeJob({
+              id: request.id,
+              executionKind: "preparation-only",
+              status: "exported-without-training",
+              summary: "Prepared bundle without training.",
+              provenance: {
+                executionKind: "preparation-only",
+                backend: "python-runtime-manifest",
+                truthfulness: "exported-without-training",
+                runtime: "python-runtime",
+                runMode: "preparation-only",
+                supportsGradientTraining: false,
+                isPreparationOnly: true,
+                path: `/tmp/${request.id}`,
+                diagnostics: [],
+              },
+            })
+            : submittedJob;
+        },
         getJob: async (jobId) => jobId === submittedJob.id ? submittedJob : undefined,
         refreshJob: async () => {
           refreshCount += 1;
@@ -644,6 +666,10 @@ describe("DefaultModelTrainingApplicationService", () => {
     expect(job.status).toBe("submitted");
 
     await new Promise((resolve) => setTimeout(resolve, 350));
+    expect(engineSubmitRequests).toEqual([
+      "training-job-engine:preflight:preparation-only",
+      "training-job-engine:local-gradient-training",
+    ]);
     expect(saved.some((entry) => entry.status === "completed")).toBe(true);
   });
 });

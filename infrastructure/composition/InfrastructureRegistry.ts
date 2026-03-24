@@ -59,7 +59,7 @@ import { WorkflowToolCapabilityExecutor } from "../tools/WorkflowToolCapabilityE
 import { WorkflowToolProjectionService } from "../../application/projection/WorkflowToolProjectionService";
 import { LoadToolDefinitionUseCase } from "../../application/tools/LoadToolDefinitionUseCase";
 import { RunToolUseCase } from "../../application/tools/RunToolUseCase";
-import { createExecutionRunRepository, createUnifiedExecutionInfrastructure } from "../execution/createExecutionInfrastructure";
+import { createExecutionApplicationInfrastructure, createExecutionRunRepository } from "../execution/createExecutionInfrastructure";
 import { UnifiedExecutionEngine } from "../../application/execution/UnifiedExecutionEngine";
 import { WorkflowContextService } from "../../application/context/WorkflowContextService";
 import { RuntimeDependencyOperationalStates, type IRuntimeDependencyOrchestrator } from "../../application/runtime/RuntimeDependencyOrchestrator";
@@ -94,6 +94,7 @@ export const TOKENS = Object.freeze({
   AssetRepository: Symbol("AssetRepository"),
   ModelRepository: Symbol("ModelRepository"),
   NodeImplementationRegistry: Symbol("NodeImplementationRegistry"),
+  ExecutionApplicationInfrastructure: Symbol("ExecutionApplicationInfrastructure"),
 }) satisfies Record<string, DependencyToken>;
 
 export interface IInfrastructureRegistryPaths {
@@ -403,11 +404,16 @@ export class InfrastructureRegistry {
       rootDirectory: options.paths.executionRunDatabasePath ? undefined : (options.paths.executionRunsDirectory ?? `${options.paths.workflowsDirectory}/../execution-runs`),
     }));
 
-    container.registerSingleton<UnifiedExecutionEngine>(TOKENS.UnifiedExecutionEngine, (c) => createUnifiedExecutionInfrastructure({
+    container.registerSingleton(TOKENS.ExecutionApplicationInfrastructure, (c) => createExecutionApplicationInfrastructure({
       workflowExecutor: c.resolve<IWorkflowExecutor>(TOKENS.WorkflowExecutor),
       executionRunRepository: c.resolve<IExecutionRunRepository>(TOKENS.ExecutionRunRepository),
       mcpServerManager: c.resolve<IMcpServerManager>(TOKENS.McpServerManager),
     }));
+
+    container.registerSingleton<UnifiedExecutionEngine>(
+      TOKENS.UnifiedExecutionEngine,
+      (c) => c.resolve<ReturnType<typeof createExecutionApplicationInfrastructure>>(TOKENS.ExecutionApplicationInfrastructure).executionEngine,
+    );
 
     container.registerSingleton(TOKENS.WorkflowRepository, (c) => {
       return new LocalWorkflowRepository({

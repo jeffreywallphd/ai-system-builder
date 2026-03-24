@@ -3,6 +3,7 @@ import type { SubmitModelTrainingJobRequest } from "../ports/interfaces/IModelTr
 import type { ModelTrainingJob } from "../../domain/model-training/ModelTrainingTypes";
 import type { IExecutionPlanResult, IExecutionUnitExecutionResult } from "./UnifiedExecutionEngine";
 import { getModelTrainingJob } from "./ModelTrainingExecutionAdapter";
+import { ExecutionRuntimeCapabilityProfiles, toExecutionRuntimeCapabilityMetadata } from "./ExecutionRuntimeCapabilities";
 
 export interface IModelTrainingExecutionPlanEnvelope {
   readonly unitId: string;
@@ -42,6 +43,8 @@ export function createModelTrainingExecutionPlan(
       versionLabel: `v${request.datasetVersionNumber}`,
       executionMode: request.executionKind,
       exampleCount: request.examples.length,
+      runtimeCapabilities: toExecutionRuntimeCapabilityMetadata(ExecutionRuntimeCapabilityProfiles.modelTraining),
+      ...toExecutionRuntimeCapabilityMetadata(ExecutionRuntimeCapabilityProfiles.modelTraining),
     }),
   });
 }

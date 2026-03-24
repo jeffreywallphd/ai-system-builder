@@ -3,7 +3,11 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { ExecutionPlan, ExecutionStatuses, ExecutionUnitKinds } from "../../../domain/execution/ExecutionPlan";
-import { createExecutionRunRepository, createUnifiedExecutionInfrastructure } from "../createExecutionInfrastructure";
+import {
+  createExecutionApplicationInfrastructure,
+  createExecutionRunRepository,
+  createUnifiedExecutionInfrastructure,
+} from "../createExecutionInfrastructure";
 import { DesktopBridgeExecutionRunRepository } from "../../browser/execution/DesktopBridgeExecutionRunRepository";
 import { SqliteExecutionRunRepository } from "../../filesystem/execution/SqliteExecutionRunRepository";
 
@@ -115,6 +119,33 @@ describe("execution infrastructure composition", () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  it("builds execution engine and history services through one canonical execution composition helper", () => {
+    const repository = {
+      saveRun: async (run: unknown) => run,
+      getRunById: async () => undefined,
+      listRuns: async () => [],
+    };
+
+    const infrastructure = createExecutionApplicationInfrastructure({
+      workflowExecutor: {
+        canExecute: () => true,
+        execute: async () => {
+          throw new Error("unused");
+        },
+        startExecution: async () => {
+          throw new Error("unused");
+        },
+      },
+      executionRunRepository: repository,
+    });
+
+    expect(infrastructure.executionEngine).toBeDefined();
+    expect(infrastructure.listExecutionRunsUseCase).toBeDefined();
+    expect(infrastructure.listRelatedExecutionRunsUseCase).toBeDefined();
+    expect(infrastructure.getExecutionRunDetailUseCase).toBeDefined();
+    expect(infrastructure.executionRunRepository).toBe(repository);
   });
 
   it("builds a unified execution engine with truthful model-training handlers when that runtime is enabled", async () => {

@@ -5,6 +5,7 @@ import type {
 } from "../../domain/tuning-datasets/interfaces/ITuningDatasetStudio";
 import type { IExecutionPlanResult, IExecutionUnitExecutionResult } from "./UnifiedExecutionEngine";
 import { getDatasetGenerationResult } from "./DatasetGenerationExecutionAdapter";
+import { ExecutionRuntimeCapabilityProfiles, toExecutionRuntimeCapabilityMetadata } from "./ExecutionRuntimeCapabilities";
 
 export interface IDatasetGenerationExecutionPlanEnvelope {
   readonly unitId: string;
@@ -39,6 +40,8 @@ export function createDatasetGenerationExecutionPlan(
       versionId: request.versionId,
       taskType: request.taskType,
       sourceDocumentCount: request.sourceDocuments.length,
+      runtimeCapabilities: toExecutionRuntimeCapabilityMetadata(ExecutionRuntimeCapabilityProfiles.datasetGeneration),
+      ...toExecutionRuntimeCapabilityMetadata(ExecutionRuntimeCapabilityProfiles.datasetGeneration),
     }),
   });
 }

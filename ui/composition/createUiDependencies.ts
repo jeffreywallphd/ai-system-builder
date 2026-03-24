@@ -133,9 +133,8 @@ import { LangChainNodeExecutor } from "../../infrastructure/interpreted/executio
 import { WorkflowRuntimeSelector } from "../../application/execution/WorkflowRuntimeSelector";
 import { PythonDelegatedWorkflowExecutionStrategy } from "../../infrastructure/python/execution/PythonDelegatedWorkflowExecutionStrategy";
 import {
-  createExecutionHistoryInfrastructure,
+  createExecutionApplicationInfrastructure,
   createExecutionRunRepository,
-  createUnifiedExecutionInfrastructure,
 } from "../../infrastructure/execution/createExecutionInfrastructure";
 import { PythonRuntimeDatasetGenerationService } from "../../infrastructure/python/tuning-datasets/PythonRuntimeDatasetGenerationService";
 import { OrchestratedDatasetGenerationService } from "../../infrastructure/python/tuning-datasets/OrchestratedDatasetGenerationService";
@@ -307,19 +306,20 @@ export function createUiDependencies(
     desktopExecutionRunBridge,
     storage: durableDesktopStorage,
   });
-  const executionEngine = createUnifiedExecutionInfrastructure({
+  const executionInfrastructure = createExecutionApplicationInfrastructure({
     workflowExecutor,
     executionRunRepository,
     datasetGenerationService,
     modelTrainingRuntime,
     mcpServerManager: mcpRuntimeIntegration.serverManager,
   });
-  const executionHistoryInfrastructure = createExecutionHistoryInfrastructure(executionRunRepository);
   const executionHistoryService = new ExecutionHistoryService(
-    executionHistoryInfrastructure.listExecutionRunsUseCase,
-    executionHistoryInfrastructure.executionRunProjectionService,
-    executionHistoryInfrastructure.getExecutionRunDetailUseCase,
+    executionInfrastructure.listExecutionRunsUseCase,
+    executionInfrastructure.executionRunProjectionService,
+    executionInfrastructure.listRelatedExecutionRunsUseCase,
+    executionInfrastructure.getExecutionRunDetailUseCase,
   );
+  const executionEngine = executionInfrastructure.executionEngine;
   const executeWorkflowUseCase = new ExecuteWorkflowUseCase(
     workflowExecutor,
     workflowValidator,

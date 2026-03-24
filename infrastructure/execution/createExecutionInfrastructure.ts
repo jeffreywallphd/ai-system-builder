@@ -3,6 +3,7 @@ import { ExecutionRunDetailProjectionService } from "../../application/execution
 import { ExecutionRunProjectionService } from "../../application/execution/ExecutionRunProjectionService";
 import { GetExecutionRunDetailUseCase } from "../../application/execution/GetExecutionRunDetailUseCase";
 import { ListExecutionRunsUseCase } from "../../application/execution/ListExecutionRunsUseCase";
+import { ListRelatedExecutionRunsUseCase } from "../../application/execution/ListRelatedExecutionRunsUseCase";
 import type { IExecutionRunRepository } from "../../application/ports/interfaces/IExecutionRunRepository";
 import type { IMcpServerManager } from "../../application/ports/interfaces/IMcpServerManager";
 import type { IWorkflowExecutor } from "../../application/ports/interfaces/IWorkflowExecutor";
@@ -88,6 +89,7 @@ export interface ExecutionHistoryInfrastructure {
   readonly executionRunProjectionService: ExecutionRunProjectionService;
   readonly executionRunDetailProjectionService: ExecutionRunDetailProjectionService;
   readonly listExecutionRunsUseCase: ListExecutionRunsUseCase;
+  readonly listRelatedExecutionRunsUseCase: ListRelatedExecutionRunsUseCase;
   readonly getExecutionRunDetailUseCase: GetExecutionRunDetailUseCase;
 }
 
@@ -101,9 +103,42 @@ export function createExecutionHistoryInfrastructure(
     executionRunProjectionService,
     executionRunDetailProjectionService,
     listExecutionRunsUseCase: new ListExecutionRunsUseCase(executionRunRepository),
+    listRelatedExecutionRunsUseCase: new ListRelatedExecutionRunsUseCase(executionRunRepository),
     getExecutionRunDetailUseCase: new GetExecutionRunDetailUseCase(
       executionRunRepository,
       executionRunDetailProjectionService,
     ),
+  });
+}
+
+export interface CreateExecutionApplicationInfrastructureOptions extends CreateUnifiedExecutionInfrastructureOptions {
+  readonly executionRunRepository: IExecutionRunRepository;
+}
+
+export interface ExecutionApplicationInfrastructure extends ExecutionHistoryInfrastructure {
+  readonly executionEngine: UnifiedExecutionEngine;
+  readonly executionRunRepository: IExecutionRunRepository;
+}
+
+export function createExecutionApplicationInfrastructure(
+  options: CreateExecutionApplicationInfrastructureOptions,
+): ExecutionApplicationInfrastructure {
+  const executionEngine = createUnifiedExecutionInfrastructure({
+    workflowExecutor: options.workflowExecutor,
+    executionRunRepository: options.executionRunRepository,
+    datasetGenerationService: options.datasetGenerationService,
+    modelTrainingRuntime: options.modelTrainingRuntime,
+    mcpServerManager: options.mcpServerManager,
+  });
+  const history = createExecutionHistoryInfrastructure(options.executionRunRepository);
+
+  return Object.freeze({
+    executionEngine,
+    executionRunRepository: options.executionRunRepository,
+    executionRunProjectionService: history.executionRunProjectionService,
+    executionRunDetailProjectionService: history.executionRunDetailProjectionService,
+    listExecutionRunsUseCase: history.listExecutionRunsUseCase,
+    listRelatedExecutionRunsUseCase: history.listRelatedExecutionRunsUseCase,
+    getExecutionRunDetailUseCase: history.getExecutionRunDetailUseCase,
   });
 }

@@ -1,5 +1,6 @@
 import type { UnifiedExecutionEngine } from "../execution/UnifiedExecutionEngine";
 import {
+  createMcpServerProvisionAndConnectExecutionPlan,
   createMcpServerOperationExecutionPlan,
   requireMcpServerOperationResult,
 } from "../execution/McpServerOperationExecutionPlanFactory";
@@ -20,7 +21,9 @@ export class CreateLocalMcpServerUseCase {
   public async execute(request: ICreateLocalMcpServerRequest): Promise<LocalMcpServerCreateResult> {
     const draft = normalizeDraft(request.draft);
     if (this.executionEngine) {
-      const executionPlan = createMcpServerOperationExecutionPlan({ action: "create-local-server", draft });
+      const executionPlan = draft.connectOnStartup
+        ? createMcpServerProvisionAndConnectExecutionPlan(draft)
+        : createMcpServerOperationExecutionPlan({ action: "create-local-server", draft });
       const result = await this.executionEngine.execute(executionPlan);
       return requireMcpServerOperationResult(result, executionPlan.unitId) as LocalMcpServerCreateResult;
     }

@@ -53,13 +53,32 @@ describe("SqliteExecutionRunRepository", () => {
       await repository.saveRun(makeRun("run-2", {
         status: ExecutionStatuses.failed,
         finalErrorMessage: "bundle failed",
-        metadata: Object.freeze({ executionKind: "model-preparation", baseModelId: "base-1", datasetVersionId: "v2" }),
+        metadata: Object.freeze({ executionKind: "model-preparation", baseModelId: "base-1", datasetVersionId: "v2", executionFlowId: "flow-2" }),
+        units: Object.freeze({
+          "unit-1": Object.freeze({
+            unitId: "unit-1",
+            kind: ExecutionUnitKinds.modelPreparation,
+            label: "Prepare bundle",
+            dependsOn: Object.freeze([]),
+            status: ExecutionStatuses.failed,
+            provenance: Object.freeze({
+              classification: "delegated",
+              executorId: "model-runtime",
+            }),
+            updatedAt: "2026-03-23T00:00:05.000Z",
+          }),
+        }),
       }));
 
       const loaded = await repository.getRunById("run-1");
       const filtered = await repository.listRuns({
         executionKind: "model-preparation",
         status: ExecutionStatuses.failed,
+        unitKind: ExecutionUnitKinds.modelPreparation,
+        provenanceClassification: "delegated",
+        flowId: "flow-2",
+        startedAfter: "2026-03-22T00:00:00.000Z",
+        updatedBefore: "2026-03-23T00:00:10.000Z",
         metadata: { datasetVersionId: "v2" },
       });
 
@@ -141,9 +160,11 @@ describe("SqliteExecutionRunRepository", () => {
       const columns = db.prepare("PRAGMA table_info(execution_runs)").all() as ReadonlyArray<{ readonly name: string }>;
       db.close();
 
-      expect(version).toBeGreaterThanOrEqual(2);
+      expect(version).toBeGreaterThanOrEqual(3);
       expect(columns.map((column) => column.name)).toContain("terminal_headline");
       expect(columns.map((column) => column.name)).toContain("diagnostics_headline");
+      expect(columns.map((column) => column.name)).toContain("primary_unit_kind");
+      expect(columns.map((column) => column.name)).toContain("execution_flow_id");
     } finally {
       repository.dispose();
       secondRepository.dispose();

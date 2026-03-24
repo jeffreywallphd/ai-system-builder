@@ -41,13 +41,19 @@ This taxonomy is intentionally small. It is sufficient for workflow execution pl
 
 The engine still runs units sequentially and is intentionally conservative. It is a clean seam and durable run coordinator, not a scheduler or distributed orchestration layer.
 
+### Lightweight runtime capability model
+
+Execution plans now carry a lightweight explicit runtime capability profile in metadata (`supportsProgressEvents`, `supportsPollingProgress`, `supportsCancellation`, `supportsIntermediateArtifacts`, `supportsPartialResults`, `supportsReconnectOrResume`, `supportsMultiUnitComposition`).
+
+This keeps capability claims small and truthful: higher layers can reason about what semantics are honestly available without inventing progress/cancellation behavior for runtimes that do not expose it.
+
 ### Workflow path now routed through the engine
 
 `application/workflows/ExecuteWorkflowUseCase.ts` now builds a one-unit execution plan for **both** the immediate workflow run path and the `startExecution(...)` path, then submits that plan to the unified execution engine.
 
 The migrated path is still deliberately narrow:
 
-- **migrated now:** direct workflow execution from `ExecuteWorkflowUseCase.execute(...)`, workflow `startExecution(...)`, direct tool execution from `RunToolUseCase.execute(...)`, tuning-dataset example generation from `DefaultTuningDatasetStudioApplicationService.generateExamplesFromSource(...)`, preparation-only model creation from `DefaultModelTrainingApplicationService.submitJob(...)`, truthful local-gradient model-training runs from that same service when the Python runtime can report real lifecycle state, and the narrow MCP server-operation slice (`connect`, `reconnect`, `disconnect`, and local-server creation) when those actions run through the Python-backed MCP runtime manager
+- **migrated now:** direct workflow execution from `ExecuteWorkflowUseCase.execute(...)`, workflow `startExecution(...)`, direct tool execution from `RunToolUseCase.execute(...)`, tuning-dataset example generation from `DefaultTuningDatasetStudioApplicationService.generateExamplesFromSource(...)`, preparation-only model creation from `DefaultModelTrainingApplicationService.submitJob(...)`, a dependency-aware model flow (`model preparation -> local model training`) for local-gradient runs from that same service, and the narrow MCP server-operation slice (`connect`, `reconnect`, `disconnect`, local-server creation, and a dependency-aware local-server `create -> connect` plan) when those actions run through the Python-backed MCP runtime manager
 - **not yet migrated:** broader MCP tool orchestration, MCP discovery/catalog refresh flows, or broader asynchronous/scheduled/distributed execution paths outside the current truthful runtime-backed slices
 
 The remaining MCP areas stay out of scope for Direction 1 because the current runtime integration can report a single server-operation result honestly, but it does not yet expose a richer durable lifecycle for broader MCP discovery/catalog/tool orchestration without inventing progress or cancellation semantics.
@@ -104,6 +110,7 @@ The unified execution engine does **not** replace existing provenance language. 
 - unavailable or degraded
 
 Plan-backed runs are also now persisted as durable execution-run records. In desktop-backed modes the preferred structured source of truth is now a SQLite execution-run repository reached either directly in outer-layer Node/Electron composition or through the desktop preload bridge. Browser/local-storage and filesystem JSON repositories remain degraded fallbacks. The records capture run identity, plan identity, unit states, status transitions, timestamps, final status, cancellation support, filtering metadata, engine-native terminal/diagnostic summaries, and truthful execution provenance metadata. Lightweight application query use cases can now list and load those run records without reaching into infrastructure directly.
+Flow-level querying is now also first-class through flow metadata (`executionFlowId`) and a related-run query use case so UI/debugging layers can resolve runs that belong to the same execution flow without manual feature-specific joins.
 
 That matters because the abstraction is meant to standardize execution flow without flattening the truthfulness model or discarding execution history.
 
@@ -224,7 +231,7 @@ The new execution engine slice starts in the domain/application layers and adapt
 3. Expand cancellation/progress modeling only where an actual runtime can report richer unit-level state truthfully.
 4. Keep converging composition helpers so unified execution-engine wiring and execution-run persistence continue to share one path across renderer, registry, and bootstrap entry points.
 
-That is "done enough" for Direction 1: the unified execution engine is no longer limited to workflows/model-training/dataset generation, the next truthful MCP-backed slice now persists through the same durable substrate, and generic history/detail surfaces can inspect it without feature-specific summary logic. The next likely architectural focus is Direction 2 work above this substrate rather than broadening Direction 1 into speculative orchestration.
+That is "done enough" for Direction 1: the unified execution engine now includes at least one real dependency-aware multi-unit production path, execution capability claims are explicit, and durable history filtering is stronger for lineage/debugging/reporting without turning Direction 1 into a scheduler/analytics rewrite. The next likely architectural focus is Direction 2 work above this substrate rather than broadening Direction 1 into speculative orchestration.
 
 ## TODO
 

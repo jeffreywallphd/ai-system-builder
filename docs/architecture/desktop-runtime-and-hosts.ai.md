@@ -14,6 +14,7 @@ Electron is the desktop host boundary; the renderer accesses desktop capabilitie
 ## Storage modes to mention
 - Desktop canonical path: filesystem JSON + SQLite workflow index plus SQLite execution-run history with explicit schema versioning/migration via SQLite `user_version`
 - Fallback path: browser/local storage repositories
+- Execution-run queries now also support unit-kind/provenance/flow/time filtering in addition to status/execution-kind/metadata filters, and non-SQLite repositories persist an explicit query-index envelope so those filters remain available in fallback modes.
 
 ## Runtime modes to mention
 - desktop development

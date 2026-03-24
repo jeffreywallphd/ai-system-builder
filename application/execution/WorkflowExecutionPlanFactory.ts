@@ -3,6 +3,7 @@ import type { IWorkflowExecutionEvent, IWorkflowExecutionInput, IWorkflowExecuti
 import type { IExecutionEngineEvent } from "./ExecutionContracts";
 import type { IExecutionPlanResult, IExecutionUnitExecutionResult } from "./UnifiedExecutionEngine";
 import { getWorkflowExecutionEvent, getWorkflowExecutionResult } from "./WorkflowExecutionAdapter";
+import { ExecutionRuntimeCapabilityProfiles, toExecutionRuntimeCapabilityMetadata } from "./ExecutionRuntimeCapabilities";
 
 export interface IWorkflowExecutionPlanEnvelope {
   readonly unitId: string;
@@ -35,6 +36,8 @@ export function createWorkflowExecutionPlan(
       executionKind: "workflow",
       workflowId: input.workflow.id,
       workflowName: input.workflow.metadata.name,
+      runtimeCapabilities: toExecutionRuntimeCapabilityMetadata(ExecutionRuntimeCapabilityProfiles.workflow),
+      ...toExecutionRuntimeCapabilityMetadata(ExecutionRuntimeCapabilityProfiles.workflow),
     }),
   });
 }

@@ -4,6 +4,7 @@ import type { LocalMcpServerCreateResult } from "../mcp/models/LocalMcpServerCre
 import type { McpServerConnectionResult } from "../mcp/models/McpServerConnectionResult";
 import type { IExecutionPlanResult, IExecutionUnitExecutionResult } from "./UnifiedExecutionEngine";
 import { getMcpServerOperationResult } from "./McpServerOperationExecutionAdapter";
+import { ExecutionRuntimeCapabilityProfiles, toExecutionRuntimeCapabilityMetadata } from "./ExecutionRuntimeCapabilities";
 
 export type McpServerOperationAction = "connect" | "reconnect" | "disconnect" | "create-local-server";
 
@@ -21,9 +22,10 @@ export type McpServerOperationExecutionResult = McpServerConnectionResult | Loca
 
 export interface IMcpServerOperationExecutionPlanEnvelope {
   readonly unitId: string;
+  readonly terminalUnitId: string;
   readonly plan: ExecutionPlan;
   readonly unitInputs: Readonly<Record<string, McpServerOperationExecutionInput>>;
-  readonly metadata: Readonly<Record<string, string | boolean>>;
+  readonly metadata: Readonly<Record<string, unknown>>;
 }
 
 export function createMcpServerOperationExecutionPlan(
@@ -35,6 +37,7 @@ export function createMcpServerOperationExecutionPlan(
 
   return Object.freeze({
     unitId,
+    terminalUnitId: unitId,
     plan: new ExecutionPlan({
       id: `mcp-server-operation:${action}:${serverId}`,
       units: [
@@ -55,6 +58,53 @@ export function createMcpServerOperationExecutionPlan(
       serverName: action === "create-local-server" ? input.draft.serverName.trim() : serverId,
       truthfulnessSummary: "Delegated to the MCP runtime manager and recorded using durable execution-run history.",
       workspaceLocal: action === "create-local-server" ? input.draft.metadata?.authoringMode === "workspace-local" : false,
+      runtimeCapabilities: toExecutionRuntimeCapabilityMetadata(ExecutionRuntimeCapabilityProfiles.mcpServerOperation),
+      ...toExecutionRuntimeCapabilityMetadata(ExecutionRuntimeCapabilityProfiles.mcpServerOperation),
+    }),
+  });
+}
+
+export function createMcpServerProvisionAndConnectExecutionPlan(
+  draft: LocalMcpToolDraft,
+): IMcpServerOperationExecutionPlanEnvelope {
+  const serverId = draft.serverId.trim();
+  const createUnitId = `mcp-server-operation:create-local-server:${serverId}`;
+  const connectUnitId = `mcp-server-operation:connect:${serverId}`;
+  const flowId = `mcp-provision-connect:${serverId}:${Date.now()}`;
+
+  return Object.freeze({
+    unitId: createUnitId,
+    terminalUnitId: connectUnitId,
+    plan: new ExecutionPlan({
+      id: `mcp-provision-connect:${serverId}`,
+      units: [
+        {
+          id: createUnitId,
+          kind: ExecutionUnitKinds.mcpServerOperation,
+          label: describeLabel("create-local-server", { action: "create-local-server", draft }),
+        },
+        {
+          id: connectUnitId,
+          kind: ExecutionUnitKinds.mcpServerOperation,
+          label: describeLabel("connect", { action: "connect", serverId }),
+          dependsOn: [createUnitId],
+        },
+      ],
+    }),
+    unitInputs: Object.freeze({
+      [createUnitId]: Object.freeze(cloneInput({ action: "create-local-server", draft })),
+      [connectUnitId]: Object.freeze(cloneInput({ action: "connect", serverId })),
+    }),
+    metadata: Object.freeze({
+      executionKind: ExecutionUnitKinds.mcpServerOperation,
+      executionFlowId: flowId,
+      mcpAction: "create-local-server-and-connect",
+      serverId,
+      serverName: draft.serverName.trim(),
+      truthfulnessSummary: "Delegated to the MCP runtime manager as a dependency-aware provisioning and connection plan.",
+      workspaceLocal: draft.metadata?.authoringMode === "workspace-local",
+      runtimeCapabilities: toExecutionRuntimeCapabilityMetadata(ExecutionRuntimeCapabilityProfiles.mcpProvisionAndConnect),
+      ...toExecutionRuntimeCapabilityMetadata(ExecutionRuntimeCapabilityProfiles.mcpProvisionAndConnect),
     }),
   });
 }

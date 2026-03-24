@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ExecutionRunDetailProjection } from "../../../application/execution/ExecutionRunDetailProjectionService";
+import type { ExecutionRelatedRunClusterProjection } from "../../../application/execution/ExecutionRelatedRunClusterProjectionService";
 import type { ExecutionRunProjection } from "../../../application/execution/ExecutionRunProjectionService";
 import type { ExecutionHistoryService } from "../../services/ExecutionHistoryService";
 import ExecutionRunDetailPanel from "./ExecutionRunDetailPanel";
@@ -23,6 +24,7 @@ export default function ExecutionHistoryPanel({
 }: ExecutionHistoryPanelProps): JSX.Element {
   const [selectedRunId, setSelectedRunId] = useState<string | undefined>(items[0]?.runId);
   const [detail, setDetail] = useState<ExecutionRunDetailProjection | undefined>(undefined);
+  const [relatedRunCluster, setRelatedRunCluster] = useState<ExecutionRelatedRunClusterProjection | undefined>(undefined);
   const [detailError, setDetailError] = useState<string | undefined>(undefined);
 
   useEffect(() => {
@@ -34,6 +36,7 @@ export default function ExecutionHistoryPanel({
   useEffect(() => {
     if (!executionHistoryService || !selectedRunId) {
       setDetail(undefined);
+      setRelatedRunCluster(undefined);
       setDetailError(undefined);
       return;
     }
@@ -49,7 +52,20 @@ export default function ExecutionHistoryPanel({
       .catch((error) => {
         if (active) {
           setDetail(undefined);
+          setRelatedRunCluster(undefined);
           setDetailError(error instanceof Error ? error.message : "Unable to load execution detail.");
+        }
+      });
+
+    void executionHistoryService.getRelatedRunCluster(selectedRunId)
+      .then((cluster) => {
+        if (active) {
+          setRelatedRunCluster(cluster);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setRelatedRunCluster(undefined);
         }
       });
 
@@ -116,7 +132,12 @@ export default function ExecutionHistoryPanel({
 
             <div className="ui-stack ui-stack--sm">
               {detailError ? <p className="ui-text-danger">{detailError}</p> : null}
-              <ExecutionRunDetailPanel detail={detail} emptyMessage={detailEmptyMessage} />
+              <ExecutionRunDetailPanel
+                detail={detail}
+                emptyMessage={detailEmptyMessage}
+                relatedRunCluster={relatedRunCluster}
+                onSelectRun={setSelectedRunId}
+              />
             </div>
           </div>
         )}
