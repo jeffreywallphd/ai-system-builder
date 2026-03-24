@@ -68,6 +68,14 @@ Use "workflow-first", "tool projection", and "truthful execution provenance" whe
 - Permission denials and auth misconfiguration now use structured errors instead of implicit fallback behavior.
 - Secret values are resolved only at execution boundary and are intentionally excluded from ordinary installed-tool projections and audit payloads.
 
+## MCP workflow-native node integration (Direction 3 stories 3.1–3.5)
+- `mcp.tool_call` is now treated as a first-class workflow node in the standard node catalog/definition/persistence surfaces, including a stable `toolId` property (`mcp:<serverId>:<toolName>`) alongside server/tool binding and descriptor snapshot fields.
+- Authoring hydration/configuration keeps node identity registry-aligned (`toolId`), materializes dynamic argument properties from the installed/discovered tool contract, and keeps argument serialization machine-readable for future editor flows.
+- Workflow execution uses the same interpreted workflow engine path as other nodes; MCP node orchestration stays in the workflow engine while MCP execution semantics are delegated to `ExecuteMcpToolUseCase` when available.
+- This means workflow MCP execution can reuse the existing MCP enforcement pipeline (status checks, contract validation, auth/secret resolution, permission policy, audit, and optional asset-I/O coordination) instead of duplicating runtime semantics inside the node executor.
+- MCP node failures now degrade into structured node-level failure outputs (`outputs.mcpError`) with bounded category/code/detail payloads, so workflow-level results/events can surface useful diagnostics without opaque crashes.
+- MCP outputs now expose workflow-consistent node outputs (`toolResult`, `resultText`) while preserving compatibility aliases used by existing downstream consumers.
+
 ## TODO
 - If asked whether tools and workflows are separate bounded contexts, answer: "not really; tools are primarily a projected and published workflow surface in the current implementation."
 - If asked what should migrate next, answer: execution areas that still cannot report real progress/cancellation truthfully yet, especially MCP/runtime-backed orchestration beyond the current narrow server-operation slice.

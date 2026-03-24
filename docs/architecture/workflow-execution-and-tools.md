@@ -268,3 +268,12 @@ The MCP execution path now includes explicit trust controls in the standard use-
 Auth and permission denials are explicit, structured outcomes (`missing-auth-configuration`, `auth-resolution-failed`, `permission-denied`) instead of implicit runtime failures.
 
 This slice enforces policy in the application/runtime orchestration layer (bounded sandbox policy) and creates seams for future stronger process/OS sandboxing and user-consent UX.
+
+## Direction 3 workflow-native update: MCP nodes inside workflow execution (stories 3.1–3.5)
+
+- `mcp.tool_call` now behaves as a first-class workflow node across catalog, persistence, and execution surfaces, with stable registry-aligned node identity (`toolId`) in addition to server/tool binding and descriptor snapshot properties.
+- MCP node configuration/hydration keeps identity and schema in sync: the node stores stable tool identity and materializes dynamic argument properties from MCP capability metadata so bindings remain machine-readable and execution-ready.
+- MCP nodes execute through the same workflow execution engine/orchestration path as all other nodes; there is no parallel MCP mini-engine.
+- Node-level MCP semantics are delegated to the existing standalone MCP execution use case (`ExecuteMcpToolUseCase`) when present, allowing workflow execution to reuse existing contract validation, auth/secrets, permission policy, audit, and optional asset-I/O coordination seams.
+- MCP execution failures now surface as structured node-level workflow failures (`outputs.mcpError` with bounded `code/category/details`) instead of opaque crashes, while preserving sanitized error messages for workflow-level reporting.
+- MCP node outputs now align with native workflow output contracts (`toolResult`, `resultText`) while preserving compatibility aliases to avoid breaking existing downstream nodes.

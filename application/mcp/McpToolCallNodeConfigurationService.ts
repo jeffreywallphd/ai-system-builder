@@ -12,6 +12,7 @@ import type { McpToolArgumentDescriptor, McpToolDescriptor } from "./models/McpT
 export const MCP_TOOL_CALL_NODE_TYPE = "mcp.tool_call";
 export const MCP_TOOL_CALL_SERVER_ID_PROPERTY = "serverId";
 export const MCP_TOOL_CALL_TOOL_NAME_PROPERTY = "toolName";
+export const MCP_TOOL_CALL_TOOL_ID_PROPERTY = "toolId";
 export const MCP_TOOL_CALL_TOOL_DESCRIPTOR_PROPERTY = "toolDescriptor";
 export const MCP_TOOL_CALL_STRINGIFY_RESULT_PROPERTY = "stringifyResult";
 export const MCP_TOOL_CALL_FAIL_ON_MISSING_ARGS_PROPERTY = "failOnMissingArgs";
@@ -96,6 +97,16 @@ export class McpToolCallNodeConfigurationService {
     }) as McpToolDescriptor;
   }
 
+  public readStoredToolId(node: INode): string | undefined {
+    const value = node.getProperty(MCP_TOOL_CALL_TOOL_ID_PROPERTY)?.value;
+    if (typeof value !== "string") {
+      return undefined;
+    }
+
+    const normalized = value.trim();
+    return normalized || undefined;
+  }
+
   public argumentPropertyId(argumentName: string): string {
     return `${MCP_TOOL_CALL_ARGUMENT_PROPERTY_PREFIX}${argumentName.trim()}`;
   }
@@ -130,6 +141,12 @@ export class McpToolCallNodeConfigurationService {
           type: "select",
           value: descriptor?.name ?? currentValue,
           options: this.toOptions(configuration.toolOptions),
+        });
+
+      case MCP_TOOL_CALL_TOOL_ID_PROPERTY:
+        return this.cloneProperty(property, {
+          type: "text",
+          value: descriptor?.id ?? currentValue,
         });
 
       case MCP_TOOL_CALL_TOOL_DESCRIPTOR_PROPERTY:

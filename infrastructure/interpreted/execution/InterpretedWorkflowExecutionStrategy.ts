@@ -93,6 +93,12 @@ export class InterpretedWorkflowExecutionStrategy implements IWorkflowExecutionS
         status: nodeResult.status === "failed" ? "failed" : "running",
         nodeId: node.id,
         message: nodeResult.errorMessage ?? nodeResult.messages?.join(" "),
+        payload: nodeResult.status === "failed"
+          ? Object.freeze({
+              nodeId: node.id,
+              outputs: nodeResult.outputs,
+            })
+          : undefined,
         nodeProvenance: nodeProvenance[node.id],
       }));
 
@@ -141,4 +147,3 @@ export class InterpretedWorkflowExecutionStrategy implements IWorkflowExecutionS
     return result;
   }
 }
-
