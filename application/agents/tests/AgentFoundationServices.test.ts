@@ -56,12 +56,11 @@ describe("Agent foundation services", () => {
       name: "Agent A",
       goals: [{ id: "goal-1", objective: "Collect facts", constraints: [], successCriteria: ["facts collected"], priority: "normal", priorityOrder: 1 }],
       policy: {
-        allowedTools: ["mcp:local:echo"],
-        toolScopeConstraints: [],
+        toolAccess: { allowedToolIds: ["mcp:local:echo"], scopeConstraints: [] },
         restrictedActions: [],
         costLimits: {},
         executionLimits: {},
-        safetyConstraints: { requiredApprovals: [], deniedPermissions: [] },
+        safetyConstraints: { requiredApprovals: [], deniedPermissionIds: [], sandbox: { network: "deny", filesystem: "deny", assets: "read-only", allowEnvironmentVariables: [] } },
       },
       memory: {
         agentId: "agent-a",
@@ -73,7 +72,7 @@ describe("Agent foundation services", () => {
     });
 
     const readModels = await service.listAgentReadModels();
-    expect(readModels[0]?.policy.allowedTools).toEqual(["mcp:local:echo"]);
+    expect(readModels[0]?.policy.toolAccess.allowedToolIds).toEqual(["mcp:local:echo"]);
     expect(readModels[0]?.memory.assetIds).toEqual(["asset:memory:a"]);
   });
 
@@ -82,21 +81,21 @@ describe("Agent foundation services", () => {
     const memoryStore = new AssetBackedAgentMemoryStore(repo, repo);
 
     await memoryStore.add("agent-a", {
-      assetId: "asset:memory:a",
+      assetId: new AssetId("asset:memory:a"),
       memoryType: "episodic",
       tags: ["planning", "facts"],
       metadata: { note: "hello" },
     });
 
     const entries = await memoryStore.query("agent-a", {
-      assetIds: ["asset:memory:a"],
+      assetIds: [new AssetId("asset:memory:a")],
       memoryTypes: ["episodic"],
       tags: ["planning"],
       maxEntries: 3,
     });
 
     expect(entries).toHaveLength(1);
-    expect(entries[0]?.assetId).toBe("asset:memory:a");
+    expect(entries[0]?.assetId.toString()).toBe("asset:memory:a");
     expect(entries[0]?.memoryType).toBe("episodic");
   });
 
@@ -104,7 +103,7 @@ describe("Agent foundation services", () => {
     const repo = new InMemoryAssetRepo();
     const memoryStore = new AssetBackedAgentMemoryStore(repo, repo);
     await memoryStore.add("agent-plan", {
-      assetId: "asset:memory:plan",
+      assetId: new AssetId("asset:memory:plan"),
       memoryType: "semantic",
       tags: ["weather"],
       metadata: { city: "Seattle" },
@@ -132,12 +131,11 @@ describe("Agent foundation services", () => {
       name: "Planner",
       goals: [{ id: "goal-1", objective: "Fetch weather", constraints: [], successCriteria: ["forecast"], priority: "high", priorityOrder: 1, requiredToolIds: ["mcp:local:get_weather"] }],
       policy: {
-        allowedTools: ["mcp:local:get_weather"],
-        toolScopeConstraints: [{ toolId: "mcp:local:get_weather", allowedScopes: ["forecast.read"] }],
+        toolAccess: { allowedToolIds: ["mcp:local:get_weather"], scopeConstraints: [{ toolId: "mcp:local:get_weather", allowedScopes: ["forecast.read"] }] },
         restrictedActions: [],
         costLimits: {},
         executionLimits: { maxSteps: 1 },
-        safetyConstraints: { requiredApprovals: [], deniedPermissions: [] },
+        safetyConstraints: { requiredApprovals: [], deniedPermissionIds: [], sandbox: { network: "deny", filesystem: "deny", assets: "read-only", allowEnvironmentVariables: [] } },
       },
       memory: {
         agentId: "agent-plan",
@@ -146,7 +144,7 @@ describe("Agent foundation services", () => {
         revision: 1,
       },
       planningStrategy: { strategyId: "deterministic", mode: "deterministic-linear" },
-      execution: { maxExecutionSteps: 1, requireTrustedTools: true },
+      execution: { maxPlanUnits: 1, requireTrustedTools: true },
       status: "ready",
       createdAt: "2026-03-24T00:00:00.000Z",
       updatedAt: "2026-03-24T00:00:00.000Z",
@@ -155,7 +153,7 @@ describe("Agent foundation services", () => {
 
     expect(plan.steps).toHaveLength(1);
     expect(plan.steps[0]?.toolId).toBe("mcp:local:get_weather");
-    expect(plan.steps[0]?.memoryContext[0]?.assetId).toBe("asset:memory:plan");
+    expect(plan.steps[0]?.memoryContext[0]?.assetId.toString()).toBe("asset:memory:plan");
   });
 
   it("executes through orchestrated tool path and persists execution memory", async () => {
@@ -163,7 +161,7 @@ describe("Agent foundation services", () => {
     const memoryStore = new AssetBackedAgentMemoryStore(assetRepo, assetRepo);
 
     await memoryStore.add("agent-exec", {
-      assetId: "asset:memory:1",
+      assetId: new AssetId("asset:memory:1"),
       memoryType: "working",
       tags: ["input"],
       metadata: { seed: true },
@@ -208,12 +206,11 @@ describe("Agent foundation services", () => {
       name: "Exec Agent",
       goals: [{ id: "goal-1", objective: "Echo this", constraints: [], successCriteria: ["response"], priority: "normal", priorityOrder: 1 }],
       policy: {
-        allowedTools: ["mcp:local:echo"],
-        toolScopeConstraints: [],
+        toolAccess: { allowedToolIds: ["mcp:local:echo"], scopeConstraints: [] },
         restrictedActions: [],
         costLimits: {},
         executionLimits: { maxSteps: 1 },
-        safetyConstraints: { requiredApprovals: [], deniedPermissions: [] },
+        safetyConstraints: { requiredApprovals: [], deniedPermissionIds: [], sandbox: { network: "deny", filesystem: "deny", assets: "read-only", allowEnvironmentVariables: [] } },
       },
       memory: {
         agentId: "agent-exec",
@@ -222,7 +219,7 @@ describe("Agent foundation services", () => {
         revision: 1,
       },
       planningStrategy: { strategyId: "deterministic", mode: "deterministic-linear" },
-      execution: { maxExecutionSteps: 1, requireTrustedTools: true },
+      execution: { maxPlanUnits: 1, requireTrustedTools: true },
       status: "ready",
       createdAt: "2026-03-24T00:00:00.000Z",
       updatedAt: "2026-03-24T00:00:00.000Z",
@@ -236,7 +233,7 @@ describe("Agent foundation services", () => {
     const result = await service.execute(agent);
     expect(result.status).toBe("completed");
 
-    const persisted = await memoryStore.query("agent-exec", { assetIds: ["asset:memory:1"], tags: ["agent-execution"] });
+    const persisted = await memoryStore.query("agent-exec", { assetIds: [new AssetId("asset:memory:1")], tags: ["agent-execution"] });
     expect(persisted).toHaveLength(1);
     expect((persisted[0]?.metadata as AgentMemoryEntryReference["metadata"] | undefined)).toBeDefined();
   });

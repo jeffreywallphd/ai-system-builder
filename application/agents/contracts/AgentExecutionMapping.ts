@@ -5,7 +5,11 @@ export interface AgentPlanStepMappingInput {
   readonly stepId: string;
   readonly goalId?: string;
   readonly toolId: string;
-  readonly objective: string;
+  readonly intent: {
+    readonly action: string;
+    readonly inputAssetIds?: ReadonlyArray<string>;
+    readonly expectedOutputKey?: string;
+  };
   readonly dependsOnStepIds?: ReadonlyArray<string>;
 }
 
@@ -21,7 +25,9 @@ export interface AgentExecutionUnitPayload {
   readonly stepId: string;
   readonly goalId?: string;
   readonly toolId: string;
-  readonly objective: string;
+  readonly action: string;
+  readonly inputAssetIds: ReadonlyArray<string>;
+  readonly expectedOutputKey?: string;
 }
 
 export interface AgentExecutionBackboneMapping {
@@ -46,7 +52,11 @@ function normalizeStep(step: AgentPlanStepMappingInput): AgentPlanStepMappingInp
     stepId: normalizeRequired(step.stepId, "Agent plan step id"),
     goalId: step.goalId?.trim() || undefined,
     toolId: normalizeRequired(step.toolId, "Agent plan step toolId"),
-    objective: normalizeRequired(step.objective, "Agent plan step objective"),
+    intent: Object.freeze({
+      action: normalizeRequired(step.intent?.action ?? "", "Agent plan step action"),
+      inputAssetIds: Object.freeze((step.intent?.inputAssetIds ?? []).map((assetId) => normalizeRequired(assetId, "Agent plan step inputAssetId"))),
+      expectedOutputKey: step.intent?.expectedOutputKey?.trim() || undefined,
+    }),
     dependsOnStepIds: Object.freeze((step.dependsOnStepIds ?? []).map((dependency) => normalizeRequired(dependency, "Agent plan dependency id"))),
   });
 }
@@ -68,7 +78,9 @@ export function buildAgentExecutionUnitPayload(input: {
     stepId: normalizedStep.stepId,
     goalId: normalizedStep.goalId,
     toolId: normalizedStep.toolId,
-    objective: normalizedStep.objective,
+    action: normalizedStep.intent.action,
+    inputAssetIds: normalizedStep.intent.inputAssetIds ?? [],
+    expectedOutputKey: normalizedStep.intent.expectedOutputKey,
   });
 }
 
@@ -79,11 +91,22 @@ export function mapAgentExecutionToBackbone(input: AgentExecutionBackboneMapping
 
   const planId = resolvePlanId(input.session);
   const normalizedSteps = input.steps.map((step) => normalizeStep(step));
+  const stepIdSet = new Set(normalizedSteps.map((step) => step.stepId));
+  if (stepIdSet.size !== normalizedSteps.length) {
+    throw new Error("Agent execution mapping steps must use unique step ids.");
+  }
+  for (const step of normalizedSteps) {
+    for (const dependencyId of step.dependsOnStepIds ?? []) {
+      if (!stepIdSet.has(dependencyId)) {
+        throw new Error(`Agent execution mapping step '${step.stepId}' depends on unknown step '${dependencyId}'.`);
+      }
+    }
+  }
 
   const units: IExecutionUnitDefinition[] = normalizedSteps.map((step) => ({
     id: step.stepId,
     kind: ExecutionUnitKinds.agentToolStep,
-    label: step.objective,
+    label: step.intent.action,
     dependsOn: step.dependsOnStepIds,
   }));
 

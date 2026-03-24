@@ -30,20 +30,20 @@ export class DeterministicAgentPlanningService implements AgentPlanningInterface
   public async plan(agent: Agent): Promise<AgentExecutionPlan> {
     const capabilities = await this.catalog.listCapabilities();
     const capabilityIds = new Set(capabilities.map((capability) => capability.id));
-    const allowedTools = agent.policy.allowedTools.filter((toolId) => capabilityIds.has(toolId));
+    const allowedTools = agent.policy.toolAccess.allowedToolIds.filter((toolId) => capabilityIds.has(toolId));
 
     if (allowedTools.length === 0) {
       throw new Error(`Agent '${agent.id}' has no executable allowed tools in the current catalog.`);
     }
 
     const memoryEntries = await this.memoryStore.query(agent.id, {
-      assetIds: agent.memory.assets.map((entry) => entry.assetId.toString()),
+      assetIds: agent.memory.assets.map((entry) => entry.assetId),
       memoryTypes: [...new Set(agent.memory.assets.map((entry) => entry.memoryType))],
       tags: agent.memory.retrieval.requiredTags,
       maxEntries: agent.memory.retrieval.maxEntries,
     });
 
-    const maxSteps = agent.execution.maxExecutionSteps ?? agent.policy.executionLimits.maxSteps ?? agent.goals.length;
+    const maxSteps = agent.execution.maxPlanUnits ?? agent.policy.executionLimits.maxSteps ?? agent.goals.length;
     const prioritizedGoals = [...agent.goals]
       .sort((left, right) => left.priorityOrder - right.priorityOrder)
       .slice(0, maxSteps);
