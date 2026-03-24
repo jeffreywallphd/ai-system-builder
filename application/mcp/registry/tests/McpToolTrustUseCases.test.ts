@@ -4,7 +4,10 @@ import type { IMcpToolSecretRepository } from "../../../ports/interfaces/IMcpToo
 import type { InstalledMcpToolRecord } from "../../../../domain/mcp/InstalledMcpTool";
 import {
   ConfigureMcpToolCredentialsUseCase,
+  GetMcpToolEffectivePermissionsUseCase,
+  GetMcpToolSandboxPostureUseCase,
   GetMcpToolCredentialStatusUseCase,
+  GetMissingMcpToolApprovalsUseCase,
   GetMcpToolTrustStateUseCase,
   RevokeMcpToolPermissionApprovalUseCase,
   SetMcpToolPermissionApprovalUseCase,
@@ -118,10 +121,46 @@ describe("McpToolTrustUseCases", () => {
     const registry = makeRegistry(tool);
     await new SetMcpToolSandboxPolicyUseCase(registry).execute({
       toolId: tool.toolId,
-      policy: { networkAccess: "deny", environmentExposure: { mode: "allowlist", allowlist: ["SAFE_ENV"] } },
+      policy: {
+        networkAccess: "deny",
+        networkAllowlist: { hosts: ["api.safe.local"], protocols: ["https"] },
+        filesystemAccess: { mode: "read-only", readAllowedPaths: ["/workspace/safe"], writeAllowedPaths: [] },
+        environmentExposure: { mode: "allowlist", allowlist: ["SAFE_ENV"] },
+      },
     });
     const trust = await new GetMcpToolTrustStateUseCase(registry).execute({ toolId: tool.toolId });
     expect(trust.sandbox.policy.networkAccess).toBe("deny");
+    expect(trust.sandbox.policy.networkAllowlist?.hosts).toEqual(["api.safe.local"]);
+    expect(trust.approval.statusByPermission[0]?.status).toBe("missing");
     expect(trust.sandbox.enforcement.environmentExposure).toBe("declared-only");
+  });
+
+  it("provides dedicated approval/permission/sandbox read models", async () => {
+    const tool = makeTool();
+    const registry = makeRegistry(tool);
+    await new SetMcpToolPermissionsUseCase(registry).execute({
+      toolId: tool.toolId,
+      grantedPermissions: ["network.access"],
+    });
+    await new SetMcpToolPermissionApprovalUseCase(registry).execute({
+      toolId: tool.toolId,
+      permissions: ["network.access"],
+      status: "approved",
+      scope: { scopeType: "project", scopeId: "project-a" },
+    });
+
+    const trustState = new GetMcpToolTrustStateUseCase(registry);
+    const missing = await new GetMissingMcpToolApprovalsUseCase(trustState).execute({
+      toolId: tool.toolId,
+      scope: { scopeType: "project", scopeId: "project-a" },
+    });
+    expect(missing.missingApprovals).toEqual([]);
+    expect(missing.approvalStatusByPermission[0]?.status).toBe("approved");
+
+    const effectivePermissions = await new GetMcpToolEffectivePermissionsUseCase(registry).execute({ toolId: tool.toolId });
+    expect(effectivePermissions.allowed).toBe(true);
+
+    const sandboxPosture = await new GetMcpToolSandboxPostureUseCase(registry).execute({ toolId: tool.toolId });
+    expect(sandboxPosture.policy.networkAccess).toBe("allow");
   });
 });

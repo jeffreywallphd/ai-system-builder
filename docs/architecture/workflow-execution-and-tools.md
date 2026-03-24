@@ -273,6 +273,16 @@ Approval lifecycle actions are auditable (`approval-requested`, `approval-grante
 
 This slice enforces bounded sandbox policy in the application/runtime orchestration layer and truthfully distinguishes invocation-level enforced controls (network/filesystem/asset gating) from declared-only posture (environment exposure). It creates seams for future stronger process/OS sandboxing without claiming that hard isolation already exists.
 
+Approval lifecycle is now complete and persisted per `(tool, permission, scopeType, scopeId)` with `pending` / `approved` / `denied` / `revoked` states, and execution enforces those records directly (no implicit grant fallback).
+
+MCP execution trust flow is now deterministic across paths: contract validation -> credential resolution -> permission policy -> approval policy -> sandbox policy -> execution.
+
+Sandbox contract now includes explicit request-vs-policy posture for network (hosts/protocols), filesystem (read/write path sets), asset actions (read/write), and environment variable exposure; request overreach fails with `sandbox-denied`.
+
+Trust read models are split for direct consumption (`getToolTrustState`, `getMissingApprovals`, `getEffectivePermissions`, `getSandboxPosture`) so callers do not reconstruct approval/sandbox logic manually.
+
+Audit schema now records administrative approval transitions plus decision denials (`approval-required`, `permission-denied`, `sandbox-denied`) and execution allows (`policy-allowed`) with non-secret payloads only.
+
 ## Direction 3 workflow-native update: MCP nodes inside workflow execution (stories 3.1–3.5)
 
 - `mcp.tool_call` now behaves as a first-class workflow node across catalog, persistence, and execution surfaces, with stable registry-aligned node identity (`toolId`) in addition to server/tool binding and descriptor snapshot properties.
