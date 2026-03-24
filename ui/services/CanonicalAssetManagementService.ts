@@ -2,6 +2,7 @@ import type { CanonicalEntityType } from "../../application/ports/interfaces/ICa
 import type {
   CanonicalAssetDetailReadModel,
   CanonicalDependencyStateReadModel,
+  CanonicalProjectionVerificationReadModel,
   CanonicalReconciliationReadModel,
   CanonicalVersionChainItemReadModel,
 } from "../../application/assets-system/AssetManagementReadModels";
@@ -15,6 +16,19 @@ export interface CanonicalAssetManagementServiceOptions {
   readonly replayScopedProjection?: (params: { entityType: CanonicalEntityType; entityId: string; versionId?: string }) => Promise<{
     readonly replayed: boolean;
     readonly reason?: string;
+  }>;
+  readonly verifyProjection?: (params: { assetId: string; versionIdsInScope?: ReadonlyArray<string> }) => Promise<CanonicalProjectionVerificationReadModel>;
+  readonly rebuildProjectionScopes?: (params: {
+    readonly scopes: ReadonlyArray<
+      | { readonly scopeType: "entity"; readonly entityType: CanonicalEntityType; readonly entityId: string; readonly versionId?: string; }
+      | { readonly scopeType: "asset"; readonly assetId: string; readonly versionIdsInScope?: ReadonlyArray<string>; }
+    >;
+    readonly verifyAfterReplay?: boolean;
+  }) => Promise<{
+    readonly totalScopes: number;
+    readonly replayedScopes: number;
+    readonly verifiedScopes: number;
+    readonly results: ReadonlyArray<unknown>;
   }>;
 }
 
@@ -65,5 +79,33 @@ export class CanonicalAssetManagementService {
       entityId: params.entityId.trim(),
       versionId: params.versionId?.trim() || undefined,
     });
+  }
+
+  public async verifyProjection(params: { assetId: string; versionIdsInScope?: ReadonlyArray<string> }): Promise<CanonicalProjectionVerificationReadModel | undefined> {
+    if (!this.options.verifyProjection) {
+      return undefined;
+    }
+    return this.options.verifyProjection({
+      assetId: params.assetId.trim(),
+      versionIdsInScope: params.versionIdsInScope?.map((entry) => entry.trim()).filter(Boolean),
+    });
+  }
+
+  public async rebuildProjectionScopes(params: {
+    readonly scopes: ReadonlyArray<
+      | { readonly scopeType: "entity"; readonly entityType: CanonicalEntityType; readonly entityId: string; readonly versionId?: string; }
+      | { readonly scopeType: "asset"; readonly assetId: string; readonly versionIdsInScope?: ReadonlyArray<string>; }
+    >;
+    readonly verifyAfterReplay?: boolean;
+  }): Promise<{
+    readonly totalScopes: number;
+    readonly replayedScopes: number;
+    readonly verifiedScopes: number;
+    readonly results: ReadonlyArray<unknown>;
+  } | undefined> {
+    if (!this.options.rebuildProjectionScopes) {
+      return undefined;
+    }
+    return this.options.rebuildProjectionScopes(params);
   }
 }

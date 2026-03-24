@@ -72,6 +72,8 @@ import {
 } from "../execution/DatasetGenerationExecutionPlanFactory";
 import type { PublishDurableEntityToAssetSystemUseCase } from "../assets-system/PublishDurableEntityToAssetSystemUseCase";
 import type { CanonicalAssetIdentityService } from "../assets-system/CanonicalAssetIdentityService";
+import type { CanonicalEntityReadResolver } from "../assets-system/CanonicalEntityReadResolver";
+import { CanonicalEntityOperationalReadService } from "../assets-system/CanonicalEntityOperationalReadService";
 
 interface ServiceOptions {
   readonly datasetRepository: DatasetRepository;
@@ -95,6 +97,7 @@ interface ServiceOptions {
   readonly executionEngine?: UnifiedExecutionEngine;
   readonly canonicalPublisher?: PublishDurableEntityToAssetSystemUseCase;
   readonly canonicalIdentityService?: CanonicalAssetIdentityService;
+  readonly canonicalReadResolver?: CanonicalEntityReadResolver;
 }
 
 function defaultCreateId(prefix: string): string {
@@ -126,6 +129,7 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
   private readonly executionEngine?: UnifiedExecutionEngine;
   private readonly canonicalPublisher?: PublishDurableEntityToAssetSystemUseCase;
   private readonly canonicalIdentityService?: CanonicalAssetIdentityService;
+  private readonly canonicalReadService: CanonicalEntityOperationalReadService;
 
   constructor(options: ServiceOptions) {
     this.datasetRepository = options.datasetRepository;
@@ -149,6 +153,7 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
     this.executionEngine = options.executionEngine;
     this.canonicalPublisher = options.canonicalPublisher;
     this.canonicalIdentityService = options.canonicalIdentityService;
+    this.canonicalReadService = new CanonicalEntityOperationalReadService(options.canonicalReadResolver);
   }
 
   public async createDataset(command: CreateDatasetCommand): Promise<DatasetDetails> {
@@ -333,31 +338,43 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
     readonly assetId?: string;
     readonly pinnedVersionId?: string;
     readonly latestVersionId?: string;
+    readonly provenance?: {
+      readonly directUpstreamCount: number;
+      readonly directDownstreamCount: number;
+      readonly producingTransformationCount: number;
+      readonly lineageConfidence: "exact" | "partial";
+    };
+    readonly dependencyState?: {
+      readonly state: "healthy" | "impacted" | "stale" | "partially-trusted" | "reconciliation-needed";
+      readonly reasons: ReadonlyArray<string>;
+      readonly nextActions: ReadonlyArray<string>;
+    };
     readonly fallbackReason?: string;
   }> {
+    const entityId = `${datasetId}:${versionId}`;
+    const resolved = await this.canonicalReadService.resolveSummary({
+      entityType: "dataset-version",
+      entityId,
+      fallbackWhenUnavailable: "Canonical resolver is not configured for dataset-version reads.",
+    });
+    if (resolved.assetId) {
+      return resolved;
+    }
     if (!this.canonicalIdentityService) {
-      return Object.freeze({
-        preferred: false,
-        fallbackReason: "Canonical identity service is not configured for dataset-version reads.",
-      });
+      return resolved;
     }
 
-    const entityId = `${datasetId}:${versionId}`;
     const identity = await this.canonicalIdentityService.resolveIdentity("dataset-version", entityId);
     const assetId = identity?.assetId;
-    if (!assetId) {
-      return Object.freeze({
-        preferred: false,
-        fallbackReason: `No canonical identity mapping found for dataset version '${entityId}'.`,
-      });
-    }
-
-    const latestVersionId = await this.canonicalIdentityService.resolveLatestVersionId("dataset-version", entityId);
+    const latestVersionId = assetId
+      ? await this.canonicalIdentityService.resolveLatestVersionId("dataset-version", entityId)
+      : undefined;
     return Object.freeze({
-      preferred: true,
+      preferred: !!assetId,
       assetId,
       pinnedVersionId: identity?.latestVersionId,
       latestVersionId,
+      fallbackReason: assetId ? resolved.fallbackReason : `No canonical identity mapping found for dataset version '${entityId}'.`,
     });
   }
 

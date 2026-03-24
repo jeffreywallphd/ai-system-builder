@@ -1,4 +1,5 @@
 import type { AppRuntimeConfigValues } from "../../infrastructure/config/AppRuntimeConfig";
+import type { CanonicalEntityType } from "../../application/ports/interfaces/ICanonicalAssetIdentityRepository";
 
 export interface DesktopStoragePaths {
   readonly appDataDirectory: string;
@@ -68,10 +69,22 @@ export interface DesktopModelFileBridge {
   copy(request: { readonly from: string; readonly to: string; readonly overwrite?: boolean }): void;
 }
 
+export interface DesktopCanonicalAssetBridge {
+  listAssets(criteriaJson?: string): Promise<ReadonlyArray<string>>;
+  loadAssetDetail(assetId: string): Promise<string | null>;
+  listVersionChain(assetId: string): Promise<ReadonlyArray<string>>;
+  evaluateDependencyState(versionId: string): Promise<string | null>;
+  reconcileIdentity(entityType: CanonicalEntityType, entityId: string): Promise<string | null>;
+  replayScopedProjection(entityType: CanonicalEntityType, entityId: string, versionId?: string): Promise<string>;
+  verifyProjection(assetId: string, versionIdsInScope?: ReadonlyArray<string>): Promise<string | null>;
+  rebuildProjectionScopes(requestJson: string): Promise<string>;
+}
+
 export interface DesktopBridge {
   readonly bootstrap: DesktopBootstrapContext;
   readonly storage: DesktopKeyValueStorageBridge;
   readonly workflows: DesktopWorkflowBridge;
   readonly executionRuns: DesktopExecutionRunBridge;
   readonly modelFiles: DesktopModelFileBridge;
+  readonly canonicalAssets: DesktopCanonicalAssetBridge;
 }

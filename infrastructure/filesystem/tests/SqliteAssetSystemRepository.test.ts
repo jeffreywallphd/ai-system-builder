@@ -58,6 +58,23 @@ describe("SqliteAssetSystemRepository", () => {
       await repo.upsertIdentity({ entityType: "workflow-definition", entityId: "wf-1", assetId: "asset-1", latestVersionId: "v2" });
       const identities = await repo.listCanonicalIdentities({ entityType: "workflow-definition" });
       expect(identities[0]?.entityId).toBe("wf-1");
+
+      await repo.saveDependencyState({
+        versionId: "v2",
+        computedAt: new Date("2026-03-24T00:00:00.000Z"),
+        summary: {
+          versionId: "v2",
+          state: "impacted",
+          lineageConfidence: "partial",
+          reasons: ["upstream changed"],
+          impactedByUpstreamVersionIds: ["v1"],
+          staleBecauseUpstreamAdvanced: [],
+          nextActions: ["Refresh dependency state after upstream changes and review downstream exposure."],
+        },
+      });
+      const dependencyState = await repo.getDependencyState("v2");
+      expect(dependencyState?.summary.state).toBe("impacted");
+      expect(dependencyState?.summary.reasons[0]).toBe("upstream changed");
     } finally {
       await rm(root, { recursive: true, force: true });
     }

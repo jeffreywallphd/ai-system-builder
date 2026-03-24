@@ -35,3 +35,11 @@ export interface CanonicalReconciliationReadModel {
   readonly previousVersionId?: string;
   readonly reconciledVersionId?: string;
 }
+
+export interface CanonicalProjectionVerificationReadModel {
+  readonly assetId: string;
+  readonly matched: boolean;
+  readonly edgeCount: number;
+  readonly scopedVersionCount: number;
+  readonly failedChecks: ReadonlyArray<string>;
+}

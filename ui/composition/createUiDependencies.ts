@@ -126,6 +126,7 @@ import { BrowserStorageWorkflowRepository } from "../../infrastructure/browser/w
 import { DesktopBridgeWorkflowRepository } from "../../infrastructure/browser/workflows/DesktopBridgeWorkflowRepository";
 import { resolveDesktopWorkflowBridge } from "./DesktopWorkflowBridgeAdapter";
 import { resolveDesktopExecutionRunBridge } from "./DesktopExecutionRunBridgeAdapter";
+import { resolveDesktopCanonicalAssetBridge } from "./DesktopCanonicalAssetBridgeAdapter";
 import { TruthfulWorkflowExecutor } from "../../infrastructure/execution/TruthfulWorkflowExecutor";
 import { InterpretedWorkflowExecutionStrategy } from "../../infrastructure/interpreted/execution/InterpretedWorkflowExecutionStrategy";
 import { DefaultNodeExecutionContextResolver } from "../../infrastructure/interpreted/execution/DefaultNodeExecutionContextResolver";
@@ -587,7 +588,53 @@ export function createUiDependencies(
   );
   const modelTrainingService = new ModelTrainingService(modelTrainingApplicationService);
   const modelTrainingStore = new ModelTrainingStore(modelTrainingService);
-  const canonicalAssetManagementService = new CanonicalAssetManagementService();
+  const desktopCanonicalAssetBridge = resolveDesktopCanonicalAssetBridge();
+  const canonicalAssetManagementService = new CanonicalAssetManagementService(desktopCanonicalAssetBridge
+    ? {
+      listAssets: async () => (await desktopCanonicalAssetBridge.listAssets()).map((entry) => JSON.parse(entry)),
+      loadAssetDetail: async (assetId) => {
+        const detail = await desktopCanonicalAssetBridge.loadAssetDetail(assetId);
+        return detail ? JSON.parse(detail) : undefined;
+      },
+      listVersionChain: async (assetId) => (await desktopCanonicalAssetBridge.listVersionChain(assetId)).map((entry) => {
+        const parsed = JSON.parse(entry) as {
+          versionId: string;
+          parentVersionId?: string;
+          label?: string;
+          dependencyState?: "healthy" | "impacted" | "stale" | "partially-trusted" | "reconciliation-needed";
+          createdAt: string;
+        };
+        return Object.freeze({
+          ...parsed,
+          createdAt: new Date(parsed.createdAt),
+        });
+      }),
+      evaluateDependencyState: async (versionId) => {
+        const state = await desktopCanonicalAssetBridge.evaluateDependencyState(versionId);
+        if (!state) {
+          throw new Error(`Canonical dependency state for version '${versionId}' is unavailable.`);
+        }
+        return JSON.parse(state);
+      },
+      reconcileIdentity: async ({ entityType, entityId }) => {
+        const reconciled = await desktopCanonicalAssetBridge.reconcileIdentity(entityType, entityId);
+        return reconciled ? JSON.parse(reconciled) : undefined;
+      },
+      replayScopedProjection: async ({ entityType, entityId, versionId }) => JSON.parse(
+        await desktopCanonicalAssetBridge.replayScopedProjection(entityType, entityId, versionId),
+      ),
+      verifyProjection: async ({ assetId, versionIdsInScope }) => {
+        const verification = await desktopCanonicalAssetBridge.verifyProjection(assetId, versionIdsInScope);
+        if (!verification) {
+          throw new Error(`Projection verification for canonical asset '${assetId}' is unavailable.`);
+        }
+        return JSON.parse(verification);
+      },
+      rebuildProjectionScopes: async (request) => JSON.parse(
+        await desktopCanonicalAssetBridge.rebuildProjectionScopes(JSON.stringify(request)),
+      ),
+    }
+    : undefined);
 
   return Object.freeze({
     config,

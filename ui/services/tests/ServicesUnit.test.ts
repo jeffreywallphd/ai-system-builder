@@ -88,5 +88,7 @@ describe("ui/services unit coverage", () => {
     expect(await service.listAssets()).toEqual([]);
     const replay = await service.replayScopedProjection({ entityType: "workflow-definition", entityId: "wf-1" });
     expect(replay.replayed).toBeFalse();
+    expect(await service.verifyProjection({ assetId: "workflow-definition:wf-1" })).toBeUndefined();
+    expect(await service.rebuildProjectionScopes({ scopes: [] })).toBeUndefined();
   });
 });

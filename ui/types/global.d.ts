@@ -1,4 +1,4 @@
-import type { DesktopBootstrapContext, DesktopExecutionRunBridge, DesktopModelFileBridge, DesktopWorkflowBridge } from "../../electron/shared/DesktopContracts";
+import type { DesktopBootstrapContext, DesktopCanonicalAssetBridge, DesktopExecutionRunBridge, DesktopModelFileBridge, DesktopWorkflowBridge } from "../../electron/shared/DesktopContracts";
 
 interface DesktopStorageBridge {
   getItem(key: string): string | null;
@@ -14,6 +14,7 @@ declare global {
       workflows: DesktopWorkflowBridge;
       executionRuns: DesktopExecutionRunBridge;
       modelFiles: DesktopModelFileBridge;
+      canonicalAssets?: DesktopCanonicalAssetBridge;
     };
   }
 }

@@ -56,4 +56,43 @@ describe("GetCanonicalDependencyStateUseCase", () => {
       await rm(root, { recursive: true, force: true });
     }
   });
+
+  it("persists and reuses dependency summaries when a fresh cached state is available", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "loom-dependency-state-cache-"));
+    try {
+      const repository = new SqliteAssetSystemRepository(path.join(root, "asset-system.sqlite"));
+      if (!repository.isAvailable) return;
+      const register = new RegisterAssetUseCase(repository);
+      const createVersion = new CreateAssetVersionUseCase(repository);
+      await register.execute({ asset: { id: "cache-asset", name: "cache-asset", kind: "generic", status: "available", source: { type: "system" }, location: { accessMethod: "virtual", location: "cache-asset" } } as any });
+      await createVersion.execute({ assetId: "cache-asset", versionId: "cache:v1" });
+      const useCase = new GetCanonicalDependencyStateUseCase(
+        repository,
+        repository,
+        new GetAssetDependencyHealthUseCase(repository, repository, repository),
+        new GetAssetImpactAnalysisUseCase(repository, repository, repository),
+        new GetCanonicalProvenanceSummaryUseCase(repository, repository, repository),
+        repository,
+      );
+
+      const initial = await useCase.execute({ versionId: "cache:v1", forceRefresh: true });
+      expect(initial.state).toBe("partially-trusted");
+
+      await repository.saveDependencyState({
+        versionId: "cache:v1",
+        computedAt: new Date(),
+        summary: {
+          ...initial,
+          state: "healthy",
+          reasons: ["cached-state"],
+          nextActions: ["No reconciliation is required."],
+        },
+      });
+      const cached = await useCase.execute({ versionId: "cache:v1", preferPersistedIfFreshMs: 60_000 });
+      expect(cached.state).toBe("healthy");
+      expect(cached.reasons).toEqual(["cached-state"]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 });

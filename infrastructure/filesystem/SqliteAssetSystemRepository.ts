@@ -13,6 +13,8 @@ import type { IAssetTransformationRepository } from "../../application/ports/int
 import type { IAssetVersionRepository } from "../../application/ports/interfaces/IAssetVersionRepository";
 import type { ICanonicalAssetIdentityRepository, CanonicalAssetIdentityRecord, CanonicalEntityType } from "../../application/ports/interfaces/ICanonicalAssetIdentityRepository";
 import type { CanonicalAssetQueryCriteria, IAssetSystemQueryRepository } from "../../application/ports/interfaces/IAssetSystemQueryRepository";
+import type { CanonicalDependencyStateSummary } from "../../application/assets-system/CanonicalDependencyStateUseCase";
+import type { ICanonicalDependencyStateRepository } from "../../application/ports/interfaces/ICanonicalDependencyStateRepository";
 
 interface AssetRow { readonly asset_json: string; }
 interface AssetVersionRow {
@@ -29,8 +31,13 @@ interface IdentityRow {
   readonly latest_version_id?: string | null;
   readonly updated_at: string;
 }
+interface DependencyStateRow {
+  readonly version_id: string;
+  readonly summary_json: string;
+  readonly computed_at: string;
+}
 
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 const MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   [1, `
     CREATE TABLE asset_system_migrations (
@@ -111,6 +118,17 @@ const MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
     CREATE INDEX IF NOT EXISTS canonical_identity_latest_idx ON canonical_asset_identities(latest_version_id, updated_at DESC);
     CREATE INDEX IF NOT EXISTS asset_versions_asset_parent_idx ON asset_versions(asset_id, parent_version_id, created_at DESC);
   `],
+  [5, `
+    CREATE TABLE IF NOT EXISTS canonical_dependency_state (
+      version_id TEXT PRIMARY KEY,
+      state TEXT NOT NULL,
+      lineage_confidence TEXT NOT NULL,
+      computed_at TEXT NOT NULL,
+      summary_json TEXT NOT NULL,
+      FOREIGN KEY(version_id) REFERENCES asset_versions(version_id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS canonical_dependency_state_idx ON canonical_dependency_state(state, computed_at DESC);
+  `],
 ]);
 
 export class SqliteAssetSystemRepository implements
@@ -119,6 +137,7 @@ export class SqliteAssetSystemRepository implements
   IAssetLineageRepository,
   IAssetTransformationRepository,
   ICanonicalAssetIdentityRepository,
+  ICanonicalDependencyStateRepository,
   IAssetSystemQueryRepository {
   private database?: Database.Database;
   private initialized = false;
@@ -456,6 +475,45 @@ export class SqliteAssetSystemRepository implements
     })));
   }
 
+  public async saveDependencyState(record: {
+    readonly versionId: string;
+    readonly summary: CanonicalDependencyStateSummary;
+    readonly computedAt: Date;
+  }): Promise<void> {
+    this.assertVersionExists(record.versionId);
+    this.getDatabase().prepare(`
+      INSERT INTO canonical_dependency_state (version_id, state, lineage_confidence, computed_at, summary_json)
+      VALUES (@versionId, @state, @lineageConfidence, @computedAt, @summaryJson)
+      ON CONFLICT(version_id) DO UPDATE SET
+        state = excluded.state,
+        lineage_confidence = excluded.lineage_confidence,
+        computed_at = excluded.computed_at,
+        summary_json = excluded.summary_json
+    `).run({
+      versionId: record.versionId.trim(),
+      state: record.summary.state,
+      lineageConfidence: record.summary.lineageConfidence,
+      computedAt: record.computedAt.toISOString(),
+      summaryJson: JSON.stringify(record.summary),
+    });
+  }
+
+  public async getDependencyState(versionId: string): Promise<{ readonly versionId: string; readonly summary: CanonicalDependencyStateSummary; readonly computedAt: Date; } | undefined> {
+    const row = this.getDatabase().prepare(`
+      SELECT version_id, summary_json, computed_at
+      FROM canonical_dependency_state
+      WHERE version_id = ?
+    `).get(versionId.trim()) as DependencyStateRow | undefined;
+    if (!row) {
+      return undefined;
+    }
+    return Object.freeze({
+      versionId: row.version_id,
+      summary: this.parseDependencyState(row.summary_json),
+      computedAt: new Date(row.computed_at),
+    });
+  }
+
   public get isAvailable(): boolean {
     try {
       const probe = new Database(":memory:");
@@ -621,6 +679,17 @@ export class SqliteAssetSystemRepository implements
       startedAt: parsed.startedAt ? new Date(parsed.startedAt) : undefined,
       completedAt: parsed.completedAt ? new Date(parsed.completedAt) : undefined,
       createdAt: new Date(parsed.createdAt),
+    });
+  }
+
+  private parseDependencyState(json: string): CanonicalDependencyStateSummary {
+    const parsed = JSON.parse(json) as CanonicalDependencyStateSummary;
+    return Object.freeze({
+      ...parsed,
+      reasons: Object.freeze([...(parsed.reasons ?? [])]),
+      impactedByUpstreamVersionIds: Object.freeze([...(parsed.impactedByUpstreamVersionIds ?? [])]),
+      staleBecauseUpstreamAdvanced: Object.freeze([...(parsed.staleBecauseUpstreamAdvanced ?? [])]),
+      nextActions: Object.freeze([...(parsed.nextActions ?? [])]),
     });
   }
 }

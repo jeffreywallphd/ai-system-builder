@@ -14,6 +14,7 @@ import { GetAssetDependencyHealthUseCase } from "../assets-system/GetAssetDepend
 import { GetAssetImpactAnalysisUseCase } from "../assets-system/GetAssetImpactAnalysisUseCase";
 import { GetCanonicalDependencyStateUseCase } from "../assets-system/CanonicalDependencyStateUseCase";
 import { CanonicalEntityReadResolver } from "../assets-system/CanonicalEntityReadResolver";
+import { CanonicalEntityOperationalReadService } from "../assets-system/CanonicalEntityOperationalReadService";
 import type { ICanonicalAssetIdentityRepository } from "../ports/interfaces/ICanonicalAssetIdentityRepository";
 import type { IAssetLineageRepository } from "../ports/interfaces/IAssetLineageRepository";
 import type { IAssetTransformationRepository } from "../ports/interfaces/IAssetTransformationRepository";
@@ -68,7 +69,7 @@ export interface ILoadWorkflowResult {
 export class LoadWorkflowUseCase {
   private readonly workflowRepository: IWorkflowRepository;
   private readonly workflowValidator?: IWorkflowValidator;
-  private readonly canonicalReadResolver?: CanonicalEntityReadResolver;
+  private readonly canonicalReadService: CanonicalEntityOperationalReadService;
 
   constructor(
     workflowRepository: IWorkflowRepository,
@@ -85,7 +86,7 @@ export class LoadWorkflowUseCase {
   ) {
     this.workflowRepository = workflowRepository;
     this.workflowValidator = workflowValidator;
-    this.canonicalReadResolver = canonicalRepositories
+    this.canonicalReadService = new CanonicalEntityOperationalReadService(canonicalRepositories
       ? new CanonicalEntityReadResolver(
         canonicalRepositories.canonicalIdentityService,
         new LoadCanonicalAssetSummaryUseCase(canonicalRepositories.assetRepository, canonicalRepositories.versionRepository, canonicalRepositories.queryRepository),
@@ -99,7 +100,7 @@ export class LoadWorkflowUseCase {
           new GetCanonicalProvenanceSummaryUseCase(canonicalRepositories.lineageRepository, canonicalRepositories.transformationRepository, canonicalRepositories.queryRepository),
         ),
       )
-      : undefined;
+      : undefined);
   }
 
   public async execute(
@@ -157,29 +158,10 @@ export class LoadWorkflowUseCase {
   }
 
   private async loadCanonicalReadSummary(workflowId: string): Promise<ILoadWorkflowResult["canonicalRead"]> {
-    if (!this.canonicalReadResolver) {
-      return Object.freeze({
-        preferred: false,
-        fallbackReason: "Canonical repositories are not configured for workflow reads.",
-      });
-    }
-
-    const resolved = await this.canonicalReadResolver.resolve({ entityType: "workflow-definition", entityId: workflowId });
-
-    return Object.freeze({
-      preferred: resolved.preferred,
-      assetId: resolved.assetId,
-      pinnedVersionId: resolved.pinnedVersionId,
-      latestVersionId: resolved.latestVersionId,
-      provenance: resolved.provenance,
-      dependencyState: resolved.dependencyState
-        ? Object.freeze({
-          state: resolved.dependencyState.state,
-          reasons: resolved.dependencyState.reasons,
-          nextActions: resolved.dependencyState.nextActions,
-        })
-        : undefined,
-      fallbackReason: resolved.fallbackReason,
+    return this.canonicalReadService.resolveSummary({
+      entityType: "workflow-definition",
+      entityId: workflowId,
+      fallbackWhenUnavailable: "Canonical repositories are not configured for workflow reads.",
     });
   }
 }

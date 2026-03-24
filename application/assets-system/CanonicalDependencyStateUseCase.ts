@@ -1,5 +1,6 @@
 import type { ICanonicalAssetIdentityRepository, CanonicalEntityType } from "../ports/interfaces/ICanonicalAssetIdentityRepository";
 import type { IAssetVersionRepository } from "../ports/interfaces/IAssetVersionRepository";
+import type { ICanonicalDependencyStateRepository } from "../ports/interfaces/ICanonicalDependencyStateRepository";
 import { GetAssetDependencyHealthUseCase } from "./GetAssetDependencyHealthUseCase";
 import { GetAssetImpactAnalysisUseCase } from "./GetAssetImpactAnalysisUseCase";
 import { GetCanonicalProvenanceSummaryUseCase } from "./CanonicalAssetReadUseCases";
@@ -32,16 +33,27 @@ export class GetCanonicalDependencyStateUseCase {
     private readonly dependencyHealthUseCase: GetAssetDependencyHealthUseCase,
     private readonly impactAnalysisUseCase: GetAssetImpactAnalysisUseCase,
     private readonly provenanceSummaryUseCase: GetCanonicalProvenanceSummaryUseCase,
+    private readonly dependencyStateRepository?: ICanonicalDependencyStateRepository,
   ) {}
 
   public async execute(params: {
     readonly versionId: string;
     readonly changedUpstreamVersionIds?: ReadonlyArray<string>;
     readonly maxDownstreamDepth?: number;
+    readonly preferPersistedIfFreshMs?: number;
+    readonly forceRefresh?: boolean;
   }): Promise<CanonicalDependencyStateSummary> {
     const version = await this.versionRepository.getByVersionId(params.versionId);
     if (!version) {
       throw new Error(`Canonical dependency state requires an existing version. '${params.versionId}' was not found.`);
+    }
+
+    const freshnessWindowMs = params.preferPersistedIfFreshMs ?? 0;
+    if (!params.forceRefresh && this.dependencyStateRepository && freshnessWindowMs > 0) {
+      const persisted = await this.dependencyStateRepository.getDependencyState(params.versionId);
+      if (persisted && Date.now() - persisted.computedAt.getTime() <= freshnessWindowMs) {
+        return persisted.summary;
+      }
     }
 
     const [health, impact, provenance] = await Promise.all([
@@ -88,7 +100,7 @@ export class GetCanonicalDependencyStateUseCase {
       hasDownstreamExposure: impact.directDependentVersionIds.length > 0 || impact.transitiveDependentVersionIds.length > 0,
     });
 
-    return Object.freeze({
+    const summary = Object.freeze({
       versionId: params.versionId,
       state,
       lineageConfidence: health.confidence === "certain" ? "exact" : "partial",
@@ -97,6 +109,12 @@ export class GetCanonicalDependencyStateUseCase {
       staleBecauseUpstreamAdvanced: Object.freeze(staleBecauseUpstreamAdvanced.map((entry) => Object.freeze(entry))),
       nextActions: Object.freeze(nextActions),
     });
+    await this.dependencyStateRepository?.saveDependencyState({
+      versionId: params.versionId,
+      computedAt: new Date(),
+      summary,
+    });
+    return summary;
   }
 
   public async evaluateCanonicalEntity(params: {
