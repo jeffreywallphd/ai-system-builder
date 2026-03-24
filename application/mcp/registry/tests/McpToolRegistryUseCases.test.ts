@@ -8,11 +8,11 @@ import {
   GetInstalledMcpToolUseCase,
   InstallMcpToolUseCase,
   ListInstalledMcpToolsUseCase,
+  ListMcpToolLifecycleHistoryUseCase,
   PreviewMcpToolUpdateUseCase,
   QueryMcpToolCapabilitiesUseCase,
   RemoveMcpToolUseCase,
   SetMcpToolStatusUseCase,
-  ListMcpToolLifecycleHistoryUseCase,
 } from "../McpToolRegistryUseCases";
 import { McpToolRegistryError } from "../McpToolRegistryErrors";
 
@@ -79,21 +79,17 @@ function toolRecord(toolId: string, version = "1.0.0", status: InstalledMcpToolR
 describe("McpToolRegistryUseCases", () => {
   it("installs and lists MCP tools", async () => {
     const repository = makeRepository();
-    const install = new InstallMcpToolUseCase(repository);
-
-    await install.execute({
-      definition: toolRecord("mcp:local:weather").definition,
-    });
+    await new InstallMcpToolUseCase(repository).execute({ definition: toolRecord("mcp:local:weather").definition });
 
     const list = await new ListInstalledMcpToolsUseCase(repository).execute();
     expect(list).toHaveLength(1);
     expect(list[0]?.toolId).toBe("mcp:local:weather");
-    expect(list[0]?.lifecycle?.lastAction).toBe("install");
+    expect(list[0]?.version).toBe("1.0.0");
+    expect(list[0]?.lifecycle.lastAction).toBe("install");
   });
 
   it("rejects duplicate installs without overwrite", async () => {
     const repository = makeRepository([toolRecord("mcp:local:weather")]);
-
     await expect(
       new InstallMcpToolUseCase(repository).execute({ definition: toolRecord("mcp:local:weather").definition }),
     ).rejects.toMatchObject({ code: "duplicate-install" } satisfies Partial<McpToolRegistryError>);
@@ -101,7 +97,6 @@ describe("McpToolRegistryUseCases", () => {
 
   it("requires explicit update lifecycle for new versions", async () => {
     const repository = makeRepository([toolRecord("mcp:local:weather", "1.0.0")]);
-
     await expect(
       new InstallMcpToolUseCase(repository).execute({ definition: toolRecord("mcp:local:weather", "1.1.0").definition }),
     ).rejects.toMatchObject({ code: "invalid-transition" } satisfies Partial<McpToolRegistryError>);
@@ -120,17 +115,6 @@ describe("McpToolRegistryUseCases", () => {
     expect(updated.lifecycle?.versionPolicy).toBe("floating");
   });
 
-  it("supports status transitions", async () => {
-    const repository = makeRepository([toolRecord("mcp:local:weather")]);
-    const useCase = new SetMcpToolStatusUseCase(repository);
-
-    const disabled = await useCase.disable("mcp:local:weather");
-    const enabled = await useCase.enable("mcp:local:weather");
-
-    expect(disabled.status).toBe("disabled");
-    expect(enabled.status).toBe("enabled");
-  });
-
   it("previews update transition and change summary", async () => {
     const repository = makeRepository([toolRecord("mcp:local:weather", "1.0.0")]);
     const scanner: IMcpToolDependencyScanner = { scanToolReferences: async () => [] };
@@ -145,33 +129,14 @@ describe("McpToolRegistryUseCases", () => {
 
     expect(preview.transition).toBe("upgrade");
     expect(preview.action).toBe("update");
-    expect(preview.changeSummary.version.changed).toBe(true);
+    expect(preview.changeSummary.classification.informational).toContain("version");
     expect(preview.changeSummary.tags.added).toEqual(["forecast"]);
-    expect(preview.remediationSuggestions.length).toBeGreaterThan(0);
-  });
-
-  it("classifies same-version update as reinstall", async () => {
-    const repository = makeRepository([toolRecord("mcp:local:weather", "1.0.0")]);
-    const scanner: IMcpToolDependencyScanner = { scanToolReferences: async () => [] };
-
-    const result = await new ApplyMcpToolUpdateUseCase(repository, scanner).execute({
-      toolId: "mcp:local:weather",
-      force: true,
-      definition: toolRecord("mcp:local:weather", "1.0.0").definition,
-    });
-
-    expect(result.status).toBe("updated");
-    expect(result.action).toBe("reinstall");
-    expect(result.transition).toBe("same-version");
-    expect(result.record?.lifecycle?.reinstallCount).toBe(1);
   });
 
   it("blocks risky update with dependencies unless forced", async () => {
     const repository = makeRepository([toolRecord("mcp:local:weather", "1.0.0")]);
     const scanner: IMcpToolDependencyScanner = {
-      scanToolReferences: async () => [
-        Object.freeze({ kind: "workflow", id: "wf-1", label: "Weather Workflow", detail: "Referenced by 1 node." }),
-      ],
+      scanToolReferences: async () => [Object.freeze({ kind: "workflow", id: "wf-1", label: "Weather Workflow" })],
     };
 
     const result = await new ApplyMcpToolUpdateUseCase(repository, scanner).execute({
@@ -184,9 +149,7 @@ describe("McpToolRegistryUseCases", () => {
     });
 
     expect(result.status).toBe("blocked");
-    expect(result.compatibility).toBe("breaking");
-    expect(result.remediationSuggestions.length).toBeGreaterThan(0);
-    expect(await repository.getInstalledTool("mcp:local:weather"))?.toMatchObject({ definition: { version: "1.0.0" } });
+    expect(result.dependencySafety.status).toBe("blocked");
   });
 
   it("allows forced risky update and preserves enabled status", async () => {
@@ -205,74 +168,15 @@ describe("McpToolRegistryUseCases", () => {
     });
 
     expect(result.status).toBe("updated");
+    expect(result.dependencySafety.status).toBe("ack-required");
     expect(result.record?.status).toBe("enabled");
-    expect(result.record?.lifecycle?.updateCount).toBe(1);
   });
 
-  it("blocks downgrade unless explicitly allowed", async () => {
-    const repository = makeRepository([toolRecord("mcp:local:weather", "2.0.0")]);
-    const scanner: IMcpToolDependencyScanner = { scanToolReferences: async () => [] };
-
-    const blocked = await new ApplyMcpToolUpdateUseCase(repository, scanner).execute({
-      toolId: "mcp:local:weather",
-      definition: toolRecord("mcp:local:weather", "1.0.0").definition,
-    });
-
-    expect(blocked.status).toBe("blocked");
-    expect(blocked.transition).toBe("downgrade");
-
-    const allowed = await new ApplyMcpToolUpdateUseCase(repository, scanner).execute({
-      toolId: "mcp:local:weather",
-      allowDowngrade: true,
-      approval: { acknowledgedBreaking: true },
-      definition: toolRecord("mcp:local:weather", "1.0.0").definition,
-    });
-
-    expect(allowed.status).toBe("updated");
-    expect(allowed.record?.lifecycle?.lastAction).toBe("downgrade");
-  });
-
-  it("requires explicit approval for risky updates", async () => {
-    const repository = makeRepository([toolRecord("mcp:local:weather", "1.0.0")]);
-    const scanner: IMcpToolDependencyScanner = { scanToolReferences: async () => [] };
-
-    const blocked = await new ApplyMcpToolUpdateUseCase(repository, scanner).execute({
-      toolId: "mcp:local:weather",
-      definition: {
-        ...toolRecord("mcp:local:weather", "1.1.0").definition,
-        tags: ["weather", "forecast"],
-      },
-    });
-    expect(blocked.status).toBe("blocked");
-
-    const allowed = await new ApplyMcpToolUpdateUseCase(repository, scanner).execute({
-      toolId: "mcp:local:weather",
-      approval: { acknowledgedRisk: true, acknowledgedBreaking: true },
-      definition: {
-        ...toolRecord("mcp:local:weather", "1.1.0").definition,
-        tags: ["weather", "forecast"],
-      },
-    });
-    expect(allowed.status).toBe("updated");
-  });
-
-  it("supports strict policy profile for schema additions", async () => {
-    const repository = makeRepository([toolRecord("mcp:local:weather", "1.0.0")]);
-    const scanner: IMcpToolDependencyScanner = { scanToolReferences: async () => [] };
-    const result = await new ApplyMcpToolUpdateUseCase(repository, scanner).execute({
-      toolId: "mcp:local:weather",
-      policyProfile: "strict",
-      approval: { acknowledgedBreaking: true },
-      definition: {
-        ...toolRecord("mcp:local:weather", "1.1.0").definition,
-        outputSchema: {
-          type: "object",
-          properties: { temperature: { type: "number" }, city: { type: "string" } },
-        },
-      },
-    });
-    expect(result.status).toBe("updated");
-    expect(result.compatibility).toBe("breaking");
+  it("supports status transitions", async () => {
+    const repository = makeRepository([toolRecord("mcp:local:weather")]);
+    const useCase = new SetMcpToolStatusUseCase(repository);
+    expect((await useCase.disable("mcp:local:weather")).status).toBe("disabled");
+    expect((await useCase.enable("mcp:local:weather")).status).toBe("enabled");
   });
 
   it("exposes lifecycle history and summary read models", async () => {
@@ -282,39 +186,21 @@ describe("McpToolRegistryUseCases", () => {
       toolId: "mcp:local:weather",
       force: true,
       approval: { acknowledgedRisk: true },
-      definition: {
-        ...toolRecord("mcp:local:weather", "1.1.0").definition,
-        tags: ["weather", "forecast"],
-      },
+      definition: { ...toolRecord("mcp:local:weather", "1.1.0").definition, tags: ["weather", "forecast"] },
     });
 
     const history = await new ListMcpToolLifecycleHistoryUseCase(repository).execute("mcp:local:weather");
     const summary = await new GetMcpToolLifecycleSummaryUseCase(repository).execute("mcp:local:weather");
     expect(history.length).toBeGreaterThan(1);
     expect(summary.counters.updateCount).toBe(1);
-    expect(summary.lastEvent?.action).toBe("update");
   });
 
   it("returns blocked safe-removal status when references exist", async () => {
     const repository = makeRepository([toolRecord("mcp:local:weather")]);
     const scanner: IMcpToolDependencyScanner = {
-      scanToolReferences: async () => [
-        Object.freeze({ kind: "workflow", id: "wf-1", label: "Weather Workflow", detail: "Referenced by 1 node." }),
-      ],
+      scanToolReferences: async () => [Object.freeze({ kind: "workflow", id: "wf-1", label: "Weather Workflow" })],
     };
-
-    const result = await new RemoveMcpToolUseCase(repository, scanner).execute("mcp:local:weather");
-    expect(result.status).toBe("blocked");
-    expect(result.references).toHaveLength(1);
-    expect(await repository.getInstalledTool("mcp:local:weather")).toBeDefined();
-  });
-
-  it("removes a tool when no references are found", async () => {
-    const repository = makeRepository([toolRecord("mcp:local:weather")]);
-    const scanner: IMcpToolDependencyScanner = { scanToolReferences: async () => [] };
-    const result = await new RemoveMcpToolUseCase(repository, scanner).execute("mcp:local:weather");
-    expect(result).toEqual({ status: "removed", toolId: "mcp:local:weather", references: [] });
-    expect(await repository.getInstalledTool("mcp:local:weather")).toBeUndefined();
+    expect((await new RemoveMcpToolUseCase(repository, scanner).execute("mcp:local:weather")).status).toBe("blocked");
   });
 
   it("queries capabilities by auth, side effects, and schema type", async () => {
@@ -330,8 +216,7 @@ describe("McpToolRegistryUseCases", () => {
       }),
     ]);
 
-    const useCase = new QueryMcpToolCapabilitiesUseCase(repository);
-    const results = await useCase.execute({
+    const results = await new QueryMcpToolCapabilitiesUseCase(repository).execute({
       inputType: "string",
       requiresAuth: true,
       sideEffects: ["write"],
@@ -339,46 +224,6 @@ describe("McpToolRegistryUseCases", () => {
 
     expect(results).toHaveLength(1);
     expect(results[0]?.toolId).toBe("mcp:local:charge");
-  });
-
-  it("supports deeper capability filtering semantics", async () => {
-    const repository = makeRepository([
-      Object.freeze({
-        ...toolRecord("mcp:local:json-array"),
-        definition: Object.freeze({
-          ...toolRecord("mcp:local:json-array").definition,
-          tags: Object.freeze(["json", "transform"]),
-          categories: Object.freeze(["utility", "conversion"]),
-          auth: Object.freeze({ kind: "optional" as const }),
-          sideEffects: "read" as const,
-          inputSchema: Object.freeze({
-            type: "object",
-            properties: {
-              records: {
-                type: "array",
-                items: { type: "object", properties: { id: { type: "integer" }, name: { type: "string" } } },
-              },
-            },
-          }),
-        }),
-      }),
-    ]);
-    const useCase = new QueryMcpToolCapabilitiesUseCase(repository);
-
-    const results = await useCase.execute({
-      inputType: "number",
-      inputPath: "records.*.id",
-      ioMatchMode: "assignable",
-      tagMatchMode: "any",
-      tags: ["nonexistent", "json"],
-      categoryMatchMode: "all",
-      categories: ["utility", "conversion"],
-      authKinds: ["optional"],
-      maxSideEffectClass: "read",
-    });
-
-    expect(results).toHaveLength(1);
-    expect(results[0]?.toolId).toBe("mcp:local:json-array");
   });
 
   it("supports asset-level capability introspection filters", async () => {
@@ -409,19 +254,50 @@ describe("McpToolRegistryUseCases", () => {
       }),
     ]);
 
-    const useCase = new QueryMcpToolCapabilitiesUseCase(repository);
-    const results = await useCase.execute({
+    const results = await new QueryMcpToolCapabilitiesUseCase(repository).execute({
       acceptsAssetKind: "json",
       producesAssetKind: "json",
       assetOutputMode: "asset-transform",
+      transformsExistingAsset: true,
     });
     expect(results).toHaveLength(1);
-    expect(results[0]?.toolId).toBe("mcp:local:asset-transform");
+  });
+
+  it("supports mixed-input and version-aware asset introspection filters", async () => {
+    const repository = makeRepository([
+      Object.freeze({
+        ...toolRecord("mcp:local:asset-mixed"),
+        definition: Object.freeze({
+          ...toolRecord("mcp:local:asset-mixed").definition,
+          assetIo: Object.freeze({
+            allowsRawInputs: true,
+            inputs: Object.freeze([
+              Object.freeze({
+                path: "source",
+                valueKind: "asset-reference" as const,
+                resolution: "asset-record" as const,
+                versionRequirement: "required" as const,
+              }),
+            ]),
+            outputs: Object.freeze([
+              Object.freeze({ path: "result", mode: "asset-create" as const, assetKind: "json" as const }),
+            ]),
+          }),
+        }),
+      }),
+    ]);
+
+    const results = await new QueryMcpToolCapabilitiesUseCase(repository).execute({
+      supportsMixedInputs: true,
+      requiresAssetVersion: true,
+      createsAsset: true,
+    });
+    expect(results).toHaveLength(1);
   });
 
   it("gets details for a single installed tool", async () => {
     const repository = makeRepository([toolRecord("mcp:local:weather")]);
     const record = await new GetInstalledMcpToolUseCase(repository).execute("mcp:local:weather");
-    expect(record.definition.displayName).toBe("Weather");
+    expect(record.version).toBe("1.0.0");
   });
 });

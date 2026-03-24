@@ -53,16 +53,32 @@ interface CollectionChange {
   readonly removed: ReadonlyArray<string>;
 }
 
+export interface McpToolChangeClassification {
+  readonly informational: ReadonlyArray<string>;
+  readonly compatibilityRisk: ReadonlyArray<string>;
+  readonly likelyBreaking: ReadonlyArray<string>;
+  readonly dependencyImpact: ReadonlyArray<string>;
+}
+
 export interface McpToolDefinitionChangeSummary {
   readonly version: ObjectChange<string>;
+  readonly source: ObjectChange<McpToolDefinitionSource>;
+  readonly versionPolicy: ObjectChange<McpToolVersionPolicy>;
   readonly binding: ObjectChange<McpToolDefinition["binding"]>;
   readonly inputSchema: ObjectChange<Readonly<Record<string, unknown>>>;
   readonly outputSchema: ObjectChange<Readonly<Record<string, unknown>> | undefined>;
   readonly sideEffects: ObjectChange<McpToolSideEffectClass>;
   readonly auth: ObjectChange<McpToolDefinition["auth"]>;
+  readonly permissions: CollectionChange;
   readonly assetIo: ObjectChange<McpToolDefinition["assetIo"]>;
   readonly tags: CollectionChange;
   readonly categories: CollectionChange;
+  readonly classification: McpToolChangeClassification;
+}
+
+export interface McpToolDependencySafetyAssessment {
+  readonly status: "no-dependencies" | "safe" | "ack-required" | "blocked";
+  readonly reason: string;
 }
 
 export interface PreviewMcpToolUpdateResult {
@@ -71,6 +87,7 @@ export interface PreviewMcpToolUpdateResult {
   readonly transition: McpToolVersionTransitionKind;
   readonly compatibility: "compatible" | "risky" | "breaking";
   readonly dependencyReferences: ReadonlyArray<{ readonly kind: string; readonly id: string; readonly label: string; readonly detail?: string }>;
+  readonly dependencySafety: McpToolDependencySafetyAssessment;
   readonly changeSummary: McpToolDefinitionChangeSummary;
   readonly warnings: ReadonlyArray<string>;
   readonly remediationSuggestions: ReadonlyArray<McpToolUpdateRemediationSuggestion>;
@@ -83,6 +100,7 @@ export interface ApplyMcpToolUpdateResult {
   readonly transition: McpToolVersionTransitionKind;
   readonly compatibility: "compatible" | "risky" | "breaking";
   readonly changeSummary: McpToolDefinitionChangeSummary;
+  readonly dependencySafety: McpToolDependencySafetyAssessment;
   readonly references: ReadonlyArray<{ readonly kind: string; readonly id: string; readonly label: string; readonly detail?: string }>;
   readonly warnings: ReadonlyArray<string>;
   readonly remediationSuggestions: ReadonlyArray<McpToolUpdateRemediationSuggestion>;
@@ -127,6 +145,25 @@ export interface McpToolLifecycleSummaryReadModel {
   readonly lastEvent?: McpToolLifecycleHistoryEntryReadModel;
 }
 
+export interface InstalledMcpToolReadModel {
+  readonly toolId: string;
+  readonly status: InstalledMcpToolRecord["status"];
+  readonly installedAt: string;
+  readonly updatedAt: string;
+  readonly version: string;
+  readonly source: McpToolDefinitionSource;
+  readonly versionPolicy: McpToolVersionPolicy;
+  readonly lifecycle: Readonly<{
+    lastAction: McpToolLifecycleAction;
+    lastTransition: McpToolVersionTransitionKind;
+    previousVersion?: string;
+    lastResolvedVersion: string;
+    historyCount: number;
+    lastEventAt?: string;
+  }>;
+  readonly updatePosture: "stable" | "risky-change-observed" | "breaking-change-observed";
+}
+
 export interface RemoveMcpToolResult {
   readonly status: "removed" | "blocked";
   readonly toolId: string;
@@ -152,6 +189,10 @@ export interface QueryMcpCapabilitiesRequest {
   readonly acceptsAssetKind?: string;
   readonly producesAssetKind?: string;
   readonly assetOutputMode?: "asset-create" | "asset-transform";
+  readonly transformsExistingAsset?: boolean;
+  readonly createsAsset?: boolean;
+  readonly supportsMixedInputs?: boolean;
+  readonly requiresAssetVersion?: boolean;
 }
 
 export class InstallMcpToolUseCase {
@@ -219,11 +260,13 @@ export class PreviewMcpToolUpdateUseCase {
     }
 
     const candidate = await loadValidatedCandidate(request, this.sourceLoader, existing.toolId);
-    const changeSummary = summarizeDefinitionChanges(existing.definition, candidate);
+    const nextSource = request.source ?? existing.source;
+    const changeSummary = summarizeDefinitionChanges(existing, candidate, nextSource);
     const transition = classifyVersionTransition(existing.definition.version, candidate.version);
     const action = classifyUpdateAction(transition);
     const compatibility = classifyCompatibility(changeSummary, transition, "balanced");
     const dependencyReferences = await this.dependencyScanner.scanToolReferences(existing.toolId);
+    const dependencySafety = assessDependencySafety(dependencyReferences.length, compatibility, false);
     const remediationSuggestions = buildRemediationSuggestions(compatibility, changeSummary, transition, dependencyReferences.length > 0);
 
     return Object.freeze({
@@ -232,6 +275,7 @@ export class PreviewMcpToolUpdateUseCase {
       transition,
       compatibility,
       dependencyReferences,
+      dependencySafety,
       changeSummary,
       warnings: buildUpdateWarnings(transition, compatibility, dependencyReferences.length > 0),
       remediationSuggestions,
@@ -253,44 +297,46 @@ export class ApplyMcpToolUpdateUseCase {
     }
 
     const candidate = await loadValidatedCandidate(request, this.sourceLoader, existing.toolId);
-    const changeSummary = summarizeDefinitionChanges(existing.definition, candidate);
+    const nextSource = request.source ?? existing.source;
+    const changeSummary = summarizeDefinitionChanges(existing, candidate, nextSource, request.versionPolicy);
     const transition = classifyVersionTransition(existing.definition.version, candidate.version);
     const action = classifyUpdateAction(transition);
     const compatibility = classifyCompatibility(changeSummary, transition, request.policyProfile ?? "balanced");
     const references = await this.dependencyScanner.scanToolReferences(existing.toolId);
     const warnings = buildUpdateWarnings(transition, compatibility, references.length > 0);
+    const dependencySafety = assessDependencySafety(references.length, compatibility, request.force === true);
     const remediationSuggestions = buildRemediationSuggestions(compatibility, changeSummary, transition, references.length > 0);
 
     if (transition === "downgrade" && request.allowDowngrade !== true && request.force !== true) {
-      return blockedUpdateResult(existing.toolId, action, transition, compatibility, changeSummary, references, [
+      return blockedUpdateResult(existing.toolId, action, transition, compatibility, changeSummary, dependencySafety, references, [
         ...warnings,
         "Downgrade is blocked unless allowDowngrade or force is set.",
       ], remediationSuggestions);
     }
 
     if (transition === "incomparable" && request.allowReplace !== true && request.force !== true) {
-      return blockedUpdateResult(existing.toolId, action, transition, compatibility, changeSummary, references, [
+      return blockedUpdateResult(existing.toolId, action, transition, compatibility, changeSummary, dependencySafety, references, [
         ...warnings,
         "Incomparable version transition is blocked unless allowReplace or force is set.",
       ], remediationSuggestions);
     }
 
     if (compatibility === "risky" && request.approval?.acknowledgedRisk !== true && request.force !== true) {
-      return blockedUpdateResult(existing.toolId, action, transition, compatibility, changeSummary, references, [
+      return blockedUpdateResult(existing.toolId, action, transition, compatibility, changeSummary, dependencySafety, references, [
         ...warnings,
         "Risky update requires explicit risk acknowledgement.",
       ], remediationSuggestions);
     }
 
     if (compatibility === "breaking" && request.approval?.acknowledgedBreaking !== true && request.force !== true) {
-      return blockedUpdateResult(existing.toolId, action, transition, compatibility, changeSummary, references, [
+      return blockedUpdateResult(existing.toolId, action, transition, compatibility, changeSummary, dependencySafety, references, [
         ...warnings,
         "Breaking update requires explicit breaking-change acknowledgement.",
       ], remediationSuggestions);
     }
 
     if (references.length > 0 && compatibility !== "compatible" && request.force !== true) {
-      return blockedUpdateResult(existing.toolId, action, transition, compatibility, changeSummary, references, [
+      return blockedUpdateResult(existing.toolId, action, transition, compatibility, changeSummary, dependencySafety, references, [
         ...warnings,
         "Update is blocked because dependent workflows exist and compatibility is risky/breaking.",
       ], remediationSuggestions);
@@ -320,6 +366,7 @@ export class ApplyMcpToolUpdateUseCase {
       transition,
       compatibility,
       changeSummary,
+      dependencySafety,
       references,
       warnings,
       remediationSuggestions,
@@ -331,20 +378,21 @@ export class ApplyMcpToolUpdateUseCase {
 export class ListInstalledMcpToolsUseCase {
   constructor(private readonly repository: IMcpToolRegistryRepository) {}
 
-  public async execute(): Promise<ReadonlyArray<InstalledMcpToolRecord>> {
-    return this.repository.listInstalledTools();
+  public async execute(): Promise<ReadonlyArray<InstalledMcpToolReadModel>> {
+    const records = await this.repository.listInstalledTools();
+    return Object.freeze(records.map((record) => toInstalledToolReadModel(record)));
   }
 }
 
 export class GetInstalledMcpToolUseCase {
   constructor(private readonly repository: IMcpToolRegistryRepository) {}
 
-  public async execute(toolId: string): Promise<InstalledMcpToolRecord> {
+  public async execute(toolId: string): Promise<InstalledMcpToolReadModel> {
     const record = await this.repository.getInstalledTool(toolId.trim());
     if (!record) {
       throw new McpToolRegistryError("tool-not-found", `MCP tool '${toolId}' was not found.`);
     }
-    return record;
+    return toInstalledToolReadModel(record);
   }
 }
 
@@ -523,6 +571,35 @@ export class QueryMcpToolCapabilitiesUseCase {
     if (filters.assetOutputMode) {
       const modes = tool.definition.assetIo?.outputs?.map((entry) => entry.mode) ?? [];
       if (!modes.includes(filters.assetOutputMode)) {
+        return false;
+      }
+    }
+
+    if (filters.transformsExistingAsset === true) {
+      const modes = tool.definition.assetIo?.outputs?.map((entry) => entry.mode) ?? [];
+      if (!modes.includes("asset-transform")) {
+        return false;
+      }
+    }
+
+    if (filters.createsAsset === true) {
+      const modes = tool.definition.assetIo?.outputs?.map((entry) => entry.mode) ?? [];
+      if (!modes.includes("asset-create")) {
+        return false;
+      }
+    }
+
+    if (filters.supportsMixedInputs === true) {
+      const hasAssetInputs = (tool.definition.assetIo?.inputs?.length ?? 0) > 0;
+      if (!(hasAssetInputs && tool.definition.assetIo?.allowsRawInputs !== false)) {
+        return false;
+      }
+    }
+
+    if (filters.requiresAssetVersion === true) {
+      const requiresVersion = tool.definition.assetIo?.inputs?.some((entry) =>
+        entry.valueKind === "asset-version-id" || entry.versionRequirement === "required") ?? false;
+      if (!requiresVersion) {
         return false;
       }
     }
@@ -755,17 +832,37 @@ function classifyUpdateAction(transition: McpToolVersionTransitionKind): McpTool
   }
 }
 
-function summarizeDefinitionChanges(current: McpToolDefinition, candidate: McpToolDefinition): McpToolDefinitionChangeSummary {
+function summarizeDefinitionChanges(
+  current: InstalledMcpToolRecord,
+  candidate: McpToolDefinition,
+  nextSource: McpToolDefinitionSource,
+  requestedPolicy?: McpToolVersionPolicy,
+): McpToolDefinitionChangeSummary {
+  const currentPolicy = current.lifecycle?.versionPolicy ?? "pinned";
+  const nextPolicy = requestedPolicy ?? currentPolicy;
+  const summary = Object.freeze({
+    version: objectChange(current.definition.version, candidate.version),
+    source: objectChange(current.source, nextSource),
+    versionPolicy: objectChange(currentPolicy, nextPolicy),
+    binding: objectChange(current.definition.binding, candidate.binding),
+    inputSchema: objectChange(current.definition.inputSchema, candidate.inputSchema),
+    outputSchema: objectChange(current.definition.outputSchema, candidate.outputSchema),
+    sideEffects: objectChange(current.definition.sideEffects, candidate.sideEffects),
+    auth: objectChange(current.definition.auth, candidate.auth),
+    permissions: collectionChange(current.definition.permissions ?? [], candidate.permissions ?? []),
+    assetIo: objectChange(current.definition.assetIo, candidate.assetIo),
+    tags: collectionChange(current.definition.tags, candidate.tags),
+    categories: collectionChange(current.definition.categories, candidate.categories),
+    classification: Object.freeze({
+      informational: Object.freeze([]),
+      compatibilityRisk: Object.freeze([]),
+      likelyBreaking: Object.freeze([]),
+      dependencyImpact: Object.freeze([]),
+    }),
+  });
   return Object.freeze({
-    version: objectChange(current.version, candidate.version),
-    binding: objectChange(current.binding, candidate.binding),
-    inputSchema: objectChange(current.inputSchema, candidate.inputSchema),
-    outputSchema: objectChange(current.outputSchema, candidate.outputSchema),
-    sideEffects: objectChange(current.sideEffects, candidate.sideEffects),
-    auth: objectChange(current.auth, candidate.auth),
-    assetIo: objectChange(current.assetIo, candidate.assetIo),
-    tags: collectionChange(current.tags, candidate.tags),
-    categories: collectionChange(current.categories, candidate.categories),
+    ...summary,
+    classification: classifyChangeSummary(summary),
   });
 }
 
@@ -779,7 +876,7 @@ function classifyCompatibility(
   }
 
   const schemaRisk = classifySchemaRisk(changes.inputSchema.from, changes.inputSchema.to, changes.outputSchema.from, changes.outputSchema.to);
-  if (changes.binding.changed || changes.auth.changed || changes.assetIo.changed || schemaRisk === "breaking") {
+  if (changes.binding.changed || changes.auth.changed || changes.permissions.changed || changes.assetIo.changed || schemaRisk === "breaking") {
     return "breaking";
   }
   if (
@@ -952,6 +1049,100 @@ function buildRemediationSuggestions(
   return Object.freeze(suggestions);
 }
 
+function classifyChangeSummary(changes: Omit<McpToolDefinitionChangeSummary, "classification">): McpToolChangeClassification {
+  const informational: string[] = [];
+  const compatibilityRisk: string[] = [];
+  const likelyBreaking: string[] = [];
+  const dependencyImpact: string[] = [];
+
+  if (changes.version.changed) {
+    informational.push("version");
+  }
+  if (changes.source.changed) {
+    informational.push("source");
+  }
+  if (changes.versionPolicy.changed) {
+    informational.push("version-policy");
+  }
+  if (changes.tags.changed || changes.categories.changed) {
+    informational.push("discovery-metadata");
+  }
+  if (changes.sideEffects.changed || changes.permissions.changed || changes.auth.changed) {
+    compatibilityRisk.push("trust-or-permissions");
+  }
+  if (changes.assetIo.changed) {
+    compatibilityRisk.push("asset-io-contract");
+    dependencyImpact.push("asset-dependent-workflows");
+  }
+  if (changes.inputSchema.changed) {
+    likelyBreaking.push("input-contract");
+    dependencyImpact.push("stored-input-mappings");
+  }
+  if (changes.outputSchema.changed) {
+    likelyBreaking.push("output-contract");
+    dependencyImpact.push("downstream-output-consumers");
+  }
+  if (changes.binding.changed) {
+    likelyBreaking.push("runtime-binding");
+  }
+
+  return Object.freeze({
+    informational: Object.freeze(informational),
+    compatibilityRisk: Object.freeze(compatibilityRisk),
+    likelyBreaking: Object.freeze(likelyBreaking),
+    dependencyImpact: Object.freeze(dependencyImpact),
+  });
+}
+
+function assessDependencySafety(
+  dependencyCount: number,
+  compatibility: "compatible" | "risky" | "breaking",
+  forced: boolean,
+): McpToolDependencySafetyAssessment {
+  if (dependencyCount === 0) {
+    return Object.freeze({ status: "no-dependencies", reason: "No dependent workflows reference this tool." });
+  }
+  if (compatibility === "compatible") {
+    return Object.freeze({ status: "safe", reason: "Dependent workflows exist, but update is contract-compatible." });
+  }
+  if (forced) {
+    return Object.freeze({ status: "ack-required", reason: "Dependent workflows exist; explicit override is required for risky/breaking changes." });
+  }
+  return Object.freeze({ status: "blocked", reason: "Dependent workflows exist and compatibility is risky/breaking." });
+}
+
+function toInstalledToolReadModel(record: InstalledMcpToolRecord): InstalledMcpToolReadModel {
+  const lifecycle = record.lifecycle;
+  const history = lifecycle?.history ?? [];
+  const lastEvent = history.length > 0 ? history[history.length - 1] : undefined;
+  const updatePosture = !lastEvent
+    ? "stable"
+    : lastEvent.transition === "same-version" || lastEvent.transition === "upgrade"
+      ? "stable"
+      : lastEvent.transition === "incomparable"
+        ? "risky-change-observed"
+        : "breaking-change-observed";
+
+  return Object.freeze({
+    toolId: record.toolId,
+    status: record.status,
+    installedAt: record.installedAt,
+    updatedAt: record.updatedAt,
+    version: record.definition.version,
+    source: record.source,
+    versionPolicy: lifecycle?.versionPolicy ?? "pinned",
+    lifecycle: Object.freeze({
+      lastAction: lifecycle?.lastAction ?? "install",
+      lastTransition: lifecycle?.lastTransition ?? "initial-install",
+      previousVersion: lifecycle?.previousVersion,
+      lastResolvedVersion: lifecycle?.lastResolvedVersion ?? record.definition.version,
+      historyCount: history.length,
+      lastEventAt: lastEvent?.occurredAt,
+    }),
+    updatePosture,
+  });
+}
+
 function nextLifecycle(params: {
   readonly current?: InstalledMcpToolLifecycle;
   readonly action: McpToolLifecycleAction;
@@ -1027,6 +1218,7 @@ function blockedUpdateResult(
   transition: McpToolVersionTransitionKind,
   compatibility: "compatible" | "risky" | "breaking",
   changeSummary: McpToolDefinitionChangeSummary,
+  dependencySafety: McpToolDependencySafetyAssessment,
   references: ReadonlyArray<McpToolDependencyReference>,
   warnings: ReadonlyArray<string>,
   remediationSuggestions: ReadonlyArray<McpToolUpdateRemediationSuggestion>,
@@ -1038,6 +1230,7 @@ function blockedUpdateResult(
     transition,
     compatibility,
     changeSummary,
+    dependencySafety,
     references,
     warnings,
     remediationSuggestions,
