@@ -2,6 +2,7 @@ export type McpToolRegistryErrorCode =
   | "invalid-definition"
   | "duplicate-install"
   | "tool-not-found"
+  | "tool-disabled"
   | "invalid-transition"
   | "unsafe-removal"
   | "invalid-input-contract"

@@ -117,7 +117,10 @@ AI Loom Studio is not just a thin GUI over a runtime. It is an authoring and gov
 The MCP layer now has an explicit inner-layer contract for installed tool definitions:
 - domain-level MCP tool capability schema (`id`, `version`, display metadata, I/O schemas, side effects, auth metadata, cost/execution hints, tags/categories, optional runtime binding).
 - application-layer registry use cases for install/register, list/detail, enable/disable transitions, safe uninstall, and capability introspection queries.
-- structured registry errors (`invalid-definition`, `duplicate-install`, `unsafe-removal`, contract violations) to keep UI and automation error handling deterministic.
+- structured registry errors (`invalid-definition`, `duplicate-install`, `tool-disabled`, contract violations) to keep UI and automation error handling deterministic.
+- safe removal now uses a structured result contract (`removed` or `blocked` with references) instead of mixing result types with thrown unsafe-removal errors.
+- capability introspection is still intentionally bounded, but now supports deeper schema-type matching (nested path and array-item checks), explicit auth-kind filtering, tag/category match modes, and side-effect ceilings for future planner/agent selection.
+- runtime contract validation remains pragmatic and non-exhaustive, but now includes nested object/array checks, enum checks, nullable handling, and clearer issue paths.
 
 This keeps MCP tools on the same inner-layer-first path as other first-class capabilities and creates a clean seam for later workflow-node integration, permissions, and agent/planner selection behavior.
 

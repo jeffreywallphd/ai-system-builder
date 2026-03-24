@@ -144,4 +144,46 @@ describe("ExecuteMcpToolUseCase", () => {
     ).rejects.toThrow("output violates");
   });
 
+  it("refuses execution when installed MCP tool is disabled", async () => {
+    const executor: IMcpToolExecutor = {
+      executeTool: async () => {
+        throw new Error("should not run");
+      },
+    };
+
+    const registry = {
+      listInstalledTools: async () => [],
+      getInstalledTool: async () => undefined,
+      findInstalledToolByBinding: async () =>
+        Object.freeze({
+          toolId: "mcp:local:echo",
+          status: "disabled" as const,
+          installedAt: "2026-03-24T00:00:00.000Z",
+          updatedAt: "2026-03-24T00:00:00.000Z",
+          source: Object.freeze({ kind: "inline" as const, location: "inline:test" }),
+          definition: Object.freeze({
+            id: "mcp:local:echo",
+            version: "1.0.0",
+            displayName: "Echo",
+            sideEffects: "none" as const,
+            auth: Object.freeze({ kind: "none" as const }),
+            tags: Object.freeze([]),
+            categories: Object.freeze([]),
+            binding: Object.freeze({ serverId: "local", toolName: "echo" }),
+            inputSchema: Object.freeze({ type: "object" }),
+          }),
+        }),
+      saveInstalledTool: async (record: never) => record,
+      removeInstalledTool: async () => false,
+    };
+
+    await expect(
+      new ExecuteMcpToolUseCase(executor, new ExecutionContextToolPolicyService(), registry).execute({
+        serverId: "local",
+        toolName: "echo",
+        arguments: {},
+      }),
+    ).rejects.toMatchObject({ code: "tool-disabled" });
+  });
+
 });

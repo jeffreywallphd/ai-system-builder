@@ -9,6 +9,9 @@ class MemoryStorage {
   public setItem(key: string, value: string): void {
     this.data.set(key, value);
   }
+  public unsafeWrite(key: string, value: string): void {
+    this.data.set(key, value);
+  }
 }
 
 describe("LocalStorageMcpToolRegistryRepository", () => {
@@ -43,5 +46,12 @@ describe("LocalStorageMcpToolRegistryRepository", () => {
     const removed = await repository.removeInstalledTool("mcp:local:echo");
     expect(removed).toBe(true);
     expect(await repository.listInstalledTools()).toHaveLength(0);
+  });
+
+  it("returns an empty list when persisted JSON is invalid", async () => {
+    const storage = new MemoryStorage();
+    storage.unsafeWrite("test", "{not-json");
+    const repository = new LocalStorageMcpToolRegistryRepository("test", storage as never);
+    expect(await repository.listInstalledTools()).toEqual([]);
   });
 });
