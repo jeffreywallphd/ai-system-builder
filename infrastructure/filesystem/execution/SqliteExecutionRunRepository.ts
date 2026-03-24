@@ -2,14 +2,15 @@ import fs from "node:fs";
 import path from "node:path";
 import Database from "better-sqlite3";
 import type { IExecutionRunRepository, IExecutionRunRepositoryListCriteria } from "../../../application/ports/interfaces/IExecutionRunRepository";
-import type { IExecutionRunProvenance, IExecutionRunRecord } from "../../../domain/execution/ExecutionRun";
+import type { IExecutionRunRecord } from "../../../domain/execution/ExecutionRun";
 import { freezeExecutionRunRecord } from "../../../application/execution/freezeExecutionRunRecord";
+import { deriveExecutionRunQueryIndex } from "../../../application/execution/ExecutionRunQueryIndex";
 
 interface ExecutionRunRow {
   readonly run_json: string;
 }
 
-const EXECUTION_RUN_SCHEMA_VERSION = 2;
+const EXECUTION_RUN_SCHEMA_VERSION = 3;
 
 const EXECUTION_RUN_MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   [1, `
@@ -56,6 +57,13 @@ const EXECUTION_RUN_MIGRATIONS: ReadonlyArray<readonly [number, string]> = Objec
     ALTER TABLE execution_runs ADD COLUMN diagnostics_detail TEXT;
     CREATE INDEX IF NOT EXISTS execution_runs_detail_idx ON execution_runs(execution_kind, status, updated_at DESC);
   `],
+  [3, `
+    ALTER TABLE execution_runs ADD COLUMN primary_unit_kind TEXT;
+    ALTER TABLE execution_runs ADD COLUMN execution_flow_id TEXT;
+    CREATE INDEX IF NOT EXISTS execution_runs_unit_kind_idx ON execution_runs(primary_unit_kind, started_at DESC);
+    CREATE INDEX IF NOT EXISTS execution_runs_flow_idx ON execution_runs(execution_flow_id, started_at DESC);
+    CREATE INDEX IF NOT EXISTS execution_runs_provenance_idx ON execution_runs(primary_classification, updated_at DESC);
+  `],
 ]);
 
 export class SqliteExecutionRunRepository implements IExecutionRunRepository {
@@ -67,7 +75,7 @@ export class SqliteExecutionRunRepository implements IExecutionRunRepository {
   public async saveRun(run: IExecutionRunRecord): Promise<IExecutionRunRecord> {
     const db = this.getDatabase();
     const metadataRows = toMetadataRows(run);
-    const primaryProvenance = extractPrimaryProvenance(run);
+    const queryIndex = deriveExecutionRunQueryIndex(run);
     const transaction = db.transaction(() => {
       db.prepare(`
         INSERT INTO execution_runs (
@@ -84,6 +92,8 @@ export class SqliteExecutionRunRepository implements IExecutionRunRepository {
           primary_executor_id,
           primary_runtime,
           primary_source_kind,
+          primary_unit_kind,
+          execution_flow_id,
           metadata_json,
           units_json,
           transitions_json,
@@ -108,6 +118,8 @@ export class SqliteExecutionRunRepository implements IExecutionRunRepository {
           @primaryExecutorId,
           @primaryRuntime,
           @primarySourceKind,
+          @primaryUnitKind,
+          @executionFlowId,
           @metadataJson,
           @unitsJson,
           @transitionsJson,
@@ -132,6 +144,8 @@ export class SqliteExecutionRunRepository implements IExecutionRunRepository {
           primary_executor_id = excluded.primary_executor_id,
           primary_runtime = excluded.primary_runtime,
           primary_source_kind = excluded.primary_source_kind,
+          primary_unit_kind = excluded.primary_unit_kind,
+          execution_flow_id = excluded.execution_flow_id,
           metadata_json = excluded.metadata_json,
           units_json = excluded.units_json,
           transitions_json = excluded.transitions_json,
@@ -152,10 +166,12 @@ export class SqliteExecutionRunRepository implements IExecutionRunRepository {
         completedAt: run.completedAt,
         cancellationSupported: run.cancellationSupported ? 1 : 0,
         finalErrorMessage: run.finalErrorMessage,
-        primaryClassification: primaryProvenance?.classification,
-        primaryExecutorId: primaryProvenance?.executorId,
-        primaryRuntime: primaryProvenance?.runtime,
-        primarySourceKind: primaryProvenance?.sourceKind,
+        primaryClassification: queryIndex.primaryProvenanceClassification,
+        primaryExecutorId: queryIndex.primaryExecutorId,
+        primaryRuntime: queryIndex.primaryRuntime,
+        primarySourceKind: run.unitIds[0] ? run.units[run.unitIds[0]]?.provenance?.sourceKind : undefined,
+        primaryUnitKind: queryIndex.primaryUnitKind,
+        executionFlowId: queryIndex.executionFlowId,
         metadataJson: JSON.stringify(run.metadata ?? {}),
         unitsJson: JSON.stringify(run.units),
         transitionsJson: JSON.stringify(run.transitions),
@@ -210,6 +226,34 @@ export class SqliteExecutionRunRepository implements IExecutionRunRepository {
     if (criteria.executionKind) {
       clauses.push("execution_kind = @executionKind");
       params.executionKind = criteria.executionKind;
+    }
+    if (criteria.unitKind) {
+      clauses.push("(primary_unit_kind = @unitKind OR EXISTS (SELECT 1 FROM json_each(execution_runs.units_json) AS unit WHERE json_extract(unit.value, '$.kind') = @unitKind))");
+      params.unitKind = criteria.unitKind;
+    }
+    if (criteria.provenanceClassification) {
+      clauses.push("primary_classification = @primaryClassification");
+      params.primaryClassification = criteria.provenanceClassification;
+    }
+    if (criteria.flowId) {
+      clauses.push("execution_flow_id = @flowId");
+      params.flowId = criteria.flowId;
+    }
+    if (criteria.startedAfter) {
+      clauses.push("started_at >= @startedAfter");
+      params.startedAfter = criteria.startedAfter;
+    }
+    if (criteria.startedBefore) {
+      clauses.push("started_at <= @startedBefore");
+      params.startedBefore = criteria.startedBefore;
+    }
+    if (criteria.updatedAfter) {
+      clauses.push("updated_at >= @updatedAfter");
+      params.updatedAfter = criteria.updatedAfter;
+    }
+    if (criteria.updatedBefore) {
+      clauses.push("updated_at <= @updatedBefore");
+      params.updatedBefore = criteria.updatedBefore;
     }
 
     let metadataIndex = 0;
@@ -316,12 +360,6 @@ export class SqliteExecutionRunRepository implements IExecutionRunRepository {
 
 function parseRun(runJson: string): IExecutionRunRecord {
   return freezeExecutionRunRecord(JSON.parse(runJson) as IExecutionRunRecord);
-}
-
-function extractPrimaryProvenance(run: IExecutionRunRecord): IExecutionRunProvenance | undefined {
-  return run.unitIds
-    .map((unitId) => run.units[unitId]?.provenance)
-    .find((provenance): provenance is IExecutionRunProvenance => Boolean(provenance));
 }
 
 function toMetadataRows(run: IExecutionRunRecord): ReadonlyArray<{

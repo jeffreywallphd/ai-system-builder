@@ -21,7 +21,10 @@ Workflow -> `ExecuteWorkflowUseCase` -> one-unit `ExecutionPlan` -> `UnifiedExec
 
 ## Unified execution engine slice
 - The current migration now covers the immediate workflow execution path, workflow `startExecution(...)`, the direct tool execution path, tuning-dataset example generation, preparation-only model creation, the truthful long-running local model-training lifecycle when the runtime can report real status/progress/cancellation, and a narrow MCP server-operation slice for connect/reconnect/disconnect/local-server creation.
+- The current migration now covers the immediate workflow execution path, workflow `startExecution(...)`, the direct tool execution path, tuning-dataset example generation, preparation-only model creation, a dependency-aware model flow (`model preparation -> local model training`) for local-gradient runs, and a narrow MCP server-operation slice for connect/reconnect/disconnect/local-server creation including a real dependency-aware local-server `create -> connect` plan.
 - The engine understands dependency-aware execution units, persisted execution runs, SQLite-backed desktop history with schema versioning, plan transitions, execution-run list/detail projections, and lightweight history query use cases.
+- Flow-related run lookup is now explicit through `executionFlowId` metadata plus a related-run use case, so UI/debugging features can query related runs from the execution substrate instead of feature-specific helpers.
+- Execution-plan metadata now includes a lightweight explicit runtime capability profile (`supportsProgressEvents`, `supportsPollingProgress`, `supportsCancellation`, `supportsIntermediateArtifacts`, `supportsPartialResults`, `supportsReconnectOrResume`, `supportsMultiUnitComposition`) so higher layers can keep truthfulness language aligned with what a runtime really supports.
 - The workflow adapter wraps the existing workflow executor instead of rewriting runtime selection or strategy internals.
 - Workflow/model/dataset/MCP-specific payloads are still preserved as artifacts, but execution-native summaries now carry the data that generic history/reporting flows need first.
 

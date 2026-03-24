@@ -20,9 +20,11 @@ import {
   requireModelPreparationJob,
 } from "../execution/ModelPreparationExecutionPlanFactory";
 import {
-  createModelTrainingExecutionPlan,
-  requireModelTrainingJobFromUnitResult,
-} from "../execution/ModelTrainingExecutionPlanFactory";
+  createModelPreparationAndTrainingExecutionPlan,
+  requireModelPreparationAndTrainingArtifacts,
+  requireModelPreparationAndTrainingJob,
+  requireModelPreparationAndTrainingResult,
+} from "../execution/ModelPreparationAndTrainingExecutionPlanFactory";
 import { getModelTrainingJobFromEvent } from "../execution/ModelTrainingExecutionAdapter";
 import type {
   GetModelTrainingStudioSummaryQuery,
@@ -413,7 +415,7 @@ export class DefaultModelTrainingApplicationService implements ModelTrainingAppl
       return this.runtime.submitJob(request);
     }
 
-    const planEnvelope = createModelTrainingExecutionPlan(request);
+    const planEnvelope = createModelPreparationAndTrainingExecutionPlan(request);
     let initialJob: ModelTrainingJob | undefined;
     let resolveInitialJob!: (job: ModelTrainingJob) => void;
     const initialJobPromise = new Promise<ModelTrainingJob>((resolve) => {
@@ -425,6 +427,9 @@ export class DefaultModelTrainingApplicationService implements ModelTrainingAppl
       unitInputs: planEnvelope.unitInputs,
       metadata: planEnvelope.metadata,
     }, (event) => {
+      if (event.unitId !== planEnvelope.trainingUnitId) {
+        return;
+      }
       const job = getModelTrainingJobFromEvent(event);
       if (!job) {
         return;
@@ -436,7 +441,12 @@ export class DefaultModelTrainingApplicationService implements ModelTrainingAppl
     });
 
     void handle.waitForCompletion()
-      .then((result) => this.jobRepository.saveJob(requireModelTrainingJobFromUnitResult(result.unitResults[planEnvelope.unitId]!)))
+      .then((result) => {
+        requireModelPreparationAndTrainingArtifacts(result, planEnvelope.preparationUnitId);
+        return this.jobRepository.saveJob(requireModelPreparationAndTrainingJob(
+          requireModelPreparationAndTrainingResult(result, planEnvelope.trainingUnitId),
+        ));
+      })
       .catch(() => undefined);
 
     return await Promise.race([

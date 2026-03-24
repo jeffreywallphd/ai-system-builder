@@ -7,7 +7,7 @@ import type { IExecutionRunRecord } from "../../../../domain/execution/Execution
 import { LocalFileStorage } from "../../LocalFileStorage";
 import { LocalExecutionRunRepository } from "../LocalExecutionRunRepository";
 
-function makeRun(runId: string): IExecutionRunRecord {
+function makeRun(runId: string, flowId?: string): IExecutionRunRecord {
   return Object.freeze({
     runId,
     planId: "plan-1",
@@ -34,6 +34,11 @@ function makeRun(runId: string): IExecutionRunRecord {
     updatedAt: `2026-01-0${runId === "run-1" ? "1" : "2"}T00:00:01.000Z`,
     completedAt: `2026-01-0${runId === "run-1" ? "1" : "2"}T00:00:01.000Z`,
     cancellationSupported: true,
+    metadata: Object.freeze({
+      executionKind: runId === "run-1" ? "workflow" : "model-training",
+      ...(flowId ? { executionFlowId: flowId } : {}),
+      supportsMultiUnitComposition: runId !== "run-1",
+    }),
   });
 }
 
@@ -46,11 +51,17 @@ describe("LocalExecutionRunRepository", () => {
         rootDirectory: root,
       });
 
-      await repository.saveRun(makeRun("run-1"));
-      await repository.saveRun(makeRun("run-2"));
+      await repository.saveRun(makeRun("run-1", "flow-1"));
+      await repository.saveRun(makeRun("run-2", "flow-2"));
 
       expect((await repository.getRunById("run-1"))?.planId).toBe("plan-1");
       expect((await repository.listRuns()).map((run) => run.runId)).toEqual(["run-2", "run-1"]);
+      const filtered = await repository.listRuns({
+        executionKind: "model-training",
+        flowId: "flow-2",
+        unitKind: ExecutionUnitKinds.workflow,
+      });
+      expect(filtered.map((run) => run.runId)).toEqual(["run-2"]);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

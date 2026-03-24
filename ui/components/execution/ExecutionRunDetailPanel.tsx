@@ -1,13 +1,18 @@
 import type { ExecutionRunDetailProjection } from "../../../application/execution/ExecutionRunDetailProjectionService";
+import type { ExecutionRelatedRunClusterProjection } from "../../../application/execution/ExecutionRelatedRunClusterProjectionService";
 
 export interface ExecutionRunDetailPanelProps {
   readonly detail?: ExecutionRunDetailProjection;
   readonly emptyMessage: string;
+  readonly relatedRunCluster?: ExecutionRelatedRunClusterProjection;
+  readonly onSelectRun?: (runId: string) => void;
 }
 
 export default function ExecutionRunDetailPanel({
   detail,
   emptyMessage,
+  relatedRunCluster,
+  onSelectRun,
 }: ExecutionRunDetailPanelProps): JSX.Element {
   if (!detail) {
     return (
@@ -55,6 +60,35 @@ export default function ExecutionRunDetailPanel({
           <ul className="ui-text-secondary ui-text-small">
             {detail.provenanceEntries.map((entry) => <li key={entry.key}>{entry.value}</li>)}
           </ul>
+        </div>
+      ) : null}
+
+      {relatedRunCluster && relatedRunCluster.runs.length > 1 ? (
+        <div className="ui-stack ui-stack--2xs">
+          <strong>Related runs</strong>
+          <div className="ui-text-secondary ui-text-small">
+            {relatedRunCluster.groupLabel} · {relatedRunCluster.orderingLabel}
+          </div>
+          <div className="ui-stack ui-stack--2xs">
+            {relatedRunCluster.runs.map((entry) => (
+              <button
+                key={entry.run.runId}
+                type="button"
+                className="ui-panel ui-row ui-row--between ui-row--wrap"
+                style={{
+                  textAlign: "left",
+                  borderColor: entry.isAnchor ? "var(--color-border-strong)" : undefined,
+                }}
+                onClick={() => onSelectRun?.(entry.run.runId)}
+                disabled={!onSelectRun || entry.run.runId === detail.runId}
+              >
+                <span className="ui-text-secondary ui-text-small">
+                  {entry.relationLabel}: {entry.run.runId}
+                </span>
+                <span className={`ui-badge ui-badge--${entry.run.statusTone}`}>{entry.run.statusLabel}</span>
+              </button>
+            ))}
+          </div>
         </div>
       ) : null}
 

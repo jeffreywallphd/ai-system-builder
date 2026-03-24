@@ -3,6 +3,12 @@ import type { IExecutionRunRepository, IExecutionRunRepositoryListCriteria } fro
 import type { IFileStorage } from "../../../application/ports/interfaces/IFileStorage";
 import type { IExecutionRunRecord } from "../../../domain/execution/ExecutionRun";
 import { freezeExecutionRunRecord } from "../../../application/execution/freezeExecutionRunRecord";
+import { deriveExecutionRunQueryIndex, type IExecutionRunQueryIndex } from "../../../application/execution/ExecutionRunQueryIndex";
+
+interface PersistedExecutionRunFile {
+  readonly run: IExecutionRunRecord;
+  readonly query: IExecutionRunQueryIndex;
+}
 
 export class LocalExecutionRunRepository implements IExecutionRunRepository {
   constructor(
@@ -13,9 +19,13 @@ export class LocalExecutionRunRepository implements IExecutionRunRepository {
   ) {}
 
   public async saveRun(run: IExecutionRunRecord): Promise<IExecutionRunRecord> {
+    const persisted: PersistedExecutionRunFile = Object.freeze({
+      run,
+      query: deriveExecutionRunQueryIndex(run),
+    });
     await this.params.fileStorage.write({
       path: this.resolvePath(run.runId),
-      content: JSON.stringify(run, null, 2),
+      content: JSON.stringify(persisted, null, 2),
       createDirectories: true,
       overwrite: true,
     });
@@ -28,7 +38,8 @@ export class LocalExecutionRunRepository implements IExecutionRunRepository {
       return undefined;
     }
 
-    return freezeExecutionRunRecord(JSON.parse(await this.params.fileStorage.readText(filePath, "utf-8")) as IExecutionRunRecord);
+    const parsed = JSON.parse(await this.params.fileStorage.readText(filePath, "utf-8")) as PersistedExecutionRunFile | IExecutionRunRecord;
+    return freezeExecutionRunRecord(isPersistedExecutionRunFile(parsed) ? parsed.run : parsed);
   }
 
   public async listRuns(criteria?: IExecutionRunRepositoryListCriteria): Promise<ReadonlyArray<IExecutionRunRecord>> {
@@ -47,14 +58,43 @@ export class LocalExecutionRunRepository implements IExecutionRunRepository {
         continue;
       }
 
-      const run = freezeExecutionRunRecord(JSON.parse(await this.params.fileStorage.readText(entry.path, "utf-8")) as IExecutionRunRecord);
+      const parsed = JSON.parse(await this.params.fileStorage.readText(entry.path, "utf-8")) as PersistedExecutionRunFile | IExecutionRunRecord;
+      const run = freezeExecutionRunRecord(isPersistedExecutionRunFile(parsed) ? parsed.run : parsed);
+      const query = isPersistedExecutionRunFile(parsed)
+        ? parsed.query
+        : deriveExecutionRunQueryIndex(run);
       if (criteria?.planId && run.planId !== criteria.planId) {
         continue;
       }
       if (criteria?.status && run.status !== criteria.status) {
         continue;
       }
-      if (criteria?.executionKind && run.metadata?.executionKind !== criteria.executionKind) {
+      if (criteria?.executionKind && query.executionKind !== criteria.executionKind) {
+        continue;
+      }
+      if (criteria?.unitKind && query.primaryUnitKind !== criteria.unitKind && !run.unitIds.some((unitId) => run.units[unitId]?.kind === criteria.unitKind)) {
+        continue;
+      }
+      if (
+        criteria?.provenanceClassification
+        && query.primaryProvenanceClassification !== criteria.provenanceClassification
+        && !run.unitIds.some((unitId) => run.units[unitId]?.provenance?.classification === criteria.provenanceClassification)
+      ) {
+        continue;
+      }
+      if (criteria?.flowId && query.executionFlowId !== criteria.flowId) {
+        continue;
+      }
+      if (criteria?.startedAfter && run.startedAt < criteria.startedAfter) {
+        continue;
+      }
+      if (criteria?.startedBefore && run.startedAt > criteria.startedBefore) {
+        continue;
+      }
+      if (criteria?.updatedAfter && run.updatedAt < criteria.updatedAfter) {
+        continue;
+      }
+      if (criteria?.updatedBefore && run.updatedAt > criteria.updatedBefore) {
         continue;
       }
       if (!matchesMetadata(run, criteria?.metadata)) {
@@ -86,4 +126,10 @@ function matchesMetadata(
   }
 
   return Object.entries(metadata).every(([key, value]) => run.metadata?.[key] === value);
+}
+
+function isPersistedExecutionRunFile(
+  value: PersistedExecutionRunFile | IExecutionRunRecord,
+): value is PersistedExecutionRunFile {
+  return "run" in value && typeof value.run === "object" && value.run !== null;
 }

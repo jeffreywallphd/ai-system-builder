@@ -5,6 +5,7 @@ export interface ExecutionRunProjection {
   readonly runId: string;
   readonly planId: string;
   readonly executionKind?: string;
+  readonly executionFlowId?: string;
   readonly status: ExecutionStatus;
   readonly statusLabel: string;
   readonly statusTone: "info" | "success" | "warning" | "danger";
@@ -41,6 +42,7 @@ export class ExecutionRunProjectionService {
       runId: run.runId,
       planId: run.planId,
       executionKind: typeof run.metadata?.executionKind === "string" ? run.metadata.executionKind : undefined,
+      executionFlowId: typeof run.metadata?.executionFlowId === "string" ? run.metadata.executionFlowId : undefined,
       status: run.status,
       statusLabel: toTitleCase(run.status),
       statusTone: mapStatusTone(run.status),
@@ -140,6 +142,11 @@ function resolveTruthfulProgress(
   if (!currentUnit || run.status !== ExecutionStatuses.running) {
     return undefined;
   }
+  const supportsProgress = run.metadata?.supportsProgressEvents === true
+    || run.metadata?.supportsPollingProgress === true;
+  if (!supportsProgress) {
+    return undefined;
+  }
 
   const metadata = currentUnit.outputMetadata;
   const progressPercent = typeof metadata?.progressPercent === "number"
@@ -191,6 +198,12 @@ function describeProgressLabel(
 
   if (params.truthfulProgress?.label) {
     return `${baseline} • ${params.truthfulProgress.label}`;
+  }
+
+  const supportsProgress = run.metadata?.supportsProgressEvents === true
+    || run.metadata?.supportsPollingProgress === true;
+  if (!supportsProgress) {
+    return `${baseline} • runtime progress unavailable`;
   }
 
   return `${baseline} • ${params.progressPercent}%`;

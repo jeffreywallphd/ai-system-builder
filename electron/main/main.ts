@@ -5,11 +5,15 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { app, BrowserWindow, ipcMain } from "electron";
 import { InitializeProductionStorageUseCase } from "../../application/runtime/InitializeProductionStorageUseCase";
+import { GetExecutionRunUseCase } from "../../application/execution/GetExecutionRunUseCase";
 import { resolveDesktopStoragePaths } from "../../infrastructure/desktop/DesktopAppPaths";
 import { DesktopStorageDatabase } from "../../infrastructure/desktop/DesktopStorageDatabase";
 import { DesktopWorkflowPersistence } from "../../infrastructure/desktop/DesktopWorkflowPersistence";
 import { SqliteExecutionRunRepository } from "../../infrastructure/filesystem/execution/SqliteExecutionRunRepository";
-import { createExecutionRunRepository } from "../../infrastructure/execution/createExecutionInfrastructure";
+import {
+  createExecutionHistoryInfrastructure,
+  createExecutionRunRepository,
+} from "../../infrastructure/execution/createExecutionInfrastructure";
 import { resolveDesktopPythonRuntime } from "../../infrastructure/desktop/DesktopPythonRuntimeResolver";
 import { AppRuntimeConfig } from "../../infrastructure/config/AppRuntimeConfig";
 import { RendererDeliveryModes } from "../../domain/runtime/AppRuntimeProfile";
@@ -28,6 +32,8 @@ let mainWindow: BrowserWindow | undefined;
 let storageDatabase: DesktopStorageDatabase | undefined;
 let workflowPersistence: DesktopWorkflowPersistence | undefined;
 let executionRunRepository: SqliteExecutionRunRepository | undefined;
+let getExecutionRunUseCase: GetExecutionRunUseCase | undefined;
+let listExecutionRunsUseCase: ReturnType<typeof createExecutionHistoryInfrastructure>["listExecutionRunsUseCase"] | undefined;
 let serviceSupervisor: DesktopServiceSupervisor | undefined;
 let bootstrapContext: DesktopBootstrapContext | undefined;
 
@@ -159,6 +165,9 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   executionRunRepository = createExecutionRunRepository({
     sqliteDatabasePath: storagePaths.databasePath,
   }) as SqliteExecutionRunRepository;
+  const executionHistoryInfrastructure = createExecutionHistoryInfrastructure(executionRunRepository);
+  getExecutionRunUseCase = new GetExecutionRunUseCase(executionRunRepository);
+  listExecutionRunsUseCase = executionHistoryInfrastructure.listExecutionRunsUseCase;
   ipcMain.on("ai-loom-desktop-workflows:save-record", (_event, recordJson: string) => {
     workflowPersistence?.saveWorkflowRecord(recordJson);
   });
@@ -190,12 +199,12 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     await executionRunRepository.saveRun(JSON.parse(runJson));
   });
   ipcMain.handle("ai-loom-desktop-execution-runs:load", async (_event, runId: string) => {
-    const run = await executionRunRepository?.getRunById(runId);
+    const run = await getExecutionRunUseCase?.execute(runId);
     return run ? JSON.stringify(run) : null;
   });
   ipcMain.handle("ai-loom-desktop-execution-runs:list", async (_event, criteriaJson?: string) => {
     const criteria = criteriaJson ? JSON.parse(criteriaJson) : undefined;
-    const runs = await executionRunRepository?.listRuns(criteria);
+    const runs = await listExecutionRunsUseCase?.execute(criteria);
     return (runs ?? []).map((run) => JSON.stringify(run));
   });
   ipcMain.on("ai-loom-desktop-model-files:exists", (event, targetPath: string) => {

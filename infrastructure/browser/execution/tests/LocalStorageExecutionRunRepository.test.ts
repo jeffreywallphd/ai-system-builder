@@ -76,4 +76,55 @@ describe("LocalStorageExecutionRunRepository", () => {
     expect(filtered.map((run) => run.runId)).toEqual(["run-1"]);
     expect(listed.map((run) => run.runId)).toEqual(["run-2", "run-1"]);
   });
+
+  it("supports unit-kind, provenance, flow, and time-range filters", async () => {
+    const repository = new LocalStorageExecutionRunRepository("runs", storageLike);
+    await repository.saveRun(makeRun({
+      metadata: Object.freeze({ executionKind: "workflow", executionFlowId: "flow-1" }),
+      units: Object.freeze({
+        "workflow:wf-1": Object.freeze({
+          unitId: "workflow:wf-1",
+          kind: ExecutionUnitKinds.workflow,
+          label: "Workflow",
+          dependsOn: Object.freeze([]),
+          status: ExecutionStatuses.completed,
+          provenance: Object.freeze({
+            classification: "delegated",
+            executorId: "workflow-runtime",
+          }),
+          updatedAt: "2026-01-01T00:00:01.000Z",
+        }),
+      }),
+    }));
+    await repository.saveRun(makeRun({
+      runId: "run-2",
+      startedAt: "2026-01-02T00:00:00.000Z",
+      updatedAt: "2026-01-02T00:00:01.000Z",
+      metadata: Object.freeze({ executionKind: "model-training", executionFlowId: "flow-2" }),
+      unitIds: Object.freeze(["model-training:job-2"]),
+      units: Object.freeze({
+        "model-training:job-2": Object.freeze({
+          unitId: "model-training:job-2",
+          kind: ExecutionUnitKinds.modelTraining,
+          dependsOn: Object.freeze([]),
+          status: ExecutionStatuses.completed,
+          provenance: Object.freeze({
+            classification: "real",
+            executorId: "local-training",
+          }),
+          updatedAt: "2026-01-02T00:00:01.000Z",
+        }),
+      }),
+    }));
+
+    const filtered = await repository.listRuns({
+      unitKind: ExecutionUnitKinds.modelTraining,
+      provenanceClassification: "real",
+      flowId: "flow-2",
+      startedAfter: "2026-01-01T12:00:00.000Z",
+      updatedBefore: "2026-01-02T00:00:01.000Z",
+    });
+
+    expect(filtered.map((run) => run.runId)).toEqual(["run-2"]);
+  });
 });
