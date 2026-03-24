@@ -1,5 +1,7 @@
 import { EnvironmentConfig } from "../config/EnvironmentConfig";
 import { EnvironmentConfigProvider } from "../config/EnvironmentConfigProvider";
+import { HttpPythonRuntimeClient } from "../python/client/HttpPythonRuntimeClient";
+import { createRuntimeDependencyOrchestrator } from "../runtime/RuntimeDependencyComposition";
 import { McpRuntimeConfig } from "../config/McpRuntimeConfig";
 import { PythonRuntimeConfig } from "../config/PythonRuntimeConfig";
 import { LocalFileStorage } from "../filesystem/LocalFileStorage";
@@ -8,6 +10,9 @@ import { LocalModelRepository } from "../filesystem/LocalModelRepository";
 import { LocalWorkflowRepository } from "../filesystem/LocalWorkflowRepository";
 import { LocalContextPackageRepository } from "../filesystem/LocalContextPackageRepository";
 import { LocalContextRecipeRepository } from "../filesystem/LocalContextRecipeRepository";
+import { SqliteAssetSystemRepository } from "../filesystem/SqliteAssetSystemRepository";
+import { Neo4jAssetLineageGraphProjectionSink } from "../graph/Neo4jAssetLineageGraphProjectionSink";
+import { NoopNeo4jCypherExecutor } from "../graph/NoopNeo4jCypherExecutor";
 import { DependencyContainer, type DependencyToken } from "./DependencyContainer";
 
 import { AssetCatalog } from "../../application/ports/AssetCatalog";
@@ -29,6 +34,8 @@ import type { IModelDownloader } from "../../application/ports/interfaces/IModel
 import type { IRemoteModelCatalog } from "../../application/ports/interfaces/IRemoteModelCatalog";
 import type { IModelInstaller } from "../../application/ports/interfaces/IModelInstaller";
 import type { IWorkflowExecutor } from "../../application/ports/interfaces/IWorkflowExecutor";
+import type { IWorkflowRepository } from "../../application/ports/interfaces/IWorkflowRepository";
+import type { IExecutionRunRepository } from "../../application/ports/interfaces/IExecutionRunRepository";
 import type { IContextPackageRepository } from "../../application/ports/interfaces/IContextPackageRepository";
 import type { IContextRecipeRepository } from "../../application/ports/interfaces/IContextRecipeRepository";
 import type { IWorkflowSerializer } from "../../application/ports/interfaces/IWorkflowSerializer";
@@ -42,13 +49,8 @@ import type { IToolCapabilityExecutor } from "../../application/ports/interfaces
 import type { IRuntimeEventSink } from "../../application/ports/interfaces/IRuntimeEventSink";
 import type { INodeImplementationRegistry } from "../nodes/shared/INodeImplementationRegistry";
 import { CompositeNodeImplementationRegistry } from "../nodes/CompositeNodeImplementationRegistry";
+import { createMcpRuntimeIntegration } from "../python/mcp/createMcpRuntimeIntegration";
 import { createCompositeNodeImplementationRegistry } from "../nodes/NodeProviderRegistryIndex";
-import { HttpMcpRuntimeClient } from "../python/mcp/HttpMcpRuntimeClient";
-import { HttpMcpServerRuntimeClient } from "../python/mcp/HttpMcpServerRuntimeClient";
-import { PythonBackedMcpServerCatalog } from "../python/mcp/PythonBackedMcpServerCatalog";
-import { PythonBackedMcpServerManager } from "../python/mcp/PythonBackedMcpServerManager";
-import { PythonBackedMcpToolCatalog } from "../python/mcp/PythonBackedMcpToolCatalog";
-import { PythonBackedMcpToolExecutor } from "../python/mcp/PythonBackedMcpToolExecutor";
 import { CompositeToolCapabilityCatalog } from "../tools/CompositeToolCapabilityCatalog";
 import { StaticLocalToolCapabilityCatalog, LOCAL_TOOL_CAPABILITY_PROVIDER } from "../tools/StaticLocalToolCapabilityCatalog";
 import { CompositeToolCapabilityExecutor } from "../tools/CompositeToolCapabilityExecutor";
@@ -60,12 +62,29 @@ import { WorkflowToolCapabilityExecutor } from "../tools/WorkflowToolCapabilityE
 import { WorkflowToolProjectionService } from "../../application/projection/WorkflowToolProjectionService";
 import { LoadToolDefinitionUseCase } from "../../application/tools/LoadToolDefinitionUseCase";
 import { RunToolUseCase } from "../../application/tools/RunToolUseCase";
+import { createExecutionApplicationInfrastructure, createExecutionRunRepository } from "../execution/createExecutionInfrastructure";
+import { UnifiedExecutionEngine } from "../../application/execution/UnifiedExecutionEngine";
 import { WorkflowContextService } from "../../application/context/WorkflowContextService";
+import { RuntimeDependencyOperationalStates, type IRuntimeDependencyOrchestrator } from "../../application/runtime/RuntimeDependencyOrchestrator";
+import type { IAssetRecordRepository } from "../../application/ports/interfaces/IAssetRecordRepository";
+import type { IAssetVersionRepository } from "../../application/ports/interfaces/IAssetVersionRepository";
+import type { IAssetLineageRepository } from "../../application/ports/interfaces/IAssetLineageRepository";
+import type { IAssetTransformationRepository } from "../../application/ports/interfaces/IAssetTransformationRepository";
+import type { IAssetLineageGraphProjectionSink } from "../../application/ports/interfaces/IAssetLineageGraphProjectionSink";
+import { RegisterAssetUseCase } from "../../application/assets-system/RegisterAssetUseCase";
+import { CreateAssetVersionUseCase } from "../../application/assets-system/CreateAssetVersionUseCase";
+import { RecordAssetTransformationUseCase } from "../../application/assets-system/RecordAssetTransformationUseCase";
+import { ProjectArtifactToAssetSystemUseCase } from "../../application/assets-system/ProjectArtifactToAssetSystemUseCase";
+import { ExecutionAssetLineageRecorder } from "../../application/assets-system/ExecutionAssetLineageRecorder";
+import { CanonicalAssetIdentityService } from "../../application/assets-system/CanonicalAssetIdentityService";
+import { PublishDurableEntityToAssetSystemUseCase } from "../../application/assets-system/PublishDurableEntityToAssetSystemUseCase";
 
 export const TOKENS = Object.freeze({
   EnvironmentConfig: Symbol("EnvironmentConfig"),
   EnvironmentConfigProvider: Symbol("EnvironmentConfigProvider"),
   McpRuntimeConfig: Symbol("McpRuntimeConfig"),
+  McpRuntimeIntegration: Symbol("McpRuntimeIntegration"),
+  RuntimeDependencyOrchestrator: Symbol("RuntimeDependencyOrchestrator"),
   McpRuntimeClient: Symbol("McpRuntimeClient"),
   McpServerCatalog: Symbol("McpServerCatalog"),
   McpServerManager: Symbol("McpServerManager"),
@@ -82,18 +101,28 @@ export const TOKENS = Object.freeze({
   ModelInstaller: Symbol("ModelInstaller"),
   WorkflowExecutor: Symbol("WorkflowExecutor"),
   WorkflowSerializer: Symbol("WorkflowSerializer"),
+  UnifiedExecutionEngine: Symbol("UnifiedExecutionEngine"),
+  ExecutionRunRepository: Symbol("ExecutionRunRepository"),
   WorkflowRepository: Symbol("WorkflowRepository"),
   ContextPackageRepository: Symbol("ContextPackageRepository"),
   ContextRecipeRepository: Symbol("ContextRecipeRepository"),
   AssetRepository: Symbol("AssetRepository"),
   ModelRepository: Symbol("ModelRepository"),
   NodeImplementationRegistry: Symbol("NodeImplementationRegistry"),
+  ExecutionApplicationInfrastructure: Symbol("ExecutionApplicationInfrastructure"),
+  AssetSystemRepository: Symbol("AssetSystemRepository"),
+  AssetLineageGraphProjectionSink: Symbol("AssetLineageGraphProjectionSink"),
+  ExecutionAssetLineageRecorder: Symbol("ExecutionAssetLineageRecorder"),
+  CanonicalAssetIdentityService: Symbol("CanonicalAssetIdentityService"),
+  DurableAssetPublisher: Symbol("DurableAssetPublisher"),
 }) satisfies Record<string, DependencyToken>;
 
 export interface IInfrastructureRegistryPaths {
   readonly workflowsDirectory: string;
   readonly assetsDirectory: string;
   readonly modelsDirectory: string;
+  readonly executionRunsDirectory?: string;
+  readonly executionRunDatabasePath?: string;
 }
 
 export interface IInfrastructureRegistryOptions {
@@ -146,61 +175,81 @@ export class InfrastructureRegistry {
       return McpRuntimeConfig.fromEnv(toStringEnv(config.toObject()));
     });
 
-    container.registerSingleton<IMcpRuntimeClient>(TOKENS.McpRuntimeClient, (c) => {
+    container.registerSingleton<IRuntimeDependencyOrchestrator>(TOKENS.RuntimeDependencyOrchestrator, (c) => {
+      const config = c.resolve<EnvironmentConfig>(TOKENS.EnvironmentConfig);
+      const pythonRuntimeConfig = PythonRuntimeConfig.fromEnv(toStringEnv(config.toObject()));
+      const pythonRuntimeClient = pythonRuntimeConfig.isEnabled
+        ? new HttpPythonRuntimeClient(pythonRuntimeConfig)
+        : undefined;
+
+      return createRuntimeDependencyOrchestrator({
+        pythonRuntime: {
+          providerId: "python-runtime-http-health",
+          ensureAvailable: async () => {
+            if (!pythonRuntimeConfig.isEnabled || !pythonRuntimeClient) {
+              return {
+                state: RuntimeDependencyOperationalStates.disabled,
+                detail: "Python runtime is disabled in settings.",
+                remediationHints: ["Enable the Python runtime to unlock MCP-backed capabilities."],
+              };
+            }
+
+            try {
+              const health = await pythonRuntimeClient.health();
+              return {
+                state: health.status === "unavailable"
+                  ? RuntimeDependencyOperationalStates.unavailable
+                  : RuntimeDependencyOperationalStates.healthy,
+                detail: health.status === "unavailable"
+                  ? "Python runtime is unavailable, so dependent runtimes remain gated."
+                  : "Python runtime dependency is reachable.",
+                metadata: health.details,
+                remediationHints: health.status === "unavailable"
+                  ? ["Start the configured Python runtime endpoint or verify the runtime base URL."]
+                  : [],
+              };
+            } catch (error) {
+              return {
+                state: RuntimeDependencyOperationalStates.failed,
+                detail: error instanceof Error ? error.message : "Python runtime health check failed.",
+                remediationHints: ["Verify network connectivity to the configured Python runtime endpoint."],
+              };
+            }
+          },
+        },
+      });
+    });
+
+    container.registerSingleton(TOKENS.McpRuntimeIntegration, (c) => {
       const config = c.resolve<EnvironmentConfig>(TOKENS.EnvironmentConfig);
       const pythonRuntimeConfig = PythonRuntimeConfig.fromEnv(toStringEnv(config.toObject()));
       const eventSink = c.tryResolve<IRuntimeEventSink>(Symbol.for("RuntimeEventSink"));
+      return createMcpRuntimeIntegration(
+        pythonRuntimeConfig,
+        eventSink,
+        fetch,
+        c.resolve<IRuntimeDependencyOrchestrator>(TOKENS.RuntimeDependencyOrchestrator),
+      );
+    });
 
-      if (!pythonRuntimeConfig.isEnabled) {
-        return createDisabledMcpRuntimeClient();
-      }
-
-      return new HttpMcpRuntimeClient(pythonRuntimeConfig, fetch, eventSink);
+    container.registerSingleton<IMcpRuntimeClient>(TOKENS.McpRuntimeClient, (c) => {
+      return c.resolve<ReturnType<typeof createMcpRuntimeIntegration>>(TOKENS.McpRuntimeIntegration).runtimeClient;
     });
 
     container.registerSingleton<IMcpServerCatalog>(TOKENS.McpServerCatalog, (c) => {
-      const config = c.resolve<EnvironmentConfig>(TOKENS.EnvironmentConfig);
-      const pythonRuntimeConfig = PythonRuntimeConfig.fromEnv(toStringEnv(config.toObject()));
-      const eventSink = c.tryResolve<IRuntimeEventSink>(Symbol.for("RuntimeEventSink"));
-
-      if (!pythonRuntimeConfig.isEnabled) {
-        return createDisabledMcpServerCatalog();
-      }
-
-      return new PythonBackedMcpServerCatalog(
-        new HttpMcpServerRuntimeClient(pythonRuntimeConfig, fetch, eventSink)
-      );
+      return c.resolve<ReturnType<typeof createMcpRuntimeIntegration>>(TOKENS.McpRuntimeIntegration).serverCatalog;
     });
 
     container.registerSingleton<IMcpServerManager>(TOKENS.McpServerManager, (c) => {
-      const config = c.resolve<EnvironmentConfig>(TOKENS.EnvironmentConfig);
-      const pythonRuntimeConfig = PythonRuntimeConfig.fromEnv(toStringEnv(config.toObject()));
-      const eventSink = c.tryResolve<IRuntimeEventSink>(Symbol.for("RuntimeEventSink"));
-
-      if (!pythonRuntimeConfig.isEnabled) {
-        return createDisabledMcpServerManager();
-      }
-
-      const client = new HttpMcpServerRuntimeClient(pythonRuntimeConfig, fetch, eventSink);
-      return new PythonBackedMcpServerManager(
-        client,
-        c.resolve<IMcpServerCatalog>(TOKENS.McpServerCatalog),
-        eventSink,
-      );
+      return c.resolve<ReturnType<typeof createMcpRuntimeIntegration>>(TOKENS.McpRuntimeIntegration).serverManager;
     });
 
     container.registerSingleton<IMcpToolCatalog>(TOKENS.McpToolCatalog, (c) => {
-      return new PythonBackedMcpToolCatalog(
-        c.resolve<IMcpRuntimeClient>(TOKENS.McpRuntimeClient),
-        c.tryResolve<IRuntimeEventSink>(Symbol.for("RuntimeEventSink"))
-      );
+      return c.resolve<ReturnType<typeof createMcpRuntimeIntegration>>(TOKENS.McpRuntimeIntegration).toolCatalog;
     });
 
     container.registerSingleton<IMcpToolExecutor>(TOKENS.McpToolExecutor, (c) => {
-      return new PythonBackedMcpToolExecutor(
-        c.resolve<IMcpRuntimeClient>(TOKENS.McpRuntimeClient),
-        c.tryResolve<IRuntimeEventSink>(Symbol.for("RuntimeEventSink"))
-      );
+      return c.resolve<ReturnType<typeof createMcpRuntimeIntegration>>(TOKENS.McpRuntimeIntegration).toolExecutor;
     });
 
     container.registerSingleton<IToolCapabilityCatalog>(TOKENS.ToolCapabilityCatalog, (c) => {
@@ -215,7 +264,7 @@ export class InfrastructureRegistry {
     });
 
     container.registerSingleton<IToolCapabilityExecutor>(TOKENS.ToolCapabilityExecutor, (c) => {
-      const workflowRepository = c.resolve(TOKENS.WorkflowRepository);
+      const workflowRepository = c.resolve<IWorkflowRepository>(TOKENS.WorkflowRepository);
       const workflowToolProjectionService = new WorkflowToolProjectionService();
       const loadToolDefinitionUseCase = new LoadToolDefinitionUseCase(
         workflowRepository,
@@ -225,12 +274,14 @@ export class InfrastructureRegistry {
         c.resolve<IContextPackageRepository>(TOKENS.ContextPackageRepository),
         c.resolve<IContextRecipeRepository>(TOKENS.ContextRecipeRepository)
       );
+      const workflowExecutor = c.resolve<IWorkflowExecutor>(TOKENS.WorkflowExecutor);
       const runToolUseCase = new RunToolUseCase(
         workflowRepository,
         workflowToolProjectionService,
-        c.resolve<IWorkflowExecutor>(TOKENS.WorkflowExecutor),
+        workflowExecutor,
         loadToolDefinitionUseCase,
-        workflowContextService
+        workflowContextService,
+        c.resolve<UnifiedExecutionEngine>(TOKENS.UnifiedExecutionEngine)
       );
 
       return new CompositeToolCapabilityExecutor([
@@ -286,6 +337,47 @@ export class InfrastructureRegistry {
         catalogs: [repository],
         writableCatalog: repository,
       });
+    });
+
+    container.registerSingleton(TOKENS.AssetSystemRepository, () => {
+      return new SqliteAssetSystemRepository(`${options.paths.assetsDirectory}/asset-system.sqlite`);
+    });
+
+    container.registerSingleton<IAssetLineageGraphProjectionSink>(TOKENS.AssetLineageGraphProjectionSink, () => {
+      // Neo4j is the default graph projection target contract; this local executor remains no-op until a real driver adapter is supplied.
+      return new Neo4jAssetLineageGraphProjectionSink(new NoopNeo4jCypherExecutor());
+    });
+
+    container.registerSingleton<CanonicalAssetIdentityService>(TOKENS.CanonicalAssetIdentityService, (c) => {
+      const systemRepository = c.resolve<SqliteAssetSystemRepository>(TOKENS.AssetSystemRepository);
+      return new CanonicalAssetIdentityService(systemRepository, systemRepository);
+    });
+
+    container.registerSingleton<PublishDurableEntityToAssetSystemUseCase>(TOKENS.DurableAssetPublisher, (c) => {
+      const systemRepository = c.resolve<SqliteAssetSystemRepository>(TOKENS.AssetSystemRepository);
+      return new PublishDurableEntityToAssetSystemUseCase(
+        new RegisterAssetUseCase(systemRepository),
+        new CreateAssetVersionUseCase(systemRepository),
+        systemRepository,
+      );
+    });
+
+    container.registerSingleton<ExecutionAssetLineageRecorder>(TOKENS.ExecutionAssetLineageRecorder, (c) => {
+      const systemRepository = c.resolve<SqliteAssetSystemRepository>(TOKENS.AssetSystemRepository);
+      const registerAssetUseCase = new RegisterAssetUseCase(systemRepository);
+      const createAssetVersionUseCase = new CreateAssetVersionUseCase(systemRepository);
+      const recordTransformationUseCase = new RecordAssetTransformationUseCase(
+        systemRepository,
+        systemRepository,
+        c.resolve<IAssetLineageGraphProjectionSink>(TOKENS.AssetLineageGraphProjectionSink),
+      );
+      const projectionUseCase = new ProjectArtifactToAssetSystemUseCase(
+        registerAssetUseCase,
+        createAssetVersionUseCase,
+        recordTransformationUseCase,
+      );
+
+      return new ExecutionAssetLineageRecorder(projectionUseCase, systemRepository, c.resolve<CanonicalAssetIdentityService>(TOKENS.CanonicalAssetIdentityService));
     });
 
     container.registerSingleton(TOKENS.ModelRepository, (c) => {
@@ -367,6 +459,24 @@ export class InfrastructureRegistry {
       }
     );
 
+    container.registerSingleton<IExecutionRunRepository>(TOKENS.ExecutionRunRepository, (c) => createExecutionRunRepository({
+      sqliteDatabasePath: options.paths.executionRunDatabasePath,
+      fileStorage: options.paths.executionRunDatabasePath ? undefined : c.resolve<IFileStorage>(TOKENS.FileStorage),
+      rootDirectory: options.paths.executionRunDatabasePath ? undefined : (options.paths.executionRunsDirectory ?? `${options.paths.workflowsDirectory}/../execution-runs`),
+    }));
+
+    container.registerSingleton(TOKENS.ExecutionApplicationInfrastructure, (c) => createExecutionApplicationInfrastructure({
+      workflowExecutor: c.resolve<IWorkflowExecutor>(TOKENS.WorkflowExecutor),
+      executionRunRepository: c.resolve<IExecutionRunRepository>(TOKENS.ExecutionRunRepository),
+      mcpServerManager: c.resolve<IMcpServerManager>(TOKENS.McpServerManager),
+      executionAssetLineageRecorder: c.resolve<ExecutionAssetLineageRecorder>(TOKENS.ExecutionAssetLineageRecorder),
+    }));
+
+    container.registerSingleton<UnifiedExecutionEngine>(
+      TOKENS.UnifiedExecutionEngine,
+      (c) => c.resolve<ReturnType<typeof createExecutionApplicationInfrastructure>>(TOKENS.ExecutionApplicationInfrastructure).executionEngine,
+    );
+
     container.registerSingleton(TOKENS.WorkflowRepository, (c) => {
       return new LocalWorkflowRepository({
         fileStorage: c.resolve<IFileStorage>(TOKENS.FileStorage),
@@ -375,111 +485,4 @@ export class InfrastructureRegistry {
       });
     });
   }
-}
-
-
-function createDisabledMcpRuntimeClient(): IMcpRuntimeClient {
-  const runtime = createDisabledRuntimeStatus();
-
-  return {
-    getConnectionStatus: async () => runtime,
-    listServers: async () => ({ query: "", totalCount: 0, limit: 20, servers: [], status: runtime }),
-    searchServers: async (criteria) => ({
-      query: criteria?.query?.trim() || "",
-      totalCount: 0,
-      limit: criteria?.limit ?? 20,
-      servers: [],
-      status: runtime,
-    }),
-    connectServer: async (request) => createDisabledConnectionResult(request.serverId, request.reconnect ? "reconnect" : "connect"),
-    disconnectServer: async (serverId) => createDisabledConnectionResult(serverId, "disconnect"),
-    listTools: async () => [],
-    searchTools: async (criteria) => ({
-      query: criteria?.query?.trim() || "",
-      totalCount: 0,
-      limit: criteria?.limit ?? 20,
-      tools: [],
-    }),
-    getToolDescriptor: async () => undefined,
-    listResources: async () => [],
-    executeTool: async (request) => ({
-      executionId: request.executionId?.trim() || "mcp-disabled",
-      serverId: request.serverId,
-      toolName: request.toolName,
-      status: "failed",
-      content: [],
-      structuredContent: {},
-      errorMessage: "Python runtime is disabled.",
-    }),
-  };
-}
-
-function createDisabledMcpServerCatalog(): IMcpServerCatalog {
-  return {
-    getConnectionStatus: async () => createDisabledRuntimeStatus(),
-    listConfiguredServers: async () => [],
-    getServerStatus: async (serverId: string) => createDisabledServerStatus(serverId),
-  };
-}
-
-function createDisabledMcpServerManager(): IMcpServerManager {
-  return {
-    connectServer: async (request) => createDisabledConnectionResult(request.serverId, "connect"),
-    disconnectServer: async (serverId) => createDisabledConnectionResult(serverId, "disconnect"),
-    reconnectServer: async (serverId) => createDisabledConnectionResult(serverId, "reconnect"),
-  };
-}
-
-function createDisabledRuntimeStatus() {
-  return {
-    enabled: false,
-    state: "disabled" as const,
-    checkedAt: new Date().toISOString(),
-    servers: [],
-    capabilities: { tools: false, resources: false, toolExecution: false },
-    metadata: { reason: "python-runtime-disabled" },
-  };
-}
-
-function createDisabledServerDescriptor(serverId: string) {
-  return {
-    id: serverId,
-    name: serverId,
-    transport: "inmemory" as const,
-    enabled: false,
-    status: "error" as const,
-    connected: false,
-    toolCount: 0,
-    resourceCount: 0,
-    capabilities: { tools: false, resources: false, toolExecution: false },
-    errorMessage: "Python runtime is disabled.",
-  };
-}
-
-function createDisabledServerStatus(serverId: string) {
-  return {
-    serverId,
-    name: serverId,
-    transport: "inmemory" as const,
-    configured: false,
-    enabled: false,
-    state: "error" as const,
-    connected: false,
-    checkedAt: new Date().toISOString(),
-    toolCount: 0,
-    resourceCount: 0,
-    capabilities: { tools: false, resources: false, toolExecution: false },
-    errorMessage: "Python runtime is disabled.",
-  };
-}
-
-function createDisabledConnectionResult(serverId: string, action: "connect" | "disconnect" | "reconnect") {
-  return {
-    action,
-    checkedAt: new Date().toISOString(),
-    server: createDisabledServerDescriptor(serverId),
-    status: createDisabledServerStatus(serverId),
-    runtime: createDisabledRuntimeStatus(),
-    metadata: { reason: "python-runtime-disabled" },
-  };
 }

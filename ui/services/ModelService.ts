@@ -72,21 +72,50 @@ export class ModelService {
   public async listInstalledModels(
     criteria?: IInstalledModelSearchCriteria
   ): Promise<ReadonlyArray<IModel>> {
-    const request: IListInstalledModelsRequest = { criteria };
-    const result: IListInstalledModelsResult =
-      await this.listInstalledModelsUseCase.execute(request);
-
+    const result = await this.listInstalledModelsReadModel(criteria);
     return result.models;
   }
 
+  public async listInstalledModelsReadModel(
+    criteria?: IInstalledModelSearchCriteria
+  ): Promise<IListInstalledModelsResult> {
+    const request: IListInstalledModelsRequest = { criteria };
+    return this.listInstalledModelsUseCase.execute(request);
+  }
+
   public async getInstalledModelById(id: string): Promise<IModel | undefined> {
+    const readModel = await this.getInstalledModelReadModel(id);
+    return readModel?.model;
+  }
+
+  public async getInstalledModelReadModel(id: string): Promise<{
+    readonly model: IModel;
+    readonly canonical?: NonNullable<IListInstalledModelsResult["canonicalByModelId"]>[string];
+  } | undefined> {
     const modelId = id.trim();
 
     if (!modelId) {
-      throw new Error("ModelService.getInstalledModelById requires a non-empty id.");
+      throw new Error("ModelService.getInstalledModelReadModel requires a non-empty id.");
     }
 
-    return this.installedModelCatalog.getInstalledById(modelId);
+    const readModel = await this.listInstalledModelsReadModel({ query: modelId, limit: 1 });
+    const exact = readModel.models.find((model) => model.id === modelId);
+    if (exact) {
+      return Object.freeze({
+        model: exact,
+        canonical: readModel.canonicalByModelId?.[modelId],
+      });
+    }
+
+    const fallback = await this.installedModelCatalog.getInstalledById(modelId);
+    if (!fallback) {
+      return undefined;
+    }
+
+    return Object.freeze({
+      model: fallback,
+      canonical: readModel.canonicalByModelId?.[modelId],
+    });
   }
 
   public async isInstalled(id: string): Promise<boolean> {

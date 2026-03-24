@@ -11,13 +11,14 @@ interface PersistedJob {
   readonly id: string;
   readonly name: string;
   readonly backend: ModelTrainingJob["backend"];
+  readonly executionKind: ModelTrainingJob["executionKind"];
   readonly baseModelId: string;
   readonly datasetId: string;
   readonly datasetVersionId: string;
   readonly createdBy: string;
   readonly createdAt: string;
   readonly updatedAt: string;
-  readonly submittedAt: string;
+  readonly submittedAt?: string;
   readonly startedAt?: string;
   readonly completedAt?: string;
   readonly status: ModelTrainingJob["status"];
@@ -27,6 +28,33 @@ interface PersistedJob {
   readonly checkpoints: ReadonlyArray<Omit<ModelTrainingCheckpoint, "createdAt"> & { readonly createdAt: string }>;
   readonly outputModelName?: string;
   readonly summary?: string;
+  readonly progress?: {
+    readonly percent: number;
+    readonly currentEpoch?: number;
+    readonly totalEpochs?: number;
+    readonly currentStep?: number;
+    readonly totalSteps?: number;
+    readonly latestMetricName?: string;
+    readonly latestMetricValue?: number;
+    readonly statusDetail?: string;
+  };
+  readonly provenance: {
+    readonly executionKind: ModelTrainingJob["executionKind"];
+    readonly backend: ModelTrainingJob["backend"];
+    readonly truthfulness: ModelTrainingJob["provenance"]["truthfulness"];
+    readonly runtime: ModelTrainingJob["provenance"]["runtime"];
+    readonly runMode: ModelTrainingJob["provenance"]["runMode"];
+    readonly supportsGradientTraining: boolean;
+    readonly isPreparationOnly: boolean;
+    readonly provider?: string;
+    readonly modelIdentity?: string;
+    readonly path: string;
+    readonly fallbackReason?: string;
+    readonly diagnostics: ReadonlyArray<ModelTrainingDiagnostic>;
+    readonly startedAt?: string;
+    readonly completedAt?: string;
+    readonly detail?: string;
+  };
 }
 
 function defaultStorage(): StorageLike | undefined {
@@ -82,7 +110,7 @@ export class LocalStorageModelTrainingJobRepository implements IModelTrainingJob
       ...job,
       createdAt: job.createdAt.toISOString(),
       updatedAt: job.updatedAt.toISOString(),
-      submittedAt: job.submittedAt.toISOString(),
+      submittedAt: job.submittedAt?.toISOString(),
       startedAt: job.startedAt?.toISOString(),
       completedAt: job.completedAt?.toISOString(),
       artifacts: job.artifacts.map((artifact) => ({ ...artifact, createdAt: artifact.createdAt.toISOString() })),
@@ -95,12 +123,14 @@ export class LocalStorageModelTrainingJobRepository implements IModelTrainingJob
       ...job,
       createdAt: new Date(job.createdAt),
       updatedAt: new Date(job.updatedAt),
-      submittedAt: new Date(job.submittedAt),
+      submittedAt: job.submittedAt ? new Date(job.submittedAt) : undefined,
       startedAt: job.startedAt ? new Date(job.startedAt) : undefined,
       completedAt: job.completedAt ? new Date(job.completedAt) : undefined,
       artifacts: Object.freeze(job.artifacts.map((artifact) => Object.freeze({ ...artifact, createdAt: new Date(artifact.createdAt) }))),
       checkpoints: Object.freeze(job.checkpoints.map((checkpoint) => Object.freeze({ ...checkpoint, createdAt: new Date(checkpoint.createdAt) }))),
       diagnostics: Object.freeze(job.diagnostics.map((diagnostic) => Object.freeze({ ...diagnostic }))),
+      progress: job.progress ? Object.freeze({ ...job.progress }) : undefined,
+      provenance: Object.freeze({ ...job.provenance }),
     });
   }
 }

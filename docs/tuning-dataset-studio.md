@@ -73,12 +73,12 @@ The domain currently models these task types:
 
 ## Extension points
 - Add task-specific example entities and validation/export services behind the existing contracts.
-- Replace or augment the heuristic QA generation service with a provider-backed implementation by swapping the `DatasetGenerationService` binding in composition.
+- Replace or augment the browser heuristic fallback by swapping the `DatasetGenerationService` binding in composition; the default desktop/runtime path already prefers provider-backed Python runtime generation and then explicit python-runtime-local fallback.
 - Add alternate persistence backends by implementing `DatasetRepository` and `DatasetVersionRepository`.
 
 ## Fallback and degraded semantics
 
 - **Primary path**: Python runtime provider-backed generation.
-- **Fallback path**: local/browser heuristic generation, explicitly labeled as `heuristic-fallback` in generation provenance.
-- **Runtime unavailable**: the fallback path records a warning diagnostic describing why the provider-backed path could not be used.
+- **Fallback paths**: first the explicit `python-runtime-local` generator, then the browser heuristic path if the runtime layer is unavailable.
+- **Runtime unavailable**: the fallback path records a warning diagnostic describing why the provider-backed path could not be used, plus the exact path/execution kind that ultimately generated the examples.
 - **Unsupported tasks**: unsupported task types are rejected explicitly instead of silently coercing them into another generation mode.

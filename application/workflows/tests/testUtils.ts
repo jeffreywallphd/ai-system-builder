@@ -1,6 +1,7 @@
 import type { IWorkflowRepository } from "../../ports/interfaces/IWorkflowRepository";
 import type { IWorkflowExecutor } from "../../ports/interfaces/IWorkflowExecutor";
 import type { IWorkflowValidator, IWorkflowValidationResult } from "../../../domain/services/interfaces/IWorkflowValidator";
+import { WorkflowExecutionHandle, WorkflowExecutionProgress, WorkflowExecutionResult } from "../../ports/WorkflowExecutor";
 
 const validResult: IWorkflowValidationResult = {
   isValid: true,
@@ -38,14 +39,13 @@ export function makeWorkflowExecutor(overrides: Partial<IWorkflowExecutor> = {})
   return {
     canExecute: () => true,
     execute: async () => ({ executionId: "exec", status: "completed", outputAssets: [] }),
-    startExecution: async (input) => ({
+    startExecution: async (input) => new WorkflowExecutionHandle({
       executionId: "exec",
       input,
-      completionPromise: Promise.resolve({ executionId: "exec", status: "completed", outputAssets: [] }),
+      initialProgress: new WorkflowExecutionProgress({ executionId: "exec", status: "queued", percent: 0 }),
+      completionPromise: Promise.resolve(new WorkflowExecutionResult({ executionId: "exec", status: "completed", outputAssets: [] })),
       cancel: async () => undefined,
-      onEvent: () => () => undefined,
     }),
-    getStatus: async () => undefined,
     ...overrides,
   };
 }

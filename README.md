@@ -109,6 +109,15 @@ The app now differentiates between:
 - `desktop-development`
 - `desktop-production`
 
+Under the hood those runtime modes are now treated as **runtime profiles** composed from smaller architectural axes:
+
+- **host kind** — browser vs desktop
+- **lifecycle stage** — development vs production
+- **distribution target** — the delivery technology currently responsible for the renderer/host pairing (today `vite-browser` or `electron`)
+- **renderer delivery mode** — dev server vs packaged assets
+
+That separation matters because “Vite”, “Electron Forge”, and similar tools are better understood here as **distribution tooling choices**, not the core runtime model. The runtime profile owns the application-facing contract, while the current toolchain plugs into it.
+
 This runtime choice drives:
 
 - renderer asset loading
@@ -211,21 +220,40 @@ The Models page now supports real end-to-end actions for download/install, refre
 
 ## Fine-tuning workflow foundation
 
-The Create Models workspace is no longer placeholder text. It now provides a truthful first vertical slice for model creation:
+The Create Models workspace now exposes two truthful model-creation paths:
 
-- select an installed base model from the managed library
-- select a tuning dataset/version from the dataset studio
-- submit a fine-tuning job to the **Python runtime manifest backend**
-- persist job metadata durably in desktop-backed storage when available
-- inspect returned diagnostics, checkpoints, and artifacts without pretending unsupported backends exist
+- **Prepare bundle only** — validates the selected base model + dataset version and writes a manifest/bundle for later use. This ends in `exported-without-training`, not `completed training`.
+- **Start local training** — submits a Python-runtime local training job that performs real local work when the current runtime mode, base model, and dataset version all support it.
 
-Today's supported backend is intentionally narrow: the Python runtime creates durable provider-ready manifests, adapter-bundle scaffolds, logs, and checkpoint metadata. Full provider-specific gradient training backends are still future work, and the UI labels that limitation explicitly rather than implying weight updates already happened.
+The studio is now explicitly mode-aware:
 
-## Provider-backed dataset generation
+- **desktop development** — bundle preparation and real local training can both be available when the Python runtime is healthy, the desktop model-file bridge is connected, a local-file base model is selected, and the dataset version uses a supported task type
+- **desktop production** — the same truthful local capabilities apply, with promotion back into the installed model library available when completed artifacts exist on disk
+- **browser fallback** — the UI no longer pretends that full local training is available; it guides the user toward bundle preparation only and explains why desktop mode is needed for real training and promotion
+- **runtime disabled or unavailable** — the workspace switches to a guided fallback, clearly explaining what is blocked and which next action is required
 
-Dataset example generation now defaults to a **provider-backed Python runtime path** for supported dataset tasks:
+The current supported training backend is intentionally narrow but real:
+
+- supported execution backend: **Python runtime local gradient trainer** (`python-runtime-local`)
+- supported preparation backend: **Python runtime manifest/export path** (`python-runtime-manifest`)
+- supported dataset tasks for real local training: `question_answering` and `chat_completion`
+- persisted lifecycle states: `submitted`, `queued`, `running`, `completed`, `failed`, `cancelled`, `reconciliation-needed`, `partially-completed`, and `exported-without-training`
+- durable outputs: manifest, checkpoints, metrics, logs, a diagnostic artifact on failure, and a final trained artifact when training completes
+- post-training lifecycle: completed outputs can be inspected immediately, and in desktop file-backed modes they can be promoted into the installed model library without faking installation in browser fallback mode
+
+This is still **not** the same thing as provider-hosted LoRA, QLoRA, or remote foundation-model fine-tuning. Unsupported provider backends remain explicit rather than being faked.
+
+## Dataset generation truthfulness
+
+Dataset example generation now prefers a **true provider/model-backed Python runtime path** when a supported provider is configured, and otherwise falls back truthfully:
+
+- `provider-model-backed` — a real provider/model completion API generated the examples
+- `python-runtime-local` — the explicit Python runtime local generator produced the examples without claiming provider backing
+- `heuristic-fallback` — an explicit degraded browser fallback path generated examples heuristically
+
+Supported dataset tasks remain:
 
 - `question_answering`
 - `chat_completion`
 
-The dataset studio records provenance for each generation batch, including provider, generator ID, batch ID, diagnostics, and whether the run was truly provider-backed or a heuristic fallback. Local/browser heuristic generation still exists only as an explicit degraded fallback when the runtime path is unavailable.
+Each generation batch persists provenance and diagnostics, including provider/model identity when available, execution path, execution kind, timing, batch status (`completed` / `partial` / `failed` / `degraded`), and fallback reasons. Browser heuristic generation still exists only as an explicit degraded fallback path, while the Python runtime local generator is labeled separately from provider-backed execution.

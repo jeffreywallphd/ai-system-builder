@@ -79,18 +79,52 @@ export interface DatasetGenerationDiagnostic {
   readonly code: string;
   readonly level: "info" | "warning" | "error";
   readonly message: string;
+  readonly detail?: string;
+}
+
+export type DatasetGenerationMode = "provider-model-backed" | "python-runtime-local" | "heuristic-fallback";
+export type DatasetGenerationStatus = "completed" | "partial" | "failed" | "cancelled" | "degraded";
+export type DatasetGenerationExecutionKind = "provider-model-backed" | "python-runtime-local" | "heuristic-fallback";
+
+export interface DatasetGenerationFallback {
+  readonly fromMode?: DatasetGenerationMode;
+  readonly reason: string;
 }
 
 export interface DatasetGenerationProvenance {
   readonly provider: string;
+  readonly modelId?: string;
+  readonly modelDisplayName?: string;
   readonly generatorId: string;
   readonly generatorVersion: string;
   readonly batchId: string;
-  readonly mode: "provider-backed" | "heuristic-fallback";
+  readonly mode: DatasetGenerationMode;
+  readonly executionKind: DatasetGenerationExecutionKind;
+  readonly status: DatasetGenerationStatus;
+  readonly path: string;
+  readonly isFallback: boolean;
+  readonly isDegraded: boolean;
   readonly detail?: string;
   readonly parameters: Readonly<Record<string, unknown>>;
+  readonly startedAt: Date;
   readonly executedAt: Date;
+  readonly durationMs?: number;
   readonly diagnostics: ReadonlyArray<DatasetGenerationDiagnostic>;
+  readonly fallbackReason?: string;
+  readonly fallback?: DatasetGenerationFallback;
+}
+
+export interface DatasetGenerationBatch {
+  readonly id: string;
+  readonly datasetId: string;
+  readonly versionId: string;
+  readonly taskType: DatasetTaskType;
+  readonly generatedAt: Date;
+  readonly generatedCount: number;
+  readonly skippedCount: number;
+  readonly status: DatasetGenerationStatus;
+  readonly provenance: DatasetGenerationProvenance;
+  readonly exampleIds: ReadonlyArray<string>;
 }
 
 export interface DatasetLineage {
@@ -343,6 +377,8 @@ export interface DatasetVersionRepository {
   listSourceDocuments(datasetId: string, versionId: string): Promise<ReadonlyArray<DatasetSourceDocument>>;
   saveValidationResult(result: DatasetValidationResult): Promise<DatasetValidationResult>;
   loadValidationResult(datasetId: string, versionId: string): Promise<DatasetValidationResult | undefined>;
+  saveGenerationBatch(batch: DatasetGenerationBatch): Promise<DatasetGenerationBatch>;
+  listGenerationBatches(datasetId: string, versionId: string): Promise<ReadonlyArray<DatasetGenerationBatch>>;
   saveExportArtifact(artifact: DatasetExportArtifact): Promise<DatasetExportArtifact>;
   listExportArtifacts(datasetId: string, versionId: string): Promise<ReadonlyArray<DatasetExportArtifact>>;
   saveWorkflowState(workflow: DatasetWorkflowState): Promise<DatasetWorkflowState>;
@@ -428,6 +464,8 @@ export interface DatasetGenerationConfiguration {
   readonly strategy: string;
   readonly maxExamplesPerSource?: number;
   readonly maxSegmentsPerSource?: number;
+  readonly provider?: string;
+  readonly model?: string;
 }
 
 export interface DatasetGenerationRequest {
@@ -450,6 +488,7 @@ export interface DatasetGenerationResult {
   readonly provenance: DatasetGenerationProvenance;
   readonly generatedCount: number;
   readonly skippedCount: number;
+  readonly status: DatasetGenerationStatus;
 }
 
 export interface DatasetGenerationService {

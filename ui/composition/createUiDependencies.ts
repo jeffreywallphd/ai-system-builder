@@ -4,6 +4,7 @@ import { ModelCompatibilityService } from "../../domain/services/ModelCompatibil
 import { CreateWorkflowUseCase } from "../../application/workflows/CreateWorkflowUseCase";
 import { ExecuteWorkflowUseCase } from "../../application/workflows/ExecuteWorkflowUseCase";
 import { ValidateWorkflowUseCase } from "../../application/workflows/ValidateWorkflowUseCase";
+import { LoadWorkflowUseCase } from "../../application/workflows/LoadWorkflowUseCase";
 import { CreateNodeUseCase } from "../../application/nodes/CreateNodeUseCase";
 import { ConnectNodesUseCase } from "../../application/nodes/ConnectNodesUseCase";
 import { ListAvailableNodesUseCase } from "../../application/nodes/ListAvailableNodesUseCase";
@@ -26,14 +27,15 @@ import { createCompositeNodeImplementationRegistry } from "../../infrastructure/
 import { ImplementationRegistryNodeCatalogProvider } from "../../infrastructure/nodes/ImplementationRegistryNodeCatalogProvider";
 import { HuggingFaceApiClient } from "../../infrastructure/huggingface/HuggingFaceApiClient";
 import { HuggingFaceModelCatalog } from "../../infrastructure/huggingface/HuggingFaceModelCatalog";
-import { BrowserHuggingFaceModelDownloader } from "../../infrastructure/browser/models/BrowserHuggingFaceModelDownloader";
-import { BrowserDownloadModelLibrary } from "../../infrastructure/browser/models/BrowserDownloadModelLibrary";
-import { LocalStorageInstalledModelCatalog } from "../../infrastructure/browser/models/LocalStorageInstalledModelCatalog";
 import { ModelDownloader } from "../../application/ports/ModelDownloader";
 import { ModelInstaller } from "../../application/ports/ModelInstaller";
 import type { IModel } from "../../domain/models/interfaces/IModel";
 import type { IPythonRuntimeClient } from "../../application/ports/interfaces/IPythonRuntimeClient";
+import { PythonRuntimeStatuses, type PythonRuntimeManagerStatus } from "../../application/ports/interfaces/IPythonRuntimeManager";
+import type { IMcpRuntimeClient } from "../../application/ports/interfaces/IMcpRuntimeClient";
+import type { IMcpServerCatalog } from "../../application/ports/interfaces/IMcpServerCatalog";
 import type { IInstalledModelCatalog } from "../../application/ports/interfaces/IInstalledModelCatalog";
+import type { IManagedModelLibrary } from "../../application/ports/interfaces/IManagedModelLibrary";
 import { RuntimeEventBuffer } from "../../application/runtime/RuntimeEventBuffer";
 import { HttpPythonRuntimeClient } from "../../infrastructure/python/client/HttpPythonRuntimeClient";
 import { PythonRuntimeConfig } from "../../infrastructure/config/PythonRuntimeConfig";
@@ -47,13 +49,6 @@ import { LocalStorageUiSettingsStorage, UiSettingsStore } from "../settings/UiSe
 import type { UiSettings } from "../settings/UiSettings";
 import { resolveDesktopStorageAdapter } from "./DesktopStorageAdapter";
 import { resolveDesktopModelFileBridge } from "./DesktopModelFileBridgeAdapter";
-import { HttpMcpRuntimeClient } from "../../infrastructure/python/mcp/HttpMcpRuntimeClient";
-import { HttpMcpServerRuntimeClient } from "../../infrastructure/python/mcp/HttpMcpServerRuntimeClient";
-import { RuntimeBackedMcpConfiguredServerRepository } from "../../infrastructure/python/mcp/RuntimeBackedMcpConfiguredServerRepository";
-import { PythonBackedMcpServerCatalog } from "../../infrastructure/python/mcp/PythonBackedMcpServerCatalog";
-import { PythonBackedMcpServerManager } from "../../infrastructure/python/mcp/PythonBackedMcpServerManager";
-import { PythonBackedMcpToolCatalog } from "../../infrastructure/python/mcp/PythonBackedMcpToolCatalog";
-import { PythonBackedMcpToolExecutor } from "../../infrastructure/python/mcp/PythonBackedMcpToolExecutor";
 import { ListConfiguredMcpServersUseCase } from "../../application/mcp/ListConfiguredMcpServersUseCase";
 import { SearchMcpServersUseCase } from "../../application/mcp/SearchMcpServersUseCase";
 import { AddConfiguredMcpServerUseCase } from "../../application/mcp/AddConfiguredMcpServerUseCase";
@@ -82,6 +77,11 @@ import { PreviewAgentContextUseCase } from "../../application/context/PreviewAge
 import { LocalStorageContextPackageRepository } from "../../infrastructure/browser/context/LocalStorageContextPackageRepository";
 import { LocalStorageContextRecipeRepository } from "../../infrastructure/browser/context/LocalStorageContextRecipeRepository";
 import { createPythonRuntimeServiceDefinition } from "../../infrastructure/python/runtime/PythonRuntimeServiceDefinition";
+import { createMcpRuntimeIntegration } from "../../infrastructure/python/mcp/createMcpRuntimeIntegration";
+import {
+  createDependentRuntimeCapabilityRegistration,
+  createRuntimeDependencyOrchestrator,
+} from "../../infrastructure/runtime/RuntimeDependencyComposition";
 import { LocalStorageManagedServiceDefinitionRepository } from "../../infrastructure/browser/services/LocalStorageManagedServiceDefinitionRepository";
 import { HttpManagedServiceDefinitionRepository } from "../../infrastructure/services/HttpManagedServiceDefinitionRepository";
 import { HttpManagedServiceSupervisorClient } from "../../infrastructure/services/HttpManagedServiceSupervisorClient";
@@ -117,6 +117,7 @@ import { DefaultTuningDatasetStudioApplicationService } from "../../application/
 import { DefaultFileIngestionApplicationService } from "../../application/ingestion/DefaultFileIngestionApplicationService";
 import { FileIngestionPolicyService } from "../../domain/ingestion/FileIngestionServices";
 import { PythonRuntimeDocumentConversionGateway } from "../../infrastructure/ingestion/PythonRuntimeDocumentConversionGateway";
+import { OrchestratedDocumentConversionGateway } from "../../infrastructure/ingestion/OrchestratedDocumentConversionGateway";
 import { DatasetSourceIngestionProfile } from "../../application/tuning-datasets/DatasetSourceIngestionProfile";
 import { BrowserDatasetImportService, DatasetStatisticsService, DatasetWorkflowProgressService, DefaultDatasetDuplicationPolicy, DefaultDatasetPrivacyPolicy, DefaultDatasetReleasePolicy, DefaultDatasetReviewPolicy, DeterministicDatasetSplitService, FallbackAwareDatasetGenerationService, JsonTuningDatasetExportService, ProviderAgnosticDatasetGenerationService, TaskTypeAwareValidationService } from "../../domain/tuning-datasets/TuningDatasetServices";
 import { LocalStorageTuningDatasetRepository } from "../../infrastructure/browser/tuning-datasets/LocalStorageTuningDatasetRepository";
@@ -124,23 +125,33 @@ import { LocalStorageTuningDatasetVersionRepository } from "../../infrastructure
 import { BrowserStorageWorkflowRepository } from "../../infrastructure/browser/workflows/SqliteBackedWorkflowRepository";
 import { DesktopBridgeWorkflowRepository } from "../../infrastructure/browser/workflows/DesktopBridgeWorkflowRepository";
 import { resolveDesktopWorkflowBridge } from "./DesktopWorkflowBridgeAdapter";
+import { resolveDesktopExecutionRunBridge } from "./DesktopExecutionRunBridgeAdapter";
+import { resolveDesktopCanonicalAssetBridge } from "./DesktopCanonicalAssetBridgeAdapter";
 import { TruthfulWorkflowExecutor } from "../../infrastructure/execution/TruthfulWorkflowExecutor";
 import { InterpretedWorkflowExecutionStrategy } from "../../infrastructure/interpreted/execution/InterpretedWorkflowExecutionStrategy";
 import { DefaultNodeExecutionContextResolver } from "../../infrastructure/interpreted/execution/DefaultNodeExecutionContextResolver";
 import { DefaultNodeOutputStore } from "../../infrastructure/interpreted/execution/DefaultNodeOutputStore";
 import { LangChainNodeExecutor } from "../../infrastructure/interpreted/execution/LangChainNodeExecutor";
+import { WorkflowRuntimeSelector } from "../../application/execution/WorkflowRuntimeSelector";
 import { PythonDelegatedWorkflowExecutionStrategy } from "../../infrastructure/python/execution/PythonDelegatedWorkflowExecutionStrategy";
-import { DesktopBridgeFileStorage } from "../../infrastructure/browser/filesystem/DesktopBridgeFileStorage";
-import { ManagedLocalModelLibrary } from "../../infrastructure/filesystem/ManagedLocalModelLibrary";
-import { HuggingFaceModelDownloader } from "../../infrastructure/huggingface/HuggingFaceModelDownloader";
-import { LocalModelRepository } from "../../infrastructure/filesystem/LocalModelRepository";
-import { FilesystemModelInstaller } from "../../infrastructure/filesystem/FilesystemModelInstaller";
+import {
+  createExecutionApplicationInfrastructure,
+  createExecutionRunRepository,
+} from "../../infrastructure/execution/createExecutionInfrastructure";
 import { PythonRuntimeDatasetGenerationService } from "../../infrastructure/python/tuning-datasets/PythonRuntimeDatasetGenerationService";
+import { OrchestratedDatasetGenerationService } from "../../infrastructure/python/tuning-datasets/OrchestratedDatasetGenerationService";
 import { LocalStorageModelTrainingJobRepository } from "../../infrastructure/browser/model-training/LocalStorageModelTrainingJobRepository";
 import { DefaultModelTrainingApplicationService } from "../../application/model-training/DefaultModelTrainingApplicationService";
 import { ModelTrainingService } from "../services/ModelTrainingService";
 import { ModelTrainingStore } from "../state/ModelTrainingStore";
 import { PythonRuntimeModelTrainingGateway } from "../../infrastructure/python/model-training/PythonRuntimeModelTrainingGateway";
+import { OrchestratedModelTrainingRuntime } from "../../infrastructure/python/model-training/OrchestratedModelTrainingRuntime";
+import { RuntimeAwareModelCreationEnvironmentGateway } from "../../infrastructure/python/model-training/RuntimeAwareModelCreationEnvironmentGateway";
+import { ExecutionHistoryService } from "../services/ExecutionHistoryService";
+import { createModelManagementDependencies } from "./modelManagementDependencies";
+import { BrowserDownloadModelLibrary } from "../../infrastructure/browser/models/BrowserDownloadModelLibrary";
+import { RuntimeDependencyIds, RuntimeDependencyOperationalStates, type IRuntimeDependencyOrchestrator } from "../../application/runtime/RuntimeDependencyOrchestrator";
+import { CanonicalAssetManagementService } from "../services/CanonicalAssetManagementService";
 
 export function createUiDependencies(
   options: CreateUiDependenciesOptions = {}
@@ -148,6 +159,7 @@ export function createUiDependencies(
   const config = options.config ?? AppRuntimeConfig.resolveDefault();
   const desktopStorage = resolveDesktopStorageAdapter();
   const desktopWorkflowBridge = resolveDesktopWorkflowBridge();
+  const desktopExecutionRunBridge = resolveDesktopExecutionRunBridge();
   const desktopModelFileBridge = resolveDesktopModelFileBridge();
   const durableDesktopStorage = desktopStorage;
   const settingsStore = new UiSettingsStore({
@@ -172,126 +184,6 @@ export function createUiDependencies(
   const runtimeClient = pythonRuntimeConfig.isEnabled
     ? new HttpPythonRuntimeClient(pythonRuntimeConfig)
     : createDisabledRuntimeClient();
-  const mcpClient = settings.runtime.mode === "disabled"
-    ? createDisabledMcpRuntimeClient()
-    : new HttpMcpRuntimeClient(pythonRuntimeConfig, fetch, runtimeEventSink);
-  const mcpServerRuntimeClient = settings.runtime.mode === "disabled"
-    ? createDisabledMcpServerRuntimeClient()
-    : new HttpMcpServerRuntimeClient(pythonRuntimeConfig, fetch, runtimeEventSink);
-  const runtimeMcpServerCatalog = settings.runtime.mode === "disabled"
-    ? createDisabledMcpServerCatalog()
-    : new PythonBackedMcpServerCatalog(mcpServerRuntimeClient);
-  const workflowExecutorSelection = createWorkflowExecutor(config, runtimeClient, pythonRuntimeConfig.isEnabled, mcpClient, runtimeMcpServerCatalog);
-  const workflowExecutor = workflowExecutorSelection.executor;
-
-  const nodeCatalogProvider = createNodeCatalogProvider(config);
-  const workflowRepositorySelection = createWorkflowRepository(config, nodeCatalogProvider, desktopWorkflowBridge, desktopStorage);
-  const workflowRepository = workflowRepositorySelection.repository;
-  const contextPackageRepository = new LocalStorageContextPackageRepository(undefined, durableDesktopStorage);
-  const contextRecipeRepository = new LocalStorageContextRecipeRepository(undefined, durableDesktopStorage);
-  const workflowContextService = new WorkflowContextService(contextPackageRepository, contextRecipeRepository);
-
-  const modelCompatibilityService = new ModelCompatibilityService();
-  const nodeCompatibilityService = new NodeCompatibilityService(
-    modelCompatibilityService
-  );
-  const workflowValidator = new WorkflowValidator(nodeCompatibilityService);
-
-  const createWorkflowUseCase = new CreateWorkflowUseCase();
-  const executeWorkflowUseCase = new ExecuteWorkflowUseCase(
-    workflowExecutor,
-    workflowValidator,
-    workflowContextService
-  );
-  const validateWorkflowUseCase = new ValidateWorkflowUseCase(workflowValidator);
-
-  const createNodeUseCase = new CreateNodeUseCase(nodeCatalogProvider);
-  const connectNodesUseCase = new ConnectNodesUseCase(nodeCompatibilityService);
-  const listAvailableNodesUseCase = new ListAvailableNodesUseCase(
-    nodeCatalogProvider
-  );
-
-  const workflowService = new WorkflowService({
-    createWorkflowUseCase,
-    executeWorkflowUseCase,
-    validateWorkflowUseCase,
-    workflowRepository,
-  });
-
-  const nodeService = new NodeService({
-    createNodeUseCase,
-    connectNodesUseCase,
-    listAvailableNodesUseCase,
-    nodeCatalogProvider,
-  });
-
-  const workflowProjectionService = new WorkflowProjectionService();
-  const workflowToolProjectionService = new WorkflowToolProjectionService();
-  const loadToolDefinitionUseCase = new LoadToolDefinitionUseCase(
-    workflowRepository,
-    workflowToolProjectionService
-  );
-  const runToolUseCase = new RunToolUseCase(
-    workflowRepository,
-    workflowToolProjectionService,
-    workflowExecutor,
-    loadToolDefinitionUseCase,
-    workflowContextService
-  );
-
-  const nodeStore = new NodeStore({
-    nodeService,
-  });
-
-  const huggingFaceApiClient = new HuggingFaceApiClient();
-  const desktopModelFileStorage = desktopModelFileBridge ? new DesktopBridgeFileStorage(desktopModelFileBridge) : undefined;
-  const installedModelCatalog = desktopModelFileStorage
-    ? new LocalModelRepository({
-      fileStorage: desktopModelFileStorage,
-      rootDirectory: config.modelInstallDirectory,
-    })
-    : new LocalStorageInstalledModelCatalog(undefined, durableDesktopStorage as never);
-  const managedModelLibrary = desktopModelFileStorage
-    ? new ManagedLocalModelLibrary(desktopModelFileStorage, installedModelCatalog, config.modelInstallDirectory)
-    : new BrowserDownloadModelLibrary(installedModelCatalog, config.modelInstallDirectory);
-  const remoteModelCatalog = new HuggingFaceModelCatalog({
-    apiClient: huggingFaceApiClient,
-  });
-  const modelInstaller = new ModelInstaller({
-    providers: desktopModelFileStorage ? [new FilesystemModelInstaller(desktopModelFileStorage)] : [],
-    downloader: new ModelDownloader([desktopModelFileStorage
-      ? new HuggingFaceModelDownloader({
-        apiClient: huggingFaceApiClient,
-        fileStorage: desktopModelFileStorage,
-      })
-      : new BrowserHuggingFaceModelDownloader({
-        apiClient: huggingFaceApiClient,
-      })]),
-  });
-
-  const modelService = new ModelService({
-    installModelUseCase: new InstallModelUseCase({
-      modelInstaller,
-      installedModelCatalog,
-      remoteModelCatalog,
-    }),
-    listInstalledModelsUseCase: new ListInstalledModelsUseCase(installedModelCatalog),
-    removeModelUseCase: new RemoveModelUseCase({
-      installedModelCatalog,
-      modelInstaller,
-    }),
-    resolveModelCompatibilityUseCase: new ResolveModelCompatibilityUseCase(
-      modelCompatibilityService
-    ),
-    searchRemoteModelsUseCase: new SearchRemoteModelsUseCase(remoteModelCatalog),
-    installedModelCatalog,
-    managedModelLibrary,
-  });
-
-  const modelStore = new ModelStore({
-    modelService,
-  });
-
   const pythonRuntimeDefinition = createPythonRuntimeServiceDefinition(new PythonRuntimeConfig({
     mode: settings.runtime.mode,
     baseUrl: settings.runtime.mode === "disabled" ? undefined : settings.runtime.baseUrl,
@@ -318,14 +210,213 @@ export function createUiDependencies(
     supervisorClient: managedServiceSupervisorClient,
   });
   const pythonRuntimeManager = pythonManagedService.pythonRuntimeManager;
-  const persistedMcpServerRepository = settings.runtime.mode === "disabled"
-    ? undefined
-    : new RuntimeBackedMcpConfiguredServerRepository(mcpServerRuntimeClient);
+  const runtimeDependencyOrchestrator = createRuntimeDependencyOrchestrator({
+    pythonRuntime: {
+      providerId: "python-runtime-manager",
+      ensureAvailable: async () => {
+        const status = await pythonRuntimeManager.ensureRuntimeAvailability();
+        return {
+          state: mapPythonRuntimeStatusToDependencyState(status),
+          isDegraded: status.status === PythonRuntimeStatuses.unhealthy,
+          detail: status.detail,
+          metadata: {
+            owner: status.owner,
+            status: status.status,
+          },
+          remediationHints: createPythonRuntimeRemediationHints(status),
+        };
+      },
+    },
+    additionalRegistrations: [
+      createDependentRuntimeCapabilityRegistration({
+        dependencyId: RuntimeDependencyIds.workflowExecutionRuntime,
+        providerId: "workflow-execution-orchestration-gate",
+        ensureAvailable: async () => ({
+          state: RuntimeDependencyOperationalStates.healthy,
+          detail: "Workflow execution dependency gate passed.",
+        }),
+      }),
+      createDependentRuntimeCapabilityRegistration({
+        dependencyId: RuntimeDependencyIds.documentConversionRuntime,
+        providerId: "document-conversion-orchestration-gate",
+        ensureAvailable: async () => ({
+          state: RuntimeDependencyOperationalStates.healthy,
+          detail: "Document conversion dependency gate passed.",
+        }),
+      }),
+      createDependentRuntimeCapabilityRegistration({
+        dependencyId: RuntimeDependencyIds.datasetGenerationRuntime,
+        providerId: "dataset-generation-orchestration-gate",
+        ensureAvailable: async () => ({
+          state: RuntimeDependencyOperationalStates.healthy,
+          detail: "Dataset generation dependency gate passed.",
+        }),
+      }),
+      createDependentRuntimeCapabilityRegistration({
+        dependencyId: RuntimeDependencyIds.modelTrainingRuntime,
+        providerId: "model-training-orchestration-gate",
+        ensureAvailable: async () => ({
+          state: RuntimeDependencyOperationalStates.healthy,
+          detail: "Model training dependency gate passed.",
+        }),
+      }),
+    ],
+  });
+  const mcpRuntimeIntegration = createMcpRuntimeIntegration(
+    pythonRuntimeConfig,
+    runtimeEventSink,
+    fetch,
+    runtimeDependencyOrchestrator,
+  );
+  const mcpClient = mcpRuntimeIntegration.runtimeClient;
+  const runtimeMcpServerCatalog = mcpRuntimeIntegration.serverCatalog;
+  const workflowExecutorSelection = createWorkflowExecutor(
+    config,
+    runtimeClient,
+    pythonRuntimeConfig.isEnabled,
+    mcpClient,
+    runtimeMcpServerCatalog,
+    runtimeDependencyOrchestrator,
+  );
+  const workflowExecutor = workflowExecutorSelection.executor;
+
+  const nodeCatalogProvider = createNodeCatalogProvider(config);
+  const workflowRepositorySelection = createWorkflowRepository(config, nodeCatalogProvider, desktopWorkflowBridge, desktopStorage);
+  const workflowRepository = workflowRepositorySelection.repository;
+  const contextPackageRepository = new LocalStorageContextPackageRepository(undefined, durableDesktopStorage);
+  const contextRecipeRepository = new LocalStorageContextRecipeRepository(undefined, durableDesktopStorage);
+  const workflowContextService = new WorkflowContextService(contextPackageRepository, contextRecipeRepository);
+
+  const modelCompatibilityService = new ModelCompatibilityService();
+  const nodeCompatibilityService = new NodeCompatibilityService(
+    modelCompatibilityService
+  );
+  const workflowValidator = new WorkflowValidator(nodeCompatibilityService);
+
+  const datasetGenerationService = new FallbackAwareDatasetGenerationService(
+    new OrchestratedDatasetGenerationService(
+      new PythonRuntimeDatasetGenerationService(runtimeClient),
+      runtimeDependencyOrchestrator,
+    ),
+    new ProviderAgnosticDatasetGenerationService(),
+  );
+  const modelTrainingRuntime = new OrchestratedModelTrainingRuntime(
+    new PythonRuntimeModelTrainingGateway(runtimeClient),
+    runtimeDependencyOrchestrator,
+  );
+  const createWorkflowUseCase = new CreateWorkflowUseCase();
+  const executionRunRepository = createExecutionRunRepository({
+    desktopExecutionRunBridge,
+    storage: durableDesktopStorage,
+  });
+  const executionInfrastructure = createExecutionApplicationInfrastructure({
+    workflowExecutor,
+    executionRunRepository,
+    datasetGenerationService,
+    modelTrainingRuntime,
+    mcpServerManager: mcpRuntimeIntegration.serverManager,
+  });
+  const executionHistoryService = new ExecutionHistoryService(
+    executionInfrastructure.listExecutionRunsUseCase,
+    executionInfrastructure.executionRunProjectionService,
+    executionInfrastructure.listRelatedExecutionRunsUseCase,
+    executionInfrastructure.getExecutionRunDetailUseCase,
+  );
+  const executionEngine = executionInfrastructure.executionEngine;
+  const executeWorkflowUseCase = new ExecuteWorkflowUseCase(
+    workflowExecutor,
+    workflowValidator,
+    workflowContextService,
+    executionEngine,
+  );
+  const validateWorkflowUseCase = new ValidateWorkflowUseCase(workflowValidator);
+  const loadWorkflowUseCase = new LoadWorkflowUseCase(workflowRepository, workflowValidator);
+
+  const createNodeUseCase = new CreateNodeUseCase(nodeCatalogProvider);
+  const connectNodesUseCase = new ConnectNodesUseCase(nodeCompatibilityService);
+  const listAvailableNodesUseCase = new ListAvailableNodesUseCase(
+    nodeCatalogProvider
+  );
+
+  const workflowService = new WorkflowService({
+    createWorkflowUseCase,
+    executeWorkflowUseCase,
+    validateWorkflowUseCase,
+    workflowRepository,
+    loadWorkflowUseCase,
+  });
+
+  const nodeService = new NodeService({
+    createNodeUseCase,
+    connectNodesUseCase,
+    listAvailableNodesUseCase,
+    nodeCatalogProvider,
+  });
+
+  const workflowProjectionService = new WorkflowProjectionService();
+  const workflowToolProjectionService = new WorkflowToolProjectionService();
+  const loadToolDefinitionUseCase = new LoadToolDefinitionUseCase(
+    workflowRepository,
+    workflowToolProjectionService
+  );
+  const runToolUseCase = new RunToolUseCase(
+    workflowRepository,
+    workflowToolProjectionService,
+    workflowExecutor,
+    loadToolDefinitionUseCase,
+    workflowContextService,
+    executionEngine,
+  );
+
+  const nodeStore = new NodeStore({
+    nodeService,
+  });
+
+  const huggingFaceApiClient = new HuggingFaceApiClient();
+  const modelManagement = createModelManagementDependencies({
+    apiClient: huggingFaceApiClient,
+    desktopModelFileBridge: desktopModelFileBridge ?? undefined,
+    modelInstallDirectory: config.modelInstallDirectory,
+    durableStorage: durableDesktopStorage as never,
+  });
+  const desktopModelFileStorage = modelManagement.fileStorage;
+  const installedModelCatalog = modelManagement.installedModelCatalog;
+  const managedModelLibrary = modelManagement.managedModelLibrary;
+  const remoteModelCatalog = new HuggingFaceModelCatalog({
+    apiClient: huggingFaceApiClient,
+  });
+  const modelInstaller = new ModelInstaller({
+    providers: modelManagement.installers,
+    downloader: new ModelDownloader([modelManagement.downloader]),
+  });
+
+  const modelService = new ModelService({
+    installModelUseCase: new InstallModelUseCase({
+      modelInstaller,
+      installedModelCatalog,
+      remoteModelCatalog,
+    }),
+    listInstalledModelsUseCase: new ListInstalledModelsUseCase(installedModelCatalog),
+    removeModelUseCase: new RemoveModelUseCase({
+      installedModelCatalog,
+      modelInstaller,
+    }),
+    resolveModelCompatibilityUseCase: new ResolveModelCompatibilityUseCase(
+      modelCompatibilityService
+    ),
+    searchRemoteModelsUseCase: new SearchRemoteModelsUseCase(remoteModelCatalog),
+    installedModelCatalog,
+    managedModelLibrary,
+  });
+
+  const modelStore = new ModelStore({
+    modelService,
+  });
+
+  const persistedMcpServerRepository = mcpRuntimeIntegration.configuredServerRepository;
   const mcpServerCatalog = runtimeMcpServerCatalog;
-  const mcpServerManager = settings.runtime.mode === "disabled"
-    ? createDisabledMcpServerManager()
-    : new PythonBackedMcpServerManager(mcpServerRuntimeClient, runtimeMcpServerCatalog, runtimeEventSink);
-  const pythonBackedMcpToolCatalog = new PythonBackedMcpToolCatalog(mcpClient, runtimeEventSink);
+  const mcpServerManager = mcpRuntimeIntegration.serverManager;
+  const pythonBackedMcpToolCatalog = mcpRuntimeIntegration.toolCatalog;
   const toolCapabilityCatalog = new CompositeToolCapabilityCatalog([
     new WorkflowProjectedToolCapabilityCatalog(workflowRepository, workflowToolProjectionService),
     new StaticLocalToolCapabilityCatalog([]),
@@ -345,7 +436,7 @@ export function createUiDependencies(
     {
       providerKind: MCP_TOOL_CAPABILITY_PROVIDER.kind,
       providerId: MCP_TOOL_CAPABILITY_PROVIDER.id,
-      executor: new McpToolCapabilityExecutor(new PythonBackedMcpToolExecutor(mcpClient, runtimeEventSink)),
+      executor: new McpToolCapabilityExecutor(mcpRuntimeIntegration.toolExecutor),
     },
   ]);
   const toolService = new ToolService(
@@ -365,12 +456,12 @@ export function createUiDependencies(
     new AddConfiguredMcpServerUseCase(persistedMcpServerRepository ?? { saveConfiguredServer: async (server) => server, listConfiguredServers: async () => [] }),
     new GetMcpConnectionStatusUseCase(mcpServerCatalog),
     new GetMcpServerStatusUseCase(mcpServerCatalog),
-    new ConnectMcpServerUseCase(mcpServerManager),
-    new DisconnectMcpServerUseCase(mcpServerManager),
-    new ReconnectMcpServerUseCase(mcpServerManager),
+    new ConnectMcpServerUseCase(mcpServerManager, executionEngine),
+    new DisconnectMcpServerUseCase(mcpServerManager, executionEngine),
+    new ReconnectMcpServerUseCase(mcpServerManager, executionEngine),
     new SearchMcpToolsUseCase(pythonBackedMcpToolCatalog),
     new GetMcpToolDescriptorUseCase(pythonBackedMcpToolCatalog),
-    new CreateLocalMcpServerUseCase(mcpServerManager),
+    new CreateLocalMcpServerUseCase(mcpServerManager, executionEngine),
     new GenerateLocalMcpToolDraftUseCase(),
   );
   const mcpToolCallAuthoringService = new McpToolCallAuthoringService(mcpService);
@@ -384,6 +475,7 @@ export function createUiDependencies(
     runtimeEventStore,
     pythonRuntimeManager,
     mcpService,
+    runtimeDependencyOrchestrator,
     runtimeManagement: {
       isManagedLocal: pythonRuntimeConfig.isManagedLocal,
       autoStartEnabled: pythonRuntimeConfig.autoStartEnabled,
@@ -406,7 +498,11 @@ export function createUiDependencies(
     : new ManagedServiceEventStream({
       baseUrl: pythonRuntimeConfig.supervisorBaseUrl,
     });
-  const managedServicesStore = new ManagedServicesStore(managedServicesService, managedServiceEventStream);
+  const managedServicesStore = new ManagedServicesStore(
+    managedServicesService,
+    managedServiceEventStream,
+    runtimeDependencyOrchestrator,
+  );
   const mcpStore = new McpStore(mcpService);
   const previewWorkflowContextUseCase = new PreviewWorkflowContextUseCase(workflowContextService);
   const previewToolContextUseCase = new PreviewToolContextUseCase(
@@ -444,7 +540,10 @@ export function createUiDependencies(
   const duplicationPolicy = new DefaultDatasetDuplicationPolicy();
   const fileIngestionService = new DefaultFileIngestionApplicationService(
     new FileIngestionPolicyService(),
-    new PythonRuntimeDocumentConversionGateway(runtimeClient),
+    new OrchestratedDocumentConversionGateway(
+      new PythonRuntimeDocumentConversionGateway(runtimeClient),
+      runtimeDependencyOrchestrator,
+    ),
   );
   const tuningDatasetApplicationService = new DefaultTuningDatasetStudioApplicationService({
     datasetRepository: tuningDatasetRepository,
@@ -453,10 +552,8 @@ export function createUiDependencies(
     splitService: new DeterministicDatasetSplitService(),
     exportService: new JsonTuningDatasetExportService(),
     importService: new BrowserDatasetImportService(new DefaultDatasetPrivacyPolicy()),
-    generationService: new FallbackAwareDatasetGenerationService(
-      new PythonRuntimeDatasetGenerationService(runtimeClient),
-      new ProviderAgnosticDatasetGenerationService(),
-    ),
+    generationService: datasetGenerationService,
+    executionEngine,
     reviewPolicy: new DefaultDatasetReviewPolicy(),
     duplicationPolicy,
     statisticsService: new DatasetStatisticsService(duplicationPolicy),
@@ -473,10 +570,71 @@ export function createUiDependencies(
     tuningDatasetRepository,
     tuningDatasetVersionRepository,
     modelTrainingJobRepository,
-    new PythonRuntimeModelTrainingGateway(runtimeClient),
+    modelTrainingRuntime,
+    new RuntimeAwareModelCreationEnvironmentGateway(
+      config,
+      runtimeClient,
+      pythonRuntimeConfig.isEnabled,
+      desktopModelFileStorage,
+      desktopModelFileStorage
+        ? "Desktop model-file bridge is connected."
+        : config.runtimeMode === "browser-development"
+          ? "Browser fallback mode does not expose the desktop model-file bridge."
+          : "The desktop model-file bridge is not available in this runtime.",
+      runtimeDependencyOrchestrator,
+    ),
+    desktopModelFileStorage,
+    executionEngine,
   );
   const modelTrainingService = new ModelTrainingService(modelTrainingApplicationService);
   const modelTrainingStore = new ModelTrainingStore(modelTrainingService);
+  const desktopCanonicalAssetBridge = resolveDesktopCanonicalAssetBridge();
+  const canonicalAssetManagementService = new CanonicalAssetManagementService(desktopCanonicalAssetBridge
+    ? {
+      listAssets: async () => (await desktopCanonicalAssetBridge.listAssets()).map((entry) => JSON.parse(entry)),
+      loadAssetDetail: async (assetId) => {
+        const detail = await desktopCanonicalAssetBridge.loadAssetDetail(assetId);
+        return detail ? JSON.parse(detail) : undefined;
+      },
+      listVersionChain: async (assetId) => (await desktopCanonicalAssetBridge.listVersionChain(assetId)).map((entry) => {
+        const parsed = JSON.parse(entry) as {
+          versionId: string;
+          parentVersionId?: string;
+          label?: string;
+          dependencyState?: "healthy" | "impacted" | "stale" | "partially-trusted" | "reconciliation-needed";
+          createdAt: string;
+        };
+        return Object.freeze({
+          ...parsed,
+          createdAt: new Date(parsed.createdAt),
+        });
+      }),
+      evaluateDependencyState: async (versionId) => {
+        const state = await desktopCanonicalAssetBridge.evaluateDependencyState(versionId);
+        if (!state) {
+          throw new Error(`Canonical dependency state for version '${versionId}' is unavailable.`);
+        }
+        return JSON.parse(state);
+      },
+      reconcileIdentity: async ({ entityType, entityId }) => {
+        const reconciled = await desktopCanonicalAssetBridge.reconcileIdentity(entityType, entityId);
+        return reconciled ? JSON.parse(reconciled) : undefined;
+      },
+      replayScopedProjection: async ({ entityType, entityId, versionId }) => JSON.parse(
+        await desktopCanonicalAssetBridge.replayScopedProjection(entityType, entityId, versionId),
+      ),
+      verifyProjection: async ({ assetId, versionIdsInScope }) => {
+        const verification = await desktopCanonicalAssetBridge.verifyProjection(assetId, versionIdsInScope);
+        if (!verification) {
+          throw new Error(`Projection verification for canonical asset '${assetId}' is unavailable.`);
+        }
+        return JSON.parse(verification);
+      },
+      rebuildProjectionScopes: async (request) => JSON.parse(
+        await desktopCanonicalAssetBridge.rebuildProjectionScopes(JSON.stringify(request)),
+      ),
+    }
+    : undefined);
 
   return Object.freeze({
     config,
@@ -507,6 +665,8 @@ export function createUiDependencies(
     tuningDatasetStore,
     modelTrainingService,
     modelTrainingStore,
+    executionHistoryService,
+    canonicalAssetManagementService,
     workflowProjectionService,
     settingsStore,
   });
@@ -541,6 +701,21 @@ function createDisabledRuntimeClient(): IPythonRuntimeClient {
     async submitFineTuningJob() {
       throw new Error("Python runtime is disabled in settings.");
     },
+    async getFineTuningJob() {
+      throw new Error("Python runtime is disabled in settings.");
+    },
+    async refreshFineTuningJob() {
+      throw new Error("Python runtime is disabled in settings.");
+    },
+    async reconcileFineTuningJob() {
+      throw new Error("Python runtime is disabled in settings.");
+    },
+    async listFineTuningJobs() {
+      throw new Error("Python runtime is disabled in settings.");
+    },
+    async cancelFineTuningJob() {
+      throw new Error("Python runtime is disabled in settings.");
+    },
     async generateDatasetExamples() {
       throw new Error("Python runtime is disabled in settings.");
     },
@@ -572,15 +747,16 @@ function createWorkflowRepository(
 
   const browserStorage = typeof window !== "undefined" ? window.localStorage : undefined;
   if (browserStorage) {
+    const usingExplicitBrowserStorage = config.workflowRepositoryMode === "browser-storage";
     return {
       repository: new BrowserStorageWorkflowRepository(nodeCatalogProvider, browserStorage, createSeedWorkflows()),
       status: {
         configuredMode: config.workflowRepositoryMode,
-        effectiveMode: "browser-storage-fallback",
-        isDegraded: true,
-        detail: config.workflowRepositoryMode === "filesystem-indexed"
-          ? "Expected dev persistence is dev/ filesystem + SQLite, but the app is running in explicit browser fallback mode and is using browser storage instead."
-          : "Workflow persistence is using the explicit browser-storage fallback mode.",
+        effectiveMode: usingExplicitBrowserStorage ? "browser-storage" : "browser-storage-fallback",
+        isDegraded: !usingExplicitBrowserStorage,
+        detail: usingExplicitBrowserStorage
+          ? "Workflow persistence is aligned with the browser-hosted architecture and is using browser storage directly."
+          : "Expected dev persistence is dev/ filesystem + SQLite, but the app is running in explicit browser fallback mode and is using browser storage instead.",
         workflowsDirectory: config.workflowStorageDirectory,
         indexDatabasePath: config.workflowIndexDatabasePath,
       },
@@ -600,8 +776,16 @@ function createWorkflowRepository(
   };
 }
 
-function createWorkflowExecutor(config: AppRuntimeConfig, runtimeClient: IPythonRuntimeClient, runtimeEnabled: boolean, mcpClient: ReturnType<typeof createDisabledMcpRuntimeClient> | HttpMcpRuntimeClient, mcpServerCatalog: ReturnType<typeof createDisabledMcpServerCatalog> | PythonBackedMcpServerCatalog) {
+function createWorkflowExecutor(
+  config: AppRuntimeConfig,
+  runtimeClient: IPythonRuntimeClient,
+  runtimeEnabled: boolean,
+  mcpClient: IMcpRuntimeClient,
+  mcpServerCatalog: IMcpServerCatalog,
+  runtimeDependencyOrchestrator: Pick<IRuntimeDependencyOrchestrator, "ensureAvailable">,
+) {
   const executor = new TruthfulWorkflowExecutor({
+    selector: new WorkflowRuntimeSelector({ runtimeDependencyOrchestrator }),
     strategies: [
       new PythonDelegatedWorkflowExecutionStrategy(runtimeClient),
       new InterpretedWorkflowExecutionStrategy({
@@ -689,7 +873,7 @@ function describeMcpOperationalStatus(runtimeMode: UiSettings["runtime"]["mode"]
     : { configuredMode: "runtime-backed", effectiveMode: "runtime-backed", isDegraded: false, detail: "MCP nodes and capabilities resolve through the runtime-backed MCP subsystem." };
 }
 
-function describeModelLibraryOperationalStatus(managedModelLibrary: BrowserDownloadModelLibrary | ManagedLocalModelLibrary) {
+function describeModelLibraryOperationalStatus(managedModelLibrary: IManagedModelLibrary) {
   const isBrowserFallback = managedModelLibrary instanceof BrowserDownloadModelLibrary;
   return {
     configuredMode: isBrowserFallback ? "browser-download-fallback" : "managed-local",
@@ -701,174 +885,41 @@ function describeModelLibraryOperationalStatus(managedModelLibrary: BrowserDownl
   };
 }
 
-function createDisabledRuntimeStatus() {
 
-  return {
-    enabled: false,
-    state: "disabled" as const,
-    checkedAt: new Date().toISOString(),
-    servers: [],
-    capabilities: { tools: false, resources: false, toolExecution: false },
-    metadata: { reason: "python-runtime-disabled" },
-  };
+
+function mapPythonRuntimeStatusToDependencyState(status: PythonRuntimeManagerStatus) {
+  switch (status.status) {
+    case PythonRuntimeStatuses.healthy:
+      return RuntimeDependencyOperationalStates.healthy;
+    case PythonRuntimeStatuses.unhealthy:
+      return RuntimeDependencyOperationalStates.degraded;
+    case PythonRuntimeStatuses.starting:
+      return RuntimeDependencyOperationalStates.starting;
+    case PythonRuntimeStatuses.stopping:
+      return RuntimeDependencyOperationalStates.stopped;
+    case PythonRuntimeStatuses.stopped:
+      return RuntimeDependencyOperationalStates.stopped;
+    case PythonRuntimeStatuses.failed:
+      return RuntimeDependencyOperationalStates.failed;
+    case PythonRuntimeStatuses.unavailable:
+    default:
+      return RuntimeDependencyOperationalStates.unavailable;
+  }
 }
 
-function createDisabledServerDescriptor(serverId: string) {
-  return {
-    id: serverId,
-    name: serverId,
-    transport: "inmemory" as const,
-    enabled: false,
-    status: "error" as const,
-    connected: false,
-    toolCount: 0,
-    resourceCount: 0,
-    capabilities: { tools: false, resources: false, toolExecution: false },
-    errorMessage: "Python runtime is disabled.",
-  };
-}
-
-function createDisabledServerStatus(serverId: string) {
-  return {
-    serverId,
-    name: serverId,
-    transport: "inmemory" as const,
-    configured: false,
-    enabled: false,
-    state: "error" as const,
-    connected: false,
-    checkedAt: new Date().toISOString(),
-    toolCount: 0,
-    resourceCount: 0,
-    capabilities: { tools: false, resources: false, toolExecution: false },
-    errorMessage: "Python runtime is disabled.",
-  };
-}
-
-function createDisabledConnectionResult(serverId: string, action: "connect" | "disconnect" | "reconnect") {
-  return {
-    action,
-    checkedAt: new Date().toISOString(),
-    server: createDisabledServerDescriptor(serverId),
-    status: createDisabledServerStatus(serverId),
-    runtime: createDisabledRuntimeStatus(),
-    metadata: { reason: "python-runtime-disabled" },
-  };
-}
-
-function createDisabledMcpRuntimeClient() {
-  const disabledStatus = () => createDisabledRuntimeStatus();
-
-  return {
-    async getConnectionStatus() {
-      return disabledStatus();
-    },
-    async listServers() {
-      return { query: "", totalCount: 0, limit: 20, servers: [], status: disabledStatus() };
-    },
-    async searchServers(criteria?: { query?: string; limit?: number }) {
-      return {
-        query: criteria?.query?.trim() || "",
-        totalCount: 0,
-        limit: criteria?.limit ?? 20,
-        servers: [],
-        status: disabledStatus(),
-      };
-    },
-    async connectServer(request: { serverId: string; reconnect?: boolean }) {
-      return createDisabledConnectionResult(request.serverId, request.reconnect ? "reconnect" : "connect");
-    },
-    async disconnectServer(serverId: string) {
-      return createDisabledConnectionResult(serverId, "disconnect");
-    },
-    async listTools() {
-      return [];
-    },
-    async searchTools(criteria?: { query?: string; limit?: number }) {
-      return { query: criteria?.query?.trim() || "", totalCount: 0, limit: criteria?.limit ?? 20, tools: [] };
-    },
-    async getToolDescriptor() {
-      return undefined;
-    },
-    async listResources() {
-      return [];
-    },
-    async executeTool(request: { serverId: string; toolName: string; executionId?: string }) {
-      return {
-        executionId: request.executionId?.trim() || "mcp-disabled",
-        serverId: request.serverId,
-        toolName: request.toolName,
-        status: "failed" as const,
-        content: [],
-        structuredContent: {},
-        errorMessage: "Python runtime is disabled.",
-      };
-    },
-  };
-}
-
-function createDisabledMcpServerRuntimeClient() {
-  return {
-    async getConnectionStatus() {
-      return createDisabledRuntimeStatus();
-    },
-    async listConfiguredServers() {
-      return [];
-    },
-    async connectServer(request: { serverId: string }) {
-      return createDisabledConnectionResult(request.serverId, "connect");
-    },
-    async disconnectServer(serverId: string) {
-      return createDisabledConnectionResult(serverId, "disconnect");
-    },
-    async reconnectServer(serverId: string) {
-      return createDisabledConnectionResult(serverId, "reconnect");
-    },
-    async createLocalServer(draft: { serverId: string }) {
-      return {
-        server: createDisabledServerDescriptor(draft.serverId),
-        status: createDisabledServerStatus(draft.serverId),
-        runtime: createDisabledRuntimeStatus(),
-        checkedAt: new Date().toISOString(),
-        created: false,
-      };
-    },
-  };
-}
-
-function createDisabledMcpServerCatalog() {
-  return {
-    async getConnectionStatus() {
-      return createDisabledRuntimeStatus();
-    },
-    async listConfiguredServers() {
-      return [];
-    },
-    async getServerStatus(serverId: string) {
-      return createDisabledServerStatus(serverId);
-    },
-  };
-}
-
-function createDisabledMcpServerManager() {
-  return {
-    async connectServer(request: { serverId: string }) {
-      return createDisabledConnectionResult(request.serverId, "connect");
-    },
-    async disconnectServer(serverId: string) {
-      return createDisabledConnectionResult(serverId, "disconnect");
-    },
-    async reconnectServer(serverId: string) {
-      return createDisabledConnectionResult(serverId, "reconnect");
-    },
-    async createLocalServer(draft: { serverId: string }) {
-      return {
-        server: createDisabledServerDescriptor(draft.serverId),
-        status: createDisabledServerStatus(draft.serverId),
-        runtime: createDisabledRuntimeStatus(),
-        checkedAt: new Date().toISOString(),
-        created: false,
-      };
-    },
-  };
+function createPythonRuntimeRemediationHints(status: PythonRuntimeManagerStatus): ReadonlyArray<string> {
+  switch (status.status) {
+    case PythonRuntimeStatuses.starting:
+      return Object.freeze(["Wait for the managed runtime startup sequence to finish, then refresh runtime-backed capabilities."]);
+    case PythonRuntimeStatuses.unhealthy:
+      return Object.freeze(["Inspect the runtime console for probe failures and restart the managed runtime if health does not recover."]);
+    case PythonRuntimeStatuses.failed:
+      return Object.freeze(["Restart the Python runtime and review runtime console errors for the failure cause."]);
+    case PythonRuntimeStatuses.stopped:
+      return Object.freeze(["Start the managed runtime before using runtime-backed capabilities."]);
+    case PythonRuntimeStatuses.unavailable:
+      return Object.freeze(["Configure or enable a Python runtime endpoint before using runtime-backed capabilities."]);
+    default:
+      return Object.freeze([]);
+  }
 }

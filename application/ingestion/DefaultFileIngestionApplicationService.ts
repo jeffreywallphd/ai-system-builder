@@ -8,6 +8,7 @@ import {
   RuntimeUnavailableError,
 } from "../../domain/ingestion/interfaces/IFileIngestion";
 import type { DocumentConversionGateway } from "./DocumentConversionGateway";
+import { RuntimeDependencyUnavailableError } from "../runtime/RuntimeDependencyOrchestrator";
 import type { FileIngestionApplicationService } from "./FileIngestionApplicationService";
 
 function toUint8Array(content: string | Uint8Array): Uint8Array {
@@ -63,6 +64,15 @@ export class DefaultFileIngestionApplicationService implements FileIngestionAppl
     } catch (error) {
       if (error instanceof FileIngestionError) {
         throw error;
+      }
+
+      if (error instanceof RuntimeDependencyUnavailableError) {
+        throw new RuntimeUnavailableError("Document conversion runtime is unavailable.", {
+          cause: error.message,
+          fileName: evaluation.descriptor.name,
+          dependency: error.resolution,
+          remediationHints: error.resolution.remediationHints,
+        });
       }
 
       if (error instanceof Error && /disabled|unavailable/i.test(error.message)) {

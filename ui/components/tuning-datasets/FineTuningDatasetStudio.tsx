@@ -3,8 +3,10 @@ import { EXPORT_FORMATS, type ChatCompletionMessage, type ExampleStatus, type Sp
 import { buildDatasetWorkflowWizard } from "../../../application/tuning-datasets/buildDatasetWorkflowWizard";
 import { ChatCompletionExample, QuestionAnsweringExample } from "../../../domain/tuning-datasets/TuningDatasetEntities";
 import { useUiDependencies } from "../../composition/AppProviders";
+import ExecutionHistoryPanel from "../execution/ExecutionHistoryPanel";
 import LinearWizard from "../wizard/LinearWizard";
 import type { TuningDatasetStoreState } from "../../state/TuningDatasetStore";
+import type { ExecutionRunProjection } from "../../../application/execution/ExecutionRunProjectionService";
 
 const fallbackState: TuningDatasetStoreState = Object.freeze({
   datasets: Object.freeze([]),
@@ -17,6 +19,7 @@ const fallbackState: TuningDatasetStoreState = Object.freeze({
   validation: undefined,
   statistics: undefined,
   exports: Object.freeze([]),
+  generationBatches: Object.freeze([]),
   duplicates: Object.freeze([]),
   workflow: undefined,
   wizard: buildDatasetWorkflowWizard({ currentStage: "dataset_definition" }),
@@ -56,7 +59,7 @@ function parseChatMessages(value: string): ReadonlyArray<ChatCompletionMessage> 
 }
 
 export default function FineTuningDatasetStudio(): JSX.Element {
-  const { tuningDatasetStore } = useUiDependencies();
+  const { tuningDatasetStore, executionHistoryService } = useUiDependencies();
   const [state, setState] = useState<TuningDatasetStoreState>(() => tuningDatasetStore.getState() || fallbackState);
   const [datasetName, setDatasetName] = useState("");
   const [datasetDescription, setDatasetDescription] = useState("");
@@ -69,6 +72,7 @@ export default function FineTuningDatasetStudio(): JSX.Element {
   const [qaDraft, setQaDraft] = useState({ question: "", answer: "", context: "" });
   const [bulkNote, setBulkNote] = useState("Bulk reviewed in dataset studio");
   const [draftEdits, setDraftEdits] = useState<Record<string, { question?: string; answer?: string; context?: string; status: ExampleStatus; split: SplitType; messagesText?: string }>>({});
+  const [executionHistory, setExecutionHistory] = useState<ReadonlyArray<ExecutionRunProjection>>([]);
 
   useEffect(() => tuningDatasetStore.subscribe(setState), [tuningDatasetStore]);
 
@@ -81,31 +85,27 @@ export default function FineTuningDatasetStudio(): JSX.Element {
   }, [state.sourceDocuments]);
 
   const selectedVersion = state.selectedDataset?.selectedVersion;
+
+  useEffect(() => {
+    if (!state.selectedDataset?.dataset.id || !selectedVersion?.id) {
+      setExecutionHistory([]);
+      return;
+    }
+
+    void executionHistoryService.listHistory({
+      executionKind: "dataset-generation",
+      metadata: {
+        datasetId: state.selectedDataset.dataset.id,
+        versionId: selectedVersion.id,
+      },
+      limit: 6,
+    }).then(setExecutionHistory).catch(() => setExecutionHistory([]));
+  }, [executionHistoryService, selectedVersion?.id, state.isMutating, state.selectedDataset?.dataset.id]);
   const selectedDataset = state.selectedDataset?.dataset;
   const workflow = state.workflow;
   const taskType = selectedDataset?.taskType ?? datasetType;
   const wizard = state.wizard;
-  const generationBatches = useMemo(() => {
-    const grouped = new Map<string, { id: string; provider: string; mode: string; detail?: string; count: number; diagnostics: string[] }>();
-    for (const example of state.examples) {
-      const generator = example.lineage.generator;
-      if (!generator) {
-        continue;
-      }
-      const existing = grouped.get(generator.batchId) ?? {
-        id: generator.batchId,
-        provider: generator.provider,
-        mode: generator.mode,
-        detail: generator.detail,
-        count: 0,
-        diagnostics: [],
-      };
-      existing.count += 1;
-      existing.diagnostics = [...existing.diagnostics, ...generator.diagnostics.map((diagnostic) => `${diagnostic.level}: ${diagnostic.message}`)];
-      grouped.set(generator.batchId, existing);
-    }
-    return [...grouped.values()];
-  }, [state.examples]);
+  const generationBatches = state.generationBatches;
 
   const exportOptions = useMemo(() => (taskType === "chat_completion"
     ? EXPORT_FORMATS.filter((format) => ["canonical_json", "canonical_jsonl", "openai_chat_jsonl"].includes(format))
@@ -235,7 +235,7 @@ export default function FineTuningDatasetStudio(): JSX.Element {
         return !selectedVersion ? <p className="ui-text-secondary">Create or select a dataset version first.</p> : (
           <div className="ui-stack ui-stack--md">
             <div className="ui-row ui-row--between ui-row--wrap">
-              <p className="ui-text-secondary">Provider-backed dataset generation is the default path. If the Python runtime cannot serve generation, the UI keeps any heuristic generation explicitly labeled as fallback provenance rather than presenting it as a managed install/runtime path.</p>
+              <p className="ui-text-secondary">Provider/model-backed generation is preferred when configured and available. If that path is unavailable, the app records whether examples came from the explicit python-runtime-local generator or a heuristic fallback, along with provider/model identity, diagnostics, and fallback reasons.</p>
               <button
                 type="button"
                 className="ui-button ui-button--secondary ui-button--sm"
@@ -245,6 +245,13 @@ export default function FineTuningDatasetStudio(): JSX.Element {
                 {taskType === "chat_completion" ? "Generate chat examples" : "Generate QA examples"}
               </button>
             </div>
+            <ExecutionHistoryPanel
+              title="Generation execution history"
+              subtitle="Durable execution-engine records for dataset example generation."
+              items={executionHistory}
+              emptyMessage="No dataset-generation execution runs have been recorded yet."
+              executionHistoryService={executionHistoryService}
+            />
             {generationBatches.length > 0 ? (
               <div className="ui-stack ui-stack--sm">
                 <h4>Generation run history</h4>
@@ -253,11 +260,13 @@ export default function FineTuningDatasetStudio(): JSX.Element {
                     <div className="ui-card__body ui-stack ui-stack--2xs">
                       <div className="ui-row ui-row--between ui-row--wrap">
                         <strong>{batch.id}</strong>
-                        <span className={`ui-badge ${batch.mode === "provider-backed" ? "ui-badge--success" : "ui-badge--warning"}`}>{batch.mode}</span>
+                        <span className={`ui-badge ${batch.provenance.mode === "provider-model-backed" ? "ui-badge--success" : batch.provenance.mode === "python-runtime-local" ? "ui-badge--info" : "ui-badge--warning"}`}>{batch.provenance.mode}</span>
                       </div>
-                      <div className="ui-text-secondary ui-text-small">Provider: {batch.provider} · Examples: {batch.count}</div>
-                      {batch.detail ? <div className="ui-text-secondary ui-text-small">{batch.detail}</div> : null}
-                      {batch.diagnostics.length > 0 ? <div className="ui-text-secondary ui-text-small">Diagnostics: {batch.diagnostics.join(" · ")}</div> : null}
+                      <div className="ui-text-secondary ui-text-small">Provider: {batch.provenance.provider} · Model: {batch.provenance.modelDisplayName ?? batch.provenance.modelId ?? "—"} · Examples: {batch.generatedCount} · Status: {batch.status} · Path: {batch.provenance.path}</div>
+                      {batch.provenance.detail ? <div className="ui-text-secondary ui-text-small">{batch.provenance.detail}</div> : null}
+                      <div className="ui-text-secondary ui-text-small">Execution kind: {batch.provenance.executionKind} · Fallback: {batch.provenance.isFallback ? "yes" : "no"} · Degraded: {batch.provenance.isDegraded ? "yes" : "no"}</div>
+                      {batch.provenance.fallback ? <div className="ui-text-secondary ui-text-small">Fallback: {batch.provenance.fallback.fromMode ?? "provider-model-backed"} → {batch.provenance.mode} · {batch.provenance.fallback.reason}</div> : null}
+                      {batch.provenance.diagnostics.length > 0 ? <div className="ui-text-secondary ui-text-small">Diagnostics: {batch.provenance.diagnostics.map((diagnostic) => `${diagnostic.level}: ${diagnostic.message}${diagnostic.detail ? ` (${diagnostic.detail})` : ""}`).join(" · ")}</div> : null}
                     </div>
                   </div>
                 ))}
@@ -487,7 +496,7 @@ export default function FineTuningDatasetStudio(): JSX.Element {
             <div className="ui-stack ui-stack--2xs">
               <h2>Fine-Tuning Dataset Studio</h2>
               <p className="ui-text-secondary">
-                Guided supervised tuning workflow with version-aware governance, source ingestion, provider-ready generation, bulk review, release invariants, and chat_completion support.
+                Guided supervised tuning workflow with version-aware governance, source ingestion, truthful generation provenance, bulk review, release invariants, and chat_completion support.
               </p>
             </div>
             <div className="ui-meta-grid" style={{ minWidth: "320px" }}>

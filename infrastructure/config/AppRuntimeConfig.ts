@@ -1,9 +1,14 @@
 import {
-  AppRuntimeModes,
-  isDesktopRuntimeMode,
   isProductionRuntimeMode,
   type AppRuntimeMode,
 } from "../../domain/runtime/AppRuntimeMode";
+import {
+  getAppRuntimeProfile,
+  type AppDistributionTarget,
+  type AppHostKind,
+  type AppLifecycleStage,
+  type RendererDeliveryMode,
+} from "../../domain/runtime/AppRuntimeProfile";
 import type { DesktopPythonRuntimeInfo, DesktopStoragePaths } from "../../electron/shared/DesktopContracts";
 
 export type WorkflowRepositoryMode = "browser-storage" | "filesystem-indexed" | "memory";
@@ -14,6 +19,10 @@ export type InstalledModelCatalogMode = "browser-local-storage" | "desktop-sqlit
 
 export interface AppRuntimeConfigValues {
   readonly runtimeMode: AppRuntimeMode;
+  readonly hostKind: AppHostKind;
+  readonly lifecycleStage: AppLifecycleStage;
+  readonly distributionTarget: AppDistributionTarget;
+  readonly rendererDeliveryMode: RendererDeliveryMode;
   readonly workflowRepositoryMode: WorkflowRepositoryMode;
   readonly workflowExecutorMode: WorkflowExecutorMode;
   readonly nodeCatalogMode: NodeCatalogMode;
@@ -41,6 +50,10 @@ interface DesktopConfigOptions {
 
 export class AppRuntimeConfig {
   public readonly runtimeMode: AppRuntimeMode;
+  public readonly hostKind: AppHostKind;
+  public readonly lifecycleStage: AppLifecycleStage;
+  public readonly distributionTarget: AppDistributionTarget;
+  public readonly rendererDeliveryMode: RendererDeliveryMode;
   public readonly workflowRepositoryMode: WorkflowRepositoryMode;
   public readonly workflowExecutorMode: WorkflowExecutorMode;
   public readonly nodeCatalogMode: NodeCatalogMode;
@@ -60,6 +73,10 @@ export class AppRuntimeConfig {
 
   constructor(values: AppRuntimeConfigValues) {
     this.runtimeMode = values.runtimeMode;
+    this.hostKind = values.hostKind;
+    this.lifecycleStage = values.lifecycleStage;
+    this.distributionTarget = values.distributionTarget;
+    this.rendererDeliveryMode = values.rendererDeliveryMode;
     this.workflowRepositoryMode = values.workflowRepositoryMode;
     this.workflowExecutorMode = values.workflowExecutorMode;
     this.nodeCatalogMode = values.nodeCatalogMode;
@@ -79,20 +96,24 @@ export class AppRuntimeConfig {
   }
 
   public get isDesktopHost(): boolean {
-    return isDesktopRuntimeMode(this.runtimeMode);
+    return this.hostKind === "desktop";
   }
 
   public get isPackagedDesktopHost(): boolean {
-    return this.runtimeMode === AppRuntimeModes.desktopProduction;
+    return this.hostKind === "desktop" && this.rendererDeliveryMode === "packaged-assets";
   }
 
   public get isDevSyncEnabled(): boolean {
-    return !this.isProductionMode && !this.isDesktopHost && !!this.devSyncBaseUrl;
+    return this.lifecycleStage === "development" && this.hostKind === "browser" && !!this.devSyncBaseUrl;
   }
 
   public toValues(): AppRuntimeConfigValues {
     return Object.freeze({
       runtimeMode: this.runtimeMode,
+      hostKind: this.hostKind,
+      lifecycleStage: this.lifecycleStage,
+      distributionTarget: this.distributionTarget,
+      rendererDeliveryMode: this.rendererDeliveryMode,
       workflowRepositoryMode: this.workflowRepositoryMode,
       workflowExecutorMode: this.workflowExecutorMode,
       nodeCatalogMode: this.nodeCatalogMode,
@@ -124,7 +145,42 @@ export class AppRuntimeConfig {
     return import.meta.env?.[key];
   }
 
+  private static createValues(
+    runtimeMode: AppRuntimeMode,
+    values: Omit<AppRuntimeConfigValues, "runtimeMode" | "hostKind" | "lifecycleStage" | "distributionTarget" | "rendererDeliveryMode" | "isProductionMode"> & {
+      readonly isProductionMode?: boolean;
+    },
+  ): AppRuntimeConfigValues {
+    const profile = getAppRuntimeProfile(runtimeMode);
+
+    return {
+      runtimeMode,
+      hostKind: profile.hostKind,
+      lifecycleStage: profile.lifecycleStage,
+      distributionTarget: profile.distributionTarget,
+      rendererDeliveryMode: profile.rendererDeliveryMode,
+      workflowRepositoryMode: values.workflowRepositoryMode,
+      workflowExecutorMode: values.workflowExecutorMode,
+      nodeCatalogMode: values.nodeCatalogMode,
+      uiSettingsPersistenceMode: values.uiSettingsPersistenceMode,
+      installedModelCatalogMode: values.installedModelCatalogMode,
+      seedStarterNode: values.seedStarterNode,
+      isProductionMode: values.isProductionMode ?? profile.lifecycleStage === "production",
+      devSyncBaseUrl: values.devSyncBaseUrl,
+      devSyncToken: values.devSyncToken,
+      modelInstallDirectory: values.modelInstallDirectory,
+      serviceSupervisorBaseUrl: values.serviceSupervisorBaseUrl,
+      serviceSupervisorPort: values.serviceSupervisorPort,
+      workflowStorageDirectory: values.workflowStorageDirectory,
+      workflowIndexDatabasePath: values.workflowIndexDatabasePath,
+      desktopStorage: values.desktopStorage,
+      desktopPythonRuntime: values.desktopPythonRuntime,
+    };
+  }
+
   public static forDevelopment(): AppRuntimeConfig {
+    const runtimeMode = "browser-development" as const;
+    const profile = getAppRuntimeProfile(runtimeMode);
     const devSyncBaseUrl =
       AppRuntimeConfig.readEnvVariable("VITE_DEV_SYNC_BASE_URL") ||
       "http://192.168.1.100:8787";
@@ -134,33 +190,31 @@ export class AppRuntimeConfig {
       AppRuntimeConfig.readEnvVariable("VITE_MODEL_INSTALL_DIRECTORY") ||
       "dev/models";
 
-    return new AppRuntimeConfig({
-      runtimeMode: AppRuntimeModes.browserDevelopment,
-      workflowRepositoryMode: "filesystem-indexed",
+    return new AppRuntimeConfig(AppRuntimeConfig.createValues(runtimeMode, {
+      workflowRepositoryMode: profile.supportsLocalWorkspaceFilesystem ? "filesystem-indexed" : "browser-storage",
       workflowExecutorMode: "strategy",
       nodeCatalogMode: "registered",
       uiSettingsPersistenceMode: "local-storage",
       installedModelCatalogMode: "browser-local-storage",
       seedStarterNode: true,
-      isProductionMode: false,
       devSyncBaseUrl,
       devSyncToken,
       modelInstallDirectory,
       workflowStorageDirectory: "dev/workflow-data/workflows",
-      workflowIndexDatabasePath: "dev/workflow-data/workflows/workflow-index.sqlite",
-    });
+      workflowIndexDatabasePath: profile.supportsLocalWorkspaceFilesystem
+        ? "dev/workflow-data/workflows/workflow-index.sqlite"
+        : undefined,
+    }));
   }
 
   public static forDesktopDevelopment(options: DesktopConfigOptions): AppRuntimeConfig {
-    return new AppRuntimeConfig({
-      runtimeMode: AppRuntimeModes.desktopDevelopment,
+    return new AppRuntimeConfig(AppRuntimeConfig.createValues("desktop-development", {
       workflowRepositoryMode: "filesystem-indexed",
       workflowExecutorMode: "strategy",
       nodeCatalogMode: "registered",
       uiSettingsPersistenceMode: "local-storage",
       installedModelCatalogMode: "browser-local-storage",
       seedStarterNode: true,
-      isProductionMode: false,
       modelInstallDirectory: options.storage.modelsDirectory,
       serviceSupervisorBaseUrl: options.serviceSupervisorBaseUrl,
       serviceSupervisorPort: options.serviceSupervisorPort,
@@ -168,19 +222,17 @@ export class AppRuntimeConfig {
       workflowIndexDatabasePath: "dev/workflow-data/workflows/workflow-index.sqlite",
       desktopStorage: options.storage,
       desktopPythonRuntime: options.pythonRuntime,
-    });
+    }));
   }
 
   public static forDesktopProduction(options: DesktopConfigOptions): AppRuntimeConfig {
-    return new AppRuntimeConfig({
-      runtimeMode: AppRuntimeModes.desktopProduction,
+    return new AppRuntimeConfig(AppRuntimeConfig.createValues("desktop-production", {
       workflowRepositoryMode: "filesystem-indexed",
       workflowExecutorMode: "strategy",
       nodeCatalogMode: "registered",
       uiSettingsPersistenceMode: "desktop-sqlite",
       installedModelCatalogMode: "desktop-sqlite",
       seedStarterNode: false,
-      isProductionMode: true,
       modelInstallDirectory: options.storage.modelsDirectory,
       serviceSupervisorBaseUrl: options.serviceSupervisorBaseUrl,
       serviceSupervisorPort: options.serviceSupervisorPort,
@@ -188,7 +240,7 @@ export class AppRuntimeConfig {
       workflowIndexDatabasePath: `${options.storage.storageDirectory}/workflow-index.sqlite`,
       desktopStorage: options.storage,
       desktopPythonRuntime: options.pythonRuntime,
-    });
+    }));
   }
 
   public static fromValues(values: AppRuntimeConfigValues): AppRuntimeConfig {

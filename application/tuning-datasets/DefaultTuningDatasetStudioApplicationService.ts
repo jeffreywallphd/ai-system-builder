@@ -65,6 +65,15 @@ import type { TuningDatasetStudioApplicationService } from "./TuningDatasetStudi
 import type { FileIngestionApplicationService } from "../ingestion/FileIngestionApplicationService";
 import type { FileIngestionProfile } from "../../domain/ingestion/interfaces/IFileIngestion";
 import { DatasetSourceIngestionProfile } from "./DatasetSourceIngestionProfile";
+import type { UnifiedExecutionEngine } from "../execution/UnifiedExecutionEngine";
+import {
+  createDatasetGenerationExecutionPlan,
+  requireDatasetGenerationResult,
+} from "../execution/DatasetGenerationExecutionPlanFactory";
+import type { PublishDurableEntityToAssetSystemUseCase } from "../assets-system/PublishDurableEntityToAssetSystemUseCase";
+import type { CanonicalAssetIdentityService } from "../assets-system/CanonicalAssetIdentityService";
+import type { CanonicalEntityReadResolver } from "../assets-system/CanonicalEntityReadResolver";
+import { CanonicalEntityOperationalReadService } from "../assets-system/CanonicalEntityOperationalReadService";
 
 interface ServiceOptions {
   readonly datasetRepository: DatasetRepository;
@@ -85,6 +94,10 @@ interface ServiceOptions {
   readonly createId?: (prefix: string) => string;
   readonly fileIngestionService?: FileIngestionApplicationService;
   readonly datasetSourceIngestionProfile?: FileIngestionProfile;
+  readonly executionEngine?: UnifiedExecutionEngine;
+  readonly canonicalPublisher?: PublishDurableEntityToAssetSystemUseCase;
+  readonly canonicalIdentityService?: CanonicalAssetIdentityService;
+  readonly canonicalReadResolver?: CanonicalEntityReadResolver;
 }
 
 function defaultCreateId(prefix: string): string {
@@ -113,6 +126,10 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
   private readonly createId: (prefix: string) => string;
   private readonly fileIngestionService?: FileIngestionApplicationService;
   private readonly datasetSourceIngestionProfile: FileIngestionProfile;
+  private readonly executionEngine?: UnifiedExecutionEngine;
+  private readonly canonicalPublisher?: PublishDurableEntityToAssetSystemUseCase;
+  private readonly canonicalIdentityService?: CanonicalAssetIdentityService;
+  private readonly canonicalReadService: CanonicalEntityOperationalReadService;
 
   constructor(options: ServiceOptions) {
     this.datasetRepository = options.datasetRepository;
@@ -133,6 +150,10 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
     this.createId = options.createId ?? defaultCreateId;
     this.fileIngestionService = options.fileIngestionService;
     this.datasetSourceIngestionProfile = options.datasetSourceIngestionProfile ?? DatasetSourceIngestionProfile;
+    this.executionEngine = options.executionEngine;
+    this.canonicalPublisher = options.canonicalPublisher;
+    this.canonicalIdentityService = options.canonicalIdentityService;
+    this.canonicalReadService = new CanonicalEntityOperationalReadService(options.canonicalReadResolver);
   }
 
   public async createDataset(command: CreateDatasetCommand): Promise<DatasetDetails> {
@@ -167,6 +188,11 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
       kind: versions.length === 0 ? "initial_draft" : "branch_draft",
     }) as TuningDatasetVersion;
     const savedVersion = await this.datasetVersionRepository.saveVersion(version);
+    await this.canonicalPublisher?.publishDatasetVersion({
+      datasetId: dataset.id,
+      datasetName: dataset.name,
+      version: savedVersion,
+    });
     await this.datasetVersionRepository.saveWorkflowState(this.workflowService.createInitial(dataset.id, savedVersion.id));
     await this.datasetRepository.save((dataset as TuningDataset).withVersionPointers(savedVersion as TuningDatasetVersion));
     await this.reconcileWorkflow(dataset.id, savedVersion.id);
@@ -185,7 +211,12 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
       versionNumber: versions.length + 1,
       createdBy: command.createdBy,
     });
-    await this.datasetVersionRepository.saveVersion(successor);
+    const savedSuccessor = await this.datasetVersionRepository.saveVersion(successor);
+    await this.canonicalPublisher?.publishDatasetVersion({
+      datasetId: dataset.id,
+      datasetName: dataset.name,
+      version: savedSuccessor,
+    });
     if (command.cloneSources ?? true) {
       const sourceDocuments = await this.datasetVersionRepository.listSourceDocuments(command.datasetId, releasedVersion.id);
       await Promise.all(sourceDocuments.map((document) => this.datasetVersionRepository.saveSourceDocument({
@@ -227,6 +258,11 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
     }
     const releasedVersion = (version as TuningDatasetVersion).release({ releaseNotes: command.releaseNotes, validationResult: validation, statistics });
     const savedVersion = await this.datasetVersionRepository.saveVersion(releasedVersion);
+    await this.canonicalPublisher?.publishDatasetVersion({
+      datasetId: dataset.id,
+      datasetName: dataset.name,
+      version: savedVersion,
+    });
     await this.datasetRepository.save((dataset as TuningDataset).withVersionPointers(savedVersion as TuningDatasetVersion, savedVersion.id));
     const manifest = this.releaseManifestService.create({ dataset, version: savedVersion, examples, sourceDocumentCount: sourceDocuments.length });
     const canonicalJson = this.exportService.exportVersion({ dataset, version: savedVersion, examples, sourceDocuments, format: "canonical_json", manifest });
@@ -254,6 +290,9 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
         selectedVersion,
         statistics,
         exampleCount: statistics?.exampleCount ?? 0,
+        canonicalSelectedVersion: selectedVersion
+          ? await this.resolveCanonicalDatasetVersion(dataset.id, selectedVersion.id)
+          : Object.freeze({ preferred: false, fallbackReason: "Dataset has no selected version." }),
       });
     })));
   }
@@ -271,6 +310,7 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
     const validation = selectedVersion ? await this.datasetVersionRepository.loadValidationResult(dataset.id, selectedVersion.id) : undefined;
     const statistics = selectedVersion ? await this.computeDatasetStatistics(dataset.id, selectedVersion.id).catch(() => undefined) : undefined;
     const exports = selectedVersion ? await this.datasetVersionRepository.listExportArtifacts(dataset.id, selectedVersion.id) : [];
+    const generationBatches = selectedVersion ? await this.datasetVersionRepository.listGenerationBatches(dataset.id, selectedVersion.id) : [];
     const workflow = selectedVersion
       ? await this.loadWorkflow(dataset.id, selectedVersion.id)
       : this.workflowService.createInitial(dataset.id, "uninitialized");
@@ -284,7 +324,57 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
       statistics,
       validation,
       exports,
+      generationBatches,
       workflow,
+      canonicalByVersionId: Object.freeze(Object.fromEntries(await Promise.all(versions.map(async (version) => [
+        version.id,
+        await this.resolveCanonicalDatasetVersion(dataset.id, version.id),
+      ] as const)))),
+    });
+  }
+
+  private async resolveCanonicalDatasetVersion(datasetId: string, versionId: string): Promise<{
+    readonly preferred: boolean;
+    readonly assetId?: string;
+    readonly pinnedVersionId?: string;
+    readonly latestVersionId?: string;
+    readonly provenance?: {
+      readonly directUpstreamCount: number;
+      readonly directDownstreamCount: number;
+      readonly producingTransformationCount: number;
+      readonly lineageConfidence: "exact" | "partial";
+    };
+    readonly dependencyState?: {
+      readonly state: "healthy" | "impacted" | "stale" | "partially-trusted" | "reconciliation-needed";
+      readonly reasons: ReadonlyArray<string>;
+      readonly nextActions: ReadonlyArray<string>;
+    };
+    readonly fallbackReason?: string;
+  }> {
+    const entityId = `${datasetId}:${versionId}`;
+    const resolved = await this.canonicalReadService.resolveSummary({
+      entityType: "dataset-version",
+      entityId,
+      fallbackWhenUnavailable: "Canonical resolver is not configured for dataset-version reads.",
+    });
+    if (resolved.assetId) {
+      return resolved;
+    }
+    if (!this.canonicalIdentityService) {
+      return resolved;
+    }
+
+    const identity = await this.canonicalIdentityService.resolveIdentity("dataset-version", entityId);
+    const assetId = identity?.assetId;
+    const latestVersionId = assetId
+      ? await this.canonicalIdentityService.resolveLatestVersionId("dataset-version", entityId)
+      : undefined;
+    return Object.freeze({
+      preferred: !!assetId,
+      assetId,
+      pinnedVersionId: identity?.latestVersionId,
+      latestVersionId,
+      fallbackReason: assetId ? resolved.fallbackReason : `No canonical identity mapping found for dataset version '${entityId}'.`,
     });
   }
 
@@ -451,7 +541,7 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
       throw new Error("Select at least one source document for generation.");
     }
     const existingExamples = await this.datasetVersionRepository.listExamples({ datasetId: command.datasetId, versionId: command.versionId });
-    const generated = await this.generationService.generate({
+    const generationRequest = {
       datasetId: command.datasetId,
       versionId: command.versionId,
       taskType: dataset.taskType,
@@ -459,11 +549,44 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
       sourceDocuments: selectedDocuments,
       existingExamples,
       configuration: command.configuration,
-    });
+    };
+    const generated = this.executionEngine
+      ? await this.generateExamplesThroughExecutionEngine(generationRequest)
+      : await this.generationService.generate(generationRequest);
     const enrichedExamples = generated.examples.map((example) => this.attachGenerationProvenance(example, generated.provenance));
-    await Promise.all(enrichedExamples.map((example) => this.datasetVersionRepository.saveExample(example)));
+    const savedExamples = await Promise.all(enrichedExamples.map((example) => this.datasetVersionRepository.saveExample(example)));
+    await this.datasetVersionRepository.saveGenerationBatch(Object.freeze({
+      id: generated.batchId,
+      datasetId: generated.datasetId,
+      versionId: generated.versionId,
+      taskType: generated.taskType,
+      generatedAt: generated.generatedAt,
+      generatedCount: generated.generatedCount,
+      skippedCount: generated.skippedCount,
+      status: generated.status,
+      provenance: generated.provenance,
+      exampleIds: Object.freeze(savedExamples.map((example) => example.id)),
+    }));
     await this.reconcileWorkflow(command.datasetId, command.versionId);
-    return Object.freeze(enrichedExamples);
+    return Object.freeze(savedExamples);
+  }
+
+
+  private async generateExamplesThroughExecutionEngine(
+    request: Parameters<DatasetGenerationService["generate"]>[0],
+  ) {
+    if (!this.executionEngine) {
+      return this.generationService.generate(request);
+    }
+
+    const executionPlan = createDatasetGenerationExecutionPlan(request);
+    const planResult = await this.executionEngine.execute({
+      plan: executionPlan.plan,
+      unitInputs: executionPlan.unitInputs,
+      metadata: executionPlan.metadata,
+    });
+
+    return requireDatasetGenerationResult(planResult, executionPlan.unitId);
   }
 
   public async generateQaExamplesFromSource(command: GenerateExamplesFromSourceCommand): Promise<ReadonlyArray<QuestionAnsweringExample>> {

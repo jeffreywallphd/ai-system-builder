@@ -9,6 +9,7 @@ import type { McpToolExecutionRequest } from "../../../application/mcp/models/Mc
 import type { McpToolExecutionResult, McpToolInvocationTrace } from "../../../application/mcp/models/McpToolExecutionResult";
 import type { McpServerConnectionRequest } from "../../../application/mcp/models/McpServerConnectionRequest";
 import type { McpServerConnectionResult } from "../../../application/mcp/models/McpServerConnectionResult";
+import type { LocalMcpServerCreateResult } from "../../../application/mcp/models/LocalMcpServerCreateResult";
 import type { McpServerDescriptor, McpServerValidationResult } from "../../../application/mcp/models/McpServerDescriptor";
 import type { McpServerSearchCriteria } from "../../../application/mcp/models/McpServerSearchCriteria";
 import type { McpServerSearchResult } from "../../../application/mcp/models/McpServerSearchResult";
@@ -113,6 +114,10 @@ export class HttpMcpRuntimeClient implements IMcpRuntimeClient {
 
   public exportServers(): Promise<McpExportResult> {
     return this.request("GET", "/mcp/servers/export");
+  }
+
+  public createLocalServer(draft: Readonly<Record<string, unknown>>): Promise<LocalMcpServerCreateResult> {
+    return this.request("POST", "/mcp/servers/local", draft);
   }
 
   public async connectServer(request: McpServerConnectionRequest): Promise<McpServerConnectionResult> {

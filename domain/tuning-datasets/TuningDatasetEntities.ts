@@ -144,8 +144,11 @@ export class ExampleLineage implements DatasetLineage {
     this.generator = params.generator
       ? Object.freeze({
           ...params.generator,
+          startedAt: new Date(params.generator.startedAt),
           executedAt: new Date(params.generator.executedAt),
           parameters: Object.freeze({ ...params.generator.parameters }),
+          diagnostics: Object.freeze(params.generator.diagnostics.map((diagnostic) => Object.freeze({ ...diagnostic }))),
+          fallback: params.generator.fallback ? Object.freeze({ ...params.generator.fallback }) : undefined,
         })
       : undefined;
   }

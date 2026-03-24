@@ -5,12 +5,21 @@ import type {
   IWorkflowExecutionResult,
   IWorkflowExecutor,
 } from "../ports/interfaces/IWorkflowExecutor";
+import { WorkflowExecutionHandle, WorkflowExecutionProgress, WorkflowExecutionResult } from "../ports/WorkflowExecutor";
 import type {
   IWorkflowValidationOptions,
   IWorkflowValidator,
 } from "../../domain/services/interfaces/IWorkflowValidator";
 import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
 import type { WorkflowContextService } from "../context/WorkflowContextService";
+import type { DynamicContextSourceInput } from "../context/models/ContextAssemblyRequest";
+import type { UnifiedExecutionEngine } from "../execution/UnifiedExecutionEngine";
+import {
+  createWorkflowExecutionPlan,
+  getWorkflowExecutionEventFromEngineEvent,
+  requireWorkflowExecutionResult,
+} from "../execution/WorkflowExecutionPlanFactory";
+
 
 export interface IExecuteWorkflowRequest {
   readonly workflow: IWorkflow;
@@ -30,14 +39,17 @@ export interface IExecuteWorkflowResult {
 export class ExecuteWorkflowUseCase {
   private readonly workflowExecutor: IWorkflowExecutor;
   private readonly workflowValidator: IWorkflowValidator;
+  private readonly executionEngine?: UnifiedExecutionEngine;
 
   constructor(
     workflowExecutor: IWorkflowExecutor,
     workflowValidator: IWorkflowValidator,
-    private readonly workflowContextService?: WorkflowContextService
+    private readonly workflowContextService?: WorkflowContextService,
+    executionEngine?: UnifiedExecutionEngine,
   ) {
     this.workflowExecutor = workflowExecutor;
     this.workflowValidator = workflowValidator;
+    this.executionEngine = executionEngine;
   }
 
   public async execute(
@@ -64,17 +76,18 @@ export class ExecuteWorkflowUseCase {
       );
     }
 
-    const result = await this.workflowExecutor.execute(
-      {
-        workflow: effectiveWorkflow,
-        target: request.target,
-        propertyOverrides: request.propertyOverrides,
-        inputAssets: request.inputAssets,
-        parameters: request.parameters,
-        executionMetadata,
-      },
-      onEvent
-    );
+    const executionInput: IWorkflowExecutionInput = {
+      workflow: effectiveWorkflow,
+      target: request.target,
+      propertyOverrides: request.propertyOverrides,
+      inputAssets: request.inputAssets,
+      parameters: request.parameters,
+      executionMetadata,
+    };
+
+    const result = this.executionEngine
+      ? await this.executeThroughPlan(executionInput, onEvent)
+      : await this.workflowExecutor.execute(executionInput, onEvent);
 
     return Object.freeze({
       effectiveWorkflow,
@@ -108,14 +121,18 @@ export class ExecuteWorkflowUseCase {
       );
     }
 
-    const handle = await this.workflowExecutor.startExecution({
+    const executionInput: IWorkflowExecutionInput = {
       workflow: effectiveWorkflow,
       target: request.target,
       propertyOverrides: request.propertyOverrides,
       inputAssets: request.inputAssets,
       parameters: request.parameters,
       executionMetadata,
-    });
+    };
+
+    const handle = this.executionEngine
+      ? await this.startThroughPlan(executionInput)
+      : await this.workflowExecutor.startExecution(executionInput);
 
     return Object.freeze({
       effectiveWorkflow,
@@ -158,6 +175,77 @@ export class ExecuteWorkflowUseCase {
     return effectiveWorkflow;
   }
 
+  private async executeThroughPlan(
+    executionInput: IWorkflowExecutionInput,
+    onEvent?: (event: IWorkflowExecutionEvent) => void
+  ): Promise<IWorkflowExecutionResult> {
+    if (!this.executionEngine) {
+      return this.workflowExecutor.execute(executionInput, onEvent);
+    }
+
+    const executionPlan = createWorkflowExecutionPlan(executionInput);
+    const planResult = await this.executionEngine.execute(
+      {
+        plan: executionPlan.plan,
+        unitInputs: executionPlan.unitInputs,
+        metadata: executionPlan.metadata,
+      },
+      (event) => {
+        const workflowEvent = getWorkflowExecutionEventFromEngineEvent(event);
+        if (workflowEvent) {
+          onEvent?.(workflowEvent);
+        }
+      }
+    );
+    return requireWorkflowExecutionResult(planResult, executionPlan.unitId);
+  }
+
+
+  private async startThroughPlan(
+    executionInput: IWorkflowExecutionInput,
+  ): Promise<IWorkflowExecutionHandle> {
+    if (!this.executionEngine) {
+      return this.workflowExecutor.startExecution(executionInput);
+    }
+
+    const executionPlan = createWorkflowExecutionPlan(executionInput);
+    const runHandle = await this.executionEngine.startExecution({
+      plan: executionPlan.plan,
+      unitInputs: executionPlan.unitInputs,
+      metadata: executionPlan.metadata,
+    });
+
+    return new WorkflowExecutionHandle({
+      executionId: runHandle.runId,
+      input: executionInput,
+      initialProgress: new WorkflowExecutionProgress({
+        executionId: runHandle.runId,
+        status: "queued",
+        percent: 0,
+        message: `Queued execution plan '${executionPlan.plan.id}'.`,
+      }),
+      completionPromise: runHandle.waitForCompletion().then((planResult) =>
+        WorkflowExecutionResult.from(requireWorkflowExecutionResult(planResult, executionPlan.unitId))
+      ),
+      cancel: async () => {
+        await runHandle.cancel();
+      },
+      subscribe: typeof runHandle.subscribe === "function"
+        ? async (listener) => {
+            const unsubscribe = await runHandle.subscribe?.((event) => {
+              const workflowEvent = getWorkflowExecutionEventFromEngineEvent(event);
+              if (!workflowEvent) {
+                return;
+              }
+
+              listener(workflowEvent);
+            });
+            return typeof unsubscribe === "function" ? unsubscribe : () => undefined;
+          }
+        : undefined,
+    });
+  }
+
   private async resolveExecutionMetadata(
     workflow: IWorkflow,
     parameters?: Readonly<Record<string, unknown>>
@@ -195,7 +283,7 @@ export class ExecuteWorkflowUseCase {
           ? contextSelection.trimPartialFragments
           : undefined,
       dynamicSources: Array.isArray(contextSelection?.dynamicSources)
-        ? (contextSelection.dynamicSources as ReadonlyArray<Record<string, unknown>>)
+        ? (contextSelection.dynamicSources as ReadonlyArray<DynamicContextSourceInput>)
         : undefined,
     });
 

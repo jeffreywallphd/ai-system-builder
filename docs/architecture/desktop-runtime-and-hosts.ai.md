@@ -1,0 +1,38 @@
+# AI Companion: Desktop Runtime and Hosts
+
+## Core fact
+Electron is the desktop host boundary; the renderer accesses desktop capabilities through preload bridge contracts.
+
+## Main files
+- Main process bootstrap: `electron/main/main.ts`
+- Preload bridge: `electron/preload.ts`
+- Bridge contracts: `electron/shared/DesktopContracts.ts`
+- Desktop workflow persistence: `infrastructure/desktop/DesktopWorkflowPersistence.ts`
+- Desktop execution-run persistence: `infrastructure/filesystem/execution/SqliteExecutionRunRepository.ts`
+- Desktop-backed workflow repo used by renderer: `infrastructure/browser/workflows/DesktopBridgeWorkflowRepository.ts`
+
+## Storage modes to mention
+- Desktop canonical path: filesystem JSON + SQLite workflow index plus SQLite execution-run history with explicit schema versioning/migration via SQLite `user_version`
+- Fallback path: browser/local storage repositories
+- Execution-run queries now also support unit-kind/provenance/flow/time filtering in addition to status/execution-kind/metadata filters, and non-SQLite repositories persist an explicit query-index envelope so those filters remain available in fallback modes.
+
+## Runtime modes to mention
+- desktop development
+- desktop production
+- browser development
+- runtime disabled/degraded states
+
+## Runtime orchestration update
+- Runtime dependency graph composition is now centralized in a reusable outer-layer module instead of being duplicated ad hoc in the infrastructure registry and UI composition.
+- The shared graph now covers `python-runtime -> mcp-runtime` plus appended runtime-backed capability gates for delegated workflow execution, document conversion, dataset generation, model training, and narrow MCP server-operation execution in the UI composition.
+- Resolutions now carry an operational state model (`disabled`, `unavailable`, `provisioning`, `starting`, `healthy`, `degraded`, `failed`, `stopped`, `unknown`), fallback information, timestamps, metadata, and remediation hints.
+- The orchestrator also supports explicit `refresh`, single-dependency invalidation, and global invalidation so runtime-backed capabilities can recompute status after managed-runtime changes; the runtime console and managed-services store now use those hooks.
+
+## Caveat
+The preload bridge uses synchronous IPC and exposes storage/workflow/model-file capabilities.
+
+## What remains out of scope
+- Orchestration is not yet rolled out across model-file bridge policies.
+
+## TODO
+- When discussing security or performance, mention the sync IPC tradeoff explicitly.

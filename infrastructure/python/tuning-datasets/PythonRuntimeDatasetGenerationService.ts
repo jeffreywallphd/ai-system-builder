@@ -28,11 +28,13 @@ export class PythonRuntimeDatasetGenerationService implements DatasetGenerationS
             strategy: request.configuration.strategy,
             max_examples_per_source: request.configuration.maxExamplesPerSource,
             max_segments_per_source: request.configuration.maxSegmentsPerSource,
+            provider: request.configuration.provider,
+            model: request.configuration.model,
           }
         : undefined,
     });
 
-    const examples = Object.freeze(response.examples.map((example, index) => toDomainExample(request, response.batch_id, example, index)));
+    const examples = Object.freeze(response.examples.map((example, index) => toDomainExample(request, response.batch_id, response.provenance.mode, example, index)));
 
     return Object.freeze({
       batchId: response.batch_id,
@@ -43,17 +45,29 @@ export class PythonRuntimeDatasetGenerationService implements DatasetGenerationS
       examples,
       provenance: Object.freeze({
         provider: response.provenance.provider,
+        modelId: response.provenance.model_id,
+        modelDisplayName: response.provenance.model_display_name,
         generatorId: response.provenance.generator_id,
         generatorVersion: response.provenance.generator_version,
         batchId: response.provenance.batch_id,
         mode: response.provenance.mode,
+        executionKind: response.provenance.execution_kind,
+        status: response.provenance.status,
+        path: response.provenance.path,
+        isFallback: response.provenance.is_fallback,
+        isDegraded: response.provenance.is_degraded,
         detail: response.provenance.detail,
         parameters: response.provenance.parameters,
+        startedAt: new Date(response.provenance.started_at),
         executedAt: new Date(response.provenance.executed_at),
+        durationMs: response.provenance.duration_ms,
         diagnostics: Object.freeze(response.provenance.diagnostics.map((diagnostic) => Object.freeze({ ...diagnostic }))),
+        fallbackReason: response.provenance.fallback_reason,
+        fallback: response.provenance.fallback ? Object.freeze({ ...response.provenance.fallback }) : undefined,
       }),
       generatedCount: response.generated_count,
       skippedCount: response.skipped_count,
+      status: response.provenance.status,
     });
   }
 }
@@ -61,17 +75,22 @@ export class PythonRuntimeDatasetGenerationService implements DatasetGenerationS
 function toDomainExample(
   request: DatasetGenerationRequest,
   batchId: string,
+  generationMode: DatasetGenerationResult["provenance"]["mode"],
   example: Readonly<Record<string, unknown>>,
   index: number,
 ): DatasetExample {
   const lineage = new ExampleLineage({
     sourceDocumentId: typeof example.sourceDocumentId === "string" ? example.sourceDocumentId : undefined,
-    generationMethod: "provider-backed-generation",
+    generationMethod: generationMode === "provider-model-backed"
+      ? "provider-model-backed-generation"
+      : generationMode === "python-runtime-local"
+        ? "python-runtime-local-generation"
+        : "heuristic-fallback-generation",
     capturedAt: new Date(),
     metadata: Object.freeze({
       ...(typeof example.lineageMetadata === "object" && example.lineageMetadata ? example.lineageMetadata as Record<string, unknown> : {}),
       batchId,
-      providerBacked: true,
+      generationMode,
     }),
   });
 

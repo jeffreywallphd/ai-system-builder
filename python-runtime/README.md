@@ -36,4 +36,17 @@ uvicorn app.main:app --host 0.0.0.0 --port 8100 --reload
 - `GET /health`
 - `POST /execute/node`
 - `POST /execute/workflow`
+- `POST /training/jobs`
+- `GET /training/jobs`
+- `GET /training/jobs/{job_id}`
+- `POST /training/jobs/{job_id}/refresh`
+- `POST /training/jobs/{job_id}/reconcile`
+- `POST /training/jobs/{job_id}/cancel`
+- `POST /datasets/generate`
 - `GET /workflows/capabilities`
+
+## Training + dataset generation truthfulness
+
+- `python-runtime-local` runs a real in-process NumPy gradient-training job for a lightweight text-adapter backend. It is a truthful local training path, not a remote provider fine-tuning API.
+- `python-runtime-manifest` writes manifest/export-only artifacts and stops at an `exported-without-training` state.
+- Dataset generation prefers a true provider/model-backed OpenAI-compatible API path when `AI_LOOM_OPENAI_API_KEY` is configured. When that is unavailable, the runtime records an explicit `python-runtime-local` degraded fallback instead of overstating the result as provider-backed. If the caller requires provider-backed generation, the runtime can fail truthfully without falling back.

@@ -5,14 +5,32 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { app, BrowserWindow, ipcMain } from "electron";
 import { InitializeProductionStorageUseCase } from "../../application/runtime/InitializeProductionStorageUseCase";
-import { ResolveAppRuntimeModeUseCase } from "../../application/runtime/ResolveAppRuntimeModeUseCase";
+import { GetExecutionRunUseCase } from "../../application/execution/GetExecutionRunUseCase";
 import { resolveDesktopStoragePaths } from "../../infrastructure/desktop/DesktopAppPaths";
 import { DesktopStorageDatabase } from "../../infrastructure/desktop/DesktopStorageDatabase";
 import { DesktopWorkflowPersistence } from "../../infrastructure/desktop/DesktopWorkflowPersistence";
+import { SqliteExecutionRunRepository } from "../../infrastructure/filesystem/execution/SqliteExecutionRunRepository";
+import {
+  createExecutionHistoryInfrastructure,
+  createExecutionRunRepository,
+} from "../../infrastructure/execution/createExecutionInfrastructure";
 import { resolveDesktopPythonRuntime } from "../../infrastructure/desktop/DesktopPythonRuntimeResolver";
 import { AppRuntimeConfig } from "../../infrastructure/config/AppRuntimeConfig";
+import { RendererDeliveryModes } from "../../domain/runtime/AppRuntimeProfile";
 import { DesktopServiceSupervisor } from "./DesktopServiceSupervisor";
 import type { DesktopBootstrapContext } from "../shared/DesktopContracts";
+import { SqliteAssetSystemRepository } from "../../infrastructure/filesystem/SqliteAssetSystemRepository";
+import { InMemoryAssetLineageGraphProjectionSink } from "../../infrastructure/filesystem/InMemoryAssetLineageGraphProjectionSink";
+import { ListCanonicalAssetsUseCase, LoadCanonicalAssetDetailUseCase } from "../../application/assets-system/CanonicalAssetReadUseCases";
+import { GetAssetVersionHistoryUseCase } from "../../application/assets-system/GetAssetVersionHistoryUseCase";
+import { GetCanonicalDependencyStateUseCase } from "../../application/assets-system/CanonicalDependencyStateUseCase";
+import { GetAssetDependencyHealthUseCase } from "../../application/assets-system/GetAssetDependencyHealthUseCase";
+import { GetAssetImpactAnalysisUseCase } from "../../application/assets-system/GetAssetImpactAnalysisUseCase";
+import { GetCanonicalProvenanceSummaryUseCase } from "../../application/assets-system/CanonicalAssetReadUseCases";
+import { ReconcileCanonicalIdentityMappingsUseCase, ReplayScopedAssetGraphProjectionUseCase } from "../../application/assets-system/ReconciliationUseCases";
+import { ReplayAssetGraphProjectionUseCase } from "../../application/assets-system/ReplayAssetGraphProjectionUseCase";
+import { VerifyAssetGraphProjectionUseCase } from "../../application/assets-system/VerifyAssetGraphProjectionUseCase";
+import { ProjectionRebuildOrchestrationUseCase } from "../../application/assets-system/ProjectionRebuildOrchestrationUseCase";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 if (started) {
@@ -25,6 +43,11 @@ const rendererDevUrl = process.env.ELECTRON_RENDERER_URL || "http://127.0.0.1:51
 let mainWindow: BrowserWindow | undefined;
 let storageDatabase: DesktopStorageDatabase | undefined;
 let workflowPersistence: DesktopWorkflowPersistence | undefined;
+let executionRunRepository: SqliteExecutionRunRepository | undefined;
+let getExecutionRunUseCase: GetExecutionRunUseCase | undefined;
+let listExecutionRunsUseCase: ReturnType<typeof createExecutionHistoryInfrastructure>["listExecutionRunsUseCase"] | undefined;
+let canonicalAssetSystemRepository: SqliteAssetSystemRepository | undefined;
+let canonicalProjectionSink: InMemoryAssetLineageGraphProjectionSink | undefined;
 let serviceSupervisor: DesktopServiceSupervisor | undefined;
 let bootstrapContext: DesktopBootstrapContext | undefined;
 
@@ -73,7 +96,8 @@ async function createMainWindow(): Promise<void> {
   mainWindow = window;
   window.once("ready-to-show", () => window.show());
 
-  if (isPackaged) {
+  const runtimeConfig = bootstrapContext?.runtimeConfig;
+  if (runtimeConfig?.rendererDeliveryMode === RendererDeliveryModes.packagedAssets) {
     await window.loadFile(path.join(__dirname, "../../dist/index.html"));
   } else {
     await window.loadURL(rendererDevUrl);
@@ -105,11 +129,6 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     pythonRuntime,
   });
   await serviceSupervisor.start();
-
-  const runtimeMode = new ResolveAppRuntimeModeUseCase().execute({
-    hasDesktopHost: true,
-    isPackagedDesktopHost: isPackaged,
-  });
 
   const runtimeConfig = isPackaged
     ? AppRuntimeConfig.forDesktopProduction({
@@ -157,6 +176,12 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     workflowsDirectory,
     indexDatabasePath: workflowIndexDatabasePath,
   });
+  executionRunRepository = createExecutionRunRepository({
+    sqliteDatabasePath: storagePaths.databasePath,
+  }) as SqliteExecutionRunRepository;
+  const executionHistoryInfrastructure = createExecutionHistoryInfrastructure(executionRunRepository);
+  getExecutionRunUseCase = new GetExecutionRunUseCase(executionRunRepository);
+  listExecutionRunsUseCase = executionHistoryInfrastructure.listExecutionRunsUseCase;
   ipcMain.on("ai-loom-desktop-workflows:save-record", (_event, recordJson: string) => {
     workflowPersistence?.saveWorkflowRecord(recordJson);
   });
@@ -180,6 +205,21 @@ async function bootstrapDesktopRuntime(): Promise<void> {
       degraded: true,
       detail: "Desktop workflow persistence service is unavailable.",
     };
+  });
+  ipcMain.handle("ai-loom-desktop-execution-runs:save", async (_event, runJson: string) => {
+    if (!executionRunRepository) {
+      return;
+    }
+    await executionRunRepository.saveRun(JSON.parse(runJson));
+  });
+  ipcMain.handle("ai-loom-desktop-execution-runs:load", async (_event, runId: string) => {
+    const run = await getExecutionRunUseCase?.execute(runId);
+    return run ? JSON.stringify(run) : null;
+  });
+  ipcMain.handle("ai-loom-desktop-execution-runs:list", async (_event, criteriaJson?: string) => {
+    const criteria = criteriaJson ? JSON.parse(criteriaJson) : undefined;
+    const runs = await listExecutionRunsUseCase?.execute(criteria);
+    return (runs ?? []).map((run) => JSON.stringify(run));
   });
   ipcMain.on("ai-loom-desktop-model-files:exists", (event, targetPath: string) => {
     event.returnValue = fs.existsSync(targetPath);
@@ -222,7 +262,147 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     fs.copyFileSync(request.from, request.to);
   });
 
-  if (runtimeMode === "desktop-production" && !pythonRuntime.isAvailable) {
+  canonicalAssetSystemRepository = new SqliteAssetSystemRepository(path.join(storagePaths.assetsDirectory, "asset-system.sqlite"));
+  canonicalProjectionSink = new InMemoryAssetLineageGraphProjectionSink();
+  const listCanonicalAssetsUseCase = new ListCanonicalAssetsUseCase(canonicalAssetSystemRepository, canonicalAssetSystemRepository);
+  const loadCanonicalAssetDetailUseCase = new LoadCanonicalAssetDetailUseCase(
+    canonicalAssetSystemRepository,
+    canonicalAssetSystemRepository,
+    canonicalAssetSystemRepository,
+    canonicalAssetSystemRepository,
+    canonicalAssetSystemRepository,
+  );
+  const getVersionHistoryUseCase = new GetAssetVersionHistoryUseCase(canonicalAssetSystemRepository);
+  const dependencyStateUseCase = new GetCanonicalDependencyStateUseCase(
+    canonicalAssetSystemRepository,
+    canonicalAssetSystemRepository,
+    new GetAssetDependencyHealthUseCase(canonicalAssetSystemRepository, canonicalAssetSystemRepository, canonicalAssetSystemRepository),
+    new GetAssetImpactAnalysisUseCase(canonicalAssetSystemRepository, canonicalAssetSystemRepository, canonicalAssetSystemRepository),
+    new GetCanonicalProvenanceSummaryUseCase(canonicalAssetSystemRepository, canonicalAssetSystemRepository, canonicalAssetSystemRepository),
+    canonicalAssetSystemRepository,
+  );
+  const replayProjectionUseCase = new ReplayAssetGraphProjectionUseCase(canonicalAssetSystemRepository, canonicalProjectionSink);
+  const replayScopedProjectionUseCase = new ReplayScopedAssetGraphProjectionUseCase(canonicalAssetSystemRepository, replayProjectionUseCase);
+  const verifyProjectionUseCase = new VerifyAssetGraphProjectionUseCase(canonicalAssetSystemRepository, canonicalProjectionSink);
+  const rebuildProjectionOrchestrationUseCase = new ProjectionRebuildOrchestrationUseCase(
+    replayScopedProjectionUseCase,
+    replayProjectionUseCase,
+    verifyProjectionUseCase,
+  );
+
+  ipcMain.handle("ai-loom-desktop-canonical-assets:list", async (_event, criteriaJson?: string) => {
+    if (!canonicalAssetSystemRepository?.isAvailable) {
+      return [];
+    }
+    const criteria = criteriaJson ? JSON.parse(criteriaJson) : undefined;
+    const assets = await listCanonicalAssetsUseCase.execute(criteria);
+    const details = await Promise.all(assets.map((asset) => loadCanonicalAssetDetailUseCase.execute(asset.id)));
+    return details
+      .filter((entry): entry is NonNullable<typeof entry> => !!entry)
+      .map((entry) => JSON.stringify({
+        assetId: entry.assetId,
+        name: entry.name,
+        kind: entry.kind,
+        status: entry.status,
+        latestVersionId: entry.latestVersion?.versionId,
+        versionCount: entry.versionCount,
+        transformationCount: entry.transformationCount,
+        lineageEdgeCount: entry.lineageEdgeCount,
+      }));
+  });
+  ipcMain.handle("ai-loom-desktop-canonical-assets:detail", async (_event, assetId: string) => {
+    if (!canonicalAssetSystemRepository?.isAvailable) {
+      return null;
+    }
+    const detail = await loadCanonicalAssetDetailUseCase.execute(assetId);
+    if (!detail) return null;
+    return JSON.stringify({
+      assetId: detail.assetId,
+      name: detail.name,
+      kind: detail.kind,
+      status: detail.status,
+      latestVersionId: detail.latestVersion?.versionId,
+      versionCount: detail.versionCount,
+      transformationCount: detail.transformationCount,
+      lineageEdgeCount: detail.lineageEdgeCount,
+    });
+  });
+  ipcMain.handle("ai-loom-desktop-canonical-assets:version-chain", async (_event, assetId: string) => {
+    if (!canonicalAssetSystemRepository?.isAvailable) {
+      return [];
+    }
+    const chain = await getVersionHistoryUseCase.execute({ assetId });
+    const withState = await Promise.all(chain.map(async (version) => {
+      const dependencyState = await dependencyStateUseCase.execute({
+        versionId: version.versionId,
+        preferPersistedIfFreshMs: 300_000,
+      }).catch(() => undefined);
+      return JSON.stringify({
+        versionId: version.versionId,
+        parentVersionId: version.parentVersionId,
+        createdAt: version.createdAt.toISOString(),
+        label: version.versionLabel,
+        dependencyState: dependencyState?.state,
+      });
+    }));
+    return withState;
+  });
+  ipcMain.handle("ai-loom-desktop-canonical-assets:dependency-state", async (_event, versionId: string) => {
+    if (!canonicalAssetSystemRepository?.isAvailable) {
+      return null;
+    }
+    const summary = await dependencyStateUseCase.execute({
+      versionId,
+      preferPersistedIfFreshMs: 300_000,
+    });
+    return JSON.stringify({
+      versionId: summary.versionId,
+      state: summary.state,
+      lineageConfidence: summary.lineageConfidence,
+      reasons: summary.reasons,
+      nextActions: summary.nextActions,
+    });
+  });
+  ipcMain.handle("ai-loom-desktop-canonical-assets:reconcile-identity", async (_event, entityType: string, entityId: string) => {
+    if (!canonicalAssetSystemRepository?.isAvailable) {
+      return null;
+    }
+    const reconciled = await new ReconcileCanonicalIdentityMappingsUseCase(canonicalAssetSystemRepository, canonicalAssetSystemRepository).execute({
+      entityType: entityType as any,
+      entityId,
+    });
+    return JSON.stringify(reconciled);
+  });
+  ipcMain.handle("ai-loom-desktop-canonical-assets:replay-scope", async (_event, entityType: string, entityId: string, versionId?: string) => {
+    if (!canonicalAssetSystemRepository?.isAvailable) {
+      return JSON.stringify({ replayed: false, reason: "Canonical asset system is unavailable." });
+    }
+    const replay = await replayScopedProjectionUseCase.execute({ entityType: entityType as any, entityId, versionId });
+    return JSON.stringify(replay);
+  });
+  ipcMain.handle("ai-loom-desktop-canonical-assets:verify-projection", async (_event, assetId: string, versionIdsInScope?: ReadonlyArray<string>) => {
+    if (!canonicalAssetSystemRepository?.isAvailable) {
+      return null;
+    }
+    const verification = await verifyProjectionUseCase.execute({ assetId, versionIdsInScope });
+    return JSON.stringify({
+      assetId: verification.assetId,
+      matched: verification.matched,
+      edgeCount: verification.projectionSummary.edgeCount,
+      scopedVersionCount: verification.projectionSummary.scopedVersionCount,
+      failedChecks: verification.checks.filter((entry) => !entry.matched).map((entry) => `${entry.code}: ${entry.message}`),
+    });
+  });
+  ipcMain.handle("ai-loom-desktop-canonical-assets:rebuild-scopes", async (_event, requestJson: string) => {
+    if (!canonicalAssetSystemRepository?.isAvailable) {
+      return JSON.stringify({ totalScopes: 0, replayedScopes: 0, verifiedScopes: 0, results: [] });
+    }
+    const request = JSON.parse(requestJson) as Parameters<ProjectionRebuildOrchestrationUseCase["execute"]>[0];
+    const result = await rebuildProjectionOrchestrationUseCase.execute(request);
+    return JSON.stringify(result);
+  });
+
+  if (runtimeConfig.isPackagedDesktopHost && !pythonRuntime.isAvailable) {
     console.warn(
       `[ai-loom] Packaged private Python runtime was not found at '${pythonRuntime.executablePath ?? pythonRuntime.runtimeRoot}'.`,
     );
@@ -252,4 +432,5 @@ app.on("window-all-closed", () => {
 app.on("before-quit", async () => {
   await serviceSupervisor?.stop();
   storageDatabase?.dispose();
+  executionRunRepository?.dispose();
 });

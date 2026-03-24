@@ -9,7 +9,7 @@ describe("ui composition interactions", () => {
       config: AppRuntimeConfig.forDevelopment(),
     });
 
-    expect(dependencies.config.workflowRepositoryMode).toBe("filesystem-indexed");
+    expect(dependencies.config.workflowRepositoryMode).toBe("browser-storage");
     expect(dependencies.operationalStatus.workflowPersistence.effectiveMode).toBe("in-memory-fallback");
     expect(dependencies.operationalStatus.workflowPersistence.detail).toContain("Emergency fallback only");
     expect(dependencies.operationalStatus.nodeCatalog.effectiveMode).toBe("registered");
@@ -24,6 +24,7 @@ describe("ui composition interactions", () => {
     expect(dependencies.mcpService).toBeDefined();
     expect(dependencies.mcpStore).toBeDefined();
     expect(dependencies.settingsStore).toBeDefined();
+    expect(dependencies.executionHistoryService).toBeDefined();
     expect(dependencies.operationalStatus.modelLibrary.effectiveMode).toBe("browser-download-fallback");
   });
 
@@ -150,5 +151,44 @@ describe("ui composition interactions", () => {
       "langchain.llm_chat",
     ]);
     expect(ragWorkflow?.connections).toHaveLength(7);
+  });
+
+  it("wires canonical asset management service to desktop canonical bridge when available", async () => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const previousBridge = window.aiLoomDesktop;
+    window.aiLoomDesktop = {
+      ...(previousBridge ?? {}),
+      canonicalAssets: {
+        listAssets: async () => [JSON.stringify({
+          assetId: "workflow-definition:wf-1",
+          name: "wf-1",
+          kind: "workflow-definition",
+          status: "available",
+          latestVersionId: "wf:v1",
+          versionCount: 1,
+          transformationCount: 0,
+          lineageEdgeCount: 0,
+        })],
+        loadAssetDetail: async () => null,
+        listVersionChain: async () => [],
+        evaluateDependencyState: async () => null,
+        reconcileIdentity: async () => null,
+        replayScopedProjection: async () => JSON.stringify({ replayed: false, reason: "n/a" }),
+        verifyProjection: async () => null,
+        rebuildProjectionScopes: async () => JSON.stringify({ totalScopes: 0, replayedScopes: 0, verifiedScopes: 0, results: [] }),
+      },
+    } as any;
+
+    try {
+      const dependencies = createUiDependencies({
+        config: AppRuntimeConfig.forDevelopment(),
+      });
+      const assets = await dependencies.canonicalAssetManagementService.listAssets();
+      expect(assets[0]?.assetId).toBe("workflow-definition:wf-1");
+    } finally {
+      window.aiLoomDesktop = previousBridge;
+    }
   });
 });

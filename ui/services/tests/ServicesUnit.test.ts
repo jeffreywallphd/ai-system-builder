@@ -2,6 +2,7 @@ import { describe, expect, it, mock } from "bun:test";
 import { NodeService } from "../NodeService";
 import { ModelService } from "../ModelService";
 import { WorkflowService } from "../WorkflowService";
+import { CanonicalAssetManagementService } from "../CanonicalAssetManagementService";
 
 describe("ui/services unit coverage", () => {
   it("NodeService trims ids before delegating lookups", async () => {
@@ -61,5 +62,33 @@ describe("ui/services unit coverage", () => {
     expect(
       service.extractExecutionMessages({ messages: ["ok"], errorMessage: "bad" } as any)
     ).toEqual(["ok", "bad"]);
+  });
+
+  it("WorkflowService lists workflow read models through canonical-aware load path", async () => {
+    const service = new WorkflowService({
+      createWorkflowUseCase: { execute: async () => ({}) } as any,
+      executeWorkflowUseCase: { execute: async () => ({}) } as any,
+      validateWorkflowUseCase: { execute: () => ({ validation: { isValid: true } }) } as any,
+      workflowRepository: {
+        save: async () => undefined,
+        load: async () => ({ id: "w1" }),
+        list: async () => [{ id: "w1", name: "workflow", updatedAt: new Date() }],
+        delete: async () => true,
+      } as any,
+      loadWorkflowUseCase: {
+        execute: async () => ({ workflow: { id: "w1" }, canonicalRead: { preferred: true, assetId: "workflow-definition:w1" } }),
+      } as any,
+    });
+    const items = await service.listWorkflowReadModels();
+    expect(items[0]?.canonicalRead?.assetId).toBe("workflow-definition:w1");
+  });
+
+  it("CanonicalAssetManagementService returns bounded fallback when operations are not configured", async () => {
+    const service = new CanonicalAssetManagementService();
+    expect(await service.listAssets()).toEqual([]);
+    const replay = await service.replayScopedProjection({ entityType: "workflow-definition", entityId: "wf-1" });
+    expect(replay.replayed).toBeFalse();
+    expect(await service.verifyProjection({ assetId: "workflow-definition:wf-1" })).toBeUndefined();
+    expect(await service.rebuildProjectionScopes({ scopes: [] })).toBeUndefined();
   });
 });

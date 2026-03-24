@@ -5,6 +5,7 @@ import NodeInspector from "../components/nodes/NodeInspector";
 import NodePropertyEditor from "../components/nodes/NodePropertyEditor";
 import ConnectionInspector from "../components/workflow/ConnectionInspector";
 import WorkflowExecutionStatusPanel from "../components/execution/WorkflowExecutionStatusPanel";
+import ExecutionHistoryPanel from "../components/execution/ExecutionHistoryPanel";
 import WorkflowCanvas from "../components/workflow/WorkflowCanvas";
 import WorkflowCanvasToolbar from "../components/workflow/WorkflowCanvasToolbar";
 import WorkflowMetadataPanel from "../components/workflow/WorkflowMetadataPanel";
@@ -15,6 +16,7 @@ import type { WorkflowViewMode } from "../state/WorkflowViewMode";
 import { useUiDependencies } from "../composition/AppProviders";
 import { NodePresenter } from "../presenters/NodePresenter";
 import { WorkflowPresenter } from "../presenters/WorkflowPresenter";
+import { WorkflowExecutionPresenter } from "../presenters/WorkflowExecutionPresenter";
 import { WorkflowOutputPresenter } from "../presenters/WorkflowOutputPresenter";
 import { ValidationPresenter } from "../presenters/ValidationPresenter";
 import { NodeStore, type INodeStoreState } from "../state/NodeStore";
@@ -25,6 +27,7 @@ import { buildInstalledModelOptions } from "../models/buildInstalledModelOptions
 import type { ContextStoreState } from "../state/ContextStore";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import type { RuntimeConsoleState } from "../state/RuntimeConsoleStore";
+import type { ExecutionRunProjection } from "../../application/execution/ExecutionRunProjectionService";
 
 export interface WorkflowEditorPageProps {
   readonly workflowStore?: WorkflowStore;
@@ -113,6 +116,7 @@ export default function WorkflowEditorPage({
     workflowStore: injectedWorkflowStore,
     nodeStore: injectedNodeStore,
     contextStore,
+    executionHistoryService,
     workflowProjectionService,
     settingsStore,
     modelStore,
@@ -142,6 +146,7 @@ export default function WorkflowEditorPage({
     ReadonlyArray<string>
   >([]);
   const [mobilePropertiesNodeId, setMobilePropertiesNodeId] = useState<string>();
+  const [executionHistory, setExecutionHistory] = useState<ReadonlyArray<ExecutionRunProjection>>([]);
   const [isMobile, setIsMobile] = useState<boolean>(() => {
     if (typeof window === "undefined") {
       return false;
@@ -152,6 +157,7 @@ export default function WorkflowEditorPage({
 
   const nodePresenter = useMemo(() => new NodePresenter(), []);
   const workflowPresenter = useMemo(() => new WorkflowPresenter(), []);
+  const workflowExecutionPresenter = useMemo(() => new WorkflowExecutionPresenter(), []);
   const workflowOutputPresenter = useMemo(() => new WorkflowOutputPresenter(), []);
   const validationPresenter = useMemo(() => new ValidationPresenter(), []);
 
@@ -244,6 +250,25 @@ export default function WorkflowEditorPage({
 
   const currentWorkflow = workflowState.currentWorkflow;
 
+  useEffect(() => {
+    if (!currentWorkflow?.id) {
+      setExecutionHistory([]);
+      return;
+    }
+
+    void executionHistoryService.listHistory({
+      planId: `workflow-run:${currentWorkflow.id}`,
+      limit: 5,
+    }).then(setExecutionHistory).catch(() => setExecutionHistory([]));
+  }, [
+    currentWorkflow?.id,
+    executionHistoryService,
+    workflowState.isExecuting,
+    workflowState.lastExecutionEvent?.executionId,
+    workflowState.lastExecutionEvent?.status,
+  ]);
+
+
   const nodeViewModels = useMemo(() => {
     if (!currentWorkflow) {
       return [];
@@ -314,6 +339,16 @@ export default function WorkflowEditorPage({
   );
 
   const validationSummary = validationPresenter.present(workflowState.validation);
+  const executionStatusViewModel = useMemo(() => workflowExecutionPresenter.present({
+    isExecuting: workflowState.isExecuting,
+    lastExecutionEvent: workflowState.lastExecutionEvent,
+    outputAssets: workflowState.outputAssets,
+  }), [
+    workflowExecutionPresenter,
+    workflowState.isExecuting,
+    workflowState.lastExecutionEvent,
+    workflowState.outputAssets,
+  ]);
   const availableModels = useMemo(() => buildInstalledModelOptions(modelState.installedModels), [modelState.installedModels]);
   const validateButtonLabel = useMemo(() => {
     if (!workflowState.validation) {
@@ -802,15 +837,15 @@ export default function WorkflowEditorPage({
                     <WorkflowValidationPanel validation={validationSummary} />
 
                     <WorkflowExecutionStatusPanel
-                      status={workflowState.lastExecutionEvent?.status ?? "queued"}
-                      executionId={workflowState.lastExecutionEvent?.executionId}
-                      currentNodeId={workflowState.lastExecutionEvent?.nodeId}
-                      progressPercent={workflowState.lastExecutionEvent?.progress?.percent}
-                      provenance={workflowState.lastExecutionEvent?.provenance}
-                      message={
-                        workflowState.lastExecutionEvent?.message ??
-                        (workflowState.isExecuting ? "Execution is in progress." : undefined)
-                      }
+                      viewModel={executionStatusViewModel}
+                    />
+
+                    <ExecutionHistoryPanel
+                      title="Recent execution history"
+                      subtitle="Durable plan-backed workflow runs for this workflow."
+                      items={executionHistory}
+                      emptyMessage="No durable workflow runs have been recorded yet."
+                      executionHistoryService={executionHistoryService}
                     />
 
                     <NodePalette

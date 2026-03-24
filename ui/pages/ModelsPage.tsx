@@ -34,7 +34,7 @@ const fallbackState: IModelStoreState = Object.freeze({
 
 export default function ModelsPage(): JSX.Element {
   const presenter = useMemo(() => new ModelPresenter(), []);
-  const { modelStore, settingsStore, modelTrainingStore, tuningDatasetStore } = useUiDependencies();
+  const { modelStore, settingsStore, modelTrainingStore, executionHistoryService } = useUiDependencies();
   const [searchParams, setSearchParams] = useSearchParams();
   const [state, setState] = useState<IModelStoreState>(fallbackState);
   const [settingsState, setSettingsState] = useState<UiSettingsState>(() => settingsStore.getState());
@@ -75,7 +75,7 @@ export default function ModelsPage(): JSX.Element {
         <div className="ui-page__hero-copy">
           <h1 className="ui-page__title">Models</h1>
           <p className="ui-page__subtitle">
-            Manage the model library your workflows can actually use, reconcile catalog metadata against managed files, and create truthful fine-tuning jobs from installed models and governed datasets.
+            Manage installed models, download new ones, and create local model outputs from the base models and dataset versions that are actually available in this runtime mode.
           </p>
           <p className="ui-text-secondary ui-text-small">
             Managed library root: <strong>{state.managedLibrary?.location ?? settingsState.settings.models.installDirectory}</strong>. Update this in{" "}
@@ -98,7 +98,7 @@ export default function ModelsPage(): JSX.Element {
           {
             id: "create",
             label: "Create Models",
-            description: "Submit runtime-backed fine-tuning jobs against installed models and dataset versions.",
+            description: "Prepare bundle-only outputs or run real local training when this mode supports it.",
           },
         ]}
         activeTabId={activeTab}
@@ -109,11 +109,11 @@ export default function ModelsPage(): JSX.Element {
         <div className="ui-card__body ui-stack ui-stack--sm">
           <div className="ui-row ui-row--between ui-row--wrap">
             <div>
-              <strong>Managed Model Library Truth</strong>
-              <div className="ui-text-secondary ui-text-small">{state.managedLibrary?.detail ?? "Model library inspection is pending."}</div>
+              <strong>Installed model library status</strong>
+              <div className="ui-text-secondary ui-text-small">{state.managedLibrary?.detail ?? "The installed model library has not been checked yet."}</div>
             </div>
             <button className="ui-button ui-button--secondary ui-button--sm" type="button" onClick={() => void modelStore.refreshInstalled()}>
-              Refresh / reconcile
+              Refresh library
             </button>
           </div>
           <div className="ui-text-secondary ui-text-small">
@@ -270,9 +270,8 @@ export default function ModelsPage(): JSX.Element {
         hidden={activeTab !== "create"}
       >
         <ModelTrainingStudio
-          modelState={state}
           modelTrainingStore={modelTrainingStore}
-          tuningDatasetStore={tuningDatasetStore}
+          executionHistoryService={executionHistoryService}
         />
       </section>
     </section>

@@ -2,12 +2,14 @@ import { describe, expect, it } from "bun:test";
 import { readSource } from "../../tests/testUtils";
 
 describe("ModelsPage studio workflow", () => {
-  it("replaces the create-models placeholder with the fine-tuning studio", () => {
+  it("wires the create-models tab to the guided model-creation studio", () => {
     const pageSource = readSource("ui/pages/ModelsPage.tsx");
     const studioSource = readSource("ui/components/models/ModelTrainingStudio.tsx");
 
     expect(pageSource).toContain("ModelTrainingStudio");
-    expect(studioSource).toContain("Submit fine-tuning job");
-    expect(studioSource).toContain("Fine-tuning jobs");
+    expect(pageSource).toContain("Prepare bundle-only outputs or run real local training when this mode supports it.");
+    expect(studioSource).toContain("Create a local model");
+    expect(studioSource).toContain("Readiness and prerequisites");
+    expect(studioSource).toContain("Job history and outputs");
   });
 });

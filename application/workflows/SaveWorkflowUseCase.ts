@@ -5,6 +5,7 @@ import type {
   IWorkflowValidator,
 } from "../../domain/services/interfaces/IWorkflowValidator";
 import type { IWorkflowRepository } from "../ports/interfaces/IWorkflowRepository";
+import type { PublishDurableEntityToAssetSystemUseCase } from "../assets-system/PublishDurableEntityToAssetSystemUseCase";
 
 export interface ISaveWorkflowRequest {
   readonly workflow: IWorkflow;
@@ -33,13 +34,16 @@ export interface ISaveWorkflowResult {
 export class SaveWorkflowUseCase {
   private readonly workflowRepository: IWorkflowRepository;
   private readonly workflowValidator?: IWorkflowValidator;
+  private readonly canonicalPublisher?: PublishDurableEntityToAssetSystemUseCase;
 
   constructor(
     workflowRepository: IWorkflowRepository,
-    workflowValidator?: IWorkflowValidator
+    workflowValidator?: IWorkflowValidator,
+    canonicalPublisher?: PublishDurableEntityToAssetSystemUseCase,
   ) {
     this.workflowRepository = workflowRepository;
     this.workflowValidator = workflowValidator;
+    this.canonicalPublisher = canonicalPublisher;
   }
 
   public async execute(
@@ -65,6 +69,7 @@ export class SaveWorkflowUseCase {
     }
 
     const workflow = await this.workflowRepository.save(request.workflow);
+    await this.canonicalPublisher?.publishWorkflowDefinition(workflow);
 
     return Object.freeze({
       workflow,

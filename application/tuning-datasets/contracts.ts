@@ -3,6 +3,7 @@ import type {
   Dataset,
   DatasetExample,
   DatasetExportArtifact,
+  DatasetGenerationBatch,
   DatasetGenerationConfiguration,
   DatasetSourceDocument,
   DatasetStatistics,
@@ -23,6 +24,24 @@ export interface DatasetSummary {
   readonly selectedVersion?: DatasetVersion;
   readonly statistics?: DatasetStatistics;
   readonly exampleCount: number;
+  readonly canonicalSelectedVersion?: {
+    readonly preferred: boolean;
+    readonly assetId?: string;
+    readonly pinnedVersionId?: string;
+    readonly latestVersionId?: string;
+    readonly provenance?: {
+      readonly directUpstreamCount: number;
+      readonly directDownstreamCount: number;
+      readonly producingTransformationCount: number;
+      readonly lineageConfidence: "exact" | "partial";
+    };
+    readonly dependencyState?: {
+      readonly state: "healthy" | "impacted" | "stale" | "partially-trusted" | "reconciliation-needed";
+      readonly reasons: ReadonlyArray<string>;
+      readonly nextActions: ReadonlyArray<string>;
+    };
+    readonly fallbackReason?: string;
+  };
 }
 
 export interface DatasetDetails {
@@ -34,7 +53,26 @@ export interface DatasetDetails {
   readonly statistics?: DatasetStatistics;
   readonly validation?: DatasetValidationResult;
   readonly exports: ReadonlyArray<DatasetExportArtifact>;
+  readonly generationBatches: ReadonlyArray<DatasetGenerationBatch>;
   readonly workflow: DatasetWorkflowState;
+  readonly canonicalByVersionId?: Readonly<Record<string, {
+    readonly preferred: boolean;
+    readonly assetId?: string;
+    readonly pinnedVersionId?: string;
+    readonly latestVersionId?: string;
+    readonly provenance?: {
+      readonly directUpstreamCount: number;
+      readonly directDownstreamCount: number;
+      readonly producingTransformationCount: number;
+      readonly lineageConfidence: "exact" | "partial";
+    };
+    readonly dependencyState?: {
+      readonly state: "healthy" | "impacted" | "stale" | "partially-trusted" | "reconciliation-needed";
+      readonly reasons: ReadonlyArray<string>;
+      readonly nextActions: ReadonlyArray<string>;
+    };
+    readonly fallbackReason?: string;
+  }>>;
 }
 
 export interface CreateDatasetCommand {
