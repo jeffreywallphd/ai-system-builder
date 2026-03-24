@@ -44,6 +44,11 @@ const baseAgent: Agent = {
     agentId: "agent-p",
     assets: [{ assetId: new AssetId("asset:memory:p"), memoryType: "semantic" as const }],
     retrieval: { strategy: "latest-first" as const, maxEntries: 10 },
+    policy: {
+      retrievableTypes: ["semantic"],
+      writableTypes: ["episodic", "semantic"],
+      retention: { mode: "bounded", maxDurableEntries: 100 },
+    },
     revision: 1,
   },
   planningStrategy: { strategyId: "deterministic", mode: "deterministic-linear" },

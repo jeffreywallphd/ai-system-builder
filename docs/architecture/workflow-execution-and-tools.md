@@ -266,6 +266,11 @@ That is "done enough" for Direction 1: the unified execution engine now includes
 - This does not add a second orchestration engine: it only establishes a durable contract for later planner/runner slices.
 
 - Direction 4 planning now has an execution-native inner seam: validated `AgentPlan` step graphs (including dependencies, input references, expected outputs) map through `application/agents/contracts/AgentExecutionMapping.ts` into `ExecutionPlan` `agent-tool-step` units, proving future planner output routes into the same unified execution engine instead of a parallel agent runtime.
+- Direction 4 Phase 3 now adds a memory substrate aligned to that same execution/planning seam:
+  - retrieval is a typed application contract that returns asset-backed memory references (`application/agents/contracts/AgentMemoryRetrieval.ts`);
+  - session working memory is a bounded domain object attached to agent plan/execution context (`domain/agents/AgentWorkingMemory.ts`);
+  - write-back is a bounded application pipeline that normalizes execution outcomes into asset-backed memory references (`application/agents/services/AgentMemoryWriteService.ts`);
+  - memory behavior is policy-shaped (`domain/agents/AgentMemory.ts`) rather than implicit.
 
 ## TODO
 

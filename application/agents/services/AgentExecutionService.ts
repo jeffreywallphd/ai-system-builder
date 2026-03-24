@@ -1,9 +1,11 @@
-import type { AgentMemoryStore } from "../../../domain/agents/AgentMemory";
 import type { Agent } from "../../../domain/agents/Agent";
 import type { AgentExecutionResult } from "../models/AgentExecutionResult";
 import type { ExecuteAgentToolsUseCase } from "../ExecuteAgentToolsUseCase";
 import type { AgentPlanningInterface } from "../contracts/AgentPlanningStrategy";
 import type { AgentPlan } from "../../../domain/agents/AgentPlan";
+import type { AgentMemoryRetrievalService } from "../contracts/AgentMemoryRetrieval";
+import { AgentWorkingMemoryService } from "./AgentWorkingMemoryService";
+import { AgentMemoryWriteService } from "./AgentMemoryWriteService";
 
 export interface AgentExecutionStepOutcome {
   readonly stepId: string;
@@ -28,7 +30,9 @@ export class AgentExecutionService {
   constructor(
     private readonly planner: AgentPlanningInterface,
     private readonly executeAgentToolsUseCase: ExecuteAgentToolsUseCase,
-    private readonly memoryStore: AgentMemoryStore,
+    private readonly memoryRetrievalService: AgentMemoryRetrievalService,
+    private readonly memoryWriteService: AgentMemoryWriteService,
+    private readonly workingMemoryService: AgentWorkingMemoryService = new AgentWorkingMemoryService(),
   ) {}
 
   public async buildExecutionGraph(agent: Agent): Promise<AgentPlan> {
@@ -37,6 +41,13 @@ export class AgentExecutionService {
 
   public async execute(agent: Agent): Promise<AgentExecutionReadModel> {
     const plan = await this.planner.plan({ agent });
+    const retrievedMemory = await this.memoryRetrievalService.retrieveMemory({ agent });
+    let workingMemory = this.workingMemoryService.createFromRetrievedMemory({
+      sessionId: `agent-session:${agent.id}:${plan.planId}`,
+      agent,
+      plan,
+      retrievedMemory,
+    });
     const outcomes: AgentExecutionStepOutcome[] = [];
     let finalStatus: AgentExecutionReadModel["status"] = "completed";
     let finalOutput = "";
@@ -78,41 +89,18 @@ export class AgentExecutionService {
       }
     }
 
-    await this.persistExecutionMemory(agent, plan, outcomes, finalStatus, finalOutput || undefined);
-
-    return Object.freeze({
+    const readModel = Object.freeze({
       agentId: agent.id,
       executionId: `agent:${agent.id}:${plan.planId}`,
       planId: plan.planId,
       status: finalStatus,
       outcomes: Object.freeze(outcomes),
       finalOutput: finalOutput || undefined,
-    });
-  }
+    } satisfies AgentExecutionReadModel);
 
-  private async persistExecutionMemory(
-    agent: Agent,
-    plan: AgentPlan,
-    outcomes: ReadonlyArray<AgentExecutionStepOutcome>,
-    status: AgentExecutionReadModel["status"],
-    finalOutput?: string,
-  ): Promise<void> {
-    const memoryAssetId = agent.memory.assets[0]?.assetId;
-    if (!memoryAssetId) {
-      return;
-    }
-
-    await this.memoryStore.add(agent.id, {
-      assetId: memoryAssetId,
-      memoryType: "episodic",
-      tags: ["agent-execution", status],
-      metadata: {
-        planId: plan.planId,
-        strategyId: plan.strategyId,
-        status,
-        stepCount: outcomes.length,
-        finalOutput: finalOutput ?? null,
-      },
-    });
+    await this.memoryWriteService.writeExecutionOutcome(agent, plan, readModel);
+    workingMemory = this.workingMemoryService.appendExecutionOutcome(workingMemory, readModel);
+    void workingMemory;
+    return readModel;
   }
 }

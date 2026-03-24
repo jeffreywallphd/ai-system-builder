@@ -56,6 +56,14 @@ export interface AgentReadModel {
     readonly retrievalStrategy: AgentMemoryConfiguration["retrieval"]["strategy"];
     readonly maxEntries: number;
     readonly assetIds: ReadonlyArray<string>;
+    readonly policy: {
+      readonly maxRetrievalEntries?: number;
+      readonly retrievableTypes: ReadonlyArray<string>;
+      readonly writableTypes: ReadonlyArray<string>;
+      readonly sessionOnlyTypes: ReadonlyArray<string>;
+      readonly retentionMode: string;
+      readonly maxDurableEntries?: number;
+    };
   };
   readonly execution: AgentExecutionConfiguration;
   readonly createdAt: string;
@@ -225,6 +233,14 @@ export function toAgentReadModel(agent: Agent): AgentReadModel {
       retrievalStrategy: agent.memory.retrieval.strategy,
       maxEntries: agent.memory.retrieval.maxEntries,
       assetIds: Object.freeze(agent.memory.assets.map((entry) => entry.assetId.toString())),
+      policy: Object.freeze({
+        maxRetrievalEntries: agent.memory.policy.maxRetrievalEntries,
+        retrievableTypes: Object.freeze([...(agent.memory.policy.retrievableTypes ?? [])]),
+        writableTypes: Object.freeze([...(agent.memory.policy.writableTypes ?? [])]),
+        sessionOnlyTypes: Object.freeze([...(agent.memory.policy.sessionOnlyTypes ?? [])]),
+        retentionMode: agent.memory.policy.retention.mode,
+        maxDurableEntries: agent.memory.policy.retention.maxDurableEntries,
+      }),
     }),
     execution: agent.execution,
     createdAt: agent.createdAt,

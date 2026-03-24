@@ -97,6 +97,10 @@ export class AssetBackedAgentMemoryStore implements AgentMemoryStore {
     const tagFilter = new Set(normalizeTags(criteria.tags));
     const memoryTypeFilter = new Set<AgentMemoryType>(criteria.memoryTypes ?? []);
     const maxEntries = Math.max(1, Math.trunc(criteria.maxEntries ?? 10));
+    const beforeTimestamp = criteria.beforeTimestamp ? new Date(criteria.beforeTimestamp) : undefined;
+    if (beforeTimestamp && Number.isNaN(beforeTimestamp.getTime())) {
+      throw new Error(`Agent memory query beforeTimestamp '${criteria.beforeTimestamp}' is invalid.`);
+    }
     const responses: AgentMemoryEntryReference[] = [];
 
     for (const assetId of assetIds) {
@@ -117,6 +121,9 @@ export class AssetBackedAgentMemoryStore implements AgentMemoryStore {
 
       const versions = await this.versionRepository.listVersionsByAssetId(assetId);
       const latest = [...versions].sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())[0];
+      if (beforeTimestamp && latest && latest.createdAt.getTime() >= beforeTimestamp.getTime()) {
+        continue;
+      }
 
       const storedMemoryType = typeof latest?.metadata?.memoryType === "string"
         ? (latest.metadata.memoryType as AgentMemoryType)
