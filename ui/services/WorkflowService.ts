@@ -74,14 +74,20 @@ export class WorkflowService {
   }
 
   public async listWorkflows(): Promise<ReadonlyArray<IWorkflow>> {
-    const summaries = await this.workflowRepository.list();
-    const workflows = await Promise.all(
-      summaries.map(async (summary) => this.loadWorkflowReadModel(summary.id).then((result) => result.workflow))
-    );
-
+    const readModels = await this.listWorkflowReadModels();
     return Object.freeze(
-      workflows.filter((workflow): workflow is IWorkflow => !!workflow)
+      readModels
+        .map((entry) => entry.workflow)
+        .filter((workflow): workflow is IWorkflow => !!workflow)
     );
+  }
+
+  public async listWorkflowReadModels(): Promise<ReadonlyArray<ILoadWorkflowResult>> {
+    const summaries = await this.workflowRepository.list();
+    const canonicalResults = await Promise.all(
+      summaries.map(async (summary) => this.loadWorkflowReadModel(summary.id))
+    );
+    return Object.freeze(canonicalResults);
   }
 
   public async saveWorkflow(workflow: IWorkflow): Promise<IWorkflow> {

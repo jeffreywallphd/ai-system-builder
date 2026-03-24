@@ -6,10 +6,17 @@ import type {
 } from "../../domain/services/interfaces/IWorkflowValidator";
 import type { IWorkflowRepository } from "../ports/interfaces/IWorkflowRepository";
 import type { CanonicalAssetIdentityService } from "../assets-system/CanonicalAssetIdentityService";
-import { GetCanonicalLatestVersionUseCase, LoadCanonicalAssetSummaryUseCase } from "../assets-system/CanonicalAssetReadUseCases";
+import { GetCanonicalLatestVersionUseCase, GetCanonicalProvenanceSummaryUseCase, LoadCanonicalAssetSummaryUseCase } from "../assets-system/CanonicalAssetReadUseCases";
 import type { IAssetRecordRepository } from "../ports/interfaces/IAssetRecordRepository";
 import type { IAssetVersionRepository } from "../ports/interfaces/IAssetVersionRepository";
 import type { IAssetSystemQueryRepository } from "../ports/interfaces/IAssetSystemQueryRepository";
+import { GetAssetDependencyHealthUseCase } from "../assets-system/GetAssetDependencyHealthUseCase";
+import { GetAssetImpactAnalysisUseCase } from "../assets-system/GetAssetImpactAnalysisUseCase";
+import { GetCanonicalDependencyStateUseCase } from "../assets-system/CanonicalDependencyStateUseCase";
+import { CanonicalEntityReadResolver } from "../assets-system/CanonicalEntityReadResolver";
+import type { ICanonicalAssetIdentityRepository } from "../ports/interfaces/ICanonicalAssetIdentityRepository";
+import type { IAssetLineageRepository } from "../ports/interfaces/IAssetLineageRepository";
+import type { IAssetTransformationRepository } from "../ports/interfaces/IAssetTransformationRepository";
 
 export interface ILoadWorkflowRequest {
   readonly workflowId: string;
@@ -41,7 +48,19 @@ export interface ILoadWorkflowResult {
   readonly canonicalRead?: {
     readonly preferred: boolean;
     readonly assetId?: string;
+    readonly pinnedVersionId?: string;
     readonly latestVersionId?: string;
+    readonly provenance?: {
+      readonly directUpstreamCount: number;
+      readonly directDownstreamCount: number;
+      readonly producingTransformationCount: number;
+      readonly lineageConfidence: "exact" | "partial";
+    };
+    readonly dependencyState?: {
+      readonly state: "healthy" | "impacted" | "stale" | "partially-trusted" | "reconciliation-needed";
+      readonly reasons: ReadonlyArray<string>;
+      readonly nextActions: ReadonlyArray<string>;
+    };
     readonly fallbackReason?: string;
   };
 }
@@ -49,9 +68,7 @@ export interface ILoadWorkflowResult {
 export class LoadWorkflowUseCase {
   private readonly workflowRepository: IWorkflowRepository;
   private readonly workflowValidator?: IWorkflowValidator;
-  private readonly canonicalIdentityService?: CanonicalAssetIdentityService;
-  private readonly canonicalAssetSummaryUseCase?: LoadCanonicalAssetSummaryUseCase;
-  private readonly canonicalLatestVersionUseCase?: GetCanonicalLatestVersionUseCase;
+  private readonly canonicalReadResolver?: CanonicalEntityReadResolver;
 
   constructor(
     workflowRepository: IWorkflowRepository,
@@ -61,16 +78,27 @@ export class LoadWorkflowUseCase {
       readonly assetRepository: IAssetRecordRepository;
       readonly versionRepository: IAssetVersionRepository;
       readonly queryRepository?: IAssetSystemQueryRepository;
+      readonly identityRepository: ICanonicalAssetIdentityRepository;
+      readonly lineageRepository: IAssetLineageRepository;
+      readonly transformationRepository: IAssetTransformationRepository;
     },
   ) {
     this.workflowRepository = workflowRepository;
     this.workflowValidator = workflowValidator;
-    this.canonicalIdentityService = canonicalRepositories?.canonicalIdentityService;
-    this.canonicalAssetSummaryUseCase = canonicalRepositories
-      ? new LoadCanonicalAssetSummaryUseCase(canonicalRepositories.assetRepository, canonicalRepositories.versionRepository, canonicalRepositories.queryRepository)
-      : undefined;
-    this.canonicalLatestVersionUseCase = canonicalRepositories
-      ? new GetCanonicalLatestVersionUseCase(canonicalRepositories.versionRepository, canonicalRepositories.queryRepository)
+    this.canonicalReadResolver = canonicalRepositories
+      ? new CanonicalEntityReadResolver(
+        canonicalRepositories.canonicalIdentityService,
+        new LoadCanonicalAssetSummaryUseCase(canonicalRepositories.assetRepository, canonicalRepositories.versionRepository, canonicalRepositories.queryRepository),
+        new GetCanonicalLatestVersionUseCase(canonicalRepositories.versionRepository, canonicalRepositories.queryRepository),
+        new GetCanonicalProvenanceSummaryUseCase(canonicalRepositories.lineageRepository, canonicalRepositories.transformationRepository, canonicalRepositories.queryRepository),
+        new GetCanonicalDependencyStateUseCase(
+          canonicalRepositories.versionRepository,
+          canonicalRepositories.identityRepository,
+          new GetAssetDependencyHealthUseCase(canonicalRepositories.lineageRepository, canonicalRepositories.transformationRepository, canonicalRepositories.versionRepository),
+          new GetAssetImpactAnalysisUseCase(canonicalRepositories.lineageRepository, canonicalRepositories.transformationRepository, canonicalRepositories.versionRepository),
+          new GetCanonicalProvenanceSummaryUseCase(canonicalRepositories.lineageRepository, canonicalRepositories.transformationRepository, canonicalRepositories.queryRepository),
+        ),
+      )
       : undefined;
   }
 
@@ -129,31 +157,29 @@ export class LoadWorkflowUseCase {
   }
 
   private async loadCanonicalReadSummary(workflowId: string): Promise<ILoadWorkflowResult["canonicalRead"]> {
-    if (!this.canonicalIdentityService || !this.canonicalAssetSummaryUseCase || !this.canonicalLatestVersionUseCase) {
+    if (!this.canonicalReadResolver) {
       return Object.freeze({
         preferred: false,
         fallbackReason: "Canonical repositories are not configured for workflow reads.",
       });
     }
 
-    const assetId = await this.canonicalIdentityService.resolveAssetId("workflow-definition", workflowId);
-    if (!assetId) {
-      return Object.freeze({
-        preferred: false,
-        fallbackReason: `No canonical identity mapping was found for workflow '${workflowId}'.`,
-      });
-    }
-
-    const [summary, latestVersion] = await Promise.all([
-      this.canonicalAssetSummaryUseCase.execute(assetId),
-      this.canonicalLatestVersionUseCase.execute(assetId),
-    ]);
+    const resolved = await this.canonicalReadResolver.resolve({ entityType: "workflow-definition", entityId: workflowId });
 
     return Object.freeze({
-      preferred: !!summary,
-      assetId,
-      latestVersionId: latestVersion?.versionId,
-      fallbackReason: summary ? undefined : `Canonical asset '${assetId}' could not be loaded; workflow read used legacy repository data.`,
+      preferred: resolved.preferred,
+      assetId: resolved.assetId,
+      pinnedVersionId: resolved.pinnedVersionId,
+      latestVersionId: resolved.latestVersionId,
+      provenance: resolved.provenance,
+      dependencyState: resolved.dependencyState
+        ? Object.freeze({
+          state: resolved.dependencyState.state,
+          reasons: resolved.dependencyState.reasons,
+          nextActions: resolved.dependencyState.nextActions,
+        })
+        : undefined,
+      fallbackReason: resolved.fallbackReason,
     });
   }
 }

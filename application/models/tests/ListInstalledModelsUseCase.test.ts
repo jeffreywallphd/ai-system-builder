@@ -38,4 +38,41 @@ describe("ListInstalledModelsUseCase", () => {
     expect(result.canonicalByModelId?.m?.preferred).toBeTrue();
     expect(result.canonicalByModelId?.m?.assetId).toBe("installed-model:m");
   });
+
+  it("prefers centralized canonical resolver details when provided", async () => {
+    const result = await new ListInstalledModelsUseCase(
+      makeInstalledModelCatalog({ listInstalled: async () => [makeModel("m")] }),
+      {
+        resolveIdentity: async () => ({
+          entityType: "installed-model",
+          entityId: "m",
+          assetId: "installed-model:m",
+          latestVersionId: "asset-version:m:1",
+          updatedAt: new Date("2026-03-24T00:00:00.000Z"),
+        }),
+      } as any,
+      {
+        resolve: async () => ({
+          preferred: true,
+          assetId: "installed-model:m",
+          pinnedVersionId: "asset-version:m:1",
+          latestVersionId: "asset-version:m:2",
+          provenance: { directUpstreamCount: 1, directDownstreamCount: 0, producingTransformationCount: 1, lineageConfidence: "exact" as const },
+          dependencyState: {
+            versionId: "asset-version:m:2",
+            state: "healthy" as const,
+            lineageConfidence: "exact" as const,
+            reasons: ["ok"],
+            impactedByUpstreamVersionIds: [],
+            staleBecauseUpstreamAdvanced: [],
+            nextActions: ["No reconciliation is required."],
+          },
+        }),
+      } as any,
+    ).execute();
+
+    expect(result.canonicalByModelId?.m?.pinnedVersionId).toBe("asset-version:m:1");
+    expect(result.canonicalByModelId?.m?.latestVersionId).toBe("asset-version:m:2");
+    expect(result.canonicalByModelId?.m?.dependencyState?.state).toBe("healthy");
+  });
 });

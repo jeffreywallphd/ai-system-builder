@@ -23,12 +23,7 @@ export class InMemoryAssetLineageGraphProjectionSink implements IAssetLineageGra
   }
 
   public hasVersionPath(fromVersionId: string, toVersionId: string, maxDepth = 6): boolean {
-    const adjacency = new Map<string, Set<string>>();
-    for (const edge of this.publishedEdgesStore) {
-      const next = adjacency.get(edge.fromVersionId) ?? new Set<string>();
-      next.add(edge.toVersionId);
-      adjacency.set(edge.fromVersionId, next);
-    }
+    const adjacency = this.buildOutgoingAdjacency();
 
     const queue: Array<{ readonly versionId: string; readonly depth: number }> = [{ versionId: fromVersionId, depth: 0 }];
     const visited = new Set<string>([fromVersionId]);
@@ -49,5 +44,33 @@ export class InMemoryAssetLineageGraphProjectionSink implements IAssetLineageGra
       }
     }
     return false;
+  }
+
+  public listOutgoingVersionIds(versionId: string): ReadonlyArray<string> {
+    return Object.freeze([...(this.buildOutgoingAdjacency().get(versionId) ?? new Set<string>())]);
+  }
+
+  public listIncomingVersionIds(versionId: string): ReadonlyArray<string> {
+    return Object.freeze([...(this.buildIncomingAdjacency().get(versionId) ?? new Set<string>())]);
+  }
+
+  private buildOutgoingAdjacency(): Map<string, Set<string>> {
+    const adjacency = new Map<string, Set<string>>();
+    for (const edge of this.publishedEdgesStore) {
+      const next = adjacency.get(edge.fromVersionId) ?? new Set<string>();
+      next.add(edge.toVersionId);
+      adjacency.set(edge.fromVersionId, next);
+    }
+    return adjacency;
+  }
+
+  private buildIncomingAdjacency(): Map<string, Set<string>> {
+    const adjacency = new Map<string, Set<string>>();
+    for (const edge of this.publishedEdgesStore) {
+      const incoming = adjacency.get(edge.toVersionId) ?? new Set<string>();
+      incoming.add(edge.fromVersionId);
+      adjacency.set(edge.toVersionId, incoming);
+    }
+    return adjacency;
   }
 }

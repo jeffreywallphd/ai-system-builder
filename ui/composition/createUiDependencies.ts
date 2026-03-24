@@ -150,6 +150,7 @@ import { ExecutionHistoryService } from "../services/ExecutionHistoryService";
 import { createModelManagementDependencies } from "./modelManagementDependencies";
 import { BrowserDownloadModelLibrary } from "../../infrastructure/browser/models/BrowserDownloadModelLibrary";
 import { RuntimeDependencyIds, RuntimeDependencyOperationalStates, type IRuntimeDependencyOrchestrator } from "../../application/runtime/RuntimeDependencyOrchestrator";
+import { CanonicalAssetManagementService } from "../services/CanonicalAssetManagementService";
 
 export function createUiDependencies(
   options: CreateUiDependenciesOptions = {}
@@ -586,6 +587,7 @@ export function createUiDependencies(
   );
   const modelTrainingService = new ModelTrainingService(modelTrainingApplicationService);
   const modelTrainingStore = new ModelTrainingStore(modelTrainingService);
+  const canonicalAssetManagementService = new CanonicalAssetManagementService();
 
   return Object.freeze({
     config,
@@ -617,6 +619,7 @@ export function createUiDependencies(
     modelTrainingService,
     modelTrainingStore,
     executionHistoryService,
+    canonicalAssetManagementService,
     workflowProjectionService,
     settingsStore,
   });

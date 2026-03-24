@@ -188,9 +188,9 @@ Canonical read/query surfaces now include dedicated application use cases for:
 - loading explicit "why this version exists" explanations from transformation/lineage evidence
 
 Canonical read preference is now integrated into three durable real flows (with explicit fallback semantics when canonical identity is missing):
-- `LoadWorkflowUseCase` now returns canonical workflow-definition identity/version read metadata.
-- `ListInstalledModelsUseCase` now returns canonical installed-model identity/version summaries per listed model.
-- `DefaultTuningDatasetStudioApplicationService` now returns canonical dataset-version identity/version summaries in dataset details/listing responses.
+- `LoadWorkflowUseCase` now routes canonical resolution through a shared resolver and returns canonical identity/version metadata plus bounded provenance and dependency-state hints.
+- `ListInstalledModelsUseCase` now returns canonical installed-model identity/version summaries per listed model using the same canonical resolver path when configured.
+- `DefaultTuningDatasetStudioApplicationService` now returns canonical dataset-version identity/version summaries in dataset details/listing responses, including explicit pinned-version metadata.
 
 Dependency-health capability now includes both bounded impact analysis and a direct operational summary (`GetAssetDependencyHealthUseCase`) that distinguishes:
 - direct upstream/downstream dependencies
@@ -201,19 +201,25 @@ Dependency-health capability now includes both bounded impact analysis and a dir
 SQLite asset-system persistence now includes canonical identity mappings and normalized query paths/indexes for durable filters (`kind/source/status`), latest-version lookup, version-chain queries, transformation lookup by asset, adjacency traversal, and identity lookup/index coverage for durable entity mappings.
 
 Graph-projection readiness now moves beyond a no-op seam:
-- projection replay is now supported from canonical storage (`ReplayAssetGraphProjectionUseCase`) for selected assets.
+- projection replay is now supported from canonical storage (`ReplayAssetGraphProjectionUseCase`) with bounded scoping by asset/version/transformation ids.
 - the in-memory projection sink can now answer simple path checks (`hasVersionPath`) to prove graph-oriented behavior without requiring Neo4j.
 - a concrete Neo4j-targeted sink contract (`Neo4jAssetLineageGraphProjectionSink` + `INeo4jCypherExecutor`) now exists as the default graph-db projection target in composition, while still using a local no-op executor unless a real driver adapter is configured.
+
+Dependency lifecycle semantics now include explicit application-layer states (`healthy`, `impacted`, `stale`, `partially-trusted`, `reconciliation-needed`) via `GetCanonicalDependencyStateUseCase`, plus bounded reconciliation/refresh helpers:
+- `RefreshCanonicalDependencyStateUseCase` to recompute dependency-state summaries.
+- `ReconcileCanonicalIdentityMappingsUseCase` to heal stale/missing pinned version references.
+- `ReplayScopedAssetGraphProjectionUseCase` for scoped graph replay by canonical entity mapping.
 
 Broader canonical-read adoption now also includes legacy UI service seams:
 - `WorkflowService` now routes load/list reads through `LoadWorkflowUseCase` when available, so canonical-read preference metadata can be surfaced without page-level lookup duplication.
 - `ModelService` now exposes a full installed-model read-model response (`listInstalledModelsReadModel`) so callers can consume canonical identity summaries directly.
+- `CanonicalAssetManagementService` now provides a dedicated UI-facing seam for canonical asset detail, dependency-state checks, scoped graph replay, and identity reconciliation actions.
 
 Partial-lineage diagnostics now include a bounded application read model (`GetAssetLineageDiagnosticsUseCase`) designed for future UI exploration without requiring graph infrastructure at render time.
 
 What remains for next chunks:
-- broaden canonical-read adoption across additional legacy catalog/repository UI paths
-- expand projection replay/sink wiring from local proof toward pluggable Neo4j-backed projection (still optional)
+- wire the canonical asset-management UI seam to runtime-backed canonical repositories in renderer/desktop composition by default.
+- expand projection replay/sink verification contracts from local proof toward richer Neo4j traversal adapters (still optional)
 - add richer partial-lineage diagnostics and UI-driven impact exploration without requiring full graph mode.
 
 SQLite storage now also carries normalized `asset_versions.version_label` and `asset_versions.parent_version_id` columns (plus legacy JSON payload compatibility) so version-chain queries can progressively move from blob parsing to explicit relational reads.

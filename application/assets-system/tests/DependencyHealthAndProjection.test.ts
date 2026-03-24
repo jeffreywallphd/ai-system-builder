@@ -12,6 +12,9 @@ import { ReplayAssetGraphProjectionUseCase } from "../ReplayAssetGraphProjection
 import { InMemoryAssetLineageGraphProjectionSink } from "../../../infrastructure/filesystem/InMemoryAssetLineageGraphProjectionSink";
 import { ExplainCanonicalVersionExistenceUseCase, GetCanonicalProvenanceSummaryUseCase } from "../CanonicalAssetReadUseCases";
 import { GetAssetLineageDiagnosticsUseCase } from "../GetAssetLineageDiagnosticsUseCase";
+import { GetAssetImpactAnalysisUseCase } from "../GetAssetImpactAnalysisUseCase";
+import { GetCanonicalDependencyStateUseCase } from "../CanonicalDependencyStateUseCase";
+import { RefreshCanonicalDependencyStateUseCase, ReconcileCanonicalIdentityMappingsUseCase } from "../ReconciliationUseCases";
 
 describe("Dependency health and graph projection", () => {
   it("distinguishes direct, transitive, and partial lineage signals", async () => {
@@ -48,6 +51,38 @@ describe("Dependency health and graph projection", () => {
       ).execute({ versionId: "d:v1" });
       expect(diagnostics.status).toBe("partial");
       expect(diagnostics.diagnostics.some((entry) => entry.code === "LINEAGE_GAP")).toBeTrue();
+
+      await repository.upsertIdentity({
+        entityType: "workflow-definition",
+        entityId: "wf-a",
+        assetId: "a",
+        latestVersionId: "a:v1",
+      });
+      const dependencyStateUseCase = new GetCanonicalDependencyStateUseCase(
+        repository,
+        repository,
+        new GetAssetDependencyHealthUseCase(repository, repository, repository),
+        new GetAssetImpactAnalysisUseCase(repository, repository, repository),
+        new GetCanonicalProvenanceSummaryUseCase(repository, repository, repository),
+      );
+      const refreshed = await new RefreshCanonicalDependencyStateUseCase(dependencyStateUseCase).execute({
+        versionId: "a:v1",
+        changedUpstreamVersionIds: ["missing-upstream"],
+      });
+      expect(refreshed.summary.state).toBe("reconciliation-needed");
+
+      await repository.upsertIdentity({
+        entityType: "dataset-version",
+        entityId: "dataset:broken",
+        assetId: "a",
+        latestVersionId: "missing-version",
+      });
+      const reconciled = await new ReconcileCanonicalIdentityMappingsUseCase(repository, repository).execute({
+        entityType: "dataset-version",
+        entityId: "dataset:broken",
+      });
+      expect(reconciled.reconciled).toBeTrue();
+      expect(reconciled.reconciledVersionId).toBe("a:v1");
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -69,9 +104,15 @@ describe("Dependency health and graph projection", () => {
       await repository.saveEdge(new AssetLineageEdge({ edgeId: "in-out", fromVersionId: "asset-in:v1", toVersionId: "asset-out:v1", type: AssetLineageRelationshipType.GENERATED_FROM, transformationId: "tx-1" }));
 
       const sink = new InMemoryAssetLineageGraphProjectionSink();
-      const replayResult = await new ReplayAssetGraphProjectionUseCase(repository, sink).execute({ assetIds: ["asset-out", "asset-in"] });
+      const replayResult = await new ReplayAssetGraphProjectionUseCase(repository, sink).execute({
+        assetIds: ["asset-out", "asset-in"],
+        versionIds: ["asset-out:v1", "asset-in:v1"],
+        transformationIds: ["tx-1"],
+      });
       expect(replayResult.publishedTransformationCount).toBeGreaterThan(0);
       expect(replayResult.publishedEdgeCount).toBeGreaterThan(0);
+      expect(replayResult.versionIds).toContain("asset-in:v1");
+      expect(replayResult.transformationIds).toContain("tx-1");
       expect(sink.hasVersionPath("asset-in:v1", "asset-out:v1")).toBeTrue();
     } finally {
       await rm(root, { recursive: true, force: true });
