@@ -62,12 +62,18 @@ Use "workflow-first", "tool projection", and "truthful execution provenance" whe
   1. installed tool lookup/binding
   2. installed status + contract checks
   3. auth credential resolution through secret-repository/auth-service seam
-  4. permission policy decision (required scopes vs granted scopes)
-  5. execution audit event emission (allow/deny, non-secret payload)
-  6. runtime execution
+  4. user approval decision (pending/approved/denied/revoked per permission + trust scope)
+  5. permission policy decision (required scopes vs granted scopes)
+  6. sandbox policy decision (network/filesystem/asset/environment posture)
+  7. execution audit event emission (allow/deny/administrative, non-secret payload)
+  8. runtime execution
 - Permission denials and auth misconfiguration now use structured errors instead of implicit fallback behavior.
+- Missing/denied approvals now use structured `approval-required` denials; sandbox policy denials use structured `sandbox-denied` errors.
+- Approval/revocation actions are now auditable events (`approval-requested` / `approval-granted` / `approval-denied` / `approval-revoked`) to keep trust lifecycle history machine-readable.
+- Trust read-model seams now expose effective trust posture for a tool (required permissions, approval gaps, sandbox policy, and enforcement truthfulness metadata).
 - Secret values are resolved only at execution boundary and are intentionally excluded from ordinary installed-tool projections and audit payloads.
 - Credential resolution now returns structured status (`success`/`missing`/`partial`/`invalid`/`failed`) so execution can distinguish missing vs malformed configuration and map to consistent auth error classes.
+- Sandbox truthfulness is explicit: network/filesystem/asset controls are invocation-level enforced policy gates; environment exposure is currently declared-only posture metadata (not hard runtime isolation).
 
 ## MCP workflow-native node integration (Direction 3 stories 3.1–3.5)
 - `mcp.tool_call` is now treated as a first-class workflow node in the standard node catalog/definition/persistence surfaces, including a stable `toolId` property (`mcp:<serverId>:<toolName>`) alongside server/tool binding and descriptor snapshot fields.

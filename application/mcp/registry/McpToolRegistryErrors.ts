@@ -11,7 +11,9 @@ export type McpToolRegistryErrorCode =
   | "invalid-auth-configuration"
   | "invalid-credentials"
   | "auth-resolution-failed"
-  | "permission-denied";
+  | "permission-denied"
+  | "approval-required"
+  | "sandbox-denied";
 
 export class McpToolRegistryError extends Error {
   constructor(

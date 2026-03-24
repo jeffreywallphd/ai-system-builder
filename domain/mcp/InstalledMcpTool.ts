@@ -1,5 +1,13 @@
 import type { McpToolDefinition } from "./McpToolCapability";
-import type { McpToolPermissionScope } from "./McpToolTrust";
+import {
+  createDefaultMcpToolSandboxEnforcementSummary,
+  createDefaultMcpToolSandboxPolicy,
+  type McpToolPermissionApprovalEvent,
+  type McpToolPermissionApprovalRecord,
+  type McpToolPermissionScope,
+  type McpToolSandboxEnforcementSummary,
+  type McpToolSandboxPolicy,
+} from "./McpToolTrust";
 
 export type InstalledMcpToolStatus = "enabled" | "disabled";
 export type McpToolDefinitionSourceKind = "inline" | "local" | "remote";
@@ -20,6 +28,10 @@ export interface InstalledMcpToolRecord {
   readonly updatedAt: string;
   readonly source: McpToolDefinitionSource;
   readonly grantedPermissions?: ReadonlyArray<McpToolPermissionScope>;
+  readonly permissionApprovals?: ReadonlyArray<McpToolPermissionApprovalRecord>;
+  readonly approvalHistory?: ReadonlyArray<McpToolPermissionApprovalEvent>;
+  readonly sandboxPolicy?: McpToolSandboxPolicy;
+  readonly sandboxEnforcement?: McpToolSandboxEnforcementSummary;
   readonly lifecycle?: InstalledMcpToolLifecycle;
 }
 
@@ -65,6 +77,10 @@ export function createInstalledMcpToolRecord(params: {
       location: params.source.location.trim(),
     }),
     grantedPermissions: Object.freeze([]),
+    permissionApprovals: Object.freeze([]),
+    approvalHistory: Object.freeze([]),
+    sandboxPolicy: createDefaultMcpToolSandboxPolicy(),
+    sandboxEnforcement: createDefaultMcpToolSandboxEnforcementSummary(),
     lifecycle: Object.freeze({
       versionPolicy: params.versionPolicy ?? "pinned",
       lastAction: "install",

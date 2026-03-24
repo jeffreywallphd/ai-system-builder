@@ -261,13 +261,17 @@ The MCP execution path now includes explicit trust controls in the standard use-
 1. Resolve installed-tool binding and status.
 2. Validate input contract.
 3. Resolve auth configuration through a dedicated secret-repository seam.
-4. Evaluate required permissions against installed-tool grants and request/runtime grants.
-5. Emit an execution audit decision event with non-secret payload.
-6. Invoke runtime execution.
+4. Evaluate explicit user approval state (pending/approved/denied/revoked per permission and trust scope).
+5. Evaluate required permissions against installed-tool grants and request/runtime grants.
+6. Evaluate explicit sandbox policy (network/filesystem/asset/environment posture).
+7. Emit an execution audit decision event with non-secret payload.
+8. Invoke runtime execution.
 
-Auth and permission denials are explicit, structured outcomes (`missing-auth-configuration`, `invalid-credentials`, `auth-resolution-failed`, `permission-denied`) instead of implicit runtime failures. Credential resolution now reports structured status (success/missing/partial/invalid/failed) so missing vs malformed states are handled deterministically.
+Auth, approval, permission, and sandbox denials are explicit structured outcomes (`missing-auth-configuration`, `invalid-credentials`, `auth-resolution-failed`, `approval-required`, `permission-denied`, `sandbox-denied`) instead of implicit runtime failures. Credential resolution now reports structured status (success/missing/partial/invalid/failed) so missing vs malformed states are handled deterministically.
 
-This slice enforces policy in the application/runtime orchestration layer (bounded sandbox policy) and creates seams for future stronger process/OS sandboxing and user-consent UX.
+Approval lifecycle actions are auditable (`approval-requested`, `approval-granted`, `approval-denied`, `approval-revoked`) and trust read models now expose machine-readable posture (required permissions, missing approvals, sandbox policy, and enforcement truthfulness metadata).
+
+This slice enforces bounded sandbox policy in the application/runtime orchestration layer and truthfully distinguishes invocation-level enforced controls (network/filesystem/asset gating) from declared-only posture (environment exposure). It creates seams for future stronger process/OS sandboxing without claiming that hard isolation already exists.
 
 ## Direction 3 workflow-native update: MCP nodes inside workflow execution (stories 3.1–3.5)
 

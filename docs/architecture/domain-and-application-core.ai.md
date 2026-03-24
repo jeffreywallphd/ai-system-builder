@@ -152,7 +152,7 @@ The MCP inner-layer model now adds an explicit trust/governance foundation:
 Current limitations (intentional for this pass):
 - secret persistence is still local-first, but now uses secure desktop encryption (`safeStorage` bridge) when available and encrypted local fallback otherwise.
 - scope is intentionally bounded to global/project with a user-scope extension seam; this is not a full identity/tenant system.
-- policy enforcement is application/runtime policy gating, not OS/container sandboxing yet.
+- sandboxing is still bounded to application/runtime execution policy gates; network/filesystem/asset posture is invocation-level enforced while environment exposure is declared-only metadata (not hard OS/container isolation).
 
 ## TODO
 
