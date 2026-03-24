@@ -54,7 +54,7 @@ export class AgentExecutionService {
           agentId: agent.id,
           planId: plan.planId,
           stepId: step.stepId,
-          memoryAssetIds: agent.memoryConfig.memoryAssetIds,
+          memoryAssetIds: agent.memory.assets.map((entry) => entry.assetId.toString()),
         }),
       });
 
@@ -95,7 +95,7 @@ export class AgentExecutionService {
     status: AgentExecutionReadModel["status"],
     finalOutput?: string,
   ): Promise<void> {
-    const memoryAssetId = agent.memoryConfig.memoryAssetIds[0];
+    const memoryAssetId = agent.memory.assets[0]?.assetId.toString();
     if (!memoryAssetId) {
       return;
     }

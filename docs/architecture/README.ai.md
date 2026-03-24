@@ -42,5 +42,11 @@ Use this file as the shortest reliable orientation before reading the human arch
 - `ui/composition/createUiDependencies.ts`
 - `electron/main/main.ts`
 
+## Direction 4 (Phase 1) foundation
+- Agent concepts are now first-class inner-layer artifacts (`domain/agents/*`) with structured goal, policy, memory, and execution-session models.
+- Agent memory configuration is explicitly asset-based (`AssetId` references + memory types + retrieval strategy + revision), aligned with Direction 2 lineage/versioning.
+- Agent execution now has a bounded mapping seam into the unified execution backbone (`application/agents/contracts/AgentExecutionMapping.ts`) rather than introducing a second runtime model.
+- This remains a foundation slice only: no studio UI, no autonomous replanning loop, and no parallel orchestration stack.
+
 ## TODO
 - If asked for the "single" architecture entry point, explain that there are currently multiple composition roots and name them explicitly.

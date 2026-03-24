@@ -100,6 +100,11 @@ Use "workflow-first", "tool projection", and "truthful execution provenance" whe
   - `ai-loom.mcp-tools.v1` for installed-registry transfer (status/source/definition/lifecycle + overwrite semantics).
   - `ai-loom.mcp-tool-definitions.v1` for shareable definitions (definition + source only), explicitly excluding runtime-only trust/approval/secret state.
 
+## Direction 4 Phase 1 execution alignment
+- Agent execution sessions now use execution-native lifecycle states in `domain/agents/AgentExecutionSession.ts`.
+- `application/agents/contracts/AgentExecutionMapping.ts` maps agent steps into unified `ExecutionPlan` units (`agent-tool-step`) to keep Direction 4 on the shared execution backbone.
+- This is a contract slice only (no second runtime, no autonomous loop in Phase 1).
+
 ## TODO
 - If asked whether tools and workflows are separate bounded contexts, answer: "not really; tools are primarily a projected and published workflow surface in the current implementation."
 - If asked what should migrate next, answer: execution areas that still cannot report real progress/cancellation truthfully yet, especially MCP/runtime-backed orchestration beyond the current narrow server-operation slice.

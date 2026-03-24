@@ -126,6 +126,12 @@ The runtime is not a single path. The system currently supports multiple executi
 - For host/runtime composition and desktop delivery, read [`desktop-runtime-and-hosts.md`](./desktop-runtime-and-hosts.md).
 - For UI composition and state flow, read [`presentation-and-state.md`](./presentation-and-state.md).
 
+## Direction 4 (Phase 1) foundation
+- Agent concepts are now first-class inner-layer artifacts (`domain/agents/*`) with structured goal, policy, memory, and execution-session models.
+- Agent memory configuration is explicitly asset-based (`AssetId` references + memory types + retrieval strategy + revision), aligned with Direction 2 lineage/versioning.
+- Agent execution now has a bounded mapping seam into the unified execution backbone (`application/agents/contracts/AgentExecutionMapping.ts`) rather than introducing a second runtime model.
+- This remains a foundation slice only: no studio UI, no autonomous replanning loop, and no parallel orchestration stack.
+
 ## TODO
 
 - The repository still contains **two composition stories**: the generic DI bootstrap in `infrastructure/composition/` and the renderer-specific manual composition in `ui/composition/createUiDependencies.ts`. Execution-engine wiring, execution-run persistence, MCP server-operation handler registration, and execution-history/detail projection services now share more of the same outer-layer path across those roots, but broader composition convergence is still future work.

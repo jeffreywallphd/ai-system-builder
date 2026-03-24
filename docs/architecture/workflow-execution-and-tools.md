@@ -259,6 +259,11 @@ That is "done enough" for Direction 1: the unified execution engine now includes
   - `ai-loom.mcp-tools.v1` for installed-registry transfer (status/source/definition/lifecycle with overwrite controls).
   - `ai-loom.mcp-tool-definitions.v1` for shareable definition export/import flows (definition + source only; no runtime approvals/secrets/operational trust state).
 
+## Direction 4 Phase 1 execution alignment
+- Agent execution sessions now use execution-native lifecycle language (`queued/planning/running/completed/failed/cancelled`) via `domain/agents/AgentExecutionSession.ts`.
+- A compact mapping seam (`application/agents/contracts/AgentExecutionMapping.ts`) maps agent plan steps into `ExecutionPlan` units (`agent-tool-step`) so future agent execution flows through the same unified engine substrate.
+- This does not add a second orchestration engine: it only establishes a durable contract for later planner/runner slices.
+
 ## TODO
 
 - Tool running, model/dataset runs, and the narrow MCP server-operation slice now share the same engine seam and persisted run model, but broader composition still has multiple roots. Further convergence should happen incrementally instead of through a giant rewrite.
