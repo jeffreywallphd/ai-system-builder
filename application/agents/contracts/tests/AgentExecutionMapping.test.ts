@@ -72,11 +72,11 @@ describe("Agent execution backbone mapping", () => {
     const running = transitionAgentExecutionSession(planning, { status: AgentExecutionSessionStatuses.running });
     const completed = transitionAgentExecutionSession(running, {
       status: AgentExecutionSessionStatuses.completed,
-      appendExecutionRunId: "run-1",
+      appendExecutionRun: { runId: "run-1", status: "running" },
       appendDiagnosticAssetId: "asset:diag:1",
     });
 
-    expect(completed.executionRunIds).toEqual(["run-1"]);
+    expect(completed.executionRuns.map((run) => run.runId)).toEqual(["run-1"]);
     expect(completed.diagnosticAssetIds).toEqual(["asset:diag:1"]);
     expect(completed.endTime).toBeDefined();
   });
@@ -102,5 +102,25 @@ describe("Agent execution backbone mapping", () => {
         ],
       }),
     ).toThrow("unique step ids");
+
+    expect(() =>
+      mapAgentExecutionToBackbone({
+        session,
+        steps: [
+          { stepId: "step-1", toolId: "mcp:local:echo", intent: { action: "one" }, dependsOnStepIds: ["step-2"] },
+          { stepId: "step-2", toolId: "mcp:local:echo", intent: { action: "two" }, dependsOnStepIds: ["step-1"] },
+        ],
+      }),
+    ).toThrow("dependency cycle");
+
+    expect(() =>
+      mapAgentExecutionToBackbone({
+        session,
+        steps: [
+          { stepId: "step-1", toolId: "mcp:local:echo", intent: { action: "one" }, dependsOnStepIds: ["step-2"] },
+          { stepId: "step-2", toolId: "mcp:local:echo", intent: { action: "two" }, dependsOnStepIds: ["step-9"] },
+        ],
+      }),
+    ).toThrow("unknown step");
   });
 });

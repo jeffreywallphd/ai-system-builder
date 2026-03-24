@@ -69,6 +69,7 @@ describe("Agent foundation services", () => {
         revision: 1,
       },
       planningStrategy: { strategyId: "deterministic", mode: "deterministic-linear" },
+      execution: { maxExecutionUnits: 2, requireTrustedTools: true },
     });
 
     const readModels = await service.listAgentReadModels();
@@ -144,7 +145,7 @@ describe("Agent foundation services", () => {
         revision: 1,
       },
       planningStrategy: { strategyId: "deterministic", mode: "deterministic-linear" },
-      execution: { maxPlanUnits: 1, requireTrustedTools: true },
+      execution: { maxExecutionUnits: 1, requireTrustedTools: true },
       status: "ready",
       createdAt: "2026-03-24T00:00:00.000Z",
       updatedAt: "2026-03-24T00:00:00.000Z",
@@ -219,7 +220,7 @@ describe("Agent foundation services", () => {
         revision: 1,
       },
       planningStrategy: { strategyId: "deterministic", mode: "deterministic-linear" },
-      execution: { maxPlanUnits: 1, requireTrustedTools: true },
+      execution: { maxExecutionUnits: 1, requireTrustedTools: true },
       status: "ready",
       createdAt: "2026-03-24T00:00:00.000Z",
       updatedAt: "2026-03-24T00:00:00.000Z",

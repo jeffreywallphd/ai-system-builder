@@ -44,7 +44,7 @@ function normalizeRequired(value: string, field: string): string {
 }
 
 function resolvePlanId(session: AgentExecutionSession): string {
-  return session.planId?.trim() || `agent-plan:${session.id}`;
+  return session.executionPlan?.planId.trim() || `agent-plan:${session.id}`;
 }
 
 function normalizeStep(step: AgentPlanStepMappingInput): AgentPlanStepMappingInput {
@@ -101,6 +101,26 @@ export function mapAgentExecutionToBackbone(input: AgentExecutionBackboneMapping
         throw new Error(`Agent execution mapping step '${step.stepId}' depends on unknown step '${dependencyId}'.`);
       }
     }
+  }
+  const dependencyGraph = new Map(normalizedSteps.map((step) => [step.stepId, step.dependsOnStepIds ?? []] as const));
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+  const visit = (stepId: string): void => {
+    if (visited.has(stepId)) {
+      return;
+    }
+    if (visiting.has(stepId)) {
+      throw new Error(`Agent execution mapping step '${stepId}' participates in a dependency cycle.`);
+    }
+    visiting.add(stepId);
+    for (const dependencyId of dependencyGraph.get(stepId) ?? []) {
+      visit(dependencyId);
+    }
+    visiting.delete(stepId);
+    visited.add(stepId);
+  };
+  for (const step of normalizedSteps) {
+    visit(step.stepId);
   }
 
   const units: IExecutionUnitDefinition[] = normalizedSteps.map((step) => ({

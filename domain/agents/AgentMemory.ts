@@ -8,6 +8,15 @@ export const AgentMemoryTypes = Object.freeze({
 
 export type AgentMemoryType = typeof AgentMemoryTypes[keyof typeof AgentMemoryTypes];
 
+export const AgentMemoryRetrievalStrategies = Object.freeze({
+  latestFirst: "latest-first",
+  semanticFilter: "semantic-filter",
+  hybrid: "hybrid",
+});
+
+export type AgentMemoryRetrievalStrategy =
+  typeof AgentMemoryRetrievalStrategies[keyof typeof AgentMemoryRetrievalStrategies];
+
 export interface AgentMemoryAssetRef {
   readonly assetId: AssetId;
   readonly assetVersionId?: string;
@@ -16,7 +25,7 @@ export interface AgentMemoryAssetRef {
 }
 
 export interface AgentMemoryRetrievalConfig {
-  readonly strategy: "latest-first" | "semantic-filter" | "hybrid";
+  readonly strategy: AgentMemoryRetrievalStrategy;
   readonly maxEntries: number;
   readonly requiredTags?: ReadonlyArray<string>;
   readonly memoryTypes?: ReadonlyArray<AgentMemoryType>;
@@ -104,6 +113,12 @@ export function normalizeAgentMemoryConfiguration(config: AgentMemoryConfigurati
       memoryType: entry.memoryType,
       lineageTag: entry.lineageTag?.trim() || undefined,
     });
+    if (!normalizedEntry.assetId.toString().startsWith("asset:")) {
+      throw new Error(`Agent memory asset reference '${normalizedEntry.assetId.toString()}' must use canonical asset id format.`);
+    }
+    if (normalizedEntry.assetVersionId !== undefined && !/^[a-zA-Z0-9:_-]+$/.test(normalizedEntry.assetVersionId)) {
+      throw new Error(`Agent memory assetVersionId '${normalizedEntry.assetVersionId}' is malformed.`);
+    }
 
     const key = [
       normalizedEntry.assetId.toString(),
@@ -148,7 +163,7 @@ export function normalizeAgentMemoryConfiguration(config: AgentMemoryConfigurati
       : undefined,
   });
 
-  if (!["latest-first", "semantic-filter", "hybrid"].includes(String(retrieval.strategy))) {
+  if (!Object.values(AgentMemoryRetrievalStrategies).includes(retrieval.strategy)) {
     throw new Error("Agent memory retrieval strategy must be latest-first, semantic-filter, or hybrid.");
   }
 
@@ -158,6 +173,12 @@ export function normalizeAgentMemoryConfiguration(config: AgentMemoryConfigurati
 
   if (retrieval.strategy === "latest-first" && retrieval.semantic) {
     throw new Error("Agent memory retrieval semantic config is not allowed for latest-first strategy.");
+  }
+  if (retrieval.strategy === "semantic-filter" && !retrieval.semantic) {
+    throw new Error("Agent memory retrieval semantic-filter strategy requires semantic config.");
+  }
+  if (retrieval.strategy === "hybrid" && !retrieval.recency && !retrieval.semantic) {
+    throw new Error("Agent memory retrieval hybrid strategy requires semantic or recency config.");
   }
 
   return Object.freeze({

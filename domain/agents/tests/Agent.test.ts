@@ -40,7 +40,7 @@ describe("Agent domain", () => {
         costLimits: { maxTokens: 12_000 },
         executionLimits: { maxSteps: 3, maxWallClockMs: 30_000 },
         safetyConstraints: {
-          requiredApprovals: [{ permissionId: "weather-data", scopeType: "tool", scopeId: "mcp:local:get_weather" }],
+          requiredApprovals: [{ permissionId: "network.access", minimumStatus: "approved", scopeType: "tool", scopeId: "mcp:local:get_weather" }],
           deniedPermissionIds: [],
           sandbox: { network: "allow", filesystem: "read-only", assets: "read-only", allowEnvironmentVariables: [] },
         },
@@ -59,7 +59,7 @@ describe("Agent domain", () => {
         revision: 1,
       },
       planningStrategy: { strategyId: "linear-default", mode: "deterministic-linear" },
-      execution: { trustPolicyId: "trust:strict", requireTrustedTools: true, maxPlanUnits: 3 },
+      execution: { trustPolicyId: "trust:strict", requireTrustedTools: true, maxExecutionUnits: 3 },
     });
 
     expect(agent.name).toBe("Weather Analyst");
@@ -90,6 +90,7 @@ describe("Agent domain", () => {
         revision: 1,
       },
       planningStrategy: { strategyId: "deterministic", mode: "deterministic-linear" },
+      execution: { maxExecutionUnits: 3, maxRunDurationMs: 30_000, requireTrustedTools: true },
     });
 
     const readModel = toAgentReadModel(agent);
@@ -98,6 +99,29 @@ describe("Agent domain", () => {
   });
 
   it("enforces core agent invariants", () => {
+    expect(() =>
+      createAgent({
+        id: "agent-missing-execution",
+        name: "No Execution Config",
+        goals: [{ id: "g1", objective: "Goal", constraints: [], successCriteria: ["Done"], priority: "normal", priorityOrder: 1 }],
+        policy: {
+          toolAccess: { allowedToolIds: ["mcp:local:echo"], scopeConstraints: [] },
+          restrictedActions: [],
+          costLimits: {},
+          executionLimits: {},
+          safetyConstraints: defaultSafety,
+        },
+        memory: {
+          agentId: "agent-missing-execution",
+          assets: [{ assetId: new AssetId("asset:memory:x"), memoryType: "working" }],
+          retrieval: { strategy: "latest-first", maxEntries: 5 },
+          revision: 1,
+        },
+        planningStrategy: { strategyId: "linear-default", mode: "deterministic-linear" },
+        execution: undefined as unknown as never,
+      }),
+    ).toThrow("execution configuration is required");
+
     expect(() =>
       createAgent({
         id: "agent-invalid",
@@ -117,6 +141,7 @@ describe("Agent domain", () => {
           revision: 1,
         },
         planningStrategy: { strategyId: "linear-default", mode: "deterministic-linear" },
+        execution: { maxExecutionUnits: 2, requireTrustedTools: true },
       }),
     ).toThrow("allowed tool");
 
@@ -147,6 +172,7 @@ describe("Agent domain", () => {
           revision: 1,
         },
         planningStrategy: { strategyId: "linear-default", mode: "deterministic-linear" },
+        execution: { maxExecutionUnits: 2, requireTrustedTools: true },
       }),
     ).toThrow("not allowed by policy");
 
@@ -169,7 +195,7 @@ describe("Agent domain", () => {
           revision: 1,
         },
         planningStrategy: { strategyId: "linear-default", mode: "deterministic-linear" },
-        execution: { maxPlanUnits: 3, requireTrustedTools: true },
+        execution: { maxExecutionUnits: 3, requireTrustedTools: true },
       }),
     ).toThrow("cannot exceed policy execution maxSteps");
   });
@@ -193,17 +219,18 @@ describe("Agent domain", () => {
         revision: 1,
       },
       planningStrategy: { strategyId: "linear-default", mode: "deterministic-linear" },
+      execution: { maxExecutionUnits: 2, requireTrustedTools: true },
       now: new Date("2026-03-24T00:00:00.000Z"),
     });
 
     const updated = updateAgent(existing, {
       status: "paused",
-      execution: { maxPlanUnits: 2, requireTrustedTools: true },
+      execution: { maxExecutionUnits: 2, requireTrustedTools: true },
       now: new Date("2026-03-24T00:05:00.000Z"),
     });
 
     expect(updated.status).toBe("paused");
-    expect(updated.execution.maxPlanUnits).toBe(2);
+    expect(updated.execution.maxExecutionUnits).toBe(2);
     expect(updated.createdAt).toBe("2026-03-24T00:00:00.000Z");
     expect(updated.updatedAt).toBe("2026-03-24T00:05:00.000Z");
   });
@@ -235,7 +262,7 @@ describe("Agent goal and policy invariants", () => {
       costLimits: { maxTokens: 1000, maxEstimatedUsd: 1.25 },
       executionLimits: { maxSteps: 3, maxWallClockMs: 10000 },
       safetyConstraints: {
-        requiredApprovals: [{ permissionId: "tool.run", scopeType: "global" }],
+        requiredApprovals: [{ permissionId: "runtime.execute", minimumStatus: "approved", scopeType: "global" }],
         deniedPermissionIds: ["filesystem.write"],
         sandbox: { network: "allow", filesystem: "read-only", assets: "read-only", allowEnvironmentVariables: ["TZ", "TZ"] },
       },
@@ -272,6 +299,34 @@ describe("Agent goal and policy invariants", () => {
         safetyConstraints: defaultSafety,
       }),
     ).toThrow("cost limits are conflicting");
+
+    expect(() =>
+      normalizeAgentPolicy({
+        toolAccess: { allowedToolIds: ["mcp:local:echo"], scopeConstraints: [] },
+        restrictedActions: [],
+        costLimits: {},
+        executionLimits: {},
+        safetyConstraints: {
+          requiredApprovals: [{ permissionId: "network.access", minimumStatus: "approved", scopeType: "tool" }],
+          deniedPermissionIds: [],
+          sandbox: { network: "allow", filesystem: "deny", assets: "read-only", allowEnvironmentVariables: [] },
+        },
+      }),
+    ).toThrow("tool scope must include scopeId");
+
+    expect(() =>
+      normalizeAgentPolicy({
+        toolAccess: { allowedToolIds: ["mcp:local:echo"], scopeConstraints: [] },
+        restrictedActions: [],
+        costLimits: {},
+        executionLimits: {},
+        safetyConstraints: {
+          requiredApprovals: [],
+          deniedPermissionIds: ["network.access"],
+          sandbox: { network: "deny", filesystem: "deny", assets: "read-only", allowEnvironmentVariables: [] },
+        },
+      }),
+    ).toThrow("redundantly deny network.access");
   });
 });
 
@@ -312,11 +367,29 @@ describe("Agent memory invariants", () => {
     expect(() =>
       normalizeAgentMemoryConfiguration({
         agentId: "agent-m",
+        assets: [{ assetId: new AssetId("memory:one"), memoryType: "working" }],
+        retrieval: { strategy: "latest-first", maxEntries: 5, semantic: { minRelevanceScore: 0.5 } },
+        revision: 1,
+      }),
+    ).toThrow("canonical asset id format");
+
+    expect(() =>
+      normalizeAgentMemoryConfiguration({
+        agentId: "agent-m",
         assets: [{ assetId: new AssetId("asset:memory:one"), memoryType: "working" }],
         retrieval: { strategy: "latest-first", maxEntries: 5, semantic: { minRelevanceScore: 0.5 } },
         revision: 1,
       }),
     ).toThrow("semantic config is not allowed");
+
+    expect(() =>
+      normalizeAgentMemoryConfiguration({
+        agentId: "agent-m",
+        assets: [{ assetId: new AssetId("asset:memory:one"), memoryType: "working" }],
+        retrieval: { strategy: "semantic-filter", maxEntries: 5 },
+        revision: 1,
+      }),
+    ).toThrow("requires semantic config");
   });
 });
 
@@ -331,7 +404,7 @@ describe("Agent execution session invariants", () => {
     const planning = transitionAgentExecutionSession(queued, { status: AgentExecutionSessionStatuses.planning });
     const running = transitionAgentExecutionSession(planning, {
       status: AgentExecutionSessionStatuses.running,
-      appendExecutionRunId: "run-1",
+      appendExecutionRun: { runId: "run-1", status: "running" },
     });
     const completed = transitionAgentExecutionSession(running, {
       status: AgentExecutionSessionStatuses.completed,
@@ -339,7 +412,7 @@ describe("Agent execution session invariants", () => {
       endedAt: new Date("2026-03-24T10:03:00.000Z"),
     });
 
-    expect(completed.executionRunIds).toEqual(["run-1"]);
+    expect(completed.executionRuns.map((run) => run.runId)).toEqual(["run-1"]);
     expect(completed.diagnosticAssetIds).toEqual(["asset:diag:1"]);
     expect(completed.endTime).toBe("2026-03-24T10:03:00.000Z");
 
