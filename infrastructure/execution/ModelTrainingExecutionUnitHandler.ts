@@ -16,6 +16,7 @@ import type {
   IExecutionUnitRunHandle,
 } from "../../application/execution/UnifiedExecutionEngine";
 import type { ModelTrainingJob } from "../../domain/model-training/ModelTrainingTypes";
+import type { ExecutionAssetLineageRecorder } from "../../application/assets-system/ExecutionAssetLineageRecorder";
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -111,6 +112,7 @@ function toExecutionEvent(
 export class ModelTrainingExecutionUnitHandler implements IExecutionUnitHandler {
   constructor(
     private readonly modelTrainingRuntime: IModelTrainingRuntime,
+    private readonly executionAssetLineageRecorder?: ExecutionAssetLineageRecorder,
     private readonly pollIntervalMs = 250,
   ) {}
 
@@ -145,6 +147,10 @@ export class ModelTrainingExecutionUnitHandler implements IExecutionUnitHandler 
         currentJob = await this.modelTrainingRuntime.refreshJob(currentJob.id) ?? currentJob;
         emit(currentJob);
       }
+      await this.executionAssetLineageRecorder?.recordModelTraining({
+        request: input,
+        job: currentJob,
+      });
 
       return toUnitResult(request.unit.id, currentJob);
     })();

@@ -7,7 +7,7 @@ import { Asset } from "../../../domain/assets/Asset";
 import { AssetLocation, AssetSourceInfo } from "../../../domain/assets/AssetMetadata";
 import { AssetVersion } from "../../../domain/assets/AssetVersion";
 import { AssetTransformation } from "../../../domain/assets/AssetTransformation";
-import { AssetLineageEdge } from "../../../domain/assets/AssetLineageEdge";
+import { AssetLineageEdge, AssetLineageRelationshipType } from "../../../domain/assets/AssetLineageEdge";
 
 describe("SqliteAssetSystemRepository", () => {
   it("persists asset, version, lineage edges, and transformations", async () => {
@@ -28,12 +28,12 @@ describe("SqliteAssetSystemRepository", () => {
       });
 
       await repo.save(asset);
-      await repo.saveVersion(new AssetVersion({ assetId: asset.id, versionId: "v1" }));
-      await repo.saveVersion(new AssetVersion({ assetId: asset.id, versionId: "v2", upstreamVersionIds: ["v1"] }));
+      await repo.saveVersion(new AssetVersion({ assetId: asset.id, versionId: "v1", versionLabel: "1" }));
+      await repo.saveVersion(new AssetVersion({ assetId: asset.id, versionId: "v2", versionLabel: "2", parentVersionId: "v1", upstreamVersionIds: ["v1"] }));
       await repo.saveTransformation(new AssetTransformation({
         transformationId: "tx-1",
-        kind: "test-transform",
-        status: "completed",
+        transformationType: "test-transform",
+        status: "success",
         inputVersionIds: ["v1"],
         outputVersionIds: ["v2"],
       }));
@@ -41,12 +41,15 @@ describe("SqliteAssetSystemRepository", () => {
         edgeId: "edge-1",
         fromVersionId: "v1",
         toVersionId: "v2",
-        kind: "derived-from",
+        type: AssetLineageRelationshipType.DERIVED_FROM,
         transformationId: "tx-1",
       }));
 
       expect((await repo.getById("asset-1"))?.name).toBe("Asset 1");
-      expect((await repo.listVersionsByAssetId("asset-1")).length).toBe(2);
+      const versions = await repo.listVersionsByAssetId("asset-1");
+      expect(versions.length).toBe(2);
+      expect(versions[0].versionLabel).toBe("2");
+      expect(versions[0].parentVersionId).toBe("v1");
       expect((await repo.listByVersionId("v2")).length).toBe(1);
       expect((await repo.listEdgesByVersionId("v2", "upstream")).length).toBe(1);
     } finally {

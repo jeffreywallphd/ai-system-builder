@@ -72,7 +72,6 @@ import type { IAssetTransformationRepository } from "../../application/ports/int
 import type { IAssetLineageGraphProjectionSink } from "../../application/ports/interfaces/IAssetLineageGraphProjectionSink";
 import { RegisterAssetUseCase } from "../../application/assets-system/RegisterAssetUseCase";
 import { CreateAssetVersionUseCase } from "../../application/assets-system/CreateAssetVersionUseCase";
-import { LinkAssetLineageUseCase } from "../../application/assets-system/LinkAssetLineageUseCase";
 import { RecordAssetTransformationUseCase } from "../../application/assets-system/RecordAssetTransformationUseCase";
 import { ProjectArtifactToAssetSystemUseCase } from "../../application/assets-system/ProjectArtifactToAssetSystemUseCase";
 import { ExecutionAssetLineageRecorder } from "../../application/assets-system/ExecutionAssetLineageRecorder";
@@ -345,16 +344,18 @@ export class InfrastructureRegistry {
       const systemRepository = c.resolve<SqliteAssetSystemRepository>(TOKENS.AssetSystemRepository);
       const registerAssetUseCase = new RegisterAssetUseCase(systemRepository);
       const createAssetVersionUseCase = new CreateAssetVersionUseCase(systemRepository);
-      const recordTransformationUseCase = new RecordAssetTransformationUseCase(systemRepository, c.resolve<IAssetLineageGraphProjectionSink>(TOKENS.AssetLineageGraphProjectionSink));
-      const linkAssetLineageUseCase = new LinkAssetLineageUseCase(systemRepository, c.resolve<IAssetLineageGraphProjectionSink>(TOKENS.AssetLineageGraphProjectionSink));
+      const recordTransformationUseCase = new RecordAssetTransformationUseCase(
+        systemRepository,
+        systemRepository,
+        c.resolve<IAssetLineageGraphProjectionSink>(TOKENS.AssetLineageGraphProjectionSink),
+      );
       const projectionUseCase = new ProjectArtifactToAssetSystemUseCase(
         registerAssetUseCase,
         createAssetVersionUseCase,
         recordTransformationUseCase,
-        linkAssetLineageUseCase,
       );
 
-      return new ExecutionAssetLineageRecorder(projectionUseCase);
+      return new ExecutionAssetLineageRecorder(projectionUseCase, systemRepository);
     });
 
     container.registerSingleton(TOKENS.ModelRepository, (c) => {

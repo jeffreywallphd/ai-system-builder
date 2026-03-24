@@ -130,6 +130,8 @@ The domain now includes explicit types for:
 
 These concepts are persistence-agnostic and model reproducibility/traceability directly instead of relying only on loose `version`, `parentAssetId`, or generic relationship strings.
 
+`AssetVersion` is the immutable snapshot model (`versionId`, `assetId`, `createdAt`, optional `parentVersionId` / `versionLabel` / checksum summary), while `Asset` remains the mutable catalog envelope. `AssetTransformation` now explicitly captures multi-input / multi-output derivations and transformation outcome (`success` / `failed` / `partial` / `degraded`). `AssetLineageEdge` now uses strict relationship typing (for example `DERIVED_FROM`, `GENERATED_FROM`, `TRAINED_FROM`) with explicit directional semantics.
+
 ### Canonical vs projected
 
 Current canonical storage for this slice is:
@@ -140,12 +142,18 @@ Projected sources currently supported:
 - uploaded files (projected as uploaded assets + first version)
 - dataset exports (projected as dataset assets + version + derivation transformation)
 - workflow execution outputs (projected as generated assets + version + transformation + lineage edges)
+- dataset-generation execution batches (projected as dataset-generation assets + version + transformation, and lineage edges when source documents resolve to known asset versions)
+- model-training artifacts (projected as model-artifact assets + version + transformation, with lineage from known dataset/base-model asset versions when available)
 
 Projection is additive and migration-friendly; no existing flow was removed.
 
 ### Lineage and execution seam
 
 Execution infrastructure now has an optional `ExecutionAssetLineageRecorder` seam. When supported workflow execution paths produce output assets, they can emit structured asset-system records without altering workflow execution truthfulness semantics.
+
+The current integrated flow resolves upstream input assets to known asset versions, creates output `AssetVersion` snapshots, records `AssetTransformation`, and automatically emits lineage edges from transformation input/output pairs. This now applies across workflow-output, dataset-generation, and model-training artifact projections.
+
+Model-training requests now support explicit asset-lineage identity hints (`datasetVersionAssetId`, `baseModelAssetId`, direct `sourceVersionIds`, and optional output namespace) so lineage projection prefers canonical IDs over broad heuristic lookup.
 
 Partial provenance remains explicit: when upstream version truth is unavailable, lineage edges are not invented.
 
@@ -155,4 +163,6 @@ A graph projection port (`IAssetLineageGraphProjectionSink`) was introduced and 
 
 ### Next chunk focus
 
-Future work should expand projection breadth and tighten identity contracts across model outputs, dataset versions, and execution artifacts while gradually migrating read/query surfaces to the canonical versioned lineage layer.
+Future work should tighten identity contracts across model outputs, dataset versions, and execution artifacts while gradually migrating read/query surfaces to the canonical versioned lineage layer.
+
+SQLite storage now also carries normalized `asset_versions.version_label` and `asset_versions.parent_version_id` columns (plus legacy JSON payload compatibility) so version-chain queries can progressively move from blob parsing to explicit relational reads.

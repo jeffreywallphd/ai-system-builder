@@ -39,4 +39,32 @@ describe("LoadAssetUseCase", () => {
     await expect(useCase.execute({ assetId: "missing", loadContent: true })).rejects.toThrow("missing");
     expect(saved).toEqual(["missing"]);
   });
+
+  it("returns canonical lineage summary when repositories are provided", async () => {
+    const asset = makeAsset("lineage-asset");
+    const useCase = new LoadAssetUseCase({
+      assetCatalog: makeAssetCatalog({ getById: async () => asset }),
+      fileStorage: makeFileStorage({ exists: async () => true }),
+      versionRepository: {
+        saveVersion: async () => undefined,
+        getByVersionId: async () => undefined,
+        listVersionsByAssetId: async () => [{ versionId: "v1", versionLabel: "1", createdAt: new Date("2026-03-24T00:00:00.000Z") } as any],
+      },
+      lineageRepository: {
+        saveEdge: async () => undefined,
+        listEdgesByVersionId: async (_versionId, direction) => direction === "upstream"
+          ? [{ edgeId: "e1", fromVersionId: "source-v1", toVersionId: "v1" }]
+          : [],
+      } as any,
+      transformationRepository: {
+        saveTransformation: async () => undefined,
+        getById: async () => undefined,
+        listByVersionId: async () => [{ transformationId: "tx-1" }],
+      } as any,
+    });
+
+    const result = await useCase.execute({ assetId: asset.id });
+    expect(result.canonicalSummary?.versionCount).toBe(1);
+    expect(result.canonicalSummary?.versions[0]?.upstreamVersionCount).toBe(1);
+  });
 });

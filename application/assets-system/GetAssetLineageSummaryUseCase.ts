@@ -1,8 +1,12 @@
 import type { AssetLineageDirection } from "../ports/interfaces/IAssetLineageRepository";
 import type { IAssetLineageRepository } from "../ports/interfaces/IAssetLineageRepository";
+import type { IAssetTransformationRepository } from "../ports/interfaces/IAssetTransformationRepository";
 
 export class GetAssetLineageSummaryUseCase {
-  constructor(private readonly lineageRepository: IAssetLineageRepository) {}
+  constructor(
+    private readonly lineageRepository: IAssetLineageRepository,
+    private readonly transformationRepository?: IAssetTransformationRepository,
+  ) {}
 
   public async execute(request: {
     readonly versionId: string;
@@ -14,6 +18,15 @@ export class GetAssetLineageSummaryUseCase {
     readonly direction: "upstream" | "downstream";
     readonly visitedVersionIds: ReadonlyArray<string>;
     readonly traversedEdgeIds: ReadonlyArray<string>;
+    readonly traversedEdges: ReadonlyArray<{
+      readonly edgeId: string;
+      readonly fromVersionId: string;
+      readonly toVersionId: string;
+      readonly type: string;
+      readonly transformationId?: string;
+      readonly transformationType?: string;
+      readonly transformationStatus?: string;
+    }>;
   }> {
     const rootVersionId = request.versionId.trim();
     if (!rootVersionId) {
@@ -26,6 +39,15 @@ export class GetAssetLineageSummaryUseCase {
 
     const visited = new Set<string>([rootVersionId]);
     const traversedEdges = new Map<string, true>();
+    const traversedEdgeDetails = new Map<string, {
+      readonly edgeId: string;
+      readonly fromVersionId: string;
+      readonly toVersionId: string;
+      readonly type: string;
+      readonly transformationId?: string;
+      readonly transformationType?: string;
+      readonly transformationStatus?: string;
+    }>();
     let frontier = new Set<string>([rootVersionId]);
 
     for (let depth = 0; depth < maxDepth && frontier.size > 0 && traversedEdges.size < maxEdges; depth += 1) {
@@ -36,6 +58,22 @@ export class GetAssetLineageSummaryUseCase {
 
         for (const edge of edges) {
           traversedEdges.set(edge.edgeId, true);
+          let transformationType: string | undefined;
+          let transformationStatus: string | undefined;
+          if (edge.transformationId) {
+            const transformation = await this.transformationRepository?.getById(edge.transformationId);
+            transformationType = transformation?.transformationType;
+            transformationStatus = transformation?.status;
+          }
+          traversedEdgeDetails.set(edge.edgeId, Object.freeze({
+            edgeId: edge.edgeId,
+            fromVersionId: edge.fromVersionId,
+            toVersionId: edge.toVersionId,
+            type: edge.type,
+            transformationId: edge.transformationId,
+            transformationType,
+            transformationStatus,
+          }));
 
           const nextVersionId = direction === "upstream" ? edge.fromVersionId : edge.toVersionId;
           if (!visited.has(nextVersionId)) {
@@ -61,6 +99,7 @@ export class GetAssetLineageSummaryUseCase {
       direction,
       visitedVersionIds: Object.freeze([...visited]),
       traversedEdgeIds: Object.freeze([...traversedEdges.keys()]),
+      traversedEdges: Object.freeze([...traversedEdgeDetails.values()]),
     });
   }
 }

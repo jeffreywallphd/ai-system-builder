@@ -14,7 +14,16 @@ export class GetAssetHistoryUseCase {
   public async execute(assetId: string): Promise<{
     readonly assetId: string;
     readonly assetName?: string;
-    readonly versions: ReadonlyArray<{ readonly versionId: string; readonly createdAt: string; readonly transformationCount: number; readonly lineageEdgeCount: number }>;
+    readonly versions: ReadonlyArray<{
+      readonly versionId: string;
+      readonly versionLabel?: string;
+      readonly parentVersionId?: string;
+      readonly createdAt: string;
+      readonly transformationCount: number;
+      readonly lineageEdgeCount: number;
+      readonly upstreamVersionIds: ReadonlyArray<string>;
+      readonly downstreamVersionIds: ReadonlyArray<string>;
+    }>;
   }> {
     const normalizedAssetId = assetId.trim();
     if (!normalizedAssetId) {
@@ -34,9 +43,13 @@ export class GetAssetHistoryUseCase {
 
       return Object.freeze({
         versionId: version.versionId,
+        versionLabel: version.versionLabel,
+        parentVersionId: version.parentVersionId,
         createdAt: version.createdAt.toISOString(),
         transformationCount: transformations.length,
         lineageEdgeCount: edges.length,
+        upstreamVersionIds: Object.freeze(edges.filter((edge) => edge.toVersionId === version.versionId).map((edge) => edge.fromVersionId)),
+        downstreamVersionIds: Object.freeze(edges.filter((edge) => edge.fromVersionId === version.versionId).map((edge) => edge.toVersionId)),
       });
     }));
 

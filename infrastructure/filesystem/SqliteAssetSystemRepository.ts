@@ -13,11 +13,15 @@ import type { IAssetTransformationRepository } from "../../application/ports/int
 import type { IAssetVersionRepository } from "../../application/ports/interfaces/IAssetVersionRepository";
 
 interface AssetRow { readonly asset_json: string; }
-interface AssetVersionRow { readonly version_json: string; }
+interface AssetVersionRow {
+  readonly version_json: string;
+  readonly version_label?: string | null;
+  readonly parent_version_id?: string | null;
+}
 interface LineageRow { readonly edge_json: string; }
 interface TransformationRow { readonly transformation_json: string; }
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 const MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   [1, `
     CREATE TABLE asset_system_migrations (
@@ -71,6 +75,11 @@ const MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
       FOREIGN KEY(version_id) REFERENCES asset_versions(version_id) ON DELETE CASCADE
     );
     CREATE INDEX asset_transform_versions_idx ON asset_transformation_versions(version_id, role);
+  `],
+  [2, `
+    ALTER TABLE asset_versions ADD COLUMN version_label TEXT;
+    ALTER TABLE asset_versions ADD COLUMN parent_version_id TEXT;
+    CREATE INDEX asset_versions_parent_idx ON asset_versions(parent_version_id);
   `],
 ]);
 
@@ -132,16 +141,20 @@ export class SqliteAssetSystemRepository implements
     this.assertAssetExists(version.assetId.value);
 
     this.getDatabase().prepare(`
-      INSERT INTO asset_versions (version_id, asset_id, created_at, content_sha256, version_json)
-      VALUES (@versionId, @assetId, @createdAt, @contentSha256, @versionJson)
+      INSERT INTO asset_versions (version_id, asset_id, version_label, parent_version_id, created_at, content_sha256, version_json)
+      VALUES (@versionId, @assetId, @versionLabel, @parentVersionId, @createdAt, @contentSha256, @versionJson)
       ON CONFLICT(version_id) DO UPDATE SET
         asset_id = excluded.asset_id,
+        version_label = excluded.version_label,
+        parent_version_id = excluded.parent_version_id,
         created_at = excluded.created_at,
         content_sha256 = excluded.content_sha256,
         version_json = excluded.version_json
     `).run({
       versionId: version.versionId,
       assetId: version.assetId.value,
+      versionLabel: version.versionLabel,
+      parentVersionId: version.parentVersionId,
       createdAt: version.createdAt.toISOString(),
       contentSha256: version.contentSha256,
       versionJson: JSON.stringify(version),
@@ -149,16 +162,16 @@ export class SqliteAssetSystemRepository implements
   }
 
   public async getByVersionId(versionId: string): Promise<AssetVersion | undefined> {
-    const row = this.getDatabase().prepare("SELECT version_json FROM asset_versions WHERE version_id = ?").get(versionId.trim()) as AssetVersionRow | undefined;
-    return row ? this.parseVersion(row.version_json) : undefined;
+    const row = this.getDatabase().prepare("SELECT version_json, version_label, parent_version_id FROM asset_versions WHERE version_id = ?").get(versionId.trim()) as AssetVersionRow | undefined;
+    return row ? this.parseVersion(row) : undefined;
   }
 
   public async listVersionsByAssetId(assetId: string): Promise<ReadonlyArray<AssetVersion>> {
     const rows = this.getDatabase()
-      .prepare("SELECT version_json FROM asset_versions WHERE asset_id = ? ORDER BY created_at DESC")
+      .prepare("SELECT version_json, version_label, parent_version_id FROM asset_versions WHERE asset_id = ? ORDER BY created_at DESC")
       .all(assetId.trim()) as AssetVersionRow[];
 
-    return Object.freeze(rows.map((row) => this.parseVersion(row.version_json)));
+    return Object.freeze(rows.map((row) => this.parseVersion(row)));
   }
 
   public async saveEdge(edge: AssetLineageEdge): Promise<void> {
@@ -330,10 +343,12 @@ export class SqliteAssetSystemRepository implements
     });
   }
 
-  private parseVersion(json: string): AssetVersion {
-    const parsed = JSON.parse(json) as {
+  private parseVersion(row: AssetVersionRow): AssetVersion {
+    const parsed = JSON.parse(row.version_json) as {
       readonly assetId: { readonly value: string } | string;
       readonly versionId: string;
+      readonly versionLabel?: string;
+      readonly parentVersionId?: string;
       readonly createdAt: string;
       readonly createdBy?: string;
       readonly contentSha256?: string;
@@ -346,6 +361,8 @@ export class SqliteAssetSystemRepository implements
     return new AssetVersion({
       assetId: typeof parsed.assetId === "string" ? parsed.assetId : parsed.assetId.value,
       versionId: parsed.versionId,
+      versionLabel: parsed.versionLabel ?? row.version_label ?? undefined,
+      parentVersionId: parsed.parentVersionId ?? row.parent_version_id ?? undefined,
       createdAt: new Date(parsed.createdAt),
       createdBy: parsed.createdBy,
       contentSha256: parsed.contentSha256,
@@ -361,7 +378,8 @@ export class SqliteAssetSystemRepository implements
       readonly edgeId: string;
       readonly fromVersionId: string;
       readonly toVersionId: string;
-      readonly kind: string;
+      readonly type?: string;
+      readonly kind?: string;
       readonly transformationId?: string;
       readonly createdAt: string;
       readonly metadata?: Readonly<Record<string, unknown>>;
@@ -371,7 +389,7 @@ export class SqliteAssetSystemRepository implements
       edgeId: parsed.edgeId,
       fromVersionId: parsed.fromVersionId,
       toVersionId: parsed.toVersionId,
-      kind: parsed.kind,
+      type: parsed.type ?? parsed.kind ?? "TRANSFORMED_FROM",
       transformationId: parsed.transformationId,
       createdAt: new Date(parsed.createdAt),
       metadata: parsed.metadata,
@@ -381,8 +399,9 @@ export class SqliteAssetSystemRepository implements
   private parseTransformation(json: string): AssetTransformation {
     const parsed = JSON.parse(json) as {
       readonly transformationId: string;
-      readonly kind: string;
-      readonly status: "queued" | "running" | "completed" | "failed" | "cancelled";
+      readonly transformationType?: string;
+      readonly kind?: string;
+      readonly status: "queued" | "running" | "completed" | "failed" | "cancelled" | "success" | "partial" | "degraded";
       readonly inputVersionIds: ReadonlyArray<string>;
       readonly outputVersionIds: ReadonlyArray<string>;
       readonly workflowId?: string;
@@ -400,7 +419,7 @@ export class SqliteAssetSystemRepository implements
 
     return new AssetTransformation({
       transformationId: parsed.transformationId,
-      kind: parsed.kind,
+      transformationType: parsed.transformationType ?? parsed.kind ?? "unknown",
       status: parsed.status,
       inputVersionIds: parsed.inputVersionIds,
       outputVersionIds: parsed.outputVersionIds,

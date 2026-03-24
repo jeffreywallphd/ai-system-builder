@@ -4,7 +4,6 @@ import type { AssetKind } from "../../domain/assets/interfaces/IAsset";
 import { RegisterAssetUseCase } from "./RegisterAssetUseCase";
 import { CreateAssetVersionUseCase } from "./CreateAssetVersionUseCase";
 import { RecordAssetTransformationUseCase } from "./RecordAssetTransformationUseCase";
-import { LinkAssetLineageUseCase } from "./LinkAssetLineageUseCase";
 
 function resolveAssetKindFromContentType(contentType?: string): AssetKind {
   if (!contentType) {
@@ -68,6 +67,23 @@ export type ProjectableArtifact =
       readonly checksum?: string;
       readonly byteLength?: number;
       readonly inputVersionIds?: ReadonlyArray<string>;
+      readonly transformationStatus?: "success" | "failed" | "partial" | "degraded";
+    }
+  | {
+      readonly projectionKind: "model-artifact";
+      readonly assetId: string;
+      readonly name: string;
+      readonly modelTrainingJobId: string;
+      readonly location: string;
+      readonly format?: string;
+      readonly contentType?: string;
+      readonly checksum?: string;
+      readonly byteLength?: number;
+      readonly sourceVersionIds?: ReadonlyArray<string>;
+      readonly provider?: string;
+      readonly runtime?: string;
+      readonly transformationStatus?: "success" | "failed" | "partial" | "degraded";
+      readonly metadata?: Readonly<Record<string, unknown>>;
     };
 
 export class ProjectArtifactToAssetSystemUseCase {
@@ -75,7 +91,6 @@ export class ProjectArtifactToAssetSystemUseCase {
     private readonly registerAssetUseCase: RegisterAssetUseCase,
     private readonly createAssetVersionUseCase: CreateAssetVersionUseCase,
     private readonly recordTransformationUseCase: RecordAssetTransformationUseCase,
-    private readonly linkLineageUseCase: LinkAssetLineageUseCase,
   ) {}
 
   public async execute(artifact: ProjectableArtifact): Promise<{ readonly assetId: string; readonly versionId: string; readonly transformationId?: string }> {
@@ -87,6 +102,8 @@ export class ProjectArtifactToAssetSystemUseCase {
       name: artifact.name,
       kind: artifact.projectionKind === "dataset-export"
         ? "dataset"
+        : artifact.projectionKind === "model-artifact"
+          ? "model"
         : resolveAssetKindFromContentType(artifact.contentType),
       status: "available",
       source: new AssetSourceInfo({
@@ -94,7 +111,11 @@ export class ProjectArtifactToAssetSystemUseCase {
         workflowId: artifact.projectionKind === "workflow-output" ? artifact.workflowId : undefined,
         nodeId: artifact.projectionKind === "workflow-output" ? artifact.nodeId : undefined,
         executionId: artifact.projectionKind === "workflow-output" ? artifact.executionId : undefined,
-        provider: artifact.projectionKind === "dataset-export" ? "dataset-studio" : undefined,
+        provider: artifact.projectionKind === "dataset-export"
+          ? "dataset-studio"
+          : artifact.projectionKind === "model-artifact"
+            ? artifact.provider
+            : undefined,
       }),
       location: new AssetLocation({
         accessMethod: "local-file",
@@ -111,6 +132,8 @@ export class ProjectArtifactToAssetSystemUseCase {
           ? ["uploaded"]
           : artifact.projectionKind === "dataset-export"
             ? ["dataset-export"]
+            : artifact.projectionKind === "model-artifact"
+              ? ["model-artifact"]
             : ["workflow-output"],
       },
       audit: {
@@ -134,11 +157,17 @@ export class ProjectArtifactToAssetSystemUseCase {
             datasetId: artifact.datasetId,
             datasetVersionId: artifact.datasetVersionId,
           }
+        : artifact.projectionKind === "model-artifact"
+          ? {
+              modelTrainingJobId: artifact.modelTrainingJobId,
+            }
         : undefined,
       upstreamVersionIds: artifact.projectionKind === "workflow-output"
         ? artifact.inputVersionIds
         : artifact.projectionKind === "dataset-export"
           ? artifact.sourceVersionIds
+          : artifact.projectionKind === "model-artifact"
+            ? artifact.sourceVersionIds
           : undefined,
     });
 
@@ -149,33 +178,40 @@ export class ProjectArtifactToAssetSystemUseCase {
     const transformationId = randomId("asset-transform");
     await this.recordTransformationUseCase.execute({
       transformationId,
-      kind: artifact.projectionKind === "dataset-export" ? "dataset-export" : "workflow-output",
-      status: "completed",
-      inputVersionIds: artifact.projectionKind === "workflow-output" ? artifact.inputVersionIds : artifact.sourceVersionIds,
+      transformationType: artifact.projectionKind === "dataset-export"
+        ? "dataset-export"
+        : artifact.projectionKind === "model-artifact"
+          ? "model-artifact"
+          : "workflow-output",
+      status: artifact.projectionKind === "workflow-output" || artifact.projectionKind === "model-artifact"
+        ? artifact.transformationStatus ?? "success"
+        : "success",
+      inputVersionIds: artifact.projectionKind === "workflow-output"
+        ? artifact.inputVersionIds
+        : artifact.projectionKind === "dataset-export" || artifact.projectionKind === "model-artifact"
+          ? artifact.sourceVersionIds
+          : undefined,
       outputVersionIds: [versionId],
       workflowId: artifact.projectionKind === "workflow-output" ? artifact.workflowId : undefined,
       nodeId: artifact.projectionKind === "workflow-output" ? artifact.nodeId : undefined,
       executionId: artifact.projectionKind === "workflow-output" ? artifact.executionId : undefined,
-      provider: artifact.projectionKind === "dataset-export" ? "dataset-studio" : undefined,
+      provider: artifact.projectionKind === "dataset-export"
+        ? "dataset-studio"
+        : artifact.projectionKind === "model-artifact"
+          ? artifact.provider
+          : undefined,
+      runtime: artifact.projectionKind === "model-artifact" ? artifact.runtime : undefined,
       createdAt: now,
       completedAt: now,
       metadata: artifact.projectionKind === "dataset-export"
         ? { datasetId: artifact.datasetId, datasetVersionId: artifact.datasetVersionId }
+        : artifact.projectionKind === "model-artifact"
+          ? {
+              modelTrainingJobId: artifact.modelTrainingJobId,
+              ...(artifact.metadata ?? {}),
+            }
         : undefined,
     });
-
-    for (const inputVersionId of artifact.projectionKind === "workflow-output"
-      ? artifact.inputVersionIds ?? []
-      : artifact.sourceVersionIds ?? []) {
-      await this.linkLineageUseCase.execute({
-        edgeId: randomId("lineage-edge"),
-        fromVersionId: inputVersionId,
-        toVersionId: versionId,
-        transformationId,
-        kind: artifact.projectionKind === "workflow-output" ? "generated-from" : "derived-from",
-        createdAt: now,
-      });
-    }
 
     return Object.freeze({
       assetId: artifact.assetId,

@@ -7,6 +7,10 @@ import {
 } from "../../domain/assets/AssetMetadata";
 import type { IAssetCatalog } from "../ports/interfaces/IAssetCatalog";
 import type { IFileStorage } from "../ports/interfaces/IFileStorage";
+import type { IAssetVersionRepository } from "../ports/interfaces/IAssetVersionRepository";
+import type { IAssetLineageRepository } from "../ports/interfaces/IAssetLineageRepository";
+import type { IAssetTransformationRepository } from "../ports/interfaces/IAssetTransformationRepository";
+import { loadCanonicalAssetSummary, type CanonicalAssetSummary } from "./AssetLineageReadModelSupport";
 
 export interface ILoadAssetRequest {
   readonly assetId: string;
@@ -19,15 +23,28 @@ export interface ILoadAssetRequest {
 export interface ILoadAssetResult {
   readonly asset: IAsset;
   readonly content?: Uint8Array | string;
+  readonly canonicalSummary?: CanonicalAssetSummary;
 }
 
 export class LoadAssetUseCase {
   private readonly assetCatalog: IAssetCatalog;
   private readonly fileStorage: IFileStorage;
+  private readonly versionRepository?: IAssetVersionRepository;
+  private readonly lineageRepository?: IAssetLineageRepository;
+  private readonly transformationRepository?: IAssetTransformationRepository;
 
-  constructor(params: { assetCatalog: IAssetCatalog; fileStorage: IFileStorage }) {
+  constructor(params: {
+    assetCatalog: IAssetCatalog;
+    fileStorage: IFileStorage;
+    versionRepository?: IAssetVersionRepository;
+    lineageRepository?: IAssetLineageRepository;
+    transformationRepository?: IAssetTransformationRepository;
+  }) {
     this.assetCatalog = params.assetCatalog;
     this.fileStorage = params.fileStorage;
+    this.versionRepository = params.versionRepository;
+    this.lineageRepository = params.lineageRepository;
+    this.transformationRepository = params.transformationRepository;
   }
 
   public async execute(request: ILoadAssetRequest): Promise<ILoadAssetResult> {
@@ -92,7 +109,10 @@ export class LoadAssetUseCase {
     }
 
     if (!request.loadContent) {
-      return Object.freeze({ asset: effectiveAsset });
+      return Object.freeze({
+        asset: effectiveAsset,
+        canonicalSummary: await loadCanonicalAssetSummary(effectiveAsset.id, this.readRepositories()),
+      });
     }
 
     if (!location) {
@@ -105,6 +125,7 @@ export class LoadAssetUseCase {
       return Object.freeze({
         asset: effectiveAsset,
         content,
+        canonicalSummary: await loadCanonicalAssetSummary(effectiveAsset.id, this.readRepositories()),
       });
     }
 
@@ -113,6 +134,23 @@ export class LoadAssetUseCase {
     return Object.freeze({
       asset: effectiveAsset,
       content: content.content,
+      canonicalSummary: await loadCanonicalAssetSummary(effectiveAsset.id, this.readRepositories()),
     });
+  }
+
+  private readRepositories(): {
+    versionRepository: IAssetVersionRepository;
+    lineageRepository: IAssetLineageRepository;
+    transformationRepository: IAssetTransformationRepository;
+  } | undefined {
+    if (!this.versionRepository || !this.lineageRepository || !this.transformationRepository) {
+      return undefined;
+    }
+
+    return {
+      versionRepository: this.versionRepository,
+      lineageRepository: this.lineageRepository,
+      transformationRepository: this.transformationRepository,
+    };
   }
 }

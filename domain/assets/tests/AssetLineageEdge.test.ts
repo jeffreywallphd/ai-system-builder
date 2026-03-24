@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { AssetLineageEdge } from "../AssetLineageEdge";
+import { AssetLineageEdge, AssetLineageRelationshipType } from "../AssetLineageEdge";
 
 describe("AssetLineageEdge", () => {
   it("accepts typed lineage relationships", () => {
@@ -7,10 +7,10 @@ describe("AssetLineageEdge", () => {
       edgeId: "edge-1",
       fromVersionId: "v-source",
       toVersionId: "v-output",
-      kind: "generated-from",
+      type: AssetLineageRelationshipType.GENERATED_FROM,
     });
 
-    expect(edge.kind).toBe("generated-from");
+    expect(edge.type).toBe(AssetLineageRelationshipType.GENERATED_FROM);
   });
 
   it("rejects unsupported kinds and same-node edges", () => {
@@ -30,7 +30,7 @@ describe("AssetLineageEdge", () => {
           edgeId: "edge-1",
           fromVersionId: "v1",
           toVersionId: "v1",
-          kind: "derived-from",
+          type: AssetLineageRelationshipType.DERIVED_FROM,
         }),
     ).toThrow("distinct");
   });
