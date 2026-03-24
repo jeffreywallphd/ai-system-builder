@@ -2,7 +2,7 @@ import { createAgentWorkingMemory, updateAgentWorkingMemory, type AgentWorkingMe
 import type { Agent } from "../../../domain/agents/Agent";
 import type { AgentPlan } from "../../../domain/agents/AgentPlan";
 import type { AgentMemoryEntryReference } from "../../../domain/agents/AgentMemory";
-import type { AgentExecutionReadModel } from "./AgentExecutionService";
+import { AssetId } from "../../../domain/assets/AssetId";
 
 function planAssetReferences(plan: AgentPlan): ReadonlyArray<AgentMemoryEntryReference["assetId"]> {
   const refs: AgentMemoryEntryReference["assetId"][] = [];
@@ -36,14 +36,21 @@ export class AgentWorkingMemoryService {
 
   public appendExecutionOutcome(
     state: AgentWorkingMemory,
-    execution: AgentExecutionReadModel,
+    outcome: {
+      readonly stepId: string;
+      readonly status: "completed" | "failed" | "cancelled";
+      readonly output?: string;
+      readonly errorMessage?: string;
+      readonly outputAssetId?: AssetId;
+    },
   ): AgentWorkingMemory {
     return updateAgentWorkingMemory(state, {
-      appendExecutionOutputs: execution.outcomes.map((outcome) => Object.freeze({
+      appendExecutionOutputs: [Object.freeze({
         stepId: outcome.stepId,
         status: outcome.status,
         summary: outcome.output ?? outcome.errorMessage,
-      })),
+        outputAssetId: outcome.outputAssetId,
+      })],
     });
   }
 }

@@ -199,6 +199,12 @@ That is an important boundary:
 
 This keeps the platform extensible without making external runtimes the center of the authoring model.
 
+## Direction 4 memory interaction with execution (Phase 3 completion note)
+
+- Agent execution now carries a bounded working-memory snapshot through execution read models, including retrieved memory references, plan-asset references, and per-step execution-output summaries.
+- Memory retrieval remains deterministic and asset/version-backed with bounded filtering (type, tags, metadata, `beforeTimestamp`) and policy-enforced exclusion of session-only memory types from durable retrieval.
+- Memory writes from execution outcomes remain asset-backed and lineage-friendly, and policy now enforces writable/session-only constraints plus bounded durable retention capacity in practice.
+
 ## Node execution context and context injection
 
 The interpreted execution path relies on a node execution context resolver and a node executor. `LangChainNodeExecutor` is a particularly important adapter because it:

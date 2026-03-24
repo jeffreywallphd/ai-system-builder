@@ -140,6 +140,9 @@ The runtime is not a single path. The system currently supports multiple executi
   - bounded session working-memory model (`domain/agents/AgentWorkingMemory.ts`, `application/agents/services/AgentWorkingMemoryService.ts`);
   - bounded memory write pipeline (`application/agents/services/AgentMemoryWriteService.ts`);
   - explicit memory policy controls on agent memory config (`domain/agents/AgentMemory.ts`) for retrieval/write/retention behavior.
+  - retrieval now remains deterministic and asset-version-backed while honoring policy/type/tag/metadata/recency constraints (and excluding session-only types from durable retrieval paths).
+  - execution read models now include bounded working-memory snapshots and memory-write outcomes so later evaluation/replanning layers can consume session context without introducing a second orchestration model.
+  - memory policy retention is now operationally enforced in the write pipeline via bounded durable-capacity gating.
 
 ## TODO
 

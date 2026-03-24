@@ -116,5 +116,6 @@ Use "workflow-first", "tool projection", and "truthful execution provenance" whe
 - Planner output is a bounded ordered step plan (`toolId` + goal/action) that is executed through existing tool capability execution seams.
 - For MCP steps, execution still flows through MCP execution use cases, preserving trust policy/auth/approval/sandbox/audit behavior.
 - For workflow-projected tools, execution still flows through workflow tool execution (`RunToolUseCase` path).
-- Agent memory writes/reads are asset-backed and versioned so execution outcomes can be persisted and reused by later planning.
+- Agent memory writes/reads are asset-backed and version-aware so execution outcomes can be persisted and reused by later planning.
+- Phase 3 completion now includes deterministic memory retrieval filters (type/tag/metadata/recency), bounded working-memory snapshots on execution read models, and retention-gated durable writes.
 - Current limits are intentional: deterministic single-agent planning, bounded step counts, no autonomous long-horizon control loop.

@@ -3,9 +3,9 @@ import type { AgentMemoryEntryReference, AgentMemoryType } from "../../../domain
 
 export interface AgentMemoryRetrievalRequest {
   readonly agent: Agent;
-  readonly query?: string;
   readonly memoryTypes?: ReadonlyArray<AgentMemoryType>;
   readonly tags?: ReadonlyArray<string>;
+  readonly metadata?: Readonly<Record<string, string | number | boolean | null>>;
   readonly maxEntries?: number;
   readonly beforeTimestamp?: string;
 }

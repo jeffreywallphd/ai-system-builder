@@ -76,6 +76,7 @@ export interface AgentMemoryQuery {
   readonly assetIds?: ReadonlyArray<AssetId>;
   readonly memoryTypes?: ReadonlyArray<AgentMemoryType>;
   readonly tags?: ReadonlyArray<string>;
+  readonly metadata?: Readonly<Record<string, string | number | boolean | null>>;
   readonly maxEntries?: number;
   readonly beforeTimestamp?: string;
 }
