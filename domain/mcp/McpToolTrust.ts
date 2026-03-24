@@ -40,24 +40,26 @@ export interface McpToolPermissionApprovalEvent {
 
 export type McpSandboxEnvironmentMode = "inherit-runtime" | "none" | "allowlist";
 export type McpSandboxNetworkProtocol = "http" | "https" | "ws" | "wss" | "tcp" | "udp";
-export type McpSandboxAssetAccessMode = "deny" | "read-only" | "read-write";
 export type McpSandboxAssetAction = "read" | "write";
 
 export interface McpToolSandboxPolicy {
-  readonly networkAccess: "allow" | "deny";
-  readonly networkAllowlist?: {
-    readonly hosts?: ReadonlyArray<string>;
-    readonly protocols?: ReadonlyArray<McpSandboxNetworkProtocol>;
+  readonly network: {
+    readonly allowed: boolean;
+    readonly allowedHosts?: ReadonlyArray<string>;
+    readonly allowedProtocols?: ReadonlyArray<McpSandboxNetworkProtocol>;
   };
-  readonly filesystemAccess: {
-    readonly mode: "deny" | "read-only" | "read-write";
-    readonly readAllowedPaths?: ReadonlyArray<string>;
-    readonly writeAllowedPaths?: ReadonlyArray<string>;
+  readonly filesystem: {
+    readonly allowed: boolean;
+    readonly readPaths?: ReadonlyArray<string>;
+    readonly writePaths?: ReadonlyArray<string>;
   };
-  readonly assetAccess: McpSandboxAssetAccessMode;
-  readonly environmentExposure: {
+  readonly assets: {
+    readonly read: boolean;
+    readonly write: boolean;
+  };
+  readonly environment: {
     readonly mode: McpSandboxEnvironmentMode;
-    readonly allowlist?: ReadonlyArray<string>;
+    readonly allowedEnvVars?: ReadonlyArray<string>;
   };
 }
 
@@ -81,10 +83,10 @@ export interface McpToolSandboxCapabilityRequest {
 export type McpSandboxEnforcementStatus = "enforced" | "declared-only";
 
 export interface McpToolSandboxEnforcementSummary {
-  readonly networkAccess: McpSandboxEnforcementStatus;
-  readonly filesystemAccess: McpSandboxEnforcementStatus;
-  readonly assetAccess: McpSandboxEnforcementStatus;
-  readonly environmentExposure: McpSandboxEnforcementStatus;
+  readonly network: McpSandboxEnforcementStatus;
+  readonly filesystem: McpSandboxEnforcementStatus;
+  readonly assets: McpSandboxEnforcementStatus;
+  readonly environment: McpSandboxEnforcementStatus;
 }
 
 export interface McpToolCredentialFieldRequirement {
@@ -155,26 +157,29 @@ export function deriveRequiredMcpToolPermissions(definition: McpToolDefinition):
 
 export function createDefaultMcpToolSandboxPolicy(): McpToolSandboxPolicy {
   return Object.freeze({
-    networkAccess: "allow",
-    networkAllowlist: Object.freeze({
-      hosts: Object.freeze([]),
-      protocols: Object.freeze(["http", "https", "ws", "wss", "tcp", "udp"]),
+    network: Object.freeze({
+      allowed: true,
+      allowedHosts: Object.freeze([]),
+      allowedProtocols: Object.freeze(["http", "https", "ws", "wss", "tcp", "udp"]),
     }),
-    filesystemAccess: Object.freeze({
-      mode: "read-write",
-      readAllowedPaths: Object.freeze([]),
-      writeAllowedPaths: Object.freeze([]),
+    filesystem: Object.freeze({
+      allowed: true,
+      readPaths: Object.freeze([]),
+      writePaths: Object.freeze([]),
     }),
-    assetAccess: "read-write",
-    environmentExposure: Object.freeze({ mode: "inherit-runtime", allowlist: Object.freeze([]) }),
+    assets: Object.freeze({
+      read: true,
+      write: true,
+    }),
+    environment: Object.freeze({ mode: "inherit-runtime", allowedEnvVars: Object.freeze([]) }),
   });
 }
 
 export function createDefaultMcpToolSandboxEnforcementSummary(): McpToolSandboxEnforcementSummary {
   return Object.freeze({
-    networkAccess: "enforced",
-    filesystemAccess: "enforced",
-    assetAccess: "enforced",
-    environmentExposure: "declared-only",
+    network: "enforced",
+    filesystem: "enforced",
+    assets: "enforced",
+    environment: "declared-only",
   });
 }

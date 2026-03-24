@@ -154,7 +154,7 @@ This slice is intentionally local-first and bounded:
 - it does not implement enterprise IAM/RBAC.
 - secret persistence prefers desktop secure encryption (`safeStorage`) with an encrypted-local fallback path when secure storage is unavailable.
 - secret resolution is now scope-aware (`project -> user -> global`, with global default for backward compatibility).
-- sandboxing is still bounded to application/runtime policy gates: network/filesystem/asset posture is invocation-level enforced while environment exposure remains declared-only metadata.
+- sandboxing is still bounded to application/runtime policy gates: policy shape is explicit (`network.allowed`, `filesystem.allowed`, `assets.read/write`, `environment.allowedEnvVars`), network/filesystem/asset posture is invocation-level enforced, and environment exposure remains declared-only metadata.
 - it creates a stable seam so stronger secret backends, consent UX, and process sandboxing can layer in later without redesigning core contracts.
 
 ## TODO
@@ -288,3 +288,13 @@ Direction 2 is now considered strong enough to hand off to Direction 3:
 - remaining caveats are intentionally small and non-blocking (mostly deeper legacy history surfaces and broader UX unification), and further Direction 2 changes should now be driven only by concrete Direction 3 integration needs.
 
 SQLite storage now also carries normalized `asset_versions.version_label` and `asset_versions.parent_version_id` columns (plus legacy JSON payload compatibility) so version-chain queries can progressively move from blob parsing to explicit relational reads.
+
+## Direction 4 start: agent inner-layer foundations (stories 6.1–6.4, initial)
+
+- A minimal domain `Agent` model now exists with stable id, structured goals, MCP `allowedTools` references, asset-backed `memoryConfig`, and planning-strategy references.
+- Agent memory is modeled as an inner-layer contract (`AgentMemoryStore`) that records/retrieves memory entries as asset/version references plus optional tags/metadata.
+- The application layer now exposes foundational services:
+  - `AgentService` (`createAgent`, `updateAgent`, `getAgent`, `listAgents`)
+  - `AgentPlanningInterface` with deterministic baseline implementation
+  - `AgentExecutionService` for simple linear execution-graph construction and bounded execution wiring via existing agent/tool execution seams.
+- Scope is intentionally foundation-only: no full autonomous planning loop, no UI orchestration surface, and no speculative LLM orchestration stack in this slice.
