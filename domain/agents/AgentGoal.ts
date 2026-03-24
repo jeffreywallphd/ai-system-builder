@@ -26,7 +26,14 @@ function normalizeRequired(value: string, field: string): string {
 }
 
 function normalizeList(values: ReadonlyArray<string> | undefined): ReadonlyArray<string> {
-  return Object.freeze((values ?? []).map((value) => value.trim()).filter(Boolean));
+  const deduped = new Set<string>();
+  for (const value of values ?? []) {
+    const normalized = value.trim();
+    if (normalized) {
+      deduped.add(normalized);
+    }
+  }
+  return Object.freeze([...deduped]);
 }
 
 export function normalizeAgentGoal(input: AgentGoal): AgentGoal {
@@ -38,6 +45,9 @@ export function normalizeAgentGoal(input: AgentGoal): AgentGoal {
 
   if (successCriteria.length === 0) {
     throw new Error("Agent goals must define at least one success criterion.");
+  }
+  if (!Object.values(AgentGoalPriorityLevels).includes(input.priority)) {
+    throw new Error("Agent goal priority must be one of low, normal, high, or critical.");
   }
   if (!Number.isInteger(input.priorityOrder) || input.priorityOrder < 0) {
     throw new Error("Agent goal priorityOrder must be a non-negative integer.");

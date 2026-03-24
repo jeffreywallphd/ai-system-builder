@@ -36,7 +36,14 @@ function normalizeRequired(value: string, field: string): string {
 }
 
 function normalizeList(values: ReadonlyArray<string> | undefined): ReadonlyArray<string> {
-  return Object.freeze((values ?? []).map((value) => value.trim()).filter(Boolean));
+  const deduped = new Set<string>();
+  for (const value of values ?? []) {
+    const normalized = value.trim();
+    if (normalized) {
+      deduped.add(normalized);
+    }
+  }
+  return Object.freeze([...deduped]);
 }
 
 export function normalizeAgentPolicy(policy: AgentPolicy): AgentPolicy {
@@ -56,17 +63,24 @@ export function normalizeAgentPolicy(policy: AgentPolicy): AgentPolicy {
     if (!allowedTools.includes(constraint.toolId)) {
       throw new Error(`Agent tool scope constraint references unknown allowed tool '${constraint.toolId}'.`);
     }
+    if (constraint.allowedScopes.length === 0) {
+      throw new Error(`Agent tool scope constraint for '${constraint.toolId}' must include at least one scope.`);
+    }
   }
 
+  const executionLimitsInput = policy.executionLimits ?? {};
   const executionLimits = Object.freeze({
-    maxSteps: normalizePositiveInt(policy.executionLimits.maxSteps, "Agent execution limit maxSteps"),
-    maxWallClockMs: normalizePositiveInt(policy.executionLimits.maxWallClockMs, "Agent execution limit maxWallClockMs"),
+    maxSteps: normalizePositiveInt(executionLimitsInput.maxSteps, "Agent execution limit maxSteps"),
+    maxWallClockMs: normalizePositiveInt(executionLimitsInput.maxWallClockMs, "Agent execution limit maxWallClockMs"),
   });
 
+  const costLimitsInput = policy.costLimits ?? {};
   const costLimits = Object.freeze({
-    maxTokens: normalizePositiveInt(policy.costLimits.maxTokens, "Agent cost limit maxTokens"),
-    maxEstimatedUsd: normalizeNonNegativeNumber(policy.costLimits.maxEstimatedUsd, "Agent cost limit maxEstimatedUsd"),
+    maxTokens: normalizePositiveInt(costLimitsInput.maxTokens, "Agent cost limit maxTokens"),
+    maxEstimatedUsd: normalizeNonNegativeNumber(costLimitsInput.maxEstimatedUsd, "Agent cost limit maxEstimatedUsd"),
   });
+
+  const safetyInput = policy.safetyConstraints ?? { requiredApprovals: [], deniedPermissions: [] };
 
   return Object.freeze({
     allowedTools,
@@ -75,8 +89,8 @@ export function normalizeAgentPolicy(policy: AgentPolicy): AgentPolicy {
     costLimits,
     executionLimits,
     safetyConstraints: Object.freeze({
-      requiredApprovals: normalizeList(policy.safetyConstraints.requiredApprovals),
-      deniedPermissions: normalizeList(policy.safetyConstraints.deniedPermissions),
+      requiredApprovals: normalizeList(safetyInput.requiredApprovals),
+      deniedPermissions: normalizeList(safetyInput.deniedPermissions),
     }),
   });
 }

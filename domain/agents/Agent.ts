@@ -5,7 +5,14 @@ import { normalizeAgentPolicy } from "./AgentPolicy";
 import type { AgentMemoryConfiguration } from "./AgentMemory";
 import { normalizeAgentMemoryConfiguration } from "./AgentMemory";
 
-export type AgentLifecycleStatus = "draft" | "ready" | "paused" | "archived";
+export const AgentLifecycleStatuses = Object.freeze({
+  draft: "draft",
+  ready: "ready",
+  paused: "paused",
+  archived: "archived",
+});
+
+export type AgentLifecycleStatus = typeof AgentLifecycleStatuses[keyof typeof AgentLifecycleStatuses];
 
 export interface AgentPlanningStrategy {
   readonly strategyId: string;
@@ -80,6 +87,10 @@ function normalizeExecutionConfiguration(input: AgentExecutionConfiguration | un
 }
 
 function normalizePlanningStrategy(input: AgentPlanningStrategy): AgentPlanningStrategy {
+  if (!["deterministic-linear", "workflow-guided"].includes(input.mode)) {
+    throw new Error("Agent planning strategy mode must be deterministic-linear or workflow-guided.");
+  }
+
   return Object.freeze({
     strategyId: normalizeRequired(input.strategyId, "Agent planning strategy id"),
     mode: input.mode,
@@ -105,6 +116,11 @@ export function createAgent(input: {
     throw new Error("Agent requires at least one goal.");
   }
 
+  const goalIds = new Set(goals.map((goal) => goal.id));
+  if (goalIds.size !== goals.length) {
+    throw new Error("Agent goals must use unique ids.");
+  }
+
   const policy = normalizeAgentPolicy(input.policy);
   for (const goal of goals) {
     for (const toolId of goal.requiredToolIds ?? []) {
@@ -121,6 +137,19 @@ export function createAgent(input: {
 
   const planningStrategy = normalizePlanningStrategy(input.planningStrategy);
   const execution = normalizeExecutionConfiguration(input.execution);
+  if (
+    execution.maxExecutionSteps !== undefined
+    && policy.executionLimits.maxSteps !== undefined
+    && execution.maxExecutionSteps > policy.executionLimits.maxSteps
+  ) {
+    throw new Error("Agent execution maxExecutionSteps cannot exceed policy execution maxSteps.");
+  }
+
+  const status = input.status ?? AgentLifecycleStatuses.ready;
+  if (!Object.values(AgentLifecycleStatuses).includes(status)) {
+    throw new Error("Agent lifecycle status must be draft, ready, paused, or archived.");
+  }
+
   const now = (input.now ?? new Date()).toISOString();
 
   return Object.freeze({
@@ -132,7 +161,7 @@ export function createAgent(input: {
     planningStrategy,
     memory,
     execution,
-    status: input.status ?? "ready",
+    status,
     createdAt: now,
     updatedAt: now,
   });
