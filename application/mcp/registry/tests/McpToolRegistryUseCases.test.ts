@@ -150,6 +150,22 @@ describe("McpToolRegistryUseCases", () => {
     expect(preview.remediationSuggestions.length).toBeGreaterThan(0);
   });
 
+  it("classifies same-version update as reinstall", async () => {
+    const repository = makeRepository([toolRecord("mcp:local:weather", "1.0.0")]);
+    const scanner: IMcpToolDependencyScanner = { scanToolReferences: async () => [] };
+
+    const result = await new ApplyMcpToolUpdateUseCase(repository, scanner).execute({
+      toolId: "mcp:local:weather",
+      force: true,
+      definition: toolRecord("mcp:local:weather", "1.0.0").definition,
+    });
+
+    expect(result.status).toBe("updated");
+    expect(result.action).toBe("reinstall");
+    expect(result.transition).toBe("same-version");
+    expect(result.record?.lifecycle?.reinstallCount).toBe(1);
+  });
+
   it("blocks risky update with dependencies unless forced", async () => {
     const repository = makeRepository([toolRecord("mcp:local:weather", "1.0.0")]);
     const scanner: IMcpToolDependencyScanner = {
@@ -363,6 +379,44 @@ describe("McpToolRegistryUseCases", () => {
 
     expect(results).toHaveLength(1);
     expect(results[0]?.toolId).toBe("mcp:local:json-array");
+  });
+
+  it("supports asset-level capability introspection filters", async () => {
+    const repository = makeRepository([
+      Object.freeze({
+        ...toolRecord("mcp:local:asset-transform"),
+        definition: Object.freeze({
+          ...toolRecord("mcp:local:asset-transform").definition,
+          assetIo: Object.freeze({
+            inputs: Object.freeze([
+              Object.freeze({
+                path: "source",
+                valueKind: "asset-reference" as const,
+                resolution: "asset-record" as const,
+                assetKinds: Object.freeze(["json"] as const),
+              }),
+            ]),
+            outputs: Object.freeze([
+              Object.freeze({
+                path: "result",
+                mode: "asset-transform" as const,
+                assetKind: "json" as const,
+                targetInputPath: "source",
+              }),
+            ]),
+          }),
+        }),
+      }),
+    ]);
+
+    const useCase = new QueryMcpToolCapabilitiesUseCase(repository);
+    const results = await useCase.execute({
+      acceptsAssetKind: "json",
+      producesAssetKind: "json",
+      assetOutputMode: "asset-transform",
+    });
+    expect(results).toHaveLength(1);
+    expect(results[0]?.toolId).toBe("mcp:local:asset-transform");
   });
 
   it("gets details for a single installed tool", async () => {

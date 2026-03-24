@@ -43,4 +43,40 @@ describe("McpToolCapability", () => {
     expect(normalized.auth.credentialFields).toEqual([{ key: "apiKey", label: "API Key", secret: true, required: true, format: undefined, description: undefined }]);
     expect(normalized.permissions).toEqual(["network.access"]);
   });
+
+  it("validates and normalizes asset I/O contract metadata", () => {
+    const validation = validateMcpToolDefinition({
+      id: "asset.tool",
+      version: "1.0.0",
+      displayName: "Asset Tool",
+      sideEffects: "read",
+      auth: { kind: "none" },
+      tags: [],
+      categories: [],
+      inputSchema: { type: "object" },
+      assetIo: {
+        inputs: [{ path: " ", valueKind: "asset-reference", resolution: "asset-record" }],
+      },
+    });
+    expect(validation.valid).toBe(false);
+    expect(validation.issues.map((issue) => issue.code)).toContain("invalid-asset-io");
+
+    const normalized = normalizeMcpToolDefinition({
+      id: "asset.tool",
+      version: "1.0.0",
+      displayName: "Asset Tool",
+      sideEffects: "read",
+      auth: { kind: "none" },
+      tags: [],
+      categories: [],
+      inputSchema: { type: "object" },
+      assetIo: {
+        inputs: [{ path: " source ", valueKind: "asset-reference", resolution: "asset-record", assetKinds: ["json"] }],
+        outputs: [{ path: " result ", mode: "asset-create", assetKind: "json", name: " Output " }],
+      },
+    });
+    expect(normalized.assetIo?.inputs?.[0]?.path).toBe("source");
+    expect(normalized.assetIo?.outputs?.[0]?.path).toBe("result");
+    expect(normalized.assetIo?.outputs?.[0]?.name).toBe("Output");
+  });
 });
