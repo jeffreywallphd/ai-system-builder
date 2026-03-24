@@ -30,6 +30,32 @@ export interface CanonicalAssetManagementServiceOptions {
     readonly verifiedScopes: number;
     readonly results: ReadonlyArray<unknown>;
   }>;
+  readonly loadManagementSnapshot?: (params: {
+    readonly assetId: string;
+    readonly includeProjectionHealth?: boolean;
+    readonly versionIdsInProjectionScope?: ReadonlyArray<string>;
+  }) => Promise<{
+    readonly asset: CanonicalAssetDetailReadModel;
+    readonly versions: ReadonlyArray<CanonicalVersionChainItemReadModel>;
+    readonly dependencyLifecycleSummary: {
+      readonly healthy: number;
+      readonly impacted: number;
+      readonly stale: number;
+      readonly partiallyTrusted: number;
+      readonly reconciliationNeeded: number;
+    };
+    readonly existenceExplanation?: {
+      readonly versionId: string;
+      readonly explanation: string;
+      readonly evidence: ReadonlyArray<string>;
+    };
+    readonly projectionHealth?: {
+      readonly matched: boolean;
+      readonly failedChecks: ReadonlyArray<string>;
+      readonly edgeCount: number;
+      readonly scopedVersionCount: number;
+    };
+  }>;
 }
 
 export class CanonicalAssetManagementService {
@@ -107,5 +133,41 @@ export class CanonicalAssetManagementService {
       return undefined;
     }
     return this.options.rebuildProjectionScopes(params);
+  }
+
+  public async loadManagementSnapshot(params: {
+    readonly assetId: string;
+    readonly includeProjectionHealth?: boolean;
+    readonly versionIdsInProjectionScope?: ReadonlyArray<string>;
+  }): Promise<{
+    readonly asset: CanonicalAssetDetailReadModel;
+    readonly versions: ReadonlyArray<CanonicalVersionChainItemReadModel>;
+    readonly dependencyLifecycleSummary: {
+      readonly healthy: number;
+      readonly impacted: number;
+      readonly stale: number;
+      readonly partiallyTrusted: number;
+      readonly reconciliationNeeded: number;
+    };
+    readonly existenceExplanation?: {
+      readonly versionId: string;
+      readonly explanation: string;
+      readonly evidence: ReadonlyArray<string>;
+    };
+    readonly projectionHealth?: {
+      readonly matched: boolean;
+      readonly failedChecks: ReadonlyArray<string>;
+      readonly edgeCount: number;
+      readonly scopedVersionCount: number;
+    };
+  } | undefined> {
+    if (!this.options.loadManagementSnapshot) {
+      return undefined;
+    }
+    return this.options.loadManagementSnapshot({
+      assetId: params.assetId.trim(),
+      includeProjectionHealth: params.includeProjectionHealth,
+      versionIdsInProjectionScope: params.versionIdsInProjectionScope?.map((entry) => entry.trim()).filter(Boolean),
+    });
   }
 }

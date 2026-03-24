@@ -128,7 +128,6 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
   private readonly datasetSourceIngestionProfile: FileIngestionProfile;
   private readonly executionEngine?: UnifiedExecutionEngine;
   private readonly canonicalPublisher?: PublishDurableEntityToAssetSystemUseCase;
-  private readonly canonicalIdentityService?: CanonicalAssetIdentityService;
   private readonly canonicalReadService: CanonicalEntityOperationalReadService;
 
   constructor(options: ServiceOptions) {
@@ -152,8 +151,7 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
     this.datasetSourceIngestionProfile = options.datasetSourceIngestionProfile ?? DatasetSourceIngestionProfile;
     this.executionEngine = options.executionEngine;
     this.canonicalPublisher = options.canonicalPublisher;
-    this.canonicalIdentityService = options.canonicalIdentityService;
-    this.canonicalReadService = new CanonicalEntityOperationalReadService(options.canonicalReadResolver);
+    this.canonicalReadService = new CanonicalEntityOperationalReadService(options.canonicalReadResolver, options.canonicalIdentityService);
   }
 
   public async createDataset(command: CreateDatasetCommand): Promise<DatasetDetails> {
@@ -357,25 +355,7 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
       entityId,
       fallbackWhenUnavailable: "Canonical resolver is not configured for dataset-version reads.",
     });
-    if (resolved.assetId) {
-      return resolved;
-    }
-    if (!this.canonicalIdentityService) {
-      return resolved;
-    }
-
-    const identity = await this.canonicalIdentityService.resolveIdentity("dataset-version", entityId);
-    const assetId = identity?.assetId;
-    const latestVersionId = assetId
-      ? await this.canonicalIdentityService.resolveLatestVersionId("dataset-version", entityId)
-      : undefined;
-    return Object.freeze({
-      preferred: !!assetId,
-      assetId,
-      pinnedVersionId: identity?.latestVersionId,
-      latestVersionId,
-      fallbackReason: assetId ? resolved.fallbackReason : `No canonical identity mapping found for dataset version '${entityId}'.`,
-    });
+    return resolved;
   }
 
   public async addExample(command: AddExampleCommand): Promise<StudioExample> {

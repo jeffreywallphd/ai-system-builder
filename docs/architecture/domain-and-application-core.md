@@ -189,8 +189,8 @@ Canonical read/query surfaces now include dedicated application use cases for:
 
 Canonical read preference is now integrated into three durable real flows (with explicit fallback semantics when canonical identity is missing):
 - `LoadWorkflowUseCase` now routes canonical resolution through a shared resolver and returns canonical identity/version metadata plus bounded provenance and dependency-state hints.
-- `ListInstalledModelsUseCase` now defaults to the same shared canonical operational resolver path (with legacy identity lookup only as fallback detail provider), reducing duplicated summary stitching.
-- `DefaultTuningDatasetStudioApplicationService` now supports the same canonical resolver path for dataset-version detail/list responses and only falls back to identity-only summaries when resolver infrastructure is unavailable.
+- `ListInstalledModelsUseCase` now defaults to the same shared canonical operational resolver path, and identity-only fallback now lives inside that shared service instead of caller-side stitching.
+- `DefaultTuningDatasetStudioApplicationService` now uses the same shared resolver path for dataset-version detail/list responses, including centralized identity-only fallback behavior when resolver infrastructure is unavailable.
 
 Canonical read consolidation now has a dedicated application helper (`CanonicalEntityOperationalReadService`) so higher-level flows do not each hand-roll canonical + fallback semantics.
 
@@ -206,10 +206,11 @@ It now also persists canonical dependency-state snapshots (`canonical_dependency
 Graph-projection readiness now moves beyond a no-op seam:
 - projection replay is now supported from canonical storage (`ReplayAssetGraphProjectionUseCase`) with bounded scoping by asset/version/transformation ids.
 - the in-memory projection sink can now answer simple path checks (`hasVersionPath`) to prove graph-oriented behavior without requiring Neo4j.
-- projection verification now supports scoped version-adjacency parity checks between canonical storage and projection traversal (`VerifyAssetGraphProjectionUseCase`) with explicit verification summaries.
+- projection verification now supports scoped version-adjacency parity checks plus scoped edge-parity mismatch details between canonical storage and projection traversal (`VerifyAssetGraphProjectionUseCase`) with explicit verification summaries.
 - a concrete Neo4j-targeted sink contract (`Neo4jAssetLineageGraphProjectionSink` + `INeo4jCypherExecutor`) now exists as the default graph-db projection target in composition, while still using a local no-op executor unless a real driver adapter is configured.
 
 Dependency lifecycle semantics now include explicit application-layer states (`healthy`, `impacted`, `stale`, `partially-trusted`, `reconciliation-needed`) via `GetCanonicalDependencyStateUseCase`, plus bounded reconciliation/refresh helpers:
+- dependency-state summaries now carry lifecycle source metadata (`persisted-fresh` vs `recomputed`) with explicit reason text for operational explainability.
 - `RefreshCanonicalDependencyStateUseCase` to recompute dependency-state summaries with explicit persisted-vs-refresh behavior.
 - `ReconcileCanonicalIdentityMappingsUseCase` to heal stale/missing pinned version references.
 - `ReplayScopedAssetGraphProjectionUseCase` for scoped graph replay by canonical entity mapping.
@@ -220,6 +221,7 @@ Broader canonical-read adoption now also includes legacy UI service seams:
 - `ModelService` now exposes a full installed-model read-model response (`listInstalledModelsReadModel`) so callers can consume canonical identity summaries directly.
 - `CanonicalAssetManagementService` now provides a dedicated UI-facing seam for canonical asset detail, dependency-state checks, scoped graph replay, identity reconciliation actions, projection verification, and multi-scope rebuild orchestration.
 - renderer composition now wires that seam to desktop runtime-backed canonical repositories by default via the desktop preload bridge (`canonicalAssets`) when available.
+- bounded management unification now includes a reusable canonical management snapshot read (`LoadCanonicalAssetManagementSnapshotUseCase`) and a desktop/UI hook (`loadManagementSnapshot`) so a single call can provide canonical detail, version-chain dependency-state rollups, latest-version existence explanation, and scoped projection-health diagnostics.
 
 Partial-lineage diagnostics now include a bounded application read model (`GetAssetLineageDiagnosticsUseCase`) designed for future UI exploration without requiring graph infrastructure at render time.
 

@@ -35,7 +35,6 @@ export interface IListInstalledModelsResult {
 
 export class ListInstalledModelsUseCase {
   private readonly installedModelCatalog: IInstalledModelCatalog;
-  private readonly canonicalIdentityService?: CanonicalAssetIdentityService;
   private readonly canonicalReadService: CanonicalEntityOperationalReadService;
 
   constructor(
@@ -44,29 +43,24 @@ export class ListInstalledModelsUseCase {
     canonicalReadResolver?: CanonicalEntityReadResolver,
   ) {
     this.installedModelCatalog = installedModelCatalog;
-    this.canonicalIdentityService = canonicalIdentityService;
-    this.canonicalReadService = new CanonicalEntityOperationalReadService(canonicalReadResolver);
+    this.canonicalReadService = new CanonicalEntityOperationalReadService(canonicalReadResolver, canonicalIdentityService);
   }
 
   public async execute(
     request: IListInstalledModelsRequest = {}
   ): Promise<IListInstalledModelsResult> {
     const models = await this.installedModelCatalog.listInstalled(request.criteria);
-    const canonicalByModelId = this.canonicalIdentityService
-      ? Object.freeze(Object.fromEntries(await Promise.all(models.map(async (model) => {
+    const canonicalByModelId = Object.freeze(Object.fromEntries(await Promise.all(models.map(async (model) => {
         const resolved = await this.canonicalReadService.resolveSummary({
           entityType: "installed-model",
           entityId: model.id,
           fallbackWhenUnavailable: "Canonical resolver is not configured for installed-model reads.",
         });
-        const identity = await this.canonicalIdentityService!.resolveIdentity("installed-model", model.id);
-        const assetId = resolved.assetId ?? identity?.assetId;
-        const latestVersionId = resolved.latestVersionId ?? await this.canonicalIdentityService!.resolveLatestVersionId("installed-model", model.id);
         return [model.id, Object.freeze({
-          preferred: !!assetId,
-          assetId,
-          pinnedVersionId: resolved.pinnedVersionId ?? identity?.latestVersionId,
-          latestVersionId,
+          preferred: resolved.preferred,
+          assetId: resolved.assetId,
+          pinnedVersionId: resolved.pinnedVersionId,
+          latestVersionId: resolved.latestVersionId,
           provenance: resolved.provenance,
           dependencyState: resolved.dependencyState
             ? Object.freeze({
@@ -75,10 +69,9 @@ export class ListInstalledModelsUseCase {
               nextActions: resolved.dependencyState.nextActions,
             })
             : undefined,
-          fallbackReason: resolved.fallbackReason ?? (assetId ? undefined : `No canonical identity mapping found for installed model '${model.id}'.`),
+          fallbackReason: resolved.fallbackReason,
         })] as const;
-      }))))
-      : undefined;
+      }))));
 
     return Object.freeze({
       models: Object.freeze([...models]),

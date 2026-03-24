@@ -683,9 +683,29 @@ export class SqliteAssetSystemRepository implements
   }
 
   private parseDependencyState(json: string): CanonicalDependencyStateSummary {
-    const parsed = JSON.parse(json) as CanonicalDependencyStateSummary;
+    const parsed = JSON.parse(json) as CanonicalDependencyStateSummary & {
+      readonly lifecycle?: {
+        readonly source: "persisted-fresh" | "recomputed";
+        readonly computedAt: string | Date;
+        readonly reason: string;
+      };
+    };
+    const lifecycle = parsed.lifecycle
+      ? Object.freeze({
+        source: parsed.lifecycle.source,
+        computedAt: parsed.lifecycle.computedAt instanceof Date
+          ? parsed.lifecycle.computedAt
+          : new Date(parsed.lifecycle.computedAt),
+        reason: parsed.lifecycle.reason,
+      })
+      : Object.freeze({
+        source: "recomputed" as const,
+        computedAt: new Date(),
+        reason: "Lifecycle metadata was unavailable in persisted dependency-state summary.",
+      });
     return Object.freeze({
       ...parsed,
+      lifecycle,
       reasons: Object.freeze([...(parsed.reasons ?? [])]),
       impactedByUpstreamVersionIds: Object.freeze([...(parsed.impactedByUpstreamVersionIds ?? [])]),
       staleBecauseUpstreamAdvanced: Object.freeze([...(parsed.staleBecauseUpstreamAdvanced ?? [])]),

@@ -90,5 +90,6 @@ describe("ui/services unit coverage", () => {
     expect(replay.replayed).toBeFalse();
     expect(await service.verifyProjection({ assetId: "workflow-definition:wf-1" })).toBeUndefined();
     expect(await service.rebuildProjectionScopes({ scopes: [] })).toBeUndefined();
+    expect(await service.loadManagementSnapshot({ assetId: "asset-1" })).toBeUndefined();
   });
 });

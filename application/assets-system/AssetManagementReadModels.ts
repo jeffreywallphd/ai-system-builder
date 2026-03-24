@@ -16,13 +16,22 @@ export interface CanonicalVersionChainItemReadModel {
   readonly parentVersionId?: string;
   readonly createdAt: Date;
   readonly label?: string;
-  readonly dependencyState?: CanonicalDependencyLifecycleState;
+  readonly dependencyState?: {
+    readonly state: CanonicalDependencyLifecycleState;
+    readonly reasons: ReadonlyArray<string>;
+    readonly nextActions: ReadonlyArray<string>;
+  };
 }
 
 export interface CanonicalDependencyStateReadModel {
   readonly versionId: string;
   readonly state: CanonicalDependencyLifecycleState;
   readonly lineageConfidence: "exact" | "partial";
+  readonly lifecycle: {
+    readonly source: "persisted-fresh" | "recomputed";
+    readonly computedAt: Date;
+    readonly reason: string;
+  };
   readonly reasons: ReadonlyArray<string>;
   readonly nextActions: ReadonlyArray<string>;
 }
