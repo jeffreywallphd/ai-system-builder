@@ -24,6 +24,12 @@ export interface DatasetSummary {
   readonly selectedVersion?: DatasetVersion;
   readonly statistics?: DatasetStatistics;
   readonly exampleCount: number;
+  readonly canonicalSelectedVersion?: {
+    readonly preferred: boolean;
+    readonly assetId?: string;
+    readonly latestVersionId?: string;
+    readonly fallbackReason?: string;
+  };
 }
 
 export interface DatasetDetails {
@@ -37,6 +43,12 @@ export interface DatasetDetails {
   readonly exports: ReadonlyArray<DatasetExportArtifact>;
   readonly generationBatches: ReadonlyArray<DatasetGenerationBatch>;
   readonly workflow: DatasetWorkflowState;
+  readonly canonicalByVersionId?: Readonly<Record<string, {
+    readonly preferred: boolean;
+    readonly assetId?: string;
+    readonly latestVersionId?: string;
+    readonly fallbackReason?: string;
+  }>>;
 }
 
 export interface CreateDatasetCommand {

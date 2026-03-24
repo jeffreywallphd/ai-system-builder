@@ -30,7 +30,7 @@ interface IdentityRow {
   readonly updated_at: string;
 }
 
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 const MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   [1, `
     CREATE TABLE asset_system_migrations (
@@ -105,6 +105,11 @@ const MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
     CREATE INDEX IF NOT EXISTS assets_kind_source_status_idx ON assets(kind, source_type, status);
     CREATE INDEX IF NOT EXISTS asset_transformations_kind_idx ON asset_transformations(kind, created_at DESC);
     CREATE INDEX IF NOT EXISTS canonical_identity_asset_idx ON canonical_asset_identities(asset_id, updated_at DESC);
+  `],
+  [4, `
+    CREATE INDEX IF NOT EXISTS canonical_identity_lookup_idx ON canonical_asset_identities(entity_type, entity_id, updated_at DESC);
+    CREATE INDEX IF NOT EXISTS canonical_identity_latest_idx ON canonical_asset_identities(latest_version_id, updated_at DESC);
+    CREATE INDEX IF NOT EXISTS asset_versions_asset_parent_idx ON asset_versions(asset_id, parent_version_id, created_at DESC);
   `],
 ]);
 
@@ -239,6 +244,13 @@ export class SqliteAssetSystemRepository implements
     return row ? this.parseVersion(row) : undefined;
   }
 
+  public async listVersionChainByAssetId(assetId: string): Promise<ReadonlyArray<AssetVersion>> {
+    const rows = this.getDatabase()
+      .prepare("SELECT version_json, version_label, parent_version_id FROM asset_versions WHERE asset_id = ? ORDER BY created_at DESC")
+      .all(assetId.trim()) as AssetVersionRow[];
+    return Object.freeze(rows.map((row) => this.parseVersion(row)));
+  }
+
   public async saveEdge(edge: AssetLineageEdge): Promise<void> {
     this.assertVersionExists(edge.fromVersionId);
     this.assertVersionExists(edge.toVersionId);
@@ -346,6 +358,18 @@ export class SqliteAssetSystemRepository implements
     return Object.freeze(rows.map((row) => this.parseTransformation(row.transformation_json)));
   }
 
+  public async listLineageEdgesByAssetId(assetId: string): Promise<ReadonlyArray<AssetLineageEdge>> {
+    const rows = this.getDatabase().prepare(`
+      SELECT DISTINCT e.edge_json
+      FROM asset_lineage_edges e
+      JOIN asset_versions v ON v.version_id = e.from_version_id OR v.version_id = e.to_version_id
+      WHERE v.asset_id = ?
+      ORDER BY e.created_at DESC
+    `).all(assetId.trim()) as LineageRow[];
+
+    return Object.freeze(rows.map((row) => this.parseLineageEdge(row.edge_json)));
+  }
+
   public async listAdjacentVersionIds(versionId: string, direction: AssetLineageDirection): Promise<ReadonlyArray<string>> {
     const normalized = versionId.trim();
     if (direction === "both") {
@@ -402,6 +426,34 @@ export class SqliteAssetSystemRepository implements
       latestVersionId: row.latest_version_id ?? undefined,
       updatedAt: new Date(row.updated_at),
     });
+  }
+
+  public async listCanonicalIdentities(params?: { readonly entityType?: CanonicalEntityType; readonly assetId?: string }): Promise<ReadonlyArray<CanonicalAssetIdentityRecord>> {
+    const where: string[] = [];
+    const bind: Record<string, unknown> = {};
+    if (params?.entityType) {
+      where.push("entity_type = @entityType");
+      bind.entityType = params.entityType;
+    }
+    if (params?.assetId) {
+      where.push("asset_id = @assetId");
+      bind.assetId = params.assetId.trim();
+    }
+
+    const sql = `
+      SELECT entity_type, entity_id, asset_id, latest_version_id, updated_at
+      FROM canonical_asset_identities
+      ${where.length > 0 ? `WHERE ${where.join(" AND ")}` : ""}
+      ORDER BY updated_at DESC, entity_type ASC, entity_id ASC
+    `;
+    const rows = this.getDatabase().prepare(sql).all(bind) as IdentityRow[];
+    return Object.freeze(rows.map((row) => Object.freeze({
+      entityType: row.entity_type,
+      entityId: row.entity_id,
+      assetId: row.asset_id,
+      latestVersionId: row.latest_version_id ?? undefined,
+      updatedAt: new Date(row.updated_at),
+    })));
   }
 
   public get isAvailable(): boolean {

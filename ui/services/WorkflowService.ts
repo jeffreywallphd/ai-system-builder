@@ -23,12 +23,14 @@ import {
   type IValidateWorkflowRequest,
   type IValidateWorkflowResult,
 } from "../../application/workflows/ValidateWorkflowUseCase";
+import { LoadWorkflowUseCase, type ILoadWorkflowResult } from "../../application/workflows/LoadWorkflowUseCase";
 
 export interface IWorkflowServiceOptions {
   readonly createWorkflowUseCase: CreateWorkflowUseCase;
   readonly executeWorkflowUseCase: ExecuteWorkflowUseCase;
   readonly validateWorkflowUseCase: ValidateWorkflowUseCase;
   readonly workflowRepository: IWorkflowRepository;
+  readonly loadWorkflowUseCase?: LoadWorkflowUseCase;
 }
 
 export class WorkflowService {
@@ -36,12 +38,28 @@ export class WorkflowService {
   private readonly executeWorkflowUseCase: ExecuteWorkflowUseCase;
   private readonly validateWorkflowUseCase: ValidateWorkflowUseCase;
   private readonly workflowRepository: IWorkflowRepository;
+  private readonly loadWorkflowUseCase?: LoadWorkflowUseCase;
 
   constructor(options: IWorkflowServiceOptions) {
     this.createWorkflowUseCase = options.createWorkflowUseCase;
     this.executeWorkflowUseCase = options.executeWorkflowUseCase;
     this.validateWorkflowUseCase = options.validateWorkflowUseCase;
     this.workflowRepository = options.workflowRepository;
+    this.loadWorkflowUseCase = options.loadWorkflowUseCase;
+  }
+
+  public async loadWorkflowReadModel(id: string): Promise<ILoadWorkflowResult> {
+    const workflowId = id.trim();
+    if (!workflowId) {
+      throw new Error("WorkflowService.loadWorkflowReadModel requires a non-empty id.");
+    }
+
+    if (this.loadWorkflowUseCase) {
+      return this.loadWorkflowUseCase.execute({ workflowId, throwIfNotFound: false });
+    }
+
+    const workflow = await this.workflowRepository.load(workflowId);
+    return Object.freeze({ workflow, validation: undefined });
   }
 
   public async createWorkflow(
@@ -52,19 +70,13 @@ export class WorkflowService {
   }
 
   public async loadWorkflow(id: string): Promise<IWorkflow | undefined> {
-    const workflowId = id.trim();
-
-    if (!workflowId) {
-      throw new Error("WorkflowService.loadWorkflow requires a non-empty id.");
-    }
-
-    return this.workflowRepository.load(workflowId);
+    return (await this.loadWorkflowReadModel(id)).workflow;
   }
 
   public async listWorkflows(): Promise<ReadonlyArray<IWorkflow>> {
     const summaries = await this.workflowRepository.list();
     const workflows = await Promise.all(
-      summaries.map(async (summary) => this.workflowRepository.load(summary.id))
+      summaries.map(async (summary) => this.loadWorkflowReadModel(summary.id).then((result) => result.workflow))
     );
 
     return Object.freeze(

@@ -11,7 +11,7 @@ import { WorkflowMetadata } from "../../../domain/workflows/WorkflowMetadata";
 import { Model, ModelArtifact, ModelSource } from "../../../domain/models/Model";
 import { ModelCompatibility } from "../../../domain/models/ModelCompatibility";
 import { TuningDatasetVersion } from "../../../domain/tuning-datasets/TuningDatasetEntities";
-import { GetCanonicalLatestVersionUseCase, GetCanonicalVersionDependencyUseCase, ListCanonicalAssetsUseCase, LoadCanonicalAssetSummaryUseCase } from "../CanonicalAssetReadUseCases";
+import { ExplainCanonicalVersionExistenceUseCase, GetCanonicalLatestVersionUseCase, GetCanonicalProvenanceSummaryUseCase, GetCanonicalVersionDependencyUseCase, ListCanonicalAssetsUseCase, LoadCanonicalAssetDetailUseCase, LoadCanonicalAssetSummaryUseCase } from "../CanonicalAssetReadUseCases";
 import { AssetLineageEdge, AssetLineageRelationshipType } from "../../../domain/assets/AssetLineageEdge";
 import { GetAssetImpactAnalysisUseCase } from "../GetAssetImpactAnalysisUseCase";
 import { AssetTransformation } from "../../../domain/assets/AssetTransformation";
@@ -73,6 +73,8 @@ describe("Canonical asset system integration", () => {
 
       const summary = await new LoadCanonicalAssetSummaryUseCase(repository, repository, repository).execute(datasetResult.assetId);
       expect(summary?.latestVersionId).toBe(datasetResult.versionId);
+      const detail = await new LoadCanonicalAssetDetailUseCase(repository, repository, repository, repository, repository).execute(datasetResult.assetId);
+      expect(detail?.versionCount).toBe(1);
       expect((await new GetCanonicalLatestVersionUseCase(repository, repository).execute(modelResult.assetId))?.versionId).toBe(modelResult.versionId);
     } finally {
       await rm(root, { recursive: true, force: true });
@@ -100,6 +102,11 @@ describe("Canonical asset system integration", () => {
       const dependencies = await new GetCanonicalVersionDependencyUseCase(repository, repository).execute("b:v1");
       expect(dependencies.dependencyVersionIds).toContain("a:v1");
       expect(dependencies.dependentVersionIds).toContain("c:v1");
+
+      const provenance = await new GetCanonicalProvenanceSummaryUseCase(repository, repository, repository).execute("b:v1");
+      expect(provenance.directUpstreamVersionIds).toContain("a:v1");
+      const explanation = await new ExplainCanonicalVersionExistenceUseCase(new GetCanonicalProvenanceSummaryUseCase(repository, repository, repository), repository).execute("b:v1");
+      expect(explanation.evidence.some((entry) => entry.includes("produced-by:tx-a"))).toBeTrue();
 
       const impact = await new GetAssetImpactAnalysisUseCase(repository, repository, repository).execute({ versionId: "a:v1", maxDepth: 2 });
       expect(impact.directDependentVersionIds).toContain("b:v1");

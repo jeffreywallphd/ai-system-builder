@@ -183,14 +183,37 @@ Canonical read/query surfaces now include dedicated application use cases for:
 - listing versions and latest version per canonical asset
 - loading transformation history for an asset or version
 - loading direct dependencies/dependents for a version
+- loading canonical asset detail with latest version + aggregate counts
+- loading bounded provenance summaries (direct upstream/downstream + producer/consumer transformations)
+- loading explicit "why this version exists" explanations from transformation/lineage evidence
 
-Bounded impact analysis is now available through `GetAssetImpactAnalysisUseCase` and returns explainable direct/transitive downstream version impact, transformation consumers, and explicit partial-lineage warning signals.
+Canonical read preference is now integrated into three durable real flows (with explicit fallback semantics when canonical identity is missing):
+- `LoadWorkflowUseCase` now returns canonical workflow-definition identity/version read metadata.
+- `ListInstalledModelsUseCase` now returns canonical installed-model identity/version summaries per listed model.
+- `DefaultTuningDatasetStudioApplicationService` now returns canonical dataset-version identity/version summaries in dataset details/listing responses.
 
-SQLite asset-system persistence now includes canonical identity mappings and normalized query paths/indexes for durable filters (`kind/source/status`), latest-version lookup, transformation lookup by asset, and adjacency traversal.
+Dependency-health capability now includes both bounded impact analysis and a direct operational summary (`GetAssetDependencyHealthUseCase`) that distinguishes:
+- direct upstream/downstream dependencies
+- transitive downstream invalidation exposure (bounded depth)
+- confidence (`certain` vs `partial`) with explicit partial-lineage reasons
+- transformation consumers and stale-exposure explanations for downstream assets/versions
+
+SQLite asset-system persistence now includes canonical identity mappings and normalized query paths/indexes for durable filters (`kind/source/status`), latest-version lookup, version-chain queries, transformation lookup by asset, adjacency traversal, and identity lookup/index coverage for durable entity mappings.
+
+Graph-projection readiness now moves beyond a no-op seam:
+- projection replay is now supported from canonical storage (`ReplayAssetGraphProjectionUseCase`) for selected assets.
+- the in-memory projection sink can now answer simple path checks (`hasVersionPath`) to prove graph-oriented behavior without requiring Neo4j.
+- a concrete Neo4j-targeted sink contract (`Neo4jAssetLineageGraphProjectionSink` + `INeo4jCypherExecutor`) now exists as the default graph-db projection target in composition, while still using a local no-op executor unless a real driver adapter is configured.
+
+Broader canonical-read adoption now also includes legacy UI service seams:
+- `WorkflowService` now routes load/list reads through `LoadWorkflowUseCase` when available, so canonical-read preference metadata can be surfaced without page-level lookup duplication.
+- `ModelService` now exposes a full installed-model read-model response (`listInstalledModelsReadModel`) so callers can consume canonical identity summaries directly.
+
+Partial-lineage diagnostics now include a bounded application read model (`GetAssetLineageDiagnosticsUseCase`) designed for future UI exploration without requiring graph infrastructure at render time.
 
 What remains for next chunks:
 - broaden canonical-read adoption across additional legacy catalog/repository UI paths
-- expand graph sink projection wiring from in-memory/local proof toward pluggable Neo4j-backed projection (still optional)
+- expand projection replay/sink wiring from local proof toward pluggable Neo4j-backed projection (still optional)
 - add richer partial-lineage diagnostics and UI-driven impact exploration without requiring full graph mode.
 
 SQLite storage now also carries normalized `asset_versions.version_label` and `asset_versions.parent_version_id` columns (plus legacy JSON payload compatibility) so version-chain queries can progressively move from blob parsing to explicit relational reads.

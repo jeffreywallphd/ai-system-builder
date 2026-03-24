@@ -52,6 +52,12 @@ describe("SqliteAssetSystemRepository", () => {
       expect(versions[0].parentVersionId).toBe("v1");
       expect((await repo.listByVersionId("v2")).length).toBe(1);
       expect((await repo.listEdgesByVersionId("v2", "upstream")).length).toBe(1);
+      expect((await repo.listVersionChainByAssetId("asset-1")).map((version) => version.versionId)).toEqual(["v2", "v1"]);
+      expect((await repo.listLineageEdgesByAssetId("asset-1")).length).toBe(1);
+
+      await repo.upsertIdentity({ entityType: "workflow-definition", entityId: "wf-1", assetId: "asset-1", latestVersionId: "v2" });
+      const identities = await repo.listCanonicalIdentities({ entityType: "workflow-definition" });
+      expect(identities[0]?.entityId).toBe("wf-1");
     } finally {
       await rm(root, { recursive: true, force: true });
     }

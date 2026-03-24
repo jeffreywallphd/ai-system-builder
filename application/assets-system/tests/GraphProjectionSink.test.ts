@@ -29,5 +29,6 @@ describe("InMemoryAssetLineageGraphProjectionSink", () => {
     expect(sink.publishedTransformations[0]?.transformationId).toBe("tx-1");
     expect(sink.publishedEdges).toHaveLength(1);
     expect(sink.publishedEdges[0]?.edgeId).toBe("e-1");
+    expect(sink.hasVersionPath("in:v1", "out:v1")).toBeTrue();
   });
 });

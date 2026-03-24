@@ -11,7 +11,8 @@ import { LocalWorkflowRepository } from "../filesystem/LocalWorkflowRepository";
 import { LocalContextPackageRepository } from "../filesystem/LocalContextPackageRepository";
 import { LocalContextRecipeRepository } from "../filesystem/LocalContextRecipeRepository";
 import { SqliteAssetSystemRepository } from "../filesystem/SqliteAssetSystemRepository";
-import { NoopAssetLineageGraphProjectionSink } from "../filesystem/NoopAssetLineageGraphProjectionSink";
+import { Neo4jAssetLineageGraphProjectionSink } from "../graph/Neo4jAssetLineageGraphProjectionSink";
+import { NoopNeo4jCypherExecutor } from "../graph/NoopNeo4jCypherExecutor";
 import { DependencyContainer, type DependencyToken } from "./DependencyContainer";
 
 import { AssetCatalog } from "../../application/ports/AssetCatalog";
@@ -342,7 +343,10 @@ export class InfrastructureRegistry {
       return new SqliteAssetSystemRepository(`${options.paths.assetsDirectory}/asset-system.sqlite`);
     });
 
-    container.registerSingleton<IAssetLineageGraphProjectionSink>(TOKENS.AssetLineageGraphProjectionSink, () => new NoopAssetLineageGraphProjectionSink());
+    container.registerSingleton<IAssetLineageGraphProjectionSink>(TOKENS.AssetLineageGraphProjectionSink, () => {
+      // Neo4j is the default graph projection target contract; this local executor remains no-op until a real driver adapter is supplied.
+      return new Neo4jAssetLineageGraphProjectionSink(new NoopNeo4jCypherExecutor());
+    });
 
     container.registerSingleton<CanonicalAssetIdentityService>(TOKENS.CanonicalAssetIdentityService, (c) => {
       const systemRepository = c.resolve<SqliteAssetSystemRepository>(TOKENS.AssetSystemRepository);
