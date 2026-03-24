@@ -22,12 +22,12 @@ describe("Agent execution backbone mapping", () => {
     const executionPlan = mapAgentExecutionToExecutionPlan({
       session,
       steps: [
-        { stepId: "step-1", goalId: "goal-1", toolId: "mcp:local:echo", objective: "Collect context" },
+        { stepId: "step-1", goalId: "goal-1", toolId: "mcp:local:echo", intent: { action: "Collect context" } },
         {
           stepId: "step-2",
           goalId: "goal-1",
           toolId: "mcp:local:summarize",
-          objective: "Summarize context",
+          intent: { action: "Summarize context", inputAssetIds: ["asset:memory:ctx"], expectedOutputKey: "summary" },
           dependsOnStepIds: ["step-1"],
         },
       ],
@@ -43,7 +43,7 @@ describe("Agent execution backbone mapping", () => {
 
     const payload = buildAgentExecutionUnitPayload({
       session,
-      step: { stepId: "step-1", goalId: "goal-2", toolId: "mcp:local:echo", objective: "Ping" },
+      step: { stepId: "step-1", goalId: "goal-2", toolId: "mcp:local:echo", intent: { action: "Ping" } },
     });
 
     expect(payload.planId).toBe("agent-plan:2");
@@ -57,12 +57,13 @@ describe("Agent execution backbone mapping", () => {
 
     const mapped = mapAgentExecutionToBackbone({
       session,
-      steps: [{ stepId: "step-1", toolId: "mcp:local:echo", objective: "Ping" }],
+      steps: [{ stepId: "step-1", toolId: "mcp:local:echo", intent: { action: "Ping", expectedOutputKey: "pong" } }],
     });
 
     expect(mapped.plan.id).toBe("agent-plan:sess-3");
     expect(Object.keys(mapped.unitPayloadByUnitId)).toEqual(["step-1"]);
     expect(mapped.unitPayloadByUnitId["step-1"]?.planId).toBe("agent-plan:sess-3");
+    expect(mapped.unitPayloadByUnitId["step-1"]?.expectedOutputKey).toBe("pong");
   });
 
   it("tracks execution session lifecycle with terminal timestamps", () => {
@@ -88,8 +89,18 @@ describe("Agent execution backbone mapping", () => {
     expect(() =>
       mapAgentExecutionToBackbone({
         session,
-        steps: [{ stepId: "step-1", toolId: "", objective: "Ping" }],
+        steps: [{ stepId: "step-1", toolId: "", intent: { action: "Ping" } }],
       }),
     ).toThrow("toolId is required");
+
+    expect(() =>
+      mapAgentExecutionToBackbone({
+        session,
+        steps: [
+          { stepId: "step-1", toolId: "mcp:echo", intent: { action: "one" }, dependsOnStepIds: ["step-2"] },
+          { stepId: "step-1", toolId: "mcp:echo", intent: { action: "two" } },
+        ],
+      }),
+    ).toThrow("unique step ids");
   });
 });

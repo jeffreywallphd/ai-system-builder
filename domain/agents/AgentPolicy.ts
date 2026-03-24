@@ -3,6 +3,11 @@ export interface AgentToolScopeConstraint {
   readonly allowedScopes: ReadonlyArray<string>;
 }
 
+export interface AgentToolAccessPolicy {
+  readonly allowedToolIds: ReadonlyArray<string>;
+  readonly scopeConstraints: ReadonlyArray<AgentToolScopeConstraint>;
+}
+
 export interface AgentCostLimits {
   readonly maxTokens?: number;
   readonly maxEstimatedUsd?: number;
@@ -14,13 +19,22 @@ export interface AgentExecutionLimits {
 }
 
 export interface AgentSafetyConstraint {
-  readonly requiredApprovals: ReadonlyArray<string>;
-  readonly deniedPermissions: ReadonlyArray<string>;
+  readonly requiredApprovals: ReadonlyArray<{
+    readonly permissionId: string;
+    readonly scopeType: "tool" | "workspace" | "global";
+    readonly scopeId?: string;
+  }>;
+  readonly deniedPermissionIds: ReadonlyArray<string>;
+  readonly sandbox: {
+    readonly network: "deny" | "allow";
+    readonly filesystem: "deny" | "read-only" | "read-write";
+    readonly assets: "deny" | "read-only" | "read-write";
+    readonly allowEnvironmentVariables: ReadonlyArray<string>;
+  };
 }
 
 export interface AgentPolicy {
-  readonly allowedTools: ReadonlyArray<string>;
-  readonly toolScopeConstraints: ReadonlyArray<AgentToolScopeConstraint>;
+  readonly toolAccess: AgentToolAccessPolicy;
   readonly restrictedActions: ReadonlyArray<string>;
   readonly costLimits: AgentCostLimits;
   readonly executionLimits: AgentExecutionLimits;
@@ -47,20 +61,20 @@ function normalizeList(values: ReadonlyArray<string> | undefined): ReadonlyArray
 }
 
 export function normalizeAgentPolicy(policy: AgentPolicy): AgentPolicy {
-  const allowedTools = normalizeList(policy.allowedTools);
-  if (allowedTools.length === 0) {
+  const allowedToolIds = normalizeList(policy.toolAccess?.allowedToolIds);
+  if (allowedToolIds.length === 0) {
     throw new Error("Agent policy must include at least one allowed tool.");
   }
 
   const toolScopeConstraints = Object.freeze(
-    (policy.toolScopeConstraints ?? []).map((constraint) => Object.freeze({
+    (policy.toolAccess?.scopeConstraints ?? []).map((constraint) => Object.freeze({
       toolId: normalizeRequired(constraint.toolId, "Agent tool scope toolId"),
       allowedScopes: normalizeList(constraint.allowedScopes),
     })),
   );
 
   for (const constraint of toolScopeConstraints) {
-    if (!allowedTools.includes(constraint.toolId)) {
+    if (!allowedToolIds.includes(constraint.toolId)) {
       throw new Error(`Agent tool scope constraint references unknown allowed tool '${constraint.toolId}'.`);
     }
     if (constraint.allowedScopes.length === 0) {
@@ -79,20 +93,53 @@ export function normalizeAgentPolicy(policy: AgentPolicy): AgentPolicy {
     maxTokens: normalizePositiveInt(costLimitsInput.maxTokens, "Agent cost limit maxTokens"),
     maxEstimatedUsd: normalizeNonNegativeNumber(costLimitsInput.maxEstimatedUsd, "Agent cost limit maxEstimatedUsd"),
   });
+  if (costLimits.maxTokens !== undefined && costLimits.maxEstimatedUsd !== undefined && costLimits.maxTokens < 100) {
+    throw new Error("Agent policy cost limits are conflicting: maxTokens is unrealistically low for a USD budget.");
+  }
 
-  const safetyInput = policy.safetyConstraints ?? { requiredApprovals: [], deniedPermissions: [] };
+  const safetyInput = policy.safetyConstraints ?? {
+    requiredApprovals: [],
+    deniedPermissionIds: [],
+    sandbox: { network: "deny", filesystem: "deny", assets: "read-only", allowEnvironmentVariables: [] },
+  };
+  const requiredApprovals = Object.freeze((safetyInput.requiredApprovals ?? []).map((entry) => Object.freeze({
+    permissionId: normalizeRequired(entry.permissionId, "Agent required approval permissionId"),
+    scopeType: normalizeScopeType(entry.scopeType),
+    scopeId: entry.scopeId?.trim() || undefined,
+  })));
+  const deniedPermissionIds = normalizeList(safetyInput.deniedPermissionIds);
+  const sandbox = Object.freeze({
+    network: safetyInput.sandbox?.network ?? "deny",
+    filesystem: safetyInput.sandbox?.filesystem ?? "deny",
+    assets: safetyInput.sandbox?.assets ?? "read-only",
+    allowEnvironmentVariables: normalizeList(safetyInput.sandbox?.allowEnvironmentVariables),
+  });
+
+  if (sandbox.network === "deny" && deniedPermissionIds.includes("network.open")) {
+    throw new Error("Agent policy should not redundantly deny network.open when sandbox.network is deny.");
+  }
 
   return Object.freeze({
-    allowedTools,
-    toolScopeConstraints,
+    toolAccess: Object.freeze({
+      allowedToolIds,
+      scopeConstraints: toolScopeConstraints,
+    }),
     restrictedActions: normalizeList(policy.restrictedActions),
     costLimits,
     executionLimits,
     safetyConstraints: Object.freeze({
-      requiredApprovals: normalizeList(safetyInput.requiredApprovals),
-      deniedPermissions: normalizeList(safetyInput.deniedPermissions),
+      requiredApprovals,
+      deniedPermissionIds,
+      sandbox,
     }),
   });
+}
+
+function normalizeScopeType(value: "tool" | "workspace" | "global"): "tool" | "workspace" | "global" {
+  if (!["tool", "workspace", "global"].includes(value)) {
+    throw new Error("Agent required approval scopeType must be tool, workspace, or global.");
+  }
+  return value;
 }
 
 function normalizePositiveInt(value: number | undefined, label: string): number | undefined {

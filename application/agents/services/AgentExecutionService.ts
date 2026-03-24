@@ -95,20 +95,21 @@ export class AgentExecutionService {
     status: AgentExecutionReadModel["status"],
     finalOutput?: string,
   ): Promise<void> {
-    const memoryAssetId = agent.memory.assets[0]?.assetId.toString();
+    const memoryAssetId = agent.memory.assets[0]?.assetId;
     if (!memoryAssetId) {
       return;
     }
 
     await this.memoryStore.add(agent.id, {
       assetId: memoryAssetId,
+      memoryType: "episodic",
       tags: ["agent-execution", status],
       metadata: {
         planId: plan.planId,
         strategyId: plan.strategyId,
         status,
-        outcomes,
-        finalOutput,
+        stepCount: outcomes.length,
+        finalOutput: finalOutput ?? null,
       },
     });
   }

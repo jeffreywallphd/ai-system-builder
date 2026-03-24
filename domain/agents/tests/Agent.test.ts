@@ -10,6 +10,12 @@ import {
   transitionAgentExecutionSession,
 } from "../AgentExecutionSession";
 
+const defaultSafety = {
+  requiredApprovals: [],
+  deniedPermissionIds: [],
+  sandbox: { network: "deny", filesystem: "deny", assets: "read-only", allowEnvironmentVariables: [] },
+} as const;
+
 describe("Agent domain", () => {
   it("creates a first-class agent with structured goals, policy, and asset-backed memory", () => {
     const agent = createAgent({
@@ -26,12 +32,18 @@ describe("Agent domain", () => {
         requiredToolIds: ["mcp:local:get_weather"],
       }],
       policy: {
-        allowedTools: ["mcp:local:get_weather"],
-        toolScopeConstraints: [{ toolId: "mcp:local:get_weather", allowedScopes: ["forecast.read"] }],
+        toolAccess: {
+          allowedToolIds: ["mcp:local:get_weather"],
+          scopeConstraints: [{ toolId: "mcp:local:get_weather", allowedScopes: ["forecast.read"] }],
+        },
         restrictedActions: ["filesystem.write"],
         costLimits: { maxTokens: 12_000 },
         executionLimits: { maxSteps: 3, maxWallClockMs: 30_000 },
-        safetyConstraints: { requiredApprovals: ["weather-data"], deniedPermissions: ["network.open"] },
+        safetyConstraints: {
+          requiredApprovals: [{ permissionId: "weather-data", scopeType: "tool", scopeId: "mcp:local:get_weather" }],
+          deniedPermissionIds: [],
+          sandbox: { network: "allow", filesystem: "read-only", assets: "read-only", allowEnvironmentVariables: [] },
+        },
       },
       memory: {
         agentId: "agent-weather",
@@ -47,11 +59,11 @@ describe("Agent domain", () => {
         revision: 1,
       },
       planningStrategy: { strategyId: "linear-default", mode: "deterministic-linear" },
-      execution: { trustPolicyId: "trust:strict", requireTrustedTools: true, maxExecutionSteps: 3 },
+      execution: { trustPolicyId: "trust:strict", requireTrustedTools: true, maxPlanUnits: 3 },
     });
 
     expect(agent.name).toBe("Weather Analyst");
-    expect(agent.policy.allowedTools[0]).toBe("mcp:local:get_weather");
+    expect(agent.policy.toolAccess.allowedToolIds[0]).toBe("mcp:local:get_weather");
     expect(agent.memory.assets[0]?.assetId.toString()).toBe("asset:memory:weather");
     expect(agent.memory.retrieval.semantic?.minRelevanceScore).toBe(0.4);
   });
@@ -65,12 +77,11 @@ describe("Agent domain", () => {
         { id: "g1", objective: "Primary", constraints: [], successCriteria: ["done"], priority: "critical", priorityOrder: 1 },
       ],
       policy: {
-        allowedTools: ["mcp:local:echo"],
-        toolScopeConstraints: [],
+        toolAccess: { allowedToolIds: ["mcp:local:echo"], scopeConstraints: [] },
         restrictedActions: [],
         costLimits: {},
         executionLimits: {},
-        safetyConstraints: { requiredApprovals: [], deniedPermissions: [] },
+        safetyConstraints: defaultSafety,
       },
       memory: {
         agentId: "agent-read",
@@ -93,16 +104,15 @@ describe("Agent domain", () => {
         name: "Invalid Agent",
         goals: [{ id: "g1", objective: "Bad tool", constraints: [], successCriteria: ["Never"], priority: "normal", priorityOrder: 1 }],
         policy: {
-          allowedTools: [],
-          toolScopeConstraints: [],
+          toolAccess: { allowedToolIds: [], scopeConstraints: [] },
           restrictedActions: [],
           costLimits: {},
           executionLimits: {},
-          safetyConstraints: { requiredApprovals: [], deniedPermissions: [] },
+          safetyConstraints: defaultSafety,
         },
         memory: {
           agentId: "agent-invalid",
-          assets: [],
+          assets: [{ assetId: new AssetId("asset:memory:a"), memoryType: "working" }],
           retrieval: { strategy: "latest-first", maxEntries: 1 },
           revision: 1,
         },
@@ -124,12 +134,11 @@ describe("Agent domain", () => {
           requiredToolIds: ["mcp:local:secret"],
         }],
         policy: {
-          allowedTools: ["mcp:local:echo"],
-          toolScopeConstraints: [],
+          toolAccess: { allowedToolIds: ["mcp:local:echo"], scopeConstraints: [] },
           restrictedActions: [],
           costLimits: {},
           executionLimits: {},
-          safetyConstraints: { requiredApprovals: [], deniedPermissions: [] },
+          safetyConstraints: defaultSafety,
         },
         memory: {
           agentId: "agent-invalid-goal-tool",
@@ -147,12 +156,11 @@ describe("Agent domain", () => {
         name: "Invalid execution",
         goals: [{ id: "g1", objective: "Goal", constraints: [], successCriteria: ["Done"], priority: "normal", priorityOrder: 1 }],
         policy: {
-          allowedTools: ["mcp:local:echo"],
-          toolScopeConstraints: [],
+          toolAccess: { allowedToolIds: ["mcp:local:echo"], scopeConstraints: [] },
           restrictedActions: [],
           costLimits: {},
           executionLimits: { maxSteps: 2 },
-          safetyConstraints: { requiredApprovals: [], deniedPermissions: [] },
+          safetyConstraints: defaultSafety,
         },
         memory: {
           agentId: "agent-invalid-execution",
@@ -161,7 +169,7 @@ describe("Agent domain", () => {
           revision: 1,
         },
         planningStrategy: { strategyId: "linear-default", mode: "deterministic-linear" },
-        execution: { maxExecutionSteps: 3, requireTrustedTools: true },
+        execution: { maxPlanUnits: 3, requireTrustedTools: true },
       }),
     ).toThrow("cannot exceed policy execution maxSteps");
   });
@@ -172,12 +180,11 @@ describe("Agent domain", () => {
       name: "Agent Update",
       goals: [{ id: "g1", objective: "Goal", constraints: [], successCriteria: ["done"], priority: "normal", priorityOrder: 1 }],
       policy: {
-        allowedTools: ["mcp:local:echo"],
-        toolScopeConstraints: [],
+        toolAccess: { allowedToolIds: ["mcp:local:echo"], scopeConstraints: [] },
         restrictedActions: [],
         costLimits: {},
         executionLimits: {},
-        safetyConstraints: { requiredApprovals: [], deniedPermissions: [] },
+        safetyConstraints: defaultSafety,
       },
       memory: {
         agentId: "agent-update",
@@ -191,12 +198,12 @@ describe("Agent domain", () => {
 
     const updated = updateAgent(existing, {
       status: "paused",
-      execution: { maxExecutionSteps: 2, requireTrustedTools: true },
+      execution: { maxPlanUnits: 2, requireTrustedTools: true },
       now: new Date("2026-03-24T00:05:00.000Z"),
     });
 
     expect(updated.status).toBe("paused");
-    expect(updated.execution.maxExecutionSteps).toBe(2);
+    expect(updated.execution.maxPlanUnits).toBe(2);
     expect(updated.createdAt).toBe("2026-03-24T00:00:00.000Z");
     expect(updated.updatedAt).toBe("2026-03-24T00:05:00.000Z");
   });
@@ -220,30 +227,51 @@ describe("Agent goal and policy invariants", () => {
 
   it("validates structured policy limits and scope constraints", () => {
     const policy = normalizeAgentPolicy({
-      allowedTools: ["mcp:local:echo", "mcp:local:echo"],
-      toolScopeConstraints: [{ toolId: "mcp:local:echo", allowedScopes: ["runtime.execute", "runtime.execute"] }],
+      toolAccess: {
+        allowedToolIds: ["mcp:local:echo", "mcp:local:echo"],
+        scopeConstraints: [{ toolId: "mcp:local:echo", allowedScopes: ["runtime.execute", "runtime.execute"] }],
+      },
       restrictedActions: ["filesystem.write", "filesystem.write"],
       costLimits: { maxTokens: 1000, maxEstimatedUsd: 1.25 },
       executionLimits: { maxSteps: 3, maxWallClockMs: 10000 },
-      safetyConstraints: { requiredApprovals: ["tool.run"], deniedPermissions: ["network.open"] },
+      safetyConstraints: {
+        requiredApprovals: [{ permissionId: "tool.run", scopeType: "global" }],
+        deniedPermissionIds: ["filesystem.write"],
+        sandbox: { network: "allow", filesystem: "read-only", assets: "read-only", allowEnvironmentVariables: ["TZ", "TZ"] },
+      },
     });
 
-    expect(policy.allowedTools).toEqual(["mcp:local:echo"]);
-    expect(policy.toolScopeConstraints[0]?.allowedScopes).toEqual(["runtime.execute"]);
+    expect(policy.toolAccess.allowedToolIds).toEqual(["mcp:local:echo"]);
+    expect(policy.toolAccess.scopeConstraints[0]?.allowedScopes).toEqual(["runtime.execute"]);
     expect(policy.restrictedActions).toEqual(["filesystem.write"]);
   });
 
   it("rejects malformed policy constraints", () => {
     expect(() =>
       normalizeAgentPolicy({
-        allowedTools: ["mcp:local:echo"],
-        toolScopeConstraints: [{ toolId: "mcp:local:echo", allowedScopes: [] }],
+        toolAccess: {
+          allowedToolIds: ["mcp:local:echo"],
+          scopeConstraints: [{ toolId: "mcp:local:echo", allowedScopes: [] }],
+        },
         restrictedActions: [],
         costLimits: {},
         executionLimits: {},
-        safetyConstraints: { requiredApprovals: [], deniedPermissions: [] },
+        safetyConstraints: defaultSafety,
       }),
     ).toThrow("at least one scope");
+
+    expect(() =>
+      normalizeAgentPolicy({
+        toolAccess: {
+          allowedToolIds: ["mcp:local:echo"],
+          scopeConstraints: [],
+        },
+        restrictedActions: [],
+        costLimits: { maxTokens: 50, maxEstimatedUsd: 2 },
+        executionLimits: {},
+        safetyConstraints: defaultSafety,
+      }),
+    ).toThrow("cost limits are conflicting");
   });
 });
 

@@ -37,15 +37,15 @@ export interface AgentMemoryConfiguration {
 }
 
 export interface AgentMemoryEntryReference {
-  readonly assetId: string;
+  readonly assetId: AssetId;
   readonly assetVersionId?: string;
-  readonly memoryType?: AgentMemoryType;
+  readonly memoryType: AgentMemoryType;
   readonly tags?: ReadonlyArray<string>;
-  readonly metadata?: Readonly<Record<string, unknown>>;
+  readonly metadata?: Readonly<Record<string, string | number | boolean | null>>;
 }
 
 export interface AgentMemoryQuery {
-  readonly assetIds?: ReadonlyArray<string>;
+  readonly assetIds?: ReadonlyArray<AssetId>;
   readonly memoryTypes?: ReadonlyArray<AgentMemoryType>;
   readonly tags?: ReadonlyArray<string>;
   readonly maxEntries?: number;

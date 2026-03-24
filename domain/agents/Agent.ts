@@ -20,8 +20,8 @@ export interface AgentPlanningStrategy {
 }
 
 export interface AgentExecutionConfiguration {
-  readonly maxExecutionSteps?: number;
-  readonly defaultExecutionTimeoutMs?: number;
+  readonly maxPlanUnits?: number;
+  readonly defaultRunTimeoutMs?: number;
   readonly requireTrustedTools: boolean;
   readonly trustPolicyId?: string;
 }
@@ -68,19 +68,19 @@ function normalizeRequired(value: string, label: string): string {
 }
 
 function normalizeExecutionConfiguration(input: AgentExecutionConfiguration | undefined): AgentExecutionConfiguration {
-  const maxExecutionSteps = input?.maxExecutionSteps;
-  if (maxExecutionSteps !== undefined && (!Number.isInteger(maxExecutionSteps) || maxExecutionSteps <= 0)) {
-    throw new Error("Agent execution maxExecutionSteps must be a positive integer when provided.");
+  const maxPlanUnits = input?.maxPlanUnits;
+  if (maxPlanUnits !== undefined && (!Number.isInteger(maxPlanUnits) || maxPlanUnits <= 0)) {
+    throw new Error("Agent execution maxPlanUnits must be a positive integer when provided.");
   }
 
-  const timeout = input?.defaultExecutionTimeoutMs;
+  const timeout = input?.defaultRunTimeoutMs;
   if (timeout !== undefined && (!Number.isInteger(timeout) || timeout <= 0)) {
-    throw new Error("Agent execution defaultExecutionTimeoutMs must be a positive integer when provided.");
+    throw new Error("Agent execution defaultRunTimeoutMs must be a positive integer when provided.");
   }
 
   return Object.freeze({
-    maxExecutionSteps,
-    defaultExecutionTimeoutMs: timeout,
+    maxPlanUnits,
+    defaultRunTimeoutMs: timeout,
     requireTrustedTools: input?.requireTrustedTools ?? true,
     trustPolicyId: input?.trustPolicyId?.trim() || undefined,
   });
@@ -124,7 +124,7 @@ export function createAgent(input: {
   const policy = normalizeAgentPolicy(input.policy);
   for (const goal of goals) {
     for (const toolId of goal.requiredToolIds ?? []) {
-      if (!policy.allowedTools.includes(toolId)) {
+      if (!policy.toolAccess.allowedToolIds.includes(toolId)) {
         throw new Error(`Agent goal '${goal.id}' requires tool '${toolId}' that is not allowed by policy.`);
       }
     }
@@ -138,11 +138,11 @@ export function createAgent(input: {
   const planningStrategy = normalizePlanningStrategy(input.planningStrategy);
   const execution = normalizeExecutionConfiguration(input.execution);
   if (
-    execution.maxExecutionSteps !== undefined
+    execution.maxPlanUnits !== undefined
     && policy.executionLimits.maxSteps !== undefined
-    && execution.maxExecutionSteps > policy.executionLimits.maxSteps
+    && execution.maxPlanUnits > policy.executionLimits.maxSteps
   ) {
-    throw new Error("Agent execution maxExecutionSteps cannot exceed policy execution maxSteps.");
+    throw new Error("Agent execution maxPlanUnits cannot exceed policy execution maxSteps.");
   }
 
   const status = input.status ?? AgentLifecycleStatuses.ready;
