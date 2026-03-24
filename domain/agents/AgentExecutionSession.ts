@@ -46,51 +46,66 @@ function normalizeRequired(value: string, field: string): string {
   return normalized;
 }
 
+function isTerminalStatus(status: AgentExecutionSessionStatus): boolean {
+  return status === AgentExecutionSessionStatuses.completed
+    || status === AgentExecutionSessionStatuses.failed
+    || status === AgentExecutionSessionStatuses.cancelled;
+}
+
+function normalizeStatus(value: ExecutionStatus | undefined): ExecutionStatus | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  if (!Object.values(ExecutionStatuses).includes(value)) {
+    throw new Error(`Agent execution run status '${value}' is invalid.`);
+  }
+
+  return value;
+}
+
+function normalizeExecutionRun(entry: AgentExecutionRunReference, sessionPlanId?: string): AgentExecutionRunReference {
+  const runId = normalizeRequired(entry.runId, "Agent execution run id");
+  const planId = entry.planId?.trim() || sessionPlanId;
+
+  if (planId && sessionPlanId && planId !== sessionPlanId) {
+    throw new Error(`Agent execution run '${runId}' planId '${planId}' must match session planId '${sessionPlanId}'.`);
+  }
+
+  return Object.freeze({
+    runId,
+    planId,
+    status: normalizeStatus(entry.status),
+  });
+}
+
 function normalizeDiagnostics(
   values: ReadonlyArray<AgentExecutionDiagnosticReference> | undefined,
 ): ReadonlyArray<AgentExecutionDiagnosticReference> {
   const deduped = new Set<string>();
   const normalized: AgentExecutionDiagnosticReference[] = [];
+
   for (const value of values ?? []) {
     const assetId = AssetId.from(value.assetId);
     if (!assetId.toString().startsWith("asset:")) {
       throw new Error(`Agent diagnostic asset id '${assetId.toString()}' must use canonical asset id format.`);
     }
+
     const assetVersionId = value.assetVersionId?.trim() || undefined;
     if (assetVersionId !== undefined && !/^[a-zA-Z0-9:_-]+$/.test(assetVersionId)) {
       throw new Error(`Agent diagnostic assetVersionId '${assetVersionId}' is malformed.`);
     }
-    const diagnosticKey = [assetId.toString(), assetVersionId ?? "latest"].join("|");
-    if (diagnosticKey) {
-      if (!deduped.has(diagnosticKey)) {
-        deduped.add(diagnosticKey);
-        normalized.push(Object.freeze({
-          assetId,
-          assetVersionId,
-        }));
-      }
+
+    const diagnosticKey = `${assetId.toString()}|${assetVersionId ?? "latest"}`;
+    if (deduped.has(diagnosticKey)) {
+      continue;
     }
+
+    deduped.add(diagnosticKey);
+    normalized.push(Object.freeze({ assetId, assetVersionId }));
   }
+
   return Object.freeze(normalized);
-}
-
-function normalizeExecutionRun(entry: AgentExecutionRunReference, sessionPlanId?: string): AgentExecutionRunReference {
-  const runId = normalizeRequired(entry.runId, "Agent execution run id");
-  const planId = entry.planId?.trim() || undefined;
-  if (planId && sessionPlanId && planId !== sessionPlanId) {
-    throw new Error(`Agent execution run '${runId}' planId '${planId}' must match session planId '${sessionPlanId}'.`);
-  }
-  return Object.freeze({
-    runId,
-    planId,
-    status: entry.status,
-  });
-}
-
-function isTerminalStatus(status: AgentExecutionSessionStatus): boolean {
-  return status === AgentExecutionSessionStatuses.completed
-    || status === AgentExecutionSessionStatuses.failed
-    || status === AgentExecutionSessionStatuses.cancelled;
 }
 
 function assertValidLifecycleTransition(
@@ -115,6 +130,12 @@ function assertValidLifecycleTransition(
   }
 }
 
+function assertTerminalTiming(startIsoTime: string, endIsoTime: string): void {
+  if (new Date(endIsoTime).getTime() < new Date(startIsoTime).getTime()) {
+    throw new Error("Agent execution session endTime cannot be earlier than startTime.");
+  }
+}
+
 export function createAgentExecutionSession(input: {
   readonly id: string;
   readonly agentId: string;
@@ -136,17 +157,18 @@ export function createAgentExecutionSession(input: {
   }
 
   const planId = input.planId?.trim() || undefined;
-  const executionPlan = planId
-    ? Object.freeze({ planId })
-    : undefined;
+  const executionPlan = planId ? Object.freeze({ planId }) : undefined;
+
+  const executionRuns = Object.freeze((input.executionRuns ?? []).map((entry) => normalizeExecutionRun(entry, planId)));
+  const diagnostics = normalizeDiagnostics(input.diagnostics);
 
   return Object.freeze({
     id: normalizeRequired(input.id, "Agent execution session id"),
     agentId: normalizeRequired(input.agentId, "Agent execution session agentId"),
     executionPlan,
     status,
-    executionRuns: Object.freeze((input.executionRuns ?? []).map((entry) => normalizeExecutionRun(entry, planId))),
-    diagnostics: normalizeDiagnostics(input.diagnostics),
+    executionRuns,
+    diagnostics,
     startTime: start.toISOString(),
     endTime: undefined,
   });
@@ -177,9 +199,8 @@ export function transitionAgentExecutionSession(
 
   const terminalStatus = isTerminalStatus(transition.status);
   const endTime = terminalStatus ? (transition.endedAt ?? new Date()).toISOString() : undefined;
-
-  if (endTime && new Date(endTime).getTime() < new Date(session.startTime).getTime()) {
-    throw new Error("Agent execution session endTime cannot be earlier than startTime.");
+  if (endTime) {
+    assertTerminalTiming(session.startTime, endTime);
   }
 
   return Object.freeze({

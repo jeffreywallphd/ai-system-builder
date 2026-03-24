@@ -265,6 +265,8 @@ That is "done enough" for Direction 1: the unified execution engine now includes
 - Agent roots expose explicit `toolAccess` beside policy and memory allows intentional zero-asset initialization while remaining canonically `AssetId`-typed once references are present.
 - This does not add a second orchestration engine: it only establishes a durable contract for later planner/runner slices.
 
+- Direction 4 planning now has an execution-native inner seam: validated `AgentPlan` step graphs (including dependencies, input references, expected outputs) map through `application/agents/contracts/AgentExecutionMapping.ts` into `ExecutionPlan` `agent-tool-step` units, proving future planner output routes into the same unified execution engine instead of a parallel agent runtime.
+
 ## TODO
 
 - Tool running, model/dataset runs, and the narrow MCP server-operation slice now share the same engine seam and persisted run model, but broader composition still has multiple roots. Further convergence should happen incrementally instead of through a giant rewrite.

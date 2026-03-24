@@ -1,33 +1,35 @@
 import type { Agent } from "../../../domain/agents/Agent";
+import { createAgentPlan, type AgentPlan } from "../../../domain/agents/AgentPlan";
 import type { AgentMemoryEntryReference, AgentMemoryStore } from "../../../domain/agents/AgentMemory";
 import type { IToolCapabilityCatalog } from "../../ports/interfaces/IToolCapabilityCatalog";
 
-export interface AgentPlanningStep {
-  readonly stepId: string;
-  readonly goalId: string;
-  readonly toolId: string;
-  readonly action: string;
-  readonly memoryContext: ReadonlyArray<AgentMemoryEntryReference>;
+export interface PlanningStrategyRequest {
+  readonly agent: Agent;
+  readonly context?: Readonly<Record<string, unknown>>;
 }
 
-export interface AgentExecutionPlan {
-  readonly planId: string;
-  readonly agentId: string;
-  readonly strategyId: string;
-  readonly steps: ReadonlyArray<AgentPlanningStep>;
+export interface PlanningStrategy {
+  plan(request: PlanningStrategyRequest): Promise<AgentPlan>;
 }
 
-export interface AgentPlanningInterface {
-  plan(agent: Agent): Promise<AgentExecutionPlan>;
+export type AgentPlanningInterface = PlanningStrategy;
+
+function buildStepId(agentId: string, goalId: string, index: number): string {
+  return `plan:${agentId}:${goalId}:${index + 1}`;
 }
 
-export class DeterministicAgentPlanningService implements AgentPlanningInterface {
+function toIntentMemoryReferences(memoryEntries: ReadonlyArray<AgentMemoryEntryReference>): ReadonlyArray<AgentMemoryEntryReference> {
+  return Object.freeze(memoryEntries.map((entry) => Object.freeze({ ...entry })));
+}
+
+export class DeterministicAgentPlanningService implements PlanningStrategy {
   constructor(
     private readonly catalog: IToolCapabilityCatalog,
     private readonly memoryStore: AgentMemoryStore,
   ) {}
 
-  public async plan(agent: Agent): Promise<AgentExecutionPlan> {
+  public async plan(request: PlanningStrategyRequest): Promise<AgentPlan> {
+    const { agent } = request;
     const capabilities = await this.catalog.listCapabilities();
     const capabilityIds = new Set(capabilities.map((capability) => capability.id));
     const allowedTools = agent.toolAccess.allowedToolIds.filter((toolId) => capabilityIds.has(toolId));
@@ -48,26 +50,40 @@ export class DeterministicAgentPlanningService implements AgentPlanningInterface
       .sort((left, right) => left.priorityOrder - right.priorityOrder)
       .slice(0, maxSteps);
 
-    const steps = prioritizedGoals.map((goal, index) => {
-      const goalTool = goal.requiredToolIds?.find((candidate) => allowedTools.includes(candidate));
-      const toolId = goalTool ?? allowedTools[index % allowedTools.length];
-      if (!toolId) {
-        throw new Error(`Agent planning could not resolve a tool for goal '${goal.id}'.`);
-      }
-      return Object.freeze({
-        stepId: `plan:${agent.id}:${goal.id}:${index + 1}`,
-        goalId: goal.id,
-        toolId,
-        action: goal.objective,
-        memoryContext: Object.freeze(memoryEntries),
-      });
-    });
+    const memoryContext = toIntentMemoryReferences(memoryEntries);
 
-    return Object.freeze({
+    return createAgentPlan({
       planId: `agent-plan:${agent.id}:${Date.now()}`,
       agentId: agent.id,
       strategyId: agent.planningStrategy.strategyId,
-      steps: Object.freeze(steps),
+      steps: prioritizedGoals.map((goal, index) => {
+        const goalTool = goal.requiredToolIds?.find((candidate) => allowedTools.includes(candidate));
+        const toolId = goalTool ?? allowedTools[index % allowedTools.length];
+        if (!toolId) {
+          throw new Error(`Agent planning could not resolve a tool for goal '${goal.id}'.`);
+        }
+
+        return Object.freeze({
+          stepId: buildStepId(agent.id, goal.id, index),
+          goalId: goal.id,
+          toolId,
+          dependsOnStepIds: Object.freeze(index === 0 ? [] : [buildStepId(agent.id, prioritizedGoals[index - 1]!.id, index - 1)]),
+          intent: Object.freeze({
+            action: goal.objective,
+            expectedOutputKey: `goal.${goal.id}.result`,
+            inputReferences: Object.freeze(
+              memoryContext.map((entry) => Object.freeze({
+                kind: "asset" as const,
+                assetId: entry.assetId,
+              })),
+            ),
+          }),
+          metadata: Object.freeze({
+            memoryContext,
+          }),
+        });
+      }),
+      metadata: request.context ? Object.freeze({ ...request.context }) : undefined,
     });
   }
 }

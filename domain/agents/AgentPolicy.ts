@@ -1,4 +1,6 @@
 import type {
+  McpSandboxEnvironmentMode,
+  McpSandboxNetworkProtocol,
   McpToolPermissionScope,
   McpToolPermissionApprovalStatus,
   McpToolSandboxPolicy,
@@ -9,9 +11,33 @@ export const AgentApprovalStatuses = Object.freeze({
   approved: "approved",
   denied: "denied",
   revoked: "revoked",
-});
+} as const satisfies Record<McpToolPermissionApprovalStatus, McpToolPermissionApprovalStatus>);
 
-export type AgentApprovalStatus = typeof AgentApprovalStatuses[keyof typeof AgentApprovalStatuses];
+export type AgentApprovalStatus = McpToolPermissionApprovalStatus;
+
+const CanonicalMcpPermissionIds = Object.freeze([
+  "asset.read",
+  "asset.write",
+  "network.access",
+  "filesystem.read",
+  "filesystem.write",
+  "system.exec",
+] as const satisfies ReadonlyArray<McpToolPermissionScope>);
+
+const CanonicalSandboxEnvironmentModes = Object.freeze([
+  "inherit-runtime",
+  "none",
+  "allowlist",
+] as const satisfies ReadonlyArray<McpSandboxEnvironmentMode>);
+
+const CanonicalSandboxNetworkProtocols = Object.freeze([
+  "http",
+  "https",
+  "ws",
+  "wss",
+  "tcp",
+  "udp",
+] as const satisfies ReadonlyArray<McpSandboxNetworkProtocol>);
 
 export const AgentExtendedPermissionIds = Object.freeze({
   runtimeExecute: "runtime.execute",
@@ -82,17 +108,26 @@ function normalizeList(values: ReadonlyArray<string> | undefined): ReadonlyArray
   return Object.freeze([...deduped]);
 }
 
-function isSupportedToolId(value: string): boolean {
-  const normalized = value.trim();
+function normalizeToolId(value: string): string {
+  const normalized = normalizeRequired(value, "Agent policy allowed tool id");
+
   if (normalized.startsWith("mcp:")) {
     const parts = normalized.split(":");
-    return parts.length === 3 && parts.every((part) => part.length > 0);
+    if (parts.length !== 3 || parts.some((part) => !part.trim())) {
+      throw new Error(`Agent policy allowed tool id '${normalized}' is malformed.`);
+    }
+    return normalized;
   }
+
   if (normalized.startsWith("workflow:")) {
     const parts = normalized.split(":");
-    return parts.length >= 2 && parts.slice(1).every((part) => part.length > 0);
+    if (parts.length < 2 || parts.slice(1).some((part) => !part.trim())) {
+      throw new Error(`Agent policy allowed tool id '${normalized}' is malformed.`);
+    }
+    return normalized;
   }
-  return false;
+
+  throw new Error(`Agent policy allowed tool id '${normalized}' is malformed.`);
 }
 
 function normalizeScope(scope: string, toolId: string): string {
@@ -103,20 +138,129 @@ function normalizeScope(scope: string, toolId: string): string {
   return normalized;
 }
 
+function normalizeScopeType(value: "tool" | "workspace" | "global"): "tool" | "workspace" | "global" {
+  if (!["tool", "workspace", "global"].includes(value)) {
+    throw new Error("Agent required approval scopeType must be tool, workspace, or global.");
+  }
+  return value;
+}
+
+function normalizeApprovalStatus(value: McpToolPermissionApprovalStatus | undefined): AgentApprovalStatus {
+  const normalized = value ?? AgentApprovalStatuses.approved;
+  if (!Object.values(AgentApprovalStatuses).includes(normalized)) {
+    throw new Error("Agent required approval minimumStatus is invalid.");
+  }
+  return normalized;
+}
+
+function normalizePermissionId(value: string): AgentPermissionId {
+  const normalized = normalizeRequired(value, "Agent permissionId") as AgentPermissionId;
+  const supported: ReadonlyArray<string> = [
+    ...CanonicalMcpPermissionIds,
+    AgentExtendedPermissionIds.runtimeExecute,
+    AgentExtendedPermissionIds.workspaceRead,
+    AgentExtendedPermissionIds.workspaceWrite,
+  ];
+  if (!supported.includes(normalized)) {
+    throw new Error(`Agent permissionId '${normalized}' is unsupported.`);
+  }
+  return normalized;
+}
+
+function normalizeSandboxPolicy(value: McpToolSandboxPolicy | undefined): McpToolSandboxPolicy {
+  const sandbox = value ?? {
+    network: { allowed: false },
+    filesystem: { allowed: false },
+    assets: { read: true, write: false },
+    environment: { mode: "none" as const },
+  };
+
+  if (!sandbox.network) {
+    throw new Error("Agent sandbox network policy is required.");
+  }
+  if (!sandbox.filesystem) {
+    throw new Error("Agent sandbox filesystem policy is required.");
+  }
+  if (!sandbox.assets) {
+    throw new Error("Agent sandbox assets policy is required.");
+  }
+  if (!sandbox.environment) {
+    throw new Error("Agent sandbox environment policy is required.");
+  }
+
+  if (!CanonicalSandboxEnvironmentModes.includes(sandbox.environment.mode)) {
+    throw new Error(`Agent sandbox environment mode '${sandbox.environment.mode}' is invalid.`);
+  }
+
+  const normalizedAllowedProtocols = Object.freeze(
+    [...new Set(sandbox.network.allowedProtocols ?? [])].map((protocol) => {
+      if (!CanonicalSandboxNetworkProtocols.includes(protocol)) {
+        throw new Error(`Agent sandbox network protocol '${protocol}' is invalid.`);
+      }
+      return protocol;
+    }),
+  );
+
+  const normalizedAllowedHosts = normalizeList(sandbox.network.allowedHosts);
+  if (normalizedAllowedHosts.some((host) => /\s/.test(host))) {
+    throw new Error("Agent sandbox network allowedHosts must not include whitespace.");
+  }
+
+  const normalizedReadPaths = normalizeList(sandbox.filesystem.readPaths);
+  const normalizedWritePaths = normalizeList(sandbox.filesystem.writePaths);
+  const normalizedAllowedEnvVars = normalizeList(sandbox.environment.allowedEnvVars);
+
+  if (!sandbox.network.allowed && (normalizedAllowedHosts.length > 0 || normalizedAllowedProtocols.length > 0)) {
+    throw new Error("Agent sandbox network denied policy cannot include allowedHosts or allowedProtocols.");
+  }
+
+  if (!sandbox.filesystem.allowed && (normalizedReadPaths.length > 0 || normalizedWritePaths.length > 0)) {
+    throw new Error("Agent sandbox filesystem denied policy cannot include readPaths or writePaths.");
+  }
+
+  if (sandbox.filesystem.allowed && normalizedReadPaths.length === 0 && normalizedWritePaths.length === 0) {
+    throw new Error("Agent sandbox filesystem policy requires readPaths or writePaths when filesystem is allowed.");
+  }
+
+  if (sandbox.environment.mode === "allowlist" && normalizedAllowedEnvVars.length === 0) {
+    throw new Error("Agent sandbox environment allowlist mode requires allowedEnvVars.");
+  }
+
+  if (sandbox.environment.mode === "none" && normalizedAllowedEnvVars.length > 0) {
+    throw new Error("Agent sandbox environment none mode cannot include allowedEnvVars.");
+  }
+
+  return Object.freeze({
+    network: Object.freeze({
+      allowed: sandbox.network.allowed,
+      allowedHosts: normalizedAllowedHosts,
+      allowedProtocols: normalizedAllowedProtocols,
+    }),
+    filesystem: Object.freeze({
+      allowed: sandbox.filesystem.allowed,
+      readPaths: normalizedReadPaths,
+      writePaths: normalizedWritePaths,
+    }),
+    assets: Object.freeze({
+      read: Boolean(sandbox.assets.read),
+      write: Boolean(sandbox.assets.write),
+    }),
+    environment: Object.freeze({
+      mode: sandbox.environment.mode,
+      allowedEnvVars: normalizedAllowedEnvVars,
+    }),
+  });
+}
+
 export function normalizeAgentPolicy(policy: AgentPolicy): AgentPolicy {
-  const allowedToolIds = normalizeList(policy.toolAccess?.allowedToolIds);
+  const allowedToolIds = Object.freeze(normalizeList(policy.toolAccess?.allowedToolIds).map((toolId) => normalizeToolId(toolId)));
   if (allowedToolIds.length === 0) {
     throw new Error("Agent policy must include at least one allowed tool.");
-  }
-  for (const toolId of allowedToolIds) {
-    if (!isSupportedToolId(toolId)) {
-      throw new Error(`Agent policy allowed tool id '${toolId}' is malformed.`);
-    }
   }
 
   const toolScopeConstraints = Object.freeze(
     (policy.toolAccess?.scopeConstraints ?? []).map((constraint) => Object.freeze({
-      toolId: normalizeRequired(constraint.toolId, "Agent tool scope toolId"),
+      toolId: normalizeToolId(constraint.toolId),
       allowedScopes: Object.freeze(
         normalizeList(constraint.allowedScopes).map((scope) => normalizeScope(scope, constraint.toolId)),
       ),
@@ -143,6 +287,7 @@ export function normalizeAgentPolicy(policy: AgentPolicy): AgentPolicy {
     maxTokens: normalizePositiveInt(costLimitsInput.maxTokens, "Agent cost limit maxTokens"),
     maxEstimatedUsd: normalizeNonNegativeNumber(costLimitsInput.maxEstimatedUsd, "Agent cost limit maxEstimatedUsd"),
   });
+
   if (costLimits.maxTokens !== undefined && costLimits.maxEstimatedUsd !== undefined && costLimits.maxTokens < 100) {
     throw new Error("Agent policy cost limits are conflicting: maxTokens is unrealistically low for a USD budget.");
   }
@@ -154,17 +299,44 @@ export function normalizeAgentPolicy(policy: AgentPolicy): AgentPolicy {
       network: { allowed: false },
       filesystem: { allowed: false },
       assets: { read: true, write: false },
-      environment: { mode: "none" },
+      environment: { mode: "none" as const },
     },
   };
+
   const requiredApprovals = Object.freeze((safetyInput.requiredApprovals ?? []).map((entry) => Object.freeze({
     permissionId: normalizePermissionId(entry.permissionId),
     minimumStatus: normalizeApprovalStatus(entry.minimumStatus),
     scopeType: normalizeScopeType(entry.scopeType),
     scopeId: entry.scopeId?.trim() || undefined,
   })));
-  const deniedPermissionIds = Object.freeze((safetyInput.deniedPermissionIds ?? []).map((permissionId) => normalizePermissionId(permissionId)));
+
+  const deniedPermissionIds = Object.freeze(
+    [...new Set((safetyInput.deniedPermissionIds ?? []).map((permissionId) => normalizePermissionId(permissionId)))],
+  );
   const sandbox = normalizeSandboxPolicy(safetyInput.sandbox);
+
+  const requiredApprovalByKey = new Map<string, AgentApprovalStatus>();
+  for (const approval of requiredApprovals) {
+    const key = `${approval.permissionId}|${approval.scopeType}|${approval.scopeId ?? "*"}`;
+    const existing = requiredApprovalByKey.get(key);
+    if (existing && existing !== approval.minimumStatus) {
+      throw new Error(`Agent policy approval for '${approval.permissionId}' has conflicting minimumStatus values.`);
+    }
+    requiredApprovalByKey.set(key, approval.minimumStatus);
+
+    if (approval.scopeType === "tool") {
+      if (!approval.scopeId) {
+        throw new Error("Agent required approvals with tool scope must include scopeId.");
+      }
+      if (!allowedToolIds.includes(approval.scopeId)) {
+        throw new Error(`Agent required approval references unknown tool scope '${approval.scopeId}'.`);
+      }
+    }
+
+    if (approval.scopeType !== "tool" && approval.scopeId) {
+      throw new Error("Agent required approval scopeId is only supported when scopeType is tool.");
+    }
+  }
 
   if (!sandbox.network.allowed && deniedPermissionIds.includes("network.access")) {
     throw new Error("Agent policy should not redundantly deny network.access when sandbox.network is deny.");
@@ -175,19 +347,13 @@ export function normalizeAgentPolicy(policy: AgentPolicy): AgentPolicy {
   if (!sandbox.filesystem.allowed && requiredApprovals.some((entry) => entry.permissionId.startsWith("filesystem."))) {
     throw new Error("Agent policy sandbox denies filesystem access but approvals require filesystem permissions.");
   }
-  for (const approval of requiredApprovals) {
-    if (approval.scopeType === "tool") {
-      if (!approval.scopeId) {
-        throw new Error("Agent required approvals with tool scope must include scopeId.");
-      }
-      if (!allowedToolIds.includes(approval.scopeId)) {
-        throw new Error(`Agent required approval references unknown tool scope '${approval.scopeId}'.`);
-      }
-    }
-    if (approval.scopeType !== "tool" && approval.scopeId) {
-      throw new Error("Agent required approval scopeId is only supported when scopeType is tool.");
-    }
+  if (!sandbox.assets.read && requiredApprovals.some((entry) => entry.permissionId === "asset.read")) {
+    throw new Error("Agent policy sandbox denies asset read but approvals require asset.read.");
   }
+  if (!sandbox.assets.write && requiredApprovals.some((entry) => entry.permissionId === "asset.write")) {
+    throw new Error("Agent policy sandbox denies asset write but approvals require asset.write.");
+  }
+
   for (const deniedPermissionId of deniedPermissionIds) {
     if (requiredApprovals.some((entry) => entry.permissionId === deniedPermissionId)) {
       throw new Error(`Agent policy permission '${deniedPermissionId}' cannot be both required and denied.`);
@@ -206,83 +372,6 @@ export function normalizeAgentPolicy(policy: AgentPolicy): AgentPolicy {
       requiredApprovals,
       deniedPermissionIds,
       sandbox,
-    }),
-  });
-}
-
-function normalizeScopeType(value: "tool" | "workspace" | "global"): "tool" | "workspace" | "global" {
-  if (!["tool", "workspace", "global"].includes(value)) {
-    throw new Error("Agent required approval scopeType must be tool, workspace, or global.");
-  }
-  return value;
-}
-
-function normalizeApprovalStatus(value: McpToolPermissionApprovalStatus | undefined): AgentApprovalStatus {
-  const normalized = value ?? "approved";
-  if (!Object.values(AgentApprovalStatuses).includes(normalized)) {
-    throw new Error("Agent required approval minimumStatus is invalid.");
-  }
-  return normalized;
-}
-
-function normalizePermissionId(value: string): AgentPermissionId {
-  const normalized = normalizeRequired(value, "Agent permissionId") as AgentPermissionId;
-  const supported: ReadonlyArray<string> = [
-    "asset.read",
-    "asset.write",
-    "network.access",
-    "filesystem.read",
-    "filesystem.write",
-    "system.exec",
-    AgentExtendedPermissionIds.runtimeExecute,
-    AgentExtendedPermissionIds.workspaceRead,
-    AgentExtendedPermissionIds.workspaceWrite,
-  ];
-  if (!supported.includes(normalized)) {
-    throw new Error(`Agent permissionId '${normalized}' is unsupported.`);
-  }
-  return normalized;
-}
-
-function normalizeSandboxPolicy(value: McpToolSandboxPolicy | undefined): McpToolSandboxPolicy {
-  const sandbox = value ?? {
-    network: { allowed: false },
-    filesystem: { allowed: false },
-    assets: { read: true, write: false },
-    environment: { mode: "none" as const },
-  };
-
-  if (!sandbox.network) {
-    throw new Error("Agent sandbox network policy is required.");
-  }
-  if (sandbox.network.allowedHosts && sandbox.network.allowedHosts.some((host) => !host.trim())) {
-    throw new Error("Agent sandbox network allowedHosts must not contain empty entries.");
-  }
-  if (sandbox.filesystem.allowed && !(sandbox.filesystem.readPaths?.length || sandbox.filesystem.writePaths?.length)) {
-    throw new Error("Agent sandbox filesystem policy requires readPaths or writePaths when filesystem is allowed.");
-  }
-  if (sandbox.environment.mode === "allowlist" && (sandbox.environment.allowedEnvVars?.length ?? 0) === 0) {
-    throw new Error("Agent sandbox environment allowlist mode requires allowedEnvVars.");
-  }
-
-  return Object.freeze({
-    network: Object.freeze({
-      allowed: sandbox.network.allowed,
-      allowedHosts: normalizeList(sandbox.network.allowedHosts),
-      allowedProtocols: Object.freeze([...(sandbox.network.allowedProtocols ?? [])]),
-    }),
-    filesystem: Object.freeze({
-      allowed: sandbox.filesystem.allowed,
-      readPaths: normalizeList(sandbox.filesystem.readPaths),
-      writePaths: normalizeList(sandbox.filesystem.writePaths),
-    }),
-    assets: Object.freeze({
-      read: Boolean(sandbox.assets.read),
-      write: Boolean(sandbox.assets.write),
-    }),
-    environment: Object.freeze({
-      mode: sandbox.environment.mode,
-      allowedEnvVars: normalizeList(sandbox.environment.allowedEnvVars),
     }),
   });
 }

@@ -1,6 +1,7 @@
 import { ExecutionPlan, ExecutionUnitKinds, type IExecutionUnitDefinition } from "../../../domain/execution/ExecutionPlan";
 import type { AgentExecutionSession } from "../../../domain/agents/AgentExecutionSession";
 import { AssetId } from "../../../domain/assets/AssetId";
+import type { AgentPlan, AgentPlanStep } from "../../../domain/agents/AgentPlan";
 
 export interface AgentPlanStepMappingInput {
   readonly stepId: string;
@@ -48,6 +49,17 @@ function resolvePlanId(session: AgentExecutionSession): string {
   return session.executionPlan?.planId.trim() || `agent-plan:${session.id}`;
 }
 
+function normalizeExpectedOutputKey(value: string | undefined): string | undefined {
+  const normalized = value?.trim() || undefined;
+  if (!normalized) {
+    return undefined;
+  }
+  if (!/^[a-zA-Z0-9_.-]+$/.test(normalized)) {
+    throw new Error(`Agent plan step expectedOutputKey '${normalized}' is malformed.`);
+  }
+  return normalized;
+}
+
 function normalizeStep(step: AgentPlanStepMappingInput): AgentPlanStepMappingInput {
   return Object.freeze({
     stepId: normalizeRequired(step.stepId, "Agent plan step id"),
@@ -62,9 +74,100 @@ function normalizeStep(step: AgentPlanStepMappingInput): AgentPlanStepMappingInp
         }
         return normalizedAssetId;
       })),
-      expectedOutputKey: step.intent?.expectedOutputKey?.trim() || undefined,
+      expectedOutputKey: normalizeExpectedOutputKey(step.intent?.expectedOutputKey),
     }),
-    dependsOnStepIds: Object.freeze((step.dependsOnStepIds ?? []).map((dependency) => normalizeRequired(dependency, "Agent plan dependency id"))),
+    dependsOnStepIds: Object.freeze(
+      [...new Set((step.dependsOnStepIds ?? []).map((dependency) => normalizeRequired(dependency, "Agent plan dependency id")))],
+    ),
+  });
+}
+
+function validateDependencies(steps: ReadonlyArray<AgentPlanStepMappingInput>): void {
+  const stepIdSet = new Set(steps.map((step) => step.stepId));
+  if (stepIdSet.size !== steps.length) {
+    throw new Error("Agent execution mapping steps must use unique step ids.");
+  }
+
+  for (const step of steps) {
+    if ((step.dependsOnStepIds ?? []).includes(step.stepId)) {
+      throw new Error(`Agent execution mapping step '${step.stepId}' cannot depend on itself.`);
+    }
+    for (const dependencyId of step.dependsOnStepIds ?? []) {
+      if (!stepIdSet.has(dependencyId)) {
+        throw new Error(`Agent execution mapping step '${step.stepId}' depends on unknown step '${dependencyId}'.`);
+      }
+    }
+  }
+
+  const dependencyGraph = new Map(steps.map((step) => [step.stepId, step.dependsOnStepIds ?? []] as const));
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+  const visit = (stepId: string): void => {
+    if (visited.has(stepId)) {
+      return;
+    }
+    if (visiting.has(stepId)) {
+      throw new Error(`Agent execution mapping step '${stepId}' participates in a dependency cycle.`);
+    }
+    visiting.add(stepId);
+    for (const dependencyId of dependencyGraph.get(stepId) ?? []) {
+      visit(dependencyId);
+    }
+    visiting.delete(stepId);
+    visited.add(stepId);
+  };
+  for (const step of steps) {
+    visit(step.stepId);
+  }
+}
+
+function validateResultWiring(steps: ReadonlyArray<AgentPlanStepMappingInput>): void {
+  const seenOutputKeys = new Set<string>();
+  for (const step of steps) {
+    const outputKey = step.intent.expectedOutputKey;
+    if (!outputKey) {
+      continue;
+    }
+    if (seenOutputKeys.has(outputKey)) {
+      throw new Error(`Agent execution mapping expectedOutputKey '${outputKey}' must be unique across steps.`);
+    }
+    seenOutputKeys.add(outputKey);
+  }
+}
+
+function toMappingStep(step: AgentPlanStep): AgentPlanStepMappingInput {
+  return Object.freeze({
+    stepId: step.stepId,
+    goalId: step.goalId,
+    toolId: step.toolId,
+    dependsOnStepIds: step.dependsOnStepIds,
+    intent: Object.freeze({
+      action: step.intent.action,
+      expectedOutputKey: step.intent.expectedOutputKey,
+      inputAssetIds: Object.freeze(
+        step.intent.inputReferences
+          .filter((reference) => reference.kind === "asset")
+          .map((reference) => reference.assetId),
+      ),
+    }),
+  });
+}
+
+export function mapAgentPlanToBackbone(input: {
+  readonly session: AgentExecutionSession;
+  readonly plan: AgentPlan;
+}): AgentExecutionBackboneMapping {
+  const sessionPlanId = input.session.executionPlan?.planId;
+  if (sessionPlanId && sessionPlanId !== input.plan.planId) {
+    throw new Error(`Agent execution session planId '${sessionPlanId}' must match agent plan '${input.plan.planId}'.`);
+  }
+  if (input.plan.agentId !== input.session.agentId) {
+    throw new Error(`Agent execution plan agentId '${input.plan.agentId}' must match session agentId '${input.session.agentId}'.`);
+  }
+
+  return mapAgentExecutionToBackbone({
+    session: input.session,
+    steps: input.plan.steps.map((step) => toMappingStep(step)),
   });
 }
 
@@ -98,37 +201,8 @@ export function mapAgentExecutionToBackbone(input: AgentExecutionBackboneMapping
 
   const planId = resolvePlanId(input.session);
   const normalizedSteps = input.steps.map((step) => normalizeStep(step));
-  const stepIdSet = new Set(normalizedSteps.map((step) => step.stepId));
-  if (stepIdSet.size !== normalizedSteps.length) {
-    throw new Error("Agent execution mapping steps must use unique step ids.");
-  }
-  for (const step of normalizedSteps) {
-    for (const dependencyId of step.dependsOnStepIds ?? []) {
-      if (!stepIdSet.has(dependencyId)) {
-        throw new Error(`Agent execution mapping step '${step.stepId}' depends on unknown step '${dependencyId}'.`);
-      }
-    }
-  }
-  const dependencyGraph = new Map(normalizedSteps.map((step) => [step.stepId, step.dependsOnStepIds ?? []] as const));
-  const visiting = new Set<string>();
-  const visited = new Set<string>();
-  const visit = (stepId: string): void => {
-    if (visited.has(stepId)) {
-      return;
-    }
-    if (visiting.has(stepId)) {
-      throw new Error(`Agent execution mapping step '${stepId}' participates in a dependency cycle.`);
-    }
-    visiting.add(stepId);
-    for (const dependencyId of dependencyGraph.get(stepId) ?? []) {
-      visit(dependencyId);
-    }
-    visiting.delete(stepId);
-    visited.add(stepId);
-  };
-  for (const step of normalizedSteps) {
-    visit(step.stepId);
-  }
+  validateDependencies(normalizedSteps);
+  validateResultWiring(normalizedSteps);
 
   const units: IExecutionUnitDefinition[] = normalizedSteps.map((step) => ({
     id: step.stepId,

@@ -49,5 +49,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Agent execution now has a bounded mapping seam into the unified execution backbone (`application/agents/contracts/AgentExecutionMapping.ts`) that yields `ExecutionPlan` units plus per-unit payload correlation data, rather than introducing a second runtime model.
 - This remains a foundation slice only: no studio UI, no autonomous replanning loop, and no parallel orchestration stack.
 
+- Direction 4 (Phase 2, inner foundation only) now includes an execution-oriented planning contract: `domain/agents/AgentPlan.ts` (dependency-aware plan/step model + validation), `application/agents/services/AgentPlanningInterface.ts` (strategy contract + deterministic strategy), and bounded planning-loop evaluation contracts in `application/agents/contracts/AgentPlanningLoop.ts` without adding a parallel runtime or UI loop.
+
 ## TODO
 - If asked for the "single" architecture entry point, explain that there are currently multiple composition roots and name them explicitly.
