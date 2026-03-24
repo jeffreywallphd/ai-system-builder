@@ -11,7 +11,7 @@ import { McpToolAuthService } from "./security/McpToolAuthService";
 import { McpToolApprovalPolicyService } from "./security/McpToolApprovalPolicyService";
 import { McpToolPermissionPolicyService } from "./security/McpToolPermissionPolicyService";
 import { McpToolSandboxPolicyService } from "./security/McpToolSandboxPolicyService";
-import type { McpToolPermissionScope } from "../../domain/mcp/McpToolTrust";
+import type { McpToolPermissionScope, McpToolSandboxCapabilityRequest } from "../../domain/mcp/McpToolTrust";
 import type { McpToolAssetIoCoordinator } from "./McpToolAssetIoCoordinator";
 import type { McpCredentialResolutionContext } from "./security/McpCredentialResolution";
 
@@ -50,6 +50,7 @@ export class ExecuteMcpToolUseCase {
       arguments: request.arguments ? Object.freeze({ ...request.arguments }) : undefined,
       context: request.context,
       runtimePermissions: request.runtimePermissions ? Object.freeze([...request.runtimePermissions]) : undefined,
+      sandboxRequest: request.sandboxRequest ? Object.freeze({ ...request.sandboxRequest }) : undefined,
       credentialContext: request.credentialContext ? Object.freeze({ ...request.credentialContext }) : undefined,
       metadata: Object.freeze({
         ...(request.metadata ? { ...request.metadata } : {}),
@@ -192,12 +193,37 @@ export class ExecuteMcpToolUseCase {
         installedTool,
         normalizedRequest.runtimePermissions ?? extractContextGrantedPermissions(normalizedRequest.metadata),
       );
+      if (!permissionDecision.allowed) {
+        const approvalDecision = this.approvalPolicyService.evaluate(
+          installedTool,
+          resolveApprovalScope(normalizedRequest),
+          normalizedRequest.runtimePermissions ?? extractContextGrantedPermissions(normalizedRequest.metadata),
+        );
+        const sandboxDecision = this.sandboxPolicyService.evaluate(installedTool, resolveSandboxRequest(normalizedRequest));
+        await this.auditSink.record({
+          toolId: installedTool.toolId,
+          serverId: normalizedRequest.serverId,
+          toolName: normalizedRequest.toolName,
+          occurredAt: new Date().toISOString(),
+          outcome: "denied",
+          reason: "permission-denied",
+          permissionDecision,
+          approvalDecision,
+          sandboxDecision,
+        });
+        throw new McpToolRegistryError("permission-denied", "MCP tool invocation denied by permission policy.", {
+          toolId: installedTool.toolId,
+          deniedPermissions: permissionDecision.deniedPermissions,
+          requiredPermissions: permissionDecision.requiredPermissions,
+        });
+      }
+
       const approvalDecision = this.approvalPolicyService.evaluate(
         installedTool,
         resolveApprovalScope(normalizedRequest),
         normalizedRequest.runtimePermissions ?? extractContextGrantedPermissions(normalizedRequest.metadata),
       );
-      const sandboxDecision = this.sandboxPolicyService.evaluate(installedTool);
+      const sandboxDecision = this.sandboxPolicyService.evaluate(installedTool, resolveSandboxRequest(normalizedRequest));
       const effectiveTrust = Object.freeze({
         permissionDecision,
         approvalDecision,
@@ -224,24 +250,6 @@ export class ExecuteMcpToolUseCase {
         });
       }
 
-      if (!permissionDecision.allowed) {
-        await this.auditSink.record({
-          toolId: installedTool.toolId,
-          serverId: normalizedRequest.serverId,
-          toolName: normalizedRequest.toolName,
-          occurredAt: new Date().toISOString(),
-          outcome: "denied",
-          reason: "permission-denied",
-          permissionDecision,
-          approvalDecision,
-          sandboxDecision,
-        });
-        throw new McpToolRegistryError("permission-denied", "MCP tool invocation denied by permission policy.", {
-          toolId: installedTool.toolId,
-          deniedPermissions: permissionDecision.deniedPermissions,
-          requiredPermissions: permissionDecision.requiredPermissions,
-        });
-      }
 
       if (!sandboxDecision.allowed) {
         await this.auditSink.record({
@@ -367,6 +375,18 @@ function resolveCredentialContext(request: McpToolExecutionRequest): McpCredenti
     userId: request.credentialContext?.userId
       ?? (typeof metadataContext?.userId === "string" ? metadataContext.userId : undefined),
   });
+}
+
+
+function resolveSandboxRequest(request: McpToolExecutionRequest): McpToolSandboxCapabilityRequest {
+  const metadataRequest = request.metadata?.sandboxRequest;
+  if (request.sandboxRequest) {
+    return request.sandboxRequest;
+  }
+  if (!metadataRequest || typeof metadataRequest !== "object") {
+    return Object.freeze({});
+  }
+  return Object.freeze({ ...(metadataRequest as Record<string, unknown>) }) as McpToolSandboxCapabilityRequest;
 }
 
 function sanitizeMcpResultErrors(result: McpToolExecutionResult): McpToolExecutionResult {

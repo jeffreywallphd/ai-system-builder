@@ -2,6 +2,7 @@ import {
   createDefaultMcpToolSandboxPolicy,
   deriveRequiredMcpToolPermissions,
   type McpSandboxEnvironmentMode,
+  type McpSandboxNetworkProtocol,
   type McpToolPermissionApprovalEvent,
   type McpToolPermissionApprovalRecord,
   type McpToolPermissionApprovalStatus,
@@ -14,6 +15,7 @@ import type { IMcpToolExecutionAuditSink } from "../../ports/interfaces/IMcpTool
 import type { IMcpToolSecretRepository, McpToolSecretScope } from "../../ports/interfaces/IMcpToolSecretRepository";
 import { McpToolAuthService } from "../security/McpToolAuthService";
 import { McpToolApprovalPolicyService } from "../security/McpToolApprovalPolicyService";
+import { McpToolPermissionPolicyService } from "../security/McpToolPermissionPolicyService";
 import { McpToolSandboxPolicyService } from "../security/McpToolSandboxPolicyService";
 import { McpToolRegistryError } from "./McpToolRegistryErrors";
 
@@ -166,52 +168,62 @@ export class RevokeMcpToolPermissionApprovalUseCase {
   ) {}
 
   public async execute(request: { readonly toolId: string; readonly permissions: ReadonlyArray<McpToolPermissionScope>; readonly scope?: McpToolTrustScope; readonly actor?: string; readonly reason?: string }) {
-    return new SetMcpToolPermissionApprovalUseCase(this.registryRepository, this.auditSink).execute({
-      toolId: request.toolId,
-      permissions: request.permissions,
-      status: "denied",
-      scope: request.scope,
-      actor: request.actor,
-      reason: request.reason ?? "revoked",
-    }).then(async (updated) => {
-      const now = new Date().toISOString();
-      const scope = normalizeScope(request.scope);
-      const permissions = normalizePermissions(request.permissions);
-      const history = [...(updated.approvalHistory ?? [])];
-      for (const permission of permissions) {
-        history.push(Object.freeze({
-          eventId: `approval-event:${updated.toolId}:${permission}:${now}:${Math.random().toString(16).slice(2)}`,
-          permission,
-          scope,
-          fromStatus: "denied" as const,
-          toStatus: "revoked" as const,
-          occurredAt: now,
-          actor: request.actor,
-          reason: request.reason ?? "revoked",
-        }));
-      }
-      const revisedApprovals = (updated.permissionApprovals ?? []).map((entry) => (
-        permissions.includes(entry.permission) && entry.scope.scopeType === scope.scopeType && entry.scope.scopeId === scope.scopeId
-          ? Object.freeze({ ...entry, status: "revoked" as const, updatedAt: now, decidedBy: request.actor, reason: request.reason ?? "revoked" })
-          : entry
-      ));
-      const saved = await this.registryRepository.saveInstalledTool(Object.freeze({
-        ...updated,
-        permissionApprovals: Object.freeze(revisedApprovals),
-        approvalHistory: Object.freeze(history.sort((left, right) => left.occurredAt.localeCompare(right.occurredAt))),
+    const tool = await this.registryRepository.getInstalledTool(request.toolId.trim());
+    if (!tool) {
+      throw new McpToolRegistryError("tool-not-found", `MCP tool '${request.toolId}' was not found.`);
+    }
+    const now = new Date().toISOString();
+    const scope = normalizeScope(request.scope);
+    const permissions = normalizePermissions(request.permissions);
+    const nextApprovals = [...(tool.permissionApprovals ?? [])];
+    const nextHistory = [...(tool.approvalHistory ?? [])];
+
+    for (const permission of permissions) {
+      const current = findLatestApproval(nextApprovals, permission, scope);
+      const revised: McpToolPermissionApprovalRecord = Object.freeze({
+        approvalId: current?.approvalId ?? `approval:${tool.toolId}:${permission}:${scope.scopeType}:${scope.scopeId ?? "global"}`,
+        permission,
+        scope,
+        status: "revoked",
+        requestedAt: current?.requestedAt ?? now,
         updatedAt: now,
-      }));
-      await this.auditSink.record({
-        toolId: saved.toolId,
-        serverId: saved.definition.binding?.serverId ?? "unknown",
-        toolName: saved.definition.binding?.toolName ?? saved.toolId,
-        occurredAt: now,
-        outcome: "administrative",
-        reason: "approval-revoked",
-        metadata: Object.freeze({ permissions, scope, actor: request.actor, reviewReason: request.reason }),
+        decidedBy: request.actor,
+        reason: request.reason ?? "revoked",
       });
-      return saved;
+      if (current) {
+        const index = nextApprovals.findIndex((entry) => entry.approvalId === current.approvalId);
+        nextApprovals[index] = revised;
+      } else {
+        nextApprovals.push(revised);
+      }
+      nextHistory.push(Object.freeze({
+        eventId: `approval-event:${tool.toolId}:${permission}:${now}:${Math.random().toString(16).slice(2)}`,
+        permission,
+        scope,
+        fromStatus: current?.status,
+        toStatus: "revoked" as const,
+        occurredAt: now,
+        actor: request.actor,
+        reason: request.reason ?? "revoked",
+      }));
+    }
+
+    const updated = await this.registryRepository.saveInstalledTool(Object.freeze({
+      ...tool,
+      permissionApprovals: Object.freeze(nextApprovals),
+      approvalHistory: Object.freeze(nextHistory.sort((left, right) => left.occurredAt.localeCompare(right.occurredAt))),
+      updatedAt: now,
+    }));
+    await this.auditSink.record({
+      toolId: updated.toolId,
+      serverId: updated.definition.binding?.serverId ?? "unknown",
+      toolName: updated.definition.binding?.toolName ?? updated.toolId,
+      occurredAt: now,
+      outcome: "administrative",
+      reason: "approval-revoked",
+      metadata: Object.freeze({ permissions, scope, actor: request.actor, reviewReason: request.reason }),
     });
+    return updated;
   }
 }
 
@@ -222,7 +234,15 @@ export class SetMcpToolSandboxPolicyUseCase {
     readonly toolId: string;
     readonly policy: {
       readonly networkAccess?: "allow" | "deny";
-      readonly filesystemAccess?: { readonly mode: "deny" | "read-only" | "read-write"; readonly allowedPaths?: ReadonlyArray<string> };
+      readonly networkAllowlist?: {
+        readonly hosts?: ReadonlyArray<string>;
+        readonly protocols?: ReadonlyArray<McpSandboxNetworkProtocol>;
+      };
+      readonly filesystemAccess?: {
+        readonly mode: "deny" | "read-only" | "read-write";
+        readonly readAllowedPaths?: ReadonlyArray<string>;
+        readonly writeAllowedPaths?: ReadonlyArray<string>;
+      };
       readonly assetAccess?: "deny" | "read-only" | "read-write";
       readonly environmentExposure?: { readonly mode: McpSandboxEnvironmentMode; readonly allowlist?: ReadonlyArray<string> };
     };
@@ -234,9 +254,14 @@ export class SetMcpToolSandboxPolicyUseCase {
     const current = tool.sandboxPolicy ?? createDefaultMcpToolSandboxPolicy();
     const nextPolicy: McpToolSandboxPolicy = Object.freeze({
       networkAccess: request.policy.networkAccess ?? current.networkAccess,
+      networkAllowlist: Object.freeze({
+        hosts: Object.freeze(request.policy.networkAllowlist?.hosts ?? current.networkAllowlist?.hosts ?? []),
+        protocols: Object.freeze(request.policy.networkAllowlist?.protocols ?? current.networkAllowlist?.protocols ?? []),
+      }),
       filesystemAccess: Object.freeze({
         mode: request.policy.filesystemAccess?.mode ?? current.filesystemAccess.mode,
-        allowedPaths: Object.freeze(request.policy.filesystemAccess?.allowedPaths ?? current.filesystemAccess.allowedPaths ?? []),
+        readAllowedPaths: Object.freeze(request.policy.filesystemAccess?.readAllowedPaths ?? current.filesystemAccess.readAllowedPaths ?? []),
+        writeAllowedPaths: Object.freeze(request.policy.filesystemAccess?.writeAllowedPaths ?? current.filesystemAccess.writeAllowedPaths ?? []),
       }),
       assetAccess: request.policy.assetAccess ?? current.assetAccess,
       environmentExposure: Object.freeze({
@@ -261,6 +286,10 @@ export interface McpToolTrustStateReadModel {
     readonly missing: ReadonlyArray<McpToolPermissionScope>;
     readonly denied: ReadonlyArray<McpToolPermissionScope>;
     readonly approvals: ReadonlyArray<McpToolPermissionApprovalRecord>;
+    readonly statusByPermission: ReadonlyArray<{
+      readonly permission: McpToolPermissionScope;
+      readonly status: McpToolPermissionApprovalStatus | "missing";
+    }>;
   };
   readonly sandbox: {
     readonly declaredCapabilities: ReadonlyArray<"network" | "filesystem" | "asset" | "environment">;
@@ -268,12 +297,17 @@ export interface McpToolTrustStateReadModel {
     readonly enforcement: Readonly<Record<"networkAccess" | "filesystemAccess" | "assetAccess" | "environmentExposure", "enforced" | "declared-only">>;
     readonly deniedCapabilities: ReadonlyArray<"network" | "filesystem" | "asset" | "environment">;
   };
+  readonly executionReadiness: {
+    readonly ready: boolean;
+    readonly blockers: ReadonlyArray<"missing-approval" | "denied-approval" | "missing-permission-grant" | "sandbox-denied">;
+  };
 }
 
 export class GetMcpToolTrustStateUseCase {
   constructor(
     private readonly registryRepository: IMcpToolRegistryRepository,
     private readonly approvalService: McpToolApprovalPolicyService = new McpToolApprovalPolicyService(),
+    private readonly permissionService: McpToolPermissionPolicyService = new McpToolPermissionPolicyService(),
     private readonly sandboxService: McpToolSandboxPolicyService = new McpToolSandboxPolicyService(),
   ) {}
 
@@ -284,8 +318,22 @@ export class GetMcpToolTrustStateUseCase {
     }
     const scope = normalizeScope(request.scope);
     const requiredPermissions = deriveRequiredMcpToolPermissions(tool.definition);
+    const permissionDecision = this.permissionService.evaluate(tool, []);
     const approvalDecision = this.approvalService.evaluate(tool, scope, []);
     const sandboxDecision = this.sandboxService.evaluate(tool);
+    const statuses = requiredPermissions.map((permission) => {
+      const latestApproval = findLatestApproval(tool.permissionApprovals ?? [], permission, scope);
+      return Object.freeze({
+        permission,
+        status: latestApproval?.status ?? "missing",
+      });
+    });
+    const blockers = [
+      ...(approvalDecision.missingApprovals.length > 0 ? ["missing-approval" as const] : []),
+      ...(approvalDecision.deniedApprovals.length > 0 ? ["denied-approval" as const] : []),
+      ...(permissionDecision.deniedPermissions.length > 0 ? ["missing-permission-grant" as const] : []),
+      ...(!sandboxDecision.allowed ? ["sandbox-denied" as const] : []),
+    ];
     return Object.freeze({
       toolId: tool.toolId,
       requiredPermissions,
@@ -295,6 +343,7 @@ export class GetMcpToolTrustStateUseCase {
         missing: approvalDecision.missingApprovals,
         denied: approvalDecision.deniedApprovals,
         approvals: Object.freeze((tool.permissionApprovals ?? []).filter((entry) => requiredPermissions.includes(entry.permission))),
+        statusByPermission: Object.freeze(statuses),
       }),
       sandbox: Object.freeze({
         declaredCapabilities: sandboxDecision.declaredCapabilities,
@@ -302,9 +351,73 @@ export class GetMcpToolTrustStateUseCase {
         enforcement: Object.freeze({ ...sandboxDecision.enforcement }),
         deniedCapabilities: sandboxDecision.deniedCapabilities,
       }),
+      executionReadiness: Object.freeze({
+        ready: blockers.length === 0,
+        blockers: Object.freeze(blockers),
+      }),
     });
   }
 }
+
+export class GetMissingMcpToolApprovalsUseCase {
+  constructor(private readonly trustStateUseCase: GetMcpToolTrustStateUseCase) {}
+
+  public async execute(request: { readonly toolId: string; readonly scope?: McpToolTrustScope }) {
+    const trust = await this.trustStateUseCase.execute(request);
+    return Object.freeze({
+      toolId: trust.toolId,
+      scope: trust.approval.scope,
+      missingApprovals: trust.approval.missing,
+      deniedApprovals: trust.approval.denied,
+      approvalStatusByPermission: trust.approval.statusByPermission,
+    });
+  }
+}
+
+export class GetMcpToolEffectivePermissionsUseCase {
+  constructor(
+    private readonly registryRepository: IMcpToolRegistryRepository,
+    private readonly permissionService: McpToolPermissionPolicyService = new McpToolPermissionPolicyService(),
+  ) {}
+
+  public async execute(request: { readonly toolId: string; readonly runtimePermissions?: ReadonlyArray<McpToolPermissionScope> }) {
+    const tool = await this.registryRepository.getInstalledTool(request.toolId.trim());
+    if (!tool) {
+      throw new McpToolRegistryError("tool-not-found", `MCP tool '${request.toolId}' was not found.`);
+    }
+    return this.permissionService.evaluate(tool, request.runtimePermissions ?? []);
+  }
+}
+
+export class GetMcpToolSandboxPostureUseCase {
+  constructor(
+    private readonly registryRepository: IMcpToolRegistryRepository,
+    private readonly sandboxService: McpToolSandboxPolicyService = new McpToolSandboxPolicyService(),
+  ) {}
+
+  public async execute(request: { readonly toolId: string }) {
+    const tool = await this.registryRepository.getInstalledTool(request.toolId.trim());
+    if (!tool) {
+      throw new McpToolRegistryError("tool-not-found", `MCP tool '${request.toolId}' was not found.`);
+    }
+    const sandboxDecision = this.sandboxService.evaluate(tool);
+    return Object.freeze({
+      toolId: tool.toolId,
+      declaredCapabilities: sandboxDecision.declaredCapabilities,
+      policy: sandboxDecision.policy,
+      enforcement: sandboxDecision.enforcement,
+      deniedCapabilities: sandboxDecision.deniedCapabilities,
+      requestedCapabilities: sandboxDecision.requestedCapabilities,
+    });
+  }
+}
+
+export {
+  GetMcpToolTrustStateUseCase as getToolTrustState,
+  GetMissingMcpToolApprovalsUseCase as getMissingApprovals,
+  GetMcpToolEffectivePermissionsUseCase as getEffectivePermissions,
+  GetMcpToolSandboxPostureUseCase as getSandboxPosture,
+};
 
 function normalizePermissions(permissions: ReadonlyArray<McpToolPermissionScope>): ReadonlyArray<McpToolPermissionScope> {
   return Object.freeze([...new Set(permissions.map((permission) => permission.trim()).filter(Boolean))] as McpToolPermissionScope[]);

@@ -1,5 +1,5 @@
 import type { ExecutionContextEnvelope } from "../../context/models/ExecutionContextEnvelope";
-import type { McpToolPermissionScope } from "../../../domain/mcp/McpToolTrust";
+import type { McpToolPermissionScope, McpToolSandboxCapabilityRequest } from "../../../domain/mcp/McpToolTrust";
 
 export interface McpToolExecutionRequest {
   readonly toolId?: string;
@@ -10,6 +10,7 @@ export interface McpToolExecutionRequest {
   readonly executionId?: string;
   readonly metadata?: Readonly<Record<string, unknown>>;
   readonly runtimePermissions?: ReadonlyArray<McpToolPermissionScope>;
+  readonly sandboxRequest?: McpToolSandboxCapabilityRequest;
   readonly resolvedCredentials?: Readonly<Record<string, string>>;
   readonly credentialContext?: {
     readonly projectId?: string;

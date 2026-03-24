@@ -22,9 +22,6 @@ export class McpToolApprovalPolicyService {
         continue;
       }
       const status = this.resolveApprovalStatus(tool, permission, scope);
-      if (!status && (tool.grantedPermissions ?? []).includes(permission)) {
-        continue;
-      }
       if (status === "approved") {
         continue;
       }

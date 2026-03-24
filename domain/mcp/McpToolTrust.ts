@@ -39,17 +39,42 @@ export interface McpToolPermissionApprovalEvent {
 }
 
 export type McpSandboxEnvironmentMode = "inherit-runtime" | "none" | "allowlist";
+export type McpSandboxNetworkProtocol = "http" | "https" | "ws" | "wss" | "tcp" | "udp";
+export type McpSandboxAssetAccessMode = "deny" | "read-only" | "read-write";
+export type McpSandboxAssetAction = "read" | "write";
 
 export interface McpToolSandboxPolicy {
   readonly networkAccess: "allow" | "deny";
+  readonly networkAllowlist?: {
+    readonly hosts?: ReadonlyArray<string>;
+    readonly protocols?: ReadonlyArray<McpSandboxNetworkProtocol>;
+  };
   readonly filesystemAccess: {
     readonly mode: "deny" | "read-only" | "read-write";
-    readonly allowedPaths?: ReadonlyArray<string>;
+    readonly readAllowedPaths?: ReadonlyArray<string>;
+    readonly writeAllowedPaths?: ReadonlyArray<string>;
   };
-  readonly assetAccess: "deny" | "read-only" | "read-write";
+  readonly assetAccess: McpSandboxAssetAccessMode;
   readonly environmentExposure: {
     readonly mode: McpSandboxEnvironmentMode;
     readonly allowlist?: ReadonlyArray<string>;
+  };
+}
+
+export interface McpToolSandboxCapabilityRequest {
+  readonly network?: {
+    readonly hosts?: ReadonlyArray<string>;
+    readonly protocols?: ReadonlyArray<McpSandboxNetworkProtocol>;
+  };
+  readonly filesystem?: {
+    readonly readPaths?: ReadonlyArray<string>;
+    readonly writePaths?: ReadonlyArray<string>;
+  };
+  readonly asset?: {
+    readonly actions?: ReadonlyArray<McpSandboxAssetAction>;
+  };
+  readonly environment?: {
+    readonly variableNames?: ReadonlyArray<string>;
   };
 }
 
@@ -108,6 +133,7 @@ export interface McpToolExecutionSandboxDecision {
   readonly allowed: boolean;
   readonly deniedCapabilities: ReadonlyArray<"network" | "filesystem" | "asset" | "environment">;
   readonly declaredCapabilities: ReadonlyArray<"network" | "filesystem" | "asset" | "environment">;
+  readonly requestedCapabilities: McpToolSandboxCapabilityRequest;
   readonly policy: McpToolSandboxPolicy;
   readonly enforcement: McpToolSandboxEnforcementSummary;
   readonly reason: "sandbox-allowed" | "sandbox-denied";
@@ -130,7 +156,15 @@ export function deriveRequiredMcpToolPermissions(definition: McpToolDefinition):
 export function createDefaultMcpToolSandboxPolicy(): McpToolSandboxPolicy {
   return Object.freeze({
     networkAccess: "allow",
-    filesystemAccess: Object.freeze({ mode: "read-write", allowedPaths: Object.freeze([]) }),
+    networkAllowlist: Object.freeze({
+      hosts: Object.freeze([]),
+      protocols: Object.freeze(["http", "https", "ws", "wss", "tcp", "udp"]),
+    }),
+    filesystemAccess: Object.freeze({
+      mode: "read-write",
+      readAllowedPaths: Object.freeze([]),
+      writeAllowedPaths: Object.freeze([]),
+    }),
     assetAccess: "read-write",
     environmentExposure: Object.freeze({ mode: "inherit-runtime", allowlist: Object.freeze([]) }),
   });

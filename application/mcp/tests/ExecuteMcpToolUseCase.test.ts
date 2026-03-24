@@ -315,6 +315,14 @@ describe("ExecuteMcpToolUseCase", () => {
           updatedAt: "2026-03-24T00:00:00.000Z",
           source: Object.freeze({ kind: "inline" as const, location: "inline:test" }),
           grantedPermissions: Object.freeze(["network.access"] as const),
+          permissionApprovals: Object.freeze([{
+            approvalId: "approval-net-global",
+            permission: "network.access" as const,
+            scope: Object.freeze({ scopeType: "global" as const }),
+            status: "approved" as const,
+            requestedAt: "2026-03-24T00:00:00.000Z",
+            updatedAt: "2026-03-24T00:00:00.000Z",
+          }]),
           definition: Object.freeze({
             id: "mcp:local:secure-weather",
             version: "1.0.0",
@@ -375,6 +383,14 @@ describe("ExecuteMcpToolUseCase", () => {
           updatedAt: "2026-03-24T00:00:00.000Z",
           source: Object.freeze({ kind: "inline" as const, location: "inline:test" }),
           grantedPermissions: Object.freeze(["network.access"] as const),
+          permissionApprovals: Object.freeze([{
+            approvalId: "approval-net-global",
+            permission: "network.access" as const,
+            scope: Object.freeze({ scopeType: "global" as const }),
+            status: "approved" as const,
+            requestedAt: "2026-03-24T00:00:00.000Z",
+            updatedAt: "2026-03-24T00:00:00.000Z",
+          }]),
           definition: Object.freeze({
             id: "mcp:local:secure-weather",
             version: "1.0.0",
@@ -430,6 +446,14 @@ describe("ExecuteMcpToolUseCase", () => {
           updatedAt: "2026-03-24T00:00:00.000Z",
           source: Object.freeze({ kind: "inline" as const, location: "inline:test" }),
           grantedPermissions: Object.freeze(["network.access"] as const),
+          permissionApprovals: Object.freeze([{
+            approvalId: "approval-project-network",
+            permission: "network.access" as const,
+            scope: Object.freeze({ scopeType: "project" as const, scopeId: "project-a" }),
+            status: "approved" as const,
+            requestedAt: "2026-03-24T00:00:00.000Z",
+            updatedAt: "2026-03-24T00:00:00.000Z",
+          }]),
           definition: Object.freeze({
             id: "mcp:local:secure-weather",
             version: "1.0.0",
@@ -577,7 +601,7 @@ describe("ExecuteMcpToolUseCase", () => {
         installedAt: "2026-03-24T00:00:00.000Z",
         updatedAt: "2026-03-24T00:00:00.000Z",
         source: Object.freeze({ kind: "inline" as const, location: "inline:test" }),
-        grantedPermissions: Object.freeze([] as const),
+        grantedPermissions: Object.freeze(["network.access"] as const),
         permissionApprovals: Object.freeze([]),
         definition: Object.freeze({
           id: "mcp:local:net",
@@ -669,8 +693,8 @@ describe("ExecuteMcpToolUseCase", () => {
         installedAt: "2026-03-24T00:00:00.000Z",
         updatedAt: "2026-03-24T00:00:00.000Z",
         source: Object.freeze({ kind: "inline" as const, location: "inline:test" }),
-        grantedPermissions: Object.freeze(["network.access"] as const),
-        permissionApprovals: Object.freeze([{
+          grantedPermissions: Object.freeze(["network.access"] as const),
+          permissionApprovals: Object.freeze([{
           approvalId: "approval-1",
           permission: "network.access" as const,
           scope: Object.freeze({ scopeType: "global" as const }),
@@ -678,12 +702,13 @@ describe("ExecuteMcpToolUseCase", () => {
           requestedAt: "2026-03-24T00:00:00.000Z",
           updatedAt: "2026-03-24T00:00:00.000Z",
         }]),
-        sandboxPolicy: Object.freeze({
-          networkAccess: "deny" as const,
-          filesystemAccess: Object.freeze({ mode: "read-write" as const, allowedPaths: Object.freeze([]) }),
-          assetAccess: "read-write" as const,
-          environmentExposure: Object.freeze({ mode: "inherit-runtime" as const, allowlist: Object.freeze([]) }),
-        }),
+          sandboxPolicy: Object.freeze({
+            networkAccess: "deny" as const,
+            networkAllowlist: Object.freeze({ hosts: Object.freeze([]), protocols: Object.freeze(["http", "https"] as const) }),
+            filesystemAccess: Object.freeze({ mode: "read-write" as const, readAllowedPaths: Object.freeze([]), writeAllowedPaths: Object.freeze([]) }),
+            assetAccess: "read-write" as const,
+            environmentExposure: Object.freeze({ mode: "inherit-runtime" as const, allowlist: Object.freeze([]) }),
+          }),
         definition: Object.freeze({
           id: "mcp:local:net",
           version: "1.0.0",
@@ -702,6 +727,105 @@ describe("ExecuteMcpToolUseCase", () => {
     await expect(new ExecuteMcpToolUseCase(executor, new ExecutionContextToolPolicyService(), registry).execute({
       serverId: "local",
       toolName: "net",
+    })).rejects.toMatchObject({ code: "sandbox-denied" });
+  });
+
+  it("enforces deterministic precedence: permission before approval and sandbox", async () => {
+    const events: Array<{ reason: string }> = [];
+    const executor: IMcpToolExecutor = { executeTool: async () => ({ executionId: "x", serverId: "local", toolName: "net", status: "completed", content: [] }) };
+    const registry = {
+      listInstalledTools: async () => [],
+      getInstalledTool: async () => undefined,
+      findInstalledToolByBinding: async () => Object.freeze({
+        toolId: "mcp:local:net",
+        status: "enabled" as const,
+        installedAt: "2026-03-24T00:00:00.000Z",
+        updatedAt: "2026-03-24T00:00:00.000Z",
+        source: Object.freeze({ kind: "inline" as const, location: "inline:test" }),
+        grantedPermissions: Object.freeze([] as const),
+        permissionApprovals: Object.freeze([]),
+        sandboxPolicy: Object.freeze({
+          networkAccess: "deny" as const,
+          networkAllowlist: Object.freeze({ hosts: Object.freeze(["safe.internal"]), protocols: Object.freeze(["https"] as const) }),
+          filesystemAccess: Object.freeze({ mode: "read-write" as const, readAllowedPaths: Object.freeze([]), writeAllowedPaths: Object.freeze([]) }),
+          assetAccess: "read-write" as const,
+          environmentExposure: Object.freeze({ mode: "none" as const }),
+        }),
+        definition: Object.freeze({
+          id: "mcp:local:net",
+          version: "1.0.0",
+          displayName: "Net",
+          sideEffects: "network" as const,
+          auth: Object.freeze({ kind: "none" as const }),
+          tags: Object.freeze([]),
+          categories: Object.freeze([]),
+          binding: Object.freeze({ serverId: "local", toolName: "net" }),
+          inputSchema: Object.freeze({ type: "object" }),
+        }),
+      }),
+      saveInstalledTool: async (record: never) => record,
+      removeInstalledTool: async () => false,
+    };
+    const auditSink = {
+      record: async (event: { reason: string }) => {
+        events.push({ reason: event.reason });
+      },
+    };
+    await expect(new ExecuteMcpToolUseCase(executor, new ExecutionContextToolPolicyService(), registry, undefined, undefined, undefined, undefined, undefined, auditSink).execute({
+      serverId: "local",
+      toolName: "net",
+      sandboxRequest: { network: { hosts: ["unsafe.internal"], protocols: ["http"] } },
+    })).rejects.toMatchObject({ code: "permission-denied" });
+    expect(events.at(-1)?.reason).toBe("permission-denied");
+  });
+
+  it("enforces sandbox request posture against host/protocol policy", async () => {
+    const executor: IMcpToolExecutor = { executeTool: async () => ({ executionId: "x", serverId: "local", toolName: "net", status: "completed", content: [] }) };
+    const registry = {
+      listInstalledTools: async () => [],
+      getInstalledTool: async () => undefined,
+      findInstalledToolByBinding: async () => Object.freeze({
+        toolId: "mcp:local:net",
+        status: "enabled" as const,
+        installedAt: "2026-03-24T00:00:00.000Z",
+        updatedAt: "2026-03-24T00:00:00.000Z",
+        source: Object.freeze({ kind: "inline" as const, location: "inline:test" }),
+        grantedPermissions: Object.freeze(["network.access"] as const),
+        permissionApprovals: Object.freeze([{
+          approvalId: "approval-1",
+          permission: "network.access" as const,
+          scope: Object.freeze({ scopeType: "global" as const }),
+          status: "approved" as const,
+          requestedAt: "2026-03-24T00:00:00.000Z",
+          updatedAt: "2026-03-24T00:00:00.000Z",
+        }]),
+        sandboxPolicy: Object.freeze({
+          networkAccess: "allow" as const,
+          networkAllowlist: Object.freeze({ hosts: Object.freeze(["api.weather.local"]), protocols: Object.freeze(["https"] as const) }),
+          filesystemAccess: Object.freeze({ mode: "read-write" as const, readAllowedPaths: Object.freeze([]), writeAllowedPaths: Object.freeze([]) }),
+          assetAccess: "read-write" as const,
+          environmentExposure: Object.freeze({ mode: "inherit-runtime" as const }),
+        }),
+        definition: Object.freeze({
+          id: "mcp:local:net",
+          version: "1.0.0",
+          displayName: "Net",
+          sideEffects: "network" as const,
+          auth: Object.freeze({ kind: "none" as const }),
+          tags: Object.freeze([]),
+          categories: Object.freeze([]),
+          binding: Object.freeze({ serverId: "local", toolName: "net" }),
+          inputSchema: Object.freeze({ type: "object" }),
+        }),
+      }),
+      saveInstalledTool: async (record: never) => record,
+      removeInstalledTool: async () => false,
+    };
+
+    await expect(new ExecuteMcpToolUseCase(executor, new ExecutionContextToolPolicyService(), registry).execute({
+      serverId: "local",
+      toolName: "net",
+      sandboxRequest: { network: { hosts: ["api.weather.local"], protocols: ["http"] } },
     })).rejects.toMatchObject({ code: "sandbox-denied" });
   });
 
@@ -770,6 +894,14 @@ describe("ExecuteMcpToolUseCase", () => {
           updatedAt: "2026-03-24T00:00:00.000Z",
           source: Object.freeze({ kind: "inline" as const, location: "inline:test" }),
           grantedPermissions: Object.freeze(["asset.write"] as const),
+          permissionApprovals: Object.freeze([{
+            approvalId: "approval-asset-write",
+            permission: "asset.write" as const,
+            scope: Object.freeze({ scopeType: "global" as const }),
+            status: "approved" as const,
+            requestedAt: "2026-03-24T00:00:00.000Z",
+            updatedAt: "2026-03-24T00:00:00.000Z",
+          }]),
           definition: Object.freeze({
             id: "mcp:local:asset-transform",
             version: "1.0.0",

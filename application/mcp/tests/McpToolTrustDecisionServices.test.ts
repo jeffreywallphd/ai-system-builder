@@ -28,10 +28,11 @@ function makeTool(overrides: Partial<InstalledMcpToolRecord> = {}): InstalledMcp
 }
 
 describe("Mcp trust decision services", () => {
-  it("accepts legacy granted permissions when explicit approvals are absent", () => {
+  it("requires explicit approvals even when permission grants exist", () => {
     const decision = new McpToolApprovalPolicyService().evaluate(makeTool(), { scopeType: "global" }, []);
-    expect(decision.allowed).toBe(true);
-    expect(decision.reason).toBe("approved");
+    expect(decision.allowed).toBe(false);
+    expect(decision.reason).toBe("approval-required");
+    expect(decision.missingApprovals).toEqual(["network.access"]);
   });
 
   it("requires explicit approval when no legacy grants exist", () => {
@@ -49,7 +50,8 @@ describe("Mcp trust decision services", () => {
     const decision = new McpToolSandboxPolicyService().evaluate(makeTool({
       sandboxPolicy: Object.freeze({
         networkAccess: "deny",
-        filesystemAccess: Object.freeze({ mode: "deny", allowedPaths: Object.freeze([]) }),
+        networkAllowlist: Object.freeze({ hosts: Object.freeze([]), protocols: Object.freeze(["https"]) }),
+        filesystemAccess: Object.freeze({ mode: "deny", readAllowedPaths: Object.freeze([]), writeAllowedPaths: Object.freeze([]) }),
         assetAccess: "deny",
         environmentExposure: Object.freeze({ mode: "allowlist", allowlist: Object.freeze(["SAFE_ENV"]) }),
       }),
