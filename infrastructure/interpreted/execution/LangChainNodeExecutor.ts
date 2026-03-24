@@ -933,6 +933,7 @@ export class LangChainNodeExecutor implements INodeExecutor {
       try {
         const execution = this.executeMcpToolUseCase
           ? await this.executeMcpToolUseCase.execute({
+              toolId: configuredToolId || derivedToolId || undefined,
               serverId,
               toolName,
               arguments: argumentsRecord,
@@ -967,7 +968,12 @@ export class LangChainNodeExecutor implements INodeExecutor {
           },
         };
       } catch (error) {
-        const registryError = error instanceof McpToolRegistryError ? error : undefined;
+        const registryError =
+          error instanceof McpToolRegistryError
+            ? error
+            : error && typeof error === "object" && "code" in error && typeof (error as { code?: unknown }).code === "string"
+              ? (error as { code: string; message?: string; details?: Readonly<Record<string, unknown>> })
+              : undefined;
         const code = registryError?.code ?? "execution-failed";
         const sanitizedMessage = registryError?.message ?? "MCP tool execution failed.";
         return {

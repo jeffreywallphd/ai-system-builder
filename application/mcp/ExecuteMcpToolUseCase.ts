@@ -39,6 +39,7 @@ export class ExecuteMcpToolUseCase {
 
     const normalizedRequest: McpToolExecutionRequest = {
       ...request,
+      toolId: request.toolId?.trim() || undefined,
       serverId: request.serverId.trim(),
       toolName: request.toolName.trim(),
       arguments: request.arguments ? Object.freeze({ ...request.arguments }) : undefined,
@@ -67,9 +68,42 @@ export class ExecuteMcpToolUseCase {
       normalizedRequest.context
     );
 
-    const installedTool = this.registryRepository
+    let installedTool = this.registryRepository
       ? await this.registryRepository.findInstalledToolByBinding(normalizedRequest.serverId, normalizedRequest.toolName)
       : undefined;
+
+    if (this.registryRepository && normalizedRequest.toolId) {
+      const installedById = await this.registryRepository.getInstalledTool(normalizedRequest.toolId);
+      if (!installedById && !installedTool) {
+        throw new McpToolRegistryError("tool-not-found", "MCP tool identity could not be resolved from the installed registry.", {
+          toolId: normalizedRequest.toolId,
+          serverId: normalizedRequest.serverId,
+          toolName: normalizedRequest.toolName,
+        });
+      }
+
+      if (!installedById) {
+        // Keep backward-compatible behavior for repositories that can resolve
+        // by binding but not by id.
+      } else {
+
+        if (
+          installedById.definition.provider.serverId !== normalizedRequest.serverId
+          || installedById.definition.provider.toolName !== normalizedRequest.toolName
+        ) {
+          throw new McpToolRegistryError("invalid-input-contract", "MCP tool identity does not match requested server/tool binding.", {
+            toolId: normalizedRequest.toolId,
+            expected: installedById.definition.provider,
+            actual: Object.freeze({
+              serverId: normalizedRequest.serverId,
+              toolName: normalizedRequest.toolName,
+            }),
+          });
+        }
+
+        installedTool = installedById;
+      }
+    }
 
     if (installedTool) {
       if (installedTool.status !== "enabled") {
