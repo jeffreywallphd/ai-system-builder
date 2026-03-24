@@ -43,7 +43,7 @@ export class DeterministicAgentPlanningService implements AgentPlanningInterface
       maxEntries: agent.memory.retrieval.maxEntries,
     });
 
-    const maxSteps = agent.execution.maxPlanUnits ?? agent.policy.executionLimits.maxSteps ?? agent.goals.length;
+    const maxSteps = agent.execution.maxExecutionUnits ?? agent.policy.executionLimits.maxSteps ?? agent.goals.length;
     const prioritizedGoals = [...agent.goals]
       .sort((left, right) => left.priorityOrder - right.priorityOrder)
       .slice(0, maxSteps);

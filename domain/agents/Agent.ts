@@ -20,8 +20,8 @@ export interface AgentPlanningStrategy {
 }
 
 export interface AgentExecutionConfiguration {
-  readonly maxPlanUnits?: number;
-  readonly defaultRunTimeoutMs?: number;
+  readonly maxExecutionUnits?: number;
+  readonly maxRunDurationMs?: number;
   readonly requireTrustedTools: boolean;
   readonly trustPolicyId?: string;
 }
@@ -68,21 +68,29 @@ function normalizeRequired(value: string, label: string): string {
 }
 
 function normalizeExecutionConfiguration(input: AgentExecutionConfiguration | undefined): AgentExecutionConfiguration {
-  const maxPlanUnits = input?.maxPlanUnits;
-  if (maxPlanUnits !== undefined && (!Number.isInteger(maxPlanUnits) || maxPlanUnits <= 0)) {
-    throw new Error("Agent execution maxPlanUnits must be a positive integer when provided.");
+  if (!input) {
+    throw new Error("Agent execution configuration is required.");
   }
 
-  const timeout = input?.defaultRunTimeoutMs;
+  const maxExecutionUnits = input.maxExecutionUnits;
+  if (maxExecutionUnits !== undefined && (!Number.isInteger(maxExecutionUnits) || maxExecutionUnits <= 0)) {
+    throw new Error("Agent execution maxExecutionUnits must be a positive integer when provided.");
+  }
+
+  const timeout = input.maxRunDurationMs;
   if (timeout !== undefined && (!Number.isInteger(timeout) || timeout <= 0)) {
-    throw new Error("Agent execution defaultRunTimeoutMs must be a positive integer when provided.");
+    throw new Error("Agent execution maxRunDurationMs must be a positive integer when provided.");
+  }
+
+  if (!input.requireTrustedTools && !input.trustPolicyId?.trim()) {
+    throw new Error("Agent execution trustPolicyId is required when requireTrustedTools is false.");
   }
 
   return Object.freeze({
-    maxPlanUnits,
-    defaultRunTimeoutMs: timeout,
-    requireTrustedTools: input?.requireTrustedTools ?? true,
-    trustPolicyId: input?.trustPolicyId?.trim() || undefined,
+    maxExecutionUnits,
+    maxRunDurationMs: timeout,
+    requireTrustedTools: input.requireTrustedTools,
+    trustPolicyId: input.trustPolicyId?.trim() || undefined,
   });
 }
 
@@ -105,7 +113,7 @@ export function createAgent(input: {
   readonly policy: AgentPolicy;
   readonly planningStrategy: AgentPlanningStrategy;
   readonly memory: AgentMemoryConfiguration;
-  readonly execution?: AgentExecutionConfiguration;
+  readonly execution: AgentExecutionConfiguration;
   readonly status?: AgentLifecycleStatus;
   readonly now?: Date;
 }): Agent {
@@ -138,11 +146,11 @@ export function createAgent(input: {
   const planningStrategy = normalizePlanningStrategy(input.planningStrategy);
   const execution = normalizeExecutionConfiguration(input.execution);
   if (
-    execution.maxPlanUnits !== undefined
+    execution.maxExecutionUnits !== undefined
     && policy.executionLimits.maxSteps !== undefined
-    && execution.maxPlanUnits > policy.executionLimits.maxSteps
+    && execution.maxExecutionUnits > policy.executionLimits.maxSteps
   ) {
-    throw new Error("Agent execution maxPlanUnits cannot exceed policy execution maxSteps.");
+    throw new Error("Agent execution maxExecutionUnits cannot exceed policy execution maxSteps.");
   }
 
   const status = input.status ?? AgentLifecycleStatuses.ready;
