@@ -586,6 +586,19 @@ function deriveMcpErrorCategory(code: string): "permission" | "auth" | "contract
   }
 }
 
+function createMcpError(options: {
+  readonly code: string;
+  readonly message: string;
+  readonly details?: Readonly<Record<string, unknown>>;
+}): Readonly<Record<string, unknown>> {
+  return Object.freeze({
+    code: options.code,
+    category: deriveMcpErrorCategory(options.code),
+    message: options.message,
+    details: options.details,
+  });
+}
+
 function nodePropertiesToObject(node: INode): Readonly<Record<string, unknown>> {
   return Object.freeze(
     Object.fromEntries(node.properties.map((property) => [property.id, property.value]))
@@ -766,7 +779,13 @@ export class LangChainNodeExecutor implements INodeExecutor {
         return {
           nodeId: context.node.id,
           status: "failed",
-          outputs: {},
+          outputs: {
+            mcpError: createMcpError({
+              code: "invalid-input-contract",
+              message: "MCP server selection requires a configured server id.",
+              details: Object.freeze({ nodeType: context.node.definition.type }),
+            }),
+          },
           messages: ["MCP server selection requires a configured server id."],
           errorMessage: "MCP server selection requires a configured server id.",
           provenance: {
@@ -808,7 +827,13 @@ export class LangChainNodeExecutor implements INodeExecutor {
         return {
           nodeId: context.node.id,
           status: "failed",
-          outputs: {},
+          outputs: {
+            mcpError: createMcpError({
+              code: "execution-failed",
+              message: "MCP tool discovery is unavailable.",
+              details: Object.freeze({ serverId, hasRuntimeClient: Boolean(this.mcpRuntimeClient) }),
+            }),
+          },
           messages: ["MCP tool discovery requires the runtime-backed MCP client and a selected server."],
           errorMessage: "MCP tool discovery is unavailable.",
           provenance: {
@@ -857,7 +882,18 @@ export class LangChainNodeExecutor implements INodeExecutor {
         return {
           nodeId: context.node.id,
           status: "failed",
-          outputs: {},
+          outputs: {
+            mcpError: createMcpError({
+              code: "execution-failed",
+              message: "MCP tool execution is unavailable.",
+              details: Object.freeze({
+                serverId,
+                toolName,
+                hasRuntimeClient: Boolean(this.mcpRuntimeClient),
+                hasUseCaseExecutor: Boolean(this.executeMcpToolUseCase),
+              }),
+            }),
+          },
           messages: ["MCP tool execution requires a runtime-backed MCP client, server id, and tool name."],
           errorMessage: "MCP tool execution is unavailable.",
           provenance: {
@@ -875,14 +911,13 @@ export class LangChainNodeExecutor implements INodeExecutor {
         return {
           nodeId: context.node.id,
           status: "failed",
-          outputs: {
-            mcpError: Object.freeze({
-              code: "tool-identity-mismatch",
-              category: "contract",
-              message: "Configured MCP tool identity does not match current server/tool selection.",
-              details: Object.freeze({ configuredToolId, derivedToolId, serverId, toolName }),
-            }),
-          },
+            outputs: {
+              mcpError: createMcpError({
+                code: "tool-identity-mismatch",
+                message: "Configured MCP tool identity does not match current server/tool selection.",
+                details: Object.freeze({ configuredToolId, derivedToolId, serverId, toolName }),
+              }),
+            },
           messages: ["Configured MCP tool identity does not match selected server/tool."],
           errorMessage: "Configured MCP tool identity mismatch.",
           provenance: {
@@ -909,9 +944,8 @@ export class LangChainNodeExecutor implements INodeExecutor {
             nodeId: context.node.id,
             status: "failed",
             outputs: {
-              mcpError: Object.freeze({
+              mcpError: createMcpError({
                 code: "missing-required-arguments",
-                category: "contract",
                 message: "MCP tool arguments are missing required fields.",
                 details: Object.freeze({ serverId, toolName, missingArguments }),
               }),
@@ -946,23 +980,33 @@ export class LangChainNodeExecutor implements INodeExecutor {
           : await this.mcpRuntimeClient.executeTool({ serverId, toolName, arguments: argumentsRecord, metadata: context.executionMetadata });
         const stringifyResult = properties["stringifyResult"] !== false;
         const renderedResult = stringifyResult ? JSON.stringify(execution.structuredContent ?? execution.content, null, 2) : undefined;
+        const isCompleted = execution.status === "completed";
+        const failedMessage = execution.errorMessage ?? `MCP tool '${toolName}' failed.`;
         return {
           nodeId: context.node.id,
-          status: execution.status === "completed" ? "completed" : "failed",
-          outputs: {
-            toolResult: execution,
-            result: execution,
-            structuredResult: execution.structuredContent ?? {},
-            resultText: renderedResult,
-            textResult: renderedResult,
-          },
-          messages: execution.status === "completed" ? [`Executed MCP tool '${toolName}'.`] : [execution.errorMessage ?? `MCP tool '${toolName}' failed.`],
-          errorMessage: execution.errorMessage,
+          status: isCompleted ? "completed" : "failed",
+          outputs: isCompleted
+            ? {
+                toolResult: execution,
+                result: execution,
+                structuredResult: execution.structuredContent ?? {},
+                resultText: renderedResult,
+                textResult: renderedResult,
+              }
+            : {
+                mcpError: createMcpError({
+                  code: "execution-failed",
+                  message: failedMessage,
+                  details: Object.freeze({ serverId, toolName, executionId: execution.executionId }),
+                }),
+              },
+          messages: isCompleted ? [`Executed MCP tool '${toolName}'.`] : [failedMessage],
+          errorMessage: isCompleted ? undefined : failedMessage,
           provenance: {
-            classification: execution.status === "completed" && mcp.status === "live" ? "delegated" : execution.status === "completed" && mcp.status === "stale" ? "hybrid" : "unavailable",
+            classification: isCompleted && mcp.status === "live" ? "delegated" : isCompleted && mcp.status === "stale" ? "hybrid" : "unavailable",
             runtime: "python",
             executorId: "mcp-runtime-bridge",
-            detail: execution.status === "completed" ? "MCP tool execution was delegated to the live runtime-backed MCP session." : "MCP tool execution failed in the runtime-backed MCP session.",
+            detail: isCompleted ? "MCP tool execution was delegated to the live runtime-backed MCP session." : "MCP tool execution failed in the runtime-backed MCP session.",
             nodeType: context.node.definition.type,
             mcp,
           },
@@ -980,9 +1024,8 @@ export class LangChainNodeExecutor implements INodeExecutor {
           nodeId: context.node.id,
           status: "failed",
           outputs: {
-            mcpError: Object.freeze({
+            mcpError: createMcpError({
               code,
-              category: deriveMcpErrorCategory(code),
               message: sanitizedMessage,
               details: registryError?.details,
             }),
