@@ -127,7 +127,7 @@ describe("Agent foundation services", () => {
     };
 
     const planner = new DeterministicAgentPlanningService(catalog, memoryStore);
-    const plan = await planner.plan({
+    const plan = await planner.plan({ agent: {
       id: "agent-plan",
       name: "Planner",
       goals: [{ id: "goal-1", objective: "Fetch weather", constraints: [], successCriteria: ["forecast"], priority: "high", priorityOrder: 1, requiredToolIds: ["mcp:local:get_weather"] }],
@@ -151,11 +151,11 @@ describe("Agent foundation services", () => {
       createdAt: "2026-03-24T00:00:00.000Z",
       updatedAt: "2026-03-24T00:00:00.000Z",
       description: undefined,
-    });
+    } });
 
     expect(plan.steps).toHaveLength(1);
     expect(plan.steps[0]?.toolId).toBe("mcp:local:get_weather");
-    expect(plan.steps[0]?.memoryContext[0]?.assetId.toString()).toBe("asset:memory:plan");
+    expect(plan.steps[0]?.intent.inputReferences).toHaveLength(1);
   });
 
   it("executes through orchestrated tool path and persists execution memory", async () => {

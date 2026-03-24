@@ -4,12 +4,14 @@ import {
   buildAgentExecutionUnitPayload,
   mapAgentExecutionToBackbone,
   mapAgentExecutionToExecutionPlan,
+  mapAgentPlanToBackbone,
 } from "../AgentExecutionMapping";
 import {
   AgentExecutionSessionStatuses,
   createAgentExecutionSession,
   transitionAgentExecutionSession,
 } from "../../../../domain/agents/AgentExecutionSession";
+import { createAgentPlan } from "../../../../domain/agents/AgentPlan";
 
 describe("Agent execution backbone mapping", () => {
   it("maps ordered agent plan steps into the unified execution plan contract", () => {
@@ -23,7 +25,7 @@ describe("Agent execution backbone mapping", () => {
     const executionPlan = mapAgentExecutionToExecutionPlan({
       session,
       steps: [
-        { stepId: "step-1", goalId: "goal-1", toolId: "mcp:local:echo", intent: { action: "Collect context" } },
+        { stepId: "step-1", goalId: "goal-1", toolId: "mcp:local:echo", intent: { action: "Collect context", expectedOutputKey: "ctx" } },
         {
           stepId: "step-2",
           goalId: "goal-1",
@@ -37,6 +39,35 @@ describe("Agent execution backbone mapping", () => {
     expect(executionPlan.id).toBe("agent-plan:1");
     expect(executionPlan.units[1]?.dependsOn).toEqual(["step-1"]);
     expect(executionPlan.units[0]?.kind).toBe("agent-tool-step");
+  });
+
+  it("maps execution-oriented AgentPlan contracts into execution-native backbone structures", () => {
+    const session = createAgentExecutionSession({ id: "sess-plan-map", agentId: "agent-z", planId: "agent-plan:z" });
+    const plan = createAgentPlan({
+      planId: "agent-plan:z",
+      agentId: "agent-z",
+      strategyId: "deterministic",
+      steps: [
+        {
+          stepId: "s1",
+          goalId: "g1",
+          toolId: "mcp:local:echo",
+          dependsOnStepIds: [],
+          intent: {
+            action: "Collect",
+            expectedOutputKey: "collect.result",
+            inputReferences: [{ kind: "asset", assetId: new AssetId("asset:memory:a") }],
+          },
+        },
+      ],
+    });
+
+    const mapped = mapAgentPlanToBackbone({ session, plan });
+
+    expect(mapped.plan.id).toBe("agent-plan:z");
+    expect(mapped.plan.units[0]?.id).toBe("s1");
+    expect(mapped.unitPayloadByUnitId.s1?.expectedOutputKey).toBe("collect.result");
+    expect(mapped.unitPayloadByUnitId.s1?.inputAssetIds[0]?.toString()).toBe("asset:memory:a");
   });
 
   it("creates payloads that preserve agent/session correlation identifiers", () => {
@@ -110,5 +141,24 @@ describe("Agent execution backbone mapping", () => {
         steps: [{ stepId: "step-1", toolId: "mcp:local:echo", intent: { action: "one", inputAssetIds: [new AssetId("not-canonical")] } }],
       }),
     ).toThrow("canonical asset id format");
+
+    expect(() =>
+      mapAgentExecutionToBackbone({
+        session,
+        steps: [
+          { stepId: "step-1", toolId: "mcp:local:echo", intent: { action: "one", expectedOutputKey: "result" } },
+          { stepId: "step-2", toolId: "mcp:local:echo", intent: { action: "two", expectedOutputKey: "result" } },
+        ],
+      }),
+    ).toThrow("must be unique across steps");
+
+    const wrongAgentPlan = createAgentPlan({
+      planId: "agent-plan:5",
+      agentId: "agent-other",
+      strategyId: "deterministic",
+      steps: [{ stepId: "s1", toolId: "mcp:local:echo", dependsOnStepIds: [], intent: { action: "go", inputReferences: [] } }],
+    });
+
+    expect(() => mapAgentPlanToBackbone({ session, plan: wrongAgentPlan })).toThrow("must match session agentId");
   });
 });

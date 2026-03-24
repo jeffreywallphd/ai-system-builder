@@ -154,6 +154,8 @@ If a change needs data from the outside world, prefer adding or using an **appli
 - Application-level mapping to runtime execution lives in `application/agents/contracts/AgentExecutionMapping.ts`, which maps agent steps onto `ExecutionPlan` units and exposes bounded per-unit execution payload contracts.
 - No agent runtime adapters or UI pages were added in this phase; infrastructure and UI remain outer-layer concerns for later slices.
 
+- Direction 4 Phase 2 now starts at the inner layers only: planning structures are domain/application contracts (`domain/agents/AgentPlan.ts`, `application/agents/services/AgentPlanningInterface.ts`, `application/agents/contracts/AgentPlanningLoop.ts`) and intentionally do not introduce a second runtime, orchestration stack, or UI loop.
+
 ## TODO
 
 - Several convenience mutations still live in UI services instead of dedicated application use cases. If the goal is a stricter clean architecture, those write operations should gradually move inward.
