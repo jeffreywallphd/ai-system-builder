@@ -6,6 +6,7 @@ import { Workflow } from "../../../domain/workflows/Workflow";
 import { WorkflowMetadata } from "../../../domain/workflows/WorkflowMetadata";
 import {
   MCP_TOOL_CALL_SERVER_ID_PROPERTY,
+  MCP_TOOL_CALL_TOOL_ID_PROPERTY,
   MCP_TOOL_CALL_TOOL_DESCRIPTOR_PROPERTY,
   MCP_TOOL_CALL_TOOL_NAME_PROPERTY,
 } from "../../../application/mcp/McpToolCallNodeConfigurationService";
@@ -39,6 +40,7 @@ describe("McpToolCallAuthoringService", () => {
 
     const node = definition.createInstance("call-1")
       .withPropertyValue(MCP_TOOL_CALL_SERVER_ID_PROPERTY, "local")
+      .withPropertyValue(MCP_TOOL_CALL_TOOL_ID_PROPERTY, "mcp:local:echo")
       .withPropertyValue(MCP_TOOL_CALL_TOOL_NAME_PROPERTY, "echo")
       .withPropertyValue(MCP_TOOL_CALL_TOOL_DESCRIPTOR_PROPERTY, {
         id: "mcp:local:echo",
@@ -72,6 +74,7 @@ describe("McpToolCallAuthoringService", () => {
     const hydratedNode = hydrated.getNode("call-1");
 
     expect(hydratedNode?.getProperty(MCP_TOOL_CALL_SERVER_ID_PROPERTY)?.value).toBe("local");
+    expect(hydratedNode?.getProperty(MCP_TOOL_CALL_TOOL_ID_PROPERTY)?.value).toBe("mcp:local:echo");
     expect(hydratedNode?.getProperty(MCP_TOOL_CALL_TOOL_NAME_PROPERTY)?.value).toBe("echo");
     expect(hydratedNode?.getProperty("arg.message")?.name).toBe("message");
   });

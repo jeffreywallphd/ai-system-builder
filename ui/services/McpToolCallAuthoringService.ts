@@ -3,6 +3,7 @@ import { buildMcpToolDescriptorId } from "../../application/mcp/models/McpToolDe
 import {
   McpToolCallNodeConfigurationService,
   MCP_TOOL_CALL_SERVER_ID_PROPERTY,
+  MCP_TOOL_CALL_TOOL_ID_PROPERTY,
   MCP_TOOL_CALL_TOOL_DESCRIPTOR_PROPERTY,
   MCP_TOOL_CALL_TOOL_NAME_PROPERTY,
   type McpToolCallNodeOption,
@@ -50,6 +51,7 @@ export class McpToolCallAuthoringService {
     let updatedNode = node.withPropertyValue(propertyId.trim(), value);
     if (propertyId.trim() === MCP_TOOL_CALL_SERVER_ID_PROPERTY) {
       updatedNode = updatedNode
+        .withPropertyValue(MCP_TOOL_CALL_TOOL_ID_PROPERTY, "")
         .withPropertyValue(MCP_TOOL_CALL_TOOL_NAME_PROPERTY, "")
         .withPropertyValue(MCP_TOOL_CALL_TOOL_DESCRIPTOR_PROPERTY, {});
       updatedNode = this.configurationService.configureNode(updatedNode, {
@@ -81,11 +83,17 @@ export class McpToolCallAuthoringService {
         : undefined;
     const toolOptions = serverId ? await this.loadToolOptions(serverId) : undefined;
 
-    return this.configurationService.configureNode(node, {
+    const configuredNode = this.configurationService.configureNode(node, {
       serverOptions,
       toolOptions,
       toolDescriptor: descriptor,
     });
+
+    if (serverId && toolName) {
+      return configuredNode.withPropertyValue(MCP_TOOL_CALL_TOOL_ID_PROPERTY, buildMcpToolDescriptorId(serverId, toolName));
+    }
+
+    return configuredNode;
   }
 
   private async resolveDescriptor(

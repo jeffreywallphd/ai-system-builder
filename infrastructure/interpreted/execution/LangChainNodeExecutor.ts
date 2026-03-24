@@ -10,7 +10,13 @@ import type { ContextFragmentKind } from "../../../application/context/models/Co
 import type { IContextBudget } from "../../../application/context/models/ContextBudget";
 import type { IContextTrimmingPolicy } from "../../../application/context/models/ContextTrimmingPolicy";
 import { deriveMcpExecutionProvenance } from "../../../application/execution/ExecutionTruth";
-import { McpToolCallNodeConfigurationService } from "../../../application/mcp/McpToolCallNodeConfigurationService";
+import { ExecuteMcpToolUseCase } from "../../../application/mcp/ExecuteMcpToolUseCase";
+import {
+  McpToolCallNodeConfigurationService,
+  MCP_TOOL_CALL_TOOL_ID_PROPERTY,
+} from "../../../application/mcp/McpToolCallNodeConfigurationService";
+import { McpToolRegistryError } from "../../../application/mcp/registry/McpToolRegistryErrors";
+import type { McpToolPermissionScope } from "../../../domain/mcp/McpToolTrust";
 import type { INode } from "../../../domain/nodes/interfaces/INode";
 import type {
   ChatMessage,
@@ -562,6 +568,24 @@ function supportsNodeType(nodeType: string, ...types: string[]): boolean {
   return types.includes(nodeType);
 }
 
+function deriveMcpErrorCategory(code: string): "permission" | "auth" | "contract" | "asset" | "runtime" {
+  switch (code) {
+    case "permission-denied":
+      return "permission";
+    case "missing-auth-configuration":
+    case "auth-resolution-failed":
+      return "auth";
+    case "invalid-input-contract":
+    case "invalid-output-contract":
+      return "contract";
+    case "asset-input-resolution-failed":
+    case "asset-output-persistence-failed":
+      return "asset";
+    default:
+      return "runtime";
+  }
+}
+
 function nodePropertiesToObject(node: INode): Readonly<Record<string, unknown>> {
   return Object.freeze(
     Object.fromEntries(node.properties.map((property) => [property.id, property.value]))
@@ -606,6 +630,7 @@ export class LangChainNodeExecutor implements INodeExecutor {
   private readonly pythonRuntimeClient?: IPythonRuntimeClient;
   private readonly mcpRuntimeClient?: IMcpRuntimeClient;
   private readonly mcpServerCatalog?: IMcpServerCatalog;
+  private readonly executeMcpToolUseCase?: ExecuteMcpToolUseCase;
 
   constructor(
     modelExecutorOrOptions?:
@@ -615,6 +640,7 @@ export class LangChainNodeExecutor implements INodeExecutor {
           readonly pythonRuntimeClient?: IPythonRuntimeClient;
           readonly mcpRuntimeClient?: IMcpRuntimeClient;
           readonly mcpServerCatalog?: IMcpServerCatalog;
+          readonly executeMcpToolUseCase?: ExecuteMcpToolUseCase;
         },
     pythonRuntimeClient?: IPythonRuntimeClient
   ) {
@@ -630,6 +656,7 @@ export class LangChainNodeExecutor implements INodeExecutor {
       this.pythonRuntimeClient = modelExecutorOrOptions.pythonRuntimeClient;
       this.mcpRuntimeClient = modelExecutorOrOptions.mcpRuntimeClient;
       this.mcpServerCatalog = modelExecutorOrOptions.mcpServerCatalog;
+      this.executeMcpToolUseCase = modelExecutorOrOptions.executeMcpToolUseCase;
       return;
     }
 
@@ -824,7 +851,9 @@ export class LangChainNodeExecutor implements INodeExecutor {
         ? descriptorFromInput as never
         : mcpToolCallNodeConfigurationService.readStoredToolDescriptor(context.node);
       const toolName = String(toolDescriptor?.name ?? properties["toolName"] ?? "").trim();
-      if (!serverId || !toolName || !this.mcpRuntimeClient) {
+      const configuredToolId = String(properties[MCP_TOOL_CALL_TOOL_ID_PROPERTY] ?? "").trim();
+      const derivedToolId = serverId && toolName ? `mcp:${encodeURIComponent(serverId)}:${encodeURIComponent(toolName)}` : "";
+      if (!serverId || !toolName || (!this.mcpRuntimeClient && !this.executeMcpToolUseCase)) {
         return {
           nodeId: context.node.id,
           status: "failed",
@@ -842,31 +871,128 @@ export class LangChainNodeExecutor implements INodeExecutor {
         };
       }
       const serverStatus = this.mcpServerCatalog ? await this.mcpServerCatalog.getServerStatus(serverId) : undefined;
+      if (configuredToolId && derivedToolId && configuredToolId !== derivedToolId) {
+        return {
+          nodeId: context.node.id,
+          status: "failed",
+          outputs: {
+            mcpError: Object.freeze({
+              code: "tool-identity-mismatch",
+              category: "contract",
+              message: "Configured MCP tool identity does not match current server/tool selection.",
+              details: Object.freeze({ configuredToolId, derivedToolId, serverId, toolName }),
+            }),
+          },
+          messages: ["Configured MCP tool identity does not match selected server/tool."],
+          errorMessage: "Configured MCP tool identity mismatch.",
+          provenance: {
+            classification: "unavailable",
+            runtime: "python",
+            executorId: "mcp-runtime-bridge",
+            detail: "MCP tool execution was blocked by workflow-level identity mismatch validation.",
+            nodeType: context.node.definition.type,
+            mcp: deriveMcpExecutionProvenance({ serverStatus, toolDescriptor: toolDescriptor as never, serverId, toolName }),
+          },
+        };
+      }
       const configuredArgs = mcpToolCallNodeConfigurationService.serializeConfiguredArguments(context.node);
       const inputArgs = inputs.arguments && typeof inputs.arguments === "object" ? inputs.arguments as Record<string, unknown> : {};
       const argumentsRecord = Object.freeze({ ...configuredArgs, ...inputArgs });
-      const execution = await this.mcpRuntimeClient.executeTool({ serverId, toolName, arguments: argumentsRecord });
-      const stringifyResult = properties["stringifyResult"] !== false;
+      const failOnMissingArgs = properties["failOnMissingArgs"] !== false;
+      if (failOnMissingArgs) {
+        const requiredArguments = (toolDescriptor?.arguments ?? []).filter((argument) => argument.required);
+        const missingArguments = requiredArguments
+          .filter((argument) => argumentsRecord[argument.name] === undefined)
+          .map((argument) => argument.name);
+        if (missingArguments.length > 0) {
+          return {
+            nodeId: context.node.id,
+            status: "failed",
+            outputs: {
+              mcpError: Object.freeze({
+                code: "missing-required-arguments",
+                category: "contract",
+                message: "MCP tool arguments are missing required fields.",
+                details: Object.freeze({ serverId, toolName, missingArguments }),
+              }),
+            },
+            messages: [`MCP tool '${toolName}' is missing required arguments: ${missingArguments.join(", ")}.`],
+            errorMessage: "MCP tool arguments are missing required fields.",
+            provenance: {
+              classification: "unavailable",
+              runtime: "python",
+              executorId: "mcp-runtime-bridge",
+              detail: "MCP tool execution was blocked by local required-argument validation.",
+              nodeType: context.node.definition.type,
+              mcp: deriveMcpExecutionProvenance({ serverStatus, toolDescriptor: toolDescriptor as never, serverId, toolName }),
+            },
+          };
+        }
+      }
       const mcp = deriveMcpExecutionProvenance({ serverStatus, toolDescriptor: toolDescriptor as never, serverId, toolName });
-      return {
-        nodeId: context.node.id,
-        status: execution.status === "completed" ? "completed" : "failed",
-        outputs: {
-          result: execution,
-          structuredResult: execution.structuredContent ?? {},
-          textResult: stringifyResult ? JSON.stringify(execution.structuredContent ?? execution.content, null, 2) : undefined,
-        },
-        messages: execution.status === "completed" ? [`Executed MCP tool '${toolName}'.`] : [execution.errorMessage ?? `MCP tool '${toolName}' failed.`],
-        errorMessage: execution.errorMessage,
-        provenance: {
-          classification: execution.status === "completed" && mcp.status === "live" ? "delegated" : execution.status === "completed" && mcp.status === "stale" ? "hybrid" : "unavailable",
-          runtime: "python",
-          executorId: "mcp-runtime-bridge",
-          detail: execution.status === "completed" ? "MCP tool execution was delegated to the live runtime-backed MCP session." : "MCP tool execution failed in the runtime-backed MCP session.",
-          nodeType: context.node.definition.type,
-          mcp,
-        },
-      };
+      try {
+        const execution = this.executeMcpToolUseCase
+          ? await this.executeMcpToolUseCase.execute({
+              serverId,
+              toolName,
+              arguments: argumentsRecord,
+              context: context.executionMetadata?.workflowContext as never,
+              runtimePermissions: Array.isArray(context.executionMetadata?.runtimePermissions)
+                ? (context.executionMetadata?.runtimePermissions as ReadonlyArray<McpToolPermissionScope>)
+                : undefined,
+              metadata: context.executionMetadata,
+            })
+          : await this.mcpRuntimeClient.executeTool({ serverId, toolName, arguments: argumentsRecord, metadata: context.executionMetadata });
+        const stringifyResult = properties["stringifyResult"] !== false;
+        const renderedResult = stringifyResult ? JSON.stringify(execution.structuredContent ?? execution.content, null, 2) : undefined;
+        return {
+          nodeId: context.node.id,
+          status: execution.status === "completed" ? "completed" : "failed",
+          outputs: {
+            toolResult: execution,
+            result: execution,
+            structuredResult: execution.structuredContent ?? {},
+            resultText: renderedResult,
+            textResult: renderedResult,
+          },
+          messages: execution.status === "completed" ? [`Executed MCP tool '${toolName}'.`] : [execution.errorMessage ?? `MCP tool '${toolName}' failed.`],
+          errorMessage: execution.errorMessage,
+          provenance: {
+            classification: execution.status === "completed" && mcp.status === "live" ? "delegated" : execution.status === "completed" && mcp.status === "stale" ? "hybrid" : "unavailable",
+            runtime: "python",
+            executorId: "mcp-runtime-bridge",
+            detail: execution.status === "completed" ? "MCP tool execution was delegated to the live runtime-backed MCP session." : "MCP tool execution failed in the runtime-backed MCP session.",
+            nodeType: context.node.definition.type,
+            mcp,
+          },
+        };
+      } catch (error) {
+        const registryError = error instanceof McpToolRegistryError ? error : undefined;
+        const code = registryError?.code ?? "execution-failed";
+        const sanitizedMessage = registryError?.message ?? "MCP tool execution failed.";
+        return {
+          nodeId: context.node.id,
+          status: "failed",
+          outputs: {
+            mcpError: Object.freeze({
+              code,
+              category: deriveMcpErrorCategory(code),
+              message: sanitizedMessage,
+              details: registryError?.details,
+            }),
+          },
+          messages: [sanitizedMessage],
+          errorMessage: sanitizedMessage,
+          provenance: {
+            classification: "unavailable",
+            runtime: "python",
+            executorId: "mcp-runtime-bridge",
+            detail: "MCP tool execution failed with a structured MCP error.",
+            nodeType: context.node.definition.type,
+            mcp,
+          },
+        };
+      }
     }
 
     if (nodeType === "test") {

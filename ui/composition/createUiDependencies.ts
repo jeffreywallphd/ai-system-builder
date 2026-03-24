@@ -61,6 +61,7 @@ import { DisconnectMcpServerUseCase } from "../../application/mcp/DisconnectMcpS
 import { ReconnectMcpServerUseCase } from "../../application/mcp/ReconnectMcpServerUseCase";
 import { CreateLocalMcpServerUseCase } from "../../application/mcp/CreateLocalMcpServerUseCase";
 import { GenerateLocalMcpToolDraftUseCase } from "../../application/mcp/GenerateLocalMcpToolDraftUseCase";
+import { ExecuteMcpToolUseCase } from "../../application/mcp/ExecuteMcpToolUseCase";
 import { WorkflowContextService } from "../../application/context/WorkflowContextService";
 import { CreateContextPackageUseCase } from "../../application/context/CreateContextPackageUseCase";
 import { CreateContextRecipeUseCase } from "../../application/context/CreateContextRecipeUseCase";
@@ -851,6 +852,7 @@ function createWorkflowExecutor(
   mcpServerCatalog: IMcpServerCatalog,
   runtimeDependencyOrchestrator: Pick<IRuntimeDependencyOrchestrator, "ensureAvailable">,
 ) {
+  const executeMcpToolUseCase = new ExecuteMcpToolUseCase(mcpClient);
   const executor = new TruthfulWorkflowExecutor({
     selector: new WorkflowRuntimeSelector({ runtimeDependencyOrchestrator }),
     strategies: [
@@ -861,6 +863,7 @@ function createWorkflowExecutor(
           pythonRuntimeClient: runtimeEnabled ? runtimeClient : undefined,
           mcpRuntimeClient: runtimeEnabled ? mcpClient : undefined,
           mcpServerCatalog: runtimeEnabled ? mcpServerCatalog : undefined,
+          executeMcpToolUseCase: runtimeEnabled ? executeMcpToolUseCase : undefined,
         }),
         contextResolver: new DefaultNodeExecutionContextResolver(),
         outputStoreFactory: () => new DefaultNodeOutputStore(),
