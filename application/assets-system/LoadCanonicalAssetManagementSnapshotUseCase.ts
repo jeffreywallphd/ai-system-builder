@@ -32,6 +32,11 @@ export interface CanonicalAssetManagementSnapshot {
     readonly partiallyTrusted: number;
     readonly reconciliationNeeded: number;
   };
+  readonly operationalSummary: {
+    readonly status: "healthy" | "attention-needed";
+    readonly explanation: string;
+    readonly recommendedActions: ReadonlyArray<string>;
+  };
   readonly existenceExplanation?: {
     readonly versionId: string;
     readonly explanation: string;
@@ -39,9 +44,12 @@ export interface CanonicalAssetManagementSnapshot {
   };
   readonly projectionHealth?: {
     readonly matched: boolean;
+    readonly trustState: "trusted" | "mismatch-detected";
+    readonly trustExplanation: string;
     readonly failedChecks: ReadonlyArray<string>;
     readonly edgeCount: number;
     readonly scopedVersionCount: number;
+    readonly mismatchedVersionIds: ReadonlyArray<string>;
   };
 }
 
@@ -99,6 +107,7 @@ export class LoadCanonicalAssetManagementSnapshotUseCase {
     const existenceExplanation = detail.latestVersion
       ? await this.explainVersionExistenceUseCase.execute(detail.latestVersion.versionId)
       : undefined;
+    const operationalSummary = this.buildOperationalSummary(versionsWithState);
 
     const projectionHealth = params.includeProjectionHealth && this.verifyProjectionUseCase
       ? await this.verifyProjectionUseCase.execute({
@@ -106,9 +115,12 @@ export class LoadCanonicalAssetManagementSnapshotUseCase {
         versionIdsInScope: params.versionIdsInProjectionScope,
       }).then((verification) => Object.freeze({
         matched: verification.matched,
+        trustState: verification.trust.state,
+        trustExplanation: verification.trust.explanation,
         failedChecks: Object.freeze(verification.checks.filter((entry) => !entry.matched).map((entry) => `${entry.code}: ${entry.message}`)),
         edgeCount: verification.projectionSummary.edgeCount,
         scopedVersionCount: verification.projectionSummary.scopedVersionCount,
+        mismatchedVersionIds: Object.freeze(verification.mismatches.map((entry) => entry.versionId)),
       }))
       : undefined;
 
@@ -125,8 +137,32 @@ export class LoadCanonicalAssetManagementSnapshotUseCase {
       }),
       versions: Object.freeze(versionsWithState),
       dependencyLifecycleSummary: lifecycleSummary,
+      operationalSummary,
       existenceExplanation,
       projectionHealth,
+    });
+  }
+
+  private buildOperationalSummary(versions: ReadonlyArray<{
+    readonly dependencyState: {
+      readonly state: "healthy" | "impacted" | "stale" | "partially-trusted" | "reconciliation-needed";
+      readonly nextActions: ReadonlyArray<string>;
+    };
+  }>): CanonicalAssetManagementSnapshot["operationalSummary"] {
+    const unhealthy = versions.filter((entry) => entry.dependencyState.state !== "healthy");
+    if (unhealthy.length === 0) {
+      return Object.freeze({
+        status: "healthy",
+        explanation: "All versions in scope currently report healthy dependency-state.",
+        recommendedActions: Object.freeze(["No reconciliation is required."]),
+      });
+    }
+
+    const actions = [...new Set(unhealthy.flatMap((entry) => entry.dependencyState.nextActions))];
+    return Object.freeze({
+      status: "attention-needed",
+      explanation: `${unhealthy.length} version(s) in this chain require dependency attention.`,
+      recommendedActions: Object.freeze(actions.slice(0, 5)),
     });
   }
 }

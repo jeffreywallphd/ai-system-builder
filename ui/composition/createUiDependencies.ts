@@ -677,7 +677,20 @@ export function createUiDependencies(
             reconciliationNeeded: number;
           };
           existenceExplanation?: { versionId: string; explanation: string; evidence: ReadonlyArray<string>; };
-          projectionHealth?: { matched: boolean; failedChecks: ReadonlyArray<string>; edgeCount: number; scopedVersionCount: number; };
+          operationalSummary: {
+            status: "healthy" | "attention-needed";
+            explanation: string;
+            recommendedActions: ReadonlyArray<string>;
+          };
+          projectionHealth?: {
+            matched: boolean;
+            trustState: "trusted" | "mismatch-detected";
+            trustExplanation: string;
+            failedChecks: ReadonlyArray<string>;
+            edgeCount: number;
+            scopedVersionCount: number;
+            mismatchedVersionIds: ReadonlyArray<string>;
+          };
         };
         return Object.freeze({
           ...parsed,

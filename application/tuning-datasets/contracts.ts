@@ -40,6 +40,11 @@ export interface DatasetSummary {
       readonly reasons: ReadonlyArray<string>;
       readonly nextActions: ReadonlyArray<string>;
     };
+    readonly operationalStatus?: {
+      readonly trust: "trusted" | "attention-needed";
+      readonly explanation: string;
+      readonly recommendedNextSteps: ReadonlyArray<string>;
+    };
     readonly fallbackReason?: string;
   };
 }
@@ -70,6 +75,11 @@ export interface DatasetDetails {
       readonly state: "healthy" | "impacted" | "stale" | "partially-trusted" | "reconciliation-needed";
       readonly reasons: ReadonlyArray<string>;
       readonly nextActions: ReadonlyArray<string>;
+    };
+    readonly operationalStatus?: {
+      readonly trust: "trusted" | "attention-needed";
+      readonly explanation: string;
+      readonly recommendedNextSteps: ReadonlyArray<string>;
     };
     readonly fallbackReason?: string;
   }>>;

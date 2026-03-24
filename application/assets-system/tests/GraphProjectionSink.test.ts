@@ -66,6 +66,7 @@ describe("InMemoryAssetLineageGraphProjectionSink", () => {
     });
 
     expect(verification.matched).toBeTrue();
+    expect(verification.trust.state).toBe("trusted");
     expect(verification.projectionSummary.scopedVersionCount).toBe(2);
     expect(verification.checks.some((check) => check.code === "PATH_EXISTS" && check.matched)).toBeTrue();
   });
@@ -99,6 +100,8 @@ describe("InMemoryAssetLineageGraphProjectionSink", () => {
     });
 
     expect(verification.matched).toBeFalse();
+    expect(verification.trust.state).toBe("mismatch-detected");
+    expect(verification.mismatches[0]?.versionId).toBe("left:v1");
     expect(verification.checks.some((check) => check.code.startsWith("SCOPE_EDGE_PARITY_DETAIL:left:v1") && !check.matched)).toBeTrue();
   });
 });

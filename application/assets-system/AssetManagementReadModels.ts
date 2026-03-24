@@ -48,7 +48,10 @@ export interface CanonicalReconciliationReadModel {
 export interface CanonicalProjectionVerificationReadModel {
   readonly assetId: string;
   readonly matched: boolean;
+  readonly trustState?: "trusted" | "mismatch-detected";
+  readonly trustExplanation?: string;
   readonly edgeCount: number;
   readonly scopedVersionCount: number;
   readonly failedChecks: ReadonlyArray<string>;
+  readonly mismatchedVersionIds?: ReadonlyArray<string>;
 }

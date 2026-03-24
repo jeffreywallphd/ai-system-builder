@@ -67,6 +67,11 @@ describe("ListInstalledModelsUseCase", () => {
             staleBecauseUpstreamAdvanced: [],
             nextActions: ["No reconciliation is required."],
           },
+          operationalStatus: {
+            trust: "trusted" as const,
+            explanation: "Canonical dependency-state is healthy.",
+            recommendedNextSteps: ["No reconciliation is required."],
+          },
         }),
       } as any,
     ).execute();
@@ -74,6 +79,7 @@ describe("ListInstalledModelsUseCase", () => {
     expect(result.canonicalByModelId?.m?.pinnedVersionId).toBe("asset-version:m:1");
     expect(result.canonicalByModelId?.m?.latestVersionId).toBe("asset-version:m:2");
     expect(result.canonicalByModelId?.m?.dependencyState?.state).toBe("healthy");
+    expect(result.canonicalByModelId?.m?.operationalStatus?.trust).toBe("trusted");
   });
 
   it("preserves explicit resolver fallback reason when canonical identity is missing", async () => {

@@ -28,6 +28,8 @@ export class ProjectionRebuildOrchestrationUseCase {
   public async execute(params: {
     readonly scopes: ReadonlyArray<ProjectionRebuildScope>;
     readonly verifyAfterReplay?: boolean;
+    readonly verifyBeforeReplay?: boolean;
+    readonly replayMismatchedVersionsOnly?: boolean;
   }) {
     const results = await Promise.all(params.scopes.map(async (scope) => {
       if (scope.scopeType === "entity") {
@@ -42,9 +44,18 @@ export class ProjectionRebuildOrchestrationUseCase {
         return Object.freeze({ scope, replayed: replay.replayed, replay, verification });
       }
 
+      const verificationBeforeReplay = params.verifyBeforeReplay
+        ? await this.verifyProjectionUseCase.execute({
+          assetId: scope.assetId,
+          versionIdsInScope: scope.versionIdsInScope,
+        })
+        : undefined;
+      const replayVersionIds = params.replayMismatchedVersionsOnly && verificationBeforeReplay && scope.versionIdsInScope
+        ? verificationBeforeReplay.mismatches.map((entry) => entry.versionId)
+        : scope.versionIdsInScope;
       const replay = await this.replayAssetProjectionUseCase.execute({
         assetIds: [scope.assetId],
-        versionIds: scope.versionIdsInScope,
+        versionIds: replayVersionIds,
         includeIdentityAssets: false,
       });
       const verification = params.verifyAfterReplay
@@ -56,6 +67,7 @@ export class ProjectionRebuildOrchestrationUseCase {
       return Object.freeze({
         scope,
         replayed: replay.publishedEdgeCount > 0 || replay.publishedTransformationCount > 0,
+        verificationBeforeReplay,
         replay,
         verification,
       });

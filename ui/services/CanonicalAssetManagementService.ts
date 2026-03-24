@@ -24,6 +24,8 @@ export interface CanonicalAssetManagementServiceOptions {
       | { readonly scopeType: "asset"; readonly assetId: string; readonly versionIdsInScope?: ReadonlyArray<string>; }
     >;
     readonly verifyAfterReplay?: boolean;
+    readonly verifyBeforeReplay?: boolean;
+    readonly replayMismatchedVersionsOnly?: boolean;
   }) => Promise<{
     readonly totalScopes: number;
     readonly replayedScopes: number;
@@ -44,6 +46,11 @@ export interface CanonicalAssetManagementServiceOptions {
       readonly partiallyTrusted: number;
       readonly reconciliationNeeded: number;
     };
+    readonly operationalSummary: {
+      readonly status: "healthy" | "attention-needed";
+      readonly explanation: string;
+      readonly recommendedActions: ReadonlyArray<string>;
+    };
     readonly existenceExplanation?: {
       readonly versionId: string;
       readonly explanation: string;
@@ -51,9 +58,12 @@ export interface CanonicalAssetManagementServiceOptions {
     };
     readonly projectionHealth?: {
       readonly matched: boolean;
+      readonly trustState: "trusted" | "mismatch-detected";
+      readonly trustExplanation: string;
       readonly failedChecks: ReadonlyArray<string>;
       readonly edgeCount: number;
       readonly scopedVersionCount: number;
+      readonly mismatchedVersionIds: ReadonlyArray<string>;
     };
   }>;
 }
@@ -123,6 +133,8 @@ export class CanonicalAssetManagementService {
       | { readonly scopeType: "asset"; readonly assetId: string; readonly versionIdsInScope?: ReadonlyArray<string>; }
     >;
     readonly verifyAfterReplay?: boolean;
+    readonly verifyBeforeReplay?: boolean;
+    readonly replayMismatchedVersionsOnly?: boolean;
   }): Promise<{
     readonly totalScopes: number;
     readonly replayedScopes: number;
@@ -149,6 +161,11 @@ export class CanonicalAssetManagementService {
       readonly partiallyTrusted: number;
       readonly reconciliationNeeded: number;
     };
+    readonly operationalSummary: {
+      readonly status: "healthy" | "attention-needed";
+      readonly explanation: string;
+      readonly recommendedActions: ReadonlyArray<string>;
+    };
     readonly existenceExplanation?: {
       readonly versionId: string;
       readonly explanation: string;
@@ -156,9 +173,12 @@ export class CanonicalAssetManagementService {
     };
     readonly projectionHealth?: {
       readonly matched: boolean;
+      readonly trustState: "trusted" | "mismatch-detected";
+      readonly trustExplanation: string;
       readonly failedChecks: ReadonlyArray<string>;
       readonly edgeCount: number;
       readonly scopedVersionCount: number;
+      readonly mismatchedVersionIds: ReadonlyArray<string>;
     };
   } | undefined> {
     if (!this.options.loadManagementSnapshot) {
