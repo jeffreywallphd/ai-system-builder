@@ -46,6 +46,29 @@ describe("ui/services unit coverage", () => {
     expect(result.nextCursor).toBe("c1");
   });
 
+  it("ModelService resolves canonical model summary for detail fallback lookups", async () => {
+    const service = new ModelService({
+      installModelUseCase: { execute: async () => ({}) } as any,
+      listInstalledModelsUseCase: {
+        execute: async () => ({ models: [], canonicalByModelId: {} }),
+        resolveCanonicalModelSummary: async () => ({ preferred: true, assetId: "installed-model:m1" }),
+      } as any,
+      removeModelUseCase: { execute: async () => ({}) } as any,
+      resolveModelCompatibilityUseCase: { execute: () => ({ compatibility: { ok: true } }) } as any,
+      searchRemoteModelsUseCase: { execute: async () => ({ items: [], nextCursor: undefined }) } as any,
+      installedModelCatalog: {
+        getInstalledById: async () => ({ id: "m1" }),
+        isInstalled: async () => true,
+        listInstalled: async () => [],
+        saveInstalled: async (m: any) => m,
+        removeInstalled: async () => false,
+      } as any,
+    });
+
+    const readModel = await service.getInstalledModelReadModel("m1");
+    expect(readModel?.canonical?.assetId).toBe("installed-model:m1");
+  });
+
   it("WorkflowService appends error message to execution messages", () => {
     const service = new WorkflowService({
       createWorkflowUseCase: { execute: async () => ({}) } as any,
@@ -90,5 +113,6 @@ describe("ui/services unit coverage", () => {
     expect(replay.replayed).toBeFalse();
     expect(await service.verifyProjection({ assetId: "workflow-definition:wf-1" })).toBeUndefined();
     expect(await service.rebuildProjectionScopes({ scopes: [] })).toBeUndefined();
+    expect(await service.loadManagementSnapshot({ assetId: "asset-1" })).toBeUndefined();
   });
 });

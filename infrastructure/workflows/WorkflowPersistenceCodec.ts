@@ -213,26 +213,24 @@ export class WorkflowPersistenceCodec {
         node = node.withEnabled(nodeRecord.isEnabled);
         node = node.withCollapsed(nodeRecord.isCollapsed);
 
+        const deferredProperties: Array<{ readonly id: string; readonly value: unknown }> = [];
         for (const propertyRecord of nodeRecord.properties) {
           if (!node.getProperty(propertyRecord.id)) {
-            if (
-              this.mcpToolCallNodeConfigurationService.isMcpToolCallNode(node)
-              && propertyRecord.id === "toolDescriptor"
-            ) {
-              node = this.mcpToolCallNodeConfigurationService.configureNode(
-                node.withPropertyValue(propertyRecord.id, propertyRecord.value)
-              );
-            }
+            deferredProperties.push({ id: propertyRecord.id, value: propertyRecord.value });
             continue;
           }
 
           node = node.withPropertyValue(propertyRecord.id, propertyRecord.value);
-          if (
-            this.mcpToolCallNodeConfigurationService.isMcpToolCallNode(node)
-            && propertyRecord.id === "toolDescriptor"
-          ) {
-            node = this.mcpToolCallNodeConfigurationService.configureNode(node);
+        }
+
+        node = this.mcpToolCallNodeConfigurationService.configureNode(node);
+
+        for (const deferredProperty of deferredProperties) {
+          if (!node.getProperty(deferredProperty.id)) {
+            continue;
           }
+
+          node = node.withPropertyValue(deferredProperty.id, deferredProperty.value);
         }
 
         return node;

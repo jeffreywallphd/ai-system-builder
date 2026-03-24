@@ -35,10 +35,12 @@ import { ConnectMcpServerUseCase } from "../../application/mcp/ConnectMcpServerU
 import { DisconnectMcpServerUseCase } from "../../application/mcp/DisconnectMcpServerUseCase";
 import { ReconnectMcpServerUseCase } from "../../application/mcp/ReconnectMcpServerUseCase";
 import { ExecuteMcpToolUseCase } from "../../application/mcp/ExecuteMcpToolUseCase";
+import { McpToolAssetIoCoordinator } from "../../application/mcp/McpToolAssetIoCoordinator";
 import { ListToolCapabilitiesUseCase } from "../../application/tools/ListToolCapabilitiesUseCase";
 import { InvokeToolCapabilityUseCase } from "../../application/tools/InvokeToolCapabilityUseCase";
 import { PublishDurableEntityToAssetSystemUseCase } from "../../application/assets-system/PublishDurableEntityToAssetSystemUseCase";
 import { CanonicalAssetIdentityService } from "../../application/assets-system/CanonicalAssetIdentityService";
+import { RecordAssetTransformationUseCase } from "../../application/assets-system/RecordAssetTransformationUseCase";
 
 import type { INodeCatalogProvider } from "../../application/ports/interfaces/INodeCatalogProvider";
 import type { IWorkflowExecutor } from "../../application/ports/interfaces/IWorkflowExecutor";
@@ -54,9 +56,17 @@ import type { IMcpServerCatalog } from "../../application/ports/interfaces/IMcpS
 import type { IMcpServerManager } from "../../application/ports/interfaces/IMcpServerManager";
 import type { IMcpToolCatalog } from "../../application/ports/interfaces/IMcpToolCatalog";
 import type { IMcpToolExecutor } from "../../application/ports/interfaces/IMcpToolExecutor";
+import type { IMcpToolRegistryRepository } from "../../application/ports/interfaces/IMcpToolRegistryRepository";
+import type { IMcpToolSecretRepository } from "../../application/ports/interfaces/IMcpToolSecretRepository";
+import type { IMcpToolExecutionAuditSink } from "../../application/ports/interfaces/IMcpToolExecutionAuditSink";
 import type { IToolCapabilityCatalog } from "../../application/ports/interfaces/IToolCapabilityCatalog";
 import type { IToolCapabilityExecutor } from "../../application/ports/interfaces/IToolCapabilityExecutor";
 import type { IExecutionRunRepository } from "../../application/ports/interfaces/IExecutionRunRepository";
+import type { IAssetRecordRepository } from "../../application/ports/interfaces/IAssetRecordRepository";
+import type { IAssetVersionRepository } from "../../application/ports/interfaces/IAssetVersionRepository";
+import type { IAssetTransformationRepository } from "../../application/ports/interfaces/IAssetTransformationRepository";
+import type { IAssetLineageRepository } from "../../application/ports/interfaces/IAssetLineageRepository";
+import type { IAssetLineageGraphProjectionSink } from "../../application/ports/interfaces/IAssetLineageGraphProjectionSink";
 import { WorkflowContextService } from "../../application/context/WorkflowContextService";
 import { UnifiedExecutionEngine } from "../../application/execution/UnifiedExecutionEngine";
 import type { IWorkflowValidator } from "../../domain/services/interfaces/IWorkflowValidator";
@@ -358,7 +368,22 @@ export class ApplicationBootstrap {
       APPLICATION_TOKENS.ExecuteMcpToolUseCase,
       (c) =>
         new ExecuteMcpToolUseCase(
-          c.resolve<IMcpToolExecutor>(TOKENS.McpToolExecutor)
+          c.resolve<IMcpToolExecutor>(TOKENS.McpToolExecutor),
+          undefined,
+          c.resolve<IMcpToolRegistryRepository>(TOKENS.McpToolRegistryRepository),
+          undefined,
+          c.resolve<IMcpToolSecretRepository>(TOKENS.McpToolSecretRepository),
+          undefined,
+          c.resolve<IMcpToolExecutionAuditSink>(TOKENS.McpToolExecutionAuditSink),
+          new McpToolAssetIoCoordinator(
+            c.resolve<IAssetRecordRepository>(TOKENS.AssetSystemRepository),
+            c.resolve<IAssetVersionRepository>(TOKENS.AssetSystemRepository),
+            new RecordAssetTransformationUseCase(
+              c.resolve<IAssetTransformationRepository>(TOKENS.AssetSystemRepository),
+              c.resolve<IAssetLineageRepository>(TOKENS.AssetSystemRepository),
+              c.tryResolve<IAssetLineageGraphProjectionSink>(TOKENS.AssetLineageGraphProjectionSink),
+            ),
+          ),
         )
     );
 

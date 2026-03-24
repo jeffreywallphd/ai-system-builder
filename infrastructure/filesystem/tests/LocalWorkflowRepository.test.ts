@@ -5,6 +5,9 @@ import path from "node:path";
 import { Workflow } from "../../../domain/workflows/Workflow";
 import { WorkflowMetadata } from "../../../domain/workflows/WorkflowMetadata";
 import { makeNode } from "../../../domain/workflows/tests/testUtils";
+import { McpToolCallNodeConfigurationService } from "../../../application/mcp/McpToolCallNodeConfigurationService";
+import { ImplementationRegistryNodeCatalogProvider } from "../../nodes/ImplementationRegistryNodeCatalogProvider";
+import { McpNodeImplementationRegistry } from "../../nodes/mcp/McpNodeImplementationRegistry";
 import { LocalFileStorage } from "../LocalFileStorage";
 import { LocalWorkflowRepository } from "../LocalWorkflowRepository";
 
@@ -138,6 +141,57 @@ describe("LocalWorkflowRepository", () => {
         includeKinds: undefined,
         excludeKinds: undefined,
       });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("persists and restores MCP tool call nodes with stable tool identity and configured arguments", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "loom-workflows-"));
+    try {
+      const nodeCatalogProvider = new ImplementationRegistryNodeCatalogProvider(
+        new McpNodeImplementationRegistry(),
+      );
+      const definition = await nodeCatalogProvider.getDefinitionByType("mcp.tool_call");
+      if (!definition) {
+        throw new Error("Expected mcp.tool_call definition.");
+      }
+
+      const configurationService = new McpToolCallNodeConfigurationService();
+      let mcpNode = definition.createInstance("mcp-1")
+        .withPropertyValue("serverId", "local")
+        .withPropertyValue("toolName", "echo")
+        .withPropertyValue("toolId", "mcp:local:echo")
+        .withPropertyValue("toolDescriptor", {
+          id: "mcp:local:echo",
+          serverId: "local",
+          name: "echo",
+          inputSchema: { type: "object" },
+          arguments: [{ name: "message", type: "string", required: true }],
+          categories: [],
+          tags: [],
+        });
+      mcpNode = configurationService.configureNode(mcpNode)
+        .withPropertyValue(configurationService.argumentPropertyId("message"), "hello");
+
+      const wf = new Workflow({
+        id: "wf-mcp",
+        metadata: new WorkflowMetadata({ name: "WF MCP" }),
+        nodes: [mcpNode],
+      });
+      const repo = new LocalWorkflowRepository({
+        fileStorage: new LocalFileStorage(),
+        rootDirectory: root,
+        nodeCatalogProvider,
+      });
+
+      await repo.save(wf);
+      const loaded = await repo.load("wf-mcp");
+      const loadedNode = loaded?.getNode("mcp-1");
+
+      expect(loadedNode?.definition.type).toBe("mcp.tool_call");
+      expect(loadedNode?.getProperty("toolId")?.value).toBe("mcp:local:echo");
+      expect(loadedNode?.getProperty(configurationService.argumentPropertyId("message"))?.value).toBe("hello");
     } finally {
       await rm(root, { recursive: true, force: true });
     }

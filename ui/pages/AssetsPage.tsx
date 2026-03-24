@@ -31,6 +31,7 @@ export default function AssetsPage(): JSX.Element {
   const [entityId, setEntityId] = useState("");
   const [versionId, setVersionId] = useState("");
   const [assetId, setAssetId] = useState("");
+  const [managementSnapshot, setManagementSnapshot] = useState<Awaited<ReturnType<typeof canonicalAssetManagementService.loadManagementSnapshot>>>();
 
   return (
     <section className="ui-page">
@@ -144,7 +145,9 @@ export default function AssetsPage(): JSX.Element {
                       entityId,
                       versionId: versionId || undefined,
                     }],
+                    verifyBeforeReplay: true,
                     verifyAfterReplay: true,
+                    replayMismatchedVersionsOnly: true,
                   });
                   if (!result) {
                     setStatusMessage("Scoped rebuild orchestration is unavailable in this runtime.");
@@ -156,7 +159,58 @@ export default function AssetsPage(): JSX.Element {
               >
                 Rebuild + verify scope
               </button>
+              <button
+                type="button"
+                className="ui-button ui-button--secondary"
+                onClick={async () => {
+                  const snapshot = await canonicalAssetManagementService.loadManagementSnapshot({
+                    assetId,
+                    includeProjectionHealth: true,
+                    versionIdsInProjectionScope: versionId ? [versionId] : undefined,
+                  });
+                  setManagementSnapshot(snapshot);
+                  if (!snapshot) {
+                    setStatusMessage("Canonical management snapshot is unavailable in this runtime.");
+                    return;
+                  }
+                  setStatusMessage(`Loaded management snapshot for '${snapshot.asset.assetId}' with ${snapshot.versions.length} version(s).`);
+                }}
+                disabled={!assetId.trim()}
+              >
+                Load management snapshot
+              </button>
             </div>
+            {managementSnapshot ? (
+              <div className="ui-stack ui-stack--xs">
+                <p className="ui-text-small">
+                  <strong>Lifecycle summary:</strong> healthy={managementSnapshot.dependencyLifecycleSummary.healthy}, impacted={managementSnapshot.dependencyLifecycleSummary.impacted}, stale={managementSnapshot.dependencyLifecycleSummary.stale}, partial={managementSnapshot.dependencyLifecycleSummary.partiallyTrusted}, reconcile={managementSnapshot.dependencyLifecycleSummary.reconciliationNeeded}
+                </p>
+                {managementSnapshot.existenceExplanation ? (
+                  <p className="ui-text-small ui-text-secondary">
+                    <strong>Latest version explanation:</strong> {managementSnapshot.existenceExplanation.explanation}
+                  </p>
+                ) : null}
+                {managementSnapshot.projectionHealth ? (
+                  <p className="ui-text-small ui-text-secondary">
+                    <strong>Projection health:</strong> {managementSnapshot.projectionHealth.matched
+                      ? `matched (${managementSnapshot.projectionHealth.trustState})`
+                      : `mismatch (${managementSnapshot.projectionHealth.failedChecks.length} check(s) failed, ${managementSnapshot.projectionHealth.mismatchedVersionIds.length} mismatched version(s))`}
+                  </p>
+                ) : null}
+                <p className="ui-text-small ui-text-secondary">
+                  <strong>Operational summary:</strong> {managementSnapshot.operationalSummary.explanation}
+                </p>
+                {managementSnapshot.operationalSummary.recommendedActions.length > 0 ? (
+                  <ul className="ui-stack ui-stack--xs">
+                    {managementSnapshot.operationalSummary.recommendedActions.map((action) => (
+                      <li key={action} className="ui-text-small ui-text-secondary">
+                        {action}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         </div>
       </div>

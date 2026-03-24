@@ -233,7 +233,88 @@ The new execution engine slice starts in the domain/application layers and adapt
 
 That is "done enough" for Direction 1: the unified execution engine now includes at least one real dependency-aware multi-unit production path, execution capability claims are explicit, and durable history filtering is stronger for lineage/debugging/reporting without turning Direction 1 into a scheduler/analytics rewrite. The next likely architectural focus is Direction 2 work above this substrate rather than broadening Direction 1 into speculative orchestration.
 
+
+## MCP registry and capability foundation (Direction 3, first slice)
+- MCP tools now have a first-class registry foundation (install/register, list/detail, enable/disable, safe removal with dependency blocking, and explicit update preview/apply lifecycle use cases).
+- Tool definitions now use a machine-readable capability contract that includes stable identity, display metadata, version, input/output schema, side-effect class, auth requirements, optional cost/execution metadata, tags/categories, and optional runtime binding (`serverId` + `toolName`).
+- Registration validates definition contracts before persistence; runtime execution validates input/output contracts against installed definitions at the use-case boundary and refuses execution when the installed tool status is `disabled`.
+- Update lifecycle now classifies transitions (`same-version`, `upgrade`, `downgrade`, `incomparable`) and actions (`reinstall`, `update`, `downgrade`, `replace`) explicitly instead of treating overwrite-install as the only path.
+- Update preview surfaces a machine-readable change summary (version, binding identity, schemas, side effects, auth, tags/categories) plus compatibility risk (`compatible`, `risky`, `breaking`).
+- Update apply performs bounded dependency safety checks: risky/breaking updates are blocked when dependent workflows reference the tool unless explicit override flags are supplied.
+- Compatibility risk now uses bounded contract-depth heuristics (required-property deltas, property add/remove, type changes) and optional policy profiles (`strict`, `balanced`, `permissive`).
+- Update flow now includes explicit acknowledgement gates for risky/breaking transitions and emits remediation suggestions suitable for UI/API preflight guidance.
+- Installed-tool lifecycle metadata now includes durable lifecycle event history and dedicated read models for lifecycle summary/history inspection.
+- Capability introspection query use cases now support bounded deeper semantics for future planner/agent selection: schema-path type checks (including array item paths), side-effect ceilings, explicit auth-kind filters, configurable tag/category match modes, and asset I/O filters (accepted/produced asset kinds, transform-vs-create mode, mixed raw+asset inputs, and explicit asset-version-required contracts).
+- Safe removal now returns an explicit structured result (`removed` or `blocked`) with dependency references, so UI/adapters can render unsafe-removal state without exception parsing.
+- MCP capability contracts now support optional `assetIo` declarations that model asset-backed inputs and asset-producing/asset-transforming outputs without removing support for raw-value tools, including explicit mixed-input flags, input version requirements, and output persistence semantics.
+- MCP execution now has an optional asset-I/O seam that can resolve asset references before runtime invocation, enforce version-required input rules, persist MCP outputs as assets/versions with bounded idempotent persistence behavior, and emit transformation lineage records for reproducibility/provenance.
+- Asset-output persistence is now enforced for installed tools that declare non-raw `assetIo.outputs`: execution fails fast when canonical asset persistence wiring is unavailable instead of silently returning loose payloads.
+- Asset-aware execution now records both consumed input asset references and produced output assets in execution metadata so downstream projections can treat MCP runs as deterministic `asset -> execution/tool -> asset` provenance events.
+- Raw-only behavior is now explicit and bounded: when `assetIo.allowsRawInputs` is `false`, undeclared raw input fields are rejected; when `assetIo.allowsRawOutputs` is `false`, missing declared asset outputs are treated as contract violations.
+- Transformation-history reads for assets now have a canonical application seam (`GetAssetTransformationHistoryUseCase`) that uses repository-native asset-scoped queries when available and version-based fallback otherwise.
+- Registry read models now include minimal marketplace-ready metadata (`description`, `author`, `version`, `categories`) as a normalized domain projection, so higher layers do not parse raw definition JSON.
+- Metadata validation is now explicit and bounded in the MCP domain contract: required core fields remain strict, `description`/`author` are optional but bounded when provided, and categories are normalized (trimmed, lower-cased, deduped, stable order).
+- Version normalization now removes optional leading `v` for semver-like values to stay aligned with existing lifecycle/update transition logic.
+- MCP tool registry import/export now has two explicit machine-readable contracts:
+  - `ai-loom.mcp-tools.v1` for installed-registry transfer (status/source/definition/lifecycle with overwrite controls).
+  - `ai-loom.mcp-tool-definitions.v1` for shareable definition export/import flows (definition + source only; no runtime approvals/secrets/operational trust state).
+
+## Direction 4 Phase 1 execution alignment
+- Agent execution sessions now use execution-native lifecycle language (`queued/planning/running/completed/failed/cancelled`) via `domain/agents/AgentExecutionSession.ts`, with explicit transition and timestamp coherence invariants.
+- A compact mapping seam (`application/agents/contracts/AgentExecutionMapping.ts`) maps agent plan steps into `ExecutionPlan` units (`agent-tool-step`) and provides per-unit payload mapping so future agent execution flows through the same unified engine substrate.
+- This does not add a second orchestration engine: it only establishes a durable contract for later planner/runner slices.
+
 ## TODO
 
 - Tool running, model/dataset runs, and the narrow MCP server-operation slice now share the same engine seam and persisted run model, but broader composition still has multiple roots. Further convergence should happen incrementally instead of through a giant rewrite.
 - The interpreted fallback is clearly useful, but the product docs should eventually define which node types are expected to be fully trustworthy under scaffold execution versus only under delegated runtimes.
+
+## Direction 3 trust update: MCP auth/secrets and permission policy
+
+The MCP execution path now includes explicit trust controls in the standard use-case flow:
+
+1. Resolve installed-tool binding and status.
+2. Validate input contract.
+3. Resolve auth configuration through a dedicated secret-repository seam.
+4. Evaluate explicit user approval state (pending/approved/denied/revoked per permission and trust scope).
+5. Evaluate required permissions against installed-tool grants and request/runtime grants.
+6. Evaluate explicit sandbox policy (network/filesystem/asset/environment posture).
+7. Emit an execution audit decision event with non-secret payload.
+8. Invoke runtime execution.
+
+Auth, approval, permission, and sandbox denials are explicit structured outcomes (`missing-auth-configuration`, `invalid-credentials`, `auth-resolution-failed`, `approval-required`, `permission-denied`, `sandbox-denied`) instead of implicit runtime failures. Credential resolution now reports structured status (success/missing/partial/invalid/failed) so missing vs malformed states are handled deterministically.
+
+Approval lifecycle actions are auditable (`approval-requested`, `approval-granted`, `approval-denied`, `approval-revoked`) and trust read models now expose machine-readable posture (required permissions, missing approvals, sandbox policy, and enforcement truthfulness metadata).
+
+This slice enforces bounded sandbox policy in the application/runtime orchestration layer and truthfully distinguishes invocation-level enforced controls (network/filesystem/asset gating) from declared-only posture (environment exposure). It creates seams for future stronger process/OS sandboxing without claiming that hard isolation already exists.
+
+Approval lifecycle is now complete and persisted per `(tool, permission, scopeType, scopeId)` with `pending` / `approved` / `denied` / `revoked` states, and execution enforces those records directly (no implicit grant fallback).
+
+MCP execution trust flow is now deterministic across paths: contract validation -> credential resolution -> permission policy -> approval policy -> sandbox policy -> execution.
+
+Sandbox contract now uses an explicit policy object (`network.allowed + allowlists`, `filesystem.allowed + read/write paths`, `assets.read/write`, `environment.allowedEnvVars`) and includes request-vs-policy posture for network (hosts/protocols), filesystem (read/write path sets), asset actions (read/write), and environment variable exposure; request overreach fails with `sandbox-denied`.
+
+Trust read models are split for direct consumption (`getToolTrustState`, `getMissingApprovals`, `getEffectivePermissions`, `getSandboxPosture`) so callers do not reconstruct approval/sandbox logic manually.
+
+Audit schema now records administrative approval transitions plus decision denials (`approval-required`, `permission-denied`, `sandbox-denied`) and execution allows (`policy-allowed`) with non-secret payloads only. Sandbox denials now include sanitized policy/context metadata for audit consumers.
+
+## Direction 3 workflow-native update: MCP nodes inside workflow execution (stories 3.1–3.5)
+
+- `mcp.tool_call` now behaves as a first-class workflow node across catalog, persistence, and execution surfaces, with stable registry-aligned node identity (`toolId`) in addition to server/tool binding and descriptor snapshot properties.
+- MCP node configuration/hydration keeps identity and schema in sync: the node stores stable tool identity and materializes dynamic argument properties from MCP capability metadata so bindings remain machine-readable and execution-ready.
+- MCP nodes execute through the same workflow execution engine/orchestration path as all other nodes; there is no parallel MCP mini-engine.
+- Node-level MCP semantics are delegated to the existing standalone MCP execution use case (`ExecuteMcpToolUseCase`) when present, allowing workflow execution to reuse existing contract validation, auth/secrets, permission policy, audit, and optional asset-I/O coordination seams.
+- Workflow MCP execution now forwards node `toolId` into MCP execution and enforces identity/binding consistency early (`toolId` must match requested `serverId`/`toolName` when registry state is available).
+- MCP node argument binding follows native workflow input rules: constant node arguments (`arg.*` properties), upstream payloads (`arguments` input port), and asset-reference objects are merged into one validated MCP request payload.
+- MCP execution failures now surface as structured node-level workflow failures (`outputs.mcpError` with bounded `code/category/details`) instead of opaque crashes, while preserving sanitized error messages for workflow-level reporting.
+- Runtime-declared MCP execution failures are normalized into that same workflow error envelope, so node results now remain `success with output` **or** `failure with structured error`, never mixed.
+- Workflow load/hydration no longer uses MCP-only persistence conditionals; dynamic MCP argument properties now restore through the same generic node-property hydration path, with MCP-specific expansion isolated behind the node configuration service seam.
+- MCP node outputs now align with native workflow output contracts (`toolResult`, `resultText`) while preserving compatibility aliases to avoid breaking existing downstream nodes.
+
+## Direction 4 update: agent execution placement (bounded first implementation)
+- Agent planning/execution sits above the existing execution backbone; it does not introduce a second runtime.
+- Planner output is a bounded ordered step plan (`toolId` + goal/action) that is executed through existing tool capability execution seams.
+- For MCP steps, execution still flows through MCP execution use cases, preserving trust policy/auth/approval/sandbox/audit behavior.
+- For workflow-projected tools, execution still flows through workflow tool execution (`RunToolUseCase` path).
+- Agent memory writes/reads are asset-backed and versioned so execution outcomes can be persisted and reused by later planning.
+- Current limits are intentional: deterministic single-agent planning, bounded step counts, no autonomous long-horizon control loop.

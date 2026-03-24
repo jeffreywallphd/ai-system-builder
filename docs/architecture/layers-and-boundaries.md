@@ -149,6 +149,11 @@ When adding or changing behavior:
 
 If a change needs data from the outside world, prefer adding or using an **application port** rather than importing infrastructure directly into a use case.
 
+## Direction 4 boundary note (Phase 1)
+- Agent business meaning is now in `domain/agents/` (goals, policies, asset-backed memory configuration, execution sessions with validated lifecycle transitions).
+- Application-level mapping to runtime execution lives in `application/agents/contracts/AgentExecutionMapping.ts`, which maps agent steps onto `ExecutionPlan` units and exposes bounded per-unit execution payload contracts.
+- No agent runtime adapters or UI pages were added in this phase; infrastructure and UI remain outer-layer concerns for later slices.
+
 ## TODO
 
 - Several convenience mutations still live in UI services instead of dedicated application use cases. If the goal is a stricter clean architecture, those write operations should gradually move inward.

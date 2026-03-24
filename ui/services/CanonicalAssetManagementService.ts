@@ -24,11 +24,47 @@ export interface CanonicalAssetManagementServiceOptions {
       | { readonly scopeType: "asset"; readonly assetId: string; readonly versionIdsInScope?: ReadonlyArray<string>; }
     >;
     readonly verifyAfterReplay?: boolean;
+    readonly verifyBeforeReplay?: boolean;
+    readonly replayMismatchedVersionsOnly?: boolean;
   }) => Promise<{
     readonly totalScopes: number;
     readonly replayedScopes: number;
     readonly verifiedScopes: number;
     readonly results: ReadonlyArray<unknown>;
+  }>;
+  readonly loadManagementSnapshot?: (params: {
+    readonly assetId: string;
+    readonly includeProjectionHealth?: boolean;
+    readonly versionIdsInProjectionScope?: ReadonlyArray<string>;
+  }) => Promise<{
+    readonly asset: CanonicalAssetDetailReadModel;
+    readonly versions: ReadonlyArray<CanonicalVersionChainItemReadModel>;
+    readonly dependencyLifecycleSummary: {
+      readonly healthy: number;
+      readonly impacted: number;
+      readonly stale: number;
+      readonly partiallyTrusted: number;
+      readonly reconciliationNeeded: number;
+    };
+    readonly operationalSummary: {
+      readonly status: "healthy" | "attention-needed";
+      readonly explanation: string;
+      readonly recommendedActions: ReadonlyArray<string>;
+    };
+    readonly existenceExplanation?: {
+      readonly versionId: string;
+      readonly explanation: string;
+      readonly evidence: ReadonlyArray<string>;
+    };
+    readonly projectionHealth?: {
+      readonly matched: boolean;
+      readonly trustState: "trusted" | "mismatch-detected";
+      readonly trustExplanation: string;
+      readonly failedChecks: ReadonlyArray<string>;
+      readonly edgeCount: number;
+      readonly scopedVersionCount: number;
+      readonly mismatchedVersionIds: ReadonlyArray<string>;
+    };
   }>;
 }
 
@@ -97,6 +133,8 @@ export class CanonicalAssetManagementService {
       | { readonly scopeType: "asset"; readonly assetId: string; readonly versionIdsInScope?: ReadonlyArray<string>; }
     >;
     readonly verifyAfterReplay?: boolean;
+    readonly verifyBeforeReplay?: boolean;
+    readonly replayMismatchedVersionsOnly?: boolean;
   }): Promise<{
     readonly totalScopes: number;
     readonly replayedScopes: number;
@@ -107,5 +145,49 @@ export class CanonicalAssetManagementService {
       return undefined;
     }
     return this.options.rebuildProjectionScopes(params);
+  }
+
+  public async loadManagementSnapshot(params: {
+    readonly assetId: string;
+    readonly includeProjectionHealth?: boolean;
+    readonly versionIdsInProjectionScope?: ReadonlyArray<string>;
+  }): Promise<{
+    readonly asset: CanonicalAssetDetailReadModel;
+    readonly versions: ReadonlyArray<CanonicalVersionChainItemReadModel>;
+    readonly dependencyLifecycleSummary: {
+      readonly healthy: number;
+      readonly impacted: number;
+      readonly stale: number;
+      readonly partiallyTrusted: number;
+      readonly reconciliationNeeded: number;
+    };
+    readonly operationalSummary: {
+      readonly status: "healthy" | "attention-needed";
+      readonly explanation: string;
+      readonly recommendedActions: ReadonlyArray<string>;
+    };
+    readonly existenceExplanation?: {
+      readonly versionId: string;
+      readonly explanation: string;
+      readonly evidence: ReadonlyArray<string>;
+    };
+    readonly projectionHealth?: {
+      readonly matched: boolean;
+      readonly trustState: "trusted" | "mismatch-detected";
+      readonly trustExplanation: string;
+      readonly failedChecks: ReadonlyArray<string>;
+      readonly edgeCount: number;
+      readonly scopedVersionCount: number;
+      readonly mismatchedVersionIds: ReadonlyArray<string>;
+    };
+  } | undefined> {
+    if (!this.options.loadManagementSnapshot) {
+      return undefined;
+    }
+    return this.options.loadManagementSnapshot({
+      assetId: params.assetId.trim(),
+      includeProjectionHealth: params.includeProjectionHealth,
+      versionIdsInProjectionScope: params.versionIdsInProjectionScope?.map((entry) => entry.trim()).filter(Boolean),
+    });
   }
 }

@@ -78,11 +78,20 @@ export interface DesktopCanonicalAssetBridge {
   replayScopedProjection(entityType: CanonicalEntityType, entityId: string, versionId?: string): Promise<string>;
   verifyProjection(assetId: string, versionIdsInScope?: ReadonlyArray<string>): Promise<string | null>;
   rebuildProjectionScopes(requestJson: string): Promise<string>;
+  loadManagementSnapshot(assetId: string, includeProjectionHealth?: boolean, versionIdsInProjectionScope?: ReadonlyArray<string>): Promise<string | null>;
+}
+
+export interface DesktopMcpSecretBridge {
+  isAvailable(): boolean;
+  getSecret(key: string): string | null;
+  setSecret(key: string, value: string): void;
+  removeSecret(key: string): void;
 }
 
 export interface DesktopBridge {
   readonly bootstrap: DesktopBootstrapContext;
   readonly storage: DesktopKeyValueStorageBridge;
+  readonly secrets?: DesktopMcpSecretBridge;
   readonly workflows: DesktopWorkflowBridge;
   readonly executionRuns: DesktopExecutionRunBridge;
   readonly modelFiles: DesktopModelFileBridge;

@@ -66,7 +66,42 @@ describe("InMemoryAssetLineageGraphProjectionSink", () => {
     });
 
     expect(verification.matched).toBeTrue();
+    expect(verification.trust.state).toBe("trusted");
     expect(verification.projectionSummary.scopedVersionCount).toBe(2);
     expect(verification.checks.some((check) => check.code === "PATH_EXISTS" && check.matched)).toBeTrue();
+  });
+
+  it("reports scoped edge-parity mismatch details when projection diverges", async () => {
+    const sink = new InMemoryAssetLineageGraphProjectionSink();
+    await sink.publishEdge(new AssetLineageEdge({
+      edgeId: "e-extra",
+      fromVersionId: "left:v1",
+      toVersionId: "unexpected:v1",
+      type: AssetLineageRelationshipType.DERIVED_FROM,
+    }));
+    const verification = await new VerifyAssetGraphProjectionUseCase(
+      {
+        listLineageEdgesByAssetId: async () => [new AssetLineageEdge({
+          edgeId: "e-repo",
+          fromVersionId: "left:v1",
+          toVersionId: "right:v1",
+          type: AssetLineageRelationshipType.DERIVED_FROM,
+        })],
+        listAdjacentVersionIds: async (versionId: string, direction: "upstream" | "downstream") =>
+          direction === "upstream"
+            ? (versionId === "right:v1" ? ["left:v1"] : [])
+            : (versionId === "left:v1" ? ["right:v1"] : []),
+      } as any,
+      sink,
+    ).execute({
+      assetId: "asset-y",
+      versionIdsInScope: ["left:v1"],
+      strictEdgeParityInScope: true,
+    });
+
+    expect(verification.matched).toBeFalse();
+    expect(verification.trust.state).toBe("mismatch-detected");
+    expect(verification.mismatches[0]?.versionId).toBe("left:v1");
+    expect(verification.checks.some((check) => check.code.startsWith("SCOPE_EDGE_PARITY_DETAIL:left:v1") && !check.matched)).toBeTrue();
   });
 });

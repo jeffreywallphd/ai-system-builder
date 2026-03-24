@@ -360,6 +360,23 @@ const MCP_NODE_CATALOG_METADATA: Readonly<Record<string, IMcpNodeCatalogMetadata
           order: 1,
         }),
         property({
+          id: "toolId",
+          name: "Installed Tool Id",
+          type: "text",
+          value: "",
+          defaultValue: "",
+          description: "Stable installed MCP tool id aligned with registry identity for dependency tracking and execution-time validation.",
+          isAdvanced: true,
+          isEditable: false,
+          order: 2,
+          projection: {
+            authorVisibility: "hidden",
+            toolVisibility: "hidden",
+            exposeInAuthorForm: false,
+            exposeInTool: false,
+          },
+        }),
+        property({
           id: "toolDescriptor",
           name: "Tool Descriptor",
           type: "json",
@@ -368,7 +385,7 @@ const MCP_NODE_CATALOG_METADATA: Readonly<Record<string, IMcpNodeCatalogMetadata
           description: "Persisted MCP tool descriptor snapshot used to materialize authoring fields from the selected tool schema.",
           isAdvanced: true,
           isEditable: false,
-          order: 2,
+          order: 3,
           projection: {
             authorVisibility: "hidden",
             toolVisibility: "hidden",

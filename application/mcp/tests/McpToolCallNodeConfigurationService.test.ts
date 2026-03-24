@@ -4,6 +4,7 @@ import { McpNodeImplementationRegistry } from "../../../infrastructure/nodes/mcp
 import {
   McpToolCallNodeConfigurationService,
   MCP_TOOL_CALL_SERVER_ID_PROPERTY,
+  MCP_TOOL_CALL_TOOL_ID_PROPERTY,
   MCP_TOOL_CALL_TOOL_DESCRIPTOR_PROPERTY,
   MCP_TOOL_CALL_TOOL_NAME_PROPERTY,
 } from "../McpToolCallNodeConfigurationService";
@@ -56,6 +57,7 @@ describe("McpToolCallNodeConfigurationService", () => {
 
     expect(configured.getProperty(MCP_TOOL_CALL_SERVER_ID_PROPERTY)?.type).toBe("select");
     expect(configured.getProperty(MCP_TOOL_CALL_TOOL_NAME_PROPERTY)?.type).toBe("select");
+    expect(configured.getProperty(MCP_TOOL_CALL_TOOL_ID_PROPERTY)?.value).toBe("mcp:local:search_docs");
     expect(configured.getProperty(MCP_TOOL_CALL_TOOL_DESCRIPTOR_PROPERTY)?.projection?.authorVisibility).toBe("hidden");
     expect(configured.getProperty("arg.query")?.name).toBe("Query");
     expect(configured.getProperty("arg.query")?.constraints?.required).toBeTrue();
@@ -111,6 +113,7 @@ describe("McpToolCallNodeConfigurationService", () => {
     });
 
     expect(reconfigured.getProperty("arg.query")?.value).toBe("workflow registry");
+    expect(reconfigured.getProperty(MCP_TOOL_CALL_TOOL_ID_PROPERTY)?.value).toBe("mcp:local:tool_b");
     expect(reconfigured.getProperty("arg.limit")).toBeUndefined();
     expect(reconfigured.getProperty("arg.category")?.value).toBe("docs");
   });

@@ -59,6 +59,8 @@ The renderer then uses `DesktopBridgeWorkflowRepository` for workflows and a des
 ### Browser/degraded path
 If the desktop workflow bridge is unavailable or the runtime mode is browser-oriented, the renderer can fall back to `BrowserStorageWorkflowRepository`, which stores workflow records in browser storage.
 
+For the current Direction 3 MCP registry slice, installed MCP tool records are also intentionally persisted via browser `localStorage` (`LocalStorageMcpToolRegistryRepository`) to match the existing renderer-side fallback persistence pattern instead of introducing a new desktop-only storage seam yet.
+
 This means the host architecture is not just about display; it directly affects persistence durability and operational guarantees.
 
 ## Runtime orchestration and managed services
@@ -146,3 +148,5 @@ The most natural next architectural steps are:
 - The preload bridge currently relies on synchronous IPC for many operations. That is simple and works, but it can become a scaling and responsiveness concern as payloads or operation frequency grow.
 - Model-file operations currently expose a broad host capability surface through the preload bridge. If the product evolves toward stronger trust boundaries, this area may need tighter scoping and policy controls.
 - Runtime/bootstrap composition is split between the Electron host and the renderer composition; the long-term architecture would benefit from a clearer statement of what must be host-owned versus renderer-owned.
+
+Direction 3 trust updates now also use local-first persistence seams for MCP governance: tool credential records prefer the desktop secure-storage bridge (Electron `safeStorage`) and fall back to encrypted local storage when unavailable; execution-policy audit decisions remain local-storage-backed, and ordinary installed-tool/read-model paths continue to avoid returning raw secret values.

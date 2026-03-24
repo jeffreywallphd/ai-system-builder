@@ -28,6 +28,8 @@ export class RefreshCanonicalDependencyStateUseCase {
     return Object.freeze({
       refreshedAt: persisted?.computedAt ?? new Date(),
       persisted: !!persisted,
+      explanation: summary.lifecycle.reason,
+      remediationHint: summary.nextActions[0] ?? "No reconciliation is required.",
       summary,
     });
   }

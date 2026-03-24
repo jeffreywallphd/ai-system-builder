@@ -18,5 +18,10 @@
 ## Important nuance
 The architecture is mostly clean, but not all write actions are modeled as application use cases. Some stay in UI services as domain-object convenience operations.
 
+## Direction 4 boundary note (Phase 1)
+- Agent meaning/rules live in `domain/agents/` (goals, policies, asset-backed memory config, execution sessions).
+- Agent-to-runtime mapping lives in `application/agents/contracts/AgentExecutionMapping.ts` and targets `ExecutionPlan` units.
+- No agent UI/runtime bypass was introduced in this phase.
+
 ## TODO
 - When summarizing purity/impurity, say "clean-architecture-style with pragmatic UI-layer convenience logic," not "strict clean architecture."

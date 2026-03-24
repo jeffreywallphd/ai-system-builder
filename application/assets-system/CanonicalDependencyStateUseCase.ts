@@ -16,6 +16,11 @@ export interface CanonicalDependencyStateSummary {
   readonly versionId: string;
   readonly state: CanonicalDependencyLifecycleState;
   readonly lineageConfidence: "exact" | "partial";
+  readonly lifecycle: {
+    readonly source: "persisted-fresh" | "recomputed";
+    readonly computedAt: Date;
+    readonly reason: string;
+  };
   readonly reasons: ReadonlyArray<string>;
   readonly impactedByUpstreamVersionIds: ReadonlyArray<string>;
   readonly staleBecauseUpstreamAdvanced: ReadonlyArray<{
@@ -52,7 +57,14 @@ export class GetCanonicalDependencyStateUseCase {
     if (!params.forceRefresh && this.dependencyStateRepository && freshnessWindowMs > 0) {
       const persisted = await this.dependencyStateRepository.getDependencyState(params.versionId);
       if (persisted && Date.now() - persisted.computedAt.getTime() <= freshnessWindowMs) {
-        return persisted.summary;
+        return Object.freeze({
+          ...persisted.summary,
+          lifecycle: Object.freeze({
+            source: "persisted-fresh",
+            computedAt: persisted.computedAt,
+            reason: `Using persisted dependency-state summary computed at ${persisted.computedAt.toISOString()} within freshness window ${freshnessWindowMs}ms.`,
+          }),
+        });
       }
     }
 
@@ -104,6 +116,13 @@ export class GetCanonicalDependencyStateUseCase {
       versionId: params.versionId,
       state,
       lineageConfidence: health.confidence === "certain" ? "exact" : "partial",
+      lifecycle: Object.freeze({
+        source: "recomputed",
+        computedAt: new Date(),
+        reason: params.forceRefresh
+          ? "Dependency state was force-refreshed."
+          : "Dependency state was recomputed from canonical lineage and transformation records.",
+      }),
       reasons: Object.freeze(reasons),
       impactedByUpstreamVersionIds: Object.freeze(impactedByUpstreamVersionIds),
       staleBecauseUpstreamAdvanced: Object.freeze(staleBecauseUpstreamAdvanced.map((entry) => Object.freeze(entry))),
@@ -111,7 +130,7 @@ export class GetCanonicalDependencyStateUseCase {
     });
     await this.dependencyStateRepository?.saveDependencyState({
       versionId: params.versionId,
-      computedAt: new Date(),
+      computedAt: summary.lifecycle.computedAt,
       summary,
     });
     return summary;

@@ -73,7 +73,7 @@ import {
 import type { PublishDurableEntityToAssetSystemUseCase } from "../assets-system/PublishDurableEntityToAssetSystemUseCase";
 import type { CanonicalAssetIdentityService } from "../assets-system/CanonicalAssetIdentityService";
 import type { CanonicalEntityReadResolver } from "../assets-system/CanonicalEntityReadResolver";
-import { CanonicalEntityOperationalReadService } from "../assets-system/CanonicalEntityOperationalReadService";
+import { CanonicalEntityOperationalReadService, type CanonicalOperationalReadSummary } from "../assets-system/CanonicalEntityOperationalReadService";
 
 interface ServiceOptions {
   readonly datasetRepository: DatasetRepository;
@@ -128,7 +128,6 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
   private readonly datasetSourceIngestionProfile: FileIngestionProfile;
   private readonly executionEngine?: UnifiedExecutionEngine;
   private readonly canonicalPublisher?: PublishDurableEntityToAssetSystemUseCase;
-  private readonly canonicalIdentityService?: CanonicalAssetIdentityService;
   private readonly canonicalReadService: CanonicalEntityOperationalReadService;
 
   constructor(options: ServiceOptions) {
@@ -152,8 +151,7 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
     this.datasetSourceIngestionProfile = options.datasetSourceIngestionProfile ?? DatasetSourceIngestionProfile;
     this.executionEngine = options.executionEngine;
     this.canonicalPublisher = options.canonicalPublisher;
-    this.canonicalIdentityService = options.canonicalIdentityService;
-    this.canonicalReadService = new CanonicalEntityOperationalReadService(options.canonicalReadResolver);
+    this.canonicalReadService = new CanonicalEntityOperationalReadService(options.canonicalReadResolver, options.canonicalIdentityService);
   }
 
   public async createDataset(command: CreateDatasetCommand): Promise<DatasetDetails> {
@@ -292,7 +290,7 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
         exampleCount: statistics?.exampleCount ?? 0,
         canonicalSelectedVersion: selectedVersion
           ? await this.resolveCanonicalDatasetVersion(dataset.id, selectedVersion.id)
-          : Object.freeze({ preferred: false, fallbackReason: "Dataset has no selected version." }),
+          : this.createUnavailableCanonicalDatasetSummary("Dataset has no selected version."),
       });
     })));
   }
@@ -357,24 +355,20 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
       entityId,
       fallbackWhenUnavailable: "Canonical resolver is not configured for dataset-version reads.",
     });
-    if (resolved.assetId) {
-      return resolved;
-    }
-    if (!this.canonicalIdentityService) {
-      return resolved;
-    }
+    return resolved;
+  }
 
-    const identity = await this.canonicalIdentityService.resolveIdentity("dataset-version", entityId);
-    const assetId = identity?.assetId;
-    const latestVersionId = assetId
-      ? await this.canonicalIdentityService.resolveLatestVersionId("dataset-version", entityId)
-      : undefined;
+  private createUnavailableCanonicalDatasetSummary(reason: string): CanonicalOperationalReadSummary {
     return Object.freeze({
-      preferred: !!assetId,
-      assetId,
-      pinnedVersionId: identity?.latestVersionId,
-      latestVersionId,
-      fallbackReason: assetId ? resolved.fallbackReason : `No canonical identity mapping found for dataset version '${entityId}'.`,
+      preferred: false,
+      operationalStatus: Object.freeze({
+        trust: "attention-needed",
+        explanation: reason,
+        recommendedNextSteps: Object.freeze([
+          "Select or create a dataset version before running canonical operational checks.",
+        ]),
+      }),
+      fallbackReason: reason,
     });
   }
 

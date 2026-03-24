@@ -13,6 +13,18 @@ export class PythonBackedMcpToolExecutor implements IMcpToolExecutor {
   ) {}
 
   public async executeTool(request: McpToolExecutionRequest): Promise<McpToolExecutionResult> {
+    const trustSandboxDecision = (request.metadata?.trust as { sandboxDecision?: { allowed?: boolean; deniedCapabilities?: ReadonlyArray<string> } } | undefined)?.sandboxDecision;
+    if (trustSandboxDecision?.allowed === false) {
+      return Object.freeze({
+        executionId: request.executionId ?? "mcp-sandbox-denied",
+        serverId: request.serverId,
+        toolName: request.toolName,
+        status: "failed",
+        content: Object.freeze([]),
+        errorMessage: `Sandbox denied MCP execution at runtime (capabilities: ${(trustSandboxDecision.deniedCapabilities ?? []).join(", ") || "unknown"}).`,
+      });
+    }
+
     this.eventSink?.emit({
       source: RuntimeEventSources.pythonRuntime,
       severity: "info",
@@ -55,7 +67,7 @@ export class PythonBackedMcpToolExecutor implements IMcpToolExecutor {
           className: "PythonBackedMcpToolExecutor",
           methodName: "executeTool",
           operation: "mcp-tool-execution",
-          details: request,
+          details: sanitizeExecutionRequestForDiagnostics(request),
         }, {
           eventType: "mcp-tool-execution-failure",
           serverId: request.serverId,
@@ -65,4 +77,15 @@ export class PythonBackedMcpToolExecutor implements IMcpToolExecutor {
       throw error;
     }
   }
+}
+
+function sanitizeExecutionRequestForDiagnostics(request: McpToolExecutionRequest): Readonly<Record<string, unknown>> {
+  return Object.freeze({
+    serverId: request.serverId,
+    toolName: request.toolName,
+    executionId: request.executionId,
+    metadata: request.metadata,
+    hasArguments: !!request.arguments && Object.keys(request.arguments).length > 0,
+    credentialKeys: request.resolvedCredentials ? Object.keys(request.resolvedCredentials) : [],
+  });
 }

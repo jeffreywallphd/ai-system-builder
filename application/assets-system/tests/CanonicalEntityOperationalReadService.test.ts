@@ -10,6 +10,7 @@ describe("CanonicalEntityOperationalReadService", () => {
     });
     expect(summary.preferred).toBeFalse();
     expect(summary.fallbackReason).toBe("Canonical resolver missing.");
+    expect(summary.operationalStatus?.trust).toBe("attention-needed");
   });
 
   it("projects dependency-state and provenance from canonical resolver", async () => {
@@ -43,5 +44,30 @@ describe("CanonicalEntityOperationalReadService", () => {
     expect(summary.preferred).toBeTrue();
     expect(summary.dependencyState?.state).toBe("impacted");
     expect(summary.provenance?.lineageConfidence).toBe("partial");
+    expect(summary.operationalStatus?.trust).toBe("attention-needed");
+  });
+
+  it("returns identity-backed canonical summary when resolver is unavailable", async () => {
+    const summary = await new CanonicalEntityOperationalReadService(
+      undefined,
+      {
+        resolveIdentity: async () => ({
+          entityType: "installed-model",
+          entityId: "model-1",
+          assetId: "installed-model:model-1",
+          latestVersionId: "model:v1",
+          updatedAt: new Date("2026-03-24T00:00:00.000Z"),
+        }),
+        resolveLatestVersionId: async () => "model:v1",
+      } as any,
+    ).resolveSummary({
+      entityType: "installed-model",
+      entityId: "model-1",
+      fallbackWhenUnavailable: "missing",
+    });
+    expect(summary.preferred).toBeTrue();
+    expect(summary.assetId).toBe("installed-model:model-1");
+    expect(summary.fallbackReason).toContain("identity-only");
+    expect(summary.operationalStatus?.trust).toBe("attention-needed");
   });
 });

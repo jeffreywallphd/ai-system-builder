@@ -4,6 +4,7 @@ export const ExecutionUnitKinds = Object.freeze({
   modelPreparation: "model-preparation",
   modelTraining: "model-training",
   mcpServerOperation: "mcp-server-operation",
+  agentToolStep: "agent-tool-step",
 });
 
 export type ExecutionUnitKind = typeof ExecutionUnitKinds[keyof typeof ExecutionUnitKinds];

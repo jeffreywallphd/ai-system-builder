@@ -61,6 +61,7 @@ import { DisconnectMcpServerUseCase } from "../../application/mcp/DisconnectMcpS
 import { ReconnectMcpServerUseCase } from "../../application/mcp/ReconnectMcpServerUseCase";
 import { CreateLocalMcpServerUseCase } from "../../application/mcp/CreateLocalMcpServerUseCase";
 import { GenerateLocalMcpToolDraftUseCase } from "../../application/mcp/GenerateLocalMcpToolDraftUseCase";
+import { ExecuteMcpToolUseCase } from "../../application/mcp/ExecuteMcpToolUseCase";
 import { WorkflowContextService } from "../../application/context/WorkflowContextService";
 import { CreateContextPackageUseCase } from "../../application/context/CreateContextPackageUseCase";
 import { CreateContextRecipeUseCase } from "../../application/context/CreateContextRecipeUseCase";
@@ -601,7 +602,11 @@ export function createUiDependencies(
           versionId: string;
           parentVersionId?: string;
           label?: string;
-          dependencyState?: "healthy" | "impacted" | "stale" | "partially-trusted" | "reconciliation-needed";
+          dependencyState?: {
+            state: "healthy" | "impacted" | "stale" | "partially-trusted" | "reconciliation-needed";
+            reasons: ReadonlyArray<string>;
+            nextActions: ReadonlyArray<string>;
+          };
           createdAt: string;
         };
         return Object.freeze({
@@ -614,7 +619,21 @@ export function createUiDependencies(
         if (!state) {
           throw new Error(`Canonical dependency state for version '${versionId}' is unavailable.`);
         }
-        return JSON.parse(state);
+        const parsed = JSON.parse(state) as {
+          versionId: string;
+          state: "healthy" | "impacted" | "stale" | "partially-trusted" | "reconciliation-needed";
+          lineageConfidence: "exact" | "partial";
+          lifecycle: { source: "persisted-fresh" | "recomputed"; computedAt: string; reason: string; };
+          reasons: ReadonlyArray<string>;
+          nextActions: ReadonlyArray<string>;
+        };
+        return Object.freeze({
+          ...parsed,
+          lifecycle: Object.freeze({
+            ...parsed.lifecycle,
+            computedAt: new Date(parsed.lifecycle.computedAt),
+          }),
+        });
       },
       reconcileIdentity: async ({ entityType, entityId }) => {
         const reconciled = await desktopCanonicalAssetBridge.reconcileIdentity(entityType, entityId);
@@ -633,6 +652,55 @@ export function createUiDependencies(
       rebuildProjectionScopes: async (request) => JSON.parse(
         await desktopCanonicalAssetBridge.rebuildProjectionScopes(JSON.stringify(request)),
       ),
+      loadManagementSnapshot: async ({ assetId, includeProjectionHealth, versionIdsInProjectionScope }) => {
+        const snapshot = await desktopCanonicalAssetBridge.loadManagementSnapshot(assetId, includeProjectionHealth, versionIdsInProjectionScope);
+        if (!snapshot) {
+          return undefined;
+        }
+        const parsed = JSON.parse(snapshot) as {
+          asset: import("../../application/assets-system/AssetManagementReadModels").CanonicalAssetDetailReadModel;
+          versions: ReadonlyArray<{
+            versionId: string;
+            parentVersionId?: string;
+            label?: string;
+            createdAt: string;
+            dependencyState: {
+              state: "healthy" | "impacted" | "stale" | "partially-trusted" | "reconciliation-needed";
+              reasons: ReadonlyArray<string>;
+              nextActions: ReadonlyArray<string>;
+            };
+          }>;
+          dependencyLifecycleSummary: {
+            healthy: number;
+            impacted: number;
+            stale: number;
+            partiallyTrusted: number;
+            reconciliationNeeded: number;
+          };
+          existenceExplanation?: { versionId: string; explanation: string; evidence: ReadonlyArray<string>; };
+          operationalSummary: {
+            status: "healthy" | "attention-needed";
+            explanation: string;
+            recommendedActions: ReadonlyArray<string>;
+          };
+          projectionHealth?: {
+            matched: boolean;
+            trustState: "trusted" | "mismatch-detected";
+            trustExplanation: string;
+            failedChecks: ReadonlyArray<string>;
+            edgeCount: number;
+            scopedVersionCount: number;
+            mismatchedVersionIds: ReadonlyArray<string>;
+          };
+        };
+        return Object.freeze({
+          ...parsed,
+          versions: Object.freeze(parsed.versions.map((entry) => Object.freeze({
+            ...entry,
+            createdAt: new Date(entry.createdAt),
+          }))),
+        });
+      },
     }
     : undefined);
 
@@ -784,6 +852,7 @@ function createWorkflowExecutor(
   mcpServerCatalog: IMcpServerCatalog,
   runtimeDependencyOrchestrator: Pick<IRuntimeDependencyOrchestrator, "ensureAvailable">,
 ) {
+  const executeMcpToolUseCase = new ExecuteMcpToolUseCase(mcpClient);
   const executor = new TruthfulWorkflowExecutor({
     selector: new WorkflowRuntimeSelector({ runtimeDependencyOrchestrator }),
     strategies: [
@@ -794,6 +863,7 @@ function createWorkflowExecutor(
           pythonRuntimeClient: runtimeEnabled ? runtimeClient : undefined,
           mcpRuntimeClient: runtimeEnabled ? mcpClient : undefined,
           mcpServerCatalog: runtimeEnabled ? mcpServerCatalog : undefined,
+          executeMcpToolUseCase: runtimeEnabled ? executeMcpToolUseCase : undefined,
         }),
         contextResolver: new DefaultNodeExecutionContextResolver(),
         outputStoreFactory: () => new DefaultNodeOutputStore(),

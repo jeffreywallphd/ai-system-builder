@@ -178,6 +178,7 @@ describe("ui composition interactions", () => {
         replayScopedProjection: async () => JSON.stringify({ replayed: false, reason: "n/a" }),
         verifyProjection: async () => null,
         rebuildProjectionScopes: async () => JSON.stringify({ totalScopes: 0, replayedScopes: 0, verifiedScopes: 0, results: [] }),
+        loadManagementSnapshot: async () => null,
       },
     } as any;
 

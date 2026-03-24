@@ -111,6 +111,49 @@ This consistency is one of the healthier signs in the codebase: even as features
 
 AI Loom Studio is not just a thin GUI over a runtime. It is an authoring and governance environment for workflows, tools, context, and local AI operations. That kind of product benefits from a strong inner core because the rules of the authoring model need to remain stable even when runtimes and integrations change.
 
+
+## Direction 3 update: MCP plugin registry/capability contracts (current slice)
+
+The MCP layer now has an explicit inner-layer contract for installed tool definitions:
+- domain-level MCP tool capability schema (`id`, `version`, display metadata, I/O schemas, side effects, auth metadata, cost/execution hints, tags/categories, optional runtime binding).
+- application-layer registry use cases for install/register, list/detail, enable/disable transitions, safe uninstall, capability introspection queries, and an explicit update lifecycle (`preview` + `apply`) for version transitions.
+- structured registry errors (`invalid-definition`, `duplicate-install`, `tool-disabled`, contract violations) to keep UI and automation error handling deterministic.
+- safe removal now uses a structured result contract (`removed` or `blocked` with references) instead of mixing result types with thrown unsafe-removal errors.
+- install/update semantics are now version-aware:
+  - `install` for first-time registration
+  - `reinstall` vs `duplicate-install` for same-version attempts (explicit behavior)
+  - `update`/`downgrade`/`replace` actions for non-trivial transitions
+  - explicit transition classification (`same-version`, `upgrade`, `downgrade`, `incomparable`) rather than install-overwrite-only behavior.
+- installed-tool records now carry lifecycle metadata (`versionPolicy`, last action/transition, transition counters, previous/current resolved versions) so list/detail read models expose lifecycle state directly.
+- update preview now returns machine-readable change summaries (version, binding, input/output schema, side effects, auth, asset I/O contract, tags/categories) plus compatibility/risk classification for future UI/workflow/agent surfaces.
+- installed-tool list/detail read models now project lifecycle-operational state directly (resolved version, source, version policy, last transition/action, history summary counts, update posture) so callers do not reconstruct lifecycle state manually.
+- update apply now integrates bounded dependency safety: risky/breaking updates are blocked when dependent workflows exist unless force/override flags are supplied.
+- update preview/apply now also emit explicit dependency-safety posture (`no-dependencies` / `safe` / `ack-required` / `blocked`) for deterministic higher-layer gating.
+- compatibility classification now includes bounded schema-contract heuristics (required-field deltas, property add/remove, and field type changes), plus optional policy profiles (`strict`, `balanced`, `permissive`) for different safety postures.
+- update apply now supports explicit approval acknowledgements (`acknowledgedRisk`, `acknowledgedBreaking`) so risky/breaking transitions require deliberate confirmation in higher-layer workflows.
+- installed-tool lifecycle metadata now persists durable per-tool lifecycle events (install/reinstall/update/downgrade/replace) that power lifecycle history/summary read models for observability.
+- update preview/apply now emit remediation guidance suggestions for dependent-workflow impact review, output contract revalidation, trust-policy checks, and downgrade mitigation planning.
+- change-summary fidelity now includes source/policy deltas, permission-set deltas, and structured change classification buckets (informational vs compatibility-risk vs likely-breaking vs dependency-impact) including explicit asset-I/O contract impact classification.
+- capability introspection is still intentionally bounded, but now supports deeper schema-type matching (nested path and array-item checks), explicit auth-kind filtering, tag/category match modes, and side-effect ceilings for future planner/agent selection.
+- runtime contract validation remains pragmatic and non-exhaustive, but now includes nested object/array checks, enum checks, nullable handling, and clearer issue paths.
+- asset-I/O contracts now include explicit mixed raw+asset declarations, input version requirements, and output persistence semantics so MCP execution and discovery surfaces can reason about asset-backed behavior without ad hoc assumptions.
+
+This keeps MCP tools on the same inner-layer-first path as other first-class capabilities and creates a clean seam for later workflow-node integration, permissions, and agent/planner selection behavior.
+
+## Direction 3 update: MCP trust foundation (stories 4–5)
+
+The MCP inner-layer model now adds an explicit trust/governance foundation:
+- capability contracts can now declare structured credential fields and explicit permission scopes (`asset.read`, `asset.write`, `network.access`, filesystem/system scopes) in addition to side-effect class.
+- installed-tool records now carry explicit granted-permission policy state so policy can be associated with each installed tool, not inferred ad hoc at call sites.
+- application-layer auth/secret seams now flow through a dedicated secret repository port and an auth service that reports credential status (configured/missing required fields) without returning raw secret values in normal read models.
+- execution-time policy now runs through a dedicated permission-policy service and yields explicit allow/deny decisions with structured denied scopes; denials are surfaced as structured registry errors (`permission-denied`, `missing-auth-configuration`, `auth-resolution-failed`).
+- execution decisions are now emitted through an audit sink port with non-secret decision payloads, creating a seam for later trust/audit UX without forcing enterprise IAM scope in this slice.
+
+Current limitations (intentional for this pass):
+- secret persistence is still local-first, but now uses secure desktop encryption (`safeStorage` bridge) when available and encrypted local fallback otherwise.
+- scope is intentionally bounded to global/project with a user-scope extension seam; this is not a full identity/tenant system.
+- sandboxing is still bounded to application/runtime execution policy gates; policy shape is explicit (`network.allowed`, `filesystem.allowed`, `assets.read/write`, `environment.allowedEnvVars`) and network/filesystem/asset posture is invocation-level enforced while environment exposure is declared-only metadata (not hard OS/container isolation).
+
 ## TODO
 
 - Some concepts currently live more in the application layer than the domain layer because they are orchestration-heavy. That is reasonable, but over time the team may want to clarify which context-engineering rules are true domain policy versus application assembly policy.
@@ -189,8 +232,8 @@ Canonical read/query surfaces now include dedicated application use cases for:
 
 Canonical read preference is now integrated into three durable real flows (with explicit fallback semantics when canonical identity is missing):
 - `LoadWorkflowUseCase` now routes canonical resolution through a shared resolver and returns canonical identity/version metadata plus bounded provenance and dependency-state hints.
-- `ListInstalledModelsUseCase` now defaults to the same shared canonical operational resolver path (with legacy identity lookup only as fallback detail provider), reducing duplicated summary stitching.
-- `DefaultTuningDatasetStudioApplicationService` now supports the same canonical resolver path for dataset-version detail/list responses and only falls back to identity-only summaries when resolver infrastructure is unavailable.
+- `ListInstalledModelsUseCase` now defaults to the same shared canonical operational resolver path, and identity-only fallback now lives inside that shared service instead of caller-side stitching.
+- `DefaultTuningDatasetStudioApplicationService` now uses the same shared resolver path for dataset-version detail/list responses, including centralized identity-only fallback behavior when resolver infrastructure is unavailable.
 
 Canonical read consolidation now has a dedicated application helper (`CanonicalEntityOperationalReadService`) so higher-level flows do not each hand-roll canonical + fallback semantics.
 
@@ -206,20 +249,26 @@ It now also persists canonical dependency-state snapshots (`canonical_dependency
 Graph-projection readiness now moves beyond a no-op seam:
 - projection replay is now supported from canonical storage (`ReplayAssetGraphProjectionUseCase`) with bounded scoping by asset/version/transformation ids.
 - the in-memory projection sink can now answer simple path checks (`hasVersionPath`) to prove graph-oriented behavior without requiring Neo4j.
-- projection verification now supports scoped version-adjacency parity checks between canonical storage and projection traversal (`VerifyAssetGraphProjectionUseCase`) with explicit verification summaries.
+- projection verification now supports scoped version-adjacency parity checks plus scoped edge-parity mismatch details between canonical storage and projection traversal (`VerifyAssetGraphProjectionUseCase`) with explicit verification summaries.
 - a concrete Neo4j-targeted sink contract (`Neo4jAssetLineageGraphProjectionSink` + `INeo4jCypherExecutor`) now exists as the default graph-db projection target in composition, while still using a local no-op executor unless a real driver adapter is configured.
 
 Dependency lifecycle semantics now include explicit application-layer states (`healthy`, `impacted`, `stale`, `partially-trusted`, `reconciliation-needed`) via `GetCanonicalDependencyStateUseCase`, plus bounded reconciliation/refresh helpers:
+- dependency-state summaries now carry lifecycle source metadata (`persisted-fresh` vs `recomputed`) with explicit reason text for operational explainability.
 - `RefreshCanonicalDependencyStateUseCase` to recompute dependency-state summaries with explicit persisted-vs-refresh behavior.
 - `ReconcileCanonicalIdentityMappingsUseCase` to heal stale/missing pinned version references.
+- canonical workflow/model/dataset operational reads now surface explicit trust/explanation/next-step metadata (`operationalStatus`) derived from canonical dependency-state.
 - `ReplayScopedAssetGraphProjectionUseCase` for scoped graph replay by canonical entity mapping.
 - `ProjectionRebuildOrchestrationUseCase` for bounded multi-scope replay + optional verification (entity and asset scopes).
 
 Broader canonical-read adoption now also includes legacy UI service seams:
 - `WorkflowService` now routes load/list reads through `LoadWorkflowUseCase` when available, so canonical-read preference metadata can be surfaced without page-level lookup duplication.
 - `ModelService` now exposes a full installed-model read-model response (`listInstalledModelsReadModel`) so callers can consume canonical identity summaries directly.
+- `ModelService.getInstalledModelReadModel` now resolves canonical summaries through the same canonical operational service even when legacy catalog fallback is used, reducing detail-view stitching drift.
 - `CanonicalAssetManagementService` now provides a dedicated UI-facing seam for canonical asset detail, dependency-state checks, scoped graph replay, identity reconciliation actions, projection verification, and multi-scope rebuild orchestration.
 - renderer composition now wires that seam to desktop runtime-backed canonical repositories by default via the desktop preload bridge (`canonicalAssets`) when available.
+- bounded management unification now includes a reusable canonical management snapshot read (`LoadCanonicalAssetManagementSnapshotUseCase`) and a desktop/UI hook (`loadManagementSnapshot`) so a single call can provide canonical detail, version-chain dependency-state rollups, operational remediation summaries, latest-version existence explanation, and scoped projection-health/trust diagnostics.
+- projection verification now returns explicit trust state plus scoped mismatch details, and rebuild orchestration can optionally verify-before-replay and replay only mismatched scoped versions.
+- projection verification read-model assembly is now centralized (`ProjectionTrustReadModelService`) so desktop handlers and management snapshots share the same trust/comparison/remediation summary semantics.
 
 Partial-lineage diagnostics now include a bounded application read model (`GetAssetLineageDiagnosticsUseCase`) designed for future UI exploration without requiring graph infrastructure at render time.
 
@@ -227,6 +276,43 @@ What remains for next chunks:
 - expand canonical asset-management UI usage beyond the current bounded controls (detail/history/verification/rebuild actions are wired; broader UX unification is still pending).
 - expand projection replay/sink verification contracts from local proof toward richer Neo4j traversal adapters (still optional) and cover broader entity-scoped rebuild workflows.
 - add richer partial-lineage diagnostics and UI-driven impact exploration without requiring full graph mode.
-- unify additional legacy-first reads (outside workflow/model/dataset detail/list paths) onto the same canonical operational resolver seam.
+- unify additional legacy-first reads (outside workflow/model/dataset detail/list paths) onto the same canonical operational resolver seam, especially deeper history pages that still stitch fallback metadata ad hoc.
+- expose projection rebuild outcomes with richer end-user action narratives in UI (current pass standardizes trust/remediation summaries but keeps rebuild UX intentionally bounded).
+
+Direction 2 is now considered strong enough to hand off to Direction 3:
+- canonical operational reads for workflow/model/dataset paths share the same fallback/trust semantics and are stable enough to treat as the backbone.
+- projection trust/remediation summaries and management snapshots are now consistent, bounded, and reusable across desktop/UI surfaces.
+- remaining caveats are intentionally small and non-blocking (mostly deeper legacy history surfaces and broader UX unification), and further Direction 2 changes should now be driven only by concrete Direction 3 integration needs.
 
 SQLite storage now also carries normalized `asset_versions.version_label` and `asset_versions.parent_version_id` columns (plus legacy JSON payload compatibility) so version-chain queries can progressively move from blob parsing to explicit relational reads.
+
+## Direction 4 update: first bounded real agent slice (stories 6.1–6.4)
+
+- `Agent` is now a fuller domain concept (not just a config bag):
+  - stable identity + explicit display name
+  - structured prioritized goals with optional required-tool constraints
+  - MCP-registry-aligned `allowedTools` (`mcp:<serverId>:<toolName>`)
+  - asset-backed memory configuration (scoped asset ids + retrieval policy)
+  - planning strategy reference
+  - execution policy/trust linkage (`trustPolicyId`, trusted-tool posture, bounded max steps)
+  - lifecycle status (`draft`/`ready`/`paused`/`archived`)
+  - stable agent read models so callers do not reconstruct state manually.
+- Validation invariants were tightened for create/update:
+  - non-empty id/name/goals/tool set
+  - strict MCP tool identity format
+  - memory config must reference at least one asset id
+  - per-goal required tools must be inside the allowed tool set
+  - bounded retrieval/execution numeric policies.
+- Planning moved from trivial pass-through to explicit deterministic planning service:
+  - planner inspects prioritized goals + allowed tools + memory-query context
+  - planner filters allowed tools against currently available capability catalog entries
+  - planner produces a machine-readable bounded plan (`planId`, ordered steps, selected tool id per step, attached memory context).
+- Agent memory now has a real asset-backed implementation:
+  - `AssetBackedAgentMemoryStore` persists memory through asset catalog + immutable asset versions
+  - memory entries are scoped by agent, tagged, metadata-capable, and queryable for planning/execution.
+- Agent execution now composes planning + execution + memory persistence:
+  - `AgentExecutionService` builds a bounded execution graph from planner output
+  - executes each planned step via existing tool execution pathways (`ExecuteAgentToolsUseCase` and underlying MCP/workflow executors, preserving trust/policy enforcement)
+  - returns stable per-step outcomes
+  - persists execution outcomes back to agent memory assets.
+- This remains intentionally bounded: deterministic single-agent planning only, no speculative autonomous loops, and no separate execution engine.
