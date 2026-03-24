@@ -1,21 +1,24 @@
-const ASSET_LINEAGE_EDGE_KINDS = [
-  "derived-from",
-  "transformed-from",
-  "trained-from",
-  "generated-from",
-  "version-of",
-  "supersedes",
-  "input-to-run",
-  "output-of-run",
-  "contains",
-  "preview-of",
-] as const;
+export const AssetLineageRelationshipType = Object.freeze({
+  DERIVED_FROM: "DERIVED_FROM",
+  GENERATED_FROM: "GENERATED_FROM",
+  TRAINED_FROM: "TRAINED_FROM",
+  TRANSFORMED_FROM: "TRANSFORMED_FROM",
+  VERSION_OF: "VERSION_OF",
+  INPUT_TO: "INPUT_TO",
+  OUTPUT_OF: "OUTPUT_OF",
+} as const);
 
-export type AssetLineageEdgeKind = (typeof ASSET_LINEAGE_EDGE_KINDS)[number];
+export type AssetLineageRelationshipType = (typeof AssetLineageRelationshipType)[keyof typeof AssetLineageRelationshipType];
 
-function isAssetLineageEdgeKind(value: string): value is AssetLineageEdgeKind {
-  return (ASSET_LINEAGE_EDGE_KINDS as ReadonlyArray<string>).includes(value);
-}
+const LEGACY_KIND_MAP: Readonly<Record<string, AssetLineageRelationshipType>> = Object.freeze({
+  "derived-from": AssetLineageRelationshipType.DERIVED_FROM,
+  "generated-from": AssetLineageRelationshipType.GENERATED_FROM,
+  "trained-from": AssetLineageRelationshipType.TRAINED_FROM,
+  "transformed-from": AssetLineageRelationshipType.TRANSFORMED_FROM,
+  "version-of": AssetLineageRelationshipType.VERSION_OF,
+  "input-to-run": AssetLineageRelationshipType.INPUT_TO,
+  "output-of-run": AssetLineageRelationshipType.OUTPUT_OF,
+});
 
 function freezeRecord(
   metadata?: Readonly<Record<string, unknown>>,
@@ -32,20 +35,23 @@ function normalizeId(name: string, value: string): string {
   return normalized;
 }
 
-function normalizeKind(value: string): AssetLineageEdgeKind {
-  const normalized = value.trim().toLowerCase();
-  if (!isAssetLineageEdgeKind(normalized)) {
+function normalizeType(value: string): AssetLineageRelationshipType {
+  const normalized = value.trim();
+  const typed = normalized in AssetLineageRelationshipType
+    ? normalized as AssetLineageRelationshipType
+    : LEGACY_KIND_MAP[normalized.toLowerCase()];
+  if (!typed) {
     throw new Error(`AssetLineageEdge.kind '${value}' is not supported.`);
   }
 
-  return normalized;
+  return typed;
 }
 
 export class AssetLineageEdge {
   public readonly edgeId: string;
   public readonly fromVersionId: string;
   public readonly toVersionId: string;
-  public readonly kind: AssetLineageEdgeKind;
+  public readonly type: AssetLineageRelationshipType;
   public readonly transformationId?: string;
   public readonly createdAt: Date;
   public readonly metadata?: Readonly<Record<string, unknown>>;
@@ -54,7 +60,8 @@ export class AssetLineageEdge {
     edgeId: string;
     fromVersionId: string;
     toVersionId: string;
-    kind: AssetLineageEdgeKind | string;
+    type?: AssetLineageRelationshipType | string;
+    kind?: AssetLineageRelationshipType | string;
     transformationId?: string;
     createdAt?: Date;
     metadata?: Readonly<Record<string, unknown>>;
@@ -66,9 +73,13 @@ export class AssetLineageEdge {
       throw new Error("AssetLineageEdge requires distinct fromVersionId and toVersionId.");
     }
 
-    this.kind = normalizeKind(params.kind);
+    this.type = normalizeType(params.type ?? params.kind ?? "");
     this.transformationId = params.transformationId?.trim() || undefined;
     this.createdAt = params.createdAt ? new Date(params.createdAt.getTime()) : new Date();
     this.metadata = freezeRecord(params.metadata);
+  }
+
+  public get kind(): AssetLineageRelationshipType {
+    return this.type;
   }
 }

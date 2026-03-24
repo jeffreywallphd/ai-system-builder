@@ -10,11 +10,12 @@ function normalizeOptionalString(value?: string): string | undefined {
 }
 
 export type AssetTransformationStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
+export type AssetTransformationOutcome = "success" | "failed" | "partial" | "degraded";
 
 export class AssetTransformation {
   public readonly transformationId: string;
-  public readonly kind: string;
-  public readonly status: AssetTransformationStatus;
+  public readonly transformationType: string;
+  public readonly status: AssetTransformationOutcome;
   public readonly inputVersionIds: ReadonlyArray<string>;
   public readonly outputVersionIds: ReadonlyArray<string>;
   public readonly workflowId?: string;
@@ -31,8 +32,9 @@ export class AssetTransformation {
 
   constructor(params: {
     transformationId: string;
-    kind: string;
-    status: AssetTransformationStatus;
+    transformationType?: string;
+    kind?: string;
+    status: AssetTransformationOutcome | AssetTransformationStatus;
     inputVersionIds?: ReadonlyArray<string>;
     outputVersionIds?: ReadonlyArray<string>;
     workflowId?: string;
@@ -52,9 +54,9 @@ export class AssetTransformation {
       throw new Error("AssetTransformation.transformationId cannot be empty.");
     }
 
-    const kind = params.kind.trim().toLowerCase();
-    if (!kind) {
-      throw new Error("AssetTransformation.kind cannot be empty.");
+    const transformationType = (params.transformationType ?? params.kind ?? "").trim().toLowerCase();
+    if (!transformationType) {
+      throw new Error("AssetTransformation.transformationType cannot be empty.");
     }
 
     const inputVersionIds = [...new Set((params.inputVersionIds ?? []).map((entry) => entry.trim()).filter(Boolean))];
@@ -64,8 +66,8 @@ export class AssetTransformation {
     }
 
     this.transformationId = transformationId;
-    this.kind = kind;
-    this.status = params.status;
+    this.transformationType = transformationType;
+    this.status = normalizeStatus(params.status);
     this.inputVersionIds = Object.freeze(inputVersionIds);
     this.outputVersionIds = Object.freeze(outputVersionIds);
     this.workflowId = normalizeOptionalString(params.workflowId);
@@ -83,5 +85,28 @@ export class AssetTransformation {
     if (this.startedAt && this.completedAt && this.completedAt.getTime() < this.startedAt.getTime()) {
       throw new Error("AssetTransformation.completedAt cannot be earlier than startedAt.");
     }
+  }
+
+  public get kind(): string {
+    return this.transformationType;
+  }
+}
+
+function normalizeStatus(status: AssetTransformationOutcome | AssetTransformationStatus): AssetTransformationOutcome {
+  switch (status) {
+    case "success":
+    case "failed":
+    case "partial":
+    case "degraded":
+      return status;
+    case "completed":
+      return "success";
+    case "cancelled":
+      return "partial";
+    case "queued":
+    case "running":
+      return "partial";
+    default:
+      return "failed";
   }
 }

@@ -72,12 +72,12 @@ export function createUnifiedExecutionInfrastructure(
   const handlers: IExecutionUnitHandler[] = [new WorkflowExecutionUnitHandler(options.workflowExecutor, options.executionAssetLineageRecorder)];
 
   if (options.datasetGenerationService) {
-    handlers.push(new DatasetGenerationExecutionUnitHandler(options.datasetGenerationService));
+    handlers.push(new DatasetGenerationExecutionUnitHandler(options.datasetGenerationService, options.executionAssetLineageRecorder));
   }
 
   if (options.modelTrainingRuntime) {
     handlers.push(new ModelPreparationExecutionUnitHandler(options.modelTrainingRuntime));
-    handlers.push(new ModelTrainingExecutionUnitHandler(options.modelTrainingRuntime));
+    handlers.push(new ModelTrainingExecutionUnitHandler(options.modelTrainingRuntime, options.executionAssetLineageRecorder));
   }
 
   if (options.mcpServerManager) {

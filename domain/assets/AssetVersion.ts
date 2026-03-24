@@ -18,6 +18,8 @@ function cloneDate(value?: Date): Date | undefined {
 export class AssetVersion {
   public readonly assetId: AssetId;
   public readonly versionId: string;
+  public readonly versionLabel?: string;
+  public readonly parentVersionId?: string;
   public readonly createdAt: Date;
   public readonly createdBy?: string;
   public readonly contentSha256?: string;
@@ -29,6 +31,8 @@ export class AssetVersion {
   constructor(params: {
     assetId: string | AssetId;
     versionId: string;
+    versionLabel?: string;
+    parentVersionId?: string;
     createdAt?: Date;
     createdBy?: string;
     contentSha256?: string;
@@ -46,6 +50,10 @@ export class AssetVersion {
     if (upstream.includes(versionId)) {
       throw new Error("AssetVersion.upstreamVersionIds cannot include the version itself.");
     }
+    const parentVersionId = normalizeOptionalString(params.parentVersionId);
+    if (parentVersionId && parentVersionId === versionId) {
+      throw new Error("AssetVersion.parentVersionId cannot reference the version itself.");
+    }
 
     const contentLengthBytes = params.contentLengthBytes;
     if (contentLengthBytes !== undefined && contentLengthBytes < 0) {
@@ -54,6 +62,8 @@ export class AssetVersion {
 
     this.assetId = AssetId.from(params.assetId);
     this.versionId = versionId;
+    this.versionLabel = normalizeOptionalString(params.versionLabel);
+    this.parentVersionId = parentVersionId;
     this.createdAt = cloneDate(params.createdAt) ?? new Date();
     this.createdBy = normalizeOptionalString(params.createdBy);
     this.contentSha256 = normalizeOptionalString(params.contentSha256)?.toLowerCase();

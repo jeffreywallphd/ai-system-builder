@@ -7,7 +7,6 @@ import { NoopAssetLineageGraphProjectionSink } from "../../../infrastructure/fil
 import { RegisterAssetUseCase } from "../RegisterAssetUseCase";
 import { CreateAssetVersionUseCase } from "../CreateAssetVersionUseCase";
 import { RecordAssetTransformationUseCase } from "../RecordAssetTransformationUseCase";
-import { LinkAssetLineageUseCase } from "../LinkAssetLineageUseCase";
 import { ProjectArtifactToAssetSystemUseCase } from "../ProjectArtifactToAssetSystemUseCase";
 import { Asset } from "../../../domain/assets/Asset";
 import { AssetLocation, AssetSourceInfo } from "../../../domain/assets/AssetMetadata";
@@ -26,8 +25,7 @@ describe("ProjectArtifactToAssetSystemUseCase integration", () => {
       const useCase = new ProjectArtifactToAssetSystemUseCase(
         new RegisterAssetUseCase(repository),
         new CreateAssetVersionUseCase(repository),
-        new RecordAssetTransformationUseCase(repository, graphSink),
-        new LinkAssetLineageUseCase(repository, graphSink),
+        new RecordAssetTransformationUseCase(repository, repository, graphSink),
       );
 
       await repository.save(new Asset({

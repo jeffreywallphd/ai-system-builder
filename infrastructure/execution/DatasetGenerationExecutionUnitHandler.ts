@@ -14,6 +14,7 @@ import type {
   IExecutionUnitExecutionResult,
   IExecutionUnitHandler,
 } from "../../application/execution/UnifiedExecutionEngine";
+import type { ExecutionAssetLineageRecorder } from "../../application/assets-system/ExecutionAssetLineageRecorder";
 
 function toExecutionStatus(result: DatasetGenerationResult): IExecutionUnitExecutionResult["status"] {
   switch (result.status) {
@@ -30,7 +31,10 @@ function toExecutionStatus(result: DatasetGenerationResult): IExecutionUnitExecu
 }
 
 export class DatasetGenerationExecutionUnitHandler implements IExecutionUnitHandler {
-  constructor(private readonly datasetGenerationService: DatasetGenerationService) {}
+  constructor(
+    private readonly datasetGenerationService: DatasetGenerationService,
+    private readonly executionAssetLineageRecorder?: ExecutionAssetLineageRecorder,
+  ) {}
 
   public canHandle(unit: IExecutionUnitExecutionRequest["unit"]): boolean {
     return unit.kind === ExecutionUnitKinds.datasetGeneration;
@@ -46,6 +50,10 @@ export class DatasetGenerationExecutionUnitHandler implements IExecutionUnitHand
     }
 
     const result = await this.datasetGenerationService.generate(input);
+    await this.executionAssetLineageRecorder?.recordDatasetGeneration({
+      request: input,
+      result,
+    });
 
     return Object.freeze({
       unitId: request.unit.id,

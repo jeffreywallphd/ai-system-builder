@@ -24,6 +24,12 @@ export interface SubmitModelTrainingJobRequest {
   readonly createdBy: string;
   readonly configuration: ModelTrainingConfiguration;
   readonly examples: ReadonlyArray<SubmitModelTrainingDatasetExample>;
+  readonly assetLineage?: {
+    readonly datasetVersionAssetId?: string;
+    readonly baseModelAssetId?: string;
+    readonly sourceVersionIds?: ReadonlyArray<string>;
+    readonly outputAssetNamespace?: string;
+  };
 }
 
 export interface IModelTrainingRuntime {

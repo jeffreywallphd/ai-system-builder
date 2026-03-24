@@ -4,9 +4,9 @@ import { AssetLocation, AssetSourceInfo } from "../../../domain/assets/AssetMeta
 import { RegisterAssetUseCase } from "../RegisterAssetUseCase";
 import { CreateAssetVersionUseCase } from "../CreateAssetVersionUseCase";
 import { RecordAssetTransformationUseCase } from "../RecordAssetTransformationUseCase";
-import { LinkAssetLineageUseCase } from "../LinkAssetLineageUseCase";
 import { GetAssetHistoryUseCase } from "../GetAssetHistoryUseCase";
 import { GetAssetLineageSummaryUseCase } from "../GetAssetLineageSummaryUseCase";
+import { GetAssetVersionHistoryUseCase } from "../GetAssetVersionHistoryUseCase";
 import { AssetVersion } from "../../../domain/assets/AssetVersion";
 import { AssetLineageEdge } from "../../../domain/assets/AssetLineageEdge";
 import { AssetTransformation } from "../../../domain/assets/AssetTransformation";
@@ -50,8 +50,7 @@ describe("Asset system use cases", () => {
       saveTransformation: repository.saveTransformation.bind(repository),
       getById: repository.getTransformationById.bind(repository),
       listByVersionId: repository.listByVersionId.bind(repository),
-    });
-    const linkLineage = new LinkAssetLineageUseCase(repository as any);
+    }, repository as any);
 
     const asset = new Asset({
       id: "asset-1",
@@ -64,20 +63,14 @@ describe("Asset system use cases", () => {
 
     await registerAsset.execute({ asset });
     await createVersion.execute({ assetId: asset.id, versionId: "v1" });
+    await expect(createVersion.execute({ assetId: asset.id, versionId: "v1" })).rejects.toThrow("immutable");
     await createVersion.execute({ assetId: asset.id, versionId: "v2", upstreamVersionIds: ["v1"] });
     await recordTransformation.execute({
       transformationId: "tx-1",
-      kind: "test-transform",
-      status: "completed",
+      transformationType: "test-transform",
+      status: "success",
       inputVersionIds: ["v1"],
       outputVersionIds: ["v2"],
-    });
-    await linkLineage.execute({
-      edgeId: "edge-1",
-      fromVersionId: "v1",
-      toVersionId: "v2",
-      kind: "derived-from",
-      transformationId: "tx-1",
     });
 
     const history = await new GetAssetHistoryUseCase(
@@ -91,14 +84,24 @@ describe("Asset system use cases", () => {
       },
     ).execute(asset.id);
     expect(history.versions).toHaveLength(2);
+    const v2Summary = history.versions.find((version) => version.versionId === "v2");
+    expect(v2Summary?.upstreamVersionIds).toContain("v1");
 
-    const lineage = await new GetAssetLineageSummaryUseCase(repository as any).execute({
+    const lineage = await new GetAssetLineageSummaryUseCase(repository as any, {
+      saveTransformation: repository.saveTransformation.bind(repository),
+      getById: repository.getTransformationById.bind(repository),
+      listByVersionId: repository.listByVersionId.bind(repository),
+    } as any).execute({
       versionId: "v2",
       direction: "upstream",
       maxDepth: 2,
       maxEdges: 10,
     });
     expect(lineage.visitedVersionIds).toContain("v1");
-    expect(lineage.traversedEdgeIds).toContain("edge-1");
+    expect(lineage.traversedEdgeIds).toContain("tx-1:v1->v2");
+    expect(lineage.traversedEdges[0]?.transformationType).toBe("test-transform");
+
+    const versionHistory = await new GetAssetVersionHistoryUseCase(repository as any).execute(asset.id);
+    expect(versionHistory).toHaveLength(2);
   });
 });
