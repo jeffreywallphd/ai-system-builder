@@ -310,6 +310,7 @@ export class ExecuteMcpToolUseCase {
     request: McpToolExecutionRequest,
     installedTool?: Awaited<ReturnType<IMcpToolRegistryRepository["findInstalledToolByBinding"]>>,
   ): Promise<McpToolExecutionResult> {
+    this.assertAssetOutputPersistenceModel(installedTool);
     const preparation = installedTool && this.assetIoCoordinator
       ? await this.assetIoCoordinator.prepareInput(installedTool, request.arguments ?? {})
       : undefined;
@@ -340,17 +341,43 @@ export class ExecuteMcpToolUseCase {
           fallbackOutput: result.content[0],
         });
         if (finalization.resultMetadata) {
+          const existingAssetIo = result.metadata?.assetIo as Record<string, unknown> | undefined;
+          const finalAssetIo = finalization.resultMetadata.assetIo as Record<string, unknown> | undefined;
+          const consumedAssetIo = preparation?.consumedAssets?.length
+            ? Object.freeze({ consumedAssets: preparation.consumedAssets })
+            : undefined;
           return Object.freeze({
             ...result,
             metadata: Object.freeze({
               ...(result.metadata ?? {}),
-              ...finalization.resultMetadata,
+              ...(finalization.resultMetadata ?? {}),
+              assetIo: Object.freeze({
+                ...(existingAssetIo ?? {}),
+                ...(finalAssetIo ?? {}),
+                ...(consumedAssetIo ?? {}),
+              }),
             }),
           });
         }
       }
     }
     return sanitizeMcpResultErrors(result);
+  }
+
+  private assertAssetOutputPersistenceModel(
+    installedTool?: Awaited<ReturnType<IMcpToolRegistryRepository["findInstalledToolByBinding"]>>,
+  ): void {
+    if (!installedTool) {
+      return;
+    }
+    const declaredAssetOutputs = installedTool.definition.assetIo?.outputs?.filter((entry) => entry.mode !== "raw") ?? [];
+    if (declaredAssetOutputs.length > 0 && !this.assetIoCoordinator) {
+      throw new McpToolRegistryError(
+        "invalid-output-contract",
+        "Installed MCP tool declares asset outputs, but canonical asset persistence is not configured.",
+        { toolId: installedTool.toolId, outputModes: declaredAssetOutputs.map((entry) => entry.mode) },
+      );
+    }
   }
 }
 

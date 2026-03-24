@@ -65,6 +65,7 @@ export interface McpToolDefinition {
   readonly version: string;
   readonly displayName: string;
   readonly description?: string;
+  readonly author?: string;
   readonly inputSchema: Readonly<Record<string, unknown>>;
   readonly outputSchema?: Readonly<Record<string, unknown>>;
   readonly sideEffects: McpToolSideEffectClass;
@@ -91,7 +92,8 @@ export interface McpToolDefinitionValidationIssue {
     | "invalid-side-effects"
     | "invalid-permissions"
     | "invalid-binding"
-    | "invalid-asset-io";
+    | "invalid-asset-io"
+    | "invalid-metadata";
   readonly message: string;
   readonly path?: string;
 }
@@ -114,6 +116,9 @@ export function validateMcpToolDefinition(
   }
   if (!definition.displayName?.trim()) {
     issues.push({ code: "missing-display-name", message: "Tool definition requires a displayName.", path: "displayName" });
+  }
+  if (definition.author !== undefined && !definition.author.trim()) {
+    issues.push({ code: "invalid-metadata", message: "Tool author must be a non-empty string when provided.", path: "author" });
   }
   if (!isSchemaRecord(definition.inputSchema)) {
     issues.push({ code: "invalid-input-schema", message: "Tool definition requires an object-shaped input schema.", path: "inputSchema" });
@@ -202,6 +207,7 @@ export function normalizeMcpToolDefinition(definition: McpToolDefinition): McpTo
     version: definition.version.trim(),
     displayName: definition.displayName.trim(),
     description: definition.description?.trim() || undefined,
+    author: definition.author?.trim() || undefined,
     inputSchema: cloneRecord(definition.inputSchema) ?? Object.freeze({ type: "object" }),
     outputSchema: cloneRecord(definition.outputSchema),
     sideEffects: definition.sideEffects,

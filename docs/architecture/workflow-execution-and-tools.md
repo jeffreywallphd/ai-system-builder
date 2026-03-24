@@ -248,6 +248,12 @@ That is "done enough" for Direction 1: the unified execution engine now includes
 - Safe removal now returns an explicit structured result (`removed` or `blocked`) with dependency references, so UI/adapters can render unsafe-removal state without exception parsing.
 - MCP capability contracts now support optional `assetIo` declarations that model asset-backed inputs and asset-producing/asset-transforming outputs without removing support for raw-value tools, including explicit mixed-input flags, input version requirements, and output persistence semantics.
 - MCP execution now has an optional asset-I/O seam that can resolve asset references before runtime invocation, enforce version-required input rules, persist MCP outputs as assets/versions with bounded idempotent persistence behavior, and emit transformation lineage records for reproducibility/provenance.
+- Asset-output persistence is now enforced for installed tools that declare non-raw `assetIo.outputs`: execution fails fast when canonical asset persistence wiring is unavailable instead of silently returning loose payloads.
+- Asset-aware execution now records both consumed input asset references and produced output assets in execution metadata so downstream projections can treat MCP runs as deterministic `asset -> execution/tool -> asset` provenance events.
+- Raw-only behavior is now explicit and bounded: when `assetIo.allowsRawInputs` is `false`, undeclared raw input fields are rejected; when `assetIo.allowsRawOutputs` is `false`, missing declared asset outputs are treated as contract violations.
+- Transformation-history reads for assets now have a canonical application seam (`GetAssetTransformationHistoryUseCase`) that uses repository-native asset-scoped queries when available and version-based fallback otherwise.
+- Registry read models now include minimal marketplace-ready metadata (`description`, `author`, `version`, `categories`) and normalize/validate author metadata in the domain contract.
+- MCP tool registry import/export is now explicit and machine-readable (`ai-loom.mcp-tools.v1`) with bounded local-first semantics (export installed records, import with optional overwrite, no remote platform coupling).
 
 ## TODO
 
