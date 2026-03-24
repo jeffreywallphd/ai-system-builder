@@ -81,9 +81,17 @@ export interface DesktopCanonicalAssetBridge {
   loadManagementSnapshot(assetId: string, includeProjectionHealth?: boolean, versionIdsInProjectionScope?: ReadonlyArray<string>): Promise<string | null>;
 }
 
+export interface DesktopMcpSecretBridge {
+  isAvailable(): boolean;
+  getSecret(key: string): string | null;
+  setSecret(key: string, value: string): void;
+  removeSecret(key: string): void;
+}
+
 export interface DesktopBridge {
   readonly bootstrap: DesktopBootstrapContext;
   readonly storage: DesktopKeyValueStorageBridge;
+  readonly secrets?: DesktopMcpSecretBridge;
   readonly workflows: DesktopWorkflowBridge;
   readonly executionRuns: DesktopExecutionRunBridge;
   readonly modelFiles: DesktopModelFileBridge;

@@ -11,6 +11,7 @@ export interface McpToolExecutionAuditEvent {
     | "tool-disabled"
     | "missing-auth-configuration"
     | "invalid-auth-configuration"
+    | "invalid-credentials"
     | "permission-denied";
   readonly permissionDecision?: McpToolExecutionPermissionDecision;
   readonly metadata?: Readonly<Record<string, unknown>>;

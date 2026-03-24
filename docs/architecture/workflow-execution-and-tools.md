@@ -265,7 +265,7 @@ The MCP execution path now includes explicit trust controls in the standard use-
 5. Emit an execution audit decision event with non-secret payload.
 6. Invoke runtime execution.
 
-Auth and permission denials are explicit, structured outcomes (`missing-auth-configuration`, `auth-resolution-failed`, `permission-denied`) instead of implicit runtime failures.
+Auth and permission denials are explicit, structured outcomes (`missing-auth-configuration`, `invalid-credentials`, `auth-resolution-failed`, `permission-denied`) instead of implicit runtime failures. Credential resolution now reports structured status (success/missing/partial/invalid/failed) so missing vs malformed states are handled deterministically.
 
 This slice enforces policy in the application/runtime orchestration layer (bounded sandbox policy) and creates seams for future stronger process/OS sandboxing and user-consent UX.
 

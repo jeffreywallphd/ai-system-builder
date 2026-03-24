@@ -1,6 +1,6 @@
 import type { McpToolPermissionScope } from "../../../domain/mcp/McpToolTrust";
 import type { IMcpToolRegistryRepository } from "../../ports/interfaces/IMcpToolRegistryRepository";
-import type { IMcpToolSecretRepository } from "../../ports/interfaces/IMcpToolSecretRepository";
+import type { IMcpToolSecretRepository, McpToolSecretScope } from "../../ports/interfaces/IMcpToolSecretRepository";
 import { McpToolAuthService } from "../security/McpToolAuthService";
 import { McpToolRegistryError } from "./McpToolRegistryErrors";
 
@@ -10,13 +10,13 @@ export class ConfigureMcpToolCredentialsUseCase {
     private readonly secretRepository: IMcpToolSecretRepository,
   ) {}
 
-  public async execute(request: { readonly toolId: string; readonly values: Readonly<Record<string, string>> }) {
+  public async execute(request: { readonly toolId: string; readonly values: Readonly<Record<string, string>>; readonly scope?: McpToolSecretScope }) {
     const tool = await this.registryRepository.getInstalledTool(request.toolId.trim());
     if (!tool) {
       throw new McpToolRegistryError("tool-not-found", `MCP tool '${request.toolId}' was not found.`);
     }
 
-    const configured = await this.secretRepository.upsertSecret(tool.toolId, request.values, tool.definition.auth.credentialFields ?? []);
+    const configured = await this.secretRepository.upsertSecret(tool.toolId, request.values, tool.definition.auth.credentialFields ?? [], request.scope);
     return configured;
   }
 }
@@ -31,12 +31,12 @@ export class GetMcpToolCredentialStatusUseCase {
     this.authService = new McpToolAuthService(secretRepository);
   }
 
-  public async execute(toolId: string) {
+  public async execute(toolId: string, scopeContext?: { readonly projectId?: string; readonly userId?: string }) {
     const tool = await this.registryRepository.getInstalledTool(toolId.trim());
     if (!tool) {
       throw new McpToolRegistryError("tool-not-found", `MCP tool '${toolId}' was not found.`);
     }
-    return this.authService.getCredentialStatus(tool);
+    return this.authService.getCredentialStatus(tool, scopeContext);
   }
 }
 

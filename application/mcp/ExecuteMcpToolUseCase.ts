@@ -11,6 +11,7 @@ import { McpToolAuthService } from "./security/McpToolAuthService";
 import { McpToolPermissionPolicyService } from "./security/McpToolPermissionPolicyService";
 import type { McpToolPermissionScope } from "../../domain/mcp/McpToolTrust";
 import type { McpToolAssetIoCoordinator } from "./McpToolAssetIoCoordinator";
+import type { McpCredentialResolutionContext } from "./security/McpCredentialResolution";
 
 export class ExecuteMcpToolUseCase {
   private readonly executor: IMcpToolExecutor;
@@ -45,6 +46,7 @@ export class ExecuteMcpToolUseCase {
       arguments: request.arguments ? Object.freeze({ ...request.arguments }) : undefined,
       context: request.context,
       runtimePermissions: request.runtimePermissions ? Object.freeze([...request.runtimePermissions]) : undefined,
+      credentialContext: request.credentialContext ? Object.freeze({ ...request.credentialContext }) : undefined,
       metadata: Object.freeze({
         ...(request.metadata ? { ...request.metadata } : {}),
         ...(request.context
@@ -132,8 +134,10 @@ export class ExecuteMcpToolUseCase {
       }
 
       const authService = this.secretRepository ? new McpToolAuthService(this.secretRepository) : undefined;
-      const credentialStatus = authService ? await authService.getCredentialStatus(installedTool) : undefined;
-      const resolvedCredentials = authService ? await authService.resolveRequiredCredentials(installedTool) : undefined;
+      const credentialContext = resolveCredentialContext(normalizedRequest);
+      const credentialStatus = authService ? await authService.getCredentialStatus(installedTool, credentialContext) : undefined;
+      const credentialResolution = authService ? await authService.resolveCredentials(installedTool, credentialContext) : undefined;
+      const resolvedCredentials = authService ? await authService.resolveRequiredCredentials(installedTool, credentialContext) : undefined;
       if (installedTool.definition.auth.kind === "required" && !this.secretRepository) {
         throw new McpToolRegistryError("missing-auth-configuration", "MCP tool requires credentials but no secret repository is configured.", {
           toolId: installedTool.toolId,
@@ -154,9 +158,29 @@ export class ExecuteMcpToolUseCase {
           missingRequiredFields: credentialStatus.missingRequiredFields,
         });
       }
+      if (installedTool.definition.auth.kind === "required" && credentialResolution?.status === "invalid") {
+        await this.auditSink.record({
+          toolId: installedTool.toolId,
+          serverId: normalizedRequest.serverId,
+          toolName: normalizedRequest.toolName,
+          occurredAt: new Date().toISOString(),
+          outcome: "denied",
+          reason: "invalid-credentials",
+          metadata: Object.freeze({
+            malformedFields: credentialResolution.malformedFields,
+            scopeType: credentialResolution.scope.scopeType,
+            scopeId: credentialResolution.scope.scopeId,
+          }),
+        });
+        throw new McpToolRegistryError("invalid-credentials", "MCP tool credentials are malformed.", {
+          toolId: installedTool.toolId,
+          malformedFields: credentialResolution.malformedFields,
+        });
+      }
       if (installedTool.definition.auth.kind === "required" && !resolvedCredentials) {
         throw new McpToolRegistryError("auth-resolution-failed", "MCP tool credentials could not be resolved.", {
           toolId: installedTool.toolId,
+          status: credentialResolution?.status,
         });
       }
 
@@ -244,7 +268,7 @@ export class ExecuteMcpToolUseCase {
         }
       }
     }
-    return result;
+    return sanitizeMcpResultErrors(result);
   }
 }
 
@@ -254,4 +278,22 @@ function extractContextGrantedPermissions(metadata: Readonly<Record<string, unkn
     return Object.freeze([]);
   }
   return Object.freeze(permissions.filter((permission): permission is McpToolPermissionScope => typeof permission === "string"));
+}
+
+function resolveCredentialContext(request: McpToolExecutionRequest): McpCredentialResolutionContext {
+  const metadataContext = request.metadata?.credentialContext as { projectId?: unknown; userId?: unknown } | undefined;
+  return Object.freeze({
+    projectId: request.credentialContext?.projectId
+      ?? (typeof metadataContext?.projectId === "string" ? metadataContext.projectId : undefined),
+    userId: request.credentialContext?.userId
+      ?? (typeof metadataContext?.userId === "string" ? metadataContext.userId : undefined),
+  });
+}
+
+function sanitizeMcpResultErrors(result: McpToolExecutionResult): McpToolExecutionResult {
+  if (result.status !== "failed" || !result.errorMessage) {
+    return result;
+  }
+  const sanitized = result.errorMessage.replace(/(api[-_ ]?key|token|secret|password)\s*[:=]\s*([^\s,;]+)/gi, "$1=[REDACTED]");
+  return Object.freeze({ ...result, errorMessage: sanitized });
 }

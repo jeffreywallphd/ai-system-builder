@@ -54,11 +54,11 @@ describe("McpToolTrustUseCases", () => {
     const registry = makeRegistry(tool);
     let storedValues: Record<string, string> | undefined;
     const secrets: IMcpToolSecretRepository = {
-      getSecretReference: async () => ({ toolId: tool.toolId, fields: tool.definition.auth.credentialFields ?? [], updatedAt: "2026-03-24T00:00:00.000Z" }),
-      resolveSecret: async () => ({ toolId: tool.toolId, values: storedValues ?? {}, updatedAt: "2026-03-24T00:00:00.000Z" }),
+      getSecretReference: async () => ({ toolId: tool.toolId, scopeType: "global", fields: tool.definition.auth.credentialFields ?? [], updatedAt: "2026-03-24T00:00:00.000Z" }),
+      resolveSecret: async () => ({ toolId: tool.toolId, scopeType: "global", values: storedValues ?? {}, updatedAt: "2026-03-24T00:00:00.000Z" }),
       upsertSecret: async (_toolId, values, fields) => {
         storedValues = { ...values };
-        return { toolId: tool.toolId, fields, updatedAt: "2026-03-24T00:00:00.000Z" };
+        return { toolId: tool.toolId, scopeType: "global", fields, updatedAt: "2026-03-24T00:00:00.000Z" };
       },
       removeSecret: async () => false,
     };

@@ -152,6 +152,8 @@ The MCP inner/application layers now include a bounded but real trust foundation
 
 This slice is intentionally local-first and bounded:
 - it does not implement enterprise IAM/RBAC.
+- secret persistence prefers desktop secure encryption (`safeStorage`) with an encrypted-local fallback path when secure storage is unavailable.
+- secret resolution is now scope-aware (`project -> user -> global`, with global default for backward compatibility).
 - it does not perform OS/container sandboxing yet.
 - it creates a stable seam so stronger secret backends, consent UX, and process sandboxing can layer in later without redesigning core contracts.
 

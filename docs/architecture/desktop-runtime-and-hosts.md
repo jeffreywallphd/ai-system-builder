@@ -149,4 +149,4 @@ The most natural next architectural steps are:
 - Model-file operations currently expose a broad host capability surface through the preload bridge. If the product evolves toward stronger trust boundaries, this area may need tighter scoping and policy controls.
 - Runtime/bootstrap composition is split between the Electron host and the renderer composition; the long-term architecture would benefit from a clearer statement of what must be host-owned versus renderer-owned.
 
-Direction 3 trust updates now also use local-first persistence seams for MCP governance: tool credential records and execution-policy audit decisions are persisted through dedicated local-storage adapters, while ordinary installed-tool/read-model paths continue to avoid returning raw secret values.
+Direction 3 trust updates now also use local-first persistence seams for MCP governance: tool credential records prefer the desktop secure-storage bridge (Electron `safeStorage`) and fall back to encrypted local storage when unavailable; execution-policy audit decisions remain local-storage-backed, and ordinary installed-tool/read-model paths continue to avoid returning raw secret values.

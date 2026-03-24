@@ -11,6 +11,12 @@ declare global {
     aiLoomDesktop?: {
       bootstrap: DesktopBootstrapContext;
       storage: DesktopStorageBridge;
+      secrets?: {
+        isAvailable(): boolean;
+        getSecret(key: string): string | null;
+        setSecret(key: string, value: string): void;
+        removeSecret(key: string): void;
+      };
       workflows: DesktopWorkflowBridge;
       executionRuns: DesktopExecutionRunBridge;
       modelFiles: DesktopModelFileBridge;
