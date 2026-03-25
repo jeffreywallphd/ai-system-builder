@@ -146,6 +146,15 @@ The runtime is not a single path. The system currently supports multiple executi
 
 - Direction 4 (Phase 4, MCP tool integration inner slice) now keeps MCP as the external tool-protocol boundary while remaining execution-native: agent policy carries canonical MCP bindings, agent mapping emits `mcp-tool-invocation` execution units, and plan/execute-time MCP governance checks reuse existing registry/trust services instead of introducing a parallel agent runtime.
 - Direction 4 (Phase 4 completion + Phase 5 inner foundations) now introduces a reusable planner/tool compatibility seam (`AgentPlanToolSelectionService`), richer deterministic MCP governance outcomes (explicit unavailable/approval-required/denied/incompatible semantics), and a bounded inner runtime coordinator (`AgentRunnerService`) that composes planning, governance, execution, and memory while emitting structured runtime progress events and applying bounded retry/failure policies.
+- Phase 5 hardening now keeps retry/partial-execution truth explicit in inner contracts:
+  - terminal failures can explicitly signal retry exhaustion (`retryExhausted`);
+  - execution sessions persist per-step outcomes and optional output-asset diagnostics;
+  - transition-history reads are part of the session repository port (`IAgentExecutionSessionRepository`).
+- Phase 6 inner authoring foundation now adds real backend-ready seams without UI coupling:
+  - persistence: `IAgentRepository` with concrete `SqliteAgentRepository`;
+  - CRUD/lifecycle use cases: create/update/get/list/delete/archive;
+  - bounded structured configuration use cases: goals/policy/tools/memory/strategy;
+  - cohesive cross-field validation seam: `AgentConfigurationValidationService` + `ValidateAgentConfigurationUseCase`.
 
 ## TODO
 

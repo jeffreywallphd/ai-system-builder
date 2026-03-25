@@ -1,7 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import Database from "better-sqlite3";
-import type { IAgentExecutionSessionRepository } from "../../../application/ports/interfaces/IAgentExecutionSessionRepository";
+import type {
+  AgentExecutionSessionTransitionRecord,
+  IAgentExecutionSessionRepository,
+} from "../../../application/ports/interfaces/IAgentExecutionSessionRepository";
 import type { AgentExecutionSession, AgentExecutionSessionStatus } from "../../../domain/agents/AgentExecutionSession";
 
 interface SessionRow {
@@ -42,11 +45,6 @@ const MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
     CREATE INDEX agent_execution_session_transitions_idx ON agent_execution_session_transitions(session_id, id ASC);
   `],
 ]);
-
-export interface AgentExecutionSessionTransitionRecord {
-  readonly status: AgentExecutionSessionStatus;
-  readonly recordedAt: string;
-}
 
 export class SqliteAgentExecutionSessionRepository implements IAgentExecutionSessionRepository {
   private database?: Database.Database;

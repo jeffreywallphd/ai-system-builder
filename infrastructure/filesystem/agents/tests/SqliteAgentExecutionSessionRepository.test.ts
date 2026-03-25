@@ -47,9 +47,45 @@ describe("SqliteAgentExecutionSessionRepository", () => {
     const listed = await repository.listByAgentId("agent-runtime");
     expect(listed).toHaveLength(1);
     expect(listed[0]?.id).toBe("agent-session:test:1");
+    expect(listed[0]?.stepOutcomes).toEqual([]);
 
     const transitions = await repository.listTransitionHistory("agent-session:test:1");
     expect(transitions.map((entry) => entry.status)).toEqual(["pending", "ready", "running", "completed"]);
+
+    repository.dispose();
+  });
+
+  it("persists session step outcomes across saves", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-agent-session-"));
+    createdRoots.push(root);
+    const repository = new SqliteAgentExecutionSessionRepository(path.join(root, "agent-sessions.sqlite"));
+
+    let session = createAgentExecutionSession({
+      id: "agent-session:test:2",
+      agentId: "agent-runtime",
+      planId: "agent-plan:2",
+    });
+    await repository.save(session);
+    session = transitionAgentExecutionSession(session, { status: AgentExecutionSessionStatuses.running });
+    await repository.save(session);
+    session = transitionAgentExecutionSession(session, {
+      status: AgentExecutionSessionStatuses.running,
+      appendStepOutcome: {
+        stepId: "s1",
+        status: "completed",
+        attempts: 1,
+        toolId: "mcp:local:echo",
+        output: "ok",
+      },
+    });
+    await repository.save(session);
+    session = transitionAgentExecutionSession(session, { status: AgentExecutionSessionStatuses.failed });
+    await repository.save(session);
+
+    const loaded = await repository.getById("agent-session:test:2");
+    expect(loaded?.stepOutcomes).toHaveLength(1);
+    expect(loaded?.stepOutcomes[0]?.stepId).toBe("s1");
+    expect(loaded?.stepOutcomes[0]?.status).toBe("completed");
 
     repository.dispose();
   });

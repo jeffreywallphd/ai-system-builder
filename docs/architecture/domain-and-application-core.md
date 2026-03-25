@@ -319,3 +319,22 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
   - returns stable per-step outcomes
   - persists execution outcomes back to agent memory assets.
 - This remains intentionally bounded: deterministic single-agent planning only, no speculative autonomous loops, and no separate execution engine.
+
+## Direction 4 update: Phase 5 hardening + Phase 6 inner authoring foundation
+
+- Runtime retry/failure contracts are now explicit in application-layer agent runtime semantics:
+  - retryability classification remains policy-first with runtime metadata hints and bounded heuristic fallback.
+  - retry exhaustion is surfaced explicitly (`retryExhausted`) on terminal failures.
+- Partial execution outcomes now remain durable across the same inner contracts:
+  - runner read model: ordered per-step outcomes
+  - working memory: per-step execution output summaries
+  - execution sessions: persisted per-step outcome summaries and output-asset diagnostics.
+- Session persistence remains port-first and infrastructure-backed:
+  - application port: `IAgentExecutionSessionRepository` (including transition history reads)
+  - infrastructure adapter: `SqliteAgentExecutionSessionRepository`
+- Phase 6 authoring/configuration now extends the inner application core:
+  - persistence seam: `IAgentRepository` + `SqliteAgentRepository`
+  - CRUD use cases: `CreateAgentUseCase`, `UpdateAgentUseCase`, `GetAgentUseCase`, `ListAgentsUseCase`, `DeleteAgentUseCase`, `ArchiveAgentUseCase`
+  - structured configuration use cases: `ConfigureAgentGoalsUseCase`, `ConfigureAgentPolicyUseCase`, `ConfigureAgentToolsUseCase`, `ConfigureAgentMemoryUseCase`, `ConfigureAgentStrategyUseCase`
+  - cohesive whole-config validation seam: `AgentConfigurationValidationService` + `ValidateAgentConfigurationUseCase`.
+- No separate agent runtime engine or non-asset memory system was introduced; backend/API transport can stay thin over these use cases.

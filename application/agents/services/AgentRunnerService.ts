@@ -3,6 +3,7 @@ import {
   AgentExecutionSessionStatuses,
   createAgentExecutionSession,
   transitionAgentExecutionSession,
+  type AgentExecutionStepOutcome,
   type AgentExecutionSession,
 } from "../../../domain/agents/AgentExecutionSession";
 import { mapAgentPlanToBackbone } from "../contracts/AgentExecutionMapping";
@@ -130,7 +131,7 @@ export class AgentRunnerService {
           retryable: false,
         };
         emit({ type: AgentRuntimeEventTypes.executionBlocked, planId: plan.planId, status: "blocked", metadata: { decision: governance.decision } });
-        const blockedSession = await this.completeSession(session, "failed", emit, plan.planId);
+        const blockedSession = await this.completeSession(session, "failed", executionId, emit, plan.planId);
         emit({
           type: AgentRuntimeEventTypes.executionFailed,
           planId: plan.planId,
@@ -216,6 +217,11 @@ export class AgentRunnerService {
           });
           continue;
         }
+        classifiedFailure = Object.freeze({
+          ...classifiedFailure,
+          retryable: false,
+          retryExhausted: true,
+        });
         emit({
           type: AgentRuntimeEventTypes.retryExhausted,
           planId: plan.planId,
@@ -262,6 +268,20 @@ export class AgentRunnerService {
         outputAssetId,
         errorMessage: result.errorMessage,
       });
+      session = await this.appendStepOutcome(
+        session,
+        Object.freeze({
+          stepId: step.stepId,
+          status,
+          attempts,
+          toolId: step.toolId,
+          output: stepOutput,
+          outputAssetId,
+          errorMessage: result.errorMessage,
+        }),
+        emit,
+        plan.planId,
+      );
       finalOutput = [finalOutput, stepOutput].filter(Boolean).join("\n");
 
       if (result.status !== "completed") {
@@ -300,6 +320,7 @@ export class AgentRunnerService {
     const terminalSession = await this.completeSession(
       session,
       finalStatus === "completed" ? "completed" : finalStatus === "cancelled" ? "cancelled" : "failed",
+      executionId,
       emit,
       plan.planId,
     );
@@ -417,6 +438,7 @@ export class AgentRunnerService {
   private async completeSession(
     session: AgentExecutionSession,
     status: "completed" | "failed" | "cancelled",
+    executionId: string,
     emit?: (event: Omit<AgentRuntimeProgressEvent, "occurredAt" | "executionId" | "agentId">) => void,
     planId?: string,
   ): Promise<AgentExecutionSession> {
@@ -426,6 +448,15 @@ export class AgentRunnerService {
         : status === "failed"
           ? AgentExecutionSessionStatuses.failed
           : AgentExecutionSessionStatuses.cancelled,
+      appendExecutionRun: {
+        runId: executionId,
+        planId: session.executionPlan?.planId,
+        status: status === "completed"
+          ? "completed"
+          : status === "failed"
+            ? "failed"
+            : "cancelled",
+      },
     });
     emit?.({
       type: AgentRuntimeEventTypes.sessionTransitioned,
@@ -437,6 +468,26 @@ export class AgentRunnerService {
       type: AgentRuntimeEventTypes.sessionPersisted,
       planId,
       metadata: { sessionId: session.id, status: persisted.status },
+    });
+    return persisted;
+  }
+
+  private async appendStepOutcome(
+    session: AgentExecutionSession,
+    outcome: AgentExecutionStepOutcome,
+    emit?: (event: Omit<AgentRuntimeProgressEvent, "occurredAt" | "executionId" | "agentId">) => void,
+    planId?: string,
+  ): Promise<AgentExecutionSession> {
+    const outputWithDiagnostics = transitionAgentExecutionSession(session, {
+      status: session.status,
+      appendStepOutcome: outcome,
+      appendDiagnostic: outcome.outputAssetId ? { assetId: outcome.outputAssetId } : undefined,
+    });
+    const persisted = await this.persistSession(outputWithDiagnostics);
+    emit?.({
+      type: AgentRuntimeEventTypes.sessionPersisted,
+      planId,
+      metadata: { sessionId: session.id, status: persisted.status, stepOutcomes: persisted.stepOutcomes.length },
     });
     return persisted;
   }

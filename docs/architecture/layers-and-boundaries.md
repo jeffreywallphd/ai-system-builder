@@ -160,6 +160,11 @@ If a change needs data from the outside world, prefer adding or using an **appli
 
 - Direction 4 Phase 4 extends those same inner boundaries: canonical MCP tool identity/binding, execution-native MCP invocation units, and deterministic agent-side MCP governance (permission/approval/sandbox/schema checks) now live in domain/application seams and reuse existing MCP registry/trust services.
 - Direction 4 Phase 5 keeps runtime coordination in the application layer via `AgentRunnerService`, with deterministic progress/failure/retry/session lifecycle contracts in `application/agents/contracts/*` and persistence exclusively through the `IAgentExecutionSessionRepository` port (implemented by a concrete SQLite repository at the infrastructure edge).
+- Direction 4 Phase 5 hardening now keeps partial execution truth inside that same boundary: per-step outcomes are persisted on execution-session records, retry exhaustion is explicit in terminal failure contracts, and transition-history reads are exposed through the same session repository port.
+- Direction 4 Phase 6 inner architecture now extends the same split:
+  - domain invariants remain in `domain/agents/*`
+  - application adds bounded authoring use cases (CRUD + goal/policy/tool/memory/strategy configuration + whole-config validation)
+  - persistence remains outer-layer through `IAgentRepository`/`IAgentExecutionSessionRepository` with concrete SQLite adapters (`SqliteAgentRepository`, `SqliteAgentExecutionSessionRepository`).
 
 ## TODO
 

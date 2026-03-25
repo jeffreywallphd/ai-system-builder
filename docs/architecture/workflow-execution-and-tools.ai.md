@@ -120,5 +120,8 @@ Use "workflow-first", "tool projection", and "truthful execution provenance" whe
 - Phase 3 completion now includes deterministic memory retrieval filters (type/tag/metadata/recency), bounded working-memory snapshots on execution read models, and retention-gated durable writes.
 - Phase 5 now emits deterministic execution-native runtime events (execution/session start, plan/governance/mapping, per-attempt step lifecycle, retry schedule/exhaustion, memory/session persistence, terminal outcome) with no UI/WebSocket runtime added.
 - Retry classification is explicit and bounded (`AgentRuntimeRetryPolicy.classifyFailure` + optional execution-result metadata hints), with heuristic fallback only when runtime metadata is absent.
+- Retry exhaustion is now terminally explicit on failures (`retryExhausted=true`), so final failure read models distinguish "retryable class but exhausted policy budget" from "non-retryable failure."
+- Agent execution sessions now persist per-step outcome summaries (status/attempts/tool/output/error + optional output asset diagnostics), so partial success followed by terminal fail/cancel remains durable and queryable.
 - Session persistence is now a real SQLite infrastructure seam (`SqliteAgentExecutionSessionRepository`) that stores both latest session snapshots and transition history under the existing repository port.
+- Session transition history lookup is now part of the application repository contract (`IAgentExecutionSessionRepository.listTransitionHistory`) instead of an infrastructure-only helper method.
 - Current limits are intentional: deterministic single-agent planning, bounded step counts, no autonomous long-horizon control loop.

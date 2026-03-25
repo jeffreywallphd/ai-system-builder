@@ -337,4 +337,7 @@ Audit schema now records administrative approval transitions plus decision denia
 - For MCP steps, execution still flows through MCP execution use cases, preserving trust policy/auth/approval/sandbox/audit behavior.
 - For workflow-projected tools, execution still flows through workflow tool execution (`RunToolUseCase` path).
 - Agent memory writes/reads are asset-backed and versioned so execution outcomes can be persisted and reused by later planning.
+- Retry classification remains bounded (`policy` override, result metadata hints, heuristic fallback), and retry exhaustion is explicitly surfaced as terminal failure state (`retryExhausted=true`) instead of implicit generic failure.
+- Agent execution sessions now persist per-step outcome summaries (status/attempts/tool/output/error + optional output asset diagnostics), so partial completion followed by fail/cancel remains durable in session snapshots.
+- Session transition history lookup is now part of the application repository contract (`IAgentExecutionSessionRepository.listTransitionHistory`) and not just an infrastructure helper.
 - Current limits are intentional: deterministic single-agent planning, bounded step counts, no autonomous long-horizon control loop.

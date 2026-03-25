@@ -316,3 +316,22 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
   - returns stable per-step outcomes
   - persists execution outcomes back to agent memory assets.
 - This remains intentionally bounded: deterministic single-agent planning only, no speculative autonomous loops, and no separate execution engine.
+
+## Direction 4 update: Phase 5 hardening + Phase 6 inner authoring foundation
+
+- Runtime retry/failure semantics are now explicit at the application contract boundary:
+  - retryability comes from policy override, runtime metadata hints, then bounded heuristic fallback.
+  - retry exhaustion is explicitly surfaced (`retryExhausted`) instead of being inferred from event streams only.
+- Partial execution outcomes are now preserved across inner read models:
+  - `AgentRunnerResult.outcomes` remains ordered per-step truth.
+  - `AgentWorkingMemory.executionOutputs` carries completed/failed/cancelled step summaries.
+  - execution sessions now persist per-step outcomes and output-asset diagnostics (`domain/agents/AgentExecutionSession.ts`), so "partial success + terminal fail/cancel" is durable.
+- Session persistence remains port-first and architecture-consistent:
+  - application port: `IAgentExecutionSessionRepository` (including transition history reads).
+  - infrastructure adapter: `SqliteAgentExecutionSessionRepository`.
+- Phase 6 inner authoring/configuration now starts from the same core-first structure:
+  - persistence seam: `IAgentRepository` + concrete `SqliteAgentRepository`.
+  - CRUD application use cases: `CreateAgentUseCase`, `UpdateAgentUseCase`, `GetAgentUseCase`, `ListAgentsUseCase`, `DeleteAgentUseCase`, `ArchiveAgentUseCase`.
+  - bounded structured configuration use cases: goals/policy/tools/memory/strategy (`ConfigureAgent*UseCase`).
+  - cohesive validation seam: `AgentConfigurationValidationService` + `ValidateAgentConfigurationUseCase` for cross-field agent config checks.
+- No UI/runtime bypass was introduced; transport can remain thin over these use cases.
