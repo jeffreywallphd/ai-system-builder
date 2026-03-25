@@ -149,12 +149,16 @@ The runtime is not a single path. The system currently supports multiple executi
 - Phase 5 hardening now keeps retry/partial-execution truth explicit in inner contracts:
   - terminal failures can explicitly signal retry exhaustion (`retryExhausted`);
   - execution sessions persist per-step outcomes and optional output-asset diagnostics;
+  - execution sessions now carry explicit terminal-state truth (`reason`: `completed` | `failed` | `cancelled` | `blocked`) plus bounded partial-progress summary (`hadPartialProgress`, completed/attempted step counts);
+  - runner/session persistence now records lifecycle transitions from first persisted `pending` state through `ready`/`running` and terminal status, so transition history is complete instead of terminal-only;
+  - SQLite session persistence now stores structured terminal/progress columns (`terminal_reason`, `had_partial_progress`, `completed_step_count`, `attempted_step_count`, `step_outcome_count`) in addition to canonical session JSON;
   - transition-history reads are part of the session repository port (`IAgentExecutionSessionRepository`).
 - Phase 6 inner authoring foundation now adds real backend-ready seams without UI coupling:
   - persistence: `IAgentRepository` with concrete `SqliteAgentRepository`;
   - CRUD/lifecycle use cases: create/update/get/list/delete/archive;
   - bounded structured configuration use cases: goals/policy/tools/memory/strategy;
-  - cohesive cross-field validation seam: `AgentConfigurationValidationService` + `ValidateAgentConfigurationUseCase`.
+  - cohesive cross-field validation seam: `AgentConfigurationValidationService` + `ValidateAgentConfigurationUseCase` (deterministic issue codes for goal/tool/memory/policy/strategy coherence, plus domain-level fallback validation);
+  - SQLite agent persistence now also records structured authoring/query fields (`strategy_id`, `strategy_mode`, `goal_count`, `allowed_tool_count`) while preserving aggregate round-trip truth in `agent_json`.
 
 ## TODO
 

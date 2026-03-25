@@ -8,7 +8,7 @@ interface AgentRow {
   readonly agent_json: string;
 }
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 const MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   [1, `
     CREATE TABLE IF NOT EXISTS agent_repository_migrations (
@@ -26,6 +26,13 @@ const MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
     CREATE INDEX IF NOT EXISTS agents_status_updated_idx ON agents(status, updated_at DESC);
     CREATE INDEX IF NOT EXISTS agents_updated_idx ON agents(updated_at DESC);
   `],
+  [2, `
+    ALTER TABLE agents ADD COLUMN strategy_id TEXT;
+    ALTER TABLE agents ADD COLUMN strategy_mode TEXT;
+    ALTER TABLE agents ADD COLUMN goal_count INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE agents ADD COLUMN allowed_tool_count INTEGER NOT NULL DEFAULT 0;
+    CREATE INDEX IF NOT EXISTS agents_strategy_idx ON agents(strategy_mode, updated_at DESC);
+  `],
 ]);
 
 export class SqliteAgentRepository implements IAgentRepository {
@@ -41,6 +48,10 @@ export class SqliteAgentRepository implements IAgentRepository {
         agent_id,
         name,
         status,
+        strategy_id,
+        strategy_mode,
+        goal_count,
+        allowed_tool_count,
         created_at,
         updated_at,
         agent_json
@@ -48,6 +59,10 @@ export class SqliteAgentRepository implements IAgentRepository {
         @id,
         @name,
         @status,
+        @strategyId,
+        @strategyMode,
+        @goalCount,
+        @allowedToolCount,
         @createdAt,
         @updatedAt,
         @agentJson
@@ -55,6 +70,10 @@ export class SqliteAgentRepository implements IAgentRepository {
       ON CONFLICT(agent_id) DO UPDATE SET
         name = excluded.name,
         status = excluded.status,
+        strategy_id = excluded.strategy_id,
+        strategy_mode = excluded.strategy_mode,
+        goal_count = excluded.goal_count,
+        allowed_tool_count = excluded.allowed_tool_count,
         created_at = excluded.created_at,
         updated_at = excluded.updated_at,
         agent_json = excluded.agent_json
@@ -62,6 +81,10 @@ export class SqliteAgentRepository implements IAgentRepository {
       id: agent.id,
       name: agent.name,
       status: agent.status,
+      strategyId: agent.planningStrategy.strategyId,
+      strategyMode: agent.planningStrategy.mode,
+      goalCount: agent.goals.length,
+      allowedToolCount: agent.policy.toolAccess.allowedToolIds.length,
       createdAt: agent.createdAt,
       updatedAt: agent.updatedAt,
       agentJson: JSON.stringify(agent),

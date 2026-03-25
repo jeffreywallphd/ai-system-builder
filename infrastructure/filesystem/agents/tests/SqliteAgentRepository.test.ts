@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import path from "node:path";
 import { tmpdir } from "node:os";
+import Database from "better-sqlite3";
 import { createAgent } from "../../../../domain/agents/Agent";
 import { AssetId } from "../../../../domain/assets/AssetId";
 import { SqliteAgentRepository } from "../SqliteAgentRepository";
@@ -64,6 +65,22 @@ describe("SqliteAgentRepository", () => {
 
     const listed = await repository.list();
     expect(listed).toHaveLength(2);
+    const db = new Database(path.join(root, "agents.sqlite"));
+    const row = db.prepare(`
+      SELECT strategy_id, strategy_mode, goal_count, allowed_tool_count
+      FROM agents
+      WHERE agent_id = ?
+    `).get("agent:repo:1") as {
+      strategy_id: string | null;
+      strategy_mode: string | null;
+      goal_count: number;
+      allowed_tool_count: number;
+    };
+    expect(row.strategy_id).toBe("deterministic");
+    expect(row.strategy_mode).toBe("deterministic-linear");
+    expect(row.goal_count).toBe(1);
+    expect(row.allowed_tool_count).toBe(1);
+    db.close();
 
     const deleted = await repository.delete("agent:repo:2");
     expect(deleted).toBe(true);
