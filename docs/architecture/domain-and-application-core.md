@@ -343,6 +343,7 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
   - goal ordering invariants are now normalized around contiguous `priorityOrder` values starting at 1 so create/update/configure flows share one coherence rule.
   - cohesive whole-config validation seam: `AgentConfigurationValidationService` + `ValidateAgentConfigurationUseCase`, now with deterministic cross-field issue codes for goal/tool/memory/policy/strategy coherence before domain fallback validation.
   - `SqliteAgentRepository` now also persists structured authoring/query metadata (`strategy_id`, `strategy_mode`, `goal_count`, `allowed_tool_count`) while preserving aggregate round-trip via `agent_json`.
+  - repository read paths now rehydrate `agent_json` snapshots through domain normalization so round-tripped aggregates keep canonical memory asset refs and validated goal/policy/tool/planning/execution semantics.
   - memory contracts are now hardened for authoring/configuration updates:
     - canonical asset-backed references + malformed-id rejection
     - retrieval compatibility validation (`latest-first` / `semantic-filter` / `hybrid`)
@@ -352,4 +353,5 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
   - whole-agent validation output now includes stable sectioned issue structure (`code`, `path`, `section`, `severity`, `message`) and is reused by CRUD/configuration use cases through a common `AgentConfigurationValidationError` path.
   - agent read-model contracts now project full memory configuration (`assets`, `retrieval`, `policy`, `revision`) so backend/API callers can consume one canonical authoring contract without reconstructing from partial fields.
   - backend authoring transport now has a dedicated thin seam (`infrastructure/api/agents/AgentAuthoringBackendApi` + desktop IPC `ai-loom-desktop-agents:*`) that maps request/response DTOs to the existing use cases/validation service.
+  - backend authoring coverage now includes SQLite-backed integration tests for CRUD + goal/policy/tool updates so real persistence seams are exercised directly.
 - No separate agent runtime engine or non-asset memory system was introduced; backend/API transport can stay thin over these use cases.
