@@ -32,7 +32,7 @@ export class CreateAgentUseCase {
     if (existing) {
       throw new AgentConflictError(id);
     }
-    this.validationService.assertValid({
+    this.validationService.assertValidForCreate({
       id,
       name: request.name,
       description: request.description,

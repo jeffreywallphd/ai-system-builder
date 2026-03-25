@@ -356,6 +356,8 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
   - strategy contracts are now explicitly bounded to supported descriptors (current slice: `deterministic@deterministic-linear`) with unsupported id/mode combinations rejected deterministically before persistence.
     - structured strategy issue codes now explicitly include missing strategy id and unsupported id/mode combinations.
   - whole-agent validation output now includes stable sectioned issue structure (`code`, `path`, `section`, `severity`, `message`) and is reused by CRUD/configuration use cases through a common `AgentConfigurationValidationError` path.
+  - validation semantics now include explicit create/update pathways (`mode: create|update`) so update flows can enforce immutable-id behavior deterministically.
+  - policy/sandbox/trust cross-field contradictions now emit dedicated issue codes (required-vs-denied permission, sandbox denial vs required approval, and tool-scope approval coherence) before generic domain fallback validation.
   - agent read-model contracts now project full memory configuration (`assets`, `retrieval`, `policy`, `revision`) so backend/API callers can consume one canonical authoring contract without reconstructing from partial fields.
   - backend authoring transport now has a dedicated thin seam (`infrastructure/api/agents/AgentAuthoringBackendApi` + desktop IPC `ai-loom-desktop-agents:*`) that maps request/response DTOs to the existing use cases/validation service.
   - backend authoring coverage now includes SQLite-backed integration tests for CRUD + goal/policy/tool/memory/strategy updates and API mapping/error-path tests so real persistence seams are exercised directly.

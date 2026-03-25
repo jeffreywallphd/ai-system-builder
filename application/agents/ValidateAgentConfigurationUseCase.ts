@@ -1,4 +1,5 @@
 import {
+  type AgentConfigurationValidationOptions,
   AgentConfigurationValidationService,
   type AgentConfigurationValidationInput,
   type AgentConfigurationValidationResult,
@@ -9,7 +10,10 @@ export class ValidateAgentConfigurationUseCase {
     private readonly validationService: AgentConfigurationValidationService = new AgentConfigurationValidationService(),
   ) {}
 
-  public async execute(input: AgentConfigurationValidationInput): Promise<AgentConfigurationValidationResult> {
-    return this.validationService.validate(input);
+  public async execute(
+    input: AgentConfigurationValidationInput,
+    options?: AgentConfigurationValidationOptions,
+  ): Promise<AgentConfigurationValidationResult> {
+    return this.validationService.validate(input, options);
   }
 }

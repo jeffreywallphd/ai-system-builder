@@ -36,6 +36,11 @@ export interface AgentConfigurationValidationResult {
   readonly issues: ReadonlyArray<AgentConfigurationValidationIssue>;
 }
 
+export interface AgentConfigurationValidationOptions {
+  readonly mode: "create" | "update";
+  readonly existingAgentId?: string;
+}
+
 export function toAgentConfigurationValidationInput(agent: Agent): AgentConfigurationValidationInput {
   return Object.freeze({
     id: agent.id,
@@ -51,21 +56,48 @@ export function toAgentConfigurationValidationInput(agent: Agent): AgentConfigur
 
 export class AgentConfigurationValidationService {
   public validateAgent(agent: Agent): AgentConfigurationValidationResult {
-    return this.validate(toAgentConfigurationValidationInput(agent));
+    return this.validate(toAgentConfigurationValidationInput(agent), { mode: "update", existingAgentId: agent.id });
   }
 
   public assertValid(input: AgentConfigurationValidationInput): void {
-    const validation = this.validate(input);
+    const validation = this.validate(input, { mode: "create" });
     if (!validation.valid) {
       throw new AgentConfigurationValidationError(validation.issues);
     }
   }
 
-  public validate(input: AgentConfigurationValidationInput): AgentConfigurationValidationResult {
+  public assertValidForCreate(input: AgentConfigurationValidationInput): void {
+    const validation = this.validate(input, { mode: "create" });
+    if (!validation.valid) {
+      throw new AgentConfigurationValidationError(validation.issues);
+    }
+  }
+
+  public assertValidForUpdate(existingAgentId: string, input: AgentConfigurationValidationInput): void {
+    const validation = this.validate(input, { mode: "update", existingAgentId });
+    if (!validation.valid) {
+      throw new AgentConfigurationValidationError(validation.issues);
+    }
+  }
+
+  public validate(
+    input: AgentConfigurationValidationInput,
+    options: AgentConfigurationValidationOptions = { mode: "create" },
+  ): AgentConfigurationValidationResult {
     const issues: AgentConfigurationValidationIssue[] = [];
     const allowedToolIds = new Set(input.policy.toolAccess.allowedToolIds);
     const supportedRetrievalStrategies = new Set(["latest-first", "semantic-filter", "hybrid"]);
     const supportedRetentionModes = new Set(["disabled", "bounded"]);
+
+    if (options.mode === "update" && options.existingAgentId && input.id !== options.existingAgentId) {
+      issues.push({
+        code: "agent-id-immutable",
+        path: "id",
+        message: "Agent id cannot be changed during update validation.",
+        severity: "error",
+        section: "agent",
+      });
+    }
 
     if (input.goals.length === 0) {
       issues.push({
@@ -470,6 +502,114 @@ export class AgentConfigurationValidationService {
         severity: "error",
         section: "strategy",
       });
+    }
+    if (
+      input.planningStrategy.strategyId.trim().toLowerCase() === "deterministic"
+      && input.planningStrategy.mode !== AgentPlanningStrategyModes.deterministicLinear
+    ) {
+      issues.push({
+        code: "strategy-deterministic-mode-mismatch",
+        path: "planningStrategy",
+        message: "deterministic strategy id only supports deterministic-linear mode.",
+        severity: "error",
+        section: "strategy",
+      });
+    }
+
+    const deniedPermissions = new Set(input.policy.safetyConstraints.deniedPermissionIds);
+    const requiredApprovals = input.policy.safetyConstraints.requiredApprovals;
+    const sandbox = input.policy.safetyConstraints.sandbox;
+    const requiredApprovalPermissionIds = new Set(requiredApprovals.map((approval) => approval.permissionId));
+
+    if (!sandbox.network.allowed && deniedPermissions.has("network.access")) {
+      issues.push({
+        code: "policy-network-denial-redundant",
+        path: "policy.safetyConstraints.deniedPermissionIds",
+        message: "network.access should not be denied redundantly when sandbox.network.allowed is false.",
+        severity: "error",
+        section: "policy",
+      });
+    }
+    if (!sandbox.network.allowed && requiredApprovalPermissionIds.has("network.access")) {
+      issues.push({
+        code: "policy-network-approval-sandbox-conflict",
+        path: "policy.safetyConstraints.requiredApprovals",
+        message: "network.access approval requirement conflicts with sandbox.network.allowed=false.",
+        severity: "error",
+        section: "policy",
+      });
+    }
+    if (
+      !sandbox.filesystem.allowed
+      && [...requiredApprovalPermissionIds].some((permissionId) => permissionId.startsWith("filesystem."))
+    ) {
+      issues.push({
+        code: "policy-filesystem-approval-sandbox-conflict",
+        path: "policy.safetyConstraints.requiredApprovals",
+        message: "filesystem approval requirements conflict with sandbox.filesystem.allowed=false.",
+        severity: "error",
+        section: "policy",
+      });
+    }
+    if (!sandbox.assets.read && requiredApprovalPermissionIds.has("asset.read")) {
+      issues.push({
+        code: "policy-asset-read-approval-sandbox-conflict",
+        path: "policy.safetyConstraints.requiredApprovals",
+        message: "asset.read approval requirement conflicts with sandbox.assets.read=false.",
+        severity: "error",
+        section: "policy",
+      });
+    }
+    if (!sandbox.assets.write && requiredApprovalPermissionIds.has("asset.write")) {
+      issues.push({
+        code: "policy-asset-write-approval-sandbox-conflict",
+        path: "policy.safetyConstraints.requiredApprovals",
+        message: "asset.write approval requirement conflicts with sandbox.assets.write=false.",
+        severity: "error",
+        section: "policy",
+      });
+    }
+
+    for (const deniedPermissionId of deniedPermissions) {
+      if (requiredApprovalPermissionIds.has(deniedPermissionId)) {
+        issues.push({
+          code: "policy-permission-required-and-denied",
+          path: "policy.safetyConstraints",
+          message: `Permission '${deniedPermissionId}' cannot be both required and denied.`,
+          severity: "error",
+          section: "policy",
+        });
+      }
+    }
+
+    for (const approval of requiredApprovals) {
+      if (approval.scopeType === "tool" && !approval.scopeId) {
+        issues.push({
+          code: "policy-tool-scope-approval-missing-scope-id",
+          path: "policy.safetyConstraints.requiredApprovals",
+          message: `Approval '${approval.permissionId}' with tool scope requires scopeId.`,
+          severity: "error",
+          section: "policy",
+        });
+      }
+      if (approval.scopeType === "tool" && approval.scopeId && !allowedToolIds.has(approval.scopeId)) {
+        issues.push({
+          code: "policy-tool-scope-approval-tool-not-allowed",
+          path: "policy.safetyConstraints.requiredApprovals",
+          message: `Approval scope tool '${approval.scopeId}' must exist in policy.toolAccess.allowedToolIds.`,
+          severity: "error",
+          section: "policy",
+        });
+      }
+      if (approval.scopeType !== "tool" && approval.scopeId) {
+        issues.push({
+          code: "policy-non-tool-scope-id-not-allowed",
+          path: "policy.safetyConstraints.requiredApprovals",
+          message: "scopeId is only allowed when approval scopeType is tool.",
+          severity: "error",
+          section: "policy",
+        });
+      }
     }
 
     try {

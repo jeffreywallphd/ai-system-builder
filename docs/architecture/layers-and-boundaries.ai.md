@@ -42,6 +42,8 @@ The architecture is mostly clean, but not all write actions are modeled as appli
   - strategy configuration is now explicitly bounded to supported descriptors (deterministic id/mode only in this slice); unsupported strategy combinations are rejected deterministically.
   - strategy validation now also emits explicit structured issues for missing strategy id and unsupported id/mode combinations.
   - whole-agent validation issues now include machine-friendly sectioning (`goals`/`tools`/`memory`/`strategy`/etc.) and are reusable across CRUD/configuration/API via `AgentConfigurationValidationError`.
+  - validation is now explicitly reusable for both create and update pathways (`mode: create|update`), including update-time immutable-id checks.
+  - policy/sandbox/trust contradictions now emit explicit cross-field issue codes (for example required-vs-denied permission conflicts, sandbox denial vs required approval conflicts, and malformed tool-scope approvals) rather than relying only on generic domain fallback errors.
   - desktop backend transport now exposes thin agent-authoring IPC handlers (`ai-loom-desktop-agents:*`) that delegate to authoring use cases instead of re-implementing domain/application rules in transport.
   - test coverage now includes SQLite-backed authoring integration checks for CRUD + goal/policy/tool/memory/strategy flows plus API mapping/error-path checks so real repository seams are exercised directly.
 
