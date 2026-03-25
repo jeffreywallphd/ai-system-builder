@@ -336,6 +336,8 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
   - persistence seam: `IAgentRepository` + concrete `SqliteAgentRepository`.
   - CRUD application use cases: `CreateAgentUseCase`, `UpdateAgentUseCase`, `GetAgentUseCase`, `ListAgentsUseCase`, `DeleteAgentUseCase`, `ArchiveAgentUseCase`.
   - bounded structured configuration use cases: goals/policy/tools/memory/strategy (`ConfigureAgent*UseCase`).
+  - goal authoring operations are deterministic at the use-case boundary: add/update/remove/reorder reject duplicate ids, missing goal references, malformed required tool ids, and non-contiguous ordering.
+  - goal ordering invariants are now aligned across create/update/configure flows to contiguous `priorityOrder` values starting at 1.
   - cohesive validation seam: `AgentConfigurationValidationService` + `ValidateAgentConfigurationUseCase` now emits deterministic cross-field issue codes for goal/tool/memory/policy/strategy coherence before domain fallback validation.
   - `SqliteAgentRepository` also projects structured authoring/query metadata (`strategy_id`, `strategy_mode`, `goal_count`, `allowed_tool_count`) while preserving aggregate round-trip in `agent_json`.
 - No UI/runtime bypass was introduced; transport can remain thin over these use cases.

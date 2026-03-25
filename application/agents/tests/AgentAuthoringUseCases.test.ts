@@ -158,6 +158,66 @@ describe("Agent authoring use cases", () => {
     expect(updated.goals.map((goal) => goal.id)).toEqual(["goal-2"]);
   });
 
+  it("rejects duplicate/missing/incoherent goal configuration operations", async () => {
+    const repository = new InMemoryAgentRepository();
+    const create = new CreateAgentUseCase(repository);
+    const configureGoals = new ConfigureAgentGoalsUseCase(repository);
+    await create.execute(createRequest("agent:authoring:goal-errors"));
+
+    await expect(configureGoals.execute({
+      agentId: "agent:authoring:goal-errors",
+      operations: [{
+        type: "add",
+        goal: {
+          id: "goal-1",
+          objective: "Duplicate id",
+          constraints: [],
+          successCriteria: ["done"],
+          priority: "normal",
+          priorityOrder: 2,
+          requiredToolIds: ["mcp:local:echo"],
+        },
+      }],
+    })).rejects.toThrow("already exists");
+
+    await expect(configureGoals.execute({
+      agentId: "agent:authoring:goal-errors",
+      operations: [{ type: "remove", goalId: "goal-missing" }],
+    })).rejects.toThrow("was not found");
+
+    await expect(configureGoals.execute({
+      agentId: "agent:authoring:goal-errors",
+      operations: [{
+        type: "add",
+        goal: {
+          id: "goal-2",
+          objective: "Bad order",
+          constraints: [],
+          successCriteria: ["done"],
+          priority: "normal",
+          priorityOrder: 3,
+          requiredToolIds: ["mcp:local:echo"],
+        },
+      }],
+    })).rejects.toThrow("contiguous and start at 1");
+
+    await expect(configureGoals.execute({
+      agentId: "agent:authoring:goal-errors",
+      operations: [{
+        type: "add",
+        goal: {
+          id: "goal-2",
+          objective: "Bad required tool ref",
+          constraints: [],
+          successCriteria: ["done"],
+          priority: "normal",
+          priorityOrder: 2,
+          requiredToolIds: ["not-canonical"],
+        },
+      }],
+    })).rejects.toThrow("malformed");
+  });
+
   it("supports policy/tool/memory/strategy configuration updates", async () => {
     const repository = new InMemoryAgentRepository();
     const create = new CreateAgentUseCase(repository);
@@ -177,6 +237,9 @@ describe("Agent authoring use cases", () => {
       scopeConstraints: [{ toolId: "mcp:local:echo", allowedScopes: ["runtime.execute"] }],
     });
     expect(toolsUpdated.policy.toolAccess.scopeConstraints).toHaveLength(1);
+    expect(toolsUpdated.policy.toolAccess.allowedMcpTools).toEqual([
+      { toolId: "mcp:local:echo", serverId: "local", toolName: "echo" },
+    ]);
 
     const configureMemory = new ConfigureAgentMemoryUseCase(repository);
     const memoryUpdated = await configureMemory.execute("agent:authoring:config", {
@@ -273,5 +336,14 @@ describe("Agent authoring use cases", () => {
     expect(validation.issues.some((issue) => issue.code === "memory-agent-id-mismatch")).toBe(true);
     expect(validation.issues.some((issue) => issue.code === "memory-hybrid-config-missing")).toBe(true);
     expect(validation.issues.some((issue) => issue.code === "strategy-id-mode-mismatch")).toBe(true);
+
+    const malformedRequiredTool = await validate.execute({
+      ...base,
+      goals: [{
+        ...base.goals[0],
+        requiredToolIds: ["not-canonical-tool-id"],
+      }],
+    });
+    expect(malformedRequiredTool.issues.some((issue) => issue.code === "goal-required-tool-malformed")).toBe(true);
   });
 });

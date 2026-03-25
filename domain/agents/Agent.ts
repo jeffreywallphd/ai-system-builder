@@ -116,6 +116,19 @@ function normalizePlanningStrategy(input: AgentPlanningStrategy): AgentPlanningS
   });
 }
 
+function validateGoalPriorityOrdering(goals: ReadonlyArray<AgentGoal>): void {
+  const priorityOrders = goals.map((goal) => goal.priorityOrder);
+  if (new Set(priorityOrders).size !== priorityOrders.length) {
+    throw new Error("Agent goals must use unique priorityOrder values.");
+  }
+
+  const sorted = [...priorityOrders].sort((left, right) => left - right);
+  const contiguous = sorted.every((value, index) => value === index + 1);
+  if (!contiguous) {
+    throw new Error("Agent goals priorityOrder values must be contiguous and start at 1.");
+  }
+}
+
 export function createAgent(input: {
   readonly id: string;
   readonly name: string;
@@ -139,6 +152,7 @@ export function createAgent(input: {
   if (goalIds.size !== goals.length) {
     throw new Error("Agent goals must use unique ids.");
   }
+  validateGoalPriorityOrdering(goals);
 
   const policy = normalizeAgentPolicy(input.policy);
   for (const goal of goals) {

@@ -22,31 +22,57 @@ function makeAgent(id = "agent:repo:1") {
   return createAgent({
     id,
     name: "Repository Agent",
-    goals: [{ id: "goal-1", objective: "Persist", constraints: [], successCriteria: ["saved"], priority: "normal", priorityOrder: 1, requiredToolIds: ["mcp:local:echo"] }],
+    description: "Round-trip full aggregate.",
+    goals: [
+      { id: "goal-1", objective: "Persist", constraints: ["trusted-only"], successCriteria: ["saved"], priority: "normal", priorityOrder: 1, requiredToolIds: ["mcp:local:echo"] },
+      { id: "goal-2", objective: "Validate", constraints: ["bounded"], successCriteria: ["validated"], priority: "high", priorityOrder: 2, requiredToolIds: ["workflow:artifact:validator"] },
+    ],
     policy: {
       toolAccess: {
-        allowedToolIds: ["mcp:local:echo"],
+        allowedToolIds: ["mcp:local:echo", "workflow:artifact:validator"],
         allowedMcpTools: [{ toolId: "mcp:local:echo", serverId: "local", toolName: "echo" }],
-        scopeConstraints: [],
+        scopeConstraints: [
+          { toolId: "mcp:local:echo", allowedScopes: ["runtime.execute"] },
+          { toolId: "workflow:artifact:validator", allowedScopes: ["workflow.execute"] },
+        ],
       },
-      restrictedActions: [],
-      costLimits: {},
-      executionLimits: { maxSteps: 2 },
+      restrictedActions: ["filesystem.write"],
+      costLimits: { maxTokens: 2000, maxEstimatedUsd: 0.5 },
+      executionLimits: { maxSteps: 4, maxWallClockMs: 120000 },
       safetyConstraints: {
-        requiredApprovals: [],
-        deniedPermissionIds: [],
-        sandbox: { network: { allowed: true }, filesystem: { allowed: false }, assets: { read: true, write: false }, environment: { mode: "none" } },
+        requiredApprovals: [{ permissionId: "network.access", minimumStatus: "approved", scopeType: "tool", scopeId: "mcp:local:echo" }],
+        deniedPermissionIds: ["workspace.write"],
+        sandbox: {
+          network: { allowed: true, allowedHosts: ["api.example.com"], allowedProtocols: ["https"] },
+          filesystem: { allowed: true, readPaths: ["/workspace"], writePaths: [] },
+          assets: { read: true, write: false },
+          environment: { mode: "allowlist", allowedEnvVars: ["TZ"] },
+        },
       },
     },
     memory: {
       agentId: id,
-      assets: [{ assetId: new AssetId("asset:memory:repo"), memoryType: "working" }],
-      retrieval: { strategy: "latest-first", maxEntries: 5 },
-      policy: { writableTypes: ["episodic", "working"], retention: { mode: "bounded", maxDurableEntries: 20 } },
-      revision: 1,
+      assets: [
+        { assetId: new AssetId("asset:memory:repo"), memoryType: "working", assetVersionId: "v1", lineageTag: "seed" },
+        { assetId: new AssetId("asset:memory:repo2"), memoryType: "episodic" },
+      ],
+      retrieval: {
+        strategy: "hybrid",
+        maxEntries: 5,
+        semantic: { minRelevanceScore: 0.4 },
+        recency: { preferLatest: true, lookbackWindowEntries: 20 },
+      },
+      policy: {
+        maxRetrievalEntries: 5,
+        retrievableTypes: ["episodic", "working"],
+        writableTypes: ["episodic", "working"],
+        sessionOnlyTypes: ["working"],
+        retention: { mode: "bounded", maxDurableEntries: 20 },
+      },
+      revision: 2,
     },
-    planningStrategy: { strategyId: "deterministic", mode: "deterministic-linear" },
-    execution: { maxExecutionUnits: 2, requireTrustedTools: true },
+    planningStrategy: { strategyId: "deterministic-v2", mode: "deterministic-linear" },
+    execution: { maxExecutionUnits: 4, maxRunDurationMs: 30000, requireTrustedTools: true },
   });
 }
 
@@ -61,7 +87,7 @@ describe("SqliteAgentRepository", () => {
 
     const loaded = await repository.get(saved.id);
     expect(loaded?.id).toBe("agent:repo:1");
-    expect(loaded?.policy.toolAccess.allowedToolIds).toEqual(["mcp:local:echo"]);
+    expect(loaded).toEqual(saved);
 
     const listed = await repository.list();
     expect(listed).toHaveLength(2);
@@ -76,16 +102,28 @@ describe("SqliteAgentRepository", () => {
       goal_count: number;
       allowed_tool_count: number;
     };
-    expect(row.strategy_id).toBe("deterministic");
+    expect(row.strategy_id).toBe("deterministic-v2");
     expect(row.strategy_mode).toBe("deterministic-linear");
-    expect(row.goal_count).toBe(1);
-    expect(row.allowed_tool_count).toBe(1);
+    expect(row.goal_count).toBe(2);
+    expect(row.allowed_tool_count).toBe(2);
     db.close();
 
     const deleted = await repository.delete("agent:repo:2");
     expect(deleted).toBe(true);
     const listedAfterDelete = await repository.list();
     expect(listedAfterDelete).toHaveLength(1);
+
+    repository.dispose();
+  });
+
+  it("handles blank ids and missing deletes without throwing", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-agent-repo-"));
+    createdRoots.push(root);
+    const repository = new SqliteAgentRepository(path.join(root, "agents.sqlite"));
+
+    expect(await repository.get("   ")).toBeUndefined();
+    expect(await repository.delete("   ")).toBe(false);
+    expect(await repository.delete("agent:missing")).toBe(false);
 
     repository.dispose();
   });
