@@ -14,6 +14,7 @@ import { GetAssetDependencyHealthUseCase } from "../assets-system/GetAssetDepend
 import { GetAssetImpactAnalysisUseCase } from "../assets-system/GetAssetImpactAnalysisUseCase";
 import { GetCanonicalDependencyStateUseCase } from "../assets-system/CanonicalDependencyStateUseCase";
 import { CanonicalEntityReadResolver } from "../assets-system/CanonicalEntityReadResolver";
+import { CompositionAssetContractResolver } from "../contracts/CompositionAssetContractResolver";
 import { CanonicalEntityOperationalReadService, type CanonicalOperationalReadSummary } from "../assets-system/CanonicalEntityOperationalReadService";
 import type { ICanonicalAssetIdentityRepository } from "../ports/interfaces/ICanonicalAssetIdentityRepository";
 import type { IAssetLineageRepository } from "../ports/interfaces/IAssetLineageRepository";
@@ -82,6 +83,7 @@ export class LoadWorkflowUseCase {
           new GetAssetImpactAnalysisUseCase(canonicalRepositories.lineageRepository, canonicalRepositories.transformationRepository, canonicalRepositories.versionRepository),
           new GetCanonicalProvenanceSummaryUseCase(canonicalRepositories.lineageRepository, canonicalRepositories.transformationRepository, canonicalRepositories.queryRepository),
         ),
+        new CompositionAssetContractResolver({ workflowRepository: this.workflowRepository }),
       )
       : undefined);
   }

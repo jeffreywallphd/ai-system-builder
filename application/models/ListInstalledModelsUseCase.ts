@@ -6,6 +6,7 @@ import type {
 import type { CanonicalAssetIdentityService } from "../assets-system/CanonicalAssetIdentityService";
 import type { CanonicalEntityReadResolver } from "../assets-system/CanonicalEntityReadResolver";
 import { CanonicalEntityOperationalReadService, type CanonicalOperationalReadSummary } from "../assets-system/CanonicalEntityOperationalReadService";
+import type { AssetContractDescriptor } from "../../domain/contracts/AssetContract";
 
 export interface IListInstalledModelsRequest {
   readonly criteria?: IInstalledModelSearchCriteria;
@@ -14,6 +15,7 @@ export interface IListInstalledModelsRequest {
 export interface IListInstalledModelsResult {
   readonly models: ReadonlyArray<IModel>;
   readonly canonicalByModelId?: Readonly<Record<string, CanonicalOperationalReadSummary>>;
+  readonly canonicalContractByModelId?: Readonly<Record<string, AssetContractDescriptor | undefined>>;
 }
 
 export class ListInstalledModelsUseCase {
@@ -38,9 +40,14 @@ export class ListInstalledModelsUseCase {
         return [model.id, summary] as const;
       }))));
 
+    const canonicalContractByModelId = Object.freeze(Object.fromEntries(
+      Object.entries(canonicalByModelId).map(([modelId, summary]) => [modelId, summary.contract] as const),
+    ));
+
     return Object.freeze({
       models: Object.freeze([...models]),
       canonicalByModelId,
+      canonicalContractByModelId,
     });
   }
 

@@ -2,6 +2,7 @@ import type { CanonicalEntityType } from "../ports/interfaces/ICanonicalAssetIde
 import type { CanonicalAssetIdentityService } from "./CanonicalAssetIdentityService";
 import type { CanonicalEntityReadResolver } from "./CanonicalEntityReadResolver";
 import type { CompositionTaxonomyDescriptor } from "../../domain/taxonomy/CompositionTaxonomy";
+import type { AssetContractDescriptor } from "../../domain/contracts/AssetContract";
 
 export interface CanonicalOperationalReadSummary {
   readonly preferred: boolean;
@@ -9,6 +10,7 @@ export interface CanonicalOperationalReadSummary {
   readonly pinnedVersionId?: string;
   readonly latestVersionId?: string;
   readonly taxonomy?: CompositionTaxonomyDescriptor;
+  readonly contract?: AssetContractDescriptor;
   readonly provenance?: {
     readonly directUpstreamCount: number;
     readonly directDownstreamCount: number;
@@ -92,6 +94,7 @@ export class CanonicalEntityOperationalReadService {
       pinnedVersionId: resolution.pinnedVersionId,
       latestVersionId: resolution.latestVersionId,
       taxonomy: resolution.taxonomy,
+      contract: resolution.contract,
       provenance: resolution.provenance,
       dependencyState,
       operationalStatus: this.toOperationalStatus(resolution.preferred, dependencyState, resolution.fallbackReason),
