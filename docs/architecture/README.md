@@ -145,6 +145,7 @@ The runtime is not a single path. The system currently supports multiple executi
   - memory policy retention is now operationally enforced in the write pipeline via bounded durable-capacity gating.
 
 - Direction 4 (Phase 4, MCP tool integration inner slice) now keeps MCP as the external tool-protocol boundary while remaining execution-native: agent policy carries canonical MCP bindings, agent mapping emits `mcp-tool-invocation` execution units, and plan/execute-time MCP governance checks reuse existing registry/trust services instead of introducing a parallel agent runtime.
+- Direction 4 (Phase 4 completion + Phase 5 inner foundations) now introduces a reusable planner/tool compatibility seam (`AgentPlanToolSelectionService`), richer deterministic MCP governance outcomes (explicit unavailable/approval-required/denied/incompatible semantics), and a bounded inner runtime coordinator (`AgentRunnerService`) that composes planning, governance, execution, and memory while emitting structured runtime progress events and applying bounded retry/failure policies.
 
 ## TODO
 

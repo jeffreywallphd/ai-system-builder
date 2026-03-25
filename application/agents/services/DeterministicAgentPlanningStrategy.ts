@@ -1,8 +1,13 @@
 import { createAgentPlan, type AgentPlan } from "../../../domain/agents/AgentPlan";
 import type { AgentMemoryEntryReference, AgentMemoryStore } from "../../../domain/agents/AgentMemory";
 import type { IToolCapabilityCatalog } from "../../ports/interfaces/IToolCapabilityCatalog";
-import type { AgentPlanningStrategy, AgentPlanningStrategyRequest } from "../contracts/AgentPlanningStrategy";
+import type {
+  AgentPlanToolSelectionService,
+  AgentPlanningStrategy,
+  AgentPlanningStrategyRequest,
+} from "../contracts/AgentPlanningStrategy";
 import type { AgentMcpToolGovernanceService } from "./AgentMcpToolGovernanceService";
+import { DefaultAgentPlanToolSelectionService } from "./AgentPlanToolSelectionService";
 
 function buildStepId(agentId: string, goalId: string, index: number): string {
   return `plan:${agentId}:${goalId}:${index + 1}`;
@@ -23,6 +28,10 @@ export class DeterministicAgentPlanningStrategy implements AgentPlanningStrategy
     private readonly catalog: IToolCapabilityCatalog,
     private readonly memoryStore: AgentMemoryStore,
     private readonly governanceService?: AgentMcpToolGovernanceService,
+    private readonly toolSelectionService: AgentPlanToolSelectionService = new DefaultAgentPlanToolSelectionService(
+      catalog,
+      governanceService,
+    ),
   ) {}
 
   public async plan(request: AgentPlanningStrategyRequest): Promise<AgentPlan> {
@@ -49,37 +58,52 @@ export class DeterministicAgentPlanningStrategy implements AgentPlanningStrategy
 
     const memoryContext = toIntentMemoryReferences(memoryEntries);
 
+    const steps = [];
+    for (let index = 0; index < prioritizedGoals.length; index += 1) {
+      const goal = prioritizedGoals[index]!;
+      const outputKey = `goal.${goal.id}.result`;
+      const candidates = (goal.requiredToolIds && goal.requiredToolIds.length > 0)
+        ? goal.requiredToolIds
+        : allowedTools;
+      const selection = await this.toolSelectionService.selectToolForGoal({
+        agent,
+        goal,
+        candidateToolIds: candidates,
+        action: goal.objective,
+        expectedOutputKey: outputKey,
+      });
+      const toolId = selection.selectedToolId;
+      if (!toolId) {
+        const messages = selection.issues.map((issue) => issue.message).join("; ");
+        throw new Error(`Agent planning could not resolve a compatible tool for goal '${goal.id}': ${messages || "no tool selected"}`);
+      }
+
+      steps.push(Object.freeze({
+        stepId: buildStepId(agent.id, goal.id, index),
+        goalId: goal.id,
+        toolId,
+        dependsOnStepIds: Object.freeze(index === 0 ? [] : [buildStepId(agent.id, prioritizedGoals[index - 1]!.id, index - 1)]),
+        intent: Object.freeze({
+          action: goal.objective,
+          expectedOutputKey: outputKey,
+          inputReferences: Object.freeze(
+            memoryContext.map((entry) => Object.freeze({
+              kind: "asset" as const,
+              assetId: entry.assetId,
+            })),
+          ),
+        }),
+        metadata: Object.freeze({
+          memoryContext,
+        }),
+      }));
+    }
+
     const plan = createAgentPlan({
       planId: `agent-plan:${agent.id}:${Date.now()}`,
       agentId: agent.id,
       strategyId: agent.planningStrategy.strategyId,
-      steps: prioritizedGoals.map((goal, index) => {
-        const goalTool = goal.requiredToolIds?.find((candidate) => allowedTools.includes(candidate));
-        const toolId = goalTool ?? allowedTools[index % allowedTools.length];
-        if (!toolId) {
-          throw new Error(`Agent planning could not resolve a tool for goal '${goal.id}'.`);
-        }
-
-        return Object.freeze({
-          stepId: buildStepId(agent.id, goal.id, index),
-          goalId: goal.id,
-          toolId,
-          dependsOnStepIds: Object.freeze(index === 0 ? [] : [buildStepId(agent.id, prioritizedGoals[index - 1]!.id, index - 1)]),
-          intent: Object.freeze({
-            action: goal.objective,
-            expectedOutputKey: `goal.${goal.id}.result`,
-            inputReferences: Object.freeze(
-              memoryContext.map((entry) => Object.freeze({
-                kind: "asset" as const,
-                assetId: entry.assetId,
-              })),
-            ),
-          }),
-          metadata: Object.freeze({
-            memoryContext,
-          }),
-        });
-      }),
+      steps,
       metadata: request.context ? Object.freeze({ ...request.context }) : undefined,
     });
 

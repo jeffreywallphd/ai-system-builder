@@ -59,6 +59,7 @@ Use this file as the shortest reliable orientation before reading the human arch
   - Execution read models now carry working-memory snapshots and write outcomes so planning/evaluation consumers can reuse bounded session context without a second runtime.
   - Write policy is now enforced operationally (writable/session-only checks + bounded durable retention gating).
 - Direction 4 (Phase 4, MCP capability layer foundation) now binds agent MCP access to canonical MCP identity (`domain/mcp/McpToolIdentity.ts` + `AgentPolicy.toolAccess.allowedMcpTools`), maps MCP steps as execution-native units (`ExecutionUnitKinds.mcpToolInvocation` via `AgentExecutionMapping`), and introduces deterministic plan/execute-time MCP governance checks (`application/agents/services/AgentMcpToolGovernanceService.ts`) that reuse registry/trust services for permission/approval/sandbox/schema checks without creating a second runtime.
+- Direction 4 (Phase 4 completion + Phase 5 inner foundation) now adds a reusable planner-side tool selection seam (`AgentPlanToolSelectionService`), explicit MCP governance decision semantics (`allowed` vs `approval-required` / `denied` / `unavailable` / `incompatible`), and an inner runtime coordination service (`AgentRunnerService`) with structured progress events, bounded retry/failure classification, and optional agent execution-session persistence seams.
 
 ## TODO
 - If asked for the "single" architecture entry point, explain that there are currently multiple composition roots and name them explicitly.

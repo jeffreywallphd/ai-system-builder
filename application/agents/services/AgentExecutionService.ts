@@ -1,5 +1,4 @@
 import type { Agent } from "../../../domain/agents/Agent";
-import type { AgentExecutionResult } from "../models/AgentExecutionResult";
 import type { ExecuteAgentToolsUseCase } from "../ExecuteAgentToolsUseCase";
 import type { AgentPlanningInterface } from "../contracts/AgentPlanningStrategy";
 import type { AgentPlan } from "../../../domain/agents/AgentPlan";
@@ -9,6 +8,8 @@ import { AgentMemoryWriteService, type AgentMemoryWriteResult } from "./AgentMem
 import type { AgentWorkingMemory } from "../../../domain/agents/AgentWorkingMemory";
 import { AssetId } from "../../../domain/assets/AssetId";
 import type { AgentMcpToolGovernanceService } from "./AgentMcpToolGovernanceService";
+import { AgentRunnerService } from "./AgentRunnerService";
+import type { IAgentExecutionSessionRepository } from "../../ports/interfaces/IAgentExecutionSessionRepository";
 
 export interface AgentExecutionStepOutcome {
   readonly stepId: string;
@@ -33,107 +34,58 @@ export interface AgentExecutionReadModel {
 }
 
 export class AgentExecutionService {
+  private readonly runner: AgentRunnerService;
+  private readonly planner: AgentPlanningInterface;
+
   constructor(
-    private readonly planner: AgentPlanningInterface,
-    private readonly executeAgentToolsUseCase: ExecuteAgentToolsUseCase,
-    private readonly memoryRetrievalService: AgentMemoryRetrievalService,
-    private readonly memoryWriteService: AgentMemoryWriteService,
-    private readonly workingMemoryService: AgentWorkingMemoryService = new AgentWorkingMemoryService(),
-    private readonly governanceService?: AgentMcpToolGovernanceService,
-  ) {}
+    planner: AgentPlanningInterface,
+    executeAgentToolsUseCase: ExecuteAgentToolsUseCase,
+    memoryRetrievalService: AgentMemoryRetrievalService,
+    memoryWriteService: AgentMemoryWriteService,
+    workingMemoryService: AgentWorkingMemoryService = new AgentWorkingMemoryService(),
+    governanceService?: AgentMcpToolGovernanceService,
+    sessionRepository?: IAgentExecutionSessionRepository,
+  ) {
+    this.planner = planner;
+    this.runner = new AgentRunnerService(
+      planner,
+      executeAgentToolsUseCase,
+      memoryRetrievalService,
+      memoryWriteService,
+      workingMemoryService,
+      governanceService,
+      sessionRepository,
+    );
+  }
 
   public async buildExecutionGraph(agent: Agent): Promise<AgentPlan> {
     return this.planner.plan({ agent });
   }
 
   public async execute(agent: Agent): Promise<AgentExecutionReadModel> {
-    const plan = await this.planner.plan({ agent });
-    if (this.governanceService) {
-      const governance = await this.governanceService.validatePlan(agent, plan);
-      if (!governance.allowed) {
-        const errors = governance.issues.map((issue) => issue.message).join("; ");
-        throw new Error(`Agent execution blocked by MCP governance policy: ${errors}`);
-      }
+    const result = await this.runner.run({ agent });
+    if (result.status === "blocked") {
+      throw new Error(`Agent execution blocked: ${result.failure?.message ?? "governance decision denied execution."}`);
     }
-    const retrievedMemory = await this.memoryRetrievalService.retrieveMemory({ agent });
-    let workingMemory = this.workingMemoryService.createFromRetrievedMemory({
-      sessionId: `agent-session:${agent.id}:${plan.planId}`,
-      agent,
-      plan,
-      retrievedMemory,
-    });
-    const outcomes: AgentExecutionStepOutcome[] = [];
-    let finalStatus: AgentExecutionReadModel["status"] = "completed";
-    let finalOutput = "";
-
-    for (const step of plan.steps) {
-      const stepResult: AgentExecutionResult = await this.executeAgentToolsUseCase.execute({
-        input: step.intent.action,
-        executionId: `agent:${agent.id}:${step.stepId}`,
-        maxIterations: 1,
-        toolSelection: {
-          mode: "capabilityIds",
-          capabilityIds: [step.toolId],
-        },
-        metadata: Object.freeze({
-          origin: "agent-execution-service",
-          agentId: agent.id,
-          planId: plan.planId,
-          stepId: step.stepId,
-          memoryAssetIds: agent.memory.assets.map((entry) => entry.assetId.toString()),
-          expectedOutputKey: step.intent.expectedOutputKey ?? null,
-        }),
-      });
-
-      const stepOutput = stepResult.finalOutput ?? stepResult.steps[0]?.resultText;
-      const outputAssetIdRaw = typeof stepResult.metadata?.outputAssetId === "string"
-        ? stepResult.metadata.outputAssetId
-        : undefined;
-      const outputAssetId = outputAssetIdRaw ? AssetId.from(outputAssetIdRaw) : undefined;
-      outcomes.push(Object.freeze({
-        stepId: step.stepId,
-        goalId: step.goalId,
-        toolId: step.toolId,
-        action: step.intent.action,
-        status: stepResult.status,
-        output: stepOutput,
-        outputAssetId,
-        errorMessage: stepResult.errorMessage,
-      }));
-      workingMemory = this.workingMemoryService.appendExecutionOutcome(workingMemory, {
-        stepId: step.stepId,
-        status: stepResult.status,
-        output: stepOutput,
-        outputAssetId,
-        errorMessage: stepResult.errorMessage,
-      });
-      finalOutput = [finalOutput, stepOutput].filter(Boolean).join("\n");
-
-      if (stepResult.status !== "completed") {
-        finalStatus = stepResult.status;
-        break;
-      }
-    }
-
-    const memoryWrite = await this.memoryWriteService.writeExecutionOutcome(agent, plan, {
-      agentId: agent.id,
-      executionId: `agent:${agent.id}:${plan.planId}`,
-      planId: plan.planId,
-      status: finalStatus,
-      outcomes: Object.freeze(outcomes),
-      finalOutput: finalOutput || undefined,
-      workingMemory,
-    });
 
     return Object.freeze({
-      agentId: agent.id,
-      executionId: `agent:${agent.id}:${plan.planId}`,
-      planId: plan.planId,
-      status: finalStatus,
-      outcomes: Object.freeze(outcomes),
-      finalOutput: finalOutput || undefined,
-      workingMemory,
-      memoryWrite,
+      agentId: result.agentId,
+      executionId: result.executionId,
+      planId: result.planId,
+      status: result.status,
+      outcomes: Object.freeze(result.outcomes.map((outcome) => Object.freeze({
+        stepId: outcome.stepId,
+        goalId: outcome.goalId,
+        toolId: outcome.toolId,
+        action: outcome.action,
+        status: outcome.status === "blocked" ? "failed" : outcome.status,
+        output: outcome.output,
+        outputAssetId: outcome.outputAssetId,
+        errorMessage: outcome.errorMessage,
+      }))),
+      finalOutput: result.finalOutput,
+      workingMemory: result.workingMemory,
+      memoryWrite: result.memoryWrite,
     } satisfies AgentExecutionReadModel);
   }
 }
