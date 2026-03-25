@@ -342,9 +342,11 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
   - `SqliteAgentRepository` also projects structured authoring/query metadata (`strategy_id`, `strategy_mode`, `goal_count`, `allowed_tool_count`) while preserving aggregate round-trip in `agent_json`.
   - repository read paths now rehydrate `agent_json` snapshots through domain normalization so persisted aggregates keep canonical memory asset refs and validated goal/policy/tool/planning/execution semantics.
   - memory contracts are now hard-validated for authoring updates (canonical asset-backed refs, retrieval compatibility, writable/retrievable/session-only coherence, and retention/session-only contradiction checks).
+    - explicit structured issue codes now cover non-canonical/malformed refs, duplicate refs, malformed asset-version ids, semantic/recency range errors, and retention-policy contradictions.
   - strategy contracts are now explicitly bounded to supported descriptors (current slice: `deterministic@deterministic-linear`) with unsupported id/mode combinations rejected deterministically.
+    - explicit structured issue codes now include missing strategy id and unsupported id/mode combinations.
   - whole-agent validation issues now include explicit section metadata (`goals`/`tools`/`memory`/`strategy`/etc.) and are reusable across CRUD/configuration/API via a shared `AgentConfigurationValidationError`.
   - agent read-model contracts now expose full structured memory configuration (`assets`, `retrieval`, `policy`, `revision`) instead of partial memory summaries.
   - desktop backend transport now has dedicated thin authoring handlers (`ai-loom-desktop-agents:*`) via `AgentAuthoringBackendApi`, mapping DTO payloads directly onto use cases and structured validation output.
-  - backend authoring coverage now includes SQLite-backed integration tests for CRUD + goal/policy/tool updates so real persistence seams are exercised directly.
+  - backend authoring coverage now includes SQLite-backed integration tests for CRUD + goal/policy/tool/memory/strategy updates and API mapping/error-path tests so real persistence seams are exercised directly.
 - No UI/runtime bypass was introduced; transport can remain thin over these use cases.

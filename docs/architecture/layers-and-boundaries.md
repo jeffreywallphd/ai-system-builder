@@ -168,10 +168,12 @@ If a change needs data from the outside world, prefer adding or using an **appli
   - persistence remains outer-layer through `IAgentRepository`/`IAgentExecutionSessionRepository` with concrete SQLite adapters (`SqliteAgentRepository`, `SqliteAgentExecutionSessionRepository`).
   - `SqliteAgentRepository` now rehydrates persisted JSON snapshots through domain normalization on reads (rather than raw cast-only deserialization), so full aggregate round-trip stays truthy for memory asset refs, goal/policy/tool config, and planning/execution config.
   - memory authoring contracts are now fully structured/validated at the inner layer (asset-backed refs, retrieval config, writable/retrievable/session-only type coherence, retention/session-only contradictions, canonical asset/id format checks).
+  - memory validation now emits explicit structured issue codes for malformed/non-canonical asset refs, duplicate asset refs, malformed asset-version ids, invalid semantic/recency settings, and retention/policy contradictions so API/UI consumers do not rely only on generic fallback errors.
   - planning strategy authoring is now explicitly bounded to supported strategy descriptors (currently deterministic only), with unsupported id/mode combinations rejected before persistence.
+  - strategy validation now includes explicit structured issues for missing strategy id and unsupported id/mode combinations.
   - whole-agent validation is now reusable across CRUD/configuration/API seams via `AgentConfigurationValidationService` + structured issue payloads (`code`, `path`, `section`, `severity`, `message`) and a deterministic `AgentConfigurationValidationError`.
   - backend transport now stays thin over those use cases through desktop IPC agent-authoring handlers and DTO mapping (`ai-loom-desktop-agents:*`) instead of transport-layer business logic.
-  - focused agent authoring coverage now includes SQLite-backed integration tests across CRUD + goal/policy/tool updates so backend behavior is validated over the real persistence seam, not only in-memory repository doubles.
+  - focused agent authoring coverage now includes SQLite-backed integration tests across CRUD + goal/policy/tool/memory/strategy updates and API-layer mapping/error-path tests so backend behavior is validated over real seams, not only in-memory repository doubles.
 
 ## TODO
 

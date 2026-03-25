@@ -118,5 +118,35 @@ describe("AgentAuthoringBackendApi", () => {
     expect(invalidMemory.error?.code).toBe("validation-failed");
     expect(invalidMemory.error?.validationIssues?.some((issue) => issue.section === "memory")).toBe(true);
   });
+
+  it("maps conflict, not-found, and validate endpoint responses through thin transport contracts", async () => {
+    const api = new AgentAuthoringBackendApi(new InMemoryAgentRepository());
+    const created = await api.createAgent(createRequest("agent:api:mapping"));
+    expect(created.ok).toBe(true);
+
+    const duplicate = await api.createAgent(createRequest("agent:api:mapping"));
+    expect(duplicate.ok).toBe(false);
+    expect(duplicate.error?.code).toBe("conflict");
+
+    const missing = await api.configureStrategy("agent:api:missing", {
+      strategyId: "deterministic",
+      mode: "deterministic-linear",
+    });
+    expect(missing.ok).toBe(false);
+    expect(missing.error?.code).toBe("not-found");
+
+    const validation = await api.validateConfiguration({
+      ...createRequest("agent:api:mapping-validate"),
+      planningStrategy: { strategyId: "", mode: "deterministic-linear" },
+      memory: {
+        ...createRequest("agent:api:mapping-validate").memory,
+        assets: [{ assetId: new AssetId("memory:not-canonical"), memoryType: "working" }],
+      },
+    });
+    expect(validation.ok).toBe(true);
+    expect(validation.data?.valid).toBe(false);
+    expect(validation.data?.issues.some((issue) => issue.code === "strategy-id-missing")).toBe(true);
+    expect(validation.data?.issues.some((issue) => issue.code === "memory-asset-id-noncanonical")).toBe(true);
+  });
 });
 

@@ -63,6 +63,8 @@ export class AgentConfigurationValidationService {
   public validate(input: AgentConfigurationValidationInput): AgentConfigurationValidationResult {
     const issues: AgentConfigurationValidationIssue[] = [];
     const allowedToolIds = new Set(input.policy.toolAccess.allowedToolIds);
+    const supportedRetrievalStrategies = new Set(["latest-first", "semantic-filter", "hybrid"]);
+    const supportedRetentionModes = new Set(["disabled", "bounded"]);
 
     if (input.goals.length === 0) {
       issues.push({
@@ -224,6 +226,50 @@ export class AgentConfigurationValidationService {
         section: "memory",
       });
     }
+    const seenMemoryAssets = new Set<string>();
+    for (let index = 0; index < input.memory.assets.length; index += 1) {
+      const assetRef = input.memory.assets[index];
+      const assetPath = `memory.assets.${index}`;
+      const assetId = assetRef.assetId?.toString?.() ?? "";
+      if (!assetId.startsWith("asset:")) {
+        issues.push({
+          code: "memory-asset-id-noncanonical",
+          path: `${assetPath}.assetId`,
+          message: `Memory asset id '${assetId}' must use canonical 'asset:' format.`,
+          severity: "error",
+          section: "memory",
+        });
+      }
+      if (assetRef.assetVersionId !== undefined && !/^[a-zA-Z0-9:_-]+$/.test(assetRef.assetVersionId)) {
+        issues.push({
+          code: "memory-asset-version-id-malformed",
+          path: `${assetPath}.assetVersionId`,
+          message: `Memory asset version id '${assetRef.assetVersionId}' is malformed.`,
+          severity: "error",
+          section: "memory",
+        });
+      }
+      const duplicateKey = `${assetId}|${assetRef.assetVersionId ?? "latest"}|${assetRef.memoryType}`;
+      if (seenMemoryAssets.has(duplicateKey)) {
+        issues.push({
+          code: "memory-asset-reference-duplicate",
+          path: assetPath,
+          message: `Duplicate memory asset reference '${duplicateKey}' is not allowed.`,
+          severity: "error",
+          section: "memory",
+        });
+      }
+      seenMemoryAssets.add(duplicateKey);
+    }
+    if (!supportedRetrievalStrategies.has(input.memory.retrieval.strategy)) {
+      issues.push({
+        code: "memory-retrieval-strategy-unsupported",
+        path: "memory.retrieval.strategy",
+        message: `Unsupported memory retrieval strategy '${input.memory.retrieval.strategy}'.`,
+        severity: "error",
+        section: "memory",
+      });
+    }
     if (input.memory.retrieval.maxEntries <= 0 || !Number.isInteger(input.memory.retrieval.maxEntries)) {
       issues.push({
         code: "memory-retrieval-max-entries-invalid",
@@ -232,6 +278,32 @@ export class AgentConfigurationValidationService {
         severity: "error",
         section: "memory",
       });
+    }
+    if (input.memory.retrieval.recency?.lookbackWindowEntries !== undefined) {
+      if (
+        !Number.isInteger(input.memory.retrieval.recency.lookbackWindowEntries)
+        || input.memory.retrieval.recency.lookbackWindowEntries <= 0
+      ) {
+        issues.push({
+          code: "memory-recency-lookback-invalid",
+          path: "memory.retrieval.recency.lookbackWindowEntries",
+          message: "memory.retrieval.recency.lookbackWindowEntries must be a positive integer when provided.",
+          severity: "error",
+          section: "memory",
+        });
+      }
+    }
+    if (input.memory.retrieval.semantic?.minRelevanceScore !== undefined) {
+      const score = input.memory.retrieval.semantic.minRelevanceScore;
+      if (!Number.isFinite(score) || score < 0 || score > 1) {
+        issues.push({
+          code: "memory-semantic-score-invalid",
+          path: "memory.retrieval.semantic.minRelevanceScore",
+          message: "memory.retrieval.semantic.minRelevanceScore must be a number between 0 and 1.",
+          severity: "error",
+          section: "memory",
+        });
+      }
     }
 
     if (input.memory.retrieval.strategy === "hybrid" && !input.memory.retrieval.semantic && !input.memory.retrieval.recency) {
@@ -270,6 +342,39 @@ export class AgentConfigurationValidationService {
         code: "memory-retrieval-types-not-retrievable",
         path: "memory.retrieval.memoryTypes",
         message: "memory.retrieval.memoryTypes must be a subset of memory.policy.retrievableTypes when retrievableTypes are configured.",
+        severity: "error",
+        section: "memory",
+      });
+    }
+    if (
+      input.memory.policy.maxRetrievalEntries !== undefined
+      && input.memory.policy.maxRetrievalEntries > input.memory.retrieval.maxEntries
+    ) {
+      issues.push({
+        code: "memory-policy-max-retrieval-exceeds-retrieval",
+        path: "memory.policy.maxRetrievalEntries",
+        message: "memory.policy.maxRetrievalEntries cannot exceed memory.retrieval.maxEntries.",
+        severity: "error",
+        section: "memory",
+      });
+    }
+    if (!supportedRetentionModes.has(input.memory.policy.retention.mode)) {
+      issues.push({
+        code: "memory-retention-mode-unsupported",
+        path: "memory.policy.retention.mode",
+        message: `Unsupported memory retention mode '${input.memory.policy.retention.mode}'.`,
+        severity: "error",
+        section: "memory",
+      });
+    }
+    if (
+      input.memory.policy.retention.mode === "disabled"
+      && input.memory.policy.retention.maxDurableEntries !== undefined
+    ) {
+      issues.push({
+        code: "memory-retention-disabled-max-durable-not-allowed",
+        path: "memory.policy.retention.maxDurableEntries",
+        message: "maxDurableEntries is not allowed when memory retention mode is disabled.",
         severity: "error",
         section: "memory",
       });
@@ -338,6 +443,15 @@ export class AgentConfigurationValidationService {
       (strategy) => strategy.strategyId === input.planningStrategy.strategyId.toLowerCase()
         && strategy.mode === input.planningStrategy.mode,
     );
+    if (!input.planningStrategy.strategyId.trim()) {
+      issues.push({
+        code: "strategy-id-missing",
+        path: "planningStrategy.strategyId",
+        message: "planningStrategy.strategyId is required.",
+        severity: "error",
+        section: "strategy",
+      });
+    }
     if (!strategySupported) {
       issues.push({
         code: "strategy-unsupported",
