@@ -1,3 +1,5 @@
+import { buildMcpToolId } from "../../../domain/mcp/McpToolIdentity";
+
 export interface McpToolDescriptorSource {
   readonly kind: "mcp-server";
   readonly serverId: string;
@@ -44,7 +46,7 @@ export interface McpPromptDescriptor {
 }
 
 export function buildMcpToolDescriptorId(serverId: string, toolName: string): string {
-  return `mcp:${encodeURIComponent(serverId.trim())}:${encodeURIComponent(toolName.trim())}`;
+  return buildMcpToolId(serverId, toolName);
 }
 
 export function normalizeMcpToolDescriptor(

@@ -8,6 +8,7 @@ import { AgentWorkingMemoryService } from "./AgentWorkingMemoryService";
 import { AgentMemoryWriteService, type AgentMemoryWriteResult } from "./AgentMemoryWriteService";
 import type { AgentWorkingMemory } from "../../../domain/agents/AgentWorkingMemory";
 import { AssetId } from "../../../domain/assets/AssetId";
+import type { AgentMcpToolGovernanceService } from "./AgentMcpToolGovernanceService";
 
 export interface AgentExecutionStepOutcome {
   readonly stepId: string;
@@ -38,6 +39,7 @@ export class AgentExecutionService {
     private readonly memoryRetrievalService: AgentMemoryRetrievalService,
     private readonly memoryWriteService: AgentMemoryWriteService,
     private readonly workingMemoryService: AgentWorkingMemoryService = new AgentWorkingMemoryService(),
+    private readonly governanceService?: AgentMcpToolGovernanceService,
   ) {}
 
   public async buildExecutionGraph(agent: Agent): Promise<AgentPlan> {
@@ -46,6 +48,13 @@ export class AgentExecutionService {
 
   public async execute(agent: Agent): Promise<AgentExecutionReadModel> {
     const plan = await this.planner.plan({ agent });
+    if (this.governanceService) {
+      const governance = await this.governanceService.validatePlan(agent, plan);
+      if (!governance.allowed) {
+        const errors = governance.issues.map((issue) => issue.message).join("; ");
+        throw new Error(`Agent execution blocked by MCP governance policy: ${errors}`);
+      }
+    }
     const retrievedMemory = await this.memoryRetrievalService.retrieveMemory({ agent });
     let workingMemory = this.workingMemoryService.createFromRetrievedMemory({
       sessionId: `agent-session:${agent.id}:${plan.planId}`,

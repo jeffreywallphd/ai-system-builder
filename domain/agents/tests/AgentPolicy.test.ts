@@ -40,6 +40,7 @@ describe("AgentPolicy", () => {
     expect(policy.safetyConstraints.requiredApprovals[0]?.permissionId).toBe("network.access");
     expect(policy.safetyConstraints.sandbox.network.allowedProtocols).toEqual(["https"]);
     expect(policy.safetyConstraints.deniedPermissionIds).toEqual(["workspace.write"]);
+    expect(policy.toolAccess.allowedMcpTools).toEqual([{ toolId: "mcp:local:echo", serverId: "local", toolName: "echo" }]);
   });
 
   it("rejects malformed tool scopes and invalid limits", () => {
@@ -124,5 +125,16 @@ describe("AgentPolicy", () => {
         },
       },
     })).toThrow("none mode cannot include allowedEnvVars");
+  });
+
+  it("rejects explicit MCP bindings that do not match canonical identity", () => {
+    expect(() => normalizeAgentPolicy({
+      ...basePolicy,
+      toolAccess: {
+        allowedToolIds: ["mcp:local:echo"],
+        allowedMcpTools: [{ toolId: "mcp:local:echo", serverId: "other", toolName: "echo" }],
+        scopeConstraints: [],
+      },
+    })).toThrow("must match canonical");
   });
 });

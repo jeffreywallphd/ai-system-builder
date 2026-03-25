@@ -2,6 +2,7 @@ import { createAgentPlan, type AgentPlan } from "../../../domain/agents/AgentPla
 import type { AgentMemoryEntryReference, AgentMemoryStore } from "../../../domain/agents/AgentMemory";
 import type { IToolCapabilityCatalog } from "../../ports/interfaces/IToolCapabilityCatalog";
 import type { AgentPlanningStrategy, AgentPlanningStrategyRequest } from "../contracts/AgentPlanningStrategy";
+import type { AgentMcpToolGovernanceService } from "./AgentMcpToolGovernanceService";
 
 function buildStepId(agentId: string, goalId: string, index: number): string {
   return `plan:${agentId}:${goalId}:${index + 1}`;
@@ -21,6 +22,7 @@ export class DeterministicAgentPlanningStrategy implements AgentPlanningStrategy
   constructor(
     private readonly catalog: IToolCapabilityCatalog,
     private readonly memoryStore: AgentMemoryStore,
+    private readonly governanceService?: AgentMcpToolGovernanceService,
   ) {}
 
   public async plan(request: AgentPlanningStrategyRequest): Promise<AgentPlan> {
@@ -47,7 +49,7 @@ export class DeterministicAgentPlanningStrategy implements AgentPlanningStrategy
 
     const memoryContext = toIntentMemoryReferences(memoryEntries);
 
-    return createAgentPlan({
+    const plan = createAgentPlan({
       planId: `agent-plan:${agent.id}:${Date.now()}`,
       agentId: agent.id,
       strategyId: agent.planningStrategy.strategyId,
@@ -80,5 +82,15 @@ export class DeterministicAgentPlanningStrategy implements AgentPlanningStrategy
       }),
       metadata: request.context ? Object.freeze({ ...request.context }) : undefined,
     });
+
+    if (this.governanceService) {
+      const governance = await this.governanceService.validatePlan(agent, plan);
+      if (!governance.allowed) {
+        const firstIssue = governance.issues[0];
+        throw new Error(`Agent plan references ineligible MCP tool usage: ${firstIssue?.message ?? "validation failed"}`);
+      }
+    }
+
+    return plan;
   }
 }
