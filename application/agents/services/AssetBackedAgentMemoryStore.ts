@@ -31,6 +31,36 @@ function versionIdFrom(agentId: string, assetId: string): string {
   return `agent-memory:${safeAgentId}:${safeAssetId}:${Date.now()}`;
 }
 
+function normalizeMetadataFilter(
+  metadata: Readonly<Record<string, string | number | boolean | null>> | undefined,
+): Readonly<Record<string, string | number | boolean | null>> {
+  if (!metadata) {
+    return Object.freeze({});
+  }
+  return Object.freeze(Object.fromEntries(
+    Object.entries(metadata).flatMap(([key, value]) => {
+      const normalizedKey = key.trim();
+      if (!normalizedKey) {
+        return [];
+      }
+      return [[normalizedKey, value] as const];
+    }),
+  ));
+}
+
+function matchesMetadataFilter(
+  stored: Readonly<Record<string, string | number | boolean | null>> | undefined,
+  filter: Readonly<Record<string, string | number | boolean | null>>,
+): boolean {
+  if (Object.keys(filter).length === 0) {
+    return true;
+  }
+  if (!stored) {
+    return false;
+  }
+  return Object.entries(filter).every(([key, expected]) => stored[key] === expected);
+}
+
 export class AssetBackedAgentMemoryStore implements AgentMemoryStore {
   constructor(
     private readonly assetCatalog: IAssetCatalog,
@@ -83,6 +113,7 @@ export class AssetBackedAgentMemoryStore implements AgentMemoryStore {
         agentId: normalizedAgentId,
         tags,
         memoryType: entry.memoryType,
+        ...(metadata ?? {}),
         entryMetadata: metadata,
       },
       reproducibilitySummary: {
@@ -96,8 +127,13 @@ export class AssetBackedAgentMemoryStore implements AgentMemoryStore {
     const assetIds = (criteria.assetIds ?? []).map((entry) => AssetId.from(entry).toString());
     const tagFilter = new Set(normalizeTags(criteria.tags));
     const memoryTypeFilter = new Set<AgentMemoryType>(criteria.memoryTypes ?? []);
+    const metadataFilter = normalizeMetadataFilter(criteria.metadata);
     const maxEntries = Math.max(1, Math.trunc(criteria.maxEntries ?? 10));
-    const responses: AgentMemoryEntryReference[] = [];
+    const beforeTimestamp = criteria.beforeTimestamp ? new Date(criteria.beforeTimestamp) : undefined;
+    if (beforeTimestamp && Number.isNaN(beforeTimestamp.getTime())) {
+      throw new Error(`Agent memory query beforeTimestamp '${criteria.beforeTimestamp}' is invalid.`);
+    }
+    const responses: Array<AgentMemoryEntryReference & { readonly createdAt: number }> = [];
 
     for (const assetId of assetIds) {
       const asset = await this.assetCatalog.getById(assetId);
@@ -111,29 +147,53 @@ export class AssetBackedAgentMemoryStore implements AgentMemoryStore {
       }
 
       const assetTags = normalizeTags(asset.semanticMetadata?.tags);
-      if (tagFilter.size > 0 && !assetTags.some((tag) => tagFilter.has(tag))) {
-        continue;
+
+      const versions = [...await this.versionRepository.listVersionsByAssetId(assetId)]
+        .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime());
+      for (const version of versions) {
+        if (beforeTimestamp && version.createdAt.getTime() >= beforeTimestamp.getTime()) {
+          continue;
+        }
+
+        const storedMemoryType = typeof version.metadata?.memoryType === "string"
+          ? (version.metadata.memoryType as AgentMemoryType)
+          : undefined;
+        if (memoryTypeFilter.size > 0 && (!storedMemoryType || !memoryTypeFilter.has(storedMemoryType))) {
+          continue;
+        }
+
+        const metadata = toPrimitiveMetadata(version.metadata);
+        const versionTags = normalizeTags(Array.isArray(version.metadata?.tags) ? (version.metadata?.tags as string[]) : undefined);
+        const candidateTags = versionTags.length > 0 ? versionTags : assetTags;
+        if (tagFilter.size > 0 && !candidateTags.some((tag) => tagFilter.has(tag))) {
+          continue;
+        }
+        if (!matchesMetadataFilter(metadata, metadataFilter)) {
+          continue;
+        }
+
+        responses.push(Object.freeze({
+          assetId: new AssetId(assetId),
+          assetVersionId: version.versionId,
+          memoryType: storedMemoryType ?? "working",
+          tags: candidateTags,
+          metadata,
+          createdAt: version.createdAt.getTime(),
+        }));
       }
-
-      const versions = await this.versionRepository.listVersionsByAssetId(assetId);
-      const latest = [...versions].sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())[0];
-
-      const storedMemoryType = typeof latest?.metadata?.memoryType === "string"
-        ? (latest.metadata.memoryType as AgentMemoryType)
-        : undefined;
-      if (memoryTypeFilter.size > 0 && (!storedMemoryType || !memoryTypeFilter.has(storedMemoryType))) {
-        continue;
-      }
-
-      responses.push(Object.freeze({
-        assetId: new AssetId(assetId),
-        assetVersionId: latest?.versionId,
-        memoryType: storedMemoryType ?? "working",
-        tags: assetTags,
-        metadata: toPrimitiveMetadata(latest?.metadata),
-      }));
     }
 
-    return Object.freeze(responses.slice(0, maxEntries));
+    return Object.freeze(
+      responses
+        .sort((left, right) => right.createdAt - left.createdAt)
+        .slice(0, maxEntries)
+        .map((entry) => Object.freeze({
+          assetId: entry.assetId,
+          assetVersionId: entry.assetVersionId,
+          memoryType: entry.memoryType,
+          tags: entry.tags,
+          metadata: entry.metadata,
+        })),
+    );
   }
 }

@@ -199,6 +199,18 @@ That is an important boundary:
 
 This keeps the platform extensible without making external runtimes the center of the authoring model.
 
+## Direction 4 memory interaction with execution (Phase 3 completion note)
+
+- Agent execution now carries a bounded working-memory snapshot through execution read models, including retrieved memory references, plan-asset references, and per-step execution-output summaries.
+
+- Direction 4 Phase 4 now treats agent-targeted MCP tool calls as execution-native units (`mcp-tool-invocation`) via the existing execution plan seam and applies deterministic plan/execute-time governance checks against MCP registry/trust contracts (tool availability, permission/approval, sandbox, and basic schema expectations) without introducing a second orchestration path.
+- Planner-side tool compatibility is now exposed through an explicit inner-layer selection seam (`AgentPlanToolSelectionService`), and MCP governance now returns deterministic decision classes (`allowed`, `approval-required`, `denied`, `unavailable`, `incompatible`) so both plan-time and pre-execution checks can reason about block/approval/failure behavior consistently.
+- Phase 5 runtime now hardens execution-native streaming semantics through `AgentRunnerService`: deterministic event ordering across execution/session start, plan/governance/mapping milestones, per-step attempt start + completion/failure/cancel outcomes, retry schedule/exhaustion signals, memory persistence, session transition/persist boundaries, and terminal execution outcomes.
+- Retry semantics are now explicit at the contract boundary (`AgentRuntimeRetryPolicy.classifyFailure` + execution-result metadata hints) rather than relying only on string heuristics, while still preserving bounded heuristic fallback when runtime metadata is absent.
+- Agent execution session persistence now has a concrete SQLite infrastructure implementation (`SqliteAgentExecutionSessionRepository`) behind `IAgentExecutionSessionRepository`, including durable latest-session snapshots and transition history for debugging/observability readiness.
+- Memory retrieval remains deterministic and asset/version-backed with bounded filtering (type, tags, metadata, `beforeTimestamp`) and policy-enforced exclusion of session-only memory types from durable retrieval.
+- Memory writes from execution outcomes remain asset-backed and lineage-friendly, and policy now enforces writable/session-only constraints plus bounded durable retention capacity in practice.
+
 ## Node execution context and context injection
 
 The interpreted execution path relies on a node execution context resolver and a node executor. `LangChainNodeExecutor` is a particularly important adapter because it:
@@ -260,9 +272,17 @@ That is "done enough" for Direction 1: the unified execution engine now includes
   - `ai-loom.mcp-tool-definitions.v1` for shareable definition export/import flows (definition + source only; no runtime approvals/secrets/operational trust state).
 
 ## Direction 4 Phase 1 execution alignment
-- Agent execution sessions now use execution-native lifecycle language (`queued/planning/running/completed/failed/cancelled`) via `domain/agents/AgentExecutionSession.ts`, with explicit transition and timestamp coherence invariants.
+- Agent execution sessions now use execution-native lifecycle language (`pending/ready/running/completed/failed/cancelled`) via `domain/agents/AgentExecutionSession.ts`, with explicit transition/run-plan compatibility checks, canonical asset-based diagnostics, and timestamp coherence invariants.
 - A compact mapping seam (`application/agents/contracts/AgentExecutionMapping.ts`) maps agent plan steps into `ExecutionPlan` units (`agent-tool-step`) and provides per-unit payload mapping so future agent execution flows through the same unified engine substrate.
+- Agent roots expose explicit `toolAccess` beside policy and memory allows intentional zero-asset initialization while remaining canonically `AssetId`-typed once references are present.
 - This does not add a second orchestration engine: it only establishes a durable contract for later planner/runner slices.
+
+- Direction 4 planning now has an execution-native inner seam: validated `AgentPlan` step graphs (including dependencies, input references, expected outputs) map through `application/agents/contracts/AgentExecutionMapping.ts` into `ExecutionPlan` `agent-tool-step` units, proving future planner output routes into the same unified execution engine instead of a parallel agent runtime.
+- Direction 4 Phase 3 now adds a memory substrate aligned to that same execution/planning seam:
+  - retrieval is a typed application contract that returns asset-backed memory references (`application/agents/contracts/AgentMemoryRetrieval.ts`);
+  - session working memory is a bounded domain object attached to agent plan/execution context (`domain/agents/AgentWorkingMemory.ts`);
+  - write-back is a bounded application pipeline that normalizes execution outcomes into asset-backed memory references (`application/agents/services/AgentMemoryWriteService.ts`);
+  - memory behavior is policy-shaped (`domain/agents/AgentMemory.ts`) rather than implicit.
 
 ## TODO
 

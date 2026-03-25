@@ -44,9 +44,22 @@ Use this file as the shortest reliable orientation before reading the human arch
 
 ## Direction 4 (Phase 1) foundation
 - Agent concepts are now first-class inner-layer artifacts (`domain/agents/*`) with validated goal, policy, memory, and execution-session models (including lifecycle and invariant enforcement).
+- Agent roots now expose explicit `toolAccess` alongside policy so planner/executor consumers have a stable contract without duplicating policy semantics.
 - Agent memory configuration is explicitly asset-based (`AssetId` references + memory types + typed retrieval configuration + revision), aligned with Direction 2 lineage/versioning.
 - Agent execution now has a bounded mapping seam into the unified execution backbone (`application/agents/contracts/AgentExecutionMapping.ts`) that yields `ExecutionPlan` units plus per-unit payload correlation data, rather than introducing a second runtime model.
 - This remains a foundation slice only: no studio UI, no autonomous replanning loop, and no parallel orchestration stack.
+
+- Direction 4 (Phase 2, inner foundation only) now includes an execution-oriented planning contract: `domain/agents/AgentPlan.ts` (dependency-aware plan/step model + validation), `application/agents/contracts/AgentPlanningStrategy.ts` (strategy contract/descriptor seam) plus `application/agents/services/DeterministicAgentPlanningStrategy.ts` (first deterministic strategy), and bounded planning-loop evaluation contracts in `application/agents/contracts/AgentPlanningLoop.ts` without adding a parallel runtime or UI loop.
+- Direction 4 (Phase 3, memory system inner slice) now adds explicit memory retrieval/write seams and session working memory:
+  - Retrieval contract: `application/agents/contracts/AgentMemoryRetrieval.ts` + `application/agents/services/AgentMemoryRetrievalService.ts`.
+  - Session working memory model: `domain/agents/AgentWorkingMemory.ts` + `application/agents/services/AgentWorkingMemoryService.ts`.
+  - Bounded write pipeline: `application/agents/services/AgentMemoryWriteService.ts`.
+  - Explicit memory policy controls now live in `domain/agents/AgentMemory.ts` (`retrievableTypes`, `writableTypes`, `sessionOnlyTypes`, bounded retention settings).
+  - Retrieval semantics are deterministic and policy-bounded (type/tag/metadata/recency filters over asset-version-backed entries), and session-only memory types are excluded from durable retrieval.
+  - Execution read models now carry working-memory snapshots and write outcomes so planning/evaluation consumers can reuse bounded session context without a second runtime.
+  - Write policy is now enforced operationally (writable/session-only checks + bounded durable retention gating).
+- Direction 4 (Phase 4, MCP capability layer foundation) now binds agent MCP access to canonical MCP identity (`domain/mcp/McpToolIdentity.ts` + `AgentPolicy.toolAccess.allowedMcpTools`), maps MCP steps as execution-native units (`ExecutionUnitKinds.mcpToolInvocation` via `AgentExecutionMapping`), and introduces deterministic plan/execute-time MCP governance checks (`application/agents/services/AgentMcpToolGovernanceService.ts`) that reuse registry/trust services for permission/approval/sandbox/schema checks without creating a second runtime.
+- Direction 4 (Phase 4 completion + Phase 5 inner foundation) now adds a reusable planner-side tool selection seam (`AgentPlanToolSelectionService`), explicit MCP governance decision semantics (`allowed` vs `approval-required` / `denied` / `unavailable` / `incompatible`), and an inner runtime coordination service (`AgentRunnerService`) with structured progress events, bounded retry/failure classification, and optional agent execution-session persistence seams.
 
 ## TODO
 - If asked for the "single" architecture entry point, explain that there are currently multiple composition roots and name them explicitly.

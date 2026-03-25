@@ -1,21 +1,39 @@
+import { ExecutionStatuses, type ExecutionStatus } from "../execution/ExecutionPlan";
+import { AssetId } from "../assets/AssetId";
+
 export const AgentExecutionSessionStatuses = Object.freeze({
-  queued: "queued",
-  planning: "planning",
-  running: "running",
-  completed: "completed",
-  failed: "failed",
-  cancelled: "cancelled",
+  pending: ExecutionStatuses.pending,
+  ready: ExecutionStatuses.ready,
+  running: ExecutionStatuses.running,
+  completed: ExecutionStatuses.completed,
+  failed: ExecutionStatuses.failed,
+  cancelled: ExecutionStatuses.cancelled,
 });
 
 export type AgentExecutionSessionStatus = typeof AgentExecutionSessionStatuses[keyof typeof AgentExecutionSessionStatuses];
 
+export interface AgentExecutionPlanReference {
+  readonly planId: string;
+}
+
+export interface AgentExecutionRunReference {
+  readonly runId: string;
+  readonly planId?: string;
+  readonly status?: ExecutionStatus;
+}
+
+export interface AgentExecutionDiagnosticReference {
+  readonly assetId: AssetId;
+  readonly assetVersionId?: string;
+}
+
 export interface AgentExecutionSession {
   readonly id: string;
   readonly agentId: string;
-  readonly planId?: string;
+  readonly executionPlan?: AgentExecutionPlanReference;
   readonly status: AgentExecutionSessionStatus;
-  readonly executionRunIds: ReadonlyArray<string>;
-  readonly diagnosticAssetIds: ReadonlyArray<string>;
+  readonly executionRuns: ReadonlyArray<AgentExecutionRunReference>;
+  readonly diagnostics: ReadonlyArray<AgentExecutionDiagnosticReference>;
   readonly startTime: string;
   readonly endTime?: string;
 }
@@ -28,21 +46,66 @@ function normalizeRequired(value: string, field: string): string {
   return normalized;
 }
 
-function normalizeList(values: ReadonlyArray<string> | undefined): ReadonlyArray<string> {
-  const deduped = new Set<string>();
-  for (const value of values ?? []) {
-    const normalized = value.trim();
-    if (normalized) {
-      deduped.add(normalized);
-    }
-  }
-  return Object.freeze([...deduped]);
-}
-
 function isTerminalStatus(status: AgentExecutionSessionStatus): boolean {
   return status === AgentExecutionSessionStatuses.completed
     || status === AgentExecutionSessionStatuses.failed
     || status === AgentExecutionSessionStatuses.cancelled;
+}
+
+function normalizeStatus(value: ExecutionStatus | undefined): ExecutionStatus | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  if (!Object.values(ExecutionStatuses).includes(value)) {
+    throw new Error(`Agent execution run status '${value}' is invalid.`);
+  }
+
+  return value;
+}
+
+function normalizeExecutionRun(entry: AgentExecutionRunReference, sessionPlanId?: string): AgentExecutionRunReference {
+  const runId = normalizeRequired(entry.runId, "Agent execution run id");
+  const planId = entry.planId?.trim() || sessionPlanId;
+
+  if (planId && sessionPlanId && planId !== sessionPlanId) {
+    throw new Error(`Agent execution run '${runId}' planId '${planId}' must match session planId '${sessionPlanId}'.`);
+  }
+
+  return Object.freeze({
+    runId,
+    planId,
+    status: normalizeStatus(entry.status),
+  });
+}
+
+function normalizeDiagnostics(
+  values: ReadonlyArray<AgentExecutionDiagnosticReference> | undefined,
+): ReadonlyArray<AgentExecutionDiagnosticReference> {
+  const deduped = new Set<string>();
+  const normalized: AgentExecutionDiagnosticReference[] = [];
+
+  for (const value of values ?? []) {
+    const assetId = AssetId.from(value.assetId);
+    if (!assetId.toString().startsWith("asset:")) {
+      throw new Error(`Agent diagnostic asset id '${assetId.toString()}' must use canonical asset id format.`);
+    }
+
+    const assetVersionId = value.assetVersionId?.trim() || undefined;
+    if (assetVersionId !== undefined && !/^[a-zA-Z0-9:_-]+$/.test(assetVersionId)) {
+      throw new Error(`Agent diagnostic assetVersionId '${assetVersionId}' is malformed.`);
+    }
+
+    const diagnosticKey = `${assetId.toString()}|${assetVersionId ?? "latest"}`;
+    if (deduped.has(diagnosticKey)) {
+      continue;
+    }
+
+    deduped.add(diagnosticKey);
+    normalized.push(Object.freeze({ assetId, assetVersionId }));
+  }
+
+  return Object.freeze(normalized);
 }
 
 function assertValidLifecycleTransition(
@@ -50,8 +113,8 @@ function assertValidLifecycleTransition(
   to: AgentExecutionSessionStatus,
 ): void {
   const allowedTransitions: Readonly<Record<AgentExecutionSessionStatus, ReadonlyArray<AgentExecutionSessionStatus>>> = {
-    queued: Object.freeze([AgentExecutionSessionStatuses.planning, AgentExecutionSessionStatuses.running, AgentExecutionSessionStatuses.cancelled]),
-    planning: Object.freeze([AgentExecutionSessionStatuses.running, AgentExecutionSessionStatuses.failed, AgentExecutionSessionStatuses.cancelled]),
+    pending: Object.freeze([AgentExecutionSessionStatuses.ready, AgentExecutionSessionStatuses.running, AgentExecutionSessionStatuses.failed, AgentExecutionSessionStatuses.cancelled]),
+    ready: Object.freeze([AgentExecutionSessionStatuses.running, AgentExecutionSessionStatuses.failed, AgentExecutionSessionStatuses.cancelled]),
     running: Object.freeze([AgentExecutionSessionStatuses.completed, AgentExecutionSessionStatuses.failed, AgentExecutionSessionStatuses.cancelled]),
     completed: Object.freeze([]),
     failed: Object.freeze([]),
@@ -67,17 +130,23 @@ function assertValidLifecycleTransition(
   }
 }
 
+function assertTerminalTiming(startIsoTime: string, endIsoTime: string): void {
+  if (new Date(endIsoTime).getTime() < new Date(startIsoTime).getTime()) {
+    throw new Error("Agent execution session endTime cannot be earlier than startTime.");
+  }
+}
+
 export function createAgentExecutionSession(input: {
   readonly id: string;
   readonly agentId: string;
   readonly planId?: string;
   readonly status?: AgentExecutionSessionStatus;
-  readonly executionRunIds?: ReadonlyArray<string>;
-  readonly diagnosticAssetIds?: ReadonlyArray<string>;
+  readonly executionRuns?: ReadonlyArray<AgentExecutionRunReference>;
+  readonly diagnostics?: ReadonlyArray<AgentExecutionDiagnosticReference>;
   readonly startTime?: Date;
 }): AgentExecutionSession {
   const start = input.startTime ?? new Date();
-  const status = input.status ?? AgentExecutionSessionStatuses.queued;
+  const status = input.status ?? AgentExecutionSessionStatuses.pending;
 
   if (!Object.values(AgentExecutionSessionStatuses).includes(status)) {
     throw new Error("Agent execution session status is invalid.");
@@ -87,13 +156,19 @@ export function createAgentExecutionSession(input: {
     throw new Error("Agent execution sessions cannot be created in a terminal status.");
   }
 
+  const planId = input.planId?.trim() || undefined;
+  const executionPlan = planId ? Object.freeze({ planId }) : undefined;
+
+  const executionRuns = Object.freeze((input.executionRuns ?? []).map((entry) => normalizeExecutionRun(entry, planId)));
+  const diagnostics = normalizeDiagnostics(input.diagnostics);
+
   return Object.freeze({
     id: normalizeRequired(input.id, "Agent execution session id"),
     agentId: normalizeRequired(input.agentId, "Agent execution session agentId"),
-    planId: input.planId?.trim() || undefined,
+    executionPlan,
     status,
-    executionRunIds: normalizeList(input.executionRunIds),
-    diagnosticAssetIds: normalizeList(input.diagnosticAssetIds),
+    executionRuns,
+    diagnostics,
     startTime: start.toISOString(),
     endTime: undefined,
   });
@@ -103,8 +178,8 @@ export function transitionAgentExecutionSession(
   session: AgentExecutionSession,
   transition: {
     readonly status: AgentExecutionSessionStatus;
-    readonly appendExecutionRunId?: string;
-    readonly appendDiagnosticAssetId?: string;
+    readonly appendExecutionRun?: AgentExecutionRunReference;
+    readonly appendDiagnostic?: AgentExecutionDiagnosticReference;
     readonly endedAt?: Date;
   },
 ): AgentExecutionSession {
@@ -114,26 +189,25 @@ export function transitionAgentExecutionSession(
 
   assertValidLifecycleTransition(session.status, transition.status);
 
-  const executionRunIds = transition.appendExecutionRunId
-    ? normalizeList([...session.executionRunIds, normalizeRequired(transition.appendExecutionRunId, "Agent execution run id")])
-    : session.executionRunIds;
+  const executionRuns = transition.appendExecutionRun
+    ? Object.freeze([...session.executionRuns, normalizeExecutionRun(transition.appendExecutionRun, session.executionPlan?.planId)])
+    : session.executionRuns;
 
-  const diagnosticAssetIds = transition.appendDiagnosticAssetId
-    ? normalizeList([...session.diagnosticAssetIds, normalizeRequired(transition.appendDiagnosticAssetId, "Agent diagnostic asset id")])
-    : session.diagnosticAssetIds;
+  const diagnostics = transition.appendDiagnostic
+    ? normalizeDiagnostics([...session.diagnostics, transition.appendDiagnostic])
+    : session.diagnostics;
 
   const terminalStatus = isTerminalStatus(transition.status);
   const endTime = terminalStatus ? (transition.endedAt ?? new Date()).toISOString() : undefined;
-
-  if (endTime && new Date(endTime).getTime() < new Date(session.startTime).getTime()) {
-    throw new Error("Agent execution session endTime cannot be earlier than startTime.");
+  if (endTime) {
+    assertTerminalTiming(session.startTime, endTime);
   }
 
   return Object.freeze({
     ...session,
     status: transition.status,
-    executionRunIds,
-    diagnosticAssetIds,
+    executionRuns,
+    diagnostics,
     endTime,
   });
 }

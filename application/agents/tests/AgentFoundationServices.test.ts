@@ -5,6 +5,8 @@ import { AssetBackedAgentMemoryStore } from "../services/AssetBackedAgentMemoryS
 import { AgentExecutionService } from "../services/AgentExecutionService";
 import { DeterministicAgentPlanningService } from "../services/AgentPlanningInterface";
 import { AgentService } from "../services/AgentService";
+import { DefaultAgentMemoryRetrievalService } from "../services/AgentMemoryRetrievalService";
+import { AgentMemoryWriteService } from "../services/AgentMemoryWriteService";
 import { ExecuteAgentToolsUseCase } from "../ExecuteAgentToolsUseCase";
 import type { IAgentRepository } from "../../ports/interfaces/IAgentRepository";
 import type { IToolCapabilityCatalog } from "../../ports/interfaces/IToolCapabilityCatalog";
@@ -60,15 +62,20 @@ describe("Agent foundation services", () => {
         restrictedActions: [],
         costLimits: {},
         executionLimits: {},
-        safetyConstraints: { requiredApprovals: [], deniedPermissionIds: [], sandbox: { network: "deny", filesystem: "deny", assets: "read-only", allowEnvironmentVariables: [] } },
+        safetyConstraints: { requiredApprovals: [], deniedPermissionIds: [], sandbox: { network: { allowed: false }, filesystem: { allowed: false }, assets: { read: true, write: false }, environment: { mode: "none" } } },
       },
       memory: {
         agentId: "agent-a",
         assets: [{ assetId: new AssetId("asset:memory:a"), memoryType: "working" }],
         retrieval: { strategy: "latest-first", maxEntries: 10 },
+        policy: {
+          writableTypes: ["episodic", "semantic", "working"],
+          retention: { mode: "bounded", maxDurableEntries: 100 },
+        },
         revision: 1,
       },
       planningStrategy: { strategyId: "deterministic", mode: "deterministic-linear" },
+      execution: { maxExecutionUnits: 2, requireTrustedTools: true },
     });
 
     const readModels = await service.listAgentReadModels();
@@ -126,7 +133,7 @@ describe("Agent foundation services", () => {
     };
 
     const planner = new DeterministicAgentPlanningService(catalog, memoryStore);
-    const plan = await planner.plan({
+    const plan = await planner.plan({ agent: {
       id: "agent-plan",
       name: "Planner",
       goals: [{ id: "goal-1", objective: "Fetch weather", constraints: [], successCriteria: ["forecast"], priority: "high", priorityOrder: 1, requiredToolIds: ["mcp:local:get_weather"] }],
@@ -135,25 +142,31 @@ describe("Agent foundation services", () => {
         restrictedActions: [],
         costLimits: {},
         executionLimits: { maxSteps: 1 },
-        safetyConstraints: { requiredApprovals: [], deniedPermissionIds: [], sandbox: { network: "deny", filesystem: "deny", assets: "read-only", allowEnvironmentVariables: [] } },
+        safetyConstraints: { requiredApprovals: [], deniedPermissionIds: [], sandbox: { network: { allowed: false }, filesystem: { allowed: false }, assets: { read: true, write: false }, environment: { mode: "none" } } },
       },
+      toolAccess: { allowedToolIds: ["mcp:local:get_weather"], scopeConstraints: [{ toolId: "mcp:local:get_weather", allowedScopes: ["forecast.read"] }] },
       memory: {
         agentId: "agent-plan",
         assets: [{ assetId: new AssetId("asset:memory:plan"), memoryType: "semantic" }],
         retrieval: { strategy: "hybrid", requiredTags: ["weather"], maxEntries: 2 },
+        policy: {
+          retrievableTypes: ["semantic"],
+          writableTypes: ["episodic", "semantic"],
+          retention: { mode: "bounded", maxDurableEntries: 20 },
+        },
         revision: 1,
       },
       planningStrategy: { strategyId: "deterministic", mode: "deterministic-linear" },
-      execution: { maxPlanUnits: 1, requireTrustedTools: true },
+      execution: { maxExecutionUnits: 1, requireTrustedTools: true },
       status: "ready",
       createdAt: "2026-03-24T00:00:00.000Z",
       updatedAt: "2026-03-24T00:00:00.000Z",
       description: undefined,
-    });
+    } });
 
     expect(plan.steps).toHaveLength(1);
     expect(plan.steps[0]?.toolId).toBe("mcp:local:get_weather");
-    expect(plan.steps[0]?.memoryContext[0]?.assetId.toString()).toBe("asset:memory:plan");
+    expect(plan.steps[0]?.intent.inputReferences).toHaveLength(1);
   });
 
   it("executes through orchestrated tool path and persists execution memory", async () => {
@@ -200,7 +213,12 @@ describe("Agent foundation services", () => {
 
     const useCase = new ExecuteAgentToolsUseCase(catalog, orchestrator);
     const planner = new DeterministicAgentPlanningService(catalog, memoryStore);
-    const service = new AgentExecutionService(planner, useCase, memoryStore);
+    const service = new AgentExecutionService(
+      planner,
+      useCase,
+      new DefaultAgentMemoryRetrievalService(memoryStore),
+      new AgentMemoryWriteService(memoryStore),
+    );
     const agent: Agent = {
       id: "agent-exec",
       name: "Exec Agent",
@@ -210,16 +228,22 @@ describe("Agent foundation services", () => {
         restrictedActions: [],
         costLimits: {},
         executionLimits: { maxSteps: 1 },
-        safetyConstraints: { requiredApprovals: [], deniedPermissionIds: [], sandbox: { network: "deny", filesystem: "deny", assets: "read-only", allowEnvironmentVariables: [] } },
+        safetyConstraints: { requiredApprovals: [], deniedPermissionIds: [], sandbox: { network: { allowed: false }, filesystem: { allowed: false }, assets: { read: true, write: false }, environment: { mode: "none" } } },
       },
+      toolAccess: { allowedToolIds: ["mcp:local:echo"], scopeConstraints: [] },
       memory: {
         agentId: "agent-exec",
         assets: [{ assetId: new AssetId("asset:memory:1"), memoryType: "working" }],
         retrieval: { strategy: "latest-first", maxEntries: 10 },
+        policy: {
+          retrievableTypes: ["working"],
+          writableTypes: ["episodic", "working"],
+          retention: { mode: "bounded", maxDurableEntries: 30 },
+        },
         revision: 1,
       },
       planningStrategy: { strategyId: "deterministic", mode: "deterministic-linear" },
-      execution: { maxPlanUnits: 1, requireTrustedTools: true },
+      execution: { maxExecutionUnits: 1, requireTrustedTools: true },
       status: "ready",
       createdAt: "2026-03-24T00:00:00.000Z",
       updatedAt: "2026-03-24T00:00:00.000Z",

@@ -101,8 +101,9 @@ Use "workflow-first", "tool projection", and "truthful execution provenance" whe
   - `ai-loom.mcp-tool-definitions.v1` for shareable definitions (definition + source only), explicitly excluding runtime-only trust/approval/secret state.
 
 ## Direction 4 Phase 1 execution alignment
-- Agent execution sessions now use execution-native lifecycle states in `domain/agents/AgentExecutionSession.ts`, with explicit transition guards and start/end-time coherence checks.
+- Agent execution sessions now use execution-native lifecycle states in `domain/agents/AgentExecutionSession.ts` (`pending/ready/running/completed/failed/cancelled`), with explicit transition guards, run-plan compatibility checks, canonical asset-based diagnostics, and start/end-time coherence checks.
 - `application/agents/contracts/AgentExecutionMapping.ts` maps agent steps into unified `ExecutionPlan` units (`agent-tool-step`) and exposes per-unit payload contracts to keep Direction 4 on the shared execution backbone.
+- Agent roots expose explicit `toolAccess` beside policy, and memory configuration intentionally allows zero-asset initialization while preserving canonical `AssetId` typing for any references.
 - This is a contract slice only (no second runtime, no autonomous loop in Phase 1).
 
 ## TODO
@@ -115,5 +116,9 @@ Use "workflow-first", "tool projection", and "truthful execution provenance" whe
 - Planner output is a bounded ordered step plan (`toolId` + goal/action) that is executed through existing tool capability execution seams.
 - For MCP steps, execution still flows through MCP execution use cases, preserving trust policy/auth/approval/sandbox/audit behavior.
 - For workflow-projected tools, execution still flows through workflow tool execution (`RunToolUseCase` path).
-- Agent memory writes/reads are asset-backed and versioned so execution outcomes can be persisted and reused by later planning.
+- Agent memory writes/reads are asset-backed and version-aware so execution outcomes can be persisted and reused by later planning.
+- Phase 3 completion now includes deterministic memory retrieval filters (type/tag/metadata/recency), bounded working-memory snapshots on execution read models, and retention-gated durable writes.
+- Phase 5 now emits deterministic execution-native runtime events (execution/session start, plan/governance/mapping, per-attempt step lifecycle, retry schedule/exhaustion, memory/session persistence, terminal outcome) with no UI/WebSocket runtime added.
+- Retry classification is explicit and bounded (`AgentRuntimeRetryPolicy.classifyFailure` + optional execution-result metadata hints), with heuristic fallback only when runtime metadata is absent.
+- Session persistence is now a real SQLite infrastructure seam (`SqliteAgentExecutionSessionRepository`) that stores both latest session snapshots and transition history under the existing repository port.
 - Current limits are intentional: deterministic single-agent planning, bounded step counts, no autonomous long-horizon control loop.

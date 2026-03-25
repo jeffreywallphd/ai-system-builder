@@ -23,7 +23,7 @@ export class AgentService {
     readonly policy: AgentPolicy;
     readonly planningStrategy: AgentPlanningStrategy;
     readonly memory: AgentMemoryConfiguration;
-    readonly execution?: AgentExecutionConfiguration;
+    readonly execution: AgentExecutionConfiguration;
   }): Promise<Agent> {
     const existing = await this.repository.get(input.id.trim());
     if (existing) {

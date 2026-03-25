@@ -154,6 +154,13 @@ If a change needs data from the outside world, prefer adding or using an **appli
 - Application-level mapping to runtime execution lives in `application/agents/contracts/AgentExecutionMapping.ts`, which maps agent steps onto `ExecutionPlan` units and exposes bounded per-unit execution payload contracts.
 - No agent runtime adapters or UI pages were added in this phase; infrastructure and UI remain outer-layer concerns for later slices.
 
+- Direction 4 Phase 2 now starts at the inner layers only: planning structures are domain/application contracts (`domain/agents/AgentPlan.ts`, `application/agents/contracts/AgentPlanningStrategy.ts` + `application/agents/services/DeterministicAgentPlanningStrategy.ts`, `application/agents/contracts/AgentPlanningLoop.ts`) and intentionally do not introduce a second runtime, orchestration stack, or UI loop.
+- Direction 4 Phase 3 continues inner-layer-first: memory retrieval/write/session behavior is now modeled as domain/application seams (`domain/agents/AgentMemory.ts`, `domain/agents/AgentWorkingMemory.ts`, `application/agents/contracts/AgentMemoryRetrieval.ts`, `application/agents/services/AgentMemoryRetrievalService.ts`, `application/agents/services/AgentMemoryWriteService.ts`, `application/agents/services/AgentWorkingMemoryService.ts`) and remains asset-backed rather than transcript/chat-wrapper-driven.
+- The Phase 3 implementation now enforces policy at runtime (retrievable/writable/session-only/retention limits) in those same inner-layer services rather than leaving policy as configuration-only metadata.
+
+- Direction 4 Phase 4 extends those same inner boundaries: canonical MCP tool identity/binding, execution-native MCP invocation units, and deterministic agent-side MCP governance (permission/approval/sandbox/schema checks) now live in domain/application seams and reuse existing MCP registry/trust services.
+- Direction 4 Phase 5 keeps runtime coordination in the application layer via `AgentRunnerService`, with deterministic progress/failure/retry/session lifecycle contracts in `application/agents/contracts/*` and persistence exclusively through the `IAgentExecutionSessionRepository` port (implemented by a concrete SQLite repository at the infrastructure edge).
+
 ## TODO
 
 - Several convenience mutations still live in UI services instead of dedicated application use cases. If the goal is a stricter clean architecture, those write operations should gradually move inward.
