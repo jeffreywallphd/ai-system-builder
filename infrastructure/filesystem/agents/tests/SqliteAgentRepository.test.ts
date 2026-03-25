@@ -154,4 +154,22 @@ describe("SqliteAgentRepository", () => {
 
     repository.dispose();
   });
+
+  it("fails fast on malformed persisted aggregates instead of returning partial agents", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-agent-repo-"));
+    createdRoots.push(root);
+    const databasePath = path.join(root, "agents.sqlite");
+    const repository = new SqliteAgentRepository(databasePath);
+
+    const saved = await repository.save(makeAgent("agent:repo:malformed"));
+    const db = new Database(databasePath);
+    const row = db.prepare("SELECT agent_json FROM agents WHERE agent_id = ?").get(saved.id) as { agent_json: string };
+    const parsed = JSON.parse(row.agent_json) as { planningStrategy?: unknown };
+    delete parsed.planningStrategy;
+    db.prepare("UPDATE agents SET agent_json = ? WHERE agent_id = ?").run(JSON.stringify(parsed), saved.id);
+    db.close();
+
+    await expect(repository.get(saved.id)).rejects.toThrow("planning strategy");
+    repository.dispose();
+  });
 });

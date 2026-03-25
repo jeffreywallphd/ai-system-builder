@@ -15,6 +15,7 @@ import { DeleteAgentUseCase } from "../DeleteAgentUseCase";
 import { GetAgentUseCase } from "../GetAgentUseCase";
 import { ListAgentsUseCase } from "../ListAgentsUseCase";
 import { UpdateAgentUseCase } from "../UpdateAgentUseCase";
+import { AgentConflictError, AgentInvalidRequestError, AgentNotFoundError } from "../AgentAuthoringErrors";
 
 const createdRoots: string[] = [];
 
@@ -137,6 +138,27 @@ describe("Agent authoring use cases (SQLite integration)", () => {
     expect((await get.execute("agent:sqlite:crud"))?.description).toBe("Updated via SQLite use-case path.");
     expect(await deleteUseCase.execute("agent:sqlite:crud")).toBe(true);
     expect(await get.execute("agent:sqlite:crud")).toBeUndefined();
+
+    repository.dispose();
+  });
+
+  it("enforces typed CRUD failure paths on real SQLite persistence", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-agent-authoring-sqlite-"));
+    createdRoots.push(root);
+    const repository = new SqliteAgentRepository(path.join(root, "agents.sqlite"));
+
+    const create = new CreateAgentUseCase(repository);
+    const update = new UpdateAgentUseCase(repository);
+    const get = new GetAgentUseCase(repository);
+    const archive = new ArchiveAgentUseCase(repository);
+    const deleteUseCase = new DeleteAgentUseCase(repository);
+
+    await create.execute(createRequest("agent:sqlite:errors"));
+    await expect(create.execute(createRequest("agent:sqlite:errors"))).rejects.toBeInstanceOf(AgentConflictError);
+    await expect(update.execute({ id: "agent:sqlite:missing", changes: { name: "Missing" } })).rejects.toBeInstanceOf(AgentNotFoundError);
+    await expect(archive.execute("agent:sqlite:missing")).rejects.toBeInstanceOf(AgentNotFoundError);
+    await expect(get.execute("   ")).rejects.toBeInstanceOf(AgentInvalidRequestError);
+    await expect(deleteUseCase.execute("   ")).rejects.toBeInstanceOf(AgentInvalidRequestError);
 
     repository.dispose();
   });

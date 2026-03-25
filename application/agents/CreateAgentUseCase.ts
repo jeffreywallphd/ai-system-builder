@@ -3,6 +3,7 @@ import type { AgentGoal } from "../../domain/agents/AgentGoal";
 import type { AgentMemoryConfiguration } from "../../domain/agents/AgentMemory";
 import type { AgentPolicy } from "../../domain/agents/AgentPolicy";
 import type { IAgentRepository } from "../ports/interfaces/IAgentRepository";
+import { AgentConflictError, AgentInvalidRequestError } from "./AgentAuthoringErrors";
 import { AgentConfigurationValidationService } from "./services/AgentConfigurationValidationService";
 
 export interface CreateAgentRequest {
@@ -24,9 +25,12 @@ export class CreateAgentUseCase {
 
   public async execute(request: CreateAgentRequest): Promise<AgentReadModel> {
     const id = request.id.trim();
+    if (!id) {
+      throw new AgentInvalidRequestError("Agent id is required.");
+    }
     const existing = await this.repository.get(id);
     if (existing) {
-      throw new Error(`Agent '${id}' already exists.`);
+      throw new AgentConflictError(id);
     }
     this.validationService.assertValid({
       id,

@@ -135,6 +135,10 @@ describe("AgentAuthoringBackendApi", () => {
     expect(missing.ok).toBe(false);
     expect(missing.error?.code).toBe("not-found");
 
+    const invalidDelete = await api.deleteAgent("   ");
+    expect(invalidDelete.ok).toBe(false);
+    expect(invalidDelete.error?.code).toBe("invalid-request");
+
     const validation = await api.validateConfiguration({
       ...createRequest("agent:api:mapping-validate"),
       planningStrategy: { strategyId: "", mode: "deterministic-linear" },

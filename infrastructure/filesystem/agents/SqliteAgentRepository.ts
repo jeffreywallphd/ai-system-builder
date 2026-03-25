@@ -197,10 +197,10 @@ export class SqliteAgentRepository implements IAgentRepository {
       name: assertString(snapshot.name, "Agent name"),
       description: typeof snapshot.description === "string" ? snapshot.description : undefined,
       goals: asReadonlyArray(snapshot.goals, "Agent goals") as Agent["goals"],
-      policy: snapshot.policy as Agent["policy"],
-      planningStrategy: snapshot.planningStrategy as Agent["planningStrategy"],
+      policy: assertObject(snapshot.policy, "Agent policy") as Agent["policy"],
+      planningStrategy: assertObject(snapshot.planningStrategy, "Agent planning strategy") as Agent["planningStrategy"],
       memory: normalizedMemory,
-      execution: snapshot.execution as Agent["execution"],
+      execution: assertObject(snapshot.execution, "Agent execution") as Agent["execution"],
       status: snapshot.status as Agent["status"],
       now: new Date(createdAt),
     });
@@ -234,6 +234,13 @@ function asReadonlyArray(value: unknown, label: string): ReadonlyArray<unknown> 
     throw new Error(`${label} is missing from persisted agent snapshot.`);
   }
   return value;
+}
+
+function assertObject(value: unknown, label: string): Record<string, unknown> {
+  if (!value || typeof value !== "object") {
+    throw new Error(`${label} is missing from persisted agent snapshot.`);
+  }
+  return value as Record<string, unknown>;
 }
 
 function normalizePersistedMemory(value: unknown): Agent["memory"] {

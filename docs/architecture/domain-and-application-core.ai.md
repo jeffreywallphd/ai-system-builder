@@ -335,6 +335,7 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
 - Phase 6 inner authoring/configuration now starts from the same core-first structure:
   - persistence seam: `IAgentRepository` + concrete `SqliteAgentRepository`.
   - CRUD application use cases: `CreateAgentUseCase`, `UpdateAgentUseCase`, `GetAgentUseCase`, `ListAgentsUseCase`, `DeleteAgentUseCase`, `ArchiveAgentUseCase`.
+  - CRUD failure paths now use explicit application error classes (`AgentConflictError`, `AgentNotFoundError`, `AgentInvalidRequestError`) so transport/API mapping does not depend on message substring parsing.
   - bounded structured configuration use cases: goals/policy/tools/memory/strategy (`ConfigureAgent*UseCase`).
   - goal authoring operations are deterministic at the use-case boundary: add/update/remove/reorder reject duplicate ids, missing goal references, malformed required tool ids, and non-contiguous ordering.
   - goal ordering invariants are now aligned across create/update/configure flows to contiguous `priorityOrder` values starting at 1.

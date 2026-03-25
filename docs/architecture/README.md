@@ -156,6 +156,7 @@ The runtime is not a single path. The system currently supports multiple executi
 - Phase 6 inner authoring foundation now adds real backend-ready seams without UI coupling:
   - persistence: `IAgentRepository` with concrete `SqliteAgentRepository`;
   - CRUD/lifecycle use cases: create/update/get/list/delete/archive;
+  - CRUD failure modes now surface typed application errors (`agent-conflict`, `agent-not-found`, `agent-invalid-request`) so API/IPC adapters map contracts deterministically;
   - bounded structured configuration use cases: goals/policy/tools/memory/strategy;
   - cohesive cross-field validation seam: `AgentConfigurationValidationService` + `ValidateAgentConfigurationUseCase` (deterministic issue codes for goal/tool/memory/policy/strategy coherence, plus domain-level fallback validation);
   - SQLite agent persistence now also records structured authoring/query fields (`strategy_id`, `strategy_mode`, `goal_count`, `allowed_tool_count`) while preserving aggregate round-trip truth in `agent_json`.

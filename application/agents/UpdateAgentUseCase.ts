@@ -3,6 +3,7 @@ import type { AgentGoal } from "../../domain/agents/AgentGoal";
 import type { AgentMemoryConfiguration } from "../../domain/agents/AgentMemory";
 import type { AgentPolicy } from "../../domain/agents/AgentPolicy";
 import type { IAgentRepository } from "../ports/interfaces/IAgentRepository";
+import { AgentInvalidRequestError, AgentNotFoundError } from "./AgentAuthoringErrors";
 import {
   AgentConfigurationValidationService,
   toAgentConfigurationValidationInput,
@@ -30,9 +31,12 @@ export class UpdateAgentUseCase {
 
   public async execute(request: UpdateAgentRequest): Promise<AgentReadModel> {
     const id = request.id.trim();
+    if (!id) {
+      throw new AgentInvalidRequestError("Agent id is required.");
+    }
     const current = await this.repository.get(id);
     if (!current) {
-      throw new Error(`Agent '${id}' was not found.`);
+      throw new AgentNotFoundError(id);
     }
     const nextConfiguration = {
       ...toAgentConfigurationValidationInput(current),
