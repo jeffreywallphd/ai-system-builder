@@ -165,7 +165,9 @@ If a change needs data from the outside world, prefer adding or using an **appli
   - domain invariants remain in `domain/agents/*`
   - application adds bounded authoring use cases (CRUD + goal/policy/tool/memory/strategy configuration + whole-config validation)
   - CRUD failure semantics are now explicit application contracts (`AgentConflictError`, `AgentNotFoundError`, `AgentInvalidRequestError`) so outer transport adapters map errors by type, not brittle message parsing.
-  - goal authoring operations (`add`/`update`/`remove`/`reorder`) now enforce deterministic coherence at the use-case/domain boundary (unique ids, canonical required tool refs, contiguous ordering from 1, and explicit missing-goal failures).
+  - goal authoring operations (`add`/`update`/`remove`/`reorder`) now enforce deterministic coherence through `AgentGoalConfiguration` at the use-case/domain boundary (unique ids, canonical required tool refs, contiguous ordering from 1, and explicit missing-goal failures).
+  - policy authoring updates are centralized through `AgentPolicyConfiguration` operations (tool-access, approvals/sandbox safety, cost limits, and execution limits), avoiding ad hoc mutation logic across application services.
+  - any new agent-facing artifacts/read models must reuse shared composition seams (`CompositionTaxonomyClassifier` classification or `CompositionAssetContractResolver` projection) instead of introducing agent-only presentation semantics.
   - persistence remains outer-layer through `IAgentRepository`/`IAgentExecutionSessionRepository` with concrete SQLite adapters (`SqliteAgentRepository`, `SqliteAgentExecutionSessionRepository`).
   - `SqliteAgentRepository` now rehydrates persisted JSON snapshots through domain normalization on reads (rather than raw cast-only deserialization), so full aggregate round-trip stays truthy for memory asset refs, goal/policy/tool config, and planning/execution config.
   - malformed persisted agent snapshots now fail fast with explicit field-level errors (for example missing policy/planning/execution objects) instead of yielding partial aggregates.

@@ -243,9 +243,9 @@ describe("Agent authoring use cases", () => {
     await create.execute(createRequest("agent:authoring:config"));
 
     const configurePolicy = new ConfigureAgentPolicyUseCase(repository);
-    const policyUpdated = await configurePolicy.execute("agent:authoring:config", {
-      ...createRequest("agent:authoring:config").policy,
-      executionLimits: { maxSteps: 4 },
+    const policyUpdated = await configurePolicy.execute({
+      agentId: "agent:authoring:config",
+      operations: [{ type: "set-execution-limits", executionLimits: { maxSteps: 4 } }],
     });
     expect(policyUpdated.policy.executionLimits.maxSteps).toBe(4);
 
@@ -275,6 +275,29 @@ describe("Agent authoring use cases", () => {
     expect(strategyUpdated.planningStrategy.strategyId).toBe("deterministic");
   });
 
+
+  it("rejects contradictory policy operation updates", async () => {
+    const repository = new InMemoryAgentRepository();
+    const create = new CreateAgentUseCase(repository);
+    await create.execute(createRequest("agent:authoring:policy-ops-errors"));
+
+    const configurePolicy = new ConfigureAgentPolicyUseCase(repository);
+    await expect(configurePolicy.execute({
+      agentId: "agent:authoring:policy-ops-errors",
+      operations: [
+        { type: "set-denied-permissions", deniedPermissionIds: ["network.access"] },
+        {
+          type: "set-required-approvals",
+          requiredApprovals: [{
+            permissionId: "network.access",
+            minimumStatus: "approved",
+            scopeType: "tool",
+            scopeId: "mcp:local:echo",
+          }],
+        },
+      ],
+    })).rejects.toThrow("cannot be both required and denied");
+  });
   it("rejects invalid tool/memory/strategy and reports validation issues", async () => {
     const repository = new InMemoryAgentRepository();
     const create = new CreateAgentUseCase(repository);
@@ -284,13 +307,13 @@ describe("Agent authoring use cases", () => {
     await expect(configureTools.execute("agent:authoring:validation", {
       allowedToolIds: ["not-canonical-tool"],
       scopeConstraints: [],
-    })).rejects.toThrow("malformed");
+    })).rejects.toThrow("validation failed");
 
     const configureMemory = new ConfigureAgentMemoryUseCase(repository);
     await expect(configureMemory.execute("agent:authoring:validation", {
       ...createRequest("agent:authoring:validation").memory,
       retrieval: { strategy: "latest-first", maxEntries: 5, semantic: { minRelevanceScore: 0.4 } },
-    })).rejects.toThrow("not allowed for latest-first");
+    })).rejects.toThrow("validation failed");
 
     const configureStrategy = new ConfigureAgentStrategyUseCase(repository);
     await expect(configureStrategy.execute("agent:authoring:validation", {

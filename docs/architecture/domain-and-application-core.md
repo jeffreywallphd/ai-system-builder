@@ -340,9 +340,11 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
   - CRUD use cases: `CreateAgentUseCase`, `UpdateAgentUseCase`, `GetAgentUseCase`, `ListAgentsUseCase`, `DeleteAgentUseCase`, `ArchiveAgentUseCase`
   - CRUD failure paths now use explicit application error classes (`AgentConflictError`, `AgentNotFoundError`, `AgentInvalidRequestError`) so transport/API mapping is deterministic without message-substring parsing
   - structured configuration use cases: `ConfigureAgentGoalsUseCase`, `ConfigureAgentPolicyUseCase`, `ConfigureAgentToolsUseCase`, `ConfigureAgentMemoryUseCase`, `ConfigureAgentStrategyUseCase`
-  - goal authoring semantics are now deterministic at the application boundary: add/update/remove/reorder operations reject duplicate goal ids, missing goal references, malformed required tool ids, and non-contiguous priority ordering.
+  - policy configuration updates are now centralized through a shared domain seam (`AgentPolicyConfiguration`) so tool-access, safety approvals/sandbox, and cost/execution limits are updated with one deterministic normalization/validation path.
+  - goal authoring semantics are now deterministic through a shared domain configuration seam (`AgentGoalConfiguration`): add/update/remove/reorder operations reject duplicate goal ids, missing goal references, malformed required tool ids, and non-contiguous priority ordering.
   - goal ordering invariants are now normalized around contiguous `priorityOrder` values starting at 1 so create/update/configure flows share one coherence rule.
   - cohesive whole-config validation seam: `AgentConfigurationValidationService` + `ValidateAgentConfigurationUseCase`, now with deterministic cross-field issue codes for goal/tool/memory/policy/strategy coherence before domain fallback validation.
+  - any new agent-facing artifact/read model must reuse shared composition seams (`CompositionTaxonomyClassifier` classification or `CompositionAssetContractResolver` projection) instead of introducing agent-only presentation semantics.
   - `SqliteAgentRepository` now also persists structured authoring/query metadata (`strategy_id`, `strategy_mode`, `goal_count`, `allowed_tool_count`) while preserving aggregate round-trip via `agent_json`.
   - repository read paths now rehydrate `agent_json` snapshots through domain normalization so round-tripped aggregates keep canonical memory asset refs and validated goal/policy/tool/planning/execution semantics.
   - memory contracts are now hardened for authoring/configuration updates:

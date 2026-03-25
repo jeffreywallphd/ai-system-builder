@@ -337,9 +337,11 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
   - CRUD application use cases: `CreateAgentUseCase`, `UpdateAgentUseCase`, `GetAgentUseCase`, `ListAgentsUseCase`, `DeleteAgentUseCase`, `ArchiveAgentUseCase`.
   - CRUD failure paths now use explicit application error classes (`AgentConflictError`, `AgentNotFoundError`, `AgentInvalidRequestError`) so transport/API mapping does not depend on message substring parsing.
   - bounded structured configuration use cases: goals/policy/tools/memory/strategy (`ConfigureAgent*UseCase`).
-  - goal authoring operations are deterministic at the use-case boundary: add/update/remove/reorder reject duplicate ids, missing goal references, malformed required tool ids, and non-contiguous ordering.
+  - policy configuration updates are now centralized through `AgentPolicyConfiguration` operations so tool access, safety approvals/sandbox posture, and cost/execution limits share one deterministic normalization/validation path.
+  - goal authoring operations are centralized in a domain configuration seam (`AgentGoalConfiguration`): add/update/remove/reorder reject duplicate ids, missing goal references, malformed required tool ids, and non-contiguous ordering.
   - goal ordering invariants are now aligned across create/update/configure flows to contiguous `priorityOrder` values starting at 1.
   - cohesive validation seam: `AgentConfigurationValidationService` + `ValidateAgentConfigurationUseCase` now emits deterministic cross-field issue codes for goal/tool/memory/policy/strategy coherence before domain fallback validation.
+  - new agent-facing artifacts/read models continue to flow through shared composition seams (`CompositionTaxonomyClassifier` or `CompositionAssetContractResolver`) rather than introducing agent-only semantics.
   - `SqliteAgentRepository` also projects structured authoring/query metadata (`strategy_id`, `strategy_mode`, `goal_count`, `allowed_tool_count`) while preserving aggregate round-trip in `agent_json`.
   - repository read paths now rehydrate `agent_json` snapshots through domain normalization so persisted aggregates keep canonical memory asset refs and validated goal/policy/tool/planning/execution semantics.
   - memory contracts are now hard-validated for authoring updates (canonical asset-backed refs, retrieval compatibility, writable/retrievable/session-only coherence, and retention/session-only contradiction checks).
