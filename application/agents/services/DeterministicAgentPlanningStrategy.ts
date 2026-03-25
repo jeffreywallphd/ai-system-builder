@@ -36,6 +36,12 @@ export class DeterministicAgentPlanningStrategy implements AgentPlanningStrategy
 
   public async plan(request: AgentPlanningStrategyRequest): Promise<AgentPlan> {
     const { agent } = request;
+    if (agent.planningStrategy.mode !== this.descriptor.mode || agent.planningStrategy.strategyId !== this.descriptor.id) {
+      throw new Error(
+        `Agent planning strategy '${agent.planningStrategy.strategyId}@${agent.planningStrategy.mode}' is not supported by deterministic planner '${this.descriptor.id}@${this.descriptor.mode}'.`,
+      );
+    }
+
     const capabilities = await this.catalog.listCapabilities();
     const capabilityIds = new Set(capabilities.map((capability) => capability.id));
     const allowedTools = agent.toolAccess.allowedToolIds.filter((toolId) => capabilityIds.has(toolId));

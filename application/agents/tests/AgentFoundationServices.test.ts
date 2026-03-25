@@ -84,7 +84,7 @@ describe("Agent foundation services", () => {
 
     const readModels = await service.listAgentReadModels();
     expect(readModels[0]?.policy.toolAccess.allowedToolIds).toEqual(["mcp:local:echo"]);
-    expect(readModels[0]?.memory.assetIds).toEqual(["asset:memory:a"]);
+    expect(readModels[0]?.memory.assets.map((entry) => entry.assetId)).toEqual(["asset:memory:a"]);
   });
 
   it("persists and retrieves asset-backed memory scoped by agent", async () => {
@@ -171,6 +171,56 @@ describe("Agent foundation services", () => {
     expect(plan.steps).toHaveLength(1);
     expect(plan.steps[0]?.toolId).toBe("mcp:local:get_weather");
     expect(plan.steps[0]?.intent.inputReferences).toHaveLength(1);
+  });
+
+  it("rejects unsupported strategy selection at planning runtime", async () => {
+    const repo = new InMemoryAssetRepo();
+    const memoryStore = new AssetBackedAgentMemoryStore(repo, repo);
+    const catalog: IToolCapabilityCatalog = {
+      async listCapabilities() {
+        return [{
+          id: "mcp:local:get_weather",
+          identity: { stableId: "mcp:local:get_weather", providerScopedId: "mcp:local:get_weather" },
+          routingName: "get_weather",
+          displayName: "Weather",
+          provider: { kind: "mcp", id: "mcp", label: "MCP" },
+          source: { kind: "mcp", serverId: "local", toolName: "get_weather" },
+          publication: { isPublished: true },
+        }];
+      },
+    };
+
+    const planner = new DeterministicAgentPlanningService(catalog, memoryStore);
+    await expect(planner.plan({ agent: {
+      id: "agent-plan-unsupported",
+      name: "Planner",
+      goals: [{ id: "goal-1", objective: "Fetch weather", constraints: [], successCriteria: ["forecast"], priority: "high", priorityOrder: 1, requiredToolIds: ["mcp:local:get_weather"] }],
+      policy: {
+        toolAccess: { allowedToolIds: ["mcp:local:get_weather"], scopeConstraints: [] },
+        restrictedActions: [],
+        costLimits: {},
+        executionLimits: { maxSteps: 1 },
+        safetyConstraints: { requiredApprovals: [], deniedPermissionIds: [], sandbox: { network: { allowed: false }, filesystem: { allowed: false }, assets: { read: true, write: false }, environment: { mode: "none" } } },
+      },
+      toolAccess: { allowedToolIds: ["mcp:local:get_weather"], scopeConstraints: [] },
+      memory: {
+        agentId: "agent-plan-unsupported",
+        assets: [{ assetId: new AssetId("asset:memory:unsupported"), memoryType: "semantic" }],
+        retrieval: { strategy: "latest-first", maxEntries: 2 },
+        policy: {
+          retrievableTypes: ["semantic"],
+          writableTypes: ["semantic"],
+          retention: { mode: "bounded", maxDurableEntries: 20 },
+        },
+        revision: 1,
+      },
+      planningStrategy: { strategyId: "unsupported", mode: "deterministic-linear" as any },
+      execution: { maxExecutionUnits: 1, requireTrustedTools: true },
+      status: "ready",
+      createdAt: "2026-03-24T00:00:00.000Z",
+      updatedAt: "2026-03-24T00:00:00.000Z",
+      description: undefined,
+    } })).rejects.toThrow("not supported by deterministic planner");
   });
 
   it("executes through orchestrated tool path and persists execution memory", async () => {

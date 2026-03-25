@@ -1,13 +1,22 @@
-import { createAgent, type AgentExecutionConfiguration, type AgentPlanningStrategy } from "../../../domain/agents/Agent";
+import {
+  createAgent,
+  type Agent,
+  type AgentExecutionConfiguration,
+  type AgentPlanningStrategy,
+  AgentPlanningStrategyModes,
+  SupportedAgentPlanningStrategies,
+} from "../../../domain/agents/Agent";
 import type { AgentGoal } from "../../../domain/agents/AgentGoal";
 import type { AgentMemoryConfiguration } from "../../../domain/agents/AgentMemory";
 import type { AgentPolicy } from "../../../domain/agents/AgentPolicy";
+import { AgentConfigurationValidationError } from "./AgentConfigurationValidationError";
 
 export interface AgentConfigurationValidationIssue {
   readonly code: string;
   readonly path: string;
   readonly message: string;
   readonly severity: "error" | "warning";
+  readonly section: "goals" | "policy" | "tools" | "memory" | "strategy" | "execution" | "agent";
 }
 
 export interface AgentConfigurationValidationInput {
@@ -26,7 +35,31 @@ export interface AgentConfigurationValidationResult {
   readonly issues: ReadonlyArray<AgentConfigurationValidationIssue>;
 }
 
+export function toAgentConfigurationValidationInput(agent: Agent): AgentConfigurationValidationInput {
+  return Object.freeze({
+    id: agent.id,
+    name: agent.name,
+    description: agent.description,
+    goals: agent.goals,
+    policy: agent.policy,
+    memory: agent.memory,
+    planningStrategy: agent.planningStrategy,
+    execution: agent.execution,
+  });
+}
+
 export class AgentConfigurationValidationService {
+  public validateAgent(agent: Agent): AgentConfigurationValidationResult {
+    return this.validate(toAgentConfigurationValidationInput(agent));
+  }
+
+  public assertValid(input: AgentConfigurationValidationInput): void {
+    const validation = this.validate(input);
+    if (!validation.valid) {
+      throw new AgentConfigurationValidationError(validation.issues);
+    }
+  }
+
   public validate(input: AgentConfigurationValidationInput): AgentConfigurationValidationResult {
     const issues: AgentConfigurationValidationIssue[] = [];
     const allowedToolIds = new Set(input.policy.toolAccess.allowedToolIds);
@@ -37,6 +70,7 @@ export class AgentConfigurationValidationService {
         path: "goals",
         message: "At least one goal is required.",
         severity: "error",
+        section: "goals",
       });
     }
 
@@ -47,6 +81,7 @@ export class AgentConfigurationValidationService {
         path: "goals",
         message: "Every goal must define a non-empty id.",
         severity: "error",
+        section: "goals",
       });
     }
     if (new Set(goalIds).size !== goalIds.length) {
@@ -55,6 +90,7 @@ export class AgentConfigurationValidationService {
         path: "goals",
         message: "Goal ids must be unique.",
         severity: "error",
+        section: "goals",
       });
     }
 
@@ -65,6 +101,7 @@ export class AgentConfigurationValidationService {
           path: `goals.${goal.id || "<unknown>"}.objective`,
           message: "Goal objective is required.",
           severity: "error",
+          section: "goals",
         });
       }
       if (goal.successCriteria.length === 0) {
@@ -73,6 +110,7 @@ export class AgentConfigurationValidationService {
           path: `goals.${goal.id || "<unknown>"}.successCriteria`,
           message: "Goal successCriteria must include at least one value.",
           severity: "error",
+          section: "goals",
         });
       }
       for (const requiredToolId of goal.requiredToolIds ?? []) {
@@ -82,6 +120,7 @@ export class AgentConfigurationValidationService {
             path: `goals.${goal.id || "<unknown>"}.requiredToolIds`,
             message: `Goal required tool id '${requiredToolId}' is malformed.`,
             severity: "error",
+            section: "goals",
           });
           continue;
         }
@@ -91,6 +130,7 @@ export class AgentConfigurationValidationService {
             path: `goals.${goal.id || "<unknown>"}.requiredToolIds`,
             message: `Goal requires tool '${requiredToolId}' that is not present in policy.toolAccess.allowedToolIds.`,
             severity: "error",
+            section: "goals",
           });
         }
       }
@@ -104,6 +144,7 @@ export class AgentConfigurationValidationService {
         path: "goals",
         message: "Goal priorityOrder values must be unique.",
         severity: "error",
+        section: "goals",
       });
     }
     const sortedPriority = [...priorityOrders].sort((left, right) => left - right);
@@ -114,6 +155,7 @@ export class AgentConfigurationValidationService {
         path: "goals",
         message: "Goal priorityOrder values must be contiguous and start at 1.",
         severity: "error",
+        section: "goals",
       });
     }
 
@@ -126,6 +168,7 @@ export class AgentConfigurationValidationService {
         path: "policy.toolAccess.allowedToolIds",
         message: `Malformed tool ids detected: ${malformedToolIds.join(", ")}.`,
         severity: "error",
+        section: "tools",
       });
     }
 
@@ -135,6 +178,7 @@ export class AgentConfigurationValidationService {
         path: "policy.toolAccess.allowedToolIds",
         message: "At least one allowed tool id is required.",
         severity: "error",
+        section: "tools",
       });
     }
 
@@ -144,6 +188,7 @@ export class AgentConfigurationValidationService {
         path: "policy.executionLimits.maxSteps",
         message: "policy.executionLimits.maxSteps is lower than the number of configured goals.",
         severity: "error",
+        section: "policy",
       });
     }
 
@@ -153,6 +198,7 @@ export class AgentConfigurationValidationService {
         path: "execution.maxExecutionUnits",
         message: "execution.maxExecutionUnits is lower than the number of configured goals.",
         severity: "error",
+        section: "execution",
       });
     }
     if (
@@ -165,6 +211,7 @@ export class AgentConfigurationValidationService {
         path: "execution.maxExecutionUnits",
         message: "execution.maxExecutionUnits cannot exceed policy.executionLimits.maxSteps.",
         severity: "error",
+        section: "execution",
       });
     }
 
@@ -174,6 +221,16 @@ export class AgentConfigurationValidationService {
         path: "memory.agentId",
         message: "memory.agentId must match the agent id.",
         severity: "error",
+        section: "memory",
+      });
+    }
+    if (input.memory.retrieval.maxEntries <= 0 || !Number.isInteger(input.memory.retrieval.maxEntries)) {
+      issues.push({
+        code: "memory-retrieval-max-entries-invalid",
+        path: "memory.retrieval.maxEntries",
+        message: "memory.retrieval.maxEntries must be a positive integer.",
+        severity: "error",
+        section: "memory",
       });
     }
 
@@ -183,6 +240,16 @@ export class AgentConfigurationValidationService {
         path: "memory.retrieval",
         message: "Hybrid retrieval requires semantic or recency configuration.",
         severity: "error",
+        section: "memory",
+      });
+    }
+    if (input.memory.retrieval.strategy === "semantic-filter" && !input.memory.retrieval.semantic) {
+      issues.push({
+        code: "memory-semantic-config-missing",
+        path: "memory.retrieval.semantic",
+        message: "semantic-filter retrieval requires semantic configuration.",
+        severity: "error",
+        section: "memory",
       });
     }
     if (input.memory.retrieval.strategy === "latest-first" && input.memory.retrieval.semantic) {
@@ -191,6 +258,20 @@ export class AgentConfigurationValidationService {
         path: "memory.retrieval.semantic",
         message: "latest-first retrieval does not allow semantic configuration.",
         severity: "error",
+        section: "memory",
+      });
+    }
+    if (
+      input.memory.retrieval.memoryTypes
+      && input.memory.policy.retrievableTypes
+      && input.memory.retrieval.memoryTypes.some((memoryType) => !input.memory.policy.retrievableTypes?.includes(memoryType))
+    ) {
+      issues.push({
+        code: "memory-retrieval-types-not-retrievable",
+        path: "memory.retrieval.memoryTypes",
+        message: "memory.retrieval.memoryTypes must be a subset of memory.policy.retrievableTypes when retrievableTypes are configured.",
+        severity: "error",
+        section: "memory",
       });
     }
     if (
@@ -203,23 +284,76 @@ export class AgentConfigurationValidationService {
         path: "memory.policy.sessionOnlyTypes",
         message: "sessionOnlyTypes must be a subset of writableTypes.",
         severity: "error",
+        section: "memory",
+      });
+    }
+    if (
+      input.memory.policy.retrievableTypes
+      && input.memory.policy.sessionOnlyTypes
+      && input.memory.policy.retrievableTypes.some((memoryType) => input.memory.policy.sessionOnlyTypes?.includes(memoryType))
+    ) {
+      issues.push({
+        code: "memory-retrievable-session-only-overlap",
+        path: "memory.policy.retrievableTypes",
+        message: "retrievableTypes cannot include sessionOnlyTypes.",
+        severity: "error",
+        section: "memory",
+      });
+    }
+    if (
+      input.memory.retrieval.memoryTypes
+      && input.memory.policy.sessionOnlyTypes
+      && input.memory.retrieval.memoryTypes.some((memoryType) => input.memory.policy.sessionOnlyTypes?.includes(memoryType))
+    ) {
+      issues.push({
+        code: "memory-retrieval-session-only-overlap",
+        path: "memory.retrieval.memoryTypes",
+        message: "retrieval.memoryTypes cannot include sessionOnlyTypes.",
+        severity: "error",
+        section: "memory",
+      });
+    }
+    const durableWritableTypes = (input.memory.policy.writableTypes ?? [])
+      .filter((memoryType) => !(input.memory.policy.sessionOnlyTypes ?? []).includes(memoryType));
+    if (durableWritableTypes.length > 0 && input.memory.assets.length === 0) {
+      issues.push({
+        code: "memory-durable-types-require-assets",
+        path: "memory.assets",
+        message: "At least one asset reference is required when durable writable memory types are configured.",
+        severity: "error",
+        section: "memory",
+      });
+    }
+    if (input.memory.policy.retention.mode === "bounded" && durableWritableTypes.length === 0) {
+      issues.push({
+        code: "memory-bounded-retention-requires-durable-types",
+        path: "memory.policy.retention",
+        message: "Bounded retention requires at least one durable writable memory type.",
+        severity: "error",
+        section: "memory",
       });
     }
 
-    if (input.planningStrategy.mode !== "deterministic-linear") {
+    const strategySupported = SupportedAgentPlanningStrategies.some(
+      (strategy) => strategy.strategyId === input.planningStrategy.strategyId.toLowerCase()
+        && strategy.mode === input.planningStrategy.mode,
+    );
+    if (!strategySupported) {
       issues.push({
-        code: "strategy-mode-not-production-ready",
-        path: "planningStrategy.mode",
-        message: "Only deterministic-linear strategy is currently production-hardened.",
-        severity: "warning",
+        code: "strategy-unsupported",
+        path: "planningStrategy",
+        message: `Unsupported strategy '${input.planningStrategy.strategyId}@${input.planningStrategy.mode}'.`,
+        severity: "error",
+        section: "strategy",
       });
     }
-    if (input.planningStrategy.mode === "deterministic-linear" && !input.planningStrategy.strategyId.toLowerCase().includes("deterministic")) {
+    if (input.planningStrategy.mode !== AgentPlanningStrategyModes.deterministicLinear) {
       issues.push({
-        code: "strategy-id-mode-mismatch",
-        path: "planningStrategy.strategyId",
-        message: "deterministic-linear mode should use a deterministic strategy id.",
-        severity: "warning",
+        code: "strategy-mode-unsupported",
+        path: "planningStrategy.mode",
+        message: "Only deterministic-linear strategy mode is supported.",
+        severity: "error",
+        section: "strategy",
       });
     }
 
@@ -240,6 +374,7 @@ export class AgentConfigurationValidationService {
         path: "agent",
         message: error instanceof Error ? error.message : "Agent configuration is invalid.",
         severity: "error",
+        section: "agent",
       });
     }
 

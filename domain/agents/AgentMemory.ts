@@ -232,6 +232,42 @@ export function normalizeAgentMemoryConfiguration(config: AgentMemoryConfigurati
   if (policy.writableTypes.length > 0 && policy.sessionOnlyTypes.length > 0) {
     assertSubset(policy.sessionOnlyTypes, policy.writableTypes, "Agent memory policy sessionOnlyTypes");
   }
+  if (policy.retrievableTypes.length > 0 && policy.sessionOnlyTypes.length > 0) {
+    const sessionOnly = new Set(policy.sessionOnlyTypes);
+    const overlap = policy.retrievableTypes.filter((type) => sessionOnly.has(type));
+    if (overlap.length > 0) {
+      throw new Error(
+        `Agent memory policy retrievableTypes cannot include session-only types: ${overlap.join(", ")}.`,
+      );
+    }
+  }
+  if (retrieval.memoryTypes.length > 0 && policy.retrievableTypes.length > 0) {
+    const allowed = new Set(policy.retrievableTypes);
+    for (const value of retrieval.memoryTypes) {
+      if (!allowed.has(value)) {
+        throw new Error(
+          `Agent memory retrieval memoryTypes includes '${value}' which is not allowed by policy retrievableTypes.`,
+        );
+      }
+    }
+  }
+  if (retrieval.memoryTypes.length > 0 && policy.sessionOnlyTypes.length > 0) {
+    const sessionOnly = new Set(policy.sessionOnlyTypes);
+    const overlap = retrieval.memoryTypes.filter((type) => sessionOnly.has(type));
+    if (overlap.length > 0) {
+      throw new Error(
+        `Agent memory retrieval memoryTypes cannot include session-only types: ${overlap.join(", ")}.`,
+      );
+    }
+  }
+
+  const durableWritableTypes = policy.writableTypes.filter((type) => !policy.sessionOnlyTypes.includes(type));
+  if (policy.retention.mode === AgentMemoryRetentionModes.bounded && durableWritableTypes.length === 0) {
+    throw new Error("Agent memory bounded retention requires at least one durable writable memory type.");
+  }
+  if (durableWritableTypes.length > 0 && assets.length === 0) {
+    throw new Error("Agent memory durable writable types require at least one asset-backed memory reference.");
+  }
 
   return Object.freeze({
     agentId,

@@ -71,7 +71,7 @@ function makeAgent(id = "agent:repo:1") {
       },
       revision: 2,
     },
-    planningStrategy: { strategyId: "deterministic-v2", mode: "deterministic-linear" },
+    planningStrategy: { strategyId: "deterministic", mode: "deterministic-linear" },
     execution: { maxExecutionUnits: 4, maxRunDurationMs: 30000, requireTrustedTools: true },
   });
 }
@@ -102,7 +102,7 @@ describe("SqliteAgentRepository", () => {
       goal_count: number;
       allowed_tool_count: number;
     };
-    expect(row.strategy_id).toBe("deterministic-v2");
+    expect(row.strategy_id).toBe("deterministic");
     expect(row.strategy_mode).toBe("deterministic-linear");
     expect(row.goal_count).toBe(2);
     expect(row.allowed_tool_count).toBe(2);

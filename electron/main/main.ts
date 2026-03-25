@@ -33,6 +33,15 @@ import { VerifyAssetGraphProjectionUseCase } from "../../application/assets-syst
 import { ProjectionRebuildOrchestrationUseCase } from "../../application/assets-system/ProjectionRebuildOrchestrationUseCase";
 import { LoadCanonicalAssetManagementSnapshotUseCase } from "../../application/assets-system/LoadCanonicalAssetManagementSnapshotUseCase";
 import { ProjectionTrustReadModelService } from "../../application/assets-system/ProjectionTrustReadModelService";
+import { SqliteAgentRepository } from "../../infrastructure/filesystem/agents/SqliteAgentRepository";
+import { AgentAuthoringBackendApi } from "../../infrastructure/api/agents/AgentAuthoringBackendApi";
+import type { CreateAgentRequest } from "../../application/agents/CreateAgentUseCase";
+import type { UpdateAgentRequest } from "../../application/agents/UpdateAgentUseCase";
+import type { ConfigureAgentGoalsRequest } from "../../application/agents/ConfigureAgentGoalsUseCase";
+import type { AgentPolicy, AgentToolAccessPolicy } from "../../domain/agents/AgentPolicy";
+import type { AgentMemoryConfiguration } from "../../domain/agents/AgentMemory";
+import type { AgentPlanningStrategy } from "../../domain/agents/Agent";
+import type { AgentConfigurationValidationInput } from "../../application/agents/services/AgentConfigurationValidationService";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 if (started) {
@@ -50,6 +59,7 @@ let getExecutionRunUseCase: GetExecutionRunUseCase | undefined;
 let listExecutionRunsUseCase: ReturnType<typeof createExecutionHistoryInfrastructure>["listExecutionRunsUseCase"] | undefined;
 let canonicalAssetSystemRepository: SqliteAssetSystemRepository | undefined;
 let canonicalProjectionSink: InMemoryAssetLineageGraphProjectionSink | undefined;
+let agentRepository: SqliteAgentRepository | undefined;
 let serviceSupervisor: DesktopServiceSupervisor | undefined;
 let bootstrapContext: DesktopBootstrapContext | undefined;
 
@@ -207,6 +217,8 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   executionRunRepository = createExecutionRunRepository({
     sqliteDatabasePath: storagePaths.databasePath,
   }) as SqliteExecutionRunRepository;
+  agentRepository = new SqliteAgentRepository(path.join(storagePaths.storageDirectory, "agents", "agents.sqlite"));
+  const agentAuthoringBackendApi = new AgentAuthoringBackendApi(agentRepository);
   const executionHistoryInfrastructure = createExecutionHistoryInfrastructure(executionRunRepository);
   getExecutionRunUseCase = new GetExecutionRunUseCase(executionRunRepository);
   listExecutionRunsUseCase = executionHistoryInfrastructure.listExecutionRunsUseCase;
@@ -248,6 +260,50 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     const criteria = criteriaJson ? JSON.parse(criteriaJson) : undefined;
     const runs = await listExecutionRunsUseCase?.execute(criteria);
     return (runs ?? []).map((run) => JSON.stringify(run));
+  });
+  ipcMain.handle("ai-loom-desktop-agents:create", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as CreateAgentRequest;
+    return JSON.stringify(await agentAuthoringBackendApi.createAgent(request));
+  });
+  ipcMain.handle("ai-loom-desktop-agents:update", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as UpdateAgentRequest;
+    return JSON.stringify(await agentAuthoringBackendApi.updateAgent(request));
+  });
+  ipcMain.handle("ai-loom-desktop-agents:get", async (_event, agentId: string) => {
+    return JSON.stringify(await agentAuthoringBackendApi.getAgent(agentId));
+  });
+  ipcMain.handle("ai-loom-desktop-agents:list", async (_event, includeArchived = true) => {
+    return JSON.stringify(await agentAuthoringBackendApi.listAgents(includeArchived));
+  });
+  ipcMain.handle("ai-loom-desktop-agents:delete", async (_event, agentId: string) => {
+    return JSON.stringify(await agentAuthoringBackendApi.deleteAgent(agentId));
+  });
+  ipcMain.handle("ai-loom-desktop-agents:archive", async (_event, agentId: string) => {
+    return JSON.stringify(await agentAuthoringBackendApi.archiveAgent(agentId));
+  });
+  ipcMain.handle("ai-loom-desktop-agents:configure-goals", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as ConfigureAgentGoalsRequest;
+    return JSON.stringify(await agentAuthoringBackendApi.configureGoals(request));
+  });
+  ipcMain.handle("ai-loom-desktop-agents:configure-policy", async (_event, agentId: string, policyJson: string) => {
+    const policy = JSON.parse(policyJson) as AgentPolicy;
+    return JSON.stringify(await agentAuthoringBackendApi.configurePolicy(agentId, policy));
+  });
+  ipcMain.handle("ai-loom-desktop-agents:configure-tools", async (_event, agentId: string, toolAccessJson: string) => {
+    const toolAccess = JSON.parse(toolAccessJson) as AgentToolAccessPolicy;
+    return JSON.stringify(await agentAuthoringBackendApi.configureTools(agentId, toolAccess));
+  });
+  ipcMain.handle("ai-loom-desktop-agents:configure-memory", async (_event, agentId: string, memoryJson: string) => {
+    const memory = JSON.parse(memoryJson) as AgentMemoryConfiguration;
+    return JSON.stringify(await agentAuthoringBackendApi.configureMemory(agentId, memory));
+  });
+  ipcMain.handle("ai-loom-desktop-agents:configure-strategy", async (_event, agentId: string, planningStrategyJson: string) => {
+    const planningStrategy = JSON.parse(planningStrategyJson) as AgentPlanningStrategy;
+    return JSON.stringify(await agentAuthoringBackendApi.configureStrategy(agentId, planningStrategy));
+  });
+  ipcMain.handle("ai-loom-desktop-agents:validate", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as AgentConfigurationValidationInput;
+    return JSON.stringify(await agentAuthoringBackendApi.validateConfiguration(request));
   });
   ipcMain.on("ai-loom-desktop-model-files:exists", (event, targetPath: string) => {
     event.returnValue = fs.existsSync(targetPath);
@@ -498,4 +554,5 @@ app.on("before-quit", async () => {
   await serviceSupervisor?.stop();
   storageDatabase?.dispose();
   executionRunRepository?.dispose();
+  agentRepository?.dispose();
 });

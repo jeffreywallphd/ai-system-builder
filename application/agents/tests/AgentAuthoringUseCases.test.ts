@@ -246,14 +246,14 @@ describe("Agent authoring use cases", () => {
       ...createRequest("agent:authoring:config").memory,
       retrieval: { strategy: "hybrid", maxEntries: 5, recency: { preferLatest: true, lookbackWindowEntries: 25 } },
     });
-    expect(memoryUpdated.memory.retrievalStrategy).toBe("hybrid");
+    expect(memoryUpdated.memory.retrieval.strategy).toBe("hybrid");
 
     const configureStrategy = new ConfigureAgentStrategyUseCase(repository);
     const strategyUpdated = await configureStrategy.execute("agent:authoring:config", {
-      strategyId: "deterministic-v2",
+      strategyId: "deterministic",
       mode: "deterministic-linear",
     });
-    expect(strategyUpdated.planningStrategy.strategyId).toBe("deterministic-v2");
+    expect(strategyUpdated.planningStrategy.strategyId).toBe("deterministic");
   });
 
   it("rejects invalid tool/memory/strategy and reports validation issues", async () => {
@@ -276,8 +276,8 @@ describe("Agent authoring use cases", () => {
     const configureStrategy = new ConfigureAgentStrategyUseCase(repository);
     await expect(configureStrategy.execute("agent:authoring:validation", {
       strategyId: "workflow-guided",
-      mode: "workflow-guided",
-    })).resolves.toBeDefined();
+      mode: "deterministic-linear",
+    })).rejects.toThrow("validation failed");
 
     const validate = new ValidateAgentConfigurationUseCase(new AgentConfigurationValidationService());
     const validation = await validate.execute({
@@ -286,7 +286,7 @@ describe("Agent authoring use cases", () => {
         { id: "goal-1", objective: "A", constraints: [], successCriteria: ["ok"], priority: "normal", priorityOrder: 1, requiredToolIds: ["mcp:local:echo"] },
         { id: "goal-2", objective: "B", constraints: [], successCriteria: ["ok"], priority: "normal", priorityOrder: 1, requiredToolIds: ["mcp:local:echo"] },
       ],
-      planningStrategy: { strategyId: "workflow-guided", mode: "workflow-guided" },
+      planningStrategy: { strategyId: "workflow-guided", mode: "workflow-guided" as any },
       execution: { maxExecutionUnits: 1, requireTrustedTools: true },
       policy: {
         ...createRequest("agent:authoring:validation").policy,
@@ -296,7 +296,54 @@ describe("Agent authoring use cases", () => {
 
     expect(validation.valid).toBe(false);
     expect(validation.issues.some((issue) => issue.code === "goal-priority-order-duplicate")).toBe(true);
-    expect(validation.issues.some((issue) => issue.code === "strategy-mode-not-production-ready")).toBe(true);
+    expect(validation.issues.some((issue) => issue.code === "strategy-unsupported")).toBe(true);
+  });
+
+  it("rejects contradictory session-only and retention memory configuration updates", async () => {
+    const repository = new InMemoryAgentRepository();
+    const create = new CreateAgentUseCase(repository);
+    await create.execute(createRequest("agent:authoring:memory-edges"));
+
+    const configureMemory = new ConfigureAgentMemoryUseCase(repository);
+    await expect(configureMemory.execute("agent:authoring:memory-edges", {
+      ...createRequest("agent:authoring:memory-edges").memory,
+      policy: {
+        ...createRequest("agent:authoring:memory-edges").memory.policy,
+        retrievableTypes: ["working"],
+        writableTypes: ["working"],
+        sessionOnlyTypes: ["working"],
+        retention: { mode: "bounded", maxDurableEntries: 10 },
+      },
+      retrieval: {
+        strategy: "latest-first",
+        maxEntries: 5,
+        memoryTypes: ["working"],
+      },
+    })).rejects.toThrow("validation failed");
+  });
+
+  it("returns structured validation issues with sections for API consumers", async () => {
+    const validate = new ValidateAgentConfigurationUseCase(new AgentConfigurationValidationService());
+    const base = createRequest("agent:authoring:issue-structure");
+    const validation = await validate.execute({
+      ...base,
+      planningStrategy: { strategyId: "workflow-guided", mode: "workflow-guided" as any },
+      memory: {
+        ...base.memory,
+        policy: {
+          ...base.memory.policy,
+          retrievableTypes: ["working"],
+          writableTypes: ["working"],
+          sessionOnlyTypes: ["working"],
+          retention: { mode: "bounded", maxDurableEntries: 5 },
+        },
+      },
+    });
+
+    expect(validation.valid).toBe(false);
+    expect(validation.issues.every((issue) => typeof issue.section === "string" && issue.section.length > 0)).toBe(true);
+    expect(validation.issues.some((issue) => issue.code === "strategy-unsupported" && issue.section === "strategy")).toBe(true);
+    expect(validation.issues.some((issue) => issue.code === "memory-retrievable-session-only-overlap" && issue.section === "memory")).toBe(true);
   });
 
   it("reports deterministic cross-field validation issues for malformed authoring payloads", async () => {
@@ -335,7 +382,7 @@ describe("Agent authoring use cases", () => {
     expect(validation.issues.some((issue) => issue.code === "execution-max-units-exceeds-policy-max-steps")).toBe(true);
     expect(validation.issues.some((issue) => issue.code === "memory-agent-id-mismatch")).toBe(true);
     expect(validation.issues.some((issue) => issue.code === "memory-hybrid-config-missing")).toBe(true);
-    expect(validation.issues.some((issue) => issue.code === "strategy-id-mode-mismatch")).toBe(true);
+    expect(validation.issues.some((issue) => issue.code === "strategy-unsupported")).toBe(true);
 
     const malformedRequiredTool = await validate.execute({
       ...base,

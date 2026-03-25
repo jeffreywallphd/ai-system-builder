@@ -22,7 +22,7 @@ It is responsible for:
 - resolving the desktop Python runtime
 - starting the desktop service supervisor
 - building the bootstrap context exposed to the renderer
-- registering IPC handlers for storage, workflow persistence, execution-run history, and model-file operations
+- registering IPC handlers for storage, workflow persistence, execution-run history, model-file operations, canonical asset reads, and thin agent-authoring backend operations
 
 This makes Electron the host-level boundary where local capabilities become available.
 
@@ -34,6 +34,8 @@ This makes Electron the host-level boundary where local capabilities become avai
 - workflow persistence operations
 - execution-run history operations
 - model-file operations
+- canonical asset operations
+- agent authoring/configuration operations (`create/update/get/list/delete/archive`, goal/policy/tool/memory/strategy configuration, and configuration validation)
 
 `electron/shared/DesktopContracts.ts` defines the TypeScript contracts for those capabilities, which is a good practice because it creates a typed interface between host and renderer.
 
