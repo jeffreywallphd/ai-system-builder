@@ -85,3 +85,4 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Canonical identity persistence now stores taxonomy metadata, and canonical asset query criteria supports taxonomy-aware filtering.
 - Canonical asset summary/detail reads include taxonomy via identity metadata with bounded fallback mapping.
 - See `docs/architecture/shared-composition-taxonomy.md` for the practical architecture note and current-scope boundaries.
+- Shared asset contracts now complement taxonomy (`domain/contracts/AssetContract.ts`, `application/contracts/CompositionAssetContractResolver.ts`) and are surfaced through canonical operational reads when available; see `docs/architecture/shared-asset-contracts.md`.

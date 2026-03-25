@@ -173,6 +173,7 @@ The runtime is not a single path. The system currently supports multiple executi
 - Canonical identities now persist taxonomy metadata and canonical asset query criteria supports taxonomy-aware filters (`structuralKinds`, `semanticRoles`, `behaviorKinds`).
 - Canonical asset summary/detail read use cases include taxonomy descriptors through identity metadata with bounded fallback mapping.
 - See `shared-composition-taxonomy.md` for scope, boundaries, and current-state mapping details.
+- Shared asset contracts now complement taxonomy through a compact inner-layer model (`domain/contracts/AssetContract.ts`) and adapter seam (`application/contracts/CompositionAssetContractResolver.ts`), with canonical operational reads surfacing both where available; see `shared-asset-contracts.md`.
 
 ## TODO
 

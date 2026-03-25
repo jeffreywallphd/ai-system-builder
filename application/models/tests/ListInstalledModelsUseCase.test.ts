@@ -82,6 +82,36 @@ describe("ListInstalledModelsUseCase", () => {
     expect(result.canonicalByModelId?.m?.operationalStatus?.trust).toBe("trusted");
   });
 
+
+  it("projects canonical contracts into lightweight model-id map", async () => {
+    const result = await new ListInstalledModelsUseCase(
+      makeInstalledModelCatalog({ listInstalled: async () => [makeModel("m")] }),
+      {
+        resolveIdentity: async () => ({
+          entityType: "installed-model",
+          entityId: "m",
+          assetId: "installed-model:m",
+          latestVersionId: "asset-version:m:1",
+          updatedAt: new Date("2026-03-24T00:00:00.000Z"),
+        }),
+      } as any,
+      {
+        resolve: async () => ({
+          preferred: true,
+          assetId: "installed-model:m",
+          contract: {
+            version: "1.0.0",
+            input: { kind: "json-schema" },
+            output: { kind: "json-schema" },
+            parameters: [],
+          },
+        }),
+      } as any,
+    ).execute();
+
+    expect(result.canonicalByModelId?.m?.contract?.version).toBe("1.0.0");
+    expect(result.canonicalContractByModelId?.m?.version).toBe("1.0.0");
+  });
   it("preserves explicit resolver fallback reason when canonical identity is missing", async () => {
     const result = await new ListInstalledModelsUseCase(
       makeInstalledModelCatalog({ listInstalled: async () => [makeModel("m")] }),
