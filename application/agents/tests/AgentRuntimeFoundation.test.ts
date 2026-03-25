@@ -268,6 +268,8 @@ describe("Agent runtime foundation", () => {
     });
 
     expect(result.status).toBe("completed");
+    expect(result.terminalState.reason).toBe("completed");
+    expect(result.terminalState.hadPartialProgress).toBe(false);
     expect(result.outcomes[0]?.attempts).toBe(2);
     expect(events).toContain("retry-scheduled");
     expect(events).toContain("session-persisted");
@@ -278,6 +280,7 @@ describe("Agent runtime foundation", () => {
     expect(sessions).toHaveLength(1);
     expect(sessions[0]?.status).toBe("completed");
     expect(sessions[0]?.stepOutcomes[0]?.status).toBe("completed");
+    expect(sessions[0]?.terminalState?.reason).toBe("completed");
   });
 
   it("emits blocked lifecycle events when governance denies execution before any step runs", async () => {
@@ -316,10 +319,11 @@ describe("Agent runtime foundation", () => {
       onProgress: (event) => events.push(event.type),
     });
     expect(result.status).toBe("blocked");
+    expect(result.terminalState.reason).toBe("blocked");
+    expect(result.terminalState.attemptedStepCount).toBe(0);
     expect(result.outcomes).toHaveLength(0);
     expect(result.session.stepOutcomes).toHaveLength(0);
     expect(events).toContain("execution-blocked");
-    expect(events).toContain("execution-failed");
     expect(events).not.toContain("step-attempt-started");
   });
 
@@ -392,6 +396,8 @@ describe("Agent runtime foundation", () => {
     expect(result.outcomes).toHaveLength(2);
     expect(result.outcomes[0]?.status).toBe("completed");
     expect(result.outcomes[1]?.status).toBe("failed");
+    expect(result.terminalState.reason).toBe("failed");
+    expect(result.terminalState.hadPartialProgress).toBe(true);
     expect(result.workingMemory.executionOutputs).toHaveLength(2);
     expect(result.memoryWrite.persisted.length).toBeGreaterThan(0);
     expect(result.session.stepOutcomes).toHaveLength(2);
@@ -440,6 +446,8 @@ describe("Agent runtime foundation", () => {
     });
 
     expect(result.status).toBe("failed");
+    expect(result.terminalState.reason).toBe("failed");
+    expect(result.terminalState.hadPartialProgress).toBe(false);
     expect(result.outcomes).toHaveLength(1);
     expect(result.outcomes[0]?.attempts).toBe(1);
     expect(result.workingMemory.executionOutputs).toHaveLength(1);
@@ -491,6 +499,8 @@ describe("Agent runtime foundation", () => {
     });
 
     expect(result.status).toBe("failed");
+    expect(result.terminalState.reason).toBe("failed");
+    expect(result.terminalState.hadPartialProgress).toBe(false);
     expect(result.outcomes[0]?.attempts).toBe(1);
     expect(events).toContain("retry-exhausted");
     expect(events).toContain("execution-failed");
@@ -569,6 +579,8 @@ describe("Agent runtime foundation", () => {
     });
 
     expect(result.status).toBe("cancelled");
+    expect(result.terminalState.reason).toBe("cancelled");
+    expect(result.terminalState.hadPartialProgress).toBe(true);
     expect(result.outcomes).toHaveLength(2);
     expect(result.outcomes[0]?.status).toBe("completed");
     expect(result.outcomes[1]?.status).toBe("cancelled");

@@ -37,6 +37,13 @@ export interface AgentExecutionStepOutcome {
   readonly errorMessage?: string;
 }
 
+export interface AgentExecutionTerminalState {
+  readonly reason: "completed" | "failed" | "cancelled" | "blocked";
+  readonly hadPartialProgress: boolean;
+  readonly completedStepCount: number;
+  readonly attemptedStepCount: number;
+}
+
 export interface AgentExecutionSession {
   readonly id: string;
   readonly agentId: string;
@@ -45,6 +52,7 @@ export interface AgentExecutionSession {
   readonly executionRuns: ReadonlyArray<AgentExecutionRunReference>;
   readonly diagnostics: ReadonlyArray<AgentExecutionDiagnosticReference>;
   readonly stepOutcomes: ReadonlyArray<AgentExecutionStepOutcome>;
+  readonly terminalState?: AgentExecutionTerminalState;
   readonly startTime: string;
   readonly endTime?: string;
 }
@@ -148,6 +156,72 @@ function normalizeStepOutcomes(
   return Object.freeze([...dedupedByStepId.values()]);
 }
 
+function normalizeTerminalState(
+  status: AgentExecutionSessionStatus,
+  stepOutcomes: ReadonlyArray<AgentExecutionStepOutcome>,
+  terminalState: AgentExecutionTerminalState | undefined,
+): AgentExecutionTerminalState | undefined {
+  if (!isTerminalStatus(status)) {
+    if (terminalState) {
+      throw new Error("Agent execution terminalState can only be set for terminal statuses.");
+    }
+    return undefined;
+  }
+
+  const completedStepCount = stepOutcomes.filter((outcome) => outcome.status === "completed").length;
+  const attemptedStepCount = stepOutcomes.length;
+  const defaultReason = status === AgentExecutionSessionStatuses.completed
+    ? "completed"
+    : status === AgentExecutionSessionStatuses.cancelled
+      ? "cancelled"
+      : "failed";
+
+  const normalizedReason = terminalState?.reason ?? defaultReason;
+  if (!["completed", "failed", "cancelled", "blocked"].includes(normalizedReason)) {
+    throw new Error(`Agent execution terminal reason '${String(normalizedReason)}' is invalid.`);
+  }
+  if (status === AgentExecutionSessionStatuses.completed && normalizedReason !== "completed") {
+    throw new Error("Completed agent execution sessions must use terminal reason 'completed'.");
+  }
+  if (status === AgentExecutionSessionStatuses.cancelled && normalizedReason !== "cancelled") {
+    throw new Error("Cancelled agent execution sessions must use terminal reason 'cancelled'.");
+  }
+  if (status === AgentExecutionSessionStatuses.failed && !["failed", "blocked"].includes(normalizedReason)) {
+    throw new Error("Failed agent execution sessions must use terminal reason 'failed' or 'blocked'.");
+  }
+
+  const normalizedCompletedCount = terminalState?.completedStepCount ?? completedStepCount;
+  const normalizedAttemptedCount = terminalState?.attemptedStepCount ?? attemptedStepCount;
+  if (!Number.isInteger(normalizedCompletedCount) || normalizedCompletedCount < 0) {
+    throw new Error("Agent execution terminal completedStepCount must be a non-negative integer.");
+  }
+  if (!Number.isInteger(normalizedAttemptedCount) || normalizedAttemptedCount < 0) {
+    throw new Error("Agent execution terminal attemptedStepCount must be a non-negative integer.");
+  }
+  if (normalizedCompletedCount > normalizedAttemptedCount) {
+    throw new Error("Agent execution terminal completedStepCount cannot exceed attemptedStepCount.");
+  }
+  if (normalizedCompletedCount !== completedStepCount) {
+    throw new Error("Agent execution terminal completedStepCount must match session step outcomes.");
+  }
+  if (normalizedAttemptedCount !== attemptedStepCount) {
+    throw new Error("Agent execution terminal attemptedStepCount must match session step outcomes.");
+  }
+
+  const inferredPartialProgress = normalizedCompletedCount > 0 && normalizedReason !== "completed";
+  const normalizedPartialProgress = terminalState?.hadPartialProgress ?? inferredPartialProgress;
+  if (normalizedPartialProgress !== inferredPartialProgress) {
+    throw new Error("Agent execution terminal hadPartialProgress is inconsistent with terminal reason and step outcomes.");
+  }
+
+  return Object.freeze({
+    reason: normalizedReason,
+    hadPartialProgress: normalizedPartialProgress,
+    completedStepCount: normalizedCompletedCount,
+    attemptedStepCount: normalizedAttemptedCount,
+  });
+}
+
 function assertValidLifecycleTransition(
   from: AgentExecutionSessionStatus,
   to: AgentExecutionSessionStatus,
@@ -203,6 +277,7 @@ export function createAgentExecutionSession(input: {
   const executionRuns = Object.freeze((input.executionRuns ?? []).map((entry) => normalizeExecutionRun(entry, planId)));
   const diagnostics = normalizeDiagnostics(input.diagnostics);
   const stepOutcomes = normalizeStepOutcomes(input.stepOutcomes);
+  const terminalState = normalizeTerminalState(status, stepOutcomes, undefined);
 
   return Object.freeze({
     id: normalizeRequired(input.id, "Agent execution session id"),
@@ -212,6 +287,7 @@ export function createAgentExecutionSession(input: {
     executionRuns,
     diagnostics,
     stepOutcomes,
+    terminalState,
     startTime: start.toISOString(),
     endTime: undefined,
   });
@@ -224,6 +300,7 @@ export function transitionAgentExecutionSession(
     readonly appendExecutionRun?: AgentExecutionRunReference;
     readonly appendDiagnostic?: AgentExecutionDiagnosticReference;
     readonly appendStepOutcome?: AgentExecutionStepOutcome;
+    readonly terminalState?: AgentExecutionTerminalState;
     readonly endedAt?: Date;
   },
 ): AgentExecutionSession {
@@ -243,6 +320,7 @@ export function transitionAgentExecutionSession(
   const stepOutcomes = transition.appendStepOutcome
     ? normalizeStepOutcomes([...session.stepOutcomes, transition.appendStepOutcome])
     : session.stepOutcomes;
+  const terminalState = normalizeTerminalState(transition.status, stepOutcomes, transition.terminalState);
 
   const terminalStatus = isTerminalStatus(transition.status);
   const endTime = terminalStatus ? (transition.endedAt ?? new Date()).toISOString() : undefined;
@@ -256,6 +334,7 @@ export function transitionAgentExecutionSession(
     executionRuns,
     diagnostics,
     stepOutcomes,
+    terminalState,
     endTime,
   });
 }

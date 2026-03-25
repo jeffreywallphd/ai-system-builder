@@ -192,10 +192,12 @@ describe("Agent runner + sqlite execution-session integration", () => {
     expect(loadedSession?.stepOutcomes).toHaveLength(2);
     expect(loadedSession?.stepOutcomes[0]?.status).toBe("completed");
     expect(loadedSession?.stepOutcomes[1]?.status).toBe("failed");
+    expect(loadedSession?.terminalState?.reason).toBe("failed");
+    expect(loadedSession?.terminalState?.hadPartialProgress).toBe(true);
     expect(loadedSession?.executionRuns[0]?.runId).toBe(result.executionId);
 
     const transitions = await sessionRepository.listTransitionHistory(result.session.id);
-    expect(transitions.map((entry) => entry.status)).toEqual(["running", "failed"]);
+    expect(transitions.map((entry) => entry.status)).toEqual(["pending", "ready", "running", "failed"]);
 
     sessionRepository.dispose();
   });

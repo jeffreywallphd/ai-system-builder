@@ -235,4 +235,43 @@ describe("Agent authoring use cases", () => {
     expect(validation.issues.some((issue) => issue.code === "goal-priority-order-duplicate")).toBe(true);
     expect(validation.issues.some((issue) => issue.code === "strategy-mode-not-production-ready")).toBe(true);
   });
+
+  it("reports deterministic cross-field validation issues for malformed authoring payloads", async () => {
+    const validate = new ValidateAgentConfigurationUseCase(new AgentConfigurationValidationService());
+    const base = createRequest("agent:authoring:cross-field");
+    const validation = await validate.execute({
+      ...base,
+      goals: [{
+        ...base.goals[0],
+        objective: "   ",
+        priorityOrder: 3,
+        requiredToolIds: ["mcp:local:missing"],
+      }],
+      policy: {
+        ...base.policy,
+        toolAccess: {
+          ...base.policy.toolAccess,
+          allowedToolIds: ["not-canonical"],
+        },
+        executionLimits: { maxSteps: 0 },
+      },
+      memory: {
+        ...base.memory,
+        agentId: "agent:other",
+        retrieval: { strategy: "hybrid", maxEntries: 5 },
+      },
+      execution: { ...base.execution, maxExecutionUnits: 4 },
+      planningStrategy: { strategyId: "custom-linear", mode: "deterministic-linear" },
+    });
+
+    expect(validation.valid).toBe(false);
+    expect(validation.issues.some((issue) => issue.code === "goal-objective-missing")).toBe(true);
+    expect(validation.issues.some((issue) => issue.code === "goal-required-tool-not-allowed")).toBe(true);
+    expect(validation.issues.some((issue) => issue.code === "goal-priority-order-noncontiguous")).toBe(true);
+    expect(validation.issues.some((issue) => issue.code === "tool-id-malformed")).toBe(true);
+    expect(validation.issues.some((issue) => issue.code === "execution-max-units-exceeds-policy-max-steps")).toBe(true);
+    expect(validation.issues.some((issue) => issue.code === "memory-agent-id-mismatch")).toBe(true);
+    expect(validation.issues.some((issue) => issue.code === "memory-hybrid-config-missing")).toBe(true);
+    expect(validation.issues.some((issue) => issue.code === "strategy-id-mode-mismatch")).toBe(true);
+  });
 });

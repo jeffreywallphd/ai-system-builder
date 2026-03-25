@@ -61,11 +61,13 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Direction 4 (Phase 4, MCP capability layer foundation) now binds agent MCP access to canonical MCP identity (`domain/mcp/McpToolIdentity.ts` + `AgentPolicy.toolAccess.allowedMcpTools`), maps MCP steps as execution-native units (`ExecutionUnitKinds.mcpToolInvocation` via `AgentExecutionMapping`), and introduces deterministic plan/execute-time MCP governance checks (`application/agents/services/AgentMcpToolGovernanceService.ts`) that reuse registry/trust services for permission/approval/sandbox/schema checks without creating a second runtime.
 - Direction 4 (Phase 4 completion + Phase 5 inner foundation) now adds a reusable planner-side tool selection seam (`AgentPlanToolSelectionService`), explicit MCP governance decision semantics (`allowed` vs `approval-required` / `denied` / `unavailable` / `incompatible`), and an inner runtime coordination service (`AgentRunnerService`) with structured progress events, bounded retry/failure classification, and optional agent execution-session persistence seams.
 - Phase 5 hardening now makes retry exhaustion and partial-execution durability explicit: per-step outcomes are persisted on execution sessions, transition-history lookup is port-level (`IAgentExecutionSessionRepository`), and terminal failure contracts now carry explicit retry-exhausted signaling.
+- Phase 5 hardening now also makes terminal truth explicit for persistence/read models: execution sessions carry bounded terminal-state summary (`reason`, `hadPartialProgress`, completed/attempted step counts), blocked-before-step runs persist as failed status with terminal reason `blocked`, and lifecycle transitions are persisted from initial `pending` through terminal status.
+- SQLite session persistence now stores structured terminal/progress columns (`terminal_reason`, `had_partial_progress`, `completed_step_count`, `attempted_step_count`, `step_outcome_count`) in addition to canonical `session_json` snapshots.
 - Phase 6 inner authoring now has real persistence/use-case seams without UI coupling:
   - persistence ports/adapters: `IAgentRepository` -> `SqliteAgentRepository`, `IAgentExecutionSessionRepository` -> `SqliteAgentExecutionSessionRepository`
   - application CRUD + lifecycle use cases: create/update/get/list/delete/archive
   - bounded configuration use cases: goals/policy/tools/memory/strategy
-  - cohesive cross-field validation seam: `AgentConfigurationValidationService`.
+  - cohesive cross-field validation seam: `AgentConfigurationValidationService` (deterministic cross-field issue codes + domain fallback validation), with SQLite agent persistence also projecting structured authoring metadata (`strategy_id`, `strategy_mode`, `goal_count`, `allowed_tool_count`).
 
 ## TODO
 - If asked for the "single" architecture entry point, explain that there are currently multiple composition roots and name them explicitly.

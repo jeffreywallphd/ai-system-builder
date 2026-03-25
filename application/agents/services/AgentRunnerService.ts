@@ -5,6 +5,7 @@ import {
   transitionAgentExecutionSession,
   type AgentExecutionStepOutcome,
   type AgentExecutionSession,
+  type AgentExecutionTerminalState,
 } from "../../../domain/agents/AgentExecutionSession";
 import { mapAgentPlanToBackbone } from "../contracts/AgentExecutionMapping";
 import type { AgentPlanningInterface } from "../contracts/AgentPlanningStrategy";
@@ -53,6 +54,7 @@ export interface AgentRunnerResult {
   readonly finalOutput?: string;
   readonly workingMemory: AgentWorkingMemory;
   readonly memoryWrite: AgentMemoryWriteResult;
+  readonly terminalState: AgentExecutionTerminalState;
   readonly failure?: AgentRuntimeFailure;
   readonly events: ReadonlyArray<AgentRuntimeProgressEvent>;
 }
@@ -97,11 +99,23 @@ export class AgentRunnerService {
       status: AgentExecutionSessionStatuses.pending,
     });
     emit({ type: AgentRuntimeEventTypes.sessionStarted, planId: plan.planId, metadata: { sessionId: session.id } });
+    session = await this.persistSession(session);
+    emit({
+      type: AgentRuntimeEventTypes.sessionPersisted,
+      planId: plan.planId,
+      metadata: { sessionId: session.id, status: session.status },
+    });
     session = transitionAgentExecutionSession(session, { status: AgentExecutionSessionStatuses.ready });
     emit({
       type: AgentRuntimeEventTypes.sessionTransitioned,
       planId: plan.planId,
       metadata: { sessionId: session.id, status: AgentExecutionSessionStatuses.ready },
+    });
+    session = await this.persistSession(session);
+    emit({
+      type: AgentRuntimeEventTypes.sessionPersisted,
+      planId: plan.planId,
+      metadata: { sessionId: session.id, status: session.status },
     });
     session = transitionAgentExecutionSession(session, { status: AgentExecutionSessionStatuses.running });
     emit({
@@ -131,12 +145,19 @@ export class AgentRunnerService {
           retryable: false,
         };
         emit({ type: AgentRuntimeEventTypes.executionBlocked, planId: plan.planId, status: "blocked", metadata: { decision: governance.decision } });
-        const blockedSession = await this.completeSession(session, "failed", executionId, emit, plan.planId);
-        emit({
-          type: AgentRuntimeEventTypes.executionFailed,
-          planId: plan.planId,
-          status: "failed",
-          metadata: { failureKind: failure.kind, blocked: true },
+        const blockedSession = await this.completeSession(
+          session,
+          "failed",
+          executionId,
+          emit,
+          plan.planId,
+          "blocked",
+        );
+        const terminalState = blockedSession.terminalState ?? Object.freeze({
+          reason: "blocked",
+          hadPartialProgress: false,
+          completedStepCount: 0,
+          attemptedStepCount: 0,
         });
         return Object.freeze({
           agentId: agent.id,
@@ -152,6 +173,7 @@ export class AgentRunnerService {
             retrievedMemory: Object.freeze([]),
           }),
           memoryWrite: Object.freeze({ persisted: Object.freeze([]), skipped: Object.freeze([]) }),
+          terminalState,
           failure,
           events: Object.freeze(events),
         });
@@ -297,7 +319,15 @@ export class AgentRunnerService {
     }
 
     if (terminalFailure && finalStatus === "failed") {
-      emit({ type: AgentRuntimeEventTypes.executionFailed, planId: plan.planId, status: "failed", metadata: { failureKind: terminalFailure.kind } });
+      emit({
+        type: AgentRuntimeEventTypes.executionFailed,
+        planId: plan.planId,
+        status: "failed",
+        metadata: {
+          failureKind: terminalFailure.kind,
+          hadPartialProgress: outcomes.some((outcome) => outcome.status === "completed"),
+        },
+      });
     }
 
     const memoryWrite = await this.memoryWriteService.writeExecutionOutcome(agent, plan, {
@@ -324,6 +354,13 @@ export class AgentRunnerService {
       emit,
       plan.planId,
     );
+    const terminalState = terminalSession.terminalState ?? Object.freeze({
+      reason: finalStatus === "completed" ? "completed" : finalStatus === "cancelled" ? "cancelled" : "failed",
+      hadPartialProgress: terminalSession.stepOutcomes.some((outcome) => outcome.status === "completed")
+        && finalStatus !== "completed",
+      completedStepCount: terminalSession.stepOutcomes.filter((outcome) => outcome.status === "completed").length,
+      attemptedStepCount: terminalSession.stepOutcomes.length,
+    });
     if (finalStatus === "completed") {
       emit({ type: AgentRuntimeEventTypes.executionCompleted, planId: plan.planId, status: "completed" });
     } else if (finalStatus === "cancelled") {
@@ -340,6 +377,7 @@ export class AgentRunnerService {
       finalOutput: finalOutput || undefined,
       workingMemory,
       memoryWrite,
+      terminalState,
       failure: terminalFailure,
       events: Object.freeze(events),
     });
@@ -441,13 +479,24 @@ export class AgentRunnerService {
     executionId: string,
     emit?: (event: Omit<AgentRuntimeProgressEvent, "occurredAt" | "executionId" | "agentId">) => void,
     planId?: string,
+    terminalReason?: AgentExecutionTerminalState["reason"],
   ): Promise<AgentExecutionSession> {
+    const completedStepCount = session.stepOutcomes.filter((outcome) => outcome.status === "completed").length;
+    const attemptedStepCount = session.stepOutcomes.length;
+    const reason = terminalReason
+      ?? (status === "completed" ? "completed" : status === "cancelled" ? "cancelled" : "failed");
     const transitioned = transitionAgentExecutionSession(session, {
       status: status === "completed"
         ? AgentExecutionSessionStatuses.completed
         : status === "failed"
           ? AgentExecutionSessionStatuses.failed
           : AgentExecutionSessionStatuses.cancelled,
+      terminalState: {
+        reason,
+        hadPartialProgress: completedStepCount > 0 && reason !== "completed",
+        completedStepCount,
+        attemptedStepCount,
+      },
       appendExecutionRun: {
         runId: executionId,
         planId: session.executionPlan?.planId,

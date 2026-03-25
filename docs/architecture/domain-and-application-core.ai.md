@@ -326,12 +326,16 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
   - `AgentRunnerResult.outcomes` remains ordered per-step truth.
   - `AgentWorkingMemory.executionOutputs` carries completed/failed/cancelled step summaries.
   - execution sessions now persist per-step outcomes and output-asset diagnostics (`domain/agents/AgentExecutionSession.ts`), so "partial success + terminal fail/cancel" is durable.
+- Session terminal truth is now explicit and persisted:
+  - `AgentExecutionSession.terminalState` captures terminal `reason` (`completed`/`failed`/`cancelled`/`blocked`) plus bounded partial-progress summary (`hadPartialProgress`, completed/attempted step counts).
+  - blocked-before-step runs persist as failed lifecycle status with terminal reason `blocked`, so blocked vs failed remains machine-readable.
 - Session persistence remains port-first and architecture-consistent:
   - application port: `IAgentExecutionSessionRepository` (including transition history reads).
-  - infrastructure adapter: `SqliteAgentExecutionSessionRepository`.
+  - infrastructure adapter: `SqliteAgentExecutionSessionRepository` with structured terminal/progress columns (`terminal_reason`, `had_partial_progress`, `completed_step_count`, `attempted_step_count`, `step_outcome_count`) plus canonical `session_json` snapshots.
 - Phase 6 inner authoring/configuration now starts from the same core-first structure:
   - persistence seam: `IAgentRepository` + concrete `SqliteAgentRepository`.
   - CRUD application use cases: `CreateAgentUseCase`, `UpdateAgentUseCase`, `GetAgentUseCase`, `ListAgentsUseCase`, `DeleteAgentUseCase`, `ArchiveAgentUseCase`.
   - bounded structured configuration use cases: goals/policy/tools/memory/strategy (`ConfigureAgent*UseCase`).
-  - cohesive validation seam: `AgentConfigurationValidationService` + `ValidateAgentConfigurationUseCase` for cross-field agent config checks.
+  - cohesive validation seam: `AgentConfigurationValidationService` + `ValidateAgentConfigurationUseCase` now emits deterministic cross-field issue codes for goal/tool/memory/policy/strategy coherence before domain fallback validation.
+  - `SqliteAgentRepository` also projects structured authoring/query metadata (`strategy_id`, `strategy_mode`, `goal_count`, `allowed_tool_count`) while preserving aggregate round-trip in `agent_json`.
 - No UI/runtime bypass was introduced; transport can remain thin over these use cases.
