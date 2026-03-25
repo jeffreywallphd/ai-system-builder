@@ -1,4 +1,4 @@
-import type { AgentReadModel } from "../../../domain/agents/Agent";
+import type { Agent, AgentReadModel } from "../../../domain/agents/Agent";
 import type { AgentMemoryConfiguration } from "../../../domain/agents/AgentMemory";
 import type { AgentToolAccessPolicy, AgentPolicy } from "../../../domain/agents/AgentPolicy";
 import type { IAgentRepository } from "../../../application/ports/interfaces/IAgentRepository";
@@ -23,6 +23,10 @@ import {
 } from "../../../application/agents/services/AgentConfigurationValidationService";
 import { AgentConfigurationValidationError } from "../../../application/agents/services/AgentConfigurationValidationError";
 import type { AgentPlanningStrategy } from "../../../domain/agents/Agent";
+import type { CompositionTaxonomyDescriptor } from "../../../domain/taxonomy/CompositionTaxonomy";
+import type { AssetContractDescriptor } from "../../../domain/contracts/AssetContract";
+import { CompositionTaxonomyClassifier } from "../../../application/taxonomy/CompositionTaxonomyClassifier";
+import { CompositionAssetContractResolver } from "../../../application/contracts/CompositionAssetContractResolver";
 
 export interface AgentAuthoringApiError {
   readonly code: "not-found" | "conflict" | "invalid-request" | "validation-failed" | "internal";
@@ -36,7 +40,14 @@ export interface AgentAuthoringApiResponse<T> {
   readonly error?: AgentAuthoringApiError;
 }
 
+export interface AgentAuthoringApiReadModel {
+  readonly agent: AgentReadModel;
+  readonly taxonomy: CompositionTaxonomyDescriptor;
+  readonly contract?: AssetContractDescriptor;
+}
+
 export class AgentAuthoringBackendApi {
+  private readonly repository: IAgentRepository;
   private readonly createUseCase: CreateAgentUseCase;
   private readonly updateUseCase: UpdateAgentUseCase;
   private readonly getUseCase: GetAgentUseCase;
@@ -49,9 +60,14 @@ export class AgentAuthoringBackendApi {
   private readonly configureMemoryUseCase: ConfigureAgentMemoryUseCase;
   private readonly configureStrategyUseCase: ConfigureAgentStrategyUseCase;
   private readonly validateUseCase: ValidateAgentConfigurationUseCase;
+  private readonly taxonomyClassifier: CompositionTaxonomyClassifier;
+  private readonly contractResolver: CompositionAssetContractResolver;
 
   constructor(repository: IAgentRepository) {
+    this.repository = repository;
     const validationService = new AgentConfigurationValidationService();
+    this.taxonomyClassifier = new CompositionTaxonomyClassifier();
+    this.contractResolver = new CompositionAssetContractResolver({ agentRepository: repository });
     this.createUseCase = new CreateAgentUseCase(repository, validationService);
     this.updateUseCase = new UpdateAgentUseCase(repository, validationService);
     this.getUseCase = new GetAgentUseCase(repository);
@@ -66,60 +82,66 @@ export class AgentAuthoringBackendApi {
     this.validateUseCase = new ValidateAgentConfigurationUseCase(validationService);
   }
 
-  public async createAgent(request: CreateAgentRequest): Promise<AgentAuthoringApiResponse<AgentReadModel>> {
-    return this.wrap(() => this.createUseCase.execute(request));
+  public async createAgent(request: CreateAgentRequest): Promise<AgentAuthoringApiResponse<AgentAuthoringApiReadModel>> {
+    return this.wrap(async () => this.toApiReadModel(await this.createUseCase.execute(request)));
   }
 
-  public async updateAgent(request: UpdateAgentRequest): Promise<AgentAuthoringApiResponse<AgentReadModel>> {
-    return this.wrap(() => this.updateUseCase.execute(request));
+  public async updateAgent(request: UpdateAgentRequest): Promise<AgentAuthoringApiResponse<AgentAuthoringApiReadModel>> {
+    return this.wrap(async () => this.toApiReadModel(await this.updateUseCase.execute(request)));
   }
 
-  public async getAgent(agentId: string): Promise<AgentAuthoringApiResponse<AgentReadModel | undefined>> {
-    return this.wrap(() => this.getUseCase.execute(agentId));
+  public async getAgent(agentId: string): Promise<AgentAuthoringApiResponse<AgentAuthoringApiReadModel | undefined>> {
+    return this.wrap(async () => {
+      const readModel = await this.getUseCase.execute(agentId);
+      return readModel ? this.toApiReadModel(readModel) : undefined;
+    });
   }
 
-  public async listAgents(includeArchived = true): Promise<AgentAuthoringApiResponse<ReadonlyArray<AgentReadModel>>> {
-    return this.wrap(() => this.listUseCase.execute({ includeArchived }));
+  public async listAgents(includeArchived = true): Promise<AgentAuthoringApiResponse<ReadonlyArray<AgentAuthoringApiReadModel>>> {
+    return this.wrap(async () => {
+      const readModels = await this.listUseCase.execute({ includeArchived });
+      return Object.freeze(await Promise.all(readModels.map((readModel) => this.toApiReadModel(readModel))));
+    });
   }
 
   public async deleteAgent(agentId: string): Promise<AgentAuthoringApiResponse<{ readonly deleted: boolean }>> {
     return this.wrap(async () => Object.freeze({ deleted: await this.deleteUseCase.execute(agentId) }));
   }
 
-  public async archiveAgent(agentId: string): Promise<AgentAuthoringApiResponse<AgentReadModel>> {
-    return this.wrap(() => this.archiveUseCase.execute(agentId));
+  public async archiveAgent(agentId: string): Promise<AgentAuthoringApiResponse<AgentAuthoringApiReadModel>> {
+    return this.wrap(async () => this.toApiReadModel(await this.archiveUseCase.execute(agentId)));
   }
 
-  public async configureGoals(request: ConfigureAgentGoalsRequest): Promise<AgentAuthoringApiResponse<AgentReadModel>> {
-    return this.wrap(() => this.configureGoalsUseCase.execute(request));
+  public async configureGoals(request: ConfigureAgentGoalsRequest): Promise<AgentAuthoringApiResponse<AgentAuthoringApiReadModel>> {
+    return this.wrap(async () => this.toApiReadModel(await this.configureGoalsUseCase.execute(request)));
   }
 
   public async configurePolicy(
     agentId: string,
     policy: AgentPolicy,
-  ): Promise<AgentAuthoringApiResponse<AgentReadModel>> {
-    return this.wrap(() => this.configurePolicyUseCase.execute(agentId, policy));
+  ): Promise<AgentAuthoringApiResponse<AgentAuthoringApiReadModel>> {
+    return this.wrap(async () => this.toApiReadModel(await this.configurePolicyUseCase.execute(agentId, policy)));
   }
 
   public async configureTools(
     agentId: string,
     toolAccess: AgentToolAccessPolicy,
-  ): Promise<AgentAuthoringApiResponse<AgentReadModel>> {
-    return this.wrap(() => this.configureToolsUseCase.execute(agentId, toolAccess));
+  ): Promise<AgentAuthoringApiResponse<AgentAuthoringApiReadModel>> {
+    return this.wrap(async () => this.toApiReadModel(await this.configureToolsUseCase.execute(agentId, toolAccess)));
   }
 
   public async configureMemory(
     agentId: string,
     memory: AgentMemoryConfiguration,
-  ): Promise<AgentAuthoringApiResponse<AgentReadModel>> {
-    return this.wrap(() => this.configureMemoryUseCase.execute(agentId, memory));
+  ): Promise<AgentAuthoringApiResponse<AgentAuthoringApiReadModel>> {
+    return this.wrap(async () => this.toApiReadModel(await this.configureMemoryUseCase.execute(agentId, memory)));
   }
 
   public async configureStrategy(
     agentId: string,
     planningStrategy: AgentPlanningStrategy,
-  ): Promise<AgentAuthoringApiResponse<AgentReadModel>> {
-    return this.wrap(() => this.configureStrategyUseCase.execute(agentId, planningStrategy));
+  ): Promise<AgentAuthoringApiResponse<AgentAuthoringApiReadModel>> {
+    return this.wrap(async () => this.toApiReadModel(await this.configureStrategyUseCase.execute(agentId, planningStrategy)));
   }
 
   public async validateConfiguration(
@@ -162,10 +184,30 @@ export class AgentAuthoringBackendApi {
       }
     }
     const message = error instanceof Error ? error.message : "Unexpected backend error.";
+    if (message.includes("not found") || message.includes("was not found")) {
+      return Object.freeze({ code: "not-found", message });
+    }
     if (message.includes("required") || message.includes("malformed") || message.includes("invalid")) {
       return Object.freeze({ code: "invalid-request", message });
     }
     return Object.freeze({ code: "internal", message });
   }
-}
 
+  private async toApiReadModel(readModel: AgentReadModel): Promise<AgentAuthoringApiReadModel> {
+    const agent = await this.repository.get(readModel.id);
+    const taxonomy = this.taxonomyClassifier.classifyAgent(this.requireAgentForProjection(readModel.id, agent));
+    const contract = await this.contractResolver.resolveAgentContractById(readModel.id);
+    return Object.freeze({
+      agent: readModel,
+      taxonomy,
+      contract,
+    });
+  }
+
+  private requireAgentForProjection(agentId: string, agent: Agent | undefined): Agent {
+    if (agent) {
+      return agent;
+    }
+    throw new Error(`Agent '${agentId}' was not found while building API projection.`);
+  }
+}

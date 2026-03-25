@@ -37,6 +37,8 @@ This makes Electron the host-level boundary where local capabilities become avai
 - canonical asset operations
 - agent authoring/configuration operations (`create/update/get/list/delete/archive`, goal/policy/tool/memory/strategy configuration, and configuration validation)
 
+Agent authoring backend responses now use a hardened projection envelope (`agent`, `taxonomy`, optional `contract`) so desktop transport keeps read semantics aligned with `CompositionTaxonomyClassifier`/`CompositionAssetContractResolver`.
+
 `electron/shared/DesktopContracts.ts` defines the TypeScript contracts for those capabilities, which is a good practice because it creates a typed interface between host and renderer.
 
 ## Why this matters architecturally

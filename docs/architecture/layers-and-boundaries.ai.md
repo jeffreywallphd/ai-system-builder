@@ -45,6 +45,7 @@ The architecture is mostly clean, but not all write actions are modeled as appli
   - validation is now explicitly reusable for both create and update pathways (`mode: create|update`), including update-time immutable-id checks.
   - policy/sandbox/trust contradictions now emit explicit cross-field issue codes (for example required-vs-denied permission conflicts, sandbox denial vs required approval conflicts, and malformed tool-scope approvals) rather than relying only on generic domain fallback errors.
   - desktop backend transport now exposes thin agent-authoring IPC handlers (`ai-loom-desktop-agents:*`) that delegate to authoring use cases instead of re-implementing domain/application rules in transport.
+  - API read-model DTOs are now hardened as composition-native projections (`agent` + taxonomy classification + optional contract projection) so transport contracts remain aligned with shared composition seams.
   - test coverage now includes SQLite-backed authoring integration checks for CRUD + goal/policy/tool/memory/strategy flows plus API mapping/error-path checks so real repository seams are exercised directly.
 
 ## TODO

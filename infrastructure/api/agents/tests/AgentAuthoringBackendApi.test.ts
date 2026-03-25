@@ -66,22 +66,25 @@ describe("AgentAuthoringBackendApi", () => {
     const api = new AgentAuthoringBackendApi(new InMemoryAgentRepository());
     const created = await api.createAgent(createRequest("agent:api:crud"));
     expect(created.ok).toBe(true);
-    expect(created.data?.id).toBe("agent:api:crud");
+    expect(created.data?.agent.id).toBe("agent:api:crud");
+    expect(created.data?.taxonomy.semanticRole).toBe("agent");
+    expect(created.data?.contract?.version).toBe("1.0.0");
 
     const listed = await api.listAgents();
     expect(listed.ok).toBe(true);
     expect(listed.data).toHaveLength(1);
+    expect(listed.data?.[0]?.agent.id).toBe("agent:api:crud");
 
     const configuredStrategy = await api.configureStrategy("agent:api:crud", {
       strategyId: "deterministic",
       mode: "deterministic-linear",
     });
     expect(configuredStrategy.ok).toBe(true);
-    expect(configuredStrategy.data?.planningStrategy.strategyId).toBe("deterministic");
+    expect(configuredStrategy.data?.agent.planningStrategy.strategyId).toBe("deterministic");
 
     const archived = await api.archiveAgent("agent:api:crud");
     expect(archived.ok).toBe(true);
-    expect(archived.data?.status).toBe("archived");
+    expect(archived.data?.agent.status).toBe("archived");
 
     const deleted = await api.deleteAgent("agent:api:crud");
     expect(deleted.ok).toBe(true);
@@ -152,5 +155,23 @@ describe("AgentAuthoringBackendApi", () => {
     expect(validation.data?.issues.some((issue) => issue.code === "strategy-id-missing")).toBe(true);
     expect(validation.data?.issues.some((issue) => issue.code === "memory-asset-id-noncanonical")).toBe(true);
   });
-});
 
+  it("returns projected contract/taxonomy read models for get and list without agent-only semantics", async () => {
+    const api = new AgentAuthoringBackendApi(new InMemoryAgentRepository());
+    await api.createAgent(createRequest("agent:api:projection"));
+
+    const loaded = await api.getAgent("agent:api:projection");
+    expect(loaded.ok).toBe(true);
+    expect(loaded.data?.taxonomy).toEqual({
+      structuralKind: "composite",
+      semanticRole: "agent",
+      behaviorKind: "autonomous",
+    });
+    expect(loaded.data?.contract?.parameters.some((parameter) => parameter.id === "planningStrategy")).toBe(true);
+
+    const listed = await api.listAgents(false);
+    expect(listed.ok).toBe(true);
+    expect(listed.data?.[0]?.taxonomy.semanticRole).toBe("agent");
+    expect(listed.data?.[0]?.contract?.output.description.includes("Agent execution session")).toBe(true);
+  });
+});
