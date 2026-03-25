@@ -71,4 +71,12 @@ export class AgentService {
     const agents = await this.repository.list();
     return Object.freeze(agents.map((agent) => toAgentReadModel(agent)));
   }
+
+  public async archiveAgent(id: string): Promise<Agent> {
+    return this.updateAgent(id, { status: "archived" });
+  }
+
+  public async deleteAgent(id: string): Promise<boolean> {
+    return this.repository.delete(id.trim());
+  }
 }

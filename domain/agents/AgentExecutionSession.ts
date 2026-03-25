@@ -27,6 +27,16 @@ export interface AgentExecutionDiagnosticReference {
   readonly assetVersionId?: string;
 }
 
+export interface AgentExecutionStepOutcome {
+  readonly stepId: string;
+  readonly status: "completed" | "failed" | "cancelled" | "blocked";
+  readonly attempts: number;
+  readonly toolId?: string;
+  readonly output?: string;
+  readonly outputAssetId?: AssetId;
+  readonly errorMessage?: string;
+}
+
 export interface AgentExecutionSession {
   readonly id: string;
   readonly agentId: string;
@@ -34,6 +44,7 @@ export interface AgentExecutionSession {
   readonly status: AgentExecutionSessionStatus;
   readonly executionRuns: ReadonlyArray<AgentExecutionRunReference>;
   readonly diagnostics: ReadonlyArray<AgentExecutionDiagnosticReference>;
+  readonly stepOutcomes: ReadonlyArray<AgentExecutionStepOutcome>;
   readonly startTime: string;
   readonly endTime?: string;
 }
@@ -108,6 +119,35 @@ function normalizeDiagnostics(
   return Object.freeze(normalized);
 }
 
+function normalizeStepOutcomes(
+  values: ReadonlyArray<AgentExecutionStepOutcome> | undefined,
+): ReadonlyArray<AgentExecutionStepOutcome> {
+  const dedupedByStepId = new Map<string, AgentExecutionStepOutcome>();
+  for (const value of values ?? []) {
+    const stepId = normalizeRequired(value.stepId, "Agent execution step outcome stepId");
+    if (!["completed", "failed", "cancelled", "blocked"].includes(value.status)) {
+      throw new Error(`Agent execution step outcome status '${String(value.status)}' is invalid.`);
+    }
+    if (!Number.isInteger(value.attempts) || value.attempts <= 0) {
+      throw new Error("Agent execution step outcome attempts must be a positive integer.");
+    }
+    const outputAssetId = value.outputAssetId ? AssetId.from(value.outputAssetId) : undefined;
+    if (outputAssetId && !outputAssetId.toString().startsWith("asset:")) {
+      throw new Error(`Agent execution step outcome asset id '${outputAssetId.toString()}' must use canonical asset id format.`);
+    }
+    dedupedByStepId.set(stepId, Object.freeze({
+      stepId,
+      status: value.status,
+      attempts: value.attempts,
+      toolId: value.toolId?.trim() || undefined,
+      output: value.output?.trim() || undefined,
+      outputAssetId,
+      errorMessage: value.errorMessage?.trim() || undefined,
+    }));
+  }
+  return Object.freeze([...dedupedByStepId.values()]);
+}
+
 function assertValidLifecycleTransition(
   from: AgentExecutionSessionStatus,
   to: AgentExecutionSessionStatus,
@@ -143,6 +183,7 @@ export function createAgentExecutionSession(input: {
   readonly status?: AgentExecutionSessionStatus;
   readonly executionRuns?: ReadonlyArray<AgentExecutionRunReference>;
   readonly diagnostics?: ReadonlyArray<AgentExecutionDiagnosticReference>;
+  readonly stepOutcomes?: ReadonlyArray<AgentExecutionStepOutcome>;
   readonly startTime?: Date;
 }): AgentExecutionSession {
   const start = input.startTime ?? new Date();
@@ -161,6 +202,7 @@ export function createAgentExecutionSession(input: {
 
   const executionRuns = Object.freeze((input.executionRuns ?? []).map((entry) => normalizeExecutionRun(entry, planId)));
   const diagnostics = normalizeDiagnostics(input.diagnostics);
+  const stepOutcomes = normalizeStepOutcomes(input.stepOutcomes);
 
   return Object.freeze({
     id: normalizeRequired(input.id, "Agent execution session id"),
@@ -169,6 +211,7 @@ export function createAgentExecutionSession(input: {
     status,
     executionRuns,
     diagnostics,
+    stepOutcomes,
     startTime: start.toISOString(),
     endTime: undefined,
   });
@@ -180,6 +223,7 @@ export function transitionAgentExecutionSession(
     readonly status: AgentExecutionSessionStatus;
     readonly appendExecutionRun?: AgentExecutionRunReference;
     readonly appendDiagnostic?: AgentExecutionDiagnosticReference;
+    readonly appendStepOutcome?: AgentExecutionStepOutcome;
     readonly endedAt?: Date;
   },
 ): AgentExecutionSession {
@@ -196,6 +240,9 @@ export function transitionAgentExecutionSession(
   const diagnostics = transition.appendDiagnostic
     ? normalizeDiagnostics([...session.diagnostics, transition.appendDiagnostic])
     : session.diagnostics;
+  const stepOutcomes = transition.appendStepOutcome
+    ? normalizeStepOutcomes([...session.stepOutcomes, transition.appendStepOutcome])
+    : session.stepOutcomes;
 
   const terminalStatus = isTerminalStatus(transition.status);
   const endTime = terminalStatus ? (transition.endedAt ?? new Date()).toISOString() : undefined;
@@ -208,6 +255,7 @@ export function transitionAgentExecutionSession(
     status: transition.status,
     executionRuns,
     diagnostics,
+    stepOutcomes,
     endTime,
   });
 }

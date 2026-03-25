@@ -32,6 +32,10 @@ class InMemoryAgentRepository implements IAgentRepository {
   async list(): Promise<ReadonlyArray<Agent>> {
     return [...this.store.values()];
   }
+
+  async delete(id: string): Promise<boolean> {
+    return this.store.delete(id.trim());
+  }
 }
 
 class InMemoryAssetRepo implements IAssetCatalog, IAssetVersionRepository {

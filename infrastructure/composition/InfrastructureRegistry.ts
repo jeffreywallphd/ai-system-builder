@@ -11,6 +11,8 @@ import { LocalWorkflowRepository } from "../filesystem/LocalWorkflowRepository";
 import { LocalContextPackageRepository } from "../filesystem/LocalContextPackageRepository";
 import { LocalContextRecipeRepository } from "../filesystem/LocalContextRecipeRepository";
 import { SqliteAssetSystemRepository } from "../filesystem/SqliteAssetSystemRepository";
+import { SqliteAgentExecutionSessionRepository } from "../filesystem/agents/SqliteAgentExecutionSessionRepository";
+import { SqliteAgentRepository } from "../filesystem/agents/SqliteAgentRepository";
 import { Neo4jAssetLineageGraphProjectionSink } from "../graph/Neo4jAssetLineageGraphProjectionSink";
 import { NoopNeo4jCypherExecutor } from "../graph/NoopNeo4jCypherExecutor";
 import { DependencyContainer, type DependencyToken } from "./DependencyContainer";
@@ -84,6 +86,8 @@ import { PublishDurableEntityToAssetSystemUseCase } from "../../application/asse
 import type { IMcpToolRegistryRepository } from "../../application/ports/interfaces/IMcpToolRegistryRepository";
 import type { IMcpToolSecretRepository } from "../../application/ports/interfaces/IMcpToolSecretRepository";
 import type { IMcpToolExecutionAuditSink } from "../../application/ports/interfaces/IMcpToolExecutionAuditSink";
+import type { IAgentRepository } from "../../application/ports/interfaces/IAgentRepository";
+import type { IAgentExecutionSessionRepository } from "../../application/ports/interfaces/IAgentExecutionSessionRepository";
 
 export const TOKENS = Object.freeze({
   EnvironmentConfig: Symbol("EnvironmentConfig"),
@@ -120,6 +124,8 @@ export const TOKENS = Object.freeze({
   NodeImplementationRegistry: Symbol("NodeImplementationRegistry"),
   ExecutionApplicationInfrastructure: Symbol("ExecutionApplicationInfrastructure"),
   AssetSystemRepository: Symbol("AssetSystemRepository"),
+  AgentRepository: Symbol("AgentRepository"),
+  AgentExecutionSessionRepository: Symbol("AgentExecutionSessionRepository"),
   AssetLineageGraphProjectionSink: Symbol("AssetLineageGraphProjectionSink"),
   ExecutionAssetLineageRecorder: Symbol("ExecutionAssetLineageRecorder"),
   CanonicalAssetIdentityService: Symbol("CanonicalAssetIdentityService"),
@@ -362,6 +368,16 @@ export class InfrastructureRegistry {
 
     container.registerSingleton(TOKENS.AssetSystemRepository, () => {
       return new SqliteAssetSystemRepository(`${options.paths.assetsDirectory}/asset-system.sqlite`);
+    });
+
+    container.registerSingleton<IAgentRepository>(TOKENS.AgentRepository, () => {
+      return new SqliteAgentRepository(`${options.paths.workflowsDirectory}/../agents/agents.sqlite`);
+    });
+
+    container.registerSingleton<IAgentExecutionSessionRepository>(TOKENS.AgentExecutionSessionRepository, () => {
+      return new SqliteAgentExecutionSessionRepository(
+        `${options.paths.workflowsDirectory}/../agents/agent-execution-sessions.sqlite`,
+      );
     });
 
     container.registerSingleton<IAssetLineageGraphProjectionSink>(TOKENS.AssetLineageGraphProjectionSink, () => {
