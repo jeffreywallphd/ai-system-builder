@@ -36,7 +36,9 @@ The architecture is mostly clean, but not all write actions are modeled as appli
   - policy authoring updates are now centralized via `AgentPolicyConfiguration` operations for tool access, safety approvals/sandbox posture, and cost/execution limits.
   - new agent-facing artifacts/read models must flow through shared composition seams (`CompositionTaxonomyClassifier` or `CompositionAssetContractResolver`) rather than agent-only presentation semantics.
   - memory configuration updates are now explicitly validated for asset-native references, retrieval compatibility, writable/retrievable/session-only coherence, and retention contradictions before persistence.
+  - tool configuration updates are now explicitly validated and normalized as canonical policy semantics (`AgentPolicy.toolAccess` only): canonical tool ids, MCP binding consistency against allowed ids, and scope-constraint integrity are enforced in inner-layer normalization before persistence.
   - memory validation now emits explicit structured issues for non-canonical/malformed asset refs, duplicate refs, malformed asset-version ids, invalid semantic/recency settings, and retention/policy contradictions (not only generic fallback errors).
+  - tool identity normalization now reuses a shared domain seam (`domain/agents/AgentToolIdentity.ts`) across policy, goals, plan, and application validation so canonical identity rules are not duplicated across services.
   - strategy configuration is now explicitly bounded to supported descriptors (deterministic id/mode only in this slice); unsupported strategy combinations are rejected deterministically.
   - strategy validation now also emits explicit structured issues for missing strategy id and unsupported id/mode combinations.
   - whole-agent validation issues now include machine-friendly sectioning (`goals`/`tools`/`memory`/`strategy`/etc.) and are reusable across CRUD/configuration/API via `AgentConfigurationValidationError`.

@@ -116,7 +116,10 @@ Use "workflow-first", "tool projection", and "truthful execution provenance" whe
 - Planner output is a bounded ordered step plan (`toolId` + goal/action) that is executed through existing tool capability execution seams.
 - For MCP steps, execution still flows through MCP execution use cases, preserving trust policy/auth/approval/sandbox/audit behavior.
 - For workflow-projected tools, execution still flows through workflow tool execution (`RunToolUseCase` path).
+- Phase 6.5 tool authoring is now explicitly structured on `AgentPolicy.toolAccess` (no second tool-config model): allowed tool ids must be canonical, optional MCP bindings must match canonical MCP identity and allowed ids, and per-tool scope constraints must target allowed tools with non-empty canonical scope ids.
 - Agent memory writes/reads are asset-backed and version-aware so execution outcomes can be persisted and reused by later planning.
+- Phase 6.6 memory authoring stays asset-native on `AgentMemoryConfiguration`: asset references/retrieval/writable/retrievable/session-only/retention combinations are validated as one coherent contract so planner/runtime consumers can use the shape directly.
+- Any new agent-facing artifact/read model added around tools or memory must still go through shared composition seams (`CompositionTaxonomyClassifier` classification or `CompositionAssetContractResolver` projection), not agent-only presentation contracts.
 - Phase 3 completion now includes deterministic memory retrieval filters (type/tag/metadata/recency), bounded working-memory snapshots on execution read models, and retention-gated durable writes.
 - Phase 5 now emits deterministic execution-native runtime events (execution/session start, plan/governance/mapping, per-attempt step lifecycle, retry schedule/exhaustion, memory/session persistence, terminal outcome) with no UI/WebSocket runtime added.
 - Retry classification is explicit and bounded (`AgentRuntimeRetryPolicy.classifyFailure` + optional execution-result metadata hints), with heuristic fallback only when runtime metadata is absent.

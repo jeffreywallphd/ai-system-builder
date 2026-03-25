@@ -308,11 +308,26 @@ describe("Agent authoring use cases", () => {
       allowedToolIds: ["not-canonical-tool"],
       scopeConstraints: [],
     })).rejects.toThrow("validation failed");
+    await expect(configureTools.execute("agent:authoring:validation", {
+      allowedToolIds: ["mcp:local:echo"],
+      allowedMcpTools: [{ toolId: "mcp:other:echo", serverId: "other", toolName: "echo" }],
+      scopeConstraints: [],
+    })).rejects.toThrow("validation failed");
 
     const configureMemory = new ConfigureAgentMemoryUseCase(repository);
     await expect(configureMemory.execute("agent:authoring:validation", {
       ...createRequest("agent:authoring:validation").memory,
       retrieval: { strategy: "latest-first", maxEntries: 5, semantic: { minRelevanceScore: 0.4 } },
+    })).rejects.toThrow("validation failed");
+    await expect(configureMemory.execute("agent:authoring:validation", {
+      ...createRequest("agent:authoring:validation").memory,
+      retrieval: { strategy: "hybrid", maxEntries: 5, memoryTypes: ["working"] },
+      policy: {
+        retrievableTypes: ["working"],
+        writableTypes: ["working"],
+        sessionOnlyTypes: ["working"],
+        retention: { mode: "bounded", maxDurableEntries: 10 },
+      },
     })).rejects.toThrow("validation failed");
 
     const configureStrategy = new ConfigureAgentStrategyUseCase(repository);

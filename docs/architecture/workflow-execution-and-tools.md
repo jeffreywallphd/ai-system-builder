@@ -152,6 +152,12 @@ For desktop tooling, this is a healthy architectural choice because users need t
 ### Publishing model
 Tool metadata lives on the workflow metadata object (`isPublishedAsTool`, `toolTitle`, `toolDescription`, `toolCategory`, `toolSlug`). This means tool publication is a property of a workflow rather than a separate top-level entity.
 
+### Agent structured tool/memory configuration boundaries (Phase 6.5/6.6)
+- Agent tool authoring remains on `AgentPolicy.toolAccess` (no parallel tool configuration model).
+- Allowed tool ids must be canonical (`mcp:*:*` or `workflow:*`), MCP bindings must match canonical identity and be consistent with allowed tool ids, and scope constraints must target allowed tools with non-empty canonical scope identifiers.
+- Agent memory authoring remains asset-native on `AgentMemoryConfiguration` and validates retrieval/writable/retrievable/session-only/retention combinations as one coherent backend-ready contract.
+- New agent-facing artifacts/read models for these slices must classify via `CompositionTaxonomyClassifier` or project via `CompositionAssetContractResolver` instead of introducing agent-only presentation semantics.
+
 ### Projection model
 The application layer provides projection services:
 - `application/projection/WorkflowProjectionService.ts`

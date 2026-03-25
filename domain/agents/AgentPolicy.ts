@@ -6,6 +6,7 @@ import type {
   McpToolSandboxPolicy,
 } from "../mcp/McpToolTrust";
 import { isMcpToolId, parseMcpToolId, type McpToolIdentity } from "../mcp/McpToolIdentity";
+import { normalizeAgentToolId } from "./AgentToolIdentity";
 
 export const AgentApprovalStatuses = Object.freeze({
   pending: "pending",
@@ -117,25 +118,7 @@ function normalizeList(values: ReadonlyArray<string> | undefined): ReadonlyArray
 }
 
 function normalizeToolId(value: string): string {
-  const normalized = normalizeRequired(value, "Agent policy allowed tool id");
-
-  if (normalized.startsWith("mcp:")) {
-    const parts = normalized.split(":");
-    if (parts.length !== 3 || parts.some((part) => !part.trim())) {
-      throw new Error(`Agent policy allowed tool id '${normalized}' is malformed.`);
-    }
-    return normalized;
-  }
-
-  if (normalized.startsWith("workflow:")) {
-    const parts = normalized.split(":");
-    if (parts.length < 2 || parts.slice(1).some((part) => !part.trim())) {
-      throw new Error(`Agent policy allowed tool id '${normalized}' is malformed.`);
-    }
-    return normalized;
-  }
-
-  throw new Error(`Agent policy allowed tool id '${normalized}' is malformed.`);
+  return normalizeAgentToolId(value, "Agent policy allowed tool id");
 }
 
 function normalizeScope(scope: string, toolId: string): string {
