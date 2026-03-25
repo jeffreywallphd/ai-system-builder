@@ -202,6 +202,8 @@ This keeps the platform extensible without making external runtimes the center o
 ## Direction 4 memory interaction with execution (Phase 3 completion note)
 
 - Agent execution now carries a bounded working-memory snapshot through execution read models, including retrieved memory references, plan-asset references, and per-step execution-output summaries.
+
+- Direction 4 Phase 4 now treats agent-targeted MCP tool calls as execution-native units (`mcp-tool-invocation`) via the existing execution plan seam and applies deterministic plan/execute-time governance checks against MCP registry/trust contracts (tool availability, permission/approval, sandbox, and basic schema expectations) without introducing a second orchestration path.
 - Memory retrieval remains deterministic and asset/version-backed with bounded filtering (type, tags, metadata, `beforeTimestamp`) and policy-enforced exclusion of session-only memory types from durable retrieval.
 - Memory writes from execution outcomes remain asset-backed and lineage-friendly, and policy now enforces writable/session-only constraints plus bounded durable retention capacity in practice.
 

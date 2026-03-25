@@ -5,6 +5,7 @@ import type {
   McpToolPermissionApprovalStatus,
   McpToolSandboxPolicy,
 } from "../mcp/McpToolTrust";
+import { isMcpToolId, parseMcpToolId, type McpToolIdentity } from "../mcp/McpToolIdentity";
 
 export const AgentApprovalStatuses = Object.freeze({
   pending: "pending",
@@ -50,6 +51,12 @@ export type AgentExtendedPermissionId =
 
 export type AgentPermissionId = McpToolPermissionScope | AgentExtendedPermissionId;
 
+export interface AgentMcpToolBinding {
+  readonly toolId: string;
+  readonly serverId: string;
+  readonly toolName: string;
+}
+
 export interface AgentToolScopeConstraint {
   readonly toolId: string;
   readonly allowedScopes: ReadonlyArray<string>;
@@ -57,6 +64,7 @@ export interface AgentToolScopeConstraint {
 
 export interface AgentToolAccessPolicy {
   readonly allowedToolIds: ReadonlyArray<string>;
+  readonly allowedMcpTools?: ReadonlyArray<AgentMcpToolBinding>;
   readonly scopeConstraints: ReadonlyArray<AgentToolScopeConstraint>;
 }
 
@@ -252,8 +260,45 @@ function normalizeSandboxPolicy(value: McpToolSandboxPolicy | undefined): McpToo
   });
 }
 
+function deriveAllowedMcpTools(
+  allowedToolIds: ReadonlyArray<string>,
+  explicitBindings?: ReadonlyArray<AgentMcpToolBinding>,
+): ReadonlyArray<AgentMcpToolBinding> {
+  const derived = new Map<string, AgentMcpToolBinding>();
+
+  for (const toolId of allowedToolIds) {
+    if (!isMcpToolId(toolId)) {
+      continue;
+    }
+    const identity: McpToolIdentity = parseMcpToolId(toolId);
+    derived.set(identity.toolId, Object.freeze({
+      toolId: identity.toolId,
+      serverId: identity.serverId,
+      toolName: identity.toolName,
+    }));
+  }
+
+  for (const binding of explicitBindings ?? []) {
+    const identity = parseMcpToolId(binding.toolId);
+    if (!allowedToolIds.includes(identity.toolId)) {
+      throw new Error(`Agent policy allowedMcpTools entry '${identity.toolId}' must also be present in allowedToolIds.`);
+    }
+    if (binding.serverId.trim() !== identity.serverId || binding.toolName.trim() !== identity.toolName) {
+      throw new Error(`Agent policy allowedMcpTools entry '${identity.toolId}' must match canonical serverId/toolName.`);
+    }
+    derived.set(identity.toolId, Object.freeze({
+      toolId: identity.toolId,
+      serverId: identity.serverId,
+      toolName: identity.toolName,
+    }));
+  }
+
+  return Object.freeze([...derived.values()].sort((left, right) => left.toolId.localeCompare(right.toolId)));
+}
+
 export function normalizeAgentPolicy(policy: AgentPolicy): AgentPolicy {
   const allowedToolIds = Object.freeze(normalizeList(policy.toolAccess?.allowedToolIds).map((toolId) => normalizeToolId(toolId)));
+  const allowedMcpTools = deriveAllowedMcpTools(allowedToolIds, policy.toolAccess?.allowedMcpTools);
   if (allowedToolIds.length === 0) {
     throw new Error("Agent policy must include at least one allowed tool.");
   }
@@ -363,6 +408,7 @@ export function normalizeAgentPolicy(policy: AgentPolicy): AgentPolicy {
   return Object.freeze({
     toolAccess: Object.freeze({
       allowedToolIds,
+      allowedMcpTools,
       scopeConstraints: toolScopeConstraints,
     }),
     restrictedActions: normalizeList(policy.restrictedActions),

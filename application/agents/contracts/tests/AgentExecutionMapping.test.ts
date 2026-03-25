@@ -38,7 +38,7 @@ describe("Agent execution backbone mapping", () => {
 
     expect(executionPlan.id).toBe("agent-plan:1");
     expect(executionPlan.units[1]?.dependsOn).toEqual(["step-1"]);
-    expect(executionPlan.units[0]?.kind).toBe("agent-tool-step");
+    expect(executionPlan.units[0]?.kind).toBe("mcp-tool-invocation");
   });
 
   it("maps execution-oriented AgentPlan contracts into execution-native backbone structures", () => {
@@ -69,6 +69,7 @@ describe("Agent execution backbone mapping", () => {
     expect(mapped.unitPayloadByUnitId.s1?.expectedOutputKey).toBe("collect.result");
     expect(mapped.unitPayloadByUnitId.s1?.inputAssetIds[0]?.toString()).toBe("asset:memory:a");
     expect(mapped.unitPayloadByUnitId.s1?.inputStepOutputs).toEqual([]);
+    expect(mapped.unitPayloadByUnitId.s1?.mcpInvocation?.serverId).toBe("local");
   });
 
   it("creates payloads that preserve agent/session correlation identifiers", () => {
@@ -83,6 +84,7 @@ describe("Agent execution backbone mapping", () => {
     expect(payload.agentId).toBe("agent-b");
     expect(payload.toolId).toBe("mcp:local:echo");
     expect(payload.goalId).toBe("goal-2");
+    expect(payload.mcpInvocation?.toolName).toBe("echo");
   });
 
   it("exposes an explicit mapping seam with payloads keyed by execution unit id", () => {

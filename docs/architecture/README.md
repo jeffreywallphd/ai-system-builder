@@ -144,6 +144,8 @@ The runtime is not a single path. The system currently supports multiple executi
   - execution read models now include bounded working-memory snapshots and memory-write outcomes so later evaluation/replanning layers can consume session context without introducing a second orchestration model.
   - memory policy retention is now operationally enforced in the write pipeline via bounded durable-capacity gating.
 
+- Direction 4 (Phase 4, MCP tool integration inner slice) now keeps MCP as the external tool-protocol boundary while remaining execution-native: agent policy carries canonical MCP bindings, agent mapping emits `mcp-tool-invocation` execution units, and plan/execute-time MCP governance checks reuse existing registry/trust services instead of introducing a parallel agent runtime.
+
 ## TODO
 
 - The repository still contains **two composition stories**: the generic DI bootstrap in `infrastructure/composition/` and the renderer-specific manual composition in `ui/composition/createUiDependencies.ts`. Execution-engine wiring, execution-run persistence, MCP server-operation handler registration, and execution-history/detail projection services now share more of the same outer-layer path across those roots, but broader composition convergence is still future work.

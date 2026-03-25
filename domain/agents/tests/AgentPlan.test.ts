@@ -18,6 +18,12 @@ describe("AgentPlan", () => {
             action: "Fetch data",
             expectedOutputKey: "raw",
             inputReferences: [{ kind: "asset", assetId: new AssetId("asset:memory:seed") }],
+            toolInvocation: {
+              kind: "mcp",
+              toolId: "mcp:local:fetch",
+              structuredInput: { query: "seed" },
+              authContextRef: "auth:project:default",
+            },
           },
         },
         {
@@ -36,6 +42,7 @@ describe("AgentPlan", () => {
 
     expect(plan.steps).toHaveLength(2);
     expect(plan.steps[1]?.dependsOnStepIds).toEqual(["s1"]);
+    expect(plan.steps[0]?.intent.toolInvocation?.kind).toBe("mcp");
   });
 
   it("rejects invalid references, cycles, and malformed output keys", () => {

@@ -2,6 +2,7 @@ import { ExecutionPlan, ExecutionUnitKinds, type IExecutionUnitDefinition } from
 import type { AgentExecutionSession } from "../../../domain/agents/AgentExecutionSession";
 import { AssetId } from "../../../domain/assets/AssetId";
 import type { AgentPlan, AgentPlanStep } from "../../../domain/agents/AgentPlan";
+import { isMcpToolId, parseMcpToolId } from "../../../domain/mcp/McpToolIdentity";
 
 export interface AgentPlanStepOutputReference {
   readonly stepId: string;
@@ -17,6 +18,11 @@ export interface AgentPlanStepMappingInput {
     readonly inputAssetIds?: ReadonlyArray<AssetId>;
     readonly inputStepOutputs?: ReadonlyArray<AgentPlanStepOutputReference>;
     readonly expectedOutputKey?: string;
+    readonly mcpInvocation?: {
+      readonly structuredInput?: Readonly<Record<string, unknown>>;
+      readonly expectedOutputSchema?: Readonly<Record<string, unknown>>;
+      readonly authContextRef?: string;
+    };
   };
   readonly dependsOnStepIds?: ReadonlyArray<string>;
 }
@@ -37,6 +43,14 @@ export interface AgentExecutionUnitPayload {
   readonly inputAssetIds: ReadonlyArray<AssetId>;
   readonly inputStepOutputs: ReadonlyArray<AgentPlanStepOutputReference>;
   readonly expectedOutputKey?: string;
+  readonly mcpInvocation?: {
+    readonly toolId: string;
+    readonly serverId: string;
+    readonly toolName: string;
+    readonly structuredInput?: Readonly<Record<string, unknown>>;
+    readonly expectedOutputSchema?: Readonly<Record<string, unknown>>;
+    readonly authContextRef?: string;
+  };
 }
 
 export interface AgentExecutionBackboneMapping {
@@ -90,11 +104,25 @@ function normalizeStep(step: AgentPlanStepMappingInput): AgentPlanStepMappingInp
       })),
       inputStepOutputs: Object.freeze((step.intent?.inputStepOutputs ?? []).map((reference) => normalizeStepOutputReference(reference))),
       expectedOutputKey: normalizeExpectedOutputKey(step.intent?.expectedOutputKey),
+      mcpInvocation: step.intent?.mcpInvocation
+        ? Object.freeze({
+            structuredInput: cloneSchemaRecord(step.intent.mcpInvocation.structuredInput),
+            expectedOutputSchema: cloneSchemaRecord(step.intent.mcpInvocation.expectedOutputSchema),
+            authContextRef: step.intent.mcpInvocation.authContextRef?.trim() || undefined,
+          })
+        : undefined,
     }),
     dependsOnStepIds: Object.freeze(
       [...new Set((step.dependsOnStepIds ?? []).map((dependency) => normalizeRequired(dependency, "Agent plan dependency id")))],
     ),
   });
+}
+
+function cloneSchemaRecord(value: Readonly<Record<string, unknown>> | undefined): Readonly<Record<string, unknown>> | undefined {
+  if (!value) {
+    return undefined;
+  }
+  return Object.freeze(JSON.parse(JSON.stringify(value)) as Record<string, unknown>);
 }
 
 function validateDependencies(steps: ReadonlyArray<AgentPlanStepMappingInput>): void {
@@ -181,6 +209,13 @@ function toMappingStep(step: AgentPlanStep): AgentPlanStepMappingInput {
     intent: Object.freeze({
       action: step.intent.action,
       expectedOutputKey: step.intent.expectedOutputKey,
+      mcpInvocation: step.intent.toolInvocation?.kind === "mcp"
+        ? Object.freeze({
+            structuredInput: step.intent.toolInvocation.structuredInput,
+            expectedOutputSchema: step.intent.toolInvocation.expectedOutputSchema,
+            authContextRef: step.intent.toolInvocation.authContextRef,
+          })
+        : undefined,
       inputAssetIds: Object.freeze(
         step.intent.inputReferences
           .filter((reference) => reference.kind === "asset")
@@ -234,6 +269,22 @@ export function buildAgentExecutionUnitPayload(input: {
     inputAssetIds: normalizedStep.intent.inputAssetIds ?? [],
     inputStepOutputs: normalizedStep.intent.inputStepOutputs ?? [],
     expectedOutputKey: normalizedStep.intent.expectedOutputKey,
+    mcpInvocation: resolveMcpInvocationPayload(normalizedStep),
+  });
+}
+
+function resolveMcpInvocationPayload(step: AgentPlanStepMappingInput): AgentExecutionUnitPayload["mcpInvocation"] {
+  if (!isMcpToolId(step.toolId)) {
+    return undefined;
+  }
+  const identity = parseMcpToolId(step.toolId);
+  return Object.freeze({
+    toolId: identity.toolId,
+    serverId: identity.serverId,
+    toolName: identity.toolName,
+    structuredInput: cloneSchemaRecord(step.intent.mcpInvocation?.structuredInput),
+    expectedOutputSchema: cloneSchemaRecord(step.intent.mcpInvocation?.expectedOutputSchema),
+    authContextRef: step.intent.mcpInvocation?.authContextRef?.trim() || undefined,
   });
 }
 
@@ -249,7 +300,7 @@ export function mapAgentExecutionToBackbone(input: AgentExecutionBackboneMapping
 
   const units: IExecutionUnitDefinition[] = normalizedSteps.map((step) => ({
     id: step.stepId,
-    kind: ExecutionUnitKinds.agentToolStep,
+    kind: isMcpToolId(step.toolId) ? ExecutionUnitKinds.mcpToolInvocation : ExecutionUnitKinds.agentToolStep,
     label: step.intent.action,
     dependsOn: step.dependsOnStepIds,
   }));

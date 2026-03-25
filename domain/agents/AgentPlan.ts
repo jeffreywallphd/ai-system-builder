@@ -24,7 +24,18 @@ export interface AgentPlanStepIntent {
   readonly action: string;
   readonly inputReferences: ReadonlyArray<AgentPlanStepInputReference>;
   readonly expectedOutputKey?: string;
+  readonly toolInvocation?: AgentPlanToolInvocation;
 }
+
+export interface AgentPlanMcpToolInvocation {
+  readonly kind: "mcp";
+  readonly toolId: string;
+  readonly structuredInput?: Readonly<Record<string, unknown>>;
+  readonly expectedOutputSchema?: Readonly<Record<string, unknown>>;
+  readonly authContextRef?: string;
+}
+
+export type AgentPlanToolInvocation = AgentPlanMcpToolInvocation;
 
 export interface AgentPlanStep {
   readonly stepId: string;
@@ -101,13 +112,14 @@ function normalizeOutputKey(value: string, field: string): string {
 }
 
 function normalizeStep(input: AgentPlanStep): AgentPlanStep {
+  const normalizedToolId = normalizeToolId(input.toolId);
   const dependsOnStepIds = Object.freeze([...new Set((input.dependsOnStepIds ?? []).map((dependency) => normalizeRequired(dependency, "Agent plan dependency stepId")))]);
   const references = Object.freeze((input.intent.inputReferences ?? []).map((reference) => normalizeInputReference(reference)));
 
   return Object.freeze({
     stepId: normalizeRequired(input.stepId, "Agent plan step id"),
     goalId: input.goalId?.trim() || undefined,
-    toolId: normalizeToolId(input.toolId),
+    toolId: normalizedToolId,
     dependsOnStepIds,
     intent: Object.freeze({
       action: normalizeRequired(input.intent?.action ?? "", "Agent plan step action"),
@@ -115,8 +127,40 @@ function normalizeStep(input: AgentPlanStep): AgentPlanStep {
       expectedOutputKey: input.intent.expectedOutputKey
         ? normalizeOutputKey(input.intent.expectedOutputKey, "Agent plan step expectedOutputKey")
         : undefined,
+      toolInvocation: normalizeToolInvocation(normalizedToolId, input.intent.toolInvocation),
     }),
     metadata: input.metadata ? Object.freeze({ ...input.metadata }) : undefined,
+  });
+}
+
+function cloneSchemaRecord(value: Readonly<Record<string, unknown>> | undefined): Readonly<Record<string, unknown>> | undefined {
+  if (!value) {
+    return undefined;
+  }
+  return Object.freeze(JSON.parse(JSON.stringify(value)) as Record<string, unknown>);
+}
+
+function normalizeToolInvocation(
+  stepToolId: string,
+  invocation: AgentPlanToolInvocation | undefined,
+): AgentPlanToolInvocation | undefined {
+  if (!invocation) {
+    return undefined;
+  }
+  if (invocation.kind !== "mcp") {
+    throw new Error("Agent plan step toolInvocation kind is invalid.");
+  }
+  const invocationToolId = normalizeToolId(invocation.toolId);
+  if (invocationToolId !== stepToolId) {
+    throw new Error(`Agent plan step toolInvocation toolId '${invocationToolId}' must match step toolId '${stepToolId}'.`);
+  }
+
+  return Object.freeze({
+    kind: "mcp",
+    toolId: invocationToolId,
+    structuredInput: cloneSchemaRecord(invocation.structuredInput),
+    expectedOutputSchema: cloneSchemaRecord(invocation.expectedOutputSchema),
+    authContextRef: invocation.authContextRef?.trim() || undefined,
   });
 }
 
