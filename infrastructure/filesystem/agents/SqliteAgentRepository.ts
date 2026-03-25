@@ -2,10 +2,25 @@ import fs from "node:fs";
 import path from "node:path";
 import Database from "better-sqlite3";
 import type { IAgentRepository } from "../../../application/ports/interfaces/IAgentRepository";
-import type { Agent } from "../../../domain/agents/Agent";
+import { createAgent, type Agent } from "../../../domain/agents/Agent";
+import { AssetId } from "../../../domain/assets/AssetId";
 
 interface AgentRow {
   readonly agent_json: string;
+}
+
+interface PersistedAgentSnapshot {
+  readonly id: string;
+  readonly name: string;
+  readonly description?: string;
+  readonly goals: unknown;
+  readonly policy: unknown;
+  readonly planningStrategy: unknown;
+  readonly memory: unknown;
+  readonly execution: unknown;
+  readonly status: unknown;
+  readonly createdAt: unknown;
+  readonly updatedAt: unknown;
 }
 
 const SCHEMA_VERSION = 2;
@@ -173,6 +188,102 @@ export class SqliteAgentRepository implements IAgentRepository {
   }
 
   private parse(value: string): Agent {
-    return JSON.parse(value) as Agent;
+    const snapshot = JSON.parse(value) as PersistedAgentSnapshot;
+    const createdAt = normalizeIsoTimestamp(snapshot.createdAt, "Agent createdAt");
+    const updatedAt = normalizeIsoTimestamp(snapshot.updatedAt, "Agent updatedAt");
+    const normalizedMemory = normalizePersistedMemory(snapshot.memory);
+    const rehydrated = createAgent({
+      id: assertString(snapshot.id, "Agent id"),
+      name: assertString(snapshot.name, "Agent name"),
+      description: typeof snapshot.description === "string" ? snapshot.description : undefined,
+      goals: asReadonlyArray(snapshot.goals, "Agent goals") as Agent["goals"],
+      policy: snapshot.policy as Agent["policy"],
+      planningStrategy: snapshot.planningStrategy as Agent["planningStrategy"],
+      memory: normalizedMemory,
+      execution: snapshot.execution as Agent["execution"],
+      status: snapshot.status as Agent["status"],
+      now: new Date(createdAt),
+    });
+
+    return Object.freeze({
+      ...rehydrated,
+      createdAt,
+      updatedAt,
+    });
   }
+}
+
+function assertString(value: unknown, label: string): string {
+  if (typeof value !== "string") {
+    throw new Error(`${label} is missing from persisted agent snapshot.`);
+  }
+  return value;
+}
+
+function normalizeIsoTimestamp(value: unknown, label: string): string {
+  const normalized = assertString(value, label);
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error(`${label} '${normalized}' is invalid.`);
+  }
+  return normalized;
+}
+
+function asReadonlyArray(value: unknown, label: string): ReadonlyArray<unknown> {
+  if (!Array.isArray(value)) {
+    throw new Error(`${label} is missing from persisted agent snapshot.`);
+  }
+  return value;
+}
+
+function normalizePersistedMemory(value: unknown): Agent["memory"] {
+  if (!value || typeof value !== "object") {
+    throw new Error("Agent memory is missing from persisted agent snapshot.");
+  }
+
+  const memory = value as {
+    readonly agentId?: unknown;
+    readonly assets?: unknown;
+    readonly retrieval?: unknown;
+    readonly policy?: unknown;
+    readonly revision?: unknown;
+  };
+
+  return Object.freeze({
+    agentId: assertString(memory.agentId, "Agent memory agentId"),
+    assets: Object.freeze(asReadonlyArray(memory.assets, "Agent memory assets").map((entry) => {
+      if (!entry || typeof entry !== "object") {
+        throw new Error("Persisted agent memory asset reference is malformed.");
+      }
+      const snapshot = entry as {
+        readonly assetId?: unknown;
+        readonly assetVersionId?: unknown;
+        readonly memoryType?: unknown;
+        readonly lineageTag?: unknown;
+      };
+      const rawAssetId = resolvePersistedAssetId(snapshot.assetId);
+      return Object.freeze({
+        assetId: AssetId.from(rawAssetId),
+        assetVersionId: typeof snapshot.assetVersionId === "string" ? snapshot.assetVersionId : undefined,
+        memoryType: assertString(snapshot.memoryType, "Agent memory asset memoryType") as Agent["memory"]["assets"][number]["memoryType"],
+        lineageTag: typeof snapshot.lineageTag === "string" ? snapshot.lineageTag : undefined,
+      });
+    })),
+    retrieval: memory.retrieval as Agent["memory"]["retrieval"],
+    policy: memory.policy as Agent["memory"]["policy"],
+    revision: memory.revision as Agent["memory"]["revision"],
+  });
+}
+
+function resolvePersistedAssetId(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (value && typeof value === "object" && "value" in value) {
+    const normalized = (value as { readonly value?: unknown }).value;
+    if (typeof normalized === "string") {
+      return normalized;
+    }
+  }
+  throw new Error("Persisted agent memory assetId is malformed.");
 }

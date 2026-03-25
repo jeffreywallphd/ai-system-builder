@@ -4,6 +4,7 @@ import path from "node:path";
 import { tmpdir } from "node:os";
 import Database from "better-sqlite3";
 import { createAgent } from "../../../../domain/agents/Agent";
+import { GetAgentUseCase } from "../../../../application/agents/GetAgentUseCase";
 import { AssetId } from "../../../../domain/assets/AssetId";
 import { SqliteAgentRepository } from "../SqliteAgentRepository";
 
@@ -88,6 +89,11 @@ describe("SqliteAgentRepository", () => {
     const loaded = await repository.get(saved.id);
     expect(loaded?.id).toBe("agent:repo:1");
     expect(loaded).toEqual(saved);
+    expect(loaded?.memory.assets[0]?.assetId).toBeInstanceOf(AssetId);
+
+    const readModel = await new GetAgentUseCase(repository).execute(saved.id);
+    expect(readModel?.memory.assets[0]?.assetId).toBe("asset:memory:repo");
+    expect(readModel?.memory.assets[0]?.assetVersionId).toBe("v1");
 
     const listed = await repository.list();
     expect(listed).toHaveLength(2);
@@ -124,6 +130,27 @@ describe("SqliteAgentRepository", () => {
     expect(await repository.get("   ")).toBeUndefined();
     expect(await repository.delete("   ")).toBe(false);
     expect(await repository.delete("agent:missing")).toBe(false);
+
+    repository.dispose();
+  });
+
+  it("rehydrates legacy serialized memory asset ids stored as object values", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-agent-repo-"));
+    createdRoots.push(root);
+    const databasePath = path.join(root, "agents.sqlite");
+    const repository = new SqliteAgentRepository(databasePath);
+
+    const saved = await repository.save(makeAgent("agent:repo:legacy-memory"));
+    const db = new Database(databasePath);
+    const row = db.prepare("SELECT agent_json FROM agents WHERE agent_id = ?").get(saved.id) as { agent_json: string };
+    const parsed = JSON.parse(row.agent_json) as { memory: { assets: Array<{ assetId: unknown }> } };
+    parsed.memory.assets[0].assetId = { value: "asset:memory:repo" };
+    db.prepare("UPDATE agents SET agent_json = ? WHERE agent_id = ?").run(JSON.stringify(parsed), saved.id);
+    db.close();
+
+    const loaded = await repository.get(saved.id);
+    expect(loaded?.memory.assets[0]?.assetId).toBeInstanceOf(AssetId);
+    expect(loaded?.memory.assets[0]?.assetId.toString()).toBe("asset:memory:repo");
 
     repository.dispose();
   });
