@@ -178,6 +178,8 @@ If a change needs data from the outside world, prefer adding or using an **appli
   - planning strategy authoring is now explicitly bounded to supported strategy descriptors (currently deterministic only), with unsupported id/mode combinations rejected before persistence.
   - strategy validation now includes explicit structured issues for missing strategy id and unsupported id/mode combinations.
   - whole-agent validation is now reusable across CRUD/configuration/API seams via `AgentConfigurationValidationService` + structured issue payloads (`code`, `path`, `section`, `severity`, `message`) and a deterministic `AgentConfigurationValidationError`.
+  - validation now supports explicit create vs update pathways (`mode: create|update`) with update-time immutable-id validation semantics.
+  - policy/sandbox/trust contradiction checks now return explicit issue codes (required-vs-denied permission conflicts, sandbox denial vs required approval conflicts, and tool-scope approval coherence) in the reusable validation output.
   - backend transport now stays thin over those use cases through desktop IPC agent-authoring handlers and DTO mapping (`ai-loom-desktop-agents:*`) instead of transport-layer business logic.
   - focused agent authoring coverage now includes SQLite-backed integration tests across CRUD + goal/policy/tool/memory/strategy updates and API-layer mapping/error-path tests so backend behavior is validated over real seams, not only in-memory repository doubles.
 

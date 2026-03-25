@@ -22,7 +22,7 @@ export class ConfigureAgentToolsUseCase {
       ...current.policy,
       toolAccess,
     });
-    this.validationService.assertValid({
+    this.validationService.assertValidForUpdate(current.id, {
       ...toAgentConfigurationValidationInput(current),
       policy: nextPolicy,
     });

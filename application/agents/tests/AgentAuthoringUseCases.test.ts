@@ -442,6 +442,21 @@ describe("Agent authoring use cases", () => {
     expect(validation.issues.some((issue) => issue.code === "strategy-id-missing")).toBe(true);
   });
 
+  it("validates create/update pathways and emits explicit update id immutability issues", async () => {
+    const validate = new ValidateAgentConfigurationUseCase(new AgentConfigurationValidationService());
+    const base = createRequest("agent:authoring:update-mode");
+    const validation = await validate.execute(
+      {
+        ...base,
+        id: "agent:authoring:other-id",
+      },
+      { mode: "update", existingAgentId: "agent:authoring:update-mode" },
+    );
+
+    expect(validation.valid).toBe(false);
+    expect(validation.issues.some((issue) => issue.code === "agent-id-immutable" && issue.section === "agent")).toBe(true);
+  });
+
   it("reports deterministic cross-field validation issues for malformed authoring payloads", async () => {
     const validate = new ValidateAgentConfigurationUseCase(new AgentConfigurationValidationService());
     const base = createRequest("agent:authoring:cross-field");
@@ -488,5 +503,26 @@ describe("Agent authoring use cases", () => {
       }],
     });
     expect(malformedRequiredTool.issues.some((issue) => issue.code === "goal-required-tool-malformed")).toBe(true);
+
+    const sandboxConflict = await validate.execute({
+      ...base,
+      policy: {
+        ...base.policy,
+        safetyConstraints: {
+          ...base.policy.safetyConstraints,
+          deniedPermissionIds: ["network.access"],
+          requiredApprovals: [{
+            permissionId: "network.access",
+            minimumStatus: "approved",
+            scopeType: "tool",
+            scopeId: "mcp:local:echo",
+          }],
+          sandbox: { ...base.policy.safetyConstraints.sandbox, network: { allowed: false } },
+        },
+      },
+    });
+    expect(sandboxConflict.issues.some((issue) => issue.code === "policy-network-denial-redundant")).toBe(true);
+    expect(sandboxConflict.issues.some((issue) => issue.code === "policy-network-approval-sandbox-conflict")).toBe(true);
+    expect(sandboxConflict.issues.some((issue) => issue.code === "policy-permission-required-and-denied")).toBe(true);
   });
 });

@@ -42,7 +42,7 @@ export class UpdateAgentUseCase {
       ...toAgentConfigurationValidationInput(current),
       ...request.changes,
     };
-    this.validationService.assertValid(nextConfiguration);
+    this.validationService.assertValidForUpdate(current.id, nextConfiguration);
     const updated = updateAgent(current, request.changes);
     const saved = await this.repository.save(updated);
     return toAgentReadModel(saved);

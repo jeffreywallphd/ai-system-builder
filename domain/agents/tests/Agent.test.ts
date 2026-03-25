@@ -174,7 +174,7 @@ describe("Agent domain", () => {
         assets: [{ assetId: new AssetId("asset:memory:update"), memoryType: "working" }],
         retrieval: { strategy: "latest-first", maxEntries: 5 },
         policy: {
-          writableTypes: ["working"],
+          writableTypes: ["working", "episodic"],
           sessionOnlyTypes: ["working"],
           retention: { mode: "bounded", maxDurableEntries: 20 },
         },

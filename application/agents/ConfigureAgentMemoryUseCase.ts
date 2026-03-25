@@ -18,7 +18,7 @@ export class ConfigureAgentMemoryUseCase {
     if (!current) {
       throw new Error(`Agent '${normalized}' was not found.`);
     }
-    this.validationService.assertValid({
+    this.validationService.assertValidForUpdate(current.id, {
       ...toAgentConfigurationValidationInput(current),
       memory,
     });

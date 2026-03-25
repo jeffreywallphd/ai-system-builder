@@ -31,7 +31,7 @@ export class ConfigureAgentPolicyUseCase {
     }
 
     const nextPolicy = request.policy ?? applyAgentPolicyConfiguration(current.policy, request.operations ?? []);
-    this.validationService.assertValid({
+    this.validationService.assertValidForUpdate(current.id, {
       ...toAgentConfigurationValidationInput(current),
       policy: nextPolicy,
     });

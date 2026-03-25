@@ -28,7 +28,7 @@ export class ConfigureAgentGoalsUseCase {
     }
 
     const goals = applyAgentGoalConfiguration(current.goals, request.operations);
-    this.validationService.assertValid({
+    this.validationService.assertValidForUpdate(current.id, {
       ...toAgentConfigurationValidationInput(current),
       goals,
     });
@@ -36,4 +36,3 @@ export class ConfigureAgentGoalsUseCase {
     return toAgentReadModel(saved);
   }
 }
-
