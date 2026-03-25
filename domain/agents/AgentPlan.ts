@@ -1,4 +1,5 @@
 import { AssetId } from "../assets/AssetId";
+import { normalizeAgentToolId } from "./AgentToolIdentity";
 
 export const AgentPlanStepInputKinds = Object.freeze({
   asset: "asset",
@@ -64,23 +65,7 @@ function normalizeRequired(value: string, field: string): string {
 }
 
 function normalizeToolId(toolId: string): string {
-  const normalized = normalizeRequired(toolId, "Agent plan step toolId");
-  if (normalized.startsWith("mcp:")) {
-    const parts = normalized.split(":");
-    if (parts.length !== 3 || parts.some((part) => !part.trim())) {
-      throw new Error(`Agent plan toolId '${normalized}' is malformed.`);
-    }
-    return normalized;
-  }
-  if (normalized.startsWith("workflow:")) {
-    const parts = normalized.split(":");
-    if (parts.length < 2 || parts.slice(1).some((part) => !part.trim())) {
-      throw new Error(`Agent plan toolId '${normalized}' is malformed.`);
-    }
-    return normalized;
-  }
-
-  throw new Error(`Agent plan toolId '${normalized}' must use mcp:*:* or workflow:* identity.`);
+  return normalizeAgentToolId(toolId, "Agent plan step toolId");
 }
 
 function normalizeInputReference(reference: AgentPlanStepInputReference): AgentPlanStepInputReference {

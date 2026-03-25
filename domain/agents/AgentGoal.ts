@@ -1,3 +1,5 @@
+import { isCanonicalAgentToolId } from "./AgentToolIdentity";
+
 export const AgentGoalPriorityLevels = Object.freeze({
   low: "low",
   normal: "normal",
@@ -36,10 +38,6 @@ function normalizeList(values: ReadonlyArray<string> | undefined): ReadonlyArray
   return Object.freeze([...deduped]);
 }
 
-function isCanonicalToolId(value: string): boolean {
-  return /^mcp:[^:\s]+:[^:\s]+$/.test(value) || /^workflow:[^:\s]+/.test(value);
-}
-
 export function normalizeAgentGoal(input: AgentGoal): AgentGoal {
   const id = normalizeRequired(input.id, "Agent goal id");
   const objective = normalizeRequired(input.objective, "Agent goal objective");
@@ -58,7 +56,7 @@ export function normalizeAgentGoal(input: AgentGoal): AgentGoal {
   }
 
   for (const requiredToolId of requiredToolIds) {
-    if (!isCanonicalToolId(requiredToolId)) {
+    if (!isCanonicalAgentToolId(requiredToolId)) {
       throw new Error(`Agent goal required tool id '${requiredToolId}' is malformed.`);
     }
   }

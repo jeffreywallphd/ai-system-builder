@@ -6,6 +6,7 @@ import {
   AgentPlanningStrategyModes,
   SupportedAgentPlanningStrategies,
 } from "../../../domain/agents/Agent";
+import { isCanonicalAgentToolId } from "../../../domain/agents/AgentToolIdentity";
 import type { AgentGoal } from "../../../domain/agents/AgentGoal";
 import type { AgentMemoryConfiguration } from "../../../domain/agents/AgentMemory";
 import type { AgentPolicy } from "../../../domain/agents/AgentPolicy";
@@ -116,7 +117,7 @@ export class AgentConfigurationValidationService {
         });
       }
       for (const requiredToolId of goal.requiredToolIds ?? []) {
-        if (!/^mcp:[^:\s]+:[^:\s]+$/.test(requiredToolId) && !/^workflow:[^:\s]+/.test(requiredToolId)) {
+        if (!isCanonicalAgentToolId(requiredToolId)) {
           issues.push({
             code: "goal-required-tool-malformed",
             path: `goals.${goal.id || "<unknown>"}.requiredToolIds`,
@@ -162,7 +163,7 @@ export class AgentConfigurationValidationService {
     }
 
     const malformedToolIds = input.policy.toolAccess.allowedToolIds.filter(
-      (toolId) => !/^mcp:[^:\s]+:[^:\s]+$/.test(toolId) && !/^workflow:[^:\s]+/.test(toolId),
+      (toolId) => !isCanonicalAgentToolId(toolId),
     );
     if (malformedToolIds.length > 0) {
       issues.push({
