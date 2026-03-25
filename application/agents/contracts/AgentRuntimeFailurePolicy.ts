@@ -1,4 +1,5 @@
 import type { AgentMcpToolGovernanceDecision } from "../services/AgentMcpToolGovernanceService";
+import type { AgentExecutionResult } from "../models/AgentExecutionResult";
 
 export type AgentRuntimeFailureKind =
   | "governance-denied"
@@ -14,10 +15,18 @@ export interface AgentRuntimeFailure {
   readonly message: string;
   readonly governanceDecision?: AgentMcpToolGovernanceDecision;
   readonly retryable: boolean;
+  readonly retryClassificationSource?: "policy" | "result-metadata" | "heuristic";
 }
 
 export interface AgentRuntimeRetryPolicy {
   readonly maxAttemptsPerStep: number;
+  readonly classifyFailure?: (input: AgentRuntimeFailureClassificationInput) => AgentRuntimeFailure;
+}
+
+export interface AgentRuntimeFailureClassificationInput {
+  readonly stepId: string;
+  readonly result: AgentExecutionResult;
+  readonly fallback: AgentRuntimeFailure;
 }
 
 export const DefaultAgentRuntimeRetryPolicy: AgentRuntimeRetryPolicy = Object.freeze({

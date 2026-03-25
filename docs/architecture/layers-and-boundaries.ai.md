@@ -23,6 +23,7 @@ The architecture is mostly clean, but not all write actions are modeled as appli
 - Agent-to-runtime mapping lives in `application/agents/contracts/AgentExecutionMapping.ts` and targets `ExecutionPlan` units.
 - No agent UI/runtime bypass was introduced in this phase.
 - Phase 3 memory services now enforce policy operationally at the same inner layers (retrievable/writable/session-only/retention checks), still asset-backed and without a second storage/runtime model.
+- Phase 5 runtime semantics are still application-layer (`AgentRunnerService`) with deterministic progress/retry/session events; persistence remains an application port (`IAgentExecutionSessionRepository`) with a concrete SQLite infrastructure implementation.
 
 ## TODO
 - When summarizing purity/impurity, say "clean-architecture-style with pragmatic UI-layer convenience logic," not "strict clean architecture."
