@@ -4,11 +4,19 @@ import type { AssetTransformation } from "../../../domain/assets/AssetTransforma
 import type { AssetLineageEdge } from "../../../domain/assets/AssetLineageEdge";
 import type { CanonicalAssetIdentityRecord, CanonicalEntityType } from "./ICanonicalAssetIdentityRepository";
 import type { AssetLineageDirection } from "./IAssetLineageRepository";
+import type {
+  TaxonomyBehaviorKind,
+  TaxonomySemanticRole,
+  TaxonomyStructuralKind,
+} from "../../../domain/taxonomy/CompositionTaxonomy";
 
 export interface CanonicalAssetQueryCriteria {
   readonly kinds?: ReadonlyArray<IAsset["kind"]>;
   readonly sourceTypes?: ReadonlyArray<IAsset["source"]["type"]>;
   readonly statuses?: ReadonlyArray<IAsset["status"]>;
+  readonly structuralKinds?: ReadonlyArray<TaxonomyStructuralKind>;
+  readonly semanticRoles?: ReadonlyArray<TaxonomySemanticRole>;
+  readonly behaviorKinds?: ReadonlyArray<TaxonomyBehaviorKind>;
   readonly limit?: number;
 }
 

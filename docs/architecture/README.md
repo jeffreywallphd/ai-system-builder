@@ -165,6 +165,15 @@ The runtime is not a single path. The system currently supports multiple executi
   - whole-agent validation output now includes machine-friendly sectioned issues (`code`, `path`, `section`, `severity`, `message`) and is reused by CRUD/configuration/API seams through `AgentConfigurationValidationError`.
   - backend authoring transport now exposes thin desktop IPC endpoints (`ai-loom-desktop-agents:*`) via `AgentAuthoringBackendApi` for CRUD/configuration/validation without transport-layer business logic.
 
+## Shared composition taxonomy foundation
+
+- A compact taxonomy descriptor now exists in `domain/taxonomy/CompositionTaxonomy.ts` with explicit `structuralKind`, `semanticRole`, and `behaviorKind`.
+- Classification seams for existing concepts live in `application/taxonomy/CompositionTaxonomyClassifier.ts`.
+- Workflow and agent adapter seams (`application/workflows/WorkflowTaxonomy.ts`, `application/agents/contracts/AgentTaxonomy.ts`) explicitly align with the same composition model.
+- Canonical identities now persist taxonomy metadata and canonical asset query criteria supports taxonomy-aware filters (`structuralKinds`, `semanticRoles`, `behaviorKinds`).
+- Canonical asset summary/detail read use cases include taxonomy descriptors through identity metadata with bounded fallback mapping.
+- See `shared-composition-taxonomy.md` for scope, boundaries, and current-state mapping details.
+
 ## TODO
 
 - The repository still contains **two composition stories**: the generic DI bootstrap in `infrastructure/composition/` and the renderer-specific manual composition in `ui/composition/createUiDependencies.ts`. Execution-engine wiring, execution-run persistence, MCP server-operation handler registration, and execution-history/detail projection services now share more of the same outer-layer path across those roots, but broader composition convergence is still future work.

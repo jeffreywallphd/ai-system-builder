@@ -2,12 +2,14 @@ import type { CanonicalEntityType } from "../ports/interfaces/ICanonicalAssetIde
 import { CanonicalAssetIdentityService } from "./CanonicalAssetIdentityService";
 import { GetCanonicalLatestVersionUseCase, GetCanonicalProvenanceSummaryUseCase, LoadCanonicalAssetSummaryUseCase } from "./CanonicalAssetReadUseCases";
 import type { GetCanonicalDependencyStateUseCase, CanonicalDependencyStateSummary } from "./CanonicalDependencyStateUseCase";
+import type { CompositionTaxonomyDescriptor } from "../../domain/taxonomy/CompositionTaxonomy";
 
 export interface CanonicalEntityReadResolution {
   readonly preferred: boolean;
   readonly assetId?: string;
   readonly pinnedVersionId?: string;
   readonly latestVersionId?: string;
+  readonly taxonomy?: CompositionTaxonomyDescriptor;
   readonly provenance?: {
     readonly directUpstreamCount: number;
     readonly directDownstreamCount: number;
@@ -51,6 +53,7 @@ export class CanonicalEntityReadResolver {
         assetId: identity.assetId,
         pinnedVersionId: identity.latestVersionId,
         latestVersionId: latestVersion?.versionId,
+        taxonomy: identity.taxonomy,
         fallbackReason: `Canonical asset '${identity.assetId}' could not be loaded.`,
       });
     }
@@ -73,6 +76,7 @@ export class CanonicalEntityReadResolver {
       assetId: identity.assetId,
       pinnedVersionId: identity.latestVersionId,
       latestVersionId: latestVersion?.versionId,
+      taxonomy: summary.taxonomy ?? identity.taxonomy,
       provenance: provenance
         ? Object.freeze({
           directUpstreamCount: provenance.directUpstreamVersionIds.length,

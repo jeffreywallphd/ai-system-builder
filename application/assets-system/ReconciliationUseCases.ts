@@ -92,6 +92,7 @@ export class ReconcileCanonicalIdentityMappingsUseCase {
       entityId: params.entityId,
       assetId: identity.assetId,
       latestVersionId: latest.versionId,
+      taxonomy: identity.taxonomy,
       updatedAt: new Date(),
     });
 

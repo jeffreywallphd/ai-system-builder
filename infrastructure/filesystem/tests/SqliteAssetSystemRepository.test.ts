@@ -55,9 +55,22 @@ describe("SqliteAssetSystemRepository", () => {
       expect((await repo.listVersionChainByAssetId("asset-1")).map((version) => version.versionId)).toEqual(["v2", "v1"]);
       expect((await repo.listLineageEdgesByAssetId("asset-1")).length).toBe(1);
 
-      await repo.upsertIdentity({ entityType: "workflow-definition", entityId: "wf-1", assetId: "asset-1", latestVersionId: "v2" });
+      await repo.upsertIdentity({
+        entityType: "workflow-definition",
+        entityId: "wf-1",
+        assetId: "asset-1",
+        latestVersionId: "v2",
+        taxonomy: {
+          structuralKind: "composite",
+          semanticRole: "workflow",
+          behaviorKind: "deterministic",
+        },
+      });
       const identities = await repo.listCanonicalIdentities({ entityType: "workflow-definition" });
       expect(identities[0]?.entityId).toBe("wf-1");
+      expect(identities[0]?.taxonomy?.semanticRole).toBe("workflow");
+      expect((await repo.listAssetsByCriteria({ semanticRoles: ["workflow"] })).length).toBe(1);
+      expect((await repo.listAssetsByCriteria({ semanticRoles: ["model"] })).length).toBe(0);
 
       await repo.saveDependencyState({
         versionId: "v2",

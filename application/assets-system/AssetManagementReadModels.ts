@@ -1,10 +1,12 @@
 import type { CanonicalDependencyLifecycleState } from "./CanonicalDependencyStateUseCase";
+import type { CompositionTaxonomyDescriptor } from "../../domain/taxonomy/CompositionTaxonomy";
 
 export interface CanonicalAssetDetailReadModel {
   readonly assetId: string;
   readonly name: string;
   readonly kind: string;
   readonly status: string;
+  readonly taxonomy?: CompositionTaxonomyDescriptor;
   readonly latestVersionId?: string;
   readonly versionCount: number;
   readonly transformationCount: number;

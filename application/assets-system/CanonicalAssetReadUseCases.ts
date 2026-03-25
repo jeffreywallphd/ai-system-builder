@@ -4,19 +4,27 @@ import type { IAssetTransformationRepository } from "../ports/interfaces/IAssetT
 import type { IAssetLineageRepository } from "../ports/interfaces/IAssetLineageRepository";
 import type { IAssetSystemQueryRepository, CanonicalAssetQueryCriteria } from "../ports/interfaces/IAssetSystemQueryRepository";
 import type { AssetVersion } from "../../domain/assets/AssetVersion";
+import type { CompositionTaxonomyDescriptor } from "../../domain/taxonomy/CompositionTaxonomy";
+import { CompositionTaxonomyClassifier } from "../taxonomy/CompositionTaxonomyClassifier";
 
 export class LoadCanonicalAssetSummaryUseCase {
+  private readonly taxonomyClassifier: CompositionTaxonomyClassifier;
+
   constructor(
     private readonly assetRepository: IAssetRecordRepository,
     private readonly versionRepository: IAssetVersionRepository,
     private readonly queryRepository?: IAssetSystemQueryRepository,
-  ) {}
+    taxonomyClassifier: CompositionTaxonomyClassifier = new CompositionTaxonomyClassifier(),
+  ) {
+    this.taxonomyClassifier = taxonomyClassifier;
+  }
 
   public async execute(assetId: string): Promise<{
     readonly assetId: string;
     readonly name: string;
     readonly kind: string;
     readonly status: string;
+    readonly taxonomy?: CompositionTaxonomyDescriptor;
     readonly latestVersionId?: string;
     readonly versionCount: number;
   } | undefined> {
@@ -32,6 +40,7 @@ export class LoadCanonicalAssetSummaryUseCase {
       name: asset.name,
       kind: asset.kind,
       status: asset.status,
+      taxonomy: this.taxonomyClassifier.classifyAsset(asset),
       latestVersionId: latest?.versionId,
       versionCount: versions.length,
     });
@@ -125,19 +134,25 @@ export class GetCanonicalVersionDependencyUseCase {
 }
 
 export class LoadCanonicalAssetDetailUseCase {
+  private readonly taxonomyClassifier: CompositionTaxonomyClassifier;
+
   constructor(
     private readonly assetRepository: IAssetRecordRepository,
     private readonly versionRepository: IAssetVersionRepository,
     private readonly transformationRepository: IAssetTransformationRepository,
     private readonly lineageRepository: IAssetLineageRepository,
     private readonly queryRepository?: IAssetSystemQueryRepository,
-  ) {}
+    taxonomyClassifier: CompositionTaxonomyClassifier = new CompositionTaxonomyClassifier(),
+  ) {
+    this.taxonomyClassifier = taxonomyClassifier;
+  }
 
   public async execute(assetId: string): Promise<{
     readonly assetId: string;
     readonly name: string;
     readonly kind: string;
     readonly status: string;
+    readonly taxonomy?: CompositionTaxonomyDescriptor;
     readonly latestVersion?: AssetVersion;
     readonly versionCount: number;
     readonly transformationCount: number;
@@ -160,6 +175,7 @@ export class LoadCanonicalAssetDetailUseCase {
       name: asset.name,
       kind: asset.kind,
       status: asset.status,
+      taxonomy: this.taxonomyClassifier.classifyAsset(asset),
       latestVersion,
       versionCount: versions.length,
       transformationCount: transformations.length,

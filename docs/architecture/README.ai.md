@@ -77,3 +77,11 @@ Use this file as the shortest reliable orientation before reading the human arch
 
 ## TODO
 - If asked for the "single" architecture entry point, explain that there are currently multiple composition roots and name them explicitly.
+
+## Shared taxonomy foundation (alignment slice)
+- A compact shared composition taxonomy now exists in `domain/taxonomy/CompositionTaxonomy.ts` with explicit structural kind, semantic role, and behavior kind.
+- Classification seams for current entities live in `application/taxonomy/CompositionTaxonomyClassifier.ts`.
+- Workflow and agent adapters use the same taxonomy model (`application/workflows/WorkflowTaxonomy.ts`, `application/agents/contracts/AgentTaxonomy.ts`) so agents remain extensions of the shared composition model, not a separate ontology.
+- Canonical identity persistence now stores taxonomy metadata, and canonical asset query criteria supports taxonomy-aware filtering.
+- Canonical asset summary/detail reads include taxonomy via identity metadata with bounded fallback mapping.
+- See `docs/architecture/shared-composition-taxonomy.md` for the practical architecture note and current-scope boundaries.
