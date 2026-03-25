@@ -68,6 +68,11 @@ Use this file as the shortest reliable orientation before reading the human arch
   - application CRUD + lifecycle use cases: create/update/get/list/delete/archive
   - bounded configuration use cases: goals/policy/tools/memory/strategy
   - cohesive cross-field validation seam: `AgentConfigurationValidationService` (deterministic cross-field issue codes + domain fallback validation), with SQLite agent persistence also projecting structured authoring metadata (`strategy_id`, `strategy_mode`, `goal_count`, `allowed_tool_count`).
+  - memory authoring contracts are now hard-validated (canonical asset refs, retrieval compatibility, writable/retrievable/session-only coherence, retention/session-only contradictions).
+  - strategy configuration is now explicitly bounded to supported descriptors (`deterministic@deterministic-linear` in this slice), with unsupported combinations rejected deterministically.
+  - validation issues now carry explicit section metadata (`goals`/`tools`/`memory`/`strategy`/etc.) and are reused by CRUD/configuration/API through `AgentConfigurationValidationError`.
+  - agent read models now expose full structured memory config (`assets`, `retrieval`, `policy`, `revision`) rather than partial memory summary fields.
+  - desktop backend now includes thin agent-authoring IPC handlers (`ai-loom-desktop-agents:*`) through `AgentAuthoringBackendApi`.
 
 ## TODO
 - If asked for the "single" architecture entry point, explain that there are currently multiple composition roots and name them explicitly.

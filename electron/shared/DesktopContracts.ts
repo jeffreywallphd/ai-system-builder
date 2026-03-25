@@ -81,6 +81,21 @@ export interface DesktopCanonicalAssetBridge {
   loadManagementSnapshot(assetId: string, includeProjectionHealth?: boolean, versionIdsInProjectionScope?: ReadonlyArray<string>): Promise<string | null>;
 }
 
+export interface DesktopAgentAuthoringBridge {
+  createAgent(requestJson: string): Promise<string>;
+  updateAgent(requestJson: string): Promise<string>;
+  getAgent(agentId: string): Promise<string>;
+  listAgents(includeArchived?: boolean): Promise<string>;
+  deleteAgent(agentId: string): Promise<string>;
+  archiveAgent(agentId: string): Promise<string>;
+  configureGoals(requestJson: string): Promise<string>;
+  configurePolicy(agentId: string, policyJson: string): Promise<string>;
+  configureTools(agentId: string, toolAccessJson: string): Promise<string>;
+  configureMemory(agentId: string, memoryJson: string): Promise<string>;
+  configureStrategy(agentId: string, planningStrategyJson: string): Promise<string>;
+  validateConfiguration(requestJson: string): Promise<string>;
+}
+
 export interface DesktopMcpSecretBridge {
   isAvailable(): boolean;
   getSecret(key: string): string | null;
@@ -96,4 +111,5 @@ export interface DesktopBridge {
   readonly executionRuns: DesktopExecutionRunBridge;
   readonly modelFiles: DesktopModelFileBridge;
   readonly canonicalAssets: DesktopCanonicalAssetBridge;
+  readonly agents?: DesktopAgentAuthoringBridge;
 }

@@ -300,7 +300,7 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
 - Validation invariants were tightened for create/update:
   - non-empty id/name/goals/tool set
   - strict MCP tool identity format
-  - memory config must reference at least one asset id
+  - memory config must use canonical asset refs for durable writable types (session-only-only initialization may omit assets)
   - per-goal required tools must be inside the allowed tool set
   - bounded retrieval/execution numeric policies.
 - Planning moved from trivial pass-through to explicit deterministic planning service:
@@ -340,4 +340,9 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
   - goal ordering invariants are now aligned across create/update/configure flows to contiguous `priorityOrder` values starting at 1.
   - cohesive validation seam: `AgentConfigurationValidationService` + `ValidateAgentConfigurationUseCase` now emits deterministic cross-field issue codes for goal/tool/memory/policy/strategy coherence before domain fallback validation.
   - `SqliteAgentRepository` also projects structured authoring/query metadata (`strategy_id`, `strategy_mode`, `goal_count`, `allowed_tool_count`) while preserving aggregate round-trip in `agent_json`.
+  - memory contracts are now hard-validated for authoring updates (canonical asset-backed refs, retrieval compatibility, writable/retrievable/session-only coherence, and retention/session-only contradiction checks).
+  - strategy contracts are now explicitly bounded to supported descriptors (current slice: `deterministic@deterministic-linear`) with unsupported id/mode combinations rejected deterministically.
+  - whole-agent validation issues now include explicit section metadata (`goals`/`tools`/`memory`/`strategy`/etc.) and are reusable across CRUD/configuration/API via a shared `AgentConfigurationValidationError`.
+  - agent read-model contracts now expose full structured memory configuration (`assets`, `retrieval`, `policy`, `revision`) instead of partial memory summaries.
+  - desktop backend transport now has dedicated thin authoring handlers (`ai-loom-desktop-agents:*`) via `AgentAuthoringBackendApi`, mapping DTO payloads directly onto use cases and structured validation output.
 - No UI/runtime bypass was introduced; transport can remain thin over these use cases.

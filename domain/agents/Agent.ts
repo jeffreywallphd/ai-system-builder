@@ -15,9 +15,15 @@ export const AgentLifecycleStatuses = Object.freeze({
 
 export type AgentLifecycleStatus = typeof AgentLifecycleStatuses[keyof typeof AgentLifecycleStatuses];
 
+export const AgentPlanningStrategyModes = Object.freeze({
+  deterministicLinear: "deterministic-linear",
+});
+
+export type AgentPlanningStrategyMode = typeof AgentPlanningStrategyModes[keyof typeof AgentPlanningStrategyModes];
+
 export interface AgentPlanningStrategy {
   readonly strategyId: string;
-  readonly mode: "deterministic-linear" | "workflow-guided";
+  readonly mode: AgentPlanningStrategyMode;
 }
 
 export interface AgentExecutionConfiguration {
@@ -42,6 +48,13 @@ export interface Agent {
   readonly updatedAt: string;
 }
 
+export const SupportedAgentPlanningStrategies = Object.freeze([
+  Object.freeze({
+    strategyId: "deterministic",
+    mode: AgentPlanningStrategyModes.deterministicLinear,
+  }),
+]);
+
 export interface AgentReadModel {
   readonly id: string;
   readonly name: string;
@@ -53,9 +66,13 @@ export interface AgentReadModel {
   readonly planningStrategy: AgentPlanningStrategy;
   readonly memory: {
     readonly revision: number;
-    readonly retrievalStrategy: AgentMemoryConfiguration["retrieval"]["strategy"];
-    readonly maxEntries: number;
-    readonly assetIds: ReadonlyArray<string>;
+    readonly assets: ReadonlyArray<{
+      readonly assetId: string;
+      readonly assetVersionId?: string;
+      readonly memoryType: string;
+      readonly lineageTag?: string;
+    }>;
+    readonly retrieval: AgentMemoryConfiguration["retrieval"];
     readonly policy: {
       readonly maxRetrievalEntries?: number;
       readonly retrievableTypes: ReadonlyArray<string>;
@@ -106,12 +123,22 @@ function normalizeExecutionConfiguration(input: AgentExecutionConfiguration | un
 }
 
 function normalizePlanningStrategy(input: AgentPlanningStrategy): AgentPlanningStrategy {
-  if (!["deterministic-linear", "workflow-guided"].includes(input.mode)) {
-    throw new Error("Agent planning strategy mode must be deterministic-linear or workflow-guided.");
+  if (!Object.values(AgentPlanningStrategyModes).includes(input.mode)) {
+    throw new Error("Agent planning strategy mode must be deterministic-linear.");
+  }
+
+  const strategyId = normalizeRequired(input.strategyId, "Agent planning strategy id").toLowerCase();
+  const supported = SupportedAgentPlanningStrategies
+    .some((entry) => entry.strategyId === strategyId && entry.mode === input.mode);
+  if (!supported) {
+    const supportedLabel = SupportedAgentPlanningStrategies
+      .map((entry) => `${entry.strategyId}@${entry.mode}`)
+      .join(", ");
+    throw new Error(`Unsupported agent planning strategy '${strategyId}@${input.mode}'. Supported strategies: ${supportedLabel}.`);
   }
 
   return Object.freeze({
-    strategyId: normalizeRequired(input.strategyId, "Agent planning strategy id"),
+    strategyId,
     mode: input.mode,
   });
 }
@@ -244,9 +271,13 @@ export function toAgentReadModel(agent: Agent): AgentReadModel {
     planningStrategy: agent.planningStrategy,
     memory: Object.freeze({
       revision: agent.memory.revision,
-      retrievalStrategy: agent.memory.retrieval.strategy,
-      maxEntries: agent.memory.retrieval.maxEntries,
-      assetIds: Object.freeze(agent.memory.assets.map((entry) => entry.assetId.toString())),
+      assets: Object.freeze(agent.memory.assets.map((entry) => Object.freeze({
+        assetId: entry.assetId.toString(),
+        assetVersionId: entry.assetVersionId,
+        memoryType: entry.memoryType,
+        lineageTag: entry.lineageTag,
+      }))),
+      retrieval: agent.memory.retrieval,
       policy: Object.freeze({
         maxRetrievalEntries: agent.memory.policy.maxRetrievalEntries,
         retrievableTypes: Object.freeze([...(agent.memory.policy.retrievableTypes ?? [])]),

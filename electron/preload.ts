@@ -121,4 +121,42 @@ contextBridge.exposeInMainWorld("aiLoomDesktop", {
       return ipcRenderer.invoke("ai-loom-desktop-canonical-assets:management-snapshot", assetId, includeProjectionHealth, versionIdsInProjectionScope) as Promise<string | null>;
     },
   },
+  agents: {
+    createAgent(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-agents:create", requestJson) as Promise<string>;
+    },
+    updateAgent(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-agents:update", requestJson) as Promise<string>;
+    },
+    getAgent(agentId: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-agents:get", agentId) as Promise<string>;
+    },
+    listAgents(includeArchived = true) {
+      return ipcRenderer.invoke("ai-loom-desktop-agents:list", includeArchived) as Promise<string>;
+    },
+    deleteAgent(agentId: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-agents:delete", agentId) as Promise<string>;
+    },
+    archiveAgent(agentId: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-agents:archive", agentId) as Promise<string>;
+    },
+    configureGoals(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-agents:configure-goals", requestJson) as Promise<string>;
+    },
+    configurePolicy(agentId: string, policyJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-agents:configure-policy", agentId, policyJson) as Promise<string>;
+    },
+    configureTools(agentId: string, toolAccessJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-agents:configure-tools", agentId, toolAccessJson) as Promise<string>;
+    },
+    configureMemory(agentId: string, memoryJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-agents:configure-memory", agentId, memoryJson) as Promise<string>;
+    },
+    configureStrategy(agentId: string, planningStrategyJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-agents:configure-strategy", agentId, planningStrategyJson) as Promise<string>;
+    },
+    validateConfiguration(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-agents:validate", requestJson) as Promise<string>;
+    },
+  },
 });

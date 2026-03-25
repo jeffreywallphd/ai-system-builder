@@ -166,6 +166,10 @@ If a change needs data from the outside world, prefer adding or using an **appli
   - application adds bounded authoring use cases (CRUD + goal/policy/tool/memory/strategy configuration + whole-config validation)
   - goal authoring operations (`add`/`update`/`remove`/`reorder`) now enforce deterministic coherence at the use-case/domain boundary (unique ids, canonical required tool refs, contiguous ordering from 1, and explicit missing-goal failures).
   - persistence remains outer-layer through `IAgentRepository`/`IAgentExecutionSessionRepository` with concrete SQLite adapters (`SqliteAgentRepository`, `SqliteAgentExecutionSessionRepository`).
+  - memory authoring contracts are now fully structured/validated at the inner layer (asset-backed refs, retrieval config, writable/retrievable/session-only type coherence, retention/session-only contradictions, canonical asset/id format checks).
+  - planning strategy authoring is now explicitly bounded to supported strategy descriptors (currently deterministic only), with unsupported id/mode combinations rejected before persistence.
+  - whole-agent validation is now reusable across CRUD/configuration/API seams via `AgentConfigurationValidationService` + structured issue payloads (`code`, `path`, `section`, `severity`, `message`) and a deterministic `AgentConfigurationValidationError`.
+  - backend transport now stays thin over those use cases through desktop IPC agent-authoring handlers and DTO mapping (`ai-loom-desktop-agents:*`) instead of transport-layer business logic.
 
 ## TODO
 

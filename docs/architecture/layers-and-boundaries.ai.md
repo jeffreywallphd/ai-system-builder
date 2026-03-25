@@ -30,6 +30,10 @@ The architecture is mostly clean, but not all write actions are modeled as appli
   - infrastructure adapters: `SqliteAgentRepository`, `SqliteAgentExecutionSessionRepository`
   - application use cases: CRUD + bounded configuration updates (`goals`, `policy`, `tools`, `memory`, `strategy`) plus whole-config validation (`AgentConfigurationValidationService`).
   - goal authoring updates (`add`/`update`/`remove`/`reorder`) now enforce deterministic coherence (unique ids, canonical required tool refs, contiguous ordering from 1, explicit missing-goal failures) at the application/domain boundary.
+  - memory configuration updates are now explicitly validated for asset-native references, retrieval compatibility, writable/retrievable/session-only coherence, and retention contradictions before persistence.
+  - strategy configuration is now explicitly bounded to supported descriptors (deterministic id/mode only in this slice); unsupported strategy combinations are rejected deterministically.
+  - whole-agent validation issues now include machine-friendly sectioning (`goals`/`tools`/`memory`/`strategy`/etc.) and are reusable across CRUD/configuration/API via `AgentConfigurationValidationError`.
+  - desktop backend transport now exposes thin agent-authoring IPC handlers (`ai-loom-desktop-agents:*`) that delegate to authoring use cases instead of re-implementing domain/application rules in transport.
 
 ## TODO
 - When summarizing purity/impurity, say "clean-architecture-style with pragmatic UI-layer convenience logic," not "strict clean architecture."

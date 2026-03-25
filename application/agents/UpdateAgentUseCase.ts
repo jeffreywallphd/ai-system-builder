@@ -3,6 +3,10 @@ import type { AgentGoal } from "../../domain/agents/AgentGoal";
 import type { AgentMemoryConfiguration } from "../../domain/agents/AgentMemory";
 import type { AgentPolicy } from "../../domain/agents/AgentPolicy";
 import type { IAgentRepository } from "../ports/interfaces/IAgentRepository";
+import {
+  AgentConfigurationValidationService,
+  toAgentConfigurationValidationInput,
+} from "./services/AgentConfigurationValidationService";
 
 export interface UpdateAgentRequest {
   readonly id: string;
@@ -19,7 +23,10 @@ export interface UpdateAgentRequest {
 }
 
 export class UpdateAgentUseCase {
-  constructor(private readonly repository: IAgentRepository) {}
+  constructor(
+    private readonly repository: IAgentRepository,
+    private readonly validationService: AgentConfigurationValidationService = new AgentConfigurationValidationService(),
+  ) {}
 
   public async execute(request: UpdateAgentRequest): Promise<AgentReadModel> {
     const id = request.id.trim();
@@ -27,6 +34,11 @@ export class UpdateAgentUseCase {
     if (!current) {
       throw new Error(`Agent '${id}' was not found.`);
     }
+    const nextConfiguration = {
+      ...toAgentConfigurationValidationInput(current),
+      ...request.changes,
+    };
+    this.validationService.assertValid(nextConfiguration);
     const updated = updateAgent(current, request.changes);
     const saved = await this.repository.save(updated);
     return toAgentReadModel(saved);
