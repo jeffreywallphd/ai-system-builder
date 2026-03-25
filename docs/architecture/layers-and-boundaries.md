@@ -159,7 +159,7 @@ If a change needs data from the outside world, prefer adding or using an **appli
 - The Phase 3 implementation now enforces policy at runtime (retrievable/writable/session-only/retention limits) in those same inner-layer services rather than leaving policy as configuration-only metadata.
 
 - Direction 4 Phase 4 extends those same inner boundaries: canonical MCP tool identity/binding, execution-native MCP invocation units, and deterministic agent-side MCP governance (permission/approval/sandbox/schema checks) now live in domain/application seams and reuse existing MCP registry/trust services.
-- Direction 4 Phase 5 inner foundation keeps runtime coordination in the application layer via `AgentRunnerService`, with progress/failure contracts in `application/agents/contracts/*` and optional persistence only through the `IAgentExecutionSessionRepository` port.
+- Direction 4 Phase 5 keeps runtime coordination in the application layer via `AgentRunnerService`, with deterministic progress/failure/retry/session lifecycle contracts in `application/agents/contracts/*` and persistence exclusively through the `IAgentExecutionSessionRepository` port (implemented by a concrete SQLite repository at the infrastructure edge).
 
 ## TODO
 

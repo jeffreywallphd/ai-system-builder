@@ -95,9 +95,25 @@ export class AgentRunnerService {
       planId: plan.planId,
       status: AgentExecutionSessionStatuses.pending,
     });
+    emit({ type: AgentRuntimeEventTypes.sessionStarted, planId: plan.planId, metadata: { sessionId: session.id } });
     session = transitionAgentExecutionSession(session, { status: AgentExecutionSessionStatuses.ready });
+    emit({
+      type: AgentRuntimeEventTypes.sessionTransitioned,
+      planId: plan.planId,
+      metadata: { sessionId: session.id, status: AgentExecutionSessionStatuses.ready },
+    });
     session = transitionAgentExecutionSession(session, { status: AgentExecutionSessionStatuses.running });
+    emit({
+      type: AgentRuntimeEventTypes.sessionTransitioned,
+      planId: plan.planId,
+      metadata: { sessionId: session.id, status: AgentExecutionSessionStatuses.running },
+    });
     session = await this.persistSession(session);
+    emit({
+      type: AgentRuntimeEventTypes.sessionPersisted,
+      planId: plan.planId,
+      metadata: { sessionId: session.id, status: session.status },
+    });
 
     if (this.governanceService) {
       const governance = await this.governanceService.validatePlan(agent, plan);
@@ -114,7 +130,13 @@ export class AgentRunnerService {
           retryable: false,
         };
         emit({ type: AgentRuntimeEventTypes.executionBlocked, planId: plan.planId, status: "blocked", metadata: { decision: governance.decision } });
-        const blockedSession = await this.completeSession(session, "failed");
+        const blockedSession = await this.completeSession(session, "failed", emit, plan.planId);
+        emit({
+          type: AgentRuntimeEventTypes.executionFailed,
+          planId: plan.planId,
+          status: "failed",
+          metadata: { failureKind: failure.kind, blocked: true },
+        });
         return Object.freeze({
           agentId: agent.id,
           executionId,
@@ -158,6 +180,12 @@ export class AgentRunnerService {
 
       while (attempts < retryPolicy.maxAttemptsPerStep) {
         attempts += 1;
+        emit({
+          type: AgentRuntimeEventTypes.stepAttemptStarted,
+          planId: plan.planId,
+          stepId: step.stepId,
+          metadata: { attempt: attempts, maxAttempts: retryPolicy.maxAttemptsPerStep, toolId: step.toolId },
+        });
         stepResult = await this.executeAgentToolsUseCase.execute({
           input: step.intent.action,
           executionId: `${executionId}:${step.stepId}:attempt:${attempts}`,
@@ -175,10 +203,26 @@ export class AgentRunnerService {
           }),
         });
 
-        classifiedFailure = this.classifyExecutionFailure(step.stepId, stepResult);
-        if (!classifiedFailure || !isAgentRuntimeFailureRetryable(classifiedFailure) || attempts >= retryPolicy.maxAttemptsPerStep) {
+        classifiedFailure = this.classifyExecutionFailure(step.stepId, stepResult, retryPolicy);
+        if (!classifiedFailure || !isAgentRuntimeFailureRetryable(classifiedFailure)) {
           break;
         }
+        if (attempts < retryPolicy.maxAttemptsPerStep) {
+          emit({
+            type: AgentRuntimeEventTypes.retryScheduled,
+            planId: plan.planId,
+            stepId: step.stepId,
+            metadata: { attempt: attempts, nextAttempt: attempts + 1, reason: classifiedFailure.message },
+          });
+          continue;
+        }
+        emit({
+          type: AgentRuntimeEventTypes.retryExhausted,
+          planId: plan.planId,
+          stepId: step.stepId,
+          metadata: { attempts, maxAttempts: retryPolicy.maxAttemptsPerStep, reason: classifiedFailure.message },
+        });
+        break;
       }
 
       const result = stepResult!;
@@ -203,7 +247,13 @@ export class AgentRunnerService {
         errorMessage: result.errorMessage,
         attempts,
       }));
-      emit({ type: AgentRuntimeEventTypes.unitCompleted, planId: plan.planId, stepId: step.stepId, status, metadata: { attempts } });
+      if (status === "completed") {
+        emit({ type: AgentRuntimeEventTypes.unitCompleted, planId: plan.planId, stepId: step.stepId, status, metadata: { attempts } });
+      } else if (status === "cancelled") {
+        emit({ type: AgentRuntimeEventTypes.unitCancelled, planId: plan.planId, stepId: step.stepId, status, metadata: { attempts } });
+      } else {
+        emit({ type: AgentRuntimeEventTypes.unitFailed, planId: plan.planId, stepId: step.stepId, status, metadata: { attempts } });
+      }
 
       workingMemory = this.workingMemoryService.appendExecutionOutcome(workingMemory, {
         stepId: step.stepId,
@@ -237,7 +287,7 @@ export class AgentRunnerService {
       status: finalStatus,
       outcomes: Object.freeze(outcomes.map((outcome) => Object.freeze({
         stepId: outcome.stepId,
-        status: outcome.status,
+        status: outcome.status === "blocked" ? "failed" : outcome.status,
         output: outcome.output,
         errorMessage: outcome.errorMessage,
         outputAssetId: outcome.outputAssetId,
@@ -247,7 +297,17 @@ export class AgentRunnerService {
     });
     emit({ type: AgentRuntimeEventTypes.memoryPersisted, planId: plan.planId, metadata: { persistedEntries: memoryWrite.persisted.length } });
 
-    const terminalSession = await this.completeSession(session, finalStatus === "completed" ? "completed" : finalStatus === "cancelled" ? "cancelled" : "failed");
+    const terminalSession = await this.completeSession(
+      session,
+      finalStatus === "completed" ? "completed" : finalStatus === "cancelled" ? "cancelled" : "failed",
+      emit,
+      plan.planId,
+    );
+    if (finalStatus === "completed") {
+      emit({ type: AgentRuntimeEventTypes.executionCompleted, planId: plan.planId, status: "completed" });
+    } else if (finalStatus === "cancelled") {
+      emit({ type: AgentRuntimeEventTypes.executionCancelled, planId: plan.planId, status: "cancelled" });
+    }
 
     return Object.freeze({
       agentId: agent.id,
@@ -269,7 +329,11 @@ export class AgentRunnerService {
     return Object.freeze({ maxAttemptsPerStep: Math.max(1, Math.min(5, Math.trunc(attempts))) });
   }
 
-  private classifyExecutionFailure(stepId: string, result: AgentExecutionResult): AgentRuntimeFailure | undefined {
+  private classifyExecutionFailure(
+    stepId: string,
+    result: AgentExecutionResult,
+    retryPolicy: AgentRuntimeRetryPolicy,
+  ): AgentRuntimeFailure | undefined {
     if (result.status === "completed") {
       return undefined;
     }
@@ -279,16 +343,55 @@ export class AgentRunnerService {
         stepId,
         message: result.errorMessage ?? "Execution cancelled.",
         retryable: false,
+        retryClassificationSource: "heuristic",
       };
     }
-    const detail = `${result.errorMessage ?? ""} ${result.stoppedReason}`.toLowerCase();
-    const retryable = /timeout|temporar|throttle|rate limit|busy/.test(detail);
-    return {
+    const metadataRetryable = this.resolveMetadataRetryable(result);
+    const baseFailure: AgentRuntimeFailure = {
       kind: "execution-failed",
       stepId,
       message: result.errorMessage ?? "Execution failed.",
-      retryable,
+      retryable: metadataRetryable ?? this.isHeuristicallyRetryable(result),
+      retryClassificationSource: metadataRetryable === undefined ? "heuristic" : "result-metadata",
     };
+    if (!retryPolicy.classifyFailure) {
+      return baseFailure;
+    }
+    const classified = retryPolicy.classifyFailure({ stepId, result, fallback: baseFailure });
+    const detail = `${result.errorMessage ?? ""} ${result.stoppedReason}`.toLowerCase();
+    if (classified.kind !== "execution-failed") {
+      return classified;
+    }
+    return Object.freeze({
+      ...classified,
+      retryClassificationSource: classified.retryClassificationSource ?? "policy",
+      message: classified.message || (detail ? result.errorMessage ?? "Execution failed." : "Execution failed."),
+    });
+  }
+
+  private resolveMetadataRetryable(result: AgentExecutionResult): boolean | undefined {
+    if (!result.metadata) {
+      return undefined;
+    }
+    const retryable = result.metadata.retryable;
+    if (typeof retryable === "boolean") {
+      return retryable;
+    }
+    const failureClass = result.metadata.failureClass;
+    if (typeof failureClass === "string") {
+      if (failureClass === "retryable") {
+        return true;
+      }
+      if (failureClass === "non-retryable") {
+        return false;
+      }
+    }
+    return undefined;
+  }
+
+  private isHeuristicallyRetryable(result: AgentExecutionResult): boolean {
+    const detail = `${result.errorMessage ?? ""} ${result.stoppedReason}`.toLowerCase();
+    return /timeout|temporar|throttle|rate limit|busy|unavailable/.test(detail);
   }
 
   private toGovernanceFailureKind(decision: "approval-required" | "denied" | "unavailable" | "incompatible"): AgentRuntimeFailure["kind"] {
@@ -314,6 +417,8 @@ export class AgentRunnerService {
   private async completeSession(
     session: AgentExecutionSession,
     status: "completed" | "failed" | "cancelled",
+    emit?: (event: Omit<AgentRuntimeProgressEvent, "occurredAt" | "executionId" | "agentId">) => void,
+    planId?: string,
   ): Promise<AgentExecutionSession> {
     const transitioned = transitionAgentExecutionSession(session, {
       status: status === "completed"
@@ -322,6 +427,17 @@ export class AgentRunnerService {
           ? AgentExecutionSessionStatuses.failed
           : AgentExecutionSessionStatuses.cancelled,
     });
-    return this.persistSession(transitioned);
+    emit?.({
+      type: AgentRuntimeEventTypes.sessionTransitioned,
+      planId,
+      metadata: { sessionId: session.id, status: transitioned.status },
+    });
+    const persisted = await this.persistSession(transitioned);
+    emit?.({
+      type: AgentRuntimeEventTypes.sessionPersisted,
+      planId,
+      metadata: { sessionId: session.id, status: persisted.status },
+    });
+    return persisted;
   }
 }

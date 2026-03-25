@@ -89,6 +89,30 @@ function makeAgent(toolId = "mcp:local:echo"): Agent {
   });
 }
 
+function makeTwoStepAgent(toolId = "mcp:local:echo"): Agent {
+  const base = makeAgent(toolId);
+  return createAgent({
+    ...base,
+    goals: [
+      base.goals[0],
+      {
+        ...base.goals[0],
+        id: "goal-2",
+        objective: "Run second step",
+        priorityOrder: 2,
+      },
+    ],
+    policy: {
+      ...base.policy,
+      executionLimits: { maxSteps: 2 },
+    },
+    execution: {
+      ...base.execution,
+      maxExecutionUnits: 2,
+    },
+  });
+}
+
 function makeCatalog(toolId = "mcp:local:echo"): IToolCapabilityCatalog {
   return {
     async listCapabilities() {
@@ -105,24 +129,39 @@ function makeCatalog(toolId = "mcp:local:echo"): IToolCapabilityCatalog {
   };
 }
 
-function makeOrchestrator(response: "success" | "retryable-failure"): IAgentToolOrchestrator {
+type OrchestratorMode = "success" | "retryable-failure" | "non-retryable-failure" | "cancelled";
+
+function makeOrchestrator(response: OrchestratorMode): IAgentToolOrchestrator {
   let calls = 0;
   return {
     async execute(request) {
       calls += 1;
-      const failed = response === "retryable-failure" && calls === 1;
+      const retryableFailed = response === "retryable-failure" && calls === 1;
+      const nonRetryableFailed = response === "non-retryable-failure";
+      const cancelled = response === "cancelled";
       return {
         executionId: request.executionId ?? "exec-runtime",
-        status: failed ? "failed" : "completed",
+        status: cancelled ? "cancelled" : retryableFailed || nonRetryableFailed ? "failed" : "completed",
         input: request.input,
         maxIterations: request.maxIterations,
         iterationCount: 1,
-        stoppedReason: failed ? "tool-failed" : "completed",
+        stoppedReason: cancelled ? "cancelled" : retryableFailed || nonRetryableFailed ? "tool-failed" : "completed",
         availableTools: request.availableTools,
         selectedTools: request.selectedTools,
         steps: [],
-        finalOutput: failed ? undefined : `ok:${request.input}`,
-        errorMessage: failed ? "temporary timeout" : undefined,
+        finalOutput: retryableFailed || nonRetryableFailed || cancelled ? undefined : `ok:${request.input}`,
+        errorMessage: cancelled
+          ? "cancelled by runtime"
+          : retryableFailed
+            ? "temporary timeout"
+            : nonRetryableFailed
+              ? "invalid arguments"
+              : undefined,
+        metadata: retryableFailed
+          ? { retryable: true }
+          : nonRetryableFailed
+            ? { retryable: false }
+            : undefined,
       };
     },
   };
@@ -146,6 +185,7 @@ describe("Agent runtime foundation", () => {
         version: "1.0.0",
         displayName: "Echo",
         inputSchema: { type: "object" },
+        outputSchema: { type: "object" },
         sideEffects: "none",
         auth: { kind: "none" },
         tags: [],
@@ -194,7 +234,7 @@ describe("Agent runtime foundation", () => {
     });
 
     const catalog = makeCatalog();
-    const planner = new DeterministicAgentPlanningService(catalog, memoryStore, new AgentMcpToolGovernanceService(makeRegistry(installed)));
+    const planner = new DeterministicAgentPlanningService(catalog, memoryStore);
     const useCase = new ExecuteAgentToolsUseCase(catalog, makeOrchestrator("retryable-failure"));
     const sessionRepo = new InMemorySessionRepo();
     const runner = new AgentRunnerService(
@@ -216,10 +256,316 @@ describe("Agent runtime foundation", () => {
 
     expect(result.status).toBe("completed");
     expect(result.outcomes[0]?.attempts).toBe(2);
+    expect(events).toEqual([
+      "execution-started",
+      "plan-prepared",
+      "session-started",
+      "session-transitioned",
+      "session-transitioned",
+      "session-persisted",
+      "governance-validated",
+      "unit-mapped",
+      "step-attempt-started",
+      "retry-scheduled",
+      "step-attempt-started",
+      "unit-completed",
+      "memory-persisted",
+      "session-transitioned",
+      "session-persisted",
+      "execution-completed",
+    ]);
     expect(events).toContain("memory-persisted");
 
     const sessions = await sessionRepo.listByAgentId("agent-runtime");
     expect(sessions).toHaveLength(1);
     expect(sessions[0]?.status).toBe("completed");
+  });
+
+  it("emits blocked lifecycle events when governance denies execution before any step runs", async () => {
+    const assetRepo = new InMemoryAssetRepo();
+    const memoryStore = new AssetBackedAgentMemoryStore(assetRepo, assetRepo);
+    await memoryStore.add("agent-runtime", { assetId: new AssetId("asset:memory:runtime"), memoryType: "working" });
+    const installed = createInstalledMcpToolRecord({
+      definition: {
+        id: "mcp:local:echo",
+        version: "1.0.0",
+        displayName: "Echo",
+        inputSchema: { type: "object" },
+        outputSchema: { type: "object" },
+        sideEffects: "none",
+        auth: { kind: "none" },
+        tags: [],
+        categories: ["utility"],
+      },
+      source: { kind: "inline", location: "test" },
+      status: "disabled",
+    });
+    const catalog = makeCatalog();
+    const planner = new DeterministicAgentPlanningService(catalog, memoryStore);
+    const runner = new AgentRunnerService(
+      planner,
+      new ExecuteAgentToolsUseCase(catalog, makeOrchestrator("success")),
+      new DefaultAgentMemoryRetrievalService(memoryStore),
+      new AgentMemoryWriteService(memoryStore),
+      undefined,
+      new AgentMcpToolGovernanceService(makeRegistry(installed)),
+    );
+
+    const events: string[] = [];
+    const result = await runner.run({
+      agent: makeAgent(),
+      onProgress: (event) => events.push(event.type),
+    });
+    expect(result.status).toBe("blocked");
+    expect(result.outcomes).toHaveLength(0);
+    expect(events).toContain("execution-blocked");
+    expect(events).toContain("execution-failed");
+    expect(events).not.toContain("step-attempt-started");
+  });
+
+  it("keeps partial step outcomes when a later step fails", async () => {
+    const assetRepo = new InMemoryAssetRepo();
+    const memoryStore = new AssetBackedAgentMemoryStore(assetRepo, assetRepo);
+    await memoryStore.add("agent-runtime", { assetId: new AssetId("asset:memory:runtime"), memoryType: "working" });
+
+    const installed = createInstalledMcpToolRecord({
+      definition: {
+        id: "mcp:local:echo",
+        version: "1.0.0",
+        displayName: "Echo",
+        inputSchema: { type: "object" },
+        outputSchema: { type: "object" },
+        sideEffects: "none",
+        auth: { kind: "none" },
+        tags: [],
+        categories: ["utility"],
+      },
+      source: { kind: "inline", location: "test" },
+      status: "enabled",
+    });
+
+    const catalog = makeCatalog();
+    const planner = new DeterministicAgentPlanningService(catalog, memoryStore, new AgentMcpToolGovernanceService(makeRegistry(installed)));
+    let calls = 0;
+    const orchestrator: IAgentToolOrchestrator = {
+      async execute(request) {
+        calls += 1;
+        if (calls === 1) {
+          return {
+            executionId: request.executionId ?? "exec-runtime",
+            status: "completed",
+            input: request.input,
+            maxIterations: request.maxIterations,
+            iterationCount: 1,
+            stoppedReason: "completed",
+            availableTools: request.availableTools,
+            selectedTools: request.selectedTools,
+            steps: [],
+            finalOutput: "first-step",
+          };
+        }
+        return {
+          executionId: request.executionId ?? "exec-runtime",
+          status: "failed",
+          input: request.input,
+          maxIterations: request.maxIterations,
+          iterationCount: 1,
+          stoppedReason: "tool-failed",
+          availableTools: request.availableTools,
+          selectedTools: request.selectedTools,
+          steps: [],
+          errorMessage: "invalid arguments",
+          metadata: { retryable: false },
+        };
+      },
+    };
+    const runner = new AgentRunnerService(
+      planner,
+      new ExecuteAgentToolsUseCase(catalog, orchestrator),
+      new DefaultAgentMemoryRetrievalService(memoryStore),
+      new AgentMemoryWriteService(memoryStore),
+      undefined,
+      new AgentMcpToolGovernanceService(makeRegistry(installed)),
+    );
+    const result = await runner.run({ agent: makeTwoStepAgent(), retryPolicy: { maxAttemptsPerStep: 3 } });
+    expect(result.status).toBe("failed");
+    expect(result.outcomes).toHaveLength(2);
+    expect(result.outcomes[0]?.status).toBe("completed");
+    expect(result.outcomes[1]?.status).toBe("failed");
+    expect(result.workingMemory.executionOutputs).toHaveLength(2);
+    expect(result.memoryWrite.persisted.length).toBeGreaterThan(0);
+  });
+
+  it("stops immediately on non-retryable failure and preserves partial outcomes", async () => {
+    const assetRepo = new InMemoryAssetRepo();
+    const memoryStore = new AssetBackedAgentMemoryStore(assetRepo, assetRepo);
+    await memoryStore.add("agent-runtime", { assetId: new AssetId("asset:memory:runtime"), memoryType: "working" });
+
+    const installed = createInstalledMcpToolRecord({
+      definition: {
+        id: "mcp:local:echo",
+        version: "1.0.0",
+        displayName: "Echo",
+        inputSchema: { type: "object" },
+        outputSchema: { type: "object" },
+        sideEffects: "none",
+        auth: { kind: "none" },
+        tags: [],
+        categories: ["utility"],
+      },
+      source: { kind: "inline", location: "test" },
+      status: "enabled",
+    });
+
+    const catalog = makeCatalog();
+    const planner = new DeterministicAgentPlanningService(catalog, memoryStore, new AgentMcpToolGovernanceService(makeRegistry(installed)));
+    const useCase = new ExecuteAgentToolsUseCase(catalog, makeOrchestrator("non-retryable-failure"));
+    const runner = new AgentRunnerService(
+      planner,
+      useCase,
+      new DefaultAgentMemoryRetrievalService(memoryStore),
+      new AgentMemoryWriteService(memoryStore),
+      undefined,
+      new AgentMcpToolGovernanceService(makeRegistry(installed)),
+    );
+
+    const events: string[] = [];
+    const result = await runner.run({
+      agent: makeAgent(),
+      retryPolicy: { maxAttemptsPerStep: 3 },
+      onProgress: (event) => events.push(event.type),
+    });
+
+    expect(result.status).toBe("failed");
+    expect(result.outcomes).toHaveLength(1);
+    expect(result.outcomes[0]?.attempts).toBe(1);
+    expect(result.workingMemory.executionOutputs).toHaveLength(1);
+    expect(events).not.toContain("retry-scheduled");
+    expect(events).toContain("unit-failed");
+    expect(result.failure?.retryable).toBe(false);
+    expect(result.failure?.retryClassificationSource).toBe("result-metadata");
+  });
+
+  it("marks retry exhaustion and terminal failure when retries are exhausted", async () => {
+    const assetRepo = new InMemoryAssetRepo();
+    const memoryStore = new AssetBackedAgentMemoryStore(assetRepo, assetRepo);
+    await memoryStore.add("agent-runtime", { assetId: new AssetId("asset:memory:runtime"), memoryType: "working" });
+
+    const installed = createInstalledMcpToolRecord({
+      definition: {
+        id: "mcp:local:echo",
+        version: "1.0.0",
+        displayName: "Echo",
+        inputSchema: { type: "object" },
+        outputSchema: { type: "object" },
+        sideEffects: "none",
+        auth: { kind: "none" },
+        tags: [],
+        categories: ["utility"],
+      },
+      source: { kind: "inline", location: "test" },
+      status: "enabled",
+    });
+
+    const catalog = makeCatalog();
+    const planner = new DeterministicAgentPlanningService(catalog, memoryStore, new AgentMcpToolGovernanceService(makeRegistry(installed)));
+    const useCase = new ExecuteAgentToolsUseCase(catalog, makeOrchestrator("retryable-failure"));
+    const runner = new AgentRunnerService(
+      planner,
+      useCase,
+      new DefaultAgentMemoryRetrievalService(memoryStore),
+      new AgentMemoryWriteService(memoryStore),
+      undefined,
+      new AgentMcpToolGovernanceService(makeRegistry(installed)),
+    );
+
+    const events: string[] = [];
+    const result = await runner.run({
+      agent: makeAgent(),
+      retryPolicy: { maxAttemptsPerStep: 1 },
+      onProgress: (event) => events.push(event.type),
+    });
+
+    expect(result.status).toBe("failed");
+    expect(result.outcomes[0]?.attempts).toBe(1);
+    expect(events).toContain("retry-exhausted");
+    expect(events).toContain("execution-failed");
+  });
+
+  it("supports cancellation after partial success", async () => {
+    const assetRepo = new InMemoryAssetRepo();
+    const memoryStore = new AssetBackedAgentMemoryStore(assetRepo, assetRepo);
+    await memoryStore.add("agent-runtime", { assetId: new AssetId("asset:memory:runtime"), memoryType: "working" });
+
+    const installed = createInstalledMcpToolRecord({
+      definition: {
+        id: "mcp:local:echo",
+        version: "1.0.0",
+        displayName: "Echo",
+        inputSchema: { type: "object" },
+        outputSchema: { type: "object" },
+        sideEffects: "none",
+        auth: { kind: "none" },
+        tags: [],
+        categories: ["utility"],
+      },
+      source: { kind: "inline", location: "test" },
+      status: "enabled",
+    });
+
+    const catalog = makeCatalog();
+    const planner = new DeterministicAgentPlanningService(catalog, memoryStore, new AgentMcpToolGovernanceService(makeRegistry(installed)));
+    let calls = 0;
+    const orchestrator: IAgentToolOrchestrator = {
+      async execute(request) {
+        calls += 1;
+        if (calls === 1) {
+          return {
+            executionId: request.executionId ?? "exec-runtime",
+            status: "completed",
+            input: request.input,
+            maxIterations: request.maxIterations,
+            iterationCount: 1,
+            stoppedReason: "completed",
+            availableTools: request.availableTools,
+            selectedTools: request.selectedTools,
+            steps: [],
+            finalOutput: "first-step",
+          };
+        }
+        return {
+          executionId: request.executionId ?? "exec-runtime",
+          status: "cancelled",
+          input: request.input,
+          maxIterations: request.maxIterations,
+          iterationCount: 1,
+          stoppedReason: "cancelled",
+          availableTools: request.availableTools,
+          selectedTools: request.selectedTools,
+          steps: [],
+          errorMessage: "cancelled by runtime",
+        };
+      },
+    };
+    const useCase = new ExecuteAgentToolsUseCase(catalog, orchestrator);
+    const runner = new AgentRunnerService(
+      planner,
+      useCase,
+      new DefaultAgentMemoryRetrievalService(memoryStore),
+      new AgentMemoryWriteService(memoryStore),
+      undefined,
+      new AgentMcpToolGovernanceService(makeRegistry(installed)),
+    );
+
+    const result = await runner.run({
+      agent: makeTwoStepAgent(),
+      retryPolicy: { maxAttemptsPerStep: 2 },
+    });
+
+    expect(result.status).toBe("cancelled");
+    expect(result.outcomes).toHaveLength(2);
+    expect(result.outcomes[0]?.status).toBe("completed");
+    expect(result.outcomes[1]?.status).toBe("cancelled");
+    expect(result.workingMemory.executionOutputs).toHaveLength(2);
   });
 });

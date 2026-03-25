@@ -1,11 +1,22 @@
 export const AgentRuntimeEventTypes = Object.freeze({
   executionStarted: "execution-started",
+  sessionStarted: "session-started",
+  sessionTransitioned: "session-transitioned",
+  sessionPersisted: "session-persisted",
   planPrepared: "plan-prepared",
   governanceValidated: "governance-validated",
   unitMapped: "unit-mapped",
+  stepAttemptStarted: "step-attempt-started",
   unitCompleted: "unit-completed",
+  unitFailed: "unit-failed",
+  unitCancelled: "unit-cancelled",
+  unitBlocked: "unit-blocked",
+  retryScheduled: "retry-scheduled",
+  retryExhausted: "retry-exhausted",
   executionBlocked: "execution-blocked",
   executionFailed: "execution-failed",
+  executionCompleted: "execution-completed",
+  executionCancelled: "execution-cancelled",
   memoryPersisted: "memory-persisted",
 });
 
