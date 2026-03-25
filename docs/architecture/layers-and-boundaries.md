@@ -164,6 +164,7 @@ If a change needs data from the outside world, prefer adding or using an **appli
 - Direction 4 Phase 6 inner architecture now extends the same split:
   - domain invariants remain in `domain/agents/*`
   - application adds bounded authoring use cases (CRUD + goal/policy/tool/memory/strategy configuration + whole-config validation)
+  - goal authoring operations (`add`/`update`/`remove`/`reorder`) now enforce deterministic coherence at the use-case/domain boundary (unique ids, canonical required tool refs, contiguous ordering from 1, and explicit missing-goal failures).
   - persistence remains outer-layer through `IAgentRepository`/`IAgentExecutionSessionRepository` with concrete SQLite adapters (`SqliteAgentRepository`, `SqliteAgentExecutionSessionRepository`).
 
 ## TODO

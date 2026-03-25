@@ -26,13 +26,20 @@ export class ConfigureAgentGoalsUseCase {
     let goals = [...current.goals];
     for (const operation of request.operations) {
       if (operation.type === "add") {
+        if (goals.some((goal) => goal.id === operation.goal.id.trim())) {
+          throw new Error(`Agent goal '${operation.goal.id.trim()}' already exists.`);
+        }
         goals.push(operation.goal);
         continue;
       }
 
       if (operation.type === "remove") {
         const goalId = operation.goalId.trim();
+        const beforeCount = goals.length;
         goals = goals.filter((goal) => goal.id !== goalId);
+        if (beforeCount === goals.length) {
+          throw new Error(`Agent goal '${goalId}' was not found.`);
+        }
         continue;
       }
 
@@ -58,6 +65,7 @@ export class ConfigureAgentGoalsUseCase {
       goals = reorderGoals(goals, operation.goalIdsInPriorityOrder);
     }
 
+    validateGoalPriorityOrdering(goals);
     const saved = await this.repository.save(updateAgent(current, { goals }));
     return toAgentReadModel(saved);
   }
@@ -85,4 +93,16 @@ function reorderGoals(goals: ReadonlyArray<AgentGoal>, goalIdsInPriorityOrder: R
       priorityOrder: index + 1,
     });
   });
+}
+
+function validateGoalPriorityOrdering(goals: ReadonlyArray<AgentGoal>): void {
+  const priorityOrders = goals.map((goal) => goal.priorityOrder);
+  if (new Set(priorityOrders).size !== priorityOrders.length) {
+    throw new Error("Goal priorityOrder values must be unique.");
+  }
+  const sorted = [...priorityOrders].sort((left, right) => left - right);
+  const contiguous = sorted.every((value, index) => value === index + 1);
+  if (!contiguous) {
+    throw new Error("Goal priorityOrder values must be contiguous and start at 1.");
+  }
 }

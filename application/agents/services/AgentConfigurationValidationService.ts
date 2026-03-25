@@ -76,6 +76,15 @@ export class AgentConfigurationValidationService {
         });
       }
       for (const requiredToolId of goal.requiredToolIds ?? []) {
+        if (!/^mcp:[^:\s]+:[^:\s]+$/.test(requiredToolId) && !/^workflow:[^:\s]+/.test(requiredToolId)) {
+          issues.push({
+            code: "goal-required-tool-malformed",
+            path: `goals.${goal.id || "<unknown>"}.requiredToolIds`,
+            message: `Goal required tool id '${requiredToolId}' is malformed.`,
+            severity: "error",
+          });
+          continue;
+        }
         if (!allowedToolIds.has(requiredToolId)) {
           issues.push({
             code: "goal-required-tool-not-allowed",

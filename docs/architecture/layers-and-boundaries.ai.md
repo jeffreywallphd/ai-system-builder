@@ -29,6 +29,7 @@ The architecture is mostly clean, but not all write actions are modeled as appli
   - persistence ports: `IAgentRepository`, `IAgentExecutionSessionRepository`
   - infrastructure adapters: `SqliteAgentRepository`, `SqliteAgentExecutionSessionRepository`
   - application use cases: CRUD + bounded configuration updates (`goals`, `policy`, `tools`, `memory`, `strategy`) plus whole-config validation (`AgentConfigurationValidationService`).
+  - goal authoring updates (`add`/`update`/`remove`/`reorder`) now enforce deterministic coherence (unique ids, canonical required tool refs, contiguous ordering from 1, explicit missing-goal failures) at the application/domain boundary.
 
 ## TODO
 - When summarizing purity/impurity, say "clean-architecture-style with pragmatic UI-layer convenience logic," not "strict clean architecture."

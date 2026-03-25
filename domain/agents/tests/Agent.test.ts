@@ -89,7 +89,7 @@ describe("Agent domain", () => {
       id: "agent-read",
       name: "Read Model Agent",
       goals: [
-        { id: "g2", objective: "Secondary", constraints: [], successCriteria: ["done"], priority: "normal", priorityOrder: 20 },
+        { id: "g2", objective: "Secondary", constraints: [], successCriteria: ["done"], priority: "normal", priorityOrder: 2 },
         { id: "g1", objective: "Primary", constraints: [], successCriteria: ["done"], priority: "critical", priorityOrder: 1 },
       ],
       policy: {
@@ -204,7 +204,7 @@ describe("Agent goal and policy invariants", () => {
       constraints: [" use trusted tools ", "use trusted tools"],
       successCriteria: ["done"],
       priority: "critical",
-      priorityOrder: 0,
+      priorityOrder: 1,
       requiredToolIds: ["mcp:local:echo", "mcp:local:echo"],
     });
 
