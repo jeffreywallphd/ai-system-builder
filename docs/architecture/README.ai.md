@@ -66,6 +66,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Phase 6 inner authoring now has real persistence/use-case seams without UI coupling:
   - persistence ports/adapters: `IAgentRepository` -> `SqliteAgentRepository`, `IAgentExecutionSessionRepository` -> `SqliteAgentExecutionSessionRepository`
   - application CRUD + lifecycle use cases: create/update/get/list/delete/archive
+  - CRUD failure modes now use explicit typed application errors (`agent-conflict`, `agent-not-found`, `agent-invalid-request`) so transport mapping is deterministic and does not depend on string parsing.
   - bounded configuration use cases: goals/policy/tools/memory/strategy
   - cohesive cross-field validation seam: `AgentConfigurationValidationService` (deterministic cross-field issue codes + domain fallback validation), with SQLite agent persistence also projecting structured authoring metadata (`strategy_id`, `strategy_mode`, `goal_count`, `allowed_tool_count`).
   - memory authoring contracts are now hard-validated (canonical asset refs, retrieval compatibility, writable/retrievable/session-only coherence, retention/session-only contradictions).

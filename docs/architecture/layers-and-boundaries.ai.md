@@ -29,7 +29,9 @@ The architecture is mostly clean, but not all write actions are modeled as appli
   - persistence ports: `IAgentRepository`, `IAgentExecutionSessionRepository`
   - infrastructure adapters: `SqliteAgentRepository`, `SqliteAgentExecutionSessionRepository`
   - application use cases: CRUD + bounded configuration updates (`goals`, `policy`, `tools`, `memory`, `strategy`) plus whole-config validation (`AgentConfigurationValidationService`).
+  - CRUD failure semantics are explicit inner-layer contracts (`AgentConflictError`, `AgentNotFoundError`, `AgentInvalidRequestError`) so infrastructure transport mapping is type-based rather than string-matching.
   - `SqliteAgentRepository` deserialization now rehydrates snapshots through domain normalization, preserving full aggregate truth (including asset-native memory refs and planning/execution config) instead of raw cast-only JSON reads.
+  - malformed persisted snapshots now fail fast with explicit field-level errors (for example missing policy/planning/execution objects) instead of silently materializing partial aggregates.
   - goal authoring updates (`add`/`update`/`remove`/`reorder`) now enforce deterministic coherence (unique ids, canonical required tool refs, contiguous ordering from 1, explicit missing-goal failures) at the application/domain boundary.
   - memory configuration updates are now explicitly validated for asset-native references, retrieval compatibility, writable/retrievable/session-only coherence, and retention contradictions before persistence.
   - memory validation now emits explicit structured issues for non-canonical/malformed asset refs, duplicate refs, malformed asset-version ids, invalid semantic/recency settings, and retention/policy contradictions (not only generic fallback errors).

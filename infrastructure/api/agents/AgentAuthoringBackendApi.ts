@@ -14,6 +14,7 @@ import { ConfigureAgentToolsUseCase } from "../../../application/agents/Configur
 import { ConfigureAgentMemoryUseCase } from "../../../application/agents/ConfigureAgentMemoryUseCase";
 import { ConfigureAgentStrategyUseCase } from "../../../application/agents/ConfigureAgentStrategyUseCase";
 import { ValidateAgentConfigurationUseCase } from "../../../application/agents/ValidateAgentConfigurationUseCase";
+import { AgentAuthoringError } from "../../../application/agents/AgentAuthoringErrors";
 import {
   AgentConfigurationValidationService,
   type AgentConfigurationValidationInput,
@@ -149,13 +150,18 @@ export class AgentAuthoringBackendApi {
         validationIssues: error.issues,
       });
     }
+    if (error instanceof AgentAuthoringError) {
+      if (error.code === "agent-conflict") {
+        return Object.freeze({ code: "conflict", message: error.message });
+      }
+      if (error.code === "agent-not-found") {
+        return Object.freeze({ code: "not-found", message: error.message });
+      }
+      if (error.code === "agent-invalid-request") {
+        return Object.freeze({ code: "invalid-request", message: error.message });
+      }
+    }
     const message = error instanceof Error ? error.message : "Unexpected backend error.";
-    if (message.includes("already exists")) {
-      return Object.freeze({ code: "conflict", message });
-    }
-    if (message.includes("was not found")) {
-      return Object.freeze({ code: "not-found", message });
-    }
     if (message.includes("required") || message.includes("malformed") || message.includes("invalid")) {
       return Object.freeze({ code: "invalid-request", message });
     }

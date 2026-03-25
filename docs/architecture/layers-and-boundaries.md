@@ -164,9 +164,11 @@ If a change needs data from the outside world, prefer adding or using an **appli
 - Direction 4 Phase 6 inner architecture now extends the same split:
   - domain invariants remain in `domain/agents/*`
   - application adds bounded authoring use cases (CRUD + goal/policy/tool/memory/strategy configuration + whole-config validation)
+  - CRUD failure semantics are now explicit application contracts (`AgentConflictError`, `AgentNotFoundError`, `AgentInvalidRequestError`) so outer transport adapters map errors by type, not brittle message parsing.
   - goal authoring operations (`add`/`update`/`remove`/`reorder`) now enforce deterministic coherence at the use-case/domain boundary (unique ids, canonical required tool refs, contiguous ordering from 1, and explicit missing-goal failures).
   - persistence remains outer-layer through `IAgentRepository`/`IAgentExecutionSessionRepository` with concrete SQLite adapters (`SqliteAgentRepository`, `SqliteAgentExecutionSessionRepository`).
   - `SqliteAgentRepository` now rehydrates persisted JSON snapshots through domain normalization on reads (rather than raw cast-only deserialization), so full aggregate round-trip stays truthy for memory asset refs, goal/policy/tool config, and planning/execution config.
+  - malformed persisted agent snapshots now fail fast with explicit field-level errors (for example missing policy/planning/execution objects) instead of yielding partial aggregates.
   - memory authoring contracts are now fully structured/validated at the inner layer (asset-backed refs, retrieval config, writable/retrievable/session-only type coherence, retention/session-only contradictions, canonical asset/id format checks).
   - memory validation now emits explicit structured issue codes for malformed/non-canonical asset refs, duplicate asset refs, malformed asset-version ids, invalid semantic/recency settings, and retention/policy contradictions so API/UI consumers do not rely only on generic fallback errors.
   - planning strategy authoring is now explicitly bounded to supported strategy descriptors (currently deterministic only), with unsupported id/mode combinations rejected before persistence.

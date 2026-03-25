@@ -14,6 +14,7 @@ import { ConfigureAgentToolsUseCase } from "../ConfigureAgentToolsUseCase";
 import { ConfigureAgentMemoryUseCase } from "../ConfigureAgentMemoryUseCase";
 import { ConfigureAgentStrategyUseCase } from "../ConfigureAgentStrategyUseCase";
 import { ValidateAgentConfigurationUseCase } from "../ValidateAgentConfigurationUseCase";
+import { AgentConflictError, AgentInvalidRequestError, AgentNotFoundError } from "../AgentAuthoringErrors";
 import { AgentConfigurationValidationService } from "../services/AgentConfigurationValidationService";
 
 class InMemoryAgentRepository implements IAgentRepository {
@@ -103,6 +104,24 @@ describe("Agent authoring use cases", () => {
     const deleted = await deleteUseCase.execute("agent:authoring:crud");
     expect(deleted).toBe(true);
     expect(await get.execute("agent:authoring:crud")).toBeUndefined();
+  });
+
+  it("exposes explicit CRUD failure modes for conflict, invalid input, and not-found", async () => {
+    const repository = new InMemoryAgentRepository();
+    const create = new CreateAgentUseCase(repository);
+    const update = new UpdateAgentUseCase(repository);
+    const get = new GetAgentUseCase(repository);
+    const archive = new ArchiveAgentUseCase(repository);
+    const deleteUseCase = new DeleteAgentUseCase(repository);
+
+    await create.execute(createRequest("agent:authoring:errors"));
+
+    await expect(create.execute(createRequest("agent:authoring:errors"))).rejects.toBeInstanceOf(AgentConflictError);
+    await expect(create.execute({ ...createRequest("agent:authoring:new"), id: "   " })).rejects.toBeInstanceOf(AgentInvalidRequestError);
+    await expect(get.execute("   ")).rejects.toBeInstanceOf(AgentInvalidRequestError);
+    await expect(update.execute({ id: "agent:authoring:missing", changes: { name: "Nope" } })).rejects.toBeInstanceOf(AgentNotFoundError);
+    await expect(archive.execute("agent:authoring:missing")).rejects.toBeInstanceOf(AgentNotFoundError);
+    await expect(deleteUseCase.execute("   ")).rejects.toBeInstanceOf(AgentInvalidRequestError);
   });
 
   it("supports structured goal add/update/remove/reorder semantics", async () => {
