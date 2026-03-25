@@ -41,6 +41,7 @@ export class CanonicalAssetIdentityService {
       entityId,
       assetId: existing.assetId,
       latestVersionId: versionId,
+      taxonomy: existing.taxonomy,
       updatedAt: new Date(),
     });
   }
