@@ -8,6 +8,8 @@ import { ArchiveAgentUseCase } from "../ArchiveAgentUseCase";
 import { ConfigureAgentGoalsUseCase } from "../ConfigureAgentGoalsUseCase";
 import { ConfigureAgentPolicyUseCase } from "../ConfigureAgentPolicyUseCase";
 import { ConfigureAgentToolsUseCase } from "../ConfigureAgentToolsUseCase";
+import { ConfigureAgentMemoryUseCase } from "../ConfigureAgentMemoryUseCase";
+import { ConfigureAgentStrategyUseCase } from "../ConfigureAgentStrategyUseCase";
 import { CreateAgentUseCase } from "../CreateAgentUseCase";
 import { DeleteAgentUseCase } from "../DeleteAgentUseCase";
 import { GetAgentUseCase } from "../GetAgentUseCase";
@@ -62,7 +64,7 @@ function createRequest(id = "agent:sqlite:1") {
 }
 
 describe("Agent authoring use cases (SQLite integration)", () => {
-  it("supports CRUD and structured goal/policy/tool updates with full read-model persistence", async () => {
+  it("supports CRUD and structured goal/policy/tool/memory/strategy updates with full read-model persistence", async () => {
     const root = mkdtempSync(path.join(tmpdir(), "loom-agent-authoring-sqlite-"));
     createdRoots.push(root);
     const repository = new SqliteAgentRepository(path.join(root, "agents.sqlite"));
@@ -76,6 +78,8 @@ describe("Agent authoring use cases (SQLite integration)", () => {
     const configureGoals = new ConfigureAgentGoalsUseCase(repository);
     const configurePolicy = new ConfigureAgentPolicyUseCase(repository);
     const configureTools = new ConfigureAgentToolsUseCase(repository);
+    const configureMemory = new ConfigureAgentMemoryUseCase(repository);
+    const configureStrategy = new ConfigureAgentStrategyUseCase(repository);
 
     await create.execute(createRequest("agent:sqlite:crud"));
     await update.execute({
@@ -112,6 +116,16 @@ describe("Agent authoring use cases (SQLite integration)", () => {
       scopeConstraints: [{ toolId: "mcp:local:echo", allowedScopes: ["runtime.execute", "workspace.read"] }],
     });
     expect(toolsUpdated.policy.toolAccess.scopeConstraints[0]?.allowedScopes).toEqual(["runtime.execute", "workspace.read"]);
+    const memoryUpdated = await configureMemory.execute("agent:sqlite:crud", {
+      ...createRequest("agent:sqlite:crud").memory,
+      retrieval: { strategy: "hybrid", maxEntries: 8, recency: { preferLatest: true, lookbackWindowEntries: 12 } },
+    });
+    expect(memoryUpdated.memory.retrieval.strategy).toBe("hybrid");
+    const strategyUpdated = await configureStrategy.execute("agent:sqlite:crud", {
+      strategyId: "deterministic",
+      mode: "deterministic-linear",
+    });
+    expect(strategyUpdated.planningStrategy.mode).toBe("deterministic-linear");
 
     const archived = await archive.execute("agent:sqlite:crud");
     expect(archived.status).toBe("archived");

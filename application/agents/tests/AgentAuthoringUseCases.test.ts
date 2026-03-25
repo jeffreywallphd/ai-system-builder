@@ -346,6 +346,45 @@ describe("Agent authoring use cases", () => {
     expect(validation.issues.some((issue) => issue.code === "memory-retrievable-session-only-overlap" && issue.section === "memory")).toBe(true);
   });
 
+  it("returns explicit structured issues for malformed memory assets and strategy id", async () => {
+    const validate = new ValidateAgentConfigurationUseCase(new AgentConfigurationValidationService());
+    const base = createRequest("agent:authoring:malformed-struct");
+    const validation = await validate.execute({
+      ...base,
+      planningStrategy: { strategyId: "   ", mode: "deterministic-linear" },
+      memory: {
+        ...base.memory,
+        assets: [
+          { assetId: new AssetId("memory:not-canonical"), memoryType: "working" },
+          { assetId: new AssetId("asset:memory:dup"), memoryType: "working", assetVersionId: "v1" },
+          { assetId: new AssetId("asset:memory:dup"), memoryType: "working", assetVersionId: "v1" },
+          { assetId: new AssetId("asset:memory:bad-version"), memoryType: "working", assetVersionId: "bad version id" as any },
+        ],
+        retrieval: {
+          strategy: "latest-first",
+          maxEntries: 3,
+          recency: { preferLatest: true, lookbackWindowEntries: 0 },
+          semantic: { minRelevanceScore: 2 },
+        },
+        policy: {
+          ...base.memory.policy,
+          maxRetrievalEntries: 10,
+          retention: { mode: "disabled", maxDurableEntries: 10 },
+        },
+      },
+    });
+
+    expect(validation.valid).toBe(false);
+    expect(validation.issues.some((issue) => issue.code === "memory-asset-id-noncanonical")).toBe(true);
+    expect(validation.issues.some((issue) => issue.code === "memory-asset-reference-duplicate")).toBe(true);
+    expect(validation.issues.some((issue) => issue.code === "memory-asset-version-id-malformed")).toBe(true);
+    expect(validation.issues.some((issue) => issue.code === "memory-recency-lookback-invalid")).toBe(true);
+    expect(validation.issues.some((issue) => issue.code === "memory-semantic-score-invalid")).toBe(true);
+    expect(validation.issues.some((issue) => issue.code === "memory-policy-max-retrieval-exceeds-retrieval")).toBe(true);
+    expect(validation.issues.some((issue) => issue.code === "memory-retention-disabled-max-durable-not-allowed")).toBe(true);
+    expect(validation.issues.some((issue) => issue.code === "strategy-id-missing")).toBe(true);
+  });
+
   it("reports deterministic cross-field validation issues for malformed authoring payloads", async () => {
     const validate = new ValidateAgentConfigurationUseCase(new AgentConfigurationValidationService());
     const base = createRequest("agent:authoring:cross-field");

@@ -349,9 +349,11 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
     - retrieval compatibility validation (`latest-first` / `semantic-filter` / `hybrid`)
     - writable/retrievable/session-only type coherence checks
     - explicit session-only vs durable retention contradiction checks.
+    - structured memory issue codes now explicitly cover malformed/non-canonical refs, duplicate refs, malformed asset-version ids, semantic/recency range errors, and retention-policy contradictions.
   - strategy contracts are now explicitly bounded to supported descriptors (current slice: `deterministic@deterministic-linear`) with unsupported id/mode combinations rejected deterministically before persistence.
+    - structured strategy issue codes now explicitly include missing strategy id and unsupported id/mode combinations.
   - whole-agent validation output now includes stable sectioned issue structure (`code`, `path`, `section`, `severity`, `message`) and is reused by CRUD/configuration use cases through a common `AgentConfigurationValidationError` path.
   - agent read-model contracts now project full memory configuration (`assets`, `retrieval`, `policy`, `revision`) so backend/API callers can consume one canonical authoring contract without reconstructing from partial fields.
   - backend authoring transport now has a dedicated thin seam (`infrastructure/api/agents/AgentAuthoringBackendApi` + desktop IPC `ai-loom-desktop-agents:*`) that maps request/response DTOs to the existing use cases/validation service.
-  - backend authoring coverage now includes SQLite-backed integration tests for CRUD + goal/policy/tool updates so real persistence seams are exercised directly.
+  - backend authoring coverage now includes SQLite-backed integration tests for CRUD + goal/policy/tool/memory/strategy updates and API mapping/error-path tests so real persistence seams are exercised directly.
 - No separate agent runtime engine or non-asset memory system was introduced; backend/API transport can stay thin over these use cases.
