@@ -94,6 +94,12 @@ export interface DesktopAgentAuthoringBridge {
   configureMemory(agentId: string, memoryJson: string): Promise<string>;
   configureStrategy(agentId: string, planningStrategyJson: string): Promise<string>;
   validateConfiguration(requestJson: string): Promise<string>;
+  launchAgent(requestJson: string): Promise<string>;
+  triggerLaunch(requestJson: string): Promise<string>;
+  listSessions(agentId: string): Promise<string>;
+  getSessionDetail(sessionId: string): Promise<string>;
+  controlRun(requestJson: string): Promise<string>;
+  getStudioSnapshot(agentId: string): Promise<string>;
 }
 
 export interface DesktopMcpSecretBridge {

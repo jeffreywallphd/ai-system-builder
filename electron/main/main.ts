@@ -34,7 +34,24 @@ import { ProjectionRebuildOrchestrationUseCase } from "../../application/assets-
 import { LoadCanonicalAssetManagementSnapshotUseCase } from "../../application/assets-system/LoadCanonicalAssetManagementSnapshotUseCase";
 import { ProjectionTrustReadModelService } from "../../application/assets-system/ProjectionTrustReadModelService";
 import { SqliteAgentRepository } from "../../infrastructure/filesystem/agents/SqliteAgentRepository";
-import { AgentAuthoringBackendApi } from "../../infrastructure/api/agents/AgentAuthoringBackendApi";
+import { SqliteAgentExecutionSessionRepository } from "../../infrastructure/filesystem/agents/SqliteAgentExecutionSessionRepository";
+import { AgentStudioBackendApi } from "../../infrastructure/api/agents/AgentStudioBackendApi";
+import { AgentRunnerService } from "../../application/agents/services/AgentRunnerService";
+import { DeterministicAgentPlanningService } from "../../application/agents/services/AgentPlanningInterface";
+import { ExecuteAgentToolsUseCase } from "../../application/agents/ExecuteAgentToolsUseCase";
+import { DefaultAgentMemoryRetrievalService } from "../../application/agents/services/AgentMemoryRetrievalService";
+import { AgentMemoryWriteService } from "../../application/agents/services/AgentMemoryWriteService";
+import { AssetBackedAgentMemoryStore } from "../../application/agents/services/AssetBackedAgentMemoryStore";
+import { CompositeToolCapabilityCatalog } from "../../infrastructure/tools/CompositeToolCapabilityCatalog";
+import { StaticLocalToolCapabilityCatalog } from "../../infrastructure/tools/StaticLocalToolCapabilityCatalog";
+import { McpToolCapabilityCatalog } from "../../infrastructure/tools/McpToolCapabilityCatalog";
+import { CompositeToolCapabilityExecutor } from "../../infrastructure/tools/CompositeToolCapabilityExecutor";
+import { StaticLocalToolCapabilityExecutor } from "../../infrastructure/tools/StaticLocalToolCapabilityExecutor";
+import { McpToolCapabilityExecutor } from "../../infrastructure/tools/McpToolCapabilityExecutor";
+import { DeterministicToolCapabilityAgentOrchestrator } from "../../infrastructure/agents/DeterministicToolCapabilityAgentOrchestrator";
+import { PythonRuntimeConfig } from "../../infrastructure/config/PythonRuntimeConfig";
+import { createMcpRuntimeIntegration } from "../../infrastructure/python/mcp/createMcpRuntimeIntegration";
+import { SqliteAssetSystemAgentMemoryCatalog } from "../../infrastructure/filesystem/agents/SqliteAssetSystemAgentMemoryCatalog";
 import type { CreateAgentRequest } from "../../application/agents/CreateAgentUseCase";
 import type { UpdateAgentRequest } from "../../application/agents/UpdateAgentUseCase";
 import type { ConfigureAgentGoalsRequest } from "../../application/agents/ConfigureAgentGoalsUseCase";
@@ -42,6 +59,8 @@ import type { AgentPolicy, AgentToolAccessPolicy } from "../../domain/agents/Age
 import type { AgentMemoryConfiguration } from "../../domain/agents/AgentMemory";
 import type { AgentPlanningStrategy } from "../../domain/agents/Agent";
 import type { AgentConfigurationValidationInput } from "../../application/agents/services/AgentConfigurationValidationService";
+import type { AgentRunControlRequest, AgentRunRequest } from "../../application/agents/contracts/AgentRunContracts";
+import type { TriggerAgentLaunchRequest } from "../../application/agents/TriggerAgentLaunchUseCase";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 if (started) {
@@ -60,6 +79,7 @@ let listExecutionRunsUseCase: ReturnType<typeof createExecutionHistoryInfrastruc
 let canonicalAssetSystemRepository: SqliteAssetSystemRepository | undefined;
 let canonicalProjectionSink: InMemoryAssetLineageGraphProjectionSink | undefined;
 let agentRepository: SqliteAgentRepository | undefined;
+let agentSessionRepository: SqliteAgentExecutionSessionRepository | undefined;
 let serviceSupervisor: DesktopServiceSupervisor | undefined;
 let bootstrapContext: DesktopBootstrapContext | undefined;
 
@@ -90,6 +110,43 @@ function listEntries(rootPath: string, recursive = false): ReadonlyArray<ReturnT
   };
   walk(rootPath);
   return results;
+}
+
+function createDesktopAgentRunner(params: {
+  readonly assetSystemRepository: SqliteAssetSystemRepository;
+  readonly sessionRepository: SqliteAgentExecutionSessionRepository;
+}): AgentRunnerService {
+  const pythonConfig = PythonRuntimeConfig.fromEnv(process.env);
+  const mcpIntegration = createMcpRuntimeIntegration(pythonConfig);
+  const toolCatalog = new CompositeToolCapabilityCatalog([
+    new StaticLocalToolCapabilityCatalog([]),
+    new McpToolCapabilityCatalog(mcpIntegration.toolCatalog),
+  ]);
+  const toolExecutor = new CompositeToolCapabilityExecutor([
+    {
+      providerKind: "local",
+      providerId: "local-runtime",
+      executor: new StaticLocalToolCapabilityExecutor({}),
+    },
+    {
+      providerKind: "mcp",
+      providerId: "python-mcp-runtime",
+      executor: new McpToolCapabilityExecutor(mcpIntegration.toolExecutor),
+    },
+  ]);
+  const memoryStore = new AssetBackedAgentMemoryStore(
+    new SqliteAssetSystemAgentMemoryCatalog(params.assetSystemRepository),
+    params.assetSystemRepository,
+  );
+  return new AgentRunnerService(
+    new DeterministicAgentPlanningService(toolCatalog, memoryStore),
+    new ExecuteAgentToolsUseCase(toolCatalog, new DeterministicToolCapabilityAgentOrchestrator(toolExecutor)),
+    new DefaultAgentMemoryRetrievalService(memoryStore),
+    new AgentMemoryWriteService(memoryStore),
+    undefined,
+    undefined,
+    params.sessionRepository,
+  );
 }
 
 async function createMainWindow(): Promise<void> {
@@ -218,7 +275,13 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     sqliteDatabasePath: storagePaths.databasePath,
   }) as SqliteExecutionRunRepository;
   agentRepository = new SqliteAgentRepository(path.join(storagePaths.storageDirectory, "agents", "agents.sqlite"));
-  const agentAuthoringBackendApi = new AgentAuthoringBackendApi(agentRepository);
+  agentSessionRepository = new SqliteAgentExecutionSessionRepository(path.join(storagePaths.storageDirectory, "agents", "agent-sessions.sqlite"));
+  const agentRunnerAssetSystemRepository = new SqliteAssetSystemRepository(path.join(storagePaths.assetsDirectory, "asset-system.sqlite"));
+  const agentRunner = createDesktopAgentRunner({
+    assetSystemRepository: agentRunnerAssetSystemRepository,
+    sessionRepository: agentSessionRepository,
+  });
+  const agentStudioBackendApi = new AgentStudioBackendApi(agentRepository, agentSessionRepository, agentRunner);
   const executionHistoryInfrastructure = createExecutionHistoryInfrastructure(executionRunRepository);
   getExecutionRunUseCase = new GetExecutionRunUseCase(executionRunRepository);
   listExecutionRunsUseCase = executionHistoryInfrastructure.listExecutionRunsUseCase;
@@ -263,47 +326,68 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   });
   ipcMain.handle("ai-loom-desktop-agents:create", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as CreateAgentRequest;
-    return JSON.stringify(await agentAuthoringBackendApi.createAgent(request));
+    return JSON.stringify(await agentStudioBackendApi.createAgent(request));
   });
   ipcMain.handle("ai-loom-desktop-agents:update", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as UpdateAgentRequest;
-    return JSON.stringify(await agentAuthoringBackendApi.updateAgent(request));
+    return JSON.stringify(await agentStudioBackendApi.updateAgent(request));
   });
   ipcMain.handle("ai-loom-desktop-agents:get", async (_event, agentId: string) => {
-    return JSON.stringify(await agentAuthoringBackendApi.getAgent(agentId));
+    return JSON.stringify(await agentStudioBackendApi.getAgent(agentId));
   });
   ipcMain.handle("ai-loom-desktop-agents:list", async (_event, includeArchived = true) => {
-    return JSON.stringify(await agentAuthoringBackendApi.listAgents(includeArchived));
+    return JSON.stringify(await agentStudioBackendApi.listAgents(includeArchived));
   });
   ipcMain.handle("ai-loom-desktop-agents:delete", async (_event, agentId: string) => {
-    return JSON.stringify(await agentAuthoringBackendApi.deleteAgent(agentId));
+    return JSON.stringify(await agentStudioBackendApi.deleteAgent(agentId));
   });
   ipcMain.handle("ai-loom-desktop-agents:archive", async (_event, agentId: string) => {
-    return JSON.stringify(await agentAuthoringBackendApi.archiveAgent(agentId));
+    return JSON.stringify(await agentStudioBackendApi.archiveAgent(agentId));
   });
   ipcMain.handle("ai-loom-desktop-agents:configure-goals", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as ConfigureAgentGoalsRequest;
-    return JSON.stringify(await agentAuthoringBackendApi.configureGoals(request));
+    return JSON.stringify(await agentStudioBackendApi.configureGoals(request));
   });
   ipcMain.handle("ai-loom-desktop-agents:configure-policy", async (_event, agentId: string, policyJson: string) => {
     const policy = JSON.parse(policyJson) as AgentPolicy;
-    return JSON.stringify(await agentAuthoringBackendApi.configurePolicy(agentId, policy));
+    return JSON.stringify(await agentStudioBackendApi.configurePolicy(agentId, policy));
   });
   ipcMain.handle("ai-loom-desktop-agents:configure-tools", async (_event, agentId: string, toolAccessJson: string) => {
     const toolAccess = JSON.parse(toolAccessJson) as AgentToolAccessPolicy;
-    return JSON.stringify(await agentAuthoringBackendApi.configureTools(agentId, toolAccess));
+    return JSON.stringify(await agentStudioBackendApi.configureTools(agentId, toolAccess));
   });
   ipcMain.handle("ai-loom-desktop-agents:configure-memory", async (_event, agentId: string, memoryJson: string) => {
     const memory = JSON.parse(memoryJson) as AgentMemoryConfiguration;
-    return JSON.stringify(await agentAuthoringBackendApi.configureMemory(agentId, memory));
+    return JSON.stringify(await agentStudioBackendApi.configureMemory(agentId, memory));
   });
   ipcMain.handle("ai-loom-desktop-agents:configure-strategy", async (_event, agentId: string, planningStrategyJson: string) => {
     const planningStrategy = JSON.parse(planningStrategyJson) as AgentPlanningStrategy;
-    return JSON.stringify(await agentAuthoringBackendApi.configureStrategy(agentId, planningStrategy));
+    return JSON.stringify(await agentStudioBackendApi.configureStrategy(agentId, planningStrategy));
   });
   ipcMain.handle("ai-loom-desktop-agents:validate", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as AgentConfigurationValidationInput;
-    return JSON.stringify(await agentAuthoringBackendApi.validateConfiguration(request));
+    return JSON.stringify(await agentStudioBackendApi.validateConfiguration(request));
+  });
+  ipcMain.handle("ai-loom-desktop-agents:launch", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as AgentRunRequest;
+    return JSON.stringify(await agentStudioBackendApi.launchAgent(request));
+  });
+  ipcMain.handle("ai-loom-desktop-agents:trigger-launch", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as TriggerAgentLaunchRequest;
+    return JSON.stringify(await agentStudioBackendApi.triggerLaunch(request));
+  });
+  ipcMain.handle("ai-loom-desktop-agents:list-sessions", async (_event, agentId: string) => {
+    return JSON.stringify(await agentStudioBackendApi.listSessions(agentId));
+  });
+  ipcMain.handle("ai-loom-desktop-agents:get-session", async (_event, sessionId: string) => {
+    return JSON.stringify(await agentStudioBackendApi.getSessionDetail(sessionId));
+  });
+  ipcMain.handle("ai-loom-desktop-agents:control-run", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as AgentRunControlRequest;
+    return JSON.stringify(await agentStudioBackendApi.controlRun(request));
+  });
+  ipcMain.handle("ai-loom-desktop-agents:studio-snapshot", async (_event, agentId: string) => {
+    return JSON.stringify(await agentStudioBackendApi.getStudioSnapshot(agentId));
   });
   ipcMain.on("ai-loom-desktop-model-files:exists", (event, targetPath: string) => {
     event.returnValue = fs.existsSync(targetPath);

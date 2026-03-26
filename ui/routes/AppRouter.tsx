@@ -19,6 +19,7 @@ import WorkflowsPage from "../pages/WorkflowsPage";
 import ToolsPage from "../pages/ToolsPage";
 import ToolRunPage from "../pages/ToolRunPage";
 import SettingsPage from "../pages/SettingsPage";
+import AgentStudioPage from "../pages/AgentStudioPage";
 import ProtectedRoute from "./ProtectedRoute";
 import { ROUTE_PATHS } from "./RouteConfig";
 
@@ -55,6 +56,7 @@ export default function AppRouter({
           { path: ROUTE_PATHS.mcp, element: <McpPage /> },
           { path: ROUTE_PATHS.services, element: <ManagedServicesPage /> },
           { path: ROUTE_PATHS.assets, element: <AssetsPage /> },
+          { path: ROUTE_PATHS.agentStudio, element: <AgentStudioPage /> },
           { path: ROUTE_PATHS.settings, element: <SettingsPage /> },
         ],
       },
