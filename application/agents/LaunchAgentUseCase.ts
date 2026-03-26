@@ -41,6 +41,7 @@ export class LaunchAgentUseCase {
 
     const result = await this.runner.run({
       agent,
+      runtimeBinding: binding,
       onProgress: undefined,
     });
 

@@ -1,8 +1,9 @@
 import type { Agent } from "../../../domain/agents/Agent";
-import type { AgentExecutionSession, AgentExecutionSessionTransitionRecord } from "../../../domain/agents/AgentExecutionSession";
+import type { AgentExecutionSession } from "../../../domain/agents/AgentExecutionSession";
 import type { CompositionTaxonomyDescriptor } from "../../../domain/taxonomy/CompositionTaxonomy";
 import type { AssetContractDescriptor } from "../../../domain/contracts/AssetContract";
 import type { AgentRunnerResult } from "../services/AgentRunnerService";
+import type { AgentExecutionSessionTransitionRecord } from "../../ports/interfaces/IAgentExecutionSessionRepository";
 
 export const AgentTriggerKinds = Object.freeze({
   manual: "manual",
@@ -46,6 +47,10 @@ export interface AgentSessionSummaryReadModel {
   readonly stepOutcomeCount: number;
   readonly startedAt: string;
   readonly endedAt?: string;
+  readonly composition: {
+    readonly taxonomy: CompositionTaxonomyDescriptor;
+    readonly contract?: AssetContractDescriptor;
+  };
 }
 
 export interface AgentOperationalProjection {
@@ -111,11 +116,27 @@ export interface AgentRunControlRequest {
   readonly action: AgentRunControlAction;
 }
 
-function normalizeRecord(value: Readonly<Record<string, unknown>> | undefined): Readonly<Record<string, unknown>> {
+function normalizeRecord(
+  value: Readonly<Record<string, unknown>> | undefined,
+  fieldName: "input" | "contextOverrides",
+): Readonly<Record<string, unknown>> {
   if (!value) {
     return Object.freeze({});
   }
-  return Object.freeze({ ...value });
+  if (Array.isArray(value)) {
+    throw new Error(`Agent run request ${fieldName} must be a key/value object.`);
+  }
+
+  const normalized: Record<string, unknown> = {};
+  for (const [rawKey, entry] of Object.entries(value)) {
+    const key = rawKey.trim();
+    if (!key) {
+      throw new Error(`Agent run request ${fieldName} keys must be non-empty when provided.`);
+    }
+    normalized[key] = entry;
+  }
+
+  return Object.freeze(normalized);
 }
 
 function normalizeMetadata(value: Readonly<Record<string, string>> | undefined): Readonly<Record<string, string>> {
@@ -167,17 +188,27 @@ export function createAgentRuntimeBinding(params: {
   }
 
   const trigger = normalizeTrigger(params.request.trigger);
+  const input = normalizeRecord(params.request.input, "input");
+  const contextOverrides = normalizeRecord(params.request.contextOverrides, "contextOverrides");
+  const overlappingKeys = Object.keys(input).filter((key) => Object.prototype.hasOwnProperty.call(contextOverrides, key));
+  if (overlappingKeys.length > 0) {
+    throw new Error(`Agent run request input/contextOverrides keys overlap: ${overlappingKeys.join(", ")}.`);
+  }
+
   return Object.freeze({
     agentId,
     persistedConfigurationRevision: params.agent.updatedAt,
-    input: normalizeRecord(params.request.input),
-    contextOverrides: normalizeRecord(params.request.contextOverrides),
+    input,
+    contextOverrides,
     metadata: normalizeMetadata(params.request.metadata),
     trigger,
   });
 }
 
-export function toAgentSessionSummaryReadModel(session: AgentExecutionSession): AgentSessionSummaryReadModel {
+export function toAgentSessionSummaryReadModel(
+  session: AgentExecutionSession,
+  composition: AgentSessionSummaryReadModel["composition"],
+): AgentSessionSummaryReadModel {
   return Object.freeze({
     sessionId: session.id,
     agentId: session.agentId,
@@ -190,6 +221,7 @@ export function toAgentSessionSummaryReadModel(session: AgentExecutionSession): 
     stepOutcomeCount: session.stepOutcomes.length,
     startedAt: session.startTime,
     endedAt: session.endTime,
+    composition,
   });
 }
 
@@ -227,11 +259,12 @@ export function toAgentSessionDetailReadModel(input: {
   readonly taxonomy: CompositionTaxonomyDescriptor;
   readonly contract?: AssetContractDescriptor;
 }): AgentSessionDetailReadModel {
+  const composition = Object.freeze({ taxonomy: input.taxonomy, contract: input.contract });
   return Object.freeze({
-    summary: toAgentSessionSummaryReadModel(input.session),
+    summary: toAgentSessionSummaryReadModel(input.session, composition),
     transitionHistory: Object.freeze([...input.transitions]),
     operational: toOperationalProjection(input.session),
-    composition: Object.freeze({ taxonomy: input.taxonomy, contract: input.contract }),
+    composition,
   });
 }
 
@@ -241,13 +274,14 @@ export function toAgentLaunchReadModel(input: {
   readonly taxonomy: CompositionTaxonomyDescriptor;
   readonly contract?: AssetContractDescriptor;
 }): AgentLaunchReadModel {
+  const composition = Object.freeze({ taxonomy: input.taxonomy, contract: input.contract });
   return Object.freeze({
     launch: Object.freeze({
       executionId: input.result.executionId,
       status: input.result.status,
     }),
     binding: input.binding,
-    session: toAgentSessionSummaryReadModel(input.result.session),
+    session: toAgentSessionSummaryReadModel(input.result.session, composition),
     operational: Object.freeze({
       ...toOperationalProjection(input.result.session),
       memoryWriteSummary: Object.freeze({
@@ -256,6 +290,6 @@ export function toAgentLaunchReadModel(input: {
         persistedAssetIds: Object.freeze(input.result.memoryWrite.persisted.map((entry) => entry.assetId.toString())),
       }),
     }),
-    composition: Object.freeze({ taxonomy: input.taxonomy, contract: input.contract }),
+    composition,
   });
 }

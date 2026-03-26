@@ -23,11 +23,15 @@ export class GetAgentSessionDetailUseCase {
     }
 
     const transitions = await this.sessionRepository.listTransitionHistory(normalized);
+    const composition = Object.freeze({
+      taxonomy: this.taxonomyClassifier.classifyCanonicalEntity("execution-artifact"),
+      contract: await this.contractResolver.resolveAgentContractById(session.agentId),
+    });
     return toAgentSessionDetailReadModel({
       session,
       transitions,
-      taxonomy: this.taxonomyClassifier.classifyCanonicalEntity("execution-artifact"),
-      contract: await this.contractResolver.resolveAgentContractById(session.agentId),
+      taxonomy: composition.taxonomy,
+      contract: composition.contract,
     });
   }
 }
