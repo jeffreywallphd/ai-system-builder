@@ -350,3 +350,19 @@ Audit schema now records administrative approval transitions plus decision denia
 - Agent execution sessions now persist per-step outcome summaries (status/attempts/tool/output/error + optional output asset diagnostics), so partial completion followed by fail/cancel remains durable in session snapshots.
 - Session transition history lookup is now part of the application repository contract (`IAgentExecutionSessionRepository.listTransitionHistory`) and not just an infrastructure helper.
 - Current limits are intentional: deterministic single-agent planning, bounded step counts, no autonomous long-horizon control loop.
+
+## Direction 4 Phase 7 contract foundation (stories 7.1–7.10, initial slice)
+- Canonical launch now has an application use case (`LaunchAgentUseCase`) that loads authored agents from `IAgentRepository` and delegates execution to the existing `AgentRunnerService` runtime/session backbone.
+- Launch request semantics are bounded by a transport-agnostic inner contract (`AgentRunRequest`) with deterministic validation for agent id, per-run input/context overrides, metadata, and trigger kind (`manual`/`backend`).
+- Per-run binding is explicit (`createAgentRuntimeBinding`) and separates immutable authored configuration from per-run invocation data without mutating persisted agent config.
+- Session reads now have first-class inner use cases:
+  - `GetAgentSessionDetailUseCase`
+  - `ListAgentSessionsUseCase`
+  with stable operational read models over persisted session truth (status, terminal reason, progress counts, transition history, retry/outcome summaries).
+- Run control contracts are explicitly bounded through `ControlAgentRunUseCase`:
+  - `cancel` is supported when lifecycle truth allows it.
+  - unsupported actions (`pause`/`resume`) fail with explicit deterministic contract errors.
+- New operational artifacts align with shared composition seams by classifying through `CompositionTaxonomyClassifier` (agent launch/session views avoid agent-only presentation semantics).
+- Trigger-first invocation now has a bounded inner use case (`TriggerAgentLaunchUseCase`) that validates trigger-kind contracts and delegates to the same canonical launch path (no side runtime path).
+- Launch/session operational projections now include bounded execution-progress, retry, outcome, memory-write, and output-asset summaries from canonical runner/session truth.
+- Session-detail composition projection can now include resolver-backed authored-agent contract projection (`CompositionAssetContractResolver.resolveAgentContractById`) alongside execution-artifact taxonomy classification.
