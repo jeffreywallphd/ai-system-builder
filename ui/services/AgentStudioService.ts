@@ -2,7 +2,13 @@ import type { AgentPlanningStrategy } from "../../domain/agents/Agent";
 import type { AgentMemoryConfiguration } from "../../domain/agents/AgentMemory";
 import type { AgentToolAccessPolicy, AgentPolicy } from "../../domain/agents/AgentPolicy";
 import type { ConfigureAgentGoalsRequest } from "../../application/agents/ConfigureAgentGoalsUseCase";
-import type { AgentLaunchReadModel, AgentRunRequest, AgentSessionDetailReadModel, AgentSessionSummaryReadModel } from "../../application/agents/contracts/AgentRunContracts";
+import type {
+  AgentLaunchReadModel,
+  AgentRunControlAction,
+  AgentRunRequest,
+  AgentSessionDetailReadModel,
+  AgentSessionSummaryReadModel,
+} from "../../application/agents/contracts/AgentRunContracts";
 import type { CreateAgentRequest } from "../../application/agents/CreateAgentUseCase";
 import { resolveDesktopAgentBridge } from "../composition/DesktopAgentBridgeAdapter";
 import type { AgentAuthoringApiReadModel } from "../../infrastructure/api/agents/AgentAuthoringBackendApi";
@@ -48,7 +54,14 @@ export class AgentStudioService {
   }
 
   public async cancelSession(sessionId: string): Promise<AgentStudioApiResponse<AgentSessionSummaryReadModel>> {
-    const raw = await this.requireBridge().controlRun(JSON.stringify({ sessionId, action: "cancel" }));
+    return this.controlRun(sessionId, "cancel");
+  }
+
+  public async controlRun(
+    sessionId: string,
+    action: AgentRunControlAction,
+  ): Promise<AgentStudioApiResponse<AgentSessionSummaryReadModel>> {
+    const raw = await this.requireBridge().controlRun(JSON.stringify({ sessionId, action }));
     return JSON.parse(raw) as AgentStudioApiResponse<AgentSessionSummaryReadModel>;
   }
 
