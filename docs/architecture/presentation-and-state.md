@@ -94,9 +94,11 @@ The architecture is therefore both layered and feature-oriented: each feature ha
 - UI state remains view orchestration only (selection/loading/error); it does not reconstruct runtime or policy semantics that already come from backend composition-classified/projection-backed read models.
 - Validation/business/runtime interpretation remains in domain/application/backend seams.
 - Phase 8.3 extends this shell with authoring sections (goals, policy, tools, memory, strategy) that submit backend configuration use cases through the same desktop bridge/service seam and reload backend snapshots after success.
-- Session list/detail and cancel control are rendered from backend session read models as-is; the UI does not rebuild runtime semantics or infer derived execution states.
+- Phase 8.4 adds a launch form that sends backend run request contracts directly (`input`, `contextOverrides`, `metadata`, `trigger`) through the existing studio bridge/service and then refreshes snapshot/session reads from backend truth.
+- Session list/detail and run controls are rendered from backend session read models and studio capability flags as-is; the UI does not rebuild runtime semantics, infer derived execution states, or expose unsupported controls.
 - Validation failures are shown exactly from backend `validationIssues` payloads without UI-side rule duplication.
 - Composition semantics stay backend-owned: UI reads taxonomy/contract projections already classified via `CompositionTaxonomyClassifier` and `CompositionAssetContractResolver`.
+- Intentionally out of scope in this slice: client-side policy validation, runtime/session interpretation heuristics, synthetic progress derivation, and any non-backend launch/control path.
 
 
 ### Presentation-side execution summaries

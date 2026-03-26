@@ -3,12 +3,19 @@ import type { AgentMemoryConfiguration } from "../../domain/agents/AgentMemory";
 import { AssetId } from "../../domain/assets/AssetId";
 import type { AgentPlanningStrategy } from "../../domain/agents/Agent";
 import type { AgentPolicy, AgentToolAccessPolicy } from "../../domain/agents/AgentPolicy";
-import type { AgentLaunchReadModel, AgentSessionDetailReadModel, AgentSessionSummaryReadModel } from "../../application/agents/contracts/AgentRunContracts";
+import type {
+  AgentLaunchReadModel,
+  AgentRunControlAction,
+  AgentRunRequest,
+  AgentSessionDetailReadModel,
+  AgentSessionSummaryReadModel,
+} from "../../application/agents/contracts/AgentRunContracts";
 import type { AgentAuthoringApiReadModel } from "../../infrastructure/api/agents/AgentAuthoringBackendApi";
 import type { AgentStudioSnapshotReadModel } from "../../infrastructure/api/agents/AgentStudioBackendApi";
 import { AgentStudioService } from "../services/AgentStudioService";
 import { AgentListPanel } from "../components/agents/AgentListPanel";
 import { AgentDetailPanel } from "../components/agents/AgentDetailPanel";
+import { AgentLaunchPanel } from "../components/agents/AgentLaunchPanel";
 import { SessionListPanel } from "../components/agents/SessionListPanel";
 import { SessionDetailPanel } from "../components/agents/SessionDetailPanel";
 
@@ -36,6 +43,10 @@ function buildCreateRequest(id: string) {
   };
 }
 
+function toIssueList(value: unknown): ReadonlyArray<unknown> {
+  return Array.isArray(value) ? value : [];
+}
+
 export default function AgentStudioPage(): JSX.Element {
   const service = useMemo(() => new AgentStudioService(), []);
   const [agents, setAgents] = useState<ReadonlyArray<AgentAuthoringApiReadModel>>([]);
@@ -45,7 +56,7 @@ export default function AgentStudioPage(): JSX.Element {
   const [selectedSession, setSelectedSession] = useState<AgentSessionDetailReadModel | undefined>();
   const [latestLaunch, setLatestLaunch] = useState<AgentLaunchReadModel | undefined>();
   const [error, setError] = useState<string | undefined>();
-  const [validationError, setValidationError] = useState<string | undefined>();
+  const [validationIssues, setValidationIssues] = useState<ReadonlyArray<unknown>>([]);
   const [isBusy, setIsBusy] = useState(false);
 
   const refreshAgents = async () => {
@@ -109,7 +120,7 @@ export default function AgentStudioPage(): JSX.Element {
       const response = await service.createAgent(buildCreateRequest(draftId));
       if (!response.ok || !response.data) {
         setError(response.error?.message ?? "Failed to create agent.");
-        setValidationError(response.error?.validationIssues ? JSON.stringify(response.error.validationIssues, null, 2) : undefined);
+        setValidationIssues(toIssueList(response.error?.validationIssues));
         return;
       }
       setSelectedAgentId(response.data.agent.id);
@@ -120,13 +131,13 @@ export default function AgentStudioPage(): JSX.Element {
     }
   };
 
-  const launchAgent = async () => {
-    if (!selectedAgentId) {
+  const launchAgent = async (request: AgentRunRequest) => {
+    if (!selectedAgentId || request.agentId !== selectedAgentId) {
       return;
     }
     setIsBusy(true);
     try {
-      const response = await service.launchAgent({ agentId: selectedAgentId });
+      const response = await service.launchAgent(request);
       if (!response.ok || !response.data) {
         setError(response.error?.message ?? "Failed to launch agent.");
         return;
@@ -138,14 +149,13 @@ export default function AgentStudioPage(): JSX.Element {
     }
   };
 
-  const cancelLatestSession = async () => {
-    const latest = sessions[0];
-    if (!latest) {
+  const controlSession = async (sessionId: string, action: AgentRunControlAction) => {
+    if (!sessionId) {
       return;
     }
     setIsBusy(true);
     try {
-      const response = await service.cancelSession(latest.sessionId);
+      const response = await service.controlRun(sessionId, action);
       if (!response.ok) {
         setError(response.error?.message ?? "Failed to cancel run.");
         return;
@@ -177,10 +187,10 @@ export default function AgentStudioPage(): JSX.Element {
       const response = await action();
       if (!response.ok) {
         setError(response.error?.message ?? "Configuration update failed.");
-        setValidationError(response.error?.validationIssues ? JSON.stringify(response.error.validationIssues, null, 2) : undefined);
+        setValidationIssues(toIssueList(response.error?.validationIssues));
         return;
       }
-      setValidationError(undefined);
+      setValidationIssues([]);
       await refreshSnapshot(selectedAgentId);
       setError(undefined);
     } finally {
@@ -220,15 +230,20 @@ export default function AgentStudioPage(): JSX.Element {
         <div className="ui-stack ui-stack--sm">
           <AgentDetailPanel
             snapshot={snapshot}
-            latestLaunch={latestLaunch}
             isBusy={isBusy}
-            onLaunch={() => { void launchAgent(); }}
-            onCancelLatest={() => { void cancelLatestSession(); }}
             onSaveGoals={(request) => { void runConfigUpdate(() => service.configureGoals(request)); }}
             onSavePolicy={(policy: AgentPolicy) => { void runConfigUpdate(() => service.configurePolicy(selectedAgentId, policy)); }}
             onSaveTools={(tools: AgentToolAccessPolicy) => { void runConfigUpdate(() => service.configureTools(selectedAgentId, tools)); }}
             onSaveMemory={(memory: AgentMemoryConfiguration) => { void runConfigUpdate(() => service.configureMemory(selectedAgentId, memory)); }}
             onSaveStrategy={(strategy: AgentPlanningStrategy) => { void runConfigUpdate(() => service.configureStrategy(selectedAgentId, strategy)); }}
+          />
+          <AgentLaunchPanel
+            snapshot={snapshot}
+            latestLaunch={latestLaunch}
+            selectedSession={sessions.find((entry) => entry.sessionId === selectedSession?.summary.sessionId)}
+            isBusy={isBusy}
+            onLaunch={(request) => { void launchAgent(request); }}
+            onControlRun={(sessionId, action) => { void controlSession(sessionId, action); }}
           />
           <SessionListPanel
             sessions={sessions}
@@ -241,7 +256,16 @@ export default function AgentStudioPage(): JSX.Element {
       </div>
 
       {error ? <div className="ui-banner ui-banner--danger">{error}</div> : null}
-      {validationError ? <pre className="ui-card">{validationError}</pre> : null}
+      {validationIssues.length > 0 ? (
+        <div className="ui-card ui-stack ui-stack--xs">
+          <h3 className="ui-heading-3">Validation issues</h3>
+          <ul className="ui-stack ui-stack--xs">
+            {validationIssues.map((issue, index) => (
+              <li key={`validation-issue-${index}`}>{typeof issue === "string" ? issue : JSON.stringify(issue)}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </section>
   );
 }

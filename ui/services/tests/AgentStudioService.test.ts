@@ -13,6 +13,7 @@ describe("AgentStudioService", () => {
     expect(source).toContain("listSessions(");
     expect(source).toContain("getSessionDetail(");
     expect(source).toContain("controlRun");
+    expect(source).toContain("public async controlRun(");
     expect(source).toContain("configureGoals(");
     expect(source).toContain("configurePolicy(");
     expect(source).toContain("configureTools(");

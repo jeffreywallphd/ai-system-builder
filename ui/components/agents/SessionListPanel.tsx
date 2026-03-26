@@ -20,8 +20,11 @@ export function SessionListPanel(props: SessionListPanelProps): JSX.Element {
               disabled={props.isBusy}
               aria-pressed={props.selectedSessionId === session.sessionId}
             >
-              {session.sessionId} — {session.status}
+              {session.sessionId} — {session.status} ({session.completedStepCount}/{session.attemptedStepCount})
             </button>
+            <div className="ui-text-secondary">
+              {session.terminalReason ?? "active"} • {session.composition.taxonomy.semanticRole}
+            </div>
           </li>
         ))}
       </ul>
