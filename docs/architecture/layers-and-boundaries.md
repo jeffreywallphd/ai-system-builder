@@ -182,6 +182,8 @@ If a change needs data from the outside world, prefer adding or using an **appli
   - validation now supports explicit create vs update pathways (`mode: create|update`) with update-time immutable-id validation semantics.
   - policy/sandbox/trust contradiction checks now return explicit issue codes (required-vs-denied permission conflicts, sandbox denial vs required approval conflicts, and tool-scope approval coherence) in the reusable validation output.
   - backend transport now stays thin over those use cases through desktop IPC agent-authoring handlers and DTO mapping (`ai-loom-desktop-agents:*`) instead of transport-layer business logic.
+  - configuration use cases now emit typed authoring failures (`AgentNotFoundError` / `AgentInvalidRequestError`) instead of generic message-thrown errors, keeping deterministic contracts at the application boundary.
+  - `AgentAuthoringBackendApi` now maps transport errors only from typed authoring/validation contracts; unknown exceptions map to `internal` without substring-based heuristics.
   - API-side read DTOs are now hardened to composition-native semantics (`agent` + taxonomy classification + optional contract projection) so transport does not invent agent-only read-model semantics.
   - focused agent authoring coverage now includes SQLite-backed integration tests across CRUD + goal/policy/tool/memory/strategy updates and API-layer mapping/error-path tests so backend behavior is validated over real seams, not only in-memory repository doubles.
 

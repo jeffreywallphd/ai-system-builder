@@ -67,6 +67,7 @@ Use this file as the shortest reliable orientation before reading the human arch
   - persistence ports/adapters: `IAgentRepository` -> `SqliteAgentRepository`, `IAgentExecutionSessionRepository` -> `SqliteAgentExecutionSessionRepository`
   - application CRUD + lifecycle use cases: create/update/get/list/delete/archive
   - CRUD failure modes now use explicit typed application errors (`agent-conflict`, `agent-not-found`, `agent-invalid-request`) so transport mapping is deterministic and does not depend on string parsing.
+  - bounded configuration use cases now use the same typed failure surface (`agent-not-found`, `agent-invalid-request`, `validation-failed`) instead of generic thrown strings.
   - bounded configuration use cases: goals/policy/tools/memory/strategy
   - cohesive cross-field validation seam: `AgentConfigurationValidationService` (deterministic cross-field issue codes + domain fallback validation), with SQLite agent persistence also projecting structured authoring metadata (`strategy_id`, `strategy_mode`, `goal_count`, `allowed_tool_count`).
   - memory authoring contracts are now hard-validated (canonical asset refs, retrieval compatibility, writable/retrievable/session-only coherence, retention/session-only contradictions).
@@ -74,6 +75,7 @@ Use this file as the shortest reliable orientation before reading the human arch
   - validation issues now carry explicit section metadata (`goals`/`tools`/`memory`/`strategy`/etc.) and are reused by CRUD/configuration/API through `AgentConfigurationValidationError`.
   - agent read models now expose full structured memory config (`assets`, `retrieval`, `policy`, `revision`) rather than partial memory summary fields.
   - desktop backend now includes thin agent-authoring IPC handlers (`ai-loom-desktop-agents:*`) through `AgentAuthoringBackendApi`.
+  - `AgentAuthoringBackendApi` now maps transport errors only from typed authoring/validation errors; unknown failures are `internal` (no substring-based error coercion).
 
 ## TODO
 - If asked for the "single" architecture entry point, explain that there are currently multiple composition roots and name them explicitly.

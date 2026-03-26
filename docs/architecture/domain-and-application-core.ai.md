@@ -349,10 +349,12 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
   - strategy contracts are now explicitly bounded to supported descriptors (current slice: `deterministic@deterministic-linear`) with unsupported id/mode combinations rejected deterministically.
     - explicit structured issue codes now include missing strategy id and unsupported id/mode combinations.
   - whole-agent validation issues now include explicit section metadata (`goals`/`tools`/`memory`/`strategy`/etc.) and are reusable across CRUD/configuration/API via a shared `AgentConfigurationValidationError`.
+  - configuration use cases now also use explicit typed failures for missing/invalid agent ids (`AgentNotFoundError`, `AgentInvalidRequestError`) instead of generic thrown-string errors.
   - create/update validation paths are now explicit in the service contract (`mode: create|update`) so update flows can enforce immutable-id semantics deterministically.
   - cross-field policy/sandbox/trust contradictions now emit dedicated issue codes (required-vs-denied permission, sandbox denial vs required approval, and tool-scope approval coherence) before domain fallback validation.
   - agent read-model contracts now expose full structured memory configuration (`assets`, `retrieval`, `policy`, `revision`) instead of partial memory summaries.
   - desktop backend transport now has dedicated thin authoring handlers (`ai-loom-desktop-agents:*`) via `AgentAuthoringBackendApi`, mapping DTO payloads directly onto use cases and structured validation output.
+  - backend API error mapping is now type-only (`AgentAuthoringError` + `AgentConfigurationValidationError`), with unknown failures mapping to `internal` rather than substring-coerced transport codes.
   - API authoring read responses are now explicitly hardened as `{ agent, taxonomy, contract? }`, with taxonomy classified via `CompositionTaxonomyClassifier` and contract projected via `CompositionAssetContractResolver` so transport contracts reuse canonical composition seams.
   - backend authoring coverage now includes SQLite-backed integration tests for CRUD + goal/policy/tool/memory/strategy updates and API mapping/error-path tests so real persistence seams are exercised directly.
 - No UI/runtime bypass was introduced; transport can remain thin over these use cases.

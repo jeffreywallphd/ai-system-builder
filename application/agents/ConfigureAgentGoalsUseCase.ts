@@ -4,6 +4,7 @@ import {
   type AgentGoalConfigurationOperation,
 } from "../../domain/agents/AgentGoalConfiguration";
 import type { IAgentRepository } from "../ports/interfaces/IAgentRepository";
+import { AgentInvalidRequestError, AgentNotFoundError } from "./AgentAuthoringErrors";
 import {
   AgentConfigurationValidationService,
   toAgentConfigurationValidationInput,
@@ -22,9 +23,12 @@ export class ConfigureAgentGoalsUseCase {
 
   public async execute(request: ConfigureAgentGoalsRequest): Promise<AgentReadModel> {
     const agentId = request.agentId.trim();
+    if (!agentId) {
+      throw new AgentInvalidRequestError("Agent id is required.");
+    }
     const current = await this.repository.get(agentId);
     if (!current) {
-      throw new Error(`Agent '${agentId}' was not found.`);
+      throw new AgentNotFoundError(agentId);
     }
 
     const goals = applyAgentGoalConfiguration(current.goals, request.operations);

@@ -46,6 +46,12 @@ export interface AgentAuthoringApiReadModel {
   readonly contract?: AssetContractDescriptor;
 }
 
+const AuthoringErrorCodeToApiCode = Object.freeze({
+  "agent-conflict": "conflict",
+  "agent-not-found": "not-found",
+  "agent-invalid-request": "invalid-request",
+} as const);
+
 export class AgentAuthoringBackendApi {
   private readonly repository: IAgentRepository;
   private readonly createUseCase: CreateAgentUseCase;
@@ -173,23 +179,12 @@ export class AgentAuthoringBackendApi {
       });
     }
     if (error instanceof AgentAuthoringError) {
-      if (error.code === "agent-conflict") {
-        return Object.freeze({ code: "conflict", message: error.message });
-      }
-      if (error.code === "agent-not-found") {
-        return Object.freeze({ code: "not-found", message: error.message });
-      }
-      if (error.code === "agent-invalid-request") {
-        return Object.freeze({ code: "invalid-request", message: error.message });
-      }
+      return Object.freeze({
+        code: AuthoringErrorCodeToApiCode[error.code],
+        message: error.message,
+      });
     }
     const message = error instanceof Error ? error.message : "Unexpected backend error.";
-    if (message.includes("not found") || message.includes("was not found")) {
-      return Object.freeze({ code: "not-found", message });
-    }
-    if (message.includes("required") || message.includes("malformed") || message.includes("invalid")) {
-      return Object.freeze({ code: "invalid-request", message });
-    }
     return Object.freeze({ code: "internal", message });
   }
 
@@ -208,6 +203,6 @@ export class AgentAuthoringBackendApi {
     if (agent) {
       return agent;
     }
-    throw new Error(`Agent '${agentId}' was not found while building API projection.`);
+    throw new AgentAuthoringError("agent-not-found", `Agent '${agentId}' was not found while building API projection.`);
   }
 }
