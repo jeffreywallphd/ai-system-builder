@@ -16,6 +16,7 @@ Electron is the desktop host boundary; the renderer accesses desktop capabilitie
 - Desktop canonical path: filesystem JSON + SQLite workflow index plus SQLite execution-run history with explicit schema versioning/migration via SQLite `user_version`
 - Desktop backend bridge now also includes thin agent-authoring IPC endpoints (`ai-loom-desktop-agents:*`) mapped to application use cases and structured validation errors.
 - Agent authoring backend responses now use a hardened projection envelope (`agent`, `taxonomy`, optional `contract`) so transport read models classify/project through shared composition seams.
+- Agent authoring error responses are type-mapped from inner contracts (`AgentAuthoringError`, `AgentConfigurationValidationError`) with unknown failures normalized to `internal` (no substring-derived mapping).
 - Fallback path: browser/local storage repositories
 - Execution-run queries now also support unit-kind/provenance/flow/time filtering in addition to status/execution-kind/metadata filters, and non-SQLite repositories persist an explicit query-index envelope so those filters remain available in fallback modes.
 - MCP installed-tool registry persistence is intentionally in browser `localStorage` in the current slice (`LocalStorageMcpToolRegistryRepository`), matching other renderer fallback repositories; this is a staging seam until/if registry durability needs to move to desktop bridge persistence.

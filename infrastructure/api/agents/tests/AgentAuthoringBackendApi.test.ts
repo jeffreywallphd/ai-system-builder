@@ -25,6 +25,12 @@ class InMemoryAgentRepository implements IAgentRepository {
   }
 }
 
+class ThrowingReadRepository extends InMemoryAgentRepository {
+  async get(_id: string): Promise<Agent | undefined> {
+    throw new Error("Agent was not found due to projection cache miss.");
+  }
+}
+
 function createRequest(id = "agent:api:1") {
   return {
     id,
@@ -142,6 +148,14 @@ describe("AgentAuthoringBackendApi", () => {
     expect(invalidDelete.ok).toBe(false);
     expect(invalidDelete.error?.code).toBe("invalid-request");
 
+    const invalidConfigure = await api.configureTools("   ", {
+      allowedToolIds: ["mcp:local:echo"],
+      allowedMcpTools: [{ toolId: "mcp:local:echo", serverId: "local", toolName: "echo" }],
+      scopeConstraints: [],
+    });
+    expect(invalidConfigure.ok).toBe(false);
+    expect(invalidConfigure.error?.code).toBe("invalid-request");
+
     const validation = await api.validateConfiguration({
       ...createRequest("agent:api:mapping-validate"),
       planningStrategy: { strategyId: "", mode: "deterministic-linear" },
@@ -154,6 +168,14 @@ describe("AgentAuthoringBackendApi", () => {
     expect(validation.data?.valid).toBe(false);
     expect(validation.data?.issues.some((issue) => issue.code === "strategy-id-missing")).toBe(true);
     expect(validation.data?.issues.some((issue) => issue.code === "memory-asset-id-noncanonical")).toBe(true);
+  });
+
+  it("maps unknown transport failures to internal without string-substring fallbacks", async () => {
+    const api = new AgentAuthoringBackendApi(new ThrowingReadRepository());
+    const created = await api.createAgent(createRequest("agent:api:internal"));
+    expect(created.ok).toBe(false);
+    expect(created.error?.code).toBe("internal");
+    expect(created.error?.message).toContain("not found");
   });
 
   it("returns projected contract/taxonomy read models for get and list without agent-only semantics", async () => {

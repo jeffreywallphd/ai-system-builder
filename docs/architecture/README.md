@@ -158,12 +158,14 @@ The runtime is not a single path. The system currently supports multiple executi
   - CRUD/lifecycle use cases: create/update/get/list/delete/archive;
   - CRUD failure modes now surface typed application errors (`agent-conflict`, `agent-not-found`, `agent-invalid-request`) so API/IPC adapters map contracts deterministically;
   - bounded structured configuration use cases: goals/policy/tools/memory/strategy;
+  - configuration use cases now share typed failure semantics (`agent-not-found`, `agent-invalid-request`, `validation-failed`) instead of message-derived mapping;
   - cohesive cross-field validation seam: `AgentConfigurationValidationService` + `ValidateAgentConfigurationUseCase` (deterministic issue codes for goal/tool/memory/policy/strategy coherence, plus domain-level fallback validation);
   - SQLite agent persistence now also records structured authoring/query fields (`strategy_id`, `strategy_mode`, `goal_count`, `allowed_tool_count`) while preserving aggregate round-trip truth in `agent_json`.
   - memory configuration is now contract-hardened (canonical asset refs, retrieval compatibility, writable/retrievable/session-only coherence, retention/session-only contradiction checks).
   - strategy configuration is now explicitly bounded to supported descriptors (`deterministic@deterministic-linear` in this slice), with unsupported configs rejected deterministically.
   - whole-agent validation output now includes machine-friendly sectioned issues (`code`, `path`, `section`, `severity`, `message`) and is reused by CRUD/configuration/API seams through `AgentConfigurationValidationError`.
   - backend authoring transport now exposes thin desktop IPC endpoints (`ai-loom-desktop-agents:*`) via `AgentAuthoringBackendApi` for CRUD/configuration/validation without transport-layer business logic.
+  - `AgentAuthoringBackendApi` error mapping is now type-based only (`AgentAuthoringError` + `AgentConfigurationValidationError`); unknown failures map to `internal` without substring heuristics.
 
 ## Shared composition taxonomy foundation
 

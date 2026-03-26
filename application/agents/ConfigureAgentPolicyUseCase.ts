@@ -5,6 +5,7 @@ import {
 } from "../../domain/agents/AgentPolicyConfiguration";
 import type { AgentPolicy } from "../../domain/agents/AgentPolicy";
 import type { IAgentRepository } from "../ports/interfaces/IAgentRepository";
+import { AgentInvalidRequestError, AgentNotFoundError } from "./AgentAuthoringErrors";
 import {
   AgentConfigurationValidationService,
   toAgentConfigurationValidationInput,
@@ -25,9 +26,12 @@ export class ConfigureAgentPolicyUseCase {
   public async execute(requestOrAgentId: ConfigureAgentPolicyRequest | string, policy?: AgentPolicy): Promise<AgentReadModel> {
     const request = this.normalizeRequest(requestOrAgentId, policy);
     const normalizedAgentId = request.agentId.trim();
+    if (!normalizedAgentId) {
+      throw new AgentInvalidRequestError("Agent id is required.");
+    }
     const current = await this.repository.get(normalizedAgentId);
     if (!current) {
-      throw new Error(`Agent '${normalizedAgentId}' was not found.`);
+      throw new AgentNotFoundError(normalizedAgentId);
     }
 
     const nextPolicy = request.policy ?? applyAgentPolicyConfiguration(current.policy, request.operations ?? []);
@@ -42,7 +46,7 @@ export class ConfigureAgentPolicyUseCase {
   private normalizeRequest(requestOrAgentId: ConfigureAgentPolicyRequest | string, policy?: AgentPolicy): ConfigureAgentPolicyRequest {
     if (typeof requestOrAgentId === "string") {
       if (!policy) {
-        throw new Error("ConfigureAgentPolicyUseCase requires policy when using legacy execute(agentId, policy) signature.");
+        throw new AgentInvalidRequestError("Configure policy requires a policy payload.");
       }
       return Object.freeze({ agentId: requestOrAgentId, policy });
     }
@@ -50,7 +54,7 @@ export class ConfigureAgentPolicyUseCase {
     const hasPolicy = requestOrAgentId.policy !== undefined;
     const hasOperations = (requestOrAgentId.operations?.length ?? 0) > 0;
     if (hasPolicy === hasOperations) {
-      throw new Error("Configure policy request must include exactly one of policy or operations.");
+      throw new AgentInvalidRequestError("Configure policy request must include exactly one of policy or operations.");
     }
 
     return requestOrAgentId;

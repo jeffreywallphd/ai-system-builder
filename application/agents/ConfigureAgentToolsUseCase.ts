@@ -1,6 +1,7 @@
 import { toAgentReadModel, updateAgent, type AgentReadModel } from "../../domain/agents/Agent";
 import type { AgentToolAccessPolicy } from "../../domain/agents/AgentPolicy";
 import type { IAgentRepository } from "../ports/interfaces/IAgentRepository";
+import { AgentInvalidRequestError, AgentNotFoundError } from "./AgentAuthoringErrors";
 import {
   AgentConfigurationValidationService,
   toAgentConfigurationValidationInput,
@@ -14,9 +15,12 @@ export class ConfigureAgentToolsUseCase {
 
   public async execute(agentId: string, toolAccess: AgentToolAccessPolicy): Promise<AgentReadModel> {
     const normalized = agentId.trim();
+    if (!normalized) {
+      throw new AgentInvalidRequestError("Agent id is required.");
+    }
     const current = await this.repository.get(normalized);
     if (!current) {
-      throw new Error(`Agent '${normalized}' was not found.`);
+      throw new AgentNotFoundError(normalized);
     }
     const nextPolicy = Object.freeze({
       ...current.policy,
