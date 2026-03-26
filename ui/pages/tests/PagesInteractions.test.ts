@@ -25,8 +25,9 @@ describe("ui/pages interactions", () => {
     expect(mcp).toContain("McpServerBrowser");
     expect(mcp).toContain("mcpStore.addConfiguredServer");
     expect(agentStudio).toContain('data-testid="agent-studio-shell"');
-    expect(agentStudio).toContain("bridge.launchAgent");
-    expect(agentStudio).toContain("bridge.getStudioSnapshot");
+    expect(agentStudio).toContain("AgentStudioService");
+    expect(agentStudio).toContain("<AgentListPanel");
+    expect(agentStudio).toContain("<AgentDetailPanel");
     expect(settings).toContain("Advanced runtime settings");
     expect(notFound).toContain("to={ROUTE_PATHS.home}");
   });
