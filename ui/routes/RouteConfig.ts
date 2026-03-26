@@ -21,6 +21,7 @@ export const ROUTE_PATHS = Object.freeze({
   mcp: "/mcp",
   services: "/services",
   assets: "/assets",
+  agentStudio: "/agent-studio",
   settings: "/settings",
   notFound: "*",
 });
@@ -90,6 +91,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteDefinition> = Object.freeze([
     key: "assets",
     path: ROUTE_PATHS.assets,
     title: "Assets",
+    showInNavigation: true,
+  }),
+  Object.freeze({
+    key: "agent-studio",
+    path: ROUTE_PATHS.agentStudio,
+    title: "Agent Studio",
     showInNavigation: true,
   }),
   Object.freeze({

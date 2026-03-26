@@ -16,6 +16,7 @@ describe("ui/routes interactions", () => {
     expect(appRouterSource).toContain("element: <NotFoundPage />");
     expect(appRouterSource).toContain("element: <Navigate to={ROUTE_PATHS.home} replace />");
     expect(appRouterSource).toContain("element: <SettingsPage />");
+    expect(appRouterSource).toContain("element: <AgentStudioPage />");
     expect(appRouterSource).toContain("element: <McpPage />");
     expect(appRouterSource).toContain("element: <ContextPage />");
     expect(appRouterSource).toContain("element: <ContextWorkbenchPage />");

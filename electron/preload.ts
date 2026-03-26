@@ -158,5 +158,23 @@ contextBridge.exposeInMainWorld("aiLoomDesktop", {
     validateConfiguration(requestJson: string) {
       return ipcRenderer.invoke("ai-loom-desktop-agents:validate", requestJson) as Promise<string>;
     },
+    launchAgent(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-agents:launch", requestJson) as Promise<string>;
+    },
+    triggerLaunch(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-agents:trigger-launch", requestJson) as Promise<string>;
+    },
+    listSessions(agentId: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-agents:list-sessions", agentId) as Promise<string>;
+    },
+    getSessionDetail(sessionId: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-agents:get-session", sessionId) as Promise<string>;
+    },
+    controlRun(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-agents:control-run", requestJson) as Promise<string>;
+    },
+    getStudioSnapshot(agentId: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-agents:studio-snapshot", agentId) as Promise<string>;
+    },
   },
 });
