@@ -25,9 +25,11 @@ import { AgentMemoryWriteService, type AgentMemoryWriteResult } from "./AgentMem
 import type { AgentWorkingMemory } from "../../../domain/agents/AgentWorkingMemory";
 import { AssetId } from "../../../domain/assets/AssetId";
 import type { AgentMcpToolGovernanceService } from "./AgentMcpToolGovernanceService";
+import type { AgentRuntimeBinding } from "../contracts/AgentRunContracts";
 
 export interface AgentRunnerRequest {
   readonly agent: Agent;
+  readonly runtimeBinding?: AgentRuntimeBinding;
   readonly retryPolicy?: AgentRuntimeRetryPolicy;
   readonly onProgress?: (event: AgentRuntimeProgressEvent) => void;
 }
@@ -72,6 +74,7 @@ export class AgentRunnerService {
 
   public async run(request: AgentRunnerRequest): Promise<AgentRunnerResult> {
     const { agent } = request;
+    const runtimeBinding = request.runtimeBinding;
     const retryPolicy = this.normalizeRetryPolicy(request.retryPolicy);
     const events: AgentRuntimeProgressEvent[] = [];
     const executionId = `agent:${agent.id}:${Date.now()}`;
@@ -210,7 +213,7 @@ export class AgentRunnerService {
           metadata: { attempt: attempts, maxAttempts: retryPolicy.maxAttemptsPerStep, toolId: step.toolId },
         });
         stepResult = await this.executeAgentToolsUseCase.execute({
-          input: step.intent.action,
+          input: this.buildStepInput(step.intent.action, runtimeBinding),
           executionId: `${executionId}:${step.stepId}:attempt:${attempts}`,
           maxIterations: 1,
           toolSelection: {
@@ -223,6 +226,13 @@ export class AgentRunnerService {
             planId: plan.planId,
             stepId: step.stepId,
             expectedOutputKey: step.intent.expectedOutputKey ?? null,
+            runtimeBinding: runtimeBinding ? Object.freeze({
+              input: runtimeBinding.input,
+              contextOverrides: runtimeBinding.contextOverrides,
+              trigger: runtimeBinding.trigger,
+              metadata: runtimeBinding.metadata,
+              persistedConfigurationRevision: runtimeBinding.persistedConfigurationRevision,
+            }) : undefined,
           }),
         });
 
@@ -381,6 +391,22 @@ export class AgentRunnerService {
       failure: terminalFailure,
       events: Object.freeze(events),
     });
+  }
+
+  private buildStepInput(baseAction: string, runtimeBinding: AgentRuntimeBinding | undefined): string {
+    const action = baseAction.trim();
+    if (!runtimeBinding) {
+      return action;
+    }
+
+    const parts = [action];
+    if (Object.keys(runtimeBinding.input).length > 0) {
+      parts.push(`run-input=${JSON.stringify(runtimeBinding.input)}`);
+    }
+    if (Object.keys(runtimeBinding.contextOverrides).length > 0) {
+      parts.push(`run-context=${JSON.stringify(runtimeBinding.contextOverrides)}`);
+    }
+    return parts.join("\n");
   }
 
   private normalizeRetryPolicy(retryPolicy: AgentRuntimeRetryPolicy | undefined): AgentRuntimeRetryPolicy {

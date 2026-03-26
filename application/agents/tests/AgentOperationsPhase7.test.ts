@@ -23,7 +23,11 @@ import { TriggerAgentLaunchUseCase } from "../TriggerAgentLaunchUseCase";
 import { ListAgentSessionsUseCase } from "../ListAgentSessionsUseCase";
 import { GetAgentSessionDetailUseCase } from "../GetAgentSessionDetailUseCase";
 import { ControlAgentRunUseCase } from "../ControlAgentRunUseCase";
-import { AgentRuntimeInvalidRequestError, AgentRuntimeUnsupportedControlError } from "../AgentRuntimeErrors";
+import {
+  AgentRuntimeInvalidControlStateError,
+  AgentRuntimeInvalidRequestError,
+  AgentRuntimeUnsupportedControlError,
+} from "../AgentRuntimeErrors";
 import { AgentRunnerService } from "../services/AgentRunnerService";
 import { DeterministicAgentPlanningService } from "../services/AgentPlanningInterface";
 import { ExecuteAgentToolsUseCase } from "../ExecuteAgentToolsUseCase";
@@ -126,7 +130,10 @@ function buildAgent(id = "agent-phase7"): Agent {
   });
 }
 
-function buildRunner(sessionRepo: IAgentExecutionSessionRepository): AgentRunnerService {
+function buildRunner(
+  sessionRepo: IAgentExecutionSessionRepository,
+  observeExecutionRequest?: (request: Parameters<IAgentToolOrchestrator["execute"]>[0]) => void,
+): AgentRunnerService {
   const assetRepo = new InMemoryAssetRepo();
   const memoryStore = new AssetBackedAgentMemoryStore(assetRepo, assetRepo);
   const catalog: IToolCapabilityCatalog = {
@@ -145,6 +152,7 @@ function buildRunner(sessionRepo: IAgentExecutionSessionRepository): AgentRunner
 
   const orchestrator: IAgentToolOrchestrator = {
     async execute(request) {
+      observeExecutionRequest?.(request);
       return {
         executionId: request.executionId ?? "exec-phase7",
         status: "completed",
@@ -188,6 +196,7 @@ describe("Agent operations phase 7 contracts", () => {
 
     expect(launched.launch.status).toBe("completed");
     expect(launched.binding.input).toEqual({ prompt: "hello" });
+    expect(launched.binding.contextOverrides).toEqual({ locale: "en-US" });
     expect(launched.binding.trigger.kind).toBe("backend");
     expect(launched.session.agentId).toBe("agent-launch");
     expect(launched.operational.memoryWriteSummary.persistedCount).toBeGreaterThanOrEqual(0);
@@ -195,6 +204,7 @@ describe("Agent operations phase 7 contracts", () => {
     const persisted = await sessions.getById(launched.session.sessionId);
     expect(persisted?.agentId).toBe("agent-launch");
     expect(persisted?.status).toBe("completed");
+    expect(launched.session.composition.taxonomy.semanticRole).toBe("agent");
   });
 
   it("validates run request and trigger contract deterministically", async () => {
@@ -202,6 +212,7 @@ describe("Agent operations phase 7 contracts", () => {
     expect(() => createAgentRuntimeBinding({ agent, request: { agentId: " ", trigger: { kind: AgentTriggerKinds.manual } } })).toThrow("agentId is required");
     expect(() => createAgentRuntimeBinding({ agent, request: { agentId: agent.id, trigger: { kind: AgentTriggerKinds.backend } } })).toThrow("require a non-empty source");
     expect(() => createAgentRuntimeBinding({ agent, request: { agentId: agent.id, metadata: { " ": "x" } } })).toThrow("non-empty");
+    expect(() => createAgentRuntimeBinding({ agent, request: { agentId: agent.id, input: { overlap: "x" }, contextOverrides: { overlap: "y" } } })).toThrow("keys overlap");
   });
 
   it("reads session detail and list views from persisted session truth", async () => {
@@ -228,11 +239,13 @@ describe("Agent operations phase 7 contracts", () => {
     const list = await listUseCase.execute("agent-read");
     expect(list).toHaveLength(1);
     expect(list[0]?.terminalReason).toBe("completed");
+    expect(list[0]?.composition.taxonomy.semanticRole).toBe("system");
 
     const detail = await detailUseCase.execute("sess-read");
     expect(detail.operational.retrySummary.totalAttempts).toBe(2);
     expect(detail.operational.outcomeSummary.outputAssetIds).toEqual(["asset:output:1"]);
     expect(detail.composition.taxonomy.semanticRole).toBe("system");
+    expect(detail.summary.composition.taxonomy.semanticRole).toBe("system");
     expect(detail.composition.contract?.output?.description).toContain("session outcome");
   });
 
@@ -255,14 +268,27 @@ describe("Agent operations phase 7 contracts", () => {
     expect(result.session.agentId).toBe("agent-trigger");
   });
 
-    it("supports cancel control and rejects unsupported controls", async () => {
+  it("supports cancel control for active states and rejects unsupported/terminal controls", async () => {
     const sessions = new InMemorySessionRepo();
-    await sessions.save(createAgentExecutionSession({ id: "sess-control", agentId: "agent-control", status: AgentExecutionSessionStatuses.running }));
-
     const controlUseCase = new ControlAgentRunUseCase(sessions);
-    const cancelled = await controlUseCase.execute({ sessionId: "sess-control", action: AgentRunControlActions.cancel });
-    expect(cancelled.status).toBe("cancelled");
-    await expect(controlUseCase.execute({ sessionId: "sess-control", action: AgentRunControlActions.pause })).rejects.toBeInstanceOf(AgentRuntimeUnsupportedControlError);
+
+    for (const status of [AgentExecutionSessionStatuses.pending, AgentExecutionSessionStatuses.ready, AgentExecutionSessionStatuses.running]) {
+      const sessionId = `sess-control-${status}`;
+      await sessions.save(createAgentExecutionSession({ id: sessionId, agentId: "agent-control", status }));
+      const cancelled = await controlUseCase.execute({ sessionId, action: AgentRunControlActions.cancel });
+      expect(cancelled.status).toBe("cancelled");
+      expect(cancelled.composition.taxonomy.semanticRole).toBe("system");
+      const transitionHistory = await sessions.listTransitionHistory(sessionId);
+      expect(transitionHistory[transitionHistory.length - 1]?.status).toBe("cancelled");
+    }
+
+    await expect(controlUseCase.execute({ sessionId: "sess-control-running", action: AgentRunControlActions.pause })).rejects.toBeInstanceOf(AgentRuntimeUnsupportedControlError);
+
+    await sessions.save(transitionAgentExecutionSession(
+      createAgentExecutionSession({ id: "sess-control-terminal", agentId: "agent-control", status: AgentExecutionSessionStatuses.running }),
+      { status: AgentExecutionSessionStatuses.completed },
+    ));
+    await expect(controlUseCase.execute({ sessionId: "sess-control-terminal", action: AgentRunControlActions.cancel })).rejects.toBeInstanceOf(AgentRuntimeInvalidControlStateError);
   });
 
   it("rejects invalid launch requests before execution", async () => {
@@ -272,5 +298,25 @@ describe("Agent operations phase 7 contracts", () => {
     const useCase = new LaunchAgentUseCase(agents, buildRunner(sessions));
 
     await expect(useCase.execute({ agentId: "  " })).rejects.toBeInstanceOf(AgentRuntimeInvalidRequestError);
+  });
+
+  it("binds run input/context through the runtime execution request", async () => {
+    const agents = new InMemoryAgentRepository();
+    const sessions = new InMemorySessionRepo();
+    await agents.save(buildAgent("agent-binding-runtime"));
+    let capturedRequest: Parameters<IAgentToolOrchestrator["execute"]>[0] | undefined;
+    const useCase = new LaunchAgentUseCase(agents, buildRunner(sessions, (request) => { capturedRequest = request; }));
+
+    await useCase.execute({
+      agentId: "agent-binding-runtime",
+      input: { prompt: "hello runtime" },
+      contextOverrides: { locale: "en-US", tenant: "demo" },
+      metadata: { caller: "phase7" },
+    });
+
+    expect(capturedRequest?.input).toContain("run-input=");
+    expect(capturedRequest?.input).toContain("hello runtime");
+    expect(capturedRequest?.input).toContain("run-context=");
+    expect(capturedRequest?.metadata?.runtimeBinding).toBeDefined();
   });
 });
