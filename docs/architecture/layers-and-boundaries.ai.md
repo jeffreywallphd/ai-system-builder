@@ -28,6 +28,7 @@ The architecture is mostly clean, but not all write actions are modeled as appli
 - Phase 6 authoring now has an explicit persistence/application seam split:
   - persistence ports: `IAgentRepository`, `IAgentExecutionSessionRepository`
   - infrastructure adapters: `SqliteAgentRepository`, `SqliteAgentExecutionSessionRepository`
+  - SQLite opening now runs through a bounded compatibility seam (`infrastructure/filesystem/sqlite/SqliteCompat.ts`) so the same repository contract works across Node/Electron (`better-sqlite3`) and Bun (`bun:sqlite`) environments.
   - application use cases: CRUD + bounded configuration updates (`goals`, `policy`, `tools`, `memory`, `strategy`) plus whole-config validation (`AgentConfigurationValidationService`).
   - CRUD failure semantics are explicit inner-layer contracts (`AgentConflictError`, `AgentNotFoundError`, `AgentInvalidRequestError`) so infrastructure transport mapping is type-based rather than string-matching.
   - `SqliteAgentRepository` deserialization now rehydrates snapshots through domain normalization, preserving full aggregate truth (including asset-native memory refs and planning/execution config) instead of raw cast-only JSON reads.

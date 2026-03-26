@@ -1,9 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
-import Database from "better-sqlite3";
 import type { IAgentRepository } from "../../../application/ports/interfaces/IAgentRepository";
 import { createAgent, type Agent } from "../../../domain/agents/Agent";
 import { AssetId } from "../../../domain/assets/AssetId";
+import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "../sqlite/SqliteCompat";
 
 interface AgentRow {
   readonly agent_json: string;
@@ -51,7 +51,7 @@ const MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
 ]);
 
 export class SqliteAgentRepository implements IAgentRepository {
-  private database?: Database.Database;
+  private database?: SqliteCompatDatabase;
   private initialized = false;
 
   constructor(private readonly databasePath: string) {}
@@ -71,16 +71,16 @@ export class SqliteAgentRepository implements IAgentRepository {
         updated_at,
         agent_json
       ) VALUES (
-        @id,
-        @name,
-        @status,
-        @strategyId,
-        @strategyMode,
-        @goalCount,
-        @allowedToolCount,
-        @createdAt,
-        @updatedAt,
-        @agentJson
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?,
+        ?
       )
       ON CONFLICT(agent_id) DO UPDATE SET
         name = excluded.name,
@@ -92,18 +92,18 @@ export class SqliteAgentRepository implements IAgentRepository {
         created_at = excluded.created_at,
         updated_at = excluded.updated_at,
         agent_json = excluded.agent_json
-    `).run({
-      id: agent.id,
-      name: agent.name,
-      status: agent.status,
-      strategyId: agent.planningStrategy.strategyId,
-      strategyMode: agent.planningStrategy.mode,
-      goalCount: agent.goals.length,
-      allowedToolCount: agent.policy.toolAccess.allowedToolIds.length,
-      createdAt: agent.createdAt,
-      updatedAt: agent.updatedAt,
-      agentJson: JSON.stringify(agent),
-    });
+    `).run(
+      agent.id,
+      agent.name,
+      agent.status,
+      agent.planningStrategy.strategyId,
+      agent.planningStrategy.mode,
+      agent.goals.length,
+      agent.policy.toolAccess.allowedToolIds.length,
+      agent.createdAt,
+      agent.updatedAt,
+      JSON.stringify(agent),
+    );
 
     return agent;
   }
@@ -143,10 +143,10 @@ export class SqliteAgentRepository implements IAgentRepository {
     this.initialized = false;
   }
 
-  private getDatabase(): Database.Database {
+  private getDatabase(): SqliteCompatDatabase {
     if (!this.database) {
       fs.mkdirSync(path.dirname(this.databasePath), { recursive: true });
-      this.database = new Database(this.databasePath);
+      this.database = openSqliteCompatDatabase(this.databasePath);
       this.database.pragma("journal_mode = WAL");
     }
     if (!this.initialized) {
@@ -156,7 +156,7 @@ export class SqliteAgentRepository implements IAgentRepository {
     return this.database;
   }
 
-  private initialize(db: Database.Database): void {
+  private initialize(db: SqliteCompatDatabase): void {
     const currentVersion = this.getSchemaVersion(db);
     if (currentVersion > SCHEMA_VERSION) {
       throw new Error(
@@ -175,7 +175,7 @@ export class SqliteAgentRepository implements IAgentRepository {
     }
   }
 
-  private getSchemaVersion(db: Database.Database): number {
+  private getSchemaVersion(db: SqliteCompatDatabase): number {
     db.exec(`
       CREATE TABLE IF NOT EXISTS agent_repository_migrations (
         version INTEGER PRIMARY KEY,
