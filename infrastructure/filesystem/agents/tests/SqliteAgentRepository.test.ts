@@ -2,11 +2,11 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import path from "node:path";
 import { tmpdir } from "node:os";
-import Database from "better-sqlite3";
 import { createAgent } from "../../../../domain/agents/Agent";
 import { GetAgentUseCase } from "../../../../application/agents/GetAgentUseCase";
 import { AssetId } from "../../../../domain/assets/AssetId";
 import { SqliteAgentRepository } from "../SqliteAgentRepository";
+import { openSqliteCompatDatabase } from "../../sqlite/SqliteCompat";
 
 const createdRoots: string[] = [];
 
@@ -65,7 +65,7 @@ function makeAgent(id = "agent:repo:1") {
       },
       policy: {
         maxRetrievalEntries: 5,
-        retrievableTypes: ["episodic", "working"],
+        retrievableTypes: ["episodic"],
         writableTypes: ["episodic", "working"],
         sessionOnlyTypes: ["working"],
         retention: { mode: "bounded", maxDurableEntries: 20 },
@@ -97,7 +97,7 @@ describe("SqliteAgentRepository", () => {
 
     const listed = await repository.list();
     expect(listed).toHaveLength(2);
-    const db = new Database(path.join(root, "agents.sqlite"));
+    const db = openSqliteCompatDatabase(path.join(root, "agents.sqlite"));
     const row = db.prepare(`
       SELECT strategy_id, strategy_mode, goal_count, allowed_tool_count
       FROM agents
@@ -141,7 +141,7 @@ describe("SqliteAgentRepository", () => {
     const repository = new SqliteAgentRepository(databasePath);
 
     const saved = await repository.save(makeAgent("agent:repo:legacy-memory"));
-    const db = new Database(databasePath);
+    const db = openSqliteCompatDatabase(databasePath);
     const row = db.prepare("SELECT agent_json FROM agents WHERE agent_id = ?").get(saved.id) as { agent_json: string };
     const parsed = JSON.parse(row.agent_json) as { memory: { assets: Array<{ assetId: unknown }> } };
     parsed.memory.assets[0].assetId = { value: "asset:memory:repo" };
@@ -162,7 +162,7 @@ describe("SqliteAgentRepository", () => {
     const repository = new SqliteAgentRepository(databasePath);
 
     const saved = await repository.save(makeAgent("agent:repo:malformed"));
-    const db = new Database(databasePath);
+    const db = openSqliteCompatDatabase(databasePath);
     const row = db.prepare("SELECT agent_json FROM agents WHERE agent_id = ?").get(saved.id) as { agent_json: string };
     const parsed = JSON.parse(row.agent_json) as { planningStrategy?: unknown };
     delete parsed.planningStrategy;
