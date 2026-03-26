@@ -50,6 +50,10 @@ The architecture is mostly clean, but not all write actions are modeled as appli
   - `AgentAuthoringBackendApi` now maps transport errors from typed authoring/validation contracts only; unknown exceptions map to `internal` without substring fallback logic.
   - API read-model DTOs are now hardened as composition-native projections (`agent` + taxonomy classification + optional contract projection) so transport contracts remain aligned with shared composition seams.
   - test coverage now includes SQLite-backed authoring integration checks for CRUD + goal/policy/tool/memory/strategy flows plus API mapping/error-path checks so real repository seams are exercised directly.
+  - Phase 8.2/8.3 renderer wiring now stays an outer-layer shell (`ui/pages/AgentStudioPage.tsx` + `ui/services/AgentStudioService.ts` + panel components) that consumes those IPC/backend contracts directly for list/load/create/launch/session/cancel and configuration updates.
+  - authoring UX surfaces (goals/policy/tools/memory/strategy) do not add client-side business validation; backend use cases and validation contracts remain source-of-truth and UI only displays returned errors/issues.
+  - agent-facing read artifacts consumed by UI remain composition-native (`agent` + taxonomy classification + optional contract projection) rather than agent-only semantics, preserving `CompositionTaxonomyClassifier` / `CompositionAssetContractResolver` boundaries.
+
 
 ## TODO
 - When summarizing purity/impurity, say "clean-architecture-style with pragmatic UI-layer convenience logic," not "strict clean architecture."

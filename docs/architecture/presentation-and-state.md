@@ -93,6 +93,10 @@ The architecture is therefore both layered and feature-oriented: each feature ha
 - The shell only consumes backend contracts exposed through the desktop bridge (`DesktopAgentAuthoringBridge` / `ai-loom-desktop-agents:*`) for list/load, launch, session reads, run control, and studio snapshot.
 - UI state remains view orchestration only (selection/loading/error); it does not reconstruct runtime or policy semantics that already come from backend composition-classified/projection-backed read models.
 - Validation/business/runtime interpretation remains in domain/application/backend seams.
+- Phase 8.3 extends this shell with authoring sections (goals, policy, tools, memory, strategy) that submit backend configuration use cases through the same desktop bridge/service seam and reload backend snapshots after success.
+- Session list/detail and cancel control are rendered from backend session read models as-is; the UI does not rebuild runtime semantics or infer derived execution states.
+- Validation failures are shown exactly from backend `validationIssues` payloads without UI-side rule duplication.
+- Composition semantics stay backend-owned: UI reads taxonomy/contract projections already classified via `CompositionTaxonomyClassifier` and `CompositionAssetContractResolver`.
 
 
 ### Presentation-side execution summaries
