@@ -26,6 +26,12 @@ describe("CanonicalEntityOperationalReadService", () => {
           producingTransformationCount: 1,
           lineageConfidence: "partial",
         },
+        contract: {
+          version: "1.0.0",
+          input: { kind: "json-schema" },
+          output: { kind: "json-schema" },
+          parameters: [],
+        },
         dependencyState: {
           versionId: "wf:v2",
           state: "impacted",
@@ -45,6 +51,7 @@ describe("CanonicalEntityOperationalReadService", () => {
     expect(summary.dependencyState?.state).toBe("impacted");
     expect(summary.provenance?.lineageConfidence).toBe("partial");
     expect(summary.operationalStatus?.trust).toBe("attention-needed");
+    expect(summary.contract?.version).toBe("1.0.0");
   });
 
   it("returns identity-backed canonical summary when resolver is unavailable", async () => {

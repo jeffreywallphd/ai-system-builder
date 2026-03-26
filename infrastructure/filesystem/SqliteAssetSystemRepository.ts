@@ -6,6 +6,7 @@ import { AssetAuditInfo, AssetLocation, AssetSemanticMetadata, AssetSourceInfo, 
 import { AssetLineageEdge } from "../../domain/assets/AssetLineageEdge";
 import { AssetTransformation } from "../../domain/assets/AssetTransformation";
 import { AssetVersion } from "../../domain/assets/AssetVersion";
+import { createCompositionTaxonomyDescriptor, type CompositionTaxonomyDescriptor } from "../../domain/taxonomy/CompositionTaxonomy";
 import type { IAsset } from "../../domain/assets/interfaces/IAsset";
 import type { AssetLineageDirection, IAssetLineageRepository } from "../../application/ports/interfaces/IAssetLineageRepository";
 import type { IAssetRecordRepository } from "../../application/ports/interfaces/IAssetRecordRepository";
@@ -29,6 +30,9 @@ interface IdentityRow {
   readonly entity_id: string;
   readonly asset_id: string;
   readonly latest_version_id?: string | null;
+  readonly structural_kind?: string | null;
+  readonly semantic_role?: string | null;
+  readonly behavior_kind?: string | null;
   readonly updated_at: string;
 }
 interface DependencyStateRow {
@@ -37,7 +41,23 @@ interface DependencyStateRow {
   readonly computed_at: string;
 }
 
-const SCHEMA_VERSION = 5;
+function parseIdentityTaxonomy(row: IdentityRow): CompositionTaxonomyDescriptor | undefined {
+  if (!row.structural_kind || !row.semantic_role || !row.behavior_kind) {
+    return undefined;
+  }
+
+  try {
+    return createCompositionTaxonomyDescriptor({
+      structuralKind: row.structural_kind as CompositionTaxonomyDescriptor["structuralKind"],
+      semanticRole: row.semantic_role as CompositionTaxonomyDescriptor["semanticRole"],
+      behaviorKind: row.behavior_kind as CompositionTaxonomyDescriptor["behaviorKind"],
+    });
+  } catch {
+    return undefined;
+  }
+}
+
+const SCHEMA_VERSION = 6;
 const MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   [1, `
     CREATE TABLE asset_system_migrations (
@@ -129,6 +149,12 @@ const MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
     );
     CREATE INDEX IF NOT EXISTS canonical_dependency_state_idx ON canonical_dependency_state(state, computed_at DESC);
   `],
+  [6, `
+    ALTER TABLE canonical_asset_identities ADD COLUMN structural_kind TEXT;
+    ALTER TABLE canonical_asset_identities ADD COLUMN semantic_role TEXT;
+    ALTER TABLE canonical_asset_identities ADD COLUMN behavior_kind TEXT;
+    CREATE INDEX IF NOT EXISTS canonical_identity_taxonomy_idx ON canonical_asset_identities(structural_kind, semantic_role, behavior_kind, updated_at DESC);
+  `],
 ]);
 
 export class SqliteAssetSystemRepository implements
@@ -203,6 +229,42 @@ export class SqliteAssetSystemRepository implements
       const placeholders = criteria.statuses.map((_, index) => `@status${index}`);
       criteria.statuses.forEach((value, index) => { params[`status${index}`] = value; });
       where.push(`status IN (${placeholders.join(", ")})`);
+    }
+
+    if (criteria?.structuralKinds?.length) {
+      const placeholders = criteria.structuralKinds.map((_, index) => `@structuralKind${index}`);
+      criteria.structuralKinds.forEach((value, index) => { params[`structuralKind${index}`] = value; });
+      where.push(`
+        EXISTS (
+          SELECT 1 FROM canonical_asset_identities cai
+          WHERE cai.asset_id = assets.asset_id
+            AND cai.structural_kind IN (${placeholders.join(", ")})
+        )
+      `);
+    }
+
+    if (criteria?.semanticRoles?.length) {
+      const placeholders = criteria.semanticRoles.map((_, index) => `@semanticRole${index}`);
+      criteria.semanticRoles.forEach((value, index) => { params[`semanticRole${index}`] = value; });
+      where.push(`
+        EXISTS (
+          SELECT 1 FROM canonical_asset_identities cai
+          WHERE cai.asset_id = assets.asset_id
+            AND cai.semantic_role IN (${placeholders.join(", ")})
+        )
+      `);
+    }
+
+    if (criteria?.behaviorKinds?.length) {
+      const placeholders = criteria.behaviorKinds.map((_, index) => `@behaviorKind${index}`);
+      criteria.behaviorKinds.forEach((value, index) => { params[`behaviorKind${index}`] = value; });
+      where.push(`
+        EXISTS (
+          SELECT 1 FROM canonical_asset_identities cai
+          WHERE cai.asset_id = assets.asset_id
+            AND cai.behavior_kind IN (${placeholders.join(", ")})
+        )
+      `);
     }
 
     const sql = `SELECT asset_json FROM assets ${where.length ? `WHERE ${where.join(" AND ")}` : ""} ORDER BY updated_at DESC, name COLLATE NOCASE ASC ${criteria?.limit ? "LIMIT @limit" : ""}`;
@@ -405,31 +467,37 @@ export class SqliteAssetSystemRepository implements
     return Object.freeze([...new Set(rows.map((row) => row.version_id))]);
   }
 
-  public async upsertIdentity(record: { readonly entityType: CanonicalEntityType; readonly entityId: string; readonly assetId: string; readonly latestVersionId?: string; readonly updatedAt?: Date; }): Promise<void> {
+  public async upsertIdentity(record: { readonly entityType: CanonicalEntityType; readonly entityId: string; readonly assetId: string; readonly latestVersionId?: string; readonly taxonomy?: CanonicalAssetIdentityRecord["taxonomy"]; readonly updatedAt?: Date; }): Promise<void> {
     this.assertAssetExists(record.assetId);
     if (record.latestVersionId) {
       this.assertVersionExists(record.latestVersionId);
     }
 
     this.getDatabase().prepare(`
-      INSERT INTO canonical_asset_identities (entity_type, entity_id, asset_id, latest_version_id, updated_at)
-      VALUES (@entityType, @entityId, @assetId, @latestVersionId, @updatedAt)
+      INSERT INTO canonical_asset_identities (entity_type, entity_id, asset_id, latest_version_id, structural_kind, semantic_role, behavior_kind, updated_at)
+      VALUES (@entityType, @entityId, @assetId, @latestVersionId, @structuralKind, @semanticRole, @behaviorKind, @updatedAt)
       ON CONFLICT(entity_type, entity_id) DO UPDATE SET
         asset_id = excluded.asset_id,
         latest_version_id = excluded.latest_version_id,
+        structural_kind = excluded.structural_kind,
+        semantic_role = excluded.semantic_role,
+        behavior_kind = excluded.behavior_kind,
         updated_at = excluded.updated_at
     `).run({
       entityType: record.entityType,
       entityId: record.entityId.trim(),
       assetId: record.assetId.trim(),
       latestVersionId: record.latestVersionId,
+      structuralKind: record.taxonomy?.structuralKind,
+      semanticRole: record.taxonomy?.semanticRole,
+      behaviorKind: record.taxonomy?.behaviorKind,
       updatedAt: (record.updatedAt ?? new Date()).toISOString(),
     });
   }
 
   public async getIdentity(entityType: CanonicalEntityType, entityId: string): Promise<CanonicalAssetIdentityRecord | undefined> {
     const row = this.getDatabase().prepare(`
-      SELECT entity_type, entity_id, asset_id, latest_version_id, updated_at
+      SELECT entity_type, entity_id, asset_id, latest_version_id, structural_kind, semantic_role, behavior_kind, updated_at
       FROM canonical_asset_identities
       WHERE entity_type = ? AND entity_id = ?
     `).get(entityType, entityId.trim()) as IdentityRow | undefined;
@@ -443,6 +511,7 @@ export class SqliteAssetSystemRepository implements
       entityId: row.entity_id,
       assetId: row.asset_id,
       latestVersionId: row.latest_version_id ?? undefined,
+      taxonomy: parseIdentityTaxonomy(row),
       updatedAt: new Date(row.updated_at),
     });
   }
@@ -460,7 +529,7 @@ export class SqliteAssetSystemRepository implements
     }
 
     const sql = `
-      SELECT entity_type, entity_id, asset_id, latest_version_id, updated_at
+      SELECT entity_type, entity_id, asset_id, latest_version_id, structural_kind, semantic_role, behavior_kind, updated_at
       FROM canonical_asset_identities
       ${where.length > 0 ? `WHERE ${where.join(" AND ")}` : ""}
       ORDER BY updated_at DESC, entity_type ASC, entity_id ASC
@@ -471,6 +540,7 @@ export class SqliteAssetSystemRepository implements
       entityId: row.entity_id,
       assetId: row.asset_id,
       latestVersionId: row.latest_version_id ?? undefined,
+      taxonomy: parseIdentityTaxonomy(row),
       updatedAt: new Date(row.updated_at),
     })));
   }

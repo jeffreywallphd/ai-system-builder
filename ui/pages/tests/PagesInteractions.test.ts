@@ -9,6 +9,7 @@ describe("ui/pages interactions", () => {
     const settings = readSource("ui/pages/SettingsPage.tsx");
     const context = readSource("ui/pages/ContextPage.tsx");
     const mcp = readSource("ui/pages/McpPage.tsx");
+    const agentStudio = readSource("ui/pages/AgentStudioPage.tsx");
     const notFound = readSource("ui/pages/NotFoundPage.tsx");
 
     expect(home).toContain('import { ROUTE_PATHS } from "../routes/RouteConfig"');
@@ -18,11 +19,14 @@ describe("ui/pages interactions", () => {
     expect(workflows).toContain("WorkflowBrowser");
     expect(workflows).toContain("workflowStore.refreshWorkflows");
     expect(models).toContain("to={ROUTE_PATHS.settings}");
-    expect(context).toContain("ContextPackageCard");
-    expect(context).toContain(".search({ query: searchQuery, tags: parseTags(searchTagsText) })");
+    expect(context).toContain("ContextEngineeringLibrary");
+    expect(context).toContain("FineTuningDatasetStudio");
     expect(settings).toContain("Auto-save is enabled");
     expect(mcp).toContain("McpServerBrowser");
     expect(mcp).toContain("mcpStore.addConfiguredServer");
+    expect(agentStudio).toContain('data-testid="agent-studio-shell"');
+    expect(agentStudio).toContain("bridge.launchAgent");
+    expect(agentStudio).toContain("bridge.getStudioSnapshot");
     expect(settings).toContain("Advanced runtime settings");
     expect(notFound).toContain("to={ROUTE_PATHS.home}");
   });

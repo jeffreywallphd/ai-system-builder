@@ -300,7 +300,7 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
 - Validation invariants were tightened for create/update:
   - non-empty id/name/goals/tool set
   - strict MCP tool identity format
-  - memory config must reference at least one asset id
+  - memory config must use canonical asset refs for durable writable types (session-only-only initialization may omit assets)
   - per-goal required tools must be inside the allowed tool set
   - bounded retrieval/execution numeric policies.
 - Planning moved from trivial pass-through to explicit deterministic planning service:
@@ -316,3 +316,45 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
   - returns stable per-step outcomes
   - persists execution outcomes back to agent memory assets.
 - This remains intentionally bounded: deterministic single-agent planning only, no speculative autonomous loops, and no separate execution engine.
+
+## Direction 4 update: Phase 5 hardening + Phase 6 inner authoring foundation
+
+- Runtime retry/failure semantics are now explicit at the application contract boundary:
+  - retryability comes from policy override, runtime metadata hints, then bounded heuristic fallback.
+  - retry exhaustion is explicitly surfaced (`retryExhausted`) instead of being inferred from event streams only.
+- Partial execution outcomes are now preserved across inner read models:
+  - `AgentRunnerResult.outcomes` remains ordered per-step truth.
+  - `AgentWorkingMemory.executionOutputs` carries completed/failed/cancelled step summaries.
+  - execution sessions now persist per-step outcomes and output-asset diagnostics (`domain/agents/AgentExecutionSession.ts`), so "partial success + terminal fail/cancel" is durable.
+- Session terminal truth is now explicit and persisted:
+  - `AgentExecutionSession.terminalState` captures terminal `reason` (`completed`/`failed`/`cancelled`/`blocked`) plus bounded partial-progress summary (`hadPartialProgress`, completed/attempted step counts).
+  - blocked-before-step runs persist as failed lifecycle status with terminal reason `blocked`, so blocked vs failed remains machine-readable.
+- Session persistence remains port-first and architecture-consistent:
+  - application port: `IAgentExecutionSessionRepository` (including transition history reads).
+  - infrastructure adapter: `SqliteAgentExecutionSessionRepository` with structured terminal/progress columns (`terminal_reason`, `had_partial_progress`, `completed_step_count`, `attempted_step_count`, `step_outcome_count`) plus canonical `session_json` snapshots.
+- Phase 6 inner authoring/configuration now starts from the same core-first structure:
+  - persistence seam: `IAgentRepository` + concrete `SqliteAgentRepository`.
+  - CRUD application use cases: `CreateAgentUseCase`, `UpdateAgentUseCase`, `GetAgentUseCase`, `ListAgentsUseCase`, `DeleteAgentUseCase`, `ArchiveAgentUseCase`.
+  - CRUD failure paths now use explicit application error classes (`AgentConflictError`, `AgentNotFoundError`, `AgentInvalidRequestError`) so transport/API mapping does not depend on message substring parsing.
+  - bounded structured configuration use cases: goals/policy/tools/memory/strategy (`ConfigureAgent*UseCase`).
+  - policy configuration updates are now centralized through `AgentPolicyConfiguration` operations so tool access, safety approvals/sandbox posture, and cost/execution limits share one deterministic normalization/validation path.
+  - goal authoring operations are centralized in a domain configuration seam (`AgentGoalConfiguration`): add/update/remove/reorder reject duplicate ids, missing goal references, malformed required tool ids, and non-contiguous ordering.
+  - goal ordering invariants are now aligned across create/update/configure flows to contiguous `priorityOrder` values starting at 1.
+  - cohesive validation seam: `AgentConfigurationValidationService` + `ValidateAgentConfigurationUseCase` now emits deterministic cross-field issue codes for goal/tool/memory/policy/strategy coherence before domain fallback validation.
+  - new agent-facing artifacts/read models continue to flow through shared composition seams (`CompositionTaxonomyClassifier` or `CompositionAssetContractResolver`) rather than introducing agent-only semantics.
+  - `SqliteAgentRepository` also projects structured authoring/query metadata (`strategy_id`, `strategy_mode`, `goal_count`, `allowed_tool_count`) while preserving aggregate round-trip in `agent_json`.
+  - repository read paths now rehydrate `agent_json` snapshots through domain normalization so persisted aggregates keep canonical memory asset refs and validated goal/policy/tool/planning/execution semantics.
+  - memory contracts are now hard-validated for authoring updates (canonical asset-backed refs, retrieval compatibility, writable/retrievable/session-only coherence, and retention/session-only contradiction checks).
+    - explicit structured issue codes now cover non-canonical/malformed refs, duplicate refs, malformed asset-version ids, semantic/recency range errors, and retention-policy contradictions.
+  - strategy contracts are now explicitly bounded to supported descriptors (current slice: `deterministic@deterministic-linear`) with unsupported id/mode combinations rejected deterministically.
+    - explicit structured issue codes now include missing strategy id and unsupported id/mode combinations.
+  - whole-agent validation issues now include explicit section metadata (`goals`/`tools`/`memory`/`strategy`/etc.) and are reusable across CRUD/configuration/API via a shared `AgentConfigurationValidationError`.
+  - configuration use cases now also use explicit typed failures for missing/invalid agent ids (`AgentNotFoundError`, `AgentInvalidRequestError`) instead of generic thrown-string errors.
+  - create/update validation paths are now explicit in the service contract (`mode: create|update`) so update flows can enforce immutable-id semantics deterministically.
+  - cross-field policy/sandbox/trust contradictions now emit dedicated issue codes (required-vs-denied permission, sandbox denial vs required approval, and tool-scope approval coherence) before domain fallback validation.
+  - agent read-model contracts now expose full structured memory configuration (`assets`, `retrieval`, `policy`, `revision`) instead of partial memory summaries.
+  - desktop backend transport now has dedicated thin authoring handlers (`ai-loom-desktop-agents:*`) via `AgentAuthoringBackendApi`, mapping DTO payloads directly onto use cases and structured validation output.
+  - backend API error mapping is now type-only (`AgentAuthoringError` + `AgentConfigurationValidationError`), with unknown failures mapping to `internal` rather than substring-coerced transport codes.
+  - API authoring read responses are now explicitly hardened as `{ agent, taxonomy, contract? }`, with taxonomy classified via `CompositionTaxonomyClassifier` and contract projected via `CompositionAssetContractResolver` so transport contracts reuse canonical composition seams.
+  - backend authoring coverage now includes SQLite-backed integration tests for CRUD + goal/policy/tool/memory/strategy updates and API mapping/error-path tests so real persistence seams are exercised directly.
+- No UI/runtime bypass was introduced; transport can remain thin over these use cases.

@@ -6,6 +6,7 @@ import type { DatasetVersion } from "../../domain/tuning-datasets/interfaces/ITu
 import { RegisterAssetUseCase } from "./RegisterAssetUseCase";
 import { CreateAssetVersionUseCase } from "./CreateAssetVersionUseCase";
 import type { ICanonicalAssetIdentityRepository } from "../ports/interfaces/ICanonicalAssetIdentityRepository";
+import { CompositionTaxonomyClassifier } from "../taxonomy/CompositionTaxonomyClassifier";
 
 function stableHash(value: string): string {
   let hash = 5381;
@@ -20,11 +21,16 @@ function toVersionId(assetId: string, payload: unknown): string {
 }
 
 export class PublishDurableEntityToAssetSystemUseCase {
+  private readonly taxonomyClassifier: CompositionTaxonomyClassifier;
+
   constructor(
     private readonly registerAssetUseCase: RegisterAssetUseCase,
     private readonly createAssetVersionUseCase: CreateAssetVersionUseCase,
     private readonly canonicalIdentityRepository: ICanonicalAssetIdentityRepository,
-  ) {}
+    taxonomyClassifier: CompositionTaxonomyClassifier = new CompositionTaxonomyClassifier(),
+  ) {
+    this.taxonomyClassifier = taxonomyClassifier;
+  }
 
   public async publishWorkflowDefinition(workflow: IWorkflow): Promise<{ readonly assetId: string; readonly versionId: string }> {
     const assetId = `workflow-definition:${workflow.id}`;
@@ -56,7 +62,13 @@ export class PublishDurableEntityToAssetSystemUseCase {
       metadata: payload as Record<string, unknown>,
     });
 
-    await this.canonicalIdentityRepository.upsertIdentity({ entityType: "workflow-definition", entityId: workflow.id, assetId, latestVersionId: versionId });
+    await this.canonicalIdentityRepository.upsertIdentity({
+      entityType: "workflow-definition",
+      entityId: workflow.id,
+      assetId,
+      latestVersionId: versionId,
+      taxonomy: this.taxonomyClassifier.classifyCanonicalEntity("workflow-definition"),
+    });
     return Object.freeze({ assetId, versionId });
   }
 
@@ -94,8 +106,20 @@ export class PublishDurableEntityToAssetSystemUseCase {
       metadata: payload as Record<string, unknown>,
     });
 
-    await this.canonicalIdentityRepository.upsertIdentity({ entityType: "installed-model", entityId: model.id, assetId, latestVersionId: versionId });
-    await this.canonicalIdentityRepository.upsertIdentity({ entityType: "base-model", entityId: model.id, assetId, latestVersionId: versionId });
+    await this.canonicalIdentityRepository.upsertIdentity({
+      entityType: "installed-model",
+      entityId: model.id,
+      assetId,
+      latestVersionId: versionId,
+      taxonomy: this.taxonomyClassifier.classifyCanonicalEntity("installed-model"),
+    });
+    await this.canonicalIdentityRepository.upsertIdentity({
+      entityType: "base-model",
+      entityId: model.id,
+      assetId,
+      latestVersionId: versionId,
+      taxonomy: this.taxonomyClassifier.classifyCanonicalEntity("base-model"),
+    });
     return Object.freeze({ assetId, versionId });
   }
 
@@ -137,7 +161,13 @@ export class PublishDurableEntityToAssetSystemUseCase {
       metadata: payload as Record<string, unknown>,
     });
 
-    await this.canonicalIdentityRepository.upsertIdentity({ entityType: "dataset-version", entityId: `${params.datasetId}:${params.version.id}`, assetId, latestVersionId: versionId });
+    await this.canonicalIdentityRepository.upsertIdentity({
+      entityType: "dataset-version",
+      entityId: `${params.datasetId}:${params.version.id}`,
+      assetId,
+      latestVersionId: versionId,
+      taxonomy: this.taxonomyClassifier.classifyCanonicalEntity("dataset-version"),
+    });
     return Object.freeze({ assetId, versionId });
   }
 }

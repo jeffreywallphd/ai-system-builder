@@ -160,8 +160,35 @@ If a change needs data from the outside world, prefer adding or using an **appli
 
 - Direction 4 Phase 4 extends those same inner boundaries: canonical MCP tool identity/binding, execution-native MCP invocation units, and deterministic agent-side MCP governance (permission/approval/sandbox/schema checks) now live in domain/application seams and reuse existing MCP registry/trust services.
 - Direction 4 Phase 5 keeps runtime coordination in the application layer via `AgentRunnerService`, with deterministic progress/failure/retry/session lifecycle contracts in `application/agents/contracts/*` and persistence exclusively through the `IAgentExecutionSessionRepository` port (implemented by a concrete SQLite repository at the infrastructure edge).
+- Direction 4 Phase 5 hardening now keeps partial execution truth inside that same boundary: per-step outcomes are persisted on execution-session records, retry exhaustion is explicit in terminal failure contracts, and transition-history reads are exposed through the same session repository port.
+- Direction 4 Phase 6 inner architecture now extends the same split:
+  - domain invariants remain in `domain/agents/*`
+  - application adds bounded authoring use cases (CRUD + goal/policy/tool/memory/strategy configuration + whole-config validation)
+  - CRUD failure semantics are now explicit application contracts (`AgentConflictError`, `AgentNotFoundError`, `AgentInvalidRequestError`) so outer transport adapters map errors by type, not brittle message parsing.
+  - goal authoring operations (`add`/`update`/`remove`/`reorder`) now enforce deterministic coherence through `AgentGoalConfiguration` at the use-case/domain boundary (unique ids, canonical required tool refs, contiguous ordering from 1, and explicit missing-goal failures).
+  - policy authoring updates are centralized through `AgentPolicyConfiguration` operations (tool-access, approvals/sandbox safety, cost limits, and execution limits), avoiding ad hoc mutation logic across application services.
+  - tool authoring updates are now canonical-first through `AgentPolicy.toolAccess` (no parallel tool-config surface), including strict tool-id normalization, MCP binding consistency checks against allowed ids, and scope-constraint integrity checks before persistence.
+  - any new agent-facing artifacts/read models must reuse shared composition seams (`CompositionTaxonomyClassifier` classification or `CompositionAssetContractResolver` projection) instead of introducing agent-only presentation semantics.
+  - persistence remains outer-layer through `IAgentRepository`/`IAgentExecutionSessionRepository` with concrete SQLite adapters (`SqliteAgentRepository`, `SqliteAgentExecutionSessionRepository`).
+  - `SqliteAgentRepository` now opens SQLite through a small compatibility seam (`infrastructure/filesystem/sqlite/SqliteCompat.ts`) so the same repository contract runs with `better-sqlite3` (Node/Electron host) and `bun:sqlite` (Bun test/runtime environments) without changing application/domain ports.
+  - `SqliteAgentRepository` now rehydrates persisted JSON snapshots through domain normalization on reads (rather than raw cast-only deserialization), so full aggregate round-trip stays truthy for memory asset refs, goal/policy/tool config, and planning/execution config.
+  - malformed persisted agent snapshots now fail fast with explicit field-level errors (for example missing policy/planning/execution objects) instead of yielding partial aggregates.
+  - memory authoring contracts are now fully structured/validated at the inner layer (asset-backed refs, retrieval config, writable/retrievable/session-only type coherence, retention/session-only contradictions, canonical asset/id format checks).
+  - memory validation now emits explicit structured issue codes for malformed/non-canonical asset refs, duplicate asset refs, malformed asset-version ids, invalid semantic/recency settings, and retention/policy contradictions so API/UI consumers do not rely only on generic fallback errors.
+  - canonical agent tool identity parsing/normalization now uses a shared domain seam (`domain/agents/AgentToolIdentity.ts`) across goals, plans, policy normalization, and validation so tool semantics remain centralized in inner layers.
+  - planning strategy authoring is now explicitly bounded to supported strategy descriptors (currently deterministic only), with unsupported id/mode combinations rejected before persistence.
+  - strategy validation now includes explicit structured issues for missing strategy id and unsupported id/mode combinations.
+  - whole-agent validation is now reusable across CRUD/configuration/API seams via `AgentConfigurationValidationService` + structured issue payloads (`code`, `path`, `section`, `severity`, `message`) and a deterministic `AgentConfigurationValidationError`.
+  - validation now supports explicit create vs update pathways (`mode: create|update`) with update-time immutable-id validation semantics.
+  - policy/sandbox/trust contradiction checks now return explicit issue codes (required-vs-denied permission conflicts, sandbox denial vs required approval conflicts, and tool-scope approval coherence) in the reusable validation output.
+  - backend transport now stays thin over those use cases through desktop IPC agent-authoring handlers and DTO mapping (`ai-loom-desktop-agents:*`) instead of transport-layer business logic.
+  - configuration use cases now emit typed authoring failures (`AgentNotFoundError` / `AgentInvalidRequestError`) instead of generic message-thrown errors, keeping deterministic contracts at the application boundary.
+  - `AgentAuthoringBackendApi` now maps transport errors only from typed authoring/validation contracts; unknown exceptions map to `internal` without substring-based heuristics.
+  - API-side read DTOs are now hardened to composition-native semantics (`agent` + taxonomy classification + optional contract projection) so transport does not invent agent-only read-model semantics.
+  - focused agent authoring coverage now includes SQLite-backed integration tests across CRUD + goal/policy/tool/memory/strategy updates and API-layer mapping/error-path tests so backend behavior is validated over real seams, not only in-memory repository doubles.
 
 ## TODO
 
 - Several convenience mutations still live in UI services instead of dedicated application use cases. If the goal is a stricter clean architecture, those write operations should gradually move inward.
 - The codebase would be easier to reason about if the manual renderer composition and the container-based infrastructure composition shared more of the same registration path or abstractions.
+- Phase 7 inner contracts now expose authored-agent operations as application use cases (launch/session-read/run-control/trigger-binding) over existing `AgentRunnerService` + `IAgentExecutionSessionRepository` seams; no parallel runtime path was introduced.

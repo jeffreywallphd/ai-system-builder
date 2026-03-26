@@ -1,7 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import Database from "better-sqlite3";
-import type { IAgentExecutionSessionRepository } from "../../../application/ports/interfaces/IAgentExecutionSessionRepository";
+import type {
+  AgentExecutionSessionTransitionRecord,
+  IAgentExecutionSessionRepository,
+} from "../../../application/ports/interfaces/IAgentExecutionSessionRepository";
 import type { AgentExecutionSession, AgentExecutionSessionStatus } from "../../../domain/agents/AgentExecutionSession";
 
 interface SessionRow {
@@ -13,7 +16,7 @@ interface TransitionRow {
   readonly recorded_at: string;
 }
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 const MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   [1, `
     CREATE TABLE agent_execution_session_migrations (
@@ -41,12 +44,16 @@ const MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
     );
     CREATE INDEX agent_execution_session_transitions_idx ON agent_execution_session_transitions(session_id, id ASC);
   `],
+  [2, `
+    ALTER TABLE agent_execution_sessions ADD COLUMN terminal_reason TEXT;
+    ALTER TABLE agent_execution_sessions ADD COLUMN had_partial_progress INTEGER;
+    ALTER TABLE agent_execution_sessions ADD COLUMN completed_step_count INTEGER;
+    ALTER TABLE agent_execution_sessions ADD COLUMN attempted_step_count INTEGER;
+    ALTER TABLE agent_execution_sessions ADD COLUMN step_outcome_count INTEGER NOT NULL DEFAULT 0;
+    CREATE INDEX IF NOT EXISTS agent_execution_sessions_terminal_idx
+      ON agent_execution_sessions(status, terminal_reason, updated_at DESC);
+  `],
 ]);
-
-export interface AgentExecutionSessionTransitionRecord {
-  readonly status: AgentExecutionSessionStatus;
-  readonly recordedAt: string;
-}
 
 export class SqliteAgentExecutionSessionRepository implements IAgentExecutionSessionRepository {
   private database?: Database.Database;
@@ -68,25 +75,40 @@ export class SqliteAgentExecutionSessionRepository implements IAgentExecutionSes
         plan_id,
         status,
         start_time,
-        end_time,
-        updated_at,
-        session_json
-      ) VALUES (
+      end_time,
+      terminal_reason,
+      had_partial_progress,
+      completed_step_count,
+      attempted_step_count,
+      step_outcome_count,
+      updated_at,
+      session_json
+    ) VALUES (
         @sessionId,
         @agentId,
         @planId,
         @status,
         @startTime,
-        @endTime,
-        @updatedAt,
-        @sessionJson
-      )
+      @endTime,
+      @terminalReason,
+      @hadPartialProgress,
+      @completedStepCount,
+      @attemptedStepCount,
+      @stepOutcomeCount,
+      @updatedAt,
+      @sessionJson
+    )
       ON CONFLICT(session_id) DO UPDATE SET
         agent_id = excluded.agent_id,
         plan_id = excluded.plan_id,
         status = excluded.status,
         start_time = excluded.start_time,
         end_time = excluded.end_time,
+        terminal_reason = excluded.terminal_reason,
+        had_partial_progress = excluded.had_partial_progress,
+        completed_step_count = excluded.completed_step_count,
+        attempted_step_count = excluded.attempted_step_count,
+        step_outcome_count = excluded.step_outcome_count,
         updated_at = excluded.updated_at,
         session_json = excluded.session_json
     `).run({
@@ -96,6 +118,11 @@ export class SqliteAgentExecutionSessionRepository implements IAgentExecutionSes
       status: session.status,
       startTime: session.startTime,
       endTime: session.endTime ?? null,
+      terminalReason: session.terminalState?.reason ?? null,
+      hadPartialProgress: session.terminalState ? (session.terminalState.hadPartialProgress ? 1 : 0) : null,
+      completedStepCount: session.terminalState?.completedStepCount ?? null,
+      attemptedStepCount: session.terminalState?.attemptedStepCount ?? null,
+      stepOutcomeCount: session.stepOutcomes.length,
       updatedAt: nowIso,
       sessionJson: JSON.stringify(session),
     });
@@ -164,14 +191,13 @@ export class SqliteAgentExecutionSessionRepository implements IAgentExecutionSes
   }
 
   private initialize(db: Database.Database): void {
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS agent_execution_session_migrations (
-        version INTEGER PRIMARY KEY,
-        applied_at TEXT NOT NULL
-      );
-    `);
-
     const currentVersion = this.getSchemaVersion(db);
+    if (currentVersion > SCHEMA_VERSION) {
+      throw new Error(
+        `Agent execution session schema version ${currentVersion} is newer than supported schema version ${SCHEMA_VERSION}.`,
+      );
+    }
+
     for (const [version, sql] of MIGRATIONS) {
       if (version <= currentVersion) {
         continue;
@@ -185,6 +211,12 @@ export class SqliteAgentExecutionSessionRepository implements IAgentExecutionSes
   }
 
   private getSchemaVersion(db: Database.Database): number {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS agent_execution_session_migrations (
+        version INTEGER PRIMARY KEY,
+        applied_at TEXT NOT NULL
+      );
+    `);
     const row = db.prepare("SELECT MAX(version) AS version FROM agent_execution_session_migrations").get() as { version?: number } | undefined;
     return typeof row?.version === "number" ? row.version : 0;
   }

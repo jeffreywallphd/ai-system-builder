@@ -116,9 +116,42 @@ Use "workflow-first", "tool projection", and "truthful execution provenance" whe
 - Planner output is a bounded ordered step plan (`toolId` + goal/action) that is executed through existing tool capability execution seams.
 - For MCP steps, execution still flows through MCP execution use cases, preserving trust policy/auth/approval/sandbox/audit behavior.
 - For workflow-projected tools, execution still flows through workflow tool execution (`RunToolUseCase` path).
+- Phase 6.5 tool authoring is now explicitly structured on `AgentPolicy.toolAccess` (no second tool-config model): allowed tool ids must be canonical, optional MCP bindings must match canonical MCP identity and allowed ids, and per-tool scope constraints must target allowed tools with non-empty canonical scope ids.
 - Agent memory writes/reads are asset-backed and version-aware so execution outcomes can be persisted and reused by later planning.
+- Phase 6.6 memory authoring stays asset-native on `AgentMemoryConfiguration`: asset references/retrieval/writable/retrievable/session-only/retention combinations are validated as one coherent contract so planner/runtime consumers can use the shape directly.
+- Any new agent-facing artifact/read model added around tools or memory must still go through shared composition seams (`CompositionTaxonomyClassifier` classification or `CompositionAssetContractResolver` projection), not agent-only presentation contracts.
 - Phase 3 completion now includes deterministic memory retrieval filters (type/tag/metadata/recency), bounded working-memory snapshots on execution read models, and retention-gated durable writes.
 - Phase 5 now emits deterministic execution-native runtime events (execution/session start, plan/governance/mapping, per-attempt step lifecycle, retry schedule/exhaustion, memory/session persistence, terminal outcome) with no UI/WebSocket runtime added.
 - Retry classification is explicit and bounded (`AgentRuntimeRetryPolicy.classifyFailure` + optional execution-result metadata hints), with heuristic fallback only when runtime metadata is absent.
+- Retry exhaustion is now terminally explicit on failures (`retryExhausted=true`), so final failure read models distinguish "retryable class but exhausted policy budget" from "non-retryable failure."
+- Session terminal truth is now explicit and persisted: terminal state includes `reason` (`completed`/`failed`/`cancelled`/`blocked`) plus bounded partial-progress summary (`hadPartialProgress`, completed/attempted step counts), so blocked-before-step and partial-then-terminal outcomes stay machine-readable.
+- Session persistence now records lifecycle from initial `pending` through `ready`/`running` and terminal states, so transition-history reads are complete rather than terminal-only.
+- Agent execution sessions now persist per-step outcome summaries (status/attempts/tool/output/error + optional output asset diagnostics), so partial success followed by terminal fail/cancel remains durable and queryable.
 - Session persistence is now a real SQLite infrastructure seam (`SqliteAgentExecutionSessionRepository`) that stores both latest session snapshots and transition history under the existing repository port.
+- SQLite session persistence now also stores structured terminal/progress columns (`terminal_reason`, `had_partial_progress`, `completed_step_count`, `attempted_step_count`, `step_outcome_count`) for API/debug filtering without JSON parsing.
+- Session transition history lookup is now part of the application repository contract (`IAgentExecutionSessionRepository.listTransitionHistory`) instead of an infrastructure-only helper method.
 - Current limits are intentional: deterministic single-agent planning, bounded step counts, no autonomous long-horizon control loop.
+
+## Direction 4 Phase 7 contract foundation (stories 7.1–7.10, initial slice)
+- Canonical launch now has an application use case (`LaunchAgentUseCase`) that loads authored agents from `IAgentRepository` and delegates execution to the existing `AgentRunnerService` runtime/session backbone.
+- Launch request semantics are bounded by a transport-agnostic inner contract (`AgentRunRequest`) with deterministic validation for agent id, per-run input/context overrides, metadata, and trigger kind (`manual`/`backend`).
+- Per-run binding is explicit (`createAgentRuntimeBinding`) and separates immutable authored configuration from per-run invocation data without mutating persisted agent config.
+- Binding validation is now deterministic for malformed input/context objects and conflicting keys across `input` + `contextOverrides` (overlaps are rejected before execution).
+- Runtime binding is now consumed by the canonical runner path: per-run input/context are attached to step invocation payloads and runtime metadata so launch-time overrides materially affect execution semantics.
+- Session reads now have first-class inner use cases:
+  - `GetAgentSessionDetailUseCase`
+  - `ListAgentSessionsUseCase`
+  with stable operational read models over persisted session truth (status, terminal reason, progress counts, transition history, retry/outcome summaries).
+- Run control contracts are explicitly bounded through `ControlAgentRunUseCase`:
+  - `cancel` is supported only for non-terminal lifecycle states (`pending`/`ready`/`running`) and persists truthful terminal transition state.
+  - terminal sessions (`completed`/`failed`/`cancelled`) reject control with deterministic typed invalid-state errors.
+  - unsupported actions (`pause`/`resume`) fail with explicit deterministic unsupported-control errors (never silent no-ops).
+- New operational artifacts align with shared composition seams by classifying through `CompositionTaxonomyClassifier` (agent launch/session views avoid agent-only presentation semantics).
+- Session summary/list/detail/control read surfaces now carry composition-aware classification (`execution-artifact`) and optional resolver-projected authored-agent contract context.
+- Trigger-first invocation now has a bounded inner use case (`TriggerAgentLaunchUseCase`) that validates trigger-kind contracts and delegates to the same canonical launch path (no side runtime path).
+- Launch/session operational projections now include bounded execution-progress, retry, outcome, memory-write, and output-asset summaries from canonical runner/session truth.
+- Session-detail composition projection can now include resolver-backed authored-agent contract projection (`CompositionAssetContractResolver.resolveAgentContractById`) alongside execution-artifact taxonomy classification.
+- Phase 8.1 backend integration now unifies Agent Studio transport through `infrastructure/api/agents/AgentStudioBackendApi.ts`, reusing Phase 6 authoring and Phase 7 runtime/session use cases under one deterministic response/error contract.
+- Agent Studio backend reads remain composition-native: authored-agent payloads are taxonomy-classified and contract-projected; session/operational payloads stay execution-artifact classified with optional authored-agent contract projection.
+- Desktop IPC now includes studio-facing operations on the existing `ai-loom-desktop-agents:*` namespace (`launch`, `trigger-launch`, `list-sessions`, `get-session`, `control-run`, `studio-snapshot`) without creating a second runtime or launch path.
+- Desktop host wiring now provides a real runner-backed launch path (planner + capability execution + asset-backed memory + session persistence), so studio launch/trigger-launch are execution-backed operations in desktop mode.

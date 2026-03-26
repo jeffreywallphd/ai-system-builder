@@ -2,12 +2,17 @@ import type { CanonicalEntityType } from "../ports/interfaces/ICanonicalAssetIde
 import { CanonicalAssetIdentityService } from "./CanonicalAssetIdentityService";
 import { GetCanonicalLatestVersionUseCase, GetCanonicalProvenanceSummaryUseCase, LoadCanonicalAssetSummaryUseCase } from "./CanonicalAssetReadUseCases";
 import type { GetCanonicalDependencyStateUseCase, CanonicalDependencyStateSummary } from "./CanonicalDependencyStateUseCase";
+import type { CompositionTaxonomyDescriptor } from "../../domain/taxonomy/CompositionTaxonomy";
+import type { AssetContractDescriptor } from "../../domain/contracts/AssetContract";
+import type { IAssetContractResolver } from "../contracts/CompositionAssetContractResolver";
 
 export interface CanonicalEntityReadResolution {
   readonly preferred: boolean;
   readonly assetId?: string;
   readonly pinnedVersionId?: string;
   readonly latestVersionId?: string;
+  readonly taxonomy?: CompositionTaxonomyDescriptor;
+  readonly contract?: AssetContractDescriptor;
   readonly provenance?: {
     readonly directUpstreamCount: number;
     readonly directDownstreamCount: number;
@@ -25,6 +30,7 @@ export class CanonicalEntityReadResolver {
     private readonly latestVersionUseCase: GetCanonicalLatestVersionUseCase,
     private readonly provenanceSummaryUseCase?: GetCanonicalProvenanceSummaryUseCase,
     private readonly dependencyStateUseCase?: GetCanonicalDependencyStateUseCase,
+    private readonly contractResolver?: IAssetContractResolver,
   ) {}
 
   public async resolve(params: {
@@ -51,6 +57,7 @@ export class CanonicalEntityReadResolver {
         assetId: identity.assetId,
         pinnedVersionId: identity.latestVersionId,
         latestVersionId: latestVersion?.versionId,
+        taxonomy: identity.taxonomy,
         fallbackReason: `Canonical asset '${identity.assetId}' could not be loaded.`,
       });
     }
@@ -59,6 +66,10 @@ export class CanonicalEntityReadResolver {
     const provenance = this.provenanceSummaryUseCase && effectiveVersionId
       ? await this.provenanceSummaryUseCase.execute(effectiveVersionId)
       : undefined;
+    const contract = this.contractResolver
+      ? await this.contractResolver.resolveCanonicalEntityContract(params.entityType, params.entityId)
+      : undefined;
+
     const dependencyState = this.dependencyStateUseCase
       ? await this.dependencyStateUseCase.evaluateCanonicalEntity({
         entityType: params.entityType,
@@ -73,6 +84,8 @@ export class CanonicalEntityReadResolver {
       assetId: identity.assetId,
       pinnedVersionId: identity.latestVersionId,
       latestVersionId: latestVersion?.versionId,
+      taxonomy: summary.taxonomy ?? identity.taxonomy,
+      contract,
       provenance: provenance
         ? Object.freeze({
           directUpstreamCount: provenance.directUpstreamVersionIds.length,

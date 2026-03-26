@@ -22,7 +22,7 @@ It is responsible for:
 - resolving the desktop Python runtime
 - starting the desktop service supervisor
 - building the bootstrap context exposed to the renderer
-- registering IPC handlers for storage, workflow persistence, execution-run history, and model-file operations
+- registering IPC handlers for storage, workflow persistence, execution-run history, model-file operations, canonical asset reads, and thin agent-authoring backend operations
 
 This makes Electron the host-level boundary where local capabilities become available.
 
@@ -34,6 +34,13 @@ This makes Electron the host-level boundary where local capabilities become avai
 - workflow persistence operations
 - execution-run history operations
 - model-file operations
+- canonical asset operations
+- agent authoring/configuration operations (`create/update/get/list/delete/archive`, goal/policy/tool/memory/strategy configuration, and configuration validation)
+
+Agent authoring backend responses now use a hardened projection envelope (`agent`, `taxonomy`, optional `contract`) so desktop transport keeps read semantics aligned with `CompositionTaxonomyClassifier`/`CompositionAssetContractResolver`.
+Phase 8.1 extends this desktop backend surface to a Studio-ready seam via `AgentStudioBackendApi`, adding runtime/session IPC operations (launch/trigger launch/session list/detail/run control/studio snapshot) on `ai-loom-desktop-agents:*` while keeping transport thin over existing application use cases.
+Desktop launch/trigger IPC handlers now delegate into a real runner-backed execution path (`AgentRunnerService`) in the host bootstrap, including deterministic planning, capability orchestration, asset-backed memory retrieval/write, and SQLite session persistence.
+Agent authoring error responses are type-mapped from inner contracts (`AgentAuthoringError`, `AgentConfigurationValidationError`) with unknown failures normalized to `internal` (no substring-derived mapping).
 
 `electron/shared/DesktopContracts.ts` defines the TypeScript contracts for those capabilities, which is a good practice because it creates a typed interface between host and renderer.
 

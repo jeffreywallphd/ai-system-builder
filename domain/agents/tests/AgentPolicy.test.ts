@@ -137,4 +137,14 @@ describe("AgentPolicy", () => {
       },
     })).toThrow("must match canonical");
   });
+
+  it("rejects non-canonical workflow tool identity segments", () => {
+    expect(() => normalizeAgentPolicy({
+      ...basePolicy,
+      toolAccess: {
+        allowedToolIds: ["workflow:bad segment"],
+        scopeConstraints: [],
+      },
+    })).toThrow("non-canonical");
+  });
 });

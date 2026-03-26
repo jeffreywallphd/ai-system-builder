@@ -146,6 +146,36 @@ The runtime is not a single path. The system currently supports multiple executi
 
 - Direction 4 (Phase 4, MCP tool integration inner slice) now keeps MCP as the external tool-protocol boundary while remaining execution-native: agent policy carries canonical MCP bindings, agent mapping emits `mcp-tool-invocation` execution units, and plan/execute-time MCP governance checks reuse existing registry/trust services instead of introducing a parallel agent runtime.
 - Direction 4 (Phase 4 completion + Phase 5 inner foundations) now introduces a reusable planner/tool compatibility seam (`AgentPlanToolSelectionService`), richer deterministic MCP governance outcomes (explicit unavailable/approval-required/denied/incompatible semantics), and a bounded inner runtime coordinator (`AgentRunnerService`) that composes planning, governance, execution, and memory while emitting structured runtime progress events and applying bounded retry/failure policies.
+- Phase 5 hardening now keeps retry/partial-execution truth explicit in inner contracts:
+  - terminal failures can explicitly signal retry exhaustion (`retryExhausted`);
+  - execution sessions persist per-step outcomes and optional output-asset diagnostics;
+  - execution sessions now carry explicit terminal-state truth (`reason`: `completed` | `failed` | `cancelled` | `blocked`) plus bounded partial-progress summary (`hadPartialProgress`, completed/attempted step counts);
+  - runner/session persistence now records lifecycle transitions from first persisted `pending` state through `ready`/`running` and terminal status, so transition history is complete instead of terminal-only;
+  - SQLite session persistence now stores structured terminal/progress columns (`terminal_reason`, `had_partial_progress`, `completed_step_count`, `attempted_step_count`, `step_outcome_count`) in addition to canonical session JSON;
+  - transition-history reads are part of the session repository port (`IAgentExecutionSessionRepository`).
+- Phase 6 inner authoring foundation now adds real backend-ready seams without UI coupling:
+  - persistence: `IAgentRepository` with concrete `SqliteAgentRepository`;
+  - CRUD/lifecycle use cases: create/update/get/list/delete/archive;
+  - CRUD failure modes now surface typed application errors (`agent-conflict`, `agent-not-found`, `agent-invalid-request`) so API/IPC adapters map contracts deterministically;
+  - bounded structured configuration use cases: goals/policy/tools/memory/strategy;
+  - configuration use cases now share typed failure semantics (`agent-not-found`, `agent-invalid-request`, `validation-failed`) instead of message-derived mapping;
+  - cohesive cross-field validation seam: `AgentConfigurationValidationService` + `ValidateAgentConfigurationUseCase` (deterministic issue codes for goal/tool/memory/policy/strategy coherence, plus domain-level fallback validation);
+  - SQLite agent persistence now also records structured authoring/query fields (`strategy_id`, `strategy_mode`, `goal_count`, `allowed_tool_count`) while preserving aggregate round-trip truth in `agent_json`.
+  - memory configuration is now contract-hardened (canonical asset refs, retrieval compatibility, writable/retrievable/session-only coherence, retention/session-only contradiction checks).
+  - strategy configuration is now explicitly bounded to supported descriptors (`deterministic@deterministic-linear` in this slice), with unsupported configs rejected deterministically.
+  - whole-agent validation output now includes machine-friendly sectioned issues (`code`, `path`, `section`, `severity`, `message`) and is reused by CRUD/configuration/API seams through `AgentConfigurationValidationError`.
+  - backend authoring transport now exposes thin desktop IPC endpoints (`ai-loom-desktop-agents:*`) via `AgentAuthoringBackendApi` for CRUD/configuration/validation without transport-layer business logic.
+  - `AgentAuthoringBackendApi` error mapping is now type-based only (`AgentAuthoringError` + `AgentConfigurationValidationError`); unknown failures map to `internal` without substring heuristics.
+
+## Shared composition taxonomy foundation
+
+- A compact taxonomy descriptor now exists in `domain/taxonomy/CompositionTaxonomy.ts` with explicit `structuralKind`, `semanticRole`, and `behaviorKind`.
+- Classification seams for existing concepts live in `application/taxonomy/CompositionTaxonomyClassifier.ts`.
+- Workflow and agent adapter seams (`application/workflows/WorkflowTaxonomy.ts`, `application/agents/contracts/AgentTaxonomy.ts`) explicitly align with the same composition model.
+- Canonical identities now persist taxonomy metadata and canonical asset query criteria supports taxonomy-aware filters (`structuralKinds`, `semanticRoles`, `behaviorKinds`).
+- Canonical asset summary/detail read use cases include taxonomy descriptors through identity metadata with bounded fallback mapping.
+- See `shared-composition-taxonomy.md` for scope, boundaries, and current-state mapping details.
+- Shared asset contracts now complement taxonomy through a compact inner-layer model (`domain/contracts/AssetContract.ts`) and adapter seam (`application/contracts/CompositionAssetContractResolver.ts`), with canonical operational reads surfacing both where available; see `shared-asset-contracts.md`.
 
 ## TODO
 

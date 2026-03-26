@@ -1,12 +1,16 @@
 import type { CanonicalEntityType } from "../ports/interfaces/ICanonicalAssetIdentityRepository";
 import type { CanonicalAssetIdentityService } from "./CanonicalAssetIdentityService";
 import type { CanonicalEntityReadResolver } from "./CanonicalEntityReadResolver";
+import type { CompositionTaxonomyDescriptor } from "../../domain/taxonomy/CompositionTaxonomy";
+import type { AssetContractDescriptor } from "../../domain/contracts/AssetContract";
 
 export interface CanonicalOperationalReadSummary {
   readonly preferred: boolean;
   readonly assetId?: string;
   readonly pinnedVersionId?: string;
   readonly latestVersionId?: string;
+  readonly taxonomy?: CompositionTaxonomyDescriptor;
+  readonly contract?: AssetContractDescriptor;
   readonly provenance?: {
     readonly directUpstreamCount: number;
     readonly directDownstreamCount: number;
@@ -50,6 +54,7 @@ export class CanonicalEntityOperationalReadService {
             assetId: identity.assetId,
             pinnedVersionId: identity.latestVersionId,
             latestVersionId,
+            taxonomy: identity.taxonomy,
             operationalStatus: Object.freeze({
               trust: "attention-needed",
               explanation: "Canonical identity resolved but resolver-backed dependency/provenance evidence is unavailable.",
@@ -88,6 +93,8 @@ export class CanonicalEntityOperationalReadService {
       assetId: resolution.assetId,
       pinnedVersionId: resolution.pinnedVersionId,
       latestVersionId: resolution.latestVersionId,
+      taxonomy: resolution.taxonomy,
+      contract: resolution.contract,
       provenance: resolution.provenance,
       dependencyState,
       operationalStatus: this.toOperationalStatus(resolution.preferred, dependencyState, resolution.fallbackReason),

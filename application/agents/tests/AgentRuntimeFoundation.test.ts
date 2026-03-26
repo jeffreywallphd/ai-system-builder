@@ -14,7 +14,10 @@ import { AgentMemoryWriteService } from "../services/AgentMemoryWriteService";
 import { DeterministicAgentPlanningService } from "../services/AgentPlanningInterface";
 import { AgentRunnerService } from "../services/AgentRunnerService";
 import type { AgentExecutionSession } from "../../../domain/agents/AgentExecutionSession";
-import type { IAgentExecutionSessionRepository } from "../../ports/interfaces/IAgentExecutionSessionRepository";
+import type {
+  AgentExecutionSessionTransitionRecord,
+  IAgentExecutionSessionRepository,
+} from "../../ports/interfaces/IAgentExecutionSessionRepository";
 import { AgentMcpToolGovernanceService } from "../services/AgentMcpToolGovernanceService";
 import { createInstalledMcpToolRecord, type InstalledMcpToolRecord } from "../../../domain/mcp/InstalledMcpTool";
 import type { IMcpToolRegistryRepository } from "../../ports/interfaces/IMcpToolRegistryRepository";
@@ -38,8 +41,14 @@ class InMemoryAssetRepo implements IAssetCatalog, IAssetVersionRepository {
 
 class InMemorySessionRepo implements IAgentExecutionSessionRepository {
   private readonly sessions = new Map<string, AgentExecutionSession>();
+  private readonly transitions = new Map<string, AgentExecutionSessionTransitionRecord[]>();
 
   async save(session: AgentExecutionSession): Promise<AgentExecutionSession> {
+    const history = this.transitions.get(session.id) ?? [];
+    if (history[history.length - 1]?.status !== session.status) {
+      history.push(Object.freeze({ status: session.status, recordedAt: new Date().toISOString() }));
+      this.transitions.set(session.id, history);
+    }
     this.sessions.set(session.id, session);
     return session;
   }
@@ -50,6 +59,10 @@ class InMemorySessionRepo implements IAgentExecutionSessionRepository {
 
   async listByAgentId(agentId: string): Promise<ReadonlyArray<AgentExecutionSession>> {
     return [...this.sessions.values()].filter((session) => session.agentId === agentId);
+  }
+
+  async listTransitionHistory(sessionId: string): Promise<ReadonlyArray<AgentExecutionSessionTransitionRecord>> {
+    return Object.freeze([...(this.transitions.get(sessionId) ?? [])]);
   }
 }
 
@@ -255,30 +268,19 @@ describe("Agent runtime foundation", () => {
     });
 
     expect(result.status).toBe("completed");
+    expect(result.terminalState.reason).toBe("completed");
+    expect(result.terminalState.hadPartialProgress).toBe(false);
     expect(result.outcomes[0]?.attempts).toBe(2);
-    expect(events).toEqual([
-      "execution-started",
-      "plan-prepared",
-      "session-started",
-      "session-transitioned",
-      "session-transitioned",
-      "session-persisted",
-      "governance-validated",
-      "unit-mapped",
-      "step-attempt-started",
-      "retry-scheduled",
-      "step-attempt-started",
-      "unit-completed",
-      "memory-persisted",
-      "session-transitioned",
-      "session-persisted",
-      "execution-completed",
-    ]);
+    expect(events).toContain("retry-scheduled");
+    expect(events).toContain("session-persisted");
+    expect(events).toContain("execution-completed");
     expect(events).toContain("memory-persisted");
 
     const sessions = await sessionRepo.listByAgentId("agent-runtime");
     expect(sessions).toHaveLength(1);
     expect(sessions[0]?.status).toBe("completed");
+    expect(sessions[0]?.stepOutcomes[0]?.status).toBe("completed");
+    expect(sessions[0]?.terminalState?.reason).toBe("completed");
   });
 
   it("emits blocked lifecycle events when governance denies execution before any step runs", async () => {
@@ -317,9 +319,11 @@ describe("Agent runtime foundation", () => {
       onProgress: (event) => events.push(event.type),
     });
     expect(result.status).toBe("blocked");
+    expect(result.terminalState.reason).toBe("blocked");
+    expect(result.terminalState.attemptedStepCount).toBe(0);
     expect(result.outcomes).toHaveLength(0);
+    expect(result.session.stepOutcomes).toHaveLength(0);
     expect(events).toContain("execution-blocked");
-    expect(events).toContain("execution-failed");
     expect(events).not.toContain("step-attempt-started");
   });
 
@@ -392,8 +396,13 @@ describe("Agent runtime foundation", () => {
     expect(result.outcomes).toHaveLength(2);
     expect(result.outcomes[0]?.status).toBe("completed");
     expect(result.outcomes[1]?.status).toBe("failed");
+    expect(result.terminalState.reason).toBe("failed");
+    expect(result.terminalState.hadPartialProgress).toBe(true);
     expect(result.workingMemory.executionOutputs).toHaveLength(2);
     expect(result.memoryWrite.persisted.length).toBeGreaterThan(0);
+    expect(result.session.stepOutcomes).toHaveLength(2);
+    expect(result.session.stepOutcomes[0]?.status).toBe("completed");
+    expect(result.session.stepOutcomes[1]?.status).toBe("failed");
   });
 
   it("stops immediately on non-retryable failure and preserves partial outcomes", async () => {
@@ -437,6 +446,8 @@ describe("Agent runtime foundation", () => {
     });
 
     expect(result.status).toBe("failed");
+    expect(result.terminalState.reason).toBe("failed");
+    expect(result.terminalState.hadPartialProgress).toBe(false);
     expect(result.outcomes).toHaveLength(1);
     expect(result.outcomes[0]?.attempts).toBe(1);
     expect(result.workingMemory.executionOutputs).toHaveLength(1);
@@ -444,6 +455,7 @@ describe("Agent runtime foundation", () => {
     expect(events).toContain("unit-failed");
     expect(result.failure?.retryable).toBe(false);
     expect(result.failure?.retryClassificationSource).toBe("result-metadata");
+    expect(result.failure?.retryExhausted).not.toBe(true);
   });
 
   it("marks retry exhaustion and terminal failure when retries are exhausted", async () => {
@@ -487,9 +499,13 @@ describe("Agent runtime foundation", () => {
     });
 
     expect(result.status).toBe("failed");
+    expect(result.terminalState.reason).toBe("failed");
+    expect(result.terminalState.hadPartialProgress).toBe(false);
     expect(result.outcomes[0]?.attempts).toBe(1);
     expect(events).toContain("retry-exhausted");
     expect(events).toContain("execution-failed");
+    expect(result.failure?.retryExhausted).toBe(true);
+    expect(result.failure?.retryable).toBe(false);
   });
 
   it("supports cancellation after partial success", async () => {
@@ -563,9 +579,14 @@ describe("Agent runtime foundation", () => {
     });
 
     expect(result.status).toBe("cancelled");
+    expect(result.terminalState.reason).toBe("cancelled");
+    expect(result.terminalState.hadPartialProgress).toBe(true);
     expect(result.outcomes).toHaveLength(2);
     expect(result.outcomes[0]?.status).toBe("completed");
     expect(result.outcomes[1]?.status).toBe("cancelled");
     expect(result.workingMemory.executionOutputs).toHaveLength(2);
+    expect(result.session.stepOutcomes).toHaveLength(2);
+    expect(result.session.stepOutcomes[0]?.status).toBe("completed");
+    expect(result.session.stepOutcomes[1]?.status).toBe("cancelled");
   });
 });

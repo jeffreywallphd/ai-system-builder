@@ -15,6 +15,7 @@ export interface AgentRuntimeFailure {
   readonly message: string;
   readonly governanceDecision?: AgentMcpToolGovernanceDecision;
   readonly retryable: boolean;
+  readonly retryExhausted?: boolean;
   readonly retryClassificationSource?: "policy" | "result-metadata" | "heuristic";
 }
 

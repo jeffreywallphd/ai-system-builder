@@ -75,7 +75,7 @@ describe("Agent domain", () => {
         },
         revision: 1,
       },
-      planningStrategy: { strategyId: "linear-default", mode: "deterministic-linear" },
+      planningStrategy: { strategyId: "deterministic", mode: "deterministic-linear" },
       execution: { trustPolicyId: "trust:strict", requireTrustedTools: true, maxExecutionUnits: 3 },
     });
 
@@ -89,7 +89,7 @@ describe("Agent domain", () => {
       id: "agent-read",
       name: "Read Model Agent",
       goals: [
-        { id: "g2", objective: "Secondary", constraints: [], successCriteria: ["done"], priority: "normal", priorityOrder: 20 },
+        { id: "g2", objective: "Secondary", constraints: [], successCriteria: ["done"], priority: "normal", priorityOrder: 2 },
         { id: "g1", objective: "Primary", constraints: [], successCriteria: ["done"], priority: "critical", priorityOrder: 1 },
       ],
       policy: {
@@ -101,7 +101,7 @@ describe("Agent domain", () => {
       },
       memory: {
         agentId: "agent-read",
-        assets: [],
+        assets: [{ assetId: new AssetId("asset:memory:read"), memoryType: "working" }],
         retrieval: { strategy: "latest-first", maxEntries: 10 },
         policy: {
           writableTypes: ["episodic", "semantic", "working"],
@@ -116,7 +116,7 @@ describe("Agent domain", () => {
     const readModel = toAgentReadModel(agent);
     expect(readModel.goals[0]?.id).toBe("g1");
     expect(readModel.toolAccess.allowedToolIds).toEqual(["mcp:local:echo"]);
-    expect(readModel.memory.assetIds).toEqual([]);
+    expect(readModel.memory.assets.map((entry) => entry.assetId)).toEqual(["asset:memory:read"]);
   });
 
   it("enforces core agent invariants", () => {
@@ -151,7 +151,7 @@ describe("Agent domain", () => {
           },
           revision: 1,
         },
-        planningStrategy: { strategyId: "linear-default", mode: "deterministic-linear" },
+        planningStrategy: { strategyId: "deterministic", mode: "deterministic-linear" },
         execution: { maxExecutionUnits: 2, requireTrustedTools: true },
       }),
     ).toThrow("not allowed by policy");
@@ -174,13 +174,13 @@ describe("Agent domain", () => {
         assets: [{ assetId: new AssetId("asset:memory:update"), memoryType: "working" }],
         retrieval: { strategy: "latest-first", maxEntries: 5 },
         policy: {
-          writableTypes: ["working"],
+          writableTypes: ["working", "episodic"],
           sessionOnlyTypes: ["working"],
           retention: { mode: "bounded", maxDurableEntries: 20 },
         },
         revision: 1,
       },
-      planningStrategy: { strategyId: "linear-default", mode: "deterministic-linear" },
+      planningStrategy: { strategyId: "deterministic", mode: "deterministic-linear" },
       execution: { maxExecutionUnits: 2, requireTrustedTools: true },
       now: new Date("2026-03-24T00:00:00.000Z"),
     });
@@ -204,7 +204,7 @@ describe("Agent goal and policy invariants", () => {
       constraints: [" use trusted tools ", "use trusted tools"],
       successCriteria: ["done"],
       priority: "critical",
-      priorityOrder: 0,
+      priorityOrder: 1,
       requiredToolIds: ["mcp:local:echo", "mcp:local:echo"],
     });
 
@@ -266,14 +266,15 @@ describe("Agent goal and policy invariants", () => {
 });
 
 describe("Agent memory invariants", () => {
-  it("accepts zero-asset initialization intentionally", () => {
+  it("accepts session-only initialization without durable asset references", () => {
     const memory = normalizeAgentMemoryConfiguration({
       agentId: "agent-m",
       assets: [],
       retrieval: { strategy: "latest-first", maxEntries: 5 },
       policy: {
-        writableTypes: ["episodic", "semantic", "working"],
-        retention: { mode: "bounded", maxDurableEntries: 20 },
+        writableTypes: ["working"],
+        sessionOnlyTypes: ["working"],
+        retention: { mode: "disabled" },
       },
       revision: 1,
     });

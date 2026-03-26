@@ -1,3 +1,5 @@
+import { isCanonicalAgentToolId } from "./AgentToolIdentity";
+
 export const AgentGoalPriorityLevels = Object.freeze({
   low: "low",
   normal: "normal",
@@ -49,8 +51,14 @@ export function normalizeAgentGoal(input: AgentGoal): AgentGoal {
   if (!Object.values(AgentGoalPriorityLevels).includes(input.priority)) {
     throw new Error("Agent goal priority must be one of low, normal, high, or critical.");
   }
-  if (!Number.isInteger(input.priorityOrder) || input.priorityOrder < 0) {
-    throw new Error("Agent goal priorityOrder must be a non-negative integer.");
+  if (!Number.isInteger(input.priorityOrder) || input.priorityOrder < 1) {
+    throw new Error("Agent goal priorityOrder must be an integer greater than or equal to 1.");
+  }
+
+  for (const requiredToolId of requiredToolIds) {
+    if (!isCanonicalAgentToolId(requiredToolId)) {
+      throw new Error(`Agent goal required tool id '${requiredToolId}' is malformed.`);
+    }
   }
 
   return Object.freeze({

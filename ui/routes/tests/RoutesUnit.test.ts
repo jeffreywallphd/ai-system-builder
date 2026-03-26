@@ -14,6 +14,8 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain('key: "mcp"');
     expect(source).toContain('key: "services"');
     expect(source).toContain('key: "context"');
+    expect(source).toContain('agentStudio: "/agent-studio"');
+    expect(source).toContain('key: "agent-studio"');
   });
 
   it("provides navigation helper and protected route behavior", () => {
@@ -37,6 +39,7 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain("path: ROUTE_PATHS.settings");
     expect(source).toContain("path: ROUTE_PATHS.mcp");
     expect(source).toContain("path: ROUTE_PATHS.services");
+    expect(source).toContain("path: ROUTE_PATHS.agentStudio");
     expect(source).toContain("path: ROUTE_PATHS.context");
     expect(source).toContain("path: ROUTE_PATHS.workflowContextWorkbench");
   });
