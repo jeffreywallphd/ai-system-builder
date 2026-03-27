@@ -177,7 +177,7 @@ describe("DefaultStudioShellApplicationService", () => {
     const loaded = await service.loadAssetDraft({ studioId: "studio-metadata", draftId: "draft-created" });
     expect(loaded?.draft.metadata.title).toBe("Draft With Metadata");
     expect(loaded?.draft.metadata.tags).toEqual(["authoring", "workflow"]);
-    expect(loaded?.draft.metadata.taxonomy?.behaviorKind).toBe("dynamic");
+    expect(loaded?.draft.metadata.taxonomy?.behaviorKind).toBe("conditional");
     expect(loaded?.draft.metadata.contract?.version).toBe("2.0.0");
     expect(loaded?.draft.metadata.contract?.parameters).toEqual([
       { id: "temperature", required: true, description: undefined, valueType: "number", defaultValue: undefined },

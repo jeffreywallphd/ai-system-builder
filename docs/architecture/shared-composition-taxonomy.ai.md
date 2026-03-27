@@ -6,8 +6,8 @@ Provide one compact, reusable classification model for workflows/assets/context/
 ## Core model
 `domain/taxonomy/CompositionTaxonomy.ts` defines:
 - `structuralKind`: `atomic` | `composite` | `system`
-- `semanticRole`: `model` | `dataset` | `tool` | `prompt-template` | `embedding-index` | `workflow` | `agent` | `context-bundle` | `training-recipe` | `tool-chain` | `system`
-- `behaviorKind`: `none` | `deterministic` | `dynamic` | `iterative` | `autonomous`
+- `semanticRole`: `model` | `dataset` | `tool` | `prompt-template` | `embedding-index` | `config-profile` | `workflow` | `agent` | `context-bundle` | `dataset-pipeline` | `training-recipe` | `tool-chain` | `app-template` | `system`
+- `behaviorKind`: `none` | `deterministic` | `conditional` | `iterative` | `autonomous` (with `dynamic` normalized as a compatibility alias)
 
 Behavior is a property of the same structural object, not a separate top-level architecture.
 
@@ -20,7 +20,7 @@ Behavior is a property of the same structural object, not a separate top-level a
 - Canonical asset reads still expose taxonomy with bounded fallback mapping where identity metadata is absent.
 
 ## Current mappings (foundation)
-- workflow definition -> composite/workflow/deterministic (or dynamic override at workflow seam)
+- workflow definition -> composite/workflow/deterministic (or conditional override at workflow seam; legacy `dynamic` inputs normalize to `conditional`)
 - agent -> composite/agent/autonomous
 - installed/base model -> atomic/model/none
 - dataset version -> atomic/dataset/none
@@ -28,8 +28,9 @@ Behavior is a property of the same structural object, not a separate top-level a
 - context recipe -> composite/context-bundle/deterministic
 - prompt asset -> atomic/prompt-template/none
 - embedding asset -> atomic/embedding-index/none
-- tool capability (mcp/local) -> atomic/tool/(dynamic|deterministic)
+- tool capability (mcp/local) -> atomic/tool/(conditional|deterministic)
 - workflow-published capability -> composite/tool-chain/deterministic
+- execution artifact canonical reads -> system/system/iterative
 
 ## Explicit non-goals in this slice
 - no UI composer rewrite
