@@ -30,10 +30,10 @@ describe("CompositionTaxonomyClassifier", () => {
     const workflow = { id: "wf-1" } as IWorkflow;
     const agent = { id: "agent-1" } as Agent;
 
-    expect(classifier.classifyWorkflow(workflow, "dynamic")).toEqual({
+    expect(classifier.classifyWorkflow(workflow, "conditional")).toEqual({
       structuralKind: "composite",
       semanticRole: "workflow",
-      behaviorKind: "dynamic",
+      behaviorKind: "conditional",
     });
     expect(classifier.classifyAgent(agent)).toEqual({
       structuralKind: "composite",
@@ -107,7 +107,7 @@ describe("CompositionTaxonomyClassifier", () => {
     })).toEqual({
       structuralKind: "atomic",
       semanticRole: "tool",
-      behaviorKind: "dynamic",
+      behaviorKind: "conditional",
     });
     expect(classifier.classifyToolCapability({
       id: "workflow:docs",
@@ -134,6 +134,14 @@ describe("CompositionTaxonomyClassifier", () => {
       structuralKind: "composite",
       semanticRole: "context-bundle",
       behaviorKind: "deterministic",
+    });
+  });
+
+  it("maps execution artifacts to system-level iterative taxonomy", () => {
+    expect(classifier.classifyCanonicalEntity("execution-artifact")).toEqual({
+      structuralKind: "system",
+      semanticRole: "system",
+      behaviorKind: "iterative",
     });
   });
 });

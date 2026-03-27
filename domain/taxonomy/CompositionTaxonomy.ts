@@ -12,11 +12,14 @@ export const TaxonomySemanticRoles = Object.freeze({
   tool: "tool",
   promptTemplate: "prompt-template",
   embeddingIndex: "embedding-index",
+  configProfile: "config-profile",
   workflow: "workflow",
   agent: "agent",
   contextBundle: "context-bundle",
+  datasetPipeline: "dataset-pipeline",
   trainingRecipe: "training-recipe",
   toolChain: "tool-chain",
+  appTemplate: "app-template",
   system: "system",
 });
 
@@ -25,12 +28,13 @@ export type TaxonomySemanticRole = typeof TaxonomySemanticRoles[keyof typeof Tax
 export const TaxonomyBehaviorKinds = Object.freeze({
   none: "none",
   deterministic: "deterministic",
-  dynamic: "dynamic",
+  conditional: "conditional",
   iterative: "iterative",
   autonomous: "autonomous",
 });
 
 export type TaxonomyBehaviorKind = typeof TaxonomyBehaviorKinds[keyof typeof TaxonomyBehaviorKinds];
+export type TaxonomyBehaviorKindAlias = "dynamic";
 
 export interface CompositionTaxonomyDescriptor {
   readonly structuralKind: TaxonomyStructuralKind;
@@ -46,26 +50,45 @@ const allowedTaxonomyCombinationsBySemanticRole: Readonly<Record<TaxonomySemanti
   [TaxonomySemanticRoles.dataset]: Object.freeze([[TaxonomyStructuralKinds.atomic, TaxonomyBehaviorKinds.none]]),
   [TaxonomySemanticRoles.tool]: Object.freeze([
     [TaxonomyStructuralKinds.atomic, TaxonomyBehaviorKinds.deterministic],
-    [TaxonomyStructuralKinds.atomic, TaxonomyBehaviorKinds.dynamic],
+    [TaxonomyStructuralKinds.atomic, TaxonomyBehaviorKinds.conditional],
   ]),
   [TaxonomySemanticRoles.promptTemplate]: Object.freeze([[TaxonomyStructuralKinds.atomic, TaxonomyBehaviorKinds.none]]),
   [TaxonomySemanticRoles.embeddingIndex]: Object.freeze([[TaxonomyStructuralKinds.atomic, TaxonomyBehaviorKinds.none]]),
+  [TaxonomySemanticRoles.configProfile]: Object.freeze([[TaxonomyStructuralKinds.atomic, TaxonomyBehaviorKinds.none]]),
   [TaxonomySemanticRoles.workflow]: Object.freeze([
     [TaxonomyStructuralKinds.composite, TaxonomyBehaviorKinds.deterministic],
-    [TaxonomyStructuralKinds.composite, TaxonomyBehaviorKinds.dynamic],
+    [TaxonomyStructuralKinds.composite, TaxonomyBehaviorKinds.conditional],
+    [TaxonomyStructuralKinds.composite, TaxonomyBehaviorKinds.iterative],
   ]),
   [TaxonomySemanticRoles.agent]: Object.freeze([[TaxonomyStructuralKinds.composite, TaxonomyBehaviorKinds.autonomous]]),
   [TaxonomySemanticRoles.contextBundle]: Object.freeze([
     [TaxonomyStructuralKinds.composite, TaxonomyBehaviorKinds.none],
     [TaxonomyStructuralKinds.composite, TaxonomyBehaviorKinds.deterministic],
   ]),
+  [TaxonomySemanticRoles.datasetPipeline]: Object.freeze([
+    [TaxonomyStructuralKinds.composite, TaxonomyBehaviorKinds.deterministic],
+    [TaxonomyStructuralKinds.composite, TaxonomyBehaviorKinds.iterative],
+  ]),
   [TaxonomySemanticRoles.trainingRecipe]: Object.freeze([[TaxonomyStructuralKinds.composite, TaxonomyBehaviorKinds.deterministic]]),
   [TaxonomySemanticRoles.toolChain]: Object.freeze([[TaxonomyStructuralKinds.composite, TaxonomyBehaviorKinds.deterministic]]),
+  [TaxonomySemanticRoles.appTemplate]: Object.freeze([
+    [TaxonomyStructuralKinds.system, TaxonomyBehaviorKinds.deterministic],
+    [TaxonomyStructuralKinds.system, TaxonomyBehaviorKinds.conditional],
+  ]),
   [TaxonomySemanticRoles.system]: Object.freeze([
-    [TaxonomyStructuralKinds.atomic, TaxonomyBehaviorKinds.none],
-    [TaxonomyStructuralKinds.system, TaxonomyBehaviorKinds.none],
+    [TaxonomyStructuralKinds.system, TaxonomyBehaviorKinds.deterministic],
+    [TaxonomyStructuralKinds.system, TaxonomyBehaviorKinds.conditional],
+    [TaxonomyStructuralKinds.system, TaxonomyBehaviorKinds.iterative],
+    [TaxonomyStructuralKinds.system, TaxonomyBehaviorKinds.autonomous],
   ]),
 });
+
+function normalizeBehaviorKind(kind: TaxonomyBehaviorKind | TaxonomyBehaviorKindAlias): TaxonomyBehaviorKind {
+  if (kind === "dynamic") {
+    return TaxonomyBehaviorKinds.conditional;
+  }
+  return kind;
+}
 
 function assertAllowed<T extends string>(
   value: T,
@@ -80,12 +103,13 @@ function assertAllowed<T extends string>(
 }
 
 export function createCompositionTaxonomyDescriptor(
-  descriptor: CompositionTaxonomyDescriptor,
+  descriptor: Omit<CompositionTaxonomyDescriptor, "behaviorKind"> & { readonly behaviorKind: TaxonomyBehaviorKind | TaxonomyBehaviorKindAlias },
 ): CompositionTaxonomyDescriptor {
+  const normalizedBehaviorKind = normalizeBehaviorKind(descriptor.behaviorKind);
   return Object.freeze({
     structuralKind: assertAllowed(descriptor.structuralKind, TaxonomyStructuralKinds, "Taxonomy structural kind"),
     semanticRole: assertAllowed(descriptor.semanticRole, TaxonomySemanticRoles, "Taxonomy semantic role"),
-    behaviorKind: assertAllowed(descriptor.behaviorKind, TaxonomyBehaviorKinds, "Taxonomy behavior kind"),
+    behaviorKind: assertAllowed(normalizedBehaviorKind, TaxonomyBehaviorKinds, "Taxonomy behavior kind"),
   });
 }
 

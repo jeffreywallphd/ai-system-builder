@@ -17,7 +17,7 @@ import type { ToolCapabilityDescriptor } from "../tools/models/ToolCapabilityDes
 export interface ICompositionTaxonomyClassifier {
   classifyCanonicalEntity(entityType: CanonicalEntityType): CompositionTaxonomyDescriptor;
   classifyAsset(asset: IAsset): CompositionTaxonomyDescriptor | undefined;
-  classifyWorkflow(workflow: IWorkflow, behaviorKind?: Extract<TaxonomyBehaviorKind, "deterministic" | "dynamic">): CompositionTaxonomyDescriptor;
+  classifyWorkflow(workflow: IWorkflow, behaviorKind?: Extract<TaxonomyBehaviorKind, "deterministic" | "conditional" | "iterative">): CompositionTaxonomyDescriptor;
   classifyAgent(agent: Agent): CompositionTaxonomyDescriptor;
   classifyContextPackage(contextPackage: ContextPackage): CompositionTaxonomyDescriptor;
   classifyContextRecipe(contextRecipe: ContextRecipe): CompositionTaxonomyDescriptor;
@@ -46,9 +46,9 @@ const canonicalEntityClassificationMap: Readonly<Record<CanonicalEntityType, Com
     behaviorKind: TaxonomyBehaviorKinds.none,
   }),
   "execution-artifact": createCompositionTaxonomyDescriptor({
-    structuralKind: TaxonomyStructuralKinds.atomic,
+    structuralKind: TaxonomyStructuralKinds.system,
     semanticRole: TaxonomySemanticRoles.system,
-    behaviorKind: TaxonomyBehaviorKinds.none,
+    behaviorKind: TaxonomyBehaviorKinds.iterative,
   }),
 });
 
@@ -96,7 +96,7 @@ export class CompositionTaxonomyClassifier implements ICompositionTaxonomyClassi
 
   public classifyWorkflow(
     _workflow: IWorkflow,
-    behaviorKind: Extract<TaxonomyBehaviorKind, "deterministic" | "dynamic"> = TaxonomyBehaviorKinds.deterministic,
+    behaviorKind: Extract<TaxonomyBehaviorKind, "deterministic" | "conditional" | "iterative"> = TaxonomyBehaviorKinds.deterministic,
   ): CompositionTaxonomyDescriptor {
     return createCompositionTaxonomyDescriptor({
       structuralKind: TaxonomyStructuralKinds.composite,
@@ -139,10 +139,10 @@ export class CompositionTaxonomyClassifier implements ICompositionTaxonomyClassi
     }
 
     return createCompositionTaxonomyDescriptor({
-      structuralKind: TaxonomyStructuralKinds.atomic,
-      semanticRole: TaxonomySemanticRoles.tool,
-      behaviorKind: capability.provider.kind === "mcp"
-        ? TaxonomyBehaviorKinds.dynamic
+        structuralKind: TaxonomyStructuralKinds.atomic,
+        semanticRole: TaxonomySemanticRoles.tool,
+        behaviorKind: capability.provider.kind === "mcp"
+        ? TaxonomyBehaviorKinds.conditional
         : TaxonomyBehaviorKinds.deterministic,
     });
   }
