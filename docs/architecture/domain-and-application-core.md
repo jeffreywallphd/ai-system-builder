@@ -211,6 +211,20 @@ The studio shell now has a bounded inner-layer model and application orchestrati
 - The bounded end-to-end path covers studio initialization/load, draft create/update, metadata patching (taxonomy/contract/provenance), dependency updates, lifecycle transitions, backend-authoritative validation projection, publish/version creation, and persisted snapshot reload.
 - Persistence-backed publish truth remains explicit: draft revision/lifecycle semantics stay distinct from immutable version history semantics, and reload tests verify that published state survives repository/host restarts.
 
+## Direction 5 update: Atomic studio registration foundation (story 2.5)
+
+- The existing Studio Shell extension seam now includes a bounded atomic-studio registration contract in `ui/studio-shell/StudioShellExtensions.ts` (`AtomicStudioRegistration`, `AtomicStudioRegistry`) rather than introducing a second plugin architecture.
+- Registration behavior is deterministic (`studioType` uniqueness, role validation, stable list ordering, slot-scoped extension lookup) and intentionally minimal: studio identity, atomic role, bounded draft defaults, and optional slot contributions.
+- Atomic registrations inherit shared shell behavior (session/draft context, metadata/dependencies/lifecycle/version validation and publish flows), with `StudioShellPage` optionally consuming registration defaults/extensions.
+
+## Direction 5 update: Model studio domain + application slice (story 2.6)
+
+- Model Studio now has a thin inner-layer domain helper (`domain/model-studio/ModelStudioDomain.ts`) that authors atomic model metadata (`atomic/model/none`) with generated provenance defaults.
+- A bounded application orchestrator (`application/model-studio/ModelStudioApplicationService.ts`) builds on `StudioShellApplicationService` so model authoring reuses shared shell create/update/publish/version behavior.
+- Model authoring now reuses shared contract/provenance/version semantics:
+  - taxonomy-driven model contracts resolve through `CompositionAssetContractResolver.resolveContractForTaxonomy` for `semanticRole=model`.
+  - publish transitions and immutable version creation remain in the shared studio-shell lifecycle flow.
+
 ## TODO
 
 - Some concepts currently live more in the application layer than the domain layer because they are orchestration-heavy. That is reasonable, but over time the team may want to clarify which context-engineering rules are true domain policy versus application assembly policy.

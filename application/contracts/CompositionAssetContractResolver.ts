@@ -58,6 +58,27 @@ function specializedCompositeDescription(role: Extract<TaxonomySemanticRole, "wo
 function defaultTaxonomyContract(descriptor: CompositionTaxonomyDescriptor): AssetContractDescriptor | undefined {
   const { semanticRole } = descriptor;
 
+  if (semanticRole === TaxonomySemanticRoles.model) {
+    return createAssetContractDescriptor({
+      version: "1.0.0",
+      input: {
+        kind: AssetContractShapeKinds.jsonSchema,
+        description: "Model invocation/configuration payload for atomic model assets.",
+      },
+      output: {
+        kind: AssetContractShapeKinds.jsonSchema,
+        description: "Model response envelope with generated outputs and usage metadata.",
+      },
+      parameters: [
+        parameter("modelRuntime", false, "Preferred runtime/provider for model execution.", "string"),
+      ],
+      execution: {
+        invocationMode: "async",
+        sideEffects: "bounded",
+      },
+    });
+  }
+
   if (semanticRole === TaxonomySemanticRoles.configProfile) {
     return createAssetContractDescriptor({
       version: "1.0.0",
