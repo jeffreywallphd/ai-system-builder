@@ -27,7 +27,9 @@ export function SessionListPanel(props: SessionListPanelProps): JSX.Element {
               {session.sessionId} — {session.status} ({session.completedStepCount}/{session.attemptedStepCount})
             </button>
             <div className="ui-text-secondary">
-              {session.terminalReason ?? "active"} • {session.composition.taxonomy.semanticRole}
+              {session.terminalReason ?? "active"} •
+              {` ${session.composition.taxonomy.structuralKind}/${session.composition.taxonomy.semanticRole}/${session.composition.taxonomy.behaviorKind}`}
+              {session.composition.contract ? ` • ${session.composition.contract.id}@${session.composition.contract.version}` : ""}
             </div>
             <AgentRunControls
               session={session}

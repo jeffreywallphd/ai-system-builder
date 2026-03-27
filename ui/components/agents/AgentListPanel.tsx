@@ -28,6 +28,10 @@ export function AgentListPanel(props: AgentListPanelProps): JSX.Element {
             >
               {entry.agent.name} ({entry.agent.id})
             </button>
+            <div className="ui-text-small ui-text-secondary">
+              {entry.taxonomy.structuralKind}/{entry.taxonomy.semanticRole}/{entry.taxonomy.behaviorKind}
+              {entry.contract ? ` · ${entry.contract.id}@${entry.contract.version}` : ""}
+            </div>
           </li>
         ))}
       </ul>

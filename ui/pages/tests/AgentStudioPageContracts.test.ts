@@ -11,6 +11,8 @@ describe("AgentStudioPage contracts", () => {
     expect(source).toContain("AgentLaunchPanel");
     expect(source).toContain("SessionListPanel");
     expect(source).toContain("SessionDetailPanel");
+    expect(source).toContain("useUiDependencies");
+    expect(source).toContain("canonicalAssetManagementService");
     expect(source).toContain("service.listAgents");
     expect(source).toContain("service.getStudioSnapshot");
     expect(source).toContain("service.createAgent");
@@ -45,6 +47,7 @@ describe("AgentStudioPage contracts", () => {
     const sessionList = readSource("ui/components/agents/SessionListPanel.tsx");
     const sessionDetail = readSource("ui/components/agents/SessionDetailPanel.tsx");
     const controls = readSource("ui/components/agents/AgentRunControls.tsx");
+    const detail = readSource("ui/components/agents/AgentDetailPanel.tsx");
 
     expect(launch).toContain("TriggerSelector");
     expect(launch).toContain("TriggerConfigFields");
@@ -54,9 +57,12 @@ describe("AgentStudioPage contracts", () => {
     expect(sessionDetail).toContain("AgentRunControls");
     expect(controls).toContain("controls.includes(\"cancel\")");
     expect(controls).not.toContain("pause");
-    expect(sessionList).toContain("session.composition.taxonomy.semanticRole");
+    expect(sessionList).toContain("session.composition.taxonomy.structuralKind");
     expect(sessionDetail).toContain("operational.retrySummary");
     expect(sessionDetail).toContain("outcomeSummary.outputAssetIds");
     expect(sessionDetail).toContain("Transition history");
+    expect(sessionDetail).toContain("OutputAssetExplorerPanel");
+    expect(sessionDetail).toContain("CompositionSummaryCard");
+    expect(detail).toContain("CompositionSummaryCard");
   });
 });
