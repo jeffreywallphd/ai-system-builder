@@ -114,4 +114,64 @@ describe("StudioShellBackendApi", () => {
     expect(published.ok).toBeTrue();
     expect((published.data?.versions.length ?? 0) > 0).toBeTrue();
   });
+
+  it("supports composite workflow drafts over the same shared validation/lifecycle/publish seams", async () => {
+    const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
+    const initialized = await api.initializeStudio("studio-workflows", "Workflow Studio");
+    const sessionId = initialized.data!.activeSessionId!;
+
+    const created = await api.createDraft({
+      studioId: "studio-workflows",
+      sessionId,
+      content: "{\"workflowSpec\":{\"steps\":[]}}",
+      metadata: {
+        title: "workflow-draft",
+        tags: ["workflow", "composite"],
+        taxonomy: {
+          structuralKind: "composite",
+          semanticRole: "workflow",
+          behaviorKind: "deterministic",
+        },
+        contract: {
+          version: "1.0.0",
+          input: { kind: "json-schema" },
+          output: { kind: "json-schema" },
+        },
+        provenance: {
+          sourceType: "generated",
+          sourceLabel: "workflow-studio",
+        },
+      },
+      dependencies: [],
+    });
+
+    expect(created.ok).toBeTrue();
+    expect(created.data?.validationIssues.some((issue) => issue.code === "composite-dependency-recommended")).toBeTrue();
+
+    const draftId = created.data!.draft!.draftId;
+    await api.updateDependencies({
+      studioId: "studio-workflows",
+      sessionId,
+      draftId,
+      dependencies: [{ assetId: "asset:model", versionId: "asset:model:v1" }],
+    });
+
+    const validated = await api.transitionLifecycle({
+      studioId: "studio-workflows",
+      sessionId,
+      draftId,
+      targetStatus: AssetDraftLifecycleStatuses.validated,
+    });
+    expect(validated.ok).toBeTrue();
+
+    const published = await api.publishVersion({
+      studioId: "studio-workflows",
+      sessionId,
+      draftId,
+      versionId: "asset:studio-workflows:v1",
+    });
+    expect(published.ok).toBeTrue();
+    expect(published.data?.draft?.lifecycleStatus).toBe(AssetDraftLifecycleStatuses.published);
+  });
+
 });

@@ -8,7 +8,7 @@ describe("ModelStudioPage contracts", () => {
 
     expect(pageSource).toContain("StudioShellPage");
     expect(pageSource).toContain("modelStudioRegistration");
-    expect(pageSource).toContain("atomicStudio={modelStudioRegistration}");
+    expect(pageSource).toContain("studioRegistration={modelStudioRegistration}");
 
     expect(registrationSource).toContain('studioType: ModelStudioIdentity.studioType');
     expect(registrationSource).toContain('role: "model"');

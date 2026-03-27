@@ -1,10 +1,15 @@
 import type { IAssetContractResolver } from "../contracts/CompositionAssetContractResolver";
 import type { AssetDraft } from "../../domain/studio-shell/StudioShellDomain";
-import type { CompositionTaxonomyDescriptor, TaxonomyBehaviorKind, TaxonomySemanticRole } from "../../domain/taxonomy/CompositionTaxonomy";
+import type {
+  CompositionTaxonomyDescriptor,
+  TaxonomyBehaviorKind,
+  TaxonomySemanticRole,
+  TaxonomyStructuralKind,
+} from "../../domain/taxonomy/CompositionTaxonomy";
 import { TaxonomyStructuralKinds } from "../../domain/taxonomy/CompositionTaxonomy";
 import { StudioShellInvalidRequestError } from "./StudioShellApplicationErrors";
 
-export const AtomicStudioEnforcementIssueCodes = Object.freeze({
+export const StudioAssetEnforcementIssueCodes = Object.freeze({
   taxonomyMissing: "taxonomy-missing",
   taxonomyStructuralKindMismatch: "taxonomy-structural-kind-mismatch",
   taxonomySemanticRoleMismatch: "taxonomy-semantic-role-mismatch",
@@ -14,12 +19,20 @@ export const AtomicStudioEnforcementIssueCodes = Object.freeze({
   contractMismatch: "contract-mismatch",
 });
 
-export type AtomicStudioEnforcementIssueCode =
-  typeof AtomicStudioEnforcementIssueCodes[keyof typeof AtomicStudioEnforcementIssueCodes];
+export type StudioAssetEnforcementIssueCode =
+  typeof StudioAssetEnforcementIssueCodes[keyof typeof StudioAssetEnforcementIssueCodes];
 
-export interface AtomicStudioEnforcementIssue {
-  readonly code: AtomicStudioEnforcementIssueCode;
+export interface StudioAssetEnforcementIssue {
+  readonly code: StudioAssetEnforcementIssueCode;
   readonly message: string;
+}
+
+export interface StudioAssetExpectation {
+  readonly studioType: string;
+  readonly structuralKind: TaxonomyStructuralKind;
+  readonly semanticRole: TaxonomySemanticRole;
+  readonly allowedBehaviorKinds: ReadonlyArray<TaxonomyBehaviorKind>;
+  readonly requireDerivableContract?: boolean;
 }
 
 export interface AtomicStudioExpectation {
@@ -32,18 +45,18 @@ function sameContractShape(left: unknown, right: unknown): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
-export function evaluateAtomicStudioDraftConsistency(input: {
+export function evaluateStudioDraftConsistency(input: {
   readonly draft: AssetDraft;
-  readonly expectation: AtomicStudioExpectation;
+  readonly expectation: StudioAssetExpectation;
   readonly contractResolver: Pick<IAssetContractResolver, "resolveContractForTaxonomy">;
-}): ReadonlyArray<AtomicStudioEnforcementIssue> {
+}): ReadonlyArray<StudioAssetEnforcementIssue> {
   const { draft, expectation, contractResolver } = input;
-  const issues: AtomicStudioEnforcementIssue[] = [];
+  const issues: StudioAssetEnforcementIssue[] = [];
   const taxonomy = draft.metadata.taxonomy;
 
   if (!taxonomy) {
     issues.push({
-      code: AtomicStudioEnforcementIssueCodes.taxonomyMissing,
+      code: StudioAssetEnforcementIssueCodes.taxonomyMissing,
       message: `Draft '${draft.id}' in '${expectation.studioType}' is missing taxonomy metadata.`,
     });
     return Object.freeze(issues);
@@ -53,24 +66,27 @@ export function evaluateAtomicStudioDraftConsistency(input: {
 
   if (!draft.metadata.contract) {
     issues.push({
-      code: AtomicStudioEnforcementIssueCodes.contractMissing,
+      code: StudioAssetEnforcementIssueCodes.contractMissing,
       message: `Draft '${draft.id}' in '${expectation.studioType}' is missing contract metadata.`,
     });
     return Object.freeze(issues);
   }
 
   const expectedContract = contractResolver.resolveContractForTaxonomy(taxonomy);
-  if (!expectedContract) {
+  const requireDerivableContract = expectation.requireDerivableContract
+    ?? expectation.structuralKind === TaxonomyStructuralKinds.atomic;
+
+  if (!expectedContract && requireDerivableContract) {
     issues.push({
-      code: AtomicStudioEnforcementIssueCodes.contractNotDerivable,
+      code: StudioAssetEnforcementIssueCodes.contractNotDerivable,
       message: `Draft '${draft.id}' has taxonomy '${taxonomy.structuralKind}/${taxonomy.semanticRole}/${taxonomy.behaviorKind}' with no shared contract projection.`,
     });
     return Object.freeze(issues);
   }
 
-  if (!sameContractShape(expectedContract, draft.metadata.contract)) {
+  if (expectedContract && !sameContractShape(expectedContract, draft.metadata.contract)) {
     issues.push({
-      code: AtomicStudioEnforcementIssueCodes.contractMismatch,
+      code: StudioAssetEnforcementIssueCodes.contractMismatch,
       message: `Draft '${draft.id}' contract does not match the shared taxonomy-driven contract projection.`,
     });
   }
@@ -80,31 +96,64 @@ export function evaluateAtomicStudioDraftConsistency(input: {
 
 function validateTaxonomyForExpectation(
   taxonomy: CompositionTaxonomyDescriptor,
-  expectation: AtomicStudioExpectation,
-): ReadonlyArray<AtomicStudioEnforcementIssue> {
-  const issues: AtomicStudioEnforcementIssue[] = [];
-  if (taxonomy.structuralKind !== TaxonomyStructuralKinds.atomic) {
+  expectation: StudioAssetExpectation,
+): ReadonlyArray<StudioAssetEnforcementIssue> {
+  const issues: StudioAssetEnforcementIssue[] = [];
+  if (taxonomy.structuralKind !== expectation.structuralKind) {
     issues.push({
-      code: AtomicStudioEnforcementIssueCodes.taxonomyStructuralKindMismatch,
-      message: `Atomic studio '${expectation.studioType}' requires structural kind 'atomic'. Received '${taxonomy.structuralKind}'.`,
+      code: StudioAssetEnforcementIssueCodes.taxonomyStructuralKindMismatch,
+      message: `Studio '${expectation.studioType}' requires structural kind '${expectation.structuralKind}'. Received '${taxonomy.structuralKind}'.`,
     });
   }
 
   if (taxonomy.semanticRole !== expectation.semanticRole) {
     issues.push({
-      code: AtomicStudioEnforcementIssueCodes.taxonomySemanticRoleMismatch,
-      message: `Atomic studio '${expectation.studioType}' requires semantic role '${expectation.semanticRole}'. Received '${taxonomy.semanticRole}'.`,
+      code: StudioAssetEnforcementIssueCodes.taxonomySemanticRoleMismatch,
+      message: `Studio '${expectation.studioType}' requires semantic role '${expectation.semanticRole}'. Received '${taxonomy.semanticRole}'.`,
     });
   }
 
   if (!expectation.allowedBehaviorKinds.includes(taxonomy.behaviorKind)) {
     issues.push({
-      code: AtomicStudioEnforcementIssueCodes.taxonomyBehaviorKindMismatch,
-      message: `Atomic studio '${expectation.studioType}' requires behavior kind in [${expectation.allowedBehaviorKinds.join(", ")}]. Received '${taxonomy.behaviorKind}'.`,
+      code: StudioAssetEnforcementIssueCodes.taxonomyBehaviorKindMismatch,
+      message: `Studio '${expectation.studioType}' requires behavior kind in [${expectation.allowedBehaviorKinds.join(", ")}]. Received '${taxonomy.behaviorKind}'.`,
     });
   }
 
   return Object.freeze(issues);
+}
+
+export function assertStudioDraftPublishConsistency(input: {
+  readonly draft: AssetDraft;
+  readonly expectation: StudioAssetExpectation;
+  readonly contractResolver: Pick<IAssetContractResolver, "resolveContractForTaxonomy">;
+}): void {
+  const issues = evaluateStudioDraftConsistency(input);
+  if (issues.length === 0) {
+    return;
+  }
+
+  throw new StudioShellInvalidRequestError(
+    `Studio draft enforcement failed for '${input.expectation.studioType}': ${issues.map((issue) => `${issue.code}: ${issue.message}`).join(" ")}`,
+  );
+}
+
+export const AtomicStudioEnforcementIssueCodes = StudioAssetEnforcementIssueCodes;
+export type AtomicStudioEnforcementIssueCode = StudioAssetEnforcementIssueCode;
+export type AtomicStudioEnforcementIssue = StudioAssetEnforcementIssue;
+
+export function evaluateAtomicStudioDraftConsistency(input: {
+  readonly draft: AssetDraft;
+  readonly expectation: AtomicStudioExpectation;
+  readonly contractResolver: Pick<IAssetContractResolver, "resolveContractForTaxonomy">;
+}): ReadonlyArray<AtomicStudioEnforcementIssue> {
+  return evaluateStudioDraftConsistency({
+    ...input,
+    expectation: {
+      ...input.expectation,
+      structuralKind: TaxonomyStructuralKinds.atomic,
+    },
+  });
 }
 
 export function assertAtomicStudioDraftPublishConsistency(input: {
@@ -112,12 +161,11 @@ export function assertAtomicStudioDraftPublishConsistency(input: {
   readonly expectation: AtomicStudioExpectation;
   readonly contractResolver: Pick<IAssetContractResolver, "resolveContractForTaxonomy">;
 }): void {
-  const issues = evaluateAtomicStudioDraftConsistency(input);
-  if (issues.length === 0) {
-    return;
-  }
-
-  throw new StudioShellInvalidRequestError(
-    `Atomic studio draft enforcement failed for '${input.expectation.studioType}': ${issues.map((issue) => `${issue.code}: ${issue.message}`).join(" ")}`,
-  );
+  assertStudioDraftPublishConsistency({
+    ...input,
+    expectation: {
+      ...input.expectation,
+      structuralKind: TaxonomyStructuralKinds.atomic,
+    },
+  });
 }

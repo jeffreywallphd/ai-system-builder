@@ -8,7 +8,7 @@ describe("DatasetStudioPage contracts", () => {
 
     expect(pageSource).toContain("StudioShellPage");
     expect(pageSource).toContain("datasetStudioRegistration");
-    expect(pageSource).toContain("atomicStudio={datasetStudioRegistration}");
+    expect(pageSource).toContain("studioRegistration={datasetStudioRegistration}");
 
     expect(registrationSource).toContain("studioType: DatasetStudioIdentity.studioType");
     expect(registrationSource).toContain('role: "dataset"');

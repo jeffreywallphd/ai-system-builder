@@ -8,8 +8,10 @@ import { createAtomicStudioMetadataPatch } from "./AtomicStudioRegistrationDefau
 export const configProfileStudioRegistration: AtomicStudioRegistration = Object.freeze({
   studioType: ConfigProfileStudioIdentity.studioType,
   studioId: ConfigProfileStudioIdentity.defaultStudioId,
+  kind: "atomic",
   displayName: ConfigProfileStudioIdentity.defaultStudioName,
   role: "config-profile",
+  allowedBehaviorKinds: Object.freeze(["none"]),
   defaults: {
     title: "Config Profile Asset Draft",
     tags: Object.freeze(["config-profile", "studio-shell", "runtime"]),

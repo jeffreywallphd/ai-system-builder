@@ -8,7 +8,7 @@ describe("EmbeddingIndexStudioPage contracts", () => {
 
     expect(pageSource).toContain("StudioShellPage");
     expect(pageSource).toContain("embeddingIndexStudioRegistration");
-    expect(pageSource).toContain("atomicStudio={embeddingIndexStudioRegistration}");
+    expect(pageSource).toContain("studioRegistration={embeddingIndexStudioRegistration}");
 
     expect(registrationSource).toContain("studioType: EmbeddingIndexStudioIdentity.studioType");
     expect(registrationSource).toContain('role: "embedding-index"');

@@ -18,6 +18,7 @@ export const StudioShellValidationIssueCodes = Object.freeze({
   provenanceMissing: "provenance-missing",
   dependencyVersionNotFound: "dependency-version-not-found",
   dependencyVersionUnpinned: "dependency-version-unpinned",
+  compositeDependencyRecommended: "composite-dependency-recommended",
   lifecycleNotPublishReady: "lifecycle-not-publish-ready",
   versionHistoryEmpty: "version-history-empty",
 });
@@ -62,6 +63,21 @@ export async function buildStudioShellValidationIssues(input: {
       section: StudioShellValidationSections.provenance,
       severity: "warning",
       message: "Draft provenance is missing. Add creator/source context for lineage explainability.",
+    });
+  }
+
+
+  const taxonomy = input.draft.metadata.taxonomy;
+  if (
+    taxonomy?.structuralKind === "composite"
+    && input.draft.dependencies.length === 0
+  ) {
+    issues.push({
+      code: StudioShellValidationIssueCodes.compositeDependencyRecommended,
+      section: StudioShellValidationSections.dependencies,
+      severity: "warning",
+      message: "Composite drafts should reference at least one dependency to preserve composition intent and lineage traceability.",
+      path: "dependencies",
     });
   }
 

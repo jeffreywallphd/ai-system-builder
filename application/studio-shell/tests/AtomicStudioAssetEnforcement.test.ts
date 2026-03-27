@@ -16,7 +16,10 @@ import {
   createConfigProfileStudioTaxonomy,
 } from "../../../domain/config-profile-studio/ConfigProfileStudioDomain";
 import { createAssetDraft, createAssetSession } from "../../../domain/studio-shell/StudioShellDomain";
-import { evaluateAtomicStudioDraftConsistency } from "../AtomicStudioAssetEnforcement";
+import {
+  evaluateAtomicStudioDraftConsistency,
+  evaluateStudioDraftConsistency,
+} from "../AtomicStudioAssetEnforcement";
 import type { AssetMetadata } from "../../../domain/studio-shell/StudioShellDomain";
 
 const resolver = new CompositionAssetContractResolver();
@@ -145,5 +148,70 @@ describe("evaluateAtomicStudioDraftConsistency", () => {
 
     expect(issues.map((issue) => issue.code)).toContain("taxonomy-behavior-kind-mismatch");
     expect(issues.map((issue) => issue.code)).toContain("contract-mismatch");
+  });
+});
+
+
+describe("evaluateStudioDraftConsistency", () => {
+  it("accepts composite workflow drafts when taxonomy/contract align with shared seams", () => {
+    const workflowTaxonomy = {
+      structuralKind: "composite" as const,
+      semanticRole: "workflow" as const,
+      behaviorKind: "deterministic" as const,
+    };
+    const draft = createAtomicDraft({
+      draftId: "draft-workflow",
+      studioId: "studio-workflows",
+      metadata: {
+        title: "Workflow",
+        tags: ["workflow"],
+        taxonomy: workflowTaxonomy,
+        contract: {
+          version: "1.0.0",
+          input: { kind: "json-schema" },
+          output: { kind: "json-schema" },
+        },
+        provenance: {
+          sourceType: "generated",
+          sourceLabel: "workflow-studio",
+        },
+      },
+    });
+
+    expect(evaluateStudioDraftConsistency({
+      draft,
+      expectation: {
+        studioType: "workflow-studio",
+        structuralKind: "composite",
+        semanticRole: "workflow",
+        allowedBehaviorKinds: ["deterministic", "conditional", "iterative"],
+      },
+      contractResolver: resolver,
+    })).toEqual([]);
+  });
+
+  it("reports structural-kind mismatch for composite expectations", () => {
+    const modelTaxonomy = createModelStudioTaxonomy();
+    const draft = createAtomicDraft({
+      draftId: "draft-not-composite",
+      studioId: "studio-workflows",
+      metadata: createModelAssetMetadata({
+        title: "Model",
+        contract: resolver.resolveContractForTaxonomy(modelTaxonomy),
+      }),
+    });
+
+    const issues = evaluateStudioDraftConsistency({
+      draft,
+      expectation: {
+        studioType: "workflow-studio",
+        structuralKind: "composite",
+        semanticRole: "workflow",
+        allowedBehaviorKinds: ["deterministic"],
+      },
+      contractResolver: resolver,
+    });
+
+    expect(issues.map((issue) => issue.code)).toContain("taxonomy-structural-kind-mismatch");
   });
 });

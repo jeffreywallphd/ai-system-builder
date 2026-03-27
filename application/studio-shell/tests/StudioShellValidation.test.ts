@@ -3,9 +3,20 @@ import { createAssetDraft, createAssetSession } from "../../../domain/studio-she
 import { createModelStudioTaxonomy } from "../../../domain/model-studio/ModelStudioDomain";
 import { createDatasetStudioTaxonomy } from "../../../domain/dataset-studio/DatasetStudioDomain";
 import { createToolStudioTaxonomy } from "../../../domain/tool-studio/ToolStudioDomain";
+import {
+  createCompositionTaxonomyDescriptor,
+  TaxonomyBehaviorKinds,
+  TaxonomySemanticRoles,
+  TaxonomyStructuralKinds,
+  type CompositionTaxonomyDescriptor,
+} from "../../../domain/taxonomy/CompositionTaxonomy";
 import { buildStudioShellValidationIssues } from "../StudioShellValidation";
 
-function createDraftWithTaxonomy(draftId: string, taxonomy: ReturnType<typeof createModelStudioTaxonomy>) {
+function createDraftWithTaxonomy(
+  draftId: string,
+  taxonomy: CompositionTaxonomyDescriptor,
+  dependencies: Array<{ assetId: string; versionId?: string }> = [],
+) {
   const session = createAssetSession({ id: `session-${draftId}`, studioId: "studio-test" });
   return createAssetDraft({
     id: draftId,
@@ -14,7 +25,7 @@ function createDraftWithTaxonomy(draftId: string, taxonomy: ReturnType<typeof cr
     content: "{}",
     metadata: {
       title: `Draft ${draftId}`,
-      tags: ["atomic"],
+      tags: ["asset"],
       taxonomy,
       contract: {
         version: "1.0.0",
@@ -23,10 +34,10 @@ function createDraftWithTaxonomy(draftId: string, taxonomy: ReturnType<typeof cr
       },
       provenance: {
         sourceType: "generated",
-        sourceLabel: "atomic-studio",
+        sourceLabel: "studio",
       },
     },
-    dependencies: [],
+    dependencies,
   });
 }
 
@@ -51,6 +62,36 @@ describe("buildStudioShellValidationIssues", () => {
       expect(issues.some((issue) => issue.code === "contract-missing")).toBeFalse();
       expect(issues.some((issue) => issue.code === "provenance-missing")).toBeFalse();
       expect(issues.some((issue) => issue.code === "dependency-version-unpinned")).toBeFalse();
+      expect(issues.some((issue) => issue.code === "composite-dependency-recommended")).toBeFalse();
     }
+  });
+
+  it("warns when composite drafts omit dependencies and clears the warning once dependencies are pinned", async () => {
+    const compositeTaxonomy = createCompositionTaxonomyDescriptor({
+      structuralKind: TaxonomyStructuralKinds.composite,
+      semanticRole: TaxonomySemanticRoles.workflow,
+      behaviorKind: TaxonomyBehaviorKinds.deterministic,
+    });
+
+    const noDependencyDraft = createDraftWithTaxonomy("draft-workflow-empty", compositeTaxonomy);
+    const withDependencyDraft = createDraftWithTaxonomy(
+      "draft-workflow-linked",
+      compositeTaxonomy,
+      [{ assetId: "asset:model", versionId: "asset:model:v1" }],
+    );
+
+    const missingDependencyIssues = await buildStudioShellValidationIssues({
+      draft: noDependencyDraft,
+      knownVersionIds: ["asset:model:v1"],
+      versionExists: async () => false,
+    });
+    expect(missingDependencyIssues.some((issue) => issue.code === "composite-dependency-recommended")).toBeTrue();
+
+    const linkedIssues = await buildStudioShellValidationIssues({
+      draft: withDependencyDraft,
+      knownVersionIds: ["asset:model:v1"],
+      versionExists: async () => false,
+    });
+    expect(linkedIssues.some((issue) => issue.code === "composite-dependency-recommended")).toBeFalse();
   });
 });

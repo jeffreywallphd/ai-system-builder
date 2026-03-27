@@ -16,7 +16,7 @@ describe("StudioShellPage contracts", () => {
     expect(source).toContain("Lifecycle / publish / version status");
     expect(source).toContain("StudioShellValidationIssuesPanel");
     expect(source).toContain("StudioShellExtensionRegistry");
-    expect(source).toContain("atomicStudio");
+    expect(source).toContain("studioRegistration");
     expect(source).toContain("shellTitle");
     expect(source).toContain("buildCreateMetadata(");
     expect(source).toContain("renderExtensions(");

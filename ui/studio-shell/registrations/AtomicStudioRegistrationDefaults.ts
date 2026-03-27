@@ -4,7 +4,7 @@ import type { CompositionTaxonomyDescriptor } from "../../../domain/taxonomy/Com
 
 const contractResolver = new CompositionAssetContractResolver();
 
-export function createAtomicStudioMetadataPatch(input: {
+export function createStudioMetadataPatch(input: {
   readonly title: string;
   readonly tags: ReadonlyArray<string>;
   readonly summary: string;
@@ -22,4 +22,24 @@ export function createAtomicStudioMetadataPatch(input: {
       sourceLabel: input.sourceLabel,
     },
   });
+}
+
+export function createAtomicStudioMetadataPatch(input: {
+  readonly title: string;
+  readonly tags: ReadonlyArray<string>;
+  readonly summary: string;
+  readonly taxonomy: CompositionTaxonomyDescriptor;
+  readonly sourceLabel: string;
+}): AssetMetadataPatch {
+  return createStudioMetadataPatch(input);
+}
+
+export function createCompositeStudioMetadataPatch(input: {
+  readonly title: string;
+  readonly tags: ReadonlyArray<string>;
+  readonly summary: string;
+  readonly taxonomy: CompositionTaxonomyDescriptor;
+  readonly sourceLabel: string;
+}): AssetMetadataPatch {
+  return createStudioMetadataPatch(input);
 }
