@@ -30,6 +30,7 @@ These concerns remain separate and compatible.
 ## Canonical read integration seam
 - Canonical operational reads now carry optional `contract` alongside canonical identity/taxonomy/provenance/dependency metadata.
 - `CanonicalEntityReadResolver` is the preferred seam for reading taxonomy + contract together where available.
+- Agent Studio output/memory asset exploration now reuses canonical asset-management reads (`loadAssetDetail`, `listVersionChain`) so run/session references stay asset-native and lineage-friendly instead of introducing agent-only output APIs.
 
 ## Scope boundaries
 - This is an integration foundation only.

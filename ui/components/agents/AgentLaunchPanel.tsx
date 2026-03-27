@@ -12,12 +12,16 @@ import type { AgentStudioSnapshotReadModel } from "../../../infrastructure/api/a
 import { AgentRunControls } from "./AgentRunControls";
 import { TriggerSelector } from "./TriggerSelector";
 import { TriggerConfigFields } from "./TriggerConfigFields";
+import type { CanonicalAssetManagementService } from "../../services/CanonicalAssetManagementService";
+import { CompositionSummaryCard } from "./CompositionSummaryCard";
+import { OutputAssetExplorerPanel } from "./OutputAssetExplorerPanel";
 
 interface AgentLaunchPanelProps {
   readonly snapshot?: AgentStudioSnapshotReadModel;
   readonly latestLaunch?: AgentLaunchReadModel;
   readonly selectedSession?: AgentSessionSummaryReadModel;
   readonly isBusy: boolean;
+  readonly canonicalAssetManagementService: CanonicalAssetManagementService;
   readonly pendingControlAction?: AgentRunControlAction;
   readonly onLaunch: (request: AgentRunRequest) => void;
   readonly onTriggerLaunch: (request: TriggerAgentLaunchRequest) => void;
@@ -122,11 +126,30 @@ export function AgentLaunchPanel(props: AgentLaunchPanelProps): JSX.Element {
       />
 
       {props.latestLaunch ? (
-        <p className="ui-text-secondary">
-          Latest launch: {props.latestLaunch.launch.executionId} ({props.latestLaunch.launch.status}),
-          steps {props.latestLaunch.operational.executionProgress.completedStepCount}/{props.latestLaunch.operational.executionProgress.attemptedStepCount},
-          memory writes {props.latestLaunch.operational.memoryWriteSummary.persistedCount}
-        </p>
+        <>
+          <p className="ui-text-secondary">
+            Latest launch: {props.latestLaunch.launch.executionId} ({props.latestLaunch.launch.status}),
+            steps {props.latestLaunch.operational.executionProgress.completedStepCount}/{props.latestLaunch.operational.executionProgress.attemptedStepCount},
+            memory writes {props.latestLaunch.operational.memoryWriteSummary.persistedCount}
+          </p>
+          <CompositionSummaryCard
+            title="Latest launch composition"
+            taxonomy={props.latestLaunch.composition.taxonomy}
+            contract={props.latestLaunch.composition.contract}
+          />
+          <OutputAssetExplorerPanel
+            title="Latest launch output assets"
+            canonicalAssetManagementService={props.canonicalAssetManagementService}
+            assetIds={props.latestLaunch.operational.outcomeSummary.outputAssetIds}
+            emptyMessage="Latest launch did not produce output asset references."
+          />
+          <OutputAssetExplorerPanel
+            title="Latest launch memory-write assets"
+            canonicalAssetManagementService={props.canonicalAssetManagementService}
+            assetIds={props.latestLaunch.operational.memoryWriteSummary.persistedAssetIds}
+            emptyMessage="Latest launch did not persist memory-write assets."
+          />
+        </>
       ) : null}
     </div>
   );

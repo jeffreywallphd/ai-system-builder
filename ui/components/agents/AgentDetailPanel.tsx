@@ -19,10 +19,14 @@ import {
 } from "../../../domain/agents/AgentPolicy";
 import type { ConfigureAgentGoalsRequest } from "../../../application/agents/ConfigureAgentGoalsUseCase";
 import type { AgentStudioSnapshotReadModel } from "../../../infrastructure/api/agents/AgentStudioBackendApi";
+import type { CanonicalAssetManagementService } from "../../services/CanonicalAssetManagementService";
+import { CompositionSummaryCard } from "./CompositionSummaryCard";
+import { OutputAssetExplorerPanel } from "./OutputAssetExplorerPanel";
 
 interface AgentDetailPanelProps {
   readonly snapshot?: AgentStudioSnapshotReadModel;
   readonly isBusy: boolean;
+  readonly canonicalAssetManagementService: CanonicalAssetManagementService;
   readonly onSaveGoals: (request: ConfigureAgentGoalsRequest) => void;
   readonly onSavePolicy: (policy: AgentPolicy) => void;
   readonly onSaveTools: (tools: AgentToolAccessPolicy) => void;
@@ -167,6 +171,17 @@ export function AgentDetailPanel(props: AgentDetailPanelProps): JSX.Element {
         <h2 className="ui-heading-2">{agent.name}</h2>
         <p className="ui-text-secondary">{agent.id} — {agent.status}</p>
       </div>
+      <CompositionSummaryCard
+        title="Composition metadata"
+        taxonomy={props.snapshot.agent.taxonomy}
+        contract={props.snapshot.agent.contract}
+      />
+      <OutputAssetExplorerPanel
+        title="Memory asset references"
+        canonicalAssetManagementService={props.canonicalAssetManagementService}
+        assetIds={agent.memory.assets.map((entry) => entry.assetId.toString())}
+        emptyMessage="No memory assets are configured for this agent."
+      />
 
       <div className="ui-card ui-stack ui-stack--sm">
         <h3 className="ui-heading-3">Goals</h3>

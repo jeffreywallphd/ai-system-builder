@@ -14,11 +14,19 @@ describe("Agent Studio UX contract wiring", () => {
 
   it("routes backend trigger launches through triggerLaunch handler and keeps basic shape validation in the panel", () => {
     const launch = readSource("ui/components/agents/AgentLaunchPanel.tsx");
+    const composition = readSource("ui/components/agents/CompositionSummaryCard.tsx");
+    const outputAssets = readSource("ui/components/agents/OutputAssetExplorerPanel.tsx");
 
     expect(launch).toContain("TriggerSelector");
     expect(launch).toContain("TriggerConfigFields");
     expect(launch).toContain("props.onTriggerLaunch");
     expect(launch).toContain("isBackendTriggerInvalid");
     expect(launch).toContain("Backend trigger requires trigger.source");
+    expect(launch).toContain("CompositionSummaryCard");
+    expect(launch).toContain("OutputAssetExplorerPanel");
+    expect(outputAssets).toContain("canonicalAssetManagementService.loadAssetDetail");
+    expect(outputAssets).toContain("canonicalAssetManagementService.listVersionChain");
+    expect(composition).toContain("props.taxonomy.structuralKind");
+    expect(composition).toContain("props.contract");
   });
 });

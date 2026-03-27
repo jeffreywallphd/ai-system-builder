@@ -1,10 +1,14 @@
 import type { AgentRunControlAction, AgentSessionDetailReadModel } from "../../../application/agents/contracts/AgentRunContracts";
 import { AgentRunControls } from "./AgentRunControls";
+import type { CanonicalAssetManagementService } from "../../services/CanonicalAssetManagementService";
+import { CompositionSummaryCard } from "./CompositionSummaryCard";
+import { OutputAssetExplorerPanel } from "./OutputAssetExplorerPanel";
 
 interface SessionDetailPanelProps {
   readonly session?: AgentSessionDetailReadModel;
   readonly controls: ReadonlyArray<AgentRunControlAction>;
   readonly isBusy: boolean;
+  readonly canonicalAssetManagementService: CanonicalAssetManagementService;
   readonly pendingControlAction?: AgentRunControlAction;
   readonly onControlRun: (sessionId: string, action: AgentRunControlAction) => void;
 }
@@ -36,8 +40,17 @@ export function SessionDetailPanel(props: SessionDetailPanelProps): JSX.Element 
       </p>
       <p className="ui-text-secondary">Retry summary: attempted {props.session.operational.retrySummary.attemptedSteps}, total attempts {props.session.operational.retrySummary.totalAttempts}, retried steps {props.session.operational.retrySummary.retriedSteps}</p>
       <p className="ui-text-secondary">Outcome summary: completed {props.session.operational.outcomeSummary.completed}, failed {props.session.operational.outcomeSummary.failed}, cancelled {props.session.operational.outcomeSummary.cancelled}, blocked {props.session.operational.outcomeSummary.blocked}</p>
-      <p className="ui-text-secondary">Output asset references: {props.session.operational.outcomeSummary.outputAssetIds.join(", ") || "none"}</p>
-      <p className="ui-text-secondary">Composition taxonomy: {props.session.composition.taxonomy.structuralKind}/{props.session.composition.taxonomy.semanticRole}/{props.session.composition.taxonomy.behaviorKind}</p>
+      <CompositionSummaryCard
+        title="Session composition"
+        taxonomy={props.session.composition.taxonomy}
+        contract={props.session.composition.contract}
+      />
+      <OutputAssetExplorerPanel
+        title="Session output assets"
+        canonicalAssetManagementService={props.canonicalAssetManagementService}
+        assetIds={props.session.operational.outcomeSummary.outputAssetIds}
+        emptyMessage="This session has no output asset references."
+      />
       <details>
         <summary><strong>Transition history ({props.session.transitionHistory.length})</strong></summary>
         <ul className="ui-stack ui-stack--xs">

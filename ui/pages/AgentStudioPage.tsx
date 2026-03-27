@@ -19,6 +19,7 @@ import { AgentDetailPanel } from "../components/agents/AgentDetailPanel";
 import { AgentLaunchPanel } from "../components/agents/AgentLaunchPanel";
 import { SessionListPanel } from "../components/agents/SessionListPanel";
 import { SessionDetailPanel } from "../components/agents/SessionDetailPanel";
+import { useUiDependencies } from "../composition/AppProviders";
 
 function buildCreateRequest(id: string) {
   return {
@@ -49,6 +50,7 @@ function toIssueList(value: unknown): ReadonlyArray<unknown> {
 }
 
 export default function AgentStudioPage(): JSX.Element {
+  const { canonicalAssetManagementService } = useUiDependencies();
   const service = useMemo(() => new AgentStudioService(), []);
   const [agents, setAgents] = useState<ReadonlyArray<AgentAuthoringApiReadModel>>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<string>("");
@@ -255,6 +257,7 @@ export default function AgentStudioPage(): JSX.Element {
           <AgentDetailPanel
             snapshot={snapshot}
             isBusy={isBusy}
+            canonicalAssetManagementService={canonicalAssetManagementService}
             onSaveGoals={(request) => { void runConfigUpdate(() => service.configureGoals(request)); }}
             onSavePolicy={(policy: AgentPolicy) => { void runConfigUpdate(() => service.configurePolicy(selectedAgentId, policy)); }}
             onSaveTools={(tools: AgentToolAccessPolicy) => { void runConfigUpdate(() => service.configureTools(selectedAgentId, tools)); }}
@@ -266,6 +269,7 @@ export default function AgentStudioPage(): JSX.Element {
             latestLaunch={latestLaunch}
             selectedSession={sessions.find((entry) => entry.sessionId === selectedSession?.summary.sessionId)}
             isBusy={isBusy}
+            canonicalAssetManagementService={canonicalAssetManagementService}
             onLaunch={(request) => { void launchAgent(request); }}
             onTriggerLaunch={(request) => { void triggerLaunch(request); }}
             pendingControlAction={pendingControlAction}
@@ -285,6 +289,7 @@ export default function AgentStudioPage(): JSX.Element {
             controls={snapshot?.capabilities.controls ?? []}
             isBusy={isBusy}
             pendingControlAction={pendingControlAction}
+            canonicalAssetManagementService={canonicalAssetManagementService}
             onControlRun={(sessionId, action) => { void controlSession(sessionId, action); }}
           />
         </div>
