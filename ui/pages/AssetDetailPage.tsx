@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import type {
   RegistryDependencyGraph,
   RegistryDependencyGraphNode,
@@ -12,7 +12,9 @@ import {
   AssetSummaryPanel,
   DependencyGraphPanel,
 } from "../components/registry/AssetDetailPanels";
+import { AssetValidationSummary, DependencyCompatibilityPanel } from "../components/registry/AssetValidationPanels";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
+import { buildStudioHandoffQuery, resolveStudioRouteFromAsset } from "../routes/StudioRouteMapping";
 import { RegistryService } from "../services/RegistryService";
 
 function removeRoot(
@@ -24,12 +26,17 @@ function removeRoot(
 
 export default function AssetDetailPage(): JSX.Element {
   const { assetId } = useParams<{ assetId: string }>();
+  const location = useLocation();
   const service = useMemo(() => new RegistryService(), []);
   const [asset, setAsset] = useState<RegistryAsset>();
   const [upstream, setUpstream] = useState<RegistryDependencyGraph>();
   const [downstream, setDownstream] = useState<RegistryDependencyGraph>();
   const [error, setError] = useState<string>();
   const [loading, setLoading] = useState(true);
+  const registryContextQuery = useMemo(() => new URLSearchParams(location.search).get("registryContext")?.trim(), [location.search]);
+  const registryBackPath = registryContextQuery
+    ? `${ROUTE_PATHS.registry}?${registryContextQuery}`
+    : ROUTE_PATHS.registry;
 
   useEffect(() => {
     let active = true;
@@ -102,7 +109,7 @@ export default function AssetDetailPage(): JSX.Element {
       <section className="ui-page ui-stack ui-stack--sm" data-testid="registry-asset-detail-page">
         <div className="ui-row ui-row--wrap" style={{ justifyContent: "space-between" }}>
           <h1 className="ui-page__title" style={{ margin: 0 }}>Registry Asset</h1>
-          <Link className="ui-button ui-button--ghost ui-button--small" to={ROUTE_PATHS.registry}>Back to registry</Link>
+          <Link className="ui-button ui-button--ghost ui-button--small" to={registryBackPath}>Back to registry</Link>
         </div>
         <p className="ui-text-secondary">{error ?? "Asset detail is unavailable."}</p>
       </section>
@@ -115,7 +122,17 @@ export default function AssetDetailPage(): JSX.Element {
         <div className="ui-page__hero-copy ui-stack ui-stack--2xs">
           <div className="ui-row ui-row--wrap" style={{ justifyContent: "space-between" }}>
             <h1 className="ui-page__title" style={{ margin: 0 }}>{asset.name}</h1>
-            <Link className="ui-button ui-button--ghost ui-button--small" to={ROUTE_PATHS.registry}>Back to registry</Link>
+            <div className="ui-row ui-row--wrap" style={{ gap: "0.5rem" }}>
+              {resolveStudioRouteFromAsset(asset) ? (
+                <Link
+                  className="ui-button ui-button--ghost ui-button--small"
+                  to={`${resolveStudioRouteFromAsset(asset)}?${buildStudioHandoffQuery(asset)}`}
+                >
+                  Open in studio
+                </Link>
+              ) : null}
+              <Link className="ui-button ui-button--ghost ui-button--small" to={registryBackPath}>Back to registry</Link>
+            </div>
           </div>
           <p className="ui-page__subtitle" style={{ margin: 0 }}>
             Unified detail view for registry taxonomy, contract, provenance, versions, and dependency lineage.
@@ -128,6 +145,8 @@ export default function AssetDetailPage(): JSX.Element {
         <AssetContractPanel asset={asset} />
         <AssetProvenancePanel asset={asset} />
         <AssetDependencySummaryPanel asset={asset} />
+        <AssetValidationSummary asset={asset} />
+        <DependencyCompatibilityPanel asset={asset} />
       </div>
 
       <DependencyGraphPanel
@@ -135,6 +154,7 @@ export default function AssetDetailPage(): JSX.Element {
         rootVersionId={asset.versionId}
         upstreamNodes={removeRoot(upstream?.nodes ?? [], asset.versionId)}
         downstreamNodes={removeRoot(downstream?.nodes ?? [], asset.versionId)}
+        registryContextQuery={registryContextQuery}
       />
     </section>
   );

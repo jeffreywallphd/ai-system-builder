@@ -157,6 +157,8 @@ describe("RegistryBackendApi", () => {
     const detailByAsset = await api.getAssetDetail({ assetId: "asset:workflow" });
     expect(detailByAsset.ok).toBeTrue();
     expect(detailByAsset.data?.assetId).toBe("asset:workflow");
+    expect(detailByAsset.data?.validation?.status).toBeDefined();
+    expect(detailByAsset.data?.validation?.issues.some((issue) => issue.code === "lifecycle-not-publish-ready")).toBeFalse();
 
     const detailByVersion = await api.getAssetDetail({ versionId: "asset:model:v1" });
     expect(detailByVersion.ok).toBeTrue();
@@ -173,5 +175,39 @@ describe("RegistryBackendApi", () => {
     const traversed = await api.traverseDependents({ assetId: "asset:model", maxDepth: 1 });
     expect(traversed.ok).toBeTrue();
     expect(traversed.data?.graph.nodes.some((node) => node.versionId === "asset:template:v1")).toBeFalse();
+  });
+
+  it("surfaces dependency compatibility issues from application validation projections", async () => {
+    const workflowAsset = buildAsset("asset:workflow", "Workflow");
+    const workflowVersionWithMissingDependency = new AssetVersion({
+      assetId: "asset:workflow",
+      versionId: "asset:workflow:v1",
+      metadata: {
+        metadata: {},
+        dependencies: [{ assetId: "asset:missing", versionId: "asset:missing:v1" }],
+      },
+    });
+    const queryRepository: Pick<IAssetSystemQueryRepository, "listAssetsByCriteria" | "getLatestVersionForAsset" | "listCanonicalIdentities"> = {
+      async listAssetsByCriteria() { return [workflowAsset]; },
+      async getLatestVersionForAsset() {
+        return workflowVersionWithMissingDependency;
+      },
+      async listCanonicalIdentities() { return []; },
+    };
+
+    const versionRepository = new InMemoryAssetVersionRepository([workflowVersionWithMissingDependency]);
+    const queryService = new RegistryQueryService(
+      new InMemoryAssetRecordRepository([workflowAsset]),
+      versionRepository,
+      new InMemoryLineageRepository([]),
+      buildResolver(),
+      queryRepository,
+    );
+    const api = new RegistryBackendApi(new CrossStudioRegistryQueryService(queryService), new RegistryDependencyGraphService(queryService, versionRepository));
+
+    const detail = await api.getAssetDetail({ assetId: "asset:workflow" });
+    expect(detail.ok).toBeTrue();
+    expect(detail.data?.validation?.incompatibleDependencyCount).toBeGreaterThan(0);
+    expect(detail.data?.validation?.issues.some((issue) => issue.code === "dependency-version-not-found")).toBeTrue();
   });
 });

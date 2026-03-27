@@ -1,16 +1,25 @@
 import { Link } from "react-router-dom";
 import type { RegistryAsset } from "../../../domain/asset-registry/RegistryAsset";
 import { ROUTE_PATHS } from "../../routes/RouteConfig";
+import { buildStudioHandoffQuery, resolveStudioRouteFromAsset } from "../../routes/StudioRouteMapping";
 
 export interface AssetListItemProps {
   readonly asset: RegistryAsset;
+  readonly registryContextQuery?: string;
 }
 
-function toAssetDetailPath(assetId: string): string {
-  return ROUTE_PATHS.registryAssetDetail.replace(":assetId", encodeURIComponent(assetId));
+function toAssetDetailPath(assetId: string, registryContextQuery?: string): string {
+  const path = ROUTE_PATHS.registryAssetDetail.replace(":assetId", encodeURIComponent(assetId));
+  if (!registryContextQuery) {
+    return path;
+  }
+
+  return `${path}?registryContext=${encodeURIComponent(registryContextQuery)}`;
 }
 
-export function AssetListItem({ asset }: AssetListItemProps): JSX.Element {
+export function AssetListItem({ asset, registryContextQuery }: AssetListItemProps): JSX.Element {
+  const studioRoute = resolveStudioRouteFromAsset(asset);
+
   return (
     <article className="ui-card" data-testid="registry-asset-item">
       <div className="ui-card__body ui-stack ui-stack--xs">
@@ -27,10 +36,18 @@ export function AssetListItem({ asset }: AssetListItemProps): JSX.Element {
         <div className="ui-text-small ui-text-secondary">
           Latest version: {asset.versionId ?? "unavailable"} · Dependencies: {asset.dependencies.length}
         </div>
-        <div>
-          <Link to={toAssetDetailPath(asset.assetId)} className="ui-button ui-button--ghost ui-button--small">
+        <div className="ui-row ui-row--wrap" style={{ gap: "0.5rem" }}>
+          <Link to={toAssetDetailPath(asset.assetId, registryContextQuery)} className="ui-button ui-button--ghost ui-button--small">
             View details
           </Link>
+          {studioRoute ? (
+            <Link
+              to={`${studioRoute}?${buildStudioHandoffQuery(asset)}`}
+              className="ui-button ui-button--ghost ui-button--small"
+            >
+              Open studio
+            </Link>
+          ) : null}
         </div>
       </div>
     </article>
