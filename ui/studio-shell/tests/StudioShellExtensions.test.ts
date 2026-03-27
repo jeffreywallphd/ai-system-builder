@@ -15,9 +15,9 @@ import { configProfileStudioRegistration } from "../registrations/ConfigProfileS
 import { workflowStudioRegistration } from "../registrations/WorkflowStudioRegistration";
 import { contextBundleStudioRegistration } from "../registrations/ContextBundleStudioRegistration";
 import { datasetPipelineStudioRegistration } from "../registrations/DatasetPipelineStudioRegistration";
+import { trainingRecipeStudioRegistration } from "../registrations/TrainingRecipeStudioRegistration";
 import {
   toolChainStudioRegistrationExample,
-  trainingRecipeStudioRegistrationExample,
 } from "../registrations/CompositeStudioRegistrationExamples";
 
 describe("StudioShellExtensionRegistry", () => {
@@ -86,7 +86,7 @@ describe("StudioRegistrationRegistry", () => {
     registry.register(workflowStudioRegistration);
     registry.register(contextBundleStudioRegistration);
     registry.register(datasetPipelineStudioRegistration);
-    registry.register(trainingRecipeStudioRegistrationExample);
+    registry.register(trainingRecipeStudioRegistration);
     registry.register(toolChainStudioRegistrationExample);
 
     expect(registry.get("workflow-studio")?.kind).toBe("composite");

@@ -559,3 +559,14 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
 
 - Dataset Pipeline Studio now integrates through the same shared shell renderer/route seam (`ui/pages/DatasetPipelineStudioPage.tsx` + `ui/studio-shell/registrations/DatasetPipelineStudioRegistration.ts` + `/studio-shell/dataset-pipeline` route wiring) instead of a separate dataset-pipeline UI architecture.
 - Dataset-pipeline registration contributes bounded dataset-pipeline-specific guidance/metadata slot panels while shared shell surfaces remain authoritative for draft/session context, taxonomy/contract/provenance/dependencies state, lifecycle transitions, validation display, and publish/version operations.
+
+## Direction 5 update: Training Recipe studio domain + application slice (story 3.11)
+
+- Training Recipe Studio now has a thin bounded inner-layer domain helper (`domain/training-recipe-studio/TrainingRecipeStudioDomain.ts`) for composite training-recipe authoring with taxonomy `composite/training-recipe/deterministic` and generated provenance defaults.
+- A bounded application orchestrator (`application/training-recipe-studio/TrainingRecipeStudioApplicationService.ts`) reuses `StudioShellApplicationService` for initialize/create/publish lifecycle instead of introducing a separate training architecture.
+- Publish gating reuses shared composite enforcement (`assertCompositeStudioDraftPublishConsistency`) so training-recipe semantic-role and deterministic-behavior invariants plus taxonomy-driven contract derivability remain backend/application-authoritative.
+
+## Direction 5 update: Training Recipe studio UI integration (story 3.12)
+
+- Training Recipe Studio now integrates through the same shared shell renderer/route seam (`ui/pages/TrainingRecipeStudioPage.tsx` + `ui/studio-shell/registrations/TrainingRecipeStudioRegistration.ts` + `/studio-shell/training-recipe` route wiring) instead of a separate training-recipe UI architecture.
+- Training-recipe registration contributes bounded training-recipe-specific guidance/metadata slot panels while shared shell surfaces remain authoritative for draft/session context, taxonomy/contract/provenance/dependencies state, lifecycle transitions, validation display, and publish/version operations.
