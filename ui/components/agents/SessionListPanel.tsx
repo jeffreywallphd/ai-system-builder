@@ -1,10 +1,14 @@
-import type { AgentSessionSummaryReadModel } from "../../../application/agents/contracts/AgentRunContracts";
+import type { AgentRunControlAction, AgentSessionSummaryReadModel } from "../../../application/agents/contracts/AgentRunContracts";
+import { AgentRunControls } from "./AgentRunControls";
 
 interface SessionListPanelProps {
   readonly sessions: ReadonlyArray<AgentSessionSummaryReadModel>;
+  readonly controls: ReadonlyArray<AgentRunControlAction>;
   readonly selectedSessionId?: string;
   readonly isBusy: boolean;
+  readonly pendingControlAction?: AgentRunControlAction;
   readonly onSelectSession: (sessionId: string) => void;
+  readonly onControlRun: (sessionId: string, action: AgentRunControlAction) => void;
 }
 
 export function SessionListPanel(props: SessionListPanelProps): JSX.Element {
@@ -25,6 +29,13 @@ export function SessionListPanel(props: SessionListPanelProps): JSX.Element {
             <div className="ui-text-secondary">
               {session.terminalReason ?? "active"} • {session.composition.taxonomy.semanticRole}
             </div>
+            <AgentRunControls
+              session={session}
+              controls={props.controls}
+              isBusy={props.isBusy}
+              pendingAction={props.pendingControlAction}
+              onControlRun={props.onControlRun}
+            />
           </li>
         ))}
       </ul>

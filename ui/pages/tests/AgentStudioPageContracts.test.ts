@@ -15,6 +15,7 @@ describe("AgentStudioPage contracts", () => {
     expect(source).toContain("service.getStudioSnapshot");
     expect(source).toContain("service.createAgent");
     expect(source).toContain("service.launchAgent");
+    expect(source).toContain("service.triggerLaunch");
     expect(source).toContain("service.listSessions");
     expect(source).toContain("service.getSessionDetail");
     expect(source).toContain("service.controlRun");
@@ -39,16 +40,20 @@ describe("AgentStudioPage contracts", () => {
     expect(page).toContain("validationIssues");
   });
 
-  it("renders launch and monitoring sections as backend read-model consumers", () => {
+  it("renders launch, control, and trigger sections as backend contract consumers", () => {
     const launch = readSource("ui/components/agents/AgentLaunchPanel.tsx");
     const sessionList = readSource("ui/components/agents/SessionListPanel.tsx");
     const sessionDetail = readSource("ui/components/agents/SessionDetailPanel.tsx");
+    const controls = readSource("ui/components/agents/AgentRunControls.tsx");
 
-    expect(launch).toContain("Run input");
-    expect(launch).toContain("Context overrides");
-    expect(launch).toContain("Metadata");
-    expect(launch).toContain("trigger");
-    expect(launch).toContain("capabilities.controls.includes(\"cancel\")");
+    expect(launch).toContain("TriggerSelector");
+    expect(launch).toContain("TriggerConfigFields");
+    expect(launch).toContain("onTriggerLaunch");
+    expect(launch).toContain("Backend trigger requires trigger.source");
+    expect(sessionList).toContain("AgentRunControls");
+    expect(sessionDetail).toContain("AgentRunControls");
+    expect(controls).toContain("controls.includes(\"cancel\")");
+    expect(controls).not.toContain("pause");
     expect(sessionList).toContain("session.composition.taxonomy.semanticRole");
     expect(sessionDetail).toContain("operational.retrySummary");
     expect(sessionDetail).toContain("outcomeSummary.outputAssetIds");

@@ -1,14 +1,26 @@
-import { useEffect, useState } from "react";
-import { AgentTriggerKinds, type AgentRunControlAction, type AgentRunRequest, type AgentSessionSummaryReadModel } from "../../../application/agents/contracts/AgentRunContracts";
+import { useEffect, useMemo, useState } from "react";
+import {
+  AgentTriggerKinds,
+  type AgentRunControlAction,
+  type AgentRunRequest,
+  type AgentRunTrigger,
+  type AgentSessionSummaryReadModel,
+} from "../../../application/agents/contracts/AgentRunContracts";
+import type { TriggerAgentLaunchRequest } from "../../../application/agents/TriggerAgentLaunchUseCase";
 import type { AgentLaunchReadModel } from "../../../application/agents/contracts/AgentRunContracts";
 import type { AgentStudioSnapshotReadModel } from "../../../infrastructure/api/agents/AgentStudioBackendApi";
+import { AgentRunControls } from "./AgentRunControls";
+import { TriggerSelector } from "./TriggerSelector";
+import { TriggerConfigFields } from "./TriggerConfigFields";
 
 interface AgentLaunchPanelProps {
   readonly snapshot?: AgentStudioSnapshotReadModel;
   readonly latestLaunch?: AgentLaunchReadModel;
   readonly selectedSession?: AgentSessionSummaryReadModel;
   readonly isBusy: boolean;
+  readonly pendingControlAction?: AgentRunControlAction;
   readonly onLaunch: (request: AgentRunRequest) => void;
+  readonly onTriggerLaunch: (request: TriggerAgentLaunchRequest) => void;
   readonly onControlRun: (sessionId: string, action: AgentRunControlAction) => void;
 }
 
@@ -45,6 +57,14 @@ export function AgentLaunchPanel(props: AgentLaunchPanelProps): JSX.Element {
     setTriggerSource(props.latestLaunch.binding.trigger.source ?? "");
   }, [props.latestLaunch?.launch.executionId]);
 
+  const trigger = useMemo<AgentRunTrigger>(() => ({
+    kind: triggerKind,
+    invokedBy: triggerInvokedBy.trim() || undefined,
+    source: triggerSource.trim() || undefined,
+  }), [triggerInvokedBy, triggerKind, triggerSource]);
+
+  const isBackendTriggerInvalid = trigger.kind === AgentTriggerKinds.backend && !trigger.source;
+
   if (!props.snapshot) {
     return null;
   }
@@ -58,40 +78,48 @@ export function AgentLaunchPanel(props: AgentLaunchPanelProps): JSX.Element {
       <textarea className="ui-input" rows={3} value={contextText} onChange={(event) => setContextText(event.target.value)} />
       <label className="ui-label">Metadata (key=value per line)</label>
       <textarea className="ui-input" rows={3} value={metadataText} onChange={(event) => setMetadataText(event.target.value)} />
-      <label className="ui-label" htmlFor="agent-trigger-kind">Trigger kind</label>
-      <select id="agent-trigger-kind" className="ui-input" value={triggerKind} onChange={(event) => setTriggerKind(event.target.value as "manual" | "backend") }>
-        <option value="manual">manual</option>
-        <option value="backend">backend</option>
-      </select>
-      <label className="ui-label">trigger.invokedBy</label>
-      <input className="ui-input" value={triggerInvokedBy} onChange={(event) => setTriggerInvokedBy(event.target.value)} />
-      <label className="ui-label">trigger.source</label>
-      <input className="ui-input" value={triggerSource} onChange={(event) => setTriggerSource(event.target.value)} />
+
+      <TriggerSelector value={triggerKind} disabled={props.isBusy} onChange={setTriggerKind} />
+      <TriggerConfigFields
+        triggerKind={triggerKind}
+        invokedBy={triggerInvokedBy}
+        source={triggerSource}
+        disabled={props.isBusy}
+        onInvokedByChange={setTriggerInvokedBy}
+        onSourceChange={setTriggerSource}
+      />
+      {isBackendTriggerInvalid ? <p className="ui-text-secondary">Backend trigger requires trigger.source.</p> : null}
+
       <div className="ui-row ui-row--wrap">
         <button
           className="ui-button ui-button--primary ui-button--sm"
-          disabled={props.isBusy || !props.snapshot.capabilities.launch}
-          onClick={() => props.onLaunch({
-            agentId: props.snapshot.agent.agent.id,
-            input: parseKvRows(inputText),
-            contextOverrides: parseKvRows(contextText),
-            metadata: parseKvRows(metadataText),
-            trigger: {
-              kind: triggerKind,
-              invokedBy: triggerInvokedBy.trim() || undefined,
-              source: triggerSource.trim() || undefined,
-            },
-          })}
-        >Launch agent</button>
-
-        {props.selectedSession && props.snapshot.capabilities.controls.includes("cancel") ? (
-          <button
-            className="ui-button ui-button--secondary ui-button--sm"
-            disabled={props.isBusy || ["completed", "failed", "cancelled"].includes(props.selectedSession.status)}
-            onClick={() => props.onControlRun(props.selectedSession!.sessionId, "cancel")}
-          >Cancel selected run</button>
-        ) : null}
+          disabled={props.isBusy || !props.snapshot.capabilities.launch || isBackendTriggerInvalid}
+          onClick={() => {
+            const request = {
+              agentId: props.snapshot!.agent.agent.id,
+              input: parseKvRows(inputText),
+              contextOverrides: parseKvRows(contextText),
+              metadata: parseKvRows(metadataText),
+              trigger,
+            };
+            if (trigger.kind === AgentTriggerKinds.backend && props.snapshot?.capabilities.triggerLaunch) {
+              props.onTriggerLaunch(request as TriggerAgentLaunchRequest);
+              return;
+            }
+            props.onLaunch(request);
+          }}
+        >
+          Launch agent
+        </button>
       </div>
+
+      <AgentRunControls
+        session={props.selectedSession}
+        controls={props.snapshot.capabilities.controls}
+        isBusy={props.isBusy}
+        pendingAction={props.pendingControlAction}
+        onControlRun={props.onControlRun}
+      />
 
       {props.latestLaunch ? (
         <p className="ui-text-secondary">

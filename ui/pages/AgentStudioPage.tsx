@@ -10,6 +10,7 @@ import type {
   AgentSessionDetailReadModel,
   AgentSessionSummaryReadModel,
 } from "../../application/agents/contracts/AgentRunContracts";
+import type { TriggerAgentLaunchRequest } from "../../application/agents/TriggerAgentLaunchUseCase";
 import type { AgentAuthoringApiReadModel } from "../../infrastructure/api/agents/AgentAuthoringBackendApi";
 import type { AgentStudioSnapshotReadModel } from "../../infrastructure/api/agents/AgentStudioBackendApi";
 import { AgentStudioService } from "../services/AgentStudioService";
@@ -58,6 +59,7 @@ export default function AgentStudioPage(): JSX.Element {
   const [error, setError] = useState<string | undefined>();
   const [validationIssues, setValidationIssues] = useState<ReadonlyArray<unknown>>([]);
   const [isBusy, setIsBusy] = useState(false);
+  const [pendingControlAction, setPendingControlAction] = useState<AgentRunControlAction | undefined>();
 
   const refreshAgents = async () => {
     setIsBusy(true);
@@ -149,19 +151,41 @@ export default function AgentStudioPage(): JSX.Element {
     }
   };
 
-  const controlSession = async (sessionId: string, action: AgentRunControlAction) => {
-    if (!sessionId) {
+  const triggerLaunch = async (request: TriggerAgentLaunchRequest) => {
+    if (!selectedAgentId || request.agentId !== selectedAgentId) {
       return;
     }
     setIsBusy(true);
     try {
+      const response = await service.triggerLaunch(request);
+      if (!response.ok || !response.data) {
+        setError(response.error?.message ?? "Failed to launch agent.");
+        return;
+      }
+      setLatestLaunch(response.data);
+      await refreshSnapshot(selectedAgentId);
+      setError(undefined);
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
+  const controlSession = async (sessionId: string, action: AgentRunControlAction) => {
+    if (!sessionId) {
+      return;
+    }
+    setPendingControlAction(action);
+    setIsBusy(true);
+    try {
       const response = await service.controlRun(sessionId, action);
       if (!response.ok) {
-        setError(response.error?.message ?? "Failed to cancel run.");
+        setError(response.error?.message ?? "Failed to control run.");
         return;
       }
       await refreshSnapshot(selectedAgentId);
+      setError(undefined);
     } finally {
+      setPendingControlAction(undefined);
       setIsBusy(false);
     }
   };
@@ -243,15 +267,26 @@ export default function AgentStudioPage(): JSX.Element {
             selectedSession={sessions.find((entry) => entry.sessionId === selectedSession?.summary.sessionId)}
             isBusy={isBusy}
             onLaunch={(request) => { void launchAgent(request); }}
+            onTriggerLaunch={(request) => { void triggerLaunch(request); }}
+            pendingControlAction={pendingControlAction}
             onControlRun={(sessionId, action) => { void controlSession(sessionId, action); }}
           />
           <SessionListPanel
             sessions={sessions}
+            controls={snapshot?.capabilities.controls ?? []}
             selectedSessionId={selectedSession?.summary.sessionId}
             isBusy={isBusy}
+            pendingControlAction={pendingControlAction}
             onSelectSession={(sessionId) => { void loadSessionDetail(sessionId); }}
+            onControlRun={(sessionId, action) => { void controlSession(sessionId, action); }}
           />
-          <SessionDetailPanel session={selectedSession} />
+          <SessionDetailPanel
+            session={selectedSession}
+            controls={snapshot?.capabilities.controls ?? []}
+            isBusy={isBusy}
+            pendingControlAction={pendingControlAction}
+            onControlRun={(sessionId, action) => { void controlSession(sessionId, action); }}
+          />
         </div>
       </div>
 
