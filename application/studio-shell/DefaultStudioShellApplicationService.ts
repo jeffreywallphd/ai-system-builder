@@ -4,6 +4,7 @@ import {
   createAssetSession,
   publishAssetDraftVersion,
   StudioShellDraftLifecycleTransitionError,
+  StudioShellDraftLifecyclePublishGateError,
   createStudio,
   transitionAssetDraftLifecycle,
   updateAssetDraft,
@@ -64,7 +65,7 @@ function asInvalidRequest(error: unknown): never {
 }
 
 function asLifecycleTransition(error: unknown): never {
-  if (error instanceof StudioShellDraftLifecycleTransitionError) {
+  if (error instanceof StudioShellDraftLifecycleTransitionError || error instanceof StudioShellDraftLifecyclePublishGateError) {
     throw new StudioShellInvalidLifecycleTransitionError(error.message);
   }
 

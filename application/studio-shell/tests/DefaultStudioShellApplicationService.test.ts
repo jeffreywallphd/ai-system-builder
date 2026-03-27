@@ -309,7 +309,7 @@ describe("DefaultStudioShellApplicationService", () => {
       studioId: "studio-versioning",
       sessionId: "session-1",
       draftId: draft.draft.id,
-    })).rejects.toBeInstanceOf(StudioShellInvalidRequestError);
+    })).rejects.toBeInstanceOf(StudioShellInvalidLifecycleTransitionError);
 
     await service.transitionAssetDraftLifecycle({
       studioId: "studio-versioning",

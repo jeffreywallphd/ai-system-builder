@@ -40,6 +40,7 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain("path: ROUTE_PATHS.mcp");
     expect(source).toContain("path: ROUTE_PATHS.services");
     expect(source).toContain("path: ROUTE_PATHS.agentStudio");
+    expect(source).toContain("path: ROUTE_PATHS.studioShell");
     expect(source).toContain("path: ROUTE_PATHS.context");
     expect(source).toContain("path: ROUTE_PATHS.workflowContextWorkbench");
   });
