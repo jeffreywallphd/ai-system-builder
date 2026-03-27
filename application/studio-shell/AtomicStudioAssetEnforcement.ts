@@ -41,6 +41,13 @@ export interface AtomicStudioExpectation {
   readonly allowedBehaviorKinds: ReadonlyArray<TaxonomyBehaviorKind>;
 }
 
+export interface CompositeStudioExpectation {
+  readonly studioType: string;
+  readonly semanticRole: TaxonomySemanticRole;
+  readonly allowedBehaviorKinds: ReadonlyArray<TaxonomyBehaviorKind>;
+  readonly requireDerivableContract?: boolean;
+}
+
 function sameContractShape(left: unknown, right: unknown): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
 }
@@ -74,7 +81,7 @@ export function evaluateStudioDraftConsistency(input: {
 
   const expectedContract = contractResolver.resolveContractForTaxonomy(taxonomy);
   const requireDerivableContract = expectation.requireDerivableContract
-    ?? expectation.structuralKind === TaxonomyStructuralKinds.atomic;
+    ?? expectation.structuralKind !== TaxonomyStructuralKinds.system;
 
   if (!expectedContract && requireDerivableContract) {
     issues.push({
@@ -166,6 +173,36 @@ export function assertAtomicStudioDraftPublishConsistency(input: {
     expectation: {
       ...input.expectation,
       structuralKind: TaxonomyStructuralKinds.atomic,
+    },
+  });
+}
+
+export function evaluateCompositeStudioDraftConsistency(input: {
+  readonly draft: AssetDraft;
+  readonly expectation: CompositeStudioExpectation;
+  readonly contractResolver: Pick<IAssetContractResolver, "resolveContractForTaxonomy">;
+}): ReadonlyArray<StudioAssetEnforcementIssue> {
+  return evaluateStudioDraftConsistency({
+    ...input,
+    expectation: {
+      ...input.expectation,
+      structuralKind: TaxonomyStructuralKinds.composite,
+      requireDerivableContract: input.expectation.requireDerivableContract ?? true,
+    },
+  });
+}
+
+export function assertCompositeStudioDraftPublishConsistency(input: {
+  readonly draft: AssetDraft;
+  readonly expectation: CompositeStudioExpectation;
+  readonly contractResolver: Pick<IAssetContractResolver, "resolveContractForTaxonomy">;
+}): void {
+  assertStudioDraftPublishConsistency({
+    ...input,
+    expectation: {
+      ...input.expectation,
+      structuralKind: TaxonomyStructuralKinds.composite,
+      requireDerivableContract: input.expectation.requireDerivableContract ?? true,
     },
   });
 }

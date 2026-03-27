@@ -18,6 +18,7 @@ import {
 import { createAssetDraft, createAssetSession } from "../../../domain/studio-shell/StudioShellDomain";
 import {
   evaluateAtomicStudioDraftConsistency,
+  evaluateCompositeStudioDraftConsistency,
   evaluateStudioDraftConsistency,
 } from "../AtomicStudioAssetEnforcement";
 import type { AssetMetadata } from "../../../domain/studio-shell/StudioShellDomain";
@@ -166,11 +167,7 @@ describe("evaluateStudioDraftConsistency", () => {
         title: "Workflow",
         tags: ["workflow"],
         taxonomy: workflowTaxonomy,
-        contract: {
-          version: "1.0.0",
-          input: { kind: "json-schema" },
-          output: { kind: "json-schema" },
-        },
+        contract: resolver.resolveContractForTaxonomy(workflowTaxonomy),
         provenance: {
           sourceType: "generated",
           sourceLabel: "workflow-studio",
@@ -213,5 +210,85 @@ describe("evaluateStudioDraftConsistency", () => {
     });
 
     expect(issues.map((issue) => issue.code)).toContain("taxonomy-structural-kind-mismatch");
+  });
+});
+
+describe("evaluateCompositeStudioDraftConsistency", () => {
+  it("enforces derivable taxonomy-contract consistency for planned composite roles", () => {
+    const compositeRoles = [
+      { role: "workflow" as const, behaviorKind: "deterministic" as const },
+      { role: "context-bundle" as const, behaviorKind: "deterministic" as const },
+      { role: "dataset-pipeline" as const, behaviorKind: "iterative" as const },
+      { role: "training-recipe" as const, behaviorKind: "deterministic" as const },
+      { role: "tool-chain" as const, behaviorKind: "deterministic" as const },
+    ];
+
+    for (const entry of compositeRoles) {
+      const taxonomy = {
+        structuralKind: "composite" as const,
+        semanticRole: entry.role,
+        behaviorKind: entry.behaviorKind,
+      };
+      const draft = createAtomicDraft({
+        draftId: `draft-${entry.role}`,
+        studioId: "studio-composite",
+        metadata: {
+          title: `Composite ${entry.role}`,
+          tags: [entry.role],
+          taxonomy,
+          contract: resolver.resolveContractForTaxonomy(taxonomy),
+          provenance: {
+            sourceType: "generated",
+            sourceLabel: "composite-studio",
+          },
+        },
+      });
+
+      expect(evaluateCompositeStudioDraftConsistency({
+        draft,
+        expectation: {
+          studioType: `${entry.role}-studio`,
+          semanticRole: entry.role,
+          allowedBehaviorKinds: [entry.behaviorKind],
+        },
+        contractResolver: resolver,
+      })).toEqual([]);
+    }
+  });
+
+  it("flags non-derivable composite taxonomy-contract combinations at publish-time", () => {
+    const taxonomy = {
+      structuralKind: "composite" as const,
+      semanticRole: "training-recipe" as const,
+      behaviorKind: "deterministic" as const,
+    };
+    const draft = createAtomicDraft({
+      draftId: "draft-training-recipe-drift",
+      studioId: "studio-training-recipes",
+      metadata: {
+        title: "Training recipe drift",
+        tags: ["training-recipe"],
+        taxonomy,
+        contract: {
+          version: "1.0.0",
+          input: { kind: "json-schema" },
+          output: { kind: "json-schema" },
+        },
+      },
+    });
+
+    const issues = evaluateCompositeStudioDraftConsistency({
+      draft,
+      expectation: {
+        studioType: "training-recipe-studio",
+        semanticRole: "training-recipe",
+        allowedBehaviorKinds: ["deterministic"],
+      },
+      contractResolver: {
+        resolveContractForTaxonomy: () => undefined,
+      },
+    });
+
+    expect(issues.map((issue) => issue.code)).toContain("contract-not-derivable");
   });
 });
