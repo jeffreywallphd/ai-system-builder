@@ -55,10 +55,48 @@ function specializedCompositeDescription(role: Extract<TaxonomySemanticRole, "wo
   return "Specialized composite input preparer assembling and shaping reusable context for downstream execution.";
 }
 
+function getDefaultInvocationModeForCompositeBehavior(behaviorKind: TaxonomyBehaviorKind): "async" | "deferred" {
+  return behaviorKind === TaxonomyBehaviorKinds.iterative ? "async" : "deferred";
+}
+
 function defaultTaxonomyContract(descriptor: CompositionTaxonomyDescriptor): AssetContractDescriptor | undefined {
-  const { semanticRole } = descriptor;
+  const { structuralKind, semanticRole, behaviorKind } = descriptor;
+
+  if (semanticRole === TaxonomySemanticRoles.workflow) {
+    if (structuralKind !== "composite") {
+      return undefined;
+    }
+
+    const workflowMode = behaviorKind === TaxonomyBehaviorKinds.iterative
+      ? "iterative"
+      : behaviorKind === TaxonomyBehaviorKinds.conditional
+        ? "conditional"
+        : "deterministic";
+    return createAssetContractDescriptor({
+      version: "1.0.0",
+      input: {
+        kind: AssetContractShapeKinds.jsonSchema,
+        description: `${specializedCompositeDescription(TaxonomySemanticRoles.workflow)} Baseline ${workflowMode} workflow orchestration request payload.`,
+      },
+      output: {
+        kind: AssetContractShapeKinds.jsonSchema,
+        description: "Baseline workflow orchestration outcome with step outputs and execution provenance.",
+      },
+      parameters: [
+        parameter("workflowMode", true, "Declared workflow orchestration mode.", "string", workflowMode),
+      ],
+      execution: {
+        invocationMode: getDefaultInvocationModeForCompositeBehavior(behaviorKind),
+        sideEffects: "bounded",
+      },
+    });
+  }
 
   if (semanticRole === TaxonomySemanticRoles.model) {
+    if (structuralKind !== "atomic") {
+      return undefined;
+    }
+
     return createAssetContractDescriptor({
       version: "1.0.0",
       input: {
@@ -80,6 +118,10 @@ function defaultTaxonomyContract(descriptor: CompositionTaxonomyDescriptor): Ass
   }
 
   if (semanticRole === TaxonomySemanticRoles.tool) {
+    if (structuralKind !== "atomic") {
+      return undefined;
+    }
+
     return createAssetContractDescriptor({
       version: "1.0.0",
       input: {
@@ -101,6 +143,10 @@ function defaultTaxonomyContract(descriptor: CompositionTaxonomyDescriptor): Ass
   }
 
   if (semanticRole === TaxonomySemanticRoles.dataset) {
+    if (structuralKind !== "atomic") {
+      return undefined;
+    }
+
     return createAssetContractDescriptor({
       version: "1.0.0",
       input: {
@@ -122,6 +168,10 @@ function defaultTaxonomyContract(descriptor: CompositionTaxonomyDescriptor): Ass
   }
 
   if (semanticRole === TaxonomySemanticRoles.promptTemplate) {
+    if (structuralKind !== "atomic") {
+      return undefined;
+    }
+
     return createAssetContractDescriptor({
       version: "1.0.0",
       input: {
@@ -143,6 +193,10 @@ function defaultTaxonomyContract(descriptor: CompositionTaxonomyDescriptor): Ass
   }
 
   if (semanticRole === TaxonomySemanticRoles.embeddingIndex) {
+    if (structuralKind !== "atomic") {
+      return undefined;
+    }
+
     return createAssetContractDescriptor({
       version: "1.0.0",
       input: {
@@ -165,6 +219,10 @@ function defaultTaxonomyContract(descriptor: CompositionTaxonomyDescriptor): Ass
   }
 
   if (semanticRole === TaxonomySemanticRoles.configProfile) {
+    if (structuralKind !== "atomic") {
+      return undefined;
+    }
+
     return createAssetContractDescriptor({
       version: "1.0.0",
       input: {
@@ -186,6 +244,10 @@ function defaultTaxonomyContract(descriptor: CompositionTaxonomyDescriptor): Ass
   }
 
   if (semanticRole === TaxonomySemanticRoles.datasetPipeline) {
+    if (structuralKind !== "composite") {
+      return undefined;
+    }
+
     return createAssetContractDescriptor({
       version: "1.0.0",
       input: {
@@ -198,15 +260,20 @@ function defaultTaxonomyContract(descriptor: CompositionTaxonomyDescriptor): Ass
       },
       parameters: [
         parameter("stageCount", false, "Declared dataset pipeline stage count.", "number"),
+        parameter("pipelineMode", true, "Declared dataset pipeline behavior mode.", "string", behaviorKind),
       ],
       execution: {
-        invocationMode: "async",
+        invocationMode: getDefaultInvocationModeForCompositeBehavior(behaviorKind),
         sideEffects: "bounded",
       },
     });
   }
 
   if (semanticRole === TaxonomySemanticRoles.trainingRecipe) {
+    if (structuralKind !== "composite" || behaviorKind !== TaxonomyBehaviorKinds.deterministic) {
+      return undefined;
+    }
+
     return createAssetContractDescriptor({
       version: "1.0.0",
       input: {
@@ -228,6 +295,10 @@ function defaultTaxonomyContract(descriptor: CompositionTaxonomyDescriptor): Ass
   }
 
   if (semanticRole === TaxonomySemanticRoles.toolChain) {
+    if (structuralKind !== "composite" || behaviorKind !== TaxonomyBehaviorKinds.deterministic) {
+      return undefined;
+    }
+
     return createAssetContractDescriptor({
       version: "1.0.0",
       input: {
@@ -249,6 +320,10 @@ function defaultTaxonomyContract(descriptor: CompositionTaxonomyDescriptor): Ass
   }
 
   if (semanticRole === TaxonomySemanticRoles.appTemplate) {
+    if (structuralKind !== "system") {
+      return undefined;
+    }
+
     return createAssetContractDescriptor({
       version: "1.0.0",
       input: {
@@ -270,7 +345,10 @@ function defaultTaxonomyContract(descriptor: CompositionTaxonomyDescriptor): Ass
   }
 
   if (semanticRole === TaxonomySemanticRoles.contextBundle) {
-    const behaviorKind: TaxonomyBehaviorKind = descriptor.behaviorKind;
+    if (structuralKind !== "composite") {
+      return undefined;
+    }
+
     if (behaviorKind === TaxonomyBehaviorKinds.none) {
       return createAssetContractDescriptor({
         version: "1.0.0",
@@ -288,24 +366,28 @@ function defaultTaxonomyContract(descriptor: CompositionTaxonomyDescriptor): Ass
       });
     }
 
-    return createAssetContractDescriptor({
-      version: "1.0.0",
-      input: {
-        kind: AssetContractShapeKinds.jsonSchema,
-        description: "Context-bundle assembly controls and source selection settings.",
-      },
-      output: {
-        kind: AssetContractShapeKinds.text,
-        description: `${specializedCompositeDescription(TaxonomySemanticRoles.contextBundle)} Recipe-guided assembly output for downstream consumers.`,
-      },
-      parameters: [
-        parameter("bundleMode", true, "Context-bundle mode.", "string", "recipe"),
-      ],
-      execution: {
-        invocationMode: "deferred",
-        sideEffects: "none",
-      },
-    });
+    if (behaviorKind === TaxonomyBehaviorKinds.deterministic) {
+      return createAssetContractDescriptor({
+        version: "1.0.0",
+        input: {
+          kind: AssetContractShapeKinds.jsonSchema,
+          description: "Context-bundle assembly controls and source selection settings.",
+        },
+        output: {
+          kind: AssetContractShapeKinds.text,
+          description: `${specializedCompositeDescription(TaxonomySemanticRoles.contextBundle)} Recipe-guided assembly output for downstream consumers.`,
+        },
+        parameters: [
+          parameter("bundleMode", true, "Context-bundle mode.", "string", "recipe"),
+        ],
+        execution: {
+          invocationMode: "deferred",
+          sideEffects: "none",
+        },
+      });
+    }
+
+    return undefined;
   }
 
   return undefined;

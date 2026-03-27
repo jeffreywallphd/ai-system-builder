@@ -115,6 +115,16 @@ describe("CompositionAssetContractResolver", () => {
       semanticRole: TaxonomySemanticRoles.datasetPipeline,
       behaviorKind: TaxonomyBehaviorKinds.iterative,
     });
+    const workflowContract = resolver.resolveContractForTaxonomy({
+      structuralKind: "composite",
+      semanticRole: TaxonomySemanticRoles.workflow,
+      behaviorKind: TaxonomyBehaviorKinds.conditional,
+    });
+    const contextBundleContract = resolver.resolveContractForTaxonomy({
+      structuralKind: "composite",
+      semanticRole: TaxonomySemanticRoles.contextBundle,
+      behaviorKind: TaxonomyBehaviorKinds.none,
+    });
     const trainingRecipeContract = resolver.resolveContractForTaxonomy({
       structuralKind: "composite",
       semanticRole: TaxonomySemanticRoles.trainingRecipe,
@@ -137,10 +147,35 @@ describe("CompositionAssetContractResolver", () => {
     expect(promptTemplateContract?.parameters.find((parameter) => parameter.id === "templateFormat")?.defaultValue).toBe("mustache");
     expect(embeddingIndexContract?.parameters.find((parameter) => parameter.id === "indexAlgorithm")?.defaultValue).toBe("hnsw");
     expect(configContract?.parameters.find((parameter) => parameter.id === "profileScope")?.defaultValue).toBe("runtime");
+    expect(workflowContract?.parameters.find((parameter) => parameter.id === "workflowMode")?.defaultValue).toBe("conditional");
+    expect(contextBundleContract?.parameters.find((parameter) => parameter.id === "bundleMode")?.defaultValue).toBe("package");
     expect(datasetPipelineContract?.output?.description).toContain("dataset-version");
+    expect(datasetPipelineContract?.parameters.find((parameter) => parameter.id === "pipelineMode")?.defaultValue).toBe("iterative");
     expect(trainingRecipeContract?.execution?.sideEffects).toBe("external");
     expect(toolChainContract?.parameters.find((parameter) => parameter.id === "executionOrdering")?.required).toBeTrue();
     expect(appTemplateContract?.parameters.find((parameter) => parameter.id === "targetRuntime")?.defaultValue).toBe("container");
+  });
+
+  it("keeps contract projection bounded for unsupported taxonomy combinations", () => {
+    const invalidTrainingRecipe = resolver.resolveContractForTaxonomy({
+      structuralKind: "composite",
+      semanticRole: TaxonomySemanticRoles.trainingRecipe,
+      behaviorKind: TaxonomyBehaviorKinds.iterative,
+    });
+    const invalidToolChain = resolver.resolveContractForTaxonomy({
+      structuralKind: "composite",
+      semanticRole: TaxonomySemanticRoles.toolChain,
+      behaviorKind: TaxonomyBehaviorKinds.conditional,
+    });
+    const invalidWorkflowShape = resolver.resolveContractForTaxonomy({
+      structuralKind: "atomic",
+      semanticRole: TaxonomySemanticRoles.workflow,
+      behaviorKind: TaxonomyBehaviorKinds.deterministic,
+    });
+
+    expect(invalidTrainingRecipe).toBeUndefined();
+    expect(invalidToolChain).toBeUndefined();
+    expect(invalidWorkflowShape).toBeUndefined();
   });
 
   it("keeps specialized composite semantics explicit for workflow, agent, and context-bundle contracts", () => {

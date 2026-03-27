@@ -103,6 +103,9 @@ describe("StudioRegistrationRegistry", () => {
       "training-recipe-studio",
       "workflow-studio",
     ]);
+    for (const entry of registry.listByKind(StudioRegistrationKinds.composite)) {
+      expect(entry.defaults.metadataPatch?.contract).toBeDefined();
+    }
   });
 
   it("rejects unsupported composite roles and duplicate studio types", () => {
