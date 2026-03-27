@@ -5,8 +5,10 @@ import { createAtomicStudioMetadataPatch } from "./AtomicStudioRegistrationDefau
 export const datasetStudioRegistration: AtomicStudioRegistration = Object.freeze({
   studioType: DatasetStudioIdentity.studioType,
   studioId: DatasetStudioIdentity.defaultStudioId,
+  kind: "atomic",
   displayName: DatasetStudioIdentity.defaultStudioName,
   role: "dataset",
+  allowedBehaviorKinds: Object.freeze(["none"]),
   defaults: {
     title: "Dataset Asset Draft",
     tags: Object.freeze(["dataset", "studio-shell"]),

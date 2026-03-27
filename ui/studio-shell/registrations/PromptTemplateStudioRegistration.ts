@@ -8,8 +8,10 @@ import { createAtomicStudioMetadataPatch } from "./AtomicStudioRegistrationDefau
 export const promptTemplateStudioRegistration: AtomicStudioRegistration = Object.freeze({
   studioType: PromptTemplateStudioIdentity.studioType,
   studioId: PromptTemplateStudioIdentity.defaultStudioId,
+  kind: "atomic",
   displayName: PromptTemplateStudioIdentity.defaultStudioName,
   role: "prompt-template",
+  allowedBehaviorKinds: Object.freeze(["none"]),
   defaults: {
     title: "Prompt Template Asset Draft",
     tags: Object.freeze(["prompt-template", "studio-shell"]),

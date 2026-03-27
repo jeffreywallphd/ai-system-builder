@@ -8,7 +8,7 @@ describe("ToolStudioPage contracts", () => {
 
     expect(pageSource).toContain("StudioShellPage");
     expect(pageSource).toContain("toolStudioRegistration");
-    expect(pageSource).toContain("atomicStudio={toolStudioRegistration}");
+    expect(pageSource).toContain("studioRegistration={toolStudioRegistration}");
 
     expect(registrationSource).toContain("studioType: ToolStudioIdentity.studioType");
     expect(registrationSource).toContain('role: "tool"');

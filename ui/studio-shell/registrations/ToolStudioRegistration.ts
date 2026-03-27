@@ -5,8 +5,10 @@ import { createAtomicStudioMetadataPatch } from "./AtomicStudioRegistrationDefau
 export const toolStudioRegistration: AtomicStudioRegistration = Object.freeze({
   studioType: ToolStudioIdentity.studioType,
   studioId: ToolStudioIdentity.defaultStudioId,
+  kind: "atomic",
   displayName: ToolStudioIdentity.defaultStudioName,
   role: "tool",
+  allowedBehaviorKinds: Object.freeze(["conditional", "deterministic"]),
   defaults: {
     title: "Tool Asset Draft",
     tags: Object.freeze(["tool", "studio-shell", "mcp"]),

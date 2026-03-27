@@ -5,7 +5,7 @@ import { StudioShellService } from "../services/StudioShellService";
 import { StudioShellPanel } from "../components/studio-shell/StudioShellPanel";
 import { StudioShellValidationIssuesPanel } from "../components/studio-shell/StudioShellValidationIssuesPanel";
 import {
-  type AtomicStudioRegistration,
+  type StudioRegistration,
   StudioShellExtensionRegistry,
   StudioShellExtensionSlots,
   type StudioShellExtensionContext,
@@ -49,7 +49,7 @@ function buildCreateMetadata(
 }
 
 interface StudioShellPageProps {
-  readonly atomicStudio?: AtomicStudioRegistration;
+  readonly studioRegistration?: StudioRegistration;
   readonly extensions?: ReadonlyArray<StudioShellExtensionContribution>;
 }
 
@@ -74,31 +74,32 @@ function renderExtensions(
   );
 }
 
-export default function StudioShellPage({ atomicStudio, extensions = [] }: StudioShellPageProps): JSX.Element {
-  const studioId = atomicStudio?.studioId ?? "studio-shell-main";
-  const defaultDraftTitle = atomicStudio?.defaults.title ?? "Studio Shell Draft";
-  const defaultDraftTags = atomicStudio?.defaults.tags ?? ["studio-shell"];
-  const defaultContent = atomicStudio?.defaults.contentTemplate ?? "{}";
-  const shellTitle = atomicStudio?.displayName ?? "Studio Shell";
-  const shellSubtitle = atomicStudio
-    ? `Shared atomic-studio shell for ${atomicStudio.role} assets: session/draft context, metadata/dependencies, lifecycle/version, and validation.`
-    : "Reusable bounded shell for studio/session context, authoring, taxonomy/contract/provenance/dependencies, lifecycle/version state, and validation.";
+export default function StudioShellPage({ studioRegistration, extensions = [] }: StudioShellPageProps): JSX.Element {
+  const studioId = studioRegistration?.studioId ?? "studio-shell-main";
+  const defaultDraftTitle = studioRegistration?.defaults.title ?? "Studio Shell Draft";
+  const defaultDraftTags = studioRegistration?.defaults.tags ?? ["studio-shell"];
+  const defaultContent = studioRegistration?.defaults.contentTemplate ?? "{}";
+  const shellTitle = studioRegistration?.shell?.title ?? studioRegistration?.displayName ?? "Studio Shell";
+  const shellSubtitle = studioRegistration?.shell?.subtitle
+    ?? (studioRegistration
+      ? `Shared ${studioRegistration.kind}-studio shell for ${studioRegistration.role} assets: session/draft context, metadata/dependencies, lifecycle/version, and validation.`
+      : "Reusable bounded shell for studio/session context, authoring, taxonomy/contract/provenance/dependencies, lifecycle/version state, and validation.");
   const service = useMemo(() => new StudioShellService(), []);
   const extensionRegistry = useMemo(() => {
     const registry = new StudioShellExtensionRegistry();
-    registry.registerMany([...(atomicStudio?.extensions ?? []), ...extensions]);
+    registry.registerMany([...(studioRegistration?.extensions ?? []), ...extensions]);
     return registry;
-  }, [atomicStudio, extensions]);
+  }, [studioRegistration, extensions]);
   const [snapshot, setSnapshot] = useState<StudioShellSnapshotReadModel | undefined>();
   const [error, setError] = useState<string | undefined>();
   const [validationIssues, setValidationIssues] = useState<ReadonlyArray<StudioShellValidationIssue>>([]);
   const [isBusy, setIsBusy] = useState(false);
   const [content, setContent] = useState(defaultContent);
   const [metadataPatchJson, setMetadataPatchJson] = useState(
-    JSON.stringify(atomicStudio?.defaults.metadataPatch ?? { title: defaultDraftTitle, tags: defaultDraftTags }),
+    JSON.stringify(studioRegistration?.defaults.metadataPatch ?? { title: defaultDraftTitle, tags: defaultDraftTags }),
   );
   const [dependenciesJson, setDependenciesJson] = useState(
-    JSON.stringify(atomicStudio?.defaults.dependencies ?? []),
+    JSON.stringify(studioRegistration?.defaults.dependencies ?? []),
   );
 
   const refreshSnapshot = async () => {
@@ -110,7 +111,7 @@ export default function StudioShellPage({ atomicStudio, extensions = [] }: Studi
         return;
       }
       if (!response.data) {
-        const initialized = await service.initializeStudio(studioId, atomicStudio?.displayName ?? "Studio Shell");
+        const initialized = await service.initializeStudio(studioId, studioRegistration?.displayName ?? "Studio Shell");
         if (!initialized.ok || !initialized.data) {
           setError(initialized.error?.message ?? "Failed to initialize Studio Shell.");
           return;

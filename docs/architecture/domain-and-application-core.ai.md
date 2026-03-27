@@ -111,7 +111,6 @@ This consistency is one of the healthier signs in the codebase: even as features
 
 AI Loom Studio is not just a thin GUI over a runtime. It is an authoring and governance environment for workflows, tools, context, and local AI operations. That kind of product benefits from a strong inner core because the rules of the authoring model need to remain stable even when runtimes and integrations change.
 
-
 ## Direction 3 update: MCP plugin registry/capability contracts (current slice)
 
 The MCP layer now has an explicit inner-layer contract for installed tool definitions:
@@ -210,7 +209,7 @@ The studio shell now has a bounded inner-layer model and application orchestrati
 
 ## Direction 5 update: Atomic studio registration foundation (story 2.5)
 
-- The existing Studio Shell extension seam now has a bounded atomic-studio registration contract in `ui/studio-shell/StudioShellExtensions.ts` (`AtomicStudioRegistration`, `AtomicStudioRegistry`) rather than a second plugin architecture.
+- The existing Studio Shell extension seam now has a bounded studio registration contract in `ui/studio-shell/StudioShellExtensions.ts` (`StudioRegistration`, `StudioRegistrationRegistry`, plus `AtomicStudioRegistry` compatibility) so atomic and composite studios share one extension/registration seam rather than a second plugin architecture.
 - Registration is deterministic (`studioType` uniqueness, role validation, stable listing order, slot-scoped extension lookup) and intentionally small: identity, atomic role, bounded draft defaults, and optional slot contributions.
 - Atomic registrations inherit the shared shell lifecycle and operational behavior (session/draft context, metadata/dependencies/lifecycle/version validation/publish surfaces), with `StudioShellPage` optionally consuming registration defaults/extensions.
 
@@ -460,7 +459,7 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
 ## Direction 5 update: Atomic validation standardization (story 2.12)
 
 - Shared studio-shell validation projection is now centralized in one application seam (`application/studio-shell/StudioShellValidation.ts`) and consumed by backend snapshot/validate endpoints, replacing backend-local duplicate validation assembly.
-- Atomic registration defaults for Model/Dataset/Tool now reuse taxonomy-driven contract projection through a shared registration helper (`ui/studio-shell/registrations/AtomicStudioRegistrationDefaults.ts`) so default metadata validity posture is consistent across atomic studios.
+- Studio registration defaults now reuse taxonomy-driven contract projection through shared helpers (`createStudioMetadataPatch`, `createAtomicStudioMetadataPatch`, `createCompositeStudioMetadataPatch` in `ui/studio-shell/registrations/AtomicStudioRegistrationDefaults.ts`) so atomic and composite studios align on metadata default validity posture.
 - Shared shell default dependency authoring now starts with an empty dependency set (instead of an implicit unpinned seed dependency), removing studio-specific accidental warning drift while preserving backend-authoritative dependency validation semantics.
 - Focused tests now cover cross-atomic validation consistency and shared issue structure (`application/studio-shell/tests/StudioShellValidation.test.ts`, `infrastructure/api/studio-shell/tests/StudioShellBackendApi.test.ts`).
 
@@ -469,7 +468,7 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
 - Atomic publish flows for Model/Dataset/Tool now enforce shared taxonomy + contract truth through one reusable application seam (`application/studio-shell/AtomicStudioAssetEnforcement.ts`) instead of studio-specific ad hoc checks.
 - Enforcement validates structural kind (`atomic`), expected semantic role (`model`/`dataset`/`tool`), allowed behavior kinds (including bounded tool `conditional|deterministic`), and contract equivalence against taxonomy-driven projection (`CompositionAssetContractResolver.resolveContractForTaxonomy`).
 - Model/Dataset/Tool application publish orchestration now runs this shared enforcement before lifecycle transition/publish so metadata drift introduced via shell patching cannot publish invalid atomic versions.
-- Focused tests now cover cross-studio consistency at the shared seam and publish-gate behavior in each atomic studio service (`application/studio-shell/tests/AtomicStudioAssetEnforcement.test.ts`, `application/model-studio/tests/ModelStudioApplicationService.test.ts`, `application/dataset-studio/tests/DatasetStudioApplicationService.test.ts`, `application/tool-studio/tests/ToolStudioApplicationService.test.ts`).
+- 
 
 ## Direction 5 update: Atomic studio end-to-end consistency (story 2.15)
 

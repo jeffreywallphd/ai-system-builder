@@ -8,8 +8,10 @@ import { createAtomicStudioMetadataPatch } from "./AtomicStudioRegistrationDefau
 export const embeddingIndexStudioRegistration: AtomicStudioRegistration = Object.freeze({
   studioType: EmbeddingIndexStudioIdentity.studioType,
   studioId: EmbeddingIndexStudioIdentity.defaultStudioId,
+  kind: "atomic",
   displayName: EmbeddingIndexStudioIdentity.defaultStudioName,
   role: "embedding-index",
+  allowedBehaviorKinds: Object.freeze(["none"]),
   defaults: {
     title: "Embedding Index Asset Draft",
     tags: Object.freeze(["embedding-index", "studio-shell"]),

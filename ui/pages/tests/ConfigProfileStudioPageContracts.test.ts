@@ -8,7 +8,7 @@ describe("ConfigProfileStudioPage contracts", () => {
 
     expect(pageSource).toContain("StudioShellPage");
     expect(pageSource).toContain("configProfileStudioRegistration");
-    expect(pageSource).toContain("atomicStudio={configProfileStudioRegistration}");
+    expect(pageSource).toContain("studioRegistration={configProfileStudioRegistration}");
 
     expect(registrationSource).toContain("studioType: ConfigProfileStudioIdentity.studioType");
     expect(registrationSource).toContain('role: "config-profile"');

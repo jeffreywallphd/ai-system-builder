@@ -8,7 +8,7 @@ describe("PromptTemplateStudioPage contracts", () => {
 
     expect(pageSource).toContain("StudioShellPage");
     expect(pageSource).toContain("promptTemplateStudioRegistration");
-    expect(pageSource).toContain("atomicStudio={promptTemplateStudioRegistration}");
+    expect(pageSource).toContain("studioRegistration={promptTemplateStudioRegistration}");
 
     expect(registrationSource).toContain("studioType: PromptTemplateStudioIdentity.studioType");
     expect(registrationSource).toContain('role: "prompt-template"');

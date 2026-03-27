@@ -1,11 +1,24 @@
 import { describe, expect, it } from "bun:test";
-import { AtomicStudioRegistry, StudioShellExtensionRegistry, StudioShellExtensionSlots } from "../StudioShellExtensions";
+import {
+  AtomicStudioRegistry,
+  StudioRegistrationRegistry,
+  StudioRegistrationKinds,
+  StudioShellExtensionRegistry,
+  StudioShellExtensionSlots,
+} from "../StudioShellExtensions";
 import { modelStudioRegistration } from "../registrations/ModelStudioRegistration";
 import { datasetStudioRegistration } from "../registrations/DatasetStudioRegistration";
 import { toolStudioRegistration } from "../registrations/ToolStudioRegistration";
 import { promptTemplateStudioRegistration } from "../registrations/PromptTemplateStudioRegistration";
 import { embeddingIndexStudioRegistration } from "../registrations/EmbeddingIndexStudioRegistration";
 import { configProfileStudioRegistration } from "../registrations/ConfigProfileStudioRegistration";
+import {
+  contextBundleStudioRegistrationExample,
+  datasetPipelineStudioRegistrationExample,
+  toolChainStudioRegistrationExample,
+  trainingRecipeStudioRegistrationExample,
+  workflowStudioRegistrationExample,
+} from "../registrations/CompositeStudioRegistrationExamples";
 
 describe("StudioShellExtensionRegistry", () => {
   it("registers contributions by slot and sorts by order then id", () => {
@@ -62,6 +75,45 @@ describe("StudioShellExtensionRegistry", () => {
       title: "Duplicate",
       render: () => null,
     })).toThrow("already registered");
+  });
+});
+
+describe("StudioRegistrationRegistry", () => {
+  it("registers mixed atomic and composite studios with deterministic lookup/kind filtering", () => {
+    const registry = new StudioRegistrationRegistry();
+    registry.register(modelStudioRegistration);
+    registry.register(datasetStudioRegistration);
+    registry.register(workflowStudioRegistrationExample);
+    registry.register(contextBundleStudioRegistrationExample);
+    registry.register(datasetPipelineStudioRegistrationExample);
+    registry.register(trainingRecipeStudioRegistrationExample);
+    registry.register(toolChainStudioRegistrationExample);
+
+    expect(registry.get("workflow-studio")?.kind).toBe("composite");
+    expect(registry.get("workflow-studio")?.role).toBe("workflow");
+    expect(registry.get("workflow-studio")?.allowedBehaviorKinds).toEqual(["deterministic", "conditional", "iterative"]);
+    expect(registry.listByKind(StudioRegistrationKinds.atomic).map((entry) => entry.studioType)).toEqual([
+      "dataset-studio",
+      "model-studio",
+    ]);
+    expect(registry.listByKind(StudioRegistrationKinds.composite).map((entry) => entry.studioType)).toEqual([
+      "context-bundle-studio",
+      "dataset-pipeline-studio",
+      "tool-chain-studio",
+      "training-recipe-studio",
+      "workflow-studio",
+    ]);
+  });
+
+  it("rejects unsupported composite roles and duplicate studio types", () => {
+    const registry = new StudioRegistrationRegistry();
+    registry.register(workflowStudioRegistrationExample);
+    expect(() => registry.register(workflowStudioRegistrationExample)).toThrow("already registered");
+    expect(() => registry.register({
+      ...workflowStudioRegistrationExample,
+      studioType: "bad-composite-role",
+      role: "agent",
+    })).toThrow("not supported");
   });
 });
 
