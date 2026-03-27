@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import {
+  applyAssetMetadataPatch,
   AssetSessionStatuses,
   attachDraftToSession,
   closeAssetSession,
@@ -39,6 +40,82 @@ describe("StudioShellDomain", () => {
     expect(draft.metadata.tags).toEqual(["alpha", "beta"]);
     expect(draft.metadata.taxonomy?.semanticRole).toBe("workflow");
     expect(draft.metadata.contract?.version).toBe("v1");
+  });
+
+  it("applies taxonomy metadata patch while preserving contract metadata", () => {
+    const studio = createStudio({ id: "studio-taxonomy", name: "Authoring Studio" });
+    const session = createAssetSession({ id: "session-taxonomy", studioId: studio.id });
+    const draft = createAssetDraft({
+      id: "draft-taxonomy",
+      studioId: studio.id,
+      session,
+      content: "draft",
+      metadata: {
+        title: "Draft",
+        tags: ["authoring"],
+        contract: {
+          version: "1.0.0",
+          parameters: [{ id: "temperature", required: false }],
+        },
+      },
+    });
+
+    const updated = updateAssetDraft(draft, session, {
+      metadataPatch: {
+        taxonomy: {
+          structuralKind: "composite",
+          semanticRole: "workflow",
+          behaviorKind: "dynamic",
+        },
+      },
+    });
+
+    expect(updated.metadata.taxonomy?.semanticRole).toBe("workflow");
+    expect(updated.metadata.contract?.version).toBe("1.0.0");
+  });
+
+  it("applies contract metadata patch while preserving taxonomy metadata", () => {
+    const metadata = applyAssetMetadataPatch(
+      {
+        title: "Draft",
+        tags: ["authoring"],
+        taxonomy: {
+          structuralKind: "composite",
+          semanticRole: "workflow",
+          behaviorKind: "deterministic",
+        },
+      },
+      {
+        contract: {
+          version: "2.0.0",
+          parameters: [{ id: "max_tokens", required: false }],
+        },
+      },
+    );
+
+    expect(metadata.taxonomy?.behaviorKind).toBe("deterministic");
+    expect(metadata.contract?.version).toBe("2.0.0");
+  });
+
+  it("rejects invalid taxonomy structural/semantic/behavior combinations", () => {
+    const studio = createStudio({ id: "studio-invalid-taxonomy", name: "Authoring Studio" });
+    const session = createAssetSession({ id: "session-invalid-taxonomy", studioId: studio.id });
+
+    expect(() => createAssetDraft({
+      id: "draft-invalid-taxonomy",
+      studioId: studio.id,
+      session,
+      content: "draft",
+      metadata: {
+        title: "Draft",
+        tags: [],
+        taxonomy: {
+          structuralKind: "atomic",
+          semanticRole: "workflow",
+          behaviorKind: "deterministic",
+        },
+      },
+    })).toThrow("Asset metadata taxonomy combination");
   });
 
   it("prevents draft mutation after session close", () => {

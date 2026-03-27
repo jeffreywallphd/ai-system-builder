@@ -1,4 +1,4 @@
-import type { AssetDraft, AssetMetadata, AssetSession, Studio } from "../../domain/studio-shell/StudioShellDomain";
+import type { AssetDraft, AssetMetadata, AssetMetadataPatch, AssetSession, Studio } from "../../domain/studio-shell/StudioShellDomain";
 
 export interface InitializeStudioCommand {
   readonly studioId: string;
@@ -29,6 +29,7 @@ export interface UpdateAssetDraftCommand {
   readonly draftId: string;
   readonly content?: string;
   readonly metadata?: AssetMetadata;
+  readonly metadataPatch?: AssetMetadataPatch;
 }
 
 export interface StudioInitializationResult {

@@ -1,7 +1,7 @@
 import type { AssetContractDescriptor } from "../contracts/AssetContract";
 import { createAssetContractDescriptor } from "../contracts/AssetContract";
 import type { CompositionTaxonomyDescriptor } from "../taxonomy/CompositionTaxonomy";
-import { createCompositionTaxonomyDescriptor } from "../taxonomy/CompositionTaxonomy";
+import { assertAllowedCompositionTaxonomyCombination, createCompositionTaxonomyDescriptor } from "../taxonomy/CompositionTaxonomy";
 
 export const StudioLifecycleStatuses = Object.freeze({
   draft: "draft",
@@ -34,6 +34,14 @@ export interface AssetMetadata {
   readonly tags: ReadonlyArray<string>;
   readonly taxonomy?: CompositionTaxonomyDescriptor;
   readonly contract?: AssetContractDescriptor;
+}
+
+export interface AssetMetadataPatch {
+  readonly title?: string;
+  readonly summary?: string | null;
+  readonly tags?: ReadonlyArray<string>;
+  readonly taxonomy?: CompositionTaxonomyDescriptor | null;
+  readonly contract?: AssetContractDescriptor | null;
 }
 
 export interface AssetDraft {
@@ -121,13 +129,30 @@ export function withStudioSession(studio: Studio, sessionId: string, now: Date =
 }
 
 export function normalizeAssetMetadata(input: AssetMetadata): AssetMetadata {
+  const taxonomy = input.taxonomy ? createCompositionTaxonomyDescriptor(input.taxonomy) : undefined;
+  if (taxonomy) {
+    assertAllowedCompositionTaxonomyCombination(taxonomy, "Asset metadata taxonomy");
+  }
+
   return Object.freeze({
     title: normalizeRequired(input.title, "Asset metadata title"),
     summary: normalizeOptional(input.summary),
     tags: normalizeTags(input.tags),
-    taxonomy: input.taxonomy ? createCompositionTaxonomyDescriptor(input.taxonomy) : undefined,
+    taxonomy,
     contract: input.contract ? createAssetContractDescriptor(input.contract) : undefined,
   });
+}
+
+export function applyAssetMetadataPatch(metadata: AssetMetadata, patch: AssetMetadataPatch): AssetMetadata {
+  const next: AssetMetadata = {
+    title: patch.title ?? metadata.title,
+    summary: patch.summary === null ? undefined : (patch.summary ?? metadata.summary),
+    tags: patch.tags ?? metadata.tags,
+    taxonomy: patch.taxonomy === null ? undefined : (patch.taxonomy ?? metadata.taxonomy),
+    contract: patch.contract === null ? undefined : (patch.contract ?? metadata.contract),
+  };
+
+  return normalizeAssetMetadata(next);
 }
 
 export function createAssetSession(input: {
@@ -209,6 +234,7 @@ export function updateAssetDraft(
   changes: {
     readonly content?: string;
     readonly metadata?: AssetMetadata;
+    readonly metadataPatch?: AssetMetadataPatch;
     readonly now?: Date;
   },
 ): AssetDraft {
@@ -216,11 +242,20 @@ export function updateAssetDraft(
   if (session.id !== draft.sessionId) {
     throw new Error(`Asset draft '${draft.id}' does not belong to session '${session.id}'.`);
   }
+  if (changes.metadata && changes.metadataPatch) {
+    throw new Error("Asset draft updates cannot include both full metadata and metadata patch.");
+  }
+
+  const metadata = changes.metadata
+    ? normalizeAssetMetadata(changes.metadata)
+    : changes.metadataPatch
+      ? applyAssetMetadataPatch(draft.metadata, changes.metadataPatch)
+      : draft.metadata;
 
   return Object.freeze({
     ...draft,
     content: changes.content ?? draft.content,
-    metadata: changes.metadata ? normalizeAssetMetadata(changes.metadata) : draft.metadata,
+    metadata,
     revision: draft.revision + 1,
     updatedAt: (changes.now ?? new Date()).toISOString(),
   });

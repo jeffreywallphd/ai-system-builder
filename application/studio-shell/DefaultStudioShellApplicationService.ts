@@ -6,6 +6,7 @@ import {
   updateAssetDraft,
   withStudioSession,
 } from "../../domain/studio-shell/StudioShellDomain";
+import type { AssetDraft } from "../../domain/studio-shell/StudioShellDomain";
 import type { IStudioShellRepository } from "../ports/interfaces/IStudioShellRepository";
 import {
   StudioShellConflictError,
@@ -38,6 +39,18 @@ function assertRequired(value: string, label: string): string {
     throw new StudioShellInvalidRequestError(`${label} is required.`);
   }
   return normalized;
+}
+
+function asInvalidRequest(error: unknown): never {
+  if (error instanceof StudioShellInvalidRequestError || error instanceof StudioShellNotFoundError || error instanceof StudioShellConflictError) {
+    throw error;
+  }
+
+  if (error instanceof Error) {
+    throw new StudioShellInvalidRequestError(error.message);
+  }
+
+  throw new StudioShellInvalidRequestError("Studio shell request could not be processed.");
 }
 
 export class DefaultStudioShellApplicationService implements StudioShellApplicationService {
@@ -102,13 +115,18 @@ export class DefaultStudioShellApplicationService implements StudioShellApplicat
       throw new StudioShellInvalidRequestError(`Session '${sessionId}' does not belong to studio '${studioId}'.`);
     }
 
-    const draft = createAssetDraft({
-      id: command.draftId?.trim() || this.createId("draft"),
-      studioId,
-      session,
-      content: command.content,
-      metadata: command.metadata,
-    });
+    let draft: AssetDraft;
+    try {
+      draft = createAssetDraft({
+        id: command.draftId?.trim() || this.createId("draft"),
+        studioId,
+        session,
+        content: command.content,
+        metadata: command.metadata,
+      });
+    } catch (error) {
+      asInvalidRequest(error);
+    }
 
     const updatedSession = attachDraftToSession(session, draft);
     await this.repository.saveDraft(draft);
@@ -164,10 +182,16 @@ export class DefaultStudioShellApplicationService implements StudioShellApplicat
       throw new StudioShellInvalidRequestError(`Draft '${draft.id}' does not belong to studio '${studio.id}'.`);
     }
 
-    const updatedDraft = updateAssetDraft(draft, session, {
-      content: command.content,
-      metadata: command.metadata,
-    });
+    let updatedDraft: AssetDraft;
+    try {
+      updatedDraft = updateAssetDraft(draft, session, {
+        content: command.content,
+        metadata: command.metadata,
+        metadataPatch: command.metadataPatch,
+      });
+    } catch (error) {
+      asInvalidRequest(error);
+    }
 
     const updatedSession = attachDraftToSession(session, updatedDraft);
     await this.repository.saveDraft(updatedDraft);
