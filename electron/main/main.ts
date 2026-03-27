@@ -62,8 +62,13 @@ import type { AgentConfigurationValidationInput } from "../../application/agents
 import type { AgentRunControlRequest, AgentRunRequest } from "../../application/agents/contracts/AgentRunContracts";
 import type { TriggerAgentLaunchRequest } from "../../application/agents/TriggerAgentLaunchUseCase";
 import { StudioShellBackendApi } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
+import { RegistryBackendApi } from "../../infrastructure/api/registry/RegistryBackendApi";
 import { SqliteStudioShellRepository } from "../../infrastructure/filesystem/studio-shell/SqliteStudioShellRepository";
 import type { CreateAssetDraftCommand, PublishAssetDraftVersionCommand, TransitionAssetDraftLifecycleCommand, UpdateAssetDraftCommand, UpdateAssetDraftDependenciesCommand } from "../../application/studio-shell/contracts";
+import { RegistryQueryService } from "../../application/asset-registry/RegistryQueryService";
+import { CrossStudioRegistryQueryService } from "../../application/asset-registry/CrossStudioRegistryQueryService";
+import { RegistryDependencyGraphService } from "../../application/asset-registry/RegistryDependencyGraphService";
+import { CompositionAssetContractResolver } from "../../application/contracts/CompositionAssetContractResolver";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 if (started) {
@@ -508,6 +513,17 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     explainVersionExistenceUseCase,
     verifyProjectionUseCase,
   );
+  const registryQueryService = new RegistryQueryService(
+    canonicalAssetSystemRepository,
+    canonicalAssetSystemRepository,
+    canonicalAssetSystemRepository,
+    new CompositionAssetContractResolver(),
+    canonicalAssetSystemRepository,
+  );
+  const registryBackendApi = new RegistryBackendApi(
+    new CrossStudioRegistryQueryService(registryQueryService),
+    new RegistryDependencyGraphService(registryQueryService, canonicalAssetSystemRepository, canonicalAssetSystemRepository),
+  );
 
   ipcMain.handle("ai-loom-desktop-canonical-assets:list", async (_event, criteriaJson?: string) => {
     if (!canonicalAssetSystemRepository?.isAvailable) {
@@ -528,6 +544,29 @@ async function bootstrapDesktopRuntime(): Promise<void> {
         transformationCount: entry.transformationCount,
         lineageEdgeCount: entry.lineageEdgeCount,
       }));
+  });
+  ipcMain.handle("ai-loom-desktop-registry:assets", async (_event, limit?: number) => {
+    return JSON.stringify(await registryBackendApi.listAssets(limit));
+  });
+  ipcMain.handle("ai-loom-desktop-registry:assets-filter", async (_event, filtersJson: string) => {
+    const filters = JSON.parse(filtersJson) as Parameters<RegistryBackendApi["filterAssets"]>[0];
+    return JSON.stringify(await registryBackendApi.filterAssets(filters));
+  });
+  ipcMain.handle("ai-loom-desktop-registry:dependencies", async (_event, queryJson: string) => {
+    const query = JSON.parse(queryJson) as Parameters<RegistryBackendApi["getDependencies"]>[0];
+    return JSON.stringify(await registryBackendApi.getDependencies(query));
+  });
+  ipcMain.handle("ai-loom-desktop-registry:dependents", async (_event, queryJson: string) => {
+    const query = JSON.parse(queryJson) as Parameters<RegistryBackendApi["getDependents"]>[0];
+    return JSON.stringify(await registryBackendApi.getDependents(query));
+  });
+  ipcMain.handle("ai-loom-desktop-registry:traverse-upstream", async (_event, queryJson: string) => {
+    const query = JSON.parse(queryJson) as Parameters<RegistryBackendApi["traverseDependencies"]>[0];
+    return JSON.stringify(await registryBackendApi.traverseDependencies(query));
+  });
+  ipcMain.handle("ai-loom-desktop-registry:traverse-downstream", async (_event, queryJson: string) => {
+    const query = JSON.parse(queryJson) as Parameters<RegistryBackendApi["traverseDependents"]>[0];
+    return JSON.stringify(await registryBackendApi.traverseDependents(query));
   });
   ipcMain.handle("ai-loom-desktop-canonical-assets:detail", async (_event, assetId: string) => {
     if (!canonicalAssetSystemRepository?.isAvailable) {

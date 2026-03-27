@@ -1,6 +1,12 @@
 import type { RegistryAsset, RegistryDependencyReference } from "../../domain/asset-registry/RegistryAsset";
 import type { AssetLineageRelationshipType } from "../../domain/assets/AssetLineageEdge";
 import type { IAssetVersionRepository } from "../ports/interfaces/IAssetVersionRepository";
+import type {
+  IRegistryGraphProjectionRepository,
+  RegistryGraphProjectionEdgeRecord,
+  RegistryGraphProjectionNodeRecord,
+} from "../ports/interfaces/IRegistryGraphProjectionRepository";
+import { buildRegistryGraphProjection } from "./RegistryGraphProjection";
 import { RegistryQueryService } from "./RegistryQueryService";
 
 export interface RegistryDependencyGraphNode {
@@ -46,6 +52,14 @@ interface DependencyAdjacency {
   readonly downstreamEdgesByVersionId: Map<string, ReadonlyArray<RegistryDependencyGraphEdge>>;
 }
 
+function toGraphNode(node: RegistryGraphProjectionNodeRecord): RegistryDependencyGraphNode {
+  return Object.freeze({ ...node });
+}
+
+function toGraphEdge(edge: RegistryGraphProjectionEdgeRecord): RegistryDependencyGraphEdge {
+  return Object.freeze({ ...edge });
+}
+
 function appendMapEntry<T>(map: Map<string, ReadonlyArray<T>>, key: string, entry: T): void {
   const existing = map.get(key) ?? Object.freeze([]);
   map.set(key, Object.freeze([...existing, entry]));
@@ -55,6 +69,7 @@ export class RegistryDependencyGraphService {
   constructor(
     private readonly registryQueryService: RegistryQueryService,
     private readonly versionRepository: Pick<IAssetVersionRepository, "getByVersionId">,
+    private readonly projectionRepository?: IRegistryGraphProjectionRepository,
   ) {}
 
   public async expandDirectDependencies(versionId: string): Promise<RegistryDependencyGraph> {
@@ -203,39 +218,22 @@ export class RegistryDependencyGraphService {
   }
 
   private async buildAdjacency(): Promise<DependencyAdjacency> {
-    const registryAssets = await this.registryQueryService.queryRegistry();
+    const projection = await this.loadOrRebuildProjection();
     const nodesByVersionId = new Map<string, RegistryDependencyGraphNode>();
     const upstreamEdgesByVersionId = new Map<string, ReadonlyArray<RegistryDependencyGraphEdge>>();
     const downstreamEdgesByVersionId = new Map<string, ReadonlyArray<RegistryDependencyGraphEdge>>();
-    const dedupedEdges = new Map<string, RegistryDependencyGraphEdge>();
 
-    for (const asset of registryAssets) {
-      if (!asset.versionId) {
-        continue;
-      }
-
-      nodesByVersionId.set(asset.versionId, Object.freeze({
-        assetId: asset.assetId,
-        versionId: asset.versionId,
-        name: asset.name,
-        kind: asset.kind,
-        status: asset.status,
-        taxonomy: asset.taxonomy,
-        isRegistryProjected: true,
-      }));
-
-      for (const dependency of asset.dependencies) {
-        const edge = this.toEdge(asset, dependency);
-        const key = `${edge.fromVersionId}->${edge.toVersionId}:${edge.source}:${edge.relationshipType ?? ""}`;
-        if (!dedupedEdges.has(key)) {
-          dedupedEdges.set(key, edge);
-          appendMapEntry(upstreamEdgesByVersionId, edge.fromVersionId, edge);
-          appendMapEntry(downstreamEdgesByVersionId, edge.toVersionId, edge);
-        }
-      }
+    for (const node of projection.nodes) {
+      nodesByVersionId.set(node.versionId, toGraphNode(node));
     }
 
-    for (const edge of dedupedEdges.values()) {
+    for (const edge of projection.edges) {
+      const mapped = toGraphEdge(edge);
+      appendMapEntry(upstreamEdgesByVersionId, edge.fromVersionId, mapped);
+      appendMapEntry(downstreamEdgesByVersionId, edge.toVersionId, mapped);
+    }
+
+    for (const edge of projection.edges) {
       if (!nodesByVersionId.has(edge.fromVersionId)) {
         const node = await this.lookupNode(edge.fromVersionId, edge.fromAssetId);
         if (node) {
@@ -258,26 +256,33 @@ export class RegistryDependencyGraphService {
     });
   }
 
-  private toEdge(asset: RegistryAsset, dependency: RegistryDependencyReference): RegistryDependencyGraphEdge {
-    if (dependency.direction === "upstream") {
-      return Object.freeze({
-        fromAssetId: asset.assetId,
-        fromVersionId: asset.versionId ?? dependency.versionId,
-        toAssetId: dependency.assetId,
-        toVersionId: dependency.versionId,
-        relationshipType: dependency.relationshipType,
-        source: dependency.source,
-      });
+  private async loadOrRebuildProjection() {
+    if (!this.projectionRepository) {
+      const assets = await this.registryQueryService.queryRegistry();
+      return buildRegistryGraphProjection(assets);
     }
 
-    return Object.freeze({
-      fromAssetId: dependency.assetId,
-      fromVersionId: dependency.versionId,
-      toAssetId: asset.assetId,
-      toVersionId: asset.versionId ?? dependency.versionId,
-      relationshipType: dependency.relationshipType,
-      source: dependency.source,
-    });
+    const [state, currentSignature] = await Promise.all([
+      this.projectionRepository.getProjectionState(),
+      this.projectionRepository.getCurrentSourceSignature?.(),
+    ]);
+
+    const snapshot = await this.projectionRepository.loadProjection();
+    const isSignatureStale = Boolean(
+      currentSignature
+      && snapshot?.sourceSignature
+      && (currentSignature.versionCount !== snapshot.sourceSignature.versionCount
+        || currentSignature.lineageEdgeCount !== snapshot.sourceSignature.lineageEdgeCount),
+    );
+
+    if (snapshot && !state?.dirty && !isSignatureStale) {
+      return snapshot;
+    }
+
+    const assets = await this.registryQueryService.queryRegistry();
+    const rebuilt = buildRegistryGraphProjection(assets, currentSignature);
+    await this.projectionRepository.saveProjection(rebuilt);
+    return rebuilt;
   }
 
   private async getNode(
