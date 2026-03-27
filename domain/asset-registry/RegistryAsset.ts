@@ -37,6 +37,25 @@ export interface RegistryAsset {
   readonly contract?: AssetContractDescriptor;
   readonly provenance: RegistryProvenanceView;
   readonly dependencies: ReadonlyArray<RegistryDependencyReference>;
+  readonly validation?: RegistryAssetValidationInsights;
+}
+
+export interface RegistryAssetValidationIssue {
+  readonly code: string;
+  readonly severity: "warning" | "error";
+  readonly section: "taxonomy" | "contract" | "provenance" | "dependencies" | "behavior" | "lifecycle" | "publish-version";
+  readonly message: string;
+  readonly path?: string;
+}
+
+export interface RegistryAssetValidationInsights {
+  readonly status: "valid" | "warning" | "invalid";
+  readonly issueCount: number;
+  readonly warningCount: number;
+  readonly errorCount: number;
+  readonly incompatibleDependencyCount: number;
+  readonly behaviorMismatchCount: number;
+  readonly issues: ReadonlyArray<RegistryAssetValidationIssue>;
 }
 
 function cloneDate(value?: Date): Date | undefined {
@@ -86,5 +105,22 @@ export function createRegistryAsset(input: RegistryAsset): RegistryAsset {
       relationshipType: dependency.relationshipType,
       source: dependency.source,
     }))),
+    validation: input.validation
+      ? Object.freeze({
+        status: input.validation.status,
+        issueCount: input.validation.issueCount,
+        warningCount: input.validation.warningCount,
+        errorCount: input.validation.errorCount,
+        incompatibleDependencyCount: input.validation.incompatibleDependencyCount,
+        behaviorMismatchCount: input.validation.behaviorMismatchCount,
+        issues: Object.freeze((input.validation.issues ?? []).map((issue) => Object.freeze({
+          code: issue.code.trim(),
+          severity: issue.severity,
+          section: issue.section,
+          message: issue.message.trim(),
+          path: issue.path?.trim() || undefined,
+        }))),
+      })
+      : undefined,
   });
 }

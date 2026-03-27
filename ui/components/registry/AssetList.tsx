@@ -5,9 +5,10 @@ export interface AssetListProps {
   readonly assets: ReadonlyArray<RegistryAsset>;
   readonly isLoading?: boolean;
   readonly error?: string;
+  readonly registryContextQuery?: string;
 }
 
-export function AssetList({ assets, isLoading, error }: AssetListProps): JSX.Element {
+export function AssetList({ assets, isLoading, error, registryContextQuery }: AssetListProps): JSX.Element {
   if (isLoading) {
     return <p className="ui-text-secondary">Loading registry assets…</p>;
   }
@@ -22,7 +23,7 @@ export function AssetList({ assets, isLoading, error }: AssetListProps): JSX.Ele
 
   return (
     <div className="ui-stack ui-stack--sm" data-testid="registry-asset-list">
-      {assets.map((asset) => <AssetListItem key={asset.assetId} asset={asset} />)}
+      {assets.map((asset) => <AssetListItem key={asset.assetId} asset={asset} registryContextQuery={registryContextQuery} />)}
     </div>
   );
 }

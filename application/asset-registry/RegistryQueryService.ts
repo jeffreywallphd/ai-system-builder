@@ -9,9 +9,15 @@ import type { AssetLineageEdge } from "../../domain/assets/AssetLineageEdge";
 import {
   createRegistryAsset,
   type RegistryAsset,
+  type RegistryAssetValidationInsights,
+  type RegistryAssetValidationIssue,
   type RegistryDependencyReference,
 } from "../../domain/asset-registry/RegistryAsset";
 import type { AssetContractDescriptor } from "../../domain/contracts/AssetContract";
+import { evaluateStudioDraftConsistency } from "../studio-shell/AtomicStudioAssetEnforcement";
+import { buildStudioShellValidationIssues } from "../studio-shell/StudioShellValidation";
+import { AssetDraftLifecycleStatuses, type AssetDraft } from "../../domain/studio-shell/StudioShellDomain";
+import { TaxonomySemanticRoles, TaxonomyStructuralKinds, type TaxonomyBehaviorKind, type TaxonomySemanticRole } from "../../domain/taxonomy/CompositionTaxonomy";
 
 export interface RegistryFilterParams {
   readonly structuralKinds?: ReadonlyArray<CompositionTaxonomyDescriptor["structuralKind"]>;
@@ -78,6 +84,14 @@ export class RegistryQueryService {
       const contract = await this.resolveContractProjection(taxonomy, latestIdentity);
       const dependencies = await this.buildDependencyReferences(latestVersion?.versionId);
       const provenance = this.readProvenance(latestVersion?.metadata, asset, dependencies);
+      const validation = await this.buildValidationInsights({
+        assetId: asset.id,
+        versionId: latestVersion?.versionId,
+        taxonomy,
+        contract,
+        dependencies,
+        provenance,
+      });
 
       return createRegistryAsset({
         assetId: asset.id,
@@ -89,6 +103,7 @@ export class RegistryQueryService {
         contract,
         provenance,
         dependencies,
+        validation,
       });
     }));
 
@@ -98,6 +113,133 @@ export class RegistryQueryService {
     }
 
     return Object.freeze(filtered);
+  }
+
+  private async buildValidationInsights(input: {
+    readonly assetId: string;
+    readonly versionId?: string;
+    readonly taxonomy?: CompositionTaxonomyDescriptor;
+    readonly contract?: AssetContractDescriptor;
+    readonly dependencies: ReadonlyArray<RegistryDependencyReference>;
+    readonly provenance: RegistryAsset["provenance"];
+  }): Promise<RegistryAssetValidationInsights> {
+    const syntheticDraft = this.createSyntheticDraft(input);
+    const studioShellIssues = await buildStudioShellValidationIssues({
+      draft: syntheticDraft,
+      knownVersionIds: input.versionId ? [input.versionId] : [],
+      versionExists: async (versionId) => Boolean(await this.versionRepository.getByVersionId(versionId)),
+      resolveDependencyVersion: async (versionId) => {
+        const version = await this.versionRepository.getByVersionId(versionId);
+        if (!version) {
+          return undefined;
+        }
+        const sourceAsset = await this.assetRepository.getById(version.assetId.value);
+        return {
+          assetId: version.assetId.value,
+          taxonomy: sourceAsset ? this.taxonomyClassifier.classifyAsset(sourceAsset) : undefined,
+        };
+      },
+    });
+
+    const expectation = input.taxonomy ? studioExpectationBySemanticRole[input.taxonomy.semanticRole] : undefined;
+    const enforcementIssues = expectation
+      ? evaluateStudioDraftConsistency({
+        draft: syntheticDraft,
+        expectation: {
+          studioType: expectation.studioType,
+          structuralKind: expectation.structuralKind,
+          semanticRole: expectation.semanticRole,
+          allowedBehaviorKinds: expectation.allowedBehaviorKinds,
+        },
+        contractResolver: this.contractResolver,
+      })
+      : [];
+
+    const issues: RegistryAssetValidationIssue[] = [
+      ...studioShellIssues.map((issue) => ({
+        code: issue.code,
+        severity: issue.severity,
+        section: issue.section,
+        message: issue.message,
+        path: issue.path,
+      })),
+      ...enforcementIssues.map((issue) => ({
+        code: issue.code,
+        severity: "error" as const,
+        section: issue.code === "taxonomy-behavior-kind-mismatch" ? "behavior" as const : "contract" as const,
+        message: issue.message,
+      })),
+    ];
+
+    const deduped = new Map<string, RegistryAssetValidationIssue>();
+    for (const issue of issues) {
+      const key = `${issue.code}:${issue.severity}:${issue.section}:${issue.path ?? ""}:${issue.message}`;
+      deduped.set(key, Object.freeze(issue));
+    }
+
+    const projected = Object.freeze([...deduped.values()]);
+    const warningCount = projected.filter((issue) => issue.severity === "warning").length;
+    const errorCount = projected.length - warningCount;
+    const incompatibleDependencyCount = projected.filter((issue) => (
+      issue.code === "composite-dependency-semantic-role-disallowed"
+      || issue.code === "dependency-asset-version-mismatch"
+      || issue.code === "dependency-version-not-found"
+    )).length;
+    const behaviorMismatchCount = projected.filter((issue) => issue.code === "taxonomy-behavior-kind-mismatch").length;
+
+    return Object.freeze({
+      status: errorCount > 0 ? "invalid" : warningCount > 0 ? "warning" : "valid",
+      issueCount: projected.length,
+      warningCount,
+      errorCount,
+      incompatibleDependencyCount,
+      behaviorMismatchCount,
+      issues: projected,
+    });
+  }
+
+  private createSyntheticDraft(input: {
+    readonly assetId: string;
+    readonly versionId?: string;
+    readonly taxonomy?: CompositionTaxonomyDescriptor;
+    readonly contract?: AssetContractDescriptor;
+    readonly dependencies: ReadonlyArray<RegistryDependencyReference>;
+    readonly provenance: RegistryAsset["provenance"];
+  }): AssetDraft {
+    const versionScopedDependencies = input.dependencies
+      .filter((entry) => entry.direction === "upstream")
+      .map((entry) => ({
+        assetId: entry.assetId,
+        versionId: entry.versionId,
+      }));
+
+    return Object.freeze({
+      id: `${input.assetId}::registry`,
+      assetId: input.assetId,
+      studioId: "registry-projection",
+      sessionId: "registry-read-session",
+      content: "",
+      metadata: {
+        title: input.assetId,
+        tags: [],
+        taxonomy: input.taxonomy,
+        contract: input.contract,
+        provenance: {
+          creatorId: input.provenance.creatorId,
+          sourceType: input.provenance.sourceType,
+          sourceLabel: input.provenance.sourceLabel,
+          derivationContext: input.provenance.derivationContext,
+          upstreamAssets: input.provenance.upstreamAssets,
+        },
+      },
+      dependencies: versionScopedDependencies,
+      lifecycleStatus: AssetDraftLifecycleStatuses.published,
+      revision: 1,
+      publishedVersionIds: input.versionId ? [input.versionId] : [],
+      lastPublishedVersionId: input.versionId,
+      createdAt: (input.provenance.createdAt ?? new Date()).toISOString(),
+      updatedAt: (input.provenance.updatedAt ?? new Date()).toISOString(),
+    });
   }
 
   private async resolveContractProjection(
@@ -316,3 +458,79 @@ export class RegistryQueryService {
     return true;
   }
 }
+
+const studioExpectationBySemanticRole: Readonly<
+  Partial<Record<TaxonomySemanticRole, {
+    readonly studioType: string;
+    readonly structuralKind: CompositionTaxonomyDescriptor["structuralKind"];
+    readonly semanticRole: TaxonomySemanticRole;
+    readonly allowedBehaviorKinds: ReadonlyArray<TaxonomyBehaviorKind>;
+  }>>
+> = Object.freeze({
+  [TaxonomySemanticRoles.model]: Object.freeze({
+    studioType: "model-studio",
+    structuralKind: TaxonomyStructuralKinds.atomic,
+    semanticRole: TaxonomySemanticRoles.model,
+    allowedBehaviorKinds: Object.freeze(["none"]),
+  }),
+  [TaxonomySemanticRoles.dataset]: Object.freeze({
+    studioType: "dataset-studio",
+    structuralKind: TaxonomyStructuralKinds.atomic,
+    semanticRole: TaxonomySemanticRoles.dataset,
+    allowedBehaviorKinds: Object.freeze(["none"]),
+  }),
+  [TaxonomySemanticRoles.tool]: Object.freeze({
+    studioType: "tool-studio",
+    structuralKind: TaxonomyStructuralKinds.atomic,
+    semanticRole: TaxonomySemanticRoles.tool,
+    allowedBehaviorKinds: Object.freeze(["conditional", "deterministic"]),
+  }),
+  [TaxonomySemanticRoles.promptTemplate]: Object.freeze({
+    studioType: "prompt-template-studio",
+    structuralKind: TaxonomyStructuralKinds.atomic,
+    semanticRole: TaxonomySemanticRoles.promptTemplate,
+    allowedBehaviorKinds: Object.freeze(["none"]),
+  }),
+  [TaxonomySemanticRoles.embeddingIndex]: Object.freeze({
+    studioType: "embedding-index-studio",
+    structuralKind: TaxonomyStructuralKinds.atomic,
+    semanticRole: TaxonomySemanticRoles.embeddingIndex,
+    allowedBehaviorKinds: Object.freeze(["none"]),
+  }),
+  [TaxonomySemanticRoles.configProfile]: Object.freeze({
+    studioType: "config-profile-studio",
+    structuralKind: TaxonomyStructuralKinds.atomic,
+    semanticRole: TaxonomySemanticRoles.configProfile,
+    allowedBehaviorKinds: Object.freeze(["none"]),
+  }),
+  [TaxonomySemanticRoles.workflow]: Object.freeze({
+    studioType: "workflow-studio",
+    structuralKind: TaxonomyStructuralKinds.composite,
+    semanticRole: TaxonomySemanticRoles.workflow,
+    allowedBehaviorKinds: Object.freeze(["deterministic", "conditional", "iterative"]),
+  }),
+  [TaxonomySemanticRoles.contextBundle]: Object.freeze({
+    studioType: "context-bundle-studio",
+    structuralKind: TaxonomyStructuralKinds.composite,
+    semanticRole: TaxonomySemanticRoles.contextBundle,
+    allowedBehaviorKinds: Object.freeze(["none", "deterministic"]),
+  }),
+  [TaxonomySemanticRoles.datasetPipeline]: Object.freeze({
+    studioType: "dataset-pipeline-studio",
+    structuralKind: TaxonomyStructuralKinds.composite,
+    semanticRole: TaxonomySemanticRoles.datasetPipeline,
+    allowedBehaviorKinds: Object.freeze(["deterministic", "iterative"]),
+  }),
+  [TaxonomySemanticRoles.trainingRecipe]: Object.freeze({
+    studioType: "training-recipe-studio",
+    structuralKind: TaxonomyStructuralKinds.composite,
+    semanticRole: TaxonomySemanticRoles.trainingRecipe,
+    allowedBehaviorKinds: Object.freeze(["deterministic"]),
+  }),
+  [TaxonomySemanticRoles.toolChain]: Object.freeze({
+    studioType: "tool-chain-studio",
+    structuralKind: TaxonomyStructuralKinds.composite,
+    semanticRole: TaxonomySemanticRoles.toolChain,
+    allowedBehaviorKinds: Object.freeze(["deterministic"]),
+  }),
+});

@@ -88,6 +88,7 @@ export interface RegistryDependencyGraphProps {
   readonly rootVersionId?: string;
   readonly upstreamNodes: ReadonlyArray<{ readonly assetId: string; readonly versionId: string; readonly name?: string }>;
   readonly downstreamNodes: ReadonlyArray<{ readonly assetId: string; readonly versionId: string; readonly name?: string }>;
+  readonly registryContextQuery?: string;
 }
 
 function toDetailPath(assetId: string): string {
@@ -98,10 +99,12 @@ function NodeList({
   title,
   nodes,
   emptyMessage,
+  registryContextQuery,
 }: {
   readonly title: string;
   readonly nodes: ReadonlyArray<{ readonly assetId: string; readonly versionId: string; readonly name?: string }>;
   readonly emptyMessage: string;
+  readonly registryContextQuery?: string;
 }): JSX.Element {
   return (
     <div className="ui-stack ui-stack--2xs">
@@ -112,7 +115,13 @@ function NodeList({
         <ul className="ui-stack ui-stack--2xs" style={{ margin: 0, paddingLeft: "1rem" }}>
           {nodes.map((node) => (
             <li key={`${node.assetId}:${node.versionId}`}>
-              <Link to={toDetailPath(node.assetId)}>{node.name ?? node.assetId}</Link>
+              <Link
+                to={registryContextQuery
+                  ? `${toDetailPath(node.assetId)}?registryContext=${encodeURIComponent(registryContextQuery)}`
+                  : toDetailPath(node.assetId)}
+              >
+                {node.name ?? node.assetId}
+              </Link>
               <span className="ui-text-small ui-text-secondary"> · {node.versionId}</span>
             </li>
           ))}
@@ -127,6 +136,7 @@ export function DependencyGraphPanel({
   rootVersionId,
   upstreamNodes,
   downstreamNodes,
+  registryContextQuery,
 }: RegistryDependencyGraphProps): JSX.Element {
   return (
     <DetailPanel title="Dependency Graph" testId="registry-asset-graph-panel">
@@ -138,11 +148,13 @@ export function DependencyGraphPanel({
           title="Upstream dependencies"
           nodes={upstreamNodes}
           emptyMessage="No direct upstream dependencies were found."
+          registryContextQuery={registryContextQuery}
         />
         <NodeList
           title="Downstream dependents"
           nodes={downstreamNodes}
           emptyMessage="No direct downstream dependents were found."
+          registryContextQuery={registryContextQuery}
         />
       </div>
     </DetailPanel>

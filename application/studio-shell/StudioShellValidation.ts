@@ -180,6 +180,18 @@ function isDependencyTaxonomyAllowed(
   return allowed.has(dependencyTaxonomy.semanticRole);
 }
 
+export function isDependencySemanticRoleAllowedForCompositeRole(
+  compositeRole: TaxonomySemanticRole,
+  dependencyRole: TaxonomySemanticRole,
+): boolean {
+  const allowed = allowedDependencyRolesByCompositeRole[compositeRole];
+  if (!allowed) {
+    return true;
+  }
+
+  return allowed.has(dependencyRole);
+}
+
 const allowedDependencyRolesByCompositeRole: Readonly<
   Partial<Record<TaxonomySemanticRole, ReadonlySet<TaxonomySemanticRole>>>
 > = Object.freeze({

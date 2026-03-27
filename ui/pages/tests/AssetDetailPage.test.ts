@@ -13,13 +13,17 @@ describe("AssetDetailPage", () => {
     expect(source).toContain("AssetContractPanel");
     expect(source).toContain("AssetProvenancePanel");
     expect(source).toContain("AssetDependencySummaryPanel");
+    expect(source).toContain("AssetValidationSummary");
+    expect(source).toContain("DependencyCompatibilityPanel");
     expect(source).toContain("DependencyGraphPanel");
   });
 
-  it("keeps registry navigation back-link and progressive detail wording", () => {
+  it("keeps registry navigation handoff links and progressive detail wording", () => {
     const source = readSource("ui/pages/AssetDetailPage.tsx");
 
     expect(source).toContain("Back to registry");
+    expect(source).toContain("Open in studio");
+    expect(source).toContain("registryContext");
     expect(source).toContain("Unified detail view for registry taxonomy, contract, provenance, versions, and dependency lineage");
   });
 });

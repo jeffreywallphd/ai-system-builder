@@ -17,5 +17,14 @@ describe("registry detail UI components", () => {
     expect(source).toContain("registry-asset-graph-panel");
     expect(source).toContain("Upstream dependencies");
     expect(source).toContain("Downstream dependents");
+    expect(source).toContain("registryContext");
+  });
+
+  it("keeps focused validation and compatibility panels", () => {
+    const source = readSource("ui/components/registry/AssetValidationPanels.tsx");
+
+    expect(source).toContain("registry-asset-validation-summary-panel");
+    expect(source).toContain("registry-asset-dependency-compatibility-panel");
+    expect(source).toContain("Incompatible dependencies");
   });
 });
