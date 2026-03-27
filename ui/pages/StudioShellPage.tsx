@@ -4,6 +4,13 @@ import type { StudioShellSnapshotReadModel, StudioShellValidationIssue } from ".
 import { StudioShellService } from "../services/StudioShellService";
 import { StudioShellPanel } from "../components/studio-shell/StudioShellPanel";
 import { StudioShellValidationIssuesPanel } from "../components/studio-shell/StudioShellValidationIssuesPanel";
+import {
+  StudioShellExtensionRegistry,
+  StudioShellExtensionSlots,
+  type StudioShellExtensionContext,
+  type StudioShellExtensionContribution,
+  type StudioShellExtensionSlot,
+} from "../studio-shell/StudioShellExtensions";
 
 const DEFAULT_STUDIO_ID = "studio-shell-main";
 
@@ -18,8 +25,38 @@ function safeParseJson<T>(value: string, fallback: T): T {
   }
 }
 
-export default function StudioShellPage(): JSX.Element {
+interface StudioShellPageProps {
+  readonly extensions?: ReadonlyArray<StudioShellExtensionContribution>;
+}
+
+function renderExtensions(
+  registry: StudioShellExtensionRegistry,
+  slot: StudioShellExtensionSlot,
+  context: StudioShellExtensionContext,
+): JSX.Element | null {
+  const extensions = registry.listBySlot(slot);
+  if (extensions.length === 0) {
+    return null;
+  }
+
+  return (
+    <>
+      {extensions.map((extension) => (
+        <StudioShellPanel key={extension.id} title={extension.title} subtitle={extension.subtitle}>
+          {extension.render(context)}
+        </StudioShellPanel>
+      ))}
+    </>
+  );
+}
+
+export default function StudioShellPage({ extensions = [] }: StudioShellPageProps): JSX.Element {
   const service = useMemo(() => new StudioShellService(), []);
+  const extensionRegistry = useMemo(() => {
+    const registry = new StudioShellExtensionRegistry();
+    registry.registerMany(extensions);
+    return registry;
+  }, [extensions]);
   const [snapshot, setSnapshot] = useState<StudioShellSnapshotReadModel | undefined>();
   const [error, setError] = useState<string | undefined>();
   const [validationIssues, setValidationIssues] = useState<ReadonlyArray<StudioShellValidationIssue>>([]);
@@ -79,6 +116,14 @@ export default function StudioShellPage(): JSX.Element {
   const sessionId = snapshot?.activeSessionId;
   const draftId = snapshot?.draft?.draftId;
 
+  const extensionContext: StudioShellExtensionContext = {
+    studioId: DEFAULT_STUDIO_ID,
+    snapshot,
+    validationIssues,
+    operationError: error,
+    isBusy,
+  };
+
   return (
     <section className="ui-page ui-stack ui-stack--md" data-testid="studio-shell-page">
       <div className="ui-page__hero">
@@ -101,6 +146,7 @@ export default function StudioShellPage(): JSX.Element {
             <button className="ui-button" disabled={isBusy} onClick={() => { void runAndRefresh(() => service.startSession(DEFAULT_STUDIO_ID)); }}>Start Session</button>
           </div>
         </StudioShellPanel>
+        {renderExtensions(extensionRegistry, StudioShellExtensionSlots.sessionContext, extensionContext)}
 
         <StudioShellPanel title="Asset draft authoring" subtitle="Thin authoring surface over studio-shell draft contracts.">
           <textarea className="ui-textarea" rows={8} value={content} onChange={(event) => setContent(event.target.value)} />
@@ -135,11 +181,13 @@ export default function StudioShellPage(): JSX.Element {
             </button>
           </div>
         </StudioShellPanel>
+        {renderExtensions(extensionRegistry, StudioShellExtensionSlots.draftAuthoring, extensionContext)}
 
         <StudioShellPanel title="Taxonomy / contract / provenance" subtitle="JSON metadata patch surface (backend/application remains authoritative).">
           <textarea className="ui-textarea" rows={8} value={metadataPatchJson} onChange={(event) => setMetadataPatchJson(event.target.value)} />
           <p className="ui-text-muted">Use keys like taxonomy, contract, provenance, title, summary, and tags in metadataPatch JSON.</p>
         </StudioShellPanel>
+        {renderExtensions(extensionRegistry, StudioShellExtensionSlots.metadata, extensionContext)}
 
         <StudioShellPanel title="Dependencies" subtitle="Draft dependency references and version pinning.">
           <textarea className="ui-textarea" rows={8} value={dependenciesJson} onChange={(event) => setDependenciesJson(event.target.value)} />
@@ -162,6 +210,7 @@ export default function StudioShellPage(): JSX.Element {
             Save Dependencies
           </button>
         </StudioShellPanel>
+        {renderExtensions(extensionRegistry, StudioShellExtensionSlots.dependencies, extensionContext)}
 
         <StudioShellPanel title="Lifecycle / publish / version status" subtitle="Explicit draft lifecycle transitions and publish/version operations.">
           <div className="ui-stack ui-stack--2xs">
@@ -237,8 +286,10 @@ export default function StudioShellPage(): JSX.Element {
             ))}
           </ul>
         </StudioShellPanel>
+        {renderExtensions(extensionRegistry, StudioShellExtensionSlots.lifecycle, extensionContext)}
 
         <StudioShellValidationIssuesPanel operationError={error} validationIssues={validationIssues} />
+        {renderExtensions(extensionRegistry, StudioShellExtensionSlots.validation, extensionContext)}
       </div>
     </section>
   );

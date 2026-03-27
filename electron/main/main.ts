@@ -62,7 +62,7 @@ import type { AgentConfigurationValidationInput } from "../../application/agents
 import type { AgentRunControlRequest, AgentRunRequest } from "../../application/agents/contracts/AgentRunContracts";
 import type { TriggerAgentLaunchRequest } from "../../application/agents/TriggerAgentLaunchUseCase";
 import { StudioShellBackendApi } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
-import { InMemoryStudioShellRepository } from "../../infrastructure/studio-shell/InMemoryStudioShellRepository";
+import { SqliteStudioShellRepository } from "../../infrastructure/filesystem/studio-shell/SqliteStudioShellRepository";
 import type { CreateAssetDraftCommand, PublishAssetDraftVersionCommand, TransitionAssetDraftLifecycleCommand, UpdateAssetDraftCommand, UpdateAssetDraftDependenciesCommand } from "../../application/studio-shell/contracts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -84,6 +84,7 @@ let canonicalProjectionSink: InMemoryAssetLineageGraphProjectionSink | undefined
 let agentRepository: SqliteAgentRepository | undefined;
 let agentSessionRepository: SqliteAgentExecutionSessionRepository | undefined;
 let serviceSupervisor: DesktopServiceSupervisor | undefined;
+let studioShellRepository: SqliteStudioShellRepository | undefined;
 let bootstrapContext: DesktopBootstrapContext | undefined;
 
 function toFileEntry(filePath: string) {
@@ -285,7 +286,8 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     sessionRepository: agentSessionRepository,
   });
   const agentStudioBackendApi = new AgentStudioBackendApi(agentRepository, agentSessionRepository, agentRunner);
-  const studioShellBackendApi = new StudioShellBackendApi(new InMemoryStudioShellRepository());
+  studioShellRepository = new SqliteStudioShellRepository(path.join(storagePaths.storageDirectory, "studio-shell", "studio-shell.sqlite"));
+  const studioShellBackendApi = new StudioShellBackendApi(studioShellRepository);
   const executionHistoryInfrastructure = createExecutionHistoryInfrastructure(executionRunRepository);
   getExecutionRunUseCase = new GetExecutionRunUseCase(executionRunRepository);
   listExecutionRunsUseCase = executionHistoryInfrastructure.listExecutionRunsUseCase;
@@ -676,4 +678,5 @@ app.on("before-quit", async () => {
   storageDatabase?.dispose();
   executionRunRepository?.dispose();
   agentRepository?.dispose();
+  studioShellRepository?.dispose();
 });
