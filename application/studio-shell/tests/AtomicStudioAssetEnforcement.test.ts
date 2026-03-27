@@ -7,6 +7,10 @@ import {
   createPromptTemplateAssetMetadata,
   createPromptTemplateStudioTaxonomy,
 } from "../../../domain/prompt-template-studio/PromptTemplateStudioDomain";
+import {
+  createEmbeddingIndexAssetMetadata,
+  createEmbeddingIndexStudioTaxonomy,
+} from "../../../domain/embedding-index-studio/EmbeddingIndexStudioDomain";
 import { createAssetDraft, createAssetSession } from "../../../domain/studio-shell/StudioShellDomain";
 import { evaluateAtomicStudioDraftConsistency } from "../AtomicStudioAssetEnforcement";
 import type { AssetMetadata } from "../../../domain/studio-shell/StudioShellDomain";
@@ -29,11 +33,12 @@ function createAtomicDraft(input: {
 }
 
 describe("evaluateAtomicStudioDraftConsistency", () => {
-  it("accepts model/dataset/tool/prompt-template atomic drafts when taxonomy + contract align with shared seams", () => {
+  it("accepts model/dataset/tool/prompt-template/embedding-index atomic drafts when taxonomy + contract align with shared seams", () => {
     const modelTaxonomy = createModelStudioTaxonomy();
     const datasetTaxonomy = createDatasetStudioTaxonomy();
     const toolTaxonomy = createToolStudioTaxonomy("conditional");
     const promptTemplateTaxonomy = createPromptTemplateStudioTaxonomy();
+    const embeddingIndexTaxonomy = createEmbeddingIndexStudioTaxonomy();
 
     const modelDraft = createAtomicDraft({
       draftId: "draft-model",
@@ -68,6 +73,14 @@ describe("evaluateAtomicStudioDraftConsistency", () => {
         contract: resolver.resolveContractForTaxonomy(promptTemplateTaxonomy),
       }),
     });
+    const embeddingIndexDraft = createAtomicDraft({
+      draftId: "draft-embedding-index",
+      studioId: "studio-embedding-indexes",
+      metadata: createEmbeddingIndexAssetMetadata({
+        title: "Embedding Index",
+        contract: resolver.resolveContractForTaxonomy(embeddingIndexTaxonomy),
+      }),
+    });
 
     expect(evaluateAtomicStudioDraftConsistency({
       draft: modelDraft,
@@ -87,6 +100,11 @@ describe("evaluateAtomicStudioDraftConsistency", () => {
     expect(evaluateAtomicStudioDraftConsistency({
       draft: promptTemplateDraft,
       expectation: { studioType: "prompt-template-studio", semanticRole: "prompt-template", allowedBehaviorKinds: ["none"] },
+      contractResolver: resolver,
+    })).toEqual([]);
+    expect(evaluateAtomicStudioDraftConsistency({
+      draft: embeddingIndexDraft,
+      expectation: { studioType: "embedding-index-studio", semanticRole: "embedding-index", allowedBehaviorKinds: ["none"] },
       contractResolver: resolver,
     })).toEqual([]);
   });

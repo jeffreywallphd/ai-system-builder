@@ -61,7 +61,7 @@ function installBridge(api: StudioShellBackendApi): void {
 }
 
 describe("StudioShellService integration", () => {
-  it("keeps model/dataset/tool/prompt-template lifecycle and persisted contract-taxonomy behavior consistent across shared seams", async () => {
+  it("keeps model/dataset/tool/prompt-template/embedding-index lifecycle and persisted contract-taxonomy behavior consistent across shared seams", async () => {
     const root = mkdtempSync(path.join(tmpdir(), "loom-atomic-studio-consistency-"));
     createdRoots.push(root);
     const databasePath = path.join(root, "atomic-studio.sqlite");
@@ -103,6 +103,14 @@ describe("StudioShellService integration", () => {
         behaviorKind: "none" as const,
         content: "{\"promptTemplateSpec\":{\"format\":\"mustache\",\"template\":\"You are a helpful assistant for {{audience}}.\",\"variables\":[\"audience\"]}}",
         dependencies: [{ assetId: "asset:prompt-library", versionId: "asset:prompt-library:v1" }],
+      },
+      {
+        studioId: "studio-embedding-indexes",
+        name: "Embedding Index Studio",
+        semanticRole: "embedding-index" as const,
+        behaviorKind: "none" as const,
+        content: "{\"embeddingIndexSpec\":{\"provider\":\"local\",\"indexAlgorithm\":\"hnsw\",\"distanceMetric\":\"cosine\"}}",
+        dependencies: [{ assetId: "asset:embedding-corpus", versionId: "asset:embedding-corpus:v1" }],
       },
     ];
 
