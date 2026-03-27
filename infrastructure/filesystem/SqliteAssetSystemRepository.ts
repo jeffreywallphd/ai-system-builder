@@ -16,6 +16,11 @@ import type { ICanonicalAssetIdentityRepository, CanonicalAssetIdentityRecord, C
 import type { CanonicalAssetQueryCriteria, IAssetSystemQueryRepository } from "../../application/ports/interfaces/IAssetSystemQueryRepository";
 import type { CanonicalDependencyStateSummary } from "../../application/assets-system/CanonicalDependencyStateUseCase";
 import type { ICanonicalDependencyStateRepository } from "../../application/ports/interfaces/ICanonicalDependencyStateRepository";
+import type {
+  IRegistryGraphProjectionRepository,
+  RegistryGraphProjectionSnapshot,
+  RegistryGraphProjectionState,
+} from "../../application/ports/interfaces/IRegistryGraphProjectionRepository";
 
 interface AssetRow { readonly asset_json: string; }
 interface AssetVersionRow {
@@ -40,6 +45,16 @@ interface DependencyStateRow {
   readonly summary_json: string;
   readonly computed_at: string;
 }
+interface RegistryGraphProjectionRow {
+  readonly node_json?: string;
+  readonly edge_json?: string;
+}
+interface RegistryGraphProjectionStateRow {
+  readonly is_dirty: number;
+  readonly computed_at?: string | null;
+  readonly source_version_count?: number | null;
+  readonly source_lineage_edge_count?: number | null;
+}
 
 function parseIdentityTaxonomy(row: IdentityRow): CompositionTaxonomyDescriptor | undefined {
   if (!row.structural_kind || !row.semantic_role || !row.behavior_kind) {
@@ -57,7 +72,7 @@ function parseIdentityTaxonomy(row: IdentityRow): CompositionTaxonomyDescriptor 
   }
 }
 
-const SCHEMA_VERSION = 6;
+const SCHEMA_VERSION = 7;
 const MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   [1, `
     CREATE TABLE asset_system_migrations (
@@ -155,6 +170,45 @@ const MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
     ALTER TABLE canonical_asset_identities ADD COLUMN behavior_kind TEXT;
     CREATE INDEX IF NOT EXISTS canonical_identity_taxonomy_idx ON canonical_asset_identities(structural_kind, semantic_role, behavior_kind, updated_at DESC);
   `],
+  [7, `
+    CREATE TABLE IF NOT EXISTS registry_dependency_projection_nodes (
+      version_id TEXT PRIMARY KEY,
+      asset_id TEXT NOT NULL,
+      name TEXT,
+      kind TEXT,
+      status TEXT,
+      structural_kind TEXT,
+      semantic_role TEXT,
+      behavior_kind TEXT,
+      is_registry_projected INTEGER NOT NULL DEFAULT 1,
+      updated_at TEXT NOT NULL,
+      node_json TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS registry_dependency_projection_edges (
+      edge_key TEXT PRIMARY KEY,
+      from_version_id TEXT NOT NULL,
+      to_version_id TEXT NOT NULL,
+      from_asset_id TEXT NOT NULL,
+      to_asset_id TEXT NOT NULL,
+      source TEXT NOT NULL,
+      relationship_type TEXT,
+      updated_at TEXT NOT NULL,
+      edge_json TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS registry_projection_edges_from_idx ON registry_dependency_projection_edges(from_version_id, updated_at DESC);
+    CREATE INDEX IF NOT EXISTS registry_projection_edges_to_idx ON registry_dependency_projection_edges(to_version_id, updated_at DESC);
+    CREATE TABLE IF NOT EXISTS registry_dependency_projection_state (
+      projection_id TEXT PRIMARY KEY CHECK (projection_id = 'default'),
+      is_dirty INTEGER NOT NULL,
+      computed_at TEXT,
+      source_version_count INTEGER,
+      source_lineage_edge_count INTEGER,
+      updated_at TEXT NOT NULL
+    );
+    INSERT INTO registry_dependency_projection_state (projection_id, is_dirty, computed_at, source_version_count, source_lineage_edge_count, updated_at)
+    VALUES ('default', 1, NULL, NULL, NULL, CURRENT_TIMESTAMP)
+    ON CONFLICT(projection_id) DO NOTHING;
+  `],
 ]);
 
 export class SqliteAssetSystemRepository implements
@@ -164,6 +218,7 @@ export class SqliteAssetSystemRepository implements
   IAssetTransformationRepository,
   ICanonicalAssetIdentityRepository,
   ICanonicalDependencyStateRepository,
+  IRegistryGraphProjectionRepository,
   IAssetSystemQueryRepository {
   private database?: Database.Database;
   private initialized = false;
@@ -303,6 +358,7 @@ export class SqliteAssetSystemRepository implements
       contentSha256: version.contentSha256,
       versionJson: JSON.stringify(version),
     });
+    await this.markProjectionDirty();
   }
 
   public async getByVersionId(versionId: string): Promise<AssetVersion | undefined> {
@@ -355,6 +411,7 @@ export class SqliteAssetSystemRepository implements
       createdAt: edge.createdAt.toISOString(),
       edgeJson: JSON.stringify(edge),
     });
+    await this.markProjectionDirty();
   }
 
   public async listEdgesByVersionId(versionId: string, direction: AssetLineageDirection = "both"): Promise<ReadonlyArray<AssetLineageEdge>> {
@@ -581,6 +638,159 @@ export class SqliteAssetSystemRepository implements
       versionId: row.version_id,
       summary: this.parseDependencyState(row.summary_json),
       computedAt: new Date(row.computed_at),
+    });
+  }
+
+  public async loadProjection(): Promise<RegistryGraphProjectionSnapshot | undefined> {
+    const state = await this.getProjectionState();
+    if (!state?.computedAt) {
+      return undefined;
+    }
+
+    const nodes = this.getDatabase()
+      .prepare("SELECT node_json FROM registry_dependency_projection_nodes ORDER BY updated_at DESC, version_id ASC")
+      .all() as RegistryGraphProjectionRow[];
+    const edges = this.getDatabase()
+      .prepare("SELECT edge_json FROM registry_dependency_projection_edges ORDER BY updated_at DESC, edge_key ASC")
+      .all() as RegistryGraphProjectionRow[];
+
+    return Object.freeze({
+      nodes: Object.freeze(
+        nodes
+          .map((row) => row.node_json)
+          .filter((row): row is string => typeof row === "string")
+          .map((row) => Object.freeze(JSON.parse(row))),
+      ),
+      edges: Object.freeze(
+        edges
+          .map((row) => row.edge_json)
+          .filter((row): row is string => typeof row === "string")
+          .map((row) => Object.freeze(JSON.parse(row))),
+      ),
+      computedAt: state.computedAt,
+      sourceSignature: state.sourceSignature,
+    });
+  }
+
+  public async saveProjection(snapshot: RegistryGraphProjectionSnapshot): Promise<void> {
+    const db = this.getDatabase();
+    const computedAt = snapshot.computedAt.toISOString();
+    const transaction = db.transaction(() => {
+      db.prepare("DELETE FROM registry_dependency_projection_nodes").run();
+      db.prepare("DELETE FROM registry_dependency_projection_edges").run();
+
+      const insertNode = db.prepare(`
+        INSERT INTO registry_dependency_projection_nodes (
+          version_id, asset_id, name, kind, status, structural_kind, semantic_role, behavior_kind, is_registry_projected, updated_at, node_json
+        ) VALUES (
+          @versionId, @assetId, @name, @kind, @status, @structuralKind, @semanticRole, @behaviorKind, @isRegistryProjected, @updatedAt, @nodeJson
+        )
+      `);
+      for (const node of snapshot.nodes) {
+        insertNode.run({
+          versionId: node.versionId,
+          assetId: node.assetId,
+          name: node.name,
+          kind: node.kind,
+          status: node.status,
+          structuralKind: node.taxonomy?.structuralKind,
+          semanticRole: node.taxonomy?.semanticRole,
+          behaviorKind: node.taxonomy?.behaviorKind,
+          isRegistryProjected: node.isRegistryProjected ? 1 : 0,
+          updatedAt: computedAt,
+          nodeJson: JSON.stringify(node),
+        });
+      }
+
+      const insertEdge = db.prepare(`
+        INSERT INTO registry_dependency_projection_edges (
+          edge_key, from_version_id, to_version_id, from_asset_id, to_asset_id, source, relationship_type, updated_at, edge_json
+        ) VALUES (
+          @edgeKey, @fromVersionId, @toVersionId, @fromAssetId, @toAssetId, @source, @relationshipType, @updatedAt, @edgeJson
+        )
+      `);
+      for (const edge of snapshot.edges) {
+        const edgeKey = `${edge.fromVersionId}->${edge.toVersionId}:${edge.source}:${edge.relationshipType ?? ""}`;
+        insertEdge.run({
+          edgeKey,
+          fromVersionId: edge.fromVersionId,
+          toVersionId: edge.toVersionId,
+          fromAssetId: edge.fromAssetId,
+          toAssetId: edge.toAssetId,
+          source: edge.source,
+          relationshipType: edge.relationshipType,
+          updatedAt: computedAt,
+          edgeJson: JSON.stringify(edge),
+        });
+      }
+
+      db.prepare(`
+        INSERT INTO registry_dependency_projection_state (
+          projection_id, is_dirty, computed_at, source_version_count, source_lineage_edge_count, updated_at
+        ) VALUES (
+          'default', 0, @computedAt, @sourceVersionCount, @sourceLineageEdgeCount, @updatedAt
+        )
+        ON CONFLICT(projection_id) DO UPDATE SET
+          is_dirty = excluded.is_dirty,
+          computed_at = excluded.computed_at,
+          source_version_count = excluded.source_version_count,
+          source_lineage_edge_count = excluded.source_lineage_edge_count,
+          updated_at = excluded.updated_at
+      `).run({
+        computedAt,
+        sourceVersionCount: snapshot.sourceSignature?.versionCount ?? null,
+        sourceLineageEdgeCount: snapshot.sourceSignature?.lineageEdgeCount ?? null,
+        updatedAt: computedAt,
+      });
+    });
+
+    transaction();
+  }
+
+  public async markProjectionDirty(): Promise<void> {
+    const updatedAt = new Date().toISOString();
+    this.getDatabase().prepare(`
+      INSERT INTO registry_dependency_projection_state (
+        projection_id, is_dirty, computed_at, source_version_count, source_lineage_edge_count, updated_at
+      ) VALUES (
+        'default', 1, NULL, NULL, NULL, @updatedAt
+      )
+      ON CONFLICT(projection_id) DO UPDATE SET
+        is_dirty = 1,
+        updated_at = excluded.updated_at
+    `).run({ updatedAt });
+  }
+
+  public async getProjectionState(): Promise<RegistryGraphProjectionState | undefined> {
+    const row = this.getDatabase().prepare(`
+      SELECT is_dirty, computed_at, source_version_count, source_lineage_edge_count
+      FROM registry_dependency_projection_state
+      WHERE projection_id = 'default'
+    `).get() as RegistryGraphProjectionStateRow | undefined;
+
+    if (!row) {
+      return undefined;
+    }
+
+    return Object.freeze({
+      dirty: row.is_dirty === 1,
+      computedAt: row.computed_at ? new Date(row.computed_at) : undefined,
+      sourceSignature:
+        typeof row.source_version_count === "number" && typeof row.source_lineage_edge_count === "number"
+          ? Object.freeze({
+            versionCount: row.source_version_count,
+            lineageEdgeCount: row.source_lineage_edge_count,
+          })
+          : undefined,
+    });
+  }
+
+  public async getCurrentSourceSignature(): Promise<{ readonly versionCount: number; readonly lineageEdgeCount: number; }> {
+    const versions = this.getDatabase().prepare("SELECT COUNT(*) AS count FROM asset_versions").get() as { count: number };
+    const edges = this.getDatabase().prepare("SELECT COUNT(*) AS count FROM asset_lineage_edges").get() as { count: number };
+    return Object.freeze({
+      versionCount: versions.count,
+      lineageEdgeCount: edges.count,
     });
   }
 

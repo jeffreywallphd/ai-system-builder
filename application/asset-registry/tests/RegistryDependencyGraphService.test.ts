@@ -14,6 +14,7 @@ import type { IAssetLineageRepository } from "../../ports/interfaces/IAssetLinea
 import type { IAssetRecordRepository } from "../../ports/interfaces/IAssetRecordRepository";
 import type { IAssetSystemQueryRepository } from "../../ports/interfaces/IAssetSystemQueryRepository";
 import type { IAssetVersionRepository } from "../../ports/interfaces/IAssetVersionRepository";
+import type { IRegistryGraphProjectionRepository, RegistryGraphProjectionSnapshot } from "../../ports/interfaces/IRegistryGraphProjectionRepository";
 
 class InMemoryAssetRecordRepository implements IAssetRecordRepository {
   constructor(private readonly assets: ReadonlyArray<Asset>) {}
@@ -43,6 +44,36 @@ class InMemoryLineageRepository implements IAssetLineageRepository {
     }
 
     return this.edges.filter((edge) => edge.toVersionId === versionId || edge.fromVersionId === versionId);
+  }
+}
+
+class InMemoryRegistryGraphProjectionRepository implements IRegistryGraphProjectionRepository {
+  private snapshot?: RegistryGraphProjectionSnapshot;
+  private dirty = true;
+  private saveCount = 0;
+
+  public async loadProjection() { return this.snapshot; }
+  public async saveProjection(snapshot: RegistryGraphProjectionSnapshot) {
+    this.snapshot = snapshot;
+    this.dirty = false;
+    this.saveCount += 1;
+  }
+  public async markProjectionDirty() { this.dirty = true; }
+  public async getProjectionState() {
+    return Object.freeze({
+      dirty: this.dirty,
+      computedAt: this.snapshot?.computedAt,
+      sourceSignature: this.snapshot?.sourceSignature,
+    });
+  }
+  public async getCurrentSourceSignature() {
+    return Object.freeze({
+      versionCount: this.snapshot?.sourceSignature?.versionCount ?? 0,
+      lineageEdgeCount: this.snapshot?.sourceSignature?.lineageEdgeCount ?? 0,
+    });
+  }
+  public get writes(): number {
+    return this.saveCount;
   }
 }
 
@@ -250,5 +281,44 @@ describe("RegistryDependencyGraphService", () => {
 
     const bounded = await service.traverseDownstream("asset:model:v1", { maxDepth: 1 });
     expect(bounded.graph.nodes.some((node) => node.versionId === "asset:template:v1")).toBeFalse();
+  });
+
+  it("persists and reuses graph projection snapshots across repeated traversals", async () => {
+    const modelAsset = buildAsset("asset:model", "Model", "generic", "model-studio");
+    const workflowAsset = buildAsset("asset:workflow", "Workflow", "workflow-definition", "workflow-studio");
+    const modelVersion = buildVersion({ assetId: "asset:model", versionId: "asset:model:v1", sourceLabel: "model-studio" });
+    const workflowVersion = buildVersion({
+      assetId: "asset:workflow",
+      versionId: "asset:workflow:v1",
+      sourceLabel: "workflow-studio",
+      upstreamVersionIds: ["asset:model:v1"],
+    });
+
+    const queryRepository: Pick<IAssetSystemQueryRepository, "listAssetsByCriteria" | "getLatestVersionForAsset" | "listCanonicalIdentities"> = {
+      async listAssetsByCriteria() { return [modelAsset, workflowAsset]; },
+      async getLatestVersionForAsset(assetId) { return assetId === "asset:model" ? modelVersion : workflowVersion; },
+      async listCanonicalIdentities() { return []; },
+    };
+
+    const versionRepository = new InMemoryAssetVersionRepository([modelVersion, workflowVersion]);
+    const registry = new RegistryQueryService(
+      new InMemoryAssetRecordRepository([modelAsset, workflowAsset]),
+      versionRepository,
+      new InMemoryLineageRepository([]),
+      buildResolver(),
+      queryRepository,
+    );
+    const projectionRepository = new InMemoryRegistryGraphProjectionRepository();
+    const service = new RegistryDependencyGraphService(registry, versionRepository, projectionRepository);
+
+    await service.expandDirectDependencies("asset:workflow:v1");
+    expect(projectionRepository.writes).toBe(1);
+
+    await service.expandDirectDependencies("asset:workflow:v1");
+    expect(projectionRepository.writes).toBe(1);
+
+    await projectionRepository.markProjectionDirty();
+    await service.expandDirectDependencies("asset:workflow:v1");
+    expect(projectionRepository.writes).toBe(2);
   });
 });

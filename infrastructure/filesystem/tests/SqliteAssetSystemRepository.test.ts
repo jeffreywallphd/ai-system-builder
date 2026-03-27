@@ -88,6 +88,38 @@ describe("SqliteAssetSystemRepository", () => {
       const dependencyState = await repo.getDependencyState("v2");
       expect(dependencyState?.summary.state).toBe("impacted");
       expect(dependencyState?.summary.reasons[0]).toBe("upstream changed");
+
+      const projectionStateAfterWrites = await repo.getProjectionState();
+      expect(projectionStateAfterWrites?.dirty).toBeTrue();
+      await repo.saveProjection({
+        nodes: Object.freeze([
+          Object.freeze({
+            assetId: "asset-1",
+            versionId: "v2",
+            name: "Asset 1",
+            kind: "document",
+            status: "available",
+            isRegistryProjected: true,
+          }),
+        ]),
+        edges: Object.freeze([
+          Object.freeze({
+            fromAssetId: "asset-1",
+            fromVersionId: "v2",
+            toAssetId: "asset-1",
+            toVersionId: "v1",
+            source: "version-upstream" as const,
+          }),
+        ]),
+        computedAt: new Date("2026-03-24T00:05:00.000Z"),
+        sourceSignature: Object.freeze({ versionCount: 2, lineageEdgeCount: 1 }),
+      });
+      const loadedProjection = await repo.loadProjection();
+      expect(loadedProjection?.nodes.length).toBe(1);
+      expect(loadedProjection?.edges.length).toBe(1);
+      const projectionState = await repo.getProjectionState();
+      expect(projectionState?.dirty).toBeFalse();
+      expect(projectionState?.sourceSignature?.versionCount).toBe(2);
     } finally {
       await rm(root, { recursive: true, force: true });
     }
