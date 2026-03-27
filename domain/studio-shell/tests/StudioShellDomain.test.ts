@@ -7,6 +7,7 @@ import {
   createAssetDraft,
   createAssetSession,
   createStudio,
+  publishAssetDraftVersion,
   updateAssetDraft,
   withStudioSession,
 } from "../StudioShellDomain";
@@ -33,6 +34,15 @@ describe("StudioShellDomain", () => {
           version: "v1",
           parameters: [{ id: "max_tokens", required: false }],
         },
+        provenance: {
+          creatorId: "  author-1  ",
+          sourceType: "uploaded",
+          derivationContext: "  imported from docs  ",
+          upstreamAssets: [
+            { assetId: "asset:source", versionId: "asset:source:v1", relationship: "DERIVED_FROM" },
+            { assetId: "asset:source", versionId: "asset:source:v1", relationship: "DERIVED_FROM" },
+          ],
+        },
       },
     });
 
@@ -40,6 +50,10 @@ describe("StudioShellDomain", () => {
     expect(draft.metadata.tags).toEqual(["alpha", "beta"]);
     expect(draft.metadata.taxonomy?.semanticRole).toBe("workflow");
     expect(draft.metadata.contract?.version).toBe("v1");
+    expect(draft.metadata.provenance?.creatorId).toBe("author-1");
+    expect(draft.metadata.provenance?.upstreamAssets).toEqual([
+      { assetId: "asset:source", versionId: "asset:source:v1", relationship: "DERIVED_FROM" },
+    ]);
   });
 
   it("applies taxonomy metadata patch while preserving contract metadata", () => {
@@ -97,6 +111,37 @@ describe("StudioShellDomain", () => {
     expect(metadata.contract?.version).toBe("2.0.0");
   });
 
+  it("applies provenance metadata patch while preserving taxonomy and contract", () => {
+    const metadata = applyAssetMetadataPatch(
+      {
+        title: "Draft",
+        tags: ["authoring"],
+        taxonomy: {
+          structuralKind: "composite",
+          semanticRole: "workflow",
+          behaviorKind: "deterministic",
+        },
+        contract: {
+          version: "1.0.0",
+          parameters: [{ id: "temperature", required: false }],
+        },
+      },
+      {
+        provenance: {
+          creatorId: "creator-1",
+          sourceType: "generated",
+          sourceLabel: "studio-shell",
+          upstreamAssets: [{ assetId: "asset:seed", versionId: "asset:seed:v2", relationship: "GENERATED_FROM" }],
+        },
+      },
+    );
+
+    expect(metadata.taxonomy?.semanticRole).toBe("workflow");
+    expect(metadata.contract?.version).toBe("1.0.0");
+    expect(metadata.provenance?.sourceType).toBe("generated");
+    expect(metadata.provenance?.upstreamAssets?.[0]?.relationship).toBe("GENERATED_FROM");
+  });
+
   it("rejects invalid taxonomy structural/semantic/behavior combinations", () => {
     const studio = createStudio({ id: "studio-invalid-taxonomy", name: "Authoring Studio" });
     const session = createAssetSession({ id: "session-invalid-taxonomy", studioId: studio.id });
@@ -116,6 +161,40 @@ describe("StudioShellDomain", () => {
         },
       },
     })).toThrow("Asset metadata taxonomy combination");
+  });
+
+  it("rejects unsupported provenance source type and lineage relationship", () => {
+    const studio = createStudio({ id: "studio-invalid-prov", name: "Authoring Studio" });
+    const session = createAssetSession({ id: "session-invalid-prov", studioId: studio.id });
+
+    expect(() => createAssetDraft({
+      id: "draft-invalid-prov",
+      studioId: studio.id,
+      session,
+      content: "draft",
+      metadata: {
+        title: "Draft",
+        tags: [],
+        provenance: {
+          sourceType: "invalid" as "uploaded",
+        },
+      },
+    })).toThrow("sourceType");
+
+    expect(() => createAssetDraft({
+      id: "draft-invalid-prov-edge",
+      studioId: studio.id,
+      session,
+      content: "draft",
+      metadata: {
+        title: "Draft",
+        tags: [],
+        provenance: {
+          sourceType: "uploaded",
+          upstreamAssets: [{ assetId: "asset:a", relationship: "unknown" as "DERIVED_FROM" }],
+        },
+      },
+    })).toThrow("relationship");
   });
 
   it("prevents draft mutation after session close", () => {
@@ -165,5 +244,49 @@ describe("StudioShellDomain", () => {
   it("sets closedAt when creating closed sessions", () => {
     const closed = createAssetSession({ id: "session-closed", studioId: "studio", status: AssetSessionStatuses.closed });
     expect(closed.closedAt).toBeDefined();
+  });
+
+  it("publishes immutable asset versions while keeping draft revision semantics separate", () => {
+    const studio = createStudio({ id: "studio-version", name: "Versioned Studio" });
+    const session = createAssetSession({ id: "session-version", studioId: studio.id });
+    const draft = createAssetDraft({
+      id: "draft-version",
+      assetId: "asset:studio:draft-version",
+      studioId: studio.id,
+      session,
+      content: "v1",
+      metadata: {
+        title: "Draft",
+        tags: ["authoring"],
+        provenance: {
+          creatorId: "author-1",
+          sourceType: "derived",
+          upstreamAssets: [{ assetId: "asset:upstream", versionId: "asset:upstream:v1", relationship: "DERIVED_FROM" }],
+        },
+      },
+    });
+
+    const first = publishAssetDraftVersion({
+      draft,
+      session,
+      versionId: "asset:studio:draft-version:v1",
+      versionLabel: "v1",
+    });
+    const second = publishAssetDraftVersion({
+      draft: first.draft,
+      session,
+      versionId: "asset:studio:draft-version:v2",
+      versionLabel: "v2",
+    });
+
+    expect(first.draft.revision).toBe(1);
+    expect(first.version.assetId.value).toBe("asset:studio:draft-version");
+    expect(first.version.createdBy).toBe("author-1");
+    expect(first.version.upstreamVersionIds).toEqual(["asset:upstream:v1"]);
+    expect(second.version.parentVersionId).toBe("asset:studio:draft-version:v1");
+    expect(second.draft.publishedVersionIds).toEqual([
+      "asset:studio:draft-version:v1",
+      "asset:studio:draft-version:v2",
+    ]);
   });
 });

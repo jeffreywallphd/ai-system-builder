@@ -172,6 +172,17 @@ The studio shell now has a bounded inner-layer model and application orchestrati
 - draft updates now support metadata patch semantics (`AssetMetadataPatch`) so taxonomy and contract can be independently set/updated/cleared without overwriting each other, while full metadata replacement remains available.
 - application orchestration maps domain validation failures for create/update into typed invalid-request errors (`StudioShellInvalidRequestError`) to keep higher-layer behavior deterministic.
 
+## Direction 5 update: Studio shell provenance + versioning foundation (stories 1.5–1.6)
+
+- studio-shell `AssetMetadata` now includes a separate provenance envelope (`creatorId`, `sourceType`, `sourceLabel`, `derivationContext`, and typed upstream asset/version references) with deterministic normalization + validation in the same inner-layer metadata lifecycle.
+- provenance remains distinct from taxonomy and contract; patch semantics now support set/update/clear for provenance without collapsing the other metadata concerns.
+- studio-shell draft authoring now has an explicit publish/version transition (`publishAssetDraftVersion`) that emits canonical `AssetVersion` snapshots from draft state.
+- draft revisioning and publish/versioning are explicitly separate:
+  - draft content/metadata edits increment `revision`
+  - publish operations append immutable version ids/history and track latest published version separately.
+- version creation now reuses canonical asset vocabulary (`AssetVersion`, parent version linkage, upstream version ids, immutable version-id conflict semantics) through the existing studio-shell application/repository seam.
+- studio-shell application orchestration now includes explicit publish and version-history operations over `IStudioShellRepository` version persistence methods, with focused domain/application tests for normalization, validation, persistence behavior, and orchestration flow.
+
 ## TODO
 
 - Some concepts currently live more in the application layer than the domain layer because they are orchestration-heavy. That is reasonable, but over time the team may want to clarify which context-engineering rules are true domain policy versus application assembly policy.

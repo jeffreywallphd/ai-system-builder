@@ -1,4 +1,5 @@
 import type { AssetDraft, AssetMetadata, AssetMetadataPatch, AssetSession, Studio } from "../../domain/studio-shell/StudioShellDomain";
+import type { AssetVersion } from "../../domain/assets/AssetVersion";
 
 export interface InitializeStudioCommand {
   readonly studioId: string;
@@ -32,6 +33,22 @@ export interface UpdateAssetDraftCommand {
   readonly metadataPatch?: AssetMetadataPatch;
 }
 
+export interface PublishAssetDraftVersionCommand {
+  readonly studioId: string;
+  readonly sessionId: string;
+  readonly draftId: string;
+  readonly versionId?: string;
+  readonly versionLabel?: string;
+  readonly parentVersionId?: string;
+  readonly createdBy?: string;
+  readonly upstreamVersionIds?: ReadonlyArray<string>;
+}
+
+export interface ListAssetDraftVersionHistoryQuery {
+  readonly studioId: string;
+  readonly draftId: string;
+}
+
 export interface StudioInitializationResult {
   readonly studio: Studio;
   readonly activeSession: AssetSession;
@@ -47,4 +64,14 @@ export interface AssetDraftResult {
   readonly studio: Studio;
   readonly session: AssetSession;
   readonly draft: AssetDraft;
+}
+
+export interface AssetVersionResult extends AssetDraftResult {
+  readonly version: AssetVersion;
+}
+
+export interface AssetVersionHistoryResult {
+  readonly studio: Studio;
+  readonly draft: AssetDraft;
+  readonly versions: ReadonlyArray<AssetVersion>;
 }

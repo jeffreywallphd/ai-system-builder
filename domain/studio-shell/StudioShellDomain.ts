@@ -1,5 +1,8 @@
 import type { AssetContractDescriptor } from "../contracts/AssetContract";
 import { createAssetContractDescriptor } from "../contracts/AssetContract";
+import { AssetLineageRelationshipType } from "../assets/AssetLineageEdge";
+import { AssetVersion } from "../assets/AssetVersion";
+import type { AssetSourceType } from "../assets/interfaces/IAsset";
 import type { CompositionTaxonomyDescriptor } from "../taxonomy/CompositionTaxonomy";
 import { assertAllowedCompositionTaxonomyCombination, createCompositionTaxonomyDescriptor } from "../taxonomy/CompositionTaxonomy";
 
@@ -34,6 +37,7 @@ export interface AssetMetadata {
   readonly tags: ReadonlyArray<string>;
   readonly taxonomy?: CompositionTaxonomyDescriptor;
   readonly contract?: AssetContractDescriptor;
+  readonly provenance?: AssetProvenance;
 }
 
 export interface AssetMetadataPatch {
@@ -42,15 +46,43 @@ export interface AssetMetadataPatch {
   readonly tags?: ReadonlyArray<string>;
   readonly taxonomy?: CompositionTaxonomyDescriptor | null;
   readonly contract?: AssetContractDescriptor | null;
+  readonly provenance?: AssetProvenance | null;
 }
+
+export interface AssetProvenanceUpstreamReference {
+  readonly assetId: string;
+  readonly versionId?: string;
+  readonly relationship?: AssetLineageRelationshipType;
+}
+
+export interface AssetProvenance {
+  readonly creatorId?: string;
+  readonly sourceType?: AssetSourceType;
+  readonly sourceLabel?: string;
+  readonly derivationContext?: string;
+  readonly upstreamAssets?: ReadonlyArray<AssetProvenanceUpstreamReference>;
+}
+
+const AllowedAssetSourceTypes: ReadonlySet<AssetSourceType> = new Set([
+  "generated",
+  "uploaded",
+  "imported",
+  "derived",
+  "system",
+  "external",
+  "unknown",
+]);
 
 export interface AssetDraft {
   readonly id: string;
+  readonly assetId: string;
   readonly studioId: string;
   readonly sessionId: string;
   readonly content: string;
   readonly metadata: AssetMetadata;
   readonly revision: number;
+  readonly publishedVersionIds: ReadonlyArray<string>;
+  readonly lastPublishedVersionId?: string;
   readonly createdAt: string;
   readonly updatedAt: string;
 }
@@ -88,6 +120,69 @@ function normalizeTags(tags?: ReadonlyArray<string>): ReadonlyArray<string> {
     }
   }
   return Object.freeze([...deduped]);
+}
+
+function normalizeAssetId(value: string, label: string): string {
+  const normalized = value.trim();
+  if (!normalized) {
+    throw new Error(`${label} is required.`);
+  }
+
+  return normalized;
+}
+
+function normalizeProvenanceUpstreamReferences(
+  references?: ReadonlyArray<AssetProvenanceUpstreamReference>,
+): ReadonlyArray<AssetProvenanceUpstreamReference> | undefined {
+  const deduped = new Map<string, AssetProvenanceUpstreamReference>();
+  for (const entry of references ?? []) {
+    const assetId = normalizeAssetId(entry.assetId, "Asset provenance upstream asset id");
+    const versionId = normalizeOptional(entry.versionId);
+    const relationship = entry.relationship
+      ? AssetLineageRelationshipType[entry.relationship]
+        ? entry.relationship
+        : undefined
+      : undefined;
+    if (entry.relationship && !relationship) {
+      throw new Error(`Asset provenance upstream relationship '${entry.relationship}' is not supported.`);
+    }
+
+    const dedupeKey = `${assetId}::${versionId ?? ""}::${relationship ?? ""}`;
+    deduped.set(dedupeKey, Object.freeze({ assetId, versionId, relationship }));
+  }
+
+  if (deduped.size === 0) {
+    return undefined;
+  }
+
+  return Object.freeze([...deduped.values()]);
+}
+
+function normalizeAssetProvenance(input?: AssetProvenance): AssetProvenance | undefined {
+  if (!input) {
+    return undefined;
+  }
+
+  const creatorId = normalizeOptional(input.creatorId);
+  const sourceType = normalizeOptional(input.sourceType);
+  if (sourceType && !AllowedAssetSourceTypes.has(sourceType as AssetSourceType)) {
+    throw new Error(`Asset provenance sourceType '${sourceType}' is not supported.`);
+  }
+  const sourceLabel = normalizeOptional(input.sourceLabel);
+  const derivationContext = normalizeOptional(input.derivationContext);
+  const upstreamAssets = normalizeProvenanceUpstreamReferences(input.upstreamAssets);
+  const hasEntries = creatorId || sourceType || sourceLabel || derivationContext || (upstreamAssets && upstreamAssets.length > 0);
+  if (!hasEntries) {
+    return undefined;
+  }
+
+  return Object.freeze({
+    creatorId,
+    sourceType: sourceType as AssetSourceType | undefined,
+    sourceLabel,
+    derivationContext,
+    upstreamAssets,
+  });
 }
 
 export function createStudio(input: {
@@ -140,6 +235,7 @@ export function normalizeAssetMetadata(input: AssetMetadata): AssetMetadata {
     tags: normalizeTags(input.tags),
     taxonomy,
     contract: input.contract ? createAssetContractDescriptor(input.contract) : undefined,
+    provenance: normalizeAssetProvenance(input.provenance),
   });
 }
 
@@ -150,6 +246,7 @@ export function applyAssetMetadataPatch(metadata: AssetMetadata, patch: AssetMet
     tags: patch.tags ?? metadata.tags,
     taxonomy: patch.taxonomy === null ? undefined : (patch.taxonomy ?? metadata.taxonomy),
     contract: patch.contract === null ? undefined : (patch.contract ?? metadata.contract),
+    provenance: patch.provenance === null ? undefined : (patch.provenance ?? metadata.provenance),
   };
 
   return normalizeAssetMetadata(next);
@@ -202,6 +299,7 @@ function assertSessionMutable(session: AssetSession): void {
 
 export function createAssetDraft(input: {
   readonly id: string;
+  readonly assetId?: string;
   readonly studioId: string;
   readonly session: AssetSession;
   readonly content: string;
@@ -218,11 +316,14 @@ export function createAssetDraft(input: {
   const now = (input.now ?? new Date()).toISOString();
   return Object.freeze({
     id,
+    assetId: normalizeAssetId(input.assetId ?? `studio-asset:${id}`, "Asset draft asset id"),
     studioId,
     sessionId: input.session.id,
     content: input.content,
     metadata: normalizeAssetMetadata(input.metadata),
     revision: 1,
+    publishedVersionIds: Object.freeze([]),
+    lastPublishedVersionId: undefined,
     createdAt: now,
     updatedAt: now,
   });
@@ -258,6 +359,67 @@ export function updateAssetDraft(
     metadata,
     revision: draft.revision + 1,
     updatedAt: (changes.now ?? new Date()).toISOString(),
+  });
+}
+
+export function publishAssetDraftVersion(input: {
+  readonly draft: AssetDraft;
+  readonly session: AssetSession;
+  readonly versionId: string;
+  readonly versionLabel?: string;
+  readonly parentVersionId?: string;
+  readonly createdBy?: string;
+  readonly upstreamVersionIds?: ReadonlyArray<string>;
+  readonly now?: Date;
+}): {
+  readonly draft: AssetDraft;
+  readonly version: AssetVersion;
+} {
+  assertSessionMutable(input.session);
+  if (input.session.id !== input.draft.sessionId) {
+    throw new Error(`Asset draft '${input.draft.id}' does not belong to session '${input.session.id}'.`);
+  }
+
+  const versionId = normalizeRequired(input.versionId, "Asset version id");
+  if (input.draft.publishedVersionIds.includes(versionId)) {
+    throw new Error(`Asset version '${versionId}' is already published for draft '${input.draft.id}'.`);
+  }
+
+  const provenanceUpstreamVersionIds = (input.draft.metadata.provenance?.upstreamAssets ?? [])
+    .map((entry) => normalizeOptional(entry.versionId))
+    .filter((entry): entry is string => !!entry);
+  const upstreamVersionIds = [...new Set([...(input.upstreamVersionIds ?? []), ...provenanceUpstreamVersionIds])];
+  const parentVersionId = normalizeOptional(input.parentVersionId) ?? input.draft.lastPublishedVersionId;
+  const createdBy = normalizeOptional(input.createdBy) ?? input.draft.metadata.provenance?.creatorId;
+  const now = input.now ?? new Date();
+
+  const version = new AssetVersion({
+    assetId: input.draft.assetId,
+    versionId,
+    versionLabel: input.versionLabel,
+    parentVersionId,
+    createdBy,
+    createdAt: now,
+    upstreamVersionIds,
+    metadata: {
+      studioId: input.draft.studioId,
+      sessionId: input.draft.sessionId,
+      draftId: input.draft.id,
+      draftRevision: input.draft.revision,
+      metadata: input.draft.metadata,
+    },
+  });
+
+  const draft = Object.freeze({
+    ...input.draft,
+    publishedVersionIds: Object.freeze([...input.draft.publishedVersionIds, version.versionId]),
+    lastPublishedVersionId: version.versionId,
+    updatedAt: now.toISOString(),
+  });
+
+  return Object.freeze({
+    draft,
+    version,
   });
 }
 

@@ -1,14 +1,16 @@
 import { describe, expect, it } from "bun:test";
 import type { IStudioShellRepository } from "../../ports/interfaces/IStudioShellRepository";
+import type { AssetVersion } from "../../../domain/assets/AssetVersion";
 import type { AssetDraft, AssetSession, Studio } from "../../../domain/studio-shell/StudioShellDomain";
 import { createAssetSession, createStudio } from "../../../domain/studio-shell/StudioShellDomain";
 import { DefaultStudioShellApplicationService } from "../DefaultStudioShellApplicationService";
-import { StudioShellInvalidRequestError, StudioShellNotFoundError } from "../StudioShellApplicationErrors";
+import { StudioShellConflictError, StudioShellInvalidRequestError, StudioShellNotFoundError } from "../StudioShellApplicationErrors";
 
 class InMemoryStudioShellRepository implements IStudioShellRepository {
   private readonly studios = new Map<string, Studio>();
   private readonly sessions = new Map<string, AssetSession>();
   private readonly drafts = new Map<string, AssetDraft>();
+  private readonly versions = new Map<string, AssetVersion>();
 
   async saveStudio(studio: Studio): Promise<Studio> {
     this.studios.set(studio.id, studio);
@@ -43,6 +45,19 @@ class InMemoryStudioShellRepository implements IStudioShellRepository {
 
   async listSessionDrafts(sessionId: string): Promise<ReadonlyArray<AssetDraft>> {
     return [...this.drafts.values()].filter((draft) => draft.sessionId === sessionId);
+  }
+
+  async saveAssetVersion(version: AssetVersion): Promise<AssetVersion> {
+    this.versions.set(version.versionId, version);
+    return version;
+  }
+
+  async getAssetVersion(versionId: string): Promise<AssetVersion | undefined> {
+    return this.versions.get(versionId);
+  }
+
+  async listAssetVersionsByAssetId(assetId: string): Promise<ReadonlyArray<AssetVersion>> {
+    return [...this.versions.values()].filter((version) => version.assetId.value === assetId);
   }
 }
 
@@ -159,6 +174,54 @@ describe("DefaultStudioShellApplicationService", () => {
     ]);
   });
 
+  it("normalizes and persists provenance through draft create and patch updates", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const service = new DefaultStudioShellApplicationService(repository, ((prefix) => `${prefix}-prov`));
+    await service.initializeStudio({ studioId: "studio-provenance", name: "Studio Provenance" });
+
+    const created = await service.createAssetDraft({
+      studioId: "studio-provenance",
+      sessionId: "session-prov",
+      content: "draft",
+      metadata: {
+        title: "Provenance Draft",
+        tags: ["source"],
+        provenance: {
+          creatorId: "  creator-1 ",
+          sourceType: "uploaded",
+          derivationContext: "  imported from workspace ",
+          upstreamAssets: [
+            { assetId: "asset:source", versionId: "asset:source:v1", relationship: "DERIVED_FROM" },
+            { assetId: "asset:source", versionId: "asset:source:v1", relationship: "DERIVED_FROM" },
+          ],
+        },
+      },
+    });
+
+    const updated = await service.updateAssetDraft({
+      studioId: "studio-provenance",
+      sessionId: "session-prov",
+      draftId: created.draft.id,
+      metadataPatch: {
+        provenance: {
+          creatorId: "editor-2",
+          sourceType: "derived",
+          upstreamAssets: [{ assetId: "asset:transform", versionId: "asset:transform:v3", relationship: "TRANSFORMED_FROM" }],
+        },
+      },
+    });
+
+    expect(created.draft.metadata.provenance?.creatorId).toBe("creator-1");
+    expect(created.draft.metadata.provenance?.upstreamAssets).toEqual([
+      { assetId: "asset:source", versionId: "asset:source:v1", relationship: "DERIVED_FROM" },
+    ]);
+    expect(updated.draft.metadata.provenance?.creatorId).toBe("editor-2");
+    expect(updated.draft.metadata.provenance?.sourceType).toBe("derived");
+    expect(updated.draft.metadata.provenance?.upstreamAssets).toEqual([
+      { assetId: "asset:transform", versionId: "asset:transform:v3", relationship: "TRANSFORMED_FROM" },
+    ]);
+  });
+
   it("returns invalid request error when taxonomy combination is unsupported", async () => {
     const repository = new InMemoryStudioShellRepository();
     const service = new DefaultStudioShellApplicationService(repository, ((prefix) => `${prefix}-invalid-taxonomy`));
@@ -178,6 +241,79 @@ describe("DefaultStudioShellApplicationService", () => {
         },
       },
     })).rejects.toBeInstanceOf(StudioShellInvalidRequestError);
+  });
+
+  it("creates version snapshots from studio drafts and returns version history", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const idQueue = ["session-1", "draft-1", "version-1", "version-2"];
+    const service = new DefaultStudioShellApplicationService(repository, (() => idQueue.shift() ?? "generated"));
+
+    await service.initializeStudio({ studioId: "studio-versioning", name: "Studio Versioning" });
+    const draft = await service.createAssetDraft({
+      studioId: "studio-versioning",
+      sessionId: "session-1",
+      content: "v1",
+      metadata: {
+        title: "Versioned Draft",
+        tags: ["authoring"],
+        provenance: {
+          creatorId: "creator-a",
+          sourceType: "derived",
+          upstreamAssets: [{ assetId: "asset:seed", versionId: "asset:seed:v1", relationship: "DERIVED_FROM" }],
+        },
+      },
+    });
+
+    const version1 = await service.publishAssetDraftVersion({
+      studioId: "studio-versioning",
+      sessionId: "session-1",
+      draftId: draft.draft.id,
+    });
+    const version2 = await service.publishAssetDraftVersion({
+      studioId: "studio-versioning",
+      sessionId: "session-1",
+      draftId: draft.draft.id,
+      versionLabel: "v2",
+    });
+    const history = await service.listAssetDraftVersionHistory({
+      studioId: "studio-versioning",
+      draftId: draft.draft.id,
+    });
+
+    expect(version1.version.versionId).toBe("version-1");
+    expect(version1.version.createdBy).toBe("creator-a");
+    expect(version1.version.upstreamVersionIds).toEqual(["asset:seed:v1"]);
+    expect(version2.version.parentVersionId).toBe("version-1");
+    expect(version2.draft.revision).toBe(1);
+    expect(version2.draft.publishedVersionIds).toEqual(["version-1", "version-2"]);
+    expect(history.versions.map((entry) => entry.versionId)).toEqual(["version-1", "version-2"]);
+  });
+
+  it("rejects duplicate immutable version ids", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const idQueue = ["session-1", "draft-1"];
+    const service = new DefaultStudioShellApplicationService(repository, (() => idQueue.shift() ?? "generated"));
+    await service.initializeStudio({ studioId: "studio-conflict", name: "Studio Conflict" });
+    const draft = await service.createAssetDraft({
+      studioId: "studio-conflict",
+      sessionId: "session-1",
+      content: "v1",
+      metadata: { title: "Draft", tags: [] },
+    });
+
+    await service.publishAssetDraftVersion({
+      studioId: "studio-conflict",
+      sessionId: "session-1",
+      draftId: draft.draft.id,
+      versionId: "asset:studio:version:v1",
+    });
+
+    await expect(service.publishAssetDraftVersion({
+      studioId: "studio-conflict",
+      sessionId: "session-1",
+      draftId: draft.draft.id,
+      versionId: "asset:studio:version:v1",
+    })).rejects.toBeInstanceOf(StudioShellConflictError);
   });
 
   it("returns undefined when loading missing draft for an existing studio", async () => {
