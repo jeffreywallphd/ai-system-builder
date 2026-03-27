@@ -1,4 +1,12 @@
-import type { AssetDraft, AssetMetadata, AssetMetadataPatch, AssetSession, Studio } from "../../domain/studio-shell/StudioShellDomain";
+import type {
+  AssetDraft,
+  AssetDraftDependencyReference,
+  AssetDraftLifecycleStatus,
+  AssetMetadata,
+  AssetMetadataPatch,
+  AssetSession,
+  Studio,
+} from "../../domain/studio-shell/StudioShellDomain";
 import type { AssetVersion } from "../../domain/assets/AssetVersion";
 
 export interface InitializeStudioCommand {
@@ -17,6 +25,7 @@ export interface CreateAssetDraftCommand {
   readonly draftId?: string;
   readonly content: string;
   readonly metadata: AssetMetadata;
+  readonly dependencies?: ReadonlyArray<AssetDraftDependencyReference>;
 }
 
 export interface LoadAssetDraftQuery {
@@ -31,6 +40,20 @@ export interface UpdateAssetDraftCommand {
   readonly content?: string;
   readonly metadata?: AssetMetadata;
   readonly metadataPatch?: AssetMetadataPatch;
+}
+
+export interface UpdateAssetDraftDependenciesCommand {
+  readonly studioId: string;
+  readonly sessionId: string;
+  readonly draftId: string;
+  readonly dependencies: ReadonlyArray<AssetDraftDependencyReference>;
+}
+
+export interface TransitionAssetDraftLifecycleCommand {
+  readonly studioId: string;
+  readonly sessionId: string;
+  readonly draftId: string;
+  readonly targetStatus: AssetDraftLifecycleStatus;
 }
 
 export interface PublishAssetDraftVersionCommand {

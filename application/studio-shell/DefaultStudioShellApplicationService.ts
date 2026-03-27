@@ -3,7 +3,9 @@ import {
   createAssetDraft,
   createAssetSession,
   publishAssetDraftVersion,
+  StudioShellDraftLifecycleTransitionError,
   createStudio,
+  transitionAssetDraftLifecycle,
   updateAssetDraft,
   withStudioSession,
 } from "../../domain/studio-shell/StudioShellDomain";
@@ -11,6 +13,7 @@ import type { AssetDraft } from "../../domain/studio-shell/StudioShellDomain";
 import type { IStudioShellRepository } from "../ports/interfaces/IStudioShellRepository";
 import {
   StudioShellConflictError,
+  StudioShellInvalidLifecycleTransitionError,
   StudioShellInvalidRequestError,
   StudioShellNotFoundError,
 } from "./StudioShellApplicationErrors";
@@ -26,7 +29,9 @@ import type {
   StartAssetSessionCommand,
   StudioInitializationResult,
   StudioSessionResult,
+  TransitionAssetDraftLifecycleCommand,
   UpdateAssetDraftCommand,
+  UpdateAssetDraftDependenciesCommand,
 } from "./contracts";
 import type { StudioShellApplicationService } from "./StudioShellApplicationService";
 
@@ -56,6 +61,14 @@ function asInvalidRequest(error: unknown): never {
   }
 
   throw new StudioShellInvalidRequestError("Studio shell request could not be processed.");
+}
+
+function asLifecycleTransition(error: unknown): never {
+  if (error instanceof StudioShellDraftLifecycleTransitionError) {
+    throw new StudioShellInvalidLifecycleTransitionError(error.message);
+  }
+
+  asInvalidRequest(error);
 }
 
 export class DefaultStudioShellApplicationService implements StudioShellApplicationService {
@@ -128,6 +141,7 @@ export class DefaultStudioShellApplicationService implements StudioShellApplicat
         session,
         content: command.content,
         metadata: command.metadata,
+        dependencies: command.dependencies,
       });
     } catch (error) {
       asInvalidRequest(error);
@@ -209,6 +223,78 @@ export class DefaultStudioShellApplicationService implements StudioShellApplicat
     });
   }
 
+  public async updateAssetDraftDependencies(command: UpdateAssetDraftDependenciesCommand): Promise<AssetDraftResult> {
+    const studioId = assertRequired(command.studioId, "Studio id");
+    const sessionId = assertRequired(command.sessionId, "Session id");
+    const draftId = assertRequired(command.draftId, "Draft id");
+
+    const studio = await this.requireStudio(studioId);
+    const session = await this.requireSession(sessionId);
+    const draft = await this.requireDraft(draftId);
+
+    if (session.studioId !== studio.id) {
+      throw new StudioShellInvalidRequestError(`Session '${session.id}' does not belong to studio '${studio.id}'.`);
+    }
+
+    if (draft.studioId !== studio.id) {
+      throw new StudioShellInvalidRequestError(`Draft '${draft.id}' does not belong to studio '${studio.id}'.`);
+    }
+
+    let updatedDraft: AssetDraft;
+    try {
+      updatedDraft = updateAssetDraft(draft, session, {
+        dependencies: command.dependencies,
+      });
+    } catch (error) {
+      asInvalidRequest(error);
+    }
+
+    const updatedSession = attachDraftToSession(session, updatedDraft);
+    await this.repository.saveDraft(updatedDraft);
+    await this.repository.saveSession(updatedSession);
+
+    return Object.freeze({
+      studio,
+      session: updatedSession,
+      draft: updatedDraft,
+    });
+  }
+
+  public async transitionAssetDraftLifecycle(command: TransitionAssetDraftLifecycleCommand): Promise<AssetDraftResult> {
+    const studioId = assertRequired(command.studioId, "Studio id");
+    const sessionId = assertRequired(command.sessionId, "Session id");
+    const draftId = assertRequired(command.draftId, "Draft id");
+
+    const studio = await this.requireStudio(studioId);
+    const session = await this.requireSession(sessionId);
+    const draft = await this.requireDraft(draftId);
+
+    if (session.studioId !== studio.id) {
+      throw new StudioShellInvalidRequestError(`Session '${session.id}' does not belong to studio '${studio.id}'.`);
+    }
+
+    if (draft.studioId !== studio.id) {
+      throw new StudioShellInvalidRequestError(`Draft '${draft.id}' does not belong to studio '${studio.id}'.`);
+    }
+
+    let updatedDraft: AssetDraft;
+    try {
+      updatedDraft = transitionAssetDraftLifecycle(draft, session, command.targetStatus);
+    } catch (error) {
+      asLifecycleTransition(error);
+    }
+
+    const updatedSession = attachDraftToSession(session, updatedDraft);
+    await this.repository.saveDraft(updatedDraft);
+    await this.repository.saveSession(updatedSession);
+
+    return Object.freeze({
+      studio,
+      session: updatedSession,
+      draft: updatedDraft,
+    });
+  }
+
   public async publishAssetDraftVersion(command: PublishAssetDraftVersionCommand): Promise<AssetVersionResult> {
     const studioId = assertRequired(command.studioId, "Studio id");
     const sessionId = assertRequired(command.sessionId, "Session id");
@@ -244,7 +330,7 @@ export class DefaultStudioShellApplicationService implements StudioShellApplicat
         upstreamVersionIds: command.upstreamVersionIds,
       });
     } catch (error) {
-      asInvalidRequest(error);
+      asLifecycleTransition(error);
     }
     const updatedSession = attachDraftToSession(session, published.draft);
 

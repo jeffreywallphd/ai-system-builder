@@ -2,9 +2,14 @@ import { describe, expect, it } from "bun:test";
 import type { IStudioShellRepository } from "../../ports/interfaces/IStudioShellRepository";
 import type { AssetVersion } from "../../../domain/assets/AssetVersion";
 import type { AssetDraft, AssetSession, Studio } from "../../../domain/studio-shell/StudioShellDomain";
-import { createAssetSession, createStudio } from "../../../domain/studio-shell/StudioShellDomain";
+import { AssetDraftLifecycleStatuses, createAssetSession, createStudio } from "../../../domain/studio-shell/StudioShellDomain";
 import { DefaultStudioShellApplicationService } from "../DefaultStudioShellApplicationService";
-import { StudioShellConflictError, StudioShellInvalidRequestError, StudioShellNotFoundError } from "../StudioShellApplicationErrors";
+import {
+  StudioShellConflictError,
+  StudioShellInvalidLifecycleTransitionError,
+  StudioShellInvalidRequestError,
+  StudioShellNotFoundError,
+} from "../StudioShellApplicationErrors";
 
 class InMemoryStudioShellRepository implements IStudioShellRepository {
   private readonly studios = new Map<string, Studio>();
@@ -96,6 +101,10 @@ describe("DefaultStudioShellApplicationService", () => {
           behaviorKind: "dynamic",
         },
       },
+      dependencies: [
+        { assetId: "asset:seed", versionId: "asset:seed:v1" },
+        { assetId: "asset:seed", versionId: "asset:seed:v1" },
+      ],
     });
 
     const updatedTaxonomy = await service.updateAssetDraft({
@@ -127,6 +136,7 @@ describe("DefaultStudioShellApplicationService", () => {
     });
 
     expect(created.session.currentDraftId).toBe("draft-1");
+    expect(created.draft.dependencies).toEqual([{ assetId: "asset:seed", versionId: "asset:seed:v1" }]);
     expect(updatedTaxonomy.draft.revision).toBe(2);
     expect(updatedTaxonomy.draft.content).toBe("v2");
     expect(updatedTaxonomy.draft.metadata.taxonomy?.semanticRole).toBe("workflow");
@@ -243,9 +253,40 @@ describe("DefaultStudioShellApplicationService", () => {
     })).rejects.toBeInstanceOf(StudioShellInvalidRequestError);
   });
 
+  it("updates dependency capture through bounded orchestration flow", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const idQueue = ["session-1", "draft-1"];
+    const service = new DefaultStudioShellApplicationService(repository, (() => idQueue.shift() ?? "generated"));
+    await service.initializeStudio({ studioId: "studio-dependencies", name: "Studio Dependencies" });
+    const created = await service.createAssetDraft({
+      studioId: "studio-dependencies",
+      sessionId: "session-1",
+      content: "v1",
+      metadata: { title: "Draft", tags: [] },
+    });
+
+    const updatedDependencies = await service.updateAssetDraftDependencies({
+      studioId: "studio-dependencies",
+      sessionId: "session-1",
+      draftId: created.draft.id,
+      dependencies: [
+        { assetId: " asset:a ", versionId: " asset:a:v1 " },
+        { assetId: "asset:a", versionId: "asset:a:v1" },
+        { assetId: "asset:b" },
+      ],
+    });
+
+    expect(updatedDependencies.draft.dependencies).toEqual([
+      { assetId: "asset:a", versionId: "asset:a:v1" },
+      { assetId: "asset:b", versionId: undefined },
+    ]);
+    expect(updatedDependencies.draft.revision).toBe(2);
+    expect(updatedDependencies.draft.lifecycleStatus).toBe(AssetDraftLifecycleStatuses.draft);
+  });
+
   it("creates version snapshots from studio drafts and returns version history", async () => {
     const repository = new InMemoryStudioShellRepository();
-    const idQueue = ["session-1", "draft-1", "version-1", "version-2"];
+    const idQueue = ["session-1", "draft-1"];
     const service = new DefaultStudioShellApplicationService(repository, (() => idQueue.shift() ?? "generated"));
 
     await service.initializeStudio({ studioId: "studio-versioning", name: "Studio Versioning" });
@@ -264,15 +305,41 @@ describe("DefaultStudioShellApplicationService", () => {
       },
     });
 
+    await expect(service.publishAssetDraftVersion({
+      studioId: "studio-versioning",
+      sessionId: "session-1",
+      draftId: draft.draft.id,
+    })).rejects.toBeInstanceOf(StudioShellInvalidRequestError);
+
+    await service.transitionAssetDraftLifecycle({
+      studioId: "studio-versioning",
+      sessionId: "session-1",
+      draftId: draft.draft.id,
+      targetStatus: AssetDraftLifecycleStatuses.validated,
+    });
     const version1 = await service.publishAssetDraftVersion({
       studioId: "studio-versioning",
       sessionId: "session-1",
       draftId: draft.draft.id,
+      versionId: "version-1",
+    });
+    await service.transitionAssetDraftLifecycle({
+      studioId: "studio-versioning",
+      sessionId: "session-1",
+      draftId: draft.draft.id,
+      targetStatus: AssetDraftLifecycleStatuses.draft,
+    });
+    await service.transitionAssetDraftLifecycle({
+      studioId: "studio-versioning",
+      sessionId: "session-1",
+      draftId: draft.draft.id,
+      targetStatus: AssetDraftLifecycleStatuses.validated,
     });
     const version2 = await service.publishAssetDraftVersion({
       studioId: "studio-versioning",
       sessionId: "session-1",
       draftId: draft.draft.id,
+      versionId: "version-2",
       versionLabel: "v2",
     });
     const history = await service.listAssetDraftVersionHistory({
@@ -285,8 +352,30 @@ describe("DefaultStudioShellApplicationService", () => {
     expect(version1.version.upstreamVersionIds).toEqual(["asset:seed:v1"]);
     expect(version2.version.parentVersionId).toBe("version-1");
     expect(version2.draft.revision).toBe(1);
+    expect(version2.draft.lifecycleStatus).toBe(AssetDraftLifecycleStatuses.published);
     expect(version2.draft.publishedVersionIds).toEqual(["version-1", "version-2"]);
     expect(history.versions.map((entry) => entry.versionId)).toEqual(["version-1", "version-2"]);
+  });
+
+  it("maps invalid lifecycle transitions to typed application failures", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const idQueue = ["session-1", "draft-1"];
+    const service = new DefaultStudioShellApplicationService(repository, (() => idQueue.shift() ?? "generated"));
+
+    await service.initializeStudio({ studioId: "studio-lifecycle", name: "Studio Lifecycle" });
+    const created = await service.createAssetDraft({
+      studioId: "studio-lifecycle",
+      sessionId: "session-1",
+      content: "v1",
+      metadata: { title: "Draft", tags: [] },
+    });
+
+    await expect(service.transitionAssetDraftLifecycle({
+      studioId: "studio-lifecycle",
+      sessionId: "session-1",
+      draftId: created.draft.id,
+      targetStatus: AssetDraftLifecycleStatuses.published,
+    })).rejects.toBeInstanceOf(StudioShellInvalidLifecycleTransitionError);
   });
 
   it("rejects duplicate immutable version ids", async () => {
@@ -299,6 +388,13 @@ describe("DefaultStudioShellApplicationService", () => {
       sessionId: "session-1",
       content: "v1",
       metadata: { title: "Draft", tags: [] },
+    });
+
+    await service.transitionAssetDraftLifecycle({
+      studioId: "studio-conflict",
+      sessionId: "session-1",
+      draftId: draft.draft.id,
+      targetStatus: AssetDraftLifecycleStatuses.validated,
     });
 
     await service.publishAssetDraftVersion({
@@ -343,7 +439,10 @@ describe("DefaultStudioShellApplicationService", () => {
       sessionId: session.id,
       content: "content",
       metadata: { title: "Draft D", tags: [] },
+      dependencies: Object.freeze([]),
+      lifecycleStatus: AssetDraftLifecycleStatuses.draft,
       revision: 1,
+      publishedVersionIds: Object.freeze([]),
       createdAt: new Date("2026-03-27T00:00:00.000Z").toISOString(),
       updatedAt: new Date("2026-03-27T00:00:00.000Z").toISOString(),
     });

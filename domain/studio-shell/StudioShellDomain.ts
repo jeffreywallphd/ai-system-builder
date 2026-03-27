@@ -6,6 +6,27 @@ import type { AssetSourceType } from "../assets/interfaces/IAsset";
 import type { CompositionTaxonomyDescriptor } from "../taxonomy/CompositionTaxonomy";
 import { assertAllowedCompositionTaxonomyCombination, createCompositionTaxonomyDescriptor } from "../taxonomy/CompositionTaxonomy";
 
+export class StudioShellDomainError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "StudioShellDomainError";
+  }
+}
+
+export class StudioShellDraftLifecycleTransitionError extends StudioShellDomainError {
+  constructor(fromStatus: AssetDraftLifecycleStatus, toStatus: AssetDraftLifecycleStatus) {
+    super(`Asset draft lifecycle cannot transition from '${fromStatus}' to '${toStatus}'.`);
+    this.name = "StudioShellDraftLifecycleTransitionError";
+  }
+}
+
+export class StudioShellDraftLifecyclePublishGateError extends StudioShellDomainError {
+  constructor(status: AssetDraftLifecycleStatus) {
+    super(`Asset draft lifecycle status '${status}' is not publish-ready.`);
+    this.name = "StudioShellDraftLifecyclePublishGateError";
+  }
+}
+
 export const StudioLifecycleStatuses = Object.freeze({
   draft: "draft",
   active: "active",
@@ -21,6 +42,14 @@ export const AssetSessionStatuses = Object.freeze({
 });
 
 export type AssetSessionStatus = typeof AssetSessionStatuses[keyof typeof AssetSessionStatuses];
+
+export const AssetDraftLifecycleStatuses = Object.freeze({
+  draft: "draft",
+  validated: "validated",
+  published: "published",
+});
+
+export type AssetDraftLifecycleStatus = typeof AssetDraftLifecycleStatuses[keyof typeof AssetDraftLifecycleStatuses];
 
 export interface Studio {
   readonly id: string;
@@ -47,6 +76,11 @@ export interface AssetMetadataPatch {
   readonly taxonomy?: CompositionTaxonomyDescriptor | null;
   readonly contract?: AssetContractDescriptor | null;
   readonly provenance?: AssetProvenance | null;
+}
+
+export interface AssetDraftDependencyReference {
+  readonly assetId: string;
+  readonly versionId?: string;
 }
 
 export interface AssetProvenanceUpstreamReference {
@@ -80,6 +114,8 @@ export interface AssetDraft {
   readonly sessionId: string;
   readonly content: string;
   readonly metadata: AssetMetadata;
+  readonly dependencies: ReadonlyArray<AssetDraftDependencyReference>;
+  readonly lifecycleStatus: AssetDraftLifecycleStatus;
   readonly revision: number;
   readonly publishedVersionIds: ReadonlyArray<string>;
   readonly lastPublishedVersionId?: string;
@@ -129,6 +165,19 @@ function normalizeAssetId(value: string, label: string): string {
   }
 
   return normalized;
+}
+
+function normalizeAssetDraftDependencies(
+  dependencies?: ReadonlyArray<AssetDraftDependencyReference>,
+): ReadonlyArray<AssetDraftDependencyReference> {
+  const deduped = new Map<string, AssetDraftDependencyReference>();
+  for (const entry of dependencies ?? []) {
+    const assetId = normalizeAssetId(entry.assetId, "Asset draft dependency asset id");
+    const versionId = normalizeOptional(entry.versionId);
+    deduped.set(`${assetId}::${versionId ?? ""}`, Object.freeze({ assetId, versionId }));
+  }
+
+  return Object.freeze([...deduped.values()]);
 }
 
 function normalizeProvenanceUpstreamReferences(
@@ -183,6 +232,23 @@ function normalizeAssetProvenance(input?: AssetProvenance): AssetProvenance | un
     derivationContext,
     upstreamAssets,
   });
+}
+
+function assertLifecycleTransitionAllowed(fromStatus: AssetDraftLifecycleStatus, toStatus: AssetDraftLifecycleStatus): void {
+  if (fromStatus === toStatus) {
+    return;
+  }
+
+  if (
+    (fromStatus === AssetDraftLifecycleStatuses.draft && toStatus === AssetDraftLifecycleStatuses.validated)
+    || (fromStatus === AssetDraftLifecycleStatuses.validated && toStatus === AssetDraftLifecycleStatuses.draft)
+    || (fromStatus === AssetDraftLifecycleStatuses.validated && toStatus === AssetDraftLifecycleStatuses.published)
+    || (fromStatus === AssetDraftLifecycleStatuses.published && toStatus === AssetDraftLifecycleStatuses.draft)
+  ) {
+    return;
+  }
+
+  throw new StudioShellDraftLifecycleTransitionError(fromStatus, toStatus);
 }
 
 export function createStudio(input: {
@@ -304,6 +370,7 @@ export function createAssetDraft(input: {
   readonly session: AssetSession;
   readonly content: string;
   readonly metadata: AssetMetadata;
+  readonly dependencies?: ReadonlyArray<AssetDraftDependencyReference>;
   readonly now?: Date;
 }): AssetDraft {
   const id = normalizeRequired(input.id, "Asset draft id");
@@ -321,6 +388,8 @@ export function createAssetDraft(input: {
     sessionId: input.session.id,
     content: input.content,
     metadata: normalizeAssetMetadata(input.metadata),
+    dependencies: normalizeAssetDraftDependencies(input.dependencies),
+    lifecycleStatus: AssetDraftLifecycleStatuses.draft,
     revision: 1,
     publishedVersionIds: Object.freeze([]),
     lastPublishedVersionId: undefined,
@@ -336,6 +405,7 @@ export function updateAssetDraft(
     readonly content?: string;
     readonly metadata?: AssetMetadata;
     readonly metadataPatch?: AssetMetadataPatch;
+    readonly dependencies?: ReadonlyArray<AssetDraftDependencyReference>;
     readonly now?: Date;
   },
 ): AssetDraft {
@@ -357,8 +427,33 @@ export function updateAssetDraft(
     ...draft,
     content: changes.content ?? draft.content,
     metadata,
+    dependencies: changes.dependencies ? normalizeAssetDraftDependencies(changes.dependencies) : draft.dependencies,
+    lifecycleStatus: AssetDraftLifecycleStatuses.draft,
     revision: draft.revision + 1,
     updatedAt: (changes.now ?? new Date()).toISOString(),
+  });
+}
+
+export function transitionAssetDraftLifecycle(
+  draft: AssetDraft,
+  session: AssetSession,
+  targetStatus: AssetDraftLifecycleStatus,
+  now: Date = new Date(),
+): AssetDraft {
+  assertSessionMutable(session);
+  if (session.id !== draft.sessionId) {
+    throw new Error(`Asset draft '${draft.id}' does not belong to session '${session.id}'.`);
+  }
+
+  assertLifecycleTransitionAllowed(draft.lifecycleStatus, targetStatus);
+  if (draft.lifecycleStatus === targetStatus) {
+    return draft;
+  }
+
+  return Object.freeze({
+    ...draft,
+    lifecycleStatus: targetStatus,
+    updatedAt: now.toISOString(),
   });
 }
 
@@ -380,6 +475,10 @@ export function publishAssetDraftVersion(input: {
     throw new Error(`Asset draft '${input.draft.id}' does not belong to session '${input.session.id}'.`);
   }
 
+  if (input.draft.lifecycleStatus !== AssetDraftLifecycleStatuses.validated) {
+    throw new StudioShellDraftLifecyclePublishGateError(input.draft.lifecycleStatus);
+  }
+
   const versionId = normalizeRequired(input.versionId, "Asset version id");
   if (input.draft.publishedVersionIds.includes(versionId)) {
     throw new Error(`Asset version '${versionId}' is already published for draft '${input.draft.id}'.`);
@@ -388,7 +487,10 @@ export function publishAssetDraftVersion(input: {
   const provenanceUpstreamVersionIds = (input.draft.metadata.provenance?.upstreamAssets ?? [])
     .map((entry) => normalizeOptional(entry.versionId))
     .filter((entry): entry is string => !!entry);
-  const upstreamVersionIds = [...new Set([...(input.upstreamVersionIds ?? []), ...provenanceUpstreamVersionIds])];
+  const dependencyVersionIds = input.draft.dependencies
+    .map((entry) => normalizeOptional(entry.versionId))
+    .filter((entry): entry is string => !!entry);
+  const upstreamVersionIds = [...new Set([...(input.upstreamVersionIds ?? []), ...provenanceUpstreamVersionIds, ...dependencyVersionIds])];
   const parentVersionId = normalizeOptional(input.parentVersionId) ?? input.draft.lastPublishedVersionId;
   const createdBy = normalizeOptional(input.createdBy) ?? input.draft.metadata.provenance?.creatorId;
   const now = input.now ?? new Date();
@@ -407,11 +509,14 @@ export function publishAssetDraftVersion(input: {
       draftId: input.draft.id,
       draftRevision: input.draft.revision,
       metadata: input.draft.metadata,
+      dependencies: input.draft.dependencies,
+      lifecycleStatus: input.draft.lifecycleStatus,
     },
   });
 
   const draft = Object.freeze({
     ...input.draft,
+    lifecycleStatus: AssetDraftLifecycleStatuses.published,
     publishedVersionIds: Object.freeze([...input.draft.publishedVersionIds, version.versionId]),
     lastPublishedVersionId: version.versionId,
     updatedAt: now.toISOString(),

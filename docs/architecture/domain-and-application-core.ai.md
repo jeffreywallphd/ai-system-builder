@@ -180,6 +180,15 @@ The studio shell now has a bounded inner-layer model and application orchestrati
 - version creation now reuses canonical asset vocabulary (`AssetVersion`, parent version linkage, upstream version ids, immutable version-id conflict semantics) through the existing studio-shell application/repository seam.
 - studio-shell application orchestration now includes explicit publish and version-history operations over `IStudioShellRepository` version persistence methods, with focused domain/application tests for normalization, validation, persistence behavior, and orchestration flow.
 
+## Direction 5 update: Studio shell dependency + lifecycle controls (stories 1.7–1.8)
+
+- studio-shell drafts now carry explicit dependency references (`assetId` + optional `versionId`) as a bounded concern separate from provenance and taxonomy/contract metadata.
+- dependency references are normalized/deduplicated in the domain model and persisted/retrieved through the existing draft/session application flow.
+- publish/version snapshots now include draft dependency references in version metadata and merge dependency version ids into canonical `AssetVersion.upstreamVersionIds` without replacing provenance behavior.
+- draft authoring now has explicit lifecycle state (`draft` | `validated` | `published`) with deterministic transition rules.
+- lifecycle transitions are enforced in the domain; invalid transitions now map to typed application failures (`StudioShellInvalidLifecycleTransitionError`) instead of string-matched handling.
+- publish operations are lifecycle-gated (`validated` required) while remaining distinct from draft revisioning and immutable version history semantics.
+
 ## TODO
 
 - Some concepts currently live more in the application layer than the domain layer because they are orchestration-heavy. That is reasonable, but over time the team may want to clarify which context-engineering rules are true domain policy versus application assembly policy.

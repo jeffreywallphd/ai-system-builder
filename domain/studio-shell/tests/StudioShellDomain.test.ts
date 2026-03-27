@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   applyAssetMetadataPatch,
+  AssetDraftLifecycleStatuses,
   AssetSessionStatuses,
   attachDraftToSession,
   closeAssetSession,
@@ -8,6 +9,9 @@ import {
   createAssetSession,
   createStudio,
   publishAssetDraftVersion,
+  transitionAssetDraftLifecycle,
+  StudioShellDraftLifecycleTransitionError,
+  StudioShellDraftLifecyclePublishGateError,
   updateAssetDraft,
   withStudioSession,
 } from "../StudioShellDomain";
@@ -51,6 +55,8 @@ describe("StudioShellDomain", () => {
     expect(draft.metadata.taxonomy?.semanticRole).toBe("workflow");
     expect(draft.metadata.contract?.version).toBe("v1");
     expect(draft.metadata.provenance?.creatorId).toBe("author-1");
+    expect(draft.dependencies).toEqual([]);
+    expect(draft.lifecycleStatus).toBe(AssetDraftLifecycleStatuses.draft);
     expect(draft.metadata.provenance?.upstreamAssets).toEqual([
       { assetId: "asset:source", versionId: "asset:source:v1", relationship: "DERIVED_FROM" },
     ]);
@@ -266,14 +272,20 @@ describe("StudioShellDomain", () => {
       },
     });
 
+    const validated = transitionAssetDraftLifecycle(draft, session, AssetDraftLifecycleStatuses.validated);
     const first = publishAssetDraftVersion({
-      draft,
+      draft: validated,
       session,
       versionId: "asset:studio:draft-version:v1",
       versionLabel: "v1",
     });
+    const repromoted = transitionAssetDraftLifecycle(
+      transitionAssetDraftLifecycle(first.draft, session, AssetDraftLifecycleStatuses.draft),
+      session,
+      AssetDraftLifecycleStatuses.validated,
+    );
     const second = publishAssetDraftVersion({
-      draft: first.draft,
+      draft: repromoted,
       session,
       versionId: "asset:studio:draft-version:v2",
       versionLabel: "v2",
@@ -283,10 +295,82 @@ describe("StudioShellDomain", () => {
     expect(first.version.assetId.value).toBe("asset:studio:draft-version");
     expect(first.version.createdBy).toBe("author-1");
     expect(first.version.upstreamVersionIds).toEqual(["asset:upstream:v1"]);
+    expect(first.draft.lifecycleStatus).toBe(AssetDraftLifecycleStatuses.published);
     expect(second.version.parentVersionId).toBe("asset:studio:draft-version:v1");
     expect(second.draft.publishedVersionIds).toEqual([
       "asset:studio:draft-version:v1",
       "asset:studio:draft-version:v2",
     ]);
+  });
+
+  it("normalizes and deduplicates explicit dependency references", () => {
+    const studio = createStudio({ id: "studio-deps", name: "Deps Studio" });
+    const session = createAssetSession({ id: "session-deps", studioId: studio.id });
+    const draft = createAssetDraft({
+      id: "draft-deps",
+      studioId: studio.id,
+      session,
+      content: "draft",
+      metadata: { title: "Draft", tags: [] },
+      dependencies: [
+        { assetId: " asset:a ", versionId: " asset:a:v1 " },
+        { assetId: "asset:a", versionId: "asset:a:v1" },
+        { assetId: "asset:b" },
+      ],
+    });
+
+    expect(draft.dependencies).toEqual([
+      { assetId: "asset:a", versionId: "asset:a:v1" },
+      { assetId: "asset:b", versionId: undefined },
+    ]);
+  });
+
+  it("enforces lifecycle transitions and publish gate deterministically", () => {
+    const studio = createStudio({ id: "studio-lifecycle", name: "Lifecycle Studio" });
+    const session = createAssetSession({ id: "session-lifecycle", studioId: studio.id });
+    const draft = createAssetDraft({
+      id: "draft-lifecycle",
+      studioId: studio.id,
+      session,
+      content: "draft",
+      metadata: { title: "Draft", tags: [] },
+      dependencies: [{ assetId: "asset:seed", versionId: "asset:seed:v1" }],
+    });
+
+    expect(() => publishAssetDraftVersion({
+      draft,
+      session,
+      versionId: "asset:lifecycle:v1",
+    })).toThrow(StudioShellDraftLifecyclePublishGateError);
+
+    const validated = transitionAssetDraftLifecycle(draft, session, AssetDraftLifecycleStatuses.validated);
+    expect(validated.lifecycleStatus).toBe(AssetDraftLifecycleStatuses.validated);
+    expect(() => transitionAssetDraftLifecycle(validated, session, AssetDraftLifecycleStatuses.published)).not.toThrow();
+    expect(() => transitionAssetDraftLifecycle(draft, session, AssetDraftLifecycleStatuses.published)).toThrow(
+      StudioShellDraftLifecycleTransitionError,
+    );
+
+    const published = publishAssetDraftVersion({
+      draft: validated,
+      session,
+      versionId: "asset:lifecycle:v1",
+    });
+    expect(published.version.upstreamVersionIds).toEqual(["asset:seed:v1"]);
+  });
+
+  it("resets lifecycle status to draft when mutable draft state changes", () => {
+    const studio = createStudio({ id: "studio-reset", name: "Reset Studio" });
+    const session = createAssetSession({ id: "session-reset", studioId: studio.id });
+    const draft = createAssetDraft({
+      id: "draft-reset",
+      studioId: studio.id,
+      session,
+      content: "v1",
+      metadata: { title: "Draft", tags: [] },
+    });
+    const validated = transitionAssetDraftLifecycle(draft, session, AssetDraftLifecycleStatuses.validated);
+
+    const updatedContent = updateAssetDraft(validated, session, { content: "v2" });
+    expect(updatedContent.lifecycleStatus).toBe(AssetDraftLifecycleStatuses.draft);
   });
 });

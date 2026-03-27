@@ -2,6 +2,7 @@ export const StudioShellErrorCodes = Object.freeze({
   invalidRequest: "studio-shell-invalid-request",
   notFound: "studio-shell-not-found",
   conflict: "studio-shell-conflict",
+  invalidLifecycleTransition: "studio-shell-invalid-lifecycle-transition",
 });
 
 export type StudioShellErrorCode = typeof StudioShellErrorCodes[keyof typeof StudioShellErrorCodes];
@@ -34,5 +35,13 @@ export class StudioShellConflictError extends StudioShellApplicationError {
   constructor(message: string) {
     super(StudioShellErrorCodes.conflict, message);
     this.name = "StudioShellConflictError";
+  }
+}
+
+
+export class StudioShellInvalidLifecycleTransitionError extends StudioShellApplicationError {
+  constructor(message: string) {
+    super(StudioShellErrorCodes.invalidLifecycleTransition, message);
+    this.name = "StudioShellInvalidLifecycleTransitionError";
   }
 }
