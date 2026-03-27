@@ -32,3 +32,8 @@
 - No parallel agent contract architecture.
 - No system-composer UI in this slice.
 - Direction 5 atomic studio slices now consume taxonomy-driven atomic contract projection for Prompt Template, Embedding Index, and Config Profile (`atomic/prompt-template/none`, `atomic/embedding-index/none`, `atomic/config-profile/none`) through shared shell metadata + publish-enforcement seams.
+
+## Implementation status snapshot (story 3.19)
+- Fully implemented now: shared taxonomy-driven contract projection for implemented atomic/composite studios, shared composite publish-consistency enforcement, and composite-to-atomic interop validation through shared dependency + taxonomy/contract seams.
+- Partially implemented / bounded: projections are baseline authoring/publish-gating contracts, not a full runtime behavior-contract system.
+- Not implemented in this slice: dedicated system-asset Studio Shell contract authoring surfaces (Full AI System, App Template / Deployment Unit).

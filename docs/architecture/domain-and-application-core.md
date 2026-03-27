@@ -584,3 +584,31 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
 
 - Training Recipe Studio now integrates through the same shared shell renderer/route seam (`ui/pages/TrainingRecipeStudioPage.tsx` + `ui/studio-shell/registrations/TrainingRecipeStudioRegistration.ts` + `/studio-shell/training-recipe` route wiring) instead of a separate training-recipe UI architecture.
 - Training-recipe registration contributes bounded training-recipe-specific guidance/metadata slot panels while shared shell surfaces remain authoritative for draft/session context, taxonomy/contract/provenance/dependencies state, lifecycle transitions, validation display, and publish/version operations.
+
+## Direction 5 update: Tool Chain studio domain + application + UI integration (stories 3.13–3.14)
+
+- Tool Chain Studio now has a thin bounded inner-layer domain helper (`domain/tool-chain-studio/ToolChainStudioDomain.ts`) for composite tool-chain authoring with taxonomy `composite/tool-chain/deterministic` and generated provenance defaults.
+- A bounded application orchestrator (`application/tool-chain-studio/ToolChainStudioApplicationService.ts`) reuses `StudioShellApplicationService` for initialize/create/publish lifecycle and shared composite publish enforcement (`assertCompositeStudioDraftPublishConsistency`) instead of introducing tool-chain-specific infrastructure.
+- Tool Chain Studio now integrates through the same shared shell renderer/route seam (`ui/pages/ToolChainStudioPage.tsx` + `ui/studio-shell/registrations/ToolChainStudioRegistration.ts` + `/studio-shell/tool-chain` route wiring), with tool-chain-specific behavior bounded to registration defaults and slot contributions.
+
+## Direction 5 update: Composite consistency + interop coverage (stories 3.17–3.18)
+
+- Shared integration coverage now includes all implemented composite studios (workflow, context-bundle, dataset-pipeline, training-recipe, tool-chain) over the same service -> bridge -> backend -> application -> SQLite seam (`ui/services/tests/StudioShellService.integration.test.ts`).
+- Shared validation and publish seams now carry composite dependency identity/version checks, semantic-role compatibility checks, taxonomy/contract consistency checks, and publish-time dependency pinning requirements (`application/studio-shell/StudioShellValidation.ts`, `application/studio-shell/AtomicStudioAssetEnforcement.ts`).
+- Composite-to-atomic interop in this slice is dependency + taxonomy + contract driven (composites reference atomic versions and are validated by shared seams); this slice does not add a separate composite runtime orchestration subsystem.
+
+## Direction 5 implementation status (story 3.19 alignment)
+
+Fully implemented now:
+- Shared Studio Shell lifecycle/session/draft/version/persistence/validation/publish seams for both atomic and composite studios.
+- Unified registration model supporting atomic and composite studios through one shell page/extension architecture.
+- Implemented composite studios: Workflow, Context Bundle, Dataset Pipeline, Training Recipe, Tool Chain.
+- Shared taxonomy + shared contract projection coverage for the implemented atomic/composite roles and corresponding publish enforcement.
+
+Partially implemented / intentionally bounded:
+- Composite behavior semantics are currently enforced as metadata + validation/publish constraints, not as a separate runtime behavior engine in Direction 5.
+- Specialized composite role semantics are fully represented in taxonomy/contract language (`workflow` orchestrator, `agent` decision unit, `context-bundle` input preparer), but only workflow/context-bundle are currently implemented as specialized composite Studio Shell surfaces.
+
+Explicitly later than this story:
+- System-asset Studio Shell surfaces for Full AI System and App Template / Deployment Unit.
+- Any broader system-composer architecture beyond current shared shell + taxonomy/contract/dependency enforcement seams.

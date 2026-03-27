@@ -40,6 +40,11 @@ Current Direction 5 target shape remains:
 - composite assets: workflow, context-bundle, dataset-pipeline, training-recipe, tool-chain
 - system assets: system, app-template
 
+## Implementation status snapshot (story 3.19)
+- Fully implemented now: shared taxonomy model + combination validation, shared studio registration taxonomy defaults, and active composite studio roles (`workflow`, `context-bundle`, `dataset-pipeline`, `training-recipe`, `tool-chain`).
+- Partially implemented / bounded: specialized composite semantics are currently taxonomy/authoring semantics (workflow orchestrator, agent decision unit, context-bundle input preparer); only workflow/context-bundle have specialized composite Studio Shell surfaces in this slice.
+- Not yet implemented in this slice: Studio Shell authoring surfaces for system-level roles (`app-template`, `system`).
+
 
 ## Specialized composite role interpretation
 - Specialized composite assets remain first-class in this taxonomy:
