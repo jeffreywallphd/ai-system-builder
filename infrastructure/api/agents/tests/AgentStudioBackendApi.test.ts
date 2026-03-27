@@ -149,6 +149,7 @@ describe("AgentStudioBackendApi", () => {
     const completed = transitionAgentExecutionSession(running, {
       status: AgentExecutionSessionStatuses.completed,
       appendStepOutcome: { stepId: "step-1", status: "completed", attempts: 1, outputAssetId: new AssetId("asset:output:studio:1") },
+      appendDiagnostic: { assetId: new AssetId("asset:diag:studio:1"), assetVersionId: "v1" },
     });
     await sessions.save(pending);
     await sessions.save(ready);
@@ -163,6 +164,13 @@ describe("AgentStudioBackendApi", () => {
     expect(snapshot.ok).toBe(true);
     expect(snapshot.data?.agent.contract?.version).toBe("1.0.0");
     expect(snapshot.data?.latestSession?.operational.outcomeSummary.outputAssetIds).toEqual(["asset:output:studio:1"]);
+    expect(snapshot.data?.latestSession?.operational.stepOutcomes).toEqual([
+      expect.objectContaining({ stepId: "step-1", status: "completed", attempts: 1 }),
+    ]);
+    expect(snapshot.data?.latestSession?.operational.diagnosticSummary).toEqual({
+      count: 1,
+      assetReferences: [{ assetId: "asset:diag:studio:1", assetVersionId: "v1" }],
+    });
     expect(snapshot.data?.capabilities.launch).toBe(false);
   });
 

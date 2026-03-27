@@ -71,6 +71,21 @@ export interface AgentOperationalProjection {
     readonly blocked: number;
     readonly outputAssetIds: ReadonlyArray<string>;
   };
+  readonly stepOutcomes: ReadonlyArray<{
+    readonly stepId: string;
+    readonly status: "completed" | "failed" | "cancelled" | "blocked";
+    readonly attempts: number;
+    readonly toolId?: string;
+    readonly outputAssetId?: string;
+    readonly errorMessage?: string;
+  }>;
+  readonly diagnosticSummary: {
+    readonly count: number;
+    readonly assetReferences: ReadonlyArray<{
+      readonly assetId: string;
+      readonly assetVersionId?: string;
+    }>;
+  };
 }
 
 export interface AgentSessionDetailReadModel {
@@ -249,6 +264,21 @@ function toOperationalProjection(session: AgentExecutionSession): AgentOperation
       cancelled: session.stepOutcomes.filter((outcome) => outcome.status === "cancelled").length,
       blocked: session.stepOutcomes.filter((outcome) => outcome.status === "blocked").length,
       outputAssetIds: Object.freeze(outputAssetIds),
+    }),
+    stepOutcomes: Object.freeze(session.stepOutcomes.map((outcome) => Object.freeze({
+      stepId: outcome.stepId,
+      status: outcome.status,
+      attempts: outcome.attempts,
+      toolId: outcome.toolId,
+      outputAssetId: outcome.outputAssetId?.toString(),
+      errorMessage: outcome.errorMessage,
+    }))),
+    diagnosticSummary: Object.freeze({
+      count: session.diagnostics.length,
+      assetReferences: Object.freeze(session.diagnostics.map((diagnostic) => Object.freeze({
+        assetId: diagnostic.assetId.toString(),
+        assetVersionId: diagnostic.assetVersionId,
+      }))),
     }),
   });
 }

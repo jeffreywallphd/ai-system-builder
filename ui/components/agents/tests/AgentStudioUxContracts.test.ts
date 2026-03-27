@@ -16,6 +16,7 @@ describe("Agent Studio UX contract wiring", () => {
     const launch = readSource("ui/components/agents/AgentLaunchPanel.tsx");
     const composition = readSource("ui/components/agents/CompositionSummaryCard.tsx");
     const outputAssets = readSource("ui/components/agents/OutputAssetExplorerPanel.tsx");
+    const sessionList = readSource("ui/components/agents/SessionListPanel.tsx");
 
     expect(launch).toContain("TriggerSelector");
     expect(launch).toContain("TriggerConfigFields");
@@ -28,5 +29,12 @@ describe("Agent Studio UX contract wiring", () => {
     expect(outputAssets).toContain("canonicalAssetManagementService.listVersionChain");
     expect(composition).toContain("props.taxonomy.structuralKind");
     expect(composition).toContain("props.contract");
+    expect(sessionList).toContain("No sessions are available for this agent yet.");
+
+    const sessionDetail = readSource("ui/components/agents/SessionDetailPanel.tsx");
+    expect(sessionDetail).toContain("SessionOperationalSummary");
+    expect(sessionDetail).toContain("SessionTransitionHistoryPanel");
+    expect(sessionDetail).toContain("SessionStepOutcomePanel");
+    expect(sessionDetail).toContain("SessionDiagnosticAssetsPanel");
   });
 });

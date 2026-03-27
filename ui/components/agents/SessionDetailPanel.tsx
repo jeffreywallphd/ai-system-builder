@@ -2,7 +2,10 @@ import type { AgentRunControlAction, AgentSessionDetailReadModel } from "../../.
 import { AgentRunControls } from "./AgentRunControls";
 import type { CanonicalAssetManagementService } from "../../services/CanonicalAssetManagementService";
 import { CompositionSummaryCard } from "./CompositionSummaryCard";
-import { OutputAssetExplorerPanel } from "./OutputAssetExplorerPanel";
+import { SessionOperationalSummary } from "./SessionOperationalSummary";
+import { SessionTransitionHistoryPanel } from "./SessionTransitionHistoryPanel";
+import { SessionStepOutcomePanel } from "./SessionStepOutcomePanel";
+import { SessionDiagnosticAssetsPanel } from "./SessionDiagnosticAssetsPanel";
 
 interface SessionDetailPanelProps {
   readonly session?: AgentSessionDetailReadModel;
@@ -34,31 +37,18 @@ export function SessionDetailPanel(props: SessionDetailPanelProps): JSX.Element 
         pendingAction={props.pendingControlAction}
         onControlRun={props.onControlRun}
       />
-      <p className="ui-text-secondary">Terminal reason: {props.session.summary.terminalReason ?? "n/a"}</p>
-      <p className="ui-text-secondary">
-        Steps: {props.session.operational.executionProgress.completedStepCount}/{props.session.operational.executionProgress.attemptedStepCount}
-      </p>
-      <p className="ui-text-secondary">Retry summary: attempted {props.session.operational.retrySummary.attemptedSteps}, total attempts {props.session.operational.retrySummary.totalAttempts}, retried steps {props.session.operational.retrySummary.retriedSteps}</p>
-      <p className="ui-text-secondary">Outcome summary: completed {props.session.operational.outcomeSummary.completed}, failed {props.session.operational.outcomeSummary.failed}, cancelled {props.session.operational.outcomeSummary.cancelled}, blocked {props.session.operational.outcomeSummary.blocked}</p>
+      <SessionOperationalSummary session={props.session} />
       <CompositionSummaryCard
         title="Session composition"
         taxonomy={props.session.composition.taxonomy}
         contract={props.session.composition.contract}
       />
-      <OutputAssetExplorerPanel
-        title="Session output assets"
+      <SessionTransitionHistoryPanel session={props.session} />
+      <SessionStepOutcomePanel session={props.session} />
+      <SessionDiagnosticAssetsPanel
+        session={props.session}
         canonicalAssetManagementService={props.canonicalAssetManagementService}
-        assetIds={props.session.operational.outcomeSummary.outputAssetIds}
-        emptyMessage="This session has no output asset references."
       />
-      <details>
-        <summary><strong>Transition history ({props.session.transitionHistory.length})</strong></summary>
-        <ul className="ui-stack ui-stack--xs">
-          {props.session.transitionHistory.map((entry, index) => (
-            <li key={`${entry.status}-${entry.recordedAt}-${index}`}>{entry.recordedAt}: {entry.status}</li>
-          ))}
-        </ul>
-      </details>
     </div>
   );
 }

@@ -18,9 +18,11 @@ describe("AgentStudioPage contracts", () => {
     expect(source).toContain("service.createAgent");
     expect(source).toContain("service.launchAgent");
     expect(source).toContain("service.triggerLaunch");
-    expect(source).toContain("service.listSessions");
     expect(source).toContain("service.getSessionDetail");
     expect(source).toContain("service.controlRun");
+    expect(source).toContain("nextSnapshot.latestSession");
+    expect(source).toContain("setLatestLaunch(undefined)");
+    expect(source).toContain("setValidationIssues([])");
   });
 
   it("wires authoring sections to backend configuration use cases", () => {
@@ -58,10 +60,11 @@ describe("AgentStudioPage contracts", () => {
     expect(controls).toContain("controls.includes(\"cancel\")");
     expect(controls).not.toContain("pause");
     expect(sessionList).toContain("session.composition.taxonomy.structuralKind");
-    expect(sessionDetail).toContain("operational.retrySummary");
-    expect(sessionDetail).toContain("outcomeSummary.outputAssetIds");
-    expect(sessionDetail).toContain("Transition history");
-    expect(sessionDetail).toContain("OutputAssetExplorerPanel");
+    expect(sessionDetail).toContain("SessionOperationalSummary");
+    expect(sessionDetail).toContain("SessionDiagnosticAssetsPanel");
+    expect(sessionDetail).toContain("SessionTransitionHistoryPanel");
+    expect(sessionDetail).toContain("SessionStepOutcomePanel");
+    expect(sessionDetail).toContain("SessionDiagnosticAssetsPanel");
     expect(sessionDetail).toContain("CompositionSummaryCard");
     expect(detail).toContain("CompositionSummaryCard");
   });

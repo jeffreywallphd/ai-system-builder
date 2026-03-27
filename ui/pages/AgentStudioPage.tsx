@@ -72,8 +72,17 @@ export default function AgentStudioPage(): JSX.Element {
         return;
       }
       setAgents(response.data);
-      if (!selectedAgentId && response.data[0]) {
-        setSelectedAgentId(response.data[0].agent.id);
+      const nextSelectedAgentId = selectedAgentId && response.data.some((entry) => entry.agent.id === selectedAgentId)
+        ? selectedAgentId
+        : response.data[0]?.agent.id ?? "";
+      if (nextSelectedAgentId !== selectedAgentId) {
+        setSelectedAgentId(nextSelectedAgentId);
+      }
+      if (!nextSelectedAgentId) {
+        setSnapshot(undefined);
+        setSessions([]);
+        setSelectedSession(undefined);
+        setLatestLaunch(undefined);
       }
       setError(undefined);
     } catch (cause) {
@@ -94,20 +103,27 @@ export default function AgentStudioPage(): JSX.Element {
         setError(snapshotResponse.error?.message ?? "Failed to load studio snapshot.");
         return;
       }
-      setSnapshot(snapshotResponse.data);
-      const sessionList = await service.listSessions(agentId);
-      if (!sessionList.ok || !sessionList.data) {
-        setError(sessionList.error?.message ?? "Failed to list sessions.");
-        return;
-      }
-      setSessions(sessionList.data);
-      if (sessionList.data[0]) {
-        const detail = await service.getSessionDetail(sessionList.data[0].sessionId);
-        if (detail.ok && detail.data) {
-          setSelectedSession(detail.data);
-        }
-      } else {
+      const nextSnapshot = snapshotResponse.data;
+      const nextSessions = nextSnapshot.sessions;
+      setSnapshot(nextSnapshot);
+      setSessions(nextSessions);
+
+      const preferredSessionId = selectedSession?.summary.sessionId;
+      const sessionToLoad = (preferredSessionId && nextSessions.some((entry) => entry.sessionId === preferredSessionId))
+        ? preferredSessionId
+        : nextSessions[0]?.sessionId;
+
+      if (!sessionToLoad) {
         setSelectedSession(undefined);
+      } else if (nextSnapshot.latestSession?.summary.sessionId === sessionToLoad) {
+        setSelectedSession(nextSnapshot.latestSession);
+      } else {
+        const detail = await service.getSessionDetail(sessionToLoad);
+        if (!detail.ok || !detail.data) {
+          setError(detail.error?.message ?? "Failed to load session detail.");
+          return;
+        }
+        setSelectedSession(detail.data);
       }
       setError(undefined);
     } catch (cause) {
@@ -148,6 +164,7 @@ export default function AgentStudioPage(): JSX.Element {
       }
       setLatestLaunch(response.data);
       await refreshSnapshot(selectedAgentId);
+      setError(undefined);
     } finally {
       setIsBusy(false);
     }
@@ -232,6 +249,12 @@ export default function AgentStudioPage(): JSX.Element {
     if (selectedAgentId) {
       void refreshSnapshot(selectedAgentId);
     }
+  }, [selectedAgentId]);
+
+  useEffect(() => {
+    setLatestLaunch(undefined);
+    setValidationIssues([]);
+    setSelectedSession(undefined);
   }, [selectedAgentId]);
 
   return (
