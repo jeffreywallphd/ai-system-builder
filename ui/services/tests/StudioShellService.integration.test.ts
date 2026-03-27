@@ -60,6 +60,121 @@ function installBridge(api: StudioShellBackendApi): void {
 
 }
 
+interface StudioLifecycleScenario {
+  readonly studioId: string;
+  readonly studioName: string;
+  readonly semanticRole: "workflow" | "context-bundle" | "dataset-pipeline" | "training-recipe" | "tool-chain";
+  readonly behaviorKind: "none" | "deterministic" | "conditional" | "iterative";
+  readonly content: string;
+  readonly dependencies: ReadonlyArray<{ readonly assetId: string; readonly versionId: string }>;
+}
+
+async function runLifecycleScenario(
+  service: StudioShellService,
+  contractResolver: CompositionAssetContractResolver,
+  scenario: StudioLifecycleScenario,
+  options: {
+    readonly expectResolvableDependencies?: boolean;
+  } = {},
+): Promise<{
+  readonly draftId: string;
+  readonly versionId: string;
+}> {
+  const initialized = await service.initializeStudio(scenario.studioId, scenario.studioName);
+  expect(initialized.ok).toBeTrue();
+  const sessionId = initialized.data?.activeSessionId;
+  expect(sessionId).toBeDefined();
+
+  const created = await service.createDraft({
+    studioId: scenario.studioId,
+    sessionId: sessionId!,
+    content: scenario.content,
+    metadata: {
+      title: `${scenario.semanticRole}-asset`,
+      tags: [scenario.semanticRole, "studio-shell", "composite"],
+      taxonomy: {
+        structuralKind: "composite",
+        semanticRole: scenario.semanticRole,
+        behaviorKind: scenario.behaviorKind,
+      },
+      contract: contractResolver.resolveContractForTaxonomy({
+        structuralKind: "composite",
+        semanticRole: scenario.semanticRole,
+        behaviorKind: scenario.behaviorKind,
+      }),
+      provenance: {
+        sourceType: "generated",
+        sourceLabel: `${scenario.semanticRole}-studio`,
+      },
+    },
+    dependencies: scenario.dependencies,
+  });
+  expect(created.ok).toBeTrue();
+  expect(created.data?.validationIssues.some((entry) => entry.code === "lifecycle-not-publish-ready")).toBeTrue();
+  expect(created.data?.validationIssues.some((entry) => entry.code === "version-history-empty")).toBeTrue();
+  expect(created.data?.validationIssues.some((entry) => entry.code === "composite-dependency-recommended")).toBeFalse();
+
+  const draftId = created.data?.draft?.draftId;
+  expect(draftId).toBeDefined();
+
+  const updated = await service.updateDraft({
+    studioId: scenario.studioId,
+    sessionId: sessionId!,
+    draftId: draftId!,
+    content: `${scenario.content}\n`,
+    metadataPatch: {
+      summary: `${scenario.studioName} cross-studio consistency`,
+    },
+  });
+  expect(updated.ok).toBeTrue();
+  expect(updated.data?.draft?.revision).toBe(2);
+
+  const validated = await service.transitionLifecycle({
+    studioId: scenario.studioId,
+    sessionId: sessionId!,
+    draftId: draftId!,
+    targetStatus: AssetDraftLifecycleStatuses.validated,
+  });
+  expect(validated.ok).toBeTrue();
+  expect(validated.data?.draft?.lifecycleStatus).toBe(AssetDraftLifecycleStatuses.validated);
+
+  const versionId = `asset:${scenario.studioId}:v1`;
+  const published = await service.publishVersion({
+    studioId: scenario.studioId,
+    sessionId: sessionId!,
+    draftId: draftId!,
+    versionId,
+    versionLabel: "v1",
+    createdBy: "composite-author",
+  });
+  expect(published.ok).toBeTrue();
+  expect(published.data?.draft?.lifecycleStatus).toBe(AssetDraftLifecycleStatuses.published);
+  expect(published.data?.versions.map((entry) => entry.versionId)).toEqual([versionId]);
+  expect(published.data?.draft?.metadata.taxonomy).toEqual({
+    structuralKind: "composite",
+    semanticRole: scenario.semanticRole,
+    behaviorKind: scenario.behaviorKind,
+  });
+  expect(published.data?.draft?.metadata.contract).toEqual(contractResolver.resolveContractForTaxonomy({
+    structuralKind: "composite",
+    semanticRole: scenario.semanticRole,
+    behaviorKind: scenario.behaviorKind,
+  }));
+
+  const issues = await service.validateDraft(scenario.studioId, draftId!);
+  expect(issues.ok).toBeTrue();
+  if (options.expectResolvableDependencies !== false) {
+    expect(issues.data?.some((entry) => entry.code === "dependency-version-not-found")).toBeFalse();
+    expect(issues.data?.some((entry) => entry.code === "composite-dependency-semantic-role-disallowed")).toBeFalse();
+  }
+  expect(issues.data?.some((entry) => entry.code === "lifecycle-not-publish-ready")).toBeFalse();
+
+  return Object.freeze({
+    draftId: draftId!,
+    versionId,
+  });
+}
+
 describe("StudioShellService integration", () => {
   it("keeps model/dataset/tool/prompt-template/embedding-index/config-profile lifecycle and persisted contract-taxonomy behavior consistent across shared seams", async () => {
     const root = mkdtempSync(path.join(tmpdir(), "loom-atomic-studio-consistency-"));
@@ -609,6 +724,265 @@ describe("StudioShellService integration", () => {
     }));
     expect(snapshot.data?.draft?.lifecycleStatus).toBe(AssetDraftLifecycleStatuses.published);
     expect(snapshot.data?.versions.map((entry) => entry.versionId)).toEqual(["asset:studio-training-recipes:v1"]);
+
+    reopenedRepository.dispose();
+  });
+
+  it("keeps workflow/context-bundle/dataset-pipeline/training-recipe/tool-chain composite lifecycle and persisted taxonomy-contract behavior consistent across shared seams", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-composite-studio-consistency-"));
+    createdRoots.push(root);
+    const databasePath = path.join(root, "composite-studio.sqlite");
+    const repository = new SqliteStudioShellRepository(databasePath);
+    const backendApi = new StudioShellBackendApi(repository);
+    installBridge(backendApi);
+
+    const service = new StudioShellService();
+    const contractResolver = new CompositionAssetContractResolver();
+
+    const scenarios: ReadonlyArray<StudioLifecycleScenario> = [
+      {
+        studioId: "studio-workflows",
+        studioName: "Workflow Studio",
+        semanticRole: "workflow",
+        behaviorKind: "conditional",
+        content: "{\"workflowSpec\":{\"metadata\":{\"name\":\"Cross Studio Workflow\"},\"nodes\":[],\"connections\":[]}}",
+        dependencies: [{ assetId: "asset:seed-model", versionId: "asset:seed-model:v1" }],
+      },
+      {
+        studioId: "studio-context-bundles",
+        studioName: "Context Bundle Studio",
+        semanticRole: "context-bundle",
+        behaviorKind: "deterministic",
+        content: "{\"contextBundleSpec\":{\"packageRefs\":[\"context-package:customer\"],\"recipeRefs\":[\"context-recipe:bounded\"],\"assemblyPolicy\":\"merge\"}}",
+        dependencies: [{ assetId: "asset:seed-context", versionId: "asset:seed-context:v1" }],
+      },
+      {
+        studioId: "studio-dataset-pipelines",
+        studioName: "Dataset Pipeline Studio",
+        semanticRole: "dataset-pipeline",
+        behaviorKind: "deterministic",
+        content: "{\"datasetPipelineSpec\":{\"sources\":[{\"datasetRef\":\"dataset-version:raw:v1\"}],\"steps\":[{\"id\":\"clean\",\"kind\":\"data-cleaning\"}]}}",
+        dependencies: [{ assetId: "asset:seed-dataset", versionId: "asset:seed-dataset:v1" }],
+      },
+      {
+        studioId: "studio-training-recipes",
+        studioName: "Training Recipe Studio",
+        semanticRole: "training-recipe",
+        behaviorKind: "deterministic",
+        content: "{\"trainingRecipeSpec\":{\"baseModelRef\":\"installed-model:base:v1\",\"datasetRefs\":[\"dataset-version:train:v1\"],\"configProfileRef\":\"config-profile:runtime:v1\"}}",
+        dependencies: [{ assetId: "asset:seed-training", versionId: "asset:seed-training:v1" }],
+      },
+      {
+        studioId: "studio-tool-chains",
+        studioName: "Tool Chain Studio",
+        semanticRole: "tool-chain",
+        behaviorKind: "deterministic",
+        content: "{\"toolChainSpec\":{\"tools\":[{\"toolAssetRef\":\"tool:lookup:v1\"}],\"invocationSteps\":[{\"id\":\"lookup\",\"kind\":\"tool-invocation\"}]}}",
+        dependencies: [{ assetId: "asset:seed-tool", versionId: "asset:seed-tool:v1" }],
+      },
+    ];
+
+    for (const scenario of scenarios) {
+      await runLifecycleScenario(service, contractResolver, scenario, {
+        expectResolvableDependencies: false,
+      });
+    }
+
+    repository.dispose();
+
+    const reopenedRepository = new SqliteStudioShellRepository(databasePath);
+    const reopenedApi = new StudioShellBackendApi(reopenedRepository);
+    installBridge(reopenedApi);
+
+    for (const scenario of scenarios) {
+      const snapshot = await service.loadSnapshot(scenario.studioId);
+      expect(snapshot.ok).toBeTrue();
+      expect(snapshot.data?.draft?.lifecycleStatus).toBe(AssetDraftLifecycleStatuses.published);
+      expect(snapshot.data?.draft?.metadata.taxonomy).toEqual({
+        structuralKind: "composite",
+        semanticRole: scenario.semanticRole,
+        behaviorKind: scenario.behaviorKind,
+      });
+      expect(snapshot.data?.draft?.metadata.contract).toEqual(contractResolver.resolveContractForTaxonomy({
+        structuralKind: "composite",
+        semanticRole: scenario.semanticRole,
+        behaviorKind: scenario.behaviorKind,
+      }));
+      expect(snapshot.data?.draft?.dependencies).toEqual(scenario.dependencies);
+      expect(snapshot.data?.versions.map((entry) => entry.versionId)).toEqual([`asset:${scenario.studioId}:v1`]);
+    }
+
+    reopenedRepository.dispose();
+  });
+
+  it("supports composite-to-atomic dependency reuse with pinned version interop over real shell/api/sqlite seams", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-composite-atomic-interop-"));
+    createdRoots.push(root);
+    const databasePath = path.join(root, "composite-atomic-interop.sqlite");
+    const repository = new SqliteStudioShellRepository(databasePath);
+    const backendApi = new StudioShellBackendApi(repository);
+    installBridge(backendApi);
+
+    const service = new StudioShellService();
+    const contractResolver = new CompositionAssetContractResolver();
+
+    const atomicScenarios = [
+      { studioId: "studio-models", studioName: "Model Studio", semanticRole: "model" as const, content: "{\"modelSpec\":{\"provider\":\"local\"}}" },
+      { studioId: "studio-datasets", studioName: "Dataset Studio", semanticRole: "dataset" as const, content: "{\"datasetSpec\":{\"format\":\"jsonl\"}}" },
+      { studioId: "studio-tools", studioName: "Tool Studio", semanticRole: "tool" as const, content: "{\"toolSpec\":{\"providerKind\":\"mcp\"}}", behaviorKind: "conditional" as const },
+      { studioId: "studio-prompt-templates", studioName: "Prompt Template Studio", semanticRole: "prompt-template" as const, content: "{\"promptTemplateSpec\":{\"format\":\"mustache\"}}" },
+      { studioId: "studio-embedding-indexes", studioName: "Embedding Index Studio", semanticRole: "embedding-index" as const, content: "{\"embeddingIndexSpec\":{\"indexAlgorithm\":\"hnsw\"}}" },
+      { studioId: "studio-config-profiles", studioName: "Config Profile Studio", semanticRole: "config-profile" as const, content: "{\"runtimeProfile\":{\"preferredRuntime\":\"python\"}}" },
+    ];
+
+    const publishedAtomicVersions = new Map<string, { assetId: string; versionId: string }>();
+
+    for (const scenario of atomicScenarios) {
+      const initialized = await service.initializeStudio(scenario.studioId, scenario.studioName);
+      expect(initialized.ok).toBeTrue();
+      const sessionId = initialized.data?.activeSessionId;
+      expect(sessionId).toBeDefined();
+
+      const behaviorKind = scenario.behaviorKind ?? "none";
+      const created = await service.createDraft({
+        studioId: scenario.studioId,
+        sessionId: sessionId!,
+        content: scenario.content,
+        metadata: {
+          title: `${scenario.semanticRole}-atomic`,
+          tags: [scenario.semanticRole, "studio-shell", "atomic"],
+          taxonomy: {
+            structuralKind: "atomic",
+            semanticRole: scenario.semanticRole,
+            behaviorKind,
+          },
+          contract: contractResolver.resolveContractForTaxonomy({
+            structuralKind: "atomic",
+            semanticRole: scenario.semanticRole,
+            behaviorKind,
+          }),
+          provenance: {
+            sourceType: "generated",
+            sourceLabel: `${scenario.semanticRole}-studio`,
+          },
+        },
+        dependencies: [{ assetId: `asset:${scenario.semanticRole}:seed`, versionId: `asset:${scenario.semanticRole}:seed:v1` }],
+      });
+      expect(created.ok).toBeTrue();
+      const draftId = created.data?.draft?.draftId;
+      expect(draftId).toBeDefined();
+      const atomicAssetId = created.data?.draft?.assetId;
+      expect(atomicAssetId).toBeDefined();
+
+      const validated = await service.transitionLifecycle({
+        studioId: scenario.studioId,
+        sessionId: sessionId!,
+        draftId: draftId!,
+        targetStatus: AssetDraftLifecycleStatuses.validated,
+      });
+      expect(validated.ok).toBeTrue();
+
+      const versionId = `asset:${scenario.studioId}:v1`;
+      const published = await service.publishVersion({
+        studioId: scenario.studioId,
+        sessionId: sessionId!,
+        draftId: draftId!,
+        versionId,
+        versionLabel: "v1",
+        createdBy: "atomic-author",
+      });
+      expect(published.ok).toBeTrue();
+
+      publishedAtomicVersions.set(scenario.semanticRole, {
+        assetId: atomicAssetId!,
+        versionId,
+      });
+    }
+
+    const compositeScenarios: ReadonlyArray<StudioLifecycleScenario> = [
+      {
+        studioId: "studio-dataset-pipelines",
+        studioName: "Dataset Pipeline Studio",
+        semanticRole: "dataset-pipeline",
+        behaviorKind: "deterministic",
+        content: "{\"datasetPipelineSpec\":{\"sources\":[{\"datasetRef\":\"dataset-version:train:v1\"}],\"configProfileRef\":\"config-profile:runtime:v1\"}}",
+        dependencies: [
+          publishedAtomicVersions.get("dataset")!,
+          publishedAtomicVersions.get("config-profile")!,
+        ],
+      },
+      {
+        studioId: "studio-training-recipes",
+        studioName: "Training Recipe Studio",
+        semanticRole: "training-recipe",
+        behaviorKind: "deterministic",
+        content: "{\"trainingRecipeSpec\":{\"baseModelRef\":\"installed-model:base:v1\",\"datasetRefs\":[\"dataset-version:train:v1\"],\"configProfileRef\":\"config-profile:runtime:v1\"}}",
+        dependencies: [
+          publishedAtomicVersions.get("model")!,
+          publishedAtomicVersions.get("dataset")!,
+          publishedAtomicVersions.get("config-profile")!,
+        ],
+      },
+      {
+        studioId: "studio-tool-chains",
+        studioName: "Tool Chain Studio",
+        semanticRole: "tool-chain",
+        behaviorKind: "deterministic",
+        content: "{\"toolChainSpec\":{\"tools\":[{\"toolAssetRef\":\"tool:lookup:v1\"}],\"invocationSteps\":[{\"id\":\"lookup\",\"kind\":\"tool-invocation\"}]}}",
+        dependencies: [publishedAtomicVersions.get("tool")!],
+      },
+      {
+        studioId: "studio-context-bundles",
+        studioName: "Context Bundle Studio",
+        semanticRole: "context-bundle",
+        behaviorKind: "deterministic",
+        content: "{\"contextBundleSpec\":{\"packageRefs\":[],\"recipeRefs\":[\"context-recipe:retrieval:v1\"],\"assemblyPolicy\":\"merge\"}}",
+        dependencies: [
+          publishedAtomicVersions.get("prompt-template")!,
+          publishedAtomicVersions.get("embedding-index")!,
+          publishedAtomicVersions.get("dataset")!,
+        ],
+      },
+      {
+        studioId: "studio-workflows",
+        studioName: "Workflow Studio",
+        semanticRole: "workflow",
+        behaviorKind: "conditional",
+        content: "{\"workflowSpec\":{\"metadata\":{\"name\":\"Interop Workflow\"},\"nodes\":[],\"connections\":[]}}",
+        dependencies: [
+          publishedAtomicVersions.get("model")!,
+          publishedAtomicVersions.get("dataset")!,
+          publishedAtomicVersions.get("tool")!,
+          publishedAtomicVersions.get("prompt-template")!,
+          publishedAtomicVersions.get("embedding-index")!,
+          publishedAtomicVersions.get("config-profile")!,
+        ],
+      },
+    ];
+
+    for (const scenario of compositeScenarios) {
+      const result = await runLifecycleScenario(service, contractResolver, scenario);
+      const publishedVersion = await repository.getAssetVersion(result.versionId);
+      expect(publishedVersion).toBeDefined();
+      expect(publishedVersion?.upstreamVersionIds).toEqual(expect.arrayContaining(
+        scenario.dependencies.map((entry) => entry.versionId),
+      ));
+    }
+
+    repository.dispose();
+
+    const reopenedRepository = new SqliteStudioShellRepository(databasePath);
+    const reopenedApi = new StudioShellBackendApi(reopenedRepository);
+    installBridge(reopenedApi);
+
+    for (const scenario of compositeScenarios) {
+      const snapshot = await service.loadSnapshot(scenario.studioId);
+      expect(snapshot.ok).toBeTrue();
+      expect(snapshot.data?.draft?.dependencies).toEqual(scenario.dependencies);
+      expect(snapshot.data?.validationIssues.some((entry) => entry.code === "dependency-version-not-found")).toBeFalse();
+      expect(snapshot.data?.validationIssues.some((entry) => entry.code === "dependency-asset-version-mismatch")).toBeFalse();
+      expect(snapshot.data?.validationIssues.some((entry) => entry.code === "composite-dependency-semantic-role-disallowed")).toBeFalse();
+    }
 
     reopenedRepository.dispose();
   });
