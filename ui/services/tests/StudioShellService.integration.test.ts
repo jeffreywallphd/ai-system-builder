@@ -511,6 +511,108 @@ describe("StudioShellService integration", () => {
     reopenedRepository.dispose();
   });
 
+  it("supports Training Recipe Studio composite flow over the same shell/persistence/publish seams", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-training-recipe-studio-service-"));
+    createdRoots.push(root);
+    const databasePath = path.join(root, "training-recipe-studio.sqlite");
+    const repository = new SqliteStudioShellRepository(databasePath);
+    const backendApi = new StudioShellBackendApi(repository);
+    installBridge(backendApi);
+
+    const service = new StudioShellService();
+    const contractResolver = new CompositionAssetContractResolver();
+    const initialized = await service.initializeStudio("studio-training-recipes", "Training Recipe Studio");
+    expect(initialized.ok).toBeTrue();
+    const sessionId = initialized.data?.activeSessionId;
+    expect(sessionId).toBeDefined();
+
+    const created = await service.createDraft({
+      studioId: "studio-training-recipes",
+      sessionId: sessionId!,
+      content: "{\"trainingRecipeSpec\":{\"baseModelRef\":\"installed-model:base:v1\",\"datasetRefs\":[\"dataset-version:train:v2\"],\"configProfileRef\":\"config-profile:runtime:v3\",\"executionKind\":\"local-gradient-training\",\"flow\":{\"epochs\":3,\"batchSize\":8}}}",
+      metadata: {
+        title: "Training Recipe Asset Draft",
+        tags: ["training-recipe", "studio-shell", "composite", "model-training", "fine-tuning"],
+        taxonomy: {
+          structuralKind: "composite",
+          semanticRole: "training-recipe",
+          behaviorKind: "deterministic",
+        },
+        contract: contractResolver.resolveContractForTaxonomy({
+          structuralKind: "composite",
+          semanticRole: "training-recipe",
+          behaviorKind: "deterministic",
+        }),
+        provenance: {
+          sourceType: "generated",
+          sourceLabel: "training-recipe-studio",
+        },
+      },
+      dependencies: [
+        { assetId: "asset:base-model", versionId: "asset:base-model:v1" },
+        { assetId: "asset:training-dataset", versionId: "asset:training-dataset:v2" },
+        { assetId: "asset:runtime-config", versionId: "asset:runtime-config:v1" },
+      ],
+    });
+    expect(created.ok).toBeTrue();
+    const draftId = created.data?.draft?.draftId;
+    expect(draftId).toBeDefined();
+    expect(created.data?.validationIssues.some((entry) => entry.code === "lifecycle-not-publish-ready")).toBeTrue();
+
+    const validated = await service.transitionLifecycle({
+      studioId: "studio-training-recipes",
+      sessionId: sessionId!,
+      draftId: draftId!,
+      targetStatus: AssetDraftLifecycleStatuses.validated,
+    });
+    expect(validated.ok).toBeTrue();
+
+    const published = await service.publishVersion({
+      studioId: "studio-training-recipes",
+      sessionId: sessionId!,
+      draftId: draftId!,
+      versionId: "asset:studio-training-recipes:v1",
+      versionLabel: "v1",
+      createdBy: "training-author",
+    });
+    expect(published.ok).toBeTrue();
+    expect(published.data?.draft?.metadata.taxonomy).toEqual({
+      structuralKind: "composite",
+      semanticRole: "training-recipe",
+      behaviorKind: "deterministic",
+    });
+    expect(published.data?.draft?.metadata.contract).toEqual(contractResolver.resolveContractForTaxonomy({
+      structuralKind: "composite",
+      semanticRole: "training-recipe",
+      behaviorKind: "deterministic",
+    }));
+    expect(published.data?.draft?.lifecycleStatus).toBe(AssetDraftLifecycleStatuses.published);
+    expect(published.data?.versions.map((entry) => entry.versionId)).toEqual(["asset:studio-training-recipes:v1"]);
+
+    repository.dispose();
+
+    const reopenedRepository = new SqliteStudioShellRepository(databasePath);
+    const reopenedApi = new StudioShellBackendApi(reopenedRepository);
+    installBridge(reopenedApi);
+
+    const snapshot = await service.loadSnapshot("studio-training-recipes");
+    expect(snapshot.ok).toBeTrue();
+    expect(snapshot.data?.draft?.metadata.taxonomy).toEqual({
+      structuralKind: "composite",
+      semanticRole: "training-recipe",
+      behaviorKind: "deterministic",
+    });
+    expect(snapshot.data?.draft?.metadata.contract).toEqual(contractResolver.resolveContractForTaxonomy({
+      structuralKind: "composite",
+      semanticRole: "training-recipe",
+      behaviorKind: "deterministic",
+    }));
+    expect(snapshot.data?.draft?.lifecycleStatus).toBe(AssetDraftLifecycleStatuses.published);
+    expect(snapshot.data?.versions.map((entry) => entry.versionId)).toEqual(["asset:studio-training-recipes:v1"]);
+
+    reopenedRepository.dispose();
+  });
+
   it("supports Dataset Studio style flow over the same shell/persistence/publish seams", async () => {
     const root = mkdtempSync(path.join(tmpdir(), "loom-dataset-studio-service-"));
     createdRoots.push(root);
