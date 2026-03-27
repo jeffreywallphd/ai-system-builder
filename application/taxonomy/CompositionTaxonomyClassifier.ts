@@ -24,6 +24,29 @@ export interface ICompositionTaxonomyClassifier {
   classifyToolCapability(capability: ToolCapabilityDescriptor): CompositionTaxonomyDescriptor;
 }
 
+
+type SpecializedCompositeSemanticRole = Extract<
+  CompositionTaxonomyDescriptor["semanticRole"],
+  "workflow" | "agent" | "context-bundle"
+>;
+
+const specializedCompositeDefaults: Readonly<Record<SpecializedCompositeSemanticRole, TaxonomyBehaviorKind>> = Object.freeze({
+  [TaxonomySemanticRoles.workflow]: TaxonomyBehaviorKinds.deterministic,
+  [TaxonomySemanticRoles.agent]: TaxonomyBehaviorKinds.autonomous,
+  [TaxonomySemanticRoles.contextBundle]: TaxonomyBehaviorKinds.none,
+});
+
+function classifySpecializedCompositeRole(
+  semanticRole: SpecializedCompositeSemanticRole,
+  behaviorKind?: TaxonomyBehaviorKind,
+): CompositionTaxonomyDescriptor {
+  return createCompositionTaxonomyDescriptor({
+    structuralKind: TaxonomyStructuralKinds.composite,
+    semanticRole,
+    behaviorKind: behaviorKind ?? specializedCompositeDefaults[semanticRole],
+  });
+}
+
 const canonicalEntityClassificationMap: Readonly<Record<CanonicalEntityType, CompositionTaxonomyDescriptor>> = Object.freeze({
   "workflow-definition": createCompositionTaxonomyDescriptor({
     structuralKind: TaxonomyStructuralKinds.composite,
@@ -98,35 +121,19 @@ export class CompositionTaxonomyClassifier implements ICompositionTaxonomyClassi
     _workflow: IWorkflow,
     behaviorKind: Extract<TaxonomyBehaviorKind, "deterministic" | "conditional" | "iterative"> = TaxonomyBehaviorKinds.deterministic,
   ): CompositionTaxonomyDescriptor {
-    return createCompositionTaxonomyDescriptor({
-      structuralKind: TaxonomyStructuralKinds.composite,
-      semanticRole: TaxonomySemanticRoles.workflow,
-      behaviorKind,
-    });
+    return classifySpecializedCompositeRole(TaxonomySemanticRoles.workflow, behaviorKind);
   }
 
   public classifyAgent(_agent: Agent): CompositionTaxonomyDescriptor {
-    return createCompositionTaxonomyDescriptor({
-      structuralKind: TaxonomyStructuralKinds.composite,
-      semanticRole: TaxonomySemanticRoles.agent,
-      behaviorKind: TaxonomyBehaviorKinds.autonomous,
-    });
+    return classifySpecializedCompositeRole(TaxonomySemanticRoles.agent);
   }
 
   public classifyContextPackage(_contextPackage: ContextPackage): CompositionTaxonomyDescriptor {
-    return createCompositionTaxonomyDescriptor({
-      structuralKind: TaxonomyStructuralKinds.composite,
-      semanticRole: TaxonomySemanticRoles.contextBundle,
-      behaviorKind: TaxonomyBehaviorKinds.none,
-    });
+    return classifySpecializedCompositeRole(TaxonomySemanticRoles.contextBundle);
   }
 
   public classifyContextRecipe(_contextRecipe: ContextRecipe): CompositionTaxonomyDescriptor {
-    return createCompositionTaxonomyDescriptor({
-      structuralKind: TaxonomyStructuralKinds.composite,
-      semanticRole: TaxonomySemanticRoles.contextBundle,
-      behaviorKind: TaxonomyBehaviorKinds.deterministic,
-    });
+    return classifySpecializedCompositeRole(TaxonomySemanticRoles.contextBundle, TaxonomyBehaviorKinds.deterministic);
   }
 
   public classifyToolCapability(capability: ToolCapabilityDescriptor): CompositionTaxonomyDescriptor {

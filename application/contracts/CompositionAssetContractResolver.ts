@@ -20,9 +20,17 @@ import type { IRemoteModelCatalog } from "../ports/interfaces/IRemoteModelCatalo
 import type { IExecutionRunRepository } from "../ports/interfaces/IExecutionRunRepository";
 import type { IModel } from "../../domain/models/interfaces/IModel";
 import type { IExecutionRunRecord } from "../../domain/execution/ExecutionRun";
+import {
+  TaxonomyBehaviorKinds,
+  TaxonomySemanticRoles,
+  type CompositionTaxonomyDescriptor,
+  type TaxonomyBehaviorKind,
+  type TaxonomySemanticRole,
+} from "../../domain/taxonomy/CompositionTaxonomy";
 
 export interface IAssetContractResolver {
   resolveCanonicalEntityContract(entityType: CanonicalEntityType, entityId: string): Promise<AssetContractDescriptor | undefined>;
+  resolveContractForTaxonomy(descriptor: CompositionTaxonomyDescriptor): AssetContractDescriptor | undefined;
   resolveWorkflowContract(workflow: IWorkflow): AssetContractDescriptor;
   resolveAgentContract(agent: Agent): AssetContractDescriptor;
   resolveToolCapabilityContract(capability: ToolCapabilityDescriptor): AssetContractDescriptor;
@@ -32,6 +40,169 @@ export interface IAssetContractResolver {
 
 function parameter(id: string, required: boolean, description: string, valueType?: string, defaultValue?: unknown): AssetContractParameterDescriptor {
   return Object.freeze({ id, required, description, valueType, defaultValue });
+}
+
+
+function specializedCompositeDescription(role: Extract<TaxonomySemanticRole, "workflow" | "agent" | "context-bundle">): string {
+  if (role === TaxonomySemanticRoles.workflow) {
+    return "Specialized composite orchestrator coordinating bounded execution across reusable units.";
+  }
+
+  if (role === TaxonomySemanticRoles.agent) {
+    return "Specialized composite decision unit balancing planning, tool use, and adaptive execution choices.";
+  }
+
+  return "Specialized composite input preparer assembling and shaping reusable context for downstream execution.";
+}
+
+function defaultTaxonomyContract(descriptor: CompositionTaxonomyDescriptor): AssetContractDescriptor | undefined {
+  const { semanticRole } = descriptor;
+
+  if (semanticRole === TaxonomySemanticRoles.configProfile) {
+    return createAssetContractDescriptor({
+      version: "1.0.0",
+      input: {
+        kind: AssetContractShapeKinds.jsonSchema,
+        description: "Config profile patch/update payload for versioned runtime or policy settings.",
+      },
+      output: {
+        kind: AssetContractShapeKinds.jsonSchema,
+        description: "Resolved configuration object consumable by dependent assets.",
+      },
+      parameters: [
+        parameter("profileScope", true, "Configuration scope targeted by the profile.", "string", "runtime"),
+      ],
+      execution: {
+        invocationMode: "deferred",
+        sideEffects: "none",
+      },
+    });
+  }
+
+  if (semanticRole === TaxonomySemanticRoles.datasetPipeline) {
+    return createAssetContractDescriptor({
+      version: "1.0.0",
+      input: {
+        kind: AssetContractShapeKinds.jsonSchema,
+        description: "Dataset pipeline request including source datasets and transformation stage controls.",
+      },
+      output: {
+        kind: AssetContractShapeKinds.jsonSchema,
+        description: "Dataset pipeline execution outcome with promoted dataset-version references.",
+      },
+      parameters: [
+        parameter("stageCount", false, "Declared dataset pipeline stage count.", "number"),
+      ],
+      execution: {
+        invocationMode: "async",
+        sideEffects: "bounded",
+      },
+    });
+  }
+
+  if (semanticRole === TaxonomySemanticRoles.trainingRecipe) {
+    return createAssetContractDescriptor({
+      version: "1.0.0",
+      input: {
+        kind: AssetContractShapeKinds.jsonSchema,
+        description: "Training recipe request including base model, dataset version, and training configuration.",
+      },
+      output: {
+        kind: AssetContractShapeKinds.jsonSchema,
+        description: "Training job specification and resulting artifact references.",
+      },
+      parameters: [
+        parameter("executionTarget", false, "Preferred training execution target.", "string"),
+      ],
+      execution: {
+        invocationMode: "async",
+        sideEffects: "external",
+      },
+    });
+  }
+
+  if (semanticRole === TaxonomySemanticRoles.toolChain) {
+    return createAssetContractDescriptor({
+      version: "1.0.0",
+      input: {
+        kind: AssetContractShapeKinds.jsonSchema,
+        description: "Tool-chain invocation payload with ordered tool-call arguments.",
+      },
+      output: {
+        kind: AssetContractShapeKinds.jsonSchema,
+        description: "Aggregated tool-chain response envelope with per-step outputs.",
+      },
+      parameters: [
+        parameter("executionOrdering", true, "Tool invocation ordering strategy.", "string", "sequential"),
+      ],
+      execution: {
+        invocationMode: "async",
+        sideEffects: "external",
+      },
+    });
+  }
+
+  if (semanticRole === TaxonomySemanticRoles.appTemplate) {
+    return createAssetContractDescriptor({
+      version: "1.0.0",
+      input: {
+        kind: AssetContractShapeKinds.jsonSchema,
+        description: "App-template deployment-unit inputs, including environment and integration bindings.",
+      },
+      output: {
+        kind: AssetContractShapeKinds.jsonSchema,
+        description: "Versioned deployment manifest and runtime provisioning guidance.",
+      },
+      parameters: [
+        parameter("targetRuntime", true, "Deployment runtime target.", "string", "container"),
+      ],
+      execution: {
+        invocationMode: "deferred",
+        sideEffects: "bounded",
+      },
+    });
+  }
+
+  if (semanticRole === TaxonomySemanticRoles.contextBundle) {
+    const behaviorKind: TaxonomyBehaviorKind = descriptor.behaviorKind;
+    if (behaviorKind === TaxonomyBehaviorKinds.none) {
+      return createAssetContractDescriptor({
+        version: "1.0.0",
+        output: {
+          kind: AssetContractShapeKinds.text,
+          description: `${specializedCompositeDescription(TaxonomySemanticRoles.contextBundle)} Prepared context fragments exposed as prompt-ready text blocks.`,
+        },
+        parameters: [
+          parameter("bundleMode", true, "Context-bundle mode.", "string", "package"),
+        ],
+        execution: {
+          invocationMode: "deferred",
+          sideEffects: "none",
+        },
+      });
+    }
+
+    return createAssetContractDescriptor({
+      version: "1.0.0",
+      input: {
+        kind: AssetContractShapeKinds.jsonSchema,
+        description: "Context-bundle assembly controls and source selection settings.",
+      },
+      output: {
+        kind: AssetContractShapeKinds.text,
+        description: `${specializedCompositeDescription(TaxonomySemanticRoles.contextBundle)} Recipe-guided assembly output for downstream consumers.`,
+      },
+      parameters: [
+        parameter("bundleMode", true, "Context-bundle mode.", "string", "recipe"),
+      ],
+      execution: {
+        invocationMode: "deferred",
+        sideEffects: "none",
+      },
+    });
+  }
+
+  return undefined;
 }
 
 export class CompositionAssetContractResolver implements IAssetContractResolver {
@@ -77,17 +248,21 @@ export class CompositionAssetContractResolver implements IAssetContractResolver 
     return undefined;
   }
 
+  public resolveContractForTaxonomy(descriptor: CompositionTaxonomyDescriptor): AssetContractDescriptor | undefined {
+    return defaultTaxonomyContract(descriptor);
+  }
+
   public resolveWorkflowContract(workflow: IWorkflow): AssetContractDescriptor {
     const contextConfiguration = workflow.metadata.contextConfiguration;
     return createAssetContractDescriptor({
       version: "1.0.0",
       input: {
         kind: AssetContractShapeKinds.jsonSchema,
-        description: "Workflow execution request payload and optional context overrides.",
+        description: `${specializedCompositeDescription(TaxonomySemanticRoles.workflow)} Workflow execution request payload with optional context overrides.`,
       },
       output: {
         kind: AssetContractShapeKinds.jsonSchema,
-        description: "Workflow execution result envelope with node outputs and execution provenance.",
+        description: "Workflow orchestrator result envelope with node outputs and execution provenance.",
       },
       parameters: [
         parameter("executionPolicy", true, "Workflow graph execution policy.", "string", workflow.executionPolicy),
@@ -107,11 +282,11 @@ export class CompositionAssetContractResolver implements IAssetContractResolver 
       version: "1.0.0",
       input: {
         kind: AssetContractShapeKinds.jsonSchema,
-        description: "Agent invocation request with objective and optional runtime context.",
+        description: `${specializedCompositeDescription(TaxonomySemanticRoles.agent)} Agent invocation request with objective and runtime context.`,
       },
       output: {
         kind: AssetContractShapeKinds.jsonSchema,
-        description: "Agent execution session outcome, step results, and terminal summary.",
+        description: "Decision-unit execution session outcome, step results, and terminal summary.",
       },
       parameters: [
         parameter("planningStrategy", true, "Planning strategy id and mode.", "string", `${agent.planningStrategy.strategyId}@${agent.planningStrategy.mode}`),
@@ -150,43 +325,37 @@ export class CompositionAssetContractResolver implements IAssetContractResolver 
   }
 
   public resolveContextPackageContract(contextPackage: ContextPackage): AssetContractDescriptor {
+    const baseline = defaultTaxonomyContract({
+      structuralKind: "composite",
+      semanticRole: TaxonomySemanticRoles.contextBundle,
+      behaviorKind: TaxonomyBehaviorKinds.none,
+    })!;
+
     return createAssetContractDescriptor({
-      version: "1.0.0",
-      output: {
-        kind: AssetContractShapeKinds.text,
-        description: "Prepared context fragments assembled into prompt-ready text blocks.",
-      },
+      ...baseline,
       parameters: [
+        ...baseline.parameters,
         parameter("fragmentCount", true, "Number of fragments exposed by the package.", "number", contextPackage.fragments.length),
         parameter("version", false, "Context package version.", "string", contextPackage.version),
       ],
-      execution: {
-        invocationMode: "deferred",
-        sideEffects: "none",
-      },
     });
   }
 
   public resolveContextRecipeContract(contextRecipe: ContextRecipe): AssetContractDescriptor {
+    const baseline = defaultTaxonomyContract({
+      structuralKind: "composite",
+      semanticRole: TaxonomySemanticRoles.contextBundle,
+      behaviorKind: TaxonomyBehaviorKinds.deterministic,
+    })!;
+
     return createAssetContractDescriptor({
-      version: "1.0.0",
-      input: {
-        kind: AssetContractShapeKinds.jsonSchema,
-        description: "Context assembly options and source toggles used when preparing context.",
-      },
-      output: {
-        kind: AssetContractShapeKinds.text,
-        description: "Assembled context envelope emitted by recipe-guided preparation.",
-      },
+      ...baseline,
       parameters: [
+        ...baseline.parameters,
         parameter("maxCharacters", false, "Default maximum character budget.", "number", contextRecipe.budgetingDefaults?.maxCharacters),
         parameter("maxTokens", false, "Default maximum token budget.", "number", contextRecipe.budgetingDefaults?.maxTokens),
         parameter("toolUseMode", false, "Tool-use guidance mode.", "string", contextRecipe.toolUseGuidance?.mode),
       ],
-      execution: {
-        invocationMode: "deferred",
-        sideEffects: "none",
-      },
     });
   }
 

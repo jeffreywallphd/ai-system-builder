@@ -137,6 +137,18 @@ describe("CompositionTaxonomyClassifier", () => {
     });
   });
 
+  it("treats specialized composite roles as first-class composite assets", () => {
+    const descriptors = [
+      classifier.classifyWorkflow({ id: "wf-special" } as IWorkflow),
+      classifier.classifyAgent({ id: "agent-special" } as Agent),
+      classifier.classifyContextPackage({ id: "cp-special" } as any),
+    ];
+
+    expect(descriptors.map((entry) => entry.structuralKind)).toEqual(["composite", "composite", "composite"]);
+    expect(descriptors.map((entry) => entry.semanticRole)).toEqual(["workflow", "agent", "context-bundle"]);
+  });
+
+
   it("maps execution artifacts to system-level iterative taxonomy", () => {
     expect(classifier.classifyCanonicalEntity("execution-artifact")).toEqual({
       structuralKind: "system",
