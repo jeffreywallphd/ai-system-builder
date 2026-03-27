@@ -30,6 +30,7 @@ export interface RegistryFilterParams {
   readonly provenanceCreatorIds?: ReadonlyArray<string>;
   readonly dependsOnAssetIds?: ReadonlyArray<string>;
   readonly dependsOnVersionIds?: ReadonlyArray<string>;
+  readonly keyword?: string;
   readonly limit?: number;
 }
 
@@ -103,16 +104,38 @@ export class RegistryQueryService {
         contract,
         provenance,
         dependencies,
+        versionHistory: await this.buildVersionHistory(asset.id),
+        lineage: await this.buildLineageContext(latestVersion?.versionId, assets),
         validation,
       });
     }));
 
-    const filtered = projected.filter((entry) => this.matchesFilters(entry, params));
+    const filtered = projected.filter((entry) => this.matchesFilters(entry, params) && this.matchesSearch(entry, params.keyword));
     if (params.limit && params.limit > 0) {
       return Object.freeze(filtered.slice(0, params.limit));
     }
 
     return Object.freeze(filtered);
+  }
+
+  public async getAssetDetailByAssetId(assetId: string): Promise<RegistryAsset | undefined> {
+    const normalized = assetId.trim();
+    if (!normalized) {
+      return undefined;
+    }
+
+    const assets = await this.queryRegistry();
+    return assets.find((asset) => asset.assetId === normalized);
+  }
+
+  public async getAssetDetailByVersionId(versionId: string): Promise<RegistryAsset | undefined> {
+    const normalized = versionId.trim();
+    if (!normalized) {
+      return undefined;
+    }
+
+    const assets = await this.queryRegistry();
+    return assets.find((asset) => asset.versionId === normalized || asset.versionHistory.some((entry) => entry.versionId === normalized));
   }
 
   private async buildValidationInsights(input: {
@@ -390,6 +413,84 @@ export class RegistryQueryService {
     });
   }
 
+  private async buildVersionHistory(assetId: string): Promise<RegistryAsset["versionHistory"]> {
+    const versions = await this.versionRepository.listVersionsByAssetId(assetId);
+    const ordered = [...versions].sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime());
+    const history: RegistryAsset["versionHistory"] = ordered.map((version, index) => {
+      const previous = ordered[index - 1];
+      const previousUpstream = new Set(previous?.upstreamVersionIds ?? []);
+      const currentUpstream = new Set(version.upstreamVersionIds);
+      return Object.freeze({
+        versionId: version.versionId,
+        versionLabel: version.versionLabel,
+        parentVersionId: version.parentVersionId,
+        createdAt: version.createdAt,
+        createdBy: version.createdBy,
+        upstreamVersionIds: Object.freeze([...currentUpstream]),
+        upstreamAdded: Object.freeze([...currentUpstream].filter((id) => !previousUpstream.has(id))),
+        upstreamRemoved: Object.freeze([...previousUpstream].filter((id) => !currentUpstream.has(id))),
+      });
+    });
+    return Object.freeze(history);
+  }
+
+  private async buildLineageContext(
+    rootVersionId: string | undefined,
+    assets: ReadonlyArray<{ readonly id: string; readonly name: string }>,
+    maxDepth = 3,
+  ): Promise<RegistryAsset["lineage"]> {
+    if (!rootVersionId) {
+      return Object.freeze({ rootVersionId: undefined, upstream: Object.freeze([]), downstream: Object.freeze([]) });
+    }
+
+    const assetNameById = new Map(assets.map((asset) => [asset.id, asset.name]));
+    const upstream = await this.collectLineage(rootVersionId, "upstream", assetNameById, maxDepth);
+    const downstream = await this.collectLineage(rootVersionId, "downstream", assetNameById, maxDepth);
+    return Object.freeze({
+      rootVersionId,
+      upstream,
+      downstream,
+    });
+  }
+
+  private async collectLineage(
+    rootVersionId: string,
+    direction: "upstream" | "downstream",
+    assetNameById: ReadonlyMap<string, string>,
+    maxDepth: number,
+  ): Promise<ReadonlyArray<RegistryAsset["lineage"]["upstream"][number]>> {
+    const queue: Array<{ versionId: string; depth: number }> = [{ versionId: rootVersionId, depth: 0 }];
+    const visited = new Set<string>([rootVersionId]);
+    const discovered: Array<RegistryAsset["lineage"]["upstream"][number]> = [];
+
+    while (queue.length > 0) {
+      const current = queue.shift();
+      if (!current || current.depth >= maxDepth) {
+        continue;
+      }
+
+      const edges = await this.lineageRepository.listEdgesByVersionId(current.versionId, direction);
+      for (const edge of edges) {
+        const adjacentVersionId = direction === "upstream" ? edge.fromVersionId : edge.toVersionId;
+        if (visited.has(adjacentVersionId)) {
+          continue;
+        }
+
+        visited.add(adjacentVersionId);
+        queue.push({ versionId: adjacentVersionId, depth: current.depth + 1 });
+        const version = await this.versionRepository.getByVersionId(adjacentVersionId);
+        discovered.push(Object.freeze({
+          assetId: version?.assetId.value ?? adjacentVersionId,
+          versionId: adjacentVersionId,
+          name: version ? assetNameById.get(version.assetId.value) : undefined,
+          depth: current.depth + 1,
+        }));
+      }
+    }
+
+    return Object.freeze(discovered);
+  }
+
   private matchesFilters(asset: RegistryAsset, params: RegistryFilterParams): boolean {
     if (params.structuralKinds?.length && (!asset.taxonomy || !params.structuralKinds.includes(asset.taxonomy.structuralKind))) {
       return false;
@@ -456,6 +557,35 @@ export class RegistryQueryService {
     }
 
     return true;
+  }
+
+  private matchesSearch(asset: RegistryAsset, keyword?: string): boolean {
+    const normalized = keyword?.trim().toLowerCase();
+    if (!normalized) {
+      return true;
+    }
+
+    const haystack = [
+      asset.name,
+      asset.assetId,
+      asset.kind,
+      asset.status,
+      asset.taxonomy?.semanticRole,
+      asset.taxonomy?.structuralKind,
+      asset.taxonomy?.behaviorKind,
+      asset.provenance.creatorId,
+      asset.provenance.sourceType,
+      asset.provenance.sourceLabel,
+      asset.provenance.derivationContext,
+      ...asset.provenance.upstreamAssets.flatMap((entry) => [entry.assetId, entry.versionId, entry.relationship]),
+      ...asset.contract?.parameters.map((parameter) => parameter.id) ?? [],
+      asset.contract?.execution?.invocationMode,
+      asset.contract?.execution?.sideEffects,
+    ]
+      .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+      .map((value) => value.toLowerCase());
+
+    return haystack.some((value) => value.includes(normalized));
   }
 }
 

@@ -9,6 +9,8 @@ describe("registry detail UI components", () => {
     expect(source).toContain("registry-asset-contract-panel");
     expect(source).toContain("registry-asset-provenance-panel");
     expect(source).toContain("registry-asset-dependency-summary-panel");
+    expect(source).toContain("registry-asset-version-history-panel");
+    expect(source).toContain("registry-asset-lineage-panel");
   });
 
   it("provides dependency graph panel with upstream and downstream sections", () => {

@@ -1,6 +1,6 @@
 import type { RegistryDependencyGraph, RegistryDependencyTraversal } from "../../application/asset-registry/RegistryDependencyGraphService";
 import type { RegistryFilterParams } from "../../application/asset-registry/RegistryQueryService";
-import type { RegistryDependencyEndpointQuery, RegistryTraversalEndpointQuery, RegistryApiResponse, RegistryAssetDetailQuery } from "../../infrastructure/api/registry/RegistryBackendApi";
+import type { RegistryDependencyEndpointQuery, RegistryTraversalEndpointQuery, RegistryApiResponse, RegistryAssetDetailQuery, RegistrySearchQuery } from "../../infrastructure/api/registry/RegistryBackendApi";
 import type { RegistryAsset } from "../../domain/asset-registry/RegistryAsset";
 import { resolveDesktopRegistryBridge } from "../composition/DesktopRegistryBridgeAdapter";
 
@@ -20,6 +20,11 @@ export class RegistryService {
 
   public async filterAssets(filters: RegistryFilterParams): Promise<RegistryApiResponse<ReadonlyArray<RegistryAsset>>> {
     const raw = await this.requireBridge().filterAssets(JSON.stringify(filters));
+    return JSON.parse(raw) as RegistryApiResponse<ReadonlyArray<RegistryAsset>>;
+  }
+
+  public async searchAssets(query: RegistrySearchQuery): Promise<RegistryApiResponse<ReadonlyArray<RegistryAsset>>> {
+    const raw = await this.requireBridge().searchAssets(JSON.stringify(query));
     return JSON.parse(raw) as RegistryApiResponse<ReadonlyArray<RegistryAsset>>;
   }
 

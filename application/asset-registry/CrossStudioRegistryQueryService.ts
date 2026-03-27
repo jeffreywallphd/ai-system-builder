@@ -31,6 +31,11 @@ export interface CrossStudioDependencyQuery extends CrossStudioTaxonomyQuery {
   readonly dependsOnAssetIds?: ReadonlyArray<string>;
   readonly dependsOnVersionIds?: ReadonlyArray<string>;
 }
+export interface CrossStudioSearchQuery extends CrossStudioTaxonomyQuery {
+  readonly keyword: string;
+  readonly parameterIds?: ReadonlyArray<string>;
+  readonly sourceTypes?: ReadonlyArray<string>;
+}
 
 function toRegistryFilters(params: CrossStudioTaxonomyQuery = {}): RegistryFilterParams {
   return Object.freeze({
@@ -77,24 +82,21 @@ export class CrossStudioRegistryQueryService {
     });
   }
 
-  public async getAssetByAssetId(assetId: string): Promise<RegistryAsset | undefined> {
-    const normalized = assetId.trim();
-    if (!normalized) {
-      return undefined;
-    }
+  public async searchAssets(params: CrossStudioSearchQuery): Promise<ReadonlyArray<RegistryAsset>> {
+    return this.registryQueryService.queryRegistry({
+      ...toRegistryFilters(params),
+      keyword: params.keyword,
+      contractParameterIds: params.parameterIds,
+      provenanceSourceTypes: params.sourceTypes,
+    });
+  }
 
-    const assets = await this.registryQueryService.queryRegistry();
-    return assets.find((asset) => asset.assetId === normalized);
+  public async getAssetByAssetId(assetId: string): Promise<RegistryAsset | undefined> {
+    return this.registryQueryService.getAssetDetailByAssetId(assetId);
   }
 
   public async getAssetByVersionId(versionId: string): Promise<RegistryAsset | undefined> {
-    const normalized = versionId.trim();
-    if (!normalized) {
-      return undefined;
-    }
-
-    const assets = await this.registryQueryService.queryRegistry();
-    return assets.find((asset) => asset.versionId === normalized);
+    return this.registryQueryService.getAssetDetailByVersionId(versionId);
   }
 
   public async listCrossStudioAssetKinds(): Promise<ReadonlyArray<CompositionTaxonomyDescriptor>> {

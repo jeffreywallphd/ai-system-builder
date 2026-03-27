@@ -27,6 +27,30 @@ export interface RegistryProvenanceView {
   readonly updatedAt?: Date;
 }
 
+export interface RegistryAssetVersionHistoryEntry {
+  readonly versionId: string;
+  readonly versionLabel?: string;
+  readonly parentVersionId?: string;
+  readonly createdAt: Date;
+  readonly createdBy?: string;
+  readonly upstreamVersionIds: ReadonlyArray<string>;
+  readonly upstreamAdded: ReadonlyArray<string>;
+  readonly upstreamRemoved: ReadonlyArray<string>;
+}
+
+export interface RegistryAssetLineageTraversalEntry {
+  readonly assetId: string;
+  readonly versionId: string;
+  readonly name?: string;
+  readonly depth: number;
+}
+
+export interface RegistryAssetLineageView {
+  readonly rootVersionId?: string;
+  readonly upstream: ReadonlyArray<RegistryAssetLineageTraversalEntry>;
+  readonly downstream: ReadonlyArray<RegistryAssetLineageTraversalEntry>;
+}
+
 export interface RegistryAsset {
   readonly assetId: string;
   readonly versionId?: string;
@@ -37,6 +61,8 @@ export interface RegistryAsset {
   readonly contract?: AssetContractDescriptor;
   readonly provenance: RegistryProvenanceView;
   readonly dependencies: ReadonlyArray<RegistryDependencyReference>;
+  readonly versionHistory: ReadonlyArray<RegistryAssetVersionHistoryEntry>;
+  readonly lineage: RegistryAssetLineageView;
   readonly validation?: RegistryAssetValidationInsights;
 }
 
@@ -105,6 +131,31 @@ export function createRegistryAsset(input: RegistryAsset): RegistryAsset {
       relationshipType: dependency.relationshipType,
       source: dependency.source,
     }))),
+    versionHistory: Object.freeze((input.versionHistory ?? []).map((entry) => Object.freeze({
+      versionId: entry.versionId.trim(),
+      versionLabel: entry.versionLabel?.trim() || undefined,
+      parentVersionId: entry.parentVersionId?.trim() || undefined,
+      createdAt: cloneDate(entry.createdAt) ?? new Date(0),
+      createdBy: entry.createdBy?.trim() || undefined,
+      upstreamVersionIds: Object.freeze([...new Set((entry.upstreamVersionIds ?? []).map((id) => id.trim()).filter(Boolean))]),
+      upstreamAdded: Object.freeze([...new Set((entry.upstreamAdded ?? []).map((id) => id.trim()).filter(Boolean))]),
+      upstreamRemoved: Object.freeze([...new Set((entry.upstreamRemoved ?? []).map((id) => id.trim()).filter(Boolean))]),
+    }))),
+    lineage: Object.freeze({
+      rootVersionId: input.lineage.rootVersionId?.trim() || undefined,
+      upstream: Object.freeze((input.lineage.upstream ?? []).map((entry) => Object.freeze({
+        assetId: entry.assetId.trim(),
+        versionId: entry.versionId.trim(),
+        name: entry.name?.trim() || undefined,
+        depth: Math.max(0, Math.floor(entry.depth)),
+      }))),
+      downstream: Object.freeze((input.lineage.downstream ?? []).map((entry) => Object.freeze({
+        assetId: entry.assetId.trim(),
+        versionId: entry.versionId.trim(),
+        name: entry.name?.trim() || undefined,
+        depth: Math.max(0, Math.floor(entry.depth)),
+      }))),
+    }),
     validation: input.validation
       ? Object.freeze({
         status: input.validation.status,

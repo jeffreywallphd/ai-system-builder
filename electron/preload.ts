@@ -157,6 +157,9 @@ contextBridge.exposeInMainWorld("aiLoomDesktop", {
     filterAssets(filtersJson: string) {
       return ipcRenderer.invoke("ai-loom-desktop-registry:assets-filter", filtersJson) as Promise<string>;
     },
+    searchAssets(queryJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-registry:search", queryJson) as Promise<string>;
+    },
     getAssetDetail(queryJson: string) {
       return ipcRenderer.invoke("ai-loom-desktop-registry:asset-detail", queryJson) as Promise<string>;
     },

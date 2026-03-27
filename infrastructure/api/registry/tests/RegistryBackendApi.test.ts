@@ -107,6 +107,11 @@ describe("RegistryBackendApi", () => {
     expect(filtered.ok).toBeTrue();
     expect(filtered.data?.length).toBe(1);
     expect(filtered.data?.[0]?.assetId).toBe("asset:workflow");
+
+    const searched = await api.searchAssets({ keyword: "Workflow" });
+    expect(searched.ok).toBeTrue();
+    expect(searched.data?.length).toBe(1);
+    expect(searched.data?.[0]?.assetId).toBe("asset:workflow");
   });
 
   it("exposes dependency and dependent traversal endpoints with bounded depth", async () => {
@@ -157,6 +162,8 @@ describe("RegistryBackendApi", () => {
     const detailByAsset = await api.getAssetDetail({ assetId: "asset:workflow" });
     expect(detailByAsset.ok).toBeTrue();
     expect(detailByAsset.data?.assetId).toBe("asset:workflow");
+    expect(detailByAsset.data?.versionHistory.length).toBeGreaterThan(0);
+    expect(detailByAsset.data?.lineage.rootVersionId).toBe("asset:workflow:v1");
     expect(detailByAsset.data?.validation?.status).toBeDefined();
     expect(detailByAsset.data?.validation?.issues.some((issue) => issue.code === "lifecycle-not-publish-ready")).toBeFalse();
 
