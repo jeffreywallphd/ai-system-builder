@@ -102,6 +102,19 @@ export interface DesktopAgentAuthoringBridge {
   getStudioSnapshot(agentId: string): Promise<string>;
 }
 
+
+export interface DesktopStudioShellBridge {
+  initializeStudio(studioId: string, name: string): Promise<string>;
+  loadSnapshot(studioId: string): Promise<string>;
+  startSession(studioId: string): Promise<string>;
+  createDraft(requestJson: string): Promise<string>;
+  updateDraft(requestJson: string): Promise<string>;
+  updateDependencies(requestJson: string): Promise<string>;
+  transitionLifecycle(requestJson: string): Promise<string>;
+  publishVersion(requestJson: string): Promise<string>;
+  validateDraft(requestJson: string): Promise<string>;
+}
+
 export interface DesktopMcpSecretBridge {
   isAvailable(): boolean;
   getSecret(key: string): string | null;
@@ -118,4 +131,5 @@ export interface DesktopBridge {
   readonly modelFiles: DesktopModelFileBridge;
   readonly canonicalAssets: DesktopCanonicalAssetBridge;
   readonly agents?: DesktopAgentAuthoringBridge;
+  readonly studioShell?: DesktopStudioShellBridge;
 }

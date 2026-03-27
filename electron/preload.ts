@@ -121,6 +121,35 @@ contextBridge.exposeInMainWorld("aiLoomDesktop", {
       return ipcRenderer.invoke("ai-loom-desktop-canonical-assets:management-snapshot", assetId, includeProjectionHealth, versionIdsInProjectionScope) as Promise<string | null>;
     },
   },
+  studioShell: {
+    initializeStudio(studioId: string, name: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:initialize", studioId, name) as Promise<string>;
+    },
+    loadSnapshot(studioId: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:snapshot", studioId) as Promise<string>;
+    },
+    startSession(studioId: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:start-session", studioId) as Promise<string>;
+    },
+    createDraft(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:create-draft", requestJson) as Promise<string>;
+    },
+    updateDraft(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:update-draft", requestJson) as Promise<string>;
+    },
+    updateDependencies(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:update-dependencies", requestJson) as Promise<string>;
+    },
+    transitionLifecycle(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:transition-lifecycle", requestJson) as Promise<string>;
+    },
+    publishVersion(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:publish-version", requestJson) as Promise<string>;
+    },
+    validateDraft(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:validate-draft", requestJson) as Promise<string>;
+    },
+  },
   agents: {
     createAgent(requestJson: string) {
       return ipcRenderer.invoke("ai-loom-desktop-agents:create", requestJson) as Promise<string>;

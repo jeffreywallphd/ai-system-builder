@@ -61,6 +61,9 @@ import type { AgentPlanningStrategy } from "../../domain/agents/Agent";
 import type { AgentConfigurationValidationInput } from "../../application/agents/services/AgentConfigurationValidationService";
 import type { AgentRunControlRequest, AgentRunRequest } from "../../application/agents/contracts/AgentRunContracts";
 import type { TriggerAgentLaunchRequest } from "../../application/agents/TriggerAgentLaunchUseCase";
+import { StudioShellBackendApi } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
+import { InMemoryStudioShellRepository } from "../../infrastructure/studio-shell/InMemoryStudioShellRepository";
+import type { CreateAssetDraftCommand, PublishAssetDraftVersionCommand, TransitionAssetDraftLifecycleCommand, UpdateAssetDraftCommand, UpdateAssetDraftDependenciesCommand } from "../../application/studio-shell/contracts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 if (started) {
@@ -282,6 +285,7 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     sessionRepository: agentSessionRepository,
   });
   const agentStudioBackendApi = new AgentStudioBackendApi(agentRepository, agentSessionRepository, agentRunner);
+  const studioShellBackendApi = new StudioShellBackendApi(new InMemoryStudioShellRepository());
   const executionHistoryInfrastructure = createExecutionHistoryInfrastructure(executionRunRepository);
   getExecutionRunUseCase = new GetExecutionRunUseCase(executionRunRepository);
   listExecutionRunsUseCase = executionHistoryInfrastructure.listExecutionRunsUseCase;
@@ -388,6 +392,39 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   });
   ipcMain.handle("ai-loom-desktop-agents:studio-snapshot", async (_event, agentId: string) => {
     return JSON.stringify(await agentStudioBackendApi.getStudioSnapshot(agentId));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:initialize", async (_event, studioId: string, name: string) => {
+    return JSON.stringify(await studioShellBackendApi.initializeStudio(studioId, name));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:snapshot", async (_event, studioId: string) => {
+    return JSON.stringify(await studioShellBackendApi.loadSnapshot(studioId));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:start-session", async (_event, studioId: string) => {
+    return JSON.stringify(await studioShellBackendApi.startSession(studioId));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:create-draft", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as CreateAssetDraftCommand;
+    return JSON.stringify(await studioShellBackendApi.createDraft(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:update-draft", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as UpdateAssetDraftCommand;
+    return JSON.stringify(await studioShellBackendApi.updateDraft(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:update-dependencies", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as UpdateAssetDraftDependenciesCommand;
+    return JSON.stringify(await studioShellBackendApi.updateDependencies(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:transition-lifecycle", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as TransitionAssetDraftLifecycleCommand;
+    return JSON.stringify(await studioShellBackendApi.transitionLifecycle(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:publish-version", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as PublishAssetDraftVersionCommand;
+    return JSON.stringify(await studioShellBackendApi.publishVersion(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:validate-draft", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as { studioId: string; draftId: string };
+    return JSON.stringify(await studioShellBackendApi.validateDraft(request));
   });
   ipcMain.on("ai-loom-desktop-model-files:exists", (event, targetPath: string) => {
     event.returnValue = fs.existsSync(targetPath);
