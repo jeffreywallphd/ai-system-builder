@@ -19,6 +19,7 @@ Behavior is a property of the same structural object, not a separate top-level a
 - Canonical asset query criteria now supports taxonomy-aware filtering (`structuralKinds`, `semanticRoles`, `behaviorKinds`).
 - Canonical asset reads still expose taxonomy with bounded fallback mapping where identity metadata is absent.
 - Direction 5 atomic studio usage now concretely applies this taxonomy in Model Studio (`atomic/model/none`), Dataset Studio (`atomic/dataset/none`), Tool Studio (`atomic/tool/conditional|deterministic`), Prompt Template Studio (`atomic/prompt-template/none`), Embedding Index Studio (`atomic/embedding-index/none`), and Config Profile Studio (`atomic/config-profile/none`) via shared shell metadata and publish enforcement.
+- Direction 5 composite studio usage now also concretely applies `composite/tool-chain/deterministic` through Tool Chain Studio (`domain/tool-chain-studio/*`, `application/tool-chain-studio/*`, and registration-driven Studio Shell UI integration).
 - End-to-end cross-studio consistency tests now verify taxonomy coherence over the real service/bridge/backend/application/SQLite path before and after reload.
 
 ## Current mappings (foundation)

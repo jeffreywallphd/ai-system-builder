@@ -25,6 +25,7 @@ import WorkflowStudioPage from "../pages/WorkflowStudioPage";
 import ContextBundleStudioPage from "../pages/ContextBundleStudioPage";
 import DatasetPipelineStudioPage from "../pages/DatasetPipelineStudioPage";
 import TrainingRecipeStudioPage from "../pages/TrainingRecipeStudioPage";
+import ToolChainStudioPage from "../pages/ToolChainStudioPage";
 import ModelStudioPage from "../pages/ModelStudioPage";
 import DatasetStudioPage from "../pages/DatasetStudioPage";
 import ToolStudioPage from "../pages/ToolStudioPage";
@@ -73,6 +74,7 @@ export default function AppRouter({
           { path: ROUTE_PATHS.contextBundleStudio, element: <ContextBundleStudioPage /> },
           { path: ROUTE_PATHS.datasetPipelineStudio, element: <DatasetPipelineStudioPage /> },
           { path: ROUTE_PATHS.trainingRecipeStudio, element: <TrainingRecipeStudioPage /> },
+          { path: ROUTE_PATHS.toolChainStudio, element: <ToolChainStudioPage /> },
           { path: ROUTE_PATHS.modelStudio, element: <ModelStudioPage /> },
           { path: ROUTE_PATHS.datasetStudio, element: <DatasetStudioPage /> },
           { path: ROUTE_PATHS.toolStudio, element: <ToolStudioPage /> },

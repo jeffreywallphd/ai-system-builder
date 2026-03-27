@@ -26,6 +26,7 @@ What is now implemented:
 - Canonical asset query criteria now includes taxonomy-aware filters (`structuralKinds`, `semanticRoles`, `behaviorKinds`) in addition to kind/source/status criteria.
 - Canonical asset summary/detail reads still expose taxonomy descriptors, with identity metadata as the preferred source and bounded fallback classification where needed.
 - Direction 5 atomic studio usage now concretely applies this taxonomy in Model Studio (`atomic/model/none`), Dataset Studio (`atomic/dataset/none`), Tool Studio (`atomic/tool/conditional|deterministic`), Prompt Template Studio (`atomic/prompt-template/none`), Embedding Index Studio (`atomic/embedding-index/none`), and Config Profile Studio (`atomic/config-profile/none`) via shared shell draft metadata and publish enforcement.
+- Direction 5 composite studio usage now also concretely applies `composite/tool-chain/deterministic` through Tool Chain Studio (`domain/tool-chain-studio/*`, `application/tool-chain-studio/*`, and registration-driven Studio Shell UI integration).
 - End-to-end cross-studio consistency tests now verify this taxonomy coherence over real shared seams (service/bridge/backend/application/SQLite) before and after reload.
 
 

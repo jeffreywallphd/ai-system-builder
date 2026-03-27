@@ -27,6 +27,7 @@ export const ROUTE_PATHS = Object.freeze({
   contextBundleStudio: "/studio-shell/context-bundle",
   datasetPipelineStudio: "/studio-shell/dataset-pipeline",
   trainingRecipeStudio: "/studio-shell/training-recipe",
+  toolChainStudio: "/studio-shell/tool-chain",
   modelStudio: "/studio-shell/model",
   datasetStudio: "/studio-shell/dataset",
   toolStudio: "/studio-shell/tool",
@@ -138,6 +139,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteDefinition> = Object.freeze([
     key: "training-recipe-studio",
     path: ROUTE_PATHS.trainingRecipeStudio,
     title: "Training Recipe Studio",
+    showInNavigation: false,
+  }),
+  Object.freeze({
+    key: "tool-chain-studio",
+    path: ROUTE_PATHS.toolChainStudio,
+    title: "Tool Chain Studio",
     showInNavigation: false,
   }),
   Object.freeze({
