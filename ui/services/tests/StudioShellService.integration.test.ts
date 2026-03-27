@@ -315,6 +315,104 @@ describe("StudioShellService integration", () => {
     repository.dispose();
   });
 
+  it("supports Workflow Studio composite orchestrator flow over the same shell/persistence/publish seams", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-workflow-studio-service-"));
+    createdRoots.push(root);
+    const databasePath = path.join(root, "workflow-studio.sqlite");
+    const repository = new SqliteStudioShellRepository(databasePath);
+    const backendApi = new StudioShellBackendApi(repository);
+    installBridge(backendApi);
+
+    const service = new StudioShellService();
+    const contractResolver = new CompositionAssetContractResolver();
+    const initialized = await service.initializeStudio("studio-workflows", "Workflow Studio");
+    expect(initialized.ok).toBeTrue();
+    const sessionId = initialized.data?.activeSessionId;
+    expect(sessionId).toBeDefined();
+
+    const created = await service.createDraft({
+      studioId: "studio-workflows",
+      sessionId: sessionId!,
+      content: "{\"workflowSpec\":{\"metadata\":{\"name\":\"Composite Workflow\"},\"executionPolicy\":\"acyclic-only\",\"nodes\":[],\"connections\":[]}}",
+      metadata: {
+        title: "Workflow Asset Draft",
+        tags: ["workflow", "studio-shell", "composite"],
+        taxonomy: {
+          structuralKind: "composite",
+          semanticRole: "workflow",
+          behaviorKind: "conditional",
+        },
+        contract: contractResolver.resolveContractForTaxonomy({
+          structuralKind: "composite",
+          semanticRole: "workflow",
+          behaviorKind: "conditional",
+        }),
+        provenance: {
+          sourceType: "generated",
+          sourceLabel: "workflow-studio",
+        },
+      },
+      dependencies: [{ assetId: "asset:model", versionId: "asset:model:v2" }],
+    });
+    expect(created.ok).toBeTrue();
+    const draftId = created.data?.draft?.draftId;
+    expect(draftId).toBeDefined();
+    expect(created.data?.validationIssues.some((entry) => entry.code === "lifecycle-not-publish-ready")).toBeTrue();
+
+    const validated = await service.transitionLifecycle({
+      studioId: "studio-workflows",
+      sessionId: sessionId!,
+      draftId: draftId!,
+      targetStatus: AssetDraftLifecycleStatuses.validated,
+    });
+    expect(validated.ok).toBeTrue();
+
+    const published = await service.publishVersion({
+      studioId: "studio-workflows",
+      sessionId: sessionId!,
+      draftId: draftId!,
+      versionId: "asset:studio-workflows:v1",
+      versionLabel: "v1",
+      createdBy: "workflow-author",
+    });
+    expect(published.ok).toBeTrue();
+    expect(published.data?.draft?.metadata.taxonomy).toEqual({
+      structuralKind: "composite",
+      semanticRole: "workflow",
+      behaviorKind: "conditional",
+    });
+    expect(published.data?.draft?.metadata.contract).toEqual(contractResolver.resolveContractForTaxonomy({
+      structuralKind: "composite",
+      semanticRole: "workflow",
+      behaviorKind: "conditional",
+    }));
+    expect(published.data?.draft?.lifecycleStatus).toBe(AssetDraftLifecycleStatuses.published);
+    expect(published.data?.versions.map((entry) => entry.versionId)).toEqual(["asset:studio-workflows:v1"]);
+
+    repository.dispose();
+
+    const reopenedRepository = new SqliteStudioShellRepository(databasePath);
+    const reopenedApi = new StudioShellBackendApi(reopenedRepository);
+    installBridge(reopenedApi);
+
+    const snapshot = await service.loadSnapshot("studio-workflows");
+    expect(snapshot.ok).toBeTrue();
+    expect(snapshot.data?.draft?.metadata.taxonomy).toEqual({
+      structuralKind: "composite",
+      semanticRole: "workflow",
+      behaviorKind: "conditional",
+    });
+    expect(snapshot.data?.draft?.metadata.contract).toEqual(contractResolver.resolveContractForTaxonomy({
+      structuralKind: "composite",
+      semanticRole: "workflow",
+      behaviorKind: "conditional",
+    }));
+    expect(snapshot.data?.draft?.lifecycleStatus).toBe(AssetDraftLifecycleStatuses.published);
+    expect(snapshot.data?.versions.map((entry) => entry.versionId)).toEqual(["asset:studio-workflows:v1"]);
+
+    reopenedRepository.dispose();
+  });
+
   it("supports Dataset Studio style flow over the same shell/persistence/publish seams", async () => {
     const root = mkdtempSync(path.join(tmpdir(), "loom-dataset-studio-service-"));
     createdRoots.push(root);

@@ -12,12 +12,12 @@ import { toolStudioRegistration } from "../registrations/ToolStudioRegistration"
 import { promptTemplateStudioRegistration } from "../registrations/PromptTemplateStudioRegistration";
 import { embeddingIndexStudioRegistration } from "../registrations/EmbeddingIndexStudioRegistration";
 import { configProfileStudioRegistration } from "../registrations/ConfigProfileStudioRegistration";
+import { workflowStudioRegistration } from "../registrations/WorkflowStudioRegistration";
 import {
   contextBundleStudioRegistrationExample,
   datasetPipelineStudioRegistrationExample,
   toolChainStudioRegistrationExample,
   trainingRecipeStudioRegistrationExample,
-  workflowStudioRegistrationExample,
 } from "../registrations/CompositeStudioRegistrationExamples";
 
 describe("StudioShellExtensionRegistry", () => {
@@ -83,7 +83,7 @@ describe("StudioRegistrationRegistry", () => {
     const registry = new StudioRegistrationRegistry();
     registry.register(modelStudioRegistration);
     registry.register(datasetStudioRegistration);
-    registry.register(workflowStudioRegistrationExample);
+    registry.register(workflowStudioRegistration);
     registry.register(contextBundleStudioRegistrationExample);
     registry.register(datasetPipelineStudioRegistrationExample);
     registry.register(trainingRecipeStudioRegistrationExample);
@@ -110,10 +110,10 @@ describe("StudioRegistrationRegistry", () => {
 
   it("rejects unsupported composite roles and duplicate studio types", () => {
     const registry = new StudioRegistrationRegistry();
-    registry.register(workflowStudioRegistrationExample);
-    expect(() => registry.register(workflowStudioRegistrationExample)).toThrow("already registered");
+    registry.register(workflowStudioRegistration);
+    expect(() => registry.register(workflowStudioRegistration)).toThrow("already registered");
     expect(() => registry.register({
-      ...workflowStudioRegistrationExample,
+      ...workflowStudioRegistration,
       studioType: "bad-composite-role",
       role: "agent",
     })).toThrow("not supported");
