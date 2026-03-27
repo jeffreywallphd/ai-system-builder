@@ -10,6 +10,7 @@ describe("AgentStudioService", () => {
     expect(source).toContain("createAgent(");
     expect(source).toContain("getStudioSnapshot(");
     expect(source).toContain("launchAgent(");
+    expect(source).toContain("triggerLaunch(");
     expect(source).toContain("listSessions(");
     expect(source).toContain("getSessionDetail(");
     expect(source).toContain("controlRun");

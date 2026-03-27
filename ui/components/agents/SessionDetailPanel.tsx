@@ -1,7 +1,12 @@
-import type { AgentSessionDetailReadModel } from "../../../application/agents/contracts/AgentRunContracts";
+import type { AgentRunControlAction, AgentSessionDetailReadModel } from "../../../application/agents/contracts/AgentRunContracts";
+import { AgentRunControls } from "./AgentRunControls";
 
 interface SessionDetailPanelProps {
   readonly session?: AgentSessionDetailReadModel;
+  readonly controls: ReadonlyArray<AgentRunControlAction>;
+  readonly isBusy: boolean;
+  readonly pendingControlAction?: AgentRunControlAction;
+  readonly onControlRun: (sessionId: string, action: AgentRunControlAction) => void;
 }
 
 export function SessionDetailPanel(props: SessionDetailPanelProps): JSX.Element {
@@ -18,6 +23,13 @@ export function SessionDetailPanel(props: SessionDetailPanelProps): JSX.Element 
     <div className="ui-card ui-stack ui-stack--sm" data-testid="session-detail-panel">
       <h3 className="ui-heading-3">Session detail</h3>
       <p className="ui-text-secondary">Session {props.session.summary.sessionId} is {props.session.summary.status}.</p>
+      <AgentRunControls
+        session={props.session.summary}
+        controls={props.controls}
+        isBusy={props.isBusy}
+        pendingAction={props.pendingControlAction}
+        onControlRun={props.onControlRun}
+      />
       <p className="ui-text-secondary">Terminal reason: {props.session.summary.terminalReason ?? "n/a"}</p>
       <p className="ui-text-secondary">
         Steps: {props.session.operational.executionProgress.completedStepCount}/{props.session.operational.executionProgress.attemptedStepCount}

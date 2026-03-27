@@ -13,6 +13,7 @@ import type { CreateAgentRequest } from "../../application/agents/CreateAgentUse
 import { resolveDesktopAgentBridge } from "../composition/DesktopAgentBridgeAdapter";
 import type { AgentAuthoringApiReadModel } from "../../infrastructure/api/agents/AgentAuthoringBackendApi";
 import type { AgentStudioApiResponse, AgentStudioSnapshotReadModel } from "../../infrastructure/api/agents/AgentStudioBackendApi";
+import type { TriggerAgentLaunchRequest } from "../../application/agents/TriggerAgentLaunchUseCase";
 
 export class AgentStudioService {
   private requireBridge() {
@@ -40,6 +41,12 @@ export class AgentStudioService {
 
   public async launchAgent(request: AgentRunRequest): Promise<AgentStudioApiResponse<AgentLaunchReadModel>> {
     const raw = await this.requireBridge().launchAgent(JSON.stringify(request));
+    return JSON.parse(raw) as AgentStudioApiResponse<AgentLaunchReadModel>;
+  }
+
+
+  public async triggerLaunch(request: TriggerAgentLaunchRequest): Promise<AgentStudioApiResponse<AgentLaunchReadModel>> {
+    const raw = await this.requireBridge().triggerLaunch(JSON.stringify(request));
     return JSON.parse(raw) as AgentStudioApiResponse<AgentLaunchReadModel>;
   }
 
