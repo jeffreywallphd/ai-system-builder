@@ -470,3 +470,22 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
 - Enforcement validates structural kind (`atomic`), expected semantic role (`model`/`dataset`/`tool`), allowed behavior kinds (including bounded tool `conditional|deterministic`), and contract equivalence against taxonomy-driven projection (`CompositionAssetContractResolver.resolveContractForTaxonomy`).
 - Model/Dataset/Tool application publish orchestration now runs this shared enforcement before lifecycle transition/publish so metadata drift introduced via shell patching cannot publish invalid atomic versions.
 - Focused tests now cover cross-studio consistency at the shared seam and publish-gate behavior in each atomic studio service (`application/studio-shell/tests/AtomicStudioAssetEnforcement.test.ts`, `application/model-studio/tests/ModelStudioApplicationService.test.ts`, `application/dataset-studio/tests/DatasetStudioApplicationService.test.ts`, `application/tool-studio/tests/ToolStudioApplicationService.test.ts`).
+
+## Direction 5 update: Atomic studio end-to-end consistency (story 2.15)
+
+- Cross-studio consistency now has one shared end-to-end integration test over the real renderer/service -> desktop bridge -> backend API -> application orchestration -> SQLite persistence path (`ui/services/tests/StudioShellService.integration.test.ts`).
+- The test runs the same lifecycle for Model, Dataset, and Tool studios: initialize/open studio, create atomic draft defaults, update draft content/metadata, run lifecycle validation/publish, reload persisted state, and verify version history.
+- Assertions are taxonomy/contract/lifecycle/version coherent across all implemented atomic studios:
+  - taxonomy stays atomic with role-specific semantics (`model`, `dataset`, `tool`);
+  - contract remains taxonomy-projected through `CompositionAssetContractResolver`;
+  - publish transitions remain lifecycle-gated and produce immutable version entries;
+  - post-reload snapshots preserve published lifecycle state and validation readiness.
+
+## Direction 5 update: Atomic studio documentation alignment (story 2.16)
+
+- Direction 5 architecture notes now explicitly describe the implemented atomic slice as of stories 2.1–2.15: shared shell reuse, registration foundation, model/dataset/tool implementation status, and cross-studio consistency guarantees.
+- The documented taxonomy model is aligned to current role coverage:
+  - atomic: `model`, `dataset`, `tool`, `prompt-template`, `embedding-index`, `config-profile`
+  - composite: `workflow`, `context-bundle`, `dataset-pipeline`, `training-recipe`, `tool-chain`
+  - system: `system`, `app-template`
+- Non-goals remain explicit: no second studio shell, no second taxonomy/contract stack, and no implementation claims yet for Prompt/Embedding/Config Profile studios beyond shared taxonomy/contract readiness.

@@ -18,6 +18,8 @@ Behavior is a property of the same structural object, not a separate top-level a
 - Canonical identity storage now persists taxonomy metadata for mapped entities.
 - Canonical asset query criteria now supports taxonomy-aware filtering (`structuralKinds`, `semanticRoles`, `behaviorKinds`).
 - Canonical asset reads still expose taxonomy with bounded fallback mapping where identity metadata is absent.
+- Direction 5 atomic studio usage now concretely applies this taxonomy in Model Studio (`atomic/model/none`), Dataset Studio (`atomic/dataset/none`), and Tool Studio (`atomic/tool/conditional|deterministic`) via shared shell metadata and publish enforcement.
+- End-to-end cross-studio consistency tests now verify taxonomy coherence over the real service/bridge/backend/application/SQLite path before and after reload.
 
 ## Current mappings (foundation)
 - workflow definition -> composite/workflow/deterministic (or conditional override at workflow seam; legacy `dynamic` inputs normalize to `conditional`)
@@ -31,6 +33,11 @@ Behavior is a property of the same structural object, not a separate top-level a
 - tool capability (mcp/local) -> atomic/tool/(conditional|deterministic)
 - workflow-published capability -> composite/tool-chain/deterministic
 - execution artifact canonical reads -> system/system/iterative
+
+Current Direction 5 target shape remains:
+- atomic assets: model, dataset, tool, prompt-template, embedding-index, config-profile
+- composite assets: workflow, context-bundle, dataset-pipeline, training-recipe, tool-chain
+- system assets: system, app-template
 
 
 ## Specialized composite role interpretation
