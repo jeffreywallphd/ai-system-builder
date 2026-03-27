@@ -82,9 +82,19 @@ function normalizeExecution(metadata?: AssetContractExecutionMetadata): AssetCon
     return undefined;
   }
 
+  const invocationMode = metadata.invocationMode;
+  if (invocationMode && !["sync", "async", "deferred"].includes(invocationMode)) {
+    throw new Error("Asset contract invocation mode must be sync, async, or deferred.");
+  }
+
+  const sideEffects = metadata.sideEffects;
+  if (sideEffects && !["none", "bounded", "external"].includes(sideEffects)) {
+    throw new Error("Asset contract side-effects must be none, bounded, or external.");
+  }
+
   return Object.freeze({
-    invocationMode: metadata.invocationMode,
-    sideEffects: metadata.sideEffects,
+    invocationMode,
+    sideEffects,
   });
 }
 

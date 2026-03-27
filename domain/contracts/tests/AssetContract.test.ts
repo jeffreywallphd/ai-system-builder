@@ -21,4 +21,15 @@ describe("AssetContract", () => {
   it("rejects empty contract versions", () => {
     expect(() => createAssetContractDescriptor({ version: " ", parameters: [] })).toThrow();
   });
+
+  it("rejects unsupported execution metadata values", () => {
+    expect(() => createAssetContractDescriptor({
+      version: "1.0.0",
+      parameters: [],
+      execution: {
+        invocationMode: "queued" as "sync",
+        sideEffects: "none",
+      },
+    })).toThrow("Asset contract invocation mode");
+  });
 });

@@ -3,7 +3,7 @@ import type { IStudioShellRepository } from "../../ports/interfaces/IStudioShell
 import type { AssetDraft, AssetSession, Studio } from "../../../domain/studio-shell/StudioShellDomain";
 import { createAssetSession, createStudio } from "../../../domain/studio-shell/StudioShellDomain";
 import { DefaultStudioShellApplicationService } from "../DefaultStudioShellApplicationService";
-import { StudioShellNotFoundError } from "../StudioShellApplicationErrors";
+import { StudioShellInvalidRequestError, StudioShellNotFoundError } from "../StudioShellApplicationErrors";
 
 class InMemoryStudioShellRepository implements IStudioShellRepository {
   private readonly studios = new Map<string, Studio>();
@@ -83,14 +83,27 @@ describe("DefaultStudioShellApplicationService", () => {
       },
     });
 
-    const updated = await service.updateAssetDraft({
+    const updatedTaxonomy = await service.updateAssetDraft({
       studioId: "studio-b",
       sessionId: "session-1",
       draftId: created.draft.id,
       content: "v2",
-      metadata: {
+      metadataPatch: {
         title: "Draft V2",
         tags: ["authoring", "updated"],
+        taxonomy: {
+          structuralKind: "composite",
+          semanticRole: "workflow",
+          behaviorKind: "deterministic",
+        },
+      },
+    });
+
+    const updatedContract = await service.updateAssetDraft({
+      studioId: "studio-b",
+      sessionId: "session-1",
+      draftId: created.draft.id,
+      metadataPatch: {
         contract: {
           version: "1.0.0",
           parameters: [{ id: "temperature", required: false }],
@@ -99,11 +112,72 @@ describe("DefaultStudioShellApplicationService", () => {
     });
 
     expect(created.session.currentDraftId).toBe("draft-1");
-    expect(updated.draft.revision).toBe(2);
-    expect(updated.draft.content).toBe("v2");
-    expect(updated.draft.metadata.taxonomy).toBeUndefined();
-    expect(updated.draft.metadata.contract?.version).toBe("1.0.0");
-    expect(updated.session.draftIds).toEqual(["draft-1"]);
+    expect(updatedTaxonomy.draft.revision).toBe(2);
+    expect(updatedTaxonomy.draft.content).toBe("v2");
+    expect(updatedTaxonomy.draft.metadata.taxonomy?.semanticRole).toBe("workflow");
+    expect(updatedTaxonomy.draft.metadata.contract).toBeUndefined();
+    expect(updatedContract.draft.revision).toBe(3);
+    expect(updatedContract.draft.metadata.taxonomy?.semanticRole).toBe("workflow");
+    expect(updatedContract.draft.metadata.contract?.version).toBe("1.0.0");
+    expect(updatedContract.session.draftIds).toEqual(["draft-1"]);
+  });
+
+  it("normalizes and persists taxonomy and contract on draft creation", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const service = new DefaultStudioShellApplicationService(repository, ((prefix) => `${prefix}-created`));
+    await service.initializeStudio({ studioId: "studio-metadata", name: "Studio Metadata" });
+
+    await service.createAssetDraft({
+      studioId: "studio-metadata",
+      sessionId: "session-created",
+      content: "draft",
+      metadata: {
+        title: "  Draft With Metadata  ",
+        tags: ["authoring", "authoring", " workflow "],
+        taxonomy: {
+          structuralKind: "composite",
+          semanticRole: "workflow",
+          behaviorKind: "dynamic",
+        },
+        contract: {
+          version: " 2.0.0 ",
+          parameters: [
+            { id: "temperature", required: false },
+            { id: "temperature", required: true, valueType: "number" },
+          ],
+        },
+      },
+    });
+
+    const loaded = await service.loadAssetDraft({ studioId: "studio-metadata", draftId: "draft-created" });
+    expect(loaded?.draft.metadata.title).toBe("Draft With Metadata");
+    expect(loaded?.draft.metadata.tags).toEqual(["authoring", "workflow"]);
+    expect(loaded?.draft.metadata.taxonomy?.behaviorKind).toBe("dynamic");
+    expect(loaded?.draft.metadata.contract?.version).toBe("2.0.0");
+    expect(loaded?.draft.metadata.contract?.parameters).toEqual([
+      { id: "temperature", required: true, description: undefined, valueType: "number", defaultValue: undefined },
+    ]);
+  });
+
+  it("returns invalid request error when taxonomy combination is unsupported", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const service = new DefaultStudioShellApplicationService(repository, ((prefix) => `${prefix}-invalid-taxonomy`));
+    await service.initializeStudio({ studioId: "studio-invalid", name: "Studio Invalid" });
+
+    await expect(service.createAssetDraft({
+      studioId: "studio-invalid",
+      sessionId: "session-invalid-taxonomy",
+      content: "draft",
+      metadata: {
+        title: "Draft",
+        tags: [],
+        taxonomy: {
+          structuralKind: "atomic",
+          semanticRole: "workflow",
+          behaviorKind: "deterministic",
+        },
+      },
+    })).rejects.toBeInstanceOf(StudioShellInvalidRequestError);
   });
 
   it("returns undefined when loading missing draft for an existing studio", async () => {
