@@ -26,6 +26,7 @@ import DatasetStudioPage from "../pages/DatasetStudioPage";
 import ToolStudioPage from "../pages/ToolStudioPage";
 import PromptTemplateStudioPage from "../pages/PromptTemplateStudioPage";
 import EmbeddingIndexStudioPage from "../pages/EmbeddingIndexStudioPage";
+import ConfigProfileStudioPage from "../pages/ConfigProfileStudioPage";
 import ProtectedRoute from "./ProtectedRoute";
 import { ROUTE_PATHS } from "./RouteConfig";
 
@@ -69,6 +70,7 @@ export default function AppRouter({
           { path: ROUTE_PATHS.toolStudio, element: <ToolStudioPage /> },
           { path: ROUTE_PATHS.promptTemplateStudio, element: <PromptTemplateStudioPage /> },
           { path: ROUTE_PATHS.embeddingIndexStudio, element: <EmbeddingIndexStudioPage /> },
+          { path: ROUTE_PATHS.configProfileStudio, element: <ConfigProfileStudioPage /> },
           { path: ROUTE_PATHS.settings, element: <SettingsPage /> },
         ],
       },

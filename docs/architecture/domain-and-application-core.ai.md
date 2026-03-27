@@ -488,7 +488,7 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
   - atomic: `model`, `dataset`, `tool`, `prompt-template`, `embedding-index`, `config-profile`
   - composite: `workflow`, `context-bundle`, `dataset-pipeline`, `training-recipe`, `tool-chain`
   - system: `system`, `app-template`
-- Non-goals remain explicit: no second studio shell, no second taxonomy/contract stack, and no implementation claims yet for Prompt/Embedding/Config Profile studios beyond shared taxonomy/contract readiness.
+- Non-goals remain explicit: no second studio shell and no second taxonomy/contract stack; Prompt Template, Embedding Index, and Config Profile remain implemented through the same shared shell seams rather than separate architectures.
 
 ## Direction 5 update: Prompt Template studio domain + application slice (story 2.17)
 
@@ -511,5 +511,16 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
 ## Direction 5 update: Embedding Index studio UI integration (story 2.20)
 
 - Embedding Index Studio now integrates through the shared shell renderer/route seam (`ui/pages/EmbeddingIndexStudioPage.tsx` + `ui/studio-shell/registrations/EmbeddingIndexStudioRegistration.ts` + `/studio-shell/embedding-index` route wiring) instead of introducing a second UI architecture.
+
+## Direction 5 update: Config Profile studio domain + application slice (story 2.21)
+
+- Config Profile Studio now has a thin inner-layer domain helper (`domain/config-profile-studio/ConfigProfileStudioDomain.ts`) for atomic config-profile authoring with taxonomy `atomic/config-profile/none` and generated provenance defaults.
+- A bounded application orchestrator (`application/config-profile-studio/ConfigProfileStudioApplicationService.ts`) follows the same Model/Dataset/Tool/Prompt Template/Embedding Index pattern and reuses `StudioShellApplicationService` for initialize/create/publish lifecycle.
+- Config Profile authoring and publish remain aligned with taxonomy-driven contract projection (`CompositionAssetContractResolver`), centralized validation (`StudioShellValidation`), and publish-time atomic enforcement (`AtomicStudioAssetEnforcement`) through shared shell seams.
+
+## Direction 5 update: Config Profile studio UI integration (story 2.22)
+
+- Config Profile Studio now integrates through the shared shell renderer/route seam (`ui/pages/ConfigProfileStudioPage.tsx` + `ui/studio-shell/registrations/ConfigProfileStudioRegistration.ts` + `/studio-shell/config-profile` route wiring) instead of introducing a second UI architecture.
+- Config-profile renderer behavior remains registration-bounded (`draft-authoring`, `metadata` slots), while shared shell panels remain authoritative for draft/session context, metadata/dependency/lifecycle/version state, validation display, and publish flow.
 - Embedding-index-specific renderer behavior remains registration-bounded (`draft-authoring`, `metadata`) while shared shell surfaces remain authoritative for session/draft context, metadata/dependencies, validation, lifecycle/version, and publish flow.
 - Cross-atomic renderer-service and enforcement coverage now includes embedding-index alongside model/dataset/tool/prompt-template in `ui/services/tests/StudioShellService.integration.test.ts` and `application/studio-shell/tests/AtomicStudioAssetEnforcement.test.ts`.

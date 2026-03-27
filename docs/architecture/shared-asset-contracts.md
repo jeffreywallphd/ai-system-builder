@@ -50,5 +50,4 @@ Specialized composite semantics remain explicit in these shared contracts: workf
 - This is an integration foundation only.
 - It does **not** add a full system-composer UI, contract editor UI, or a parallel agent-only contract universe.
 - Agents continue to extend the shared composition model and use the shared contract seam.
-- Prompt/Embedding/Config Profile studios are not implemented yet in Direction 5 UI/application slices; only their taxonomy/contract groundwork exists in this shared seam.
-- Direction 5 Prompt Template Studio now also consumes taxonomy-driven atomic contract projection (`atomic/prompt-template/none`) through the same shared shell metadata + publish-enforcement seams.
+- Direction 5 atomic studio slices now consume taxonomy-driven atomic contract projection for Prompt Template, Embedding Index, and Config Profile (`atomic/prompt-template/none`, `atomic/embedding-index/none`, `atomic/config-profile/none`) through shared shell metadata + publish-enforcement seams.

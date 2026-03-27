@@ -25,7 +25,7 @@ What is now implemented:
 - Canonical identity records now persist optional taxonomy metadata (`structural_kind`, `semantic_role`, `behavior_kind`) and canonical resolver/operational summaries can project it.
 - Canonical asset query criteria now includes taxonomy-aware filters (`structuralKinds`, `semanticRoles`, `behaviorKinds`) in addition to kind/source/status criteria.
 - Canonical asset summary/detail reads still expose taxonomy descriptors, with identity metadata as the preferred source and bounded fallback classification where needed.
-- Direction 5 atomic studio usage now concretely applies this taxonomy in Model Studio (`atomic/model/none`), Dataset Studio (`atomic/dataset/none`), Tool Studio (`atomic/tool/conditional|deterministic`), Prompt Template Studio (`atomic/prompt-template/none`), and Embedding Index Studio (`atomic/embedding-index/none`) via shared shell draft metadata and publish enforcement.
+- Direction 5 atomic studio usage now concretely applies this taxonomy in Model Studio (`atomic/model/none`), Dataset Studio (`atomic/dataset/none`), Tool Studio (`atomic/tool/conditional|deterministic`), Prompt Template Studio (`atomic/prompt-template/none`), Embedding Index Studio (`atomic/embedding-index/none`), and Config Profile Studio (`atomic/config-profile/none`) via shared shell draft metadata and publish enforcement.
 - End-to-end cross-studio consistency tests now verify this taxonomy coherence over real shared seams (service/bridge/backend/application/SQLite) before and after reload.
 
 
@@ -56,4 +56,4 @@ What is **not** implemented in this slice:
 - Execution artifacts now map to **system/system/iterative** in canonical classification seams, avoiding outdated atomic/system mappings.
 
 This shared taxonomy is a guardrail to keep workflow/agent/asset/system language coherent while implementation continues in parallel.
-- Direction 5 atomic studio usage now also concretely applies `atomic/prompt-template/none` and `atomic/embedding-index/none` through Prompt Template / Embedding Index studios (`domain/prompt-template-studio/*`, `application/prompt-template-studio/*`, `domain/embedding-index-studio/*`, `application/embedding-index-studio/*`, and registration-driven UI shell integration).
+- Direction 5 atomic studio usage now also concretely applies `atomic/prompt-template/none`, `atomic/embedding-index/none`, and `atomic/config-profile/none` through Prompt Template / Embedding Index / Config Profile studios (`domain/prompt-template-studio/*`, `application/prompt-template-studio/*`, `domain/embedding-index-studio/*`, `application/embedding-index-studio/*`, `domain/config-profile-studio/*`, `application/config-profile-studio/*`, and registration-driven UI shell integration).
