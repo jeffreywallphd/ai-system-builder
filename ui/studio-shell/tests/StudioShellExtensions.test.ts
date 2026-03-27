@@ -3,6 +3,7 @@ import { AtomicStudioRegistry, StudioShellExtensionRegistry, StudioShellExtensio
 import { modelStudioRegistration } from "../registrations/ModelStudioRegistration";
 import { datasetStudioRegistration } from "../registrations/DatasetStudioRegistration";
 import { toolStudioRegistration } from "../registrations/ToolStudioRegistration";
+import { promptTemplateStudioRegistration } from "../registrations/PromptTemplateStudioRegistration";
 
 describe("StudioShellExtensionRegistry", () => {
   it("registers contributions by slot and sorts by order then id", () => {
@@ -80,8 +81,14 @@ describe("AtomicStudioRegistry", () => {
     expect(registry.get("model-studio")?.role).toBe("model");
     registry.register(datasetStudioRegistration);
     registry.register(toolStudioRegistration);
+    registry.register(promptTemplateStudioRegistration);
 
-    expect(registry.list().map((entry) => entry.studioType)).toEqual(["dataset-studio", "model-studio", "tool-studio"]);
+    expect(registry.list().map((entry) => entry.studioType)).toEqual([
+      "dataset-studio",
+      "model-studio",
+      "prompt-template-studio",
+      "tool-studio",
+    ]);
     expect(registry.listExtensionsBySlot("model-studio", StudioShellExtensionSlots.lifecycle).map((entry) => entry.id)).toEqual([
       "model-lifecycle-panel",
     ]);

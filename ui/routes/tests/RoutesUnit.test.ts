@@ -18,9 +18,11 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain('modelStudio: "/studio-shell/model"');
     expect(source).toContain('datasetStudio: "/studio-shell/dataset"');
     expect(source).toContain('toolStudio: "/studio-shell/tool"');
+    expect(source).toContain('promptTemplateStudio: "/studio-shell/prompt-template"');
     expect(source).toContain('key: "agent-studio"');
     expect(source).toContain('key: "dataset-studio"');
     expect(source).toContain('key: "tool-studio"');
+    expect(source).toContain('key: "prompt-template-studio"');
   });
 
   it("provides navigation helper and protected route behavior", () => {
@@ -49,6 +51,7 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain("path: ROUTE_PATHS.modelStudio");
     expect(source).toContain("path: ROUTE_PATHS.datasetStudio");
     expect(source).toContain("path: ROUTE_PATHS.toolStudio");
+    expect(source).toContain("path: ROUTE_PATHS.promptTemplateStudio");
     expect(source).toContain("path: ROUTE_PATHS.context");
     expect(source).toContain("path: ROUTE_PATHS.workflowContextWorkbench");
   });

@@ -52,3 +52,4 @@ Current Direction 5 target shape remains:
 - no replacement of workflow or execution backbone
 - no parallel agent architecture/runtime model
 - no over-atomicization of rows/chunks/fragments as global assets
+- Direction 5 atomic studio usage now also concretely applies `atomic/prompt-template/none` through Prompt Template Studio (`domain/prompt-template-studio/*`, `application/prompt-template-studio/*`, and registration-driven UI shell integration).

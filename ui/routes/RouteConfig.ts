@@ -26,6 +26,7 @@ export const ROUTE_PATHS = Object.freeze({
   modelStudio: "/studio-shell/model",
   datasetStudio: "/studio-shell/dataset",
   toolStudio: "/studio-shell/tool",
+  promptTemplateStudio: "/studio-shell/prompt-template",
   settings: "/settings",
   notFound: "*",
 });
@@ -125,6 +126,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteDefinition> = Object.freeze([
     key: "tool-studio",
     path: ROUTE_PATHS.toolStudio,
     title: "Tool Studio",
+    showInNavigation: false,
+  }),
+  Object.freeze({
+    key: "prompt-template-studio",
+    path: ROUTE_PATHS.promptTemplateStudio,
+    title: "Prompt Template Studio",
     showInNavigation: false,
   }),
   Object.freeze({

@@ -3,6 +3,10 @@ import { CompositionAssetContractResolver } from "../../contracts/CompositionAss
 import { createModelAssetMetadata, createModelStudioTaxonomy } from "../../../domain/model-studio/ModelStudioDomain";
 import { createDatasetAssetMetadata, createDatasetStudioTaxonomy } from "../../../domain/dataset-studio/DatasetStudioDomain";
 import { createToolAssetMetadata, createToolStudioTaxonomy } from "../../../domain/tool-studio/ToolStudioDomain";
+import {
+  createPromptTemplateAssetMetadata,
+  createPromptTemplateStudioTaxonomy,
+} from "../../../domain/prompt-template-studio/PromptTemplateStudioDomain";
 import { createAssetDraft, createAssetSession } from "../../../domain/studio-shell/StudioShellDomain";
 import { evaluateAtomicStudioDraftConsistency } from "../AtomicStudioAssetEnforcement";
 import type { AssetMetadata } from "../../../domain/studio-shell/StudioShellDomain";
@@ -25,10 +29,11 @@ function createAtomicDraft(input: {
 }
 
 describe("evaluateAtomicStudioDraftConsistency", () => {
-  it("accepts model/dataset/tool atomic drafts when taxonomy + contract align with shared seams", () => {
+  it("accepts model/dataset/tool/prompt-template atomic drafts when taxonomy + contract align with shared seams", () => {
     const modelTaxonomy = createModelStudioTaxonomy();
     const datasetTaxonomy = createDatasetStudioTaxonomy();
     const toolTaxonomy = createToolStudioTaxonomy("conditional");
+    const promptTemplateTaxonomy = createPromptTemplateStudioTaxonomy();
 
     const modelDraft = createAtomicDraft({
       draftId: "draft-model",
@@ -55,6 +60,14 @@ describe("evaluateAtomicStudioDraftConsistency", () => {
         contract: resolver.resolveContractForTaxonomy(toolTaxonomy),
       }),
     });
+    const promptTemplateDraft = createAtomicDraft({
+      draftId: "draft-prompt-template",
+      studioId: "studio-prompt-templates",
+      metadata: createPromptTemplateAssetMetadata({
+        title: "Prompt Template",
+        contract: resolver.resolveContractForTaxonomy(promptTemplateTaxonomy),
+      }),
+    });
 
     expect(evaluateAtomicStudioDraftConsistency({
       draft: modelDraft,
@@ -69,6 +82,11 @@ describe("evaluateAtomicStudioDraftConsistency", () => {
     expect(evaluateAtomicStudioDraftConsistency({
       draft: toolDraft,
       expectation: { studioType: "tool-studio", semanticRole: "tool", allowedBehaviorKinds: ["conditional", "deterministic"] },
+      contractResolver: resolver,
+    })).toEqual([]);
+    expect(evaluateAtomicStudioDraftConsistency({
+      draft: promptTemplateDraft,
+      expectation: { studioType: "prompt-template-studio", semanticRole: "prompt-template", allowedBehaviorKinds: ["none"] },
       contractResolver: resolver,
     })).toEqual([]);
   });

@@ -29,3 +29,4 @@
 - No parallel agent contract architecture.
 - No system-composer UI in this slice.
 - Prompt/Embedding/Config Profile studios are not implemented yet in Direction 5 UI/application slices; this document only claims shared contract readiness for those roles.
+- Direction 5 Prompt Template Studio now also consumes taxonomy-driven atomic contract projection (`atomic/prompt-template/none`) through the same shared shell metadata + publish-enforcement seams.

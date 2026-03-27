@@ -121,6 +121,27 @@ function defaultTaxonomyContract(descriptor: CompositionTaxonomyDescriptor): Ass
     });
   }
 
+  if (semanticRole === TaxonomySemanticRoles.promptTemplate) {
+    return createAssetContractDescriptor({
+      version: "1.0.0",
+      input: {
+        kind: AssetContractShapeKinds.jsonSchema,
+        description: "Prompt-template authoring/update payload for atomic prompt-template assets.",
+      },
+      output: {
+        kind: AssetContractShapeKinds.jsonSchema,
+        description: "Versioned prompt-template descriptor with template text and variable metadata.",
+      },
+      parameters: [
+        parameter("templateFormat", false, "Declared prompt template format.", "string", "mustache"),
+      ],
+      execution: {
+        invocationMode: "deferred",
+        sideEffects: "none",
+      },
+    });
+  }
+
   if (semanticRole === TaxonomySemanticRoles.configProfile) {
     return createAssetContractDescriptor({
       version: "1.0.0",

@@ -61,7 +61,7 @@ function installBridge(api: StudioShellBackendApi): void {
 }
 
 describe("StudioShellService integration", () => {
-  it("keeps model/dataset/tool lifecycle and persisted contract-taxonomy behavior consistent across shared seams", async () => {
+  it("keeps model/dataset/tool/prompt-template lifecycle and persisted contract-taxonomy behavior consistent across shared seams", async () => {
     const root = mkdtempSync(path.join(tmpdir(), "loom-atomic-studio-consistency-"));
     createdRoots.push(root);
     const databasePath = path.join(root, "atomic-studio.sqlite");
@@ -95,6 +95,14 @@ describe("StudioShellService integration", () => {
         behaviorKind: "conditional" as const,
         content: "{\"toolSpec\":{\"providerKind\":\"mcp\",\"serverId\":\"search\",\"operationId\":\"query\"}}",
         dependencies: [{ assetId: "asset:mcp-catalog", versionId: "asset:mcp-catalog:v2" }],
+      },
+      {
+        studioId: "studio-prompt-templates",
+        name: "Prompt Template Studio",
+        semanticRole: "prompt-template" as const,
+        behaviorKind: "none" as const,
+        content: "{\"promptTemplateSpec\":{\"format\":\"mustache\",\"template\":\"You are a helpful assistant for {{audience}}.\",\"variables\":[\"audience\"]}}",
+        dependencies: [{ assetId: "asset:prompt-library", versionId: "asset:prompt-library:v1" }],
       },
     ];
 
@@ -346,6 +354,66 @@ describe("StudioShellService integration", () => {
     expect(published.data?.draft?.metadata.taxonomy?.semanticRole).toBe("dataset");
     expect(published.data?.draft?.lifecycleStatus).toBe(AssetDraftLifecycleStatuses.published);
     expect(published.data?.versions.map((entry) => entry.versionId)).toEqual(["asset:studio-datasets:v1"]);
+
+    repository.dispose();
+  });
+
+  it("supports Prompt Template Studio style flow over the same shell/persistence/publish seams", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-prompt-template-studio-service-"));
+    createdRoots.push(root);
+    const databasePath = path.join(root, "prompt-template-studio.sqlite");
+    const repository = new SqliteStudioShellRepository(databasePath);
+    const backendApi = new StudioShellBackendApi(repository);
+    installBridge(backendApi);
+
+    const service = new StudioShellService();
+    const initialized = await service.initializeStudio("studio-prompt-templates", "Prompt Template Studio");
+    expect(initialized.ok).toBeTrue();
+    const sessionId = initialized.data?.activeSessionId;
+
+    const created = await service.createDraft({
+      studioId: "studio-prompt-templates",
+      sessionId: sessionId!,
+      content: '{"promptTemplateSpec":{"format":"mustache","template":"Write a summary for {{topic}}.","variables":["topic"]}}',
+      metadata: {
+        title: "Prompt Template Asset Draft",
+        tags: ["prompt-template", "studio-shell"],
+        taxonomy: {
+          structuralKind: "atomic",
+          semanticRole: "prompt-template",
+          behaviorKind: "none",
+        },
+        provenance: {
+          sourceType: "generated",
+          sourceLabel: "prompt-template-studio",
+        },
+      },
+      dependencies: [{ assetId: "asset:prompt-library", versionId: "asset:prompt-library:v1" }],
+    });
+    expect(created.ok).toBeTrue();
+
+    const draftId = created.data?.draft?.draftId;
+    await service.transitionLifecycle({
+      studioId: "studio-prompt-templates",
+      sessionId: sessionId!,
+      draftId: draftId!,
+      targetStatus: AssetDraftLifecycleStatuses.validated,
+    });
+
+    const published = await service.publishVersion({
+      studioId: "studio-prompt-templates",
+      sessionId: sessionId!,
+      draftId: draftId!,
+      versionId: "asset:studio-prompt-templates:v1",
+      versionLabel: "v1",
+      createdBy: "prompt-author",
+    });
+
+    expect(published.ok).toBeTrue();
+    expect(published.data?.draft?.metadata.taxonomy?.semanticRole).toBe("prompt-template");
+    expect(published.data?.draft?.metadata.taxonomy?.behaviorKind).toBe("none");
+    expect(published.data?.draft?.lifecycleStatus).toBe(AssetDraftLifecycleStatuses.published);
+    expect(published.data?.versions.map((entry) => entry.versionId)).toEqual(["asset:studio-prompt-templates:v1"]);
 
     repository.dispose();
   });
