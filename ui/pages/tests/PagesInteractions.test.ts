@@ -11,6 +11,7 @@ describe("ui/pages interactions", () => {
     const mcp = readSource("ui/pages/McpPage.tsx");
     const agentStudio = readSource("ui/pages/AgentStudioPage.tsx");
     const studioShell = readSource("ui/pages/StudioShellPage.tsx");
+    const registry = readSource("ui/pages/RegistryPage.tsx");
     const notFound = readSource("ui/pages/NotFoundPage.tsx");
 
     expect(home).toContain('import { ROUTE_PATHS } from "../routes/RouteConfig"');
@@ -31,6 +32,10 @@ describe("ui/pages interactions", () => {
     expect(agentStudio).toContain("<AgentDetailPanel");
     expect(studioShell).toContain('data-testid="studio-shell-page"');
     expect(studioShell).toContain("StudioShellService");
+    expect(registry).toContain('data-testid="registry-page"');
+    expect(registry).toContain("RegistryService");
+    expect(registry).toContain("AssetFilterPanel");
+    expect(registry).toContain("AssetList");
     expect(settings).toContain("Advanced runtime settings");
     expect(notFound).toContain("to={ROUTE_PATHS.home}");
   });

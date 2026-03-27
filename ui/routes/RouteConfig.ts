@@ -23,6 +23,7 @@ export const ROUTE_PATHS = Object.freeze({
   assets: "/assets",
   agentStudio: "/agent-studio",
   studioShell: "/studio-shell",
+  registry: "/studio-shell/registry",
   workflowStudio: "/studio-shell/workflow",
   contextBundleStudio: "/studio-shell/context-bundle",
   datasetPipelineStudio: "/studio-shell/dataset-pipeline",
@@ -115,6 +116,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteDefinition> = Object.freeze([
     key: "studio-shell",
     path: ROUTE_PATHS.studioShell,
     title: "Studio Shell",
+    showInNavigation: true,
+  }),
+  Object.freeze({
+    key: "registry",
+    path: ROUTE_PATHS.registry,
+    title: "Registry",
     showInNavigation: true,
   }),
   Object.freeze({

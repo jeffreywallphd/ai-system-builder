@@ -70,4 +70,6 @@ Related-run lineage navigation now also uses that same execution-history service
 
 Current Direction 5 UI status:
 - Fully implemented now in renderer: atomic studios + composite studios (Workflow, Context Bundle, Dataset Pipeline, Training Recipe, Tool Chain) on one shared `StudioShellPage` architecture.
+- Registry is now a first-class Studio Shell surface (`/studio-shell/registry`) routed through the same app shell/navigation and powered by a thin desktop bridge-backed `RegistryService` plus shared page/card/layout primitives.
+- Registry asset browsing uses API-driven taxonomy filters (structural kind, semantic role, behavior kind) with progressive disclosure (`Advanced filters`) so renderer state remains minimal and business filtering stays backend-authoritative.
 - Intentionally not implemented in renderer in this slice: dedicated system-asset studio surfaces (Full AI System, App Template / Deployment Unit) and any separate composite-runtime authoring UX beyond shared shell metadata/dependency/lifecycle/publish flows.

@@ -150,6 +150,26 @@ contextBridge.exposeInMainWorld("aiLoomDesktop", {
       return ipcRenderer.invoke("ai-loom-desktop-studio-shell:validate-draft", requestJson) as Promise<string>;
     },
   },
+  registry: {
+    listAssets(limit?: number) {
+      return ipcRenderer.invoke("ai-loom-desktop-registry:assets", limit) as Promise<string>;
+    },
+    filterAssets(filtersJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-registry:assets-filter", filtersJson) as Promise<string>;
+    },
+    getDependencies(queryJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-registry:dependencies", queryJson) as Promise<string>;
+    },
+    getDependents(queryJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-registry:dependents", queryJson) as Promise<string>;
+    },
+    traverseUpstream(queryJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-registry:traverse-upstream", queryJson) as Promise<string>;
+    },
+    traverseDownstream(queryJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-registry:traverse-downstream", queryJson) as Promise<string>;
+    },
+  },
   agents: {
     createAgent(requestJson: string) {
       return ipcRenderer.invoke("ai-loom-desktop-agents:create", requestJson) as Promise<string>;
