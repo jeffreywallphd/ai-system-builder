@@ -16,9 +16,7 @@ import { workflowStudioRegistration } from "../registrations/WorkflowStudioRegis
 import { contextBundleStudioRegistration } from "../registrations/ContextBundleStudioRegistration";
 import { datasetPipelineStudioRegistration } from "../registrations/DatasetPipelineStudioRegistration";
 import { trainingRecipeStudioRegistration } from "../registrations/TrainingRecipeStudioRegistration";
-import {
-  toolChainStudioRegistrationExample,
-} from "../registrations/CompositeStudioRegistrationExamples";
+import { toolChainStudioRegistration } from "../registrations/ToolChainStudioRegistration";
 
 describe("StudioShellExtensionRegistry", () => {
   it("registers contributions by slot and sorts by order then id", () => {
@@ -87,7 +85,7 @@ describe("StudioRegistrationRegistry", () => {
     registry.register(contextBundleStudioRegistration);
     registry.register(datasetPipelineStudioRegistration);
     registry.register(trainingRecipeStudioRegistration);
-    registry.register(toolChainStudioRegistrationExample);
+    registry.register(toolChainStudioRegistration);
 
     expect(registry.get("workflow-studio")?.kind).toBe("composite");
     expect(registry.get("workflow-studio")?.role).toBe("workflow");

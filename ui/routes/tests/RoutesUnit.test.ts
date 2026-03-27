@@ -18,6 +18,7 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain('workflowStudio: "/studio-shell/workflow"');
     expect(source).toContain('contextBundleStudio: "/studio-shell/context-bundle"');
     expect(source).toContain('datasetPipelineStudio: "/studio-shell/dataset-pipeline"');
+    expect(source).toContain('toolChainStudio: "/studio-shell/tool-chain"');
     expect(source).toContain('modelStudio: "/studio-shell/model"');
     expect(source).toContain('datasetStudio: "/studio-shell/dataset"');
     expect(source).toContain('toolStudio: "/studio-shell/tool"');
@@ -28,6 +29,7 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain('key: "workflow-studio"');
     expect(source).toContain('key: "context-bundle-studio"');
     expect(source).toContain('key: "dataset-pipeline-studio"');
+    expect(source).toContain('key: "tool-chain-studio"');
     expect(source).toContain('key: "dataset-studio"');
     expect(source).toContain('key: "tool-studio"');
     expect(source).toContain('key: "prompt-template-studio"');
@@ -61,6 +63,8 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain("path: ROUTE_PATHS.workflowStudio");
     expect(source).toContain("path: ROUTE_PATHS.contextBundleStudio");
     expect(source).toContain("path: ROUTE_PATHS.datasetPipelineStudio");
+    expect(source).toContain("path: ROUTE_PATHS.trainingRecipeStudio");
+    expect(source).toContain("path: ROUTE_PATHS.toolChainStudio");
     expect(source).toContain("path: ROUTE_PATHS.modelStudio");
     expect(source).toContain("path: ROUTE_PATHS.datasetStudio");
     expect(source).toContain("path: ROUTE_PATHS.toolStudio");

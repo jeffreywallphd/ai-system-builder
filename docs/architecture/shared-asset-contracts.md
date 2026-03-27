@@ -43,6 +43,7 @@ Specialized composite semantics remain explicit in these shared contracts: workf
   - Model Studio and Dataset Studio publish with `atomic/*/none` contract projections.
   - Tool Studio publish supports `atomic/tool/(conditional|deterministic)` projections.
 - Shared Studio Shell publish-time enforcement now evaluates composite drafts through the same resolver seam for taxonomy and contract consistency (no separate composite enforcement stack).
+- Tool Chain Studio now reuses this same composite publish-consistency seam (`tool-chain`/`deterministic`) and the shared taxonomy-driven contract projection (`executionOrdering=sequential`) for draft authoring and publish gating.
 - Cross-studio end-to-end consistency coverage now verifies that projected contracts remain stable through create/update/validate/publish/reload paths over shared shell seams.
 
 ## Canonical read integration seam
