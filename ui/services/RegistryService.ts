@@ -1,5 +1,6 @@
+import type { RegistryDependencyGraph, RegistryDependencyTraversal } from "../../application/asset-registry/RegistryDependencyGraphService";
 import type { RegistryFilterParams } from "../../application/asset-registry/RegistryQueryService";
-import type { RegistryDependencyEndpointQuery, RegistryTraversalEndpointQuery, RegistryApiResponse } from "../../infrastructure/api/registry/RegistryBackendApi";
+import type { RegistryDependencyEndpointQuery, RegistryTraversalEndpointQuery, RegistryApiResponse, RegistryAssetDetailQuery } from "../../infrastructure/api/registry/RegistryBackendApi";
 import type { RegistryAsset } from "../../domain/asset-registry/RegistryAsset";
 import { resolveDesktopRegistryBridge } from "../composition/DesktopRegistryBridgeAdapter";
 
@@ -22,23 +23,28 @@ export class RegistryService {
     return JSON.parse(raw) as RegistryApiResponse<ReadonlyArray<RegistryAsset>>;
   }
 
-  public async getDependencies(query: RegistryDependencyEndpointQuery): Promise<RegistryApiResponse<unknown>> {
+  public async getAssetDetail(query: RegistryAssetDetailQuery): Promise<RegistryApiResponse<RegistryAsset>> {
+    const raw = await this.requireBridge().getAssetDetail(JSON.stringify(query));
+    return JSON.parse(raw) as RegistryApiResponse<RegistryAsset>;
+  }
+
+  public async getDependencies(query: RegistryDependencyEndpointQuery): Promise<RegistryApiResponse<RegistryDependencyGraph>> {
     const raw = await this.requireBridge().getDependencies(JSON.stringify(query));
-    return JSON.parse(raw) as RegistryApiResponse<unknown>;
+    return JSON.parse(raw) as RegistryApiResponse<RegistryDependencyGraph>;
   }
 
-  public async getDependents(query: RegistryDependencyEndpointQuery): Promise<RegistryApiResponse<unknown>> {
+  public async getDependents(query: RegistryDependencyEndpointQuery): Promise<RegistryApiResponse<RegistryDependencyGraph>> {
     const raw = await this.requireBridge().getDependents(JSON.stringify(query));
-    return JSON.parse(raw) as RegistryApiResponse<unknown>;
+    return JSON.parse(raw) as RegistryApiResponse<RegistryDependencyGraph>;
   }
 
-  public async traverseUpstream(query: RegistryTraversalEndpointQuery): Promise<RegistryApiResponse<unknown>> {
+  public async traverseUpstream(query: RegistryTraversalEndpointQuery): Promise<RegistryApiResponse<RegistryDependencyTraversal>> {
     const raw = await this.requireBridge().traverseUpstream(JSON.stringify(query));
-    return JSON.parse(raw) as RegistryApiResponse<unknown>;
+    return JSON.parse(raw) as RegistryApiResponse<RegistryDependencyTraversal>;
   }
 
-  public async traverseDownstream(query: RegistryTraversalEndpointQuery): Promise<RegistryApiResponse<unknown>> {
+  public async traverseDownstream(query: RegistryTraversalEndpointQuery): Promise<RegistryApiResponse<RegistryDependencyTraversal>> {
     const raw = await this.requireBridge().traverseDownstream(JSON.stringify(query));
-    return JSON.parse(raw) as RegistryApiResponse<unknown>;
+    return JSON.parse(raw) as RegistryApiResponse<RegistryDependencyTraversal>;
   }
 }

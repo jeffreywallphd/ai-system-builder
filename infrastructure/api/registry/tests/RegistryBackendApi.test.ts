@@ -154,6 +154,14 @@ describe("RegistryBackendApi", () => {
 
     const api = new RegistryBackendApi(new CrossStudioRegistryQueryService(queryService), new RegistryDependencyGraphService(queryService, versionRepository));
 
+    const detailByAsset = await api.getAssetDetail({ assetId: "asset:workflow" });
+    expect(detailByAsset.ok).toBeTrue();
+    expect(detailByAsset.data?.assetId).toBe("asset:workflow");
+
+    const detailByVersion = await api.getAssetDetail({ versionId: "asset:model:v1" });
+    expect(detailByVersion.ok).toBeTrue();
+    expect(detailByVersion.data?.assetId).toBe("asset:model");
+
     const dependencies = await api.getDependencies({ assetId: "asset:workflow" });
     expect(dependencies.ok).toBeTrue();
     expect(dependencies.data?.edges.some((edge) => edge.fromVersionId === "asset:workflow:v1" && edge.toVersionId === "asset:model:v1")).toBeTrue();
