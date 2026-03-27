@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { AtomicStudioRegistry, StudioShellExtensionRegistry, StudioShellExtensionSlots } from "../StudioShellExtensions";
 import { modelStudioRegistration } from "../registrations/ModelStudioRegistration";
+import { datasetStudioRegistration } from "../registrations/DatasetStudioRegistration";
 
 describe("StudioShellExtensionRegistry", () => {
   it("registers contributions by slot and sorts by order then id", () => {
@@ -76,7 +77,9 @@ describe("AtomicStudioRegistry", () => {
     });
 
     expect(registry.get("model-studio")?.role).toBe("model");
-    expect(registry.list().map((entry) => entry.studioType)).toEqual(["model-studio"]);
+    registry.register(datasetStudioRegistration);
+
+    expect(registry.list().map((entry) => entry.studioType)).toEqual(["dataset-studio", "model-studio"]);
     expect(registry.listExtensionsBySlot("model-studio", StudioShellExtensionSlots.lifecycle).map((entry) => entry.id)).toEqual([
       "model-lifecycle-panel",
     ]);

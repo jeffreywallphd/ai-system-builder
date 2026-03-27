@@ -85,6 +85,11 @@ describe("CompositionAssetContractResolver", () => {
       semanticRole: TaxonomySemanticRoles.model,
       behaviorKind: TaxonomyBehaviorKinds.none,
     });
+    const toolContract = resolver.resolveContractForTaxonomy({
+      structuralKind: "atomic",
+      semanticRole: TaxonomySemanticRoles.tool,
+      behaviorKind: TaxonomyBehaviorKinds.conditional,
+    });
     const datasetContract = resolver.resolveContractForTaxonomy({
       structuralKind: "atomic",
       semanticRole: TaxonomySemanticRoles.dataset,
@@ -117,6 +122,7 @@ describe("CompositionAssetContractResolver", () => {
     });
 
     expect(modelContract?.execution?.invocationMode).toBe("async");
+    expect(toolContract?.parameters.find((parameter) => parameter.id === "providerKind")?.defaultValue).toBe("mcp-or-api");
     expect(datasetContract?.parameters.find((parameter) => parameter.id === "datasetFormat")?.defaultValue).toBe("jsonl");
     expect(configContract?.parameters.find((parameter) => parameter.id === "profileScope")?.defaultValue).toBe("runtime");
     expect(datasetPipelineContract?.output?.description).toContain("dataset-version");

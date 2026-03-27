@@ -24,6 +24,7 @@ export const ROUTE_PATHS = Object.freeze({
   agentStudio: "/agent-studio",
   studioShell: "/studio-shell",
   modelStudio: "/studio-shell/model",
+  datasetStudio: "/studio-shell/dataset",
   settings: "/settings",
   notFound: "*",
 });
@@ -111,6 +112,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteDefinition> = Object.freeze([
     key: "model-studio",
     path: ROUTE_PATHS.modelStudio,
     title: "Model Studio",
+    showInNavigation: false,
+  }),
+  Object.freeze({
+    key: "dataset-studio",
+    path: ROUTE_PATHS.datasetStudio,
+    title: "Dataset Studio",
     showInNavigation: false,
   }),
   Object.freeze({
