@@ -9,6 +9,8 @@ This note captures the minimal integration seam that complements shared taxonomy
 
 These concerns remain separate and compatible.
 
+Specialized composite semantics remain explicit in these shared contracts: workflow = orchestrator, agent = decision unit, context-bundle = input preparer.
+
 ## Shared contract model
 - Inner-layer contract types live in `domain/contracts/AssetContract.ts`.
 - The model is intentionally compact:
@@ -25,6 +27,12 @@ These concerns remain separate and compatible.
   - tool capabilities
   - context packages
   - context recipes
+- Bounded taxonomy-driven projections cover revised roles without creating a second contract system:
+  - `config-profile`
+  - `dataset-pipeline`
+  - `training-recipe`
+  - `tool-chain`
+  - `app-template`
 - Canonical-entity contract resolution now includes workflow definitions plus installed/base models and execution artifacts when matching repositories/catalogs are wired.
 
 ## Canonical read integration seam

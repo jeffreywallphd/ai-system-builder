@@ -26,6 +26,14 @@ What is now implemented:
 - Canonical asset query criteria now includes taxonomy-aware filters (`structuralKinds`, `semanticRoles`, `behaviorKinds`) in addition to kind/source/status criteria.
 - Canonical asset summary/detail reads still expose taxonomy descriptors, with identity metadata as the preferred source and bounded fallback classification where needed.
 
+
+## Specialized composite role interpretation
+- Specialized composite assets remain first-class in this taxonomy:
+  - `workflow` = orchestrator
+  - `agent` = decision unit
+  - `context-bundle` = input preparer
+- These are semantic-role distinctions inside one shared taxonomy (not separate architecture stacks).
+
 What is **not** implemented in this slice:
 
 - no new UI composer

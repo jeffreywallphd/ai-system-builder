@@ -4,6 +4,7 @@ import type { Agent } from "../../../domain/agents/Agent";
 import { ContextPackage } from "../../context/models/ContextPackage";
 import { ContextRecipe } from "../../context/models/ContextRecipe";
 import { CompositionTaxonomyClassifier } from "../../taxonomy/CompositionTaxonomyClassifier";
+import { TaxonomyBehaviorKinds, TaxonomySemanticRoles } from "../../../domain/taxonomy/CompositionTaxonomy";
 import { CompositionAssetContractResolver } from "../CompositionAssetContractResolver";
 
 describe("CompositionAssetContractResolver", () => {
@@ -75,6 +76,69 @@ describe("CompositionAssetContractResolver", () => {
     expect(toolContract.output?.schema).toEqual({ type: "object", properties: { results: { type: "array" } } });
     expect(contextPackageContract.output?.kind).toBe("text");
     expect(contextRecipeContract.parameters.find((parameter) => parameter.id === "toolUseMode")?.defaultValue).toBe("guided");
+  });
+
+
+  it("provides bounded taxonomy-driven contract projections for revised asset roles", () => {
+    const configContract = resolver.resolveContractForTaxonomy({
+      structuralKind: "atomic",
+      semanticRole: TaxonomySemanticRoles.configProfile,
+      behaviorKind: TaxonomyBehaviorKinds.none,
+    });
+    const datasetPipelineContract = resolver.resolveContractForTaxonomy({
+      structuralKind: "composite",
+      semanticRole: TaxonomySemanticRoles.datasetPipeline,
+      behaviorKind: TaxonomyBehaviorKinds.iterative,
+    });
+    const trainingRecipeContract = resolver.resolveContractForTaxonomy({
+      structuralKind: "composite",
+      semanticRole: TaxonomySemanticRoles.trainingRecipe,
+      behaviorKind: TaxonomyBehaviorKinds.deterministic,
+    });
+    const toolChainContract = resolver.resolveContractForTaxonomy({
+      structuralKind: "composite",
+      semanticRole: TaxonomySemanticRoles.toolChain,
+      behaviorKind: TaxonomyBehaviorKinds.deterministic,
+    });
+    const appTemplateContract = resolver.resolveContractForTaxonomy({
+      structuralKind: "system",
+      semanticRole: TaxonomySemanticRoles.appTemplate,
+      behaviorKind: TaxonomyBehaviorKinds.conditional,
+    });
+
+    expect(configContract?.parameters.find((parameter) => parameter.id === "profileScope")?.defaultValue).toBe("runtime");
+    expect(datasetPipelineContract?.output?.description).toContain("dataset-version");
+    expect(trainingRecipeContract?.execution?.sideEffects).toBe("external");
+    expect(toolChainContract?.parameters.find((parameter) => parameter.id === "executionOrdering")?.required).toBeTrue();
+    expect(appTemplateContract?.parameters.find((parameter) => parameter.id === "targetRuntime")?.defaultValue).toBe("container");
+  });
+
+  it("keeps specialized composite semantics explicit for workflow, agent, and context-bundle contracts", () => {
+    const workflow = {
+      id: "wf-specialized",
+      executionPolicy: "acyclic-only",
+      metadata: { name: "WF", contextConfiguration: {} },
+    } as unknown as IWorkflow;
+    const agent = {
+      id: "agent-specialized",
+      planningStrategy: { strategyId: "deterministic", mode: "deterministic-linear" },
+      execution: { requireTrustedTools: true },
+    } as Agent;
+
+    const contextPackage = new ContextPackage({
+      id: "cp-specialized",
+      name: "Package",
+      fragments: [{ id: "f-1", content: "alpha", order: 1, kind: "instructions" }],
+      references: [],
+    });
+
+    const workflowContract = resolver.resolveWorkflowContract(workflow);
+    const agentContract = resolver.resolveAgentContract(agent);
+    const contextBundleContract = resolver.resolveContextPackageContract(contextPackage);
+
+    expect(workflowContract.input?.description).toContain("orchestrator");
+    expect(agentContract.input?.description).toContain("decision unit");
+    expect(contextBundleContract.output?.description).toContain("input preparer");
   });
 
 

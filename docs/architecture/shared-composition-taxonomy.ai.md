@@ -32,6 +32,14 @@ Behavior is a property of the same structural object, not a separate top-level a
 - workflow-published capability -> composite/tool-chain/deterministic
 - execution artifact canonical reads -> system/system/iterative
 
+
+## Specialized composite role interpretation
+- Specialized composite assets remain first-class in this taxonomy:
+  - `workflow` = orchestrator
+  - `agent` = decision unit
+  - `context-bundle` = input preparer
+- These are semantic-role distinctions inside one shared taxonomy (not separate architecture stacks).
+
 ## Explicit non-goals in this slice
 - no UI composer rewrite
 - no replacement of workflow or execution backbone
