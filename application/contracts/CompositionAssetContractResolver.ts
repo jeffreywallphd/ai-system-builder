@@ -79,6 +79,27 @@ function defaultTaxonomyContract(descriptor: CompositionTaxonomyDescriptor): Ass
     });
   }
 
+  if (semanticRole === TaxonomySemanticRoles.dataset) {
+    return createAssetContractDescriptor({
+      version: "1.0.0",
+      input: {
+        kind: AssetContractShapeKinds.jsonSchema,
+        description: "Dataset authoring/update payload for atomic dataset assets.",
+      },
+      output: {
+        kind: AssetContractShapeKinds.jsonSchema,
+        description: "Versioned dataset descriptor with schema/profile and lineage-ready metadata.",
+      },
+      parameters: [
+        parameter("datasetFormat", false, "Declared canonical dataset format.", "string", "jsonl"),
+      ],
+      execution: {
+        invocationMode: "deferred",
+        sideEffects: "none",
+      },
+    });
+  }
+
   if (semanticRole === TaxonomySemanticRoles.configProfile) {
     return createAssetContractDescriptor({
       version: "1.0.0",

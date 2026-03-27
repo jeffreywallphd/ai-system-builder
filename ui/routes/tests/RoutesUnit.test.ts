@@ -15,6 +15,7 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain('key: "services"');
     expect(source).toContain('key: "context"');
     expect(source).toContain('agentStudio: "/agent-studio"');
+    expect(source).toContain('modelStudio: "/studio-shell/model"');
     expect(source).toContain('key: "agent-studio"');
   });
 
@@ -41,6 +42,7 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain("path: ROUTE_PATHS.services");
     expect(source).toContain("path: ROUTE_PATHS.agentStudio");
     expect(source).toContain("path: ROUTE_PATHS.studioShell");
+    expect(source).toContain("path: ROUTE_PATHS.modelStudio");
     expect(source).toContain("path: ROUTE_PATHS.context");
     expect(source).toContain("path: ROUTE_PATHS.workflowContextWorkbench");
   });

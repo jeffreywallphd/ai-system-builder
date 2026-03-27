@@ -27,7 +27,9 @@ Specialized composite semantics remain explicit in these shared contracts: workf
   - tool capabilities
   - context packages
   - context recipes
-- Bounded taxonomy-driven projections cover revised roles without creating a second contract system:
+- Bounded taxonomy-driven projections cover atomic dataset/model/config-profile roles and revised composite/system roles without creating a second contract system:
+  - `dataset`
+  - `model`
   - `config-profile`
   - `dataset-pipeline`
   - `training-recipe`

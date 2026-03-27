@@ -24,6 +24,30 @@ function safeParseJson<T>(value: string, fallback: T): T {
   }
 }
 
+
+function buildCreateMetadata(
+  defaultDraftTitle: string,
+  defaultDraftTags: ReadonlyArray<string>,
+  metadataPatchJson: string,
+): {
+  readonly title: string;
+  readonly summary?: string;
+  readonly tags?: ReadonlyArray<string>;
+  readonly taxonomy?: AssetMetadataPatch["taxonomy"];
+  readonly contract?: AssetMetadataPatch["contract"];
+  readonly provenance?: AssetMetadataPatch["provenance"];
+} {
+  const metadataPatch = safeParseJson<AssetMetadataPatch>(metadataPatchJson, {});
+  return {
+    title: metadataPatch.title ?? defaultDraftTitle,
+    summary: metadataPatch.summary,
+    tags: metadataPatch.tags ?? defaultDraftTags,
+    taxonomy: metadataPatch.taxonomy,
+    contract: metadataPatch.contract,
+    provenance: metadataPatch.provenance,
+  };
+}
+
 interface StudioShellPageProps {
   readonly atomicStudio?: AtomicStudioRegistration;
   readonly extensions?: ReadonlyArray<StudioShellExtensionContribution>;
@@ -55,6 +79,10 @@ export default function StudioShellPage({ atomicStudio, extensions = [] }: Studi
   const defaultDraftTitle = atomicStudio?.defaults.title ?? "Studio Shell Draft";
   const defaultDraftTags = atomicStudio?.defaults.tags ?? ["studio-shell"];
   const defaultContent = atomicStudio?.defaults.contentTemplate ?? "{}";
+  const shellTitle = atomicStudio?.displayName ?? "Studio Shell";
+  const shellSubtitle = atomicStudio
+    ? `Shared atomic-studio shell for ${atomicStudio.role} assets: session/draft context, metadata/dependencies, lifecycle/version, and validation.`
+    : "Reusable bounded shell for studio/session context, authoring, taxonomy/contract/provenance/dependencies, lifecycle/version state, and validation.";
   const service = useMemo(() => new StudioShellService(), []);
   const extensionRegistry = useMemo(() => {
     const registry = new StudioShellExtensionRegistry();
@@ -136,8 +164,8 @@ export default function StudioShellPage({ atomicStudio, extensions = [] }: Studi
     <section className="ui-page ui-stack ui-stack--md" data-testid="studio-shell-page">
       <div className="ui-page__hero">
         <div className="ui-page__hero-copy">
-          <h1 className="ui-page__title">Studio Shell</h1>
-          <p className="ui-page__subtitle">Reusable bounded shell for studio/session context, authoring, taxonomy/contract/provenance/dependencies, lifecycle/version state, and validation.</p>
+          <h1 className="ui-page__title">{shellTitle}</h1>
+          <p className="ui-page__subtitle">{shellSubtitle}</p>
         </div>
       </div>
 
@@ -167,11 +195,12 @@ export default function StudioShellPage({ atomicStudio, extensions = [] }: Studi
                   return;
                 }
                 if (!draftId) {
+                  const metadata = buildCreateMetadata(defaultDraftTitle, defaultDraftTags, metadataPatchJson);
                   void runAndRefresh(() => service.createDraft({
                     studioId,
                     sessionId,
                     content,
-                    metadata: { title: defaultDraftTitle, tags: defaultDraftTags },
+                    metadata,
                   }));
                   return;
                 }
