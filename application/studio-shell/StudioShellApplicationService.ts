@@ -1,8 +1,12 @@
 import type {
   AssetDraftResult,
+  AssetVersionHistoryResult,
+  AssetVersionResult,
   CreateAssetDraftCommand,
   InitializeStudioCommand,
+  ListAssetDraftVersionHistoryQuery,
   LoadAssetDraftQuery,
+  PublishAssetDraftVersionCommand,
   StartAssetSessionCommand,
   StudioInitializationResult,
   StudioSessionResult,
@@ -15,4 +19,6 @@ export interface StudioShellApplicationService {
   createAssetDraft(command: CreateAssetDraftCommand): Promise<AssetDraftResult>;
   loadAssetDraft(query: LoadAssetDraftQuery): Promise<AssetDraftResult | undefined>;
   updateAssetDraft(command: UpdateAssetDraftCommand): Promise<AssetDraftResult>;
+  publishAssetDraftVersion(command: PublishAssetDraftVersionCommand): Promise<AssetVersionResult>;
+  listAssetDraftVersionHistory(query: ListAssetDraftVersionHistoryQuery): Promise<AssetVersionHistoryResult>;
 }

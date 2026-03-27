@@ -2,6 +2,7 @@ import {
   attachDraftToSession,
   createAssetDraft,
   createAssetSession,
+  publishAssetDraftVersion,
   createStudio,
   updateAssetDraft,
   withStudioSession,
@@ -15,9 +16,13 @@ import {
 } from "./StudioShellApplicationErrors";
 import type {
   AssetDraftResult,
+  AssetVersionHistoryResult,
+  AssetVersionResult,
   CreateAssetDraftCommand,
   InitializeStudioCommand,
+  ListAssetDraftVersionHistoryQuery,
   LoadAssetDraftQuery,
+  PublishAssetDraftVersionCommand,
   StartAssetSessionCommand,
   StudioInitializationResult,
   StudioSessionResult,
@@ -56,7 +61,7 @@ function asInvalidRequest(error: unknown): never {
 export class DefaultStudioShellApplicationService implements StudioShellApplicationService {
   constructor(
     private readonly repository: IStudioShellRepository,
-    private readonly createId: (prefix: "session" | "draft") => string = defaultCreateId,
+    private readonly createId: (prefix: "session" | "draft" | "version") => string = defaultCreateId,
   ) {}
 
   public async initializeStudio(command: InitializeStudioCommand): Promise<StudioInitializationResult> {
@@ -201,6 +206,74 @@ export class DefaultStudioShellApplicationService implements StudioShellApplicat
       studio,
       session: updatedSession,
       draft: updatedDraft,
+    });
+  }
+
+  public async publishAssetDraftVersion(command: PublishAssetDraftVersionCommand): Promise<AssetVersionResult> {
+    const studioId = assertRequired(command.studioId, "Studio id");
+    const sessionId = assertRequired(command.sessionId, "Session id");
+    const draftId = assertRequired(command.draftId, "Draft id");
+    const versionId = command.versionId?.trim() || this.createId("version");
+
+    const studio = await this.requireStudio(studioId);
+    const session = await this.requireSession(sessionId);
+    const draft = await this.requireDraft(draftId);
+
+    if (session.studioId !== studio.id) {
+      throw new StudioShellInvalidRequestError(`Session '${session.id}' does not belong to studio '${studio.id}'.`);
+    }
+
+    if (draft.studioId !== studio.id) {
+      throw new StudioShellInvalidRequestError(`Draft '${draft.id}' does not belong to studio '${studio.id}'.`);
+    }
+
+    const existingVersion = await this.repository.getAssetVersion(versionId);
+    if (existingVersion) {
+      throw new StudioShellConflictError(`Asset version '${versionId}' already exists and is immutable.`);
+    }
+
+    let published: ReturnType<typeof publishAssetDraftVersion>;
+    try {
+      published = publishAssetDraftVersion({
+        draft,
+        session,
+        versionId,
+        versionLabel: command.versionLabel,
+        parentVersionId: command.parentVersionId,
+        createdBy: command.createdBy,
+        upstreamVersionIds: command.upstreamVersionIds,
+      });
+    } catch (error) {
+      asInvalidRequest(error);
+    }
+    const updatedSession = attachDraftToSession(session, published.draft);
+
+    await this.repository.saveAssetVersion(published.version);
+    await this.repository.saveDraft(published.draft);
+    await this.repository.saveSession(updatedSession);
+
+    return Object.freeze({
+      studio,
+      session: updatedSession,
+      draft: published.draft,
+      version: published.version,
+    });
+  }
+
+  public async listAssetDraftVersionHistory(query: ListAssetDraftVersionHistoryQuery): Promise<AssetVersionHistoryResult> {
+    const studioId = assertRequired(query.studioId, "Studio id");
+    const draftId = assertRequired(query.draftId, "Draft id");
+    const studio = await this.requireStudio(studioId);
+    const draft = await this.requireDraft(draftId);
+    if (draft.studioId !== studio.id) {
+      throw new StudioShellInvalidRequestError(`Draft '${draft.id}' does not belong to studio '${studio.id}'.`);
+    }
+
+    const versions = await this.repository.listAssetVersionsByAssetId(draft.assetId);
+    return Object.freeze({
+      studio,
+      draft,
+      versions: Object.freeze([...versions].sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime())),
     });
   }
 
