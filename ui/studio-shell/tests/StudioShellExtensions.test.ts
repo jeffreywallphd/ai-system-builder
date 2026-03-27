@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { StudioShellExtensionRegistry, StudioShellExtensionSlots } from "../StudioShellExtensions";
+import { AtomicStudioRegistry, StudioShellExtensionRegistry, StudioShellExtensionSlots } from "../StudioShellExtensions";
+import { modelStudioRegistration } from "../registrations/ModelStudioRegistration";
 
 describe("StudioShellExtensionRegistry", () => {
   it("registers contributions by slot and sorts by order then id", () => {
@@ -56,5 +57,41 @@ describe("StudioShellExtensionRegistry", () => {
       title: "Duplicate",
       render: () => null,
     })).toThrow("already registered");
+  });
+});
+
+describe("AtomicStudioRegistry", () => {
+  it("registers atomic studios with deterministic lookup and extension slot composition", () => {
+    const registry = new AtomicStudioRegistry();
+    registry.register({
+      ...modelStudioRegistration,
+      extensions: [
+        {
+          id: "model-lifecycle-panel",
+          slot: StudioShellExtensionSlots.lifecycle,
+          title: "Model Lifecycle",
+          render: () => null,
+        },
+      ],
+    });
+
+    expect(registry.get("model-studio")?.role).toBe("model");
+    expect(registry.list().map((entry) => entry.studioType)).toEqual(["model-studio"]);
+    expect(registry.listExtensionsBySlot("model-studio", StudioShellExtensionSlots.lifecycle).map((entry) => entry.id)).toEqual([
+      "model-lifecycle-panel",
+    ]);
+  });
+
+  it("rejects unsupported roles and duplicate studio types", () => {
+    const registry = new AtomicStudioRegistry();
+    registry.register(modelStudioRegistration);
+
+    expect(() => registry.register(modelStudioRegistration)).toThrow("already registered");
+    expect(() => registry.register({
+      ...modelStudioRegistration,
+      studioType: "invalid-role",
+      studioId: "studio-invalid",
+      role: "workflow" as "model",
+    })).toThrow("not supported");
   });
 });

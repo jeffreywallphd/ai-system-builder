@@ -5,14 +5,13 @@ import { StudioShellService } from "../services/StudioShellService";
 import { StudioShellPanel } from "../components/studio-shell/StudioShellPanel";
 import { StudioShellValidationIssuesPanel } from "../components/studio-shell/StudioShellValidationIssuesPanel";
 import {
+  type AtomicStudioRegistration,
   StudioShellExtensionRegistry,
   StudioShellExtensionSlots,
   type StudioShellExtensionContext,
   type StudioShellExtensionContribution,
   type StudioShellExtensionSlot,
 } from "../studio-shell/StudioShellExtensions";
-
-const DEFAULT_STUDIO_ID = "studio-shell-main";
 
 function safeParseJson<T>(value: string, fallback: T): T {
   try {
@@ -26,6 +25,7 @@ function safeParseJson<T>(value: string, fallback: T): T {
 }
 
 interface StudioShellPageProps {
+  readonly atomicStudio?: AtomicStudioRegistration;
   readonly extensions?: ReadonlyArray<StudioShellExtensionContribution>;
 }
 
@@ -50,31 +50,39 @@ function renderExtensions(
   );
 }
 
-export default function StudioShellPage({ extensions = [] }: StudioShellPageProps): JSX.Element {
+export default function StudioShellPage({ atomicStudio, extensions = [] }: StudioShellPageProps): JSX.Element {
+  const studioId = atomicStudio?.studioId ?? "studio-shell-main";
+  const defaultDraftTitle = atomicStudio?.defaults.title ?? "Studio Shell Draft";
+  const defaultDraftTags = atomicStudio?.defaults.tags ?? ["studio-shell"];
+  const defaultContent = atomicStudio?.defaults.contentTemplate ?? "{}";
   const service = useMemo(() => new StudioShellService(), []);
   const extensionRegistry = useMemo(() => {
     const registry = new StudioShellExtensionRegistry();
-    registry.registerMany(extensions);
+    registry.registerMany([...(atomicStudio?.extensions ?? []), ...extensions]);
     return registry;
-  }, [extensions]);
+  }, [atomicStudio, extensions]);
   const [snapshot, setSnapshot] = useState<StudioShellSnapshotReadModel | undefined>();
   const [error, setError] = useState<string | undefined>();
   const [validationIssues, setValidationIssues] = useState<ReadonlyArray<StudioShellValidationIssue>>([]);
   const [isBusy, setIsBusy] = useState(false);
-  const [content, setContent] = useState("{}");
-  const [metadataPatchJson, setMetadataPatchJson] = useState('{"title":"Studio Shell Draft","tags":["studio-shell"]}');
-  const [dependenciesJson, setDependenciesJson] = useState('[{"assetId":"asset:seed"}]');
+  const [content, setContent] = useState(defaultContent);
+  const [metadataPatchJson, setMetadataPatchJson] = useState(
+    JSON.stringify(atomicStudio?.defaults.metadataPatch ?? { title: defaultDraftTitle, tags: defaultDraftTags }),
+  );
+  const [dependenciesJson, setDependenciesJson] = useState(
+    JSON.stringify(atomicStudio?.defaults.dependencies ?? [{ assetId: "asset:seed" }]),
+  );
 
   const refreshSnapshot = async () => {
     setIsBusy(true);
     try {
-      const response = await service.loadSnapshot(DEFAULT_STUDIO_ID);
+      const response = await service.loadSnapshot(studioId);
       if (!response.ok) {
         setError(response.error?.message ?? "Failed to load Studio Shell snapshot.");
         return;
       }
       if (!response.data) {
-        const initialized = await service.initializeStudio(DEFAULT_STUDIO_ID, "Studio Shell");
+        const initialized = await service.initializeStudio(studioId, atomicStudio?.displayName ?? "Studio Shell");
         if (!initialized.ok || !initialized.data) {
           setError(initialized.error?.message ?? "Failed to initialize Studio Shell.");
           return;
@@ -96,7 +104,7 @@ export default function StudioShellPage({ extensions = [] }: StudioShellPageProp
 
   useEffect(() => {
     void refreshSnapshot();
-  }, []);
+  }, [studioId]);
 
   const runAndRefresh = async (action: () => Promise<{ ok: boolean; error?: { message: string } }>) => {
     setIsBusy(true);
@@ -117,7 +125,7 @@ export default function StudioShellPage({ extensions = [] }: StudioShellPageProp
   const draftId = snapshot?.draft?.draftId;
 
   const extensionContext: StudioShellExtensionContext = {
-    studioId: DEFAULT_STUDIO_ID,
+    studioId,
     snapshot,
     validationIssues,
     operationError: error,
@@ -136,14 +144,14 @@ export default function StudioShellPage({ extensions = [] }: StudioShellPageProp
       <div className="ui-grid" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "1rem" }}>
         <StudioShellPanel title="Studio/session context" subtitle="Current studio, active session, and draft context.">
           <div className="ui-stack ui-stack--2xs">
-            <div><strong>Studio:</strong> {snapshot?.studioName ?? "-"} ({snapshot?.studioId ?? DEFAULT_STUDIO_ID})</div>
+            <div><strong>Studio:</strong> {snapshot?.studioName ?? "-"} ({snapshot?.studioId ?? studioId})</div>
             <div><strong>Session:</strong> {snapshot?.activeSessionId ?? "-"} ({snapshot?.sessionStatus ?? "n/a"})</div>
             <div><strong>Draft:</strong> {snapshot?.draft?.draftId ?? "-"}</div>
             <div><strong>Revision:</strong> {snapshot?.draft?.revision ?? 0}</div>
           </div>
           <div className="ui-stack ui-stack--xs" style={{ flexDirection: "row" }}>
             <button className="ui-button" disabled={isBusy} onClick={() => { void refreshSnapshot(); }}>Refresh</button>
-            <button className="ui-button" disabled={isBusy} onClick={() => { void runAndRefresh(() => service.startSession(DEFAULT_STUDIO_ID)); }}>Start Session</button>
+            <button className="ui-button" disabled={isBusy} onClick={() => { void runAndRefresh(() => service.startSession(studioId)); }}>Start Session</button>
           </div>
         </StudioShellPanel>
         {renderExtensions(extensionRegistry, StudioShellExtensionSlots.sessionContext, extensionContext)}
@@ -155,21 +163,21 @@ export default function StudioShellPage({ extensions = [] }: StudioShellPageProp
               className="ui-button ui-button--primary"
               disabled={isBusy || !sessionId}
               onClick={() => {
-                if (!sessionId) {
+                    if (!sessionId) {
                   return;
                 }
                 if (!draftId) {
                   void runAndRefresh(() => service.createDraft({
-                    studioId: DEFAULT_STUDIO_ID,
+                    studioId,
                     sessionId,
                     content,
-                    metadata: { title: "Studio Shell Draft", tags: ["studio-shell"] },
+                    metadata: { title: defaultDraftTitle, tags: defaultDraftTags },
                   }));
                   return;
                 }
                 const metadataPatch = safeParseJson<AssetMetadataPatch>(metadataPatchJson, {});
                 void runAndRefresh(() => service.updateDraft({
-                  studioId: DEFAULT_STUDIO_ID,
+                  studioId,
                   sessionId,
                   draftId,
                   content,
@@ -200,7 +208,7 @@ export default function StudioShellPage({ extensions = [] }: StudioShellPageProp
               }
               const dependencies = safeParseJson<Array<{ assetId: string; versionId?: string }>>(dependenciesJson, []);
               void runAndRefresh(() => service.updateDependencies({
-                studioId: DEFAULT_STUDIO_ID,
+                studioId,
                 sessionId,
                 draftId,
                 dependencies,
@@ -227,7 +235,7 @@ export default function StudioShellPage({ extensions = [] }: StudioShellPageProp
                   return;
                 }
                 void runAndRefresh(() => service.transitionLifecycle({
-                  studioId: DEFAULT_STUDIO_ID,
+                  studioId,
                   sessionId,
                   draftId,
                   targetStatus: AssetDraftLifecycleStatuses.validated,
@@ -242,7 +250,7 @@ export default function StudioShellPage({ extensions = [] }: StudioShellPageProp
                   return;
                 }
                 void runAndRefresh(() => service.transitionLifecycle({
-                  studioId: DEFAULT_STUDIO_ID,
+                  studioId,
                   sessionId,
                   draftId,
                   targetStatus: AssetDraftLifecycleStatuses.draft,
@@ -257,7 +265,7 @@ export default function StudioShellPage({ extensions = [] }: StudioShellPageProp
                   return;
                 }
                 void runAndRefresh(() => service.publishVersion({
-                  studioId: DEFAULT_STUDIO_ID,
+                  studioId,
                   sessionId,
                   draftId,
                 }));
@@ -271,7 +279,7 @@ export default function StudioShellPage({ extensions = [] }: StudioShellPageProp
                   return;
                 }
                 void runAndRefresh(async () => {
-                  const response = await service.validateDraft(DEFAULT_STUDIO_ID, draftId);
+                  const response = await service.validateDraft(studioId, draftId);
                   if (response.ok && response.data) {
                     setValidationIssues(response.data);
                   }
