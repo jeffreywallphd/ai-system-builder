@@ -198,6 +198,13 @@ The studio shell now has a bounded inner-layer model and application orchestrati
 - Rehydration paths normalize persisted metadata/dependencies and reconstruct studio/session/draft/version state through existing domain normalization seams so taxonomy/contract/provenance/dependency/lifecycle/version invariants stay bounded to inner-layer rules.
 - Desktop composition now uses the SQLite repository for studio-shell IPC operations (`electron/main/main.ts`) so studio/session/draft/version state survives process restarts.
 
+## Direction 5 update: Composite dependency semantics + behavior enforcement (stories 3.15–3.16)
+
+- Shared studio-shell dependency validation now performs version-aware identity checks for pinned dependencies (`assetId` must match the resolved `versionId` owner when resolvable through repository/version seams).
+- Composite draft validation now enforces bounded dependency semantic-role compatibility when referenced version metadata includes taxonomy descriptors (for implemented composite studios: workflow, context-bundle, dataset-pipeline, training-recipe, tool-chain).
+- Composite publish-time enforcement now requires at least one dependency and requires composite dependencies to be version-pinned, reusing the existing shared studio-shell publish-consistency seam rather than adding studio-specific publish gates.
+- Existing atomic publish enforcement behavior remains unchanged.
+
 ## Direction 5 update: Studio shell extension interface (story 1.12)
 
 - Studio shell now includes a bounded typed extension contract for renderer panel contributions (`ui/studio-shell/StudioShellExtensions.ts`) with explicit slot targeting, ordering, and duplicate-id rejection.
