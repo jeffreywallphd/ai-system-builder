@@ -1,5 +1,6 @@
 import { createModelStudioTaxonomy, ModelStudioIdentity } from "../../../domain/model-studio/ModelStudioDomain";
 import type { AtomicStudioRegistration } from "../StudioShellExtensions";
+import { createAtomicStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
 
 export const modelStudioRegistration: AtomicStudioRegistration = Object.freeze({
   studioType: ModelStudioIdentity.studioType,
@@ -10,16 +11,14 @@ export const modelStudioRegistration: AtomicStudioRegistration = Object.freeze({
     title: "Model Asset Draft",
     tags: Object.freeze(["model", "studio-shell"]),
     contentTemplate: JSON.stringify({ modelSpec: { provider: "", modelId: "", parameters: {} } }, null, 2),
-    metadataPatch: {
+    metadataPatch: createAtomicStudioMetadataPatch({
       title: "Model Asset Draft",
       tags: ["model", "studio-shell"],
       summary: "Atomic model asset drafted through Model Studio.",
       taxonomy: createModelStudioTaxonomy(),
-      provenance: {
-        sourceType: "generated",
-        sourceLabel: ModelStudioIdentity.studioType,
-      },
-    },
+      sourceLabel: ModelStudioIdentity.studioType,
+    }),
+    dependencies: Object.freeze([]),
   },
   extensions: Object.freeze([
     {

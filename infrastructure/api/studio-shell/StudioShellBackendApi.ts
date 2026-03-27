@@ -1,7 +1,10 @@
 import type { AssetDraftLifecycleStatus, AssetMetadata, AssetMetadataPatch } from "../../../domain/studio-shell/StudioShellDomain";
-import { AssetDraftLifecycleStatuses } from "../../../domain/studio-shell/StudioShellDomain";
 import type { IStudioShellRepository } from "../../../application/ports/interfaces/IStudioShellRepository";
 import { DefaultStudioShellApplicationService } from "../../../application/studio-shell/DefaultStudioShellApplicationService";
+import {
+  buildStudioShellValidationIssues,
+  type StudioShellValidationIssue,
+} from "../../../application/studio-shell/StudioShellValidation";
 import type {
   CreateAssetDraftCommand,
   PublishAssetDraftVersionCommand,
@@ -14,21 +17,6 @@ import {
   StudioShellErrorCodes,
   StudioShellInvalidRequestError,
 } from "../../../application/studio-shell/StudioShellApplicationErrors";
-
-export interface StudioShellValidationIssue {
-  readonly code:
-    | "taxonomy-missing"
-    | "contract-missing"
-    | "provenance-missing"
-    | "dependency-version-not-found"
-    | "dependency-version-unpinned"
-    | "lifecycle-not-publish-ready"
-    | "version-history-empty";
-  readonly section: "taxonomy" | "contract" | "provenance" | "dependencies" | "lifecycle" | "publish-version";
-  readonly severity: "warning" | "error";
-  readonly message: string;
-  readonly path?: string;
-}
 
 export interface StudioShellApiError {
   readonly code: "not-found" | "conflict" | "invalid-request" | "invalid-lifecycle-transition" | "validation-failed" | "internal";
@@ -161,7 +149,11 @@ export class StudioShellBackendApi {
       ? await this.repository.listAssetVersionsByAssetId(activeDraft.assetId)
       : Object.freeze([]);
     const validationIssues = activeDraft
-      ? await this.buildValidationIssues(activeDraft, versions.map((entry) => entry.versionId))
+      ? await buildStudioShellValidationIssues({
+        draft: activeDraft,
+        knownVersionIds: versions.map((entry) => entry.versionId),
+        versionExists: async (versionId) => Boolean(await this.repository.getAssetVersion(versionId)),
+      })
       : Object.freeze([]);
 
     return Object.freeze({
@@ -196,82 +188,6 @@ export class StudioShellBackendApi {
       ),
       validationIssues,
     });
-  }
-
-  private async buildValidationIssues(
-    draft: NonNullable<StudioShellSnapshotReadModel["draft"]>,
-    knownVersionIds: ReadonlyArray<string>,
-  ): Promise<ReadonlyArray<StudioShellValidationIssue>> {
-    const issues: StudioShellValidationIssue[] = [];
-
-    if (!draft.metadata.taxonomy) {
-      issues.push({
-        code: "taxonomy-missing",
-        section: "taxonomy",
-        severity: "warning",
-        message: "Draft taxonomy is missing. Add taxonomy to support downstream composition projection.",
-      });
-    }
-    if (!draft.metadata.contract) {
-      issues.push({
-        code: "contract-missing",
-        section: "contract",
-        severity: "warning",
-        message: "Draft contract is missing. Add contract metadata before publishing integrations.",
-      });
-    }
-    if (!draft.metadata.provenance) {
-      issues.push({
-        code: "provenance-missing",
-        section: "provenance",
-        severity: "warning",
-        message: "Draft provenance is missing. Add creator/source context for lineage explainability.",
-      });
-    }
-
-    for (const [index, dependency] of draft.dependencies.entries()) {
-      if (!dependency.versionId) {
-        issues.push({
-          code: "dependency-version-unpinned",
-          section: "dependencies",
-          severity: "warning",
-          message: `Dependency '${dependency.assetId}' is not pinned to a version.`,
-          path: `dependencies[${index}]`,
-        });
-        continue;
-      }
-      const version = await this.repository.getAssetVersion(dependency.versionId);
-      const versionExists = Boolean(version) || knownVersionIds.includes(dependency.versionId);
-      if (!versionExists) {
-        issues.push({
-          code: "dependency-version-not-found",
-          section: "dependencies",
-          severity: "error",
-          message: `Dependency version '${dependency.versionId}' was not found.`,
-          path: `dependencies[${index}].versionId`,
-        });
-      }
-    }
-
-    if (draft.lifecycleStatus !== AssetDraftLifecycleStatuses.validated && draft.lifecycleStatus !== AssetDraftLifecycleStatuses.published) {
-      issues.push({
-        code: "lifecycle-not-publish-ready",
-        section: "lifecycle",
-        severity: "error",
-        message: "Draft lifecycle must be 'validated' before publish/version operations.",
-      });
-    }
-
-    if (draft.publishedVersionIds.length === 0) {
-      issues.push({
-        code: "version-history-empty",
-        section: "publish-version",
-        severity: "warning",
-        message: "No published versions exist yet for this draft.",
-      });
-    }
-
-    return Object.freeze(issues);
   }
 
   private async wrap<T>(action: () => Promise<T>): Promise<StudioShellApiResponse<T>> {

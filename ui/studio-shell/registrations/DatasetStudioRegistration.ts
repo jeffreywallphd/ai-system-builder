@@ -1,5 +1,6 @@
 import { createDatasetStudioTaxonomy, DatasetStudioIdentity } from "../../../domain/dataset-studio/DatasetStudioDomain";
 import type { AtomicStudioRegistration } from "../StudioShellExtensions";
+import { createAtomicStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
 
 export const datasetStudioRegistration: AtomicStudioRegistration = Object.freeze({
   studioType: DatasetStudioIdentity.studioType,
@@ -10,16 +11,14 @@ export const datasetStudioRegistration: AtomicStudioRegistration = Object.freeze
     title: "Dataset Asset Draft",
     tags: Object.freeze(["dataset", "studio-shell"]),
     contentTemplate: JSON.stringify({ datasetSpec: { format: "jsonl", schema: {}, source: "" } }, null, 2),
-    metadataPatch: {
+    metadataPatch: createAtomicStudioMetadataPatch({
       title: "Dataset Asset Draft",
       tags: ["dataset", "studio-shell"],
       summary: "Atomic dataset asset drafted through Dataset Studio.",
       taxonomy: createDatasetStudioTaxonomy(),
-      provenance: {
-        sourceType: "generated",
-        sourceLabel: DatasetStudioIdentity.studioType,
-      },
-    },
+      sourceLabel: DatasetStudioIdentity.studioType,
+    }),
+    dependencies: Object.freeze([]),
   },
   extensions: Object.freeze([
     {

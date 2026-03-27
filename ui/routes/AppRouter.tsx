@@ -23,6 +23,7 @@ import AgentStudioPage from "../pages/AgentStudioPage";
 import StudioShellPage from "../pages/StudioShellPage";
 import ModelStudioPage from "../pages/ModelStudioPage";
 import DatasetStudioPage from "../pages/DatasetStudioPage";
+import ToolStudioPage from "../pages/ToolStudioPage";
 import ProtectedRoute from "./ProtectedRoute";
 import { ROUTE_PATHS } from "./RouteConfig";
 
@@ -63,6 +64,7 @@ export default function AppRouter({
           { path: ROUTE_PATHS.studioShell, element: <StudioShellPage /> },
           { path: ROUTE_PATHS.modelStudio, element: <ModelStudioPage /> },
           { path: ROUTE_PATHS.datasetStudio, element: <DatasetStudioPage /> },
+          { path: ROUTE_PATHS.toolStudio, element: <ToolStudioPage /> },
           { path: ROUTE_PATHS.settings, element: <SettingsPage /> },
         ],
       },

@@ -98,7 +98,7 @@ export default function StudioShellPage({ atomicStudio, extensions = [] }: Studi
     JSON.stringify(atomicStudio?.defaults.metadataPatch ?? { title: defaultDraftTitle, tags: defaultDraftTags }),
   );
   const [dependenciesJson, setDependenciesJson] = useState(
-    JSON.stringify(atomicStudio?.defaults.dependencies ?? [{ assetId: "asset:seed" }]),
+    JSON.stringify(atomicStudio?.defaults.dependencies ?? []),
   );
 
   const refreshSnapshot = async () => {
