@@ -174,4 +174,63 @@ describe("StudioShellBackendApi", () => {
     expect(published.data?.draft?.lifecycleStatus).toBe(AssetDraftLifecycleStatuses.published);
   });
 
+  it("supports composite context-bundle drafts over the same shared validation/lifecycle/publish seams", async () => {
+    const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
+    const initialized = await api.initializeStudio("studio-context-bundles", "Context Bundle Studio");
+    const sessionId = initialized.data!.activeSessionId!;
+
+    const created = await api.createDraft({
+      studioId: "studio-context-bundles",
+      sessionId,
+      content: "{\"contextBundleSpec\":{\"packageRefs\":[],\"recipeRefs\":[]}}",
+      metadata: {
+        title: "context-bundle-draft",
+        tags: ["context-bundle", "composite"],
+        taxonomy: {
+          structuralKind: "composite",
+          semanticRole: "context-bundle",
+          behaviorKind: "deterministic",
+        },
+        contract: {
+          version: "1.0.0",
+          input: { kind: "json-schema" },
+          output: { kind: "text" },
+        },
+        provenance: {
+          sourceType: "generated",
+          sourceLabel: "context-bundle-studio",
+        },
+      },
+      dependencies: [],
+    });
+
+    expect(created.ok).toBeTrue();
+    expect(created.data?.validationIssues.some((issue) => issue.code === "composite-dependency-recommended")).toBeTrue();
+
+    const draftId = created.data!.draft!.draftId;
+    await api.updateDependencies({
+      studioId: "studio-context-bundles",
+      sessionId,
+      draftId,
+      dependencies: [{ assetId: "asset:context-recipe", versionId: "asset:context-recipe:v1" }],
+    });
+
+    const validated = await api.transitionLifecycle({
+      studioId: "studio-context-bundles",
+      sessionId,
+      draftId,
+      targetStatus: AssetDraftLifecycleStatuses.validated,
+    });
+    expect(validated.ok).toBeTrue();
+
+    const published = await api.publishVersion({
+      studioId: "studio-context-bundles",
+      sessionId,
+      draftId,
+      versionId: "asset:studio-context-bundles:v1",
+    });
+    expect(published.ok).toBeTrue();
+    expect(published.data?.draft?.lifecycleStatus).toBe(AssetDraftLifecycleStatuses.published);
+  });
+
 });

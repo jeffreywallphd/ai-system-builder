@@ -542,3 +542,15 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
 - Workflow Studio now integrates through the same shared shell renderer/route seam (`ui/pages/WorkflowStudioPage.tsx` + `ui/studio-shell/registrations/WorkflowStudioRegistration.ts` + `/studio-shell/workflow` route wiring) instead of a separate workflow UI architecture.
 - Workflow registration contributes bounded workflow-specific guidance/metadata slot panels while shared shell surfaces remain authoritative for draft/session context, taxonomy/contract/provenance/dependencies state, lifecycle transitions, validation display, and publish/version operations.
 - Renderer-service integration coverage now includes a workflow composite-orchestrator scenario over the real shared path (`StudioShellService` -> desktop bridge -> `StudioShellBackendApi` -> `DefaultStudioShellApplicationService` -> SQLite repository) in `ui/services/tests/StudioShellService.integration.test.ts`.
+
+## Direction 5 update: Context Bundle studio domain + application slice (story 3.7)
+
+- Context Bundle Studio now has a thin bounded inner-layer domain helper (`domain/context-bundle-studio/ContextBundleStudioDomain.ts`) for specialized composite input-preparer authoring with taxonomy `composite/context-bundle/{none|deterministic}` and generated provenance defaults.
+- A bounded application orchestrator (`application/context-bundle-studio/ContextBundleStudioApplicationService.ts`) reuses `StudioShellApplicationService` for initialize/create/publish lifecycle instead of introducing context-bundle-specific create/update/publish infrastructure.
+- Publish gating now reuses shared composite enforcement (`assertCompositeStudioDraftPublishConsistency`) so context-bundle semantic-role and behavior invariants plus taxonomy-driven contract derivability remain backend/application-authoritative.
+
+## Direction 5 update: Context Bundle studio UI integration (story 3.8)
+
+- Context Bundle Studio now integrates through the same shared shell renderer/route seam (`ui/pages/ContextBundleStudioPage.tsx` + `ui/studio-shell/registrations/ContextBundleStudioRegistration.ts` + `/studio-shell/context-bundle` route wiring) instead of a separate context-bundle UI architecture.
+- Context-bundle registration contributes bounded context-specific guidance/metadata slot panels while shared shell surfaces remain authoritative for draft/session context, taxonomy/contract/provenance/dependencies state, lifecycle transitions, validation display, and publish/version operations.
+- Renderer-service integration coverage now includes a context-bundle composite input-preparer scenario over the real shared path (`StudioShellService` -> desktop bridge -> `StudioShellBackendApi` -> `DefaultStudioShellApplicationService` -> SQLite repository) in `ui/services/tests/StudioShellService.integration.test.ts`.

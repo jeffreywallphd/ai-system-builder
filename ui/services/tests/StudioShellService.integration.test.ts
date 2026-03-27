@@ -413,6 +413,104 @@ describe("StudioShellService integration", () => {
     reopenedRepository.dispose();
   });
 
+  it("supports Context Bundle Studio composite input-preparer flow over the same shell/persistence/publish seams", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-context-bundle-studio-service-"));
+    createdRoots.push(root);
+    const databasePath = path.join(root, "context-bundle-studio.sqlite");
+    const repository = new SqliteStudioShellRepository(databasePath);
+    const backendApi = new StudioShellBackendApi(repository);
+    installBridge(backendApi);
+
+    const service = new StudioShellService();
+    const contractResolver = new CompositionAssetContractResolver();
+    const initialized = await service.initializeStudio("studio-context-bundles", "Context Bundle Studio");
+    expect(initialized.ok).toBeTrue();
+    const sessionId = initialized.data?.activeSessionId;
+    expect(sessionId).toBeDefined();
+
+    const created = await service.createDraft({
+      studioId: "studio-context-bundles",
+      sessionId: sessionId!,
+      content: "{\"contextBundleSpec\":{\"packageRefs\":[\"context-package:customer-profile\"],\"recipeRefs\":[\"context-recipe:retrieval-bounded\"],\"assemblyPolicy\":\"merge\"}}",
+      metadata: {
+        title: "Context Bundle Asset Draft",
+        tags: ["context-bundle", "studio-shell", "composite", "input-preparer"],
+        taxonomy: {
+          structuralKind: "composite",
+          semanticRole: "context-bundle",
+          behaviorKind: "deterministic",
+        },
+        contract: contractResolver.resolveContractForTaxonomy({
+          structuralKind: "composite",
+          semanticRole: "context-bundle",
+          behaviorKind: "deterministic",
+        }),
+        provenance: {
+          sourceType: "generated",
+          sourceLabel: "context-bundle-studio",
+        },
+      },
+      dependencies: [{ assetId: "asset:context-package", versionId: "asset:context-package:v2" }],
+    });
+    expect(created.ok).toBeTrue();
+    const draftId = created.data?.draft?.draftId;
+    expect(draftId).toBeDefined();
+    expect(created.data?.validationIssues.some((entry) => entry.code === "lifecycle-not-publish-ready")).toBeTrue();
+
+    const validated = await service.transitionLifecycle({
+      studioId: "studio-context-bundles",
+      sessionId: sessionId!,
+      draftId: draftId!,
+      targetStatus: AssetDraftLifecycleStatuses.validated,
+    });
+    expect(validated.ok).toBeTrue();
+
+    const published = await service.publishVersion({
+      studioId: "studio-context-bundles",
+      sessionId: sessionId!,
+      draftId: draftId!,
+      versionId: "asset:studio-context-bundles:v1",
+      versionLabel: "v1",
+      createdBy: "context-author",
+    });
+    expect(published.ok).toBeTrue();
+    expect(published.data?.draft?.metadata.taxonomy).toEqual({
+      structuralKind: "composite",
+      semanticRole: "context-bundle",
+      behaviorKind: "deterministic",
+    });
+    expect(published.data?.draft?.metadata.contract).toEqual(contractResolver.resolveContractForTaxonomy({
+      structuralKind: "composite",
+      semanticRole: "context-bundle",
+      behaviorKind: "deterministic",
+    }));
+    expect(published.data?.draft?.lifecycleStatus).toBe(AssetDraftLifecycleStatuses.published);
+    expect(published.data?.versions.map((entry) => entry.versionId)).toEqual(["asset:studio-context-bundles:v1"]);
+
+    repository.dispose();
+
+    const reopenedRepository = new SqliteStudioShellRepository(databasePath);
+    const reopenedApi = new StudioShellBackendApi(reopenedRepository);
+    installBridge(reopenedApi);
+
+    const snapshot = await service.loadSnapshot("studio-context-bundles");
+    expect(snapshot.ok).toBeTrue();
+    expect(snapshot.data?.draft?.metadata.taxonomy).toEqual({
+      structuralKind: "composite",
+      semanticRole: "context-bundle",
+      behaviorKind: "deterministic",
+    });
+    expect(snapshot.data?.draft?.metadata.contract).toEqual(contractResolver.resolveContractForTaxonomy({
+      structuralKind: "composite",
+      semanticRole: "context-bundle",
+      behaviorKind: "deterministic",
+    }));
+    expect(snapshot.data?.draft?.lifecycleStatus).toBe(AssetDraftLifecycleStatuses.published);
+    expect(snapshot.data?.versions.map((entry) => entry.versionId)).toEqual(["asset:studio-context-bundles:v1"]);
+
+    reopenedRepository.dispose();
+  });
+
   it("supports Dataset Studio style flow over the same shell/persistence/publish seams", async () => {
     const root = mkdtempSync(path.join(tmpdir(), "loom-dataset-studio-service-"));
     createdRoots.push(root);
