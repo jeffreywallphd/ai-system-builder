@@ -19,6 +19,8 @@ export interface RegistryDependencyEndpointQuery {
   readonly versionId?: string;
 }
 
+export interface RegistryAssetDetailQuery extends RegistryDependencyEndpointQuery {}
+
 export interface RegistryTraversalEndpointQuery extends RegistryDependencyEndpointQuery {
   readonly maxDepth?: number;
   readonly maxNodes?: number;
@@ -71,6 +73,30 @@ export class RegistryBackendApi {
       }
       return true;
     })));
+  }
+
+  public async getAssetDetail(query: RegistryAssetDetailQuery): Promise<RegistryApiResponse<RegistryAsset>> {
+    return this.wrap(async () => {
+      const versionId = query.versionId?.trim();
+      if (versionId) {
+        const byVersion = await this.registryQueryService.getAssetByVersionId(versionId);
+        if (!byVersion) {
+          throw new Error("not-found:Asset or version was not found.");
+        }
+        return byVersion;
+      }
+
+      const assetId = query.assetId?.trim();
+      if (!assetId) {
+        throw new Error("invalid-request:assetId or versionId is required.");
+      }
+
+      const asset = await this.registryQueryService.getAssetByAssetId(assetId);
+      if (!asset) {
+        throw new Error("not-found:Asset or version was not found.");
+      }
+      return asset;
+    });
   }
 
   public async getDependencies(query: RegistryDependencyEndpointQuery) {

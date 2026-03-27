@@ -16,6 +16,7 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain('key: "context"');
     expect(source).toContain('agentStudio: "/agent-studio"');
     expect(source).toContain('registry: "/studio-shell/registry"');
+    expect(source).toContain('registryAssetDetail: "/studio-shell/registry/assets/:assetId"');
     expect(source).toContain('workflowStudio: "/studio-shell/workflow"');
     expect(source).toContain('contextBundleStudio: "/studio-shell/context-bundle"');
     expect(source).toContain('datasetPipelineStudio: "/studio-shell/dataset-pipeline"');
@@ -28,6 +29,7 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain('configProfileStudio: "/studio-shell/config-profile"');
     expect(source).toContain('key: "agent-studio"');
     expect(source).toContain('key: "registry"');
+    expect(source).toContain('key: "registry-asset-detail"');
     expect(source).toContain('key: "workflow-studio"');
     expect(source).toContain('key: "context-bundle-studio"');
     expect(source).toContain('key: "dataset-pipeline-studio"');
@@ -63,6 +65,7 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain("path: ROUTE_PATHS.agentStudio");
     expect(source).toContain("path: ROUTE_PATHS.studioShell");
     expect(source).toContain("path: ROUTE_PATHS.registry");
+    expect(source).toContain("path: ROUTE_PATHS.registryAssetDetail");
     expect(source).toContain("path: ROUTE_PATHS.workflowStudio");
     expect(source).toContain("path: ROUTE_PATHS.contextBundleStudio");
     expect(source).toContain("path: ROUTE_PATHS.datasetPipelineStudio");

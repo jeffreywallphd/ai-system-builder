@@ -12,5 +12,6 @@ describe("RegistryPage", () => {
     expect(source).toContain("AssetList");
     expect(source).toContain("service.filterAssets");
     expect(source).toContain("Showing {assets.length} result(s)");
+    expect(readSource("ui/components/registry/AssetListItem.tsx")).toContain("View details");
   });
 });

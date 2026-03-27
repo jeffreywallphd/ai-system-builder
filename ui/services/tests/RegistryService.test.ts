@@ -43,10 +43,11 @@ describe("RegistryService", () => {
             }],
           });
         },
-        getDependencies: async () => JSON.stringify({ ok: true, data: {} }),
-        getDependents: async () => JSON.stringify({ ok: true, data: {} }),
-        traverseUpstream: async () => JSON.stringify({ ok: true, data: {} }),
-        traverseDownstream: async () => JSON.stringify({ ok: true, data: {} }),
+        getAssetDetail: async () => JSON.stringify({ ok: true, data: { assetId: "asset:workflow" } }),
+        getDependencies: async () => JSON.stringify({ ok: true, data: { nodes: [], edges: [] } }),
+        getDependents: async () => JSON.stringify({ ok: true, data: { nodes: [], edges: [] } }),
+        traverseUpstream: async () => JSON.stringify({ ok: true, data: { rootVersionId: "", direction: "upstream", maxDepth: 1, graph: { nodes: [], edges: [] }, levels: [] } }),
+        traverseDownstream: async () => JSON.stringify({ ok: true, data: { rootVersionId: "", direction: "downstream", maxDepth: 1, graph: { nodes: [], edges: [] }, levels: [] } }),
       },
     } as any;
 

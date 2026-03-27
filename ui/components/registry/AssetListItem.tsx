@@ -1,7 +1,13 @@
+import { Link } from "react-router-dom";
 import type { RegistryAsset } from "../../../domain/asset-registry/RegistryAsset";
+import { ROUTE_PATHS } from "../../routes/RouteConfig";
 
 export interface AssetListItemProps {
   readonly asset: RegistryAsset;
+}
+
+function toAssetDetailPath(assetId: string): string {
+  return ROUTE_PATHS.registryAssetDetail.replace(":assetId", encodeURIComponent(assetId));
 }
 
 export function AssetListItem({ asset }: AssetListItemProps): JSX.Element {
@@ -20,6 +26,11 @@ export function AssetListItem({ asset }: AssetListItemProps): JSX.Element {
         </div>
         <div className="ui-text-small ui-text-secondary">
           Latest version: {asset.versionId ?? "unavailable"} · Dependencies: {asset.dependencies.length}
+        </div>
+        <div>
+          <Link to={toAssetDetailPath(asset.assetId)} className="ui-button ui-button--ghost ui-button--small">
+            View details
+          </Link>
         </div>
       </div>
     </article>
