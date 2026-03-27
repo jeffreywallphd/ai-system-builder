@@ -60,6 +60,65 @@ function installBridge(api: StudioShellBackendApi): void {
 }
 
 describe("StudioShellService integration", () => {
+
+  it("supports Dataset Studio style flow over the same shell/persistence/publish seams", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-dataset-studio-service-"));
+    createdRoots.push(root);
+    const databasePath = path.join(root, "dataset-studio.sqlite");
+    const repository = new SqliteStudioShellRepository(databasePath);
+    const backendApi = new StudioShellBackendApi(repository);
+    installBridge(backendApi);
+
+    const service = new StudioShellService();
+    const initialized = await service.initializeStudio("studio-datasets", "Dataset Studio");
+    expect(initialized.ok).toBeTrue();
+    const sessionId = initialized.data?.activeSessionId;
+
+    const created = await service.createDraft({
+      studioId: "studio-datasets",
+      sessionId: sessionId!,
+      content: '{"datasetSpec":{"format":"jsonl"}}',
+      metadata: {
+        title: "Dataset Asset Draft",
+        tags: ["dataset", "studio-shell"],
+        taxonomy: {
+          structuralKind: "atomic",
+          semanticRole: "dataset",
+          behaviorKind: "none",
+        },
+        provenance: {
+          sourceType: "generated",
+          sourceLabel: "dataset-studio",
+        },
+      },
+      dependencies: [{ assetId: "asset:seed-dataset", versionId: "asset:seed-dataset:v1" }],
+    });
+    expect(created.ok).toBeTrue();
+
+    const draftId = created.data?.draft?.draftId;
+    await service.transitionLifecycle({
+      studioId: "studio-datasets",
+      sessionId: sessionId!,
+      draftId: draftId!,
+      targetStatus: AssetDraftLifecycleStatuses.validated,
+    });
+
+    const published = await service.publishVersion({
+      studioId: "studio-datasets",
+      sessionId: sessionId!,
+      draftId: draftId!,
+      versionId: "asset:studio-datasets:v1",
+      versionLabel: "v1",
+      createdBy: "dataset-curator",
+    });
+
+    expect(published.ok).toBeTrue();
+    expect(published.data?.draft?.metadata.taxonomy?.semanticRole).toBe("dataset");
+    expect(published.data?.draft?.lifecycleStatus).toBe(AssetDraftLifecycleStatuses.published);
+    expect(published.data?.versions.map((entry) => entry.versionId)).toEqual(["asset:studio-datasets:v1"]);
+
+    repository.dispose();
+  });
   it("executes the Studio Shell vertical flow through bridge -> backend -> application -> sqlite persistence", async () => {
     const root = mkdtempSync(path.join(tmpdir(), "loom-studio-shell-service-"));
     createdRoots.push(root);

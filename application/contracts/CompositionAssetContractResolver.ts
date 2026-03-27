@@ -79,6 +79,27 @@ function defaultTaxonomyContract(descriptor: CompositionTaxonomyDescriptor): Ass
     });
   }
 
+  if (semanticRole === TaxonomySemanticRoles.tool) {
+    return createAssetContractDescriptor({
+      version: "1.0.0",
+      input: {
+        kind: AssetContractShapeKinds.jsonSchema,
+        description: "Tool definition payload for atomic tool assets (endpoint/binding and invocation schema metadata).",
+      },
+      output: {
+        kind: AssetContractShapeKinds.jsonSchema,
+        description: "Versioned tool descriptor including callable contract and runtime binding metadata.",
+      },
+      parameters: [
+        parameter("providerKind", true, "Tool provider kind (for example mcp/local/api).", "string", "mcp-or-api"),
+      ],
+      execution: {
+        invocationMode: "async",
+        sideEffects: "external",
+      },
+    });
+  }
+
   if (semanticRole === TaxonomySemanticRoles.dataset) {
     return createAssetContractDescriptor({
       version: "1.0.0",

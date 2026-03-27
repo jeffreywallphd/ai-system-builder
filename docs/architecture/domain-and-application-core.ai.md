@@ -438,3 +438,15 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
   - API authoring read responses are now explicitly hardened as `{ agent, taxonomy, contract? }`, with taxonomy classified via `CompositionTaxonomyClassifier` and contract projected via `CompositionAssetContractResolver` so transport contracts reuse canonical composition seams.
   - backend authoring coverage now includes SQLite-backed integration tests for CRUD + goal/policy/tool/memory/strategy updates and API mapping/error-path tests so real persistence seams are exercised directly.
 - No UI/runtime bypass was introduced; transport can remain thin over these use cases.
+
+## Direction 5 update: Dataset studio UI integration (story 2.9)
+
+- Dataset Studio now integrates through the shared shell renderer with registration-driven wiring (`ui/pages/DatasetStudioPage.tsx` + `ui/studio-shell/registrations/DatasetStudioRegistration.ts`) instead of introducing a second dataset page architecture.
+- Dataset registration contributes bounded dataset-specific panel guidance (`draft-authoring`, `metadata`) while shared shell surfaces remain authoritative for session/draft context, taxonomy/contract/provenance/dependencies, validation, lifecycle, and publish/version state.
+- Dataset Studio flow now has an explicit renderer-service integration test over the real shell backend/persistence path (`ui/services/tests/StudioShellService.integration.test.ts`) using dataset-studio studio ids and taxonomy semantics.
+
+## Direction 5 update: Tool studio domain + application slice (story 2.10)
+
+- Tool Studio now has a thin inner-layer domain helper (`domain/tool-studio/ToolStudioDomain.ts`) for atomic tool authoring with taxonomy `atomic/tool/(conditional|deterministic)` and generated provenance defaults.
+- A bounded application orchestrator (`application/tool-studio/ToolStudioApplicationService.ts`) mirrors model/dataset patterns and reuses `StudioShellApplicationService` for initialize/create/publish lifecycle instead of duplicating shell orchestration.
+- Shared taxonomy-driven contract projection now includes atomic tool defaults in `CompositionAssetContractResolver.resolveContractForTaxonomy`, aligning Tool Studio draft metadata with shared contract/provenance/version semantics and MCP/API-facing provider metadata posture.
