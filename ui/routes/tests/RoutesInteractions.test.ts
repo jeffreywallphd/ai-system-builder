@@ -19,6 +19,8 @@ describe("ui/routes interactions", () => {
     expect(appRouterSource).toContain("element: <AgentStudioPage />");
     expect(appRouterSource).toContain("element: <StudioShellPage />");
     expect(appRouterSource).toContain("element: <WorkflowStudioPage />");
+    expect(appRouterSource).toContain("element: <ContextBundleStudioPage />");
+    expect(appRouterSource).toContain("element: <DatasetPipelineStudioPage />");
     expect(appRouterSource).toContain("element: <ModelStudioPage />");
     expect(appRouterSource).toContain("element: <DatasetStudioPage />");
     expect(appRouterSource).toContain("element: <ToolStudioPage />");

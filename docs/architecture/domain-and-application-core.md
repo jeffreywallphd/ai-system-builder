@@ -554,3 +554,15 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
 - Context Bundle Studio now integrates through the same shared shell renderer/route seam (`ui/pages/ContextBundleStudioPage.tsx` + `ui/studio-shell/registrations/ContextBundleStudioRegistration.ts` + `/studio-shell/context-bundle` route wiring) instead of a separate context-bundle UI architecture.
 - Context-bundle registration contributes bounded context-specific guidance/metadata slot panels while shared shell surfaces remain authoritative for draft/session context, taxonomy/contract/provenance/dependencies state, lifecycle transitions, validation display, and publish/version operations.
 - Renderer-service integration coverage now includes a context-bundle composite input-preparer scenario over the real shared path (`StudioShellService` -> desktop bridge -> `StudioShellBackendApi` -> `DefaultStudioShellApplicationService` -> SQLite repository) in `ui/services/tests/StudioShellService.integration.test.ts`.
+
+## Direction 5 update: Dataset Pipeline studio domain + application slice (story 3.9)
+
+- Dataset Pipeline Studio now has a thin bounded inner-layer domain helper (`domain/dataset-pipeline-studio/DatasetPipelineStudioDomain.ts`) for composite dataset-pipeline authoring with taxonomy `composite/dataset-pipeline/{deterministic|iterative}` and generated provenance defaults.
+- A bounded application orchestrator (`application/dataset-pipeline-studio/DatasetPipelineStudioApplicationService.ts`) reuses `StudioShellApplicationService` for initialize/create/publish lifecycle instead of introducing dataset-pipeline-specific infrastructure.
+- Publish gating now reuses shared composite enforcement (`assertCompositeStudioDraftPublishConsistency`) so dataset-pipeline semantic-role and behavior invariants plus taxonomy-driven contract derivability remain backend/application-authoritative.
+- Dataset-pipeline draft guidance and tests intentionally reuse existing data-preparation vocabulary (source ingestion, data cleaning, dataset transformation, data validation) instead of creating a parallel pipeline ontology.
+
+## Direction 5 update: Dataset Pipeline studio UI integration (story 3.10)
+
+- Dataset Pipeline Studio now integrates through the same shared shell renderer/route seam (`ui/pages/DatasetPipelineStudioPage.tsx` + `ui/studio-shell/registrations/DatasetPipelineStudioRegistration.ts` + `/studio-shell/dataset-pipeline` route wiring) instead of a separate dataset-pipeline UI architecture.
+- Dataset-pipeline registration contributes bounded dataset-pipeline-specific guidance/metadata slot panels while shared shell surfaces remain authoritative for draft/session context, taxonomy/contract/provenance/dependencies state, lifecycle transitions, validation display, and publish/version operations.
