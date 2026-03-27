@@ -60,6 +60,71 @@ function installBridge(api: StudioShellBackendApi): void {
 }
 
 describe("StudioShellService integration", () => {
+  it("supports Tool Studio style flow over the same shell/persistence/publish seams", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-tool-studio-service-"));
+    createdRoots.push(root);
+    const databasePath = path.join(root, "tool-studio.sqlite");
+    const repository = new SqliteStudioShellRepository(databasePath);
+    const backendApi = new StudioShellBackendApi(repository);
+    installBridge(backendApi);
+
+    const service = new StudioShellService();
+    const initialized = await service.initializeStudio("studio-tools", "Tool Studio");
+    expect(initialized.ok).toBeTrue();
+    const sessionId = initialized.data?.activeSessionId;
+
+    const created = await service.createDraft({
+      studioId: "studio-tools",
+      sessionId: sessionId!,
+      content: '{"toolSpec":{"providerKind":"mcp","serverId":"search","operationId":"web.search"}}',
+      metadata: {
+        title: "Tool Asset Draft",
+        tags: ["tool", "studio-shell", "mcp"],
+        taxonomy: {
+          structuralKind: "atomic",
+          semanticRole: "tool",
+          behaviorKind: "conditional",
+        },
+        contract: {
+          version: "1.0.0",
+          input: { kind: "json-schema" },
+          output: { kind: "json-schema" },
+          parameters: [{ id: "providerKind", required: true, defaultValue: "mcp-or-api" }],
+        },
+        provenance: {
+          sourceType: "generated",
+          sourceLabel: "tool-studio",
+        },
+      },
+      dependencies: [],
+    });
+    expect(created.ok).toBeTrue();
+
+    const draftId = created.data?.draft?.draftId;
+    await service.transitionLifecycle({
+      studioId: "studio-tools",
+      sessionId: sessionId!,
+      draftId: draftId!,
+      targetStatus: AssetDraftLifecycleStatuses.validated,
+    });
+
+    const published = await service.publishVersion({
+      studioId: "studio-tools",
+      sessionId: sessionId!,
+      draftId: draftId!,
+      versionId: "asset:studio-tools:v1",
+      versionLabel: "v1",
+      createdBy: "tool-author",
+    });
+
+    expect(published.ok).toBeTrue();
+    expect(published.data?.draft?.metadata.taxonomy?.semanticRole).toBe("tool");
+    expect(published.data?.draft?.metadata.taxonomy?.behaviorKind).toBe("conditional");
+    expect(published.data?.draft?.lifecycleStatus).toBe(AssetDraftLifecycleStatuses.published);
+    expect(published.data?.versions.map((entry) => entry.versionId)).toEqual(["asset:studio-tools:v1"]);
+
+    repository.dispose();
+  });
 
   it("supports Dataset Studio style flow over the same shell/persistence/publish seams", async () => {
     const root = mkdtempSync(path.join(tmpdir(), "loom-dataset-studio-service-"));

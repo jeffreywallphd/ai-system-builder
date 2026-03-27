@@ -4,6 +4,48 @@ import { StudioShellBackendApi } from "../StudioShellBackendApi";
 import { InMemoryStudioShellRepository } from "../../../studio-shell/InMemoryStudioShellRepository";
 
 describe("StudioShellBackendApi", () => {
+  it("projects the same validation issue structure for atomic model/dataset/tool drafts", async () => {
+    const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
+    const drafts: Array<{ studioId: string; semanticRole: "model" | "dataset" | "tool"; behaviorKind: "none" | "conditional" }> = [
+      { studioId: "studio-models", semanticRole: "model", behaviorKind: "none" },
+      { studioId: "studio-datasets", semanticRole: "dataset", behaviorKind: "none" },
+      { studioId: "studio-tools", semanticRole: "tool", behaviorKind: "conditional" },
+    ];
+
+    for (const entry of drafts) {
+      const initialized = await api.initializeStudio(entry.studioId, entry.studioId);
+      const sessionId = initialized.data!.activeSessionId!;
+      await api.createDraft({
+        studioId: entry.studioId,
+        sessionId,
+        content: "{}",
+        metadata: {
+          title: `${entry.semanticRole}-draft`,
+          tags: [entry.semanticRole],
+          taxonomy: {
+            structuralKind: "atomic",
+            semanticRole: entry.semanticRole,
+            behaviorKind: entry.behaviorKind,
+          },
+          contract: {
+            version: "1.0.0",
+            input: { kind: "json-schema" },
+            output: { kind: "json-schema" },
+          },
+          provenance: {
+            sourceType: "generated",
+            sourceLabel: `${entry.semanticRole}-studio`,
+          },
+        },
+        dependencies: [],
+      });
+
+      const snapshot = await api.loadSnapshot(entry.studioId);
+      const codes = (snapshot.data?.validationIssues ?? []).map((issue) => issue.code).sort();
+      expect(codes).toEqual(["lifecycle-not-publish-ready", "version-history-empty"]);
+    }
+  });
+
   it("builds a bounded snapshot and validation issue projection for active draft surfaces", async () => {
     const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
 
