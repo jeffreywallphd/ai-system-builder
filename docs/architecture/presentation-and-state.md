@@ -170,4 +170,6 @@ The clean-architecture story would be simpler if the renderer reused the generic
 
 Current Direction 5 UI status:
 - Fully implemented now in renderer: atomic studios + composite studios (Workflow, Context Bundle, Dataset Pipeline, Training Recipe, Tool Chain) on one shared `StudioShellPage` architecture.
+- Registry is now a first-class Studio Shell surface (`/studio-shell/registry`) routed through the same app shell/navigation and implemented as a thin renderer page over desktop registry bridge contracts (`RegistryService`), not a parallel UI system.
+- Registry browsing/filtering is API-driven and taxonomy-aligned (structural kind + progressive advanced semantic-role/behavior filters), keeping filter/business semantics backend-authoritative while reusing shared page/card/layout patterns.
 - Intentionally not implemented in renderer in this slice: dedicated system-asset studio surfaces (Full AI System, App Template / Deployment Unit) and any separate composite-runtime authoring UX beyond shared shell metadata/dependency/lifecycle/publish flows.

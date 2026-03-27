@@ -21,6 +21,7 @@ describe("ui/routes contract adherence", () => {
     expect(source).toContain('mcp: "/mcp"');
     expect(source).toContain('services: "/services"');
     expect(source).toContain('assets: "/assets"');
+    expect(source).toContain('registry: "/studio-shell/registry"');
     expect(source).toContain('settings: "/settings"');
     expect(source).toContain('notFound: "*"');
   });

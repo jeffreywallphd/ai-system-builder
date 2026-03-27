@@ -32,6 +32,7 @@ import ToolStudioPage from "../pages/ToolStudioPage";
 import PromptTemplateStudioPage from "../pages/PromptTemplateStudioPage";
 import EmbeddingIndexStudioPage from "../pages/EmbeddingIndexStudioPage";
 import ConfigProfileStudioPage from "../pages/ConfigProfileStudioPage";
+import RegistryPage from "../pages/RegistryPage";
 import ProtectedRoute from "./ProtectedRoute";
 import { ROUTE_PATHS } from "./RouteConfig";
 
@@ -70,6 +71,7 @@ export default function AppRouter({
           { path: ROUTE_PATHS.assets, element: <AssetsPage /> },
           { path: ROUTE_PATHS.agentStudio, element: <AgentStudioPage /> },
           { path: ROUTE_PATHS.studioShell, element: <StudioShellPage /> },
+          { path: ROUTE_PATHS.registry, element: <RegistryPage /> },
           { path: ROUTE_PATHS.workflowStudio, element: <WorkflowStudioPage /> },
           { path: ROUTE_PATHS.contextBundleStudio, element: <ContextBundleStudioPage /> },
           { path: ROUTE_PATHS.datasetPipelineStudio, element: <DatasetPipelineStudioPage /> },

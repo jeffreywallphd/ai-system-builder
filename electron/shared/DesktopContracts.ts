@@ -115,6 +115,15 @@ export interface DesktopStudioShellBridge {
   validateDraft(requestJson: string): Promise<string>;
 }
 
+export interface DesktopRegistryBridge {
+  listAssets(limit?: number): Promise<string>;
+  filterAssets(filtersJson: string): Promise<string>;
+  getDependencies(queryJson: string): Promise<string>;
+  getDependents(queryJson: string): Promise<string>;
+  traverseUpstream(queryJson: string): Promise<string>;
+  traverseDownstream(queryJson: string): Promise<string>;
+}
+
 export interface DesktopMcpSecretBridge {
   isAvailable(): boolean;
   getSecret(key: string): string | null;
@@ -132,4 +141,5 @@ export interface DesktopBridge {
   readonly canonicalAssets: DesktopCanonicalAssetBridge;
   readonly agents?: DesktopAgentAuthoringBridge;
   readonly studioShell?: DesktopStudioShellBridge;
+  readonly registry?: DesktopRegistryBridge;
 }
