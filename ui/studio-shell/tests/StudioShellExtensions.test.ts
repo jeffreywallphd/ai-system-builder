@@ -14,8 +14,8 @@ import { embeddingIndexStudioRegistration } from "../registrations/EmbeddingInde
 import { configProfileStudioRegistration } from "../registrations/ConfigProfileStudioRegistration";
 import { workflowStudioRegistration } from "../registrations/WorkflowStudioRegistration";
 import { contextBundleStudioRegistration } from "../registrations/ContextBundleStudioRegistration";
+import { datasetPipelineStudioRegistration } from "../registrations/DatasetPipelineStudioRegistration";
 import {
-  datasetPipelineStudioRegistrationExample,
   toolChainStudioRegistrationExample,
   trainingRecipeStudioRegistrationExample,
 } from "../registrations/CompositeStudioRegistrationExamples";
@@ -85,7 +85,7 @@ describe("StudioRegistrationRegistry", () => {
     registry.register(datasetStudioRegistration);
     registry.register(workflowStudioRegistration);
     registry.register(contextBundleStudioRegistration);
-    registry.register(datasetPipelineStudioRegistrationExample);
+    registry.register(datasetPipelineStudioRegistration);
     registry.register(trainingRecipeStudioRegistrationExample);
     registry.register(toolChainStudioRegistrationExample);
 
