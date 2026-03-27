@@ -5,7 +5,8 @@ import { createModelAssetMetadata, createModelStudioTaxonomy, ModelStudioIdentit
 import type { StudioShellApplicationService } from "../studio-shell/StudioShellApplicationService";
 import type { AssetDraftDependencyReference } from "../../domain/studio-shell/StudioShellDomain";
 import type { AssetDraftResult, AssetVersionResult, StudioInitializationResult, StudioSessionResult } from "../studio-shell/contracts";
-import { StudioShellConflictError } from "../studio-shell/StudioShellApplicationErrors";
+import { StudioShellConflictError, StudioShellInvalidRequestError } from "../studio-shell/StudioShellApplicationErrors";
+import { assertAtomicStudioDraftPublishConsistency } from "../studio-shell/AtomicStudioAssetEnforcement";
 
 export interface EnsureModelStudioResult {
   readonly initialized: boolean;
@@ -93,8 +94,26 @@ export class ModelStudioApplicationService {
     });
   }
 
+  private async assertPublishConsistency(studioId: string, draftId: string): Promise<void> {
+    const snapshot = await this.studioShellService.loadAssetDraft({ studioId, draftId });
+    if (!snapshot) {
+      throw new StudioShellInvalidRequestError(`Draft '${draftId}' is not available in studio '${studioId}'.`);
+    }
+
+    assertAtomicStudioDraftPublishConsistency({
+      draft: snapshot.draft,
+      expectation: {
+        studioType: ModelStudioIdentity.studioType,
+        semanticRole: "model",
+        allowedBehaviorKinds: ["none"],
+      },
+      contractResolver: this.contractResolver,
+    });
+  }
+
   public async publishModelDraft(command: PublishModelDraftCommand): Promise<AssetVersionResult> {
     const studioId = command.studioId?.trim() || ModelStudioIdentity.defaultStudioId;
+    await this.assertPublishConsistency(studioId, command.draftId);
     await this.studioShellService.transitionAssetDraftLifecycle({
       studioId,
       sessionId: command.sessionId,

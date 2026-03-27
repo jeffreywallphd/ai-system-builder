@@ -9,7 +9,8 @@ import type {
   StudioSessionResult,
 } from "../studio-shell/contracts";
 import type { StudioShellApplicationService } from "../studio-shell/StudioShellApplicationService";
-import { StudioShellConflictError } from "../studio-shell/StudioShellApplicationErrors";
+import { StudioShellConflictError, StudioShellInvalidRequestError } from "../studio-shell/StudioShellApplicationErrors";
+import { assertAtomicStudioDraftPublishConsistency } from "../studio-shell/AtomicStudioAssetEnforcement";
 import {
   createToolAssetMetadata,
   createToolStudioTaxonomy,
@@ -104,8 +105,26 @@ export class ToolStudioApplicationService {
     });
   }
 
+  private async assertPublishConsistency(studioId: string, draftId: string): Promise<void> {
+    const snapshot = await this.studioShellService.loadAssetDraft({ studioId, draftId });
+    if (!snapshot) {
+      throw new StudioShellInvalidRequestError(`Draft '${draftId}' is not available in studio '${studioId}'.`);
+    }
+
+    assertAtomicStudioDraftPublishConsistency({
+      draft: snapshot.draft,
+      expectation: {
+        studioType: ToolStudioIdentity.studioType,
+        semanticRole: "tool",
+        allowedBehaviorKinds: ["conditional", "deterministic"],
+      },
+      contractResolver: this.contractResolver,
+    });
+  }
+
   public async publishToolDraft(command: PublishToolDraftCommand): Promise<AssetVersionResult> {
     const studioId = command.studioId?.trim() || ToolStudioIdentity.defaultStudioId;
+    await this.assertPublishConsistency(studioId, command.draftId);
     await this.studioShellService.transitionAssetDraftLifecycle({
       studioId,
       sessionId: command.sessionId,

@@ -94,4 +94,33 @@ describe("ToolStudioApplicationService", () => {
     expect(published.draft.lifecycleStatus).toBe("published");
     expect(published.draft.publishedVersionIds).toEqual(["tool-version-1"]);
   });
+
+  it("blocks publish when tool taxonomy semantic role drifts outside atomic tool expectations", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const ids = ["session-1", "draft-1"];
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => ids.shift() ?? "generated");
+    const service = new ToolStudioApplicationService(studioShell);
+
+    const ensure = await service.ensureStudioInitialized();
+    const created = await service.createToolDraft({
+      sessionId: ensure.session.id,
+      title: "Tool",
+      content: "{}",
+    });
+
+    await studioShell.updateAssetDraft({
+      studioId: ToolStudioIdentity.defaultStudioId,
+      sessionId: ensure.session.id,
+      draftId: created.draft.id,
+      metadataPatch: {
+        taxonomy: { structuralKind: "atomic", semanticRole: "model", behaviorKind: "none" },
+      },
+    });
+
+    await expect(service.publishToolDraft({
+      sessionId: ensure.session.id,
+      draftId: created.draft.id,
+      versionId: "tool-version-invalid",
+    })).rejects.toThrow("taxonomy-semantic-role-mismatch");
+  });
 });

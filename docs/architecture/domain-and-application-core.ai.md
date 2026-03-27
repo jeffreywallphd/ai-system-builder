@@ -463,3 +463,10 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
 - Atomic registration defaults for Model/Dataset/Tool now reuse taxonomy-driven contract projection through a shared registration helper (`ui/studio-shell/registrations/AtomicStudioRegistrationDefaults.ts`) so default metadata validity posture is consistent across atomic studios.
 - Shared shell default dependency authoring now starts with an empty dependency set (instead of an implicit unpinned seed dependency), removing studio-specific accidental warning drift while preserving backend-authoritative dependency validation semantics.
 - Focused tests now cover cross-atomic validation consistency and shared issue structure (`application/studio-shell/tests/StudioShellValidation.test.ts`, `infrastructure/api/studio-shell/tests/StudioShellBackendApi.test.ts`).
+
+## Direction 5 update: Atomic contract and taxonomy enforcement hardening (stories 2.13–2.14)
+
+- Atomic publish flows for Model/Dataset/Tool now enforce shared taxonomy + contract truth through one reusable application seam (`application/studio-shell/AtomicStudioAssetEnforcement.ts`) instead of studio-specific ad hoc checks.
+- Enforcement validates structural kind (`atomic`), expected semantic role (`model`/`dataset`/`tool`), allowed behavior kinds (including bounded tool `conditional|deterministic`), and contract equivalence against taxonomy-driven projection (`CompositionAssetContractResolver.resolveContractForTaxonomy`).
+- Model/Dataset/Tool application publish orchestration now runs this shared enforcement before lifecycle transition/publish so metadata drift introduced via shell patching cannot publish invalid atomic versions.
+- Focused tests now cover cross-studio consistency at the shared seam and publish-gate behavior in each atomic studio service (`application/studio-shell/tests/AtomicStudioAssetEnforcement.test.ts`, `application/model-studio/tests/ModelStudioApplicationService.test.ts`, `application/dataset-studio/tests/DatasetStudioApplicationService.test.ts`, `application/tool-studio/tests/ToolStudioApplicationService.test.ts`).
