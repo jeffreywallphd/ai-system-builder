@@ -23,6 +23,7 @@ export const ROUTE_PATHS = Object.freeze({
   assets: "/assets",
   agentStudio: "/agent-studio",
   studioShell: "/studio-shell",
+  modelStudio: "/studio-shell/model",
   settings: "/settings",
   notFound: "*",
 });
@@ -105,6 +106,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteDefinition> = Object.freeze([
     path: ROUTE_PATHS.studioShell,
     title: "Studio Shell",
     showInNavigation: true,
+  }),
+  Object.freeze({
+    key: "model-studio",
+    path: ROUTE_PATHS.modelStudio,
+    title: "Model Studio",
+    showInNavigation: false,
   }),
   Object.freeze({
     key: "settings",

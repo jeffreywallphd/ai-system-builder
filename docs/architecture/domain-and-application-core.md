@@ -433,3 +433,16 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
   - API read responses now use a hardened projection envelope (`{ agent, taxonomy, contract? }`) where taxonomy is classified through `CompositionTaxonomyClassifier` and contract is projected through `CompositionAssetContractResolver`, so backend authoring responses do not introduce agent-only presentation semantics.
   - backend authoring coverage now includes SQLite-backed integration tests for CRUD + goal/policy/tool/memory/strategy updates and API mapping/error-path tests so real persistence seams are exercised directly.
 - No separate agent runtime engine or non-asset memory system was introduced; backend/API transport can stay thin over these use cases.
+
+
+## Direction 5 update: Model studio UI integration (story 2.7)
+
+- Model Studio now integrates directly through the shared `StudioShellPage` surface using registration-driven wiring (`ui/pages/ModelStudioPage.tsx` + `ui/studio-shell/registrations/ModelStudioRegistration.ts`) rather than introducing a second Model Studio UI architecture.
+- Model registration now contributes bounded model-specific extension panels (draft guidance + metadata status) through existing slot seams while shared shell panels remain authoritative for session context, metadata/dependencies, lifecycle/version state, validation, and publish flow.
+- `StudioShellPage` now respects registration defaults during draft creation (title/tags plus optional taxonomy/contract/provenance patch fields) so atomic model defaults flow through the same backend/application contracts.
+
+## Direction 5 update: Dataset studio domain + application slice (story 2.8)
+
+- Dataset Studio now has a thin inner-layer domain helper (`domain/dataset-studio/DatasetStudioDomain.ts`) that authors atomic dataset metadata (taxonomy `atomic/dataset/none`) with generated provenance defaults.
+- A bounded application orchestrator (`application/dataset-studio/DatasetStudioApplicationService.ts`) mirrors the Model Studio pattern and reuses `StudioShellApplicationService` for initialize/create/publish lifecycle rather than duplicating shell orchestration.
+- Shared taxonomy-driven contract projection now includes atomic dataset defaults in `CompositionAssetContractResolver`, keeping dataset authoring aligned with shared contract/provenance/version semantics.
