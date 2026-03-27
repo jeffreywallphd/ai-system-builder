@@ -13,6 +13,8 @@ describe("AssetDetailPage", () => {
     expect(source).toContain("AssetContractPanel");
     expect(source).toContain("AssetProvenancePanel");
     expect(source).toContain("AssetDependencySummaryPanel");
+    expect(source).toContain("AssetVersionHistoryPanel");
+    expect(source).toContain("AssetLineageView");
     expect(source).toContain("AssetValidationSummary");
     expect(source).toContain("DependencyCompatibilityPanel");
     expect(source).toContain("DependencyGraphPanel");

@@ -83,11 +83,62 @@ export function AssetDependencySummaryPanel({ asset }: { readonly asset: Registr
   );
 }
 
+export function AssetVersionHistoryPanel({ asset }: { readonly asset: RegistryAsset }): JSX.Element {
+  return (
+    <DetailPanel title="Version History" testId="registry-asset-version-history-panel">
+      {asset.versionHistory.length === 0 ? (
+        <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>No published versions are available.</p>
+      ) : (
+        <ol className="ui-stack ui-stack--2xs" style={{ margin: 0, paddingLeft: "1rem" }}>
+          {asset.versionHistory.map((entry) => (
+            <li key={entry.versionId}>
+              <div className="ui-text-small">
+                {entry.versionLabel ? `${entry.versionLabel} · ` : ""}{entry.versionId}
+              </div>
+              <div className="ui-text-small ui-text-secondary">
+                Created {entry.createdAt.toString()}
+                {entry.parentVersionId ? ` · Parent ${entry.parentVersionId}` : ""}
+              </div>
+              <div className="ui-text-small ui-text-secondary">
+                Upstream links: {entry.upstreamVersionIds.length}
+                {entry.upstreamAdded.length ? ` · +${entry.upstreamAdded.length}` : ""}
+                {entry.upstreamRemoved.length ? ` · -${entry.upstreamRemoved.length}` : ""}
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
+    </DetailPanel>
+  );
+}
+
+export function AssetLineageView({ asset, registryContextQuery }: { readonly asset: RegistryAsset; readonly registryContextQuery?: string }): JSX.Element {
+  return (
+    <DetailPanel title="Version Lineage" testId="registry-asset-lineage-panel">
+      <div className="ui-text-small ui-text-secondary">Root version: {asset.lineage.rootVersionId ?? "unavailable"}</div>
+      <div className="ui-grid" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "1rem" }}>
+        <NodeList
+          title="Upstream lineage"
+          nodes={asset.lineage.upstream}
+          emptyMessage="No upstream lineage entries were found."
+          registryContextQuery={registryContextQuery}
+        />
+        <NodeList
+          title="Downstream lineage"
+          nodes={asset.lineage.downstream}
+          emptyMessage="No downstream lineage entries were found."
+          registryContextQuery={registryContextQuery}
+        />
+      </div>
+    </DetailPanel>
+  );
+}
+
 export interface RegistryDependencyGraphProps {
   readonly rootAssetId: string;
   readonly rootVersionId?: string;
-  readonly upstreamNodes: ReadonlyArray<{ readonly assetId: string; readonly versionId: string; readonly name?: string }>;
-  readonly downstreamNodes: ReadonlyArray<{ readonly assetId: string; readonly versionId: string; readonly name?: string }>;
+  readonly upstreamNodes: ReadonlyArray<{ readonly assetId: string; readonly versionId: string; readonly name?: string; readonly depth?: number }>;
+  readonly downstreamNodes: ReadonlyArray<{ readonly assetId: string; readonly versionId: string; readonly name?: string; readonly depth?: number }>;
   readonly registryContextQuery?: string;
 }
 
@@ -102,7 +153,7 @@ function NodeList({
   registryContextQuery,
 }: {
   readonly title: string;
-  readonly nodes: ReadonlyArray<{ readonly assetId: string; readonly versionId: string; readonly name?: string }>;
+  readonly nodes: ReadonlyArray<{ readonly assetId: string; readonly versionId: string; readonly name?: string; readonly depth?: number }>;
   readonly emptyMessage: string;
   readonly registryContextQuery?: string;
 }): JSX.Element {
@@ -123,6 +174,9 @@ function NodeList({
                 {node.name ?? node.assetId}
               </Link>
               <span className="ui-text-small ui-text-secondary"> · {node.versionId}</span>
+              {typeof node.depth === "number" ? (
+                <span className="ui-text-small ui-text-secondary"> · depth {node.depth}</span>
+              ) : null}
             </li>
           ))}
         </ul>

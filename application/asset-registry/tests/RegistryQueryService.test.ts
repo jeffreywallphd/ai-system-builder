@@ -206,6 +206,8 @@ describe("RegistryQueryService", () => {
     expect(workflowOnly[0]?.dependencies.some((dependency) => dependency.versionId === "asset:model:v1")).toBeTrue();
     expect(workflowOnly[0]?.provenance.directUpstreamVersionIds).toContain("asset:model:v1");
     expect(workflowOnly[0]?.contract?.parameters.map((parameter) => parameter.id)).toContain("workflowMode");
+    expect(workflowOnly[0]?.versionHistory.length).toBe(1);
+    expect(workflowOnly[0]?.lineage.upstream.some((entry) => entry.versionId === "asset:model:v1")).toBeTrue();
 
     const atomicOnly = await service.queryRegistry({
       structuralKinds: ["atomic"],
@@ -218,5 +220,9 @@ describe("RegistryQueryService", () => {
     expect(atomicOnly).toHaveLength(1);
     expect(atomicOnly[0]?.assetId).toBe("asset:model");
     expect(atomicOnly[0]?.taxonomy?.structuralKind).toBe("atomic");
+
+    const searched = await service.queryRegistry({ keyword: "workflow-author" });
+    expect(searched).toHaveLength(1);
+    expect(searched[0]?.assetId).toBe("asset:workflow");
   });
 });

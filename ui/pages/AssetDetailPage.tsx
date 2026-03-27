@@ -8,8 +8,10 @@ import type { RegistryAsset } from "../../domain/asset-registry/RegistryAsset";
 import {
   AssetContractPanel,
   AssetDependencySummaryPanel,
+  AssetLineageView,
   AssetProvenancePanel,
   AssetSummaryPanel,
+  AssetVersionHistoryPanel,
   DependencyGraphPanel,
 } from "../components/registry/AssetDetailPanels";
 import { AssetValidationSummary, DependencyCompatibilityPanel } from "../components/registry/AssetValidationPanels";
@@ -145,6 +147,8 @@ export default function AssetDetailPage(): JSX.Element {
         <AssetContractPanel asset={asset} />
         <AssetProvenancePanel asset={asset} />
         <AssetDependencySummaryPanel asset={asset} />
+        <AssetVersionHistoryPanel asset={asset} />
+        <AssetLineageView asset={asset} registryContextQuery={registryContextQuery ?? undefined} />
         <AssetValidationSummary asset={asset} />
         <DependencyCompatibilityPanel asset={asset} />
       </div>

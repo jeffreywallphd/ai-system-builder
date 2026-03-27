@@ -4,6 +4,7 @@ import type { RegistryFilterParams } from "../../application/asset-registry/Regi
 import type { RegistryAsset } from "../../domain/asset-registry/RegistryAsset";
 import { AssetFilterPanel, type RegistryFilterState } from "../components/registry/AssetFilterPanel";
 import { AssetList } from "../components/registry/AssetList";
+import { SearchBar } from "../components/registry/SearchBar";
 import { RegistryService } from "../services/RegistryService";
 import { TaxonomyBehaviorKinds, TaxonomySemanticRoles, TaxonomyStructuralKinds, type TaxonomyBehaviorKind, type TaxonomySemanticRole, type TaxonomyStructuralKind } from "../../domain/taxonomy/CompositionTaxonomy";
 
@@ -33,7 +34,7 @@ function parseList<T extends string>(value: string | null, allowed: ReadonlySet<
   return value.split(",").map((entry) => entry.trim()).filter((entry): entry is T => allowed.has(entry as T));
 }
 
-function parseFromSearch(params: URLSearchParams): { readonly filters: RegistryFilterState; readonly limit: number } {
+function parseFromSearch(params: URLSearchParams): { readonly filters: RegistryFilterState; readonly limit: number; readonly keyword: string } {
   const parsedLimit = Number(params.get("limit"));
   const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 100;
   return {
@@ -43,10 +44,11 @@ function parseFromSearch(params: URLSearchParams): { readonly filters: RegistryF
       behaviorKinds: Object.freeze(parseList(params.get("behaviorKinds"), allowedBehaviorKinds)),
     }),
     limit,
+    keyword: params.get("q")?.trim() ?? "",
   };
 }
 
-function toSearchParams(filters: RegistryFilterState, limit: number): URLSearchParams {
+function toSearchParams(filters: RegistryFilterState, limit: number, keyword: string): URLSearchParams {
   const params = new URLSearchParams();
   if (filters.structuralKinds.length) {
     params.set("structuralKinds", filters.structuralKinds.join(","));
@@ -56,6 +58,9 @@ function toSearchParams(filters: RegistryFilterState, limit: number): URLSearchP
   }
   if (filters.behaviorKinds.length) {
     params.set("behaviorKinds", filters.behaviorKinds.join(","));
+  }
+  if (keyword.trim()) {
+    params.set("q", keyword.trim());
   }
   params.set("limit", String(limit));
   return params;
@@ -67,20 +72,29 @@ export default function RegistryPage(): JSX.Element {
   const service = useMemo(() => new RegistryService(), []);
   const [filters, setFilters] = useState<RegistryFilterState>(initialState.filters ?? defaultFilterState);
   const [limit, setLimit] = useState(initialState.limit ?? 100);
+  const [keyword, setKeyword] = useState(initialState.keyword ?? "");
   const [assets, setAssets] = useState<ReadonlyArray<RegistryAsset>>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string>();
 
   useEffect(() => {
-    setSearchParams(toSearchParams(filters, limit), { replace: true });
-  }, [filters, limit, setSearchParams]);
+    setSearchParams(toSearchParams(filters, limit, keyword), { replace: true });
+  }, [filters, limit, keyword, setSearchParams]);
 
   useEffect(() => {
     let active = true;
 
     const load = async (): Promise<void> => {
       setIsLoading(true);
-      const response = await service.filterAssets(toFilterParams(filters, limit));
+      const response = keyword.trim()
+        ? await service.searchAssets({
+          keyword,
+          structuralKinds: filters.structuralKinds.length > 0 ? filters.structuralKinds : undefined,
+          semanticRoles: filters.semanticRoles.length > 0 ? filters.semanticRoles : undefined,
+          behaviorKinds: filters.behaviorKinds.length > 0 ? filters.behaviorKinds : undefined,
+          limit,
+        })
+        : await service.filterAssets(toFilterParams(filters, limit));
       if (!active) {
         return;
       }
@@ -100,7 +114,7 @@ export default function RegistryPage(): JSX.Element {
     return () => {
       active = false;
     };
-  }, [filters, limit, service]);
+  }, [filters, limit, keyword, service]);
 
   return (
     <section className="ui-page ui-stack ui-stack--md" data-testid="registry-page">
@@ -122,6 +136,7 @@ export default function RegistryPage(): JSX.Element {
                 Structural kind is always visible; semantic role and behavior are in advanced filters.
               </p>
             </div>
+            <SearchBar value={keyword} onChange={setKeyword} disabled={isLoading} />
             <AssetFilterPanel value={filters} onChange={setFilters} disabled={isLoading} />
             <label className="ui-stack ui-stack--2xs">
               <span className="ui-text-small">Max results</span>
@@ -144,7 +159,7 @@ export default function RegistryPage(): JSX.Element {
               assets={assets}
               isLoading={isLoading}
               error={error}
-              registryContextQuery={toSearchParams(filters, limit).toString()}
+              registryContextQuery={toSearchParams(filters, limit, keyword).toString()}
             />
           </div>
         </div>

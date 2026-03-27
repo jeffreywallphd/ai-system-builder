@@ -242,6 +242,10 @@ describe("CrossStudioRegistryQueryService", () => {
     expect(byProvenance).toHaveLength(1);
     expect(byProvenance[0]?.assetId).toBe("asset:workflow");
 
+    const bySearch = await crossStudio.searchAssets({ keyword: "template-author" });
+    expect(bySearch).toHaveLength(1);
+    expect(bySearch[0]?.assetId).toBe("asset:template");
+
     const byAssetId = await crossStudio.getAssetByAssetId("asset:model");
     expect(byAssetId?.versionId).toBe("asset:model:v1");
 

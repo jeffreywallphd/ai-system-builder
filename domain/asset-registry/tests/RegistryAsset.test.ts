@@ -46,6 +46,20 @@ function createBaseRegistryAsset() {
         source: "lineage-edge",
       },
     ],
+    versionHistory: [
+      {
+        versionId: "asset:workflow:v1",
+        createdAt: new Date("2026-03-20T00:00:00.000Z"),
+        upstreamVersionIds: ["asset:model:v1"],
+        upstreamAdded: ["asset:model:v1"],
+        upstreamRemoved: [],
+      },
+    ],
+    lineage: {
+      rootVersionId: "asset:workflow:v1",
+      upstream: [{ assetId: "asset:model", versionId: "asset:model:v1", depth: 1 }],
+      downstream: [],
+    },
   });
 }
 
@@ -97,6 +111,8 @@ describe("RegistryAsset", () => {
     const registryAsset = createBaseRegistryAsset();
     expect(Object.isFrozen(registryAsset)).toBeTrue();
     expect(Object.isFrozen(registryAsset.dependencies)).toBeTrue();
+    expect(Object.isFrozen(registryAsset.versionHistory)).toBeTrue();
+    expect(Object.isFrozen(registryAsset.lineage)).toBeTrue();
     expect(Object.isFrozen(registryAsset.provenance)).toBeTrue();
   });
 });

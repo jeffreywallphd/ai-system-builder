@@ -26,6 +26,16 @@ export interface RegistryTraversalEndpointQuery extends RegistryDependencyEndpoi
   readonly maxNodes?: number;
 }
 
+export interface RegistrySearchQuery {
+  readonly keyword: string;
+  readonly structuralKinds?: RegistryFilterParams["structuralKinds"];
+  readonly semanticRoles?: RegistryFilterParams["semanticRoles"];
+  readonly behaviorKinds?: RegistryFilterParams["behaviorKinds"];
+  readonly contractParameterIds?: RegistryFilterParams["contractParameterIds"];
+  readonly provenanceSourceTypes?: RegistryFilterParams["provenanceSourceTypes"];
+  readonly limit?: number;
+}
+
 function normalizeTraversalOptions(query: RegistryTraversalEndpointQuery): RegistryDependencyTraversalOptions {
   return Object.freeze({
     maxDepth: typeof query.maxDepth === "number" && query.maxDepth > 0 ? query.maxDepth : undefined,
@@ -73,6 +83,18 @@ export class RegistryBackendApi {
       }
       return true;
     })));
+  }
+
+  public async searchAssets(query: RegistrySearchQuery): Promise<RegistryApiResponse<ReadonlyArray<RegistryAsset>>> {
+    return this.wrap(() => this.registryQueryService.searchAssets({
+      keyword: query.keyword,
+      structuralKinds: query.structuralKinds,
+      semanticRoles: query.semanticRoles,
+      behaviorKinds: query.behaviorKinds,
+      parameterIds: query.contractParameterIds,
+      sourceTypes: query.provenanceSourceTypes,
+      limit: query.limit,
+    }));
   }
 
   public async getAssetDetail(query: RegistryAssetDetailQuery): Promise<RegistryApiResponse<RegistryAsset>> {
