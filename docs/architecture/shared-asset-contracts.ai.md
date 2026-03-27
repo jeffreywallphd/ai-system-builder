@@ -28,5 +28,4 @@
 - Keep changes incremental, inner-layer-first, and adapter-driven.
 - No parallel agent contract architecture.
 - No system-composer UI in this slice.
-- Prompt/Embedding/Config Profile studios are not implemented yet in Direction 5 UI/application slices; this document only claims shared contract readiness for those roles.
-- Direction 5 Prompt Template Studio now also consumes taxonomy-driven atomic contract projection (`atomic/prompt-template/none`) through the same shared shell metadata + publish-enforcement seams.
+- Direction 5 atomic studio slices now consume taxonomy-driven atomic contract projection for Prompt Template, Embedding Index, and Config Profile (`atomic/prompt-template/none`, `atomic/embedding-index/none`, `atomic/config-profile/none`) through shared shell metadata + publish-enforcement seams.

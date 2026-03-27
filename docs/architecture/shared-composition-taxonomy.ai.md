@@ -18,7 +18,7 @@ Behavior is a property of the same structural object, not a separate top-level a
 - Canonical identity storage now persists taxonomy metadata for mapped entities.
 - Canonical asset query criteria now supports taxonomy-aware filtering (`structuralKinds`, `semanticRoles`, `behaviorKinds`).
 - Canonical asset reads still expose taxonomy with bounded fallback mapping where identity metadata is absent.
-- Direction 5 atomic studio usage now concretely applies this taxonomy in Model Studio (`atomic/model/none`), Dataset Studio (`atomic/dataset/none`), Tool Studio (`atomic/tool/conditional|deterministic`), Prompt Template Studio (`atomic/prompt-template/none`), and Embedding Index Studio (`atomic/embedding-index/none`) via shared shell metadata and publish enforcement.
+- Direction 5 atomic studio usage now concretely applies this taxonomy in Model Studio (`atomic/model/none`), Dataset Studio (`atomic/dataset/none`), Tool Studio (`atomic/tool/conditional|deterministic`), Prompt Template Studio (`atomic/prompt-template/none`), Embedding Index Studio (`atomic/embedding-index/none`), and Config Profile Studio (`atomic/config-profile/none`) via shared shell metadata and publish enforcement.
 - End-to-end cross-studio consistency tests now verify taxonomy coherence over the real service/bridge/backend/application/SQLite path before and after reload.
 
 ## Current mappings (foundation)
@@ -52,4 +52,4 @@ Current Direction 5 target shape remains:
 - no replacement of workflow or execution backbone
 - no parallel agent architecture/runtime model
 - no over-atomicization of rows/chunks/fragments as global assets
-- Direction 5 atomic studio usage now also concretely applies `atomic/prompt-template/none` and `atomic/embedding-index/none` through Prompt Template / Embedding Index studios (`domain/prompt-template-studio/*`, `application/prompt-template-studio/*`, `domain/embedding-index-studio/*`, `application/embedding-index-studio/*`, and registration-driven UI shell integration).
+- Direction 5 atomic studio usage now also concretely applies `atomic/prompt-template/none`, `atomic/embedding-index/none`, and `atomic/config-profile/none` through Prompt Template / Embedding Index / Config Profile studios (`domain/prompt-template-studio/*`, `application/prompt-template-studio/*`, `domain/embedding-index-studio/*`, `application/embedding-index-studio/*`, `domain/config-profile-studio/*`, `application/config-profile-studio/*`, and registration-driven UI shell integration).

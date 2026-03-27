@@ -20,11 +20,13 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain('toolStudio: "/studio-shell/tool"');
     expect(source).toContain('promptTemplateStudio: "/studio-shell/prompt-template"');
     expect(source).toContain('embeddingIndexStudio: "/studio-shell/embedding-index"');
+    expect(source).toContain('configProfileStudio: "/studio-shell/config-profile"');
     expect(source).toContain('key: "agent-studio"');
     expect(source).toContain('key: "dataset-studio"');
     expect(source).toContain('key: "tool-studio"');
     expect(source).toContain('key: "prompt-template-studio"');
     expect(source).toContain('key: "embedding-index-studio"');
+    expect(source).toContain('key: "config-profile-studio"');
   });
 
   it("provides navigation helper and protected route behavior", () => {
@@ -55,6 +57,7 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain("path: ROUTE_PATHS.toolStudio");
     expect(source).toContain("path: ROUTE_PATHS.promptTemplateStudio");
     expect(source).toContain("path: ROUTE_PATHS.embeddingIndexStudio");
+    expect(source).toContain("path: ROUTE_PATHS.configProfileStudio");
     expect(source).toContain("path: ROUTE_PATHS.context");
     expect(source).toContain("path: ROUTE_PATHS.workflowContextWorkbench");
   });
