@@ -94,4 +94,53 @@ describe("buildStudioShellValidationIssues", () => {
     });
     expect(linkedIssues.some((issue) => issue.code === "composite-dependency-recommended")).toBeFalse();
   });
+
+  it("flags dependency identity/version mismatches using shared version-aware validation seams", async () => {
+    const compositeTaxonomy = createCompositionTaxonomyDescriptor({
+      structuralKind: TaxonomyStructuralKinds.composite,
+      semanticRole: TaxonomySemanticRoles.workflow,
+      behaviorKind: TaxonomyBehaviorKinds.deterministic,
+    });
+    const draft = createDraftWithTaxonomy(
+      "draft-workflow-mismatch",
+      compositeTaxonomy,
+      [{ assetId: "asset:model", versionId: "asset:dataset:v1" }],
+    );
+
+    const issues = await buildStudioShellValidationIssues({
+      draft,
+      knownVersionIds: ["asset:dataset:v1"],
+      versionExists: async () => true,
+      resolveDependencyVersion: async () => Object.freeze({
+        assetId: "asset:dataset",
+      }),
+    });
+
+    expect(issues.some((issue) => issue.code === "dependency-asset-version-mismatch")).toBeTrue();
+  });
+
+  it("flags disallowed composite dependency semantic roles when dependency taxonomy is known", async () => {
+    const compositeTaxonomy = createCompositionTaxonomyDescriptor({
+      structuralKind: TaxonomyStructuralKinds.composite,
+      semanticRole: TaxonomySemanticRoles.toolChain,
+      behaviorKind: TaxonomyBehaviorKinds.deterministic,
+    });
+    const draft = createDraftWithTaxonomy(
+      "draft-tool-chain-bad-dependency",
+      compositeTaxonomy,
+      [{ assetId: "asset:dataset", versionId: "asset:dataset:v1" }],
+    );
+
+    const issues = await buildStudioShellValidationIssues({
+      draft,
+      knownVersionIds: ["asset:dataset:v1"],
+      versionExists: async () => true,
+      resolveDependencyVersion: async () => Object.freeze({
+        assetId: "asset:dataset",
+        taxonomy: createDatasetStudioTaxonomy(),
+      }),
+    });
+
+    expect(issues.some((issue) => issue.code === "composite-dependency-semantic-role-disallowed")).toBeTrue();
+  });
 });

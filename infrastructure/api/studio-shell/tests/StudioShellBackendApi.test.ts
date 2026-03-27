@@ -233,4 +233,70 @@ describe("StudioShellBackendApi", () => {
     expect(published.data?.draft?.lifecycleStatus).toBe(AssetDraftLifecycleStatuses.published);
   });
 
+  it("surfaces version-aware dependency mismatch validation for composite drafts", async () => {
+    const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
+
+    const atomicInit = await api.initializeStudio("studio-models", "Model Studio");
+    const atomicSessionId = atomicInit.data!.activeSessionId!;
+    const atomicDraft = await api.createDraft({
+      studioId: "studio-models",
+      sessionId: atomicSessionId,
+      content: "{}",
+      metadata: {
+        title: "model-draft",
+        tags: ["model"],
+        taxonomy: {
+          structuralKind: "atomic",
+          semanticRole: "model",
+          behaviorKind: "none",
+        },
+        contract: { version: "1.0.0", input: { kind: "json-schema" }, output: { kind: "json-schema" } },
+        provenance: { sourceType: "generated", sourceLabel: "model-studio" },
+      },
+    });
+    const atomicDraftId = atomicDraft.data!.draft!.draftId;
+    await api.transitionLifecycle({
+      studioId: "studio-models",
+      sessionId: atomicSessionId,
+      draftId: atomicDraftId,
+      targetStatus: AssetDraftLifecycleStatuses.validated,
+    });
+    await api.publishVersion({
+      studioId: "studio-models",
+      sessionId: atomicSessionId,
+      draftId: atomicDraftId,
+      versionId: "asset:model:v1",
+    });
+
+    const compositeInit = await api.initializeStudio("studio-workflows", "Workflow Studio");
+    const compositeSessionId = compositeInit.data!.activeSessionId!;
+    const created = await api.createDraft({
+      studioId: "studio-workflows",
+      sessionId: compositeSessionId,
+      content: "{\"workflowSpec\":{\"steps\":[]}}",
+      metadata: {
+        title: "workflow-draft",
+        tags: ["workflow"],
+        taxonomy: {
+          structuralKind: "composite",
+          semanticRole: "workflow",
+          behaviorKind: "deterministic",
+        },
+        contract: {
+          version: "1.0.0",
+          input: { kind: "json-schema" },
+          output: { kind: "json-schema" },
+        },
+        provenance: {
+          sourceType: "generated",
+          sourceLabel: "workflow-studio",
+        },
+      },
+      dependencies: [{ assetId: "asset:dataset", versionId: "asset:model:v1" }],
+    });
+
+    expect(created.ok).toBeTrue();
+    expect(created.data?.validationIssues.some((issue) => issue.code === "dependency-asset-version-mismatch")).toBeTrue();
+  });
+
 });

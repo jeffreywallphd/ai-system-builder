@@ -243,9 +243,13 @@ describe("evaluateCompositeStudioDraftConsistency", () => {
           },
         },
       });
+      const draftWithDependencies = {
+        ...draft,
+        dependencies: Object.freeze([{ assetId: "asset:dependency", versionId: "asset:dependency:v1" }]),
+      };
 
       expect(evaluateCompositeStudioDraftConsistency({
-        draft,
+        draft: draftWithDependencies,
         expectation: {
           studioType: `${entry.role}-studio`,
           semanticRole: entry.role,
@@ -276,9 +280,13 @@ describe("evaluateCompositeStudioDraftConsistency", () => {
         },
       },
     });
+    const draftWithDependencies = {
+      ...draft,
+      dependencies: Object.freeze([{ assetId: "asset:training-dataset", versionId: "asset:training-dataset:v1" }]),
+    };
 
     const issues = evaluateCompositeStudioDraftConsistency({
-      draft,
+      draft: draftWithDependencies,
       expectation: {
         studioType: "training-recipe-studio",
         semanticRole: "training-recipe",
@@ -290,5 +298,87 @@ describe("evaluateCompositeStudioDraftConsistency", () => {
     });
 
     expect(issues.map((issue) => issue.code)).toContain("contract-not-derivable");
+  });
+
+  it("requires composite drafts to include pinned dependency references for publish enforcement", () => {
+    const taxonomy = {
+      structuralKind: "composite" as const,
+      semanticRole: "workflow" as const,
+      behaviorKind: "deterministic" as const,
+    };
+    const draft = createAtomicDraft({
+      draftId: "draft-workflow-unpinned",
+      studioId: "studio-workflows",
+      metadata: {
+        title: "Workflow",
+        tags: ["workflow"],
+        taxonomy,
+        contract: resolver.resolveContractForTaxonomy(taxonomy),
+        provenance: { sourceType: "generated", sourceLabel: "workflow-studio" },
+      },
+    });
+
+    const issues = evaluateCompositeStudioDraftConsistency({
+      draft: {
+        ...draft,
+        dependencies: Object.freeze([{ assetId: "asset:model" }]),
+      },
+      expectation: {
+        studioType: "workflow-studio",
+        semanticRole: "workflow",
+        allowedBehaviorKinds: ["deterministic", "conditional", "iterative"],
+      },
+      contractResolver: resolver,
+    });
+
+    expect(issues.map((issue) => issue.code)).toContain("dependency-version-unpinned");
+  });
+
+  it("rejects disallowed composite behavior kinds across implemented composite studios", () => {
+    const cases = [
+      { role: "workflow" as const, behaviorKind: "iterative" as const, disallowedExpectation: ["deterministic", "conditional"] as const },
+      { role: "context-bundle" as const, behaviorKind: "none" as const, disallowedExpectation: ["deterministic"] as const },
+      { role: "dataset-pipeline" as const, behaviorKind: "iterative" as const, disallowedExpectation: ["deterministic"] as const },
+      { role: "training-recipe" as const, behaviorKind: "deterministic" as const, disallowedExpectation: ["iterative"] as const },
+      { role: "tool-chain" as const, behaviorKind: "deterministic" as const, disallowedExpectation: ["conditional"] as const },
+    ];
+
+    for (const entry of cases) {
+      const draft = createAtomicDraft({
+        draftId: `draft-${entry.role}-invalid-behavior`,
+        studioId: "studio-composite",
+        metadata: {
+          title: `Composite ${entry.role}`,
+          tags: [entry.role],
+          taxonomy: {
+            structuralKind: "composite",
+            semanticRole: entry.role,
+            behaviorKind: entry.behaviorKind,
+          },
+          contract: {
+            version: "1.0.0",
+            input: { kind: "json-schema" },
+            output: { kind: "json-schema" },
+          },
+          provenance: {
+            sourceType: "generated",
+            sourceLabel: "composite-studio",
+          },
+        },
+        dependencies: [{ assetId: "asset:dependency", versionId: "asset:dependency:v1" }],
+      });
+
+      const issues = evaluateCompositeStudioDraftConsistency({
+        draft,
+        expectation: {
+          studioType: `${entry.role}-studio`,
+          semanticRole: entry.role,
+          allowedBehaviorKinds: [...entry.disallowedExpectation],
+        },
+        contractResolver: resolver,
+      });
+
+      expect(issues.map((issue) => issue.code)).toContain("taxonomy-behavior-kind-mismatch");
+    }
   });
 });

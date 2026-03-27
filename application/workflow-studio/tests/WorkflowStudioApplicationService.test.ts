@@ -110,4 +110,25 @@ describe("WorkflowStudioApplicationService", () => {
       versionId: "workflow-version-invalid",
     })).rejects.toThrow("taxonomy-semantic-role-mismatch");
   });
+
+  it("blocks publish when workflow draft dependencies are unpinned", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const ids = ["session-1", "draft-1"];
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => ids.shift() ?? "generated");
+    const service = new WorkflowStudioApplicationService(studioShell);
+
+    const ensure = await service.ensureStudioInitialized();
+    const created = await service.createWorkflowDraft({
+      sessionId: ensure.session.id,
+      title: "Workflow",
+      content: "{}",
+      dependencies: [{ assetId: "asset:model" }],
+    });
+
+    await expect(service.publishWorkflowDraft({
+      sessionId: ensure.session.id,
+      draftId: created.draft.id,
+      versionId: "workflow-version-unpinned",
+    })).rejects.toThrow("dependency-version-unpinned");
+  });
 });

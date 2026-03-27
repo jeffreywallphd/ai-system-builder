@@ -1,4 +1,11 @@
 import { AssetDraftLifecycleStatuses, type AssetDraft } from "../../domain/studio-shell/StudioShellDomain";
+import {
+  createCompositionTaxonomyDescriptor,
+  type CompositionTaxonomyDescriptor,
+  TaxonomySemanticRoles,
+  TaxonomyStructuralKinds,
+  type TaxonomySemanticRole,
+} from "../../domain/taxonomy/CompositionTaxonomy";
 
 export const StudioShellValidationSections = Object.freeze({
   taxonomy: "taxonomy",
@@ -18,6 +25,8 @@ export const StudioShellValidationIssueCodes = Object.freeze({
   provenanceMissing: "provenance-missing",
   dependencyVersionNotFound: "dependency-version-not-found",
   dependencyVersionUnpinned: "dependency-version-unpinned",
+  dependencyAssetVersionMismatch: "dependency-asset-version-mismatch",
+  compositeDependencySemanticRoleDisallowed: "composite-dependency-semantic-role-disallowed",
   compositeDependencyRecommended: "composite-dependency-recommended",
   lifecycleNotPublishReady: "lifecycle-not-publish-ready",
   versionHistoryEmpty: "version-history-empty",
@@ -38,6 +47,7 @@ export async function buildStudioShellValidationIssues(input: {
   readonly draft: AssetDraft;
   readonly knownVersionIds: ReadonlyArray<string>;
   readonly versionExists: (versionId: string) => Promise<boolean>;
+  readonly resolveDependencyVersion?: (versionId: string) => Promise<{ readonly assetId: string; readonly taxonomy?: CompositionTaxonomyDescriptor } | undefined>;
 }): Promise<ReadonlyArray<StudioShellValidationIssue>> {
   const issues: StudioShellValidationIssue[] = [];
 
@@ -92,6 +102,7 @@ export async function buildStudioShellValidationIssues(input: {
       });
       continue;
     }
+
     const versionExists = input.knownVersionIds.includes(dependency.versionId)
       || await input.versionExists(dependency.versionId);
     if (!versionExists) {
@@ -101,6 +112,29 @@ export async function buildStudioShellValidationIssues(input: {
         severity: "error",
         message: `Dependency version '${dependency.versionId}' was not found.`,
         path: `dependencies[${index}].versionId`,
+      });
+      continue;
+    }
+
+    const resolvedVersion = await input.resolveDependencyVersion?.(dependency.versionId);
+    if (resolvedVersion && resolvedVersion.assetId !== dependency.assetId) {
+      issues.push({
+        code: StudioShellValidationIssueCodes.dependencyAssetVersionMismatch,
+        section: StudioShellValidationSections.dependencies,
+        severity: "error",
+        message: `Dependency '${dependency.assetId}' does not match version '${dependency.versionId}' asset '${resolvedVersion.assetId}'.`,
+        path: `dependencies[${index}]`,
+      });
+      continue;
+    }
+
+    if (resolvedVersion?.taxonomy && !isDependencyTaxonomyAllowed(input.draft, resolvedVersion.taxonomy)) {
+      issues.push({
+        code: StudioShellValidationIssueCodes.compositeDependencySemanticRoleDisallowed,
+        section: StudioShellValidationSections.dependencies,
+        severity: "error",
+        message: `Composite draft semantic role '${taxonomy?.semanticRole}' does not allow dependency taxonomy '${resolvedVersion.taxonomy.structuralKind}/${resolvedVersion.taxonomy.semanticRole}/${resolvedVersion.taxonomy.behaviorKind}'.`,
+        path: `dependencies[${index}]`,
       });
     }
   }
@@ -127,4 +161,96 @@ export async function buildStudioShellValidationIssues(input: {
   }
 
   return Object.freeze(issues);
+}
+
+function isDependencyTaxonomyAllowed(
+  draft: AssetDraft,
+  dependencyTaxonomy: CompositionTaxonomyDescriptor,
+): boolean {
+  const taxonomy = draft.metadata.taxonomy;
+  if (!taxonomy || taxonomy.structuralKind !== TaxonomyStructuralKinds.composite) {
+    return true;
+  }
+
+  const allowed = allowedDependencyRolesByCompositeRole[taxonomy.semanticRole];
+  if (!allowed) {
+    return true;
+  }
+
+  return allowed.has(dependencyTaxonomy.semanticRole);
+}
+
+const allowedDependencyRolesByCompositeRole: Readonly<
+  Partial<Record<TaxonomySemanticRole, ReadonlySet<TaxonomySemanticRole>>>
+> = Object.freeze({
+  [TaxonomySemanticRoles.workflow]: new Set<TaxonomySemanticRole>([
+    TaxonomySemanticRoles.model,
+    TaxonomySemanticRoles.dataset,
+    TaxonomySemanticRoles.tool,
+    TaxonomySemanticRoles.promptTemplate,
+    TaxonomySemanticRoles.embeddingIndex,
+    TaxonomySemanticRoles.configProfile,
+    TaxonomySemanticRoles.contextBundle,
+    TaxonomySemanticRoles.datasetPipeline,
+    TaxonomySemanticRoles.trainingRecipe,
+    TaxonomySemanticRoles.toolChain,
+    TaxonomySemanticRoles.workflow,
+  ]),
+  [TaxonomySemanticRoles.contextBundle]: new Set<TaxonomySemanticRole>([
+    TaxonomySemanticRoles.dataset,
+    TaxonomySemanticRoles.promptTemplate,
+    TaxonomySemanticRoles.embeddingIndex,
+    TaxonomySemanticRoles.configProfile,
+    TaxonomySemanticRoles.contextBundle,
+  ]),
+  [TaxonomySemanticRoles.datasetPipeline]: new Set<TaxonomySemanticRole>([
+    TaxonomySemanticRoles.dataset,
+    TaxonomySemanticRoles.tool,
+    TaxonomySemanticRoles.configProfile,
+    TaxonomySemanticRoles.contextBundle,
+    TaxonomySemanticRoles.datasetPipeline,
+  ]),
+  [TaxonomySemanticRoles.trainingRecipe]: new Set<TaxonomySemanticRole>([
+    TaxonomySemanticRoles.model,
+    TaxonomySemanticRoles.dataset,
+    TaxonomySemanticRoles.datasetPipeline,
+    TaxonomySemanticRoles.configProfile,
+    TaxonomySemanticRoles.trainingRecipe,
+  ]),
+  [TaxonomySemanticRoles.toolChain]: new Set<TaxonomySemanticRole>([
+    TaxonomySemanticRoles.tool,
+    TaxonomySemanticRoles.promptTemplate,
+    TaxonomySemanticRoles.configProfile,
+    TaxonomySemanticRoles.toolChain,
+  ]),
+});
+
+export function tryReadTaxonomyFromVersionMetadata(metadata: unknown): CompositionTaxonomyDescriptor | undefined {
+  if (!metadata || typeof metadata !== "object") {
+    return undefined;
+  }
+
+  const root = metadata as { readonly metadata?: unknown };
+  if (!root.metadata || typeof root.metadata !== "object") {
+    return undefined;
+  }
+  const nested = root.metadata as { readonly taxonomy?: unknown };
+  if (!nested.taxonomy || typeof nested.taxonomy !== "object") {
+    return undefined;
+  }
+
+  const snapshot = nested.taxonomy as {
+    readonly structuralKind?: CompositionTaxonomyDescriptor["structuralKind"];
+    readonly semanticRole?: CompositionTaxonomyDescriptor["semanticRole"];
+    readonly behaviorKind?: CompositionTaxonomyDescriptor["behaviorKind"];
+  };
+  if (!snapshot.structuralKind || !snapshot.semanticRole || !snapshot.behaviorKind) {
+    return undefined;
+  }
+
+  try {
+    return createCompositionTaxonomyDescriptor(snapshot);
+  } catch {
+    return undefined;
+  }
 }

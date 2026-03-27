@@ -17,6 +17,8 @@ export const StudioAssetEnforcementIssueCodes = Object.freeze({
   contractMissing: "contract-missing",
   contractNotDerivable: "contract-not-derivable",
   contractMismatch: "contract-mismatch",
+  compositeDependencyRequired: "composite-dependency-required",
+  dependencyVersionUnpinned: "dependency-version-unpinned",
 });
 
 export type StudioAssetEnforcementIssueCode =
@@ -182,14 +184,32 @@ export function evaluateCompositeStudioDraftConsistency(input: {
   readonly expectation: CompositeStudioExpectation;
   readonly contractResolver: Pick<IAssetContractResolver, "resolveContractForTaxonomy">;
 }): ReadonlyArray<StudioAssetEnforcementIssue> {
-  return evaluateStudioDraftConsistency({
+  const issues = [...evaluateStudioDraftConsistency({
     ...input,
     expectation: {
       ...input.expectation,
       structuralKind: TaxonomyStructuralKinds.composite,
       requireDerivableContract: input.expectation.requireDerivableContract ?? true,
     },
-  });
+  })];
+
+  if (input.draft.dependencies.length === 0) {
+    issues.push({
+      code: StudioAssetEnforcementIssueCodes.compositeDependencyRequired,
+      message: `Composite studio '${input.expectation.studioType}' draft '${input.draft.id}' must include at least one dependency reference.`,
+    });
+  }
+
+  for (const dependency of input.draft.dependencies) {
+    if (!dependency.versionId) {
+      issues.push({
+        code: StudioAssetEnforcementIssueCodes.dependencyVersionUnpinned,
+        message: `Composite studio '${input.expectation.studioType}' draft '${input.draft.id}' dependency '${dependency.assetId}' must be pinned to a version.`,
+      });
+    }
+  }
+
+  return Object.freeze(issues);
 }
 
 export function assertCompositeStudioDraftPublishConsistency(input: {
@@ -197,12 +217,12 @@ export function assertCompositeStudioDraftPublishConsistency(input: {
   readonly expectation: CompositeStudioExpectation;
   readonly contractResolver: Pick<IAssetContractResolver, "resolveContractForTaxonomy">;
 }): void {
-  assertStudioDraftPublishConsistency({
-    ...input,
-    expectation: {
-      ...input.expectation,
-      structuralKind: TaxonomyStructuralKinds.composite,
-      requireDerivableContract: input.expectation.requireDerivableContract ?? true,
-    },
-  });
+  const issues = evaluateCompositeStudioDraftConsistency(input);
+  if (issues.length === 0) {
+    return;
+  }
+
+  throw new StudioShellInvalidRequestError(
+    `Studio draft enforcement failed for '${input.expectation.studioType}': ${issues.map((issue) => `${issue.code}: ${issue.message}`).join(" ")}`,
+  );
 }

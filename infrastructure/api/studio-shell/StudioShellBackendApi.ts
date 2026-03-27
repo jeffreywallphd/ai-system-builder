@@ -3,6 +3,7 @@ import type { IStudioShellRepository } from "../../../application/ports/interfac
 import { DefaultStudioShellApplicationService } from "../../../application/studio-shell/DefaultStudioShellApplicationService";
 import {
   buildStudioShellValidationIssues,
+  tryReadTaxonomyFromVersionMetadata,
   type StudioShellValidationIssue,
 } from "../../../application/studio-shell/StudioShellValidation";
 import type {
@@ -153,6 +154,16 @@ export class StudioShellBackendApi {
         draft: activeDraft,
         knownVersionIds: versions.map((entry) => entry.versionId),
         versionExists: async (versionId) => Boolean(await this.repository.getAssetVersion(versionId)),
+        resolveDependencyVersion: async (versionId) => {
+          const version = await this.repository.getAssetVersion(versionId);
+          if (!version) {
+            return undefined;
+          }
+          return Object.freeze({
+            assetId: version.assetId.value,
+            taxonomy: tryReadTaxonomyFromVersionMetadata(version.metadata),
+          });
+        },
       })
       : Object.freeze([]);
 
