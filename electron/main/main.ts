@@ -68,6 +68,7 @@ import type { CreateAssetDraftCommand, PublishAssetDraftVersionCommand, Transiti
 import { RegistryQueryService } from "../../application/asset-registry/RegistryQueryService";
 import { CrossStudioRegistryQueryService } from "../../application/asset-registry/CrossStudioRegistryQueryService";
 import { RegistryDependencyGraphService } from "../../application/asset-registry/RegistryDependencyGraphService";
+import { RegistryCacheLayer } from "../../application/asset-registry/RegistryCacheLayer";
 import { CompositionAssetContractResolver } from "../../application/contracts/CompositionAssetContractResolver";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -513,16 +514,20 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     explainVersionExistenceUseCase,
     verifyProjectionUseCase,
   );
+  const registryCacheLayer = new RegistryCacheLayer({ maxEntriesPerNamespace: 300 });
   const registryQueryService = new RegistryQueryService(
     canonicalAssetSystemRepository,
     canonicalAssetSystemRepository,
     canonicalAssetSystemRepository,
     new CompositionAssetContractResolver(),
     canonicalAssetSystemRepository,
+    undefined,
+    registryCacheLayer,
+    canonicalAssetSystemRepository,
   );
   const registryBackendApi = new RegistryBackendApi(
     new CrossStudioRegistryQueryService(registryQueryService),
-    new RegistryDependencyGraphService(registryQueryService, canonicalAssetSystemRepository, canonicalAssetSystemRepository),
+    new RegistryDependencyGraphService(registryQueryService, canonicalAssetSystemRepository, canonicalAssetSystemRepository, registryCacheLayer),
   );
 
   ipcMain.handle("ai-loom-desktop-canonical-assets:list", async (_event, criteriaJson?: string) => {

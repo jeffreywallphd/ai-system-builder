@@ -51,12 +51,17 @@ class InMemoryRegistryGraphProjectionRepository implements IRegistryGraphProject
   private snapshot?: RegistryGraphProjectionSnapshot;
   private dirty = true;
   private saveCount = 0;
+  private signature = { versionCount: 0, lineageEdgeCount: 0 };
 
   public async loadProjection() { return this.snapshot; }
   public async saveProjection(snapshot: RegistryGraphProjectionSnapshot) {
     this.snapshot = snapshot;
     this.dirty = false;
     this.saveCount += 1;
+    this.signature = {
+      versionCount: snapshot.sourceSignature?.versionCount ?? snapshot.nodes.length,
+      lineageEdgeCount: snapshot.sourceSignature?.lineageEdgeCount ?? snapshot.edges.length,
+    };
   }
   public async markProjectionDirty() { this.dirty = true; }
   public async getProjectionState() {
@@ -67,10 +72,10 @@ class InMemoryRegistryGraphProjectionRepository implements IRegistryGraphProject
     });
   }
   public async getCurrentSourceSignature() {
-    return Object.freeze({
-      versionCount: this.snapshot?.sourceSignature?.versionCount ?? 0,
-      lineageEdgeCount: this.snapshot?.sourceSignature?.lineageEdgeCount ?? 0,
-    });
+    return Object.freeze(this.signature);
+  }
+  public setCurrentSourceSignature(signature: { readonly versionCount: number; readonly lineageEdgeCount: number }) {
+    this.signature = { ...signature };
   }
   public get writes(): number {
     return this.saveCount;
@@ -319,6 +324,53 @@ describe("RegistryDependencyGraphService", () => {
 
     await projectionRepository.markProjectionDirty();
     await service.expandDirectDependencies("asset:workflow:v1");
+    expect(projectionRepository.writes).toBe(2);
+  });
+
+  it("caches traversal queries and invalidates cached results when signatures change", async () => {
+    const modelAsset = buildAsset("asset:model", "Model", "generic", "model-studio");
+    const workflowAsset = buildAsset("asset:workflow", "Workflow", "workflow-definition", "workflow-studio");
+    const modelVersion = buildVersion({ assetId: "asset:model", versionId: "asset:model:v1", sourceLabel: "model-studio" });
+    const workflowVersion = buildVersion({
+      assetId: "asset:workflow",
+      versionId: "asset:workflow:v1",
+      sourceLabel: "workflow-studio",
+      upstreamVersionIds: ["asset:model:v1"],
+    });
+
+    let registryQueryCalls = 0;
+    const queryRepository: Pick<IAssetSystemQueryRepository, "listAssetsByCriteria" | "getLatestVersionForAsset" | "listCanonicalIdentities"> = {
+      async listAssetsByCriteria() {
+        registryQueryCalls += 1;
+        return [modelAsset, workflowAsset];
+      },
+      async getLatestVersionForAsset(assetId) {
+        return assetId === "asset:model" ? modelVersion : workflowVersion;
+      },
+      async listCanonicalIdentities() {
+        return [];
+      },
+    };
+    const versionRepository = new InMemoryAssetVersionRepository([modelVersion, workflowVersion]);
+    const registry = new RegistryQueryService(
+      new InMemoryAssetRecordRepository([modelAsset, workflowAsset]),
+      versionRepository,
+      new InMemoryLineageRepository([]),
+      buildResolver(),
+      queryRepository,
+    );
+    const projectionRepository = new InMemoryRegistryGraphProjectionRepository();
+    projectionRepository.setCurrentSourceSignature({ versionCount: 2, lineageEdgeCount: 0 });
+    const service = new RegistryDependencyGraphService(registry, versionRepository, projectionRepository);
+
+    await service.traverseUpstream("asset:workflow:v1");
+    await service.traverseUpstream("asset:workflow:v1");
+    expect(registryQueryCalls).toBe(1);
+    expect(projectionRepository.writes).toBe(1);
+    expect(service.getCacheStats().hits).toBeGreaterThan(0);
+
+    projectionRepository.setCurrentSourceSignature({ versionCount: 3, lineageEdgeCount: 0 });
+    await service.traverseUpstream("asset:workflow:v1");
     expect(projectionRepository.writes).toBe(2);
   });
 });

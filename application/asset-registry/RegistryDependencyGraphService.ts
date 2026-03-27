@@ -8,6 +8,7 @@ import type {
 } from "../ports/interfaces/IRegistryGraphProjectionRepository";
 import { buildRegistryGraphProjection } from "./RegistryGraphProjection";
 import { RegistryQueryService } from "./RegistryQueryService";
+import { RegistryCacheLayer } from "./RegistryCacheLayer";
 
 export interface RegistryDependencyGraphNode {
   readonly assetId: string;
@@ -70,6 +71,10 @@ export class RegistryDependencyGraphService {
     private readonly registryQueryService: RegistryQueryService,
     private readonly versionRepository: Pick<IAssetVersionRepository, "getByVersionId">,
     private readonly projectionRepository?: IRegistryGraphProjectionRepository,
+    private readonly cacheLayer: RegistryCacheLayer = new RegistryCacheLayer(),
+    private readonly sourceSignatureProvider?: {
+      getCurrentSourceSignature?(): Promise<{ readonly versionCount: number; readonly lineageEdgeCount: number }>;
+    },
   ) {}
 
   public async expandDirectDependencies(versionId: string): Promise<RegistryDependencyGraph> {
@@ -94,34 +99,49 @@ export class RegistryDependencyGraphService {
     return this.traverse(versionId, "downstream", options);
   }
 
+  public getCacheStats() {
+    return this.cacheLayer.getStats();
+  }
+
+  public invalidateCache(): void {
+    this.cacheLayer.invalidateNamespace("registry-graph-adjacency");
+    this.cacheLayer.invalidateNamespace("registry-graph-direct-upstream");
+    this.cacheLayer.invalidateNamespace("registry-graph-direct-downstream");
+    this.cacheLayer.invalidateNamespace("registry-graph-traversal-upstream");
+    this.cacheLayer.invalidateNamespace("registry-graph-traversal-downstream");
+  }
+
   private async expandDirect(versionId: string, direction: "upstream" | "downstream"): Promise<RegistryDependencyGraph> {
     const normalized = versionId.trim();
     if (!normalized) {
       return Object.freeze({ nodes: Object.freeze([]), edges: Object.freeze([]) });
     }
 
-    const adjacency = await this.buildAdjacency();
-    const root = await this.getNode(normalized, adjacency.nodesByVersionId);
-    if (!root) {
-      return Object.freeze({ nodes: Object.freeze([]), edges: Object.freeze([]) });
-    }
-
-    const selected = direction === "upstream"
-      ? adjacency.upstreamEdgesByVersionId.get(normalized) ?? Object.freeze([])
-      : adjacency.downstreamEdgesByVersionId.get(normalized) ?? Object.freeze([]);
-
-    const nodes = new Map<string, RegistryDependencyGraphNode>([[root.versionId, root]]);
-    for (const edge of selected) {
-      const adjacentVersionId = direction === "upstream" ? edge.toVersionId : edge.fromVersionId;
-      const adjacent = await this.getNode(adjacentVersionId, adjacency.nodesByVersionId);
-      if (adjacent) {
-        nodes.set(adjacent.versionId, adjacent);
+    await this.enforceCacheSourceSignature();
+    return this.cacheLayer.getOrSet(`registry-graph-direct-${direction}`, normalized, async () => {
+      const adjacency = await this.buildAdjacency();
+      const root = await this.getNode(normalized, adjacency.nodesByVersionId);
+      if (!root) {
+        return Object.freeze({ nodes: Object.freeze([]), edges: Object.freeze([]) });
       }
-    }
 
-    return Object.freeze({
-      nodes: Object.freeze([...nodes.values()]),
-      edges: selected,
+      const selected = direction === "upstream"
+        ? adjacency.upstreamEdgesByVersionId.get(normalized) ?? Object.freeze([])
+        : adjacency.downstreamEdgesByVersionId.get(normalized) ?? Object.freeze([]);
+
+      const nodes = new Map<string, RegistryDependencyGraphNode>([[root.versionId, root]]);
+      for (const edge of selected) {
+        const adjacentVersionId = direction === "upstream" ? edge.toVersionId : edge.fromVersionId;
+        const adjacent = await this.getNode(adjacentVersionId, adjacency.nodesByVersionId);
+        if (adjacent) {
+          nodes.set(adjacent.versionId, adjacent);
+        }
+      }
+
+      return Object.freeze({
+        nodes: Object.freeze([...nodes.values()]),
+        edges: selected,
+      });
     });
   }
 
@@ -144,116 +164,150 @@ export class RegistryDependencyGraphService {
       });
     }
 
-    const adjacency = await this.buildAdjacency();
-    const root = await this.getNode(normalized, adjacency.nodesByVersionId);
-    if (!root) {
-      return Object.freeze({
-        rootVersionId: normalized,
-        direction,
-        maxDepth,
-        graph: Object.freeze({ nodes: Object.freeze([]), edges: Object.freeze([]) }),
-        levels: Object.freeze([]),
-      });
-    }
-
-    const queue: Array<{ versionId: string; depth: number }> = [{ versionId: normalized, depth: 0 }];
-    const visited = new Set<string>([normalized]);
-    const edges = new Map<string, RegistryDependencyGraphEdge>();
-    const nodes = new Map<string, RegistryDependencyGraphNode>([[root.versionId, root]]);
-    const levels: string[][] = [[normalized]];
-
-    while (queue.length > 0 && nodes.size < maxNodes) {
-      const current = queue.shift();
-      if (!current) {
-        break;
-      }
-
-      if (current.depth >= maxDepth) {
-        continue;
-      }
-
-      const adjacencyEdges = direction === "upstream"
-        ? adjacency.upstreamEdgesByVersionId.get(current.versionId) ?? Object.freeze([])
-        : adjacency.downstreamEdgesByVersionId.get(current.versionId) ?? Object.freeze([]);
-
-      for (const edge of adjacencyEdges) {
-        const edgeKey = `${edge.fromVersionId}->${edge.toVersionId}:${edge.source}:${edge.relationshipType ?? ""}`;
-        edges.set(edgeKey, edge);
-
-        const adjacentVersionId = direction === "upstream" ? edge.toVersionId : edge.fromVersionId;
-        if (visited.has(adjacentVersionId)) {
-          continue;
+    await this.enforceCacheSourceSignature();
+    return this.cacheLayer.getOrSet(
+      `registry-graph-traversal-${direction}`,
+      JSON.stringify({ versionId: normalized, maxDepth, maxNodes }),
+      async () => {
+        const adjacency = await this.buildAdjacency();
+        const root = await this.getNode(normalized, adjacency.nodesByVersionId);
+        if (!root) {
+          return Object.freeze({
+            rootVersionId: normalized,
+            direction,
+            maxDepth,
+            graph: Object.freeze({ nodes: Object.freeze([]), edges: Object.freeze([]) }),
+            levels: Object.freeze([]),
+          });
         }
 
-        const adjacentNode = await this.getNode(adjacentVersionId, adjacency.nodesByVersionId);
-        if (!adjacentNode) {
-          continue;
+        const queue: Array<{ versionId: string; depth: number }> = [{ versionId: normalized, depth: 0 }];
+        const visited = new Set<string>([normalized]);
+        const edges = new Map<string, RegistryDependencyGraphEdge>();
+        const nodes = new Map<string, RegistryDependencyGraphNode>([[root.versionId, root]]);
+        const levels: string[][] = [[normalized]];
+
+        while (queue.length > 0 && nodes.size < maxNodes) {
+          const current = queue.shift();
+          if (!current) {
+            break;
+          }
+
+          if (current.depth >= maxDepth) {
+            continue;
+          }
+
+          const adjacencyEdges = direction === "upstream"
+            ? adjacency.upstreamEdgesByVersionId.get(current.versionId) ?? Object.freeze([])
+            : adjacency.downstreamEdgesByVersionId.get(current.versionId) ?? Object.freeze([]);
+
+          for (const edge of adjacencyEdges) {
+            const edgeKey = `${edge.fromVersionId}->${edge.toVersionId}:${edge.source}:${edge.relationshipType ?? ""}`;
+            edges.set(edgeKey, edge);
+
+            const adjacentVersionId = direction === "upstream" ? edge.toVersionId : edge.fromVersionId;
+            if (visited.has(adjacentVersionId)) {
+              continue;
+            }
+
+            const adjacentNode = await this.getNode(adjacentVersionId, adjacency.nodesByVersionId);
+            if (!adjacentNode) {
+              continue;
+            }
+
+            visited.add(adjacentVersionId);
+            nodes.set(adjacentNode.versionId, adjacentNode);
+            queue.push({ versionId: adjacentVersionId, depth: current.depth + 1 });
+
+            if (!levels[current.depth + 1]) {
+              levels[current.depth + 1] = [];
+            }
+            levels[current.depth + 1]!.push(adjacentVersionId);
+
+            if (nodes.size >= maxNodes) {
+              break;
+            }
+          }
         }
 
-        visited.add(adjacentVersionId);
-        nodes.set(adjacentNode.versionId, adjacentNode);
-        queue.push({ versionId: adjacentVersionId, depth: current.depth + 1 });
-
-        if (!levels[current.depth + 1]) {
-          levels[current.depth + 1] = [];
-        }
-        levels[current.depth + 1]!.push(adjacentVersionId);
-
-        if (nodes.size >= maxNodes) {
-          break;
-        }
-      }
-    }
-
-    return Object.freeze({
-      rootVersionId: normalized,
-      direction,
-      maxDepth,
-      graph: Object.freeze({
-        nodes: Object.freeze([...nodes.values()]),
-        edges: Object.freeze([...edges.values()]),
-      }),
-      levels: Object.freeze(levels.map((level) => Object.freeze(level))),
-    });
+        return Object.freeze({
+          rootVersionId: normalized,
+          direction,
+          maxDepth,
+          graph: Object.freeze({
+            nodes: Object.freeze([...nodes.values()]),
+            edges: Object.freeze([...edges.values()]),
+          }),
+          levels: Object.freeze(levels.map((level) => Object.freeze(level))),
+        });
+      },
+    );
   }
 
   private async buildAdjacency(): Promise<DependencyAdjacency> {
-    const projection = await this.loadOrRebuildProjection();
-    const nodesByVersionId = new Map<string, RegistryDependencyGraphNode>();
-    const upstreamEdgesByVersionId = new Map<string, ReadonlyArray<RegistryDependencyGraphEdge>>();
-    const downstreamEdgesByVersionId = new Map<string, ReadonlyArray<RegistryDependencyGraphEdge>>();
+    await this.enforceCacheSourceSignature();
+    return this.cacheLayer.getOrSet("registry-graph-adjacency", "default", async () => {
+      const projection = await this.loadOrRebuildProjection();
+      const nodesByVersionId = new Map<string, RegistryDependencyGraphNode>();
+      const upstreamEdgesByVersionId = new Map<string, ReadonlyArray<RegistryDependencyGraphEdge>>();
+      const downstreamEdgesByVersionId = new Map<string, ReadonlyArray<RegistryDependencyGraphEdge>>();
 
-    for (const node of projection.nodes) {
-      nodesByVersionId.set(node.versionId, toGraphNode(node));
-    }
+      for (const node of projection.nodes) {
+        nodesByVersionId.set(node.versionId, toGraphNode(node));
+      }
 
-    for (const edge of projection.edges) {
-      const mapped = toGraphEdge(edge);
-      appendMapEntry(upstreamEdgesByVersionId, edge.fromVersionId, mapped);
-      appendMapEntry(downstreamEdgesByVersionId, edge.toVersionId, mapped);
-    }
+      for (const edge of projection.edges) {
+        const mapped = toGraphEdge(edge);
+        appendMapEntry(upstreamEdgesByVersionId, edge.fromVersionId, mapped);
+        appendMapEntry(downstreamEdgesByVersionId, edge.toVersionId, mapped);
+      }
 
-    for (const edge of projection.edges) {
-      if (!nodesByVersionId.has(edge.fromVersionId)) {
-        const node = await this.lookupNode(edge.fromVersionId, edge.fromAssetId);
-        if (node) {
-          nodesByVersionId.set(node.versionId, node);
+      for (const edge of projection.edges) {
+        if (!nodesByVersionId.has(edge.fromVersionId)) {
+          const node = await this.lookupNode(edge.fromVersionId, edge.fromAssetId);
+          if (node) {
+            nodesByVersionId.set(node.versionId, node);
+          }
+        }
+
+        if (!nodesByVersionId.has(edge.toVersionId)) {
+          const node = await this.lookupNode(edge.toVersionId, edge.toAssetId);
+          if (node) {
+            nodesByVersionId.set(node.versionId, node);
+          }
         }
       }
 
-      if (!nodesByVersionId.has(edge.toVersionId)) {
-        const node = await this.lookupNode(edge.toVersionId, edge.toAssetId);
-        if (node) {
-          nodesByVersionId.set(node.versionId, node);
-        }
-      }
-    }
-
-    return Object.freeze({
-      nodesByVersionId,
-      upstreamEdgesByVersionId,
-      downstreamEdgesByVersionId,
+      return Object.freeze({
+        nodesByVersionId,
+        upstreamEdgesByVersionId,
+        downstreamEdgesByVersionId,
+      });
     });
+  }
+
+  private async enforceCacheSourceSignature(): Promise<void> {
+    const projectionState = this.projectionRepository
+      ? await this.projectionRepository.getProjectionState()
+      : undefined;
+    if (projectionState?.dirty) {
+      this.invalidateCache();
+    }
+
+    const signatureSource = this.projectionRepository?.getCurrentSourceSignature
+      ? this.projectionRepository
+      : this.sourceSignatureProvider;
+    if (!signatureSource?.getCurrentSourceSignature) {
+      return;
+    }
+
+    const signature = await signatureSource.getCurrentSourceSignature();
+    const signatureKey = `${signature.versionCount}:${signature.lineageEdgeCount}`;
+    this.cacheLayer.enforceNamespaceSignature("registry-graph-adjacency", signatureKey);
+    this.cacheLayer.enforceNamespaceSignature("registry-graph-direct-upstream", signatureKey);
+    this.cacheLayer.enforceNamespaceSignature("registry-graph-direct-downstream", signatureKey);
+    this.cacheLayer.enforceNamespaceSignature("registry-graph-traversal-upstream", signatureKey);
+    this.cacheLayer.enforceNamespaceSignature("registry-graph-traversal-downstream", signatureKey);
   }
 
   private async loadOrRebuildProjection() {

@@ -18,6 +18,7 @@ import { evaluateStudioDraftConsistency } from "../studio-shell/AtomicStudioAsse
 import { buildStudioShellValidationIssues } from "../studio-shell/StudioShellValidation";
 import { AssetDraftLifecycleStatuses, type AssetDraft } from "../../domain/studio-shell/StudioShellDomain";
 import { TaxonomySemanticRoles, TaxonomyStructuralKinds, type TaxonomyBehaviorKind, type TaxonomySemanticRole } from "../../domain/taxonomy/CompositionTaxonomy";
+import { RegistryCacheLayer } from "./RegistryCacheLayer";
 
 export interface RegistryFilterParams {
   readonly structuralKinds?: ReadonlyArray<CompositionTaxonomyDescriptor["structuralKind"]>;
@@ -42,8 +43,13 @@ function normalizeSet(values?: ReadonlyArray<string>): ReadonlySet<string> | und
   return new Set(values.map((entry) => entry.trim()).filter(Boolean));
 }
 
+interface RegistrySourceSignatureProvider {
+  getCurrentSourceSignature?(): Promise<{ readonly versionCount: number; readonly lineageEdgeCount: number }>;
+}
+
 export class RegistryQueryService {
   private readonly taxonomyClassifier: CompositionTaxonomyClassifier;
+  private readonly sourceSignatureProvider?: RegistrySourceSignatureProvider;
 
   constructor(
     private readonly assetRepository: IAssetRecordRepository,
@@ -52,70 +58,112 @@ export class RegistryQueryService {
     private readonly contractResolver: Pick<IAssetContractResolver, "resolveCanonicalEntityContract" | "resolveContractForTaxonomy">,
     private readonly queryRepository?: Pick<IAssetSystemQueryRepository, "listAssetsByCriteria" | "getLatestVersionForAsset" | "listCanonicalIdentities">,
     taxonomyClassifier: CompositionTaxonomyClassifier = new CompositionTaxonomyClassifier(),
+    private readonly cacheLayer: RegistryCacheLayer = new RegistryCacheLayer(),
+    sourceSignatureProvider?: RegistrySourceSignatureProvider,
   ) {
     this.taxonomyClassifier = taxonomyClassifier;
+    this.sourceSignatureProvider = sourceSignatureProvider
+      ?? (queryRepository as RegistrySourceSignatureProvider | undefined);
   }
 
   public async queryRegistry(params: RegistryFilterParams = {}): Promise<ReadonlyArray<RegistryAsset>> {
-    const assets = await (this.queryRepository
-      ? this.queryRepository.listAssetsByCriteria({
-        structuralKinds: params.structuralKinds,
-        semanticRoles: params.semanticRoles,
-        behaviorKinds: params.behaviorKinds,
-      })
-      : this.assetRepository.list());
+    await this.enforceCacheSourceSignature();
+    const queryKey = JSON.stringify({
+      structuralKinds: params.structuralKinds ?? [],
+      semanticRoles: params.semanticRoles ?? [],
+      behaviorKinds: params.behaviorKinds ?? [],
+      contractParameterIds: params.contractParameterIds ?? [],
+      contractInvocationModes: params.contractInvocationModes ?? [],
+      contractSideEffects: params.contractSideEffects ?? [],
+      provenanceSourceTypes: params.provenanceSourceTypes ?? [],
+      provenanceCreatorIds: params.provenanceCreatorIds ?? [],
+      dependsOnAssetIds: params.dependsOnAssetIds ?? [],
+      dependsOnVersionIds: params.dependsOnVersionIds ?? [],
+      keyword: params.keyword ?? "",
+      limit: params.limit ?? null,
+    });
 
-    const identityRecords = this.queryRepository
-      ? await this.queryRepository.listCanonicalIdentities()
-      : [];
-    const identitiesByAssetId = new Map<string, ReadonlyArray<typeof identityRecords[number]>>();
-    for (const identity of identityRecords) {
-      const entries = identitiesByAssetId.get(identity.assetId) ?? [];
-      identitiesByAssetId.set(identity.assetId, Object.freeze([...entries, identity]));
+    return this.cacheLayer.getOrSet("registry-query-results", queryKey, async () => {
+      const assets = await (this.queryRepository
+        ? this.queryRepository.listAssetsByCriteria({
+          structuralKinds: params.structuralKinds,
+          semanticRoles: params.semanticRoles,
+          behaviorKinds: params.behaviorKinds,
+        })
+        : this.assetRepository.list());
+
+      const identityRecords = this.queryRepository
+        ? await this.queryRepository.listCanonicalIdentities()
+        : [];
+      const identitiesByAssetId = new Map<string, ReadonlyArray<typeof identityRecords[number]>>();
+      for (const identity of identityRecords) {
+        const entries = identitiesByAssetId.get(identity.assetId) ?? [];
+        identitiesByAssetId.set(identity.assetId, Object.freeze([...entries, identity]));
+      }
+
+      const projected = await Promise.all(assets.map(async (asset) => {
+        const identities = identitiesByAssetId.get(asset.id) ?? Object.freeze([]);
+        const latestIdentity = identities[0];
+        const latestVersion = this.queryRepository
+          ? await this.queryRepository.getLatestVersionForAsset(asset.id)
+          : (await this.versionRepository.listVersionsByAssetId(asset.id))[0];
+
+        const taxonomy = latestIdentity?.taxonomy ?? this.taxonomyClassifier.classifyAsset(asset);
+        const contract = await this.resolveContractProjection(taxonomy, latestIdentity);
+        const dependencies = await this.buildDependencyReferences(latestVersion?.versionId);
+        const provenance = this.readProvenance(latestVersion?.metadata, asset, dependencies);
+        const validation = await this.buildValidationInsights({
+          assetId: asset.id,
+          versionId: latestVersion?.versionId,
+          taxonomy,
+          contract,
+          dependencies,
+          provenance,
+        });
+
+        return createRegistryAsset({
+          assetId: asset.id,
+          versionId: latestVersion?.versionId,
+          name: asset.name,
+          kind: asset.kind,
+          status: asset.status,
+          taxonomy,
+          contract,
+          provenance,
+          dependencies,
+          versionHistory: await this.buildVersionHistory(asset.id),
+          lineage: await this.buildLineageContext(latestVersion?.versionId, assets),
+          validation,
+        });
+      }));
+
+      const filtered = projected.filter((entry) => this.matchesFilters(entry, params) && this.matchesSearch(entry, params.keyword));
+      if (params.limit && params.limit > 0) {
+        return Object.freeze(filtered.slice(0, params.limit));
+      }
+
+      return Object.freeze(filtered);
+    });
+  }
+
+  public async invalidateCache(): Promise<void> {
+    this.cacheLayer.invalidateNamespace("registry-query-results");
+  }
+
+  public getCacheStats() {
+    return this.cacheLayer.getStats();
+  }
+
+  private async enforceCacheSourceSignature(): Promise<void> {
+    if (!this.sourceSignatureProvider?.getCurrentSourceSignature) {
+      return;
     }
 
-    const projected = await Promise.all(assets.map(async (asset) => {
-      const identities = identitiesByAssetId.get(asset.id) ?? Object.freeze([]);
-      const latestIdentity = identities[0];
-      const latestVersion = this.queryRepository
-        ? await this.queryRepository.getLatestVersionForAsset(asset.id)
-        : (await this.versionRepository.listVersionsByAssetId(asset.id))[0];
-
-      const taxonomy = latestIdentity?.taxonomy ?? this.taxonomyClassifier.classifyAsset(asset);
-      const contract = await this.resolveContractProjection(taxonomy, latestIdentity);
-      const dependencies = await this.buildDependencyReferences(latestVersion?.versionId);
-      const provenance = this.readProvenance(latestVersion?.metadata, asset, dependencies);
-      const validation = await this.buildValidationInsights({
-        assetId: asset.id,
-        versionId: latestVersion?.versionId,
-        taxonomy,
-        contract,
-        dependencies,
-        provenance,
-      });
-
-      return createRegistryAsset({
-        assetId: asset.id,
-        versionId: latestVersion?.versionId,
-        name: asset.name,
-        kind: asset.kind,
-        status: asset.status,
-        taxonomy,
-        contract,
-        provenance,
-        dependencies,
-        versionHistory: await this.buildVersionHistory(asset.id),
-        lineage: await this.buildLineageContext(latestVersion?.versionId, assets),
-        validation,
-      });
-    }));
-
-    const filtered = projected.filter((entry) => this.matchesFilters(entry, params) && this.matchesSearch(entry, params.keyword));
-    if (params.limit && params.limit > 0) {
-      return Object.freeze(filtered.slice(0, params.limit));
-    }
-
-    return Object.freeze(filtered);
+    const signature = await this.sourceSignatureProvider.getCurrentSourceSignature();
+    this.cacheLayer.enforceNamespaceSignature(
+      "registry-query-results",
+      `${signature.versionCount}:${signature.lineageEdgeCount}`,
+    );
   }
 
   public async getAssetDetailByAssetId(assetId: string): Promise<RegistryAsset | undefined> {
