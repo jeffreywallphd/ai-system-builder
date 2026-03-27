@@ -56,3 +56,4 @@ What is **not** implemented in this slice:
 - Execution artifacts now map to **system/system/iterative** in canonical classification seams, avoiding outdated atomic/system mappings.
 
 This shared taxonomy is a guardrail to keep workflow/agent/asset/system language coherent while implementation continues in parallel.
+- Direction 5 atomic studio usage now also concretely applies `atomic/prompt-template/none` through Prompt Template Studio (`domain/prompt-template-studio/*`, `application/prompt-template-studio/*`, and registration-driven UI shell integration).

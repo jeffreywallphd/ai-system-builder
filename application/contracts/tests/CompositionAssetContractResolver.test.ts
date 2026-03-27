@@ -100,6 +100,11 @@ describe("CompositionAssetContractResolver", () => {
       semanticRole: TaxonomySemanticRoles.configProfile,
       behaviorKind: TaxonomyBehaviorKinds.none,
     });
+    const promptTemplateContract = resolver.resolveContractForTaxonomy({
+      structuralKind: "atomic",
+      semanticRole: TaxonomySemanticRoles.promptTemplate,
+      behaviorKind: TaxonomyBehaviorKinds.none,
+    });
     const datasetPipelineContract = resolver.resolveContractForTaxonomy({
       structuralKind: "composite",
       semanticRole: TaxonomySemanticRoles.datasetPipeline,
@@ -124,6 +129,7 @@ describe("CompositionAssetContractResolver", () => {
     expect(modelContract?.execution?.invocationMode).toBe("async");
     expect(toolContract?.parameters.find((parameter) => parameter.id === "providerKind")?.defaultValue).toBe("mcp-or-api");
     expect(datasetContract?.parameters.find((parameter) => parameter.id === "datasetFormat")?.defaultValue).toBe("jsonl");
+    expect(promptTemplateContract?.parameters.find((parameter) => parameter.id === "templateFormat")?.defaultValue).toBe("mustache");
     expect(configContract?.parameters.find((parameter) => parameter.id === "profileScope")?.defaultValue).toBe("runtime");
     expect(datasetPipelineContract?.output?.description).toContain("dataset-version");
     expect(trainingRecipeContract?.execution?.sideEffects).toBe("external");

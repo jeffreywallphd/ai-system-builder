@@ -489,3 +489,15 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
   - composite: `workflow`, `context-bundle`, `dataset-pipeline`, `training-recipe`, `tool-chain`
   - system: `system`, `app-template`
 - Non-goals remain explicit: no second studio shell, no second taxonomy/contract stack, and no implementation claims yet for Prompt/Embedding/Config Profile studios beyond shared taxonomy/contract readiness.
+
+## Direction 5 update: Prompt Template studio domain + application slice (story 2.17)
+
+- Prompt Template Studio now has a thin inner-layer domain helper (`domain/prompt-template-studio/PromptTemplateStudioDomain.ts`) for atomic prompt-template authoring with taxonomy `atomic/prompt-template/none` and generated provenance defaults.
+- A bounded application orchestrator (`application/prompt-template-studio/PromptTemplateStudioApplicationService.ts`) follows the Model/Dataset/Tool pattern and reuses `StudioShellApplicationService` for initialize/create/publish lifecycle.
+- Shared taxonomy-driven contract projection now includes atomic prompt-template defaults in `CompositionAssetContractResolver.resolveContractForTaxonomy`, and publish flow reuses shared atomic taxonomy/contract enforcement via `AtomicStudioAssetEnforcement`.
+
+## Direction 5 update: Prompt Template studio UI integration (story 2.18)
+
+- Prompt Template Studio now integrates through the same shared shell renderer/route seam (`ui/pages/PromptTemplateStudioPage.tsx` + `ui/studio-shell/registrations/PromptTemplateStudioRegistration.ts` + `/studio-shell/prompt-template` route wiring) instead of a separate page architecture.
+- Prompt-template-specific renderer behavior remains registration-bounded (`draft-authoring`, `metadata`) while shared shell surfaces stay authoritative for session/draft context, metadata/dependencies, validation, lifecycle/version, and publish flow.
+- Cross-atomic renderer-service integration coverage now includes prompt-template alongside model/dataset/tool in `ui/services/tests/StudioShellService.integration.test.ts`.
