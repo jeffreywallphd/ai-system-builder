@@ -27,10 +27,12 @@ Related-run lineage navigation now also uses that same execution-history service
 - Phase 8.6 adds trigger UX seams (`TriggerSelector`, `TriggerConfigFields`) that expose only supported trigger contracts (`manual`, `backend`) and route backend-trigger launches through the backend `triggerLaunch` contract; UI-side checking is limited to basic request-shape guardrails (for example `backend` requires `trigger.source`) while backend validation remains authoritative.
 - Phase 8.7 adds shared composition metadata renderers in Agent Studio (`CompositionSummaryCard`) across agent detail/launch/session surfaces; these render backend taxonomy/contract projections as-is with no UI-side ontology/classification derivation.
 - Phase 8.8 adds canonical asset-native output exploration in Agent Studio (`OutputAssetExplorerPanel`) for output and memory-write asset IDs by reusing canonical asset-management reads (`loadAssetDetail`, `listVersionChain`) instead of agent-specific asset semantics.
+- Phase 8.9 hardens session observability/debug UX through backend-owned operational projections: `SessionDetailPanel` now composes thin bounded sections (`SessionOperationalSummary`, `SessionTransitionHistoryPanel`, `SessionStepOutcomePanel`, `SessionDiagnosticAssetsPanel`) that render canonical session status/terminal/progress/retry/outcome/step/transition/diagnostic/output fields from `AgentSessionDetailReadModel` directly.
+- Phase 8.10 hardens end-to-end Studio integration by keeping refresh deterministic after authoring/launch/control flows (`getStudioSnapshot` as primary session source, selected-session retention when still present, and reuse of `snapshot.latestSession` when it matches selected detail), and by aligning empty/error/loading behavior with backend contract truth (including explicit no-session empty state) rather than page-level inference.
 - Session list/detail/control are rendered from backend read models/capability flags as-is; the UI does not rebuild runtime semantics or infer derived execution states.
 - Validation failures are shown exactly from backend `validationIssues` payloads without UI-side rule duplication.
 - Composition semantics stay backend-owned: UI reads taxonomy/contract projections already classified via `CompositionTaxonomyClassifier` and `CompositionAssetContractResolver`.
-- Out of scope in this slice: client-derived launch semantics, UI validation/business rules, inferred runtime state machines, and speculative control actions not advertised by backend capabilities.
+- Out of scope in this slice: client-derived launch semantics, UI validation/business rules, inferred runtime state machines, speculative observability/analytics frameworks, and control actions not advertised by backend capabilities.
 
 
 ## TODO
