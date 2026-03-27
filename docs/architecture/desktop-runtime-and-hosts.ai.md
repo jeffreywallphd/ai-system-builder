@@ -18,6 +18,7 @@ Electron is the desktop host boundary; the renderer accesses desktop capabilitie
 - Phase 8.1 now consolidates Studio-facing desktop agent transport through `AgentStudioBackendApi` and extends `ai-loom-desktop-agents:*` with runtime/session endpoints (`launch`, `trigger-launch`, `list-sessions`, `get-session`, `control-run`, `studio-snapshot`) while staying thin over Phase 6/7 use cases.
 - Phase 8.5/8.6 renderer flows consume those same host contracts directly: run controls call `control-run`, manual launches call `launch`, and backend-trigger launches call `trigger-launch`, with no renderer-owned scheduler/automation runtime.
 - Desktop launch/trigger handlers now execute through a real host-wired runner path (`AgentRunnerService`) with deterministic planning + capability execution + asset-backed memory + SQLite-backed session persistence.
+- Direction 5 Studio Shell transport now follows the same thin-host pattern on `ai-loom-desktop-studio-shell:*`, delegating to `StudioShellBackendApi` backed by `SqliteStudioShellRepository` for durable studio/session/draft/version state.
 - Agent authoring backend responses now use a hardened projection envelope (`agent`, `taxonomy`, optional `contract`) so transport read models classify/project through shared composition seams.
 - Agent authoring error responses are type-mapped from inner contracts (`AgentAuthoringError`, `AgentConfigurationValidationError`) with unknown failures normalized to `internal` (no substring-derived mapping).
 - Fallback path: browser/local storage repositories
