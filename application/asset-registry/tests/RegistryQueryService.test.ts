@@ -225,4 +225,71 @@ describe("RegistryQueryService", () => {
     expect(searched).toHaveLength(1);
     expect(searched[0]?.assetId).toBe("asset:workflow");
   });
+
+  it("caches read-model query results and invalidates on source signature changes", async () => {
+    const modelAsset = buildAsset("asset:model", "Model", "generic");
+    const modelVersion = buildVersion({
+      assetId: "asset:model",
+      versionId: "asset:model:v1",
+    });
+
+    let listCalls = 0;
+    let latestCalls = 0;
+    let identityCalls = 0;
+    let signature = { versionCount: 1, lineageEdgeCount: 0 };
+
+    const queryRepository: Pick<IAssetSystemQueryRepository, "listAssetsByCriteria" | "getLatestVersionForAsset" | "listCanonicalIdentities"> & {
+      getCurrentSourceSignature(): Promise<{ readonly versionCount: number; readonly lineageEdgeCount: number }>;
+    } = {
+      async listAssetsByCriteria() {
+        listCalls += 1;
+        return [modelAsset];
+      },
+      async getLatestVersionForAsset() {
+        latestCalls += 1;
+        return modelVersion;
+      },
+      async listCanonicalIdentities() {
+        identityCalls += 1;
+        return [];
+      },
+      async getCurrentSourceSignature() {
+        return signature;
+      },
+    };
+
+    const service = new RegistryQueryService(
+      new InMemoryAssetRecordRepository([modelAsset]),
+      new InMemoryAssetVersionRepository([modelVersion]),
+      new InMemoryLineageRepository([]),
+      {
+        async resolveCanonicalEntityContract() {
+          return undefined;
+        },
+        resolveContractForTaxonomy() {
+          return {
+            version: "1.0.0",
+            parameters: [],
+            execution: { invocationMode: "deferred", sideEffects: "bounded" },
+          };
+        },
+      },
+      queryRepository,
+    );
+
+    const first = await service.queryRegistry({ structuralKinds: ["atomic"] });
+    const second = await service.queryRegistry({ structuralKinds: ["atomic"] });
+    expect(first).toEqual(second);
+    expect(listCalls).toBe(1);
+    expect(latestCalls).toBe(1);
+    expect(identityCalls).toBe(1);
+    expect(service.getCacheStats().hits).toBeGreaterThan(0);
+
+    signature = { versionCount: 2, lineageEdgeCount: 0 };
+    const third = await service.queryRegistry({ structuralKinds: ["atomic"] });
+    expect(third).toEqual(first);
+    expect(listCalls).toBe(2);
+    expect(latestCalls).toBe(2);
+    expect(identityCalls).toBe(2);
+  });
 });

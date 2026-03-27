@@ -612,3 +612,10 @@ Partially implemented / intentionally bounded:
 Explicitly later than this story:
 - System-asset Studio Shell surfaces for Full AI System and App Template / Deployment Unit.
 - Any broader system-composer architecture beyond current shared shell + taxonomy/contract/dependency enforcement seams.
+
+## Direction 5 update: Registry performance + consistency hardening (stories 4.15–4.16)
+
+- Registry reads now include a bounded in-memory cache layer (`application/asset-registry/RegistryCacheLayer.ts`) used by query and dependency-graph services with cache-aside/read-through behavior.
+- Registry query caching is keyed by filter/search shape and invalidated by source-signature changes (`versionCount` + `lineageEdgeCount`) so cache entries remain derived from canonical asset/version/lineage truth.
+- Dependency graph expansion/traversal now caches adjacency and frequently repeated traversals, while projection rebuild remains tied to projection dirty/signature checks (`IRegistryGraphProjectionRepository`) rather than a second persistence layer.
+- Cross-studio registry consistency now has integration-style coverage for atomic + composite publish/read/query/graph/lineage/search flows, including version update and dependency replacement scenarios (`application/asset-registry/tests/CrossStudioRegistryConsistency.integration.test.ts`).
