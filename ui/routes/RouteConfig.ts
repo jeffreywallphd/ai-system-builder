@@ -27,6 +27,7 @@ export const ROUTE_PATHS = Object.freeze({
   datasetStudio: "/studio-shell/dataset",
   toolStudio: "/studio-shell/tool",
   promptTemplateStudio: "/studio-shell/prompt-template",
+  embeddingIndexStudio: "/studio-shell/embedding-index",
   settings: "/settings",
   notFound: "*",
 });
@@ -132,6 +133,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteDefinition> = Object.freeze([
     key: "prompt-template-studio",
     path: ROUTE_PATHS.promptTemplateStudio,
     title: "Prompt Template Studio",
+    showInNavigation: false,
+  }),
+  Object.freeze({
+    key: "embedding-index-studio",
+    path: ROUTE_PATHS.embeddingIndexStudio,
+    title: "Embedding Index Studio",
     showInNavigation: false,
   }),
   Object.freeze({

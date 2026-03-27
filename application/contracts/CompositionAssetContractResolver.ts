@@ -142,6 +142,28 @@ function defaultTaxonomyContract(descriptor: CompositionTaxonomyDescriptor): Ass
     });
   }
 
+  if (semanticRole === TaxonomySemanticRoles.embeddingIndex) {
+    return createAssetContractDescriptor({
+      version: "1.0.0",
+      input: {
+        kind: AssetContractShapeKinds.jsonSchema,
+        description: "Embedding-index authoring/update payload for atomic embedding-index assets.",
+      },
+      output: {
+        kind: AssetContractShapeKinds.jsonSchema,
+        description: "Versioned embedding-index descriptor with index strategy and retrieval metadata.",
+      },
+      parameters: [
+        parameter("indexAlgorithm", false, "Declared embedding-index algorithm.", "string", "hnsw"),
+        parameter("distanceMetric", false, "Declared vector distance metric.", "string", "cosine"),
+      ],
+      execution: {
+        invocationMode: "deferred",
+        sideEffects: "none",
+      },
+    });
+  }
+
   if (semanticRole === TaxonomySemanticRoles.configProfile) {
     return createAssetContractDescriptor({
       version: "1.0.0",

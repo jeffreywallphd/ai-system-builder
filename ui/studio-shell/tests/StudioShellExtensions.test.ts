@@ -4,6 +4,7 @@ import { modelStudioRegistration } from "../registrations/ModelStudioRegistratio
 import { datasetStudioRegistration } from "../registrations/DatasetStudioRegistration";
 import { toolStudioRegistration } from "../registrations/ToolStudioRegistration";
 import { promptTemplateStudioRegistration } from "../registrations/PromptTemplateStudioRegistration";
+import { embeddingIndexStudioRegistration } from "../registrations/EmbeddingIndexStudioRegistration";
 
 describe("StudioShellExtensionRegistry", () => {
   it("registers contributions by slot and sorts by order then id", () => {
@@ -82,9 +83,11 @@ describe("AtomicStudioRegistry", () => {
     registry.register(datasetStudioRegistration);
     registry.register(toolStudioRegistration);
     registry.register(promptTemplateStudioRegistration);
+    registry.register(embeddingIndexStudioRegistration);
 
     expect(registry.list().map((entry) => entry.studioType)).toEqual([
       "dataset-studio",
+      "embedding-index-studio",
       "model-studio",
       "prompt-template-studio",
       "tool-studio",

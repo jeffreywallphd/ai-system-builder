@@ -509,3 +509,15 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
 - Prompt Template Studio now integrates through the same shared shell renderer/route seam (`ui/pages/PromptTemplateStudioPage.tsx` + `ui/studio-shell/registrations/PromptTemplateStudioRegistration.ts` + `/studio-shell/prompt-template` route wiring) instead of a separate page architecture.
 - Prompt-template-specific renderer behavior remains registration-bounded (`draft-authoring`, `metadata`) while shared shell surfaces stay authoritative for session/draft context, metadata/dependencies, validation, lifecycle/version, and publish flow.
 - Cross-atomic renderer-service integration coverage now includes prompt-template alongside model/dataset/tool in `ui/services/tests/StudioShellService.integration.test.ts`.
+
+## Direction 5 update: Embedding Index studio domain + application slice (story 2.19)
+
+- Embedding Index Studio now has a thin inner-layer domain helper (`domain/embedding-index-studio/EmbeddingIndexStudioDomain.ts`) for atomic embedding-index authoring with taxonomy `atomic/embedding-index/none` and generated provenance defaults.
+- A bounded application orchestrator (`application/embedding-index-studio/EmbeddingIndexStudioApplicationService.ts`) follows the same Model/Dataset/Tool/Prompt Template pattern and reuses `StudioShellApplicationService` for initialize/create/publish lifecycle.
+- Shared taxonomy-driven contract projection now includes atomic embedding-index defaults in `CompositionAssetContractResolver.resolveContractForTaxonomy`, and publish flow reuses shared atomic taxonomy/contract enforcement via `AtomicStudioAssetEnforcement`.
+
+## Direction 5 update: Embedding Index studio UI integration (story 2.20)
+
+- Embedding Index Studio now integrates through the shared shell renderer/route seam (`ui/pages/EmbeddingIndexStudioPage.tsx` + `ui/studio-shell/registrations/EmbeddingIndexStudioRegistration.ts` + `/studio-shell/embedding-index` route wiring) instead of introducing a second UI architecture.
+- Embedding-index-specific renderer behavior remains registration-bounded (`draft-authoring`, `metadata`) while shared shell surfaces remain authoritative for session/draft context, metadata/dependencies, validation, lifecycle/version, and publish flow.
+- Cross-atomic renderer-service and enforcement coverage now includes embedding-index alongside model/dataset/tool/prompt-template in `ui/services/tests/StudioShellService.integration.test.ts` and `application/studio-shell/tests/AtomicStudioAssetEnforcement.test.ts`.

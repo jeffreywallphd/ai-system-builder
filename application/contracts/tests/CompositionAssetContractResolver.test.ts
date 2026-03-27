@@ -105,6 +105,11 @@ describe("CompositionAssetContractResolver", () => {
       semanticRole: TaxonomySemanticRoles.promptTemplate,
       behaviorKind: TaxonomyBehaviorKinds.none,
     });
+    const embeddingIndexContract = resolver.resolveContractForTaxonomy({
+      structuralKind: "atomic",
+      semanticRole: TaxonomySemanticRoles.embeddingIndex,
+      behaviorKind: TaxonomyBehaviorKinds.none,
+    });
     const datasetPipelineContract = resolver.resolveContractForTaxonomy({
       structuralKind: "composite",
       semanticRole: TaxonomySemanticRoles.datasetPipeline,
@@ -130,6 +135,7 @@ describe("CompositionAssetContractResolver", () => {
     expect(toolContract?.parameters.find((parameter) => parameter.id === "providerKind")?.defaultValue).toBe("mcp-or-api");
     expect(datasetContract?.parameters.find((parameter) => parameter.id === "datasetFormat")?.defaultValue).toBe("jsonl");
     expect(promptTemplateContract?.parameters.find((parameter) => parameter.id === "templateFormat")?.defaultValue).toBe("mustache");
+    expect(embeddingIndexContract?.parameters.find((parameter) => parameter.id === "indexAlgorithm")?.defaultValue).toBe("hnsw");
     expect(configContract?.parameters.find((parameter) => parameter.id === "profileScope")?.defaultValue).toBe("runtime");
     expect(datasetPipelineContract?.output?.description).toContain("dataset-version");
     expect(trainingRecipeContract?.execution?.sideEffects).toBe("external");
