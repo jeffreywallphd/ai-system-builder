@@ -76,4 +76,31 @@ describe("DatasetStudioApplicationService", () => {
     expect(published.draft.lifecycleStatus).toBe("published");
     expect(published.draft.publishedVersionIds).toEqual(["dataset-version-1"]);
   });
+
+  it("blocks publish when dataset draft contract is removed", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const ids = ["session-1", "draft-1"];
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => ids.shift() ?? "generated");
+    const service = new DatasetStudioApplicationService(studioShell);
+
+    const ensure = await service.ensureStudioInitialized();
+    const created = await service.createDatasetDraft({
+      sessionId: ensure.session.id,
+      title: "Dataset",
+      content: "{}",
+    });
+
+    await studioShell.updateAssetDraft({
+      studioId: DatasetStudioIdentity.defaultStudioId,
+      sessionId: ensure.session.id,
+      draftId: created.draft.id,
+      metadataPatch: { contract: null },
+    });
+
+    await expect(service.publishDatasetDraft({
+      sessionId: ensure.session.id,
+      draftId: created.draft.id,
+      versionId: "dataset-version-invalid",
+    })).rejects.toThrow("contract-missing");
+  });
 });

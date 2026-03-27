@@ -76,4 +76,33 @@ describe("ModelStudioApplicationService", () => {
     expect(published.draft.lifecycleStatus).toBe("published");
     expect(published.draft.publishedVersionIds).toEqual(["model-version-1"]);
   });
+
+  it("blocks publish when model draft taxonomy/contract drift from atomic model expectations", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const ids = ["session-1", "draft-1"];
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => ids.shift() ?? "generated");
+    const service = new ModelStudioApplicationService(studioShell);
+
+    const ensure = await service.ensureStudioInitialized();
+    const created = await service.createModelDraft({
+      sessionId: ensure.session.id,
+      title: "Model Draft",
+      content: "{}",
+    });
+
+    await studioShell.updateAssetDraft({
+      studioId: ModelStudioIdentity.defaultStudioId,
+      sessionId: ensure.session.id,
+      draftId: created.draft.id,
+      metadataPatch: {
+        taxonomy: { structuralKind: "atomic", semanticRole: "dataset", behaviorKind: "none" },
+      },
+    });
+
+    await expect(service.publishModelDraft({
+      sessionId: ensure.session.id,
+      draftId: created.draft.id,
+      versionId: "model-version-invalid",
+    })).rejects.toThrow("Atomic studio draft enforcement failed");
+  });
 });

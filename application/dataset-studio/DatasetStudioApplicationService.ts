@@ -14,7 +14,8 @@ import type {
   StudioInitializationResult,
   StudioSessionResult,
 } from "../studio-shell/contracts";
-import { StudioShellConflictError } from "../studio-shell/StudioShellApplicationErrors";
+import { StudioShellConflictError, StudioShellInvalidRequestError } from "../studio-shell/StudioShellApplicationErrors";
+import { assertAtomicStudioDraftPublishConsistency } from "../studio-shell/AtomicStudioAssetEnforcement";
 
 export interface EnsureDatasetStudioResult {
   readonly initialized: boolean;
@@ -102,8 +103,26 @@ export class DatasetStudioApplicationService {
     });
   }
 
+  private async assertPublishConsistency(studioId: string, draftId: string): Promise<void> {
+    const snapshot = await this.studioShellService.loadAssetDraft({ studioId, draftId });
+    if (!snapshot) {
+      throw new StudioShellInvalidRequestError(`Draft '${draftId}' is not available in studio '${studioId}'.`);
+    }
+
+    assertAtomicStudioDraftPublishConsistency({
+      draft: snapshot.draft,
+      expectation: {
+        studioType: DatasetStudioIdentity.studioType,
+        semanticRole: "dataset",
+        allowedBehaviorKinds: ["none"],
+      },
+      contractResolver: this.contractResolver,
+    });
+  }
+
   public async publishDatasetDraft(command: PublishDatasetDraftCommand): Promise<AssetVersionResult> {
     const studioId = command.studioId?.trim() || DatasetStudioIdentity.defaultStudioId;
+    await this.assertPublishConsistency(studioId, command.draftId);
     await this.studioShellService.transitionAssetDraftLifecycle({
       studioId,
       sessionId: command.sessionId,
