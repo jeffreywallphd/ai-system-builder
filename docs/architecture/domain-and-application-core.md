@@ -530,3 +530,15 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
 - Config-profile renderer behavior remains registration-bounded (`draft-authoring`, `metadata` slots), while shared shell panels remain authoritative for draft/session context, metadata/dependency/lifecycle/version state, validation display, and publish flow.
 - Embedding-index-specific renderer behavior remains registration-bounded (`draft-authoring`, `metadata`) while shared shell surfaces remain authoritative for session/draft context, metadata/dependencies, validation, lifecycle/version, and publish flow.
 - Cross-atomic renderer-service and enforcement coverage now includes embedding-index alongside model/dataset/tool/prompt-template in `ui/services/tests/StudioShellService.integration.test.ts` and `application/studio-shell/tests/AtomicStudioAssetEnforcement.test.ts`.
+
+## Direction 5 update: Workflow studio domain + application slice (story 3.5)
+
+- Workflow Studio now has a thin bounded inner-layer domain helper (`domain/workflow-studio/WorkflowStudioDomain.ts`) for specialized composite orchestrator authoring with taxonomy `composite/workflow/{deterministic|conditional|iterative}` and generated provenance defaults.
+- A bounded application orchestrator (`application/workflow-studio/WorkflowStudioApplicationService.ts`) reuses `StudioShellApplicationService` for initialize/create/publish lifecycle instead of introducing workflow-specific create/update/publish infrastructure.
+- Publish gating now reuses shared composite enforcement (`assertCompositeStudioDraftPublishConsistency`) so workflow semantic-role and behavior invariants plus taxonomy-driven contract derivability remain backend/application-authoritative.
+
+## Direction 5 update: Workflow studio UI integration (story 3.6)
+
+- Workflow Studio now integrates through the same shared shell renderer/route seam (`ui/pages/WorkflowStudioPage.tsx` + `ui/studio-shell/registrations/WorkflowStudioRegistration.ts` + `/studio-shell/workflow` route wiring) instead of a separate workflow UI architecture.
+- Workflow registration contributes bounded workflow-specific guidance/metadata slot panels while shared shell surfaces remain authoritative for draft/session context, taxonomy/contract/provenance/dependencies state, lifecycle transitions, validation display, and publish/version operations.
+- Renderer-service integration coverage now includes a workflow composite-orchestrator scenario over the real shared path (`StudioShellService` -> desktop bridge -> `StudioShellBackendApi` -> `DefaultStudioShellApplicationService` -> SQLite repository) in `ui/services/tests/StudioShellService.integration.test.ts`.

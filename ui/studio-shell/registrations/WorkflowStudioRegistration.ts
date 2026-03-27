@@ -1,0 +1,74 @@
+import { createWorkflowStudioTaxonomy, WorkflowStudioIdentity } from "../../../domain/workflow-studio/WorkflowStudioDomain";
+import type { CompositeStudioRegistration } from "../StudioShellExtensions";
+import { createCompositeStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
+
+export const workflowStudioRegistration: CompositeStudioRegistration = Object.freeze({
+  studioType: WorkflowStudioIdentity.studioType,
+  studioId: WorkflowStudioIdentity.defaultStudioId,
+  kind: "composite",
+  displayName: WorkflowStudioIdentity.defaultStudioName,
+  role: "workflow",
+  allowedBehaviorKinds: Object.freeze(["deterministic", "conditional", "iterative"]),
+  shell: Object.freeze({
+    title: WorkflowStudioIdentity.defaultStudioName,
+    subtitle: "Shared composite shell for workflow orchestrator authoring with backend-authoritative lifecycle, validation, and publish/version flows.",
+  }),
+  defaults: {
+    title: "Workflow Asset Draft",
+    tags: Object.freeze(["workflow", "studio-shell", "composite", "orchestrator"]),
+    contentTemplate: JSON.stringify(
+      {
+        workflowSpec: {
+          metadata: {
+            name: "",
+            description: "",
+          },
+          executionPolicy: "acyclic-only",
+          nodes: [],
+          connections: [],
+        },
+      },
+      null,
+      2,
+    ),
+    metadataPatch: createCompositeStudioMetadataPatch({
+      title: "Workflow Asset Draft",
+      tags: ["workflow", "studio-shell", "composite", "orchestrator"],
+      summary: "Composite workflow orchestrator asset drafted through Workflow Studio.",
+      taxonomy: createWorkflowStudioTaxonomy("deterministic"),
+      sourceLabel: WorkflowStudioIdentity.studioType,
+    }),
+    dependencies: Object.freeze([]),
+  },
+  extensions: Object.freeze([
+    {
+      id: "workflow-studio-draft-guidance",
+      slot: "draft-authoring",
+      title: "Workflow draft guidance",
+      subtitle: "Author orchestrator structure as a composite asset while keeping execution behavior in taxonomy metadata.",
+      order: 10,
+      render: ({ snapshot }) => Object.freeze([
+        "Workflow assets are specialized composite orchestrators: structure/version in assets, execution patterns in behavior metadata.",
+        "Allowed behavior kinds: deterministic, conditional, iterative.",
+        `Draft asset id: ${snapshot?.draft?.assetId ?? "-"}`,
+      ]),
+    },
+    {
+      id: "workflow-studio-metadata-summary",
+      slot: "metadata",
+      title: "Workflow taxonomy and contract status",
+      subtitle: "Read-only taxonomy/contract/provenance projection from backend-authoritative draft metadata.",
+      order: 20,
+      render: ({ snapshot }) => {
+        const taxonomy = snapshot?.draft?.metadata.taxonomy;
+        return Object.freeze([
+          `Taxonomy: ${taxonomy
+            ? `${taxonomy.structuralKind}/${taxonomy.semanticRole}/${taxonomy.behaviorKind}`
+            : "missing"}`,
+          `Contract: ${snapshot?.draft?.metadata.contract ? "present" : "missing"}`,
+          `Provenance source: ${snapshot?.draft?.metadata.provenance?.sourceLabel ?? "-"}`,
+        ]);
+      },
+    },
+  ]),
+});
