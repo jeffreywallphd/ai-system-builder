@@ -205,6 +205,12 @@ The studio shell now has a bounded inner-layer model and application orchestrati
 - `StudioShellPage` composes registered extension panels alongside shared shell concerns (session/draft context, metadata/dependencies/lifecycle surfaces, validation/error display) without moving business rules out of backend/application contracts.
 - publish operations are lifecycle-gated (`validated` required) while remaining distinct from draft revisioning and immutable version history semantics.
 
+## Direction 5 update: Studio shell initial end-to-end vertical slice (story 1.13)
+
+- Studio shell now has a tested vertical flow across real seams (`StudioShellService` -> desktop bridge -> `StudioShellBackendApi` -> `DefaultStudioShellApplicationService` -> `IStudioShellRepository` SQLite adapter) rather than isolated layer checks.
+- The bounded end-to-end path covers studio initialization/load, draft create/update, metadata patching (taxonomy/contract/provenance), dependency updates, lifecycle transitions, backend-authoritative validation projection, publish/version creation, and persisted snapshot reload.
+- Persistence-backed publish truth remains explicit: draft revision/lifecycle semantics stay distinct from immutable version history semantics, and reload tests verify that published state survives repository/host restarts.
+
 ## TODO
 
 - Some concepts currently live more in the application layer than the domain layer because they are orchestration-heavy. That is reasonable, but over time the team may want to clarify which context-engineering rules are true domain policy versus application assembly policy.

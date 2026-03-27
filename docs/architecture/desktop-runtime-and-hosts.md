@@ -36,9 +36,11 @@ This makes Electron the host-level boundary where local capabilities become avai
 - model-file operations
 - canonical asset operations
 - agent authoring/configuration operations (`create/update/get/list/delete/archive`, goal/policy/tool/memory/strategy configuration, and configuration validation)
+- studio-shell authoring operations (`initialize/snapshot/start-session/create-draft/update-draft/update-dependencies/transition-lifecycle/publish-version/validate-draft`)
 
 Agent authoring backend responses now use a hardened projection envelope (`agent`, `taxonomy`, optional `contract`) so desktop transport keeps read semantics aligned with `CompositionTaxonomyClassifier`/`CompositionAssetContractResolver`.
 Phase 8.1 extends this desktop backend surface to a Studio-ready seam via `AgentStudioBackendApi`, adding runtime/session IPC operations (launch/trigger launch/session list/detail/run control/studio snapshot) on `ai-loom-desktop-agents:*` while keeping transport thin over existing application use cases.
+Direction 5 Studio Shell operations are exposed the same way on `ai-loom-desktop-studio-shell:*` and delegate to `StudioShellBackendApi` over the real SQLite studio-shell repository.
 Desktop launch/trigger IPC handlers now delegate into a real runner-backed execution path (`AgentRunnerService`) in the host bootstrap, including deterministic planning, capability orchestration, asset-backed memory retrieval/write, and SQLite session persistence.
 Phase 8.5/8.6 UI flows remain contract-driven over this bridge: run-control UX maps directly to `control-run`, manual launches map to `launch`, and backend-trigger launches map to `trigger-launch`; unsupported automation systems (scheduler/cron/event bus/background orchestration) are intentionally not exposed in renderer-host contracts for this slice.
 Agent authoring error responses are type-mapped from inner contracts (`AgentAuthoringError`, `AgentConfigurationValidationError`) with unknown failures normalized to `internal` (no substring-derived mapping).
