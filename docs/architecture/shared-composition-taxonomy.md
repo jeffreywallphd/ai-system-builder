@@ -25,6 +25,8 @@ What is now implemented:
 - Canonical identity records now persist optional taxonomy metadata (`structural_kind`, `semantic_role`, `behavior_kind`) and canonical resolver/operational summaries can project it.
 - Canonical asset query criteria now includes taxonomy-aware filters (`structuralKinds`, `semanticRoles`, `behaviorKinds`) in addition to kind/source/status criteria.
 - Canonical asset summary/detail reads still expose taxonomy descriptors, with identity metadata as the preferred source and bounded fallback classification where needed.
+- Direction 5 atomic studio usage now concretely applies this taxonomy in Model Studio (`atomic/model/none`), Dataset Studio (`atomic/dataset/none`), and Tool Studio (`atomic/tool/conditional|deterministic`) via shared shell draft metadata and publish enforcement.
+- End-to-end cross-studio consistency tests now verify this taxonomy coherence over real shared seams (service/bridge/backend/application/SQLite) before and after reload.
 
 
 ## Specialized composite role interpretation
@@ -43,6 +45,10 @@ What is **not** implemented in this slice:
 
 ## Composition interpretation in this codebase
 - Assets remain structural/versionable objects with durable identity.
+- Current target shape for Direction 5 classification remains:
+  - atomic assets: model, dataset, tool, prompt-template, embedding-index, config-profile
+  - composite assets: workflow, context-bundle, dataset-pipeline, training-recipe, tool-chain
+  - system assets: system, app-template
 - Workflows and agents are both **composite** structures.
   - Workflow semantic role: `workflow`, behavior typically `deterministic` or `conditional` (legacy `dynamic` normalizes to `conditional`).
   - Agent semantic role: `agent`, behavior `autonomous`.

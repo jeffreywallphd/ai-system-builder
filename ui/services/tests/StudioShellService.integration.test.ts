@@ -7,6 +7,7 @@ import { StudioShellBackendApi } from "../../../infrastructure/api/studio-shell/
 import { SqliteStudioShellRepository } from "../../../infrastructure/filesystem/studio-shell/SqliteStudioShellRepository";
 import { AssetDraftLifecycleStatuses } from "../../../domain/studio-shell/StudioShellDomain";
 import { StudioShellService } from "../StudioShellService";
+import { CompositionAssetContractResolver } from "../../../application/contracts/CompositionAssetContractResolver";
 
 const createdRoots: string[] = [];
 
@@ -60,6 +61,170 @@ function installBridge(api: StudioShellBackendApi): void {
 }
 
 describe("StudioShellService integration", () => {
+  it("keeps model/dataset/tool lifecycle and persisted contract-taxonomy behavior consistent across shared seams", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-atomic-studio-consistency-"));
+    createdRoots.push(root);
+    const databasePath = path.join(root, "atomic-studio.sqlite");
+    const repository = new SqliteStudioShellRepository(databasePath);
+    const backendApi = new StudioShellBackendApi(repository);
+    installBridge(backendApi);
+
+    const service = new StudioShellService();
+    const contractResolver = new CompositionAssetContractResolver();
+    const scenarios = [
+      {
+        studioId: "studio-models",
+        name: "Model Studio",
+        semanticRole: "model" as const,
+        behaviorKind: "none" as const,
+        content: "{\"modelSpec\":{\"provider\":\"local\",\"modelId\":\"mistral-7b\"}}",
+        dependencies: [{ assetId: "asset:model-catalog", versionId: "asset:model-catalog:v1" }],
+      },
+      {
+        studioId: "studio-datasets",
+        name: "Dataset Studio",
+        semanticRole: "dataset" as const,
+        behaviorKind: "none" as const,
+        content: "{\"datasetSpec\":{\"format\":\"jsonl\",\"schema\":{\"instruction\":\"string\"}}}",
+        dependencies: [{ assetId: "asset:seed-dataset", versionId: "asset:seed-dataset:v3" }],
+      },
+      {
+        studioId: "studio-tools",
+        name: "Tool Studio",
+        semanticRole: "tool" as const,
+        behaviorKind: "conditional" as const,
+        content: "{\"toolSpec\":{\"providerKind\":\"mcp\",\"serverId\":\"search\",\"operationId\":\"query\"}}",
+        dependencies: [{ assetId: "asset:mcp-catalog", versionId: "asset:mcp-catalog:v2" }],
+      },
+    ];
+
+    for (const scenario of scenarios) {
+      const initialized = await service.initializeStudio(scenario.studioId, scenario.name);
+      expect(initialized.ok).toBeTrue();
+      const sessionId = initialized.data?.activeSessionId;
+      expect(sessionId).toBeDefined();
+
+      const created = await service.createDraft({
+        studioId: scenario.studioId,
+        sessionId: sessionId!,
+        content: scenario.content,
+        metadata: {
+          title: `${scenario.semanticRole}-asset`,
+          tags: [scenario.semanticRole, "studio-shell"],
+          taxonomy: {
+            structuralKind: "atomic",
+            semanticRole: scenario.semanticRole,
+            behaviorKind: scenario.behaviorKind,
+          },
+          contract: contractResolver.resolveContractForTaxonomy({
+            structuralKind: "atomic",
+            semanticRole: scenario.semanticRole,
+            behaviorKind: scenario.behaviorKind,
+          }),
+          provenance: {
+            sourceType: "generated",
+            sourceLabel: `${scenario.semanticRole}-studio`,
+          },
+        },
+        dependencies: scenario.dependencies,
+      });
+      expect(created.ok).toBeTrue();
+      expect(created.data?.validationIssues).toContainEqual(expect.objectContaining({
+        code: "lifecycle-not-publish-ready",
+      }));
+      expect(created.data?.validationIssues).toContainEqual(expect.objectContaining({
+        code: "version-history-empty",
+      }));
+
+      const draftId = created.data?.draft?.draftId;
+      expect(draftId).toBeDefined();
+
+      const updated = await service.updateDraft({
+        studioId: scenario.studioId,
+        sessionId: sessionId!,
+        draftId: draftId!,
+        content: `${scenario.content}\n`,
+        metadataPatch: {
+          summary: `${scenario.name} consistency draft`,
+        },
+      });
+      expect(updated.ok).toBeTrue();
+      expect(updated.data?.draft?.revision).toBe(2);
+
+      const dependencyUpdated = await service.updateDependencies({
+        studioId: scenario.studioId,
+        sessionId: sessionId!,
+        draftId: draftId!,
+        dependencies: scenario.dependencies,
+      });
+      expect(dependencyUpdated.ok).toBeTrue();
+      expect(dependencyUpdated.data?.draft?.dependencies).toEqual(scenario.dependencies);
+
+      const validated = await service.transitionLifecycle({
+        studioId: scenario.studioId,
+        sessionId: sessionId!,
+        draftId: draftId!,
+        targetStatus: AssetDraftLifecycleStatuses.validated,
+      });
+      expect(validated.ok).toBeTrue();
+      expect(validated.data?.draft?.lifecycleStatus).toBe(AssetDraftLifecycleStatuses.validated);
+
+      const published = await service.publishVersion({
+        studioId: scenario.studioId,
+        sessionId: sessionId!,
+        draftId: draftId!,
+        versionId: `asset:${scenario.studioId}:v1`,
+        versionLabel: "v1",
+        createdBy: "atomic-author",
+      });
+      expect(published.ok).toBeTrue();
+      expect(published.data?.draft?.lifecycleStatus).toBe(AssetDraftLifecycleStatuses.published);
+      expect(published.data?.versions.map((entry) => entry.versionId)).toEqual([`asset:${scenario.studioId}:v1`]);
+      expect(published.data?.draft?.metadata.taxonomy).toEqual({
+        structuralKind: "atomic",
+        semanticRole: scenario.semanticRole,
+        behaviorKind: scenario.behaviorKind,
+      });
+      expect(published.data?.draft?.metadata.contract).toEqual(contractResolver.resolveContractForTaxonomy({
+        structuralKind: "atomic",
+        semanticRole: scenario.semanticRole,
+        behaviorKind: scenario.behaviorKind,
+      }));
+
+      const issues = await service.validateDraft(scenario.studioId, draftId!);
+      expect(issues.ok).toBeTrue();
+      expect(issues.data?.some((entry) => entry.code === "lifecycle-not-publish-ready")).toBeFalse();
+      expect(issues.data?.some((entry) => entry.code === "version-history-empty")).toBeFalse();
+    }
+
+    repository.dispose();
+
+    const reopenedRepository = new SqliteStudioShellRepository(databasePath);
+    const reopenedApi = new StudioShellBackendApi(reopenedRepository);
+    installBridge(reopenedApi);
+
+    for (const scenario of scenarios) {
+      const snapshot = await service.loadSnapshot(scenario.studioId);
+      expect(snapshot.ok).toBeTrue();
+      expect(snapshot.data?.draft?.lifecycleStatus).toBe(AssetDraftLifecycleStatuses.published);
+      expect(snapshot.data?.draft?.metadata.taxonomy).toEqual({
+        structuralKind: "atomic",
+        semanticRole: scenario.semanticRole,
+        behaviorKind: scenario.behaviorKind,
+      });
+      expect(snapshot.data?.draft?.metadata.contract).toEqual(contractResolver.resolveContractForTaxonomy({
+        structuralKind: "atomic",
+        semanticRole: scenario.semanticRole,
+        behaviorKind: scenario.behaviorKind,
+      }));
+      expect(snapshot.data?.versions.map((entry) => entry.versionId)).toEqual([`asset:${scenario.studioId}:v1`]);
+      expect(snapshot.data?.validationIssues.some((entry) => entry.code === "lifecycle-not-publish-ready")).toBeFalse();
+      expect(snapshot.data?.validationIssues.some((entry) => entry.code === "version-history-empty")).toBeFalse();
+    }
+
+    reopenedRepository.dispose();
+  });
+
   it("supports Tool Studio style flow over the same shell/persistence/publish seams", async () => {
     const root = mkdtempSync(path.join(tmpdir(), "loom-tool-studio-service-"));
     createdRoots.push(root);

@@ -36,6 +36,10 @@ Specialized composite semantics remain explicit in these shared contracts: workf
   - `tool-chain`
   - `app-template`
 - Canonical-entity contract resolution now includes workflow definitions plus installed/base models and execution artifacts when matching repositories/catalogs are wired.
+- Direction 5 atomic studios now use this same taxonomy-driven contract seam for authoring/publish enforcement:
+  - Model Studio and Dataset Studio publish with `atomic/*/none` contract projections.
+  - Tool Studio publish supports `atomic/tool/(conditional|deterministic)` projections.
+- Cross-studio end-to-end consistency coverage now verifies that projected contracts remain stable through create/update/validate/publish/reload paths over shared shell seams.
 
 ## Canonical read integration seam
 - Canonical operational reads now carry optional `contract` alongside canonical identity/taxonomy/provenance/dependency metadata.
@@ -46,3 +50,4 @@ Specialized composite semantics remain explicit in these shared contracts: workf
 - This is an integration foundation only.
 - It does **not** add a full system-composer UI, contract editor UI, or a parallel agent-only contract universe.
 - Agents continue to extend the shared composition model and use the shared contract seam.
+- Prompt/Embedding/Config Profile studios are not implemented yet in Direction 5 UI/application slices; only their taxonomy/contract groundwork exists in this shared seam.
