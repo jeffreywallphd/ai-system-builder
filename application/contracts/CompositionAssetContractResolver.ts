@@ -27,10 +27,25 @@ import {
   type TaxonomyBehaviorKind,
   type TaxonomySemanticRole,
 } from "../../domain/taxonomy/CompositionTaxonomy";
+import {
+  buildNestedSystemReferences,
+  type SystemAsset,
+  type SystemBindingEndpoint,
+  type SystemComponentReference,
+  SystemBindingEndpointScopes,
+  SystemComponentKinds,
+  type SystemCompositionReference,
+} from "../../domain/system-studio/SystemAssetDomain";
 
 export interface IAssetContractResolver {
   resolveCanonicalEntityContract(entityType: CanonicalEntityType, entityId: string): Promise<AssetContractDescriptor | undefined>;
   resolveContractForTaxonomy(descriptor: CompositionTaxonomyDescriptor): AssetContractDescriptor | undefined;
+  resolveSystemContract(input: {
+    readonly root: SystemAsset;
+    readonly resolveSystem: (reference: SystemCompositionReference) => Promise<SystemAsset | undefined> | SystemAsset | undefined;
+    readonly resolveChildContract?: (component: SystemComponentReference) => Promise<AssetContractDescriptor | undefined> | AssetContractDescriptor | undefined;
+    readonly maxDepth?: number;
+  }): Promise<AssetContractDescriptor>;
   resolveWorkflowContract(workflow: IWorkflow): AssetContractDescriptor;
   resolveAgentContract(agent: Agent): AssetContractDescriptor;
   resolveToolCapabilityContract(capability: ToolCapabilityDescriptor): AssetContractDescriptor;
@@ -57,6 +72,69 @@ function specializedCompositeDescription(role: Extract<TaxonomySemanticRole, "wo
 
 function getDefaultInvocationModeForCompositeBehavior(behaviorKind: TaxonomyBehaviorKind): "async" | "deferred" {
   return behaviorKind === TaxonomyBehaviorKinds.iterative ? "async" : "deferred";
+}
+
+interface SystemContractProjectionEntry {
+  readonly path: string;
+  readonly assetId: string;
+  readonly versionId?: string;
+  readonly inputCount: number;
+  readonly outputCount: number;
+  readonly parameterCount: number;
+  readonly bindingCount: number;
+}
+
+function makeSystemReferenceKey(reference: { readonly assetId: string; readonly versionId?: string }): string {
+  return `${reference.assetId}::${reference.versionId ?? ""}`;
+}
+
+function inferInputValueType(contract?: AssetContractDescriptor, inputId?: string): string | undefined {
+  if (!contract?.input?.schema || !inputId) {
+    return undefined;
+  }
+
+  const schema = contract.input.schema as { readonly properties?: Record<string, { readonly type?: string }> };
+  return schema.properties?.[inputId]?.type;
+}
+
+function inferOutputValueType(contract?: AssetContractDescriptor, outputId?: string): string | undefined {
+  if (!contract?.output?.schema || !outputId) {
+    return undefined;
+  }
+
+  const schema = contract.output.schema as { readonly properties?: Record<string, { readonly type?: string }> };
+  return schema.properties?.[outputId]?.type;
+}
+
+function inferEndpointValueType(input: {
+  readonly endpoint: SystemBindingEndpoint;
+  readonly system: SystemAsset;
+  readonly componentContracts: ReadonlyMap<string, AssetContractDescriptor | undefined>;
+}): string | undefined {
+  if (input.endpoint.scope === SystemBindingEndpointScopes.systemInput) {
+    return input.system.inputs.find((entry) => entry.inputId === input.endpoint.endpointId)?.valueType;
+  }
+  if (input.endpoint.scope === SystemBindingEndpointScopes.systemOutput) {
+    return input.system.outputs.find((entry) => entry.outputId === input.endpoint.endpointId)?.valueType;
+  }
+  if (input.endpoint.scope === SystemBindingEndpointScopes.systemParameter) {
+    return input.system.parameters.find((entry) => entry.parameterId === input.endpoint.endpointId)?.valueType;
+  }
+
+  const alias = input.endpoint.componentAlias ?? "";
+  const componentContract = input.componentContracts.get(alias);
+  if (!componentContract) {
+    return undefined;
+  }
+
+  if (input.endpoint.scope === SystemBindingEndpointScopes.componentInput) {
+    return inferInputValueType(componentContract, input.endpoint.endpointId);
+  }
+  if (input.endpoint.scope === SystemBindingEndpointScopes.componentOutput) {
+    return inferOutputValueType(componentContract, input.endpoint.endpointId);
+  }
+
+  return componentContract.parameters.find((parameter) => parameter.id === input.endpoint.endpointId)?.valueType;
 }
 
 function defaultTaxonomyContract(descriptor: CompositionTaxonomyDescriptor): AssetContractDescriptor | undefined {
@@ -465,6 +543,228 @@ export class CompositionAssetContractResolver implements IAssetContractResolver 
 
   public resolveContractForTaxonomy(descriptor: CompositionTaxonomyDescriptor): AssetContractDescriptor | undefined {
     return defaultTaxonomyContract(descriptor);
+  }
+
+  public async resolveSystemContract(input: {
+    readonly root: SystemAsset;
+    readonly resolveSystem: (reference: SystemCompositionReference) => Promise<SystemAsset | undefined> | SystemAsset | undefined;
+    readonly resolveChildContract?: (component: SystemComponentReference) => Promise<AssetContractDescriptor | undefined> | AssetContractDescriptor | undefined;
+    readonly maxDepth?: number;
+  }): Promise<AssetContractDescriptor> {
+    const maxDepth = Math.max(1, input.maxDepth ?? 4);
+    const nestedEntries: SystemContractProjectionEntry[] = [];
+    const nestedSystemIds = new Set<string>();
+    const rootKey = makeSystemReferenceKey(input.root);
+    let recursionStatus: "complete" | "cycle-detected" | "max-depth-exceeded" = "complete";
+    let unresolvedNestedSystemCount = 0;
+    const componentContracts = new Map<string, AssetContractDescriptor | undefined>();
+
+    const resolveComponentContract = async (component: SystemComponentReference): Promise<AssetContractDescriptor | undefined> => {
+      if (input.resolveChildContract) {
+        return input.resolveChildContract(component);
+      }
+      if (component.taxonomy) {
+        return this.resolveContractForTaxonomy(component.taxonomy);
+      }
+      return undefined;
+    };
+
+    for (const component of input.root.components) {
+      if (!component.alias) {
+        continue;
+      }
+
+      if (component.componentKind === SystemComponentKinds.system) {
+        const nested = await input.resolveSystem({
+          assetId: component.assetId,
+          versionId: component.versionId,
+          alias: component.alias,
+        });
+        if (!nested) {
+          componentContracts.set(component.alias, undefined);
+          continue;
+        }
+        componentContracts.set(component.alias, createAssetContractDescriptor({
+          version: "1.1.0",
+          input: {
+            kind: AssetContractShapeKinds.jsonSchema,
+            schema: {
+              type: "object",
+              properties: Object.fromEntries(nested.inputs.map((entry) => [
+                entry.inputId,
+                { type: entry.valueType ?? "string" },
+              ])),
+            },
+          },
+          output: {
+            kind: AssetContractShapeKinds.jsonSchema,
+            schema: {
+              type: "object",
+              properties: Object.fromEntries(nested.outputs.map((entry) => [
+                entry.outputId,
+                { type: entry.valueType ?? "string" },
+              ])),
+            },
+          },
+          parameters: nested.parameters.map((entry) => parameter(
+            entry.parameterId,
+            entry.required ?? false,
+            entry.description ?? `Nested system parameter '${entry.parameterId}'.`,
+            entry.valueType,
+            entry.defaultValue,
+          )),
+          execution: {
+            invocationMode: nested.taxonomy.behaviorKind === TaxonomyBehaviorKinds.autonomous ? "async" : "deferred",
+            sideEffects: "bounded",
+          },
+        }));
+        continue;
+      }
+
+      componentContracts.set(component.alias, await resolveComponentContract(component));
+    }
+
+    const traverse = async (
+      system: SystemAsset,
+      pathKeys: ReadonlyArray<string>,
+      pathLabel: string,
+      depth: number,
+    ): Promise<void> => {
+      const key = makeSystemReferenceKey(system);
+      if (pathKeys.includes(key)) {
+        recursionStatus = "cycle-detected";
+        return;
+      }
+      if (depth > maxDepth) {
+        recursionStatus = "max-depth-exceeded";
+        return;
+      }
+
+      if (key !== rootKey) {
+        nestedSystemIds.add(system.assetId);
+        nestedEntries.push(Object.freeze({
+          path: pathLabel,
+          assetId: system.assetId,
+          versionId: system.versionId,
+          inputCount: system.inputs.length,
+          outputCount: system.outputs.length,
+          parameterCount: system.parameters.length,
+          bindingCount: system.bindings.length,
+        }));
+      }
+
+      const nextKeys = [...pathKeys, key];
+      const nestedRefs = [...buildNestedSystemReferences(system)].sort((left, right) => (
+        `${left.alias ?? left.assetId}:${left.versionId ?? ""}`.localeCompare(
+          `${right.alias ?? right.assetId}:${right.versionId ?? ""}`,
+        )
+      ));
+
+      for (const reference of nestedRefs) {
+        const child = await input.resolveSystem(reference);
+        if (!child) {
+          unresolvedNestedSystemCount += 1;
+          continue;
+        }
+
+        const childLabel = `${pathLabel}/${reference.alias ?? reference.assetId}`;
+        await traverse(child, nextKeys, childLabel, depth + 1);
+      }
+    };
+
+    await traverse(input.root, [], input.root.assetId, 1);
+
+    const nestedInputCount = nestedEntries.reduce((total, entry) => total + entry.inputCount, 0);
+    const nestedOutputCount = nestedEntries.reduce((total, entry) => total + entry.outputCount, 0);
+    const nestedParameterCount = nestedEntries.reduce((total, entry) => total + entry.parameterCount, 0);
+    const nestedBindingCount = nestedEntries.reduce((total, entry) => total + entry.bindingCount, 0);
+
+    const inputSchema = {
+      type: "object",
+      properties: Object.fromEntries(input.root.inputs.map((entry) => [
+        entry.inputId,
+        Object.freeze({
+          type: entry.valueType ?? "string",
+          description: entry.description,
+        }),
+      ])),
+      required: input.root.inputs.filter((entry) => entry.required).map((entry) => entry.inputId),
+    };
+
+    const outputSchema = {
+      type: "object",
+      properties: Object.fromEntries(input.root.outputs.map((entry) => [
+        entry.outputId,
+        Object.freeze({
+          type: entry.valueType ?? "string",
+          description: entry.description,
+        }),
+      ])),
+    };
+
+    const systemParameters = input.root.parameters.map((entry) => parameter(
+      `systemParameter:${entry.parameterId}`,
+      entry.required ?? false,
+      entry.description ?? `System parameter '${entry.parameterId}'.`,
+      entry.valueType,
+      entry.defaultValue,
+    ));
+
+    const bindingTypeMismatches = input.root.bindings
+      .map((binding) => {
+        const sourceType = inferEndpointValueType({
+          endpoint: binding.source,
+          system: input.root,
+          componentContracts,
+        });
+        const targetType = inferEndpointValueType({
+          endpoint: binding.target,
+          system: input.root,
+          componentContracts,
+        });
+        if (!sourceType || !targetType || sourceType === targetType) {
+          return undefined;
+        }
+        return `${binding.bindingId}:${sourceType}->${targetType}`;
+      })
+      .filter((value): value is string => Boolean(value));
+
+    return createAssetContractDescriptor({
+      version: "1.1.0",
+      input: {
+        kind: AssetContractShapeKinds.jsonSchema,
+        description: `System input contract for '${input.root.assetId}' derived from explicit system inputs and recursive nested-system context.`,
+        schema: inputSchema,
+      },
+      output: {
+        kind: AssetContractShapeKinds.jsonSchema,
+        description: `System output contract for '${input.root.assetId}' derived from explicit system outputs and child binding topology.`,
+        schema: outputSchema,
+      },
+      parameters: [
+        ...systemParameters,
+        parameter("systemMode", true, "Declared system behavior mode.", "string", input.root.taxonomy.behaviorKind),
+        parameter("bindingCount", true, "Total explicit system binding count.", "number", input.root.bindings.length),
+        parameter("childComponentCount", true, "Total direct child component count.", "number", input.root.components.length),
+        parameter("nestedSystemCount", true, "Total recursively discovered nested system count.", "number", nestedEntries.length),
+        parameter("nestedDistinctSystemCount", true, "Distinct nested system asset-id count.", "number", nestedSystemIds.size),
+        parameter("nestedInputCount", true, "Total recursively discovered nested system input count.", "number", nestedInputCount),
+        parameter("nestedOutputCount", true, "Total recursively discovered nested system output count.", "number", nestedOutputCount),
+        parameter("nestedParameterCount", true, "Total recursively discovered nested system parameter count.", "number", nestedParameterCount),
+        parameter("nestedBindingCount", true, "Total recursively discovered nested system binding count.", "number", nestedBindingCount),
+        parameter("recursiveTraversalMaxDepth", true, "Maximum recursive system traversal depth used for projection.", "number", maxDepth),
+        parameter("recursiveTraversalStatus", true, "Recursive traversal status for deterministic projection safety.", "string", recursionStatus),
+        parameter("recursiveTraversalCycleSafe", true, "Whether recursive traversal completed without cycle detection.", "boolean", recursionStatus !== "cycle-detected"),
+        parameter("recursiveTraversalDepthBounded", true, "Whether recursive traversal stayed within configured depth bound.", "boolean", recursionStatus !== "max-depth-exceeded"),
+        parameter("unresolvedNestedSystemCount", true, "Number of nested systems that could not be resolved during projection.", "number", unresolvedNestedSystemCount),
+        parameter("bindingTypeMismatchCount", true, "Count of explicit child/system bindings with incompatible value types.", "number", bindingTypeMismatches.length),
+        parameter("bindingTypeMismatches", false, "Binding ids with source->target type mismatches.", "string", bindingTypeMismatches.join(",")),
+      ],
+      execution: {
+        invocationMode: input.root.taxonomy.behaviorKind === TaxonomyBehaviorKinds.autonomous ? "async" : "deferred",
+        sideEffects: "bounded",
+      },
+    });
   }
 
   public resolveWorkflowContract(workflow: IWorkflow): AssetContractDescriptor {

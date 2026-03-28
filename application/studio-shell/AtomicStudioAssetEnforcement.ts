@@ -8,6 +8,14 @@ import type {
 } from "../../domain/taxonomy/CompositionTaxonomy";
 import { TaxonomyStructuralKinds } from "../../domain/taxonomy/CompositionTaxonomy";
 import { StudioShellInvalidRequestError } from "./StudioShellApplicationErrors";
+import {
+  buildNestedSystemReferences,
+  type SystemAsset,
+  type SystemBindingEndpoint,
+  type SystemComponentReference,
+  SystemBindingEndpointScopes,
+  type SystemCompositionReference,
+} from "../../domain/system-studio/SystemAssetDomain";
 
 export const StudioAssetEnforcementIssueCodes = Object.freeze({
   taxonomyMissing: "taxonomy-missing",
@@ -19,6 +27,12 @@ export const StudioAssetEnforcementIssueCodes = Object.freeze({
   contractMismatch: "contract-mismatch",
   compositeDependencyRequired: "composite-dependency-required",
   dependencyVersionUnpinned: "dependency-version-unpinned",
+  systemChildVersionUnpinned: "system-child-version-unpinned",
+  systemChildReferenceMissing: "system-child-reference-missing",
+  systemBindingEndpointNotFound: "system-binding-endpoint-not-found",
+  systemBindingTypeMismatch: "system-binding-type-mismatch",
+  systemRecursionCycleDetected: "system-recursion-cycle-detected",
+  systemRecursionDepthExceeded: "system-recursion-depth-exceeded",
 });
 
 export type StudioAssetEnforcementIssueCode =
@@ -48,6 +62,18 @@ export interface CompositeStudioExpectation {
   readonly semanticRole: TaxonomySemanticRole;
   readonly allowedBehaviorKinds: ReadonlyArray<TaxonomyBehaviorKind>;
   readonly requireDerivableContract?: boolean;
+}
+
+export interface SystemStudioExpectation {
+  readonly studioType: string;
+  readonly semanticRole: Extract<TaxonomySemanticRole, "system" | "app-template">;
+  readonly allowedBehaviorKinds: ReadonlyArray<TaxonomyBehaviorKind>;
+  readonly requireDerivableContract?: boolean;
+}
+
+interface SystemBindingEndpointValidation {
+  readonly exists: boolean;
+  readonly valueType?: string;
 }
 
 function sameContractShape(left: unknown, right: unknown): boolean {
@@ -218,6 +244,207 @@ export function assertCompositeStudioDraftPublishConsistency(input: {
   readonly contractResolver: Pick<IAssetContractResolver, "resolveContractForTaxonomy">;
 }): void {
   const issues = evaluateCompositeStudioDraftConsistency(input);
+  if (issues.length === 0) {
+    return;
+  }
+
+  throw new StudioShellInvalidRequestError(
+    `Studio draft enforcement failed for '${input.expectation.studioType}': ${issues.map((issue) => `${issue.code}: ${issue.message}`).join(" ")}`,
+  );
+}
+
+function inferInputValueType(contract: AssetDraft["metadata"]["contract"], endpointId: string): string | undefined {
+  const schema = contract?.input?.schema as { readonly properties?: Record<string, { readonly type?: string }> } | undefined;
+  return schema?.properties?.[endpointId]?.type;
+}
+
+function inferOutputValueType(contract: AssetDraft["metadata"]["contract"], endpointId: string): string | undefined {
+  const schema = contract?.output?.schema as { readonly properties?: Record<string, { readonly type?: string }> } | undefined;
+  return schema?.properties?.[endpointId]?.type;
+}
+
+function resolveSystemBindingEndpoint(input: {
+  readonly endpoint: SystemBindingEndpoint;
+  readonly system: SystemAsset;
+  readonly componentContractsByAlias: ReadonlyMap<string, AssetDraft["metadata"]["contract"] | undefined>;
+}): SystemBindingEndpointValidation {
+  if (input.endpoint.scope === SystemBindingEndpointScopes.systemInput) {
+    const found = input.system.inputs.find((entry) => entry.inputId === input.endpoint.endpointId);
+    return { exists: Boolean(found), valueType: found?.valueType };
+  }
+  if (input.endpoint.scope === SystemBindingEndpointScopes.systemOutput) {
+    const found = input.system.outputs.find((entry) => entry.outputId === input.endpoint.endpointId);
+    return { exists: Boolean(found), valueType: found?.valueType };
+  }
+  if (input.endpoint.scope === SystemBindingEndpointScopes.systemParameter) {
+    const found = input.system.parameters.find((entry) => entry.parameterId === input.endpoint.endpointId);
+    return { exists: Boolean(found), valueType: found?.valueType };
+  }
+
+  const alias = input.endpoint.componentAlias ?? "";
+  const contract = input.componentContractsByAlias.get(alias);
+  if (!contract) {
+    return { exists: false };
+  }
+
+  if (input.endpoint.scope === SystemBindingEndpointScopes.componentInput) {
+    const schema = contract.input?.schema as { readonly properties?: Record<string, { readonly type?: string }> } | undefined;
+    const property = schema?.properties?.[input.endpoint.endpointId];
+    return { exists: Boolean(property), valueType: inferInputValueType(contract, input.endpoint.endpointId) };
+  }
+  if (input.endpoint.scope === SystemBindingEndpointScopes.componentOutput) {
+    const schema = contract.output?.schema as { readonly properties?: Record<string, { readonly type?: string }> } | undefined;
+    const property = schema?.properties?.[input.endpoint.endpointId];
+    return { exists: Boolean(property), valueType: inferOutputValueType(contract, input.endpoint.endpointId) };
+  }
+
+  const parameter = contract.parameters.find((entry) => entry.id === input.endpoint.endpointId);
+  return { exists: Boolean(parameter), valueType: parameter?.valueType };
+}
+
+export async function evaluateSystemStudioDraftConsistency(input: {
+  readonly draft: AssetDraft;
+  readonly expectation: SystemStudioExpectation;
+  readonly contractResolver: Pick<IAssetContractResolver, "resolveContractForTaxonomy" | "resolveSystemContract">;
+  readonly systemAsset: SystemAsset;
+  readonly resolveSystem: (reference: SystemCompositionReference) => Promise<SystemAsset | undefined> | SystemAsset | undefined;
+  readonly resolveChildContract?: (component: SystemComponentReference) => Promise<AssetDraft["metadata"]["contract"] | undefined> | AssetDraft["metadata"]["contract"] | undefined;
+  readonly maxDepth?: number;
+}): Promise<ReadonlyArray<StudioAssetEnforcementIssue>> {
+  const issues = [...evaluateStudioDraftConsistency({
+    ...input,
+    expectation: {
+      ...input.expectation,
+      structuralKind: TaxonomyStructuralKinds.system,
+      requireDerivableContract: input.expectation.requireDerivableContract ?? false,
+    },
+  }).filter((issue) => issue.code !== StudioAssetEnforcementIssueCodes.contractMismatch)];
+
+  const componentContractsByAlias = new Map<string, AssetDraft["metadata"]["contract"] | undefined>();
+  for (const component of input.systemAsset.components) {
+    if (!component.alias) {
+      continue;
+    }
+    if (!component.versionId) {
+      issues.push({
+        code: StudioAssetEnforcementIssueCodes.systemChildVersionUnpinned,
+        message: `System draft '${input.draft.id}' child '${component.assetId}' must be pinned to a version.`,
+      });
+    }
+
+    const resolvedContract = input.resolveChildContract
+      ? await input.resolveChildContract(component)
+      : (component.taxonomy ? input.contractResolver.resolveContractForTaxonomy(component.taxonomy) : undefined);
+    if (!resolvedContract) {
+      issues.push({
+        code: StudioAssetEnforcementIssueCodes.systemChildReferenceMissing,
+        message: `System draft '${input.draft.id}' child '${component.assetId}' does not have a resolvable contract.`,
+      });
+    }
+    componentContractsByAlias.set(component.alias, resolvedContract);
+  }
+
+  for (const reference of buildNestedSystemReferences(input.systemAsset)) {
+    if (!reference.versionId) {
+      issues.push({
+        code: StudioAssetEnforcementIssueCodes.systemChildVersionUnpinned,
+        message: `System draft '${input.draft.id}' nested system '${reference.assetId}' must be pinned to a version.`,
+      });
+    }
+
+    const child = await input.resolveSystem(reference);
+    if (!child) {
+      issues.push({
+        code: StudioAssetEnforcementIssueCodes.systemChildReferenceMissing,
+        message: `System draft '${input.draft.id}' nested system '${reference.assetId}' could not be resolved.`,
+      });
+    }
+  }
+
+  for (const binding of input.systemAsset.bindings) {
+    const source = resolveSystemBindingEndpoint({
+      endpoint: binding.source,
+      system: input.systemAsset,
+      componentContractsByAlias,
+    });
+    const target = resolveSystemBindingEndpoint({
+      endpoint: binding.target,
+      system: input.systemAsset,
+      componentContractsByAlias,
+    });
+
+    if (!source.exists || !target.exists) {
+      issues.push({
+        code: StudioAssetEnforcementIssueCodes.systemBindingEndpointNotFound,
+        message: `System binding '${binding.bindingId}' references unresolved endpoint(s).`,
+      });
+      continue;
+    }
+
+    if (source.valueType && target.valueType && source.valueType !== target.valueType) {
+      issues.push({
+        code: StudioAssetEnforcementIssueCodes.systemBindingTypeMismatch,
+        message: `System binding '${binding.bindingId}' has incompatible endpoint types '${source.valueType}' -> '${target.valueType}'.`,
+      });
+    }
+  }
+
+  const maxDepth = Math.max(1, input.maxDepth ?? 4);
+  const visited = new Set<string>();
+  const traverse = async (system: SystemAsset, path: ReadonlyArray<string>, depth: number): Promise<void> => {
+    const key = `${system.assetId}::${system.versionId ?? ""}`;
+    if (path.includes(key)) {
+      issues.push({
+        code: StudioAssetEnforcementIssueCodes.systemRecursionCycleDetected,
+        message: `System draft '${input.draft.id}' recursion cycle detected at '${system.assetId}'.`,
+      });
+      return;
+    }
+    if (depth > maxDepth) {
+      issues.push({
+        code: StudioAssetEnforcementIssueCodes.systemRecursionDepthExceeded,
+        message: `System draft '${input.draft.id}' recursion depth exceeds max depth ${maxDepth}.`,
+      });
+      return;
+    }
+
+    visited.add(key);
+    for (const reference of buildNestedSystemReferences(system)) {
+      const child = await input.resolveSystem(reference);
+      if (!child) {
+        continue;
+      }
+      await traverse(child, [...path, key], depth + 1);
+    }
+  };
+  await traverse(input.systemAsset, [], 1);
+
+  const projectedContract = await input.contractResolver.resolveSystemContract({
+    root: input.systemAsset,
+    resolveSystem: input.resolveSystem,
+    resolveChildContract: input.resolveChildContract,
+    maxDepth,
+  });
+  if (input.draft.metadata.contract && JSON.stringify(projectedContract) !== JSON.stringify(input.draft.metadata.contract)) {
+    issues.push({
+      code: StudioAssetEnforcementIssueCodes.contractMismatch,
+      message: `System draft '${input.draft.id}' contract does not match recursive system contract projection.`,
+    });
+  }
+
+  return Object.freeze(issues);
+}
+
+export async function assertSystemStudioDraftPublishConsistency(input: {
+  readonly draft: AssetDraft;
+  readonly expectation: SystemStudioExpectation;
+  readonly contractResolver: Pick<IAssetContractResolver, "resolveContractForTaxonomy" | "resolveSystemContract">;
+  readonly systemAsset: SystemAsset;
+  readonly resolveSystem: (reference: SystemCompositionReference) => Promise<SystemAsset | undefined> | SystemAsset | undefined;
+  readonly resolveChildContract?: (component: SystemComponentReference) => Promise<AssetDraft["metadata"]["contract"] | undefined> | AssetDraft["metadata"]["contract"] | undefined;
+  readonly maxDepth?: number;
+}): Promise<void> {
+  const issues = await evaluateSystemStudioDraftConsistency(input);
   if (issues.length === 0) {
     return;
   }

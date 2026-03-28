@@ -24,6 +24,8 @@
   - Model Studio + Dataset Studio use `atomic/*/none` contract projections.
   - Tool Studio uses `atomic/tool/(conditional|deterministic)` projections.
 - Shared Studio Shell publish-time enforcement now uses the same resolver seam for composite consistency checks (taxonomy shape + derivable/compatible contract), rather than introducing a separate composite enforcement path.
+- System Studio contract projection now extends the same shared resolver seam with bounded recursive projection (`resolveSystemContract`) so system contracts truthfully reflect explicit system I/O/parameters, child bindings, and nested-system topology without creating a parallel contract model.
+- System publish enforcement now extends the same shared studio-shell enforcement seam with bounded recursive checks for system child references/contracts, binding endpoint compatibility, and recursion cycle/depth safety before publish.
 - Tool Chain Studio now reuses this same composite publish-consistency seam (`tool-chain`/`deterministic`) and the shared taxonomy-driven contract projection (`executionOrdering=sequential`) for draft authoring and publish gating.
 - Cross-studio end-to-end consistency tests now verify contract coherence through create/update/validate/publish/reload over real service/bridge/backend/application/SQLite seams.
 
