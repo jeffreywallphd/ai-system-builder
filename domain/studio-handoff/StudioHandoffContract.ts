@@ -1,5 +1,10 @@
 import type { AssetContractDescriptor } from "../contracts/AssetContract";
 import type { CompositionTaxonomyDescriptor } from "../taxonomy/CompositionTaxonomy";
+import {
+  createStudioHandoffContext,
+  type StudioHandoffContext,
+  type StudioHandoffContextInput,
+} from "./StudioHandoffContext";
 
 function normalizeRequired(value: string, label: string): string {
   const normalized = value.trim();
@@ -12,13 +17,6 @@ function normalizeRequired(value: string, label: string): string {
 function normalizeOptional(value?: string): string | undefined {
   const normalized = value?.trim();
   return normalized ? normalized : undefined;
-}
-
-function normalizeRecord(value?: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> | undefined {
-  if (!value) {
-    return undefined;
-  }
-  return Object.freeze({ ...value });
 }
 
 export class StudioHandoffContractId {
@@ -90,12 +88,6 @@ export interface StudioHandoffPayload {
   readonly targetInputContract: TargetStudioInputContract;
 }
 
-export interface StudioHandoffContext {
-  readonly config?: Readonly<Record<string, unknown>>;
-  readonly correlationId?: string;
-  readonly note?: string;
-}
-
 export interface StudioHandoffContract {
   readonly id: StudioHandoffContractId;
   readonly domain: "studio-handoff";
@@ -107,12 +99,25 @@ export interface StudioHandoffContract {
   readonly intent: StudioHandoffIntent;
 }
 
+function normalizeIntent(intent: StudioHandoffIntent): StudioHandoffIntent {
+  const intentKind = intent.kind;
+  if (!Object.values(StudioHandoffIntentKinds).includes(intentKind)) {
+    throw new Error(`Studio handoff intent kind '${intent.kind}' is not supported.`);
+  }
+
+  return Object.freeze({
+    kind: intentKind,
+    description: normalizeOptional(intent.description),
+    labels: Object.freeze([...(intent.labels ?? []).map((entry) => entry.trim()).filter(Boolean)]),
+  });
+}
+
 export function createStudioHandoffContract(input: {
   readonly id: string | StudioHandoffContractId;
   readonly source: StudioHandoffSource;
   readonly target: StudioHandoffTarget;
   readonly payload: StudioHandoffPayload;
-  readonly context?: StudioHandoffContext;
+  readonly context?: Omit<StudioHandoffContextInput, "sourceStudioId" | "sourceStudioType" | "targetStudioId" | "targetStudioType" | "intent">;
   readonly intent: StudioHandoffIntent;
   readonly createdAt?: Date;
 }): StudioHandoffContract {
@@ -120,14 +125,25 @@ export function createStudioHandoffContract(input: {
   const sourceStudioType = normalizeRequired(input.source.studioType, "Studio handoff source studio type");
   const targetStudioId = normalizeRequired(input.target.studioId, "Studio handoff target studio id");
   const targetStudioType = normalizeRequired(input.target.studioType, "Studio handoff target studio type");
-
-  const intentKind = input.intent.kind;
-  if (!Object.values(StudioHandoffIntentKinds).includes(intentKind)) {
-    throw new Error(`Studio handoff intent kind '${input.intent.kind}' is not supported.`);
-  }
+  const normalizedIntent = normalizeIntent(input.intent);
 
   const targetInputContract = input.payload.targetInputContract;
   const contractId = normalizeRequired(targetInputContract.contractId, "Target studio input contract id");
+
+  const context = input.context
+    ? createStudioHandoffContext({
+      sourceStudioId,
+      sourceStudioType,
+      targetStudioId,
+      targetStudioType,
+      intent: normalizedIntent,
+      initiatedAt: input.context.initiatedAt,
+      actor: input.context.actor,
+      prefill: input.context.prefill,
+      sourceReferences: input.context.sourceReferences,
+      provenance: input.context.provenance,
+    })
+    : undefined;
 
   return Object.freeze({
     id: StudioHandoffContractId.from(input.id),
@@ -167,17 +183,7 @@ export function createStudioHandoffContract(input: {
           : undefined,
       }),
     }),
-    context: input.context
-      ? Object.freeze({
-        config: normalizeRecord(input.context.config),
-        correlationId: normalizeOptional(input.context.correlationId),
-        note: normalizeOptional(input.context.note),
-      })
-      : undefined,
-    intent: Object.freeze({
-      kind: intentKind,
-      description: normalizeOptional(input.intent.description),
-      labels: Object.freeze([...(input.intent.labels ?? []).map((entry) => entry.trim()).filter(Boolean)]),
-    }),
+    context,
+    intent: normalizedIntent,
   });
 }

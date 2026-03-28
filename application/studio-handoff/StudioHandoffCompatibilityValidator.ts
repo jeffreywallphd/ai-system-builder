@@ -4,6 +4,7 @@ import type {
   TargetStudioInputContract,
 } from "../../domain/studio-handoff/StudioHandoffContract";
 import type { CompositionTaxonomyDescriptor } from "../../domain/taxonomy/CompositionTaxonomy";
+import { listStudioHandoffPrefillKeys } from "../../domain/studio-handoff/StudioHandoffContext";
 
 export const StudioHandoffCompatibilityIssueCodes = Object.freeze({
   targetStudioUnsupported: "target-studio-unsupported",
@@ -176,9 +177,9 @@ export class StudioHandoffCompatibilityValidator {
       }
     }
 
-    if (contractForValidation.allowedContextKeys && input.handoff.context?.config) {
+    if (contractForValidation.allowedContextKeys) {
       const allowed = new Set(contractForValidation.allowedContextKeys);
-      for (const key of Object.keys(input.handoff.context.config)) {
+      for (const key of listStudioHandoffPrefillKeys(input.handoff.context)) {
         if (!allowed.has(key)) {
           issues.push(Object.freeze({
             code: StudioHandoffCompatibilityIssueCodes.contextKeyNotAllowed,
