@@ -38,10 +38,49 @@ export interface SystemCompositionReference {
   readonly alias?: string;
 }
 
-export interface SystemBindingReference {
+export interface SystemInputDefinition {
+  readonly inputId: string;
+  readonly description?: string;
+  readonly valueType?: string;
+  readonly required?: boolean;
+}
+
+export interface SystemOutputDefinition {
+  readonly outputId: string;
+  readonly description?: string;
+  readonly valueType?: string;
+}
+
+export interface SystemParameterDefinition {
+  readonly parameterId: string;
+  readonly description?: string;
+  readonly valueType?: string;
+  readonly required?: boolean;
+  readonly defaultValue?: unknown;
+}
+
+export const SystemBindingEndpointScopes = Object.freeze({
+  systemInput: "system-input",
+  systemOutput: "system-output",
+  systemParameter: "system-parameter",
+  componentInput: "component-input",
+  componentOutput: "component-output",
+  componentParameter: "component-parameter",
+});
+
+export type SystemBindingEndpointScope =
+  typeof SystemBindingEndpointScopes[keyof typeof SystemBindingEndpointScopes];
+
+export interface SystemBindingEndpoint {
+  readonly scope: SystemBindingEndpointScope;
+  readonly endpointId: string;
+  readonly componentAlias?: string;
+}
+
+export interface SystemBinding {
   readonly bindingId: string;
-  readonly sourceComponentAlias?: string;
-  readonly targetComponentAlias?: string;
+  readonly source: SystemBindingEndpoint;
+  readonly target: SystemBindingEndpoint;
   readonly description?: string;
 }
 
@@ -53,7 +92,10 @@ export interface SystemAsset {
   readonly dependencies: ReadonlyArray<AssetDraftDependencyReference>;
   readonly components: ReadonlyArray<SystemComponentReference>;
   readonly nestedSystems: ReadonlyArray<SystemCompositionReference>;
-  readonly bindings: ReadonlyArray<SystemBindingReference>;
+  readonly inputs: ReadonlyArray<SystemInputDefinition>;
+  readonly outputs: ReadonlyArray<SystemOutputDefinition>;
+  readonly parameters: ReadonlyArray<SystemParameterDefinition>;
+  readonly bindings: ReadonlyArray<SystemBinding>;
 }
 
 export interface SystemCompositionNode {
@@ -73,6 +115,13 @@ function normalizeRequired(value: string, label: string): string {
 function normalizeOptional(value?: string): string | undefined {
   const normalized = value?.trim();
   return normalized ? normalized : undefined;
+}
+
+function createDependencyReference(assetId: string, versionId?: string): AssetDraftDependencyReference {
+  return Object.freeze({
+    assetId: normalizeRequired(assetId, "System dependency asset id"),
+    versionId: normalizeOptional(versionId),
+  });
 }
 
 function normalizeSystemComponentReference(input: SystemComponentReference): SystemComponentReference {
@@ -104,11 +153,65 @@ function normalizeSystemComponentReference(input: SystemComponentReference): Sys
   });
 }
 
-function normalizeSystemBinding(input: SystemBindingReference): SystemBindingReference {
+function normalizeSystemInputDefinition(input: SystemInputDefinition): SystemInputDefinition {
+  return Object.freeze({
+    inputId: normalizeRequired(input.inputId, "System input id"),
+    description: normalizeOptional(input.description),
+    valueType: normalizeOptional(input.valueType),
+    required: input.required ?? false,
+  });
+}
+
+function normalizeSystemOutputDefinition(input: SystemOutputDefinition): SystemOutputDefinition {
+  return Object.freeze({
+    outputId: normalizeRequired(input.outputId, "System output id"),
+    description: normalizeOptional(input.description),
+    valueType: normalizeOptional(input.valueType),
+  });
+}
+
+function normalizeSystemParameterDefinition(input: SystemParameterDefinition): SystemParameterDefinition {
+  return Object.freeze({
+    parameterId: normalizeRequired(input.parameterId, "System parameter id"),
+    description: normalizeOptional(input.description),
+    valueType: normalizeOptional(input.valueType),
+    required: input.required ?? false,
+    defaultValue: input.defaultValue,
+  });
+}
+
+function normalizeSystemBindingEndpoint(input: SystemBindingEndpoint): SystemBindingEndpoint {
+  if (!Object.values(SystemBindingEndpointScopes).includes(input.scope)) {
+    throw new Error(`System binding endpoint scope '${input.scope}' is not supported.`);
+  }
+
+  const componentAlias = normalizeOptional(input.componentAlias);
+  if (input.scope.startsWith("component-") && !componentAlias) {
+    throw new Error("System component binding endpoints require a component alias.");
+  }
+
+  return Object.freeze({
+    scope: input.scope,
+    endpointId: normalizeRequired(input.endpointId, "System binding endpoint id"),
+    componentAlias,
+  });
+}
+
+function normalizeSystemBinding(input: SystemBinding): SystemBinding {
+  const source = normalizeSystemBindingEndpoint(input.source);
+  const target = normalizeSystemBindingEndpoint(input.target);
+  if (
+    source.scope === target.scope
+    && source.endpointId === target.endpointId
+    && source.componentAlias === target.componentAlias
+  ) {
+    throw new Error("System bindings must connect distinct source and target endpoints.");
+  }
+
   return Object.freeze({
     bindingId: normalizeRequired(input.bindingId, "System binding id"),
-    sourceComponentAlias: normalizeOptional(input.sourceComponentAlias),
-    targetComponentAlias: normalizeOptional(input.targetComponentAlias),
+    source,
+    target,
     description: normalizeOptional(input.description),
   });
 }
@@ -116,9 +219,8 @@ function normalizeSystemBinding(input: SystemBindingReference): SystemBindingRef
 function normalizeSystemDependencies(dependencies?: ReadonlyArray<AssetDraftDependencyReference>): ReadonlyArray<AssetDraftDependencyReference> {
   const deduped = new Map<string, AssetDraftDependencyReference>();
   for (const dependency of dependencies ?? []) {
-    const assetId = normalizeRequired(dependency.assetId, "System dependency asset id");
-    const versionId = normalizeOptional(dependency.versionId);
-    deduped.set(`${assetId}::${versionId ?? ""}`, Object.freeze({ assetId, versionId }));
+    const normalized = createDependencyReference(dependency.assetId, dependency.versionId);
+    deduped.set(`${normalized.assetId}::${normalized.versionId ?? ""}`, normalized);
   }
 
   return Object.freeze([...deduped.values()]);
@@ -132,9 +234,71 @@ function normalizeNestedSystemReference(input: SystemCompositionReference): Syst
   });
 }
 
+function assertNoDuplicateIdentifiers(input: {
+  readonly values: ReadonlyArray<{ readonly id: string }>;
+  readonly label: string;
+}): void {
+  const seen = new Set<string>();
+  for (const value of input.values) {
+    if (seen.has(value.id)) {
+      throw new Error(`${input.label} '${value.id}' must be unique.`);
+    }
+    seen.add(value.id);
+  }
+}
+
 function assertNoDirectSelfReference(assetId: string, components: ReadonlyArray<SystemComponentReference>): void {
   if (components.some((component) => component.componentKind === SystemComponentKinds.system && component.assetId === assetId)) {
     throw new Error("System assets cannot directly reference themselves as child system components.");
+  }
+}
+
+function assertNoDirectSelfNestedReference(assetId: string, nestedSystems: ReadonlyArray<SystemCompositionReference>): void {
+  if (nestedSystems.some((entry) => entry.assetId === assetId)) {
+    throw new Error("System assets cannot directly reference themselves as nested systems.");
+  }
+}
+
+function assertNoDirectSelfDependency(assetId: string, dependencies: ReadonlyArray<AssetDraftDependencyReference>): void {
+  if (dependencies.some((dependency) => dependency.assetId === assetId)) {
+    throw new Error("System assets cannot directly depend on themselves.");
+  }
+}
+
+function assertValidBindingEndpoints(input: {
+  readonly assetId: string;
+  readonly components: ReadonlyArray<SystemComponentReference>;
+  readonly inputs: ReadonlyArray<SystemInputDefinition>;
+  readonly outputs: ReadonlyArray<SystemOutputDefinition>;
+  readonly parameters: ReadonlyArray<SystemParameterDefinition>;
+  readonly bindings: ReadonlyArray<SystemBinding>;
+}): void {
+  const componentAliases = new Set(input.components.map((component) => component.alias).filter((value): value is string => !!value));
+  const systemInputIds = new Set(input.inputs.map((entry) => entry.inputId));
+  const systemOutputIds = new Set(input.outputs.map((entry) => entry.outputId));
+  const systemParameterIds = new Set(input.parameters.map((entry) => entry.parameterId));
+
+  const assertEndpoint = (endpoint: SystemBindingEndpoint, label: "source" | "target"): void => {
+    if (endpoint.scope === SystemBindingEndpointScopes.systemInput && !systemInputIds.has(endpoint.endpointId)) {
+      throw new Error(`System binding ${label} endpoint '${endpoint.endpointId}' is not a defined system input on '${input.assetId}'.`);
+    }
+    if (endpoint.scope === SystemBindingEndpointScopes.systemOutput && !systemOutputIds.has(endpoint.endpointId)) {
+      throw new Error(`System binding ${label} endpoint '${endpoint.endpointId}' is not a defined system output on '${input.assetId}'.`);
+    }
+    if (endpoint.scope === SystemBindingEndpointScopes.systemParameter && !systemParameterIds.has(endpoint.endpointId)) {
+      throw new Error(`System binding ${label} endpoint '${endpoint.endpointId}' is not a defined system parameter on '${input.assetId}'.`);
+    }
+
+    if (endpoint.scope.startsWith("component-")) {
+      if (!endpoint.componentAlias || !componentAliases.has(endpoint.componentAlias)) {
+        throw new Error(`System binding ${label} endpoint references unknown component alias '${endpoint.componentAlias ?? ""}'.`);
+      }
+    }
+  };
+
+  for (const binding of input.bindings) {
+    assertEndpoint(binding.source, "source");
+    assertEndpoint(binding.target, "target");
   }
 }
 
@@ -157,7 +321,10 @@ export function createSystemAsset(input: {
   readonly dependencies?: ReadonlyArray<AssetDraftDependencyReference>;
   readonly components?: ReadonlyArray<SystemComponentReference>;
   readonly nestedSystems?: ReadonlyArray<SystemCompositionReference>;
-  readonly bindings?: ReadonlyArray<SystemBindingReference>;
+  readonly inputs?: ReadonlyArray<SystemInputDefinition>;
+  readonly outputs?: ReadonlyArray<SystemOutputDefinition>;
+  readonly parameters?: ReadonlyArray<SystemParameterDefinition>;
+  readonly bindings?: ReadonlyArray<SystemBinding>;
 }): SystemAsset {
   const assetId = AssetId.from(input.assetId).value;
   const versionId = normalizeOptional(input.versionId);
@@ -172,19 +339,33 @@ export function createSystemAsset(input: {
   const components = Object.freeze((input.components ?? []).map(normalizeSystemComponentReference));
   assertNoDirectSelfReference(assetId, components);
 
-  const nestedSystems = Object.freeze((input.nestedSystems ?? [])
-    .map(normalizeNestedSystemReference)
-    .filter((entry) => entry.assetId !== assetId));
+  const nestedSystems = Object.freeze((input.nestedSystems ?? []).map(normalizeNestedSystemReference));
+  assertNoDirectSelfNestedReference(assetId, nestedSystems);
+
+  const dependencies = normalizeSystemDependencies(input.dependencies);
+  assertNoDirectSelfDependency(assetId, dependencies);
+
+  const inputs = Object.freeze((input.inputs ?? []).map(normalizeSystemInputDefinition));
+  const outputs = Object.freeze((input.outputs ?? []).map(normalizeSystemOutputDefinition));
+  const parameters = Object.freeze((input.parameters ?? []).map(normalizeSystemParameterDefinition));
   const bindings = Object.freeze((input.bindings ?? []).map(normalizeSystemBinding));
+
+  assertNoDuplicateIdentifiers({ values: inputs.map((entry) => ({ id: entry.inputId })), label: "System input id" });
+  assertNoDuplicateIdentifiers({ values: outputs.map((entry) => ({ id: entry.outputId })), label: "System output id" });
+  assertNoDuplicateIdentifiers({ values: parameters.map((entry) => ({ id: entry.parameterId })), label: "System parameter id" });
+  assertValidBindingEndpoints({ assetId, components, inputs, outputs, parameters, bindings });
 
   return Object.freeze({
     assetId,
     versionId,
     taxonomy,
     provenance: input.provenance,
-    dependencies: normalizeSystemDependencies(input.dependencies),
+    dependencies,
     components,
     nestedSystems,
+    inputs,
+    outputs,
+    parameters,
     bindings,
   });
 }
@@ -205,6 +386,96 @@ export function buildNestedSystemReferences(system: SystemAsset): ReadonlyArray<
   }
 
   return Object.freeze([...deduped.values()]);
+}
+
+export function collectSystemDirectDependencies(system: SystemAsset): ReadonlyArray<AssetDraftDependencyReference> {
+  const deduped = new Map<string, AssetDraftDependencyReference>();
+
+  for (const dependency of system.dependencies) {
+    deduped.set(`${dependency.assetId}::${dependency.versionId ?? ""}`, dependency);
+  }
+
+  for (const component of system.components) {
+    const reference = createDependencyReference(component.assetId, component.versionId);
+    deduped.set(`${reference.assetId}::${reference.versionId ?? ""}`, reference);
+  }
+
+  for (const nested of system.nestedSystems) {
+    const reference = createDependencyReference(nested.assetId, nested.versionId);
+    deduped.set(`${reference.assetId}::${reference.versionId ?? ""}`, reference);
+  }
+
+  return Object.freeze([...deduped.values()]);
+}
+
+export async function aggregateSystemDependencies(input: {
+  readonly root: SystemAsset;
+  readonly resolveSystem: (reference: SystemCompositionReference) => Promise<SystemAsset | undefined> | SystemAsset | undefined;
+  readonly maxDepth?: number;
+}): Promise<{
+  readonly rootSystemId: string;
+  readonly rootSystemVersionId?: string;
+  readonly directDependencies: ReadonlyArray<AssetDraftDependencyReference>;
+  readonly transitiveDependencies: ReadonlyArray<AssetDraftDependencyReference>;
+  readonly allDependencies: ReadonlyArray<AssetDraftDependencyReference>;
+  readonly traversedSystemIds: ReadonlyArray<string>;
+  readonly maxDepth: number;
+}> {
+  const maxDepth = Math.max(1, input.maxDepth ?? 4);
+  const rootKey = `${input.root.assetId}::${input.root.versionId ?? ""}`;
+  const direct = new Map<string, AssetDraftDependencyReference>();
+  const transitive = new Map<string, AssetDraftDependencyReference>();
+  const traversed = new Set<string>();
+
+  const traverse = async (system: SystemAsset, path: ReadonlyArray<string>, depth: number): Promise<void> => {
+    const key = `${system.assetId}::${system.versionId ?? ""}`;
+    if (path.includes(key)) {
+      throw new Error(`System dependency cycle detected at '${system.assetId}'.`);
+    }
+
+    if (depth > maxDepth) {
+      throw new Error(`System dependency traversal exceeds max depth of ${maxDepth}.`);
+    }
+
+    traversed.add(system.assetId);
+
+    const dependencies = collectSystemDirectDependencies(system);
+    for (const dependency of dependencies) {
+      const depKey = `${dependency.assetId}::${dependency.versionId ?? ""}`;
+      if (key === rootKey) {
+        direct.set(depKey, dependency);
+      } else {
+        transitive.set(depKey, dependency);
+      }
+    }
+
+    for (const reference of buildNestedSystemReferences(system)) {
+      const child = await input.resolveSystem(reference);
+      if (!child) {
+        continue;
+      }
+      await traverse(child, [...path, key], depth + 1);
+    }
+  };
+
+  await traverse(input.root, [], 1);
+
+  const directKeys = new Set(direct.keys());
+  for (const key of [...transitive.keys()]) {
+    if (directKeys.has(key)) {
+      transitive.delete(key);
+    }
+  }
+
+  return Object.freeze({
+    rootSystemId: input.root.assetId,
+    rootSystemVersionId: input.root.versionId,
+    directDependencies: Object.freeze([...direct.values()]),
+    transitiveDependencies: Object.freeze([...transitive.values()]),
+    allDependencies: Object.freeze([...direct.values(), ...transitive.values()]),
+    traversedSystemIds: Object.freeze([...traversed]),
+    maxDepth,
+  });
 }
 
 export function assertBoundedSystemComposition(input: {

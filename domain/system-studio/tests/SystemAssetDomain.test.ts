@@ -1,9 +1,12 @@
 import { describe, expect, it } from "bun:test";
 import {
+  aggregateSystemDependencies,
   assertBoundedSystemComposition,
   buildNestedSystemReferences,
+  collectSystemDirectDependencies,
   createSystemAsset,
   createSystemStudioTaxonomy,
+  SystemBindingEndpointScopes,
   SystemComponentKinds,
 } from "../SystemAssetDomain";
 import { TaxonomyBehaviorKinds, TaxonomySemanticRoles } from "../../taxonomy/CompositionTaxonomy";
@@ -63,6 +66,128 @@ describe("SystemAssetDomain", () => {
     expect(empty.components).toEqual([]);
     expect(empty.dependencies).toEqual([]);
     expect(empty.nestedSystems).toEqual([]);
+    expect(empty.inputs).toEqual([]);
+    expect(empty.outputs).toEqual([]);
+    expect(empty.parameters).toEqual([]);
+    expect(empty.bindings).toEqual([]);
+  });
+
+  it("supports explicit system binding model across system and component endpoints", () => {
+    const system = createSystemAsset({
+      assetId: "system:bindings",
+      components: [
+        {
+          componentKind: SystemComponentKinds.atomic,
+          assetId: "asset:model",
+          versionId: "asset:model:v1",
+          alias: "model-a",
+        },
+        {
+          componentKind: SystemComponentKinds.system,
+          assetId: "system:child",
+          versionId: "system:child:v1",
+          alias: "child-system",
+        },
+      ],
+      inputs: [
+        { inputId: "userPrompt", valueType: "string", required: true },
+      ],
+      outputs: [
+        { outputId: "finalAnswer", valueType: "string" },
+      ],
+      parameters: [
+        { parameterId: "temperature", valueType: "number", defaultValue: 0.2 },
+      ],
+      bindings: [
+        {
+          bindingId: "bind-system-to-atomic",
+          source: {
+            scope: SystemBindingEndpointScopes.systemInput,
+            endpointId: "userPrompt",
+          },
+          target: {
+            scope: SystemBindingEndpointScopes.componentInput,
+            componentAlias: "model-a",
+            endpointId: "prompt",
+          },
+        },
+        {
+          bindingId: "bind-child-to-system",
+          source: {
+            scope: SystemBindingEndpointScopes.componentOutput,
+            componentAlias: "child-system",
+            endpointId: "answer",
+          },
+          target: {
+            scope: SystemBindingEndpointScopes.systemOutput,
+            endpointId: "finalAnswer",
+          },
+        },
+        {
+          bindingId: "bind-component-to-component",
+          source: {
+            scope: SystemBindingEndpointScopes.componentParameter,
+            componentAlias: "child-system",
+            endpointId: "temperature",
+          },
+          target: {
+            scope: SystemBindingEndpointScopes.componentParameter,
+            componentAlias: "model-a",
+            endpointId: "temperature",
+          },
+        },
+      ],
+    });
+
+    expect(system.inputs.map((entry) => entry.inputId)).toEqual(["userPrompt"]);
+    expect(system.outputs.map((entry) => entry.outputId)).toEqual(["finalAnswer"]);
+    expect(system.parameters.map((entry) => entry.parameterId)).toEqual(["temperature"]);
+    expect(system.bindings).toHaveLength(3);
+  });
+
+  it("rejects invalid system binding shapes and unknown endpoint references", () => {
+    expect(() => createSystemAsset({
+      assetId: "system:binding-invalid",
+      components: [
+        {
+          componentKind: SystemComponentKinds.atomic,
+          assetId: "asset:model",
+          alias: "model-a",
+        },
+      ],
+      bindings: [
+        {
+          bindingId: "missing-system-input",
+          source: {
+            scope: SystemBindingEndpointScopes.systemInput,
+            endpointId: "missing-input",
+          },
+          target: {
+            scope: SystemBindingEndpointScopes.componentInput,
+            componentAlias: "model-a",
+            endpointId: "prompt",
+          },
+        },
+      ],
+    })).toThrow("defined system input");
+
+    expect(() => createSystemAsset({
+      assetId: "system:binding-invalid-alias",
+      bindings: [
+        {
+          bindingId: "missing-component-alias",
+          source: {
+            scope: SystemBindingEndpointScopes.componentOutput,
+            endpointId: "response",
+          },
+          target: {
+            scope: SystemBindingEndpointScopes.systemOutput,
+            endpointId: "result",
+          },
+        },
+      ],
+      outputs: [{ outputId: "result" }],
+    })).toThrow("require a component alias");
   });
 
   it("guards against direct self-reference and recursive cycles", () => {
@@ -75,6 +200,11 @@ describe("SystemAssetDomain", () => {
         },
       ],
     })).toThrow("cannot directly reference themselves");
+
+    expect(() => createSystemAsset({
+      assetId: "system:dep-self",
+      dependencies: [{ assetId: "system:dep-self" }],
+    })).toThrow("cannot directly depend on themselves");
 
     const root = createSystemAsset({ assetId: "system:root" });
     const child = createSystemAsset({ assetId: "system:child" });
@@ -91,6 +221,118 @@ describe("SystemAssetDomain", () => {
         ],
       },
     })).toThrow("cycle detected");
+  });
+
+  it("aggregates direct and transitive dependencies across nested systems", async () => {
+    const leaf = createSystemAsset({
+      assetId: "system:leaf",
+      versionId: "system:leaf:v1",
+      components: [
+        {
+          componentKind: SystemComponentKinds.atomic,
+          assetId: "asset:dataset",
+          versionId: "asset:dataset:v1",
+          alias: "dataset",
+        },
+      ],
+      dependencies: [{ assetId: "asset:prompt", versionId: "asset:prompt:v1" }],
+    });
+
+    const child = createSystemAsset({
+      assetId: "system:child",
+      versionId: "system:child:v1",
+      components: [
+        {
+          componentKind: SystemComponentKinds.system,
+          assetId: "system:leaf",
+          versionId: "system:leaf:v1",
+          alias: "leaf",
+        },
+      ],
+      dependencies: [{ assetId: "asset:tool", versionId: "asset:tool:v1" }],
+    });
+
+    const root = createSystemAsset({
+      assetId: "system:root",
+      versionId: "system:root:v1",
+      components: [
+        {
+          componentKind: SystemComponentKinds.atomic,
+          assetId: "asset:model",
+          versionId: "asset:model:v1",
+          alias: "model",
+        },
+        {
+          componentKind: SystemComponentKinds.system,
+          assetId: "system:child",
+          versionId: "system:child:v1",
+          alias: "child",
+        },
+      ],
+      dependencies: [{ assetId: "asset:config", versionId: "asset:config:v1" }],
+    });
+
+    const direct = collectSystemDirectDependencies(root);
+    expect(direct.map((entry) => entry.assetId).sort()).toEqual(["asset:config", "asset:model", "system:child"]);
+
+    const byId = new Map([
+      ["system:child::system:child:v1", child],
+      ["system:leaf::system:leaf:v1", leaf],
+    ]);
+    const summary = await aggregateSystemDependencies({
+      root,
+      resolveSystem: (reference) => byId.get(`${reference.assetId}::${reference.versionId ?? ""}`),
+      maxDepth: 5,
+    });
+
+    expect(summary.directDependencies.map((entry) => entry.assetId).sort()).toEqual([
+      "asset:config",
+      "asset:model",
+      "system:child",
+    ]);
+    expect(summary.transitiveDependencies.map((entry) => entry.assetId).sort()).toEqual([
+      "asset:dataset",
+      "asset:prompt",
+      "asset:tool",
+      "system:leaf",
+    ]);
+  });
+
+  it("rejects indirect cycles in aggregated system dependency traversal", async () => {
+    const root = createSystemAsset({
+      assetId: "system:root",
+      versionId: "system:root:v1",
+      components: [{
+        componentKind: SystemComponentKinds.system,
+        assetId: "system:child",
+        versionId: "system:child:v1",
+        alias: "child",
+      }],
+    });
+    const child = createSystemAsset({
+      assetId: "system:child",
+      versionId: "system:child:v1",
+      components: [{
+        componentKind: SystemComponentKinds.system,
+        assetId: "system:root",
+        versionId: "system:root:v1",
+        alias: "root",
+      }],
+    });
+
+    await expect(aggregateSystemDependencies({
+      root,
+      resolveSystem: (reference) => {
+        if (reference.assetId === "system:child") {
+          return child;
+        }
+        if (reference.assetId === "system:root") {
+          return root;
+        }
+        return undefined;
+      },
+      maxDepth: 6,
+    })).rejects.toThrow("cycle detected");
   });
 
   it("enforces bounded recursion depth for nested system composition graphs", () => {
@@ -110,6 +352,33 @@ describe("SystemAssetDomain", () => {
         ],
       },
     })).toThrow("max depth");
+  });
+
+  it("enforces bounded recursion depth for dependency traversal", async () => {
+    const level1 = createSystemAsset({
+      assetId: "system:l1",
+      versionId: "system:l1:v1",
+      components: [{ componentKind: SystemComponentKinds.system, assetId: "system:l2", versionId: "system:l2:v1", alias: "l2" }],
+    });
+    const level2 = createSystemAsset({
+      assetId: "system:l2",
+      versionId: "system:l2:v1",
+      components: [{ componentKind: SystemComponentKinds.system, assetId: "system:l3", versionId: "system:l3:v1", alias: "l3" }],
+    });
+    const level3 = createSystemAsset({
+      assetId: "system:l3",
+      versionId: "system:l3:v1",
+    });
+
+    await expect(aggregateSystemDependencies({
+      root: level1,
+      resolveSystem: (reference) => {
+        if (reference.assetId === "system:l2") return level2;
+        if (reference.assetId === "system:l3") return level3;
+        return undefined;
+      },
+      maxDepth: 2,
+    })).rejects.toThrow("max depth");
   });
 
   it("creates valid system and app-template taxonomy descriptors", () => {
