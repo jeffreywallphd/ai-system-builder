@@ -16,6 +16,9 @@ import RuntimeConsoleDrawer from "../components/execution/RuntimeConsoleDrawer";
 import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
 import logo from "../images/ai-loom-studio-logo.svg";
 import ContextNavigationBar from "../components/navigation/ContextNavigationBar";
+import CommandPalette from "../components/navigation/CommandPalette";
+import { GlobalCommandTrigger } from "../routes/CommandPalette";
+import GuidedOnboardingFlowSurface from "../components/navigation/GuidedOnboardingFlow";
 
 function navLinkClassName(isActive: boolean): string {
   return isActive
@@ -63,6 +66,8 @@ export default function AppLayout(): JSX.Element {
   const navigationModel = navigationShell.resolvePrimaryNavigation({ pathname: location.pathname });
   const contextNavigation = contextNavigationService.resolve({ pathname: location.pathname, search: location.search });
   const [runtimeConsoleState, setRuntimeConsoleState] = useState<RuntimeConsoleState>(fallbackConsoleState);
+  const [isCommandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const globalCommandTrigger = useMemo(() => new GlobalCommandTrigger(), []);
   const previousPathnameRef = useRef(location.pathname);
 
   useEffect(() => {
@@ -143,6 +148,20 @@ export default function AppLayout(): JSX.Element {
     }
   }, [location.pathname, workflowStore]);
 
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (!globalCommandTrigger.isOpenCommand(event)) {
+        return;
+      }
+      event.preventDefault();
+      setCommandPaletteOpen((value) => !value);
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [globalCommandTrigger]);
+
   const isWideWorkspace =
     location.pathname.startsWith("/workflows/") ||
     location.pathname === "/workflows";
@@ -164,6 +183,14 @@ export default function AppLayout(): JSX.Element {
             style={{ justifyContent: "flex-end", flex: 1 }}
           >
             {!config.isProductionMode ? <DevSyncButton /> : null}
+            <button
+              type="button"
+              className="ui-button ui-button--ghost ui-button--sm"
+              onClick={() => setCommandPaletteOpen(true)}
+              aria-label="Open command palette"
+            >
+              Command palette
+            </button>
 
             <nav className="ui-app__nav" aria-label="Primary">
               {navigationModel.items.map((route) => (
@@ -187,6 +214,7 @@ export default function AppLayout(): JSX.Element {
             isWideWorkspace ? " ui-app__main-inner--wide" : ""
           }`}
         >
+          <GuidedOnboardingFlowSurface pathname={location.pathname} />
           <ContextNavigationBar model={contextNavigation} />
           <Outlet />
         </div>
@@ -209,6 +237,8 @@ export default function AppLayout(): JSX.Element {
         canRestartRuntime={runtimeConsoleState.canRestartRuntime}
         isRestartingRuntime={runtimeConsoleState.isRestartingRuntime}
       />
+
+      <CommandPalette isOpen={isCommandPaletteOpen} onClose={() => setCommandPaletteOpen(false)} />
 
       <footer className="ui-app__footer">
         <div className="ui-app__footer-inner">
