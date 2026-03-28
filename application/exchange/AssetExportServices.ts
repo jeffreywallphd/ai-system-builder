@@ -20,6 +20,11 @@ import {
 import { ExchangeFormatCompatibilities } from "../../domain/exchange/ExchangeFormatVersioning";
 import { ExchangeBundleDeserializer, ExchangeBundleSerializer } from "../../domain/exchange/ExchangeBundleSerialization";
 import { ExchangeBundleValidator } from "../../domain/exchange/ExchangeBundleValidation";
+import {
+  ExchangeImportConflictResolver,
+  ImportConflictResolutionDecisions,
+} from "../../domain/exchange/ExchangeImportConflictResolution";
+import { ExchangeProvenanceTracker } from "../../domain/exchange/ExchangeProvenance";
 import { createSystemPackageManifest, type SystemPackageManifest } from "../../domain/exchange/SystemPackageManifest";
 import { createSystemAsset, type SystemAsset, type SystemCompositionNode, type SystemCompositionReference } from "../../domain/system-studio/SystemAssetDomain";
 import type { CompositionTaxonomyDescriptor } from "../../domain/taxonomy/CompositionTaxonomy";
@@ -331,6 +336,31 @@ function deriveProvenance(version: AssetVersion): ExchangeBundleProvenance | und
   });
 }
 
+function withExportProvenance(
+  provenance: ExchangeBundleProvenance | undefined,
+  input: {
+    readonly bundleId: string;
+    readonly subjectKind: "atomic-asset" | "composite-asset" | "system-asset";
+    readonly assetId: string;
+    readonly versionId: string;
+    readonly exportedAt: string;
+  },
+): ExchangeBundleProvenance {
+  return Object.freeze({
+    ...(provenance ?? {}),
+    metadata: Object.freeze({
+      ...((provenance?.metadata ?? {}) as Record<string, unknown>),
+      exchangeExport: Object.freeze({
+        bundleId: input.bundleId,
+        subjectKind: input.subjectKind,
+        exportedAssetId: input.assetId,
+        exportedVersionId: input.versionId,
+        exportedAt: input.exportedAt,
+      }),
+    }),
+  });
+}
+
 function createBundleId(kind: "atomic" | "composite", assetId: string, versionId: string): string {
   return `exchange:${kind}:${assetId}:${versionId}`;
 }
@@ -450,6 +480,49 @@ function inferSystemAssetKind(): IAsset["kind"] {
   return "json";
 }
 
+async function resolveDependencyConflicts(
+  dependencies: ReadonlyArray<{ readonly assetId: string; readonly versionId?: string }>,
+  versionRepository: IAssetVersionRepository,
+): Promise<{
+  readonly dependencyVersionExists: Readonly<Record<string, boolean>>;
+  readonly dependencyVersionRemapCandidates: Readonly<Record<string, string | undefined>>;
+}> {
+  const exists: Record<string, boolean> = {};
+  const remapCandidates: Record<string, string | undefined> = {};
+  const seen = new Set<string>();
+  for (const dependency of dependencies) {
+    const versionId = dependency.versionId?.trim();
+    if (!versionId || seen.has(versionId)) {
+      continue;
+    }
+    seen.add(versionId);
+    const existingVersion = await versionRepository.getByVersionId(versionId);
+    exists[versionId] = Boolean(existingVersion);
+    if (existingVersion) {
+      continue;
+    }
+    const versionsForAsset = await versionRepository.listVersionsByAssetId(dependency.assetId);
+    remapCandidates[versionId] = versionsForAsset[0]?.versionId;
+  }
+  return Object.freeze({
+    dependencyVersionExists: Object.freeze(exists),
+    dependencyVersionRemapCandidates: Object.freeze(remapCandidates),
+  });
+}
+
+function applyDependencyRemap(
+  dependencies: ReadonlyArray<{ readonly assetId: string; readonly versionId?: string; readonly relation: "component" | "dependency" | "contract"; readonly capabilityHints?: ReadonlyArray<string>; readonly configurationHints?: Readonly<Record<string, unknown>> }>,
+  remappedDependencyVersionIds: Readonly<Record<string, string>>,
+): ReadonlyArray<{ readonly assetId: string; readonly versionId?: string; readonly relation: "component" | "dependency" | "contract"; readonly capabilityHints?: ReadonlyArray<string>; readonly configurationHints?: Readonly<Record<string, unknown>> }> {
+  return Object.freeze(dependencies.map((entry) => {
+    const current = entry.versionId?.trim();
+    if (!current || !(current in remappedDependencyVersionIds)) {
+      return entry;
+    }
+    return Object.freeze({ ...entry, versionId: remappedDependencyVersionIds[current] });
+  }));
+}
+
 export class AtomicAssetBundleBuilder {
   private readonly taxonomyClassifier: CompositionTaxonomyClassifier;
 
@@ -485,7 +558,13 @@ export class AtomicAssetBundleBuilder {
         tags: [...(envelope.metadata?.tags ?? []), ...(input.request.tags ?? [])],
       },
       contract: envelope.metadata?.contract as never,
-      provenance: deriveProvenance(input.version),
+      provenance: withExportProvenance(deriveProvenance(input.version), {
+        bundleId: createBundleId("atomic", input.asset.id, input.version.versionId),
+        subjectKind: "atomic-asset",
+        assetId: input.asset.id,
+        versionId: input.version.versionId,
+        exportedAt: createdAt,
+      }),
       dependencies,
     });
 
@@ -509,7 +588,13 @@ export class AtomicAssetBundleBuilder {
         deterministicInputKey: `${input.asset.id}@${input.version.versionId}`,
         tags: normalizeTags([...(envelope.metadata?.tags ?? []), ...(input.request.tags ?? [])]),
       },
-      provenance: deriveProvenance(input.version),
+      provenance: withExportProvenance(deriveProvenance(input.version), {
+        bundleId: createBundleId("atomic", input.asset.id, input.version.versionId),
+        subjectKind: "atomic-asset",
+        assetId: input.asset.id,
+        versionId: input.version.versionId,
+        exportedAt: createdAt,
+      }),
     });
 
     const dependencySnapshot = BundleDependencySnapshotBuilder.fromAssetPackageManifest(manifest);
@@ -567,7 +652,13 @@ export class CompositeAssetBundleBuilder {
         tags: [...(envelope.metadata?.tags ?? []), ...(input.request.tags ?? [])],
       },
       contract: envelope.metadata?.contract as never,
-      provenance: deriveProvenance(input.version),
+      provenance: withExportProvenance(deriveProvenance(input.version), {
+        bundleId: createBundleId("composite", input.asset.id, input.version.versionId),
+        subjectKind: "composite-asset",
+        assetId: input.asset.id,
+        versionId: input.version.versionId,
+        exportedAt: createdAt,
+      }),
       dependencies,
     });
 
@@ -597,7 +688,13 @@ export class CompositeAssetBundleBuilder {
         deterministicInputKey: `${input.asset.id}@${input.version.versionId}`,
         tags: normalizeTags([...(envelope.metadata?.tags ?? []), ...(input.request.tags ?? [])]),
       },
-      provenance: deriveProvenance(input.version),
+      provenance: withExportProvenance(deriveProvenance(input.version), {
+        bundleId: createBundleId("composite", input.asset.id, input.version.versionId),
+        subjectKind: "composite-asset",
+        assetId: input.asset.id,
+        versionId: input.version.versionId,
+        exportedAt: createdAt,
+      }),
     });
 
     const dependencySnapshot = BundleDependencySnapshotBuilder.fromAssetPackageManifest(manifest);
@@ -638,7 +735,13 @@ export class SystemAssetBundleBuilder {
         packageLabel: envelope.metadata?.title,
         tags: normalizeTags([...(envelope.metadata?.tags ?? []), ...(input.request.tags ?? [])]),
       },
-      provenance: deriveProvenance(input.version),
+      provenance: withExportProvenance(deriveProvenance(input.version), {
+        bundleId: createBundleId("composite", input.asset.id, input.version.versionId).replace("exchange:composite:", "exchange:system:"),
+        subjectKind: "system-asset",
+        assetId: input.asset.id,
+        versionId: input.version.versionId,
+        exportedAt: createdAt,
+      }),
       rootContract: envelope.metadata?.contract as never,
       maxDepth: input.request.maxDepth,
     });
@@ -678,7 +781,13 @@ export class SystemAssetBundleBuilder {
         deterministicInputKey,
         tags: normalizeTags([...(envelope.metadata?.tags ?? []), ...(input.request.tags ?? [])]),
       },
-      provenance: deriveProvenance(input.version),
+      provenance: withExportProvenance(deriveProvenance(input.version), {
+        bundleId: createBundleId("composite", input.asset.id, input.version.versionId).replace("exchange:composite:", "exchange:system:"),
+        subjectKind: "system-asset",
+        assetId: input.asset.id,
+        versionId: input.version.versionId,
+        exportedAt: createdAt,
+      }),
     });
 
     const dependencySnapshot = BundleDependencySnapshotBuilder.fromSystemPackageManifest(manifest);
@@ -1089,6 +1198,8 @@ export class SystemAssetBundleImportResolver {
 export class AtomicAssetImportService {
   private readonly deserializer: ExchangeBundleDeserializer;
   private readonly resolver: AtomicAssetBundleImportResolver;
+  private readonly conflictResolver: ExchangeImportConflictResolver;
+  private readonly provenanceTracker: ExchangeProvenanceTracker;
 
   public constructor(
     private readonly assetRepository: IAssetRecordRepository,
@@ -1096,9 +1207,13 @@ export class AtomicAssetImportService {
     deserializer: ExchangeBundleDeserializer = new ExchangeBundleDeserializer({ validator: new ExchangeBundleValidator() }),
     resolver: AtomicAssetBundleImportResolver = new AtomicAssetBundleImportResolver(),
     private readonly clock: () => Date = () => new Date(),
+    conflictResolver: ExchangeImportConflictResolver = new ExchangeImportConflictResolver(),
+    provenanceTracker: ExchangeProvenanceTracker = new ExchangeProvenanceTracker(),
   ) {
     this.deserializer = deserializer;
     this.resolver = resolver;
+    this.conflictResolver = conflictResolver;
+    this.provenanceTracker = provenanceTracker;
   }
 
   public async import(request: AtomicAssetImportRequest): Promise<AtomicAssetImportResult> {
@@ -1147,25 +1262,39 @@ export class AtomicAssetImportService {
       const resolved = this.resolver.resolve({ bundle, manifest });
       const existingAsset = await this.assetRepository.getById(resolved.assetId);
       const existingVersion = await this.versionRepository.getByVersionId(resolved.versionId);
-      if (existingVersion && existingVersion.assetId.value !== resolved.assetId) {
+      const dependencyConflicts = await resolveDependencyConflicts(manifest.dependencies, this.versionRepository);
+      const conflictResolution = this.conflictResolver.resolve({
+        subjectKind: "atomic-asset",
+        bundleId: resolved.bundleId,
+        incomingAssetId: resolved.assetId,
+        incomingVersionId: resolved.versionId,
+        packageLabel: manifest.metadata.packageLabel,
+        existingAssetIdForVersion: existingVersion?.assetId.value,
+        hasExistingAsset: Boolean(existingAsset),
+        hasExistingVersion: Boolean(existingVersion),
+        dependencyVersionExists: dependencyConflicts.dependencyVersionExists,
+        dependencyVersionRemapCandidates: dependencyConflicts.dependencyVersionRemapCandidates,
+      });
+      if (conflictResolution.decision === ImportConflictResolutionDecisions.rejectImport) {
         return {
           ok: false,
           subjectKind: "atomic-asset",
           code: "conflict",
-          message: `Imported version '${resolved.versionId}' belongs to a different asset id.`,
+          message: conflictResolution.conflicts[0]?.message ?? "Atomic import conflict detected.",
+          details: { conflicts: conflictResolution.conflicts, reasons: conflictResolution.reasons },
         };
       }
 
       if (!existingAsset) {
         await this.assetRepository.save(new Asset({
-          id: manifest.subject.assetId,
+          id: conflictResolution.resolvedAssetId,
           name: manifest.metadata.packageLabel ?? manifest.subject.assetId,
           kind: inferAtomicAssetKind(manifest),
           status: "available",
           source: new AssetSourceInfo({ type: "imported", provider: "exchange-bundle" }),
           location: new AssetLocation({
             accessMethod: "virtual",
-            location: `exchange://${bundle.bundleId.value}/${manifest.subject.assetId}/${manifest.subject.versionId}`,
+            location: `exchange://${bundle.bundleId.value}/${conflictResolution.resolvedAssetId}/${conflictResolution.resolvedVersionId}`,
             contentType: "application/vnd.ai-loom.exchange-bundle+json",
             format: "json",
           }),
@@ -1180,13 +1309,32 @@ export class AtomicAssetImportService {
 
       if (!existingVersion) {
         const upstreamVersionIds = [...new Set([
-          ...manifest.dependencies.map((entry) => entry.versionId).filter((value): value is string => Boolean(value?.trim())),
+          ...applyDependencyRemap(manifest.dependencies, conflictResolution.remappedDependencyVersionIds)
+            .map((entry) => entry.versionId).filter((value): value is string => Boolean(value?.trim())),
           ...resolved.sourceVersionLineage,
         ])].filter((entry) => entry !== resolved.versionId);
+        const importProvenance = this.provenanceTracker.createImportProvenance({
+          bundleId: resolved.bundleId,
+          sourceBundleId: resolved.sourceBundleId,
+          sourceAssetId: manifest.subject.assetId,
+          sourceVersionId: manifest.subject.versionId,
+          importedAssetId: conflictResolution.resolvedAssetId,
+          importedVersionId: conflictResolution.resolvedVersionId,
+          importedAt: this.clock().toISOString(),
+          decision: conflictResolution.decision,
+          remappedDependencyVersionIds: conflictResolution.remappedDependencyVersionIds,
+        });
+        const lineageEdge = this.provenanceTracker.createImportEdge({
+          sourceVersionId: manifest.subject.versionId,
+          targetVersionId: conflictResolution.resolvedVersionId,
+          decision: conflictResolution.decision,
+          bundleId: resolved.bundleId,
+          createdAt: this.clock().toISOString(),
+        });
 
         await this.versionRepository.saveVersion(new CanonicalAssetVersion({
-          assetId: resolved.assetId,
-          versionId: resolved.versionId,
+          assetId: conflictResolution.resolvedAssetId,
+          versionId: conflictResolution.resolvedVersionId,
           createdAt: new Date(manifest.metadata.createdAt),
           upstreamVersionIds,
           metadata: {
@@ -1201,13 +1349,28 @@ export class AtomicAssetImportService {
                 upstreamAssets: resolved.sourceVersionLineage.map((versionId) => ({ versionId })),
               },
             },
-            dependencies: manifest.dependencies,
+            dependencies: applyDependencyRemap(manifest.dependencies, conflictResolution.remappedDependencyVersionIds),
             exchangeImport: {
               bundleId: resolved.bundleId,
               sourceBundleId: resolved.sourceBundleId,
               importedAt: this.clock().toISOString(),
               dependencySnapshotVersion: deserialized.deserialized.dependencySnapshot.snapshotVersion,
+              conflictResolution: {
+                decision: conflictResolution.decision,
+                conflicts: conflictResolution.conflicts,
+                reasons: conflictResolution.reasons,
+                remappedDependencyVersionIds: conflictResolution.remappedDependencyVersionIds,
+              },
             },
+            exchangeProvenance: this.provenanceTracker.createRecord({
+              importProvenance,
+              importedFromBundle: {
+                bundleId: resolved.bundleId,
+                sourceBundleId: resolved.sourceBundleId,
+                importedAt: this.clock().toISOString(),
+              },
+              lineageEdges: [lineageEdge],
+            }),
           },
         }));
       }
@@ -1217,8 +1380,8 @@ export class AtomicAssetImportService {
         subjectKind: "atomic-asset",
         dependencyCount: manifest.dependencies.length,
         imported: Object.freeze({
-          assetId: resolved.assetId,
-          versionId: resolved.versionId,
+          assetId: conflictResolution.resolvedAssetId,
+          versionId: conflictResolution.resolvedVersionId,
           bundleId: resolved.bundleId,
           sourceBundleId: resolved.sourceBundleId,
           sourceVersionLineage: resolved.sourceVersionLineage,
@@ -1241,6 +1404,8 @@ export class AtomicAssetImportService {
 export class CompositeAssetImportService {
   private readonly deserializer: ExchangeBundleDeserializer;
   private readonly resolver: CompositeAssetBundleImportResolver;
+  private readonly conflictResolver: ExchangeImportConflictResolver;
+  private readonly provenanceTracker: ExchangeProvenanceTracker;
 
   public constructor(
     private readonly assetRepository: IAssetRecordRepository,
@@ -1248,9 +1413,13 @@ export class CompositeAssetImportService {
     deserializer: ExchangeBundleDeserializer = new ExchangeBundleDeserializer({ validator: new ExchangeBundleValidator() }),
     resolver: CompositeAssetBundleImportResolver = new CompositeAssetBundleImportResolver(),
     private readonly clock: () => Date = () => new Date(),
+    conflictResolver: ExchangeImportConflictResolver = new ExchangeImportConflictResolver(),
+    provenanceTracker: ExchangeProvenanceTracker = new ExchangeProvenanceTracker(),
   ) {
     this.deserializer = deserializer;
     this.resolver = resolver;
+    this.conflictResolver = conflictResolver;
+    this.provenanceTracker = provenanceTracker;
   }
 
   public async import(request: CompositeAssetImportRequest): Promise<CompositeAssetImportResult> {
@@ -1299,25 +1468,42 @@ export class CompositeAssetImportService {
       const resolved = this.resolver.resolve({ bundle, manifest });
       const existingAsset = await this.assetRepository.getById(resolved.assetId);
       const existingVersion = await this.versionRepository.getByVersionId(resolved.versionId);
-      if (existingVersion && existingVersion.assetId.value !== resolved.assetId) {
+      const dependencyConflicts = await resolveDependencyConflicts(
+        [...manifest.dependencies, ...manifest.composition.map((entry) => ({ assetId: entry.assetId, versionId: entry.versionId }))],
+        this.versionRepository,
+      );
+      const conflictResolution = this.conflictResolver.resolve({
+        subjectKind: "composite-asset",
+        bundleId: resolved.bundleId,
+        incomingAssetId: resolved.assetId,
+        incomingVersionId: resolved.versionId,
+        packageLabel: manifest.metadata.packageLabel,
+        existingAssetIdForVersion: existingVersion?.assetId.value,
+        hasExistingAsset: Boolean(existingAsset),
+        hasExistingVersion: Boolean(existingVersion),
+        dependencyVersionExists: dependencyConflicts.dependencyVersionExists,
+        dependencyVersionRemapCandidates: dependencyConflicts.dependencyVersionRemapCandidates,
+      });
+      if (conflictResolution.decision === ImportConflictResolutionDecisions.rejectImport) {
         return {
           ok: false,
           subjectKind: "composite-asset",
           code: "conflict",
-          message: `Imported version '${resolved.versionId}' belongs to a different asset id.`,
+          message: conflictResolution.conflicts[0]?.message ?? "Composite import conflict detected.",
+          details: { conflicts: conflictResolution.conflicts, reasons: conflictResolution.reasons },
         };
       }
 
       if (!existingAsset) {
         await this.assetRepository.save(new Asset({
-          id: resolved.assetId,
+          id: conflictResolution.resolvedAssetId,
           name: manifest.metadata.packageLabel ?? resolved.assetId,
           kind: inferCompositeAssetKind(manifest),
           status: "available",
           source: new AssetSourceInfo({ type: "imported", provider: "exchange-bundle" }),
           location: new AssetLocation({
             accessMethod: "virtual",
-            location: `exchange://${bundle.bundleId.value}/${resolved.assetId}/${resolved.versionId}`,
+            location: `exchange://${bundle.bundleId.value}/${conflictResolution.resolvedAssetId}/${conflictResolution.resolvedVersionId}`,
             contentType: "application/vnd.ai-loom.exchange-bundle+json",
             format: "json",
           }),
@@ -1331,15 +1517,38 @@ export class CompositeAssetImportService {
       }
 
       if (!existingVersion) {
+        const remappedDependencies = applyDependencyRemap(manifest.dependencies, conflictResolution.remappedDependencyVersionIds);
+        const remappedComposition = Object.freeze(resolved.composition.map((entry) => {
+          const remappedVersionId = conflictResolution.remappedDependencyVersionIds[entry.versionId];
+          return remappedVersionId ? Object.freeze({ ...entry, versionId: remappedVersionId }) : entry;
+        }));
         const upstreamVersionIds = [...new Set([
-          ...manifest.dependencies.map((entry) => entry.versionId).filter((value): value is string => Boolean(value?.trim())),
-          ...manifest.composition.map((entry) => entry.versionId).filter((value): value is string => Boolean(value?.trim())),
+          ...remappedDependencies.map((entry) => entry.versionId).filter((value): value is string => Boolean(value?.trim())),
+          ...remappedComposition.map((entry) => entry.versionId).filter((value): value is string => Boolean(value?.trim())),
           ...resolved.sourceVersionLineage,
         ])].filter((entry) => entry !== resolved.versionId);
+        const importProvenance = this.provenanceTracker.createImportProvenance({
+          bundleId: resolved.bundleId,
+          sourceBundleId: resolved.sourceBundleId,
+          sourceAssetId: manifest.subject.assetId,
+          sourceVersionId: manifest.subject.versionId,
+          importedAssetId: conflictResolution.resolvedAssetId,
+          importedVersionId: conflictResolution.resolvedVersionId,
+          importedAt: this.clock().toISOString(),
+          decision: conflictResolution.decision,
+          remappedDependencyVersionIds: conflictResolution.remappedDependencyVersionIds,
+        });
+        const lineageEdge = this.provenanceTracker.createImportEdge({
+          sourceVersionId: manifest.subject.versionId,
+          targetVersionId: conflictResolution.resolvedVersionId,
+          decision: conflictResolution.decision,
+          bundleId: resolved.bundleId,
+          createdAt: this.clock().toISOString(),
+        });
 
         await this.versionRepository.saveVersion(new CanonicalAssetVersion({
-          assetId: resolved.assetId,
-          versionId: resolved.versionId,
+          assetId: conflictResolution.resolvedAssetId,
+          versionId: conflictResolution.resolvedVersionId,
           createdAt: new Date(manifest.metadata.createdAt),
           upstreamVersionIds,
           metadata: {
@@ -1354,14 +1563,29 @@ export class CompositeAssetImportService {
                 upstreamAssets: resolved.sourceVersionLineage.map((versionId) => ({ versionId })),
               },
             },
-            composition: resolved.composition,
-            dependencies: manifest.dependencies,
+            composition: remappedComposition,
+            dependencies: remappedDependencies,
             exchangeImport: {
               bundleId: resolved.bundleId,
               sourceBundleId: resolved.sourceBundleId,
               importedAt: this.clock().toISOString(),
               dependencySnapshotVersion: deserialized.deserialized.dependencySnapshot.snapshotVersion,
+              conflictResolution: {
+                decision: conflictResolution.decision,
+                conflicts: conflictResolution.conflicts,
+                reasons: conflictResolution.reasons,
+                remappedDependencyVersionIds: conflictResolution.remappedDependencyVersionIds,
+              },
             },
+            exchangeProvenance: this.provenanceTracker.createRecord({
+              importProvenance,
+              importedFromBundle: {
+                bundleId: resolved.bundleId,
+                sourceBundleId: resolved.sourceBundleId,
+                importedAt: this.clock().toISOString(),
+              },
+              lineageEdges: [lineageEdge],
+            }),
           },
         }));
       }
@@ -1370,8 +1594,8 @@ export class CompositeAssetImportService {
         ok: true,
         subjectKind: "composite-asset",
         imported: Object.freeze({
-          assetId: resolved.assetId,
-          versionId: resolved.versionId,
+          assetId: conflictResolution.resolvedAssetId,
+          versionId: conflictResolution.resolvedVersionId,
           bundleId: resolved.bundleId,
           sourceBundleId: resolved.sourceBundleId,
           sourceVersionLineage: resolved.sourceVersionLineage,
@@ -1396,6 +1620,8 @@ export class CompositeAssetImportService {
 export class SystemAssetImportService {
   private readonly deserializer: ExchangeBundleDeserializer;
   private readonly resolver: SystemAssetBundleImportResolver;
+  private readonly conflictResolver: ExchangeImportConflictResolver;
+  private readonly provenanceTracker: ExchangeProvenanceTracker;
 
   public constructor(
     private readonly assetRepository: IAssetRecordRepository,
@@ -1403,9 +1629,13 @@ export class SystemAssetImportService {
     deserializer: ExchangeBundleDeserializer = new ExchangeBundleDeserializer({ validator: new ExchangeBundleValidator() }),
     resolver: SystemAssetBundleImportResolver = new SystemAssetBundleImportResolver(),
     private readonly clock: () => Date = () => new Date(),
+    conflictResolver: ExchangeImportConflictResolver = new ExchangeImportConflictResolver(),
+    provenanceTracker: ExchangeProvenanceTracker = new ExchangeProvenanceTracker(),
   ) {
     this.deserializer = deserializer;
     this.resolver = resolver;
+    this.conflictResolver = conflictResolver;
+    this.provenanceTracker = provenanceTracker;
   }
 
   public async import(request: SystemAssetImportRequest): Promise<SystemAssetImportResult> {
@@ -1454,25 +1684,42 @@ export class SystemAssetImportService {
       const resolved = this.resolver.resolve({ bundle, manifest });
       const existingAsset = await this.assetRepository.getById(resolved.assetId);
       const existingVersion = await this.versionRepository.getByVersionId(resolved.versionId);
-      if (existingVersion && existingVersion.assetId.value !== resolved.assetId) {
+      const dependencyConflicts = await resolveDependencyConflicts(
+        manifest.composition.map((entry) => ({ assetId: entry.childAssetId, versionId: entry.childVersionId })),
+        this.versionRepository,
+      );
+      const conflictResolution = this.conflictResolver.resolve({
+        subjectKind: "system-asset",
+        bundleId: resolved.bundleId,
+        incomingAssetId: resolved.assetId,
+        incomingVersionId: resolved.versionId,
+        packageLabel: manifest.metadata.packageLabel,
+        existingAssetIdForVersion: existingVersion?.assetId.value,
+        hasExistingAsset: Boolean(existingAsset),
+        hasExistingVersion: Boolean(existingVersion),
+        dependencyVersionExists: dependencyConflicts.dependencyVersionExists,
+        dependencyVersionRemapCandidates: dependencyConflicts.dependencyVersionRemapCandidates,
+      });
+      if (conflictResolution.decision === ImportConflictResolutionDecisions.rejectImport) {
         return {
           ok: false,
           subjectKind: "system-asset",
           code: "conflict",
-          message: `Imported version '${resolved.versionId}' belongs to a different asset id.`,
+          message: conflictResolution.conflicts[0]?.message ?? "System import conflict detected.",
+          details: { conflicts: conflictResolution.conflicts, reasons: conflictResolution.reasons },
         };
       }
 
       if (!existingAsset) {
         await this.assetRepository.save(new Asset({
-          id: resolved.assetId,
+          id: conflictResolution.resolvedAssetId,
           name: manifest.metadata.packageLabel ?? resolved.assetId,
           kind: inferSystemAssetKind(),
           status: "available",
           source: new AssetSourceInfo({ type: "imported", provider: "exchange-bundle" }),
           location: new AssetLocation({
             accessMethod: "virtual",
-            location: `exchange://${bundle.bundleId.value}/${resolved.assetId}/${resolved.versionId}`,
+            location: `exchange://${bundle.bundleId.value}/${conflictResolution.resolvedAssetId}/${conflictResolution.resolvedVersionId}`,
             contentType: "application/vnd.ai-loom.exchange-bundle+json",
             format: "json",
           }),
@@ -1486,15 +1733,37 @@ export class SystemAssetImportService {
       }
 
       if (!existingVersion) {
+        const remappedComposition = Object.freeze(manifest.composition.map((entry) => {
+          const remappedVersionId = conflictResolution.remappedDependencyVersionIds[entry.childVersionId];
+          return remappedVersionId ? Object.freeze({ ...entry, childVersionId: remappedVersionId }) : entry;
+        }));
         const upstreamVersionIds = [...new Set([
-          ...manifest.composition.map((entry) => entry.childVersionId),
-          ...manifest.composition.map((entry) => entry.parentVersionId),
+          ...remappedComposition.map((entry) => entry.childVersionId),
+          ...remappedComposition.map((entry) => entry.parentVersionId),
           ...resolved.sourceVersionLineage,
         ])].filter((entry) => entry && entry !== resolved.versionId);
+        const importProvenance = this.provenanceTracker.createImportProvenance({
+          bundleId: resolved.bundleId,
+          sourceBundleId: resolved.sourceBundleId,
+          sourceAssetId: manifest.subject.assetId,
+          sourceVersionId: manifest.subject.versionId,
+          importedAssetId: conflictResolution.resolvedAssetId,
+          importedVersionId: conflictResolution.resolvedVersionId,
+          importedAt: this.clock().toISOString(),
+          decision: conflictResolution.decision,
+          remappedDependencyVersionIds: conflictResolution.remappedDependencyVersionIds,
+        });
+        const lineageEdge = this.provenanceTracker.createImportEdge({
+          sourceVersionId: manifest.subject.versionId,
+          targetVersionId: conflictResolution.resolvedVersionId,
+          decision: conflictResolution.decision,
+          bundleId: resolved.bundleId,
+          createdAt: this.clock().toISOString(),
+        });
 
         await this.versionRepository.saveVersion(new CanonicalAssetVersion({
-          assetId: resolved.assetId,
-          versionId: resolved.versionId,
+          assetId: conflictResolution.resolvedAssetId,
+          versionId: conflictResolution.resolvedVersionId,
           createdAt: new Date(manifest.metadata.createdAt),
           upstreamVersionIds,
           metadata: {
@@ -1508,7 +1777,7 @@ export class SystemAssetImportService {
                 upstreamAssets: resolved.sourceVersionLineage.map((versionId) => ({ versionId })),
               },
             },
-            dependencies: manifest.composition.map((entry) => ({
+            dependencies: remappedComposition.map((entry) => ({
               assetId: entry.childAssetId,
               versionId: entry.childVersionId,
               relation: entry.edgeKind === "nested-system" ? "component" : "dependency",
@@ -1525,7 +1794,22 @@ export class SystemAssetImportService {
               sourceBundleId: resolved.sourceBundleId,
               importedAt: this.clock().toISOString(),
               dependencySnapshotVersion: deserialized.deserialized.dependencySnapshot.snapshotVersion,
+              conflictResolution: {
+                decision: conflictResolution.decision,
+                conflicts: conflictResolution.conflicts,
+                reasons: conflictResolution.reasons,
+                remappedDependencyVersionIds: conflictResolution.remappedDependencyVersionIds,
+              },
             },
+            exchangeProvenance: this.provenanceTracker.createRecord({
+              importProvenance,
+              importedFromBundle: {
+                bundleId: resolved.bundleId,
+                sourceBundleId: resolved.sourceBundleId,
+                importedAt: this.clock().toISOString(),
+              },
+              lineageEdges: [lineageEdge],
+            }),
           },
         }));
       }
@@ -1534,8 +1818,8 @@ export class SystemAssetImportService {
         ok: true,
         subjectKind: "system-asset",
         imported: Object.freeze({
-          assetId: resolved.assetId,
-          versionId: resolved.versionId,
+          assetId: conflictResolution.resolvedAssetId,
+          versionId: conflictResolution.resolvedVersionId,
           bundleId: resolved.bundleId,
           sourceBundleId: resolved.sourceBundleId,
           sourceVersionLineage: resolved.sourceVersionLineage,

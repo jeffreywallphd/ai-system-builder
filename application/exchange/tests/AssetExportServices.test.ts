@@ -533,4 +533,91 @@ describe("Asset export services", () => {
       expect(unsupported.code).toBe("unsupported-format-version");
     }
   });
+
+  it("records exchange export provenance on bundles", async () => {
+    const assets = new InMemoryAssetRecordRepository();
+    const versions = new InMemoryAssetVersionRepository();
+    await assets.save(createAsset({ id: "asset:prov", kind: "json" }));
+    await versions.saveVersion(new AssetVersion({
+      assetId: "asset:prov",
+      versionId: "asset:prov:v1",
+      createdAt: new Date("2026-03-28T00:00:00.000Z"),
+      metadata: { metadata: { taxonomy: { structuralKind: "atomic", semanticRole: "model", behaviorKind: "none" } } },
+    }));
+
+    const exported = await new AtomicAssetExportService(assets, versions).export({ assetId: "asset:prov", versionId: "asset:prov:v1" });
+    expect(exported.ok).toBeTrue();
+    if (exported.ok) {
+      expect(exported.artifact.content).toContain("\"exchangeExport\"");
+      expect(exported.artifact.content).toContain("\"exportedAssetId\": \"asset:prov\"");
+    }
+  });
+
+  it("returns structured identity conflict outcomes for imports", async () => {
+    const assets = new InMemoryAssetRecordRepository();
+    const versions = new InMemoryAssetVersionRepository();
+    await assets.save(createAsset({ id: "asset:existing", kind: "json" }));
+    await versions.saveVersion(new AssetVersion({ assetId: "asset:existing", versionId: "asset:target:v1" }));
+
+    const exportAssets = new InMemoryAssetRecordRepository();
+    const exportVersions = new InMemoryAssetVersionRepository();
+    await exportAssets.save(createAsset({ id: "asset:source", kind: "json" }));
+    await exportVersions.saveVersion(new AssetVersion({
+      assetId: "asset:source",
+      versionId: "asset:target:v1",
+      metadata: { metadata: { taxonomy: { structuralKind: "atomic", semanticRole: "model", behaviorKind: "none" } } },
+    }));
+    const exported = await new AtomicAssetExportService(exportAssets, exportVersions).export({ assetId: "asset:source", versionId: "asset:target:v1" });
+    expect(exported.ok).toBeTrue();
+    if (!exported.ok) {
+      return;
+    }
+
+    const imported = await new AtomicAssetImportService(assets, versions).import({ artifactContent: exported.artifact.content });
+    expect(imported.ok).toBeFalse();
+    if (!imported.ok) {
+      expect(imported.code).toBe("conflict");
+      expect(JSON.stringify(imported.details)).toContain("\"kind\":\"identity\"");
+    }
+  });
+
+  it("remaps composite dependency versions when bounded candidates exist and records provenance", async () => {
+    const exportAssets = new InMemoryAssetRecordRepository();
+    const exportVersions = new InMemoryAssetVersionRepository();
+    await exportAssets.save(createAsset({ id: "workflow-definition:wf-remap", kind: "workflow-definition" }));
+    await exportVersions.saveVersion(new AssetVersion({
+      assetId: "workflow-definition:wf-remap",
+      versionId: "workflow-definition:wf-remap:v1",
+      metadata: {
+        metadata: { taxonomy: { structuralKind: "composite", semanticRole: "workflow", behaviorKind: "deterministic" } },
+        dependencies: [{ assetId: "asset:model", versionId: "asset:model:v1", relation: "dependency" }],
+        composition: [{ alias: "model", assetId: "asset:model", versionId: "asset:model:v1", relation: "component" }],
+      },
+    }));
+
+    const exported = await new CompositeAssetExportService(exportAssets, exportVersions).export({
+      assetId: "workflow-definition:wf-remap",
+      versionId: "workflow-definition:wf-remap:v1",
+    });
+    expect(exported.ok).toBeTrue();
+    if (!exported.ok) {
+      return;
+    }
+
+    const importAssets = new InMemoryAssetRecordRepository();
+    const importVersions = new InMemoryAssetVersionRepository();
+    await importAssets.save(createAsset({ id: "asset:model", kind: "json" }));
+    await importVersions.saveVersion(new AssetVersion({ assetId: "asset:model", versionId: "asset:model:v3" }));
+
+    const imported = await new CompositeAssetImportService(importAssets, importVersions).import({ artifactContent: exported.artifact.content });
+    expect(imported.ok).toBeTrue();
+    if (!imported.ok) {
+      return;
+    }
+    const stored = await importVersions.getByVersionId("workflow-definition:wf-remap:v1");
+    const metadataText = JSON.stringify(stored?.metadata);
+    expect(metadataText).toContain("\"decision\":\"remap-reference\"");
+    expect(metadataText).toContain("\"asset:model:v1\":\"asset:model:v3\"");
+    expect(metadataText).toContain("\"exchangeProvenance\"");
+  });
 });
