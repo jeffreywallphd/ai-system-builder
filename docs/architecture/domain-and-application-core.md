@@ -677,3 +677,16 @@ Explicitly later than this scope:
 - The runtime model introduces execution concerns only: execution identity, invocation context, runtime environment references, status transitions, input/output payload envelopes, and execution-node references.
 - Runtime node references are nested-system-ready (`parentExecutionNodeId` + `path`) while intentionally stopping short of full orchestration/planning engines in this slice.
 - Added runtime behavior alignment seam at `application/system-runtime/RuntimeBehaviorAlignment.ts` that maps shared behavior kinds into runtime execution profiles without reclassifying assets or duplicating taxonomy logic.
+
+
+## Direction 5 update: Runtime environment abstraction + execution plan builder (stories 6.5–6.6)
+
+- Runtime environment selection is now a bounded domain/application seam (`RuntimeEnvironmentDomain` + `RuntimeEnvironmentSelector`) rather than an implicit local-host assumption.
+- The selector models current truthful local capabilities and explicit extension points for MCP-mediated and remote/distributed environments without implementing infrastructure adapters in this slice.
+- Runtime planning now has an explicit `ExecutionPlanBuilder` in `application/system-runtime/ExecutionPlanBuilder.ts` that composes:
+  - system structure + bindings
+  - runtime execution contract mapping outputs
+  - runtime dependency resolution outputs
+  - runtime behavior profile
+  - selected runtime environment
+- Plan outputs are deterministic and cycle-safe (with explicit invalid results) and remain runtime-only artifacts, preserving separation from asset-definition models and UI state.
