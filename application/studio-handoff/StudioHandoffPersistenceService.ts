@@ -22,6 +22,16 @@ export interface StudioHandoffRevisionRecord {
   readonly changes?: StudioHandoffChangeSet;
 }
 
+export interface StudioHandoffRetryLinkRecord {
+  readonly attemptKind: "retry" | "reconciliation";
+  readonly decision: "retryable" | "reconcilable" | "terminal";
+  readonly reasonCode: string;
+  readonly reason: string;
+  readonly sourceHandoffId: string;
+  readonly targetHandoffId: string;
+  readonly initiatedAt: string;
+}
+
 export interface PersistedStudioHandoffRecord {
   readonly handoffId: string;
   readonly sourceStudioId: string;
@@ -51,6 +61,7 @@ export interface PersistedStudioHandoffRecord {
     readonly issueCodes: ReadonlyArray<string>;
   };
   readonly revision?: StudioHandoffRevisionRecord;
+  readonly retryLink?: StudioHandoffRetryLinkRecord;
   readonly lineageRecordId?: string;
   readonly dependencyRecordId?: string;
   readonly createdAt: string;
@@ -86,6 +97,7 @@ function toRecord(input: {
   readonly status: "prepared" | "failed";
   readonly revision?: StudioHandoffRevision;
   readonly changes?: StudioHandoffChangeSet;
+  readonly retryLink?: StudioHandoffRetryLinkRecord;
   readonly lineage?: StudioHandoffLineageRecord;
   readonly dependency?: StudioHandoffDependencyRecord;
 }): PersistedStudioHandoffRecord {
@@ -123,6 +135,17 @@ function toRecord(input: {
         changes: input.changes,
       })
       : undefined,
+    retryLink: input.retryLink
+      ? Object.freeze({
+        attemptKind: input.retryLink.attemptKind,
+        decision: input.retryLink.decision,
+        reasonCode: input.retryLink.reasonCode,
+        reason: input.retryLink.reason,
+        sourceHandoffId: input.retryLink.sourceHandoffId,
+        targetHandoffId: input.retryLink.targetHandoffId,
+        initiatedAt: input.retryLink.initiatedAt,
+      })
+      : undefined,
     lineageRecordId: input.lineage?.recordId,
     dependencyRecordId: input.dependency?.recordId,
     createdAt: now,
@@ -140,6 +163,7 @@ export class StudioHandoffPersistenceService {
     readonly preparation: StudioHandoffPreparation;
     readonly revision?: StudioHandoffRevision;
     readonly changes?: StudioHandoffChangeSet;
+    readonly retryLink?: StudioHandoffRetryLinkRecord;
     readonly lineage?: StudioHandoffLineageRecord;
     readonly dependency?: StudioHandoffDependencyRecord;
   }): Promise<PersistedStudioHandoffRecord> {
@@ -152,6 +176,7 @@ export class StudioHandoffPersistenceService {
       issueCodes: input.preparation.compatibility.issues.map((entry) => entry.code),
       revision: input.revision,
       changes: input.changes,
+      retryLink: input.retryLink,
       lineage: input.lineage ?? input.preparation.lineage,
       dependency: input.dependency,
     });
@@ -186,6 +211,7 @@ export class StudioHandoffPersistenceService {
     readonly failure: StudioHandoffFailure;
     readonly revision?: StudioHandoffRevision;
     readonly changes?: StudioHandoffChangeSet;
+    readonly retryLink?: StudioHandoffRetryLinkRecord;
   }): Promise<PersistedStudioHandoffRecord> {
     const record = toRecord({
       handoff: input.handoff,
@@ -194,6 +220,7 @@ export class StudioHandoffPersistenceService {
       issueCodes: [input.failure.code, ...input.failure.issues.map((entry) => entry.code)],
       revision: input.revision,
       changes: input.changes,
+      retryLink: input.retryLink,
     });
     const persisted = await this.repository.saveRecord(record);
     this.auditTrail?.record({
