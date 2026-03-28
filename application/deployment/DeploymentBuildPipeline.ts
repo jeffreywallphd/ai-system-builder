@@ -16,10 +16,21 @@ export interface DeploymentBuildResult {
   readonly issues: ReadonlyArray<{ readonly code: string; readonly message: string }>;
 }
 
+export interface DeploymentBuildPipelinePolicy {
+  readonly maxCachedBundles: number;
+}
+
+const DEFAULT_POLICY: DeploymentBuildPipelinePolicy = Object.freeze({
+  maxCachedBundles: 200,
+});
+
 export class DeploymentBuildPipeline {
+  private readonly bundleByDeterminismKey = new Map<string, DeploymentBundle>();
+
   public constructor(
     private readonly configurationValidator: DeploymentConfigurationValidator = new DeploymentConfigurationValidator(),
     private readonly clock: () => Date = () => new Date(),
+    private readonly policy: DeploymentBuildPipelinePolicy = DEFAULT_POLICY,
   ) {}
 
   public build(request: DeploymentBuildRequest): DeploymentBuildResult {
@@ -46,6 +57,16 @@ export class DeploymentBuildPipeline {
       targetType: request.target.type,
       dependencyPins,
     });
+
+
+    const cached = this.bundleByDeterminismKey.get(reproducibilityKey);
+    if (cached) {
+      return Object.freeze({
+        ok: true,
+        bundle: cached,
+        issues: Object.freeze([]),
+      });
+    }
 
     const bundleId = `deployment-bundle:${request.systemPackage.packageId.value}:${request.target.targetId.value}:${reproducibilityKey.slice(0, 16)}`;
     const builtAt = this.clock().toISOString();
@@ -81,10 +102,23 @@ export class DeploymentBuildPipeline {
       },
     });
 
+    this.bundleByDeterminismKey.set(reproducibilityKey, bundle);
+    this.enforceCacheBound();
+
     return Object.freeze({
       ok: true,
       bundle,
       issues: Object.freeze([]),
     });
+  }
+
+  private enforceCacheBound(): void {
+    while (this.bundleByDeterminismKey.size > this.policy.maxCachedBundles) {
+      const oldest = this.bundleByDeterminismKey.keys().next().value;
+      if (!oldest) {
+        break;
+      }
+      this.bundleByDeterminismKey.delete(oldest);
+    }
   }
 }

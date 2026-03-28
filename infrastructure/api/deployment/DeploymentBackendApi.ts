@@ -43,7 +43,26 @@ export interface DeploymentApiResponse<T> extends DeploymentSdkResponse<T> {
   readonly error?: DeploymentApiError;
 }
 
+interface DeploymentReadPolicy {
+  readonly maxListedDeployments: number;
+  readonly maxStateTransitions: number;
+  readonly cacheTtlMs: number;
+  readonly maxCachedResponses: number;
+}
+
+const DEFAULT_READ_POLICY: DeploymentReadPolicy = Object.freeze({
+  maxListedDeployments: 200,
+  maxStateTransitions: 200,
+  cacheTtlMs: 100,
+  maxCachedResponses: 1000,
+});
+
 export class DeploymentBackendApi {
+  private readonly cachedStatusResponses = new Map<string, { readonly expiresAtMs: number; readonly response: DeploymentSdkDeploymentStatusResponse }>();
+  private readonly cachedListResponses = new Map<string, { readonly expiresAtMs: number; readonly response: DeploymentSdkListDeploymentsResponse }>();
+  private readonly cachedActiveResponses = new Map<string, { readonly expiresAtMs: number; readonly response: DeploymentSdkGetActiveDeploymentResponse }>();
+  private readonly cachedHealthResponses = new Map<string, { readonly expiresAtMs: number; readonly response: DeploymentSdkHealthResponse }>();
+
   public constructor(
     private readonly buildPipeline: DeploymentBuildPipeline,
     private readonly deploymentExecutionService: DeploymentExecutionService,
@@ -51,6 +70,7 @@ export class DeploymentBackendApi {
     private readonly deploymentRollbackService: DeploymentRollbackService,
     private readonly deploymentHealthMonitor: DeploymentHealthMonitor,
     private readonly deploymentRepository: DeploymentRecordRepository,
+    private readonly readPolicy: DeploymentReadPolicy = DEFAULT_READ_POLICY,
   ) {}
 
   public startDeployment(
@@ -95,6 +115,12 @@ export class DeploymentBackendApi {
     context?: { readonly accessContext?: DeploymentSdkAccessContext },
   ): DeploymentApiResponse<DeploymentSdkDeploymentStatusResponse> {
     return this.wrap(() => {
+      const cacheKey = this.makeStatusCacheKey(request, context?.accessContext);
+      const cached = this.getCachedResponse(this.cachedStatusResponses, cacheKey);
+      if (cached) {
+        return cached;
+      }
+
       const record = this.deploymentRepository.getById(request.deploymentId);
       if (!record) {
         throw new Error(`not-found:Deployment '${request.deploymentId}' was not found.`);
@@ -109,15 +135,22 @@ export class DeploymentBackendApi {
         requestSource: context?.accessContext?.source ?? "external-api",
       });
 
-      return Object.freeze({
+      const maxTransitions = this.normalizeLimit(request.stateTransitionLimit, this.readPolicy.maxStateTransitions);
+      const stateTransitions = maxTransitions === undefined
+        ? record.stateTransitions
+        : Object.freeze(record.stateTransitions.slice(Math.max(0, record.stateTransitions.length - maxTransitions)));
+
+      const response = Object.freeze({
         deployment: toSummary(record),
         stateSnapshot: Object.freeze({
           currentState: record.stateSnapshot.currentState,
           updatedAt: record.stateSnapshot.updatedAt,
           sequence: record.stateSnapshot.sequence,
         }),
-        stateTransitions: record.stateTransitions,
+        stateTransitions,
       });
+      this.setCachedResponse(this.cachedStatusResponses, cacheKey, response);
+      return response;
     });
   }
 
@@ -126,14 +159,25 @@ export class DeploymentBackendApi {
     context?: { readonly accessContext?: DeploymentSdkAccessContext },
   ): DeploymentApiResponse<DeploymentSdkListDeploymentsResponse> {
     return this.wrap(() => {
+      const cacheKey = this.makeListCacheKey(request, context?.accessContext);
+      const cached = this.getCachedResponse(this.cachedListResponses, cacheKey);
+      if (cached) {
+        return cached;
+      }
+
       const deployments = this.deploymentVersionManager.listDeploymentHistory({
         ...request,
         accessContext: this.toAccessContext(context?.accessContext, request.tenantId),
         resourceTenantId: request.tenantId,
         requestSource: context?.accessContext?.source ?? "external-api",
       });
-      return Object.freeze({
-        deployments: Object.freeze(deployments.map((entry) => {
+      const maxDeployments = this.normalizeLimit(request.limit, this.readPolicy.maxListedDeployments);
+      const boundedDeployments = maxDeployments === undefined
+        ? deployments
+        : deployments.slice(0, maxDeployments);
+
+      const response = Object.freeze({
+        deployments: Object.freeze(boundedDeployments.map((entry) => {
           const record = this.deploymentRepository.getById(entry.deploymentId);
           if (!record) {
             throw new Error(`not-found:Deployment '${entry.deploymentId}' was not found.`);
@@ -141,6 +185,8 @@ export class DeploymentBackendApi {
           return toSummary(record);
         })),
       });
+      this.setCachedResponse(this.cachedListResponses, cacheKey, response);
+      return response;
     });
   }
 
@@ -149,6 +195,12 @@ export class DeploymentBackendApi {
     context?: { readonly accessContext?: DeploymentSdkAccessContext },
   ): DeploymentApiResponse<DeploymentSdkGetActiveDeploymentResponse> {
     return this.wrap(() => {
+      const cacheKey = this.makeActiveCacheKey(request, context?.accessContext);
+      const cached = this.getCachedResponse(this.cachedActiveResponses, cacheKey);
+      if (cached) {
+        return cached;
+      }
+
       const active = this.deploymentVersionManager.getActiveDeployment({
         rootSystemAssetId: request.rootSystemAssetId,
         targetId: request.targetId,
@@ -159,9 +211,11 @@ export class DeploymentBackendApi {
       });
 
       const record = active ? this.deploymentRepository.getById(active.deploymentId) : undefined;
-      return Object.freeze({
+      const response = Object.freeze({
         activeDeployment: record ? toSummary(record) : undefined,
       });
+      this.setCachedResponse(this.cachedActiveResponses, cacheKey, response);
+      return response;
     });
   }
 
@@ -185,15 +239,111 @@ export class DeploymentBackendApi {
     context?: { readonly accessContext?: DeploymentSdkAccessContext },
   ): DeploymentApiResponse<DeploymentSdkHealthResponse> {
     return this.wrap(() => {
+      const cacheKey = this.makeHealthCacheKey(request, context?.accessContext);
+      const cached = this.getCachedResponse(this.cachedHealthResponses, cacheKey);
+      if (cached) {
+        return cached;
+      }
+
       const snapshot = this.deploymentHealthMonitor.getDeploymentHealth({
         deploymentId: request.deploymentId,
         callerContext: this.toAccessContext(context?.accessContext, request.tenantId)?.caller,
         tenantId: request.tenantId,
         requestSource: context?.accessContext?.source ?? "external-api",
       });
+      this.setCachedResponse(this.cachedHealthResponses, cacheKey, snapshot);
       return snapshot;
     });
   }
+
+
+  private normalizeLimit(limit: number | undefined, maxAllowed: number): number | undefined {
+    if (limit === undefined) {
+      return undefined;
+    }
+    if (!Number.isFinite(limit)) {
+      throw new Error("invalid-request:Read limit must be a finite number.");
+    }
+    const normalized = Math.trunc(limit);
+    if (normalized <= 0) {
+      throw new Error("invalid-request:Read limit must be greater than zero.");
+    }
+    return Math.min(normalized, maxAllowed);
+  }
+
+  private makeStatusCacheKey(request: DeploymentSdkDeploymentStatusRequest, accessContext?: DeploymentSdkAccessContext): string {
+    return JSON.stringify({
+      deploymentId: request.deploymentId,
+      tenantId: request.tenantId,
+      stateTransitionLimit: request.stateTransitionLimit,
+      callerId: accessContext?.callerId,
+      callerKind: accessContext?.callerKind,
+      source: accessContext?.source,
+    });
+  }
+
+  private makeListCacheKey(request: DeploymentSdkListDeploymentsRequest, accessContext?: DeploymentSdkAccessContext): string {
+    return JSON.stringify({
+      rootSystemAssetId: request.rootSystemAssetId,
+      rootSystemVersionId: request.rootSystemVersionId,
+      targetId: request.targetId,
+      targetType: request.targetType,
+      tenantId: request.tenantId,
+      limit: request.limit,
+      callerId: accessContext?.callerId,
+      callerKind: accessContext?.callerKind,
+      source: accessContext?.source,
+    });
+  }
+
+  private makeActiveCacheKey(request: DeploymentSdkGetActiveDeploymentRequest, accessContext?: DeploymentSdkAccessContext): string {
+    return JSON.stringify({
+      rootSystemAssetId: request.rootSystemAssetId,
+      targetId: request.targetId,
+      targetType: request.targetType,
+      tenantId: request.tenantId,
+      callerId: accessContext?.callerId,
+      callerKind: accessContext?.callerKind,
+      source: accessContext?.source,
+    });
+  }
+
+  private makeHealthCacheKey(request: DeploymentSdkHealthRequest, accessContext?: DeploymentSdkAccessContext): string {
+    return JSON.stringify({
+      deploymentId: request.deploymentId,
+      tenantId: request.tenantId,
+      callerId: accessContext?.callerId,
+      callerKind: accessContext?.callerKind,
+      source: accessContext?.source,
+    });
+  }
+
+  private getCachedResponse<T>(cache: Map<string, { readonly expiresAtMs: number; readonly response: T }>, key: string): T | undefined {
+    const entry = cache.get(key);
+    if (!entry) {
+      return undefined;
+    }
+    if (entry.expiresAtMs <= Date.now()) {
+      cache.delete(key);
+      return undefined;
+    }
+    return entry.response;
+  }
+
+  private setCachedResponse<T>(cache: Map<string, { readonly expiresAtMs: number; readonly response: T }>, key: string, response: T): void {
+    cache.set(key, Object.freeze({
+      expiresAtMs: Date.now() + this.readPolicy.cacheTtlMs,
+      response,
+    }));
+    while (cache.size > this.readPolicy.maxCachedResponses) {
+      const oldest = cache.keys().next().value;
+      if (!oldest) {
+        break;
+      }
+      cache.delete(oldest);
+    }
+  }
+
 
   private wrap<T>(operation: () => T): DeploymentApiResponse<T> {
     try {

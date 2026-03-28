@@ -141,6 +141,57 @@ describe("DeploymentVersionManager", () => {
     expect(traceable.map((entry) => entry.deploymentConfigurationId)).toContain("deploy-config:v7:b");
     expect(traceable.some((entry) => entry.nestedSystemCount > 0)).toBeTrue();
   });
+
+  it("reuses short-lived cached history/active lookups while preserving activation correctness", () => {
+    const repository = new InMemoryDeploymentRecordRepository();
+    const diagnostics = new DeploymentDiagnosticsService(new InMemoryDeploymentDiagnosticsRepository(), () => new Date("2026-03-28T14:20:00.000Z"));
+    const executionService = new DeploymentExecutionService(undefined, repository, () => new Date("2026-03-28T14:21:00.000Z"), undefined, undefined, diagnostics);
+
+    let listCalls = 0;
+    const listAll = repository.listAll.bind(repository);
+    repository.listAll = (() => {
+      listCalls += 1;
+      return listAll();
+    }) as typeof repository.listAll;
+
+    const manager = new DeploymentVersionManager(repository, executionService);
+    const baseline = buildSampleBundle();
+
+    const deployment = executionService.executeLifecycle({
+      requestId: "deploy:req:cache:v1",
+      bundle: baseline.bundle,
+      deploymentConfiguration: baseline.deploymentConfiguration,
+      target: baseline.target,
+      requestedAt: "2026-03-28T14:22:00.000Z",
+    }).deployment!;
+    manager.setActiveDeployment({ deploymentId: deployment.deploymentId, reason: "promote-cache-v1" });
+    const callsBeforeReads = listCalls;
+
+    const firstHistory = manager.listDeploymentHistory({
+      rootSystemAssetId: baseline.systemPackage.manifest.rootSystemAssetId,
+      targetId: baseline.target.targetId.value,
+      targetType: baseline.target.type,
+    });
+    const secondHistory = manager.listDeploymentHistory({
+      rootSystemAssetId: baseline.systemPackage.manifest.rootSystemAssetId,
+      targetId: baseline.target.targetId.value,
+      targetType: baseline.target.type,
+    });
+    const firstActive = manager.getActiveDeployment({
+      rootSystemAssetId: baseline.systemPackage.manifest.rootSystemAssetId,
+      targetId: baseline.target.targetId.value,
+      targetType: baseline.target.type,
+    });
+    const secondActive = manager.getActiveDeployment({
+      rootSystemAssetId: baseline.systemPackage.manifest.rootSystemAssetId,
+      targetId: baseline.target.targetId.value,
+      targetType: baseline.target.type,
+    });
+
+    expect(firstHistory).toEqual(secondHistory);
+    expect(firstActive?.deploymentId).toBe(secondActive?.deploymentId);
+    expect(listCalls - callsBeforeReads).toBe(2);
+  });
 });
 
 describe("DeploymentRollbackService", () => {

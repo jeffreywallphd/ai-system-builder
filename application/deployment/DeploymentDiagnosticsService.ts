@@ -13,6 +13,13 @@ export interface DeploymentDiagnosticsRepository {
   listDiagnostics(deploymentId: string): ReadonlyArray<DeploymentDiagnosticRecord>;
 }
 
+export interface DeploymentDiagnosticsQueryOptions {
+  readonly limit?: number;
+}
+
+const MAX_QUERY_LIMIT = 500;
+
+
 export class InMemoryDeploymentDiagnosticsRepository implements DeploymentDiagnosticsRepository {
   private readonly logsByDeployment = new Map<string, Array<DeploymentLogEntry>>();
   private readonly diagnosticsByDeployment = new Map<string, Array<DeploymentDiagnosticRecord>>();
@@ -115,11 +122,33 @@ export class DeploymentDiagnosticsService {
     return record;
   }
 
-  public listLogs(deploymentId: string): ReadonlyArray<DeploymentLogEntry> {
-    return this.repository.listLogs(deploymentId);
+  public listLogs(deploymentId: string, options?: DeploymentDiagnosticsQueryOptions): ReadonlyArray<DeploymentLogEntry> {
+    return this.applyLimit(this.repository.listLogs(deploymentId), options?.limit);
   }
 
-  public listDiagnostics(deploymentId: string): ReadonlyArray<DeploymentDiagnosticRecord> {
-    return this.repository.listDiagnostics(deploymentId);
+  public listDiagnostics(deploymentId: string, options?: DeploymentDiagnosticsQueryOptions): ReadonlyArray<DeploymentDiagnosticRecord> {
+    return this.applyLimit(this.repository.listDiagnostics(deploymentId), options?.limit);
+  }
+
+  private applyLimit<T>(entries: ReadonlyArray<T>, requestedLimit?: number): ReadonlyArray<T> {
+    const limit = this.normalizeLimit(requestedLimit);
+    if (!limit || entries.length <= limit) {
+      return entries;
+    }
+    return Object.freeze(entries.slice(entries.length - limit));
+  }
+
+  private normalizeLimit(limit?: number): number | undefined {
+    if (limit === undefined) {
+      return undefined;
+    }
+    if (!Number.isFinite(limit)) {
+      throw new Error("Diagnostics query limit must be a finite number.");
+    }
+    const normalized = Math.trunc(limit);
+    if (normalized <= 0) {
+      throw new Error("Diagnostics query limit must be greater than zero.");
+    }
+    return Math.min(normalized, MAX_QUERY_LIMIT);
   }
 }

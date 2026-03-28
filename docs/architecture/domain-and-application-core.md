@@ -808,8 +808,8 @@ Explicitly later than this scope:
   - endpoint records preserve deployment linkage (deployment id, system version, bundle/build key, config id, environment),
   - endpoint resolution reuses deployment isolation checks.
 - Scope remains intentionally bounded:
-  - no full endpoint routing fabric in this slice,
-  - no deployment health monitoring/autoscaling,
+  - endpoint exposure in this slice only binds stable endpoint identity to active deployment linkage,
+  - endpoint routing and health monitoring are introduced by later stories (8.15–8.16),
   - no alternate invocation architecture outside existing runtime external invocation seams.
 
 ## Direction 5 update: Bounded autoscaling interface + deployment audit trail (stories 8.17–8.18)
@@ -833,3 +833,25 @@ Explicitly later than this scope:
   - no provider-specific autoscaling infrastructure integration,
   - no health-remediation/autoscaling control loop,
   - no merging deployment audit records into runtime invocation audit or deployment diagnostics streams.
+
+## Direction 5 update: Deployment endpoint/runtime interop + bounded safeguards alignment (stories 8.19–8.24)
+
+- Deployment public surfaces are now explicitly implemented and tested:
+  - deployment SDK/public contract + reference client (`infrastructure/api/deployment/sdk/PublicDeploymentSdkContract.ts`, `DeploymentClient.ts`),
+  - deployment backend API transport mapping (`infrastructure/api/deployment/DeploymentBackendApi.ts`),
+  - deployment end-to-end + interop coverage (`infrastructure/api/deployment/tests/DeploymentLifecycleE2E.test.ts`, `DeploymentInteropE2E.test.ts`, `DeploymentClientSdk.test.ts`).
+- Endpoint routing and deployment health are now first-class implemented seams (stories 8.15–8.16), layered on top of exposure/version/activation truth:
+  - `application/deployment/EndpointRoutingService.ts` resolves exposed endpoint -> active deployment -> runtime invoker path,
+  - `application/deployment/DeploymentHealthMonitor.ts` evaluates deployment health from deployment state + diagnostics + endpoint resolvability signals.
+- Story 8.23 adds bounded performance safeguards without introducing a second deployment platform:
+  - deterministic build bundle reuse for repeated build requests (`DeploymentBuildPipeline` bounded cache),
+  - bounded deployment diagnostics/log polling (`DeploymentDiagnosticsService` query limits),
+  - short-lived bounded history/active-deployment lookup caching on deployment version management read paths (`DeploymentVersionManager`),
+  - bounded deployment SDK/public read shaping + short-lived read response caching for status/history/active/health API calls (`DeploymentBackendApi`),
+  - bounded endpoint resolvability work in health evaluation (`DeploymentHealthMonitor` endpoint-resolution cap with explicit truncation reason).
+- These safeguards are intentionally additive and correctness-preserving:
+  - access control, quota checks, tenant/environment isolation, activation/rollback semantics, and deployment audit boundaries remain authoritative,
+  - no distributed caches/queues/control-planes were introduced; safeguards remain in-process and bounded.
+- Current boundaries (implemented vs future):
+  - implemented now: packaging -> target/config validation -> build/bundle -> provisioning/execution -> state/diagnostics -> versioning/rollback -> access/quota/isolation -> endpoint exposure/routing -> health -> autoscaling interface -> deployment audit trail -> SDK/public API + e2e/interop tests + bounded read-path safeguards.
+  - future work: provider-specific deployment infrastructure, distributed deployment orchestration/backpressure/observability platforms, and autonomous autoscaling/remediation loops.

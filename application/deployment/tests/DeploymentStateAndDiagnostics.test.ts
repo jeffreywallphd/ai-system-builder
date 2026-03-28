@@ -59,4 +59,31 @@ describe("DeploymentDiagnosticsService", () => {
     expect(records[0]?.code).toBe("deploy-step-timeout");
     expect(records[0]?.details?.step).toBe("activate");
   });
+
+  it("applies bounded log/diagnostic query limits for polling workloads", () => {
+    const diagnostics = new DeploymentDiagnosticsService(undefined, () => new Date("2026-03-28T10:05:00.000Z"));
+    for (const index of [1, 2, 3, 4]) {
+      diagnostics.logEvent({
+        deploymentId: "deployment:test:3",
+        eventKind: `event-${index}`,
+        message: `event ${index}`,
+      });
+      diagnostics.recordFailure({
+        deploymentId: "deployment:test:3",
+        eventKind: `failure-${index}`,
+        code: `code-${index}`,
+        summary: `failure ${index}`,
+      });
+    }
+
+    const boundedLogs = diagnostics.listLogs("deployment:test:3", { limit: 2 });
+    const boundedDiagnostics = diagnostics.listDiagnostics("deployment:test:3", { limit: 2 });
+
+    expect(boundedLogs).toHaveLength(2);
+    expect(boundedLogs[0]?.eventKind).toBe("event-4");
+    expect(boundedLogs[1]?.eventKind).toBe("failure-4");
+    expect(boundedDiagnostics).toHaveLength(2);
+    expect(boundedDiagnostics[0]?.code).toBe("code-3");
+    expect(boundedDiagnostics[1]?.code).toBe("code-4");
+  });
 });

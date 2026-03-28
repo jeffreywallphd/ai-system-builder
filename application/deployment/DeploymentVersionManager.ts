@@ -20,7 +20,20 @@ import type { DeploymentEnvironmentContext } from "../../domain/deployment/Deplo
 import { DeploymentAuditEventKinds, DeploymentAuditOutcomes } from "../../domain/deployment/DeploymentAuditTrailDomain";
 import type { DeploymentAuditTrailService } from "./DeploymentAuditTrailService";
 
+interface DeploymentVersionLookupCachePolicy {
+  readonly ttlMs: number;
+  readonly maxEntries: number;
+}
+
+const DEFAULT_LOOKUP_CACHE_POLICY: DeploymentVersionLookupCachePolicy = Object.freeze({
+  ttlMs: 100,
+  maxEntries: 500,
+});
+
 export class DeploymentVersionManager {
+  private readonly deploymentHistoryCache = new Map<string, { readonly expiresAtMs: number; readonly value: ReadonlyArray<ManagedDeploymentVersion> }>();
+  private readonly activeDeploymentCache = new Map<string, { readonly expiresAtMs: number; readonly hasValue: boolean; readonly value?: ManagedDeploymentVersion }>();
+
   public constructor(
     private readonly repository: DeploymentRecordRepository,
     private readonly deploymentExecutionService: Pick<DeploymentExecutionService, "setDeploymentActivationState">,
@@ -28,6 +41,7 @@ export class DeploymentVersionManager {
     private readonly quotaEvaluator: DeploymentQuotaEvaluator = new DeploymentQuotaEvaluator(),
     private readonly isolationEvaluator: DeploymentIsolationEvaluator = new DeploymentIsolationEvaluator(),
     private readonly auditTrailService?: DeploymentAuditTrailService,
+    private readonly cachePolicy: DeploymentVersionLookupCachePolicy = DEFAULT_LOOKUP_CACHE_POLICY,
   ) {}
 
   public listDeploymentsForSystemVersion(input: {
@@ -76,13 +90,28 @@ export class DeploymentVersionManager {
       targetType: query.targetType,
     });
 
-    return Object.freeze(this.isolationEvaluator.filterRecords({ records: this.repository.listAll(), context: isolationContext })
+    const cacheKey = this.makeHistoryCacheKey({
+      rootSystemAssetId,
+      rootSystemVersionId,
+      targetId,
+      targetType: query.targetType,
+      isolationContext,
+    });
+    const cached = this.getCached(this.deploymentHistoryCache, cacheKey);
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    const computed = Object.freeze(this.isolationEvaluator.filterRecords({ records: this.repository.listAll(), context: isolationContext })
       .filter((record) => record.rootSystemAssetId === rootSystemAssetId)
       .filter((record) => !rootSystemVersionId || record.rootSystemVersionId === rootSystemVersionId)
       .filter((record) => !targetId || record.targetId === targetId)
       .filter((record) => !query.targetType || record.targetType === query.targetType)
       .map((record) => toManagedDeploymentVersion(record))
       .sort((left, right) => right.deployedAt.localeCompare(left.deployedAt)));
+
+    this.setCached(this.deploymentHistoryCache, cacheKey, computed);
+    return computed;
   }
 
   public getActiveDeployment(input: {
@@ -115,6 +144,17 @@ export class DeploymentVersionManager {
       targetType: input.targetType,
     });
 
+    const cacheKey = this.makeActiveCacheKey({
+      rootSystemAssetId,
+      targetId,
+      targetType: input.targetType,
+      isolationContext,
+    });
+    const cached = this.getCachedActive(cacheKey);
+    if (cached.hit) {
+      return cached.value;
+    }
+
     const record = this.isolationEvaluator.filterRecords({ records: this.repository.listAll(), context: isolationContext })
       .filter((candidate) => candidate.rootSystemAssetId === rootSystemAssetId)
       .filter((candidate) => candidate.targetId === targetId)
@@ -122,7 +162,9 @@ export class DeploymentVersionManager {
       .filter((candidate) => candidate.activationState === DeploymentActivationStates.active)
       .sort((left, right) => right.activationUpdatedAt.localeCompare(left.activationUpdatedAt))[0];
 
-    return record ? toManagedDeploymentVersion(record) : undefined;
+    const resolved = record ? toManagedDeploymentVersion(record) : undefined;
+    this.setCachedActive(cacheKey, resolved);
+    return resolved;
   }
 
   public setActiveDeployment(input: {
@@ -246,11 +288,114 @@ export class DeploymentVersionManager {
       }),
     });
 
+    this.clearLookupCaches();
+
     return Object.freeze({
       active: toManagedDeploymentVersion(activeRecord),
       superseded: Object.freeze(superseded.sort((left, right) => right.activationUpdatedAt.localeCompare(left.activationUpdatedAt))),
     });
   }
+
+
+  private clearLookupCaches(): void {
+    this.deploymentHistoryCache.clear();
+    this.activeDeploymentCache.clear();
+  }
+
+  private makeHistoryCacheKey(input: {
+    readonly rootSystemAssetId: string;
+    readonly rootSystemVersionId?: string;
+    readonly targetId?: string;
+    readonly targetType?: DeploymentRecord["targetType"];
+    readonly isolationContext: DeploymentEnvironmentContext;
+  }): string {
+    return JSON.stringify({
+      rootSystemAssetId: input.rootSystemAssetId,
+      rootSystemVersionId: input.rootSystemVersionId,
+      targetId: input.targetId,
+      targetType: input.targetType,
+      tenantId: input.isolationContext.tenantId,
+      deploymentEnvironmentId: input.isolationContext.deploymentEnvironmentId,
+      source: input.isolationContext.source,
+      callerId: input.isolationContext.callerId,
+      sessionId: input.isolationContext.sessionId,
+    });
+  }
+
+  private makeActiveCacheKey(input: {
+    readonly rootSystemAssetId: string;
+    readonly targetId: string;
+    readonly targetType: DeploymentRecord["targetType"];
+    readonly isolationContext: DeploymentEnvironmentContext;
+  }): string {
+    return JSON.stringify({
+      rootSystemAssetId: input.rootSystemAssetId,
+      targetId: input.targetId,
+      targetType: input.targetType,
+      tenantId: input.isolationContext.tenantId,
+      deploymentEnvironmentId: input.isolationContext.deploymentEnvironmentId,
+      source: input.isolationContext.source,
+      callerId: input.isolationContext.callerId,
+      sessionId: input.isolationContext.sessionId,
+    });
+  }
+
+  private getCached<T>(cache: Map<string, { readonly expiresAtMs: number; readonly value: T }>, key: string): T | undefined {
+    const entry = cache.get(key);
+    if (!entry) {
+      return undefined;
+    }
+    if (entry.expiresAtMs <= Date.now()) {
+      cache.delete(key);
+      return undefined;
+    }
+    return entry.value;
+  }
+
+  private setCached<T>(cache: Map<string, { readonly expiresAtMs: number; readonly value: T }>, key: string, value: T): void {
+    cache.set(key, Object.freeze({
+      expiresAtMs: Date.now() + this.cachePolicy.ttlMs,
+      value,
+    }));
+    while (cache.size > this.cachePolicy.maxEntries) {
+      const oldest = cache.keys().next().value;
+      if (!oldest) {
+        break;
+      }
+      cache.delete(oldest);
+    }
+  }
+
+  private getCachedActive(key: string): { readonly hit: boolean; readonly value?: ManagedDeploymentVersion } {
+    const entry = this.activeDeploymentCache.get(key);
+    if (!entry) {
+      return Object.freeze({ hit: false });
+    }
+    if (entry.expiresAtMs <= Date.now()) {
+      this.activeDeploymentCache.delete(key);
+      return Object.freeze({ hit: false });
+    }
+    return Object.freeze({
+      hit: true,
+      value: entry.hasValue ? entry.value : undefined,
+    });
+  }
+
+  private setCachedActive(key: string, value?: ManagedDeploymentVersion): void {
+    this.activeDeploymentCache.set(key, Object.freeze({
+      expiresAtMs: Date.now() + this.cachePolicy.ttlMs,
+      hasValue: value !== undefined,
+      value,
+    }));
+    while (this.activeDeploymentCache.size > this.cachePolicy.maxEntries) {
+      const oldest = this.activeDeploymentCache.keys().next().value;
+      if (!oldest) {
+        break;
+      }
+      this.activeDeploymentCache.delete(oldest);
+    }
+  }
+
 
   private assertAccess(input: {
     readonly action: typeof DeploymentAccessActions[keyof typeof DeploymentAccessActions];

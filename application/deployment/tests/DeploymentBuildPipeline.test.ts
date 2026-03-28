@@ -146,4 +146,25 @@ describe("DeploymentBuildPipeline", () => {
     expect(result.bundle).toBeUndefined();
     expect(result.issues.map((issue) => issue.code)).toContain("missing-required-deployment-setting");
   });
+
+  it("reuses cached bundles for repeated deterministic build requests", () => {
+    const request = createValidConfiguration();
+    let buildClockCalls = 0;
+    const pipeline = new DeploymentBuildPipeline(
+      undefined,
+      () => {
+        buildClockCalls += 1;
+        return new Date("2026-03-28T11:20:00.000Z");
+      },
+    );
+
+    const first = pipeline.build(request);
+    const second = pipeline.build(request);
+
+    expect(first.ok).toBeTrue();
+    expect(second.ok).toBeTrue();
+    expect(first.bundle).toBeDefined();
+    expect(second.bundle).toBe(first.bundle);
+    expect(buildClockCalls).toBe(1);
+  });
 });
