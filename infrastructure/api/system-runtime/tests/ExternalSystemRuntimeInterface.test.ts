@@ -10,6 +10,8 @@ import {
   type ExecutionAccessPolicy,
   type ExecutionAccessRequest,
 } from "../../../../application/system-runtime/RuntimeAccessControlService";
+import { StaticTokenRuntimeApiAuthenticator } from "../RuntimeApiAuthentication";
+import { ExecutionQuotaEvaluator } from "../../../../application/system-runtime/ExecutionQuotaEvaluator";
 
 class InMemoryStudioShellRepository implements IStudioShellRepository {
   private readonly studios = new Map<string, Studio>();
@@ -40,6 +42,21 @@ class DenyAllPolicy implements ExecutionAccessPolicy {
       message: "Caller cannot execute this system version.",
       policyId: this.policyId,
     });
+  }
+}
+
+class RequireUser1Policy implements ExecutionAccessPolicy {
+  public readonly policyId = "require-user-1";
+  public evaluate(request: ExecutionAccessRequest): ExecutionAccessDecision {
+    if (request.context?.callerId !== "user-1") {
+      return Object.freeze({
+        allowed: false,
+        reasonCode: "caller-mismatch",
+        message: "Caller is not allowed to access this execution.",
+        policyId: this.policyId,
+      });
+    }
+    return Object.freeze({ allowed: true, policyId: this.policyId });
   }
 }
 
@@ -75,14 +92,21 @@ describe("ExternalSystemRuntimeInterface", () => {
   it("starts and reads execution through the existing runtime backend path", async () => {
     const repository = new InMemoryStudioShellRepository();
     await seedVersion(repository);
-    const backend = new SystemRuntimeBackendApi(repository);
+    const backend = new SystemRuntimeBackendApi(
+      repository,
+      undefined,
+      new RuntimeAccessControlService(),
+      new StaticTokenRuntimeApiAuthenticator({
+        "token-user-1": { callerKind: "user", callerId: "user-1", roles: ["external-runtime"] },
+      }),
+    );
     const external = new ExternalSystemRuntimeInterface(backend);
 
     const started = await external.startExecution({
       systemId: "system:external",
       versionId: "system:external:v1",
       inputPayload: { request: "hello" },
-      callerContext: { callerKind: "system", callerId: "external-client" },
+      authentication: { bearerToken: "token-user-1" },
     });
 
     expect(started.ok).toBeTrue();
@@ -90,7 +114,10 @@ describe("ExternalSystemRuntimeInterface", () => {
     expect(started.data?.versionId).toBe("system:external:v1");
     expect(started.data?.executedVersionMap.rootVersionId).toBe("system:external:v1");
 
-    const status = await external.getExecutionStatus(started.data!.executionId);
+    const status = await external.getExecutionStatus({
+      executionId: started.data!.executionId,
+      authentication: { bearerToken: "token-user-1" },
+    });
     expect(status.ok).toBeTrue();
     expect(status.data?.rootAssetId).toBe("system:external");
 
@@ -98,6 +125,7 @@ describe("ExternalSystemRuntimeInterface", () => {
       executionId: started.data!.executionId,
       eventLimit: 3,
       logLimit: 2,
+      authentication: { bearerToken: "token-user-1" },
     });
     expect(trace.ok).toBeTrue();
     expect((trace.data?.trace.events.length ?? 0) <= 3).toBeTrue();
@@ -107,6 +135,7 @@ describe("ExternalSystemRuntimeInterface", () => {
       executionId: started.data!.executionId,
       nodeResultLimit: 1,
       diagnosticsLimit: 1,
+      authentication: { bearerToken: "token-user-1" },
     });
     expect(result.ok).toBeTrue();
     expect((result.data?.nodeResults.length ?? 0) <= 1).toBeTrue();
@@ -129,11 +158,90 @@ describe("ExternalSystemRuntimeInterface", () => {
     expect(invalid.error?.message).toContain("must match");
   });
 
+  it("rejects missing or invalid authentication for external runtime API calls", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    await seedVersion(repository);
+    const backend = new SystemRuntimeBackendApi(
+      repository,
+      undefined,
+      new RuntimeAccessControlService(),
+      new StaticTokenRuntimeApiAuthenticator({
+        "token-user-1": { callerKind: "user", callerId: "user-1" },
+      }),
+    );
+    const external = new ExternalSystemRuntimeInterface(backend);
+
+    const missing = await external.startExecution({
+      systemId: "system:external",
+      versionId: "system:external:v1",
+    });
+    expect(missing.ok).toBeFalse();
+    expect(missing.error?.code).toBe("unauthorized");
+
+    const invalid = await external.startExecution({
+      systemId: "system:external",
+      versionId: "system:external:v1",
+      authentication: { bearerToken: "token-unknown" },
+    });
+    expect(invalid.ok).toBeFalse();
+    expect(invalid.error?.code).toBe("unauthorized");
+  });
+
+  it("passes authenticated context through access control for start/status/result/trace", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    await seedVersion(repository);
+    const backend = new SystemRuntimeBackendApi(
+      repository,
+      undefined,
+      new RuntimeAccessControlService(new RequireUser1Policy()),
+      new StaticTokenRuntimeApiAuthenticator({
+        "token-user-1": { callerKind: "user", callerId: "user-1", roles: ["reader"] },
+        "token-user-2": { callerKind: "user", callerId: "user-2", roles: ["reader"] },
+      }),
+    );
+    const external = new ExternalSystemRuntimeInterface(backend);
+
+    const started = await external.startExecution({
+      systemId: "system:external",
+      versionId: "system:external:v1",
+      authentication: { bearerToken: "token-user-1" },
+    });
+    expect(started.ok).toBeTrue();
+
+    const deniedStatus = await external.getExecutionStatus({
+      executionId: started.data!.executionId,
+      authentication: { bearerToken: "token-user-2" },
+    });
+    expect(deniedStatus.ok).toBeFalse();
+    expect(deniedStatus.error?.code).toBe("forbidden");
+
+    const deniedTrace = await external.getExecutionTrace({
+      executionId: started.data!.executionId,
+      authentication: { bearerToken: "token-user-2" },
+    });
+    expect(deniedTrace.ok).toBeFalse();
+    expect(deniedTrace.error?.code).toBe("forbidden");
+
+    const deniedResult = await external.getExecutionResult({
+      executionId: started.data!.executionId,
+      authentication: { bearerToken: "token-user-2" },
+    });
+    expect(deniedResult.ok).toBeFalse();
+    expect(deniedResult.error?.code).toBe("forbidden");
+  });
+
   it("enforces access-control denials before runtime orchestration across backend and external entrypoints", async () => {
     const repository = new InMemoryStudioShellRepository();
     await seedVersion(repository);
     const access = new RuntimeAccessControlService(new DenyAllPolicy());
-    const backend = new SystemRuntimeBackendApi(repository, undefined, access);
+    const backend = new SystemRuntimeBackendApi(
+      repository,
+      undefined,
+      access,
+      new StaticTokenRuntimeApiAuthenticator({
+        "token-user-1": { callerKind: "user", callerId: "user-1" },
+      }),
+    );
     const external = new ExternalSystemRuntimeInterface(backend);
 
     const deniedBackend = await backend.startExecution({
@@ -148,9 +256,65 @@ describe("ExternalSystemRuntimeInterface", () => {
       systemId: "system:external",
       versionId: "system:external:v1",
       callerContext: { callerKind: "user", callerId: "user-1" },
+      authentication: { bearerToken: "token-user-1" },
     });
     expect(deniedExternal.ok).toBeFalse();
     expect(deniedExternal.error?.code).toBe("forbidden");
     expect(deniedExternal.error?.message).toContain("cannot execute");
+  });
+
+  it("enforces quota limits before execution starts", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    await seedVersion(repository);
+    const backend = new SystemRuntimeBackendApi(
+      repository,
+      undefined,
+      new RuntimeAccessControlService(),
+      new StaticTokenRuntimeApiAuthenticator({
+        "token-user-1": { callerKind: "user", callerId: "user-1" },
+      }),
+      new ExecutionQuotaEvaluator({
+        maxConcurrentExecutionsPerCaller: 3,
+        maxExecutionsPerWindow: 1,
+        windowMs: 60_000,
+      }),
+    );
+    const external = new ExternalSystemRuntimeInterface(backend);
+
+    const first = await external.startExecution({
+      systemId: "system:external",
+      versionId: "system:external:v1",
+      authentication: { bearerToken: "token-user-1" },
+    });
+    expect(first.ok).toBeTrue();
+
+    const blocked = await external.startExecution({
+      systemId: "system:external",
+      versionId: "system:external:v1",
+      authentication: { bearerToken: "token-user-1" },
+    });
+    expect(blocked.ok).toBeFalse();
+    expect(blocked.error?.code).toBe("quota-exceeded");
+  });
+
+  it("preserves trusted internal runtime path without external authentication", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    await seedVersion(repository);
+    const backend = new SystemRuntimeBackendApi(
+      repository,
+      undefined,
+      new RuntimeAccessControlService(new RequireUser1Policy()),
+      new StaticTokenRuntimeApiAuthenticator({
+        "token-user-1": { callerKind: "user", callerId: "user-1" },
+      }),
+    );
+
+    const trusted = await backend.startExecution({
+      versionId: "system:external:v1",
+      systemId: "system:external",
+      requestContext: { trustedInternal: true },
+      accessContext: { callerKind: "user", callerId: "user-1" },
+    });
+    expect(trusted.ok).toBeTrue();
   });
 });
