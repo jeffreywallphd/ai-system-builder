@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Link,
   NavLink,
@@ -7,13 +7,15 @@ import {
   useBeforeUnload,
   useLocation,
 } from "react-router-dom";
-import { getNavigationRoutes } from "../routes/RouteConfig";
+import { IntentNavigationShell } from "../routes/IntentNavigationShell";
+import { ContextNavigationService } from "../routes/ContextNavigation";
 import DevSyncButton from "../dev/DevSyncButton";
 import { useUiDependencies } from "../composition/AppProviders";
 import type { RuntimeConsoleState } from "../state/RuntimeConsoleStore";
 import RuntimeConsoleDrawer from "../components/execution/RuntimeConsoleDrawer";
 import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
 import logo from "../images/ai-loom-studio-logo.svg";
+import ContextNavigationBar from "../components/navigation/ContextNavigationBar";
 
 function navLinkClassName(isActive: boolean): string {
   return isActive
@@ -54,9 +56,12 @@ function getWorkflowEditorExitPrompt(workflowName?: string): string {
 }
 
 export default function AppLayout(): JSX.Element {
-  const routes = getNavigationRoutes();
   const { config, runtimeConsoleStore, workflowStore } = useUiDependencies();
   const location = useLocation();
+  const navigationShell = useMemo(() => new IntentNavigationShell(), []);
+  const contextNavigationService = useMemo(() => new ContextNavigationService(), []);
+  const navigationModel = navigationShell.resolvePrimaryNavigation({ pathname: location.pathname });
+  const contextNavigation = contextNavigationService.resolve({ pathname: location.pathname, search: location.search });
   const [runtimeConsoleState, setRuntimeConsoleState] = useState<RuntimeConsoleState>(fallbackConsoleState);
   const previousPathnameRef = useRef(location.pathname);
 
@@ -161,7 +166,7 @@ export default function AppLayout(): JSX.Element {
             {!config.isProductionMode ? <DevSyncButton /> : null}
 
             <nav className="ui-app__nav" aria-label="Primary">
-              {routes.map((route) => (
+              {navigationModel.items.map((route) => (
                 <NavLink
                   key={route.key}
                   to={route.path}
@@ -182,6 +187,7 @@ export default function AppLayout(): JSX.Element {
             isWideWorkspace ? " ui-app__main-inner--wide" : ""
           }`}
         >
+          <ContextNavigationBar model={contextNavigation} />
           <Outlet />
         </div>
       </main>

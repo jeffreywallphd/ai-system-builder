@@ -17,6 +17,8 @@ describe("ui/routes contract adherence", () => {
 
     expect(source).toContain('home: "/"');
     expect(source).toContain('build: "/build"');
+    expect(source).toContain('explore: "/explore"');
+    expect(source).toContain('run: "/run"');
     expect(source).toContain('workflows: "/workflows"');
     expect(source).toContain('models: "/models"');
     expect(source).toContain('mcp: "/mcp"');
