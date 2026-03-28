@@ -31,6 +31,7 @@ import {
   SystemStudioOutputAdapter,
 } from "../StudioOutputAdapter";
 import { StudioHandoffOrchestrationService } from "../StudioHandoffOrchestrationService";
+import { StudioHandoffLineageTracker } from "../StudioHandoffLineageTracker";
 
 const resolver = new CompositionAssetContractResolver();
 
@@ -82,6 +83,9 @@ function createService(): StudioHandoffOrchestrationService {
       }),
       inputRegistry,
     ),
+    {
+      lineageTracker: new StudioHandoffLineageTracker(),
+    },
   );
 }
 
@@ -311,9 +315,13 @@ describe("StudioHandoffOrchestrationService", () => {
 
     expect(result.ok).toBeTrue();
     expect(result.preparation?.sourceOutput.authoritativeAsset.assetId).toBe("asset:authoritative");
+    expect(result.preparation?.sourceOutput.authoritativeAsset.pinnedVersion.versionId).toBe("asset:authoritative:v9");
     expect(result.preparation?.handoff.payload.assetId).toBe("asset:authoritative");
+    expect(result.preparation?.handoff.payload.pinnedVersion?.versionId).toBe("asset:authoritative:v9");
     expect(result.preparation?.targetInput.authoritativeAsset.assetId).toBe("asset:authoritative");
+    expect(result.preparation?.targetInput.authoritativeAsset.pinnedVersion.versionId).toBe("asset:authoritative:v9");
     expect(result.preparation?.sourceOutput.handoffMetadata.hints.trainingObjective).toBe("regression");
+    expect(result.preparation?.lineage?.sourceVersions[0]?.versionId).toBe("asset:authoritative:v9");
   });
 
   it("supports incremental handoff refresh with revision linkage, changed fields, and revalidation", () => {
@@ -423,9 +431,14 @@ describe("StudioHandoffOrchestrationService", () => {
     expect(updated.revision?.previousHandoffId).toBe("basis-handoff");
     expect(updated.revision?.updatedHandoffId).toContain("basis-handoff:rev");
     expect(updated.changes?.updatedAuthoritativeAsset).toBeTrue();
+    expect(updated.changes?.updatedAuthoritativeVersion?.previousVersionId).toBe("asset:dataset:v1");
+    expect(updated.changes?.updatedAuthoritativeVersion?.nextVersionId).toBe("asset:dataset:v2");
     expect(updated.changes?.updatedBundleAssets).toHaveLength(2);
     expect(updated.changes?.updatedContextPrefillKeys).toContain("priority");
     expect(updated.preparation?.handoff.payload.versionId).toBe("asset:dataset:v2");
+    expect(updated.preparation?.handoff.payload.pinnedVersion?.versionId).toBe("asset:dataset:v2");
     expect(updated.preparation?.compatibility.compatible).toBeTrue();
+    expect(updated.preparation?.lineage?.handoffRevisionId).toBe("rev-2");
+    expect(updated.preparation?.lineage?.previousHandoffId).toBe("basis-handoff");
   });
 });

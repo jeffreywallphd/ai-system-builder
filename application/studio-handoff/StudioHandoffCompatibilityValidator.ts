@@ -14,6 +14,7 @@ export const StudioHandoffCompatibilityIssueCodes = Object.freeze({
   taxonomyIncompatible: "taxonomy-incompatible",
   contractIncompatible: "contract-incompatible",
   versionReferenceInvalid: "version-reference-invalid",
+  versionReferenceMismatch: "version-reference-mismatch",
   contextKeyNotAllowed: "context-key-not-allowed",
   bundleAssetMissing: "bundle-asset-missing",
   bundleAssetIncompatible: "bundle-asset-incompatible",
@@ -126,6 +127,10 @@ export class StudioHandoffCompatibilityValidator {
     readonly actualContract?: AssetContractDescriptor;
     readonly assetId: string;
     readonly versionId: string;
+    readonly pinnedVersion?: {
+      readonly assetId: string;
+      readonly versionId: string;
+    };
     readonly allowedContextKeys?: ReadonlyArray<string>;
     readonly contextPathPrefix?: string;
     readonly sourcePathPrefix?: string;
@@ -149,6 +154,13 @@ export class StudioHandoffCompatibilityValidator {
     }
 
     if (input.contract.requireVersionedAsset ?? true) {
+      if (input.pinnedVersion && (input.pinnedVersion.assetId !== input.assetId || input.pinnedVersion.versionId !== input.versionId)) {
+        issues.push(Object.freeze({
+          code: StudioHandoffCompatibilityIssueCodes.versionReferenceMismatch,
+          message: `Asset '${input.assetId}' pinned version reference must match explicit asset/version fields.`,
+          path: input.sourcePathPrefix ? `${input.sourcePathPrefix}.pinnedVersion` : "payload.pinnedVersion",
+        }));
+      }
       const referenceIsValid = this.options.validateVersionReference
         ? this.options.validateVersionReference({
           assetId: input.assetId,
@@ -193,6 +205,7 @@ export class StudioHandoffCompatibilityValidator {
         actualContract: entry.contract,
         assetId: entry.assetId,
         versionId: entry.versionId,
+        pinnedVersion: entry.pinnedVersion,
         allowedContextKeys: input.contextKeys,
         contextPathPrefix: "context.config",
         sourcePathPrefix: `multiAsset.assets[${index}]`,
@@ -283,7 +296,9 @@ export class StudioHandoffCompatibilityValidator {
         actualContract: input.handoff.payload.contract,
         assetId: input.handoff.payload.assetId,
         versionId: input.handoff.payload.versionId,
+        pinnedVersion: input.handoff.payload.pinnedVersion,
         allowedContextKeys: contextKeys,
+        sourcePathPrefix: "payload",
       }),
     );
 

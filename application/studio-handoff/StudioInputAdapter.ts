@@ -25,6 +25,10 @@ export interface AdaptedStudioInput {
   readonly authoritativeAsset: {
     readonly assetId: string;
     readonly versionId: string;
+    readonly pinnedVersion: {
+      readonly assetId: string;
+      readonly versionId: string;
+    };
     readonly taxonomy: StudioHandoffPayload["taxonomy"];
     readonly contract?: StudioHandoffPayload["contract"];
   };
@@ -48,6 +52,10 @@ export interface GroupedAdaptedStudioInput extends AdaptedStudioInput {
     readonly roleLabel?: string;
     readonly assetId: string;
     readonly versionId: string;
+    readonly pinnedVersion: {
+      readonly assetId: string;
+      readonly versionId: string;
+    };
     readonly taxonomy: StudioHandoffPayload["taxonomy"];
     readonly contract?: StudioHandoffPayload["contract"];
     readonly context: Readonly<Record<string, unknown>>;
@@ -101,6 +109,10 @@ function createBaseAdaptedInput(
     authoritativeAsset: Object.freeze({
       assetId: handoff.payload.assetId,
       versionId: handoff.payload.versionId,
+      pinnedVersion: Object.freeze({
+        assetId: handoff.payload.pinnedVersion?.assetId ?? handoff.payload.assetId,
+        versionId: handoff.payload.pinnedVersion?.versionId ?? handoff.payload.versionId,
+      }),
       taxonomy: handoff.payload.taxonomy,
       contract: handoff.payload.contract,
     }),
@@ -133,6 +145,10 @@ function maybeAttachGroupedInput(
       roleLabel: entry.roleLabel,
       assetId: entry.assetId,
       versionId: entry.versionId,
+      pinnedVersion: Object.freeze({
+        assetId: entry.pinnedVersion?.assetId ?? entry.assetId,
+        versionId: entry.pinnedVersion?.versionId ?? entry.versionId,
+      }),
       taxonomy: entry.taxonomy,
       contract: entry.contract,
       context: Object.freeze({ ...(entry.context ?? {}) }),

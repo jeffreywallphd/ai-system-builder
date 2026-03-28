@@ -258,6 +258,7 @@ describe("StudioInputAdapterLayer", () => {
     expect(result.ok).toBeTrue();
     expect(result.adapted?.authoritativeAsset.assetId).toBe("asset:authoritative-dataset");
     expect(result.adapted?.authoritativeAsset.versionId).toBe("asset:authoritative-dataset:v11");
+    expect(result.adapted?.authoritativeAsset.pinnedVersion.versionId).toBe("asset:authoritative-dataset:v11");
     expect(result.adapted?.prefill.assetId).toBe("prefill-override-attempt");
     expect(result.adapted?.authoritativeAsset.assetId).not.toBe(result.adapted?.prefill.assetId);
   });
