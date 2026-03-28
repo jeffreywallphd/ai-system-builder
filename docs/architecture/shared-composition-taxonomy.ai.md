@@ -60,3 +60,15 @@ Current Direction 5 target shape remains:
 - no parallel agent architecture/runtime model
 - no over-atomicization of rows/chunks/fragments as global assets
 - Direction 5 atomic studio usage now also concretely applies `atomic/prompt-template/none`, `atomic/embedding-index/none`, and `atomic/config-profile/none` through Prompt Template / Embedding Index / Config Profile studios (`domain/prompt-template-studio/*`, `application/prompt-template-studio/*`, `domain/embedding-index-studio/*`, `application/embedding-index-studio/*`, `domain/config-profile-studio/*`, `application/config-profile-studio/*`, and registration-driven UI shell integration).
+
+## Direction 5 update: Runtime taxonomy alignment foundation (stories 6.1–6.2)
+
+- Added bounded runtime behavior mapping seam: `application/system-runtime/RuntimeBehaviorAlignment.ts`.
+- Mapping reuses existing taxonomy descriptors and validation (`CompositionTaxonomyDescriptor`, `assertAllowedCompositionTaxonomyCombination`) and does not create a second taxonomy universe.
+- Runtime behavior mapping is intentionally minimal and authoritative:
+  - deterministic => fixed execution profile
+  - conditional => branch-capable execution profile
+  - iterative => loop-capable execution profile
+  - autonomous => planner-capable execution profile
+- Behavior kind `none` stays non-executable in this runtime mapping layer (returns no runtime behavior profile).
+- Workflow/agent/system resolution is provided through `RuntimeBehaviorAlignmentService` and delegates classification to the existing `CompositionTaxonomyClassifier` seam.

@@ -71,3 +71,14 @@ Partially implemented / bounded:
 
 This shared taxonomy is a guardrail to keep workflow/agent/asset/system language coherent while implementation continues in parallel.
 - Direction 5 atomic studio usage now also concretely applies `atomic/prompt-template/none`, `atomic/embedding-index/none`, and `atomic/config-profile/none` through Prompt Template / Embedding Index / Config Profile studios (`domain/prompt-template-studio/*`, `application/prompt-template-studio/*`, `domain/embedding-index-studio/*`, `application/embedding-index-studio/*`, `domain/config-profile-studio/*`, `application/config-profile-studio/*`, and registration-driven UI shell integration).
+
+## Direction 5 update: Runtime taxonomy alignment foundation (stories 6.1–6.2)
+
+- A bounded runtime alignment seam now exists in `application/system-runtime/RuntimeBehaviorAlignment.ts` and consumes existing taxonomy truth (`CompositionTaxonomyDescriptor` + `assertAllowedCompositionTaxonomyCombination`) instead of introducing a second behavior ontology.
+- Runtime behavior profiles are now mapped directly from shared behavior kinds:
+  - `deterministic` -> fixed execution profile
+  - `conditional` -> branch-capable profile
+  - `iterative` -> loop-capable profile
+  - `autonomous` -> planner-capable profile
+- `none` remains non-executable in runtime behavior mapping and intentionally resolves to no runtime behavior profile.
+- Workflow, agent, and system runtime behavior resolution flows through the existing taxonomy classifier seam (`CompositionTaxonomyClassifier`) via `RuntimeBehaviorAlignmentService`, preserving current atomic/composite/system taxonomy authority.
