@@ -20,4 +20,17 @@ describe("SystemStudioPage contracts", () => {
     expect(registrationSource).toContain('slot: "dependencies"');
     expect(registrationSource).toContain('slot: "metadata"');
   });
+
+  it("keeps System Studio wired into shared route and navigation configuration", () => {
+    const routerSource = readSource("ui/routes/AppRouter.tsx");
+    const routesConfigSource = readSource("ui/routes/RouteConfig.ts");
+
+    expect(routerSource).toContain("import SystemStudioPage");
+    expect(routerSource).toContain("path: ROUTE_PATHS.systemStudio");
+    expect(routerSource).toContain("element: <SystemStudioPage />");
+
+    expect(routesConfigSource).toContain('systemStudio: "/studio-shell/system"');
+    expect(routesConfigSource).toContain('key: "system-studio"');
+    expect(routesConfigSource).toContain('title: "System Studio"');
+  });
 });

@@ -195,6 +195,13 @@ The studio shell now has a bounded inner-layer model and application orchestrati
 - Rehydration paths normalize persisted metadata/dependencies and reconstruct studio/session/draft/version state through existing domain normalization seams so taxonomy/contract/provenance/dependency/lifecycle/version invariants stay bounded to inner-layer rules.
 - Desktop composition now uses the SQLite repository for studio-shell IPC operations (`electron/main/main.ts`) so studio/session/draft/version state survives process restarts.
 
+## Direction 5 update: System Studio inner orchestration (stories 5.9–5.10)
+
+- System Studio now has a bounded application orchestrator (`application/system-studio/SystemStudioApplicationService.ts`) that reuses the shared Studio Shell lifecycle (initialize/open/create/update/validate/publish) instead of introducing a second lifecycle stack.
+- System draft authoring remains first-class in shared draft/version persistence; no side-channel system store was introduced.
+- System publish flow now enforces recursive system consistency through existing shared seams (`evaluate/assertSystemStudioDraftPublishConsistency`) including nested system resolution, child contract resolution, recursive contract projection, and recursion safety checks.
+- System Studio UI integration remains on the shared `StudioShellPage` registration/route architecture (`/studio-shell/system`) with backend-authoritative draft/session/validation/publish behavior.
+
 ## Direction 5 update: Composite dependency semantics + behavior enforcement (stories 3.15–3.16)
 
 - Shared studio-shell dependency validation now performs version-aware identity checks for pinned dependencies (`assetId` must match the resolved `versionId` owner when resolvable through repository/version seams).
