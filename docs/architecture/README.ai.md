@@ -88,3 +88,12 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Canonical asset summary/detail reads include taxonomy via identity metadata with bounded fallback mapping.
 - See `docs/architecture/shared-composition-taxonomy.md` for the practical architecture note and current-scope boundaries.
 - Shared asset contracts now complement taxonomy (`domain/contracts/AssetContract.ts`, `application/contracts/CompositionAssetContractResolver.ts`) and are surfaced through canonical operational reads when available; see `docs/architecture/shared-asset-contracts.md`.
+
+## Direction 5 update: Exchange (Epic 10) status snapshot
+
+- Exchange now has a first-class local-first publish/package/import stack across `domain/exchange/*`, `application/exchange/*`, and `infrastructure/api/exchange/*`.
+- Implemented now: bundle + manifest + dependency snapshot modeling, format compatibility/versioning, validation + deterministic serialization/deserialization, atomic/composite/system export/import services, exchange access control, publishable package lifecycle, local catalog abstraction, publish workflow, and public exchange SDK DTO mappings.
+- End-to-end coherence coverage is now present for export -> validate/deserialize -> publish/catalog -> import (including provenance/lineage, access-denial, and conflict outcomes) in `application/exchange/tests/ExchangeEndToEndLifecycle.integration.test.ts`.
+- Boundary clarity is explicit: exchange artifacts remain distinct from runtime execution state, deployment execution state, and studio-handoff artifacts.
+- Future-oriented but not implemented in this slice: distributed/LAN repository sharing and distributed packaging/execution behaviors; current abstractions keep that path open without claiming support today.
+

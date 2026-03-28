@@ -882,3 +882,26 @@ Explicitly later than this scope:
   - implemented now: deterministic, version-aware handoff contracts/routing/adaptation/orchestration + persistence/lineage/dependency/audit + retry/reconciliation + System Studio intake + SDK + e2e/interop tests + bounded hot-path safeguards.
   - bounded/partial by design: in-process caches/record windows only; no distributed cache/queue/control-plane and no separate runtime/deployment architecture for handoffs.
   - future work: larger-scale distributed reliability/observability/backpressure systems, if and when required by product scope.
+
+## Direction 5 update: Exchange publish/package/import platform + end-to-end coherence coverage (stories 10.1–10.24)
+
+- Epic 10 is implemented as a bounded exchange stack across existing domain/application/infrastructure seams (`domain/exchange/*`, `application/exchange/*`, `infrastructure/api/exchange/*`) and remains explicitly separate from runtime execution state, deployment execution state, and studio-handoff transport artifacts.
+- Implemented exchange domain model/capabilities now include:
+  - unified exchange bundle model + format/version compatibility (`ExchangeBundleDomain`, `ExchangeFormatVersioning`),
+  - package manifests for atomic/composite assets and systems (`AssetPackageManifest`, `SystemPackageManifest`),
+  - dependency snapshot model/builders (`BundleDependencySnapshot`),
+  - validation + deterministic serialization/deserialization (`ExchangeBundleValidation`, `ExchangeBundleSerialization`),
+  - import conflict handling (`ExchangeImportConflictResolution`) and exchange provenance/lineage tracking (`ExchangeProvenance`).
+- Implemented authoritative application workflows now include:
+  - version-pinned export/import flows for atomic/composite/system assets (`Atomic|Composite|SystemAssetExportService`, `Atomic|Composite|SystemAssetImportService`),
+  - publishable package lifecycle modeling + status transitions (`PublishablePackageService`),
+  - exchange access control/evaluation (`ExchangeAccessControl`) with caller/tenant propagation,
+  - local-first exchange catalog abstraction + concrete local catalog/query support (`ExchangeCatalogServices`),
+  - authoritative publish workflow linking package readiness, artifact verification, catalog registration, and published record persistence (`ExchangePublishWorkflow`).
+- Public exchange contract surfaces are implemented and tested via the SDK/public DTO mapping seam (`infrastructure/api/exchange/sdk/PublicExchangeSdkContract.ts`, `ExchangeSdkMapper.ts`, `ExchangeSdkContract.test.ts`).
+- Story 10.23 end-to-end integration coverage now verifies coherent exchange lifecycle behavior over real seams (export -> deserialize/validate -> publish/catalog -> import), including bounded access-denial/conflict outcomes and system-of-systems continuity (`application/exchange/tests/ExchangeEndToEndLifecycle.integration.test.ts`).
+- Current boundaries (implemented vs bounded/future):
+  - implemented now: local-first exchange for atomic/composite/system package export/import/publish/catalog with provenance/lineage continuity and public contract mapping.
+  - bounded/partial by design: local catalog implementation is in-memory/local-reference oriented in this slice; repository abstraction boundaries are preserved for later remote/LAN catalog adapters.
+  - future work: distributed/LAN package sharing, remote repository synchronization, and distributed execution/deployment behaviors are design considerations preserved by current abstraction boundaries, not current product behavior.
+
