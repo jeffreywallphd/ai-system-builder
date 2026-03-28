@@ -42,3 +42,16 @@
 - Fully implemented now: shared taxonomy-driven contract projection for implemented atomic/composite studios, shared composite publish-consistency enforcement, and composite-to-atomic interop validation through shared dependency + taxonomy/contract seams.
 - Fully implemented now: bounded System Studio authoring/publish orchestration uses recursive system contract projection through shared Studio Shell seams, and registry detail/lineage projections surface system child/nested-version lineage alignment (`includedInUpstream`) for published system versions.
 - Partially implemented / bounded: projections are baseline authoring/publish-gating contracts, not a full runtime behavior-contract system.
+
+## Direction 5 update: Runtime execution contract + dependency resolution foundation (stories 6.3–6.4)
+
+- Runtime now has an explicit execution-contract mapping seam in `application/system-runtime/RuntimeExecutionContractMapping.ts`.
+- Mapping remains derived from shared contract truth (`resolveSystemContract`) and system definitions; it does not introduce a second contract model.
+- Runtime-facing execution mapping now includes:
+  - system runtime inputs/outputs
+  - system/runtime parameters (system-authored + derived contract parameters)
+  - runtime-visible child component interface references (atomic/composite/system)
+  - bounded recursive traversal status for nested system-of-systems references.
+- Runtime now has an explicit dependency-resolution seam in `application/system-runtime/RuntimeDependencyResolution.ts`.
+- Resolution reuses existing system dependency truth (`collectSystemDirectDependencies`, nested-system traversal) and preserves version-aware asset references in runtime-oriented results.
+- Recursive dependency resolution is bounded and cycle-safe, and yields deterministic outputs for later execution-plan construction (resolved components, dependency sets, ordering hints) without implementing an orchestrator in this slice.
