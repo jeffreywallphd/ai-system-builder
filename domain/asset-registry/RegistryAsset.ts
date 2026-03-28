@@ -64,6 +64,31 @@ export interface RegistryAsset {
   readonly versionHistory: ReadonlyArray<RegistryAssetVersionHistoryEntry>;
   readonly lineage: RegistryAssetLineageView;
   readonly validation?: RegistryAssetValidationInsights;
+  readonly systemDetails?: RegistrySystemDetailsView;
+}
+
+export interface RegistrySystemDetailsView {
+  readonly selectedChildren: ReadonlyArray<{
+    readonly alias?: string;
+    readonly componentKind: "atomic" | "composite" | "system";
+    readonly assetId: string;
+    readonly versionId?: string;
+  }>;
+  readonly interfaces: {
+    readonly inputs: ReadonlyArray<{ readonly id: string; readonly valueType?: string; readonly required: boolean }>;
+    readonly outputs: ReadonlyArray<{ readonly id: string; readonly valueType?: string }>;
+    readonly parameters: ReadonlyArray<{ readonly id: string; readonly valueType?: string; readonly required: boolean; readonly hasDefault: boolean }>;
+  };
+  readonly bindings: {
+    readonly count: number;
+    readonly bindingIds: ReadonlyArray<string>;
+  };
+  readonly aggregatedDependencies: {
+    readonly directCount: number;
+    readonly transitiveCount: number;
+    readonly totalCount: number;
+    readonly traversalStatus: "complete" | "cycle-detected" | "max-depth-exceeded" | "unresolved";
+  };
 }
 
 export interface RegistryAssetValidationIssue {
@@ -171,6 +196,43 @@ export function createRegistryAsset(input: RegistryAsset): RegistryAsset {
           message: issue.message.trim(),
           path: issue.path?.trim() || undefined,
         }))),
+      })
+      : undefined,
+    systemDetails: input.systemDetails
+      ? Object.freeze({
+        selectedChildren: Object.freeze((input.systemDetails.selectedChildren ?? []).map((entry) => Object.freeze({
+          alias: entry.alias?.trim() || undefined,
+          componentKind: entry.componentKind,
+          assetId: entry.assetId.trim(),
+          versionId: entry.versionId?.trim() || undefined,
+        }))),
+        interfaces: Object.freeze({
+          inputs: Object.freeze((input.systemDetails.interfaces.inputs ?? []).map((entry) => Object.freeze({
+            id: entry.id.trim(),
+            valueType: entry.valueType?.trim() || undefined,
+            required: Boolean(entry.required),
+          }))),
+          outputs: Object.freeze((input.systemDetails.interfaces.outputs ?? []).map((entry) => Object.freeze({
+            id: entry.id.trim(),
+            valueType: entry.valueType?.trim() || undefined,
+          }))),
+          parameters: Object.freeze((input.systemDetails.interfaces.parameters ?? []).map((entry) => Object.freeze({
+            id: entry.id.trim(),
+            valueType: entry.valueType?.trim() || undefined,
+            required: Boolean(entry.required),
+            hasDefault: Boolean(entry.hasDefault),
+          }))),
+        }),
+        bindings: Object.freeze({
+          count: Math.max(0, Math.floor(input.systemDetails.bindings.count)),
+          bindingIds: Object.freeze((input.systemDetails.bindings.bindingIds ?? []).map((entry) => entry.trim()).filter(Boolean)),
+        }),
+        aggregatedDependencies: Object.freeze({
+          directCount: Math.max(0, Math.floor(input.systemDetails.aggregatedDependencies.directCount)),
+          transitiveCount: Math.max(0, Math.floor(input.systemDetails.aggregatedDependencies.transitiveCount)),
+          totalCount: Math.max(0, Math.floor(input.systemDetails.aggregatedDependencies.totalCount)),
+          traversalStatus: input.systemDetails.aggregatedDependencies.traversalStatus,
+        }),
       })
       : undefined,
   });

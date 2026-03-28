@@ -292,4 +292,143 @@ describe("RegistryQueryService", () => {
     expect(latestCalls).toBe(2);
     expect(identityCalls).toBe(2);
   });
+
+  it("projects system detail and recursive dependency summaries for registry detail surfaces", async () => {
+    const modelAsset = buildAsset("asset:model", "Model", "generic");
+    const childAsset = buildAsset("asset:child-system", "Child System", "system-composition");
+    const rootAsset = buildAsset("asset:root-system", "Root System", "system-composition");
+
+    const modelVersion = buildVersion({
+      assetId: "asset:model",
+      versionId: "asset:model:v1",
+      metadata: {
+        metadata: {
+          taxonomy: {
+            structuralKind: TaxonomyStructuralKinds.atomic,
+            semanticRole: TaxonomySemanticRoles.model,
+            behaviorKind: TaxonomyBehaviorKinds.none,
+          },
+        },
+      },
+    });
+
+    const childVersion = buildVersion({
+      assetId: "asset:child-system",
+      versionId: "asset:child-system:v1",
+      metadata: {
+        metadata: {
+          taxonomy: {
+            structuralKind: TaxonomyStructuralKinds.system,
+            semanticRole: TaxonomySemanticRoles.system,
+            behaviorKind: TaxonomyBehaviorKinds.deterministic,
+          },
+          provenance: { creatorId: "child-author", sourceType: "generated" },
+        },
+        dependencies: [{ assetId: "asset:model", versionId: "asset:model:v1" }],
+        content: JSON.stringify({
+          systemSpec: {
+            components: [{ componentKind: "atomic", assetId: "asset:model", versionId: "asset:model:v1", alias: "model" }],
+            inputs: [{ inputId: "prompt", valueType: "string", required: true }],
+            outputs: [{ outputId: "answer", valueType: "string" }],
+            parameters: [{ parameterId: "temperature", valueType: "number", required: false, defaultValue: 0.3 }],
+            bindings: [],
+          },
+        }),
+      },
+    });
+
+    const rootVersion = buildVersion({
+      assetId: "asset:root-system",
+      versionId: "asset:root-system:v1",
+      metadata: {
+        metadata: {
+          taxonomy: {
+            structuralKind: TaxonomyStructuralKinds.system,
+            semanticRole: TaxonomySemanticRoles.appTemplate,
+            behaviorKind: TaxonomyBehaviorKinds.conditional,
+          },
+          provenance: { creatorId: "root-author", sourceType: "generated" },
+        },
+        dependencies: [{ assetId: "asset:child-system", versionId: "asset:child-system:v1" }],
+        content: JSON.stringify({
+          systemSpec: {
+            components: [{ componentKind: "system", assetId: "asset:child-system", versionId: "asset:child-system:v1", alias: "child" }],
+            inputs: [{ inputId: "userPrompt", valueType: "string", required: true }],
+            outputs: [{ outputId: "finalAnswer", valueType: "string" }],
+            parameters: [{ parameterId: "maxTokens", valueType: "number", required: false, defaultValue: 256 }],
+            bindings: [
+              {
+                bindingId: "prompt-in",
+                source: { scope: "system-input", endpointId: "userPrompt" },
+                target: { scope: "component-input", componentAlias: "child", endpointId: "prompt" },
+              },
+            ],
+          },
+        }),
+      },
+      upstreamVersionIds: ["asset:child-system:v1", "asset:model:v1"],
+    });
+
+    const queryRepository: Pick<IAssetSystemQueryRepository, "listAssetsByCriteria" | "getLatestVersionForAsset" | "listCanonicalIdentities"> = {
+      async listAssetsByCriteria() {
+        return [modelAsset, childAsset, rootAsset];
+      },
+      async getLatestVersionForAsset(assetId) {
+        if (assetId === "asset:model") return modelVersion;
+        if (assetId === "asset:child-system") return childVersion;
+        if (assetId === "asset:root-system") return rootVersion;
+        return undefined;
+      },
+      async listCanonicalIdentities() {
+        return [
+          {
+            entityType: "execution-artifact" as const,
+            entityId: "entity:root",
+            assetId: "asset:root-system",
+            latestVersionId: "asset:root-system:v1",
+            taxonomy: {
+              structuralKind: TaxonomyStructuralKinds.system,
+              semanticRole: TaxonomySemanticRoles.appTemplate,
+              behaviorKind: TaxonomyBehaviorKinds.conditional,
+            },
+            updatedAt: new Date("2026-03-01T00:00:00.000Z"),
+          },
+        ];
+      },
+    };
+
+    const service = new RegistryQueryService(
+      new InMemoryAssetRecordRepository([modelAsset, childAsset, rootAsset]),
+      new InMemoryAssetVersionRepository([modelVersion, childVersion, rootVersion]),
+      new InMemoryLineageRepository([]),
+      {
+        async resolveCanonicalEntityContract() {
+          return undefined;
+        },
+        resolveContractForTaxonomy() {
+          return {
+            version: "1.0.0",
+            parameters: [],
+            execution: { invocationMode: "deferred", sideEffects: "bounded" },
+          };
+        },
+      },
+      queryRepository,
+    );
+
+    const result = await service.queryRegistry({
+      structuralKinds: [TaxonomyStructuralKinds.system],
+      semanticRoles: [TaxonomySemanticRoles.appTemplate],
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.assetId).toBe("asset:root-system");
+    expect(result[0]?.systemDetails?.selectedChildren.map((child) => child.assetId)).toEqual(["asset:child-system"]);
+    expect(result[0]?.systemDetails?.interfaces.inputs.map((entry) => entry.id)).toEqual(["userPrompt"]);
+    expect(result[0]?.systemDetails?.bindings.bindingIds).toEqual(["prompt-in"]);
+    expect(result[0]?.systemDetails?.aggregatedDependencies.directCount).toBeGreaterThan(0);
+    expect(result[0]?.systemDetails?.aggregatedDependencies.transitiveCount).toBeGreaterThan(0);
+    expect(result[0]?.systemDetails?.aggregatedDependencies.traversalStatus).toBe("complete");
+    expect(result[0]?.validation?.issues.some((issue) => issue.code === "taxonomy-semantic-role-mismatch")).toBeFalse();
+  });
 });

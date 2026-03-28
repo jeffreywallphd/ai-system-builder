@@ -19,6 +19,13 @@ import { buildStudioShellValidationIssues } from "../studio-shell/StudioShellVal
 import { AssetDraftLifecycleStatuses, type AssetDraft } from "../../domain/studio-shell/StudioShellDomain";
 import { TaxonomySemanticRoles, TaxonomyStructuralKinds, type TaxonomyBehaviorKind, type TaxonomySemanticRole } from "../../domain/taxonomy/CompositionTaxonomy";
 import { RegistryCacheLayer } from "./RegistryCacheLayer";
+import {
+  aggregateSystemDependencies,
+  createSystemAsset,
+  type SystemAsset,
+  type SystemCompositionReference,
+} from "../../domain/system-studio/SystemAssetDomain";
+import type { AssetVersion } from "../../domain/assets/AssetVersion";
 
 export interface RegistryFilterParams {
   readonly structuralKinds?: ReadonlyArray<CompositionTaxonomyDescriptor["structuralKind"]>;
@@ -134,6 +141,7 @@ export class RegistryQueryService {
           versionHistory: await this.buildVersionHistory(asset.id),
           lineage: await this.buildLineageContext(latestVersion?.versionId, assets),
           validation,
+          systemDetails: await this.buildSystemDetails(latestVersion),
         });
       }));
 
@@ -368,6 +376,164 @@ export class RegistryQueryService {
     }
 
     return Object.freeze([...resolved.values()]);
+  }
+
+  private async buildSystemDetails(version?: AssetVersion): Promise<RegistryAsset["systemDetails"] | undefined> {
+    if (!version) {
+      return undefined;
+    }
+
+    const system = this.tryReadSystemAssetFromVersion(version);
+    if (!system) {
+      return undefined;
+    }
+
+    const aggregation = await this.aggregateSystemDependenciesForRegistry(system);
+    return Object.freeze({
+      selectedChildren: Object.freeze(system.components.map((component) => Object.freeze({
+        alias: component.alias,
+        componentKind: component.componentKind,
+        assetId: component.assetId,
+        versionId: component.versionId,
+      }))),
+      interfaces: Object.freeze({
+        inputs: Object.freeze(system.inputs.map((entry) => Object.freeze({
+          id: entry.inputId,
+          valueType: entry.valueType,
+          required: entry.required ?? false,
+        }))),
+        outputs: Object.freeze(system.outputs.map((entry) => Object.freeze({
+          id: entry.outputId,
+          valueType: entry.valueType,
+        }))),
+        parameters: Object.freeze(system.parameters.map((entry) => Object.freeze({
+          id: entry.parameterId,
+          valueType: entry.valueType,
+          required: entry.required ?? false,
+          hasDefault: entry.defaultValue !== undefined,
+        }))),
+      }),
+      bindings: Object.freeze({
+        count: system.bindings.length,
+        bindingIds: Object.freeze(system.bindings.map((binding) => binding.bindingId)),
+      }),
+      aggregatedDependencies: Object.freeze({
+        directCount: aggregation.directCount,
+        transitiveCount: aggregation.transitiveCount,
+        totalCount: aggregation.totalCount,
+        traversalStatus: aggregation.traversalStatus,
+      }),
+    });
+  }
+
+  private tryReadSystemAssetFromVersion(version: AssetVersion): SystemAsset | undefined {
+    const metadataEnvelope = version.metadata as {
+      readonly metadata?: {
+        readonly taxonomy?: CompositionTaxonomyDescriptor;
+        readonly provenance?: AssetDraft["metadata"]["provenance"];
+      };
+      readonly dependencies?: ReadonlyArray<{ readonly assetId?: string; readonly versionId?: string }>;
+      readonly content?: string;
+    } | undefined;
+    const taxonomy = metadataEnvelope?.metadata?.taxonomy;
+    if (!taxonomy || taxonomy.structuralKind !== TaxonomyStructuralKinds.system) {
+      return undefined;
+    }
+
+    const content = typeof metadataEnvelope?.content === "string" ? metadataEnvelope.content : "";
+    let spec: {
+      readonly components?: unknown;
+      readonly nestedSystems?: unknown;
+      readonly inputs?: unknown;
+      readonly outputs?: unknown;
+      readonly parameters?: unknown;
+      readonly bindings?: unknown;
+    } = {};
+    if (content.trim()) {
+      try {
+        const parsed = JSON.parse(content) as { readonly systemSpec?: unknown };
+        if (parsed?.systemSpec && typeof parsed.systemSpec === "object" && !Array.isArray(parsed.systemSpec)) {
+          spec = parsed.systemSpec as typeof spec;
+        }
+      } catch {
+        return undefined;
+      }
+    }
+
+    try {
+      return createSystemAsset({
+        assetId: version.assetId.value,
+        versionId: version.versionId,
+        taxonomy,
+        provenance: metadataEnvelope?.metadata?.provenance,
+        dependencies: (metadataEnvelope?.dependencies ?? []).flatMap((entry) => {
+          const assetId = entry.assetId?.trim();
+          if (!assetId) {
+            return [];
+          }
+          return [{
+            assetId,
+            versionId: entry.versionId?.trim() || undefined,
+          }];
+        }),
+        components: Array.isArray(spec.components) ? spec.components as SystemAsset["components"] : undefined,
+        nestedSystems: Array.isArray(spec.nestedSystems) ? spec.nestedSystems as SystemAsset["nestedSystems"] : undefined,
+        inputs: Array.isArray(spec.inputs) ? spec.inputs as SystemAsset["inputs"] : undefined,
+        outputs: Array.isArray(spec.outputs) ? spec.outputs as SystemAsset["outputs"] : undefined,
+        parameters: Array.isArray(spec.parameters) ? spec.parameters as SystemAsset["parameters"] : undefined,
+        bindings: Array.isArray(spec.bindings) ? spec.bindings as SystemAsset["bindings"] : undefined,
+      });
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async aggregateSystemDependenciesForRegistry(system: SystemAsset): Promise<{
+    readonly directCount: number;
+    readonly transitiveCount: number;
+    readonly totalCount: number;
+    readonly traversalStatus: "complete" | "cycle-detected" | "max-depth-exceeded" | "unresolved";
+  }> {
+    try {
+      const summary = await aggregateSystemDependencies({
+        root: system,
+        resolveSystem: (reference) => this.resolveSystemReference(reference),
+        maxDepth: 6,
+      });
+      return Object.freeze({
+        directCount: summary.directDependencies.length,
+        transitiveCount: summary.transitiveDependencies.length,
+        totalCount: summary.allDependencies.length,
+        traversalStatus: "complete",
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message.toLowerCase() : "";
+      const traversalStatus = message.includes("cycle")
+        ? "cycle-detected"
+        : message.includes("max depth")
+          ? "max-depth-exceeded"
+          : "unresolved";
+      return Object.freeze({
+        directCount: system.dependencies.length,
+        transitiveCount: 0,
+        totalCount: system.dependencies.length,
+        traversalStatus,
+      });
+    }
+  }
+
+  private async resolveSystemReference(reference: SystemCompositionReference): Promise<SystemAsset | undefined> {
+    const byVersion = reference.versionId
+      ? await this.versionRepository.getByVersionId(reference.versionId)
+      : undefined;
+    if (byVersion && byVersion.assetId.value === reference.assetId) {
+      return this.tryReadSystemAssetFromVersion(byVersion);
+    }
+
+    const versions = await this.versionRepository.listVersionsByAssetId(reference.assetId);
+    const latest = [...versions]
+      .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())[0];
+    return latest ? this.tryReadSystemAssetFromVersion(latest) : undefined;
   }
 
   private async toDependency(edge: AssetLineageEdge, versionId: string): Promise<RegistryDependencyReference> {
@@ -710,5 +876,17 @@ const studioExpectationBySemanticRole: Readonly<
     structuralKind: TaxonomyStructuralKinds.composite,
     semanticRole: TaxonomySemanticRoles.toolChain,
     allowedBehaviorKinds: Object.freeze(["deterministic"]),
+  }),
+  [TaxonomySemanticRoles.system]: Object.freeze({
+    studioType: "system-studio",
+    structuralKind: TaxonomyStructuralKinds.system,
+    semanticRole: TaxonomySemanticRoles.system,
+    allowedBehaviorKinds: Object.freeze(["deterministic", "conditional", "iterative", "autonomous"]),
+  }),
+  [TaxonomySemanticRoles.appTemplate]: Object.freeze({
+    studioType: "system-studio",
+    structuralKind: TaxonomyStructuralKinds.system,
+    semanticRole: TaxonomySemanticRoles.appTemplate,
+    allowedBehaviorKinds: Object.freeze(["deterministic", "conditional", "iterative", "autonomous"]),
   }),
 });

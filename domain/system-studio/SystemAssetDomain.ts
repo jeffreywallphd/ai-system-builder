@@ -434,7 +434,44 @@ export function collectSystemDirectDependencies(system: SystemAsset): ReadonlyAr
     deduped.set(`${reference.assetId}::${reference.versionId ?? ""}`, reference);
   }
 
+  for (const dependency of collectSystemBindingImpliedDependencies(system)) {
+    deduped.set(`${dependency.assetId}::${dependency.versionId ?? ""}`, dependency);
+  }
+
   return Object.freeze([...deduped.values()]);
+}
+
+export function collectSystemBindingImpliedDependencies(system: SystemAsset): ReadonlyArray<AssetDraftDependencyReference> {
+  const componentsByAlias = new Map<string, SystemComponentReference>();
+  for (const component of system.components) {
+    if (component.alias) {
+      componentsByAlias.set(component.alias, component);
+    }
+  }
+
+  const dependencies = new Map<string, AssetDraftDependencyReference>();
+  const addEndpointDependency = (endpoint: SystemBindingEndpoint): void => {
+    if (!endpoint.scope.startsWith("component-")) {
+      return;
+    }
+    const componentAlias = endpoint.componentAlias?.trim();
+    if (!componentAlias) {
+      return;
+    }
+    const component = componentsByAlias.get(componentAlias);
+    if (!component) {
+      return;
+    }
+    const reference = createDependencyReference(component.assetId, component.versionId);
+    dependencies.set(`${reference.assetId}::${reference.versionId ?? ""}`, reference);
+  };
+
+  for (const binding of system.bindings) {
+    addEndpointDependency(binding.source);
+    addEndpointDependency(binding.target);
+  }
+
+  return Object.freeze([...dependencies.values()]);
 }
 
 export async function aggregateSystemDependencies(input: {

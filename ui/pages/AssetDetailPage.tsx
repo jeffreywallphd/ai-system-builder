@@ -11,6 +11,7 @@ import {
   AssetLineageView,
   AssetProvenancePanel,
   AssetSummaryPanel,
+  SystemAssetDetailsPanel,
   AssetVersionHistoryPanel,
   DependencyGraphPanel,
 } from "../components/registry/AssetDetailPanels";
@@ -147,6 +148,7 @@ export default function AssetDetailPage(): JSX.Element {
         <AssetContractPanel asset={asset} />
         <AssetProvenancePanel asset={asset} />
         <AssetDependencySummaryPanel asset={asset} />
+        <SystemAssetDetailsPanel asset={asset} />
         <AssetVersionHistoryPanel asset={asset} />
         <AssetLineageView asset={asset} registryContextQuery={registryContextQuery ?? undefined} />
         <AssetValidationSummary asset={asset} />

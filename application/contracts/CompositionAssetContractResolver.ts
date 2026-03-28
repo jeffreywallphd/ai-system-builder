@@ -28,6 +28,7 @@ import {
   type TaxonomySemanticRole,
 } from "../../domain/taxonomy/CompositionTaxonomy";
 import {
+  aggregateSystemDependencies,
   buildNestedSystemReferences,
   type SystemAsset,
   type SystemBindingEndpoint,
@@ -729,6 +730,12 @@ export class CompositionAssetContractResolver implements IAssetContractResolver 
       })
       .filter((value): value is string => Boolean(value));
 
+    const dependencySummary = await aggregateSystemDependencies({
+      root: input.root,
+      resolveSystem: input.resolveSystem,
+      maxDepth,
+    }).catch(() => undefined);
+
     return createAssetContractDescriptor({
       version: "1.1.0",
       input: {
@@ -759,6 +766,10 @@ export class CompositionAssetContractResolver implements IAssetContractResolver 
         parameter("unresolvedNestedSystemCount", true, "Number of nested systems that could not be resolved during projection.", "number", unresolvedNestedSystemCount),
         parameter("bindingTypeMismatchCount", true, "Count of explicit child/system bindings with incompatible value types.", "number", bindingTypeMismatches.length),
         parameter("bindingTypeMismatches", false, "Binding ids with source->target type mismatches.", "string", bindingTypeMismatches.join(",")),
+        parameter("directDependencyCount", true, "Count of direct dependencies collected from explicit dependencies, children, and binding-implied references.", "number", dependencySummary?.directDependencies.length ?? 0),
+        parameter("transitiveDependencyCount", true, "Count of recursively discovered transitive dependencies from nested systems.", "number", dependencySummary?.transitiveDependencies.length ?? 0),
+        parameter("aggregatedDependencyCount", true, "Total aggregated dependency count (direct + transitive).", "number", dependencySummary?.allDependencies.length ?? 0),
+        parameter("dependencyTraversalStatus", true, "Status of bounded recursive dependency aggregation during contract projection.", "string", dependencySummary ? "complete" : "incomplete"),
       ],
       execution: {
         invocationMode: input.root.taxonomy.behaviorKind === TaxonomyBehaviorKinds.autonomous ? "async" : "deferred",
