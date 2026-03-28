@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import type { DesktopStudioShellBridge } from "../../../electron/shared/DesktopContracts";
 import { StudioShellBackendApi } from "../../../infrastructure/api/studio-shell/StudioShellBackendApi";
 import { SystemStudioBackendApi } from "../../../infrastructure/api/system-studio/SystemStudioBackendApi";
+import { SystemRuntimeBackendApi } from "../../../infrastructure/api/system-runtime/SystemRuntimeBackendApi";
 import { SqliteStudioShellRepository } from "../../../infrastructure/filesystem/studio-shell/SqliteStudioShellRepository";
 import { AssetDraftLifecycleStatuses } from "../../../domain/studio-shell/StudioShellDomain";
 import { StudioShellService } from "../StudioShellService";
@@ -29,6 +30,7 @@ function unsupportedSystemOperation() {
 function installBridge(
   api: StudioShellBackendApi,
   systemApi?: SystemStudioBackendApi,
+  runtimeApi?: SystemRuntimeBackendApi,
 ): void {
   const bridge: DesktopStudioShellBridge = {
     initializeStudio(studioId: string, name: string) {
@@ -105,6 +107,30 @@ function installBridge(
         return unsupportedSystemOperation();
       }
       return systemApi.getCompatibilityInsights(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
+    },
+    startSystemExecution(requestJson: string) {
+      if (!runtimeApi) {
+        return unsupportedSystemOperation();
+      }
+      return runtimeApi.startExecution(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
+    },
+    getSystemExecutionStatus(executionId: string) {
+      if (!runtimeApi) {
+        return unsupportedSystemOperation();
+      }
+      return runtimeApi.getExecutionStatus(executionId).then((response) => JSON.stringify(response));
+    },
+    getSystemExecutionTrace(requestJson: string) {
+      if (!runtimeApi) {
+        return unsupportedSystemOperation();
+      }
+      return runtimeApi.getExecutionTrace(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
+    },
+    getSystemExecutionResult(executionId: string) {
+      if (!runtimeApi) {
+        return unsupportedSystemOperation();
+      }
+      return runtimeApi.getExecutionResult(executionId).then((response) => JSON.stringify(response));
     },
   };
 
@@ -1708,5 +1734,84 @@ describe("StudioShellService integration", () => {
     expect(reloadedSnapshot.data?.versions.map((entry) => entry.versionId)).toEqual(["asset:studio-shell-main:v1"]);
 
     reopenedRepository.dispose();
+  });
+
+  it("starts a system execution from System Studio through service -> bridge -> runtime backend and reads status/trace/result", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-system-runtime-service-"));
+    createdRoots.push(root);
+    const databasePath = path.join(root, "system-runtime.sqlite");
+    const repository = new SqliteStudioShellRepository(databasePath);
+    const backendApi = new StudioShellBackendApi(repository);
+    const systemApi = new SystemStudioBackendApi(repository);
+    const runtimeApi = new SystemRuntimeBackendApi(repository);
+    installBridge(backendApi, systemApi, runtimeApi);
+
+    const service = new StudioShellService();
+    const initialized = await service.initializeStudio("studio-systems", "System Studio");
+    expect(initialized.ok).toBeTrue();
+    const sessionId = initialized.data?.activeSessionId;
+    expect(sessionId).toBeDefined();
+
+    const created = await service.createDraft({
+      studioId: "studio-systems",
+      sessionId: sessionId!,
+      content: JSON.stringify({
+        systemSpec: {
+          components: [],
+          inputs: [{ inputId: "request", valueType: "string", required: true }],
+          outputs: [{ outputId: "response", valueType: "string" }],
+        },
+      }),
+      metadata: {
+        title: "Runnable System",
+        tags: ["system", "runtime"],
+        taxonomy: {
+          structuralKind: "system",
+          semanticRole: "system",
+          behaviorKind: "deterministic",
+        },
+      },
+    });
+    expect(created.ok).toBeTrue();
+    const draftId = created.data?.draft?.draftId;
+    expect(draftId).toBeDefined();
+
+    const validated = await service.transitionLifecycle({
+      studioId: "studio-systems",
+      sessionId: sessionId!,
+      draftId: draftId!,
+      targetStatus: AssetDraftLifecycleStatuses.validated,
+    });
+    expect(validated.ok).toBeTrue();
+
+    const started = await service.startSystemExecution({
+      studioId: "studio-systems",
+      draftId: draftId!,
+      context: { trigger: "manual", actorId: "integration-test" },
+    });
+    expect(started.ok).toBeTrue();
+    expect(started.data?.executionId).toBeDefined();
+    expect(started.data?.status === "succeeded" || started.data?.status === "failed").toBeTrue();
+
+    const status = await service.getSystemExecutionStatus(started.data!.executionId);
+    expect(status.ok).toBeTrue();
+    expect(status.data?.executionId).toBe(started.data?.executionId);
+    expect(status.data?.progress.totalNodeCount).toBeGreaterThan(0);
+
+    const trace = await service.getSystemExecutionTrace({
+      executionId: started.data!.executionId,
+      eventLimit: 3,
+      logLimit: 2,
+    });
+    expect(trace.ok).toBeTrue();
+    expect((trace.data?.trace.events.length ?? 0) <= 3).toBeTrue();
+    expect((trace.data?.trace.logs.length ?? 0) <= 2).toBeTrue();
+
+    const result = await service.getSystemExecutionResult(started.data!.executionId);
+    expect(result.ok).toBeTrue();
+    expect(result.data?.executionId).toBe(started.data?.executionId);
+    expect(result.data?.output).toBeDefined();
+
+    repository.dispose();
   });
 });

@@ -181,6 +181,8 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
     isBusy,
     operations: {
       refresh: refreshSnapshot,
+      startSystemExecution: async (request) => service.startSystemExecution(request),
+      getSystemExecutionStatus: async (executionId) => service.getSystemExecutionStatus(executionId),
       saveSystemChildComponent: async (request) => {
         const response = await service.addSystemChildComponent(request);
         if (!response.ok) {

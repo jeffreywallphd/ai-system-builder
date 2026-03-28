@@ -121,6 +121,10 @@ export interface DesktopStudioShellBridge {
   updateSystemParameters(requestJson: string): Promise<string>;
   updateSystemExecutionMetadata(requestJson: string): Promise<string>;
   getSystemCompatibilityInsights(requestJson: string): Promise<string>;
+  startSystemExecution(requestJson: string): Promise<string>;
+  getSystemExecutionStatus(executionId: string): Promise<string>;
+  getSystemExecutionTrace(requestJson: string): Promise<string>;
+  getSystemExecutionResult(executionId: string): Promise<string>;
 }
 
 export interface DesktopRegistryBridge {
