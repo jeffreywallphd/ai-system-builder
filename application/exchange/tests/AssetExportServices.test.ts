@@ -5,7 +5,14 @@ import { AssetVersion } from "../../../domain/assets/AssetVersion";
 import type { IAsset } from "../../../domain/assets/interfaces/IAsset";
 import type { IAssetRecordRepository } from "../../ports/interfaces/IAssetRecordRepository";
 import type { IAssetVersionRepository } from "../../ports/interfaces/IAssetVersionRepository";
-import { AtomicAssetExportService, AtomicAssetImportService, CompositeAssetExportService, SystemAssetExportService } from "../AssetExportServices";
+import {
+  AtomicAssetExportService,
+  AtomicAssetImportService,
+  CompositeAssetExportService,
+  CompositeAssetImportService,
+  SystemAssetExportService,
+  SystemAssetImportService,
+} from "../AssetExportServices";
 
 class InMemoryAssetRecordRepository implements IAssetRecordRepository {
   private readonly records = new Map<string, IAsset>();
@@ -338,6 +345,157 @@ describe("Asset export services", () => {
     });
     expect(JSON.stringify(storedVersion?.metadata)).not.toContain("runtimeState");
     expect(JSON.stringify(storedVersion?.metadata)).not.toContain("deploymentState");
+  });
+
+  it("imports serialized composite bundles through the authoritative flow and preserves composition semantics", async () => {
+    const exportAssets = new InMemoryAssetRecordRepository();
+    const exportVersions = new InMemoryAssetVersionRepository();
+    await exportAssets.save(createAsset({ id: "workflow-definition:wf-2", kind: "workflow-definition" }));
+    await exportAssets.save(createAsset({ id: "asset:model-x", kind: "json" }));
+    await exportAssets.save(createAsset({ id: "dataset-version:data-2", kind: "dataset" }));
+    await exportVersions.saveVersion(new AssetVersion({ assetId: "asset:model-x", versionId: "asset:model-x:v1" }));
+    await exportVersions.saveVersion(new AssetVersion({ assetId: "dataset-version:data-2", versionId: "dataset-version:data-2:v1" }));
+    await exportVersions.saveVersion(new AssetVersion({
+      assetId: "workflow-definition:wf-2",
+      versionId: "workflow-definition:wf-2:v7",
+      createdAt: new Date("2026-03-28T00:00:00.000Z"),
+      metadata: {
+        metadata: {
+          title: "Composite Import",
+          taxonomy: { structuralKind: "composite", semanticRole: "workflow", behaviorKind: "deterministic" },
+        },
+        composition: [
+          { alias: "model", assetId: "asset:model-x", versionId: "asset:model-x:v1", relation: "component", taxonomy: { structuralKind: "atomic", semanticRole: "model", behaviorKind: "none" } },
+          { alias: "dataset", assetId: "dataset-version:data-2", versionId: "dataset-version:data-2:v1", relation: "component", taxonomy: { structuralKind: "atomic", semanticRole: "dataset", behaviorKind: "none" } },
+        ],
+        dependencies: [
+          { assetId: "asset:model-x", versionId: "asset:model-x:v1", relation: "component" },
+          { assetId: "dataset-version:data-2", versionId: "dataset-version:data-2:v1", relation: "dependency" },
+        ],
+      },
+    }));
+
+    const exported = await new CompositeAssetExportService(exportAssets, exportVersions).export({
+      assetId: "workflow-definition:wf-2",
+      versionId: "workflow-definition:wf-2:v7",
+    });
+    expect(exported.ok).toBeTrue();
+    if (!exported.ok) {
+      return;
+    }
+
+    const importAssets = new InMemoryAssetRecordRepository();
+    const importVersions = new InMemoryAssetVersionRepository();
+    const imported = await new CompositeAssetImportService(importAssets, importVersions, undefined, undefined, () => new Date("2026-03-28T02:00:00.000Z")).import({
+      artifactContent: exported.artifact.content,
+    });
+
+    expect(imported.ok).toBeTrue();
+    if (imported.ok) {
+      expect(imported.imported.assetId).toBe("workflow-definition:wf-2");
+      expect(imported.imported.versionId).toBe("workflow-definition:wf-2:v7");
+      expect(imported.imported.compositionCount).toBe(2);
+      expect(imported.imported.dependencyCount).toBe(2);
+    }
+
+    const stored = await importVersions.getByVersionId("workflow-definition:wf-2:v7");
+    const metadata = stored?.metadata as {
+      readonly composition?: ReadonlyArray<{ readonly alias: string; readonly assetId: string; readonly versionId: string }>;
+      readonly dependencies?: ReadonlyArray<{ readonly assetId: string; readonly versionId?: string }>;
+      readonly exchangeImport?: { readonly bundleId?: string };
+    };
+    expect(metadata.composition?.map((entry) => entry.alias)).toEqual(["dataset", "model"]);
+    expect(metadata.dependencies?.length).toBe(2);
+    expect(metadata.exchangeImport?.bundleId).toBe("exchange:composite:workflow-definition:wf-2:workflow-definition:wf-2:v7");
+    expect(JSON.stringify(metadata)).not.toContain("runtimeState");
+    expect(JSON.stringify(metadata)).not.toContain("deploymentState");
+  });
+
+  it("imports serialized system bundles through the authoritative flow and preserves system-of-systems semantics", async () => {
+    const assets = new InMemoryAssetRecordRepository();
+    const versions = new InMemoryAssetVersionRepository();
+
+    await assets.save(createAsset({ id: "system:root", kind: "json" }));
+    await assets.save(createAsset({ id: "system:child", kind: "json" }));
+    await assets.save(createAsset({ id: "asset:model", kind: "json" }));
+    await versions.saveVersion(new AssetVersion({ assetId: "asset:model", versionId: "asset:model:v1" }));
+    await versions.saveVersion(new AssetVersion({
+      assetId: "system:child",
+      versionId: "system:child:v1",
+      metadata: {
+        metadata: { taxonomy: { structuralKind: "system", semanticRole: "system", behaviorKind: "deterministic" } },
+        content: JSON.stringify({
+          systemSpec: {
+            components: [{ componentKind: "atomic", alias: "model", assetId: "asset:model", versionId: "asset:model:v1" }],
+          },
+        }),
+      },
+    }));
+    await versions.saveVersion(new AssetVersion({
+      assetId: "system:root",
+      versionId: "system:root:v2",
+      metadata: {
+        metadata: {
+          title: "Importable Root",
+          taxonomy: { structuralKind: "system", semanticRole: "system", behaviorKind: "conditional" },
+        },
+        content: JSON.stringify({
+          systemSpec: {
+            components: [{ componentKind: "atomic", alias: "model", assetId: "asset:model", versionId: "asset:model:v1" }],
+            nestedSystems: [{ assetId: "system:child", versionId: "system:child:v1", alias: "child" }],
+            executionMetadata: { orchestration: { hints: ["portable"] } },
+          },
+        }),
+      },
+    }));
+
+    const exported = await new SystemAssetExportService(assets, versions).export({
+      assetId: "system:root",
+      versionId: "system:root:v2",
+    });
+    expect(exported.ok).toBeTrue();
+    if (!exported.ok) {
+      return;
+    }
+
+    const importAssets = new InMemoryAssetRecordRepository();
+    const importVersions = new InMemoryAssetVersionRepository();
+    const imported = await new SystemAssetImportService(importAssets, importVersions, undefined, undefined, () => new Date("2026-03-28T03:00:00.000Z")).import({
+      artifactContent: exported.artifact.content,
+    });
+
+    expect(imported.ok).toBeTrue();
+    if (imported.ok) {
+      expect(imported.imported.assetId).toBe("system:root");
+      expect(imported.imported.versionId).toBe("system:root:v2");
+      expect(imported.imported.nodeCount).toBeGreaterThanOrEqual(3);
+      expect(imported.imported.compositionCount).toBeGreaterThanOrEqual(2);
+    }
+
+    const stored = await importVersions.getByVersionId("system:root:v2");
+    const payload = stored?.metadata as { readonly content?: string; readonly exchangeImport?: { readonly bundleId?: string } };
+    expect(payload.exchangeImport?.bundleId).toBe("exchange:system:system:root:system:root:v2");
+    expect(payload.content).toContain("\"nestedSystems\"");
+    expect(payload.content).toContain("\"assetId\":\"system:child\"");
+    expect(payload.content).toContain("\"executionMetadata\"");
+    expect(payload.content).not.toContain("runtimeState");
+    expect(payload.content).not.toContain("deploymentState");
+  });
+
+  it("returns structured failures for unsupported composite/system import artifacts", async () => {
+    const compositeService = new CompositeAssetImportService(new InMemoryAssetRecordRepository(), new InMemoryAssetVersionRepository());
+    const systemService = new SystemAssetImportService(new InMemoryAssetRecordRepository(), new InMemoryAssetVersionRepository());
+
+    const malformedComposite = await compositeService.import({ artifactContent: "not-json" });
+    const malformedSystem = await systemService.import({ artifactContent: "not-json" });
+    expect(malformedComposite.ok).toBeFalse();
+    expect(malformedSystem.ok).toBeFalse();
+    if (!malformedComposite.ok) {
+      expect(malformedComposite.code).toBe("deserialization-failed");
+    }
+    if (!malformedSystem.ok) {
+      expect(malformedSystem.code).toBe("deserialization-failed");
+    }
   });
 
   it("returns structured failures for malformed and unsupported atomic import artifacts", async () => {

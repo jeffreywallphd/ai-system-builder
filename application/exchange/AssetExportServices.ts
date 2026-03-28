@@ -20,7 +20,7 @@ import {
 import { ExchangeFormatCompatibilities } from "../../domain/exchange/ExchangeFormatVersioning";
 import { ExchangeBundleDeserializer, ExchangeBundleSerializer } from "../../domain/exchange/ExchangeBundleSerialization";
 import { ExchangeBundleValidator } from "../../domain/exchange/ExchangeBundleValidation";
-import { createSystemPackageManifest } from "../../domain/exchange/SystemPackageManifest";
+import { createSystemPackageManifest, type SystemPackageManifest } from "../../domain/exchange/SystemPackageManifest";
 import { createSystemAsset, type SystemAsset, type SystemCompositionNode, type SystemCompositionReference } from "../../domain/system-studio/SystemAssetDomain";
 import type { CompositionTaxonomyDescriptor } from "../../domain/taxonomy/CompositionTaxonomy";
 import type { IAssetRecordRepository } from "../ports/interfaces/IAssetRecordRepository";
@@ -112,12 +112,46 @@ export interface AtomicAssetImportRequest {
   readonly artifactContent: string;
 }
 
+export interface CompositeAssetImportRequest {
+  readonly artifactContent: string;
+}
+
+export interface SystemAssetImportRequest {
+  readonly artifactContent: string;
+}
+
 export interface ImportedAtomicAssetRecord {
   readonly assetId: string;
   readonly versionId: string;
   readonly bundleId: string;
   readonly sourceBundleId?: string;
   readonly sourceVersionLineage: ReadonlyArray<string>;
+  readonly importedAt: string;
+  readonly existingAsset: boolean;
+  readonly existingVersion: boolean;
+}
+
+export interface ImportedCompositeAssetRecord {
+  readonly assetId: string;
+  readonly versionId: string;
+  readonly bundleId: string;
+  readonly sourceBundleId?: string;
+  readonly sourceVersionLineage: ReadonlyArray<string>;
+  readonly compositionCount: number;
+  readonly dependencyCount: number;
+  readonly importedAt: string;
+  readonly existingAsset: boolean;
+  readonly existingVersion: boolean;
+}
+
+export interface ImportedSystemAssetRecord {
+  readonly assetId: string;
+  readonly versionId: string;
+  readonly bundleId: string;
+  readonly sourceBundleId?: string;
+  readonly sourceVersionLineage: ReadonlyArray<string>;
+  readonly nodeCount: number;
+  readonly compositionCount: number;
   readonly importedAt: string;
   readonly existingAsset: boolean;
   readonly existingVersion: boolean;
@@ -131,6 +165,42 @@ export type AtomicAssetImportResult = {
 } | {
   readonly ok: false;
   readonly subjectKind: "atomic-asset";
+  readonly code:
+    | "invalid-request"
+    | "deserialization-failed"
+    | "unsupported-format-version"
+    | "validation-failed"
+    | "unsupported-subject-kind"
+    | "conflict";
+  readonly message: string;
+  readonly details?: Readonly<Record<string, unknown>>;
+};
+
+export type CompositeAssetImportResult = {
+  readonly ok: true;
+  readonly subjectKind: "composite-asset";
+  readonly imported: ImportedCompositeAssetRecord;
+} | {
+  readonly ok: false;
+  readonly subjectKind: "composite-asset";
+  readonly code:
+    | "invalid-request"
+    | "deserialization-failed"
+    | "unsupported-format-version"
+    | "validation-failed"
+    | "unsupported-subject-kind"
+    | "conflict";
+  readonly message: string;
+  readonly details?: Readonly<Record<string, unknown>>;
+};
+
+export type SystemAssetImportResult = {
+  readonly ok: true;
+  readonly subjectKind: "system-asset";
+  readonly imported: ImportedSystemAssetRecord;
+} | {
+  readonly ok: false;
+  readonly subjectKind: "system-asset";
   readonly code:
     | "invalid-request"
     | "deserialization-failed"
@@ -368,6 +438,18 @@ function inferAtomicAssetKind(manifest: AssetPackageManifest): IAsset["kind"] {
   return "generic";
 }
 
+function inferCompositeAssetKind(manifest: AssetPackageManifest): IAsset["kind"] {
+  const taxonomy = manifest.subject.taxonomy;
+  if (taxonomy.semanticRole === "workflow") {
+    return "workflow-definition";
+  }
+  return "generic";
+}
+
+function inferSystemAssetKind(): IAsset["kind"] {
+  return "json";
+}
+
 export class AtomicAssetBundleBuilder {
   private readonly taxonomyClassifier: CompositionTaxonomyClassifier;
 
@@ -535,7 +617,7 @@ export class SystemAssetBundleBuilder {
     readonly request: SystemAssetExportRequest;
   }): Promise<{
     readonly bundle: ReturnType<typeof createExchangeBundle>;
-    readonly manifest: ReturnType<typeof createSystemPackageManifest>;
+    readonly manifest: SystemPackageManifest;
     readonly dependencySnapshot: ReturnType<typeof BundleDependencySnapshotBuilder.fromSystemPackageManifest>;
   }> {
     const rootSystem = this.mapVersionToSystemAsset(input.asset, input.version);
@@ -886,6 +968,124 @@ export class AtomicAssetBundleImportResolver {
   }
 }
 
+export class CompositeAssetBundleImportResolver {
+  public resolve(input: {
+    readonly bundle: {
+      readonly bundleId: { readonly value: string };
+      readonly subject: { readonly root: { readonly kind: string; readonly assetId: string; readonly versionId: string } };
+      readonly provenance?: ExchangeBundleProvenance;
+    };
+    readonly manifest: AssetPackageManifest;
+  }): {
+    readonly assetId: string;
+    readonly versionId: string;
+    readonly bundleId: string;
+    readonly sourceBundleId?: string;
+    readonly sourceVersionLineage: ReadonlyArray<string>;
+    readonly composition: ReadonlyArray<{
+      readonly alias: string;
+      readonly assetId: string;
+      readonly versionId: string;
+      readonly taxonomy?: CompositionTaxonomyDescriptor;
+    }>;
+  } {
+    if (input.bundle.subject.root.kind !== ExchangeBundleSubjectKinds.compositeAsset || input.manifest.type !== "composite") {
+      throw new Error("Composite import requires a composite bundle root and composite package manifest.");
+    }
+
+    return Object.freeze({
+      assetId: input.manifest.subject.assetId,
+      versionId: input.manifest.subject.versionId,
+      bundleId: input.bundle.bundleId.value,
+      sourceBundleId: input.bundle.provenance?.sourceBundleId,
+      sourceVersionLineage: Object.freeze([...(input.bundle.provenance?.sourceVersionLineage ?? [])]),
+      composition: Object.freeze(input.manifest.composition.map((entry) => Object.freeze({
+        alias: entry.alias,
+        assetId: entry.assetId,
+        versionId: entry.versionId ?? "",
+        taxonomy: entry.taxonomy,
+      }))),
+    });
+  }
+}
+
+export class SystemAssetBundleImportResolver {
+  public resolve(input: {
+    readonly bundle: {
+      readonly bundleId: { readonly value: string };
+      readonly subject: { readonly root: { readonly kind: string; readonly assetId: string; readonly versionId: string } };
+      readonly provenance?: ExchangeBundleProvenance;
+    };
+    readonly manifest: SystemPackageManifest;
+  }): {
+    readonly assetId: string;
+    readonly versionId: string;
+    readonly bundleId: string;
+    readonly sourceBundleId?: string;
+    readonly sourceVersionLineage: ReadonlyArray<string>;
+    readonly nodeCount: number;
+    readonly compositionCount: number;
+    readonly components: ReadonlyArray<SystemAsset["components"][number]>;
+    readonly nestedSystems: ReadonlyArray<SystemAsset["nestedSystems"][number]>;
+    readonly executionMetadata?: SystemAsset["executionMetadata"];
+  } {
+    if (input.bundle.subject.root.kind !== ExchangeBundleSubjectKinds.systemAsset) {
+      throw new Error("System import requires a system bundle root.");
+    }
+
+    const rootNodeId = `${input.manifest.subject.assetId}@${input.manifest.subject.versionId}`;
+    const componentMap = new Map<string, SystemAsset["components"][number]>();
+    const nestedMap = new Map<string, SystemAsset["nestedSystems"][number]>();
+    const rootNode = input.manifest.nodes.find((entry) => entry.nodeId === rootNodeId);
+    const executionMetadata = rootNode?.configurationHints?.executionMetadata as SystemAsset["executionMetadata"] | undefined;
+
+    for (const edge of input.manifest.edges) {
+      if (edge.fromNodeId !== rootNodeId) {
+        continue;
+      }
+
+      const childNode = input.manifest.nodes.find((node) => node.nodeId === edge.toNodeId);
+      if (!childNode) {
+        continue;
+      }
+
+      if (edge.edgeKind === "component") {
+        const componentKind: SystemAsset["components"][number]["componentKind"] = childNode.kind === "system"
+          ? "system"
+          : childNode.kind;
+        const component = Object.freeze({
+          componentKind,
+          alias: edge.alias,
+          assetId: childNode.assetId,
+          versionId: childNode.versionId,
+          taxonomy: childNode.taxonomy,
+        });
+        componentMap.set(`${component.componentKind}:${component.assetId}:${component.versionId}:${component.alias ?? ""}`, component);
+      } else if (edge.edgeKind === "nested-system") {
+        const nested = Object.freeze({
+          alias: edge.alias,
+          assetId: childNode.assetId,
+          versionId: childNode.versionId,
+        });
+        nestedMap.set(`${nested.assetId}:${nested.versionId}:${nested.alias ?? ""}`, nested);
+      }
+    }
+
+    return Object.freeze({
+      assetId: input.manifest.subject.assetId,
+      versionId: input.manifest.subject.versionId,
+      bundleId: input.bundle.bundleId.value,
+      sourceBundleId: input.bundle.provenance?.sourceBundleId,
+      sourceVersionLineage: Object.freeze([...(input.bundle.provenance?.sourceVersionLineage ?? [])]),
+      nodeCount: input.manifest.nodes.length,
+      compositionCount: input.manifest.composition.length,
+      components: Object.freeze([...componentMap.values()]),
+      nestedSystems: Object.freeze([...nestedMap.values()]),
+      executionMetadata,
+    });
+  }
+}
+
 export class AtomicAssetImportService {
   private readonly deserializer: ExchangeBundleDeserializer;
   private readonly resolver: AtomicAssetBundleImportResolver;
@@ -1033,6 +1233,325 @@ export class AtomicAssetImportService {
         subjectKind: "atomic-asset",
         code: "invalid-request",
         message: error instanceof Error ? error.message : "Atomic import request is invalid.",
+      };
+    }
+  }
+}
+
+export class CompositeAssetImportService {
+  private readonly deserializer: ExchangeBundleDeserializer;
+  private readonly resolver: CompositeAssetBundleImportResolver;
+
+  public constructor(
+    private readonly assetRepository: IAssetRecordRepository,
+    private readonly versionRepository: IAssetVersionRepository,
+    deserializer: ExchangeBundleDeserializer = new ExchangeBundleDeserializer({ validator: new ExchangeBundleValidator() }),
+    resolver: CompositeAssetBundleImportResolver = new CompositeAssetBundleImportResolver(),
+    private readonly clock: () => Date = () => new Date(),
+  ) {
+    this.deserializer = deserializer;
+    this.resolver = resolver;
+  }
+
+  public async import(request: CompositeAssetImportRequest): Promise<CompositeAssetImportResult> {
+    try {
+      const content = normalizeRequired(request.artifactContent, "Composite import artifact content");
+      const deserialized = this.deserializer.deserialize({ content });
+      if (!deserialized.ok) {
+        if (deserialized.formatVersionSupport
+          && deserialized.formatVersionSupport.compatibility !== ExchangeFormatCompatibilities.compatible) {
+          return {
+            ok: false,
+            subjectKind: "composite-asset",
+            code: "unsupported-format-version",
+            message: deserialized.formatVersionSupport.reason ?? "Composite import format version is not supported.",
+            details: { compatibility: deserialized.formatVersionSupport.compatibility, version: deserialized.formatVersionSupport.version.value },
+          };
+        }
+        if (deserialized.validation) {
+          return {
+            ok: false,
+            subjectKind: "composite-asset",
+            code: "validation-failed",
+            message: "Composite import bundle failed validation.",
+            details: { issues: deserialized.validation.issues },
+          };
+        }
+        return {
+          ok: false,
+          subjectKind: "composite-asset",
+          code: "deserialization-failed",
+          message: deserialized.parseFailure?.message ?? "Composite import artifact could not be deserialized.",
+          details: deserialized.parseFailure ? { parseFailure: deserialized.parseFailure } : undefined,
+        };
+      }
+
+      const { bundle, manifest } = deserialized.deserialized;
+      if (manifest.manifestVersion !== "ai-loom.asset-package-manifest.v1" || manifest.type !== "composite") {
+        return {
+          ok: false,
+          subjectKind: "composite-asset",
+          code: "unsupported-subject-kind",
+          message: "Composite import only supports composite asset package manifests.",
+        };
+      }
+
+      const resolved = this.resolver.resolve({ bundle, manifest });
+      const existingAsset = await this.assetRepository.getById(resolved.assetId);
+      const existingVersion = await this.versionRepository.getByVersionId(resolved.versionId);
+      if (existingVersion && existingVersion.assetId.value !== resolved.assetId) {
+        return {
+          ok: false,
+          subjectKind: "composite-asset",
+          code: "conflict",
+          message: `Imported version '${resolved.versionId}' belongs to a different asset id.`,
+        };
+      }
+
+      if (!existingAsset) {
+        await this.assetRepository.save(new Asset({
+          id: resolved.assetId,
+          name: manifest.metadata.packageLabel ?? resolved.assetId,
+          kind: inferCompositeAssetKind(manifest),
+          status: "available",
+          source: new AssetSourceInfo({ type: "imported", provider: "exchange-bundle" }),
+          location: new AssetLocation({
+            accessMethod: "virtual",
+            location: `exchange://${bundle.bundleId.value}/${resolved.assetId}/${resolved.versionId}`,
+            contentType: "application/vnd.ai-loom.exchange-bundle+json",
+            format: "json",
+          }),
+          technicalMetadata: new AssetTechnicalMetadata({}),
+          semanticMetadata: new AssetSemanticMetadata({
+            description: manifest.metadata.packageLabel,
+            tags: manifest.metadata.tags,
+          }),
+          audit: new AssetAuditInfo({ createdAt: this.clock(), updatedAt: this.clock() }),
+        }));
+      }
+
+      if (!existingVersion) {
+        const upstreamVersionIds = [...new Set([
+          ...manifest.dependencies.map((entry) => entry.versionId).filter((value): value is string => Boolean(value?.trim())),
+          ...manifest.composition.map((entry) => entry.versionId).filter((value): value is string => Boolean(value?.trim())),
+          ...resolved.sourceVersionLineage,
+        ])].filter((entry) => entry !== resolved.versionId);
+
+        await this.versionRepository.saveVersion(new CanonicalAssetVersion({
+          assetId: resolved.assetId,
+          versionId: resolved.versionId,
+          createdAt: new Date(manifest.metadata.createdAt),
+          upstreamVersionIds,
+          metadata: {
+            metadata: {
+              title: manifest.metadata.packageLabel,
+              tags: manifest.metadata.tags,
+              taxonomy: manifest.subject.taxonomy,
+              contract: manifest.contract,
+              provenance: {
+                sourceType: "imported",
+                sourceLabel: "exchange-bundle",
+                upstreamAssets: resolved.sourceVersionLineage.map((versionId) => ({ versionId })),
+              },
+            },
+            composition: resolved.composition,
+            dependencies: manifest.dependencies,
+            exchangeImport: {
+              bundleId: resolved.bundleId,
+              sourceBundleId: resolved.sourceBundleId,
+              importedAt: this.clock().toISOString(),
+              dependencySnapshotVersion: deserialized.deserialized.dependencySnapshot.snapshotVersion,
+            },
+          },
+        }));
+      }
+
+      return {
+        ok: true,
+        subjectKind: "composite-asset",
+        imported: Object.freeze({
+          assetId: resolved.assetId,
+          versionId: resolved.versionId,
+          bundleId: resolved.bundleId,
+          sourceBundleId: resolved.sourceBundleId,
+          sourceVersionLineage: resolved.sourceVersionLineage,
+          compositionCount: manifest.composition.length,
+          dependencyCount: manifest.dependencies.length,
+          importedAt: this.clock().toISOString(),
+          existingAsset: Boolean(existingAsset),
+          existingVersion: Boolean(existingVersion),
+        }),
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        subjectKind: "composite-asset",
+        code: "invalid-request",
+        message: error instanceof Error ? error.message : "Composite import request is invalid.",
+      };
+    }
+  }
+}
+
+export class SystemAssetImportService {
+  private readonly deserializer: ExchangeBundleDeserializer;
+  private readonly resolver: SystemAssetBundleImportResolver;
+
+  public constructor(
+    private readonly assetRepository: IAssetRecordRepository,
+    private readonly versionRepository: IAssetVersionRepository,
+    deserializer: ExchangeBundleDeserializer = new ExchangeBundleDeserializer({ validator: new ExchangeBundleValidator() }),
+    resolver: SystemAssetBundleImportResolver = new SystemAssetBundleImportResolver(),
+    private readonly clock: () => Date = () => new Date(),
+  ) {
+    this.deserializer = deserializer;
+    this.resolver = resolver;
+  }
+
+  public async import(request: SystemAssetImportRequest): Promise<SystemAssetImportResult> {
+    try {
+      const content = normalizeRequired(request.artifactContent, "System import artifact content");
+      const deserialized = this.deserializer.deserialize({ content });
+      if (!deserialized.ok) {
+        if (deserialized.formatVersionSupport
+          && deserialized.formatVersionSupport.compatibility !== ExchangeFormatCompatibilities.compatible) {
+          return {
+            ok: false,
+            subjectKind: "system-asset",
+            code: "unsupported-format-version",
+            message: deserialized.formatVersionSupport.reason ?? "System import format version is not supported.",
+            details: { compatibility: deserialized.formatVersionSupport.compatibility, version: deserialized.formatVersionSupport.version.value },
+          };
+        }
+        if (deserialized.validation) {
+          return {
+            ok: false,
+            subjectKind: "system-asset",
+            code: "validation-failed",
+            message: "System import bundle failed validation.",
+            details: { issues: deserialized.validation.issues },
+          };
+        }
+        return {
+          ok: false,
+          subjectKind: "system-asset",
+          code: "deserialization-failed",
+          message: deserialized.parseFailure?.message ?? "System import artifact could not be deserialized.",
+          details: deserialized.parseFailure ? { parseFailure: deserialized.parseFailure } : undefined,
+        };
+      }
+
+      const { bundle, manifest } = deserialized.deserialized;
+      if (manifest.manifestVersion !== "ai-loom.system-package-manifest.v1") {
+        return {
+          ok: false,
+          subjectKind: "system-asset",
+          code: "unsupported-subject-kind",
+          message: "System import only supports system package manifests.",
+        };
+      }
+
+      const resolved = this.resolver.resolve({ bundle, manifest });
+      const existingAsset = await this.assetRepository.getById(resolved.assetId);
+      const existingVersion = await this.versionRepository.getByVersionId(resolved.versionId);
+      if (existingVersion && existingVersion.assetId.value !== resolved.assetId) {
+        return {
+          ok: false,
+          subjectKind: "system-asset",
+          code: "conflict",
+          message: `Imported version '${resolved.versionId}' belongs to a different asset id.`,
+        };
+      }
+
+      if (!existingAsset) {
+        await this.assetRepository.save(new Asset({
+          id: resolved.assetId,
+          name: manifest.metadata.packageLabel ?? resolved.assetId,
+          kind: inferSystemAssetKind(),
+          status: "available",
+          source: new AssetSourceInfo({ type: "imported", provider: "exchange-bundle" }),
+          location: new AssetLocation({
+            accessMethod: "virtual",
+            location: `exchange://${bundle.bundleId.value}/${resolved.assetId}/${resolved.versionId}`,
+            contentType: "application/vnd.ai-loom.exchange-bundle+json",
+            format: "json",
+          }),
+          technicalMetadata: new AssetTechnicalMetadata({}),
+          semanticMetadata: new AssetSemanticMetadata({
+            description: manifest.metadata.packageLabel,
+            tags: manifest.metadata.tags,
+          }),
+          audit: new AssetAuditInfo({ createdAt: this.clock(), updatedAt: this.clock() }),
+        }));
+      }
+
+      if (!existingVersion) {
+        const upstreamVersionIds = [...new Set([
+          ...manifest.composition.map((entry) => entry.childVersionId),
+          ...manifest.composition.map((entry) => entry.parentVersionId),
+          ...resolved.sourceVersionLineage,
+        ])].filter((entry) => entry && entry !== resolved.versionId);
+
+        await this.versionRepository.saveVersion(new CanonicalAssetVersion({
+          assetId: resolved.assetId,
+          versionId: resolved.versionId,
+          createdAt: new Date(manifest.metadata.createdAt),
+          upstreamVersionIds,
+          metadata: {
+            metadata: {
+              title: manifest.metadata.packageLabel,
+              tags: manifest.metadata.tags,
+              taxonomy: manifest.subject.taxonomy,
+              provenance: {
+                sourceType: "imported",
+                sourceLabel: "exchange-bundle",
+                upstreamAssets: resolved.sourceVersionLineage.map((versionId) => ({ versionId })),
+              },
+            },
+            dependencies: manifest.composition.map((entry) => ({
+              assetId: entry.childAssetId,
+              versionId: entry.childVersionId,
+              relation: entry.edgeKind === "nested-system" ? "component" : "dependency",
+            })),
+            content: JSON.stringify({
+              systemSpec: {
+                components: resolved.components,
+                nestedSystems: resolved.nestedSystems,
+                executionMetadata: resolved.executionMetadata,
+              },
+            }),
+            exchangeImport: {
+              bundleId: resolved.bundleId,
+              sourceBundleId: resolved.sourceBundleId,
+              importedAt: this.clock().toISOString(),
+              dependencySnapshotVersion: deserialized.deserialized.dependencySnapshot.snapshotVersion,
+            },
+          },
+        }));
+      }
+
+      return {
+        ok: true,
+        subjectKind: "system-asset",
+        imported: Object.freeze({
+          assetId: resolved.assetId,
+          versionId: resolved.versionId,
+          bundleId: resolved.bundleId,
+          sourceBundleId: resolved.sourceBundleId,
+          sourceVersionLineage: resolved.sourceVersionLineage,
+          nodeCount: resolved.nodeCount,
+          compositionCount: resolved.compositionCount,
+          importedAt: this.clock().toISOString(),
+          existingAsset: Boolean(existingAsset),
+          existingVersion: Boolean(existingVersion),
+        }),
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        subjectKind: "system-asset",
+        code: "invalid-request",
+        message: error instanceof Error ? error.message : "System import request is invalid.",
       };
     }
   }
