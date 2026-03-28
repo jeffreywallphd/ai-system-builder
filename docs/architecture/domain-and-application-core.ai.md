@@ -202,6 +202,16 @@ The studio shell now has a bounded inner-layer model and application orchestrati
 - System publish flow now enforces recursive system consistency through existing shared seams (`evaluate/assertSystemStudioDraftPublishConsistency`) including nested system resolution, child contract resolution, recursive contract projection, and recursion safety checks.
 - System Studio UI integration remains on the shared `StudioShellPage` registration/route architecture (`/studio-shell/system`) with backend-authoritative draft/session/validation/publish behavior.
 
+## Direction 5 update: External runtime bounded safeguards alignment (stories 7.23–7.24)
+
+- External runtime safeguards stay in existing application/infrastructure seams (`SystemRuntimeBackendApi`, `ExecutionUpdateStream`, quota/rate-limit/access/tenant services) instead of introducing a second execution platform.
+- Hot-path protections are explicitly bounded and testable: short-lived caller/tenant-scoped poll/status caching, bounded callback registrations per session, bounded streaming subscription/fan-out controls, bounded async in-flight tracking, and bounded emit cadence on execution updates.
+- These guards are additive and preserve current correctness constraints (auth/access/tenant/version-aware semantics remain required before returning cached/projection reads).
+- Architecture docs now explicitly separate:
+  - implemented external runtime surface (stories 7.1–7.23),
+  - bounded behavior/limits (in-process, non-distributed),
+  - future work (distributed backpressure/observability platforms not in this scope).
+
 ## Direction 5 update: Composite dependency semantics + behavior enforcement (stories 3.15–3.16)
 
 - Shared studio-shell dependency validation now performs version-aware identity checks for pinned dependencies (`assetId` must match the resolved `versionId` owner when resolvable through repository/version seams).
@@ -701,3 +711,131 @@ Explicitly later than this scope:
   - bounded iteration/planning-cycle markers
   - last progression decision/error summaries.
 - Execution-state tracking remains runtime-scoped and in-memory/domain-application scoped for now (no parallel asset persistence model, no UI monitoring/logging subsystem in this slice).
+
+## Direction 5 update: Deployment provisioning + execution foundation (stories 8.5–8.6)
+
+- Deployment now includes a bounded environment provisioning seam in deployment layers (`domain/deployment/EnvironmentProvisioningDomain.ts`, `application/deployment/EnvironmentProvisioningCompatibilityValidator.ts`, `application/deployment/EnvironmentProvisioningService.ts`).
+- Provisioning remains deterministic and provider-agnostic:
+  - it accepts built deployment bundles + validated deployment configuration + selected abstract target category (`local`/`cloud`/`edge`),
+  - emits a structured provisioning plan and a provisioned-environment reference,
+  - validates compatibility explicitly before producing a ready environment.
+- Deployment execution now has a bounded application service (`application/deployment/DeploymentExecutionService.ts`) and explicit deployment contracts (`domain/deployment/DeploymentExecutionDomain.ts`):
+  - execution requires bundle/config/target + provisioned-environment linkage,
+  - emits structured deployment result/status + version-pinned traceable deployment record,
+  - persists records through a minimal bounded in-memory repository seam for later state/log/version stories.
+- Boundaries remain explicit in this slice:
+  - no provider-specific provisioning/deployment adapters,
+  - no health monitoring, rollback, autoscaling, or endpoint exposure,
+  - no merging with runtime execution orchestration.
+
+## Direction 5 update: Deployment state tracking + diagnostics (stories 8.7–8.8)
+
+- Deployment now has explicit lifecycle state contracts in `domain/deployment/DeploymentStateDomain.ts` (`requested`, provisioning progress/completion, deployment-in-progress, `active`, `failed`, `inactive`) with bounded transition validation.
+- `application/deployment/DeploymentExecutionService.ts` now orchestrates provisioning + execution through `executeLifecycle`, persists state snapshots/transitions on deployment records, and exposes query seams (`listDeploymentsByState`, `getDeploymentStateSnapshot`, `listStateTransitions`).
+- Deployment diagnostics are now explicit and separate from runtime execution trace/audit semantics via `domain/deployment/DeploymentDiagnosticsDomain.ts` + `application/deployment/DeploymentDiagnosticsService.ts`:
+  - authoritative provisioning/deployment/state-transition points emit bounded deployment log entries,
+  - failure paths emit structured deployment diagnostic records linked to deployment identity and version-pinned linkage metadata.
+- Boundaries remain explicit in this slice:
+  - deployment state/diagnostics are not merged into system runtime execution-state or trace/log models,
+  - no rollback/health/endpoint/autoscaling behavior is added yet,
+  - storage remains intentionally bounded (in-memory repositories) while preserving durable-in-process queryability for later API/UI stories.
+
+## Direction 5 update: Deployment version management + rollback (stories 8.9–8.10)
+
+- Deployment activation is now an explicit management concern separated from deployment lifecycle state:
+  - deployment records track activation state (`active`/`inactive`/`superseded`) and activation history events with action-kind metadata.
+  - successful deployments are not implicitly active; activation is explicitly selected by management actions.
+- Versioned deployment management now has a bounded application service (`application/deployment/DeploymentVersionManager.ts`) that:
+  - lists deployment history by system/version/target scope,
+  - exposes active deployment lookup for a bounded target context,
+  - applies explicit active selection while superseding prior active records in-scope.
+- Rollback is now an explicit bounded deployment-management action via `application/deployment/DeploymentRollbackService.ts` with contracts in `domain/deployment/DeploymentRollbackDomain.ts`:
+  - rollback eligibility is explicit and structured (`isRollbackEligible`),
+  - rollback actions record request/decision/outcome separately from ordinary deployment actions,
+  - rollback re-activation preserves deployment-version traceability (asset version, bundle, config, target, deployment identity).
+- Scope remains intentionally bounded:
+  - no health-triggered automatic rollback,
+  - no endpoint-routing/traffic-shifting orchestration,
+  - no merge with runtime retry/recovery semantics.
+
+## Direction 5 update: Deployment access control + quotas (stories 8.11–8.12)
+
+- Deployment governance now reuses Epic 7 caller-context patterns (authenticated caller kind/id, roles, session, tenant context) through bounded deployment services rather than introducing a second auth universe.
+- `application/deployment/DeploymentAccessControl.ts` introduces explicit deployment access contracts:
+  - `DeploymentAccessContext`, `DeploymentAccessPolicy`, `DeploymentAccessEvaluator`, and structured `DeploymentAccessDecision`.
+  - bounded role-based policy defaults for deploy, activation, rollback, and deployment history/detail reads.
+  - structured denial errors (`DeploymentAccessDeniedError`) that preserve caller/tenant/system/target linkage metadata.
+- Authoritative deployment entry seams now enforce access checks before mutation:
+  - deployment execution entry (`DeploymentExecutionService.execute`/`executeLifecycle`),
+  - deployment activation/version management (`DeploymentVersionManager.setActiveDeployment`),
+  - rollback execution (`DeploymentRollbackService.rollback`),
+  - deployment-history/detail reads where exposed (`DeploymentVersionManager`, rollback action listing).
+- Deployment quotas remain distinct from access control through `application/deployment/DeploymentQuotaEvaluator.ts`:
+  - explicit `DeploymentQuotaPolicy`, `DeploymentQuotaDecision`, and structured `DeploymentQuotaExceededError`,
+  - bounded windowed limits for deployments per caller, deployments per target scope, activation-change frequency, and rollback frequency.
+- Quota evaluation is centralized at the same authoritative deployment boundaries (execution/activation/rollback) and is tenant-aware in scoped key derivation.
+- Scope remains intentionally bounded:
+  - no billing/subscription framework,
+  - no distributed/global quota coordination,
+  - no merging deployment quotas into runtime execution quotas/rate limits.
+
+## Direction 5 update: Deployment environment isolation + system endpoint exposure (stories 8.13–8.14)
+
+- Deployment records now include explicit environment isolation scope (`domain/deployment/DeploymentIsolationDomain.ts`) with durable linkage across deployment identity, source system/bundle version, deployment target/environment, tenant context, and bounded runtime binding key.
+- Deployment isolation enforcement is centralized through `application/deployment/DeploymentIsolationEvaluator.ts` and applied at authoritative seams:
+  - deployment state/log/diagnostic reads,
+  - deployment history + active deployment lookup/selection paths,
+  - rollback candidate selection.
+- Isolation remains deployment-specific (not a duplicate of runtime request isolation) and extends Epic 7 tenant/caller propagation semantics into deployment-management boundaries.
+- System endpoint exposure is now a first-class deployment output via `domain/deployment/SystemEndpointExposureDomain.ts` and `application/deployment/SystemEndpointExposureService.ts`:
+  - stable endpoint identity maps to the active deployment for a bounded system/target/tenant scope,
+  - endpoint records preserve deployment linkage (deployment id, system version, bundle/build key, config id, environment),
+  - endpoint resolution reuses deployment isolation checks.
+- Scope remains intentionally bounded:
+  - endpoint exposure in this slice only binds stable endpoint identity to active deployment linkage,
+  - endpoint routing and health monitoring are introduced by later stories (8.15–8.16),
+  - no alternate invocation architecture outside existing runtime external invocation seams.
+
+## Direction 5 update: Bounded autoscaling interface + deployment audit trail (stories 8.17–8.18)
+
+- Deployment autoscaling is now an explicit bounded deployment-management seam (not provider infrastructure):
+  - domain contracts in `domain/deployment/DeploymentAutoscalingDomain.ts` (`DeploymentScalingPolicy`, `DeploymentScalingConfiguration`, `DeploymentScaleStatus`, `ScaleDecision`, `ScaleActionRequest`),
+  - application orchestration in `application/deployment/DeploymentAutoscalingService.ts` exposing a typed `AutoscalingInterface`.
+- Autoscaling remains deployment-linked and provider-agnostic:
+  - only active deployments are eligible for scaling configuration and scale-action requests,
+  - scaling records preserve linkage across deployment id, system asset/version, bundle/build key, deployment configuration, target/environment, tenant boundary, and nested-system counts,
+  - bounded policy inputs (utilization/health metadata) can drive explicit `ScaleDecision` outputs without introducing automatic scaling loops or provider adapters.
+- Deployment governance now includes a deployment-specific audit trail separate from runtime execution audit and deployment diagnostics:
+  - domain audit contracts in `domain/deployment/DeploymentAuditTrailDomain.ts`,
+  - queryable persistence seam in `application/deployment/DeploymentAuditTrailService.ts`,
+  - authoritative deployment boundaries now emit deployment audit records:
+    - deployment lifecycle request/outcomes (`DeploymentExecutionService`),
+    - activation changes (`DeploymentVersionManager`),
+    - rollback request/outcomes (`DeploymentRollbackService`),
+    - autoscaling configuration/action management events (`DeploymentAutoscalingService`).
+- Scope remains intentionally bounded:
+  - no provider-specific autoscaling infrastructure integration,
+  - no health-remediation/autoscaling control loop,
+  - no merging deployment audit records into runtime invocation audit or deployment diagnostics streams.
+
+## Direction 5 update: Deployment endpoint/runtime interop + bounded safeguards alignment (stories 8.19–8.24)
+
+- Deployment public surfaces are now explicitly implemented and tested:
+  - deployment SDK/public contract + reference client (`infrastructure/api/deployment/sdk/PublicDeploymentSdkContract.ts`, `DeploymentClient.ts`),
+  - deployment backend API transport mapping (`infrastructure/api/deployment/DeploymentBackendApi.ts`),
+  - deployment end-to-end + interop coverage (`infrastructure/api/deployment/tests/DeploymentLifecycleE2E.test.ts`, `DeploymentInteropE2E.test.ts`, `DeploymentClientSdk.test.ts`).
+- Endpoint routing and deployment health are now first-class implemented seams (stories 8.15–8.16), layered on top of exposure/version/activation truth:
+  - `application/deployment/EndpointRoutingService.ts` resolves exposed endpoint -> active deployment -> runtime invoker path,
+  - `application/deployment/DeploymentHealthMonitor.ts` evaluates deployment health from deployment state + diagnostics + endpoint resolvability signals.
+- Story 8.23 adds bounded performance safeguards without introducing a second deployment platform:
+  - deterministic build bundle reuse for repeated build requests (`DeploymentBuildPipeline` bounded cache),
+  - bounded deployment diagnostics/log polling (`DeploymentDiagnosticsService` query limits),
+  - short-lived bounded history/active-deployment lookup caching on deployment version management read paths (`DeploymentVersionManager`),
+  - bounded deployment SDK/public read shaping + short-lived read response caching for status/history/active/health API calls (`DeploymentBackendApi`),
+  - bounded endpoint resolvability work in health evaluation (`DeploymentHealthMonitor` endpoint-resolution cap with explicit truncation reason).
+- These safeguards are intentionally additive and correctness-preserving:
+  - access control, quota checks, tenant/environment isolation, activation/rollback semantics, and deployment audit boundaries remain authoritative,
+  - no distributed caches/queues/control-planes were introduced; safeguards remain in-process and bounded.
+- Current boundaries (implemented vs future):
+  - implemented now: packaging -> target/config validation -> build/bundle -> provisioning/execution -> state/diagnostics -> versioning/rollback -> access/quota/isolation -> endpoint exposure/routing -> health -> autoscaling interface -> deployment audit trail -> SDK/public API + e2e/interop tests + bounded read-path safeguards.
+  - future work: provider-specific deployment infrastructure, distributed deployment orchestration/backpressure/observability platforms, and autonomous autoscaling/remediation loops.

@@ -14,8 +14,10 @@ import { SqliteStudioShellRepository } from "../../../filesystem/studio-shell/Sq
 import { SqliteSystemRuntimeExecutionStore } from "../../../filesystem/system-runtime/SqliteSystemRuntimeExecutionStore";
 import type { ExecutionCallbackDispatcher, ExecutionCallbackPayload } from "../ExecutionCallbackDispatcher";
 import { ExecutionUpdateEventKinds } from "../ExecutionUpdateStream";
+import { StaticTokenRuntimeApiAuthenticator } from "../RuntimeApiAuthentication";
 import { InMemoryExecutionAuditRepository } from "../../../../application/system-runtime/ExecutionAuditRepository";
 import { ExecutionAuditEventKinds } from "../../../../domain/system-runtime/ExecutionAuditTrailDomain";
+import { RuntimeRateLimitEvaluator } from "../../../../application/system-runtime/RuntimeRateLimitEvaluator";
 
 class RecordingCallbackDispatcher implements ExecutionCallbackDispatcher {
   public readonly deliveries: Array<{ payload: ExecutionCallbackPayload; targetUrl: string }> = [];
@@ -921,4 +923,209 @@ describe("SystemRuntimeBackendApi", () => {
     expect(completed?.execution.versionId).toBe("system:audit-root:v1");
     expect((completed?.execution.childExecutionIds?.length ?? 0) > 0).toBeTrue();
   });
+
+  it("retries callback deliveries up to bounded attempts and records retry audit entries", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    await repository.saveAssetVersion(new AssetVersion({
+      assetId: "system:callback-retry",
+      versionId: "system:callback-retry:v1",
+      metadata: {
+        metadata: {
+          taxonomy: createSystemStudioTaxonomy("system", "deterministic"),
+        },
+        content: JSON.stringify({
+          systemSpec: {
+            components: [],
+            inputs: [{ inputId: "request", valueType: "string", required: false }],
+            outputs: [{ outputId: "response", valueType: "string" }],
+          },
+        }),
+        dependencies: [],
+      },
+    }));
+    const dispatcher = new RecordingCallbackDispatcher(true);
+    const auditRepository = new InMemoryExecutionAuditRepository();
+    const runtimeApi = new SystemRuntimeBackendApi(
+      repository,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      dispatcher,
+      auditRepository,
+    );
+
+    const started = await runtimeApi.startExecution({
+      systemId: "system:callback-retry",
+      versionId: "system:callback-retry:v1",
+      callback: {
+        targetUrl: "https://example.invalid/callback",
+        eventKinds: ["execution-completed"],
+        maxAttempts: 3,
+      },
+      requestContext: { trustedInternal: true },
+    });
+
+    expect(started.ok).toBeTrue();
+    expect(dispatcher.deliveries.length).toBe(3);
+
+    const auditTrail = await runtimeApi.getExecutionAuditTrail({
+      executionId: started.data!.executionId,
+      requestContext: { trustedInternal: true },
+    });
+    expect(auditTrail.ok).toBeTrue();
+    expect(auditTrail.data?.some((entry) => entry.eventKind === ExecutionAuditEventKinds.retryAttempted)).toBeTrue();
+    expect(auditTrail.data?.some((entry) => entry.eventKind === ExecutionAuditEventKinds.retryExhausted)).toBeTrue();
+  });
+
+  it("applies external rate limiting separately from execution quotas", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    await repository.saveAssetVersion(new AssetVersion({
+      assetId: "system:rate-limit",
+      versionId: "system:rate-limit:v1",
+      metadata: {
+        metadata: {
+          taxonomy: createSystemStudioTaxonomy("system", "deterministic"),
+        },
+        content: JSON.stringify({
+          systemSpec: {
+            components: [],
+            inputs: [{ inputId: "request", valueType: "string", required: false }],
+            outputs: [{ outputId: "response", valueType: "string" }],
+          },
+        }),
+        dependencies: [],
+      },
+    }));
+    const runtimeApi = new SystemRuntimeBackendApi(
+      repository,
+      undefined,
+      undefined,
+      new StaticTokenRuntimeApiAuthenticator({
+        "token-user-1": { callerKind: "user", callerId: "user-1" },
+      }),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      new RuntimeRateLimitEvaluator({
+        maxRequestsPerCallerPerWindow: 1,
+        maxRequestsPerTenantPerWindow: 10,
+        maxRequestsPerSourceOperationPerWindow: 10,
+        windowMs: 60_000,
+      }),
+    );
+
+    const first = await runtimeApi.startExecution({
+      systemId: "system:rate-limit",
+      versionId: "system:rate-limit:v1",
+      requestContext: {
+        authentication: { bearerToken: "token-user-1" },
+        requireAuthentication: true,
+        requestSource: "external-api",
+      },
+    });
+    expect(first.ok).toBeTrue();
+
+    const second = await runtimeApi.startExecution({
+      systemId: "system:rate-limit",
+      versionId: "system:rate-limit:v1",
+      requestContext: {
+        authentication: { bearerToken: "token-user-1" },
+        requireAuthentication: true,
+        requestSource: "external-api",
+      },
+    });
+    expect(second.ok).toBeFalse();
+    expect(second.error?.code).toBe("rate-limit-exceeded");
+  });
+
+  it("serves burst external polling from a short-lived cache to avoid runaway hot-path amplification", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    await repository.saveAssetVersion(new AssetVersion({
+      assetId: "system:poll-cache",
+      versionId: "system:poll-cache:v1",
+      metadata: {
+        metadata: {
+          taxonomy: createSystemStudioTaxonomy("system", "deterministic"),
+        },
+        content: JSON.stringify({
+          systemSpec: {
+            components: [],
+            inputs: [{ inputId: "request", valueType: "string", required: false }],
+            outputs: [{ outputId: "response", valueType: "string" }],
+          },
+        }),
+        dependencies: [],
+      },
+    }));
+    const runtimeApi = new SystemRuntimeBackendApi(
+      repository,
+      undefined,
+      undefined,
+      new StaticTokenRuntimeApiAuthenticator({
+        "token-poller": { callerKind: "user", callerId: "poller-1", metadata: { tenantId: "tenant-a" } },
+      }),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      new RuntimeRateLimitEvaluator({
+        maxRequestsPerCallerPerWindow: 2,
+        maxRequestsPerTenantPerWindow: 10,
+        maxRequestsPerSourceOperationPerWindow: 10,
+        windowMs: 60_000,
+      }),
+    );
+
+    const started = await runtimeApi.startExecutionAsync({
+      systemId: "system:poll-cache",
+      versionId: "system:poll-cache:v1",
+      requestContext: {
+        authentication: { bearerToken: "token-poller" },
+        requireAuthentication: true,
+        tenantId: "tenant-a",
+        requestSource: "external-api",
+      },
+    });
+    expect(started.ok).toBeTrue();
+
+    const firstPoll = await runtimeApi.pollExecution({
+      executionId: started.data!.executionId,
+      requestContext: {
+        authentication: { bearerToken: "token-poller" },
+        requireAuthentication: true,
+        tenantId: "tenant-a",
+        requestSource: "external-api",
+      },
+    });
+    expect(firstPoll.ok).toBeTrue();
+
+    const secondPoll = await runtimeApi.pollExecution({
+      executionId: started.data!.executionId,
+      requestContext: {
+        authentication: { bearerToken: "token-poller" },
+        requireAuthentication: true,
+        tenantId: "tenant-a",
+        requestSource: "external-api",
+      },
+    });
+    expect(secondPoll.ok).toBeTrue();
+    expect(secondPoll.data?.executionId).toBe(firstPoll.data?.executionId);
+
+    await Bun.sleep(90);
+    const thirdPoll = await runtimeApi.pollExecution({
+      executionId: started.data!.executionId,
+      requestContext: {
+        authentication: { bearerToken: "token-poller" },
+        requireAuthentication: true,
+        tenantId: "tenant-a",
+        requestSource: "external-api",
+      },
+    });
+    expect(thirdPoll.ok).toBeFalse();
+    expect(thirdPoll.error?.code).toBe("rate-limit-exceeded");
+  });
+
 });

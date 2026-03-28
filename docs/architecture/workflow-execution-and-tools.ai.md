@@ -47,6 +47,19 @@ Workflow -> `ExecuteWorkflowUseCase` -> one-unit `ExecutionPlan` -> `UnifiedExec
   - execution audit is now a separate durable trail (requested/accepted/completed/failed) capturing caller, tenant, request source, system/version, and execution/session identity with bounded nested-child attribution,
   - audit trail remains distinct from runtime trace/log streams and asset-version history (no broad compliance analytics subsystem added).
 
+- Direction 5 Epic 7 stories 7.17–7.18 now add bounded external-boundary resilience controls on the same seams:
+  - external start/invocation paths now apply explicit external retry classification (retryable transport/internal failures only) with bounded attempts,
+  - idempotent replay protection at external start boundary reuses execution identity for repeated idempotency-key requests instead of creating duplicate runs,
+  - callback delivery retries are bounded by callback registration max-attempts and audited as retry-attempted/retry-exhausted outcomes,
+  - external entrypoint rate limiting is evaluated centrally at runtime API boundaries (caller/tenant/source-operation windows), remains distinct from execution quotas, and returns structured `rate-limit-exceeded` errors.
+
+- Direction 5 Epic 7 stories 7.23–7.24 now align external-runtime performance safeguards + docs truth on the same seams:
+  - external hot paths keep one runtime stack and remain auth/access/quota/rate-limit/tenant/version aware (no parallel runtime path),
+  - external status/poll read pressure is reduced through short-lived caller/tenant-scoped response caching on backend hot paths (bounded, correctness-preserving, non-distributed),
+  - callback/stream pressure now has explicit bounded guards (max callback registrations per session, max stream subscriptions, max listeners per event, bounded emit cadence),
+  - async external run tracking has explicit in-flight bounds and terminal cleanup to avoid runaway map growth under bursty external traffic,
+  - docs (`.md` + `.ai.md`) now explicitly distinguish implemented vs bounded vs future external-runtime behavior for stories 7.1–7.24.
+
 ## Runtime orchestration update
 - Delegated workflow execution selection can now consult the shared runtime dependency orchestrator before choosing a delegated strategy.
 - When the delegated workflow runtime gate is unavailable, selection falls back to a compatible interpreted strategy instead of pretending delegated execution is still ready.

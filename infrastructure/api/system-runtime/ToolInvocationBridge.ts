@@ -32,6 +32,7 @@ export interface ToolInvocationContext {
 
 export interface ExternalToolInvocationRequest {
   readonly invocationId?: string;
+  readonly idempotencyKey?: string;
   readonly toolName?: string;
   readonly action?: ExternalToolInvocationAction;
   readonly systemId?: string;
@@ -147,6 +148,7 @@ export class ToolInvocationBridge {
       callback: request.callback,
       requestedEnvironment: request.requestedEnvironment,
       tenantId: request.tenantId,
+      idempotencyKey: request.idempotencyKey,
       callerContext: request.invocationContext?.callerContext,
       authentication: request.invocationContext?.authentication,
       requestSource: "external-tool",
@@ -189,6 +191,7 @@ export class ToolInvocationBridge {
       executionId: request.executionId,
       sessionId: request.sessionId,
       tenantId: request.tenantId,
+      idempotencyKey: request.idempotencyKey,
       callerContext: request.invocationContext?.callerContext,
       authentication: request.invocationContext?.authentication,
       requestSource: "external-tool",
@@ -210,6 +213,7 @@ export class ToolInvocationBridge {
       nodeResultLimit: request.nodeResultLimit,
       diagnosticsLimit: request.diagnosticsLimit,
       tenantId: request.tenantId,
+      idempotencyKey: request.idempotencyKey,
       callerContext: request.invocationContext?.callerContext,
       authentication: request.invocationContext?.authentication,
       requestSource: "external-tool",
@@ -256,6 +260,7 @@ export class ToolInvocationBridge {
       eventLimit: request.eventLimit,
       logLimit: request.logLimit,
       tenantId: request.tenantId,
+      idempotencyKey: request.idempotencyKey,
       callerContext: request.invocationContext?.callerContext,
       authentication: request.invocationContext?.authentication,
       requestSource: "external-tool",
