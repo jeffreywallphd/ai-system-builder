@@ -34,6 +34,7 @@ export interface StudioShellExtensionContribution {
 export const StudioRegistrationKinds = Object.freeze({
   atomic: "atomic",
   composite: "composite",
+  system: "system",
 });
 
 export type StudioRegistrationKind = typeof StudioRegistrationKinds[keyof typeof StudioRegistrationKinds];
@@ -56,6 +57,19 @@ type CompositeStudioRole = Extract<
   | "training-recipe"
   | "tool-chain"
 >;
+
+type SystemStudioRole = Extract<
+  TaxonomySemanticRole,
+  | "system"
+  | "app-template"
+>;
+
+export interface SystemStudioCompositionCapabilities {
+  readonly supportsAtomicAssets: boolean;
+  readonly supportsCompositeAssets: boolean;
+  readonly supportsSystemAssets: boolean;
+  readonly supportsNestedSystemAssets: boolean;
+}
 
 export interface StudioDraftDefaults {
   readonly title: string;
@@ -91,7 +105,14 @@ export interface CompositeStudioRegistration extends BaseStudioRegistration {
   readonly allowedBehaviorKinds: ReadonlyArray<Extract<TaxonomyBehaviorKind, "none" | "conditional" | "deterministic" | "iterative">>;
 }
 
-export type StudioRegistration = AtomicStudioRegistration | CompositeStudioRegistration;
+export interface SystemStudioRegistration extends BaseStudioRegistration {
+  readonly kind: "system";
+  readonly role: SystemStudioRole;
+  readonly allowedBehaviorKinds: ReadonlyArray<Extract<TaxonomyBehaviorKind, "conditional" | "deterministic" | "iterative" | "autonomous">>;
+  readonly compositionCapabilities: SystemStudioCompositionCapabilities;
+}
+
+export type StudioRegistration = AtomicStudioRegistration | CompositeStudioRegistration | SystemStudioRegistration;
 
 function assertAtomicRole(role: TaxonomySemanticRole): AtomicStudioRole {
   const allowed = new Set<TaxonomySemanticRole>([
@@ -122,6 +143,17 @@ function assertCompositeRole(role: TaxonomySemanticRole): CompositeStudioRole {
   return role as CompositeStudioRole;
 }
 
+function assertSystemRole(role: TaxonomySemanticRole): SystemStudioRole {
+  const allowed = new Set<TaxonomySemanticRole>([
+    TaxonomySemanticRoles.system,
+    TaxonomySemanticRoles.appTemplate,
+  ]);
+  if (!allowed.has(role)) {
+    throw new Error(`System studio role '${role}' is not supported.`);
+  }
+  return role as SystemStudioRole;
+}
+
 function normalizeRegistration(registration: StudioRegistration): StudioRegistration {
   const studioType = registration.studioType.trim();
   if (!studioType) {
@@ -148,6 +180,29 @@ function normalizeRegistration(registration: StudioRegistration): StudioRegistra
       studioId,
       role: assertAtomicRole(registration.role),
       allowedBehaviorKinds: Object.freeze([...registration.allowedBehaviorKinds]),
+      defaults: Object.freeze({
+        ...registration.defaults,
+        title: registration.defaults.title.trim(),
+        tags: Object.freeze([...registration.defaults.tags]),
+        contentTemplate: registration.defaults.contentTemplate,
+        metadataPatch: registration.defaults.metadataPatch,
+        dependencies: registration.defaults.dependencies,
+      }),
+      extensions: Object.freeze([...(registration.extensions ?? [])]),
+      shell: registration.shell ? Object.freeze({ ...registration.shell }) : undefined,
+    });
+  }
+
+  if (registration.kind === StudioRegistrationKinds.system) {
+    return Object.freeze({
+      ...registration,
+      studioType,
+      studioId,
+      role: assertSystemRole(registration.role),
+      allowedBehaviorKinds: Object.freeze([...registration.allowedBehaviorKinds]),
+      compositionCapabilities: Object.freeze({
+        ...registration.compositionCapabilities,
+      }),
       defaults: Object.freeze({
         ...registration.defaults,
         title: registration.defaults.title.trim(),
@@ -271,6 +326,27 @@ export class AtomicStudioRegistry {
 
   public list(): ReadonlyArray<AtomicStudioRegistration> {
     return Object.freeze(this.inner.listByKind(StudioRegistrationKinds.atomic) as ReadonlyArray<AtomicStudioRegistration>);
+  }
+
+  public listExtensionsBySlot(studioType: string, slot: StudioShellExtensionSlot): ReadonlyArray<StudioShellExtensionContribution> {
+    return this.inner.listExtensionsBySlot(studioType, slot);
+  }
+}
+
+export class SystemStudioRegistry {
+  private readonly inner = new StudioRegistrationRegistry();
+
+  public register(registration: SystemStudioRegistration): void {
+    this.inner.register(registration);
+  }
+
+  public get(studioType: string): SystemStudioRegistration | undefined {
+    const registration = this.inner.get(studioType);
+    return registration?.kind === StudioRegistrationKinds.system ? registration : undefined;
+  }
+
+  public list(): ReadonlyArray<SystemStudioRegistration> {
+    return Object.freeze(this.inner.listByKind(StudioRegistrationKinds.system) as ReadonlyArray<SystemStudioRegistration>);
   }
 
   public listExtensionsBySlot(studioType: string, slot: StudioShellExtensionSlot): ReadonlyArray<StudioShellExtensionContribution> {

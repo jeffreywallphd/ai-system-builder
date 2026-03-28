@@ -43,3 +43,13 @@ export function createCompositeStudioMetadataPatch(input: {
 }): AssetMetadataPatch {
   return createStudioMetadataPatch(input);
 }
+
+export function createSystemStudioMetadataPatch(input: {
+  readonly title: string;
+  readonly tags: ReadonlyArray<string>;
+  readonly summary: string;
+  readonly taxonomy: CompositionTaxonomyDescriptor;
+  readonly sourceLabel: string;
+}): AssetMetadataPatch {
+  return createStudioMetadataPatch(input);
+}

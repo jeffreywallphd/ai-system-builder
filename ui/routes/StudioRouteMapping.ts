@@ -14,6 +14,8 @@ const semanticRoleToStudioRoute: Readonly<Partial<Record<TaxonomySemanticRole, s
   "dataset-pipeline": ROUTE_PATHS.datasetPipelineStudio,
   "training-recipe": ROUTE_PATHS.trainingRecipeStudio,
   "tool-chain": ROUTE_PATHS.toolChainStudio,
+  system: ROUTE_PATHS.systemStudio,
+  "app-template": ROUTE_PATHS.systemStudio,
   agent: ROUTE_PATHS.agentStudio,
 });
 
@@ -31,4 +33,3 @@ export function buildStudioHandoffQuery(asset: Pick<RegistryAsset, "assetId" | "
   params.set("handoff", "registry");
   return params.toString();
 }
-

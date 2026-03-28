@@ -1,5 +1,10 @@
 import { AssetId } from "../assets/AssetId";
-import type { AssetDraftDependencyReference, AssetProvenance } from "../studio-shell/StudioShellDomain";
+import type {
+  AssetDraftDependencyReference,
+  AssetMetadata,
+  AssetProvenance,
+} from "../studio-shell/StudioShellDomain";
+import type { AssetContractDescriptor } from "../contracts/AssetContract";
 import {
   assertAllowedCompositionTaxonomyCombination,
   createCompositionTaxonomyDescriptor,
@@ -310,6 +315,30 @@ export function createSystemStudioTaxonomy(
     structuralKind: TaxonomyStructuralKinds.system,
     semanticRole,
     behaviorKind,
+  });
+}
+
+export function createSystemAssetMetadata(input: {
+  readonly title: string;
+  readonly summary?: string;
+  readonly tags?: ReadonlyArray<string>;
+  readonly creatorId?: string;
+  readonly sourceLabel?: string;
+  readonly semanticRole?: Extract<CompositionTaxonomyDescriptor["semanticRole"], "system" | "app-template">;
+  readonly behaviorKind?: Extract<TaxonomyBehaviorKind, "deterministic" | "conditional" | "iterative" | "autonomous">;
+  readonly contract?: AssetContractDescriptor;
+}): AssetMetadata {
+  return Object.freeze({
+    title: input.title,
+    summary: input.summary,
+    tags: Object.freeze(["system", ...(input.tags ?? [])]),
+    taxonomy: createSystemStudioTaxonomy(input.semanticRole, input.behaviorKind),
+    contract: input.contract,
+    provenance: {
+      creatorId: input.creatorId,
+      sourceType: "generated",
+      sourceLabel: input.sourceLabel ?? SystemStudioIdentity.studioType,
+    },
   });
 }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   AtomicStudioRegistry,
+  SystemStudioRegistry,
   StudioRegistrationRegistry,
   StudioRegistrationKinds,
   StudioShellExtensionRegistry,
@@ -17,6 +18,7 @@ import { contextBundleStudioRegistration } from "../registrations/ContextBundleS
 import { datasetPipelineStudioRegistration } from "../registrations/DatasetPipelineStudioRegistration";
 import { trainingRecipeStudioRegistration } from "../registrations/TrainingRecipeStudioRegistration";
 import { toolChainStudioRegistration } from "../registrations/ToolChainStudioRegistration";
+import { systemStudioRegistration } from "../registrations/SystemStudioRegistration";
 
 describe("StudioShellExtensionRegistry", () => {
   it("registers contributions by slot and sorts by order then id", () => {
@@ -86,6 +88,7 @@ describe("StudioRegistrationRegistry", () => {
     registry.register(datasetPipelineStudioRegistration);
     registry.register(trainingRecipeStudioRegistration);
     registry.register(toolChainStudioRegistration);
+    registry.register(systemStudioRegistration);
 
     expect(registry.get("workflow-studio")?.kind).toBe("composite");
     expect(registry.get("workflow-studio")?.role).toBe("workflow");
@@ -101,9 +104,14 @@ describe("StudioRegistrationRegistry", () => {
       "training-recipe-studio",
       "workflow-studio",
     ]);
+    expect(registry.listByKind(StudioRegistrationKinds.system).map((entry) => entry.studioType)).toEqual([
+      "system-studio",
+    ]);
     for (const entry of registry.listByKind(StudioRegistrationKinds.composite)) {
       expect(entry.defaults.metadataPatch?.contract).toBeDefined();
     }
+    expect(registry.get("system-studio")?.kind).toBe("system");
+    expect(registry.get("system-studio")?.role).toBe("system");
   });
 
   it("rejects unsupported composite roles and duplicate studio types", () => {
@@ -114,6 +122,40 @@ describe("StudioRegistrationRegistry", () => {
       ...workflowStudioRegistration,
       studioType: "bad-composite-role",
       role: "agent",
+    })).toThrow("not supported");
+  });
+});
+
+describe("SystemStudioRegistry", () => {
+  it("registers system studios and preserves explicit system-of-systems composition capabilities", () => {
+    const registry = new SystemStudioRegistry();
+    registry.register(systemStudioRegistration);
+
+    expect(registry.get("system-studio")?.kind).toBe("system");
+    expect(registry.get("system-studio")?.compositionCapabilities.supportsSystemAssets).toBeTrue();
+    expect(registry.get("system-studio")?.compositionCapabilities.supportsNestedSystemAssets).toBeTrue();
+    expect(registry.get("system-studio")?.defaults.metadataPatch?.taxonomy).toEqual({
+      structuralKind: "system",
+      semanticRole: "system",
+      behaviorKind: "deterministic",
+    });
+    expect(registry.get("system-studio")?.defaults.metadataPatch?.contract).toBeDefined();
+    expect(registry.list().map((entry) => entry.studioType)).toEqual(["system-studio"]);
+    expect(registry.listExtensionsBySlot("system-studio", StudioShellExtensionSlots.dependencies).map((entry) => entry.id)).toContain(
+      "system-studio-composition-capabilities",
+    );
+  });
+
+  it("rejects unsupported roles and duplicate system studio types", () => {
+    const registry = new SystemStudioRegistry();
+    registry.register(systemStudioRegistration);
+
+    expect(() => registry.register(systemStudioRegistration)).toThrow("already registered");
+    expect(() => registry.register({
+      ...systemStudioRegistration,
+      studioType: "invalid-system-role",
+      studioId: "studio-invalid-system-role",
+      role: "workflow" as "system",
     })).toThrow("not supported");
   });
 });

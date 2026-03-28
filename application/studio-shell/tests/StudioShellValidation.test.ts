@@ -215,4 +215,34 @@ describe("buildStudioShellValidationIssues", () => {
 
     expect(issues.some((issue) => issue.code === "composite-dependency-semantic-role-disallowed")).toBeTrue();
   });
+
+  it("keeps app-template system drafts on shared validation seams without composite fallback warnings", async () => {
+    const appTemplateTaxonomy = createCompositionTaxonomyDescriptor({
+      structuralKind: TaxonomyStructuralKinds.system,
+      semanticRole: TaxonomySemanticRoles.appTemplate,
+      behaviorKind: TaxonomyBehaviorKinds.conditional,
+    });
+    const appTemplateDraft = createDraftWithTaxonomy(
+      "draft-app-template",
+      appTemplateTaxonomy,
+      [{ assetId: "asset:system-child", versionId: "asset:system-child:v1" }],
+    );
+
+    const issues = await buildStudioShellValidationIssues({
+      draft: appTemplateDraft,
+      knownVersionIds: ["asset:system-child:v1"],
+      versionExists: async () => true,
+      resolveDependencyVersion: async () => Object.freeze({
+        assetId: "asset:system-child",
+        taxonomy: createCompositionTaxonomyDescriptor({
+          structuralKind: TaxonomyStructuralKinds.system,
+          semanticRole: TaxonomySemanticRoles.system,
+          behaviorKind: TaxonomyBehaviorKinds.iterative,
+        }),
+      }),
+    });
+
+    expect(issues.some((issue) => issue.code === "composite-dependency-recommended")).toBeFalse();
+    expect(issues.some((issue) => issue.code === "composite-dependency-semantic-role-disallowed")).toBeFalse();
+  });
 });

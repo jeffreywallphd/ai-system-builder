@@ -5,6 +5,7 @@ import {
   buildNestedSystemReferences,
   collectSystemDirectDependencies,
   createSystemAsset,
+  createSystemAssetMetadata,
   createSystemStudioTaxonomy,
   SystemBindingEndpointScopes,
   SystemComponentKinds,
@@ -395,5 +396,22 @@ describe("SystemAssetDomain", () => {
       semanticRole: "app-template",
       behaviorKind: "conditional",
     });
+  });
+
+  it("builds default system metadata aligned with shared studio lifecycle defaults", () => {
+    const metadata = createSystemAssetMetadata({
+      title: "System Draft",
+      tags: ["system-composition"],
+      semanticRole: "app-template",
+      behaviorKind: "conditional",
+    });
+
+    expect(metadata.tags).toEqual(["system", "system-composition"]);
+    expect(metadata.taxonomy).toEqual({
+      structuralKind: "system",
+      semanticRole: "app-template",
+      behaviorKind: "conditional",
+    });
+    expect(metadata.provenance?.sourceLabel).toBe("system-studio");
   });
 });
