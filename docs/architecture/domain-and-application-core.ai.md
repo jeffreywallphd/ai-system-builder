@@ -711,3 +711,19 @@ Explicitly later than this scope:
   - bounded iteration/planning-cycle markers
   - last progression decision/error summaries.
 - Execution-state tracking remains runtime-scoped and in-memory/domain-application scoped for now (no parallel asset persistence model, no UI monitoring/logging subsystem in this slice).
+
+## Direction 5 update: Deployment provisioning + execution foundation (stories 8.5–8.6)
+
+- Deployment now includes a bounded environment provisioning seam in deployment layers (`domain/deployment/EnvironmentProvisioningDomain.ts`, `application/deployment/EnvironmentProvisioningCompatibilityValidator.ts`, `application/deployment/EnvironmentProvisioningService.ts`).
+- Provisioning remains deterministic and provider-agnostic:
+  - it accepts built deployment bundles + validated deployment configuration + selected abstract target category (`local`/`cloud`/`edge`),
+  - emits a structured provisioning plan and a provisioned-environment reference,
+  - validates compatibility explicitly before producing a ready environment.
+- Deployment execution now has a bounded application service (`application/deployment/DeploymentExecutionService.ts`) and explicit deployment contracts (`domain/deployment/DeploymentExecutionDomain.ts`):
+  - execution requires bundle/config/target + provisioned-environment linkage,
+  - emits structured deployment result/status + version-pinned traceable deployment record,
+  - persists records through a minimal bounded in-memory repository seam for later state/log/version stories.
+- Boundaries remain explicit in this slice:
+  - no provider-specific provisioning/deployment adapters,
+  - no health monitoring, rollback, autoscaling, or endpoint exposure,
+  - no merging with runtime execution orchestration.
