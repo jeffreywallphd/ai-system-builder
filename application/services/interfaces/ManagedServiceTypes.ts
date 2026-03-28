@@ -25,7 +25,9 @@ export const ManagedServiceProvisioningStates = {
   unprovisioned: "unprovisioned",
   provisioning: "provisioning",
   provisioned: "provisioned",
+  provisionedUnlaunchable: "provisioned-unlaunchable",
   provisionFailed: "provision-failed",
+  corrupted: "corrupted",
 } as const;
 
 export const ManagedServiceProvisioningActions = {

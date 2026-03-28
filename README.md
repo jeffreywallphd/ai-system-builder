@@ -53,6 +53,10 @@ The Python runtime provisioning path in development also treats `.venv` as a dis
 - bounded in-place repair is attempted only when safe (`ensurepip --upgrade`), then revalidated; unsafe cases transition directly to rebuild
 - when an environment is unhealthy, the supervisor provisions a fresh staged environment under `.venv.managed/`, validates it, promotes it as active, and marks prior environments invalid/cleanup-pending on a best-effort basis
 - runtime diagnostics keep corrupted/rebuild-needed/rebuild-in-progress truth explicit instead of retrying poisoned environments indefinitely
+- provisioning and launchability are now modeled separately: the supervisor records `provisioned` vs `provisioned-unlaunchable` so “requirements installed” is not treated as “runtime can boot on this host”
+- provisioning now runs an explicit runtime import preflight (`import app.main`) and persists launchability diagnostics so host-incompatible native dependencies (for example CPU-incompatible NumPy wheels) are surfaced as a known root cause instead of generic startup timeouts
+- browser and desktop dev startup now consult supervisor state directly after `ensure-running`; when the runtime is already known failed/unlaunchable, startup reports that cause immediately instead of primarily timing out on `127.0.0.1:8100`
+- model-training native dependency failures are capability-scoped: the core Python API can still boot, while local gradient training truthfully reports unavailable/degraded behavior when NumPy cannot initialize
 
 ## Production desktop mode
 

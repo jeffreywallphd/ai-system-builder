@@ -80,7 +80,15 @@ The product also has a managed runtime story, especially for Python-backed capab
 ### Python runtime
 The UI composition builds a `PythonRuntimeConfig`, runtime client, runtime manager, and service-definition wiring. The desktop host also resolves a desktop Python runtime and starts the service supervisor.
 
-For desktop development provisioning, the supervisor treats the local Python environment as a managed disposable artifact rather than durable state. Provisioning performs explicit venv/pip integrity checks (including pip import/command checks and invalid distribution artifacts such as `~ip*.dist-info`), attempts bounded safe repair (`ensurepip --upgrade`) only when trustworthy, and otherwise builds a fresh staged environment under `.venv.managed/` before promoting it active. Prior broken environments are marked invalid and cleanup is best-effort so Windows lock/delete failures do not trap provisioning in repeated in-place mutation loops. Runtime diagnostics distinguish unprovisioned/provisioning/provision-failed/corrupted/reprovision-needed states so the app does not over-claim runtime health.
+For desktop development provisioning, the supervisor treats the local Python environment as a managed disposable artifact rather than durable state. Provisioning performs explicit venv/pip integrity checks (including pip import/command checks and invalid distribution artifacts such as `~ip*.dist-info`), attempts bounded safe repair (`ensurepip --upgrade`) only when trustworthy, and otherwise builds a fresh staged environment under `.venv.managed/` before promoting it active. Prior broken environments are marked invalid and cleanup is best-effort so Windows lock/delete failures do not trap provisioning in repeated in-place mutation loops.
+
+Provisioning and launchability are now intentionally separate truths:
+- provisioning success means dependency installation/integrity succeeded
+- launchability success means runtime import preflight succeeded on this host (`import app.main`)
+
+The supervisor now persists launchability preflight results in provisioning metadata and can surface `provisioned-unlaunchable` for host/runtime-incompatible dependency builds (for example CPU-incompatible native wheels). Runtime diagnostics now distinguish unprovisioned/provisioning/provision-failed/corrupted/provisioned-unlaunchable/reprovision-needed states so the app does not over-claim runtime health.
+
+Browser and desktop startup flows now also check supervisor service state after `ensure-running`, so known startup-fatal causes are surfaced directly instead of being primarily reported as port-wait timeouts.
 
 ### Runtime dependency orchestration
 The infrastructure bootstrap and UI composition now share a centralized runtime-dependency composition module that builds the core `Python runtime -> MCP runtime` graph and can append other runtime-backed capability registrations such as document conversion, model training, and narrow MCP server-operation execution while still letting each outer-layer composition root inject its own health adapter.

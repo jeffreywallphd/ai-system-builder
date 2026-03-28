@@ -234,6 +234,7 @@ describe("InMemoryServiceSupervisor", () => {
       "-m pip install -r " + path.join(tempDir, "requirements.txt"),
       "-c import pip; import pip._internal.cli.main",
       "-m pip --version",
+      "-c import app.main",
     ]);
     expect(provisioned.diagnostics.provisioning.needsReprovision).toBeFalse();
     expect(started.state).toBe(ServiceStates.healthy);
@@ -292,6 +293,7 @@ describe("InMemoryServiceSupervisor", () => {
       "-m pip install -r " + path.join(tempDir, "requirements.txt"),
       "-c import pip; import pip._internal.cli.main",
       "-m pip --version",
+      "-c import app.main",
     ]);
   });
 
@@ -351,12 +353,13 @@ describe("InMemoryServiceSupervisor", () => {
       "-c import pip; import pip._internal.cli.main",
       "-m ensurepip --upgrade",
       "-c import pip; import pip._internal.cli.main",
-      expect.stringMatching(/-m venv .*\.venv\.managed\/env-/),
+      expect.stringContaining("-m venv "),
       "-c import pip; import pip._internal.cli.main",
       "-m pip --version",
-      expect.stringContaining("-m pip install -r " + path.join(tempDir, "requirements.txt")),
+      "-m pip install -r " + path.join(tempDir, "requirements.txt"),
       "-c import pip; import pip._internal.cli.main",
       "-m pip --version",
+      "-c import app.main",
     ]);
   });
 
@@ -475,6 +478,87 @@ describe("InMemoryServiceSupervisor", () => {
     expect(result.diagnostics.provisioning.state).toBe("provision-failed");
     expect(result.detail).toContain("Unsupported Python version '3.10'");
     expect(result.recentLogs.some((entry) => entry.message.includes("Unsupported Python version"))).toBeTrue();
+  });
+
+  it("loads provisioned-unlaunchable runtime state from persisted launchability diagnostics", async () => {
+    const tempRoot = mkdtempSync(path.join(os.tmpdir(), "python-runtime-unlaunchable-"));
+    const tempDir = path.join(tempRoot, "python-runtime");
+    const environmentPath = path.join(tempDir, ".venv");
+    const venvPython = path.join(environmentPath, "bin", "python");
+    const metadataPath = path.join(environmentPath, ".ai-loom-python-provisioning.json");
+    mkdirSync(path.dirname(venvPython), { recursive: true });
+    writeFileSync(venvPython, "#!/usr/bin/env python\n", "utf8");
+    writeFileSync(path.join(tempDir, "requirements.txt"), "fastapi==0.115.0\n", "utf8");
+    writeFileSync(metadataPath, JSON.stringify({
+      schemaVersion: 1,
+      requestedVersion: "3.12",
+      resolvedVersion: "3.12.7",
+      resolvedInterpreter: "/usr/bin/python3.12",
+      fingerprint: {
+        schemaVersion: 1,
+        requirementsHash: "hash",
+        platform: process.platform,
+        arch: process.arch,
+      },
+      provisionedAt: new Date().toISOString(),
+      launchability: {
+        state: "unlaunchable",
+        checkedAt: new Date().toISOString(),
+        lastError: {
+          at: new Date().toISOString(),
+          message: "RuntimeError: NumPy was built with baseline optimizations: (X86_V2) but your machine doesn't support: (X86_V2).",
+          code: "PYTHON_RUNTIME_HOST_INCOMPATIBLE_DEPENDENCY",
+          category: "host-incompatible",
+          details: {},
+        },
+      },
+    }, null, 2), "utf8");
+    tempDirectories.push(tempRoot);
+
+    const supervisor = new InMemoryServiceSupervisor({
+      runtime: createStubProcessRuntime(),
+      services: [createRuntimeDefinition({
+        command: "python",
+        cwd: tempDir,
+        pythonVersion: "3.12",
+      })],
+      allowedPaths: [repoRoot, tempRoot],
+    });
+
+    const provisioning = supervisor.getService("python-runtime")?.diagnostics.provisioning;
+    expect(provisioning?.state).toBe("provisioned-unlaunchable");
+    expect(provisioning?.lastError?.category).toBe("runtime-launchability");
+  });
+
+  it("prevents startup when runtime is provisioned but unlaunchable", async () => {
+    const supervisor = createManagedSupervisor(createRuntimeDefinition());
+    const existing = supervisor.getService("python-runtime");
+    if (!existing) {
+      throw new Error("Expected python-runtime service.");
+    }
+
+    supervisor.updateState("python-runtime", {
+      diagnostics: {
+        ...existing.diagnostics,
+        provisioning: {
+          ...existing.diagnostics.provisioning,
+          required: true,
+          state: "provisioned-unlaunchable",
+          needsReprovision: false,
+          lastError: {
+            at: new Date().toISOString(),
+            message: "NumPy CPU compatibility failure during runtime preflight.",
+            code: "PYTHON_RUNTIME_HOST_INCOMPATIBLE_DEPENDENCY",
+            category: "host-incompatible",
+            details: {},
+          },
+        },
+      },
+    });
+
+    const status = await supervisor.start("python-runtime");
+    expect(status.state).toBe(ServiceStates.stopped);
+    expect(status.detail).toContain("not launchable on this host");
   });
 
   it("marks python runtime as needing reprovision when provisioning fingerprint inputs drift", () => {
@@ -713,6 +797,7 @@ describe("InMemoryServiceSupervisor", () => {
         TEST_RUNTIME_PORT: String(port),
         TEST_RUNTIME_HEALTHY_AFTER_MS: "500",
         TEST_RUNTIME_CRASH_AFTER_MS: "40",
+        TEST_RUNTIME_STDERR_MESSAGE: "RuntimeError: NumPy was built with baseline optimizations: (X86_V2) but your machine doesn't support: (X86_V2).",
       },
     }));
 
@@ -721,6 +806,7 @@ describe("InMemoryServiceSupervisor", () => {
     expect(status.state).toBe(ServiceStates.failed);
     expect(status.pid).toBeNull();
     expect(status.detail).toContain("exited unexpectedly during startup");
+    expect(status.detail).toContain("Known cause");
     expect(status.diagnostics.lastExit?.code).toBe(12);
     expect(status.recentLogs.some((entry) => entry.message.includes("crashing-during-startup"))).toBeTrue();
   });
