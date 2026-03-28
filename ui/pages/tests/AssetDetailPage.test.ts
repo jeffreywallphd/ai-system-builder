@@ -19,14 +19,15 @@ describe("AssetDetailPage", () => {
     expect(source).toContain("AssetValidationSummary");
     expect(source).toContain("DependencyCompatibilityPanel");
     expect(source).toContain("DependencyGraphPanel");
+    expect(source).toContain("StandardAssetDetailView");
   });
 
-  it("keeps registry navigation handoff links and progressive detail wording", () => {
+  it("keeps registry navigation handoff links and intent-aware context passthrough", () => {
     const source = readSource("ui/pages/AssetDetailPage.tsx");
 
     expect(source).toContain("Back to results");
-    expect(source).toContain("resolveOpenLabel");
+    expect(source).toContain("buildFlowSessionId");
     expect(source).toContain("registryContext");
-    expect(source).toContain("Unified detail view across taxonomy, contract, provenance, dependency graph, and lineage");
+    expect(source).toContain("StandardAssetDetailView asset={asset}");
   });
 });

@@ -17,9 +17,8 @@ import {
 } from "../components/registry/AssetDetailPanels";
 import { AssetValidationSummary, DependencyCompatibilityPanel } from "../components/registry/AssetValidationPanels";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
-import { StudioEntryService } from "../routes/StudioRouteMapping";
-import { UxStudioEntryLabelResolver } from "../taxonomy/UxTaxonomySuppression";
 import { RegistryService } from "../services/RegistryService";
+import { StandardAssetDetailView } from "../components/registry/StandardAssetDetailView";
 
 function removeRoot(
   nodes: ReadonlyArray<RegistryDependencyGraphNode>,
@@ -32,8 +31,6 @@ export default function AssetDetailPage(): JSX.Element {
   const { assetId } = useParams<{ assetId: string }>();
   const location = useLocation();
   const service = useMemo(() => new RegistryService(), []);
-  const studioEntryService = useMemo(() => new StudioEntryService(), []);
-  const labelResolver = useMemo(() => new UxStudioEntryLabelResolver(), []);
   const [asset, setAsset] = useState<RegistryAsset>();
   const [upstream, setUpstream] = useState<RegistryDependencyGraph>();
   const [downstream, setDownstream] = useState<RegistryDependencyGraph>();
@@ -43,18 +40,6 @@ export default function AssetDetailPage(): JSX.Element {
   const registryBackPath = registryContextQuery
     ? `${ROUTE_PATHS.registry}?${registryContextQuery}`
     : ROUTE_PATHS.registry;
-  const studioEntryPath = asset
-    ? studioEntryService.buildStudioRoute({
-      requestedRole: asset.taxonomy?.semanticRole,
-      mode: "asset",
-      asset: { assetId: asset.assetId, versionId: asset.versionId, taxonomy: asset.taxonomy },
-      entryContext: {
-        source: "registry",
-        registryContext: registryContextQuery ?? undefined,
-      },
-    })
-    : undefined;
-
   useEffect(() => {
     let active = true;
 
@@ -133,29 +118,22 @@ export default function AssetDetailPage(): JSX.Element {
     );
   }
 
+  const actionContext = {
+    asset: {
+      assetId: asset.assetId,
+      versionId: asset.versionId,
+      taxonomy: asset.taxonomy,
+    },
+    source: "detail" as const,
+    registryContextQuery: registryContextQuery ?? undefined,
+    buildFlowSessionId: new URLSearchParams(location.search).get("buildFlowSessionId")?.trim() || undefined,
+    buildIntent: new URLSearchParams(location.search).get("buildIntent")?.trim() || undefined,
+    buildIntentSelectedAt: new URLSearchParams(location.search).get("buildIntentSelectedAt")?.trim() || undefined,
+  };
+
   return (
     <section className="ui-page ui-stack ui-stack--md" data-testid="registry-asset-detail-page">
-      <div className="ui-page__hero">
-        <div className="ui-page__hero-copy ui-stack ui-stack--2xs">
-          <div className="ui-row ui-row--wrap" style={{ justifyContent: "space-between" }}>
-            <h1 className="ui-page__title" style={{ margin: 0 }}>{asset.name}</h1>
-            <div className="ui-row ui-row--wrap" style={{ gap: "0.5rem" }}>
-              {studioEntryPath ? (
-                <Link
-                  className="ui-button ui-button--ghost ui-button--small"
-                  to={studioEntryPath}
-                >
-                  {labelResolver.resolveOpenLabel(asset.taxonomy)}
-                </Link>
-              ) : null}
-              <Link className="ui-button ui-button--ghost ui-button--small" to={registryBackPath}>Back to results</Link>
-            </div>
-          </div>
-          <p className="ui-page__subtitle" style={{ margin: 0 }}>
-            Unified detail view across taxonomy, contract, provenance, dependency graph, and lineage.
-          </p>
-        </div>
-      </div>
+      <StandardAssetDetailView asset={asset} actionContext={actionContext} backPath={registryBackPath} />
 
       <div className="ui-grid" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "1rem" }}>
         <AssetSummaryPanel asset={asset} />
