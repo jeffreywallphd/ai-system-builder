@@ -49,8 +49,10 @@ Desktop development is now the main truthful development runtime:
 The Python runtime provisioning path in development also treats `.venv` as a disposable managed artifact:
 
 - the supervisor performs explicit virtual-environment/pip integrity checks before package installation
-- if pip is corrupted, the supervisor attempts `ensurepip --upgrade` repair and revalidates
-- if repair fails, the supervisor recreates `.venv` deterministically and reports corrupted/provisioning states truthfully in managed-runtime diagnostics
+- integrity checks now explicitly detect missing interpreter, pip import/command failures, and invalid pip distribution artifacts (for example leftover `~ip*.dist-info`)
+- bounded in-place repair is attempted only when safe (`ensurepip --upgrade`), then revalidated; unsafe cases transition directly to rebuild
+- when an environment is unhealthy, the supervisor provisions a fresh staged environment under `.venv.managed/`, validates it, promotes it as active, and marks prior environments invalid/cleanup-pending on a best-effort basis
+- runtime diagnostics keep corrupted/rebuild-needed/rebuild-in-progress truth explicit instead of retrying poisoned environments indefinitely
 
 ## Production desktop mode
 
@@ -66,6 +68,7 @@ In packaged desktop builds:
 - Core renderer persistence is backed by a **SQLite** database stored under the app data directory.
 - Production no longer relies on browser `localStorage` or in-memory workflow repositories as the system of record.
 - The Python runtime path is resolved as a **private packaged runtime location** under `runtime-assets/python/<platform>-<arch>/...`.
+- Packaged desktop keeps this private runtime direction and does not fall back into dev `.venv` provisioning semantics; health/provisioning diagnostics still use the same truthful managed-service contract.
 
 ### Private Python runtime packaging
 
