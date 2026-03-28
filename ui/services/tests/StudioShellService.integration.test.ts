@@ -1105,6 +1105,74 @@ describe("StudioShellService integration", () => {
 
     repository.dispose();
   });
+
+  it("supports System Studio style flow over the same shared shell/persistence/publish seams", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-system-studio-service-"));
+    createdRoots.push(root);
+    const databasePath = path.join(root, "system-studio.sqlite");
+    const repository = new SqliteStudioShellRepository(databasePath);
+    const backendApi = new StudioShellBackendApi(repository);
+    installBridge(backendApi);
+
+    const service = new StudioShellService();
+    const contractResolver = new CompositionAssetContractResolver();
+    const initialized = await service.initializeStudio("studio-systems", "System Studio");
+    expect(initialized.ok).toBeTrue();
+    const sessionId = initialized.data?.activeSessionId;
+
+    const created = await service.createDraft({
+      studioId: "studio-systems",
+      sessionId: sessionId!,
+      content: "{\"systemSpec\":{\"components\":[],\"nestedSystems\":[]}}",
+      metadata: {
+        title: "System Asset Draft",
+        tags: ["system", "studio-shell", "system-composition"],
+        taxonomy: {
+          structuralKind: "system",
+          semanticRole: "system",
+          behaviorKind: "deterministic",
+        },
+        contract: contractResolver.resolveContractForTaxonomy({
+          structuralKind: "system",
+          semanticRole: "system",
+          behaviorKind: "deterministic",
+        }),
+        provenance: {
+          sourceType: "generated",
+          sourceLabel: "system-studio",
+        },
+      },
+      dependencies: [{ assetId: "asset:system-child", versionId: "asset:system-child:v1" }],
+    });
+    expect(created.ok).toBeTrue();
+    expect(created.data?.validationIssues.some((entry) => entry.code === "composite-dependency-recommended")).toBeFalse();
+
+    const draftId = created.data?.draft?.draftId;
+    await service.transitionLifecycle({
+      studioId: "studio-systems",
+      sessionId: sessionId!,
+      draftId: draftId!,
+      targetStatus: AssetDraftLifecycleStatuses.validated,
+    });
+
+    const published = await service.publishVersion({
+      studioId: "studio-systems",
+      sessionId: sessionId!,
+      draftId: draftId!,
+      versionId: "asset:studio-systems:v1",
+      versionLabel: "v1",
+      createdBy: "system-author",
+    });
+
+    expect(published.ok).toBeTrue();
+    expect(published.data?.draft?.metadata.taxonomy?.structuralKind).toBe("system");
+    expect(published.data?.draft?.metadata.taxonomy?.semanticRole).toBe("system");
+    expect(published.data?.draft?.lifecycleStatus).toBe(AssetDraftLifecycleStatuses.published);
+    expect(published.data?.versions.map((entry) => entry.versionId)).toEqual(["asset:studio-systems:v1"]);
+
+    repository.dispose();
+  });
+
   it("executes the Studio Shell vertical flow through bridge -> backend -> application -> sqlite persistence", async () => {
     const root = mkdtempSync(path.join(tmpdir(), "loom-studio-shell-service-"));
     createdRoots.push(root);

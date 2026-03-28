@@ -30,6 +30,7 @@ export const ROUTE_PATHS = Object.freeze({
   datasetPipelineStudio: "/studio-shell/dataset-pipeline",
   trainingRecipeStudio: "/studio-shell/training-recipe",
   toolChainStudio: "/studio-shell/tool-chain",
+  systemStudio: "/studio-shell/system",
   modelStudio: "/studio-shell/model",
   datasetStudio: "/studio-shell/dataset",
   toolStudio: "/studio-shell/tool",
@@ -159,6 +160,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteDefinition> = Object.freeze([
     key: "tool-chain-studio",
     path: ROUTE_PATHS.toolChainStudio,
     title: "Tool Chain Studio",
+    showInNavigation: false,
+  }),
+  Object.freeze({
+    key: "system-studio",
+    path: ROUTE_PATHS.systemStudio,
+    title: "System Studio",
     showInNavigation: false,
   }),
   Object.freeze({
