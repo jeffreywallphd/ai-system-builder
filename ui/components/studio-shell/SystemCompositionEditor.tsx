@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import type { RegistryAsset } from "../../../domain/asset-registry/RegistryAsset";
 import { RegistryService } from "../../services/RegistryService";
 import type { StudioShellExtensionContext } from "../../studio-shell/StudioShellExtensions";
+import { ROUTE_PATHS } from "../../routes/RouteConfig";
+import { buildStudioHandoffQuery } from "../../routes/StudioRouteMapping";
 
 function parseSystemComponents(content: string): ReadonlyArray<{
   readonly componentKind: "atomic" | "composite" | "system";
@@ -24,6 +27,16 @@ function kindFromAsset(asset: RegistryAsset): "atomic" | "composite" | "system" 
       : "atomic";
 }
 
+function studioRouteFromComponentKind(kind: "atomic" | "composite" | "system"): string {
+  if (kind === "system") {
+    return ROUTE_PATHS.systemStudio;
+  }
+  if (kind === "composite") {
+    return ROUTE_PATHS.workflowStudio;
+  }
+  return ROUTE_PATHS.modelStudio;
+}
+
 export function SystemCompositionEditor({ context }: { readonly context: StudioShellExtensionContext }): JSX.Element {
   const service = useMemo(() => new RegistryService(), []);
   const [query, setQuery] = useState("");
@@ -34,6 +47,9 @@ export function SystemCompositionEditor({ context }: { readonly context: StudioS
   const draft = context.snapshot?.draft;
   const sessionId = context.snapshot?.activeSessionId;
   const components = draft ? parseSystemComponents(draft.content) : [];
+  const parentAssetId = context.handoffContext.assetId ?? draft?.assetId;
+  const parentVersionId = context.handoffContext.versionId;
+  const registryContext = context.handoffContext.registryContext;
 
   useEffect(() => {
     let active = true;
@@ -89,6 +105,31 @@ export function SystemCompositionEditor({ context }: { readonly context: StudioS
               <div><strong>{component.alias ?? `${component.componentKind}:${index + 1}`}</strong></div>
               <div className="ui-text-small">{component.componentKind} · {component.assetId} · {component.versionId ?? "unpinned"}</div>
               <div className="ui-stack ui-stack--xs" style={{ flexDirection: "row", flexWrap: "wrap" }}>
+                <Link
+                  className="ui-button ui-button--ghost ui-button--small"
+                  to={registryContext
+                    ? `${ROUTE_PATHS.registryAssetDetail.replace(":assetId", encodeURIComponent(component.assetId))}?registryContext=${encodeURIComponent(registryContext)}`
+                    : ROUTE_PATHS.registryAssetDetail.replace(":assetId", encodeURIComponent(component.assetId))}
+                >
+                  Open detail
+                </Link>
+                <Link
+                  className="ui-button ui-button--ghost ui-button--small"
+                  to={`${studioRouteFromComponentKind(component.componentKind)}?${
+                    buildStudioHandoffQuery(
+                      { assetId: component.assetId, versionId: component.versionId },
+                      {
+                        handoff: "system-studio",
+                        registryContext,
+                        parentAssetId,
+                        parentVersionId,
+                        selectedComponent: component.alias ?? component.assetId,
+                      },
+                    )
+                  }`}
+                >
+                  Open child in studio
+                </Link>
                 <button
                   className="ui-button"
                   disabled={!sessionId || !draft}
@@ -187,7 +228,21 @@ export function SystemCompositionEditor({ context }: { readonly context: StudioS
         <ul className="ui-stack ui-stack--2xs">
           {components.filter((entry) => entry.componentKind === "system").map((entry, index) => (
             <li key={`${entry.assetId}:${entry.versionId ?? ""}:${index}`} className="ui-text-small">
-              {entry.alias ?? `system-${index + 1}`} → {entry.assetId} ({entry.versionId ?? "unpinned"})
+              {entry.alias ?? `system-${index + 1}`} → {entry.assetId} ({entry.versionId ?? "unpinned"}){" "}
+              <Link
+                to={`${ROUTE_PATHS.systemStudio}?${buildStudioHandoffQuery(
+                  { assetId: entry.assetId, versionId: entry.versionId },
+                  {
+                    handoff: "system-studio",
+                    registryContext,
+                    parentAssetId,
+                    parentVersionId,
+                    selectedComponent: entry.alias ?? entry.assetId,
+                  },
+                )}`}
+              >
+                Open nested system
+              </Link>
             </li>
           ))}
           {components.filter((entry) => entry.componentKind === "system").length === 0 && (

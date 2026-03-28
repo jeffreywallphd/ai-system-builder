@@ -129,7 +129,10 @@ export default function AssetDetailPage(): JSX.Element {
               {resolveStudioRouteFromAsset(asset) ? (
                 <Link
                   className="ui-button ui-button--ghost ui-button--small"
-                  to={`${resolveStudioRouteFromAsset(asset)}?${buildStudioHandoffQuery(asset)}`}
+                  to={`${resolveStudioRouteFromAsset(asset)}?${buildStudioHandoffQuery(asset, {
+                    handoff: "registry",
+                    registryContext: registryContextQuery ?? undefined,
+                  })}`}
                 >
                   Open in studio
                 </Link>

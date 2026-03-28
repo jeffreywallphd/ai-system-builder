@@ -104,4 +104,51 @@ describe("SystemStudioBackendApi", () => {
     });
     expect(removed.data?.map((entry) => entry.assetId)).toEqual(["system:child"]);
   });
+
+  it("projects recursive compatibility insights from system validation outputs", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const ids = ["session-1", "draft-root"];
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => ids.shift() ?? "generated");
+    const systemService = new SystemStudioApplicationService(studioShell, repository);
+    const api = new SystemStudioBackendApi(repository);
+
+    const ensure = await systemService.ensureStudioInitialized();
+    const created = await systemService.createSystemDraft({
+      studioId: SystemStudioIdentity.defaultStudioId,
+      sessionId: ensure.session.id,
+      draftId: "draft-root",
+      title: "System",
+      content: JSON.stringify({
+        systemSpec: {
+          components: [
+            {
+              componentKind: "system",
+              assetId: "system:missing",
+              versionId: "system:missing:v1",
+              alias: "missing",
+            },
+          ],
+          inputs: [{ inputId: "in", valueType: "string", required: true }],
+          outputs: [{ outputId: "out", valueType: "string" }],
+          bindings: [{
+            bindingId: "bind-invalid-target",
+            source: { scope: "system-input", endpointId: "in" },
+            target: { scope: "component-input", componentAlias: "missing", endpointId: "missing-input" },
+          }],
+        },
+      }),
+      dependencies: [{ assetId: "system:missing", versionId: "system:missing:v1" }],
+    });
+
+    const insights = await api.getCompatibilityInsights({
+      studioId: SystemStudioIdentity.defaultStudioId,
+      draftId: created.draft.id,
+    });
+    expect(insights.ok).toBeTrue();
+    expect(insights.data?.summary.status).toBe("incompatible");
+    expect(insights.data?.summary.incompatibleChildAssetCount).toBeGreaterThan(0);
+    expect(insights.data?.summary.unresolvedNestedSystemCount).toBeGreaterThan(0);
+    expect(insights.data?.summary.interfaceMismatchCount).toBeGreaterThan(0);
+    expect(insights.data?.issues.some((issue) => issue.code === "system-child-reference-missing")).toBeTrue();
+  });
 });

@@ -17,6 +17,7 @@ import type {
   ReorderSystemChildComponentRequest,
   SystemStudioApiResponse,
   SystemStudioChildComponentReadModel,
+  SystemCompatibilityInsightsReadModel,
   UpdateSystemInterfacesRequest,
   UpdateSystemParametersRequest,
 } from "../../infrastructure/api/system-studio/SystemStudioBackendApi";
@@ -104,5 +105,10 @@ export class StudioShellService {
   public async updateSystemParameters(request: UpdateSystemParametersRequest): Promise<SystemStudioApiResponse<{ readonly updated: boolean }>> {
     const raw = await this.requireBridge().updateSystemParameters(JSON.stringify(request));
     return JSON.parse(raw) as SystemStudioApiResponse<{ readonly updated: boolean }>;
+  }
+
+  public async getSystemCompatibilityInsights(request: ListSystemChildComponentsRequest): Promise<SystemStudioApiResponse<SystemCompatibilityInsightsReadModel>> {
+    const raw = await this.requireBridge().getSystemCompatibilityInsights(JSON.stringify(request));
+    return JSON.parse(raw) as SystemStudioApiResponse<SystemCompatibilityInsightsReadModel>;
   }
 }

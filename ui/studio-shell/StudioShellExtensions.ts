@@ -6,6 +6,7 @@ import type {
   AddSystemChildComponentRequest,
   RemoveSystemChildComponentRequest,
   ReorderSystemChildComponentRequest,
+  SystemCompatibilityInsightsReadModel,
   UpdateSystemInterfacesRequest,
   UpdateSystemParametersRequest,
 } from "../../infrastructure/api/system-studio/SystemStudioBackendApi";
@@ -34,6 +35,14 @@ export interface StudioShellExtensionContext {
   readonly studioId: string;
   readonly snapshot: StudioShellSnapshotReadModel | undefined;
   readonly validationIssues: ReadonlyArray<StudioShellValidationIssue>;
+  readonly systemCompatibility?: SystemCompatibilityInsightsReadModel;
+  readonly handoffContext: {
+    readonly assetId?: string;
+    readonly versionId?: string;
+    readonly handoff?: string;
+    readonly registryContext?: string;
+    readonly selectedComponent?: string;
+  };
   readonly operationError?: string;
   readonly isBusy: boolean;
   readonly operations: StudioShellExtensionOperations;
