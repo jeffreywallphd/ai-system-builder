@@ -33,6 +33,8 @@ describe("Build entry and intent landing seams", () => {
     expect(query.get("initSource")).toBe("intent");
     expect(query.get("buildIntent")).toBe(BuildIntents.automateTask);
     expect(query.get("buildIntentSelectedAt")).toBe("2026-03-28T00:00:00.000Z");
+    expect(query.get("buildFlowSessionId")).toContain("build-flow-automate-task");
+    expect(query.get("buildFlowProgress")).toBe("active");
   });
 
   it("exposes intent-first landing options and keeps taxonomy suppression in intent-primary mode", () => {
