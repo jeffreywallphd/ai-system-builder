@@ -2,11 +2,11 @@ import type { StudioHandoffContract, StudioHandoffPayload } from "../../domain/s
 import type { StudioHandoffContext } from "../../domain/studio-handoff/StudioHandoffContext";
 import {
   StudioHandoffCompatibilityIssueCodes,
-  type StudioCapabilityDescriptor,
   type StudioHandoffCompatibilityDecision,
   type StudioHandoffCompatibilityIssue,
   type StudioHandoffCompatibilityValidator,
 } from "./StudioHandoffCompatibilityValidator";
+import type { StudioCapabilityDescriptor } from "./StudioCapabilityRegistry";
 
 export const AdaptedStudioInputKinds = Object.freeze({
   atomic: "atomic",

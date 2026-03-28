@@ -1,4 +1,9 @@
 import type { StudioHandoffContract, StudioHandoffAssetRole } from "../../domain/studio-handoff/StudioHandoffContract";
+import {
+  StudioHandoffAuditEventKinds,
+  StudioHandoffAuditOutcomes,
+} from "../../domain/studio-handoff/StudioHandoffAuditTrail";
+import type { StudioHandoffAuditTrailService } from "./StudioHandoffAuditTrailService";
 import type { StudioHandoffContext, StudioHandoffSourceReference } from "../../domain/studio-handoff/StudioHandoffContext";
 import type { StudioHandoffDependencyRecord } from "./CrossStudioDependencyGraph";
 import type { StudioHandoffLineageRecord } from "./StudioHandoffLineageTracker";
@@ -126,7 +131,10 @@ function toRecord(input: {
 }
 
 export class StudioHandoffPersistenceService {
-  public constructor(private readonly repository: StudioHandoffRepository) {}
+  public constructor(
+    private readonly repository: StudioHandoffRepository,
+    private readonly auditTrail?: Pick<StudioHandoffAuditTrailService, "record">,
+  ) {}
 
   public async persistPrepared(input: {
     readonly preparation: StudioHandoffPreparation;
@@ -148,7 +156,28 @@ export class StudioHandoffPersistenceService {
       dependency: input.dependency,
     });
 
-    return this.repository.saveRecord(record);
+    const persisted = await this.repository.saveRecord(record);
+    this.auditTrail?.record({
+      eventKind: StudioHandoffAuditEventKinds.handoffOrchestrated,
+      outcome: persisted.orchestration.status === "prepared" ? StudioHandoffAuditOutcomes.succeeded : StudioHandoffAuditOutcomes.failed,
+      handoff: {
+        handoffId: persisted.handoffId,
+        revisionId: persisted.revision?.revisionId,
+        previousHandoffId: persisted.revision?.previousHandoffId,
+      },
+      actor: input.preparation.context.actor,
+      sourceStudio: { studioId: persisted.sourceStudioId, studioType: persisted.sourceStudioType },
+      targetStudio: { studioId: persisted.targetStudioId, studioType: persisted.targetStudioType },
+      assets: persisted.bundledAssets,
+      detail: {
+        statusCode: persisted.orchestration.status,
+        issueCodes: persisted.orchestration.issueCodes,
+        matchedContractId: persisted.orchestration.matchedContractId,
+        targetInputKind: persisted.orchestration.targetInputKind,
+        compatibilityPassed: persisted.orchestration.issueCodes.length === 0,
+      },
+    });
+    return persisted;
   }
 
   public async persistFailure(input: {
@@ -166,7 +195,27 @@ export class StudioHandoffPersistenceService {
       revision: input.revision,
       changes: input.changes,
     });
-    return this.repository.saveRecord(record);
+    const persisted = await this.repository.saveRecord(record);
+    this.auditTrail?.record({
+      eventKind: StudioHandoffAuditEventKinds.handoffFailed,
+      outcome: StudioHandoffAuditOutcomes.failed,
+      handoff: {
+        handoffId: persisted.handoffId,
+        revisionId: persisted.revision?.revisionId,
+        previousHandoffId: persisted.revision?.previousHandoffId,
+      },
+      actor: input.context.actor,
+      sourceStudio: { studioId: persisted.sourceStudioId, studioType: persisted.sourceStudioType },
+      targetStudio: { studioId: persisted.targetStudioId, studioType: persisted.targetStudioType },
+      assets: persisted.bundledAssets,
+      detail: {
+        statusCode: input.failure.code,
+        message: input.failure.message,
+        issueCodes: persisted.orchestration.issueCodes,
+        compatibilityPassed: false,
+      },
+    });
+    return persisted;
   }
 }
 
