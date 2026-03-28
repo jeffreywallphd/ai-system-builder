@@ -3,6 +3,7 @@ import type { DeploymentConfigurationContract } from "./DeploymentConfigurationD
 import type { DeploymentTarget } from "./DeploymentTargetDomain";
 import type { ProvisionedDeploymentEnvironment } from "./EnvironmentProvisioningDomain";
 import type { DeploymentState, DeploymentStateSnapshot, DeploymentStateTransition } from "./DeploymentStateDomain";
+import type { IsolatedDeploymentScope } from "./DeploymentIsolationDomain";
 
 export const DeploymentStatuses = Object.freeze({
   pending: "pending",
@@ -70,6 +71,7 @@ export interface DeploymentRecord {
   readonly provisionedEnvironmentId?: string;
   readonly nestedSystemCount: number;
   readonly deployedAt: string;
+  readonly isolation: IsolatedDeploymentScope;
   readonly metadata: {
     readonly deploymentDeterminismKey: string;
     readonly notes: ReadonlyArray<string>;

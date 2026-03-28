@@ -12,6 +12,11 @@ import {
 } from "../../domain/deployment/DeploymentExecutionDomain";
 import { DeploymentLogLevels } from "../../domain/deployment/DeploymentDiagnosticsDomain";
 import {
+  deriveDeploymentIsolationIds,
+  type DeploymentEnvironmentContext,
+  type IsolatedDeploymentScope,
+} from "../../domain/deployment/DeploymentIsolationDomain";
+import {
   EnvironmentProvisioningStatuses,
   type EnvironmentProvisioningInterface,
   type ProvisionedDeploymentEnvironment,
@@ -30,6 +35,7 @@ import {
   DeploymentQuotaActions,
   DeploymentQuotaEvaluator,
 } from "./DeploymentQuotaEvaluator";
+import { DeploymentIsolationEvaluator } from "./DeploymentIsolationEvaluator";
 
 export interface DeploymentRecordRepository {
   save(record: DeploymentRecord): DeploymentRecord;
@@ -96,6 +102,7 @@ export class DeploymentExecutionService {
     private readonly diagnosticsService: DeploymentDiagnosticsService = new DeploymentDiagnosticsService(new InMemoryDeploymentDiagnosticsRepository(), () => this.clock()),
     private readonly accessEvaluator: DeploymentAccessEvaluator = new DeploymentAccessEvaluator(),
     private readonly quotaEvaluator: DeploymentQuotaEvaluator = new DeploymentQuotaEvaluator(),
+    private readonly isolationEvaluator: DeploymentIsolationEvaluator = new DeploymentIsolationEvaluator(),
   ) {}
 
   public executeLifecycle(
@@ -145,6 +152,14 @@ export class DeploymentExecutionService {
       targetType: normalized.target.type,
       nestedSystemCount: normalized.bundle.manifest.package.dependencyVersionSnapshot.filter((entry) => entry.assetId.startsWith("system:")).length,
       deployedAt: this.clock().toISOString(),
+      isolationContext: this.createIsolationContext({
+        accessContext: governance?.accessContext,
+        resourceTenantId: governance?.resourceTenantId,
+        source: governance?.requestSource,
+        targetId: normalized.target.targetId.value,
+        targetType: normalized.target.type,
+        deploymentEnvironmentId: "pending-provisioning",
+      }),
     });
 
     record = this.transitionRecord(record, DeploymentStates.provisioningInProgress, "provisioning-started");
@@ -240,7 +255,7 @@ export class DeploymentExecutionService {
       });
     }
 
-    let record = existingRecord ?? this.createDeploymentRecord(normalizedRequest);
+    let record = existingRecord ?? this.createDeploymentRecord(normalizedRequest, governance);
     if (!existingRecord) {
       this.repository.save(record);
       record = this.transitionRecord(record, DeploymentStates.deploymentInProgress, "deployment-started-with-preprovisioned-environment");
@@ -290,30 +305,63 @@ export class DeploymentExecutionService {
   }
 
   public getDeployment(deploymentId: string): DeploymentRecord | undefined {
-    return this.repository.getById(deploymentId);
+    const record = this.repository.getById(deploymentId);
+    return record;
   }
 
-  public listDeploymentsForEnvironment(environmentId: string): ReadonlyArray<DeploymentRecord> {
-    return this.repository.listByEnvironment(environmentId);
+  public getDeploymentIsolated(input: {
+    readonly deploymentId: string;
+    readonly isolationContext?: DeploymentEnvironmentContext;
+  }): DeploymentRecord | undefined {
+    const record = this.repository.getById(input.deploymentId);
+    if (!record) {
+      return undefined;
+    }
+    this.isolationEvaluator.assertRecordAccessible({
+      record,
+      context: input.isolationContext,
+      expectedDeploymentId: input.deploymentId,
+    });
+    return record;
   }
 
-  public listDeploymentsByState(state: DeploymentRecord["state"]): ReadonlyArray<DeploymentRecord> {
-    return this.repository.listByState(state);
+  public listDeploymentsForEnvironment(
+    environmentId: string,
+    isolationContext?: DeploymentEnvironmentContext,
+  ): ReadonlyArray<DeploymentRecord> {
+    const records = this.repository.listByEnvironment(environmentId);
+    return this.isolationEvaluator.filterRecords({ records, context: isolationContext });
   }
 
-  public getDeploymentStateSnapshot(deploymentId: string): DeploymentStateSnapshot | undefined {
-    return this.repository.getById(deploymentId)?.stateSnapshot;
+  public listDeploymentsByState(
+    state: DeploymentRecord["state"],
+    isolationContext?: DeploymentEnvironmentContext,
+  ): ReadonlyArray<DeploymentRecord> {
+    const records = this.repository.listByState(state);
+    return this.isolationEvaluator.filterRecords({ records, context: isolationContext });
   }
 
-  public listStateTransitions(deploymentId: string): ReadonlyArray<DeploymentStateTransition> {
-    return this.repository.getById(deploymentId)?.stateTransitions ?? Object.freeze([]);
+  public getDeploymentStateSnapshot(
+    deploymentId: string,
+    isolationContext?: DeploymentEnvironmentContext,
+  ): DeploymentStateSnapshot | undefined {
+    return this.getDeploymentIsolated({ deploymentId, isolationContext })?.stateSnapshot;
   }
 
-  public listDeploymentLogs(deploymentId: string) {
+  public listStateTransitions(
+    deploymentId: string,
+    isolationContext?: DeploymentEnvironmentContext,
+  ): ReadonlyArray<DeploymentStateTransition> {
+    return this.getDeploymentIsolated({ deploymentId, isolationContext })?.stateTransitions ?? Object.freeze([]);
+  }
+
+  public listDeploymentLogs(deploymentId: string, isolationContext?: DeploymentEnvironmentContext) {
+    this.getDeploymentIsolated({ deploymentId, isolationContext });
     return this.diagnosticsService.listLogs(deploymentId);
   }
 
-  public listDeploymentDiagnostics(deploymentId: string) {
+  public listDeploymentDiagnostics(deploymentId: string, isolationContext?: DeploymentEnvironmentContext) {
+    this.getDeploymentIsolated({ deploymentId, isolationContext });
     return this.diagnosticsService.listDiagnostics(deploymentId);
   }
 
@@ -371,7 +419,14 @@ export class DeploymentExecutionService {
     }
   }
 
-  private createDeploymentRecord(request: DeploymentExecutionRequest): DeploymentRecord {
+  private createDeploymentRecord(
+    request: DeploymentExecutionRequest,
+    governance?: {
+      readonly accessContext?: DeploymentAccessContext;
+      readonly resourceTenantId?: string;
+      readonly requestSource?: string;
+    },
+  ): DeploymentRecord {
     const nestedSystemCount = request.bundle.manifest.package.dependencyVersionSnapshot
       .filter((entry) => entry.assetId.startsWith("system:"))
       .length;
@@ -400,6 +455,14 @@ export class DeploymentExecutionService {
       provisionedEnvironmentId: request.provisionedEnvironment.environmentId,
       nestedSystemCount,
       deployedAt: this.clock().toISOString(),
+      isolationContext: this.createIsolationContext({
+        accessContext: governance?.accessContext,
+        resourceTenantId: governance?.resourceTenantId,
+        source: governance?.requestSource,
+        targetId: request.target.targetId.value,
+        targetType: request.target.type,
+        deploymentEnvironmentId: request.provisionedEnvironment.environmentId,
+      }),
       metadata: Object.freeze({
         deploymentDeterminismKey,
         notes: Object.freeze([
@@ -425,6 +488,7 @@ export class DeploymentExecutionService {
     readonly provisionedEnvironmentId?: string;
     readonly nestedSystemCount: number;
     readonly deployedAt: string;
+    readonly isolationContext: DeploymentEnvironmentContext;
     readonly metadata?: DeploymentRecord["metadata"];
   }): DeploymentRecord {
     const initial = this.stateTracker.initialize({ deploymentId: input.deploymentId, at: input.deployedAt, initialState: DeploymentStates.requested });
@@ -474,6 +538,21 @@ export class DeploymentExecutionService {
       provisionedEnvironmentId: input.provisionedEnvironmentId,
       nestedSystemCount: input.nestedSystemCount,
       deployedAt: input.deployedAt,
+      isolation: this.createIsolatedScope({
+        deploymentId: input.deploymentId,
+        rootSystemAssetId: input.rootSystemAssetId,
+        rootSystemVersionId: input.rootSystemVersionId,
+        bundleId: input.bundleId,
+        bundleVersionKey: input.bundleVersionKey,
+        packageId: input.packageId,
+        deploymentConfigurationId: input.deploymentConfigurationId,
+        targetId: input.targetId,
+        targetType: input.targetType,
+        nestedSystemCount: input.nestedSystemCount,
+        deploymentEnvironmentId: input.provisionedEnvironmentId ?? input.isolationContext.deploymentEnvironmentId ?? "pending-provisioning",
+        tenantId: input.isolationContext.tenantId,
+        context: input.isolationContext,
+      }),
       metadata,
     });
   }
@@ -551,6 +630,21 @@ export class DeploymentExecutionService {
     return Object.freeze({
       ...record,
       provisionedEnvironmentId: environment.environmentId,
+      isolation: Object.freeze({
+        ...record.isolation,
+        context: Object.freeze({
+          ...record.isolation.context,
+          deploymentEnvironmentId: environment.environmentId,
+          targetId: environment.targetId,
+          targetType: environment.targetType,
+        }),
+        boundary: Object.freeze({
+          ...record.isolation.boundary,
+          deploymentEnvironmentId: environment.environmentId,
+          targetId: environment.targetId,
+          targetType: environment.targetType,
+        }),
+      }),
       metadata: Object.freeze({
         ...record.metadata,
         notes: Object.freeze([...record.metadata.notes, `environment:${environment.environmentId}`]),
@@ -627,6 +721,76 @@ export class DeploymentExecutionService {
       rootSystemVersionId: input.rootSystemVersionId,
       targetId: input.targetId,
       targetType: input.targetType,
+    });
+  }
+
+  private createIsolationContext(input: {
+    readonly accessContext?: DeploymentAccessContext;
+    readonly resourceTenantId?: string;
+    readonly source?: string;
+    readonly targetId: string;
+    readonly targetType: DeploymentRecord["targetType"];
+    readonly deploymentEnvironmentId: string;
+  }): DeploymentEnvironmentContext {
+    return Object.freeze({
+      tenantId: input.resourceTenantId?.trim() || input.accessContext?.tenantId?.trim() || undefined,
+      deploymentEnvironmentId: input.deploymentEnvironmentId.trim(),
+      targetId: input.targetId.trim(),
+      targetType: input.targetType,
+      source: input.source?.trim() || input.accessContext?.source?.trim() || undefined,
+      callerId: input.accessContext?.caller?.callerId?.trim() || undefined,
+      sessionId: input.accessContext?.caller?.sessionId?.trim() || undefined,
+    });
+  }
+
+  private createIsolatedScope(input: {
+    readonly deploymentId: string;
+    readonly rootSystemAssetId: string;
+    readonly rootSystemVersionId: string;
+    readonly bundleId: string;
+    readonly bundleVersionKey: string;
+    readonly packageId: string;
+    readonly deploymentConfigurationId: string;
+    readonly targetId: string;
+    readonly targetType: DeploymentRecord["targetType"];
+    readonly nestedSystemCount: number;
+    readonly deploymentEnvironmentId: string;
+    readonly tenantId?: string;
+    readonly context: DeploymentEnvironmentContext;
+  }): IsolatedDeploymentScope {
+    const ids = deriveDeploymentIsolationIds({
+      deploymentId: input.deploymentId,
+      deploymentEnvironmentId: input.deploymentEnvironmentId,
+      targetId: input.targetId,
+      targetType: input.targetType,
+      tenantId: input.tenantId,
+    });
+    return Object.freeze({
+      scopeId: ids.scopeId,
+      context: input.context,
+      boundary: Object.freeze({
+        boundaryId: ids.boundaryId,
+        deploymentEnvironmentId: input.deploymentEnvironmentId,
+        targetId: input.targetId,
+        targetType: input.targetType,
+        tenantId: input.tenantId,
+      }),
+      linkage: Object.freeze({
+        deploymentId: input.deploymentId,
+        rootSystemAssetId: input.rootSystemAssetId,
+        rootSystemVersionId: input.rootSystemVersionId,
+        bundleId: input.bundleId,
+        bundleVersionKey: input.bundleVersionKey,
+        packageId: input.packageId,
+        deploymentConfigurationId: input.deploymentConfigurationId,
+        targetId: input.targetId,
+        targetType: input.targetType,
+        nestedSystemCount: input.nestedSystemCount,
+      }),
+      runtimeBinding: Object.freeze({
+        runtimeTenantId: input.tenantId,
+        runtimeContextKey: ids.runtimeContextKey,
+      }),
     });
   }
 }

@@ -778,3 +778,20 @@ Explicitly later than this scope:
   - no billing/subscription framework,
   - no distributed/global quota coordination,
   - no merging deployment quotas into runtime execution quotas/rate limits.
+
+## Direction 5 update: Deployment environment isolation + system endpoint exposure (stories 8.13–8.14)
+
+- Deployment records now include explicit environment isolation scope (`domain/deployment/DeploymentIsolationDomain.ts`) with durable linkage across deployment identity, source system/bundle version, deployment target/environment, tenant context, and bounded runtime binding key.
+- Deployment isolation enforcement is centralized through `application/deployment/DeploymentIsolationEvaluator.ts` and applied at authoritative seams:
+  - deployment state/log/diagnostic reads,
+  - deployment history + active deployment lookup/selection paths,
+  - rollback candidate selection.
+- Isolation remains deployment-specific (not a duplicate of runtime request isolation) and extends Epic 7 tenant/caller propagation semantics into deployment-management boundaries.
+- System endpoint exposure is now a first-class deployment output via `domain/deployment/SystemEndpointExposureDomain.ts` and `application/deployment/SystemEndpointExposureService.ts`:
+  - stable endpoint identity maps to the active deployment for a bounded system/target/tenant scope,
+  - endpoint records preserve deployment linkage (deployment id, system version, bundle/build key, config id, environment),
+  - endpoint resolution reuses deployment isolation checks.
+- Scope remains intentionally bounded:
+  - no full endpoint routing fabric in this slice,
+  - no deployment health monitoring/autoscaling,
+  - no alternate invocation architecture outside existing runtime external invocation seams.
