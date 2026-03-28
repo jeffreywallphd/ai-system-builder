@@ -80,6 +80,8 @@ The product also has a managed runtime story, especially for Python-backed capab
 ### Python runtime
 The UI composition builds a `PythonRuntimeConfig`, runtime client, runtime manager, and service-definition wiring. The desktop host also resolves a desktop Python runtime and starts the service supervisor.
 
+For desktop development provisioning, the supervisor now treats `python-runtime/.venv` as a managed disposable artifact rather than durable state. Provisioning performs explicit venv/pip integrity checks, attempts bounded standard-library repair (`ensurepip --upgrade`) when pip is corrupted, and recreates the venv deterministically when repair cannot restore integrity. Runtime diagnostics distinguish unprovisioned/provisioning/provision-failed/corrupted/reprovision-needed states so the app does not over-claim runtime health.
+
 ### Runtime dependency orchestration
 The infrastructure bootstrap and UI composition now share a centralized runtime-dependency composition module that builds the core `Python runtime -> MCP runtime` graph and can append other runtime-backed capability registrations such as document conversion, model training, and narrow MCP server-operation execution while still letting each outer-layer composition root inject its own health adapter.
 

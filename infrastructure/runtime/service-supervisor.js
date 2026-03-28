@@ -1,5 +1,6 @@
 import "dotenv/config";
 import http from "node:http";
+import crypto from "node:crypto";
 import {
   accessSync,
   constants as fsConstants,
@@ -44,6 +45,7 @@ const DEFAULT_PYTHON_RUNTIME_ENTRYPOINT = "app.main:app";
 const DEFAULT_PYTHON_RUNTIME_VERSION = process.env.PYTHON_RUNTIME_PYTHON_VERSION?.trim() || "3.12";
 const SUPPORTED_PYTHON_VERSIONS = new Set(["3.11", "3.12"]);
 const PROVISIONING_METADATA_FILENAME = ".ai-loom-python-provisioning.json";
+const PROVISIONING_METADATA_SCHEMA_VERSION = 2;
 const DEFAULT_DEFINITIONS_PATH = path.join(process.cwd(), ".ai-loom-studio", "managed-services.json");
 const DEFAULT_CONTROL_TOKEN = process.env.SERVICE_SUPERVISOR_CONTROL_TOKEN?.trim() || undefined;
 const DEFAULT_RESTART_POLICY = Object.freeze({
@@ -98,6 +100,7 @@ export const ProvisioningStates = Object.freeze({
   provisioning: "provisioning",
   provisioned: "provisioned",
   provisionFailed: "provision-failed",
+  corrupted: "corrupted",
 });
 
 function createClockTimestamp(clock) {
@@ -801,6 +804,34 @@ function readProvisioningMetadata(definition) {
   }
 }
 
+function hashFileContents(filePath) {
+  if (!existsSync(filePath)) {
+    return null;
+  }
+
+  return crypto.createHash("sha256").update(readFileSync(filePath)).digest("hex");
+}
+
+function buildProvisioningFingerprint(definition) {
+  return {
+    schemaVersion: PROVISIONING_METADATA_SCHEMA_VERSION,
+    requirementsHash: hashFileContents(path.join(definition.cwd, "requirements.txt")),
+    platform: process.platform,
+    arch: process.arch,
+  };
+}
+
+function isFingerprintMismatch(currentFingerprint, savedFingerprint) {
+  if (!savedFingerprint || typeof savedFingerprint !== "object") {
+    return true;
+  }
+
+  return currentFingerprint.schemaVersion !== savedFingerprint.schemaVersion
+    || currentFingerprint.requirementsHash !== savedFingerprint.requirementsHash
+    || currentFingerprint.platform !== savedFingerprint.platform
+    || currentFingerprint.arch !== savedFingerprint.arch;
+}
+
 function buildInitialProvisioningState(clock, definition) {
   if (!isProvisioningRequired(definition)) {
     return {
@@ -811,6 +842,7 @@ function buildInitialProvisioningState(clock, definition) {
       resolvedInterpreter: null,
       environmentPath: null,
       versionMismatch: false,
+      fingerprintMismatch: false,
       needsReprovision: false,
       lastUpdatedAt: null,
       lastError: null,
@@ -824,6 +856,8 @@ function buildInitialProvisioningState(clock, definition) {
   const hasEnvironment = existsSync(environmentPath) && existsSync(venvPythonPath);
   const resolvedVersion = metadata?.resolvedVersion ?? null;
   const versionMismatch = Boolean(hasEnvironment && resolvedVersion && !String(resolvedVersion).startsWith(requestedVersion));
+  const fingerprintMismatch = Boolean(hasEnvironment
+    && isFingerprintMismatch(buildProvisioningFingerprint(definition), metadata?.fingerprint));
 
   return {
     state: hasEnvironment ? ProvisioningStates.provisioned : ProvisioningStates.unprovisioned,
@@ -833,7 +867,8 @@ function buildInitialProvisioningState(clock, definition) {
     resolvedInterpreter: metadata?.resolvedInterpreter ?? null,
     environmentPath,
     versionMismatch,
-    needsReprovision: versionMismatch,
+    fingerprintMismatch,
+    needsReprovision: versionMismatch || fingerprintMismatch,
     lastUpdatedAt: metadata?.provisionedAt ?? null,
     lastError: null,
   };
@@ -1278,6 +1313,7 @@ export class InMemoryServiceSupervisor {
       requestedVersion,
       environmentPath: getPythonEnvironmentPath(definition),
       versionMismatch,
+      fingerprintMismatch: baseline.fingerprintMismatch,
       needsReprovision: versionMismatch || baseline.needsReprovision,
       state: existingProvisioning.state === ProvisioningStates.unsupported
         ? baseline.state
@@ -1392,6 +1428,50 @@ export class InMemoryServiceSupervisor {
     });
   }
 
+  appendCommandOutput(serviceId, result) {
+    if (!result) {
+      return;
+    }
+
+    if (result.stdout) {
+      this.appendLog(serviceId, "stdout", result.stdout);
+    }
+    if (result.stderr) {
+      this.appendLog(serviceId, "stderr", result.stderr);
+    }
+  }
+
+  async validateVenvPipHealth(serviceId, definition, venvPython) {
+    if (!existsSync(venvPython)) {
+      return {
+        healthy: false,
+        error: new Error(`Virtual environment interpreter not found at ${venvPython}.`),
+      };
+    }
+
+    const importCheck = await this.runCommand(
+      venvPython,
+      ["-c", "import pip; import pip._internal.cli.main"],
+      { cwd: definition.cwd },
+    );
+    this.appendCommandOutput(serviceId, importCheck);
+    if (importCheck.code !== 0) {
+      const error = new Error(importCheck.stderr || importCheck.stdout || "pip import integrity check failed.");
+      error.code = "PYTHON_RUNTIME_PIP_CORRUPTED";
+      return { healthy: false, error };
+    }
+
+    const pipVersion = await this.runCommand(venvPython, ["-m", "pip", "--version"], { cwd: definition.cwd });
+    this.appendCommandOutput(serviceId, pipVersion);
+    if (pipVersion.code !== 0) {
+      const error = new Error(pipVersion.stderr || pipVersion.stdout || "pip command check failed.");
+      error.code = "PYTHON_RUNTIME_PIP_CORRUPTED";
+      return { healthy: false, error };
+    }
+
+    return { healthy: true, error: null };
+  }
+
   async provisionInternal(serviceId, action) {
     const definition = this.requireDefinition(serviceId);
     const state = this.requireState(serviceId);
@@ -1435,25 +1515,70 @@ export class InMemoryServiceSupervisor {
         rmSync(environmentPath, { recursive: true, force: true });
       }
 
+      let environmentCreated = false;
       if (!existsSync(venvPython)) {
         this.appendLog(serviceId, "info", `Creating virtual environment in ${environmentPath}.`);
         const createResult = await this.runCommand(interpreter.command, [...interpreter.args, "-m", "venv", environmentPath], { cwd: definition.cwd });
-        if (createResult.stdout) {
-          this.appendLog(serviceId, "stdout", createResult.stdout);
-        }
-        if (createResult.stderr) {
-          this.appendLog(serviceId, "stderr", createResult.stderr);
-        }
+        this.appendCommandOutput(serviceId, createResult);
         if (createResult.code !== 0) {
           throw new Error(createResult.stderr || createResult.stdout || "Virtual environment creation failed.");
         }
+        environmentCreated = true;
       } else {
         this.appendLog(serviceId, "info", `Using existing virtual environment at ${environmentPath}.`);
       }
 
+      let pipHealth = await this.validateVenvPipHealth(serviceId, definition, venvPython);
+      if (!pipHealth.healthy) {
+        this.appendLog(serviceId, "warning", `${definition.name} detected corrupted Python environment: ${toErrorMessage(pipHealth.error)} Attempting ensurepip repair.`);
+        this.updateProvisioning(serviceId, {
+          state: ProvisioningStates.corrupted,
+          required: true,
+          requestedVersion,
+          environmentPath,
+          needsReprovision: true,
+          lastUpdatedAt: createClockTimestamp(this.clock),
+          lastError: createDiagnosticError(this.clock, "provisioning", toErrorMessage(pipHealth.error), {
+            code: pipHealth.error?.code ?? "PYTHON_RUNTIME_PIP_CORRUPTED",
+            category: "corrupted-environment",
+          }),
+        });
+
+        const ensurePipResult = await this.runCommand(venvPython, ["-m", "ensurepip", "--upgrade"], { cwd: definition.cwd });
+        this.appendCommandOutput(serviceId, ensurePipResult);
+        if (ensurePipResult.code === 0) {
+          pipHealth = await this.validateVenvPipHealth(serviceId, definition, venvPython);
+        }
+
+        if (!pipHealth.healthy) {
+          this.appendLog(serviceId, "warning", `${definition.name} pip repair failed; recreating virtual environment at ${environmentPath}.`);
+          if (existsSync(environmentPath)) {
+            rmSync(environmentPath, { recursive: true, force: true });
+          }
+
+          const recreateResult = await this.runCommand(interpreter.command, [...interpreter.args, "-m", "venv", environmentPath], { cwd: definition.cwd });
+          this.appendCommandOutput(serviceId, recreateResult);
+          if (recreateResult.code !== 0) {
+            const recreationError = new Error(recreateResult.stderr || recreateResult.stdout || "Virtual environment recreation failed.");
+            recreationError.code = "PYTHON_RUNTIME_ENV_RECREATE_FAILED";
+            throw recreationError;
+          }
+          environmentCreated = true;
+          pipHealth = await this.validateVenvPipHealth(serviceId, definition, venvPython);
+          if (!pipHealth.healthy) {
+            const corruptedError = new Error(`Python virtual environment remains corrupted after repair and recreation: ${toErrorMessage(pipHealth.error)}`);
+            corruptedError.code = "PYTHON_RUNTIME_PIP_CORRUPTED";
+            throw corruptedError;
+          }
+        }
+      }
+
+      if (!environmentCreated) {
+        this.appendLog(serviceId, "info", `Virtual environment at ${environmentPath} passed integrity checks.`);
+      }
+
       const upgradePip = await this.runCommand(venvPython, ["-m", "pip", "install", "--upgrade", "pip"], { cwd: definition.cwd });
-      if (upgradePip.stdout) this.appendLog(serviceId, "stdout", upgradePip.stdout);
-      if (upgradePip.stderr) this.appendLog(serviceId, "stderr", upgradePip.stderr);
+      this.appendCommandOutput(serviceId, upgradePip);
       if (upgradePip.code !== 0) {
         throw new Error(upgradePip.stderr || upgradePip.stdout || "pip upgrade failed.");
       }
@@ -1461,17 +1586,19 @@ export class InMemoryServiceSupervisor {
       const requirementsPath = path.join(definition.cwd, "requirements.txt");
       this.appendLog(serviceId, "info", `Installing requirements from ${requirementsPath}.`);
       const installRequirements = await this.runCommand(venvPython, ["-m", "pip", "install", "-r", requirementsPath], { cwd: definition.cwd });
-      if (installRequirements.stdout) this.appendLog(serviceId, "stdout", installRequirements.stdout);
-      if (installRequirements.stderr) this.appendLog(serviceId, "stderr", installRequirements.stderr);
+      this.appendCommandOutput(serviceId, installRequirements);
       if (installRequirements.code !== 0) {
         throw new Error(installRequirements.stderr || installRequirements.stdout || "requirements installation failed.");
       }
 
       mkdirSync(environmentPath, { recursive: true });
+      const provisioningFingerprint = buildProvisioningFingerprint(definition);
       writeFileSync(metadataPath, `${JSON.stringify({
+        schemaVersion: PROVISIONING_METADATA_SCHEMA_VERSION,
         requestedVersion,
         resolvedVersion: interpreter.version,
         resolvedInterpreter: interpreter.executable,
+        fingerprint: provisioningFingerprint,
         provisionedAt: createClockTimestamp(this.clock),
       }, null, 2)}\n`, "utf8");
 
@@ -1489,6 +1616,7 @@ export class InMemoryServiceSupervisor {
             resolvedInterpreter: interpreter.executable,
             environmentPath,
             versionMismatch: false,
+            fingerprintMismatch: false,
             needsReprovision: false,
             lastUpdatedAt: createClockTimestamp(this.clock),
             lastError: null,
@@ -1497,21 +1625,24 @@ export class InMemoryServiceSupervisor {
       });
     } catch (error) {
       this.appendLog(serviceId, "error", `${definition.name} provisioning failed: ${toErrorMessage(error)}`);
+      const isCorruptedEnvironment = error?.code === "PYTHON_RUNTIME_PIP_CORRUPTED";
       return this.updateState(serviceId, {
         detail: `${definition.name} provisioning failed: ${toErrorMessage(error)}`,
         diagnostics: {
           ...this.requireState(serviceId).diagnostics,
           provisioning: {
             ...this.requireState(serviceId).diagnostics.provisioning,
-            state: ProvisioningStates.provisionFailed,
+            state: isCorruptedEnvironment ? ProvisioningStates.corrupted : ProvisioningStates.provisionFailed,
             required: true,
             requestedVersion,
             environmentPath,
+            needsReprovision: true,
             lastUpdatedAt: createClockTimestamp(this.clock),
             lastError: {
               at: createClockTimestamp(this.clock),
               message: toErrorMessage(error),
               code: error?.code ?? null,
+              category: isCorruptedEnvironment ? "corrupted-environment" : "provisioning",
               details: toErrorDetails(error),
             },
           },
@@ -1837,7 +1968,11 @@ export class InMemoryServiceSupervisor {
 
     if (provisioning?.required && (provisioning.state !== ProvisioningStates.provisioned || provisioning.needsReprovision)) {
       const detail = provisioning.needsReprovision
-        ? `${definition.name} Python version changed from ${provisioning.resolvedVersion ?? "unknown"} to ${provisioning.requestedVersion ?? "unknown"}. Repair or recreate the environment before starting.`
+        ? provisioning.versionMismatch
+          ? `${definition.name} Python version changed from ${provisioning.resolvedVersion ?? "unknown"} to ${provisioning.requestedVersion ?? "unknown"}. Repair or recreate the environment before starting.`
+          : `${definition.name} environment inputs changed and reprovisioning is required before starting.`
+        : provisioning.state === ProvisioningStates.corrupted
+        ? `${definition.name} environment is corrupted. Repair or recreate the environment before starting.`
         : provisioning.state === ProvisioningStates.provisionFailed
         ? `${definition.name} provisioning failed. Repair or recreate the environment before starting.`
         : `${definition.name} must be provisioned before it can start.`;

@@ -37,6 +37,8 @@ Electron is the desktop host boundary; the renderer accesses desktop capabilitie
 - The shared graph now covers `python-runtime -> mcp-runtime` plus appended runtime-backed capability gates for delegated workflow execution, document conversion, dataset generation, model training, and narrow MCP server-operation execution in the UI composition.
 - Resolutions now carry an operational state model (`disabled`, `unavailable`, `provisioning`, `starting`, `healthy`, `degraded`, `failed`, `stopped`, `unknown`), fallback information, timestamps, metadata, and remediation hints.
 - The orchestrator also supports explicit `refresh`, single-dependency invalidation, and global invalidation so runtime-backed capabilities can recompute status after managed-runtime changes; the runtime console and managed-services store now use those hooks.
+- Python runtime provisioning in desktop development treats `.venv` as disposable: supervisor provisioning verifies venv/pip integrity before pip operations, attempts bounded `ensurepip --upgrade` repair for corrupted pip, and deterministically recreates the venv when repair does not restore integrity.
+- Provisioning/runtime diagnostics must stay truthful across these flows and distinguish at least unprovisioned, provisioning, provision-failed, corrupted environment, and needs-reprovision states.
 
 ## Caveat
 The preload bridge uses synchronous IPC and exposes storage/workflow/model-file capabilities.
