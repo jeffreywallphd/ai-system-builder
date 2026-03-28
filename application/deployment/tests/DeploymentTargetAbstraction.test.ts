@@ -57,6 +57,8 @@ describe("Deployment target abstraction", () => {
         supportedRuntimeEnvironments: ["container", "local"],
         providedRuntimeRequirements: ["gpu", "network", "filesystem"],
         supportedExportTargets: ["registry", "archive"],
+        supportedDeploymentSettings: ["region"],
+        supportedRuntimeSettings: ["runtimeEnvironment", "runtimeRequirements"],
       },
     });
     const edge = createDeploymentTarget({
@@ -69,6 +71,8 @@ describe("Deployment target abstraction", () => {
         supportedRuntimeEnvironments: ["edge"],
         providedRuntimeRequirements: ["network"],
         supportedExportTargets: ["archive"],
+        supportedDeploymentSettings: ["region"],
+        supportedRuntimeSettings: ["runtimeEnvironment", "runtimeRequirements"],
       },
     });
 
@@ -96,6 +100,8 @@ describe("Deployment target abstraction", () => {
         supportedRuntimeEnvironments: ["container"],
         providedRuntimeRequirements: ["network"],
         supportedExportTargets: ["registry"],
+        supportedDeploymentSettings: ["region"],
+        supportedRuntimeSettings: ["runtimeEnvironment", "runtimeRequirements"],
       },
     });
 

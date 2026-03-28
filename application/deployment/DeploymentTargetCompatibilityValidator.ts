@@ -24,7 +24,7 @@ export class DeploymentTargetCompatibilityValidator {
     readonly systemPackage: SystemPackage;
     readonly target: DeploymentTarget;
   }): DeploymentTargetCompatibilityResult {
-    const issues: DeploymentTargetCompatibilityResult["issues"] = [];
+    const issues: Array<DeploymentTargetCompatibilityResult["issues"][number]> = [];
     const requirements = input.systemPackage.manifest.requirements;
     const capabilities = input.target.capabilities;
 
