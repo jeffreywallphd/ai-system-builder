@@ -506,6 +506,23 @@ export class RuntimeConsoleStore {
         ...statuses.map((status) => this.mapMcpServerHealthCheck(status)),
       ]);
     } catch (error) {
+      if (isRequestCancelled(error)) {
+        this.appendLog({
+          severity: "info",
+          source: "mcp-runtime",
+          message: "MCP runtime inspection request was cancelled.",
+          error,
+          diagnosticsContext: {
+            message: "MCP runtime inspection request was cancelled.",
+            subsystem: "mcp-runtime",
+            className: "RuntimeConsoleStore",
+            methodName: "collectHealthChecks",
+            operation: "inspect-mcp-runtime-cancelled",
+          },
+        });
+        return this.buildCancelledMcpInspectionHealthChecks(checks);
+      }
+
       const message = toErrorMessage(error) || "Unable to inspect MCP server health.";
       this.appendLog({
         severity: "error",
@@ -530,6 +547,25 @@ export class RuntimeConsoleStore {
       });
       return Object.freeze(checks);
     }
+  }
+
+  private buildCancelledMcpInspectionHealthChecks(checks: RuntimeHealthCheck[]): ReadonlyArray<RuntimeHealthCheck> {
+    const existingMcpChecks = this.state.healthChecks.filter((check) => check.kind === "mcp-runtime" || check.kind === "mcp-server");
+    if (existingMcpChecks.length > 0) {
+      return Object.freeze([...checks, ...existingMcpChecks]);
+    }
+
+    return Object.freeze([
+      ...checks,
+      {
+        id: "mcp-runtime",
+        label: "MCP runtime",
+        kind: "mcp-runtime",
+        status: "unknown",
+        detail: "MCP runtime inspection was cancelled before completion.",
+        checkedAt: new Date().toISOString(),
+      },
+    ]);
   }
 
   private buildPythonRuntimeHealthChecks(status: PythonRuntimeManagerStatus): ReadonlyArray<RuntimeHealthCheck> {
@@ -983,6 +1019,25 @@ function toErrorMessage(error: unknown): string | undefined {
 
 function toErrorStack(error: unknown): string | undefined {
   return error instanceof Error ? error.stack : undefined;
+}
+
+function isRequestCancelled(error: unknown): boolean {
+  const diagnostics = normalizeRuntimeError(error);
+  const details = diagnostics.details;
+  if (details && typeof details === "object") {
+    const lifecycle = (details as { requestLifecycle?: unknown }).requestLifecycle;
+    if (lifecycle === "cancelled") {
+      return true;
+    }
+  }
+
+  return diagnostics.name === "AbortError"
+    || diagnostics.message.toLowerCase().includes("aborted")
+    || diagnostics.message.toLowerCase().includes("cancelled")
+    || diagnostics.causeChain.some((entry) => {
+      const text = entry.message.toLowerCase();
+      return text.includes("aborted") || text.includes("cancelled");
+    });
 }
 
 function readRuntimeDiagnostics(details: RuntimeEvent["details"]): RuntimeDiagnostics | undefined {

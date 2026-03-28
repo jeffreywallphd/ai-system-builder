@@ -21,7 +21,7 @@ from app.services.dataset_generation_service import DatasetGenerationService
 
 @lru_cache
 def get_health_service() -> HealthService:
-    return HealthService()
+    return HealthService(training_service=get_model_training_service())
 
 
 @lru_cache

@@ -2,6 +2,16 @@ from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class RuntimeCapabilityStatus(BaseModel):
+    capability_id: str
+    state: Literal["ready", "unavailable", "degraded"]
+    reason_code: Optional[str] = None
+    reason_category: Optional[Literal["dependency-missing", "host-incompatible", "resource-constrained", "execution-constrained", "unknown"]] = None
+    detail: Optional[str] = None
+    checked_at: str
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
 class HealthResponse(BaseModel):
     status: Literal["ok", "degraded", "unavailable"]
     runtime: Literal["python"] = "python"

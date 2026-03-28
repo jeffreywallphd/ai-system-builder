@@ -46,6 +46,19 @@ Desktop development is now the main truthful development runtime:
 - scaffold execution remains available only as an explicit fallback path and is labeled as such in execution metadata
 - the primary node catalog is registry-backed rather than mock-only
 
+The Python runtime provisioning path in development also treats `.venv` as a disposable managed artifact:
+
+- the supervisor performs explicit virtual-environment/pip integrity checks before package installation
+- integrity checks now explicitly detect missing interpreter, pip import/command failures, and invalid pip distribution artifacts (for example leftover `~ip*.dist-info`)
+- bounded in-place repair is attempted only when safe (`ensurepip --upgrade`), then revalidated; unsafe cases transition directly to rebuild
+- when an environment is unhealthy, the supervisor provisions a fresh staged environment under `.venv.managed/`, validates it, promotes it as active, and marks prior environments invalid/cleanup-pending on a best-effort basis
+- runtime diagnostics keep corrupted/rebuild-needed/rebuild-in-progress truth explicit instead of retrying poisoned environments indefinitely
+- provisioning and launchability are now modeled separately: the supervisor records `provisioned` vs `provisioned-unlaunchable` so “requirements installed” is not treated as “runtime can boot on this host”
+- provisioning now runs an explicit runtime import preflight (`import app.main`) and persists launchability diagnostics so host-incompatible native dependencies (for example CPU-incompatible NumPy wheels) are surfaced as a known root cause instead of generic startup timeouts
+- browser and desktop dev startup now consult supervisor state directly after `ensure-running`; when the runtime is already known failed/unlaunchable, startup reports that cause immediately instead of primarily timing out on `127.0.0.1:8100`
+- model-training native dependency failures are capability-scoped: the core Python API can still boot, while local gradient training truthfully reports unavailable/degraded behavior when NumPy cannot initialize
+- runtime health (`/health` bootability), capability health (for example `local-gradient-training` dependency/platform/resource readiness), and task execution readiness are now reported as distinct truths; a bootable runtime does not imply every optional local capability is runnable on the current machine
+
 ## Production desktop mode
 
 Production is now modeled as a packaged Electron app for **Windows** and **macOS**.
@@ -60,6 +73,7 @@ In packaged desktop builds:
 - Core renderer persistence is backed by a **SQLite** database stored under the app data directory.
 - Production no longer relies on browser `localStorage` or in-memory workflow repositories as the system of record.
 - The Python runtime path is resolved as a **private packaged runtime location** under `runtime-assets/python/<platform>-<arch>/...`.
+- Packaged desktop keeps this private runtime direction and does not fall back into dev `.venv` provisioning semantics; health/provisioning diagnostics still use the same truthful managed-service contract.
 
 ### Private Python runtime packaging
 

@@ -20,6 +20,21 @@ import ToolsPage from "../pages/ToolsPage";
 import ToolRunPage from "../pages/ToolRunPage";
 import SettingsPage from "../pages/SettingsPage";
 import AgentStudioPage from "../pages/AgentStudioPage";
+import StudioShellPage from "../pages/StudioShellPage";
+import WorkflowStudioPage from "../pages/WorkflowStudioPage";
+import ContextBundleStudioPage from "../pages/ContextBundleStudioPage";
+import DatasetPipelineStudioPage from "../pages/DatasetPipelineStudioPage";
+import TrainingRecipeStudioPage from "../pages/TrainingRecipeStudioPage";
+import ToolChainStudioPage from "../pages/ToolChainStudioPage";
+import SystemStudioPage from "../pages/SystemStudioPage";
+import ModelStudioPage from "../pages/ModelStudioPage";
+import DatasetStudioPage from "../pages/DatasetStudioPage";
+import ToolStudioPage from "../pages/ToolStudioPage";
+import PromptTemplateStudioPage from "../pages/PromptTemplateStudioPage";
+import EmbeddingIndexStudioPage from "../pages/EmbeddingIndexStudioPage";
+import ConfigProfileStudioPage from "../pages/ConfigProfileStudioPage";
+import RegistryPage from "../pages/RegistryPage";
+import AssetDetailPage from "../pages/AssetDetailPage";
 import ProtectedRoute from "./ProtectedRoute";
 import { ROUTE_PATHS } from "./RouteConfig";
 
@@ -57,6 +72,21 @@ export default function AppRouter({
           { path: ROUTE_PATHS.services, element: <ManagedServicesPage /> },
           { path: ROUTE_PATHS.assets, element: <AssetsPage /> },
           { path: ROUTE_PATHS.agentStudio, element: <AgentStudioPage /> },
+          { path: ROUTE_PATHS.studioShell, element: <StudioShellPage /> },
+          { path: ROUTE_PATHS.registry, element: <RegistryPage /> },
+          { path: ROUTE_PATHS.registryAssetDetail, element: <AssetDetailPage /> },
+          { path: ROUTE_PATHS.workflowStudio, element: <WorkflowStudioPage /> },
+          { path: ROUTE_PATHS.contextBundleStudio, element: <ContextBundleStudioPage /> },
+          { path: ROUTE_PATHS.datasetPipelineStudio, element: <DatasetPipelineStudioPage /> },
+          { path: ROUTE_PATHS.trainingRecipeStudio, element: <TrainingRecipeStudioPage /> },
+          { path: ROUTE_PATHS.toolChainStudio, element: <ToolChainStudioPage /> },
+          { path: ROUTE_PATHS.systemStudio, element: <SystemStudioPage /> },
+          { path: ROUTE_PATHS.modelStudio, element: <ModelStudioPage /> },
+          { path: ROUTE_PATHS.datasetStudio, element: <DatasetStudioPage /> },
+          { path: ROUTE_PATHS.toolStudio, element: <ToolStudioPage /> },
+          { path: ROUTE_PATHS.promptTemplateStudio, element: <PromptTemplateStudioPage /> },
+          { path: ROUTE_PATHS.embeddingIndexStudio, element: <EmbeddingIndexStudioPage /> },
+          { path: ROUTE_PATHS.configProfileStudio, element: <ConfigProfileStudioPage /> },
           { path: ROUTE_PATHS.settings, element: <SettingsPage /> },
         ],
       },

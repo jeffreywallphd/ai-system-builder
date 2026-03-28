@@ -1,5 +1,6 @@
 import "dotenv/config";
 import http from "node:http";
+import crypto from "node:crypto";
 import {
   accessSync,
   constants as fsConstants,
@@ -44,6 +45,10 @@ const DEFAULT_PYTHON_RUNTIME_ENTRYPOINT = "app.main:app";
 const DEFAULT_PYTHON_RUNTIME_VERSION = process.env.PYTHON_RUNTIME_PYTHON_VERSION?.trim() || "3.12";
 const SUPPORTED_PYTHON_VERSIONS = new Set(["3.11", "3.12"]);
 const PROVISIONING_METADATA_FILENAME = ".ai-loom-python-provisioning.json";
+const PROVISIONING_METADATA_SCHEMA_VERSION = 3;
+const RUNTIME_ENVIRONMENT_STATE_FILENAME = ".ai-loom-python-runtime-state.json";
+const RUNTIME_ENVIRONMENT_STATE_SCHEMA_VERSION = 1;
+const MANAGED_ENVIRONMENTS_DIRECTORY = ".venv.managed";
 const DEFAULT_DEFINITIONS_PATH = path.join(process.cwd(), ".ai-loom-studio", "managed-services.json");
 const DEFAULT_CONTROL_TOKEN = process.env.SERVICE_SUPERVISOR_CONTROL_TOKEN?.trim() || undefined;
 const DEFAULT_RESTART_POLICY = Object.freeze({
@@ -97,7 +102,9 @@ export const ProvisioningStates = Object.freeze({
   unprovisioned: "unprovisioned",
   provisioning: "provisioning",
   provisioned: "provisioned",
+  provisionedUnlaunchable: "provisioned-unlaunchable",
   provisionFailed: "provision-failed",
+  corrupted: "corrupted",
 });
 
 function createClockTimestamp(clock) {
@@ -353,7 +360,14 @@ function validateWorkingDirectory(cwd, securityPolicy) {
   return resolvedCwd;
 }
 
-function validateExecutable(command, securityPolicy) {
+function isTrustedBuiltinPythonLauncher(command, context) {
+  return command === "py"
+    && context?.serviceId === "python-runtime"
+    && context?.kind === "python-runtime"
+    && context?.source === "builtin";
+}
+
+function validateExecutable(command, securityPolicy, context = undefined) {
   assertNoUnsafeShellInterpolation(command, "Service command");
 
   if (/\s/.test(command.trim())) {
@@ -381,7 +395,7 @@ function validateExecutable(command, securityPolicy) {
     throw new Error("Relative executable paths are not allowed; use an approved absolute path or command name.");
   }
 
-  if (!securityPolicy.allowedExecutableNames.has(command)) {
+  if (!securityPolicy.allowedExecutableNames.has(command) && !isTrustedBuiltinPythonLauncher(command, context)) {
     throw new Error(`Executable '${command}' is not in the allowed executable list.`);
   }
 
@@ -518,12 +532,31 @@ function normalizeServiceDefinition(definition, options = {}) {
     throw new Error(`Service '${serviceId}' healthCheckPath must begin with '/'.`);
   }
 
+  const normalizedKind = typeof definition.kind === "string" && definition.kind.trim()
+    ? definition.kind.trim()
+    : typeof metadata.kind === "string" && metadata.kind.trim()
+      ? metadata.kind.trim()
+      : serviceId === "python-runtime"
+        ? "python-runtime"
+        : "custom";
+  const normalizedSource = typeof definition.source === "string" && definition.source.trim()
+    ? definition.source.trim()
+    : typeof metadata.source === "string" && metadata.source.trim()
+      ? metadata.source.trim()
+      : serviceId === "python-runtime"
+        ? "builtin"
+        : "custom";
+
   const normalized = Object.freeze({
     serviceId,
     name: name || serviceId,
     dependencies: Object.freeze(normalizeDependencyList(definition.dependencies, serviceId)),
     command: typeof definition.command === "string" && definition.command.trim()
-      ? validateExecutable(definition.command.trim(), securityPolicy)
+      ? validateExecutable(definition.command.trim(), securityPolicy, {
+        serviceId,
+        kind: normalizedKind,
+        source: normalizedSource,
+      })
       : undefined,
     args,
     cwd,
@@ -535,20 +568,8 @@ function normalizeServiceDefinition(definition, options = {}) {
     stopTimeoutMs: normalizePositiveNumber(definition.stopTimeoutMs, DEFAULT_STOP_TIMEOUT_MS),
     metadata: {
       ...metadata,
-      kind: typeof definition.kind === "string" && definition.kind.trim()
-        ? definition.kind.trim()
-        : typeof metadata.kind === "string" && metadata.kind.trim()
-          ? metadata.kind.trim()
-          : serviceId === "python-runtime"
-            ? "python-runtime"
-            : "custom",
-      source: typeof definition.source === "string" && definition.source.trim()
-        ? definition.source.trim()
-        : typeof metadata.source === "string" && metadata.source.trim()
-          ? metadata.source.trim()
-          : serviceId === "python-runtime"
-            ? "builtin"
-            : "custom",
+      kind: normalizedKind,
+      source: normalizedSource,
       transport,
       autoStartPolicy: typeof definition.autoStartPolicy === "string" && definition.autoStartPolicy.trim()
         ? definition.autoStartPolicy.trim()
@@ -774,22 +795,107 @@ function resolveRequestedPythonVersion(definition) {
   return definition?.metadata?.pythonVersion ?? DEFAULT_PYTHON_RUNTIME_VERSION;
 }
 
-function getPythonEnvironmentPath(definition) {
+function getDefaultPythonEnvironmentPath(definition) {
   return path.join(definition.cwd, ".venv");
 }
 
-function getProvisioningMetadataPath(definition) {
-  return path.join(getPythonEnvironmentPath(definition), PROVISIONING_METADATA_FILENAME);
+function getRuntimeEnvironmentStatePath(definition) {
+  return path.join(definition.cwd, RUNTIME_ENVIRONMENT_STATE_FILENAME);
 }
 
-function getVenvPythonPath(definition) {
+function readRuntimeEnvironmentState(definition) {
+  const statePath = getRuntimeEnvironmentStatePath(definition);
+  if (!existsSync(statePath)) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(readFileSync(statePath, "utf8"));
+    if (!parsed || typeof parsed !== "object") {
+      return undefined;
+    }
+    return parsed;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeRuntimeEnvironmentState(definition, state) {
+  const statePath = getRuntimeEnvironmentStatePath(definition);
+  mkdirSync(path.dirname(statePath), { recursive: true });
+  writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+}
+
+function isInvalidEnvironmentPath(definition, environmentPath) {
+  const state = readRuntimeEnvironmentState(definition);
+  const invalid = state?.invalidEnvironments;
+  return Boolean(invalid && typeof invalid === "object" && invalid[environmentPath]);
+}
+
+function markInvalidEnvironment(definition, environmentPath, reason, clock) {
+  if (!environmentPath) {
+    return;
+  }
+  const state = readRuntimeEnvironmentState(definition);
+  const invalidEnvironments = state?.invalidEnvironments && typeof state.invalidEnvironments === "object"
+    ? { ...state.invalidEnvironments }
+    : {};
+  invalidEnvironments[environmentPath] = {
+    at: createClockTimestamp(clock),
+    reason,
+  };
+  writeRuntimeEnvironmentState(definition, {
+    schemaVersion: RUNTIME_ENVIRONMENT_STATE_SCHEMA_VERSION,
+    activeEnvironmentPath: state?.activeEnvironmentPath ?? null,
+    cleanupPendingPaths: Array.isArray(state?.cleanupPendingPaths) ? [...state.cleanupPendingPaths] : [],
+    invalidEnvironments,
+    updatedAt: createClockTimestamp(clock),
+  });
+}
+
+function clearInvalidEnvironment(definition, environmentPath, clock) {
+  if (!environmentPath) {
+    return;
+  }
+  const state = readRuntimeEnvironmentState(definition);
+  if (!state?.invalidEnvironments || typeof state.invalidEnvironments !== "object") {
+    return;
+  }
+  const invalidEnvironments = { ...state.invalidEnvironments };
+  delete invalidEnvironments[environmentPath];
+  writeRuntimeEnvironmentState(definition, {
+    schemaVersion: RUNTIME_ENVIRONMENT_STATE_SCHEMA_VERSION,
+    activeEnvironmentPath: state?.activeEnvironmentPath ?? null,
+    cleanupPendingPaths: Array.isArray(state?.cleanupPendingPaths) ? [...state.cleanupPendingPaths] : [],
+    invalidEnvironments,
+    updatedAt: createClockTimestamp(clock),
+  });
+}
+
+function getPythonEnvironmentPath(definition) {
+  const state = readRuntimeEnvironmentState(definition);
+  const configuredPath = typeof state?.activeEnvironmentPath === "string" && state.activeEnvironmentPath.trim()
+    ? state.activeEnvironmentPath
+    : null;
+  if (configuredPath && !isInvalidEnvironmentPath(definition, configuredPath)) {
+    return configuredPath;
+  }
+
+  return getDefaultPythonEnvironmentPath(definition);
+}
+
+function getProvisioningMetadataPath(definition, environmentPath = getPythonEnvironmentPath(definition)) {
+  return path.join(environmentPath, PROVISIONING_METADATA_FILENAME);
+}
+
+function getVenvPythonPath(definition, environmentPath = getPythonEnvironmentPath(definition)) {
   return process.platform === "win32"
-    ? path.join(getPythonEnvironmentPath(definition), "Scripts", "python.exe")
-    : path.join(getPythonEnvironmentPath(definition), "bin", "python");
+    ? path.join(environmentPath, "Scripts", "python.exe")
+    : path.join(environmentPath, "bin", "python");
 }
 
-function readProvisioningMetadata(definition) {
-  const metadataPath = getProvisioningMetadataPath(definition);
+function readProvisioningMetadata(definition, environmentPath = getPythonEnvironmentPath(definition)) {
+  const metadataPath = getProvisioningMetadataPath(definition, environmentPath);
   if (!existsSync(metadataPath)) {
     return undefined;
   }
@@ -801,7 +907,109 @@ function readProvisioningMetadata(definition) {
   }
 }
 
+function normalizeLaunchabilityMetadata(metadata) {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return undefined;
+  }
+
+  const state = typeof metadata.state === "string" ? metadata.state.trim() : "";
+  if (!state) {
+    return undefined;
+  }
+
+  const lastError = metadata.lastError && typeof metadata.lastError === "object" && !Array.isArray(metadata.lastError)
+    ? {
+      at: typeof metadata.lastError.at === "string" ? metadata.lastError.at : null,
+      message: typeof metadata.lastError.message === "string" ? metadata.lastError.message : "Runtime launchability preflight failed.",
+      code: typeof metadata.lastError.code === "string" ? metadata.lastError.code : null,
+      category: typeof metadata.lastError.category === "string" ? metadata.lastError.category : "runtime-launchability",
+      details: metadata.lastError.details && typeof metadata.lastError.details === "object" && !Array.isArray(metadata.lastError.details)
+        ? { ...metadata.lastError.details }
+        : {},
+    }
+    : null;
+
+  return {
+    state,
+    checkedAt: typeof metadata.checkedAt === "string" ? metadata.checkedAt : null,
+    lastError,
+  };
+}
+
+function classifyRuntimeLaunchabilityIssue(message) {
+  const normalized = String(message || "").toLowerCase();
+  if (!normalized) {
+    return { category: "runtime-launchability", code: "PYTHON_RUNTIME_IMPORT_PREFLIGHT_FAILED" };
+  }
+  if (
+    normalized.includes("x86_v2")
+    || normalized.includes("doesn't support")
+    || normalized.includes("cpu")
+    || normalized.includes("illegal instruction")
+  ) {
+    return { category: "host-incompatible", code: "PYTHON_RUNTIME_HOST_INCOMPATIBLE_DEPENDENCY" };
+  }
+  if (normalized.includes("cannot import") || normalized.includes("importerror") || normalized.includes("module not found")) {
+    return { category: "dependency-import", code: "PYTHON_RUNTIME_IMPORT_PREFLIGHT_FAILED" };
+  }
+  return { category: "runtime-launchability", code: "PYTHON_RUNTIME_IMPORT_PREFLIGHT_FAILED" };
+}
+
+function hashFileContents(filePath) {
+  if (!existsSync(filePath)) {
+    return null;
+  }
+
+  return crypto.createHash("sha256").update(readFileSync(filePath)).digest("hex");
+}
+
+function buildProvisioningFingerprint(definition) {
+  return {
+    schemaVersion: PROVISIONING_METADATA_SCHEMA_VERSION,
+    requirementsHash: hashFileContents(path.join(definition.cwd, "requirements.txt")),
+    platform: process.platform,
+    arch: process.arch,
+  };
+}
+
+function isFingerprintMismatch(currentFingerprint, savedFingerprint) {
+  if (!savedFingerprint || typeof savedFingerprint !== "object") {
+    return true;
+  }
+
+  return currentFingerprint.schemaVersion !== savedFingerprint.schemaVersion
+    || currentFingerprint.requirementsHash !== savedFingerprint.requirementsHash
+    || currentFingerprint.platform !== savedFingerprint.platform
+    || currentFingerprint.arch !== savedFingerprint.arch;
+}
+
 function buildInitialProvisioningState(clock, definition) {
+  const isBuiltinPythonWorkspace = definition?.serviceId === "python-runtime"
+    && path.basename(definition?.cwd || "") === "python-runtime";
+  if (definition?.invalid && isBuiltinPythonWorkspace) {
+    return {
+      state: ProvisioningStates.provisionFailed,
+      required: true,
+      requestedVersion: resolveRequestedPythonVersion(definition),
+      resolvedVersion: null,
+      resolvedInterpreter: null,
+      environmentPath: getPythonEnvironmentPath(definition),
+      versionMismatch: false,
+      fingerprintMismatch: false,
+      needsReprovision: true,
+      lastUpdatedAt: createClockTimestamp(clock),
+      lastError: createDiagnosticError(
+        clock,
+        "config",
+        `Invalid service configuration: ${definition.invalidReason ?? "Unknown configuration error."}`,
+        {
+          code: "SERVICE_CONFIGURATION_INVALID",
+          serviceId: definition.serviceId,
+        },
+      ),
+    };
+  }
+
   if (!isProvisioningRequired(definition)) {
     return {
       state: ProvisioningStates.unsupported,
@@ -811,6 +1019,7 @@ function buildInitialProvisioningState(clock, definition) {
       resolvedInterpreter: null,
       environmentPath: null,
       versionMismatch: false,
+      fingerprintMismatch: false,
       needsReprovision: false,
       lastUpdatedAt: null,
       lastError: null,
@@ -818,24 +1027,55 @@ function buildInitialProvisioningState(clock, definition) {
   }
 
   const requestedVersion = resolveRequestedPythonVersion(definition);
-  const metadata = readProvisioningMetadata(definition);
   const environmentPath = getPythonEnvironmentPath(definition);
-  const venvPythonPath = getVenvPythonPath(definition);
+  const metadata = readProvisioningMetadata(definition, environmentPath);
+  const venvPythonPath = getVenvPythonPath(definition, environmentPath);
   const hasEnvironment = existsSync(environmentPath) && existsSync(venvPythonPath);
+  const isInvalidEnvironment = isInvalidEnvironmentPath(definition, environmentPath);
   const resolvedVersion = metadata?.resolvedVersion ?? null;
   const versionMismatch = Boolean(hasEnvironment && resolvedVersion && !String(resolvedVersion).startsWith(requestedVersion));
+  const fingerprintMismatch = Boolean(hasEnvironment
+    && isFingerprintMismatch(buildProvisioningFingerprint(definition), metadata?.fingerprint));
+  const needsReprovision = isInvalidEnvironment || versionMismatch || fingerprintMismatch;
+  const launchability = normalizeLaunchabilityMetadata(metadata?.launchability);
+  const hasRecordedLaunchabilityFailure = launchability?.state === "unlaunchable";
+  const state = !hasEnvironment
+    ? ProvisioningStates.unprovisioned
+    : isInvalidEnvironment
+      ? ProvisioningStates.corrupted
+      : hasRecordedLaunchabilityFailure
+        ? ProvisioningStates.provisionedUnlaunchable
+      : ProvisioningStates.provisioned;
 
   return {
-    state: hasEnvironment ? ProvisioningStates.provisioned : ProvisioningStates.unprovisioned,
+    state,
     required: true,
     requestedVersion,
     resolvedVersion,
     resolvedInterpreter: metadata?.resolvedInterpreter ?? null,
     environmentPath,
     versionMismatch,
-    needsReprovision: versionMismatch,
-    lastUpdatedAt: metadata?.provisionedAt ?? null,
-    lastError: null,
+    fingerprintMismatch,
+    needsReprovision,
+    lastUpdatedAt: launchability?.checkedAt ?? metadata?.provisionedAt ?? null,
+    lastError: isInvalidEnvironment
+      ? createDiagnosticError(clock, "provisioning", "Managed Python environment is marked invalid and must be recreated.", {
+        code: "PYTHON_RUNTIME_ENV_INVALIDATED",
+        category: "corrupted-environment",
+        environmentPath,
+      })
+      : launchability?.lastError
+        ? createDiagnosticError(
+          clock,
+          "runtime-launchability",
+          launchability.lastError.message,
+          {
+            code: launchability.lastError.code ?? "PYTHON_RUNTIME_IMPORT_PREFLIGHT_FAILED",
+            category: launchability.lastError.category ?? "runtime-launchability",
+            ...launchability.lastError.details,
+          },
+        )
+      : null,
   };
 }
 
@@ -1134,12 +1374,15 @@ export class InMemoryServiceSupervisor {
           ? rawDefinition.serviceId.trim()
           : `invalid-service-${this.definitions.size + this.states.size + 1}`;
         const name = typeof rawDefinition?.name === "string" && rawDefinition.name.trim() ? rawDefinition.name.trim() : serviceId;
+        const fallbackCwd = typeof rawDefinition?.cwd === "string" && rawDefinition.cwd.trim()
+          ? rawDefinition.cwd.trim()
+          : process.cwd();
         const fallbackDefinition = Object.freeze({
           serviceId,
           name,
           command: undefined,
           args: [],
-          cwd: process.cwd(),
+          cwd: fallbackCwd,
           env: {},
           baseUrl: undefined,
       healthCheckPath: DEFAULT_PYTHON_RUNTIME_HEALTH_PATH,
@@ -1278,6 +1521,7 @@ export class InMemoryServiceSupervisor {
       requestedVersion,
       environmentPath: getPythonEnvironmentPath(definition),
       versionMismatch,
+      fingerprintMismatch: baseline.fingerprintMismatch,
       needsReprovision: versionMismatch || baseline.needsReprovision,
       state: existingProvisioning.state === ProvisioningStates.unsupported
         ? baseline.state
@@ -1323,6 +1567,73 @@ export class InMemoryServiceSupervisor {
           stderr: stderr.trim(),
         });
       });
+    });
+  }
+
+  removeDirectory(targetPath) {
+    rmSync(targetPath, { recursive: true, force: true });
+  }
+
+  ensureDirectory(targetPath) {
+    mkdirSync(targetPath, { recursive: true });
+  }
+
+  createManagedEnvironmentPath(definition) {
+    const token = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    return path.join(definition.cwd, MANAGED_ENVIRONMENTS_DIRECTORY, `env-${token}`);
+  }
+
+  tryCleanupEnvironmentPath(serviceId, environmentPath, reason = "cleanup") {
+    if (!environmentPath || !existsSync(environmentPath)) {
+      return true;
+    }
+    try {
+      this.removeDirectory(environmentPath);
+      this.appendLog(serviceId, "info", `Removed stale Python environment at ${environmentPath} (${reason}).`);
+      return true;
+    } catch (error) {
+      this.appendLog(serviceId, "warning", `Deferred cleanup for Python environment ${environmentPath}: ${toErrorMessage(error)}`);
+      return false;
+    }
+  }
+
+  promoteActiveEnvironment(definition, environmentPath, previousEnvironmentPath) {
+    const existing = readRuntimeEnvironmentState(definition);
+    const pending = new Set(Array.isArray(existing?.cleanupPendingPaths) ? existing.cleanupPendingPaths : []);
+    if (previousEnvironmentPath && previousEnvironmentPath !== environmentPath) {
+      pending.add(previousEnvironmentPath);
+    }
+    pending.delete(environmentPath);
+    writeRuntimeEnvironmentState(definition, {
+      schemaVersion: RUNTIME_ENVIRONMENT_STATE_SCHEMA_VERSION,
+      activeEnvironmentPath: environmentPath,
+      cleanupPendingPaths: [...pending],
+      invalidEnvironments: existing?.invalidEnvironments && typeof existing.invalidEnvironments === "object"
+        ? { ...existing.invalidEnvironments }
+        : {},
+      updatedAt: createClockTimestamp(this.clock),
+    });
+  }
+
+  flushPendingEnvironmentCleanup(serviceId, definition) {
+    const state = readRuntimeEnvironmentState(definition);
+    if (!Array.isArray(state?.cleanupPendingPaths) || state.cleanupPendingPaths.length === 0) {
+      return;
+    }
+    const retained = [];
+    for (const pendingPath of state.cleanupPendingPaths) {
+      if (!this.tryCleanupEnvironmentPath(serviceId, pendingPath, "deferred-cleanup")) {
+        retained.push(pendingPath);
+      }
+    }
+    writeRuntimeEnvironmentState(definition, {
+      schemaVersion: RUNTIME_ENVIRONMENT_STATE_SCHEMA_VERSION,
+      activeEnvironmentPath: state.activeEnvironmentPath ?? null,
+      cleanupPendingPaths: retained,
+      invalidEnvironments: state.invalidEnvironments && typeof state.invalidEnvironments === "object"
+        ? { ...state.invalidEnvironments }
+        : {},
+      updatedAt: createClockTimestamp(this.clock),
     });
   }
 
@@ -1392,6 +1703,129 @@ export class InMemoryServiceSupervisor {
     });
   }
 
+  appendCommandOutput(serviceId, result) {
+    if (!result) {
+      return;
+    }
+
+    if (result.stdout) {
+      this.appendLog(serviceId, "stdout", result.stdout);
+    }
+    if (result.stderr) {
+      this.appendLog(serviceId, "stderr", result.stderr);
+    }
+  }
+
+  async validateVenvPipHealth(serviceId, definition, venvPython, environmentPath) {
+    const issues = [];
+    if (!existsSync(venvPython)) {
+      issues.push("missing-interpreter");
+      return {
+        healthy: false,
+        issues,
+        error: new Error(`Virtual environment interpreter not found at ${venvPython}.`),
+      };
+    }
+
+    const importCheck = await this.runCommand(
+      venvPython,
+      ["-c", "import pip; import pip._internal.cli.main"],
+      { cwd: definition.cwd },
+    );
+    this.appendCommandOutput(serviceId, importCheck);
+    if (importCheck.code !== 0) {
+      const error = new Error(importCheck.stderr || importCheck.stdout || "pip import integrity check failed.");
+      error.code = "PYTHON_RUNTIME_PIP_CORRUPTED";
+      issues.push("pip-import-failed");
+      return { healthy: false, issues, error };
+    }
+
+    const pipVersion = await this.runCommand(venvPython, ["-m", "pip", "--version"], { cwd: definition.cwd });
+    this.appendCommandOutput(serviceId, pipVersion);
+    if (pipVersion.code !== 0) {
+      const error = new Error(pipVersion.stderr || pipVersion.stdout || "pip command check failed.");
+      error.code = "PYTHON_RUNTIME_PIP_CORRUPTED";
+      issues.push("pip-command-failed");
+      return { healthy: false, issues, error };
+    }
+
+    const invalidDistributionCheck = await this.runCommand(
+      venvPython,
+      ["-c", "import json,pathlib,sysconfig; p=pathlib.Path(sysconfig.get_paths().get('purelib') or ''); bad=sorted(x.name for x in p.iterdir() if x.name.startswith('~') and (x.name.endswith('.dist-info') or x.name.endswith('.egg-info'))) if p.exists() else []; print(json.dumps({'invalidDistributions': bad}))"],
+      { cwd: definition.cwd },
+    );
+    this.appendCommandOutput(serviceId, invalidDistributionCheck);
+    if (invalidDistributionCheck.code !== 0) {
+      const error = new Error(invalidDistributionCheck.stderr || invalidDistributionCheck.stdout || "pip distribution integrity check failed.");
+      error.code = "PYTHON_RUNTIME_PIP_CORRUPTED";
+      issues.push("pip-distribution-scan-failed");
+      return { healthy: false, issues, error };
+    }
+
+    try {
+      const parsed = JSON.parse(invalidDistributionCheck.stdout || "{}");
+      const invalidDistributions = Array.isArray(parsed.invalidDistributions)
+        ? parsed.invalidDistributions.filter((entry) => typeof entry === "string" && entry.trim())
+        : [];
+      if (invalidDistributions.length > 0) {
+        const error = new Error(`Invalid pip distributions detected: ${invalidDistributions.join(", ")}.`);
+        error.code = "PYTHON_RUNTIME_PIP_INVALID_DISTRIBUTIONS";
+        issues.push("invalid-distributions");
+        return { healthy: false, issues, error };
+      }
+    } catch (error) {
+      const parseError = new Error(`pip distribution integrity check returned invalid JSON: ${toErrorMessage(error)}`);
+      parseError.code = "PYTHON_RUNTIME_PIP_CORRUPTED";
+      issues.push("pip-distribution-scan-parse-failed");
+      return { healthy: false, issues, error: parseError };
+    }
+
+    if (environmentPath && isInvalidEnvironmentPath(definition, environmentPath)) {
+      const error = new Error(`Managed Python environment at ${environmentPath} is marked invalid and cannot be reused.`);
+      error.code = "PYTHON_RUNTIME_ENV_INVALIDATED";
+      issues.push("environment-invalidated");
+      return { healthy: false, issues, error };
+    }
+
+    return { healthy: true, issues, error: null };
+  }
+
+  async validateRuntimeLaunchabilityPreflight(serviceId, definition, pythonExecutable) {
+    const result = await this.runCommand(
+      pythonExecutable,
+      ["-c", "import app.main"],
+      { cwd: definition.cwd },
+    );
+    this.appendCommandOutput(serviceId, result);
+
+    if (result.code === 0) {
+      return {
+        launchable: true,
+        checkedAt: createClockTimestamp(this.clock),
+        lastError: null,
+      };
+    }
+
+    const failureMessage = result.stderr || result.stdout || "Python runtime import preflight failed.";
+    const issue = classifyRuntimeLaunchabilityIssue(failureMessage);
+    return {
+      launchable: false,
+      checkedAt: createClockTimestamp(this.clock),
+      lastError: {
+        at: createClockTimestamp(this.clock),
+        message: failureMessage,
+        code: issue.code,
+        category: issue.category,
+        details: {
+          command: pythonExecutable,
+          check: "import app.main",
+          exitCode: result.code,
+          signal: result.signal ?? null,
+        },
+      },
+    };
+  }
+
   async provisionInternal(serviceId, action) {
     const definition = this.requireDefinition(serviceId);
     const state = this.requireState(serviceId);
@@ -1400,7 +1834,6 @@ export class InMemoryServiceSupervisor {
     }
 
     const environmentPath = getPythonEnvironmentPath(definition);
-    const metadataPath = getProvisioningMetadataPath(definition);
     const requestedVersion = resolveRequestedPythonVersion(definition);
 
     this.updateProvisioning(serviceId, {
@@ -1417,101 +1850,198 @@ export class InMemoryServiceSupervisor {
       const interpreter = await this.resolvePythonInterpreter(definition);
       this.appendLog(serviceId, "info", `Resolved Python ${interpreter.version} at ${interpreter.executable}.`);
 
-      if (action === "recreate-environment" && existsSync(environmentPath)) {
-        this.appendLog(serviceId, "warning", `Removing existing virtual environment at ${environmentPath}.`);
-        rmSync(environmentPath, { recursive: true, force: true });
-      }
-
-      const venvPython = getVenvPythonPath(definition);
-      const metadataBefore = readProvisioningMetadata(definition);
-      const shouldRecreate = action !== "provision"
+      this.flushPendingEnvironmentCleanup(serviceId, definition);
+      let activeEnvironmentPath = getPythonEnvironmentPath(definition);
+      let venvPython = getVenvPythonPath(definition, activeEnvironmentPath);
+      const metadataBefore = readProvisioningMetadata(definition, activeEnvironmentPath);
+      let shouldBuildFreshEnvironment = action === "recreate-environment";
+      const shouldRecreateForMismatch = action !== "provision"
         && (
           !existsSync(venvPython)
           || (metadataBefore?.resolvedVersion && !String(metadataBefore.resolvedVersion).startsWith(requestedVersion))
         );
-
-      if (shouldRecreate && existsSync(environmentPath)) {
-        this.appendLog(serviceId, "warning", `Rebuilding incompatible or broken environment at ${environmentPath}.`);
-        rmSync(environmentPath, { recursive: true, force: true });
+      if (shouldRecreateForMismatch) {
+        shouldBuildFreshEnvironment = true;
       }
 
-      if (!existsSync(venvPython)) {
-        this.appendLog(serviceId, "info", `Creating virtual environment in ${environmentPath}.`);
-        const createResult = await this.runCommand(interpreter.command, [...interpreter.args, "-m", "venv", environmentPath], { cwd: definition.cwd });
-        if (createResult.stdout) {
-          this.appendLog(serviceId, "stdout", createResult.stdout);
-        }
-        if (createResult.stderr) {
-          this.appendLog(serviceId, "stderr", createResult.stderr);
-        }
+      if (!shouldBuildFreshEnvironment && existsSync(venvPython)) {
+        this.appendLog(serviceId, "info", `Using existing virtual environment at ${activeEnvironmentPath}.`);
+      } else if (!shouldBuildFreshEnvironment) {
+        this.appendLog(serviceId, "info", `Creating virtual environment in ${activeEnvironmentPath}.`);
+        const createResult = await this.runCommand(interpreter.command, [...interpreter.args, "-m", "venv", activeEnvironmentPath], { cwd: definition.cwd });
+        this.appendCommandOutput(serviceId, createResult);
         if (createResult.code !== 0) {
           throw new Error(createResult.stderr || createResult.stdout || "Virtual environment creation failed.");
         }
-      } else {
-        this.appendLog(serviceId, "info", `Using existing virtual environment at ${environmentPath}.`);
       }
 
-      const upgradePip = await this.runCommand(venvPython, ["-m", "pip", "install", "--upgrade", "pip"], { cwd: definition.cwd });
-      if (upgradePip.stdout) this.appendLog(serviceId, "stdout", upgradePip.stdout);
-      if (upgradePip.stderr) this.appendLog(serviceId, "stderr", upgradePip.stderr);
-      if (upgradePip.code !== 0) {
-        throw new Error(upgradePip.stderr || upgradePip.stdout || "pip upgrade failed.");
+      let pipHealth = await this.validateVenvPipHealth(serviceId, definition, venvPython, activeEnvironmentPath);
+      if (!pipHealth.healthy) {
+        this.appendLog(
+          serviceId,
+          "warning",
+          `${definition.name} detected corrupted Python environment (${(pipHealth.issues ?? []).join(", ") || "integrity-check-failed"}): ${toErrorMessage(pipHealth.error)}.`,
+        );
+        this.updateProvisioning(serviceId, {
+          state: ProvisioningStates.corrupted,
+          required: true,
+          requestedVersion,
+          environmentPath: activeEnvironmentPath,
+          needsReprovision: true,
+          lastUpdatedAt: createClockTimestamp(this.clock),
+          lastError: createDiagnosticError(this.clock, "provisioning", toErrorMessage(pipHealth.error), {
+            code: pipHealth.error?.code ?? "PYTHON_RUNTIME_PIP_CORRUPTED",
+            category: "corrupted-environment",
+            integrityIssues: pipHealth.issues ?? [],
+          }),
+        });
+
+        const integrityIssues = pipHealth.issues ?? [];
+        const canAttemptEnsurePip = process.platform !== "win32"
+          && existsSync(venvPython)
+          && !integrityIssues.includes("invalid-distributions")
+          && !integrityIssues.includes("environment-invalidated");
+        if (canAttemptEnsurePip) {
+          this.appendLog(serviceId, "warning", `${definition.name} attempting bounded pip repair via ensurepip before recreation.`);
+          const ensurePipResult = await this.runCommand(venvPython, ["-m", "ensurepip", "--upgrade"], { cwd: definition.cwd });
+          this.appendCommandOutput(serviceId, ensurePipResult);
+          if (ensurePipResult.code === 0) {
+            pipHealth = await this.validateVenvPipHealth(serviceId, definition, venvPython, activeEnvironmentPath);
+          }
+        }
+
+        if (!pipHealth.healthy) {
+          markInvalidEnvironment(definition, activeEnvironmentPath, toErrorMessage(pipHealth.error), this.clock);
+          shouldBuildFreshEnvironment = true;
+        } else {
+          clearInvalidEnvironment(definition, activeEnvironmentPath, this.clock);
+        }
+      }
+
+      if (shouldBuildFreshEnvironment) {
+        const previousEnvironmentPath = activeEnvironmentPath;
+        const stagedEnvironmentPath = this.createManagedEnvironmentPath(definition);
+        this.appendLog(serviceId, "warning", `${definition.name} creating a fresh staged environment at ${stagedEnvironmentPath}.`);
+        this.ensureDirectory(path.dirname(stagedEnvironmentPath));
+        const recreateResult = await this.runCommand(interpreter.command, [...interpreter.args, "-m", "venv", stagedEnvironmentPath], { cwd: definition.cwd });
+        this.appendCommandOutput(serviceId, recreateResult);
+        if (recreateResult.code !== 0) {
+          const recreationError = new Error(recreateResult.stderr || recreateResult.stdout || "Virtual environment recreation failed.");
+          recreationError.code = "PYTHON_RUNTIME_ENV_RECREATE_FAILED";
+          throw recreationError;
+        }
+
+        const stagedVenvPython = getVenvPythonPath(definition, stagedEnvironmentPath);
+        let stagedPipHealth = await this.validateVenvPipHealth(serviceId, definition, stagedVenvPython, stagedEnvironmentPath);
+        if (!stagedPipHealth.healthy) {
+          if (process.platform !== "win32" && existsSync(stagedVenvPython)) {
+            const ensurePipResult = await this.runCommand(stagedVenvPython, ["-m", "ensurepip", "--upgrade"], { cwd: definition.cwd });
+            this.appendCommandOutput(serviceId, ensurePipResult);
+            if (ensurePipResult.code === 0) {
+              stagedPipHealth = await this.validateVenvPipHealth(serviceId, definition, stagedVenvPython, stagedEnvironmentPath);
+            }
+          }
+          if (!stagedPipHealth.healthy) {
+            markInvalidEnvironment(definition, stagedEnvironmentPath, toErrorMessage(stagedPipHealth.error), this.clock);
+            const corruptedError = new Error(`Python virtual environment remains corrupted after recreation: ${toErrorMessage(stagedPipHealth.error)}`);
+            corruptedError.code = "PYTHON_RUNTIME_PIP_CORRUPTED";
+            throw corruptedError;
+          }
+        }
+
+        activeEnvironmentPath = stagedEnvironmentPath;
+        venvPython = stagedVenvPython;
+        this.promoteActiveEnvironment(definition, activeEnvironmentPath, previousEnvironmentPath);
+        markInvalidEnvironment(definition, previousEnvironmentPath, "Replaced by staged environment after failed integrity checks.", this.clock);
+        clearInvalidEnvironment(definition, activeEnvironmentPath, this.clock);
       }
 
       const requirementsPath = path.join(definition.cwd, "requirements.txt");
       this.appendLog(serviceId, "info", `Installing requirements from ${requirementsPath}.`);
       const installRequirements = await this.runCommand(venvPython, ["-m", "pip", "install", "-r", requirementsPath], { cwd: definition.cwd });
-      if (installRequirements.stdout) this.appendLog(serviceId, "stdout", installRequirements.stdout);
-      if (installRequirements.stderr) this.appendLog(serviceId, "stderr", installRequirements.stderr);
+      this.appendCommandOutput(serviceId, installRequirements);
       if (installRequirements.code !== 0) {
         throw new Error(installRequirements.stderr || installRequirements.stdout || "requirements installation failed.");
       }
 
-      mkdirSync(environmentPath, { recursive: true });
+      const postInstallHealth = await this.validateVenvPipHealth(serviceId, definition, venvPython, activeEnvironmentPath);
+      if (!postInstallHealth.healthy) {
+        markInvalidEnvironment(definition, activeEnvironmentPath, toErrorMessage(postInstallHealth.error), this.clock);
+        const postInstallError = new Error(`Python environment failed integrity validation after requirements installation: ${toErrorMessage(postInstallHealth.error)}`);
+        postInstallError.code = postInstallHealth.error?.code ?? "PYTHON_RUNTIME_PIP_CORRUPTED";
+        throw postInstallError;
+      }
+
+      const launchability = await this.validateRuntimeLaunchabilityPreflight(serviceId, definition, venvPython);
+
+      this.ensureDirectory(activeEnvironmentPath);
+      const provisioningFingerprint = buildProvisioningFingerprint(definition);
+      const metadataPath = getProvisioningMetadataPath(definition, activeEnvironmentPath);
       writeFileSync(metadataPath, `${JSON.stringify({
+        schemaVersion: PROVISIONING_METADATA_SCHEMA_VERSION,
         requestedVersion,
         resolvedVersion: interpreter.version,
-        resolvedInterpreter: interpreter.executable,
+        resolvedInterpreter: venvPython,
+        environmentPath: activeEnvironmentPath,
+        fingerprint: provisioningFingerprint,
         provisionedAt: createClockTimestamp(this.clock),
+        launchability,
       }, null, 2)}\n`, "utf8");
+      this.promoteActiveEnvironment(definition, activeEnvironmentPath, environmentPath);
+      clearInvalidEnvironment(definition, activeEnvironmentPath, this.clock);
+      this.flushPendingEnvironmentCleanup(serviceId, definition);
 
-      this.appendLog(serviceId, "success", `${definition.name} provisioning completed successfully.`);
+      if (!launchability.launchable) {
+        this.appendLog(
+          serviceId,
+          "warning",
+          `${definition.name} environment provisioned but runtime import preflight failed: ${launchability.lastError?.message ?? "unknown error"}`,
+        );
+      } else {
+        this.appendLog(serviceId, "success", `${definition.name} provisioning completed successfully.`);
+      }
       return this.updateState(serviceId, {
-        detail: `${definition.name} is provisioned and ready to start.`,
+        detail: launchability.launchable
+          ? `${definition.name} is provisioned and ready to start.`
+          : `${definition.name} environment is provisioned but not launchable on this host.`,
         diagnostics: {
           ...this.requireState(serviceId).diagnostics,
           provisioning: {
             ...this.requireState(serviceId).diagnostics.provisioning,
-            state: ProvisioningStates.provisioned,
+            state: launchability.launchable ? ProvisioningStates.provisioned : ProvisioningStates.provisionedUnlaunchable,
             required: true,
             requestedVersion,
             resolvedVersion: interpreter.version,
-            resolvedInterpreter: interpreter.executable,
-            environmentPath,
+            resolvedInterpreter: venvPython,
+            environmentPath: activeEnvironmentPath,
             versionMismatch: false,
+            fingerprintMismatch: false,
             needsReprovision: false,
-            lastUpdatedAt: createClockTimestamp(this.clock),
-            lastError: null,
+            lastUpdatedAt: launchability.checkedAt,
+            lastError: launchability.lastError,
           },
         },
       });
     } catch (error) {
       this.appendLog(serviceId, "error", `${definition.name} provisioning failed: ${toErrorMessage(error)}`);
+      const isCorruptedEnvironment = error?.code === "PYTHON_RUNTIME_PIP_CORRUPTED";
       return this.updateState(serviceId, {
         detail: `${definition.name} provisioning failed: ${toErrorMessage(error)}`,
         diagnostics: {
           ...this.requireState(serviceId).diagnostics,
           provisioning: {
             ...this.requireState(serviceId).diagnostics.provisioning,
-            state: ProvisioningStates.provisionFailed,
+            state: isCorruptedEnvironment ? ProvisioningStates.corrupted : ProvisioningStates.provisionFailed,
             required: true,
             requestedVersion,
             environmentPath,
+            needsReprovision: true,
             lastUpdatedAt: createClockTimestamp(this.clock),
             lastError: {
               at: createClockTimestamp(this.clock),
               message: toErrorMessage(error),
               code: error?.code ?? null,
+              category: isCorruptedEnvironment ? "corrupted-environment" : "provisioning",
               details: toErrorDetails(error),
             },
           },
@@ -1525,7 +2055,8 @@ export class InMemoryServiceSupervisor {
       return definition;
     }
 
-    const venvPython = getVenvPythonPath(definition);
+    const environmentPath = state?.diagnostics?.provisioning?.environmentPath || getPythonEnvironmentPath(definition);
+    const venvPython = getVenvPythonPath(definition, environmentPath);
     const resolvedCommand = existsSync(venvPython)
       ? venvPython
       : state?.diagnostics?.provisioning?.resolvedInterpreter || definition.command;
@@ -1837,7 +2368,13 @@ export class InMemoryServiceSupervisor {
 
     if (provisioning?.required && (provisioning.state !== ProvisioningStates.provisioned || provisioning.needsReprovision)) {
       const detail = provisioning.needsReprovision
-        ? `${definition.name} Python version changed from ${provisioning.resolvedVersion ?? "unknown"} to ${provisioning.requestedVersion ?? "unknown"}. Repair or recreate the environment before starting.`
+        ? provisioning.versionMismatch
+          ? `${definition.name} Python version changed from ${provisioning.resolvedVersion ?? "unknown"} to ${provisioning.requestedVersion ?? "unknown"}. Repair or recreate the environment before starting.`
+          : `${definition.name} environment inputs changed and reprovisioning is required before starting.`
+        : provisioning.state === ProvisioningStates.corrupted
+        ? `${definition.name} environment is corrupted. Repair or recreate the environment before starting.`
+        : provisioning.state === ProvisioningStates.provisionedUnlaunchable
+        ? `${definition.name} environment is provisioned but not launchable on this host. ${provisioning.lastError?.message ?? "Runtime import preflight failed."}`
         : provisioning.state === ProvisioningStates.provisionFailed
         ? `${definition.name} provisioning failed. Repair or recreate the environment before starting.`
         : `${definition.name} must be provisioned before it can start.`;
@@ -2000,10 +2537,14 @@ export class InMemoryServiceSupervisor {
       const current = this.requireState(serviceId);
       const exitInfo = getExitInfo?.();
       if (exitInfo) {
+        const startupFailure = this.detectKnownStartupFailure(serviceId);
+        const knownFailureSuffix = startupFailure
+          ? ` Known cause: ${startupFailure.message}`
+          : "";
         return this.failService(serviceId, definition, {
           category: "start",
-          detail: `${definition.name} exited unexpectedly during startup (code=${exitInfo?.code ?? "null"}, signal=${exitInfo?.signal ?? "null"}).`,
-          error: new Error(`${definition.name} exited unexpectedly during startup.`),
+          detail: `${definition.name} exited unexpectedly during startup (code=${exitInfo?.code ?? "null"}, signal=${exitInfo?.signal ?? "null"}).${knownFailureSuffix}`,
+          error: new Error(`${definition.name} exited unexpectedly during startup.${knownFailureSuffix}`),
           outcome: "failed-start",
           ownership: ServiceOwnership.none,
           exitInfo,
@@ -2064,11 +2605,19 @@ export class InMemoryServiceSupervisor {
       await this.sleep(definition.healthPollIntervalMs);
     }
 
+    const startupFailure = this.detectKnownStartupFailure(serviceId);
+    const timeoutDetail = startupFailure
+      ? `${definition.name} failed during startup before the health endpoint became available. Known cause: ${startupFailure.message}`
+      : `${definition.name} startup timed out after ${definition.startupTimeoutMs}ms.${lastProbe?.detail ? ` Last probe: ${lastProbe.detail}` : ""}`;
     const timedOut = this.failService(serviceId, definition, {
       category: "start",
-      detail: `${definition.name} startup timed out after ${definition.startupTimeoutMs}ms.${lastProbe?.detail ? ` Last probe: ${lastProbe.detail}` : ""}`,
-      error: new Error(`${definition.name} startup timed out.`),
-      logs: [createLogEntry(this.clock, "error", `${definition.name} startup timed out.`)],
+      detail: timeoutDetail,
+      error: new Error(
+        startupFailure
+          ? `${definition.name} startup failed: ${startupFailure.message}`
+          : `${definition.name} startup timed out.`,
+      ),
+      logs: [createLogEntry(this.clock, "error", startupFailure ? `${definition.name} startup failed with a known cause.` : `${definition.name} startup timed out.`)],
       outcome: "failed-start",
       ownership: ServiceOwnership.managed,
       probe: lastProbe,
@@ -2088,6 +2637,35 @@ export class InMemoryServiceSupervisor {
       pid: null,
       ownership: ServiceOwnership.none,
     });
+  }
+
+  detectKnownStartupFailure(serviceId) {
+    const state = this.states.get(serviceId);
+    if (!state) {
+      return undefined;
+    }
+
+    const stderrTail = [...state.recentLogs]
+      .reverse()
+      .filter((entry) => entry.level === "stderr")
+      .slice(0, 20)
+      .map((entry) => entry.message)
+      .join("\n");
+    if (!stderrTail) {
+      return undefined;
+    }
+
+    const issue = classifyRuntimeLaunchabilityIssue(stderrTail);
+    if (issue.code === "PYTHON_RUNTIME_IMPORT_PREFLIGHT_FAILED" && issue.category === "runtime-launchability") {
+      return undefined;
+    }
+
+    const conciseMessage = stderrTail.split("\n").find((line) => line.trim()) ?? "Runtime startup dependency failure detected.";
+    return {
+      code: issue.code,
+      category: issue.category,
+      message: conciseMessage,
+    };
   }
 
   async detectExternalService(serviceId, definition, state) {
@@ -2149,7 +2727,7 @@ export class InMemoryServiceSupervisor {
       return;
     }
 
-    if (state.state === ServiceStates.failed && state.detail?.includes("startup timed out")) {
+    if (state.state === ServiceStates.failed && state.processHistory.at(-1)?.outcome === "failed-start") {
       this.updateState(serviceId, {
         pid: null,
         ownership: ServiceOwnership.none,

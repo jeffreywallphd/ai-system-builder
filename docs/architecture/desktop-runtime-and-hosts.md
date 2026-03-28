@@ -36,10 +36,13 @@ This makes Electron the host-level boundary where local capabilities become avai
 - model-file operations
 - canonical asset operations
 - agent authoring/configuration operations (`create/update/get/list/delete/archive`, goal/policy/tool/memory/strategy configuration, and configuration validation)
+- studio-shell authoring operations (`initialize/snapshot/start-session/create-draft/update-draft/update-dependencies/transition-lifecycle/publish-version/validate-draft`)
 
 Agent authoring backend responses now use a hardened projection envelope (`agent`, `taxonomy`, optional `contract`) so desktop transport keeps read semantics aligned with `CompositionTaxonomyClassifier`/`CompositionAssetContractResolver`.
 Phase 8.1 extends this desktop backend surface to a Studio-ready seam via `AgentStudioBackendApi`, adding runtime/session IPC operations (launch/trigger launch/session list/detail/run control/studio snapshot) on `ai-loom-desktop-agents:*` while keeping transport thin over existing application use cases.
+Direction 5 Studio Shell operations are exposed the same way on `ai-loom-desktop-studio-shell:*` and delegate to `StudioShellBackendApi` over the real SQLite studio-shell repository.
 Desktop launch/trigger IPC handlers now delegate into a real runner-backed execution path (`AgentRunnerService`) in the host bootstrap, including deterministic planning, capability orchestration, asset-backed memory retrieval/write, and SQLite session persistence.
+Phase 8.5/8.6 UI flows remain contract-driven over this bridge: run-control UX maps directly to `control-run`, manual launches map to `launch`, and backend-trigger launches map to `trigger-launch`; unsupported automation systems (scheduler/cron/event bus/background orchestration) are intentionally not exposed in renderer-host contracts for this slice.
 Agent authoring error responses are type-mapped from inner contracts (`AgentAuthoringError`, `AgentConfigurationValidationError`) with unknown failures normalized to `internal` (no substring-derived mapping).
 
 `electron/shared/DesktopContracts.ts` defines the TypeScript contracts for those capabilities, which is a good practice because it creates a typed interface between host and renderer.
@@ -76,6 +79,18 @@ The product also has a managed runtime story, especially for Python-backed capab
 
 ### Python runtime
 The UI composition builds a `PythonRuntimeConfig`, runtime client, runtime manager, and service-definition wiring. The desktop host also resolves a desktop Python runtime and starts the service supervisor.
+
+For desktop development provisioning, the supervisor treats the local Python environment as a managed disposable artifact rather than durable state. Provisioning performs explicit venv/pip integrity checks (including pip import/command checks and invalid distribution artifacts such as `~ip*.dist-info`), attempts bounded safe repair (`ensurepip --upgrade`) only when trustworthy, and otherwise builds a fresh staged environment under `.venv.managed/` before promoting it active. Prior broken environments are marked invalid and cleanup is best-effort so Windows lock/delete failures do not trap provisioning in repeated in-place mutation loops.
+
+Provisioning and launchability are now intentionally separate truths:
+- provisioning success means dependency installation/integrity succeeded
+- launchability success means runtime import preflight succeeded on this host (`import app.main`)
+
+The supervisor now persists launchability preflight results in provisioning metadata and can surface `provisioned-unlaunchable` for host/runtime-incompatible dependency builds (for example CPU-incompatible native wheels). Runtime diagnostics now distinguish unprovisioned/provisioning/provision-failed/corrupted/provisioned-unlaunchable/reprovision-needed states so the app does not over-claim runtime health.
+
+Runtime truth is now explicitly split across three surfaces: baseline runtime boot health, capability-level readiness/unavailability (dependency/platform/resource constrained), and per-request execution readiness checks. Optional heavyweight capability failures are surfaced as capability/task unavailability rather than forcing the whole runtime into a fake healthy-or-dead binary.
+
+Browser and desktop startup flows now also check supervisor service state after `ensure-running`, so known startup-fatal causes are surfaced directly instead of being primarily reported as port-wait timeouts.
 
 ### Runtime dependency orchestration
 The infrastructure bootstrap and UI composition now share a centralized runtime-dependency composition module that builds the core `Python runtime -> MCP runtime` graph and can append other runtime-backed capability registrations such as document conversion, model training, and narrow MCP server-operation execution while still letting each outer-layer composition root inject its own health adapter.

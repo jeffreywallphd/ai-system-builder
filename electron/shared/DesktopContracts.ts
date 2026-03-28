@@ -102,6 +102,42 @@ export interface DesktopAgentAuthoringBridge {
   getStudioSnapshot(agentId: string): Promise<string>;
 }
 
+
+export interface DesktopStudioShellBridge {
+  initializeStudio(studioId: string, name: string): Promise<string>;
+  loadSnapshot(studioId: string): Promise<string>;
+  startSession(studioId: string): Promise<string>;
+  createDraft(requestJson: string): Promise<string>;
+  updateDraft(requestJson: string): Promise<string>;
+  updateDependencies(requestJson: string): Promise<string>;
+  transitionLifecycle(requestJson: string): Promise<string>;
+  publishVersion(requestJson: string): Promise<string>;
+  validateDraft(requestJson: string): Promise<string>;
+  listSystemChildComponents(requestJson: string): Promise<string>;
+  addSystemChildComponent(requestJson: string): Promise<string>;
+  removeSystemChildComponent(requestJson: string): Promise<string>;
+  reorderSystemChildComponent(requestJson: string): Promise<string>;
+  updateSystemInterfaces(requestJson: string): Promise<string>;
+  updateSystemParameters(requestJson: string): Promise<string>;
+  updateSystemExecutionMetadata(requestJson: string): Promise<string>;
+  getSystemCompatibilityInsights(requestJson: string): Promise<string>;
+  startSystemExecution(requestJson: string): Promise<string>;
+  getSystemExecutionStatus(executionId: string): Promise<string>;
+  getSystemExecutionTrace(requestJson: string): Promise<string>;
+  getSystemExecutionResult(executionId: string): Promise<string>;
+}
+
+export interface DesktopRegistryBridge {
+  listAssets(limit?: number): Promise<string>;
+  filterAssets(filtersJson: string): Promise<string>;
+  searchAssets(queryJson: string): Promise<string>;
+  getAssetDetail(queryJson: string): Promise<string>;
+  getDependencies(queryJson: string): Promise<string>;
+  getDependents(queryJson: string): Promise<string>;
+  traverseUpstream(queryJson: string): Promise<string>;
+  traverseDownstream(queryJson: string): Promise<string>;
+}
+
 export interface DesktopMcpSecretBridge {
   isAvailable(): boolean;
   getSecret(key: string): string | null;
@@ -118,4 +154,6 @@ export interface DesktopBridge {
   readonly modelFiles: DesktopModelFileBridge;
   readonly canonicalAssets: DesktopCanonicalAssetBridge;
   readonly agents?: DesktopAgentAuthoringBridge;
+  readonly studioShell?: DesktopStudioShellBridge;
+  readonly registry?: DesktopRegistryBridge;
 }

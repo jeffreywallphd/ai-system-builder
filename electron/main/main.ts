@@ -61,6 +61,19 @@ import type { AgentPlanningStrategy } from "../../domain/agents/Agent";
 import type { AgentConfigurationValidationInput } from "../../application/agents/services/AgentConfigurationValidationService";
 import type { AgentRunControlRequest, AgentRunRequest } from "../../application/agents/contracts/AgentRunContracts";
 import type { TriggerAgentLaunchRequest } from "../../application/agents/TriggerAgentLaunchUseCase";
+import { StudioShellBackendApi } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
+import { RegistryBackendApi } from "../../infrastructure/api/registry/RegistryBackendApi";
+import { SqliteStudioShellRepository } from "../../infrastructure/filesystem/studio-shell/SqliteStudioShellRepository";
+import type { CreateAssetDraftCommand, PublishAssetDraftVersionCommand, TransitionAssetDraftLifecycleCommand, UpdateAssetDraftCommand, UpdateAssetDraftDependenciesCommand } from "../../application/studio-shell/contracts";
+import { RegistryQueryService } from "../../application/asset-registry/RegistryQueryService";
+import { CrossStudioRegistryQueryService } from "../../application/asset-registry/CrossStudioRegistryQueryService";
+import { RegistryDependencyGraphService } from "../../application/asset-registry/RegistryDependencyGraphService";
+import { RegistryCacheLayer } from "../../application/asset-registry/RegistryCacheLayer";
+import { CompositionAssetContractResolver } from "../../application/contracts/CompositionAssetContractResolver";
+import { SystemStudioBackendApi } from "../../infrastructure/api/system-studio/SystemStudioBackendApi";
+import { SystemRuntimeBackendApi } from "../../infrastructure/api/system-runtime/SystemRuntimeBackendApi";
+import { SqliteSystemRuntimeExecutionStore } from "../../infrastructure/filesystem/system-runtime/SqliteSystemRuntimeExecutionStore";
+import { SqliteExecutionAuditRepository } from "../../infrastructure/filesystem/system-runtime/SqliteExecutionAuditRepository";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 if (started) {
@@ -81,6 +94,7 @@ let canonicalProjectionSink: InMemoryAssetLineageGraphProjectionSink | undefined
 let agentRepository: SqliteAgentRepository | undefined;
 let agentSessionRepository: SqliteAgentExecutionSessionRepository | undefined;
 let serviceSupervisor: DesktopServiceSupervisor | undefined;
+let studioShellRepository: SqliteStudioShellRepository | undefined;
 let bootstrapContext: DesktopBootstrapContext | undefined;
 
 function toFileEntry(filePath: string) {
@@ -282,6 +296,12 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     sessionRepository: agentSessionRepository,
   });
   const agentStudioBackendApi = new AgentStudioBackendApi(agentRepository, agentSessionRepository, agentRunner);
+  studioShellRepository = new SqliteStudioShellRepository(path.join(storagePaths.storageDirectory, "studio-shell", "studio-shell.sqlite"));
+  const studioShellBackendApi = new StudioShellBackendApi(studioShellRepository);
+  const systemStudioBackendApi = new SystemStudioBackendApi(studioShellRepository);
+  const runtimeExecutionStore = new SqliteSystemRuntimeExecutionStore(path.join(storagePaths.assetsDirectory, "system-runtime.sqlite"));
+  const runtimeExecutionAuditRepository = new SqliteExecutionAuditRepository(path.join(storagePaths.assetsDirectory, "system-runtime-audit.sqlite"));
+  const systemRuntimeBackendApi = new SystemRuntimeBackendApi(studioShellRepository, runtimeExecutionStore, undefined, undefined, undefined, undefined, undefined, runtimeExecutionAuditRepository);
   const executionHistoryInfrastructure = createExecutionHistoryInfrastructure(executionRunRepository);
   getExecutionRunUseCase = new GetExecutionRunUseCase(executionRunRepository);
   listExecutionRunsUseCase = executionHistoryInfrastructure.listExecutionRunsUseCase;
@@ -389,6 +409,85 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   ipcMain.handle("ai-loom-desktop-agents:studio-snapshot", async (_event, agentId: string) => {
     return JSON.stringify(await agentStudioBackendApi.getStudioSnapshot(agentId));
   });
+  ipcMain.handle("ai-loom-desktop-studio-shell:initialize", async (_event, studioId: string, name: string) => {
+    return JSON.stringify(await studioShellBackendApi.initializeStudio(studioId, name));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:snapshot", async (_event, studioId: string) => {
+    return JSON.stringify(await studioShellBackendApi.loadSnapshot(studioId));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:start-session", async (_event, studioId: string) => {
+    return JSON.stringify(await studioShellBackendApi.startSession(studioId));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:create-draft", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as CreateAssetDraftCommand;
+    return JSON.stringify(await studioShellBackendApi.createDraft(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:update-draft", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as UpdateAssetDraftCommand;
+    return JSON.stringify(await studioShellBackendApi.updateDraft(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:update-dependencies", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as UpdateAssetDraftDependenciesCommand;
+    return JSON.stringify(await studioShellBackendApi.updateDependencies(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:transition-lifecycle", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as TransitionAssetDraftLifecycleCommand;
+    return JSON.stringify(await studioShellBackendApi.transitionLifecycle(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:publish-version", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as PublishAssetDraftVersionCommand;
+    return JSON.stringify(await studioShellBackendApi.publishVersion(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:validate-draft", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as { studioId: string; draftId: string };
+    return JSON.stringify(await studioShellBackendApi.validateDraft(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:system-components:list", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["listChildComponents"]>[0];
+    return JSON.stringify(await systemStudioBackendApi.listChildComponents(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:system-components:add", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["addChildComponent"]>[0];
+    return JSON.stringify(await systemStudioBackendApi.addChildComponent(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:system-components:remove", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["removeChildComponent"]>[0];
+    return JSON.stringify(await systemStudioBackendApi.removeChildComponent(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:system-components:reorder", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["reorderChildComponent"]>[0];
+    return JSON.stringify(await systemStudioBackendApi.reorderChildComponent(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:system-interfaces:update", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["updateInterfaces"]>[0];
+    return JSON.stringify(await systemStudioBackendApi.updateInterfaces(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:system-parameters:update", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["updateParameters"]>[0];
+    return JSON.stringify(await systemStudioBackendApi.updateParameters(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:system-execution-metadata:update", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["updateExecutionMetadata"]>[0];
+    return JSON.stringify(await systemStudioBackendApi.updateExecutionMetadata(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:system-compatibility:insights", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["getCompatibilityInsights"]>[0];
+    return JSON.stringify(await systemStudioBackendApi.getCompatibilityInsights(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:system-runtime:start", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<SystemRuntimeBackendApi["startExecution"]>[0];
+    return JSON.stringify(await systemRuntimeBackendApi.startExecution(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:system-runtime:status", async (_event, executionId: string) => {
+    return JSON.stringify(await systemRuntimeBackendApi.getExecutionStatus(executionId));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:system-runtime:trace", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<SystemRuntimeBackendApi["getExecutionTrace"]>[0];
+    return JSON.stringify(await systemRuntimeBackendApi.getExecutionTrace(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:system-runtime:result", async (_event, executionId: string) => {
+    return JSON.stringify(await systemRuntimeBackendApi.getExecutionResult(executionId));
+  });
   ipcMain.on("ai-loom-desktop-model-files:exists", (event, targetPath: string) => {
     event.returnValue = fs.existsSync(targetPath);
   });
@@ -469,6 +568,27 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     explainVersionExistenceUseCase,
     verifyProjectionUseCase,
   );
+  const registryCacheLayer = new RegistryCacheLayer({ maxEntriesPerNamespace: 300 });
+  const registryQueryService = new RegistryQueryService(
+    canonicalAssetSystemRepository,
+    canonicalAssetSystemRepository,
+    canonicalAssetSystemRepository,
+    new CompositionAssetContractResolver(),
+    canonicalAssetSystemRepository,
+    undefined,
+    registryCacheLayer,
+    canonicalAssetSystemRepository,
+    {
+      async listRecentExecutionsForSystem(input) {
+        const response = await systemRuntimeBackendApi.listRecentExecutionsForSystem(input);
+        return response.ok && response.data ? response.data : [];
+      },
+    },
+  );
+  const registryBackendApi = new RegistryBackendApi(
+    new CrossStudioRegistryQueryService(registryQueryService),
+    new RegistryDependencyGraphService(registryQueryService, canonicalAssetSystemRepository, canonicalAssetSystemRepository, registryCacheLayer),
+  );
 
   ipcMain.handle("ai-loom-desktop-canonical-assets:list", async (_event, criteriaJson?: string) => {
     if (!canonicalAssetSystemRepository?.isAvailable) {
@@ -489,6 +609,37 @@ async function bootstrapDesktopRuntime(): Promise<void> {
         transformationCount: entry.transformationCount,
         lineageEdgeCount: entry.lineageEdgeCount,
       }));
+  });
+  ipcMain.handle("ai-loom-desktop-registry:assets", async (_event, limit?: number) => {
+    return JSON.stringify(await registryBackendApi.listAssets(limit));
+  });
+  ipcMain.handle("ai-loom-desktop-registry:assets-filter", async (_event, filtersJson: string) => {
+    const filters = JSON.parse(filtersJson) as Parameters<RegistryBackendApi["filterAssets"]>[0];
+    return JSON.stringify(await registryBackendApi.filterAssets(filters));
+  });
+  ipcMain.handle("ai-loom-desktop-registry:search", async (_event, queryJson: string) => {
+    const query = JSON.parse(queryJson) as Parameters<RegistryBackendApi["searchAssets"]>[0];
+    return JSON.stringify(await registryBackendApi.searchAssets(query));
+  });
+  ipcMain.handle("ai-loom-desktop-registry:asset-detail", async (_event, queryJson: string) => {
+    const query = JSON.parse(queryJson) as Parameters<RegistryBackendApi["getAssetDetail"]>[0];
+    return JSON.stringify(await registryBackendApi.getAssetDetail(query));
+  });
+  ipcMain.handle("ai-loom-desktop-registry:dependencies", async (_event, queryJson: string) => {
+    const query = JSON.parse(queryJson) as Parameters<RegistryBackendApi["getDependencies"]>[0];
+    return JSON.stringify(await registryBackendApi.getDependencies(query));
+  });
+  ipcMain.handle("ai-loom-desktop-registry:dependents", async (_event, queryJson: string) => {
+    const query = JSON.parse(queryJson) as Parameters<RegistryBackendApi["getDependents"]>[0];
+    return JSON.stringify(await registryBackendApi.getDependents(query));
+  });
+  ipcMain.handle("ai-loom-desktop-registry:traverse-upstream", async (_event, queryJson: string) => {
+    const query = JSON.parse(queryJson) as Parameters<RegistryBackendApi["traverseDependencies"]>[0];
+    return JSON.stringify(await registryBackendApi.traverseDependencies(query));
+  });
+  ipcMain.handle("ai-loom-desktop-registry:traverse-downstream", async (_event, queryJson: string) => {
+    const query = JSON.parse(queryJson) as Parameters<RegistryBackendApi["traverseDependents"]>[0];
+    return JSON.stringify(await registryBackendApi.traverseDependents(query));
   });
   ipcMain.handle("ai-loom-desktop-canonical-assets:detail", async (_event, assetId: string) => {
     if (!canonicalAssetSystemRepository?.isAvailable) {
@@ -639,4 +790,5 @@ app.on("before-quit", async () => {
   storageDatabase?.dispose();
   executionRunRepository?.dispose();
   agentRepository?.dispose();
+  studioShellRepository?.dispose();
 });

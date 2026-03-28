@@ -186,6 +186,9 @@ If a change needs data from the outside world, prefer adding or using an **appli
   - `AgentAuthoringBackendApi` now maps transport errors only from typed authoring/validation contracts; unknown exceptions map to `internal` without substring-based heuristics.
   - API-side read DTOs are now hardened to composition-native semantics (`agent` + taxonomy classification + optional contract projection) so transport does not invent agent-only read-model semantics.
   - focused agent authoring coverage now includes SQLite-backed integration tests across CRUD + goal/policy/tool/memory/strategy updates and API-layer mapping/error-path tests so backend behavior is validated over real seams, not only in-memory repository doubles.
+  - Phase 8.2/8.3 renderer wiring now stays an outer-layer shell (`ui/pages/AgentStudioPage.tsx` + `ui/services/AgentStudioService.ts` + panel components) that consumes those IPC/backend contracts directly for list/load/create/launch/session/cancel and configuration updates.
+  - authoring UX surfaces (goals/policy/tools/memory/strategy) do not add client-side business validation; backend use cases and validation contracts remain source-of-truth and UI only displays returned errors/issues.
+  - agent-facing read artifacts consumed by UI remain composition-native (`agent` + taxonomy classification + optional contract projection) rather than agent-only semantics, preserving `CompositionTaxonomyClassifier` / `CompositionAssetContractResolver` boundaries.
 
 ## TODO
 

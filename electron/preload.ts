@@ -121,6 +121,97 @@ contextBridge.exposeInMainWorld("aiLoomDesktop", {
       return ipcRenderer.invoke("ai-loom-desktop-canonical-assets:management-snapshot", assetId, includeProjectionHealth, versionIdsInProjectionScope) as Promise<string | null>;
     },
   },
+  studioShell: {
+    initializeStudio(studioId: string, name: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:initialize", studioId, name) as Promise<string>;
+    },
+    loadSnapshot(studioId: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:snapshot", studioId) as Promise<string>;
+    },
+    startSession(studioId: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:start-session", studioId) as Promise<string>;
+    },
+    createDraft(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:create-draft", requestJson) as Promise<string>;
+    },
+    updateDraft(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:update-draft", requestJson) as Promise<string>;
+    },
+    updateDependencies(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:update-dependencies", requestJson) as Promise<string>;
+    },
+    transitionLifecycle(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:transition-lifecycle", requestJson) as Promise<string>;
+    },
+    publishVersion(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:publish-version", requestJson) as Promise<string>;
+    },
+    validateDraft(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:validate-draft", requestJson) as Promise<string>;
+    },
+    listSystemChildComponents(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:system-components:list", requestJson) as Promise<string>;
+    },
+    addSystemChildComponent(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:system-components:add", requestJson) as Promise<string>;
+    },
+    removeSystemChildComponent(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:system-components:remove", requestJson) as Promise<string>;
+    },
+    reorderSystemChildComponent(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:system-components:reorder", requestJson) as Promise<string>;
+    },
+    updateSystemInterfaces(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:system-interfaces:update", requestJson) as Promise<string>;
+    },
+    updateSystemParameters(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:system-parameters:update", requestJson) as Promise<string>;
+    },
+    updateSystemExecutionMetadata(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:system-execution-metadata:update", requestJson) as Promise<string>;
+    },
+    getSystemCompatibilityInsights(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:system-compatibility:insights", requestJson) as Promise<string>;
+    },
+    startSystemExecution(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:system-runtime:start", requestJson) as Promise<string>;
+    },
+    getSystemExecutionStatus(executionId: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:system-runtime:status", executionId) as Promise<string>;
+    },
+    getSystemExecutionTrace(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:system-runtime:trace", requestJson) as Promise<string>;
+    },
+    getSystemExecutionResult(executionId: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:system-runtime:result", executionId) as Promise<string>;
+    },
+  },
+  registry: {
+    listAssets(limit?: number) {
+      return ipcRenderer.invoke("ai-loom-desktop-registry:assets", limit) as Promise<string>;
+    },
+    filterAssets(filtersJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-registry:assets-filter", filtersJson) as Promise<string>;
+    },
+    searchAssets(queryJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-registry:search", queryJson) as Promise<string>;
+    },
+    getAssetDetail(queryJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-registry:asset-detail", queryJson) as Promise<string>;
+    },
+    getDependencies(queryJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-registry:dependencies", queryJson) as Promise<string>;
+    },
+    getDependents(queryJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-registry:dependents", queryJson) as Promise<string>;
+    },
+    traverseUpstream(queryJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-registry:traverse-upstream", queryJson) as Promise<string>;
+    },
+    traverseDownstream(queryJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-registry:traverse-downstream", queryJson) as Promise<string>;
+    },
+  },
   agents: {
     createAgent(requestJson: string) {
       return ipcRenderer.invoke("ai-loom-desktop-agents:create", requestJson) as Promise<string>;

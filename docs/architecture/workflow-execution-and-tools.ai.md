@@ -27,6 +27,25 @@ Workflow -> `ExecuteWorkflowUseCase` -> one-unit `ExecutionPlan` -> `UnifiedExec
 - Execution-plan metadata now includes a lightweight explicit runtime capability profile (`supportsProgressEvents`, `supportsPollingProgress`, `supportsCancellation`, `supportsIntermediateArtifacts`, `supportsPartialResults`, `supportsReconnectOrResume`, `supportsMultiUnitComposition`) so higher layers can keep truthfulness language aligned with what a runtime really supports.
 - The workflow adapter wraps the existing workflow executor instead of rewriting runtime selection or strategy internals.
 - Workflow/model/dataset/MCP-specific payloads are still preserved as artifacts, but execution-native summaries now carry the data that generic history/reporting flows need first.
+- Direction 5 Epic 6 stories 6.17–6.18 now keep system-runtime execution read integration bounded and version-aware:
+  - runtime executions are projected into registry system-detail read models as recent execution summaries (status/result/timestamps plus bounded trace-reference counts),
+  - registry remains read-only (no runtime command surface),
+  - execution planning/orchestration enforces version-pinned component references and records executed version maps on runtime status/result APIs for truthful lineage and reproducibility.
+- Direction 5 Epic 6 stories 6.19–6.20 now add bounded runtime durability + nested execution truth without creating a second runtime stack:
+  - system-runtime execution records are persisted as runtime-scoped metadata snapshots (execution/root identity, status, bounded trace/result summaries, environment/version maps, timestamps, and parent/child execution linkage),
+  - desktop host wiring now uses a SQLite-backed system-runtime execution store instead of in-memory-only run state,
+  - nested system components execute recursively through the same orchestration service (parent node -> child execution), and parent run outputs/metadata carry child execution ids for monitor/detail linkage,
+  - this remains bounded (cycle/depth safeguards stay in dependency/plan recursion seams; no replay/event-sourcing platform introduced).
+- Direction 5 Epic 6 story 6.23 now adds bounded runtime hardening on the same seams:
+  - orchestration enforces bounded trace/log/error/progression retention,
+  - runtime start requests validate depth/iteration/planning/retention bounds with deterministic invalid-request failures on pathological values,
+  - in-memory and SQLite runtime execution stores prune oldest records on capacity overflow,
+  - no distributed scheduler/queue/observability architecture is introduced.
+- Direction 5 Epic 7 stories 7.15–7.16 now keep external system invocation + audit truth on the same runtime seams:
+  - external API/tool invocation now supports nested system-of-systems execution as a first-class runtime path (no separate nested runtime), with bounded parent/child execution lineage summaries surfaced on start/status/result read models,
+  - external invocation lineage remains version-aware (root + child version ids) and preserves existing auth/access/quota/tenant/session bounds,
+  - execution audit is now a separate durable trail (requested/accepted/completed/failed) capturing caller, tenant, request source, system/version, and execution/session identity with bounded nested-child attribution,
+  - audit trail remains distinct from runtime trace/log streams and asset-version history (no broad compliance analytics subsystem added).
 
 ## Runtime orchestration update
 - Delegated workflow execution selection can now consult the shared runtime dependency orchestrator before choosing a delegated strategy.
@@ -110,6 +129,7 @@ Use "workflow-first", "tool projection", and "truthful execution provenance" whe
 - If asked whether tools and workflows are separate bounded contexts, answer: "not really; tools are primarily a projected and published workflow surface in the current implementation."
 - If asked what should migrate next, answer: execution areas that still cannot report real progress/cancellation truthfully yet, especially MCP/runtime-backed orchestration beyond the current narrow server-operation slice.
 - If asked whether Direction 1 is finished, answer: "done enough that the execution substrate is no longer the obvious bottleneck; the next focus should likely move to Direction 2 unless a new truthful runtime-backed slice is clearly ready."
+- Keep runtime docs aligned with implementation: when runtime seams or bounds change, update both `.md` and `.ai.md` architecture docs in the same change.
 
 ## Direction 4 update: agent execution placement (bounded first implementation)
 - Agent planning/execution sits above the existing execution backbone; it does not introduce a second runtime.

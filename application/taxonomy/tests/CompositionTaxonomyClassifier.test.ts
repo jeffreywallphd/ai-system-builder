@@ -30,10 +30,10 @@ describe("CompositionTaxonomyClassifier", () => {
     const workflow = { id: "wf-1" } as IWorkflow;
     const agent = { id: "agent-1" } as Agent;
 
-    expect(classifier.classifyWorkflow(workflow, "dynamic")).toEqual({
+    expect(classifier.classifyWorkflow(workflow, "conditional")).toEqual({
       structuralKind: "composite",
       semanticRole: "workflow",
-      behaviorKind: "dynamic",
+      behaviorKind: "conditional",
     });
     expect(classifier.classifyAgent(agent)).toEqual({
       structuralKind: "composite",
@@ -107,7 +107,7 @@ describe("CompositionTaxonomyClassifier", () => {
     })).toEqual({
       structuralKind: "atomic",
       semanticRole: "tool",
-      behaviorKind: "dynamic",
+      behaviorKind: "conditional",
     });
     expect(classifier.classifyToolCapability({
       id: "workflow:docs",
@@ -134,6 +134,39 @@ describe("CompositionTaxonomyClassifier", () => {
       structuralKind: "composite",
       semanticRole: "context-bundle",
       behaviorKind: "deterministic",
+    });
+  });
+
+  it("treats specialized composite roles as first-class composite assets", () => {
+    const descriptors = [
+      classifier.classifyWorkflow({ id: "wf-special" } as IWorkflow),
+      classifier.classifyAgent({ id: "agent-special" } as Agent),
+      classifier.classifyContextPackage({ id: "cp-special" } as any),
+    ];
+
+    expect(descriptors.map((entry) => entry.structuralKind)).toEqual(["composite", "composite", "composite"]);
+    expect(descriptors.map((entry) => entry.semanticRole)).toEqual(["workflow", "agent", "context-bundle"]);
+  });
+
+
+  it("maps execution artifacts to system-level iterative taxonomy", () => {
+    expect(classifier.classifyCanonicalEntity("execution-artifact")).toEqual({
+      structuralKind: "system",
+      semanticRole: "system",
+      behaviorKind: "iterative",
+    });
+  });
+
+  it("classifies first-class system assets without collapsing them into composite roles", () => {
+    expect(classifier.classifySystemAsset("system", "autonomous")).toEqual({
+      structuralKind: "system",
+      semanticRole: "system",
+      behaviorKind: "autonomous",
+    });
+    expect(classifier.classifySystemAsset("app-template", "conditional")).toEqual({
+      structuralKind: "system",
+      semanticRole: "app-template",
+      behaviorKind: "conditional",
     });
   });
 });

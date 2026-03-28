@@ -415,6 +415,109 @@ describe("RuntimeConsoleStore", () => {
     expect(refreshLog?.details).toContain("Illegal invocation");
   });
 
+  it("treats cancelled MCP inspection requests as request-lifecycle noise instead of runtime failure", async () => {
+    const store = new RuntimeConsoleStore({
+      runtimeEventStore: new RuntimeEventBuffer(),
+      pythonRuntimeManager: {
+        checkAvailability: async () => true,
+        ensureRuntimeAvailability: async () => ({
+          status: "healthy" as const,
+          isAvailable: true,
+          owner: "external" as const,
+          lastUpdatedAt: "2026-03-20T00:00:00.000Z",
+        }),
+        restartRuntime: async () => ({
+          status: "healthy" as const,
+          isAvailable: true,
+          owner: "external" as const,
+          lastUpdatedAt: "2026-03-20T00:00:00.000Z",
+        }),
+        getStatus: () => ({
+          status: "healthy" as const,
+          isAvailable: true,
+          owner: "external" as const,
+          lastUpdatedAt: "2026-03-20T00:00:00.000Z",
+        }),
+        stopManagedRuntime: async () => undefined,
+      },
+      mcpService: {
+        getConnectionStatus: async () => {
+          throw new Error("Python runtime MCP request was cancelled.", {
+            cause: new DOMException("signal is aborted without reason", "AbortError"),
+          });
+        },
+        listConfiguredServers: async () => [],
+        getServerStatus: async () => {
+          throw new Error("unexpected");
+        },
+      } as any,
+    });
+
+    await store.refreshHealth();
+
+    const cancelledLog = store.getState().logs.find((entry) => entry.message === "MCP runtime inspection request was cancelled.");
+    expect(cancelledLog).toBeDefined();
+    expect(cancelledLog?.severity).toBe("info");
+    expect(store.getState().logs.find((entry) => entry.message === "MCP runtime inspection failed.")).toBeUndefined();
+    expect(store.getState().healthChecks.find((entry) => entry.id === "mcp-runtime")?.status).toBe("unknown");
+  });
+
+  it("retains the previous healthy MCP runtime status when a later inspection request is cancelled", async () => {
+    let invocation = 0;
+    const store = new RuntimeConsoleStore({
+      runtimeEventStore: new RuntimeEventBuffer(),
+      pythonRuntimeManager: {
+        checkAvailability: async () => true,
+        ensureRuntimeAvailability: async () => ({
+          status: "healthy" as const,
+          isAvailable: true,
+          owner: "external" as const,
+          lastUpdatedAt: "2026-03-20T00:00:00.000Z",
+        }),
+        restartRuntime: async () => ({
+          status: "healthy" as const,
+          isAvailable: true,
+          owner: "external" as const,
+          lastUpdatedAt: "2026-03-20T00:00:00.000Z",
+        }),
+        getStatus: () => ({
+          status: "healthy" as const,
+          isAvailable: true,
+          owner: "external" as const,
+          lastUpdatedAt: "2026-03-20T00:00:00.000Z",
+        }),
+        stopManagedRuntime: async () => undefined,
+      },
+      mcpService: {
+        getConnectionStatus: async () => {
+          invocation += 1;
+          if (invocation === 1) {
+            return {
+              enabled: true,
+              state: "ready" as const,
+              checkedAt: "2026-03-20T00:00:01.000Z",
+              servers: [],
+              capabilities: { tools: true, resources: true, toolExecution: true },
+            };
+          }
+
+          throw new Error("Python runtime MCP request was cancelled.");
+        },
+        listConfiguredServers: async () => [],
+        getServerStatus: async () => {
+          throw new Error("unexpected");
+        },
+      } as any,
+    });
+
+    await store.refreshHealth();
+    expect(store.getState().healthChecks.find((entry) => entry.id === "mcp-runtime")?.status).toBe("healthy");
+
+    await store.refreshHealth();
+    expect(store.getState().healthChecks.find((entry) => entry.id === "mcp-runtime")?.status).toBe("healthy");
+    expect(store.getState().logs.find((entry) => entry.message === "MCP runtime inspection failed.")).toBeUndefined();
+  });
+
   it("defaults to normal verbosity and lets the user switch to verbose mode", () => {
     const store = new RuntimeConsoleStore({
       runtimeEventStore: new RuntimeEventBuffer(),

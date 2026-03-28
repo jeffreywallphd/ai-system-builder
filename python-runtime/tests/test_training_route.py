@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from app.api.dependencies import get_dataset_generation_service, get_model_training_service
 from app.main import app
 from app.services.dataset_generation_service import DatasetGenerationService
+from app.services import model_training_service
 from app.services.model_training_service import ModelTrainingService, _now_iso
 
 
@@ -113,6 +114,31 @@ def test_training_failure_persists_diagnostic_artifact(tmp_path) -> None:
         time.sleep(0.05)
     else:
         raise AssertionError("training job did not reach failed state")
+
+    app.dependency_overrides.clear()
+
+
+def test_local_training_reports_numpy_import_incompatibility_without_crashing_runtime(tmp_path, monkeypatch) -> None:
+    service = ModelTrainingService(workspace_root=tmp_path)
+    app.dependency_overrides[get_model_training_service] = lambda: service
+
+    def fail_numpy_import():
+        raise ValueError("Local gradient training is unavailable because NumPy could not be initialized on this host.")
+
+    monkeypatch.setattr(model_training_service, "_require_numpy", fail_numpy_import)
+
+    response = client.post("/training/jobs", json=create_training_payload())
+    assert response.status_code == 503
+    payload = response.json()
+    assert payload["detail"]["code"] in {"LOCAL_TRAINING_DEPENDENCY_UNAVAILABLE", "LOCAL_TRAINING_DEPENDENCY_MISSING"}
+    assert payload["detail"]["category"] in {"execution-constrained", "dependency-missing"}
+
+    health = client.get("/health")
+    assert health.status_code == 200
+    health_payload = health.json()
+    local_training_capability = health_payload["details"]["capabilities"]["local-gradient-training"]
+    assert local_training_capability["state"] == "unavailable"
+    assert local_training_capability["reason_code"] in {"LOCAL_TRAINING_DEPENDENCY_UNAVAILABLE", "LOCAL_TRAINING_DEPENDENCY_MISSING"}
 
     app.dependency_overrides.clear()
 

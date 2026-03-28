@@ -9,8 +9,8 @@ This foundation is intentionally narrow. It adds shared taxonomy descriptors and
 The shared descriptor has three dimensions:
 
 - **structural kind**: `atomic` | `composite` | `system`
-- **semantic role**: `model` | `dataset` | `tool` | `prompt-template` | `embedding-index` | `workflow` | `agent` | `context-bundle` | `training-recipe` | `tool-chain` | `system`
-- **behavior kind**: `none` | `deterministic` | `dynamic` | `iterative` | `autonomous`
+- **semantic role**: `model` | `dataset` | `tool` | `prompt-template` | `embedding-index` | `config-profile` | `workflow` | `agent` | `context-bundle` | `dataset-pipeline` | `training-recipe` | `tool-chain` | `app-template` | `system`
+- **behavior kind**: `none` | `deterministic` | `conditional` | `iterative` | `autonomous` (with legacy `dynamic` normalized as an alias)
 
 Behavior is treated as a property/capability of a structural thing, not as a separate architecture stack.
 
@@ -21,9 +21,21 @@ What is now implemented:
 - Classification seams live in `application/taxonomy/CompositionTaxonomyClassifier.ts`.
 - Canonical entity mappings now include: workflow definition, installed/base model, dataset version, execution artifact.
 - Workflow and agent adapter seams are explicit (`application/workflows/WorkflowTaxonomy.ts`, `application/agents/contracts/AgentTaxonomy.ts`).
+- Revised semantic roles now cover atomic (`config-profile`), composite (`dataset-pipeline`), and system deployment (`app-template`) assets without introducing a second taxonomy universe.
 - Canonical identity records now persist optional taxonomy metadata (`structural_kind`, `semantic_role`, `behavior_kind`) and canonical resolver/operational summaries can project it.
 - Canonical asset query criteria now includes taxonomy-aware filters (`structuralKinds`, `semanticRoles`, `behaviorKinds`) in addition to kind/source/status criteria.
 - Canonical asset summary/detail reads still expose taxonomy descriptors, with identity metadata as the preferred source and bounded fallback classification where needed.
+- Direction 5 atomic studio usage now concretely applies this taxonomy in Model Studio (`atomic/model/none`), Dataset Studio (`atomic/dataset/none`), Tool Studio (`atomic/tool/conditional|deterministic`), Prompt Template Studio (`atomic/prompt-template/none`), Embedding Index Studio (`atomic/embedding-index/none`), and Config Profile Studio (`atomic/config-profile/none`) via shared shell draft metadata and publish enforcement.
+- Direction 5 composite studio usage now also concretely applies `composite/tool-chain/deterministic` through Tool Chain Studio (`domain/tool-chain-studio/*`, `application/tool-chain-studio/*`, and registration-driven Studio Shell UI integration).
+- End-to-end cross-studio consistency tests now verify this taxonomy coherence over real shared seams (service/bridge/backend/application/SQLite) before and after reload.
+
+
+## Specialized composite role interpretation
+- Specialized composite assets remain first-class in this taxonomy:
+  - `workflow` = orchestrator
+  - `agent` = decision unit
+  - `context-bundle` = input preparer
+- These are semantic-role distinctions inside one shared taxonomy (not separate architecture stacks).
 
 What is **not** implemented in this slice:
 
@@ -34,9 +46,39 @@ What is **not** implemented in this slice:
 
 ## Composition interpretation in this codebase
 - Assets remain structural/versionable objects with durable identity.
+- Current target shape for Direction 5 classification remains:
+  - atomic assets: model, dataset, tool, prompt-template, embedding-index, config-profile
+  - composite assets: workflow, context-bundle, dataset-pipeline, training-recipe, tool-chain
+  - system assets: system, app-template
 - Workflows and agents are both **composite** structures.
-  - Workflow semantic role: `workflow`, behavior typically `deterministic` or `dynamic`.
+  - Workflow semantic role: `workflow`, behavior typically `deterministic` or `conditional` (legacy `dynamic` normalizes to `conditional`).
   - Agent semantic role: `agent`, behavior `autonomous`.
 - Models and dataset versions are **atomic** with behavior `none` in this taxonomy layer.
+- Execution artifacts now map to **system/system/iterative** in canonical classification seams, avoiding outdated atomic/system mappings.
+
+## Implementation status snapshot (Direction 5 through stories 5.24)
+
+Fully implemented now:
+- Shared taxonomy model + allowed combination validation.
+- Studio-shell atomic and composite registrations using shared taxonomy descriptors.
+- Implemented composite studio roles in active use: `workflow`, `context-bundle`, `dataset-pipeline`, `training-recipe`, `tool-chain`.
+- System Studio registration and authoring now runs on the same shared Studio Shell path (`/studio-shell/system`) with first-class `system` structural kind handling and bounded recursive system-of-systems composition.
+- Registry list/detail/graph/lineage surfaces now project system assets as first-class records (including nested system references and version-lineage summaries) using shared registry query/graph seams.
+
+Partially implemented / bounded:
+- Specialized composite semantics are currently classification and authoring semantics (`workflow` orchestrator, `agent` decision unit, `context-bundle` input preparer); only workflow and context-bundle are implemented as specialized composite Studio Shell surfaces in this Direction 5 slice.
+- System composition editing remains intentionally bounded to structural authoring (add/remove/reorder child assets, nested-system visibility, interface/parameter/config surfaces, compatibility summaries). Rich visual graph-canvas editing remains later work.
 
 This shared taxonomy is a guardrail to keep workflow/agent/asset/system language coherent while implementation continues in parallel.
+- Direction 5 atomic studio usage now also concretely applies `atomic/prompt-template/none`, `atomic/embedding-index/none`, and `atomic/config-profile/none` through Prompt Template / Embedding Index / Config Profile studios (`domain/prompt-template-studio/*`, `application/prompt-template-studio/*`, `domain/embedding-index-studio/*`, `application/embedding-index-studio/*`, `domain/config-profile-studio/*`, `application/config-profile-studio/*`, and registration-driven UI shell integration).
+
+## Direction 5 update: Runtime taxonomy alignment foundation (stories 6.1–6.2)
+
+- A bounded runtime alignment seam now exists in `application/system-runtime/RuntimeBehaviorAlignment.ts` and consumes existing taxonomy truth (`CompositionTaxonomyDescriptor` + `assertAllowedCompositionTaxonomyCombination`) instead of introducing a second behavior ontology.
+- Runtime behavior profiles are now mapped directly from shared behavior kinds:
+  - `deterministic` -> fixed execution profile
+  - `conditional` -> branch-capable profile
+  - `iterative` -> loop-capable profile
+  - `autonomous` -> planner-capable profile
+- `none` remains non-executable in runtime behavior mapping and intentionally resolves to no runtime behavior profile.
+- Workflow, agent, and system runtime behavior resolution flows through the existing taxonomy classifier seam (`CompositionTaxonomyClassifier`) via `RuntimeBehaviorAlignmentService`, preserving current atomic/composite/system taxonomy authority.

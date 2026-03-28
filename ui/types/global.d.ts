@@ -4,6 +4,8 @@ import type {
   DesktopCanonicalAssetBridge,
   DesktopExecutionRunBridge,
   DesktopModelFileBridge,
+  DesktopRegistryBridge,
+  DesktopStudioShellBridge,
   DesktopWorkflowBridge,
 } from "../../electron/shared/DesktopContracts";
 
@@ -29,6 +31,8 @@ declare global {
       modelFiles: DesktopModelFileBridge;
       canonicalAssets?: DesktopCanonicalAssetBridge;
       agents?: DesktopAgentAuthoringBridge;
+      studioShell?: DesktopStudioShellBridge;
+      registry?: DesktopRegistryBridge;
     };
   }
 }

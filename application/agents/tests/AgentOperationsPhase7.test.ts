@@ -222,6 +222,7 @@ describe("Agent operations phase 7 contracts", () => {
     const completed = transitionAgentExecutionSession(running, {
       status: AgentExecutionSessionStatuses.completed,
       appendStepOutcome: { stepId: "step-1", status: "completed", attempts: 2, outputAssetId: new AssetId("asset:output:1") },
+      appendDiagnostic: { assetId: new AssetId("asset:diag:1"), assetVersionId: "v1" },
     });
     await sessions.save(base);
     await sessions.save(running);
@@ -244,6 +245,18 @@ describe("Agent operations phase 7 contracts", () => {
     const detail = await detailUseCase.execute("sess-read");
     expect(detail.operational.retrySummary.totalAttempts).toBe(2);
     expect(detail.operational.outcomeSummary.outputAssetIds).toEqual(["asset:output:1"]);
+    expect(detail.operational.stepOutcomes).toEqual([
+      expect.objectContaining({
+        stepId: "step-1",
+        status: "completed",
+        attempts: 2,
+        outputAssetId: "asset:output:1",
+      }),
+    ]);
+    expect(detail.operational.diagnosticSummary).toEqual({
+      count: 1,
+      assetReferences: [{ assetId: "asset:diag:1", assetVersionId: "v1" }],
+    });
     expect(detail.composition.taxonomy.semanticRole).toBe("system");
     expect(detail.summary.composition.taxonomy.semanticRole).toBe("system");
     expect(detail.composition.contract?.output?.description).toContain("session outcome");

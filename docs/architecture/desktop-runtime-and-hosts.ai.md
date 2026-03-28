@@ -16,7 +16,10 @@ Electron is the desktop host boundary; the renderer accesses desktop capabilitie
 - Desktop canonical path: filesystem JSON + SQLite workflow index plus SQLite execution-run history with explicit schema versioning/migration via SQLite `user_version`
 - Desktop backend bridge now also includes thin agent-authoring IPC endpoints (`ai-loom-desktop-agents:*`) mapped to application use cases and structured validation errors.
 - Phase 8.1 now consolidates Studio-facing desktop agent transport through `AgentStudioBackendApi` and extends `ai-loom-desktop-agents:*` with runtime/session endpoints (`launch`, `trigger-launch`, `list-sessions`, `get-session`, `control-run`, `studio-snapshot`) while staying thin over Phase 6/7 use cases.
+- Phase 8.5/8.6 renderer flows consume those same host contracts directly: run controls call `control-run`, manual launches call `launch`, and backend-trigger launches call `trigger-launch`, with no renderer-owned scheduler/automation runtime.
 - Desktop launch/trigger handlers now execute through a real host-wired runner path (`AgentRunnerService`) with deterministic planning + capability execution + asset-backed memory + SQLite-backed session persistence.
+- Direction 5 Studio Shell transport now follows the same thin-host pattern on `ai-loom-desktop-studio-shell:*`, delegating to `StudioShellBackendApi` backed by `SqliteStudioShellRepository` for durable studio/session/draft/version state.
+- Direction 5 Epic 6 runtime transport now extends that same Studio Shell host seam with bounded system-runtime endpoints (`system-runtime:start|status|trace|result`) delegated to `SystemRuntimeBackendApi` over the same repository-backed application/runtime path.
 - Agent authoring backend responses now use a hardened projection envelope (`agent`, `taxonomy`, optional `contract`) so transport read models classify/project through shared composition seams.
 - Agent authoring error responses are type-mapped from inner contracts (`AgentAuthoringError`, `AgentConfigurationValidationError`) with unknown failures normalized to `internal` (no substring-derived mapping).
 - Fallback path: browser/local storage repositories
@@ -35,6 +38,11 @@ Electron is the desktop host boundary; the renderer accesses desktop capabilitie
 - The shared graph now covers `python-runtime -> mcp-runtime` plus appended runtime-backed capability gates for delegated workflow execution, document conversion, dataset generation, model training, and narrow MCP server-operation execution in the UI composition.
 - Resolutions now carry an operational state model (`disabled`, `unavailable`, `provisioning`, `starting`, `healthy`, `degraded`, `failed`, `stopped`, `unknown`), fallback information, timestamps, metadata, and remediation hints.
 - The orchestrator also supports explicit `refresh`, single-dependency invalidation, and global invalidation so runtime-backed capabilities can recompute status after managed-runtime changes; the runtime console and managed-services store now use those hooks.
+- Python runtime provisioning in desktop development treats the managed environment as disposable: supervisor provisioning verifies venv/pip integrity before pip operations (including invalid-distribution detection), performs bounded safe `ensurepip --upgrade` repair only when trustworthy, and otherwise provisions/validates a fresh staged environment (`.venv.managed/*`) before promoting it active.
+- Runtime launchability is a separate truth from provisioning: after install/integrity checks, provisioning now runs an import preflight (`import app.main`) and persists launchability diagnostics.
+- Provisioning/runtime diagnostics must stay truthful across these flows and distinguish at least unprovisioned, provisioning, provisioned, provisioned-unlaunchable, provision-failed, corrupted environment, and needs-reprovision states.
+- Browser/desktop startup now checks supervisor state after `ensure-running` so known startup-fatal failures are surfaced directly instead of being masked by generic port-wait timeouts.
+- Runtime truth now has three distinct layers: baseline runtime boot health, capability readiness (dependency/platform/resource constrained vs ready), and execution-time task readiness checks for optional heavyweight local flows such as local gradient training.
 
 ## Caveat
 The preload bridge uses synchronous IPC and exposes storage/workflow/model-file capabilities.
