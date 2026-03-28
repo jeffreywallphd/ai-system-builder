@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { CompositionAssetContractResolver } from "../../contracts/CompositionAssetContractResolver";
 import {
   createStudioHandoffContract,
+  StudioHandoffAssetRoles,
   StudioHandoffIntentKinds,
   type StudioHandoffContract,
 } from "../../../domain/studio-handoff/StudioHandoffContract";
@@ -259,5 +260,84 @@ describe("StudioInputAdapterLayer", () => {
     expect(result.adapted?.authoritativeAsset.versionId).toBe("asset:authoritative-dataset:v11");
     expect(result.adapted?.prefill.assetId).toBe("prefill-override-attempt");
     expect(result.adapted?.authoritativeAsset.assetId).not.toBe(result.adapted?.prefill.assetId);
+  });
+
+  it("adapts grouped multi-asset handoffs into a first-class grouped input bundle", () => {
+    const layer = createAdapterLayer();
+    const capabilities = createCapabilities();
+    const datasetTaxonomy = createCompositionTaxonomyDescriptor({
+      structuralKind: TaxonomyStructuralKinds.atomic,
+      semanticRole: TaxonomySemanticRoles.dataset,
+      behaviorKind: TaxonomyBehaviorKinds.none,
+    });
+    const modelTaxonomy = createCompositionTaxonomyDescriptor({
+      structuralKind: TaxonomyStructuralKinds.atomic,
+      semanticRole: TaxonomySemanticRoles.model,
+      behaviorKind: TaxonomyBehaviorKinds.none,
+    });
+
+    const handoff = createStudioHandoffContract({
+      id: "grouped-bundle",
+      source: {
+        studioId: "dataset-studio-default",
+        studioType: "dataset-studio",
+      },
+      target: {
+        studioId: "system-studio-default",
+        studioType: "system-studio",
+      },
+      payload: {
+        assetId: "asset:dataset",
+        versionId: "asset:dataset:v5",
+        taxonomy: datasetTaxonomy,
+        contract: resolver.resolveContractForTaxonomy(datasetTaxonomy),
+        targetInputContract: {
+          contractId: "system-default-input",
+        },
+      },
+      multiAsset: {
+        grouped: true,
+        requireAllAssets: true,
+        assets: [
+          {
+            role: StudioHandoffAssetRoles.primary,
+            assetId: "asset:dataset",
+            versionId: "asset:dataset:v5",
+            taxonomy: datasetTaxonomy,
+          },
+          {
+            role: StudioHandoffAssetRoles.supporting,
+            roleLabel: "model",
+            assetId: "asset:model",
+            versionId: "asset:model:v2",
+            taxonomy: modelTaxonomy,
+          },
+        ],
+      },
+      intent: {
+        kind: StudioHandoffIntentKinds.compositionAssembly,
+      },
+      context: {
+        sourceReferences: [
+          { assetId: "asset:dataset", versionId: "asset:dataset:v5", relation: "primary" },
+          { assetId: "asset:model", versionId: "asset:model:v2", relation: "supporting" },
+        ],
+        prefill: {
+          values: { nestedStrategy: "compose" },
+        },
+      },
+    });
+
+    const adapted = layer.adapt({
+      handoff,
+      targetCapabilities: capabilities,
+    });
+
+    expect(adapted.ok).toBeTrue();
+    expect("grouped" in (adapted.adapted ?? {})).toBeTrue();
+    const grouped = adapted.adapted as unknown as { grouped: boolean; bundledAssets: Array<{ roleLabel?: string }> };
+    expect(grouped.grouped).toBeTrue();
+    expect(grouped.bundledAssets).toHaveLength(2);
+    expect(grouped.bundledAssets[1]?.roleLabel).toBe("model");
   });
 });

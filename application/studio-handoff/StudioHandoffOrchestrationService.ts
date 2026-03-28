@@ -54,6 +54,45 @@ export interface StudioHandoffResult {
   readonly failure?: StudioHandoffFailure;
 }
 
+export interface StudioHandoffRevision {
+  readonly revisionId: string;
+  readonly previousHandoffId: string;
+  readonly updatedHandoffId: string;
+  readonly createdAt: string;
+}
+
+export interface IncrementalStudioHandoffUpdate {
+  readonly handoffId?: string;
+  readonly revisionId?: string;
+  readonly contextPrefillPatch?: Readonly<Record<string, unknown>>;
+  readonly contextProvenancePatch?: {
+    readonly correlationId?: string;
+    readonly labels?: ReadonlyArray<string>;
+  };
+  readonly assetVersionUpdates?: ReadonlyArray<{
+    readonly assetId: string;
+    readonly versionId: string;
+    readonly role?: string;
+  }>;
+}
+
+export interface StudioHandoffChangeSet {
+  readonly updatedAuthoritativeAsset: boolean;
+  readonly updatedBundleAssets: ReadonlyArray<{
+    readonly assetId: string;
+    readonly previousVersionId: string;
+    readonly nextVersionId: string;
+    readonly role?: string;
+  }>;
+  readonly updatedContextPrefillKeys: ReadonlyArray<string>;
+  readonly updatedContextProvenanceFields: ReadonlyArray<string>;
+}
+
+export interface UpdatedStudioHandoffResult extends StudioHandoffResult {
+  readonly revision?: StudioHandoffRevision;
+  readonly changes?: StudioHandoffChangeSet;
+}
+
 function resolveContract(input: {
   readonly request: StudioHandoffRequest;
   readonly adaptedOutput: AdaptedStudioOutput;
@@ -178,6 +217,112 @@ function ensureContext(input: {
   });
 }
 
+function applyIncrementalUpdate(input: {
+  readonly basis: StudioHandoffContract;
+  readonly update: IncrementalStudioHandoffUpdate;
+}): {
+  readonly handoff: StudioHandoffContract;
+  readonly revision: StudioHandoffRevision;
+  readonly changes: StudioHandoffChangeSet;
+} {
+  const byAsset = new Map((input.update.assetVersionUpdates ?? []).map((entry) => [entry.assetId, entry]));
+
+  const updatedPayload = byAsset.get(input.basis.payload.assetId);
+  const nextPayloadVersionId = updatedPayload?.versionId ?? input.basis.payload.versionId;
+  const updatedAuthoritativeAsset = nextPayloadVersionId !== input.basis.payload.versionId;
+
+  const nextBundleAssets = input.basis.multiAsset?.assets.map((entry) => {
+    const update = byAsset.get(entry.assetId);
+    return Object.freeze({
+      ...entry,
+      versionId: update?.versionId ?? entry.versionId,
+      role: update?.role ?? entry.role,
+    });
+  });
+
+  const updatedBundleAssets = (nextBundleAssets ?? [])
+    .filter((entry, index) => entry.versionId !== input.basis.multiAsset?.assets[index]?.versionId)
+    .map((entry, index) => Object.freeze({
+      assetId: entry.assetId,
+      previousVersionId: input.basis.multiAsset?.assets[index]?.versionId ?? entry.versionId,
+      nextVersionId: entry.versionId,
+      role: entry.role,
+    }));
+
+  const basePrefill = input.basis.context?.prefill?.values ?? {};
+  const prefillPatch = input.update.contextPrefillPatch ?? {};
+  const nextPrefill = Object.freeze({
+    ...basePrefill,
+    ...prefillPatch,
+  });
+
+  const baseProvenance = input.basis.context?.provenance;
+  const nextProvenance = input.update.contextProvenancePatch
+    ? {
+      ...baseProvenance,
+      ...input.update.contextProvenancePatch,
+    }
+    : baseProvenance;
+
+  const updatedContextProvenanceFields = Object.keys(input.update.contextProvenancePatch ?? {});
+  const updatedContextPrefillKeys = Object.keys(prefillPatch);
+
+  const revisionId = input.update.revisionId ?? `${input.basis.id.value}:rev:${Date.now()}`;
+  const nextHandoffId = input.update.handoffId ?? `${input.basis.id.value}:rev:${revisionId}`;
+
+  const revised = createStudioHandoffContract({
+    id: nextHandoffId,
+    source: input.basis.source,
+    target: input.basis.target,
+    payload: {
+      ...input.basis.payload,
+      versionId: nextPayloadVersionId,
+    },
+    multiAsset: input.basis.multiAsset
+      ? {
+        grouped: true,
+        requireAllAssets: input.basis.multiAsset.requireAllAssets,
+        assets: nextBundleAssets ?? input.basis.multiAsset.assets,
+      }
+      : undefined,
+    intent: input.basis.intent,
+    context: input.basis.context
+      ? {
+        initiatedAt: new Date(),
+        actor: input.basis.context.actor,
+        sourceReferences: (nextBundleAssets ?? input.basis.context.sourceReferences).map((entry) => ({
+          assetId: entry.assetId,
+          versionId: entry.versionId,
+          relation: "role" in entry ? entry.role : entry.relation,
+          studioId: "studioId" in entry ? entry.studioId : undefined,
+          studioType: "studioType" in entry ? entry.studioType : undefined,
+        })),
+        prefill: {
+          values: nextPrefill,
+          hintOnlyKeys: Object.freeze(Object.keys(nextPrefill)),
+        },
+        provenance: nextProvenance,
+      }
+      : undefined,
+  });
+
+  return Object.freeze({
+    handoff: revised,
+    revision: Object.freeze({
+      revisionId,
+      previousHandoffId: input.basis.id.value,
+      updatedHandoffId: revised.id.value,
+      createdAt: new Date().toISOString(),
+    }),
+    changes: Object.freeze({
+      updatedAuthoritativeAsset,
+      updatedBundleAssets: Object.freeze(updatedBundleAssets),
+      updatedContextPrefillKeys: Object.freeze(updatedContextPrefillKeys),
+      updatedContextProvenanceFields: Object.freeze(updatedContextProvenanceFields),
+    }),
+  });
+}
+
 export class StudioHandoffOrchestrationService {
   public constructor(
     private readonly outputAdapterLayer: Pick<StudioOutputAdapterLayer, "adapt">,
@@ -244,6 +389,30 @@ export class StudioHandoffOrchestrationService {
         compatibility: inputAdaptation.compatibility,
         targetInput: inputAdaptation.adapted,
       }),
+    });
+  }
+
+  public refreshStudioHandoff(input: {
+    readonly basis: StudioHandoffContract;
+    readonly update: IncrementalStudioHandoffUpdate;
+    readonly sourceOutput: StudioProducedOutput;
+    readonly targetCapabilities: ReadonlyArray<StudioCapabilityDescriptor>;
+  }): UpdatedStudioHandoffResult {
+    const revised = applyIncrementalUpdate({
+      basis: input.basis,
+      update: input.update,
+    });
+
+    const result = this.orchestrate({
+      handoff: revised.handoff,
+      sourceOutput: input.sourceOutput,
+      targetCapabilities: input.targetCapabilities,
+    });
+
+    return Object.freeze({
+      ...result,
+      revision: revised.revision,
+      changes: revised.changes,
     });
   }
 }

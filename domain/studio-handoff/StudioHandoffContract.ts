@@ -88,6 +88,34 @@ export interface StudioHandoffPayload {
   readonly targetInputContract: TargetStudioInputContract;
 }
 
+export const StudioHandoffAssetRoles = Object.freeze({
+  primary: "primary",
+  supporting: "supporting",
+  peer: "peer",
+  dependency: "dependency",
+  systemComponent: "system-component",
+});
+
+export type StudioHandoffAssetRole =
+  typeof StudioHandoffAssetRoles[keyof typeof StudioHandoffAssetRoles];
+
+export interface StudioHandoffAssetEntry {
+  readonly role: StudioHandoffAssetRole;
+  readonly ordinal?: number;
+  readonly roleLabel?: string;
+  readonly assetId: string;
+  readonly versionId: string;
+  readonly taxonomy: CompositionTaxonomyDescriptor;
+  readonly contract?: AssetContractDescriptor;
+  readonly context?: Readonly<Record<string, unknown>>;
+}
+
+export interface MultiAssetStudioHandoffContract {
+  readonly grouped: true;
+  readonly requireAllAssets: boolean;
+  readonly assets: ReadonlyArray<StudioHandoffAssetEntry>;
+}
+
 export interface StudioHandoffContract {
   readonly id: StudioHandoffContractId;
   readonly domain: "studio-handoff";
@@ -95,6 +123,7 @@ export interface StudioHandoffContract {
   readonly source: StudioHandoffSource;
   readonly target: StudioHandoffTarget;
   readonly payload: StudioHandoffPayload;
+  readonly multiAsset?: MultiAssetStudioHandoffContract;
   readonly context?: StudioHandoffContext;
   readonly intent: StudioHandoffIntent;
 }
@@ -112,11 +141,70 @@ function normalizeIntent(intent: StudioHandoffIntent): StudioHandoffIntent {
   });
 }
 
+function normalizeAssetEntry(
+  entry: StudioHandoffAssetEntry,
+  index: number,
+): StudioHandoffAssetEntry {
+  if (!Object.values(StudioHandoffAssetRoles).includes(entry.role)) {
+    throw new Error(`Studio handoff asset role '${entry.role}' is not supported.`);
+  }
+
+  return Object.freeze({
+    role: entry.role,
+    ordinal: entry.ordinal,
+    roleLabel: normalizeOptional(entry.roleLabel),
+    assetId: normalizeRequired(entry.assetId, `Studio handoff multi-asset entry[${index}] asset id`),
+    versionId: normalizeRequired(entry.versionId, `Studio handoff multi-asset entry[${index}] version id`),
+    taxonomy: entry.taxonomy,
+    contract: entry.contract,
+    context: entry.context ? Object.freeze({ ...entry.context }) : undefined,
+  });
+}
+
+function normalizeMultiAssetContract(
+  input: MultiAssetStudioHandoffContract | undefined,
+  fallbackPayload: StudioHandoffPayload,
+): MultiAssetStudioHandoffContract | undefined {
+  if (!input) {
+    return undefined;
+  }
+
+  const normalizedAssets = input.assets.map((entry, index) => normalizeAssetEntry(entry, index));
+  if (normalizedAssets.length === 0) {
+    throw new Error("Studio handoff multi-asset contract requires at least one asset entry.");
+  }
+
+  const hasPrimary = normalizedAssets.some((entry) => entry.role === StudioHandoffAssetRoles.primary);
+  if (!hasPrimary) {
+    normalizedAssets.unshift(Object.freeze({
+      role: StudioHandoffAssetRoles.primary,
+      ordinal: -1,
+      roleLabel: "authoritative",
+      assetId: normalizeRequired(fallbackPayload.assetId, "Studio handoff payload asset id"),
+      versionId: normalizeRequired(fallbackPayload.versionId, "Studio handoff payload asset version id"),
+      taxonomy: fallbackPayload.taxonomy,
+      contract: fallbackPayload.contract,
+    }));
+  }
+
+  const normalized = normalizedAssets
+    .map((entry, index) => ({ ...entry, ordinal: entry.ordinal ?? index }))
+    .sort((left, right) => (left.ordinal ?? 0) - (right.ordinal ?? 0))
+    .map((entry) => Object.freeze(entry));
+
+  return Object.freeze({
+    grouped: true,
+    requireAllAssets: input.requireAllAssets,
+    assets: Object.freeze(normalized),
+  });
+}
+
 export function createStudioHandoffContract(input: {
   readonly id: string | StudioHandoffContractId;
   readonly source: StudioHandoffSource;
   readonly target: StudioHandoffTarget;
   readonly payload: StudioHandoffPayload;
+  readonly multiAsset?: MultiAssetStudioHandoffContract;
   readonly context?: Omit<StudioHandoffContextInput, "sourceStudioId" | "sourceStudioType" | "targetStudioId" | "targetStudioType" | "intent">;
   readonly intent: StudioHandoffIntent;
   readonly createdAt?: Date;
@@ -129,6 +217,29 @@ export function createStudioHandoffContract(input: {
 
   const targetInputContract = input.payload.targetInputContract;
   const contractId = normalizeRequired(targetInputContract.contractId, "Target studio input contract id");
+
+  const normalizedPayload = Object.freeze({
+    assetId: normalizeRequired(input.payload.assetId, "Studio handoff payload asset id"),
+    versionId: normalizeRequired(input.payload.versionId, "Studio handoff payload asset version id"),
+    taxonomy: input.payload.taxonomy,
+    contract: input.payload.contract,
+    targetInputContract: Object.freeze({
+      ...targetInputContract,
+      contractId,
+      acceptedStructuralKinds: targetInputContract.acceptedStructuralKinds
+        ? Object.freeze([...targetInputContract.acceptedStructuralKinds])
+        : undefined,
+      acceptedSemanticRoles: targetInputContract.acceptedSemanticRoles
+        ? Object.freeze([...targetInputContract.acceptedSemanticRoles])
+        : undefined,
+      acceptedBehaviorKinds: targetInputContract.acceptedBehaviorKinds
+        ? Object.freeze([...targetInputContract.acceptedBehaviorKinds])
+        : undefined,
+      allowedContextKeys: targetInputContract.allowedContextKeys
+        ? Object.freeze([...targetInputContract.allowedContextKeys.map((entry) => entry.trim()).filter(Boolean)])
+        : undefined,
+    }),
+  });
 
   const context = input.context
     ? createStudioHandoffContext({
@@ -161,28 +272,8 @@ export function createStudioHandoffContract(input: {
       draftId: normalizeOptional(input.target.draftId),
       sessionId: normalizeOptional(input.target.sessionId),
     }),
-    payload: Object.freeze({
-      assetId: normalizeRequired(input.payload.assetId, "Studio handoff payload asset id"),
-      versionId: normalizeRequired(input.payload.versionId, "Studio handoff payload asset version id"),
-      taxonomy: input.payload.taxonomy,
-      contract: input.payload.contract,
-      targetInputContract: Object.freeze({
-        ...targetInputContract,
-        contractId,
-        acceptedStructuralKinds: targetInputContract.acceptedStructuralKinds
-          ? Object.freeze([...targetInputContract.acceptedStructuralKinds])
-          : undefined,
-        acceptedSemanticRoles: targetInputContract.acceptedSemanticRoles
-          ? Object.freeze([...targetInputContract.acceptedSemanticRoles])
-          : undefined,
-        acceptedBehaviorKinds: targetInputContract.acceptedBehaviorKinds
-          ? Object.freeze([...targetInputContract.acceptedBehaviorKinds])
-          : undefined,
-        allowedContextKeys: targetInputContract.allowedContextKeys
-          ? Object.freeze([...targetInputContract.allowedContextKeys.map((entry) => entry.trim()).filter(Boolean)])
-          : undefined,
-      }),
-    }),
+    payload: normalizedPayload,
+    multiAsset: normalizeMultiAssetContract(input.multiAsset, normalizedPayload),
     context,
     intent: normalizedIntent,
   });

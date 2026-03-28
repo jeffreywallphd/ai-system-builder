@@ -7,6 +7,7 @@ import {
 } from "../StudioHandoffCompatibilityValidator";
 import {
   createStudioHandoffContract,
+  StudioHandoffAssetRoles,
   StudioHandoffIntentKinds,
   type StudioHandoffContract,
 } from "../../../domain/studio-handoff/StudioHandoffContract";
@@ -238,5 +239,62 @@ describe("StudioHandoffCompatibilityValidator", () => {
         path: "target.studioType",
       },
     ]);
+  });
+
+  it("evaluates grouped multi-asset compatibility with per-asset and aggregate bundle decisions", () => {
+    const validator = new StudioHandoffCompatibilityValidator({
+      validateVersionReference: ({ versionId }) => versionId.includes(":v"),
+    });
+    const handoff = createHandoff({
+      id: "multi-bundle",
+      sourceType: "dataset-studio",
+      targetType: "system-studio",
+      taxonomy: { structuralKind: "atomic", semanticRole: "dataset", behaviorKind: "none" },
+    });
+    const modelTaxonomy = createCompositionTaxonomyDescriptor({
+      structuralKind: TaxonomyStructuralKinds.atomic,
+      semanticRole: TaxonomySemanticRoles.model,
+      behaviorKind: TaxonomyBehaviorKinds.none,
+    });
+
+    const updated = createStudioHandoffContract({
+      id: handoff.id,
+      source: handoff.source,
+      target: handoff.target,
+      payload: handoff.payload,
+      intent: handoff.intent,
+      context: {
+        sourceReferences: handoff.context?.sourceReferences ?? [],
+        prefill: handoff.context?.prefill,
+        provenance: handoff.context?.provenance,
+      },
+      multiAsset: {
+        grouped: true,
+        requireAllAssets: true,
+        assets: [
+          {
+            role: StudioHandoffAssetRoles.primary,
+            assetId: handoff.payload.assetId,
+            versionId: handoff.payload.versionId,
+            taxonomy: handoff.payload.taxonomy,
+            contract: handoff.payload.contract,
+          },
+          {
+            role: StudioHandoffAssetRoles.supporting,
+            assetId: "asset:model",
+            versionId: "asset:model:bad",
+            taxonomy: modelTaxonomy,
+            contract: resolver.resolveContractForTaxonomy(modelTaxonomy),
+          },
+        ],
+      },
+    });
+
+    const decision = validator.validate({ handoff: updated, targetCapabilities: createCapabilities() });
+    expect(decision.multiAsset?.grouped).toBeTrue();
+    expect(decision.multiAsset?.entries).toHaveLength(2);
+    expect(decision.compatible).toBeFalse();
+    expect(decision.issues.map((entry) => entry.code)).toContain(StudioHandoffCompatibilityIssueCodes.bundleAssetIncompatible);
+    expect(decision.multiAsset?.entries[1]?.issues.map((entry) => entry.code)).toContain(StudioHandoffCompatibilityIssueCodes.versionReferenceInvalid);
   });
 });

@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { CompositionAssetContractResolver } from "../../contracts/CompositionAssetContractResolver";
 import {
   createStudioHandoffContract,
+  StudioHandoffAssetRoles,
   StudioHandoffIntentKinds,
   type StudioHandoffContract,
 } from "../../../domain/studio-handoff/StudioHandoffContract";
@@ -313,5 +314,118 @@ describe("StudioHandoffOrchestrationService", () => {
     expect(result.preparation?.handoff.payload.assetId).toBe("asset:authoritative");
     expect(result.preparation?.targetInput.authoritativeAsset.assetId).toBe("asset:authoritative");
     expect(result.preparation?.sourceOutput.handoffMetadata.hints.trainingObjective).toBe("regression");
+  });
+
+  it("supports incremental handoff refresh with revision linkage, changed fields, and revalidation", () => {
+    const service = createService();
+    const capabilities = createCapabilities();
+    const datasetTaxonomy = createCompositionTaxonomyDescriptor({
+      structuralKind: TaxonomyStructuralKinds.atomic,
+      semanticRole: TaxonomySemanticRoles.dataset,
+      behaviorKind: TaxonomyBehaviorKinds.none,
+    });
+    const modelTaxonomy = createCompositionTaxonomyDescriptor({
+      structuralKind: TaxonomyStructuralKinds.atomic,
+      semanticRole: TaxonomySemanticRoles.model,
+      behaviorKind: TaxonomyBehaviorKinds.none,
+    });
+
+    const basis = createStudioHandoffContract({
+      id: "basis-handoff",
+      source: {
+        studioId: "dataset-studio-default",
+        studioType: "dataset-studio",
+      },
+      target: {
+        studioId: "system-studio-default",
+        studioType: "system-studio",
+      },
+      payload: {
+        assetId: "asset:dataset",
+        versionId: "asset:dataset:v1",
+        taxonomy: datasetTaxonomy,
+        contract: resolver.resolveContractForTaxonomy(datasetTaxonomy),
+        targetInputContract: {
+          contractId: "system-default-input",
+        },
+      },
+      multiAsset: {
+        grouped: true,
+        requireAllAssets: true,
+        assets: [
+          {
+            role: StudioHandoffAssetRoles.primary,
+            assetId: "asset:dataset",
+            versionId: "asset:dataset:v1",
+            taxonomy: datasetTaxonomy,
+          },
+          {
+            role: StudioHandoffAssetRoles.supporting,
+            roleLabel: "model",
+            assetId: "asset:model",
+            versionId: "asset:model:v1",
+            taxonomy: modelTaxonomy,
+          },
+        ],
+      },
+      intent: {
+        kind: StudioHandoffIntentKinds.compositionAssembly,
+      },
+      context: {
+        sourceReferences: [
+          { assetId: "asset:dataset", versionId: "asset:dataset:v1", relation: "primary" },
+          { assetId: "asset:model", versionId: "asset:model:v1", relation: "supporting" },
+        ],
+        prefill: {
+          values: {
+            priority: "normal",
+          },
+        },
+      },
+    });
+
+    const updated = service.refreshStudioHandoff({
+      basis,
+      update: {
+        revisionId: "rev-2",
+        assetVersionUpdates: [
+          { assetId: "asset:dataset", versionId: "asset:dataset:v2", role: "primary" },
+          { assetId: "asset:model", versionId: "asset:model:v3", role: "supporting" },
+        ],
+        contextPrefillPatch: {
+          priority: "urgent",
+        },
+        contextProvenancePatch: {
+          correlationId: "corr-updated",
+        },
+      },
+      sourceOutput: {
+        sourceStudioType: "dataset-studio",
+        sourceStudioId: "dataset-studio-default",
+        authoritativeAsset: {
+          assetId: "asset:dataset",
+          versionId: "asset:dataset:v2",
+          taxonomy: datasetTaxonomy,
+          contract: resolver.resolveContractForTaxonomy(datasetTaxonomy),
+        },
+        sourceReferences: [
+          { assetId: "asset:dataset", versionId: "asset:dataset:v2", relation: "primary" },
+          { assetId: "asset:model", versionId: "asset:model:v3", relation: "supporting" },
+        ],
+        handoffHints: {
+          priority: "urgent",
+        },
+      },
+      targetCapabilities: capabilities,
+    });
+
+    expect(updated.ok).toBeTrue();
+    expect(updated.revision?.previousHandoffId).toBe("basis-handoff");
+    expect(updated.revision?.updatedHandoffId).toContain("basis-handoff:rev");
+    expect(updated.changes?.updatedAuthoritativeAsset).toBeTrue();
+    expect(updated.changes?.updatedBundleAssets).toHaveLength(2);
+    expect(updated.changes?.updatedContextPrefillKeys).toContain("priority");
+    expect(updated.preparation?.handoff.payload.versionId).toBe("asset:dataset:v2");
+    expect(updated.preparation?.compatibility.compatible).toBeTrue();
   });
 });

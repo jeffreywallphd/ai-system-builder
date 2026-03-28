@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { CompositionAssetContractResolver } from "../../../application/contracts/CompositionAssetContractResolver";
 import {
   createStudioHandoffContract,
+  StudioHandoffAssetRoles,
   StudioHandoffIntentKinds,
   StudioHandoffContractId,
 } from "../StudioHandoffContract";
@@ -153,5 +154,75 @@ describe("createStudioHandoffContract", () => {
     });
 
     expect(handoff.id.value).toBe("handoff-id");
+  });
+
+  it("supports typed multi-asset handoff bundles with role semantics and version-aware identity", () => {
+    const datasetTaxonomy = createCompositionTaxonomyDescriptor({
+      structuralKind: TaxonomyStructuralKinds.atomic,
+      semanticRole: TaxonomySemanticRoles.dataset,
+      behaviorKind: TaxonomyBehaviorKinds.none,
+    });
+    const modelTaxonomy = createCompositionTaxonomyDescriptor({
+      structuralKind: TaxonomyStructuralKinds.atomic,
+      semanticRole: TaxonomySemanticRoles.model,
+      behaviorKind: TaxonomyBehaviorKinds.none,
+    });
+
+    const handoff = createStudioHandoffContract({
+      id: "handoff-multi-asset",
+      source: {
+        studioId: "studio-source",
+        studioType: "dataset-studio",
+      },
+      target: {
+        studioId: "studio-target",
+        studioType: "training-recipe-studio",
+      },
+      payload: {
+        assetId: "asset:dataset",
+        versionId: "asset:dataset:v7",
+        taxonomy: datasetTaxonomy,
+        contract: resolver.resolveContractForTaxonomy(datasetTaxonomy),
+        targetInputContract: {
+          contractId: "training-default-input",
+        },
+      },
+      multiAsset: {
+        grouped: true,
+        requireAllAssets: true,
+        assets: [
+          {
+            role: StudioHandoffAssetRoles.primary,
+            assetId: "asset:dataset",
+            versionId: "asset:dataset:v7",
+            taxonomy: datasetTaxonomy,
+          },
+          {
+            role: StudioHandoffAssetRoles.supporting,
+            roleLabel: "model",
+            assetId: "asset:model",
+            versionId: "asset:model:v3",
+            taxonomy: modelTaxonomy,
+            context: {
+              usage: "seed-model",
+            },
+          },
+        ],
+      },
+      intent: {
+        kind: StudioHandoffIntentKinds.compositionAssembly,
+      },
+      context: {
+        sourceReferences: [
+          { assetId: "asset:dataset", versionId: "asset:dataset:v7", relation: "primary" },
+          { assetId: "asset:model", versionId: "asset:model:v3", relation: "supporting" },
+        ],
+      },
+    });
+
+    expect(handoff.multiAsset?.grouped).toBeTrue();
+    expect(handoff.multiAsset?.assets).toHaveLength(2);
+    expect(handoff.multiAsset?.assets[1]?.roleLabel).toBe("model");
+    expect(handoff.multiAsset?.assets[1]?.versionId).toBe("asset:model:v3");
   });
 });

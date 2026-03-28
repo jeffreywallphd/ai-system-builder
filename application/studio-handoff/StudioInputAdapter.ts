@@ -39,6 +39,21 @@ export interface AdaptedStudioInput {
   readonly studioSpecific: Readonly<Record<string, unknown>>;
 }
 
+export interface GroupedAdaptedStudioInput extends AdaptedStudioInput {
+  readonly grouped: true;
+  readonly requireAllAssets: boolean;
+  readonly bundledAssets: ReadonlyArray<{
+    readonly role: string;
+    readonly ordinal: number;
+    readonly roleLabel?: string;
+    readonly assetId: string;
+    readonly versionId: string;
+    readonly taxonomy: StudioHandoffPayload["taxonomy"];
+    readonly contract?: StudioHandoffPayload["contract"];
+    readonly context: Readonly<Record<string, unknown>>;
+  }>;
+}
+
 export interface StudioInputAdapter<TAdapted extends AdaptedStudioInput = AdaptedStudioInput> {
   readonly id: string;
   readonly kind: AdaptedStudioInputKind;
@@ -100,6 +115,32 @@ function createBaseAdaptedInput(
   });
 }
 
+function maybeAttachGroupedInput(
+  handoff: StudioHandoffContract,
+  adapted: AdaptedStudioInput,
+): AdaptedStudioInput {
+  if (!handoff.multiAsset) {
+    return adapted;
+  }
+
+  const grouped: GroupedAdaptedStudioInput = Object.freeze({
+    ...adapted,
+    grouped: true,
+    requireAllAssets: handoff.multiAsset.requireAllAssets,
+    bundledAssets: Object.freeze(handoff.multiAsset.assets.map((entry, index) => Object.freeze({
+      role: entry.role,
+      ordinal: entry.ordinal ?? index,
+      roleLabel: entry.roleLabel,
+      assetId: entry.assetId,
+      versionId: entry.versionId,
+      taxonomy: entry.taxonomy,
+      contract: entry.contract,
+      context: Object.freeze({ ...(entry.context ?? {}) }),
+    }))),
+  });
+  return grouped;
+}
+
 abstract class BaseStudioInputAdapter implements StudioInputAdapter {
   public abstract readonly id: string;
   public abstract readonly kind: AdaptedStudioInputKind;
@@ -131,13 +172,13 @@ export class AtomicStudioInputAdapter extends BaseStudioInputAdapter {
     readonly compatibility: StudioHandoffCompatibilityDecision;
   }): AdaptedStudioInput {
     const base = createBaseAdaptedInput(this.kind, input.handoff, input.context);
-    return Object.freeze({
+    return maybeAttachGroupedInput(input.handoff, Object.freeze({
       ...base,
       studioSpecific: Object.freeze({
         expectedInputContractId: input.compatibility.matchedContractId ?? input.handoff.payload.targetInputContract.contractId,
         acceptedAsAtomic: true,
       }),
-    });
+    }));
   }
 }
 
@@ -155,7 +196,7 @@ export class CompositeStudioInputAdapter extends BaseStudioInputAdapter {
     readonly compatibility: StudioHandoffCompatibilityDecision;
   }): AdaptedStudioInput {
     const base = createBaseAdaptedInput(this.kind, input.handoff, input.context);
-    return Object.freeze({
+    return maybeAttachGroupedInput(input.handoff, Object.freeze({
       ...base,
       studioSpecific: Object.freeze({
         expectedInputContractId: input.compatibility.matchedContractId ?? input.handoff.payload.targetInputContract.contractId,
@@ -165,7 +206,7 @@ export class CompositeStudioInputAdapter extends BaseStudioInputAdapter {
           relation: entry.relation ?? "dependency",
         }))),
       }),
-    });
+    }));
   }
 }
 
@@ -183,7 +224,7 @@ export class SystemStudioInputAdapter extends BaseStudioInputAdapter {
     readonly compatibility: StudioHandoffCompatibilityDecision;
   }): AdaptedStudioInput {
     const base = createBaseAdaptedInput(this.kind, input.handoff, input.context);
-    return Object.freeze({
+    return maybeAttachGroupedInput(input.handoff, Object.freeze({
       ...base,
       studioSpecific: Object.freeze({
         expectedInputContractId: input.compatibility.matchedContractId ?? input.handoff.payload.targetInputContract.contractId,
@@ -197,7 +238,7 @@ export class SystemStudioInputAdapter extends BaseStudioInputAdapter {
             })),
         ),
       }),
-    });
+    }));
   }
 }
 
