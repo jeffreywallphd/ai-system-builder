@@ -183,6 +183,7 @@ export interface DeploymentSdkStartDeploymentResponse {
 export interface DeploymentSdkDeploymentStatusRequest {
   readonly deploymentId: string;
   readonly tenantId?: string;
+  readonly stateTransitionLimit?: number;
 }
 
 export interface DeploymentSdkDeploymentStatusResponse {
@@ -208,6 +209,7 @@ export interface DeploymentSdkListDeploymentsRequest {
   readonly targetId?: string;
   readonly targetType?: "local" | "cloud" | "edge";
   readonly tenantId?: string;
+  readonly limit?: number;
 }
 
 export interface DeploymentSdkListDeploymentsResponse {

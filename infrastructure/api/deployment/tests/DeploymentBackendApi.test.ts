@@ -114,19 +114,21 @@ describe("DeploymentBackendApi", () => {
     const status = backend.getDeploymentStatus({
       deploymentId: startedV2.data!.deployment.deploymentId,
       tenantId: "tenant-alpha",
+      stateTransitionLimit: 1,
     }, { accessContext });
     expect(status.ok, status.error?.message).toBeTrue();
     expect(status.data?.deployment.rootSystemVersionId).toBe("system:root:v8");
-    expect((status.data?.stateTransitions.length ?? 0) > 0).toBeTrue();
+    expect(status.data?.stateTransitions.length).toBe(1);
 
     const history = backend.listDeployments({
       rootSystemAssetId: baseline.systemPackage.manifest.rootSystemAssetId,
       targetId: baseline.target.targetId.value,
       targetType: baseline.target.type,
       tenantId: "tenant-alpha",
+      limit: 1,
     }, { accessContext });
     expect(history.ok, history.error?.message).toBeTrue();
-    expect(history.data?.deployments.length).toBe(2);
+    expect(history.data?.deployments.length).toBe(1);
     expect(history.data?.deployments.every((entry) => entry.targetId === baseline.target.targetId.value)).toBeTrue();
 
     const active = backend.getActiveDeployment({

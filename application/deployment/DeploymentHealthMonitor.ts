@@ -101,6 +101,14 @@ function normalizeRequired(value: string, label: string): string {
   return normalized;
 }
 
+export interface DeploymentHealthMonitorPolicy {
+  readonly maxEndpointResolutionsPerCheck: number;
+}
+
+const DEFAULT_POLICY: DeploymentHealthMonitorPolicy = Object.freeze({
+  maxEndpointResolutionsPerCheck: 50,
+});
+
 export class DeploymentHealthMonitor {
   public constructor(
     private readonly deploymentRepository: DeploymentRecordRepository,
@@ -111,6 +119,7 @@ export class DeploymentHealthMonitor {
     private readonly evaluator: DeploymentHealthEvaluator = new DeploymentHealthEvaluator(),
     private readonly repository: DeploymentHealthSnapshotRepository = new InMemoryDeploymentHealthSnapshotRepository(),
     private readonly clock: () => Date = () => new Date(),
+    private readonly policy: DeploymentHealthMonitorPolicy = DEFAULT_POLICY,
   ) {}
 
   public getDeploymentHealth(input: {
@@ -144,8 +153,12 @@ export class DeploymentHealthMonitor {
     const endpointRecords = this.endpointExposureRepository
       .listByRootSystemAssetId(record.rootSystemAssetId)
       .filter((entry) => entry.deploymentId === record.deploymentId);
+    const endpointRecordsForResolution = endpointRecords
+      .slice()
+      .sort((left, right) => left.endpoint.endpointId.value.localeCompare(right.endpoint.endpointId.value))
+      .slice(0, this.policy.maxEndpointResolutionsPerCheck);
 
-    const resolvableCount = endpointRecords.filter((entry) => {
+    const resolvableCount = endpointRecordsForResolution.filter((entry) => {
       try {
         const resolved = this.endpointRoutingService.resolveRoute({
           endpointId: entry.endpoint.endpointId.value,
@@ -176,11 +189,17 @@ export class DeploymentHealthMonitor {
       signalSnapshot,
     });
 
+
+    const reasons = [...evaluation.reasons];
+    if (endpointRecords.length > endpointRecordsForResolution.length) {
+      reasons.push(`Health evaluation resolved ${endpointRecordsForResolution.length.toString(10)} endpoint(s) out of ${endpointRecords.length.toString(10)} total for bounded polling stability.`);
+    }
+
     const snapshot: DeploymentHealthSnapshot = Object.freeze({
       deploymentId: record.deploymentId,
       status: evaluation.status,
       evaluatedAt: this.clock().toISOString(),
-      reasons: evaluation.reasons,
+      reasons: Object.freeze(reasons),
       linkage: Object.freeze({
         rootSystemAssetId: record.rootSystemAssetId,
         rootSystemVersionId: record.rootSystemVersionId,
