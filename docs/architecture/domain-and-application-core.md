@@ -670,3 +670,10 @@ Explicitly later than this scope:
 - **Atomic and composite assets** are fully represented in current registry query/filter/detail/graph flows through taxonomy + contract projections and shared validation insights.
 - **System assets** are first-class in current registry query/filter/detail/graph/lineage flows, including system-of-systems child references and bounded version-lineage projections for nested/child version inclusion.
 - Future work remains explicit: broader visual graph editing and runtime/deployment orchestration UX are still outside current registry/system stories.
+
+## Direction 5 update: System runtime domain foundation (stories 6.1–6.2)
+
+- Added a bounded runtime domain slice at `domain/system-runtime/SystemRuntimeDomain.ts` for execution-state modeling that is explicitly separate from persisted asset-definition models.
+- The runtime model introduces execution concerns only: execution identity, invocation context, runtime environment references, status transitions, input/output payload envelopes, and execution-node references.
+- Runtime node references are nested-system-ready (`parentExecutionNodeId` + `path`) while intentionally stopping short of full orchestration/planning engines in this slice.
+- Added runtime behavior alignment seam at `application/system-runtime/RuntimeBehaviorAlignment.ts` that maps shared behavior kinds into runtime execution profiles without reclassifying assets or duplicating taxonomy logic.

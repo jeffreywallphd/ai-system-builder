@@ -645,3 +645,16 @@ Explicitly later than this scope:
 - Scope truth:
   - atomic + composite assets are fully covered in registry browse/detail/graph/navigation flows.
   - system assets are now first-class in registry browse/detail/graph/lineage flows, including nested-system child references and bounded version-lineage summaries.
+
+## Direction 5 update: System runtime domain foundation (stories 6.1–6.2)
+
+- New bounded runtime domain slice: `domain/system-runtime/SystemRuntimeDomain.ts`.
+- Keeps runtime state separate from asset definitions and models only execution-state concerns:
+  - execution id
+  - execution context/invocation metadata
+  - environment refs
+  - execution status lifecycle
+  - input/output payload envelopes
+  - execution node refs
+- Execution node refs include `parentExecutionNodeId` and `path` for nested-system readiness without implementing recursive orchestration.
+- Runtime behavior alignment is now explicit in application layer (`application/system-runtime/RuntimeBehaviorAlignment.ts`) and consumes shared taxonomy truth rather than introducing parallel runtime taxonomy rules.
