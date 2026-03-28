@@ -17,6 +17,8 @@ describe("SystemStudioPage contracts", () => {
     expect(registrationSource).toContain('supportsSystemAssets: true');
     expect(registrationSource).toContain('supportsNestedSystemAssets: true');
     expect(registrationSource).toContain('slot: "draft-authoring"');
+    expect(registrationSource).toContain("SystemCompositionEditor");
+    expect(registrationSource).toContain("system-studio-structure-editor");
     expect(registrationSource).toContain('slot: "dependencies"');
     expect(registrationSource).toContain('slot: "metadata"');
   });
@@ -32,5 +34,17 @@ describe("SystemStudioPage contracts", () => {
     expect(routesConfigSource).toContain('systemStudio: "/studio-shell/system"');
     expect(routesConfigSource).toContain('key: "system-studio"');
     expect(routesConfigSource).toContain('title: "System Studio"');
+  });
+
+  it("renders bounded system composition editor and nested-system summary surfaces", () => {
+    const source = readSource("ui/components/studio-shell/SystemCompositionEditor.tsx");
+    expect(source).toContain("data-testid=\"system-composition-editor\"");
+    expect(source).toContain("System composition structure editor");
+    expect(source).toContain("Selected components");
+    expect(source).toContain("Nested system summary");
+    expect(source).toContain("componentKind === \"system\"");
+    expect(source).toContain("saveSystemChildComponent");
+    expect(source).toContain("removeSystemChildComponent");
+    expect(source).toContain("reorderSystemChildComponent");
   });
 });

@@ -10,6 +10,14 @@ import type {
   StudioShellSnapshotReadModel,
   StudioShellValidationIssue,
 } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
+import type {
+  AddSystemChildComponentRequest,
+  ListSystemChildComponentsRequest,
+  RemoveSystemChildComponentRequest,
+  ReorderSystemChildComponentRequest,
+  SystemStudioApiResponse,
+  SystemStudioChildComponentReadModel,
+} from "../../infrastructure/api/system-studio/SystemStudioBackendApi";
 import { resolveDesktopStudioShellBridge } from "../composition/DesktopStudioShellBridgeAdapter";
 
 export class StudioShellService {
@@ -64,5 +72,25 @@ export class StudioShellService {
   public async validateDraft(studioId: string, draftId: string): Promise<StudioShellApiResponse<ReadonlyArray<StudioShellValidationIssue>>> {
     const raw = await this.requireBridge().validateDraft(JSON.stringify({ studioId, draftId }));
     return JSON.parse(raw) as StudioShellApiResponse<ReadonlyArray<StudioShellValidationIssue>>;
+  }
+
+  public async listSystemChildComponents(request: ListSystemChildComponentsRequest): Promise<SystemStudioApiResponse<ReadonlyArray<SystemStudioChildComponentReadModel>>> {
+    const raw = await this.requireBridge().listSystemChildComponents(JSON.stringify(request));
+    return JSON.parse(raw) as SystemStudioApiResponse<ReadonlyArray<SystemStudioChildComponentReadModel>>;
+  }
+
+  public async addSystemChildComponent(request: AddSystemChildComponentRequest): Promise<SystemStudioApiResponse<{ readonly updated: boolean }>> {
+    const raw = await this.requireBridge().addSystemChildComponent(JSON.stringify(request));
+    return JSON.parse(raw) as SystemStudioApiResponse<{ readonly updated: boolean }>;
+  }
+
+  public async removeSystemChildComponent(request: RemoveSystemChildComponentRequest): Promise<SystemStudioApiResponse<{ readonly updated: boolean }>> {
+    const raw = await this.requireBridge().removeSystemChildComponent(JSON.stringify(request));
+    return JSON.parse(raw) as SystemStudioApiResponse<{ readonly updated: boolean }>;
+  }
+
+  public async reorderSystemChildComponent(request: ReorderSystemChildComponentRequest): Promise<SystemStudioApiResponse<{ readonly updated: boolean }>> {
+    const raw = await this.requireBridge().reorderSystemChildComponent(JSON.stringify(request));
+    return JSON.parse(raw) as SystemStudioApiResponse<{ readonly updated: boolean }>;
   }
 }

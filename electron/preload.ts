@@ -149,6 +149,18 @@ contextBridge.exposeInMainWorld("aiLoomDesktop", {
     validateDraft(requestJson: string) {
       return ipcRenderer.invoke("ai-loom-desktop-studio-shell:validate-draft", requestJson) as Promise<string>;
     },
+    listSystemChildComponents(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:system-components:list", requestJson) as Promise<string>;
+    },
+    addSystemChildComponent(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:system-components:add", requestJson) as Promise<string>;
+    },
+    removeSystemChildComponent(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:system-components:remove", requestJson) as Promise<string>;
+    },
+    reorderSystemChildComponent(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:system-components:reorder", requestJson) as Promise<string>;
+    },
   },
   registry: {
     listAssets(limit?: number) {

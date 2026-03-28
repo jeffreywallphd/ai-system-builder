@@ -70,6 +70,7 @@ import { CrossStudioRegistryQueryService } from "../../application/asset-registr
 import { RegistryDependencyGraphService } from "../../application/asset-registry/RegistryDependencyGraphService";
 import { RegistryCacheLayer } from "../../application/asset-registry/RegistryCacheLayer";
 import { CompositionAssetContractResolver } from "../../application/contracts/CompositionAssetContractResolver";
+import { SystemStudioBackendApi } from "../../infrastructure/api/system-studio/SystemStudioBackendApi";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 if (started) {
@@ -294,6 +295,7 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   const agentStudioBackendApi = new AgentStudioBackendApi(agentRepository, agentSessionRepository, agentRunner);
   studioShellRepository = new SqliteStudioShellRepository(path.join(storagePaths.storageDirectory, "studio-shell", "studio-shell.sqlite"));
   const studioShellBackendApi = new StudioShellBackendApi(studioShellRepository);
+  const systemStudioBackendApi = new SystemStudioBackendApi(studioShellRepository);
   const executionHistoryInfrastructure = createExecutionHistoryInfrastructure(executionRunRepository);
   getExecutionRunUseCase = new GetExecutionRunUseCase(executionRunRepository);
   listExecutionRunsUseCase = executionHistoryInfrastructure.listExecutionRunsUseCase;
@@ -433,6 +435,22 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   ipcMain.handle("ai-loom-desktop-studio-shell:validate-draft", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as { studioId: string; draftId: string };
     return JSON.stringify(await studioShellBackendApi.validateDraft(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:system-components:list", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["listChildComponents"]>[0];
+    return JSON.stringify(await systemStudioBackendApi.listChildComponents(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:system-components:add", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["addChildComponent"]>[0];
+    return JSON.stringify(await systemStudioBackendApi.addChildComponent(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:system-components:remove", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["removeChildComponent"]>[0];
+    return JSON.stringify(await systemStudioBackendApi.removeChildComponent(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:system-components:reorder", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["reorderChildComponent"]>[0];
+    return JSON.stringify(await systemStudioBackendApi.reorderChildComponent(request));
   });
   ipcMain.on("ai-loom-desktop-model-files:exists", (event, targetPath: string) => {
     event.returnValue = fs.existsSync(targetPath);

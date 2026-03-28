@@ -2,6 +2,11 @@ import type { ReactNode } from "react";
 import type { AssetDraftDependencyReference, AssetMetadataPatch } from "../../domain/studio-shell/StudioShellDomain";
 import { TaxonomySemanticRoles, type TaxonomyBehaviorKind, type TaxonomySemanticRole } from "../../domain/taxonomy/CompositionTaxonomy";
 import type { StudioShellSnapshotReadModel, StudioShellValidationIssue } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
+import type {
+  AddSystemChildComponentRequest,
+  RemoveSystemChildComponentRequest,
+  ReorderSystemChildComponentRequest,
+} from "../../infrastructure/api/system-studio/SystemStudioBackendApi";
 
 export const StudioShellExtensionSlots = Object.freeze({
   sessionContext: "session-context",
@@ -14,12 +19,20 @@ export const StudioShellExtensionSlots = Object.freeze({
 
 export type StudioShellExtensionSlot = typeof StudioShellExtensionSlots[keyof typeof StudioShellExtensionSlots];
 
+export interface StudioShellExtensionOperations {
+  refresh(): Promise<void>;
+  saveSystemChildComponent?(request: AddSystemChildComponentRequest): Promise<boolean>;
+  removeSystemChildComponent?(request: RemoveSystemChildComponentRequest): Promise<boolean>;
+  reorderSystemChildComponent?(request: ReorderSystemChildComponentRequest): Promise<boolean>;
+}
+
 export interface StudioShellExtensionContext {
   readonly studioId: string;
   readonly snapshot: StudioShellSnapshotReadModel | undefined;
   readonly validationIssues: ReadonlyArray<StudioShellValidationIssue>;
   readonly operationError?: string;
   readonly isBusy: boolean;
+  readonly operations: StudioShellExtensionOperations;
 }
 
 export interface StudioShellExtensionContribution {

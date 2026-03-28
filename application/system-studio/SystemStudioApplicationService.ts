@@ -3,6 +3,8 @@ import {
   type AssetContractDescriptor,
 } from "../../domain/contracts/AssetContract";
 import {
+  buildNestedSystemReferences,
+  collectSystemDirectDependencies,
   createSystemAsset,
   createSystemAssetMetadata,
   createSystemStudioTaxonomy,
@@ -87,6 +89,30 @@ export interface PublishSystemDraftCommand {
   readonly maxDepth?: number;
 }
 
+export interface AddSystemChildComponentCommand {
+  readonly studioId?: string;
+  readonly sessionId: string;
+  readonly draftId: string;
+  readonly component: SystemComponentReference;
+}
+
+export interface RemoveSystemChildComponentCommand {
+  readonly studioId?: string;
+  readonly sessionId: string;
+  readonly draftId: string;
+  readonly componentAssetId: string;
+  readonly componentVersionId?: string;
+}
+
+export interface ReorderSystemChildComponentCommand {
+  readonly studioId?: string;
+  readonly sessionId: string;
+  readonly draftId: string;
+  readonly componentAssetId: string;
+  readonly componentVersionId?: string;
+  readonly toIndex: number;
+}
+
 function parseSystemContent(content: string): {
   readonly components?: ReadonlyArray<SystemAsset["components"][number]>;
   readonly nestedSystems?: ReadonlyArray<SystemAsset["nestedSystems"][number]>;
@@ -129,6 +155,47 @@ function parseSystemContent(content: string): {
     outputs: spec?.outputs,
     parameters: spec?.parameters,
     bindings: spec?.bindings,
+  });
+}
+
+function parseSystemContentEnvelope(content: string): Record<string, unknown> {
+  if (!content.trim()) {
+    return {};
+  }
+  const parsed = JSON.parse(content) as unknown;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return {};
+  }
+  return { ...(parsed as Record<string, unknown>) };
+}
+
+function serializeSystemContent(input: {
+  readonly content: string;
+  readonly components: ReadonlyArray<SystemComponentReference>;
+  readonly nestedSystems: ReadonlyArray<SystemCompositionReference>;
+}): string {
+  const root = parseSystemContentEnvelope(input.content);
+  const existingSpec = (root.systemSpec && typeof root.systemSpec === "object" && !Array.isArray(root.systemSpec))
+    ? root.systemSpec as Record<string, unknown>
+    : {};
+  root.systemSpec = {
+    ...existingSpec,
+    components: input.components,
+    nestedSystems: input.nestedSystems,
+  };
+  return JSON.stringify(root, null, 2);
+}
+
+function splitStandaloneDependencies(input: {
+  readonly dependencies: ReadonlyArray<AssetDraftDependencyReference>;
+  readonly components: ReadonlyArray<SystemComponentReference>;
+  readonly nestedSystems: ReadonlyArray<SystemCompositionReference>;
+}): ReadonlyArray<AssetDraftDependencyReference> {
+  const componentKeys = new Set(input.components.map((entry) => `${entry.assetId}::${entry.versionId ?? ""}`));
+  const nestedKeys = new Set(input.nestedSystems.map((entry) => `${entry.assetId}::${entry.versionId ?? ""}`));
+  return input.dependencies.filter((dependency) => {
+    const key = `${dependency.assetId}::${dependency.versionId ?? ""}`;
+    return !componentKeys.has(key) && !nestedKeys.has(key);
   });
 }
 
@@ -378,6 +445,127 @@ export class SystemStudioApplicationService {
       versionId: command.versionId,
       versionLabel: command.versionLabel,
       createdBy: command.createdBy,
+    });
+  }
+
+  public async addSystemChildComponent(command: AddSystemChildComponentCommand): Promise<AssetDraftResult> {
+    const studioId = command.studioId?.trim() || SystemStudioIdentity.defaultStudioId;
+    const loaded = await this.studioShellService.loadAssetDraft({ studioId, draftId: command.draftId });
+    if (!loaded) {
+      throw new StudioShellInvalidRequestError(`Draft '${command.draftId}' is not available in studio '${studioId}'.`);
+    }
+
+    const spec = parseSystemContent(loaded.draft.content);
+    const standaloneDependencies = splitStandaloneDependencies({
+      dependencies: loaded.draft.dependencies,
+      components: spec.components ?? [],
+      nestedSystems: spec.nestedSystems ?? [],
+    });
+    const nextComponents = [...(spec.components ?? []), command.component];
+    const nextSystem = createSystemAsset({
+      assetId: loaded.draft.assetId,
+      taxonomy: loaded.draft.metadata.taxonomy ?? createSystemStudioTaxonomy(),
+      dependencies: standaloneDependencies,
+      components: nextComponents,
+      nestedSystems: spec.nestedSystems,
+      inputs: spec.inputs,
+      outputs: spec.outputs,
+      parameters: spec.parameters,
+      bindings: spec.bindings,
+    });
+    const dependencies = collectSystemDirectDependencies(nextSystem);
+    return this.updateSystemDraft({
+      studioId,
+      sessionId: command.sessionId,
+      draftId: command.draftId,
+      content: serializeSystemContent({
+        content: loaded.draft.content,
+        components: nextSystem.components,
+        nestedSystems: buildNestedSystemReferences(nextSystem),
+      }),
+      dependencies,
+    });
+  }
+
+  public async removeSystemChildComponent(command: RemoveSystemChildComponentCommand): Promise<AssetDraftResult> {
+    const studioId = command.studioId?.trim() || SystemStudioIdentity.defaultStudioId;
+    const loaded = await this.studioShellService.loadAssetDraft({ studioId, draftId: command.draftId });
+    if (!loaded) {
+      throw new StudioShellInvalidRequestError(`Draft '${command.draftId}' is not available in studio '${studioId}'.`);
+    }
+
+    const spec = parseSystemContent(loaded.draft.content);
+    const standaloneDependencies = splitStandaloneDependencies({
+      dependencies: loaded.draft.dependencies,
+      components: spec.components ?? [],
+      nestedSystems: spec.nestedSystems ?? [],
+    });
+    const filteredComponents = (spec.components ?? []).filter((entry) => (
+      !(entry.assetId === command.componentAssetId && (entry.versionId ?? "") === (command.componentVersionId?.trim() ?? ""))
+    ));
+    const nextSystem = createSystemAsset({
+      assetId: loaded.draft.assetId,
+      taxonomy: loaded.draft.metadata.taxonomy ?? createSystemStudioTaxonomy(),
+      dependencies: standaloneDependencies,
+      components: filteredComponents,
+      nestedSystems: spec.nestedSystems,
+      inputs: spec.inputs,
+      outputs: spec.outputs,
+      parameters: spec.parameters,
+      bindings: spec.bindings,
+    });
+    const dependencies = collectSystemDirectDependencies(nextSystem);
+    return this.updateSystemDraft({
+      studioId,
+      sessionId: command.sessionId,
+      draftId: command.draftId,
+      content: serializeSystemContent({
+        content: loaded.draft.content,
+        components: nextSystem.components,
+        nestedSystems: buildNestedSystemReferences(nextSystem),
+      }),
+      dependencies,
+    });
+  }
+
+  public async reorderSystemChildComponent(command: ReorderSystemChildComponentCommand): Promise<AssetDraftResult> {
+    const studioId = command.studioId?.trim() || SystemStudioIdentity.defaultStudioId;
+    const loaded = await this.studioShellService.loadAssetDraft({ studioId, draftId: command.draftId });
+    if (!loaded) {
+      throw new StudioShellInvalidRequestError(`Draft '${command.draftId}' is not available in studio '${studioId}'.`);
+    }
+
+    const spec = parseSystemContent(loaded.draft.content);
+    const components = [...(spec.components ?? [])];
+    const currentIndex = components.findIndex((entry) => (
+      entry.assetId === command.componentAssetId && (entry.versionId ?? "") === (command.componentVersionId?.trim() ?? "")
+    ));
+    if (currentIndex < 0) {
+      throw new StudioShellInvalidRequestError("Requested component is not present in the current system draft.");
+    }
+    const boundedTarget = Math.max(0, Math.min(command.toIndex, components.length - 1));
+    const [moved] = components.splice(currentIndex, 1);
+    components.splice(boundedTarget, 0, moved);
+
+    return this.updateSystemDraft({
+      studioId,
+      sessionId: command.sessionId,
+      draftId: command.draftId,
+      content: serializeSystemContent({
+        content: loaded.draft.content,
+        components,
+        nestedSystems: buildNestedSystemReferences(createSystemAsset({
+          assetId: loaded.draft.assetId,
+          taxonomy: loaded.draft.metadata.taxonomy ?? createSystemStudioTaxonomy(),
+          dependencies: loaded.draft.dependencies,
+          components,
+          nestedSystems: spec.nestedSystems,
+          inputs: spec.inputs,
+          outputs: spec.outputs,
+          parameters: spec.parameters,
+          bindings: spec.bindings,
+        })),
+      }),
     });
   }
 

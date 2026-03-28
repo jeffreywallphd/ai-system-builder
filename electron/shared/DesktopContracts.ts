@@ -113,6 +113,10 @@ export interface DesktopStudioShellBridge {
   transitionLifecycle(requestJson: string): Promise<string>;
   publishVersion(requestJson: string): Promise<string>;
   validateDraft(requestJson: string): Promise<string>;
+  listSystemChildComponents(requestJson: string): Promise<string>;
+  addSystemChildComponent(requestJson: string): Promise<string>;
+  removeSystemChildComponent(requestJson: string): Promise<string>;
+  reorderSystemChildComponent(requestJson: string): Promise<string>;
 }
 
 export interface DesktopRegistryBridge {

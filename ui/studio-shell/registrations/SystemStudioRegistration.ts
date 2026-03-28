@@ -2,6 +2,8 @@ import {
   createSystemStudioTaxonomy,
   SystemStudioIdentity,
 } from "../../../domain/system-studio/SystemAssetDomain";
+import { createElement } from "react";
+import { SystemCompositionEditor } from "../../components/studio-shell/SystemCompositionEditor";
 import type { SystemStudioRegistration } from "../StudioShellExtensions";
 import { createSystemStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
 
@@ -50,17 +52,12 @@ export const systemStudioRegistration: SystemStudioRegistration = Object.freeze(
   },
   extensions: Object.freeze([
     {
-      id: "system-studio-draft-guidance",
+      id: "system-studio-structure-editor",
       slot: "draft-authoring",
-      title: "System draft guidance",
-      subtitle: "Compose system-level structures while preserving identity/version as assets and behavior as taxonomy metadata.",
-      order: 10,
-      render: ({ snapshot }) => Object.freeze([
-        "System assets are top-level compositions and may include atomic assets, composite assets, and nested system assets.",
-        "Keep recursive composition explicit with version-pinned dependencies for publish-ready lineage.",
-        "Do not collapse system semantics into composite-only roles; use system/app-template taxonomy roles.",
-        `Draft asset id: ${snapshot?.draft?.assetId ?? "-"}`,
-      ]),
+      title: "System composition canvas / structure editor",
+      subtitle: "Bounded, backend-authoritative structure editor for multi-level system composition.",
+      order: 8,
+      render: (context) => createElement(SystemCompositionEditor, { context }),
     },
     {
       id: "system-studio-composition-capabilities",
