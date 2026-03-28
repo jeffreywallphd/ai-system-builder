@@ -191,6 +191,26 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
         setError(undefined);
         return true;
       },
+      updateSystemInterfaces: async (request) => {
+        const response = await service.updateSystemInterfaces(request);
+        if (!response.ok) {
+          setError(response.error?.message ?? "Failed to update system interfaces.");
+          return false;
+        }
+        await refreshSnapshot();
+        setError(undefined);
+        return true;
+      },
+      updateSystemParameters: async (request) => {
+        const response = await service.updateSystemParameters(request);
+        if (!response.ok) {
+          setError(response.error?.message ?? "Failed to update system parameters.");
+          return false;
+        }
+        await refreshSnapshot();
+        setError(undefined);
+        return true;
+      },
     },
   };
 

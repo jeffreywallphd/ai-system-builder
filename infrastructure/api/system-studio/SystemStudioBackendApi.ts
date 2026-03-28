@@ -52,6 +52,21 @@ export interface ReorderSystemChildComponentRequest extends MutateSystemChildCom
   readonly toIndex: number;
 }
 
+export interface UpdateSystemInterfacesRequest extends MutateSystemChildComponentRequest {
+  readonly inputs: ReadonlyArray<{ readonly inputId: string; readonly description?: string; readonly valueType?: string; readonly required?: boolean }>;
+  readonly outputs: ReadonlyArray<{ readonly outputId: string; readonly description?: string; readonly valueType?: string }>;
+}
+
+export interface UpdateSystemParametersRequest extends MutateSystemChildComponentRequest {
+  readonly parameters: ReadonlyArray<{
+    readonly parameterId: string;
+    readonly description?: string;
+    readonly valueType?: string;
+    readonly required?: boolean;
+    readonly defaultValue?: unknown;
+  }>;
+}
+
 export class SystemStudioBackendApi {
   private readonly service: SystemStudioApplicationService;
 
@@ -93,6 +108,20 @@ export class SystemStudioBackendApi {
   public async reorderChildComponent(request: ReorderSystemChildComponentRequest) {
     return this.wrap(async () => {
       await this.service.reorderSystemChildComponent(request);
+      return Object.freeze({ updated: true });
+    });
+  }
+
+  public async updateInterfaces(request: UpdateSystemInterfacesRequest) {
+    return this.wrap(async () => {
+      await this.service.updateSystemInterfaces(request);
+      return Object.freeze({ updated: true });
+    });
+  }
+
+  public async updateParameters(request: UpdateSystemParametersRequest) {
+    return this.wrap(async () => {
+      await this.service.updateSystemParameters(request);
       return Object.freeze({ updated: true });
     });
   }

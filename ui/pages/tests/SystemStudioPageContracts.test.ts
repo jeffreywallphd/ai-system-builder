@@ -18,7 +18,11 @@ describe("SystemStudioPage contracts", () => {
     expect(registrationSource).toContain('supportsNestedSystemAssets: true');
     expect(registrationSource).toContain('slot: "draft-authoring"');
     expect(registrationSource).toContain("SystemCompositionEditor");
+    expect(registrationSource).toContain("SystemInterfaceEditor");
+    expect(registrationSource).toContain("SystemParameterConfigEditor");
     expect(registrationSource).toContain("system-studio-structure-editor");
+    expect(registrationSource).toContain("system-studio-interface-editor");
+    expect(registrationSource).toContain("system-studio-parameter-editor");
     expect(registrationSource).toContain('slot: "dependencies"');
     expect(registrationSource).toContain('slot: "metadata"');
   });
@@ -46,5 +50,16 @@ describe("SystemStudioPage contracts", () => {
     expect(source).toContain("saveSystemChildComponent");
     expect(source).toContain("removeSystemChildComponent");
     expect(source).toContain("reorderSystemChildComponent");
+  });
+
+  it("renders first-class system interface and parameter authoring panels", () => {
+    const interfaceSource = readSource("ui/components/studio-shell/SystemInterfaceEditor.tsx");
+    const parameterSource = readSource("ui/components/studio-shell/SystemParameterConfigEditor.tsx");
+    expect(interfaceSource).toContain("data-testid=\"system-interface-editor\"");
+    expect(interfaceSource).toContain("System inputs and outputs");
+    expect(interfaceSource).toContain("updateSystemInterfaces");
+    expect(parameterSource).toContain("data-testid=\"system-parameter-config-editor\"");
+    expect(parameterSource).toContain("System parameters and defaults");
+    expect(parameterSource).toContain("updateSystemParameters");
   });
 });

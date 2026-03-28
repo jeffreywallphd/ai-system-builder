@@ -161,6 +161,12 @@ contextBridge.exposeInMainWorld("aiLoomDesktop", {
     reorderSystemChildComponent(requestJson: string) {
       return ipcRenderer.invoke("ai-loom-desktop-studio-shell:system-components:reorder", requestJson) as Promise<string>;
     },
+    updateSystemInterfaces(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:system-interfaces:update", requestJson) as Promise<string>;
+    },
+    updateSystemParameters(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:system-parameters:update", requestJson) as Promise<string>;
+    },
   },
   registry: {
     listAssets(limit?: number) {
