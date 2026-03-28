@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import json
 import math
+import os
+import platform
 import re
 import threading
 import time
+from dataclasses import dataclass, field
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Literal
 
 from app.models.requests import FineTuningJobRequest
 from app.models.responses import FineTuningJobResponse
@@ -27,6 +30,41 @@ def _require_numpy():
             f"Underlying error: {error}"
         ) from error
     return np
+
+
+CapabilityReasonCategory = Literal[
+    "dependency-missing",
+    "host-incompatible",
+    "resource-constrained",
+    "execution-constrained",
+    "unknown",
+]
+
+
+@dataclass(frozen=True)
+class TrainingCapabilityStatus:
+    capability_id: str
+    state: Literal["ready", "unavailable", "degraded"]
+    reason_code: str | None = None
+    reason_category: CapabilityReasonCategory | None = None
+    detail: str | None = None
+    checked_at: str = field(default_factory=_now_iso)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+class LocalTrainingUnavailableError(ValueError):
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str = "LOCAL_TRAINING_UNAVAILABLE",
+        category: CapabilityReasonCategory = "unknown",
+        metadata: Dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.category = category
+        self.metadata = metadata or {}
 
 
 class ModelTrainingService:
@@ -50,7 +88,90 @@ class ModelTrainingService:
             return self._prepare_job(request)
         if request.backend != "python-runtime-local":
             raise ValueError("Real training requires the python-runtime-local backend.")
+        self.ensure_local_training_ready()
         return self._start_local_training_job(request)
+
+    def inspect_local_training_capability(self) -> TrainingCapabilityStatus:
+        checks: Dict[str, Any] = {
+            "platform": platform.system().lower(),
+            "architecture": platform.machine().lower(),
+        }
+        min_memory_mb = int(os.environ.get("AI_LOOM_LOCAL_TRAINING_MIN_MEMORY_MB", "512"))
+        checks["minimumMemoryMb"] = min_memory_mb
+
+        try:
+            page_size = os.sysconf("SC_PAGE_SIZE")
+            page_count = os.sysconf("SC_PHYS_PAGES")
+            if isinstance(page_size, int) and isinstance(page_count, int) and page_size > 0 and page_count > 0:
+                total_memory_mb = int((page_size * page_count) / (1024 * 1024))
+                checks["totalMemoryMb"] = total_memory_mb
+                if total_memory_mb < min_memory_mb:
+                    return TrainingCapabilityStatus(
+                        capability_id="local-gradient-training",
+                        state="unavailable",
+                        reason_code="LOCAL_TRAINING_INSUFFICIENT_MEMORY",
+                        reason_category="resource-constrained",
+                        detail=f"Local gradient training requires at least {min_memory_mb}MB RAM on this host.",
+                        metadata=checks,
+                    )
+        except (AttributeError, OSError, ValueError):
+            checks["totalMemoryMb"] = "unknown"
+
+        machine = checks["architecture"]
+        if not any(machine.startswith(prefix) for prefix in ("x86_64", "amd64", "arm64", "aarch64")):
+            return TrainingCapabilityStatus(
+                capability_id="local-gradient-training",
+                state="unavailable",
+                reason_code="LOCAL_TRAINING_UNSUPPORTED_ARCH",
+                reason_category="host-incompatible",
+                detail=f"Local gradient training is not supported on architecture '{machine}'.",
+                metadata=checks,
+            )
+
+        try:
+            _require_numpy()
+        except Exception as error:  # noqa: BLE001
+            message = str(error)
+            normalized = message.lower()
+            if "no module named" in normalized or "cannot import name" in normalized:
+                category: CapabilityReasonCategory = "dependency-missing"
+                code = "LOCAL_TRAINING_DEPENDENCY_MISSING"
+            elif "illegal instruction" in normalized or "x86_v2" in normalized or "doesn't support" in normalized:
+                category = "host-incompatible"
+                code = "LOCAL_TRAINING_HOST_INCOMPATIBLE"
+            elif "cannot allocate" in normalized or "out of memory" in normalized:
+                category = "resource-constrained"
+                code = "LOCAL_TRAINING_RESOURCE_CONSTRAINED"
+            else:
+                category = "execution-constrained"
+                code = "LOCAL_TRAINING_DEPENDENCY_UNAVAILABLE"
+
+            return TrainingCapabilityStatus(
+                capability_id="local-gradient-training",
+                state="unavailable",
+                reason_code=code,
+                reason_category=category,
+                detail=message,
+                metadata=checks,
+            )
+
+        return TrainingCapabilityStatus(
+            capability_id="local-gradient-training",
+            state="ready",
+            detail="Local gradient training dependencies are available.",
+            metadata=checks,
+        )
+
+    def ensure_local_training_ready(self) -> TrainingCapabilityStatus:
+        status = self.inspect_local_training_capability()
+        if status.state == "ready":
+            return status
+        raise LocalTrainingUnavailableError(
+            status.detail or "Local gradient training is unavailable on this host.",
+            code=status.reason_code or "LOCAL_TRAINING_UNAVAILABLE",
+            category=status.reason_category or "unknown",
+            metadata=status.metadata,
+        )
 
     def list_jobs(self) -> List[FineTuningJobResponse]:
         with self._lock:

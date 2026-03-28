@@ -9,3 +9,5 @@ def test_health_route() -> None:
     payload = response.json()
     assert payload['runtime'] == 'python'
     assert payload['status'] == 'ok'
+    assert payload["details"]["runtimeBoot"]["state"] == "healthy"
+    assert "local-gradient-training" in payload["details"]["capabilities"]

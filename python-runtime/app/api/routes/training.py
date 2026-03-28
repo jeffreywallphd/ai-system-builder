@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.api.dependencies import get_model_training_service
 from app.models.requests import FineTuningJobRequest
 from app.models.responses import FineTuningJobResponse
-from app.services.model_training_service import ModelTrainingService
+from app.services.model_training_service import LocalTrainingUnavailableError, ModelTrainingService
 
 router = APIRouter(prefix="/training", tags=["training"])
 
@@ -15,6 +15,16 @@ def create_training_job(
 ) -> FineTuningJobResponse:
     try:
         return service.submit_job(request)
+    except LocalTrainingUnavailableError as error:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "message": str(error),
+                "code": error.code,
+                "category": error.category,
+                "metadata": error.metadata,
+            },
+        ) from error
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 

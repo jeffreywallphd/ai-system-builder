@@ -160,7 +160,12 @@ export class BrowserDevelopmentManagedRuntime {
       logger.info("[ai-loom] ensuring browser dev Python runtime is running.");
       const ensureRunning = await this.requestSupervisorAction("ensure-running");
       this.assertManagedRuntimeStarted(ensureRunning);
-      await this.waitForPort(this.options.pythonRuntimePort, this.options.supervisorHost, PYTHON_READY_TIMEOUT_MS);
+      await this.waitForPort(
+        this.options.pythonRuntimePort,
+        this.options.supervisorHost,
+        PYTHON_READY_TIMEOUT_MS,
+        async () => this.assertRuntimeNotFailed(await this.fetchPythonRuntimeSnapshot()),
+      );
       logger.info(
         `[ai-loom] python runtime ready on http://${this.options.supervisorHost}:${this.options.pythonRuntimePort} with MCP runtime auto-connect enabled.`,
       );
@@ -224,6 +229,21 @@ export class BrowserDevelopmentManagedRuntime {
     return payload.service;
   }
 
+  private assertRuntimeNotFailed(snapshot: ManagedServiceSnapshot | undefined): void {
+    if (!snapshot) {
+      return;
+    }
+
+    if (snapshot.state === "failed" || snapshot.state === "stopped" || snapshot.state === "unavailable") {
+      const provisioningState = snapshot.diagnostics?.provisioning?.state;
+      const provisioningError = snapshot.diagnostics?.provisioning?.lastError;
+      const detail = snapshot.detail ?? provisioningError?.message ?? "Python runtime startup failed before becoming healthy.";
+      throw new Error(
+        `Python runtime startup failed (supervisorState=${snapshot.state}${provisioningState ? `, provisioningState=${provisioningState}` : ""}): ${detail}`,
+      );
+    }
+  }
+
   private async logPythonRuntimeDiagnostics(logger: BrowserDevelopmentManagedRuntimeLogger, cause: unknown): Promise<void> {
     logger.warn(
       `[ai-loom] python runtime bootstrap failed: ${cause instanceof Error ? cause.message : String(cause)}`,
@@ -275,10 +295,18 @@ export class BrowserDevelopmentManagedRuntime {
     }
   }
 
-  private async waitForPort(port: number, host: string, timeoutMs: number): Promise<void> {
+  private async waitForPort(
+    port: number,
+    host: string,
+    timeoutMs: number,
+    onPoll?: () => Promise<void>,
+  ): Promise<void> {
     const startedAt = Date.now();
 
     while (Date.now() - startedAt < timeoutMs) {
+      if (onPoll) {
+        await onPoll();
+      }
       if (await this.canConnectToPort(port, host)) {
         return;
       }

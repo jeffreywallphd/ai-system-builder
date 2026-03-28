@@ -128,22 +128,17 @@ def test_local_training_reports_numpy_import_incompatibility_without_crashing_ru
     monkeypatch.setattr(model_training_service, "_require_numpy", fail_numpy_import)
 
     response = client.post("/training/jobs", json=create_training_payload())
-    assert response.status_code == 200
+    assert response.status_code == 503
+    payload = response.json()
+    assert payload["detail"]["code"] in {"LOCAL_TRAINING_DEPENDENCY_UNAVAILABLE", "LOCAL_TRAINING_DEPENDENCY_MISSING"}
+    assert payload["detail"]["category"] in {"execution-constrained", "dependency-missing"}
 
-    terminal = None
-    for _ in range(60):
-        polled = client.post("/training/jobs/job-1/refresh")
-        payload = polled.json()
-        if payload["status"] in {"failed", "partially-completed"}:
-            terminal = payload
-            break
-        time.sleep(0.05)
-
-    assert terminal is not None
-    assert any(diagnostic["code"] == "local_training_failed" for diagnostic in terminal["diagnostics"])
-    assert any("NumPy" in (diagnostic.get("detail") or "") for diagnostic in terminal["diagnostics"])
     health = client.get("/health")
     assert health.status_code == 200
+    health_payload = health.json()
+    local_training_capability = health_payload["details"]["capabilities"]["local-gradient-training"]
+    assert local_training_capability["state"] == "unavailable"
+    assert local_training_capability["reason_code"] in {"LOCAL_TRAINING_DEPENDENCY_UNAVAILABLE", "LOCAL_TRAINING_DEPENDENCY_MISSING"}
 
     app.dependency_overrides.clear()
 
