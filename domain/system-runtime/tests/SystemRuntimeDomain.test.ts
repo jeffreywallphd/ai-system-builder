@@ -2,9 +2,13 @@ import { describe, expect, it } from "bun:test";
 import {
   attachExecutionNode,
   createSystemExecution,
+  ExecutionDecisionKinds,
+  ExecutionNodeStatusKinds,
   ExecutionStatusKinds,
+  initializeExecutionRuntimeState,
   isTerminalExecutionStatus,
   transitionSystemExecutionStatus,
+  updateExecutionNodeState,
 } from "../SystemRuntimeDomain";
 
 describe("SystemRuntimeDomain", () => {
@@ -203,5 +207,60 @@ describe("SystemRuntimeDomain", () => {
     expect(nested.nodes).toHaveLength(2);
     expect(nested.nodes[1]?.path).toEqual(["root-system-node", "nested-system-node"]);
     expect(nested.nodes[1]?.target.assetId).toBe("asset:system-child");
+  });
+
+  it("tracks typed runtime state transitions for node progression", () => {
+    const base = createSystemExecution({
+      executionId: "exec-state",
+      root: {
+        assetId: "asset:system-root",
+        taxonomy: {
+          structuralKind: "system",
+          semanticRole: "system",
+          behaviorKind: "autonomous",
+        },
+      },
+      input: {
+        payload: {},
+        capturedAt: "2026-03-28T13:00:00.000Z",
+      },
+      startedAt: "2026-03-28T13:00:00.000Z",
+    });
+
+    const initialized = initializeExecutionRuntimeState({
+      execution: base,
+      nodeIds: ["node:root", "node:child"],
+      updatedAt: "2026-03-28T13:00:05.000Z",
+    });
+    const running = updateExecutionNodeState({
+      execution: initialized,
+      executionNodeId: "node:root",
+      status: ExecutionNodeStatusKinds.running,
+      updatedAt: "2026-03-28T13:00:10.000Z",
+      startedAt: "2026-03-28T13:00:10.000Z",
+      incrementIteration: true,
+      decision: {
+        kind: ExecutionDecisionKinds.iterate,
+        reason: "bounded-loop",
+        decidedAt: "2026-03-28T13:00:10.000Z",
+      },
+    });
+    const complete = updateExecutionNodeState({
+      execution: running,
+      executionNodeId: "node:root",
+      status: ExecutionNodeStatusKinds.succeeded,
+      updatedAt: "2026-03-28T13:00:20.000Z",
+      completedAt: "2026-03-28T13:00:20.000Z",
+      incrementPlanningCycle: true,
+      decision: {
+        kind: ExecutionDecisionKinds.complete,
+        decidedAt: "2026-03-28T13:00:20.000Z",
+      },
+    });
+
+    expect(initialized.runtimeState.snapshot.totalNodeCount).toBe(2);
+    expect(complete.runtimeState.snapshot.completedNodeCount).toBe(1);
+    expect(complete.runtimeState.nodeStates.find((entry) => entry.executionNodeId === "node:root")?.iterationCount).toBe(1);
+    expect(complete.runtimeState.nodeStates.find((entry) => entry.executionNodeId === "node:root")?.planningCycleCount).toBe(1);
   });
 });

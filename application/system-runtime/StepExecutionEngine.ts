@@ -18,6 +18,26 @@ export interface StepExecutionRequest {
   readonly execution: SystemExecution;
   readonly input?: unknown;
   readonly startedAt?: string;
+  readonly progression?: {
+    readonly iteration: number;
+    readonly planningCycle: number;
+    readonly maxIterations: number;
+    readonly maxPlanningCycles: number;
+  };
+}
+
+export const StepProgressionDecisionKinds = Object.freeze({
+  complete: "complete",
+  iterate: "iterate",
+  replan: "replan",
+  unsupported: "unsupported",
+});
+
+export type StepProgressionDecisionKind = typeof StepProgressionDecisionKinds[keyof typeof StepProgressionDecisionKinds];
+
+export interface StepProgressionDecision {
+  readonly kind: StepProgressionDecisionKind;
+  readonly reason?: string;
 }
 
 export interface StepExecutionResult {
@@ -27,6 +47,7 @@ export interface StepExecutionResult {
   readonly completedAt: string;
   readonly output?: unknown;
   readonly diagnostics?: ReadonlyArray<string>;
+  readonly progressionDecision?: StepProgressionDecision;
   readonly error?: {
     readonly code: string;
     readonly message: string;
@@ -53,6 +74,7 @@ function createFailedResult(input: {
   readonly code: string;
   readonly message: string;
   readonly diagnostics?: ReadonlyArray<string>;
+  readonly progressionDecision?: StepProgressionDecision;
 }): StepExecutionResult {
   return Object.freeze({
     nodeId: input.nodeId,
@@ -60,6 +82,7 @@ function createFailedResult(input: {
     startedAt: input.startedAt,
     completedAt: nowIso(),
     diagnostics: input.diagnostics ? Object.freeze([...input.diagnostics]) : undefined,
+    progressionDecision: input.progressionDecision,
     error: Object.freeze({
       code: input.code,
       message: input.message,
@@ -118,6 +141,13 @@ class BoundedPlanNodeStepExecutionAdapter implements IStepExecutionAdapter {
       }
     }
 
+    const progression = request.progression ?? {
+      iteration: 0,
+      planningCycle: 0,
+      maxIterations: 1,
+      maxPlanningCycles: 1,
+    };
+
     const diagnostics: string[] = [];
     if (request.node.behavior.supportsBranching) {
       diagnostics.push("branch-capable behavior profile evaluated in bounded mode");
@@ -126,7 +156,25 @@ class BoundedPlanNodeStepExecutionAdapter implements IStepExecutionAdapter {
       diagnostics.push("iteration-capable behavior profile executed with a single bounded pass");
     }
     if (request.node.behavior.supportsPlanning) {
-      diagnostics.push("planner-capable behavior profile executed with a single bounded planning pass");
+      diagnostics.push("planner-capable behavior profile evaluated with bounded planning progression");
+    }
+
+    let progressionDecision: StepProgressionDecision = Object.freeze({ kind: StepProgressionDecisionKinds.complete });
+
+    if (request.node.behavior.supportsPlanning) {
+      if (progression.planningCycle + 1 < progression.maxPlanningCycles) {
+        progressionDecision = Object.freeze({
+          kind: StepProgressionDecisionKinds.replan,
+          reason: `planning-cycle-${progression.planningCycle + 1}-of-${progression.maxPlanningCycles}`,
+        });
+      }
+    } else if (request.node.behavior.supportsIteration) {
+      if (progression.iteration + 1 < progression.maxIterations) {
+        progressionDecision = Object.freeze({
+          kind: StepProgressionDecisionKinds.iterate,
+          reason: `iteration-${progression.iteration + 1}-of-${progression.maxIterations}`,
+        });
+      }
     }
 
     return Object.freeze({
@@ -145,10 +193,11 @@ class BoundedPlanNodeStepExecutionAdapter implements IStepExecutionAdapter {
           supportsBranching: request.node.behavior.supportsBranching,
           supportsIteration: request.node.behavior.supportsIteration,
           supportsPlanning: request.node.behavior.supportsPlanning,
-          boundedPasses: request.node.behavior.supportsPlanning || request.node.behavior.supportsIteration ? 1 : undefined,
+          boundedPasses: progression.planningCycle + progression.iteration + 1,
         }),
       }),
       diagnostics: diagnostics.length > 0 ? Object.freeze(diagnostics) : undefined,
+      progressionDecision,
     });
   }
 }

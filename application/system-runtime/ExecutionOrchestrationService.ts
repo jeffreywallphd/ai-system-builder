@@ -1,9 +1,14 @@
 import {
   attachExecutionNode,
   createSystemExecution,
+  ExecutionDecisionKinds,
+  ExecutionNodeStatusKinds,
   ExecutionStatusKinds,
+  initializeExecutionRuntimeState,
   transitionSystemExecutionStatus,
+  updateExecutionNodeState,
   type ExecutionContext,
+  type ExecutionDecisionKind,
   type ExecutionEnvironmentRef,
   type ExecutionOutputEnvelope,
   type SystemExecution,
@@ -14,11 +19,20 @@ import { ExecutionPlanBuilder, type ExecutionPlan } from "./ExecutionPlanBuilder
 import type { RuntimeBehaviorProfile } from "./RuntimeBehaviorAlignment";
 import type { RuntimeDependencyResolutionResult } from "./RuntimeDependencyResolution";
 import type { RuntimeExecutionContract } from "./RuntimeExecutionContractMapping";
-import { StepExecutionStatusKinds, type IStepExecutionEngine, type StepExecutionResult } from "./StepExecutionEngine";
+import {
+  StepExecutionStatusKinds,
+  StepProgressionDecisionKinds,
+  type IStepExecutionEngine,
+  type StepExecutionResult,
+} from "./StepExecutionEngine";
 
 export interface ExecutionProgression {
   readonly nodeId: string;
+  readonly passIndex: number;
+  readonly iteration: number;
+  readonly planningCycle: number;
   readonly status: StepExecutionResult["status"];
+  readonly decision: ExecutionDecisionKind;
   readonly startedAt: string;
   readonly completedAt: string;
   readonly diagnostics?: ReadonlyArray<string>;
@@ -39,6 +53,8 @@ export interface ExecutionOrchestrationRequest {
   readonly inputContentType?: string;
   readonly inputSchemaVersion?: string;
   readonly startedAt?: string;
+  readonly maxIterationsPerNode?: number;
+  readonly maxPlanningCyclesPerNode?: number;
 }
 
 export interface ExecutionOrchestrationResult {
@@ -95,6 +111,24 @@ function resolveOutput(stepResults: Readonly<Record<string, StepExecutionResult>
       nodeResults: Object.fromEntries(Object.values(stepResults).map((entry) => [entry.nodeId, entry.output])),
     }),
   });
+}
+
+function mapDecisionKind(result: StepExecutionResult): ExecutionDecisionKind {
+  const decisionKind = result.progressionDecision?.kind ?? StepProgressionDecisionKinds.complete;
+  switch (decisionKind) {
+    case StepProgressionDecisionKinds.iterate:
+      return ExecutionDecisionKinds.iterate;
+    case StepProgressionDecisionKinds.replan:
+      return ExecutionDecisionKinds.replan;
+    case StepProgressionDecisionKinds.unsupported:
+      return ExecutionDecisionKinds.unsupported;
+    default:
+      return ExecutionDecisionKinds.complete;
+  }
+}
+
+function normalizePositive(value: number | undefined, fallback: number): number {
+  return Number.isFinite(value) && (value as number) > 0 ? Math.floor(value as number) : fallback;
 }
 
 function validatePlanForRequest(input: {
@@ -184,9 +218,16 @@ export class ExecutionOrchestrationService {
       nextStatus: ExecutionStatusKinds.running,
       updatedAt: startedAt,
     });
+    execution = initializeExecutionRuntimeState({
+      execution,
+      nodeIds: plan.orderedNodeIds,
+      updatedAt: startedAt,
+    });
 
     const progression: ExecutionProgression[] = [];
     const stepResults: Record<string, StepExecutionResult> = {};
+    const maxIterationsPerNode = normalizePositive(request.maxIterationsPerNode, 3);
+    const maxPlanningCyclesPerNode = normalizePositive(request.maxPlanningCyclesPerNode, 2);
 
     for (const nodeId of plan.orderedNodeIds) {
       const node = nodesById.get(nodeId);
@@ -215,43 +256,236 @@ export class ExecutionOrchestrationService {
         },
         updatedAt: nowIso(),
       });
+      let passIndex = 0;
+      let iteration = 0;
+      let planningCycle = 0;
+      let continueProgression = true;
 
-      const stepResult = await this.stepExecutionEngine.executeStep({
-        plan,
-        node,
-        execution,
-        environment,
-        input: request.inputPayload,
-      });
-
-      stepResults[node.nodeId] = stepResult;
-      progression.push(Object.freeze({
-        nodeId: node.nodeId,
-        status: stepResult.status,
-        startedAt: stepResult.startedAt,
-        completedAt: stepResult.completedAt,
-        diagnostics: stepResult.diagnostics,
-      }));
-
-      if (stepResult.status !== StepExecutionStatusKinds.succeeded) {
-        execution = transitionSystemExecutionStatus({
+      while (continueProgression) {
+        const startedAtNode = nowIso();
+        execution = updateExecutionNodeState({
           execution,
-          nextStatus: stepResult.status === StepExecutionStatusKinds.cancelled
-            ? ExecutionStatusKinds.cancelled
-            : ExecutionStatusKinds.failed,
-          updatedAt: stepResult.completedAt,
-          completedAt: stepResult.completedAt,
-          output: resolveOutput(stepResults),
+          executionNodeId: node.nodeId,
+          status: ExecutionNodeStatusKinds.running,
+          startedAt: startedAtNode,
+          updatedAt: startedAtNode,
         });
 
-        return Object.freeze({
-          status: "failed",
+        const stepResult = await this.stepExecutionEngine.executeStep({
           plan,
+          node,
           execution,
-          progression: Object.freeze(progression),
-          stepResults: Object.freeze({ ...stepResults }),
-          errors: Object.freeze(stepResult.error ? [stepResult.error.message] : ["Step execution failed."]),
+          environment,
+          input: request.inputPayload,
+          progression: {
+            iteration,
+            planningCycle,
+            maxIterations: maxIterationsPerNode,
+            maxPlanningCycles: maxPlanningCyclesPerNode,
+          },
         });
+        stepResults[node.nodeId] = stepResult;
+
+        const decision = mapDecisionKind(stepResult);
+        progression.push(Object.freeze({
+          nodeId: node.nodeId,
+          passIndex,
+          iteration,
+          planningCycle,
+          status: stepResult.status,
+          decision,
+          startedAt: stepResult.startedAt,
+          completedAt: stepResult.completedAt,
+          diagnostics: stepResult.diagnostics,
+        }));
+
+        if (stepResult.status !== StepExecutionStatusKinds.succeeded) {
+          execution = updateExecutionNodeState({
+            execution,
+            executionNodeId: node.nodeId,
+            status: stepResult.status === StepExecutionStatusKinds.cancelled
+              ? ExecutionNodeStatusKinds.cancelled
+              : ExecutionNodeStatusKinds.failed,
+            completedAt: stepResult.completedAt,
+            updatedAt: stepResult.completedAt,
+            decision: {
+              kind: decision,
+              reason: stepResult.progressionDecision?.reason,
+              decidedAt: stepResult.completedAt,
+            },
+            error: stepResult.error,
+          });
+
+          execution = transitionSystemExecutionStatus({
+            execution,
+            nextStatus: stepResult.status === StepExecutionStatusKinds.cancelled
+              ? ExecutionStatusKinds.cancelled
+              : ExecutionStatusKinds.failed,
+            updatedAt: stepResult.completedAt,
+            completedAt: stepResult.completedAt,
+            output: resolveOutput(stepResults),
+          });
+
+          return Object.freeze({
+            status: "failed",
+            plan,
+            execution,
+            progression: Object.freeze(progression),
+            stepResults: Object.freeze({ ...stepResults }),
+            errors: Object.freeze(stepResult.error ? [stepResult.error.message] : ["Step execution failed."]),
+          });
+        }
+
+        if (decision === ExecutionDecisionKinds.iterate) {
+          iteration += 1;
+          execution = updateExecutionNodeState({
+            execution,
+            executionNodeId: node.nodeId,
+            status: ExecutionNodeStatusKinds.running,
+            updatedAt: stepResult.completedAt,
+            decision: {
+              kind: decision,
+              reason: stepResult.progressionDecision?.reason,
+              decidedAt: stepResult.completedAt,
+            },
+            incrementIteration: true,
+          });
+          passIndex += 1;
+          if (iteration >= maxIterationsPerNode) {
+            execution = updateExecutionNodeState({
+              execution,
+              executionNodeId: node.nodeId,
+              status: ExecutionNodeStatusKinds.failed,
+              completedAt: stepResult.completedAt,
+              updatedAt: stepResult.completedAt,
+              error: {
+                code: "iteration-limit-exceeded",
+                message: `Node '${node.nodeId}' exceeded bounded iteration limit '${maxIterationsPerNode}'.`,
+              },
+              decision: {
+                kind: ExecutionDecisionKinds.unsupported,
+                reason: "bounded-iteration-limit-exceeded",
+                decidedAt: stepResult.completedAt,
+              },
+            });
+            execution = transitionSystemExecutionStatus({
+              execution,
+              nextStatus: ExecutionStatusKinds.failed,
+              updatedAt: stepResult.completedAt,
+              completedAt: stepResult.completedAt,
+              output: resolveOutput(stepResults),
+            });
+            return Object.freeze({
+              status: "failed",
+              plan,
+              execution,
+              progression: Object.freeze(progression),
+              stepResults: Object.freeze({ ...stepResults }),
+              errors: Object.freeze([`Node '${node.nodeId}' exceeded bounded iteration limit '${maxIterationsPerNode}'.`]),
+            });
+          }
+          continue;
+        }
+
+        if (decision === ExecutionDecisionKinds.replan) {
+          planningCycle += 1;
+          execution = updateExecutionNodeState({
+            execution,
+            executionNodeId: node.nodeId,
+            status: ExecutionNodeStatusKinds.running,
+            updatedAt: stepResult.completedAt,
+            decision: {
+              kind: decision,
+              reason: stepResult.progressionDecision?.reason,
+              decidedAt: stepResult.completedAt,
+            },
+            incrementPlanningCycle: true,
+          });
+          passIndex += 1;
+          if (planningCycle >= maxPlanningCyclesPerNode) {
+            execution = updateExecutionNodeState({
+              execution,
+              executionNodeId: node.nodeId,
+              status: ExecutionNodeStatusKinds.failed,
+              completedAt: stepResult.completedAt,
+              updatedAt: stepResult.completedAt,
+              error: {
+                code: "planning-limit-exceeded",
+                message: `Node '${node.nodeId}' exceeded bounded planning-cycle limit '${maxPlanningCyclesPerNode}'.`,
+              },
+              decision: {
+                kind: ExecutionDecisionKinds.unsupported,
+                reason: "bounded-planning-limit-exceeded",
+                decidedAt: stepResult.completedAt,
+              },
+            });
+            execution = transitionSystemExecutionStatus({
+              execution,
+              nextStatus: ExecutionStatusKinds.failed,
+              updatedAt: stepResult.completedAt,
+              completedAt: stepResult.completedAt,
+              output: resolveOutput(stepResults),
+            });
+            return Object.freeze({
+              status: "failed",
+              plan,
+              execution,
+              progression: Object.freeze(progression),
+              stepResults: Object.freeze({ ...stepResults }),
+              errors: Object.freeze([`Node '${node.nodeId}' exceeded bounded planning-cycle limit '${maxPlanningCyclesPerNode}'.`]),
+            });
+          }
+          continue;
+        }
+
+        if (decision === ExecutionDecisionKinds.unsupported) {
+          execution = updateExecutionNodeState({
+            execution,
+            executionNodeId: node.nodeId,
+            status: ExecutionNodeStatusKinds.failed,
+            completedAt: stepResult.completedAt,
+            updatedAt: stepResult.completedAt,
+            error: {
+              code: "unsupported-progression",
+              message: `Node '${node.nodeId}' requested unsupported progression.`,
+            },
+            decision: {
+              kind: decision,
+              reason: stepResult.progressionDecision?.reason,
+              decidedAt: stepResult.completedAt,
+            },
+          });
+          execution = transitionSystemExecutionStatus({
+            execution,
+            nextStatus: ExecutionStatusKinds.failed,
+            updatedAt: stepResult.completedAt,
+            completedAt: stepResult.completedAt,
+            output: resolveOutput(stepResults),
+          });
+          return Object.freeze({
+            status: "failed",
+            plan,
+            execution,
+            progression: Object.freeze(progression),
+            stepResults: Object.freeze({ ...stepResults }),
+            errors: Object.freeze([`Node '${node.nodeId}' requested unsupported progression.`]),
+          });
+        }
+
+        execution = updateExecutionNodeState({
+          execution,
+          executionNodeId: node.nodeId,
+          status: ExecutionNodeStatusKinds.succeeded,
+          completedAt: stepResult.completedAt,
+          updatedAt: stepResult.completedAt,
+          decision: {
+            kind: decision,
+            reason: stepResult.progressionDecision?.reason,
+            decidedAt: stepResult.completedAt,
+          },
+        });
+
+        continueProgression = false;
       }
     }
 

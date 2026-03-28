@@ -705,3 +705,18 @@ Explicitly later than this scope:
   - supports atomic/composite/system step categories with bounded system-step recursion readiness
   - reflects conditional/iterative/autonomous behavior profiles only to currently truthful bounded capability depth (single-pass branching/iteration/planning markers, no full loop/retry/autonomy runtime yet)
   - returns runtime-domain-consistent step status/output/diagnostics without mutating asset-definition models.
+
+## Direction 5 update: bounded loop/planning progression + execution state tracking (stories 6.9–6.10)
+
+- Runtime orchestration now supports bounded iterative and autonomous progression while preserving existing deterministic sequencing semantics.
+- `ExecutionOrchestrationService` now:
+  - keeps per-node bounded progression (`maxIterationsPerNode`, `maxPlanningCyclesPerNode`)
+  - performs additional passes only when the step engine returns behavior-truthful progression decisions (`iterate`, `replan`)
+  - fails truthfully on unsupported progression or bound overruns.
+- `StepExecutionEngine` now returns explicit progression decisions (`complete`, `iterate`, `replan`, `unsupported`) derived from runtime behavior profiles rather than ad hoc node-type branching.
+- `SystemRuntimeDomain` now carries typed runtime execution-state tracking (`runtimeState`) including:
+  - plan-level progress snapshot counters
+  - node-level status transitions
+  - bounded iteration/planning-cycle markers
+  - last progression decision/error summaries.
+- Execution-state tracking remains runtime-scoped and in-memory/domain-application scoped for now (no parallel asset persistence model, no UI monitoring/logging subsystem in this slice).
