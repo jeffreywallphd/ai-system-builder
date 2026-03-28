@@ -3,9 +3,11 @@ import {
   SystemRuntimeApplicationService,
   type RuntimeExecutionResultReadModel,
   type RuntimeExecutionStatusReadModel,
+  type RuntimeExecutionSummaryReadModel,
   type RuntimeExecutionTraceReadModel,
   type StartSystemRuntimeExecutionRequest,
 } from "../../../application/system-runtime/SystemRuntimeApplicationService";
+import type { ISystemRuntimeExecutionStore } from "../../../application/system-runtime/SystemRuntimeExecutionStore";
 
 export type {
   RuntimeExecutionResultReadModel,
@@ -34,6 +36,10 @@ export interface StartSystemRuntimeExecutionResponse {
     readonly behaviorKind: string;
     readonly executionPattern: string;
   };
+  readonly executedVersionMap: {
+    readonly rootVersionId?: string;
+    readonly nodeVersionIds: Readonly<Record<string, string>>;
+  };
 }
 
 export interface GetSystemRuntimeExecutionTraceRequest {
@@ -45,8 +51,8 @@ export interface GetSystemRuntimeExecutionTraceRequest {
 export class SystemRuntimeBackendApi {
   private readonly service: SystemRuntimeApplicationService;
 
-  public constructor(repository: IStudioShellRepository) {
-    this.service = new SystemRuntimeApplicationService(repository);
+  public constructor(repository: IStudioShellRepository, executionStore?: ISystemRuntimeExecutionStore) {
+    this.service = new SystemRuntimeApplicationService(repository, executionStore);
   }
 
   public async startExecution(request: StartSystemRuntimeExecutionRequest): Promise<SystemRuntimeApiResponse<StartSystemRuntimeExecutionResponse>> {
@@ -60,6 +66,13 @@ export class SystemRuntimeBackendApi {
         runtimeBehavior: Object.freeze({
           behaviorKind: started.runtimeBehavior.behaviorKind,
           executionPattern: started.runtimeBehavior.executionPattern,
+        }),
+        executedVersionMap: Object.freeze({
+          rootVersionId: started.execution.root.versionId,
+          nodeVersionIds: Object.freeze(Object.fromEntries(started.execution.nodes
+            .filter((node) => Boolean(node.target.versionId))
+            .map((node) => [node.executionNodeId, node.target.versionId!])
+            .sort(([left], [right]) => left.localeCompare(right)))),
         }),
       });
     });
@@ -78,6 +91,14 @@ export class SystemRuntimeBackendApi {
 
   public async getExecutionResult(executionId: string): Promise<SystemRuntimeApiResponse<RuntimeExecutionResultReadModel>> {
     return this.wrap(async () => this.service.getExecutionResult(executionId));
+  }
+
+  public async listRecentExecutionsForSystem(input: {
+    readonly assetId: string;
+    readonly versionId?: string;
+    readonly limit?: number;
+  }): Promise<SystemRuntimeApiResponse<ReadonlyArray<RuntimeExecutionSummaryReadModel>>> {
+    return this.wrap(async () => this.service.listRecentExecutionsForSystem(input));
   }
 
   private async wrap<T>(action: () => Promise<T>): Promise<SystemRuntimeApiResponse<T>> {

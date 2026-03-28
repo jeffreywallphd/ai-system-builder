@@ -138,6 +138,30 @@ export function SystemAssetDetailsPanel({ asset }: { readonly asset: RegistryAss
       ) : (
         <div className="ui-text-small ui-text-secondary">Execution metadata: none authored.</div>
       )}
+      {asset.systemDetails.runtimeActivity ? (
+        <div className="ui-stack ui-stack--2xs">
+          <div className="ui-text-small ui-text-secondary">
+            Runtime activity: {asset.systemDetails.runtimeActivity.recentExecutionCount} recent execution(s)
+            {asset.systemDetails.runtimeActivity.latestExecution
+              ? ` · latest ${asset.systemDetails.runtimeActivity.latestExecution.executionId} (${asset.systemDetails.runtimeActivity.latestExecution.result})`
+              : " · no recent runs"}
+          </div>
+          {asset.systemDetails.runtimeActivity.recentExecutions.length > 0 ? (
+            <ul className="ui-stack ui-stack--2xs" style={{ margin: 0, paddingLeft: "1rem" }}>
+              {asset.systemDetails.runtimeActivity.recentExecutions.map((execution) => (
+                <li key={execution.executionId} className="ui-text-small ui-text-secondary">
+                  {execution.executionId}
+                  {" · "}status {execution.status}
+                  {" · "}result {execution.result}
+                  {" · "}version {execution.rootVersionId ?? "draft/unversioned"}
+                  {" · "}trace events {execution.traceEventCount}
+                  {" · "}trace logs {execution.traceLogCount}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
     </DetailPanel>
   );
 }

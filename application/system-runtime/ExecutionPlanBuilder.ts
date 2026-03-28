@@ -44,6 +44,10 @@ export interface ExecutionPlan {
   readonly dependencyResolution: RuntimeDependencyResolutionResult;
   readonly bindings: ReadonlyArray<SystemBinding>;
   readonly recursion: RuntimeDependencyResolutionResult["recursion"];
+  readonly resolvedVersionMap: {
+    readonly rootVersionId?: string;
+    readonly nodeVersionIds: Readonly<Record<string, string>>;
+  };
 }
 
 export interface ExecutionPlanBuildResult {
@@ -140,6 +144,7 @@ export class ExecutionPlanBuilder {
     }
 
     const rootNodeId = `system:${input.root.assetId}:${input.root.versionId ?? ""}`;
+    const nodeVersionIds: Record<string, string> = {};
     const baseNodes: ExecutionPlanNode[] = [Object.freeze({
       nodeId: rootNodeId,
       nodeType: "system-root",
@@ -180,6 +185,23 @@ export class ExecutionPlanBuilder {
         dependsOnNodeIds: Object.freeze([rootNodeId]),
         environmentId: environmentResolution.selectedEnvironment.environmentId,
       }));
+      if (component.versionId) {
+        nodeVersionIds[nodeId] = component.versionId;
+      }
+    }
+
+    if (input.root.versionId) {
+      nodeVersionIds[rootNodeId] = input.root.versionId;
+    }
+
+    const unresolvedVersionNodes = baseNodes
+      .filter((node) => node.nodeType === "component" && !node.versionId)
+      .map((node) => node.alias ?? node.assetId);
+    if (unresolvedVersionNodes.length > 0) {
+      return Object.freeze({
+        status: "invalid",
+        errors: Object.freeze([`Execution plan requires version-pinned components. Missing versions for: ${unresolvedVersionNodes.join(", ")}.`]),
+      });
     }
 
     const edges: ExecutionPlanEdge[] = baseNodes
@@ -239,6 +261,10 @@ export class ExecutionPlanBuilder {
       dependencyResolution: input.dependencyResolution,
       bindings: Object.freeze([...input.root.bindings].sort((left, right) => left.bindingId.localeCompare(right.bindingId))),
       recursion: input.dependencyResolution.recursion,
+      resolvedVersionMap: Object.freeze({
+        rootVersionId: input.root.versionId,
+        nodeVersionIds: Object.freeze(Object.fromEntries(Object.entries(nodeVersionIds).sort(([left], [right]) => left.localeCompare(right)))),
+      }),
     });
 
     return Object.freeze({
