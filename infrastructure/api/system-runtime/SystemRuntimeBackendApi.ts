@@ -29,11 +29,29 @@ import {
 } from "./RuntimeOutputSerializer";
 import {
   createExecutionSession,
+  appendExecutionSessionCallbackDelivery,
   ExecutionSessionStatuses,
+  registerExecutionSessionCallback,
   transitionExecutionSession,
   type ExecutionSession,
   type ExecutionSessionContext,
 } from "../../../domain/system-runtime/ExecutionSessionDomain";
+import {
+  ExecutionCallbackEventKinds,
+  type ExecutionCallbackEventKind,
+  type ExecutionCallbackRegistration,
+} from "../../../domain/system-runtime/ExecutionCallbackDomain";
+import {
+  ExecutionUpdateEventKinds,
+  ExecutionUpdateStream,
+  type ExecutionUpdateEventKind,
+  type ExecutionUpdateSubscription,
+} from "./ExecutionUpdateStream";
+import {
+  HttpExecutionCallbackDispatcher,
+  type ExecutionCallbackDispatcher,
+  type ExecutionCallbackPayload,
+} from "./ExecutionCallbackDispatcher";
 
 export type {
   RuntimeExecutionResultReadModel,
@@ -105,6 +123,16 @@ export interface RuntimeApiRequestContext {
   readonly accessContext?: ExecutionAccessContext;
 }
 
+export interface ExecutionCallbackRegistrationRequest {
+  readonly callbackId?: string;
+  readonly targetUrl: string;
+  readonly eventKinds?: ReadonlyArray<ExecutionCallbackEventKind>;
+  readonly secretToken?: string;
+  readonly includeResultSummary?: boolean;
+  readonly headers?: Readonly<Record<string, string>>;
+  readonly maxAttempts?: number;
+}
+
 export class SystemRuntimeBackendApi {
   private readonly service: SystemRuntimeApplicationService;
   private readonly outputSerializer = new RuntimeOutputSerializer();
@@ -115,6 +143,8 @@ export class SystemRuntimeBackendApi {
     readonly rootVersionId?: string;
     state: ExecutionPollResponse["acceptedState"];
   }>();
+  private readonly updateStream = new ExecutionUpdateStream();
+  private readonly emittedTraceCountsByExecutionId = new Map<string, number>();
 
   public constructor(
     repository: IStudioShellRepository,
@@ -123,6 +153,7 @@ export class SystemRuntimeBackendApi {
     private readonly runtimeAuthenticator: RuntimeApiAuthenticator = new PermissiveRuntimeApiAuthenticator(),
     private readonly executionQuotaEvaluator = new ExecutionQuotaEvaluator(),
     private readonly executionSessionRepository: ExecutionSessionRepository = new InMemoryExecutionSessionRepository(),
+    private readonly callbackDispatcher: ExecutionCallbackDispatcher = new HttpExecutionCallbackDispatcher(),
   ) {
     this.service = new SystemRuntimeApplicationService(repository, executionStore);
   }
@@ -131,6 +162,7 @@ export class SystemRuntimeBackendApi {
     readonly accessContext?: ExecutionAccessContext;
     readonly requestContext?: RuntimeApiRequestContext;
     readonly systemId?: string;
+    readonly callback?: ExecutionCallbackRegistrationRequest;
   }): Promise<SystemRuntimeApiResponse<StartSystemRuntimeExecutionResponse>> {
     return this.wrap(async () => {
       const callerContext = this.resolveCallerContext(request);
@@ -154,14 +186,26 @@ export class SystemRuntimeBackendApi {
         requestedSessionId: undefined,
         executionId: started.execution.executionId,
         callerContext,
+        callback: request.callback,
       });
-      this.executionSessionRepository.save(transitionExecutionSession({
+      const finalizedSession = this.executionSessionRepository.save(transitionExecutionSession({
         session,
         status: started.execution.status === "failed"
           ? ExecutionSessionStatuses.failed
           : ExecutionSessionStatuses.completed,
         executionId: started.execution.executionId,
       }));
+      await this.dispatchExecutionCallbacks({
+        session: finalizedSession,
+        eventKind: started.execution.status === "failed"
+          ? ExecutionCallbackEventKinds.executionFailed
+          : ExecutionCallbackEventKinds.executionCompleted,
+        executionId: started.execution.executionId,
+      });
+      this.emitExecutionUpdateFromSnapshot({
+        executionId: started.execution.executionId,
+        sessionId: finalizedSession.sessionId,
+      });
       return Object.freeze({
         executionId: started.execution.executionId,
         sessionId: this.executionSessionRepository.getByExecutionId(started.execution.executionId)?.sessionId,
@@ -188,6 +232,7 @@ export class SystemRuntimeBackendApi {
     readonly requestContext?: RuntimeApiRequestContext;
     readonly systemId?: string;
     readonly sessionId?: string;
+    readonly callback?: ExecutionCallbackRegistrationRequest;
   }): Promise<SystemRuntimeApiResponse<AsyncExecutionStartResponse>> {
     return this.wrap(async () => {
       const callerContext = this.resolveCallerContext(request);
@@ -206,6 +251,7 @@ export class SystemRuntimeBackendApi {
         requestedSessionId: request.sessionId,
         executionId,
         callerContext,
+        callback: request.callback,
       });
       session = this.executionSessionRepository.save(transitionExecutionSession({
         session,
@@ -220,6 +266,17 @@ export class SystemRuntimeBackendApi {
         rootVersionId: request.versionId,
         state: "accepted",
       });
+      await this.dispatchExecutionCallbacks({
+        session,
+        eventKind: ExecutionCallbackEventKinds.executionAccepted,
+        executionId,
+      });
+      this.updateStream.emit({
+        executionId,
+        sessionId,
+        kind: ExecutionUpdateEventKinds.executionAccepted,
+        status: "pending",
+      });
 
       const asyncRequest: StartSystemRuntimeExecutionRequest = Object.freeze({
         ...request,
@@ -232,11 +289,20 @@ export class SystemRuntimeBackendApi {
           if (pending) {
             pending.state = "completed";
           }
-          this.executionSessionRepository.save(transitionExecutionSession({
+          const updatedSession = this.executionSessionRepository.save(transitionExecutionSession({
             session: this.executionSessionRepository.getById(sessionId) ?? session,
             status: ExecutionSessionStatuses.completed,
             executionId,
           }));
+          void this.dispatchExecutionCallbacks({
+            session: updatedSession,
+            eventKind: ExecutionCallbackEventKinds.executionCompleted,
+            executionId,
+          });
+          this.emitExecutionUpdateFromSnapshot({
+            executionId: result.execution.executionId,
+            sessionId,
+          });
           reservation.reservation?.release();
           return result;
         })
@@ -245,7 +311,7 @@ export class SystemRuntimeBackendApi {
           if (pending) {
             pending.state = "failed";
           }
-          this.executionSessionRepository.save(transitionExecutionSession({
+          const updatedSession = this.executionSessionRepository.save(transitionExecutionSession({
             session: this.executionSessionRepository.getById(sessionId) ?? session,
             status: ExecutionSessionStatuses.failed,
             executionId,
@@ -254,6 +320,15 @@ export class SystemRuntimeBackendApi {
               message: error instanceof Error ? error.message : "Asynchronous runtime execution failed.",
             },
           }));
+          void this.dispatchExecutionCallbacks({
+            session: updatedSession,
+            eventKind: ExecutionCallbackEventKinds.executionFailed,
+            executionId,
+          });
+          this.emitExecutionUpdateFromSnapshot({
+            executionId,
+            sessionId,
+          });
           reservation.reservation?.release();
         });
 
@@ -342,6 +417,11 @@ export class SystemRuntimeBackendApi {
       }
       const status = await this.getExecutionStatusAuthorized(executionId, input.requestContext).catch(() => undefined);
       if (status) {
+        this.emitExecutionUpdateFromSnapshot({
+          executionId,
+          sessionId: this.executionSessionRepository.getByExecutionId(executionId)?.sessionId,
+          status,
+        });
         return Object.freeze({
           executionId,
           sessionId: this.executionSessionRepository.getByExecutionId(executionId)?.sessionId,
@@ -385,6 +465,52 @@ export class SystemRuntimeBackendApi {
       }
       return session;
     });
+  }
+
+  public async registerExecutionCallback(input: {
+    readonly sessionId?: string;
+    readonly executionId?: string;
+    readonly callback: ExecutionCallbackRegistrationRequest;
+    readonly requestContext?: RuntimeApiRequestContext;
+  }): Promise<SystemRuntimeApiResponse<ExecutionCallbackRegistration>> {
+    return this.wrap(async () => {
+      const session = await this.resolveSessionForUpdate(input.sessionId, input.executionId, input.requestContext);
+      const updated = this.executionSessionRepository.save(registerExecutionSessionCallback({
+        session,
+        callback: input.callback,
+      }));
+      return updated.callbacks?.[updated.callbacks.length - 1] as ExecutionCallbackRegistration;
+    });
+  }
+
+  public subscribeToExecutionUpdates(input: {
+    readonly executionId?: string;
+    readonly sessionId?: string;
+    readonly requestContext?: RuntimeApiRequestContext;
+    readonly eventKinds?: ReadonlyArray<ExecutionUpdateEventKind>;
+    readonly listener: (event: ReturnType<ExecutionUpdateStream["emit"]>) => void;
+  }): SystemRuntimeApiResponse<ExecutionUpdateSubscription> {
+    try {
+      if (!input.executionId?.trim() && !input.sessionId?.trim()) {
+        throw new Error("invalid-request:executionId or sessionId is required.");
+      }
+      this.resolveCallerContext({ requestContext: input.requestContext });
+      const subscription = this.updateStream.subscribe({
+        executionId: input.executionId,
+        sessionId: input.sessionId,
+        eventKinds: input.eventKinds,
+        listener: input.listener,
+      });
+      return Object.freeze({
+        ok: true,
+        data: subscription,
+      });
+    } catch (error) {
+      return Object.freeze({
+        ok: false,
+        error: this.toApiError(error),
+      });
+    }
   }
 
 
@@ -449,23 +575,166 @@ export class SystemRuntimeBackendApi {
     readonly requestedSessionId?: string;
     readonly executionId: string;
     readonly callerContext?: ExecutionAccessContext;
+    readonly callback?: ExecutionCallbackRegistrationRequest;
   }): ExecutionSession {
     const requested = input.requestedSessionId?.trim();
     const existing = requested ? this.executionSessionRepository.getById(requested) : undefined;
     if (existing) {
-      return this.executionSessionRepository.save(transitionExecutionSession({
+      let updated = this.executionSessionRepository.save(transitionExecutionSession({
         session: existing,
         status: existing.status,
         executionId: input.executionId,
       }));
+      if (input.callback) {
+        updated = registerExecutionSessionCallback({
+          session: updated,
+          callback: input.callback,
+        });
+      }
+      return this.executionSessionRepository.save(updated);
     }
-    const created = createExecutionSession({
+    let created = createExecutionSession({
       sessionId: requested ?? `exec-session-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
       context: this.toSessionContext(input.callerContext),
       executionId: input.executionId,
       status: ExecutionSessionStatuses.accepted,
     });
+    if (input.callback) {
+      created = registerExecutionSessionCallback({
+        session: created,
+        callback: input.callback,
+      });
+    }
     return this.executionSessionRepository.save(created);
+  }
+
+  private async resolveSessionForUpdate(
+    sessionId: string | undefined,
+    executionId: string | undefined,
+    requestContext?: RuntimeApiRequestContext,
+  ): Promise<ExecutionSession> {
+    const byId = sessionId?.trim() ? this.executionSessionRepository.getById(sessionId.trim()) : undefined;
+    const byExecution = executionId?.trim() ? this.executionSessionRepository.getByExecutionId(executionId.trim()) : undefined;
+    const session = byId ?? byExecution;
+    if (!session) {
+      throw new Error("not-found:Execution session was not found.");
+    }
+    const caller = this.resolveCallerContext({ requestContext });
+    if (caller?.callerId && session.context?.callerId && caller.callerId !== session.context.callerId) {
+      throw new Error("forbidden:Runtime execution session does not belong to caller.");
+    }
+    return session;
+  }
+
+  private async dispatchExecutionCallbacks(input: {
+    readonly session: ExecutionSession;
+    readonly eventKind: ExecutionCallbackEventKind;
+    readonly executionId: string;
+  }): Promise<void> {
+    const callbacks = (input.session.callbacks ?? []).filter((entry) => entry.eventKinds.includes(input.eventKind));
+    if (callbacks.length === 0) {
+      return;
+    }
+    for (const callback of callbacks) {
+      const payload = await this.buildCallbackPayload(input, callback);
+      const delivery = await this.callbackDispatcher.dispatch(callback, payload);
+      const currentSession = this.executionSessionRepository.getById(input.session.sessionId) ?? input.session;
+      this.executionSessionRepository.save(appendExecutionSessionCallbackDelivery({
+        session: currentSession,
+        delivery,
+      }));
+    }
+  }
+
+  private async buildCallbackPayload(
+    input: { readonly session: ExecutionSession; readonly eventKind: ExecutionCallbackEventKind; readonly executionId: string },
+    callback: ExecutionCallbackRegistration,
+  ): Promise<ExecutionCallbackPayload> {
+    let status: RuntimeExecutionStatusReadModel | undefined;
+    try {
+      status = this.service.getExecutionStatus(input.executionId);
+    } catch {
+      status = undefined;
+    }
+    const safeResult = callback.includeResultSummary
+      ? (() => {
+        try {
+          return this.service.getExecutionResult(input.executionId);
+        } catch {
+          return undefined;
+        }
+      })()
+      : undefined;
+    return Object.freeze({
+      callbackId: callback.callbackId,
+      eventKind: input.eventKind,
+      executionId: input.executionId,
+      sessionId: input.session.sessionId,
+      occurredAt: new Date().toISOString(),
+      status: status?.status ?? input.session.status,
+      summary: callback.includeResultSummary && input.eventKind !== ExecutionCallbackEventKinds.executionAccepted
+        ? Object.freeze({
+          rootAssetId: status?.rootAssetId,
+          rootVersionId: status?.rootVersionId,
+          completedAt: status?.completedAt,
+          outputSummary: safeResult?.outputSummary,
+          diagnostics: safeResult?.diagnostics.slice(0, 10),
+        })
+        : undefined,
+    });
+  }
+
+  private emitExecutionUpdateFromSnapshot(input: {
+    readonly executionId: string;
+    readonly sessionId?: string;
+    readonly status?: RuntimeExecutionStatusReadModel;
+  }): void {
+    try {
+      const status = input.status ?? this.service.getExecutionStatus(input.executionId);
+      const trace = this.service.getExecutionTrace(input.executionId, { eventLimit: 50 }).trace;
+      const priorTraceCount = this.emittedTraceCountsByExecutionId.get(input.executionId) ?? 0;
+      const nextTraceCount = trace.events.length;
+      const nextEvents = trace.events.slice(priorTraceCount);
+      this.emittedTraceCountsByExecutionId.set(input.executionId, nextTraceCount);
+      this.updateStream.emit({
+        executionId: input.executionId,
+        sessionId: input.sessionId,
+        kind: ExecutionUpdateEventKinds.executionStatus,
+        status: status.status,
+        progress: status.progress,
+      });
+      for (const traceEvent of nextEvents.slice(0, 20)) {
+        this.updateStream.emit({
+          executionId: input.executionId,
+          sessionId: input.sessionId,
+          kind: ExecutionUpdateEventKinds.executionTrace,
+          status: status.status,
+          traceEvent: {
+            kind: traceEvent.kind,
+            at: traceEvent.at,
+            nodeId: traceEvent.nodeId,
+            status: traceEvent.status,
+            summary: traceEvent.summary,
+          },
+        });
+      }
+      if (status.status === "succeeded" || status.status === "failed") {
+        const result = this.service.getExecutionResult(input.executionId);
+        this.updateStream.emit({
+          executionId: input.executionId,
+          sessionId: input.sessionId,
+          kind: status.status === "succeeded" ? ExecutionUpdateEventKinds.executionCompleted : ExecutionUpdateEventKinds.executionFailed,
+          status: status.status,
+          summary: {
+            rootAssetId: result.rootAssetId,
+            rootVersionId: result.rootVersionId,
+            diagnosticsCount: result.diagnostics.length,
+          },
+        });
+      }
+    } catch {
+      return;
+    }
   }
 
   private deriveSystemIdFromVersionId(versionId?: string): string {
