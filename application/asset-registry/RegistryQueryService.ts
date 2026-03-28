@@ -21,6 +21,7 @@ import { TaxonomySemanticRoles, TaxonomyStructuralKinds, type TaxonomyBehaviorKi
 import { RegistryCacheLayer } from "./RegistryCacheLayer";
 import {
   aggregateSystemDependencies,
+  buildNestedSystemReferences,
   createSystemAsset,
   type SystemAsset,
   type SystemCompositionReference,
@@ -423,6 +424,38 @@ export class RegistryQueryService {
         totalCount: aggregation.totalCount,
         traversalStatus: aggregation.traversalStatus,
       }),
+      versionLineage: Object.freeze({
+        currentVersionId: version.versionId,
+        parentVersionId: version.parentVersionId,
+        rootVersionId: system.versionId,
+        nestedSystemVersionReferences: Object.freeze(buildNestedSystemReferences(system).map((entry) => Object.freeze({
+          assetId: entry.assetId,
+          versionId: entry.versionId,
+          alias: entry.alias,
+          includedInUpstream: Boolean(entry.versionId && version.upstreamVersionIds.includes(entry.versionId)),
+        }))),
+        childVersionReferences: Object.freeze(system.components.map((component) => Object.freeze({
+          assetId: component.assetId,
+          versionId: component.versionId,
+          componentKind: component.componentKind,
+          alias: component.alias,
+          includedInUpstream: Boolean(component.versionId && version.upstreamVersionIds.includes(component.versionId)),
+        }))),
+      }),
+      executionMetadata: system.executionMetadata
+        ? Object.freeze({
+          runtimeEnvironment: system.executionMetadata.runtime?.environment,
+          runtimeRequirementCount: system.executionMetadata.runtime?.requirements?.length ?? 0,
+          orchestrationMode: system.executionMetadata.orchestration?.mode,
+          orchestrationHintCount: system.executionMetadata.orchestration?.hints?.length ?? 0,
+          publishVisibility: system.executionMetadata.publish?.visibility,
+          exportTargetCount: system.executionMetadata.publish?.exportTargets?.length ?? 0,
+          executionProfileId: system.executionMetadata.executionProfile?.profileId,
+          executionLatencyTier: system.executionMetadata.executionProfile?.latencyTier,
+          ownerTeam: system.executionMetadata.operations?.ownerTeam,
+          hasSupportContact: Boolean(system.executionMetadata.operations?.supportContact),
+        })
+        : undefined,
     });
   }
 
@@ -448,6 +481,7 @@ export class RegistryQueryService {
       readonly outputs?: unknown;
       readonly parameters?: unknown;
       readonly bindings?: unknown;
+      readonly executionMetadata?: unknown;
     } = {};
     if (content.trim()) {
       try {
@@ -482,6 +516,9 @@ export class RegistryQueryService {
         outputs: Array.isArray(spec.outputs) ? spec.outputs as SystemAsset["outputs"] : undefined,
         parameters: Array.isArray(spec.parameters) ? spec.parameters as SystemAsset["parameters"] : undefined,
         bindings: Array.isArray(spec.bindings) ? spec.bindings as SystemAsset["bindings"] : undefined,
+        executionMetadata: (spec.executionMetadata && typeof spec.executionMetadata === "object" && !Array.isArray(spec.executionMetadata))
+          ? spec.executionMetadata as SystemAsset["executionMetadata"]
+          : undefined,
       });
     } catch {
       return undefined;

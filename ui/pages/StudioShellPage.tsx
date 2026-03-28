@@ -231,6 +231,16 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
         setError(undefined);
         return true;
       },
+      updateSystemExecutionMetadata: async (request) => {
+        const response = await service.updateSystemExecutionMetadata(request);
+        if (!response.ok) {
+          setError(response.error?.message ?? "Failed to update system execution metadata.");
+          return false;
+        }
+        await refreshSnapshot();
+        setError(undefined);
+        return true;
+      },
     },
   };
 

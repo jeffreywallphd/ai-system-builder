@@ -460,6 +460,10 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["updateParameters"]>[0];
     return JSON.stringify(await systemStudioBackendApi.updateParameters(request));
   });
+  ipcMain.handle("ai-loom-desktop-studio-shell:system-execution-metadata:update", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["updateExecutionMetadata"]>[0];
+    return JSON.stringify(await systemStudioBackendApi.updateExecutionMetadata(request));
+  });
   ipcMain.handle("ai-loom-desktop-studio-shell:system-compatibility:insights", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["getCompatibilityInsights"]>[0];
     return JSON.stringify(await systemStudioBackendApi.getCompatibilityInsights(request));

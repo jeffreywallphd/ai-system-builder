@@ -7,6 +7,7 @@ import type {
   RemoveSystemChildComponentRequest,
   ReorderSystemChildComponentRequest,
   SystemCompatibilityInsightsReadModel,
+  UpdateSystemExecutionMetadataRequest,
   UpdateSystemInterfacesRequest,
   UpdateSystemParametersRequest,
 } from "../../infrastructure/api/system-studio/SystemStudioBackendApi";
@@ -29,6 +30,7 @@ export interface StudioShellExtensionOperations {
   reorderSystemChildComponent?(request: ReorderSystemChildComponentRequest): Promise<boolean>;
   updateSystemInterfaces?(request: UpdateSystemInterfacesRequest): Promise<boolean>;
   updateSystemParameters?(request: UpdateSystemParametersRequest): Promise<boolean>;
+  updateSystemExecutionMetadata?(request: UpdateSystemExecutionMetadataRequest): Promise<boolean>;
 }
 
 export interface StudioShellExtensionContext {

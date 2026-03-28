@@ -344,9 +344,21 @@ describe("SystemStudioApplicationService", () => {
       draftId: created.draft.id,
       parameters: [{ parameterId: "temperature", valueType: "number", required: false, defaultValue: 0.2 }],
     });
+    const withExecutionMetadata = await service.updateSystemExecutionMetadata({
+      sessionId: ensure.session.id,
+      draftId: created.draft.id,
+      executionMetadata: {
+        runtime: { environment: "python-3.11", requirements: ["numpy"] },
+        orchestration: { mode: "queued", hints: ["retryable"] },
+        publish: { visibility: "team", exportTargets: ["registry"] },
+        executionProfile: { profileId: "profile:prod", latencyTier: "standard" },
+        operations: { ownerTeam: "platform", supportContact: "ops@loom.local" },
+      },
+    });
 
     expect(withInterfaces.draft.revision).toBeGreaterThan(1);
     expect(withParameters.draft.revision).toBeGreaterThan(withInterfaces.draft.revision - 1);
+    expect(withExecutionMetadata.draft.revision).toBeGreaterThan(withParameters.draft.revision - 1);
 
     const validation = await service.validateSystemDraft({ draftId: created.draft.id });
     expect(validation.issues.filter((entry) => entry.code !== "contract-mismatch")).toHaveLength(0);
@@ -365,6 +377,11 @@ describe("SystemStudioApplicationService", () => {
         readonly inputs?: ReadonlyArray<{ readonly inputId: string }>;
         readonly outputs?: ReadonlyArray<{ readonly outputId: string }>;
         readonly parameters?: ReadonlyArray<{ readonly parameterId: string; readonly defaultValue?: unknown }>;
+        readonly executionMetadata?: {
+          readonly runtime?: { readonly environment?: string };
+          readonly orchestration?: { readonly mode?: string };
+          readonly publish?: { readonly visibility?: string };
+        };
       };
     };
     expect(reloadedSpec.systemSpec?.inputs?.map((entry) => entry.inputId)).toEqual(["prompt"]);
@@ -373,6 +390,9 @@ describe("SystemStudioApplicationService", () => {
       parameterId: "temperature",
       defaultValue: 0.2,
     }));
+    expect(reloadedSpec.systemSpec?.executionMetadata?.runtime?.environment).toBe("python-3.11");
+    expect(reloadedSpec.systemSpec?.executionMetadata?.orchestration?.mode).toBe("queued");
+    expect(reloadedSpec.systemSpec?.executionMetadata?.publish?.visibility).toBe("team");
 
     const projectedContract = reloaded!.draft.metadata.contract;
     const inputSchema = projectedContract?.input?.schema as { readonly properties?: Record<string, unknown> } | undefined;

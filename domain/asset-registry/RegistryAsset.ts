@@ -89,6 +89,36 @@ export interface RegistrySystemDetailsView {
     readonly totalCount: number;
     readonly traversalStatus: "complete" | "cycle-detected" | "max-depth-exceeded" | "unresolved";
   };
+  readonly versionLineage: {
+    readonly currentVersionId: string;
+    readonly parentVersionId?: string;
+    readonly rootVersionId?: string;
+    readonly nestedSystemVersionReferences: ReadonlyArray<{
+      readonly assetId: string;
+      readonly versionId?: string;
+      readonly alias?: string;
+      readonly includedInUpstream: boolean;
+    }>;
+    readonly childVersionReferences: ReadonlyArray<{
+      readonly assetId: string;
+      readonly versionId?: string;
+      readonly componentKind: "atomic" | "composite" | "system";
+      readonly alias?: string;
+      readonly includedInUpstream: boolean;
+    }>;
+  };
+  readonly executionMetadata?: {
+    readonly runtimeEnvironment?: string;
+    readonly runtimeRequirementCount: number;
+    readonly orchestrationMode?: string;
+    readonly orchestrationHintCount: number;
+    readonly publishVisibility?: "private" | "team" | "public";
+    readonly exportTargetCount: number;
+    readonly executionProfileId?: string;
+    readonly executionLatencyTier?: "standard" | "low-latency" | "batch";
+    readonly ownerTeam?: string;
+    readonly hasSupportContact: boolean;
+  };
 }
 
 export interface RegistryAssetValidationIssue {
@@ -233,6 +263,38 @@ export function createRegistryAsset(input: RegistryAsset): RegistryAsset {
           totalCount: Math.max(0, Math.floor(input.systemDetails.aggregatedDependencies.totalCount)),
           traversalStatus: input.systemDetails.aggregatedDependencies.traversalStatus,
         }),
+        versionLineage: Object.freeze({
+          currentVersionId: input.systemDetails.versionLineage.currentVersionId.trim(),
+          parentVersionId: input.systemDetails.versionLineage.parentVersionId?.trim() || undefined,
+          rootVersionId: input.systemDetails.versionLineage.rootVersionId?.trim() || undefined,
+          nestedSystemVersionReferences: Object.freeze((input.systemDetails.versionLineage.nestedSystemVersionReferences ?? []).map((entry) => Object.freeze({
+            assetId: entry.assetId.trim(),
+            versionId: entry.versionId?.trim() || undefined,
+            alias: entry.alias?.trim() || undefined,
+            includedInUpstream: Boolean(entry.includedInUpstream),
+          }))),
+          childVersionReferences: Object.freeze((input.systemDetails.versionLineage.childVersionReferences ?? []).map((entry) => Object.freeze({
+            assetId: entry.assetId.trim(),
+            versionId: entry.versionId?.trim() || undefined,
+            componentKind: entry.componentKind,
+            alias: entry.alias?.trim() || undefined,
+            includedInUpstream: Boolean(entry.includedInUpstream),
+          }))),
+        }),
+        executionMetadata: input.systemDetails.executionMetadata
+          ? Object.freeze({
+            runtimeEnvironment: input.systemDetails.executionMetadata.runtimeEnvironment?.trim() || undefined,
+            runtimeRequirementCount: Math.max(0, Math.floor(input.systemDetails.executionMetadata.runtimeRequirementCount)),
+            orchestrationMode: input.systemDetails.executionMetadata.orchestrationMode?.trim() || undefined,
+            orchestrationHintCount: Math.max(0, Math.floor(input.systemDetails.executionMetadata.orchestrationHintCount)),
+            publishVisibility: input.systemDetails.executionMetadata.publishVisibility,
+            exportTargetCount: Math.max(0, Math.floor(input.systemDetails.executionMetadata.exportTargetCount)),
+            executionProfileId: input.systemDetails.executionMetadata.executionProfileId?.trim() || undefined,
+            executionLatencyTier: input.systemDetails.executionMetadata.executionLatencyTier,
+            ownerTeam: input.systemDetails.executionMetadata.ownerTeam?.trim() || undefined,
+            hasSupportContact: Boolean(input.systemDetails.executionMetadata.hasSupportContact),
+          })
+          : undefined,
       })
       : undefined,
   });

@@ -119,6 +119,7 @@ export interface DesktopStudioShellBridge {
   reorderSystemChildComponent(requestJson: string): Promise<string>;
   updateSystemInterfaces(requestJson: string): Promise<string>;
   updateSystemParameters(requestJson: string): Promise<string>;
+  updateSystemExecutionMetadata(requestJson: string): Promise<string>;
   getSystemCompatibilityInsights(requestJson: string): Promise<string>;
 }
 

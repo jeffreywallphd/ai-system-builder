@@ -356,6 +356,13 @@ describe("RegistryQueryService", () => {
             inputs: [{ inputId: "userPrompt", valueType: "string", required: true }],
             outputs: [{ outputId: "finalAnswer", valueType: "string" }],
             parameters: [{ parameterId: "maxTokens", valueType: "number", required: false, defaultValue: 256 }],
+            executionMetadata: {
+              runtime: { environment: "python-3.11", requirements: ["numpy", "pandas"] },
+              orchestration: { mode: "queued", hints: ["retryable"] },
+              publish: { visibility: "team", exportTargets: ["registry"] },
+              executionProfile: { profileId: "profile:prod", latencyTier: "standard" },
+              operations: { ownerTeam: "platform", supportContact: "ops@loom.local" },
+            },
             bindings: [
               {
                 bindingId: "prompt-in",
@@ -429,6 +436,11 @@ describe("RegistryQueryService", () => {
     expect(result[0]?.systemDetails?.aggregatedDependencies.directCount).toBeGreaterThan(0);
     expect(result[0]?.systemDetails?.aggregatedDependencies.transitiveCount).toBeGreaterThan(0);
     expect(result[0]?.systemDetails?.aggregatedDependencies.traversalStatus).toBe("complete");
+    expect(result[0]?.systemDetails?.versionLineage.currentVersionId).toBe("asset:root-system:v1");
+    expect(result[0]?.systemDetails?.versionLineage.childVersionReferences.some((entry) => entry.includedInUpstream)).toBeTrue();
+    expect(result[0]?.systemDetails?.executionMetadata?.runtimeEnvironment).toBe("python-3.11");
+    expect(result[0]?.systemDetails?.executionMetadata?.runtimeRequirementCount).toBe(2);
+    expect(result[0]?.systemDetails?.executionMetadata?.publishVisibility).toBe("team");
     expect(result[0]?.validation?.issues.some((issue) => issue.code === "taxonomy-semantic-role-mismatch")).toBeFalse();
   });
 });
