@@ -57,6 +57,7 @@ The Python runtime provisioning path in development also treats `.venv` as a dis
 - provisioning now runs an explicit runtime import preflight (`import app.main`) and persists launchability diagnostics so host-incompatible native dependencies (for example CPU-incompatible NumPy wheels) are surfaced as a known root cause instead of generic startup timeouts
 - browser and desktop dev startup now consult supervisor state directly after `ensure-running`; when the runtime is already known failed/unlaunchable, startup reports that cause immediately instead of primarily timing out on `127.0.0.1:8100`
 - model-training native dependency failures are capability-scoped: the core Python API can still boot, while local gradient training truthfully reports unavailable/degraded behavior when NumPy cannot initialize
+- runtime health (`/health` bootability), capability health (for example `local-gradient-training` dependency/platform/resource readiness), and task execution readiness are now reported as distinct truths; a bootable runtime does not imply every optional local capability is runnable on the current machine
 
 ## Production desktop mode
 

@@ -787,6 +787,28 @@ describe("InMemoryServiceSupervisor", () => {
     expect(status.recentLogs.filter((entry) => entry.message === "Health check failed for python-runtime.")).toHaveLength(0);
   });
 
+  it("surfaces known startup dependency failures directly instead of timeout-only detail", async () => {
+    const port = await getAvailablePort();
+    const supervisor = createManagedSupervisor(createRuntimeDefinition({
+      baseUrl: `http://127.0.0.1:${port}`,
+      startupTimeoutMs: 120,
+      healthPollIntervalMs: 20,
+      env: {
+        TEST_RUNTIME_PORT: String(port),
+        TEST_RUNTIME_HEALTHY_AFTER_MS: "500",
+        TEST_RUNTIME_STDERR_MESSAGE: "ImportError: numpy.core.multiarray failed to import",
+      },
+    }));
+
+    const status = await supervisor.start("python-runtime");
+
+    expect(status.state).toBe(ServiceStates.failed);
+    expect(status.pid).toBeNull();
+    expect(status.detail).toContain("Known cause");
+    expect(status.detail).not.toContain("startup timed out");
+    expect(status.diagnostics.lastError?.category).toBe("start");
+  });
+
   it("marks crashes during startup as failed and records exit diagnostics", async () => {
     const port = await getAvailablePort();
     const supervisor = createManagedSupervisor(createRuntimeDefinition({

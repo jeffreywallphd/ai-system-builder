@@ -88,6 +88,8 @@ Provisioning and launchability are now intentionally separate truths:
 
 The supervisor now persists launchability preflight results in provisioning metadata and can surface `provisioned-unlaunchable` for host/runtime-incompatible dependency builds (for example CPU-incompatible native wheels). Runtime diagnostics now distinguish unprovisioned/provisioning/provision-failed/corrupted/provisioned-unlaunchable/reprovision-needed states so the app does not over-claim runtime health.
 
+Runtime truth is now explicitly split across three surfaces: baseline runtime boot health, capability-level readiness/unavailability (dependency/platform/resource constrained), and per-request execution readiness checks. Optional heavyweight capability failures are surfaced as capability/task unavailability rather than forcing the whole runtime into a fake healthy-or-dead binary.
+
 Browser and desktop startup flows now also check supervisor service state after `ensure-running`, so known startup-fatal causes are surfaced directly instead of being primarily reported as port-wait timeouts.
 
 ### Runtime dependency orchestration

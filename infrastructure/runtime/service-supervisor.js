@@ -2562,11 +2562,19 @@ export class InMemoryServiceSupervisor {
       await this.sleep(definition.healthPollIntervalMs);
     }
 
+    const startupFailure = this.detectKnownStartupFailure(serviceId);
+    const timeoutDetail = startupFailure
+      ? `${definition.name} failed during startup before the health endpoint became available. Known cause: ${startupFailure.message}`
+      : `${definition.name} startup timed out after ${definition.startupTimeoutMs}ms.${lastProbe?.detail ? ` Last probe: ${lastProbe.detail}` : ""}`;
     const timedOut = this.failService(serviceId, definition, {
       category: "start",
-      detail: `${definition.name} startup timed out after ${definition.startupTimeoutMs}ms.${lastProbe?.detail ? ` Last probe: ${lastProbe.detail}` : ""}`,
-      error: new Error(`${definition.name} startup timed out.`),
-      logs: [createLogEntry(this.clock, "error", `${definition.name} startup timed out.`)],
+      detail: timeoutDetail,
+      error: new Error(
+        startupFailure
+          ? `${definition.name} startup failed: ${startupFailure.message}`
+          : `${definition.name} startup timed out.`,
+      ),
+      logs: [createLogEntry(this.clock, "error", startupFailure ? `${definition.name} startup failed with a known cause.` : `${definition.name} startup timed out.`)],
       outcome: "failed-start",
       ownership: ServiceOwnership.managed,
       probe: lastProbe,
@@ -2676,7 +2684,7 @@ export class InMemoryServiceSupervisor {
       return;
     }
 
-    if (state.state === ServiceStates.failed && state.detail?.includes("startup timed out")) {
+    if (state.state === ServiceStates.failed && state.processHistory.at(-1)?.outcome === "failed-start") {
       this.updateState(serviceId, {
         pid: null,
         ownership: ServiceOwnership.none,

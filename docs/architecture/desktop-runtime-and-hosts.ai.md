@@ -41,6 +41,7 @@ Electron is the desktop host boundary; the renderer accesses desktop capabilitie
 - Runtime launchability is a separate truth from provisioning: after install/integrity checks, provisioning now runs an import preflight (`import app.main`) and persists launchability diagnostics.
 - Provisioning/runtime diagnostics must stay truthful across these flows and distinguish at least unprovisioned, provisioning, provisioned, provisioned-unlaunchable, provision-failed, corrupted environment, and needs-reprovision states.
 - Browser/desktop startup now checks supervisor state after `ensure-running` so known startup-fatal failures are surfaced directly instead of being masked by generic port-wait timeouts.
+- Runtime truth now has three distinct layers: baseline runtime boot health, capability readiness (dependency/platform/resource constrained vs ready), and execution-time task readiness checks for optional heavyweight local flows such as local gradient training.
 
 ## Caveat
 The preload bridge uses synchronous IPC and exposes storage/workflow/model-file capabilities.
