@@ -446,4 +446,106 @@ describe("ExternalSystemRuntimeInterface", () => {
     });
     expect(trusted.ok).toBeTrue();
   });
+
+  it("exposes bounded execution environment configuration and selected environment details", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    await seedVersion(repository);
+    const backend = new SystemRuntimeBackendApi(
+      repository,
+      undefined,
+      new RuntimeAccessControlService(),
+      new StaticTokenRuntimeApiAuthenticator({
+        "token-user-1": { callerKind: "user", callerId: "user-1", roles: ["external-runtime"] },
+      }),
+    );
+    const external = new ExternalSystemRuntimeInterface(backend);
+
+    const started = await external.startExecution({
+      systemId: "system:external",
+      versionId: "system:external:v1",
+      inputPayload: { request: "hello" },
+      authentication: { bearerToken: "token-user-1" },
+      requestedEnvironment: {
+        option: "local",
+        configuration: {
+          requireNestedSystems: true,
+        },
+      },
+    });
+
+    expect(started.ok).toBeTrue();
+    expect(started.data?.executionEnvironment?.environmentId).toBe("runtime:local-default");
+    expect(started.data?.executionEnvironment?.option).toBe("local");
+    expect(started.data?.executionEnvironment?.capabilities.supportsNestedSystems).toBeTrue();
+
+    const invalid = await external.startExecution({
+      systemId: "system:external",
+      versionId: "system:external:v1",
+      authentication: { bearerToken: "token-user-1" },
+      requestedEnvironment: { option: "unsafe-custom" as never },
+    });
+    expect(invalid.ok).toBeFalse();
+    expect(invalid.error?.code).toBe("invalid-request");
+  });
+
+  it("enforces tenant-scoped execution isolation across external status/result/trace reads", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    await seedVersion(repository);
+    const backend = new SystemRuntimeBackendApi(
+      repository,
+      undefined,
+      new RuntimeAccessControlService(),
+      new StaticTokenRuntimeApiAuthenticator({
+        "tenant-a-token": { callerKind: "user", callerId: "user-1", metadata: { tenantId: "tenant-a" } },
+        "tenant-b-token": { callerKind: "user", callerId: "user-2", metadata: { tenantId: "tenant-b" } },
+      }),
+    );
+    const external = new ExternalSystemRuntimeInterface(backend);
+
+    const started = await external.startExecution({
+      systemId: "system:external",
+      versionId: "system:external:v1",
+      async: true,
+      inputPayload: { request: "hello" },
+      authentication: { bearerToken: "tenant-a-token" },
+      tenantId: "tenant-a",
+    });
+    expect(started.ok).toBeTrue();
+
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      const poll = await external.pollExecution({
+        executionId: started.data!.executionId,
+        authentication: { bearerToken: "tenant-a-token" },
+        tenantId: "tenant-a",
+      });
+      if (poll.ok && (poll.data?.acceptedState === "completed" || poll.data?.acceptedState === "failed")) {
+        break;
+      }
+      await Bun.sleep(5);
+    }
+
+    const crossTenantStatus = await external.getExecutionStatus({
+      executionId: started.data!.executionId,
+      authentication: { bearerToken: "tenant-b-token" },
+      tenantId: "tenant-b",
+    });
+    expect(crossTenantStatus.ok).toBeFalse();
+    expect(crossTenantStatus.error?.code).toBe("forbidden");
+
+    const crossTenantResult = await external.getExecutionResult({
+      executionId: started.data!.executionId,
+      authentication: { bearerToken: "tenant-b-token" },
+      tenantId: "tenant-b",
+    });
+    expect(crossTenantResult.ok).toBeFalse();
+    expect(crossTenantResult.error?.code).toBe("forbidden");
+
+    const crossTenantTrace = await external.getExecutionTrace({
+      executionId: started.data!.executionId,
+      authentication: { bearerToken: "tenant-b-token" },
+      tenantId: "tenant-b",
+    });
+    expect(crossTenantTrace.ok).toBeFalse();
+    expect(crossTenantTrace.error?.code).toBe("forbidden");
+  });
 });

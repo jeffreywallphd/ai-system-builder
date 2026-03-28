@@ -10,7 +10,7 @@ interface ExecutionRecordRow {
   readonly record_json: string;
 }
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 const MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   [1, `
     CREATE TABLE system_runtime_executions (
@@ -29,6 +29,11 @@ const MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
       ON system_runtime_executions(root_asset_id, root_version_id, started_at DESC);
     CREATE INDEX system_runtime_executions_parent_idx
       ON system_runtime_executions(parent_execution_id, started_at DESC);
+  `],
+  [2, `
+    ALTER TABLE system_runtime_executions ADD COLUMN tenant_id TEXT;
+    CREATE INDEX IF NOT EXISTS system_runtime_executions_tenant_idx
+      ON system_runtime_executions(tenant_id, started_at DESC);
   `],
 ]);
 
@@ -52,10 +57,11 @@ export class SqliteSystemRuntimeExecutionStore implements ISystemRuntimeExecutio
           started_at,
           updated_at,
           completed_at,
+          tenant_id,
           parent_execution_id,
           parent_node_id,
           record_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(execution_id) DO UPDATE SET
           root_asset_id = excluded.root_asset_id,
           root_version_id = excluded.root_version_id,
@@ -63,6 +69,7 @@ export class SqliteSystemRuntimeExecutionStore implements ISystemRuntimeExecutio
           started_at = excluded.started_at,
           updated_at = excluded.updated_at,
           completed_at = excluded.completed_at,
+          tenant_id = excluded.tenant_id,
           parent_execution_id = excluded.parent_execution_id,
           parent_node_id = excluded.parent_node_id,
           record_json = excluded.record_json
@@ -75,6 +82,7 @@ export class SqliteSystemRuntimeExecutionStore implements ISystemRuntimeExecutio
         record.execution.startedAt,
         record.execution.updatedAt,
         record.execution.completedAt ?? null,
+        record.metadata.tenantId ?? null,
         record.metadata.parentExecutionId ?? null,
         record.metadata.parentNodeId ?? null,
         JSON.stringify(record),

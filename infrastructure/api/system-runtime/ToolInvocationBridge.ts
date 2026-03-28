@@ -1,6 +1,7 @@
 import type { ExecutionContext } from "../../../domain/system-runtime/SystemRuntimeDomain";
 import type { ExecutionAccessContext } from "../../../application/system-runtime/RuntimeAccessControlService";
 import type { RuntimeApiAuthenticationRequest } from "./RuntimeApiAuthentication";
+import type { ExternalExecutionEnvironmentRequest } from "../../../application/system-runtime/ExecutionEnvironmentConfigurationValidator";
 import {
   ExternalSystemRuntimeInterface,
   type ExternalExecutionResult,
@@ -43,6 +44,8 @@ export interface ExternalToolInvocationRequest {
   readonly inputSchemaVersion?: string;
   readonly context?: ExecutionContext;
   readonly callback?: ExternalExecutionRequest["callback"];
+  readonly requestedEnvironment?: ExternalExecutionEnvironmentRequest;
+  readonly tenantId?: string;
   readonly nodeResultLimit?: number;
   readonly diagnosticsLimit?: number;
   readonly eventLimit?: number;
@@ -142,6 +145,8 @@ export class ToolInvocationBridge {
       inputSchemaVersion: request.inputSchemaVersion,
       context: request.context,
       callback: request.callback,
+      requestedEnvironment: request.requestedEnvironment,
+      tenantId: request.tenantId,
       callerContext: request.invocationContext?.callerContext,
       authentication: request.invocationContext?.authentication,
     });
@@ -168,6 +173,7 @@ export class ToolInvocationBridge {
         }),
         payload: Object.freeze({
           executedVersionMap: started.data.executedVersionMap,
+          executionEnvironment: started.data.executionEnvironment,
         }),
       }),
     });
@@ -181,6 +187,7 @@ export class ToolInvocationBridge {
     const statusRequest: ExternalExecutionStatusRequest = Object.freeze({
       executionId: request.executionId,
       sessionId: request.sessionId,
+      tenantId: request.tenantId,
       callerContext: request.invocationContext?.callerContext,
       authentication: request.invocationContext?.authentication,
     });
@@ -200,6 +207,7 @@ export class ToolInvocationBridge {
       executionId: request.executionId ?? "",
       nodeResultLimit: request.nodeResultLimit,
       diagnosticsLimit: request.diagnosticsLimit,
+      tenantId: request.tenantId,
       callerContext: request.invocationContext?.callerContext,
       authentication: request.invocationContext?.authentication,
     });
@@ -244,6 +252,7 @@ export class ToolInvocationBridge {
       executionId: request.executionId ?? "",
       eventLimit: request.eventLimit,
       logLimit: request.logLimit,
+      tenantId: request.tenantId,
       callerContext: request.invocationContext?.callerContext,
       authentication: request.invocationContext?.authentication,
     });

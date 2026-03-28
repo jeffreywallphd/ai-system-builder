@@ -2,6 +2,7 @@ import type { SystemExecution } from "../../domain/system-runtime/SystemRuntimeD
 
 export interface ExecutionMetadataSnapshot {
   readonly executionId: string;
+  readonly tenantId?: string;
   readonly rootAssetId: string;
   readonly rootVersionId?: string;
   readonly status: SystemExecution["status"];

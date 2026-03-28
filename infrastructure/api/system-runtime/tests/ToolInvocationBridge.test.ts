@@ -207,4 +207,55 @@ describe("ToolInvocationBridge", () => {
     expect(blockedByQuota.ok).toBeFalse();
     expect(blockedByQuota.error?.code).toBe("quota-exceeded");
   });
+
+  it("enforces bounded environment selection and tenant isolation through tool invocations", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    await seedVersion(repository);
+    const backend = new SystemRuntimeBackendApi(
+      repository,
+      undefined,
+      new RuntimeAccessControlService(),
+      new StaticTokenRuntimeApiAuthenticator({
+        "tenant-a-token": { callerKind: "user", callerId: "user-1", metadata: { tenantId: "tenant-a" } },
+        "tenant-b-token": { callerKind: "user", callerId: "user-2", metadata: { tenantId: "tenant-b" } },
+      }),
+    );
+    const bridge = new ToolInvocationBridge(new ExternalSystemRuntimeInterface(backend), 64 * 1024);
+
+    const started = await bridge.invoke({
+      action: ExternalToolInvocationActions.startExecution,
+      systemId: "system:tool",
+      versionId: "system:tool:v2",
+      requestedEnvironment: { option: "local", configuration: { requireNestedSystems: true } },
+      tenantId: "tenant-a",
+      invocationContext: {
+        authentication: { bearerToken: "tenant-a-token" },
+      },
+    });
+    expect(started.ok).toBeTrue();
+    expect(started.data?.payload.executionEnvironment).toBeDefined();
+
+    const invalidEnvironment = await bridge.invoke({
+      action: ExternalToolInvocationActions.startExecution,
+      systemId: "system:tool",
+      versionId: "system:tool:v2",
+      requestedEnvironment: { option: "invalid" as never },
+      invocationContext: {
+        authentication: { bearerToken: "tenant-a-token" },
+      },
+    });
+    expect(invalidEnvironment.ok).toBeFalse();
+    expect(invalidEnvironment.error?.code).toBe("invalid-request");
+
+    const statusDenied = await bridge.invoke({
+      action: ExternalToolInvocationActions.getExecutionStatus,
+      executionId: started.data!.execution.executionId,
+      tenantId: "tenant-b",
+      invocationContext: {
+        authentication: { bearerToken: "tenant-b-token" },
+      },
+    });
+    expect(statusDenied.ok).toBeFalse();
+    expect(statusDenied.error?.code).toBe("forbidden");
+  });
 });

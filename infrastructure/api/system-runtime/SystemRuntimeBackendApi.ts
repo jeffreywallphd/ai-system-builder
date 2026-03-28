@@ -23,6 +23,15 @@ import {
   type RuntimeApiAuthenticationRequest,
   type RuntimeApiAuthenticator,
 } from "./RuntimeApiAuthentication";
+import type {
+  ExternalExecutionEnvironmentRequest,
+  SerializedExecutionEnvironment,
+} from "../../../application/system-runtime/ExecutionEnvironmentConfigurationValidator";
+import {
+  TenantExecutionIsolationPolicy,
+  type ExecutionTenantContext,
+  type TenantScopedExecutionAccessContext,
+} from "../../../application/system-runtime/TenantExecutionIsolationPolicy";
 import {
   RuntimeOutputSerializer,
   type SerializedExecutionResult,
@@ -41,6 +50,7 @@ import {
   type ExecutionCallbackEventKind,
   type ExecutionCallbackRegistration,
 } from "../../../domain/system-runtime/ExecutionCallbackDomain";
+import type { RuntimeEnvironment } from "../../../domain/system-runtime/RuntimeEnvironmentDomain";
 import {
   ExecutionUpdateEventKinds,
   ExecutionUpdateStream,
@@ -86,6 +96,7 @@ export interface StartSystemRuntimeExecutionResponse {
     readonly rootVersionId?: string;
     readonly nodeVersionIds: Readonly<Record<string, string>>;
   };
+  readonly executionEnvironment?: SerializedExecutionEnvironment;
 }
 export interface AsyncExecutionStartResponse extends StartSystemRuntimeExecutionResponse {
   readonly acceptedState: "accepted" | "running";
@@ -121,6 +132,7 @@ export interface RuntimeApiRequestContext {
   readonly requireAuthentication?: boolean;
   readonly authentication?: RuntimeApiAuthenticationRequest;
   readonly accessContext?: ExecutionAccessContext;
+  readonly tenantId?: string;
 }
 
 export interface ExecutionCallbackRegistrationRequest {
@@ -145,6 +157,7 @@ export class SystemRuntimeBackendApi {
   }>();
   private readonly updateStream = new ExecutionUpdateStream();
   private readonly emittedTraceCountsByExecutionId = new Map<string, number>();
+  private readonly tenantIsolationPolicy = new TenantExecutionIsolationPolicy();
 
   public constructor(
     repository: IStudioShellRepository,
@@ -163,9 +176,12 @@ export class SystemRuntimeBackendApi {
     readonly requestContext?: RuntimeApiRequestContext;
     readonly systemId?: string;
     readonly callback?: ExecutionCallbackRegistrationRequest;
+    readonly requestedEnvironment?: ExternalExecutionEnvironmentRequest;
+    readonly tenantId?: string;
   }): Promise<SystemRuntimeApiResponse<StartSystemRuntimeExecutionResponse>> {
     return this.wrap(async () => {
       const callerContext = this.resolveCallerContext(request);
+      const tenantContext = this.resolveTenantContext({ requestContext: request.requestContext, callerContext, requestTenantId: request.tenantId });
       this.assertExecutionAccess({
         accessContext: callerContext,
         systemId: request.systemId,
@@ -178,7 +194,11 @@ export class SystemRuntimeBackendApi {
 
       let started;
       try {
-        started = await this.service.startExecution(request);
+        started = await this.service.startExecution({
+          ...request,
+          tenantContext,
+          requestedEnvironment: request.requestedEnvironment,
+        });
       } finally {
         reservation.reservation?.release();
       }
@@ -186,6 +206,7 @@ export class SystemRuntimeBackendApi {
         requestedSessionId: undefined,
         executionId: started.execution.executionId,
         callerContext,
+        tenantContext,
         callback: request.callback,
       });
       const finalizedSession = this.executionSessionRepository.save(transitionExecutionSession({
@@ -223,6 +244,9 @@ export class SystemRuntimeBackendApi {
             .map((node) => [node.executionNodeId, node.target.versionId!])
             .sort(([left], [right]) => left.localeCompare(right)))),
         }),
+        executionEnvironment: started.executionEnvironment
+          ? this.serializeExecutionEnvironment(started.executionEnvironment)
+          : undefined,
       });
     });
   }
@@ -233,9 +257,12 @@ export class SystemRuntimeBackendApi {
     readonly systemId?: string;
     readonly sessionId?: string;
     readonly callback?: ExecutionCallbackRegistrationRequest;
+    readonly requestedEnvironment?: ExternalExecutionEnvironmentRequest;
+    readonly tenantId?: string;
   }): Promise<SystemRuntimeApiResponse<AsyncExecutionStartResponse>> {
     return this.wrap(async () => {
       const callerContext = this.resolveCallerContext(request);
+      const tenantContext = this.resolveTenantContext({ requestContext: request.requestContext, callerContext, requestTenantId: request.tenantId });
       this.assertExecutionAccess({
         accessContext: callerContext,
         systemId: request.systemId,
@@ -251,6 +278,7 @@ export class SystemRuntimeBackendApi {
         requestedSessionId: request.sessionId,
         executionId,
         callerContext,
+        tenantContext,
         callback: request.callback,
       });
       session = this.executionSessionRepository.save(transitionExecutionSession({
@@ -281,6 +309,8 @@ export class SystemRuntimeBackendApi {
       const asyncRequest: StartSystemRuntimeExecutionRequest = Object.freeze({
         ...request,
         executionId,
+        tenantContext,
+        requestedEnvironment: request.requestedEnvironment,
       });
 
       void this.service.startExecution(asyncRequest)
@@ -434,6 +464,16 @@ export class SystemRuntimeBackendApi {
 
       const pending = this.asyncRunsByExecutionId.get(executionId);
       if (pending) {
+        const caller = this.resolveCallerContext({ requestContext: input.requestContext });
+        const tenantContext = this.resolveTenantContext({ requestContext: input.requestContext, callerContext: caller });
+        const session = this.executionSessionRepository.getById(pending.sessionId);
+        if (caller?.callerId && session?.context?.callerId && caller.callerId !== session.context.callerId) {
+          throw new Error("forbidden:Runtime execution session does not belong to caller.");
+        }
+        this.assertTenantIsolation({
+          access: { caller, tenant: tenantContext },
+          resourceTenantId: session?.context?.tenantId,
+        });
         return Object.freeze({
           executionId,
           sessionId: pending.sessionId,
@@ -463,6 +503,11 @@ export class SystemRuntimeBackendApi {
       if (caller?.callerId && session.context?.callerId && caller.callerId !== session.context.callerId) {
         throw new Error("forbidden:Runtime execution session does not belong to caller.");
       }
+      const tenantContext = this.resolveTenantContext({ requestContext, callerContext: caller });
+      this.assertTenantIsolation({
+        access: { caller, tenant: tenantContext },
+        resourceTenantId: session.context?.tenantId,
+      });
       return session;
     });
   }
@@ -494,7 +539,21 @@ export class SystemRuntimeBackendApi {
       if (!input.executionId?.trim() && !input.sessionId?.trim()) {
         throw new Error("invalid-request:executionId or sessionId is required.");
       }
-      this.resolveCallerContext({ requestContext: input.requestContext });
+      const caller = this.resolveCallerContext({ requestContext: input.requestContext });
+      const tenantContext = this.resolveTenantContext({ requestContext: input.requestContext, callerContext: caller });
+      if (input.executionId?.trim()) {
+        this.assertTenantIsolation({
+          access: { caller, tenant: tenantContext },
+          resourceTenantId: this.readExecutionTenantId(input.executionId),
+        });
+      }
+      if (input.sessionId?.trim()) {
+        const session = this.executionSessionRepository.getById(input.sessionId.trim());
+        this.assertTenantIsolation({
+          access: { caller, tenant: tenantContext },
+          resourceTenantId: session?.context?.tenantId,
+        });
+      }
       const subscription = this.updateStream.subscribe({
         executionId: input.executionId,
         sessionId: input.sessionId,
@@ -558,15 +617,23 @@ export class SystemRuntimeBackendApi {
     });
   }
 
-  private toSessionContext(callerContext?: ExecutionAccessContext): ExecutionSessionContext | undefined {
+  private toSessionContext(
+    callerContext?: ExecutionAccessContext,
+    tenantContext?: ExecutionTenantContext,
+  ): ExecutionSessionContext | undefined {
     if (!callerContext) {
-      return undefined;
+      return tenantContext ? Object.freeze({
+        callerKind: "anonymous",
+        callerId: "unknown",
+        tenantId: tenantContext.tenantId,
+      }) : undefined;
     }
     return Object.freeze({
       callerKind: callerContext.callerKind ?? "anonymous",
       callerId: callerContext.callerId ?? "unknown",
       roles: callerContext.roles,
       callerSessionId: callerContext.sessionId,
+      tenantId: tenantContext?.tenantId,
       metadata: callerContext.metadata,
     });
   }
@@ -575,11 +642,16 @@ export class SystemRuntimeBackendApi {
     readonly requestedSessionId?: string;
     readonly executionId: string;
     readonly callerContext?: ExecutionAccessContext;
+    readonly tenantContext?: ExecutionTenantContext;
     readonly callback?: ExecutionCallbackRegistrationRequest;
   }): ExecutionSession {
     const requested = input.requestedSessionId?.trim();
     const existing = requested ? this.executionSessionRepository.getById(requested) : undefined;
     if (existing) {
+      this.assertTenantIsolation({
+        access: { caller: input.callerContext, tenant: input.tenantContext },
+        resourceTenantId: existing.context?.tenantId,
+      });
       let updated = this.executionSessionRepository.save(transitionExecutionSession({
         session: existing,
         status: existing.status,
@@ -595,7 +667,7 @@ export class SystemRuntimeBackendApi {
     }
     let created = createExecutionSession({
       sessionId: requested ?? `exec-session-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
-      context: this.toSessionContext(input.callerContext),
+      context: this.toSessionContext(input.callerContext, input.tenantContext),
       executionId: input.executionId,
       status: ExecutionSessionStatuses.accepted,
     });
@@ -623,6 +695,11 @@ export class SystemRuntimeBackendApi {
     if (caller?.callerId && session.context?.callerId && caller.callerId !== session.context.callerId) {
       throw new Error("forbidden:Runtime execution session does not belong to caller.");
     }
+    const tenantContext = this.resolveTenantContext({ requestContext, callerContext: caller });
+    this.assertTenantIsolation({
+      access: { caller, tenant: tenantContext },
+      resourceTenantId: session.context?.tenantId,
+    });
     return session;
   }
 
@@ -752,12 +829,66 @@ export class SystemRuntimeBackendApi {
   ): Promise<RuntimeExecutionStatusReadModel> {
     const status = await this.service.getExecutionStatus(executionId);
     const callerContext = this.resolveCallerContext({ requestContext });
+    const tenantContext = this.resolveTenantContext({ requestContext, callerContext });
     this.assertExecutionAccess({
       accessContext: callerContext,
       systemId: status.rootAssetId,
       versionId: status.rootVersionId,
     });
+    this.assertTenantIsolation({
+      access: { caller: callerContext, tenant: tenantContext },
+      resourceTenantId: this.readExecutionTenantId(executionId),
+    });
     return status;
+  }
+
+  private resolveTenantContext(input: {
+    readonly requestContext?: RuntimeApiRequestContext;
+    readonly callerContext?: ExecutionAccessContext;
+    readonly requestTenantId?: string;
+  }): ExecutionTenantContext | undefined {
+    const explicitTenantId = input.requestTenantId?.trim() || input.requestContext?.tenantId?.trim();
+    if (explicitTenantId) {
+      return Object.freeze({ tenantId: explicitTenantId, source: "explicit-request" });
+    }
+    const metadata = input.callerContext?.metadata as { readonly tenantId?: unknown } | undefined;
+    const tenantFromCaller = typeof metadata?.tenantId === "string" ? metadata.tenantId.trim() : "";
+    if (tenantFromCaller) {
+      return Object.freeze({ tenantId: tenantFromCaller, source: "caller-context" });
+    }
+    return undefined;
+  }
+
+  private readExecutionTenantId(executionId: string): string | undefined {
+    try {
+      return this.service.getExecutionTenantId(executionId);
+    } catch {
+      const session = this.executionSessionRepository.getByExecutionId(executionId);
+      return session?.context?.tenantId;
+    }
+  }
+
+  private assertTenantIsolation(input: {
+    readonly access: TenantScopedExecutionAccessContext;
+    readonly resourceTenantId?: string;
+  }): void {
+    const decision = this.tenantIsolationPolicy.evaluate(input);
+    if (!decision.allowed) {
+      throw new Error(`forbidden:${decision.reason ?? "Runtime tenant isolation policy denied access."}`);
+    }
+  }
+
+  private serializeExecutionEnvironment(input: RuntimeEnvironment): SerializedExecutionEnvironment {
+    return Object.freeze({
+      environmentId: input.environmentId,
+      option: input.kind,
+      displayName: input.displayName,
+      capabilities: Object.freeze({
+        supportsNestedSystems: input.capabilities.supportsNestedSystems,
+        supportsMcpMediatedExecution: input.capabilities.supportsMcpMediatedExecution,
+        supportsStructuralKinds: Object.freeze([...input.capabilities.supportsStructuralKinds]),
+      }),
+    });
   }
 
   private normalizeOptionalBoundedInteger(value: number | undefined, min: number, max: number, label: string): number | undefined {

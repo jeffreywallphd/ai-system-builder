@@ -13,6 +13,12 @@ import {
 } from "../../domain/system-studio/SystemAssetDomain";
 import type { IStudioShellRepository } from "../ports/interfaces/IStudioShellRepository";
 import { RuntimeEnvironmentKinds } from "../../domain/system-runtime/RuntimeEnvironmentDomain";
+import type { RuntimeEnvironment } from "../../domain/system-runtime/RuntimeEnvironmentDomain";
+import {
+  ExecutionEnvironmentConfigurationValidator,
+  type ExternalExecutionEnvironmentRequest,
+} from "./ExecutionEnvironmentConfigurationValidator";
+import type { ExecutionTenantContext } from "./TenantExecutionIsolationPolicy";
 import {
   createExecutionTraceSnapshot,
   ExecutionLogLevels,
@@ -54,6 +60,8 @@ export interface StartSystemRuntimeExecutionRequest {
   readonly inputSchemaVersion?: string;
   readonly requestedEnvironmentId?: string;
   readonly requestedEnvironmentKind?: keyof typeof RuntimeEnvironmentKinds;
+  readonly requestedEnvironment?: ExternalExecutionEnvironmentRequest;
+  readonly tenantContext?: ExecutionTenantContext;
   readonly maxDepth?: number;
   readonly maxIterationsPerNode?: number;
   readonly maxPlanningCyclesPerNode?: number;
@@ -68,6 +76,7 @@ export interface StartSystemRuntimeExecutionRequest {
 export interface StartSystemRuntimeExecutionResult {
   readonly execution: SystemExecution;
   readonly runtimeBehavior: RuntimeBehaviorProfile;
+  readonly executionEnvironment?: RuntimeEnvironment;
 }
 
 export interface RuntimeExecutionStatusReadModel {
@@ -283,6 +292,7 @@ export class SystemRuntimeApplicationService {
   private readonly contractResolver = new CompositionAssetContractResolver();
   private readonly orchestration = new ExecutionOrchestrationService(new StepExecutionEngine(), new ExecutionPlanBuilder());
   private readonly runtimeInputValidation = new RuntimeInputValidationService();
+  private readonly environmentConfigurationValidator = new ExecutionEnvironmentConfigurationValidator();
 
   public constructor(
     private readonly repository: IStudioShellRepository,
@@ -350,6 +360,7 @@ export class SystemRuntimeApplicationService {
       maxDepth,
     });
 
+    const environmentConfiguration = this.environmentConfigurationValidator.validate(request.requestedEnvironment);
     const result = await this.orchestration.orchestrate({
       root,
       runtimeContract,
@@ -360,8 +371,10 @@ export class SystemRuntimeApplicationService {
       inputPayload: request.inputPayload,
       inputContentType: request.inputContentType,
       inputSchemaVersion: request.inputSchemaVersion,
-      requestedEnvironmentId: request.requestedEnvironmentId,
-      requestedEnvironmentKind: request.requestedEnvironmentKind,
+      requestedEnvironmentId: environmentConfiguration.requestedEnvironmentId ?? request.requestedEnvironmentId,
+      requestedEnvironmentKind: environmentConfiguration.requestedEnvironmentKind ?? request.requestedEnvironmentKind,
+      requireNestedSystems: environmentConfiguration.requireNestedSystems,
+      requireMcpMediatedExecution: environmentConfiguration.requireMcpMediatedExecution,
       maxIterationsPerNode,
       maxPlanningCyclesPerNode,
       maxTraceEvents,
@@ -393,8 +406,25 @@ export class SystemRuntimeApplicationService {
       })
       : result.execution;
 
-    this.executionStore.saveExecutionRecord(this.createExecutionRecord(normalizedExecution));
-    return Object.freeze({ execution: normalizedExecution, runtimeBehavior: behavior });
+    const executionWithTenant: SystemExecution = request.tenantContext?.tenantId
+      ? Object.freeze({
+        ...normalizedExecution,
+        context: Object.freeze({
+          ...normalizedExecution.context,
+          metadata: Object.freeze({
+            ...(normalizedExecution.context.metadata ?? {}),
+            tenantId: request.tenantContext.tenantId,
+          }),
+        }),
+      })
+      : normalizedExecution;
+
+    this.executionStore.saveExecutionRecord(this.createExecutionRecord(executionWithTenant));
+    return Object.freeze({
+      execution: executionWithTenant,
+      runtimeBehavior: behavior,
+      executionEnvironment: result.plan?.environment,
+    });
   }
 
   public getExecutionStatus(executionId: string): RuntimeExecutionStatusReadModel {
@@ -552,6 +582,12 @@ export class SystemRuntimeApplicationService {
         nodeVersionIds: this.buildNodeVersionMap(execution),
       }),
     });
+  }
+
+  public getExecutionTenantId(executionId: string): string | undefined {
+    const execution = this.requireExecution(executionId);
+    const tenantId = execution.context.metadata?.tenantId;
+    return typeof tenantId === "string" ? tenantId : undefined;
   }
 
   private requireExecution(executionId: string): SystemExecution {
@@ -833,6 +869,9 @@ export class SystemRuntimeApplicationService {
       });
     const summary: ExecutionMetadataSnapshot = Object.freeze({
       executionId: execution.executionId,
+      tenantId: typeof execution.context.metadata?.tenantId === "string"
+        ? execution.context.metadata.tenantId
+        : undefined,
       rootAssetId: execution.root.assetId,
       rootVersionId: execution.root.versionId,
       status: execution.status,
