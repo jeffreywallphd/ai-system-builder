@@ -190,7 +190,7 @@ export class RecentAndFavoritesService {
     switch (intent) {
       case "automate-task":
         return "Automate a task";
-      case "create-assistant":
+      case "create-ai-assistant":
         return "Create an AI assistant";
       case "train-model":
         return "Train a model";

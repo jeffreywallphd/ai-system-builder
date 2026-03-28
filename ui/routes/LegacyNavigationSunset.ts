@@ -173,3 +173,53 @@ export class NavigationMigrationService {
     return undefined;
   }
 }
+
+export interface DeprecatedUxRoutePolicy {
+  readonly routePath: string;
+  readonly entry: LegacyNavigationEntry;
+  readonly canonicalPath: string;
+  readonly state: LegacyNavigationEntryState;
+}
+
+export interface LegacyUxCleanupPlan {
+  readonly generatedAtIso: string;
+  readonly compatibilityMode: LegacyNavigationCompatibilityMode;
+  readonly deprecatedRoutes: ReadonlyArray<DeprecatedUxRoutePolicy>;
+}
+
+const deprecatedRouteCatalog: ReadonlyArray<{ readonly routePath: string; readonly entry: LegacyNavigationEntry }> = Object.freeze([
+  Object.freeze({ routePath: ROUTE_PATHS.create, entry: LegacyNavigationEntries.create }),
+  Object.freeze({ routePath: ROUTE_PATHS.compose, entry: LegacyNavigationEntries.compose }),
+  Object.freeze({ routePath: ROUTE_PATHS.workflows, entry: LegacyNavigationEntries.workflows }),
+  Object.freeze({ routePath: ROUTE_PATHS.tools, entry: LegacyNavigationEntries.tools }),
+  Object.freeze({ routePath: ROUTE_PATHS.models, entry: LegacyNavigationEntries.models }),
+  Object.freeze({ routePath: ROUTE_PATHS.context, entry: LegacyNavigationEntries.context }),
+  Object.freeze({ routePath: ROUTE_PATHS.mcp, entry: LegacyNavigationEntries.mcp }),
+  Object.freeze({ routePath: ROUTE_PATHS.services, entry: LegacyNavigationEntries.services }),
+  Object.freeze({ routePath: ROUTE_PATHS.assets, entry: LegacyNavigationEntries.assets }),
+  Object.freeze({ routePath: ROUTE_PATHS.agentStudio, entry: LegacyNavigationEntries.agentStudio }),
+  Object.freeze({ routePath: ROUTE_PATHS.studioShell, entry: LegacyNavigationEntries.studioShell }),
+]);
+
+export class LegacyUxCleanupPlanner {
+  private readonly policy: LegacyNavigationSunsetPolicy;
+
+  constructor(private readonly mode: LegacyNavigationCompatibilityMode) {
+    this.policy = new LegacyNavigationSunsetPolicy(mode);
+  }
+
+  public createPlan(): LegacyUxCleanupPlan {
+    return Object.freeze({
+      generatedAtIso: new Date().toISOString(),
+      compatibilityMode: this.mode,
+      deprecatedRoutes: Object.freeze(
+        deprecatedRouteCatalog.map((route) => Object.freeze({
+          routePath: route.routePath,
+          entry: route.entry,
+          canonicalPath: this.policy.resolveCanonicalDestination(route.entry),
+          state: this.policy.evaluateEntry(route.entry),
+        })),
+      ),
+    });
+  }
+}

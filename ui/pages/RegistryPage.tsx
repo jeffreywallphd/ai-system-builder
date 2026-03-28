@@ -93,7 +93,7 @@ export default function RegistryPage(): JSX.Element {
       if (!response.ok || !response.data) {
         setAssets([]);
         setFacets([]);
-        setError(response.error?.message ?? "Failed to load registry assets.");
+        setError(response.error?.message ?? "Failed to load Explore assets.");
         setIsLoading(false);
         return;
       }
@@ -114,7 +114,7 @@ export default function RegistryPage(): JSX.Element {
     <section className="ui-page ui-stack ui-stack--md" data-testid="registry-page">
       <div className="ui-page__hero">
         <div className="ui-page__hero-copy">
-          <h1 className="ui-page__title">Registry</h1>
+          <h1 className="ui-page__title">Explore</h1>
           <p className="ui-page__subtitle">
             Explore a unified asset library across atomic, composite, and system assets with intent-friendly metadata-first filtering.
           </p>
