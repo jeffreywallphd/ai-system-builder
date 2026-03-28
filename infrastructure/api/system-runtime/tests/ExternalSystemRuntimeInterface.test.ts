@@ -106,6 +106,7 @@ describe("ExternalSystemRuntimeInterface", () => {
     const started = await external.startExecution({
       systemId: "system:external",
       versionId: "system:external:v1",
+      async: true,
       inputPayload: { request: "hello" },
       authentication: { bearerToken: "token-user-1" },
     });
@@ -113,10 +114,32 @@ describe("ExternalSystemRuntimeInterface", () => {
     expect(started.ok).toBeTrue();
     expect(started.data?.systemId).toBe("system:external");
     expect(started.data?.versionId).toBe("system:external:v1");
+    expect(started.data?.sessionId).toBeDefined();
+    expect(started.data?.acceptedState).toBe("accepted");
     expect(started.data?.executedVersionMap.rootVersionId).toBe("system:external:v1");
 
-    const status = await external.getExecutionStatus({
+    const polled = await external.pollExecution({
+      sessionId: started.data?.sessionId,
+      authentication: { bearerToken: "token-user-1" },
+    });
+    expect(polled.ok).toBeTrue();
+    expect(polled.data?.executionId).toBe(started.data?.executionId);
+    expect(["running", "completed", "failed"]).toContain(polled.data?.acceptedState);
+
+    let polledStatus = await external.pollExecution({
       executionId: started.data!.executionId,
+      authentication: { bearerToken: "token-user-1" },
+    });
+    for (let attempt = 0; attempt < 30 && polledStatus.ok && polledStatus.data?.acceptedState === "running"; attempt += 1) {
+      await Bun.sleep(5);
+      polledStatus = await external.pollExecution({
+        executionId: started.data!.executionId,
+        authentication: { bearerToken: "token-user-1" },
+      });
+    }
+
+    const status = await external.getExecutionStatus({
+      executionId: polledStatus.data?.executionId ?? started.data!.executionId,
       authentication: { bearerToken: "token-user-1" },
     });
     expect(status.ok).toBeTrue();

@@ -1,13 +1,17 @@
 import type { IStudioShellRepository } from "../../../application/ports/interfaces/IStudioShellRepository";
 import {
   SystemRuntimeApplicationService,
+  type RuntimeExecutionSummaryReadModel,
   type RuntimeExecutionResultReadModel,
   type RuntimeExecutionStatusReadModel,
-  type RuntimeExecutionSummaryReadModel,
   type RuntimeExecutionTraceReadModel,
   type StartSystemRuntimeExecutionRequest,
 } from "../../../application/system-runtime/SystemRuntimeApplicationService";
 import type { ISystemRuntimeExecutionStore } from "../../../application/system-runtime/SystemRuntimeExecutionStore";
+import {
+  InMemoryExecutionSessionRepository,
+  type ExecutionSessionRepository,
+} from "../../../application/system-runtime/ExecutionSessionRepository";
 import { RuntimeAccessControlService, type ExecutionAccessContext } from "../../../application/system-runtime/RuntimeAccessControlService";
 import { ExecutionQuotaEvaluator } from "../../../application/system-runtime/ExecutionQuotaEvaluator";
 import {
@@ -23,6 +27,13 @@ import {
   RuntimeOutputSerializer,
   type SerializedExecutionResult,
 } from "./RuntimeOutputSerializer";
+import {
+  createExecutionSession,
+  ExecutionSessionStatuses,
+  transitionExecutionSession,
+  type ExecutionSession,
+  type ExecutionSessionContext,
+} from "../../../domain/system-runtime/ExecutionSessionDomain";
 
 export type {
   RuntimeExecutionResultReadModel,
@@ -45,6 +56,7 @@ export interface SystemRuntimeApiResponse<T> {
 
 export interface StartSystemRuntimeExecutionResponse {
   readonly executionId: string;
+  readonly sessionId?: string;
   readonly status: RuntimeExecutionStatusReadModel["status"];
   readonly rootAssetId: string;
   readonly rootVersionId?: string;
@@ -56,6 +68,18 @@ export interface StartSystemRuntimeExecutionResponse {
     readonly rootVersionId?: string;
     readonly nodeVersionIds: Readonly<Record<string, string>>;
   };
+}
+export interface AsyncExecutionStartResponse extends StartSystemRuntimeExecutionResponse {
+  readonly acceptedState: "accepted" | "running";
+}
+
+export interface ExecutionPollResponse {
+  readonly executionId: string;
+  readonly sessionId?: string;
+  readonly acceptedState: "accepted" | "running" | "completed" | "failed";
+  readonly status?: RuntimeExecutionStatusReadModel["status"];
+  readonly rootAssetId?: string;
+  readonly rootVersionId?: string;
 }
 
 export interface GetSystemRuntimeExecutionTraceRequest {
@@ -84,6 +108,13 @@ export interface RuntimeApiRequestContext {
 export class SystemRuntimeBackendApi {
   private readonly service: SystemRuntimeApplicationService;
   private readonly outputSerializer = new RuntimeOutputSerializer();
+  private readonly asyncRunsByExecutionId = new Map<string, {
+    readonly executionId: string;
+    readonly sessionId: string;
+    readonly rootAssetId: string;
+    readonly rootVersionId?: string;
+    state: ExecutionPollResponse["acceptedState"];
+  }>();
 
   public constructor(
     repository: IStudioShellRepository,
@@ -91,6 +122,7 @@ export class SystemRuntimeBackendApi {
     private readonly runtimeAccessControl = new RuntimeAccessControlService(),
     private readonly runtimeAuthenticator: RuntimeApiAuthenticator = new PermissiveRuntimeApiAuthenticator(),
     private readonly executionQuotaEvaluator = new ExecutionQuotaEvaluator(),
+    private readonly executionSessionRepository: ExecutionSessionRepository = new InMemoryExecutionSessionRepository(),
   ) {
     this.service = new SystemRuntimeApplicationService(repository, executionStore);
   }
@@ -118,8 +150,21 @@ export class SystemRuntimeBackendApi {
       } finally {
         reservation.reservation?.release();
       }
+      const session = this.requireOrCreateSession({
+        requestedSessionId: undefined,
+        executionId: started.execution.executionId,
+        callerContext,
+      });
+      this.executionSessionRepository.save(transitionExecutionSession({
+        session,
+        status: started.execution.status === "failed"
+          ? ExecutionSessionStatuses.failed
+          : ExecutionSessionStatuses.completed,
+        executionId: started.execution.executionId,
+      }));
       return Object.freeze({
         executionId: started.execution.executionId,
+        sessionId: this.executionSessionRepository.getByExecutionId(started.execution.executionId)?.sessionId,
         status: started.execution.status,
         rootAssetId: started.execution.root.assetId,
         rootVersionId: started.execution.root.versionId,
@@ -133,6 +178,99 @@ export class SystemRuntimeBackendApi {
             .filter((node) => Boolean(node.target.versionId))
             .map((node) => [node.executionNodeId, node.target.versionId!])
             .sort(([left], [right]) => left.localeCompare(right)))),
+        }),
+      });
+    });
+  }
+
+  public async startExecutionAsync(request: StartSystemRuntimeExecutionRequest & {
+    readonly accessContext?: ExecutionAccessContext;
+    readonly requestContext?: RuntimeApiRequestContext;
+    readonly systemId?: string;
+    readonly sessionId?: string;
+  }): Promise<SystemRuntimeApiResponse<AsyncExecutionStartResponse>> {
+    return this.wrap(async () => {
+      const callerContext = this.resolveCallerContext(request);
+      this.assertExecutionAccess({
+        accessContext: callerContext,
+        systemId: request.systemId,
+        versionId: request.versionId,
+      });
+      const reservation = this.executionQuotaEvaluator.reserveExecution({ callerContext });
+      if (!reservation.decision.allowed) {
+        throw new Error(`quota-exceeded:${reservation.decision.message ?? "Runtime execution quota exceeded."}`);
+      }
+
+      const executionId = request.executionId?.trim() || `sys-exec-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+      let session = this.requireOrCreateSession({
+        requestedSessionId: request.sessionId,
+        executionId,
+        callerContext,
+      });
+      session = this.executionSessionRepository.save(transitionExecutionSession({
+        session,
+        status: ExecutionSessionStatuses.running,
+        executionId,
+      }));
+      const sessionId = session.sessionId;
+      this.asyncRunsByExecutionId.set(executionId, {
+        executionId,
+        sessionId,
+        rootAssetId: request.systemId ?? this.deriveSystemIdFromVersionId(request.versionId),
+        rootVersionId: request.versionId,
+        state: "accepted",
+      });
+
+      const asyncRequest: StartSystemRuntimeExecutionRequest = Object.freeze({
+        ...request,
+        executionId,
+      });
+
+      void this.service.startExecution(asyncRequest)
+        .then((result) => {
+          const pending = this.asyncRunsByExecutionId.get(executionId);
+          if (pending) {
+            pending.state = "completed";
+          }
+          this.executionSessionRepository.save(transitionExecutionSession({
+            session: this.executionSessionRepository.getById(sessionId) ?? session,
+            status: ExecutionSessionStatuses.completed,
+            executionId,
+          }));
+          reservation.reservation?.release();
+          return result;
+        })
+        .catch((error) => {
+          const pending = this.asyncRunsByExecutionId.get(executionId);
+          if (pending) {
+            pending.state = "failed";
+          }
+          this.executionSessionRepository.save(transitionExecutionSession({
+            session: this.executionSessionRepository.getById(sessionId) ?? session,
+            status: ExecutionSessionStatuses.failed,
+            executionId,
+            error: {
+              code: "runtime-async-failure",
+              message: error instanceof Error ? error.message : "Asynchronous runtime execution failed.",
+            },
+          }));
+          reservation.reservation?.release();
+        });
+
+      return Object.freeze({
+        executionId,
+        sessionId,
+        acceptedState: "accepted" as const,
+        status: "pending" as const,
+        rootAssetId: request.systemId ?? this.deriveSystemIdFromVersionId(request.versionId),
+        rootVersionId: request.versionId,
+        runtimeBehavior: Object.freeze({
+          behaviorKind: "unknown",
+          executionPattern: "asynchronous",
+        }),
+        executedVersionMap: Object.freeze({
+          rootVersionId: request.versionId,
+          nodeVersionIds: Object.freeze({}),
         }),
       });
     });
@@ -192,6 +330,63 @@ export class SystemRuntimeBackendApi {
     return this.wrap(async () => this.service.listRecentExecutionsForSystem(input));
   }
 
+  public async pollExecution(input: {
+    readonly executionId?: string;
+    readonly sessionId?: string;
+    readonly requestContext?: RuntimeApiRequestContext;
+  }): Promise<SystemRuntimeApiResponse<ExecutionPollResponse>> {
+    return this.wrap(async () => {
+      const executionId = input.executionId?.trim() || this.executionSessionRepository.getById(input.sessionId?.trim() ?? "")?.lastExecutionId;
+      if (!executionId) {
+        throw new Error("invalid-request:executionId or sessionId is required.");
+      }
+      const status = await this.getExecutionStatusAuthorized(executionId, input.requestContext).catch(() => undefined);
+      if (status) {
+        return Object.freeze({
+          executionId,
+          sessionId: this.executionSessionRepository.getByExecutionId(executionId)?.sessionId,
+          acceptedState: status.status === "failed" ? "failed" : status.status === "succeeded" ? "completed" : "running",
+          status: status.status,
+          rootAssetId: status.rootAssetId,
+          rootVersionId: status.rootVersionId,
+        });
+      }
+
+      const pending = this.asyncRunsByExecutionId.get(executionId);
+      if (pending) {
+        return Object.freeze({
+          executionId,
+          sessionId: pending.sessionId,
+          acceptedState: pending.state === "completed" || pending.state === "failed" ? pending.state : "running",
+          rootAssetId: pending.rootAssetId,
+          rootVersionId: pending.rootVersionId,
+        });
+      }
+      throw new Error(`not-found:Execution '${executionId}' was not found.`);
+    });
+  }
+
+  public async getExecutionSession(
+    sessionId: string,
+    requestContext?: RuntimeApiRequestContext,
+  ): Promise<SystemRuntimeApiResponse<ExecutionSession>> {
+    return this.wrap(async () => {
+      const normalized = sessionId.trim();
+      if (!normalized) {
+        throw new Error("invalid-request:sessionId is required.");
+      }
+      const session = this.executionSessionRepository.getById(normalized);
+      if (!session) {
+        throw new Error(`not-found:Execution session '${normalized}' was not found.`);
+      }
+      const caller = this.resolveCallerContext({ requestContext });
+      if (caller?.callerId && session.context?.callerId && caller.callerId !== session.context.callerId) {
+        throw new Error("forbidden:Runtime execution session does not belong to caller.");
+      }
+      return session;
+    });
+  }
+
 
   private assertExecutionAccess(request: { readonly accessContext?: ExecutionAccessContext; readonly systemId?: string; readonly versionId?: string }): void {
     const decision = this.runtimeAccessControl.evaluate({
@@ -235,6 +430,51 @@ export class SystemRuntimeBackendApi {
       roles: principal.roles,
       metadata: principal.metadata,
     });
+  }
+
+  private toSessionContext(callerContext?: ExecutionAccessContext): ExecutionSessionContext | undefined {
+    if (!callerContext) {
+      return undefined;
+    }
+    return Object.freeze({
+      callerKind: callerContext.callerKind ?? "anonymous",
+      callerId: callerContext.callerId ?? "unknown",
+      roles: callerContext.roles,
+      callerSessionId: callerContext.sessionId,
+      metadata: callerContext.metadata,
+    });
+  }
+
+  private requireOrCreateSession(input: {
+    readonly requestedSessionId?: string;
+    readonly executionId: string;
+    readonly callerContext?: ExecutionAccessContext;
+  }): ExecutionSession {
+    const requested = input.requestedSessionId?.trim();
+    const existing = requested ? this.executionSessionRepository.getById(requested) : undefined;
+    if (existing) {
+      return this.executionSessionRepository.save(transitionExecutionSession({
+        session: existing,
+        status: existing.status,
+        executionId: input.executionId,
+      }));
+    }
+    const created = createExecutionSession({
+      sessionId: requested ?? `exec-session-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+      context: this.toSessionContext(input.callerContext),
+      executionId: input.executionId,
+      status: ExecutionSessionStatuses.accepted,
+    });
+    return this.executionSessionRepository.save(created);
+  }
+
+  private deriveSystemIdFromVersionId(versionId?: string): string {
+    const normalized = versionId?.trim();
+    if (!normalized) {
+      return "unknown-system";
+    }
+    const index = normalized.lastIndexOf(":v");
+    return index > 0 ? normalized.slice(0, index) : normalized;
   }
 
   private async getExecutionStatusAuthorized(

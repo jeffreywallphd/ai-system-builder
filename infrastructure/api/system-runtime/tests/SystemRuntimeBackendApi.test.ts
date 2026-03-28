@@ -108,6 +108,80 @@ describe("SystemRuntimeBackendApi", () => {
     expect(invalid.error?.code).toBe("invalid-request");
   });
 
+  it("creates execution sessions and supports async polling/result retrieval", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    await repository.saveAssetVersion(new AssetVersion({
+      assetId: "system:async",
+      versionId: "system:async:v1",
+      metadata: {
+        metadata: {
+          taxonomy: createSystemStudioTaxonomy("system", "deterministic"),
+        },
+        content: JSON.stringify({
+          systemSpec: {
+            components: [],
+            inputs: [{ inputId: "request", valueType: "string", required: false }],
+            outputs: [{ outputId: "response", valueType: "string" }],
+          },
+        }),
+        dependencies: [],
+      },
+    }));
+
+    const runtimeApi = new SystemRuntimeBackendApi(repository);
+    const started = await runtimeApi.startExecutionAsync({
+      versionId: "system:async:v1",
+      systemId: "system:async",
+      inputPayload: { request: "hello" },
+      requestContext: {
+        trustedInternal: true,
+        accessContext: { callerKind: "user", callerId: "user-async", sessionId: "caller-session-1" },
+      },
+    });
+    expect(started.ok).toBeTrue();
+    expect(started.data?.acceptedState).toBe("accepted");
+    expect(started.data?.sessionId).toBeDefined();
+    expect(started.data?.executionId).toBeDefined();
+
+    let poll = await runtimeApi.pollExecution({
+      sessionId: started.data?.sessionId,
+      requestContext: {
+        trustedInternal: true,
+        accessContext: { callerKind: "user", callerId: "user-async" },
+      },
+    });
+    expect(poll.ok).toBeTrue();
+    expect(poll.data?.executionId).toBe(started.data?.executionId);
+    expect(["running", "completed", "failed"]).toContain(poll.data?.acceptedState);
+
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      poll = await runtimeApi.pollExecution({
+        executionId: started.data?.executionId,
+        requestContext: {
+          trustedInternal: true,
+          accessContext: { callerKind: "user", callerId: "user-async" },
+        },
+      });
+      if (poll.ok && (poll.data?.acceptedState === "completed" || poll.data?.acceptedState === "failed")) {
+        break;
+      }
+      await Bun.sleep(5);
+    }
+
+    const session = await runtimeApi.getExecutionSession(started.data!.sessionId!, {
+      trustedInternal: true,
+      accessContext: { callerKind: "user", callerId: "user-async" },
+    });
+    expect(session.ok).toBeTrue();
+    expect(session.data?.executionIds).toContain(started.data?.executionId);
+    expect(session.data?.context?.callerId).toBe("user-async");
+    expect(session.data?.context?.callerSessionId).toBe("caller-session-1");
+
+    const result = await runtimeApi.getExecutionResult(started.data!.executionId);
+    expect(result.ok).toBeTrue();
+    expect(result.data?.executionId).toBe(started.data?.executionId);
+  });
+
   it("returns structured runtime input validation errors before orchestration", async () => {
     const repository = new InMemoryStudioShellRepository();
     await repository.saveAssetVersion(new AssetVersion({
