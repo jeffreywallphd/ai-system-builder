@@ -21,6 +21,15 @@ import { DeploymentDiagnosticsService, InMemoryDeploymentDiagnosticsRepository }
 import { EnvironmentProvisioningCompatibilityValidator } from "./EnvironmentProvisioningCompatibilityValidator";
 import { EnvironmentProvisioningService } from "./EnvironmentProvisioningService";
 import { DeploymentStateTracker } from "./DeploymentStateTracker";
+import {
+  DeploymentAccessActions,
+  DeploymentAccessEvaluator,
+  type DeploymentAccessContext,
+} from "./DeploymentAccessControl";
+import {
+  DeploymentQuotaActions,
+  DeploymentQuotaEvaluator,
+} from "./DeploymentQuotaEvaluator";
 
 export interface DeploymentRecordRepository {
   save(record: DeploymentRecord): DeploymentRecord;
@@ -85,10 +94,34 @@ export class DeploymentExecutionService {
     private readonly provisioningInterface: EnvironmentProvisioningInterface = new EnvironmentProvisioningService(),
     private readonly stateTracker: DeploymentStateTracker = new DeploymentStateTracker(),
     private readonly diagnosticsService: DeploymentDiagnosticsService = new DeploymentDiagnosticsService(new InMemoryDeploymentDiagnosticsRepository(), () => this.clock()),
+    private readonly accessEvaluator: DeploymentAccessEvaluator = new DeploymentAccessEvaluator(),
+    private readonly quotaEvaluator: DeploymentQuotaEvaluator = new DeploymentQuotaEvaluator(),
   ) {}
 
-  public executeLifecycle(request: DeploymentLifecycleRequest): DeploymentExecutionResult {
+  public executeLifecycle(
+    request: DeploymentLifecycleRequest,
+    governance?: { readonly accessContext?: DeploymentAccessContext; readonly resourceTenantId?: string; readonly requestSource?: string },
+  ): DeploymentExecutionResult {
     const normalized = createDeploymentLifecycleRequest(request);
+    this.assertDeploymentAccess({
+      action: DeploymentAccessActions.executeDeployment,
+      accessContext: governance?.accessContext,
+      resourceTenantId: governance?.resourceTenantId,
+      requestSource: governance?.requestSource,
+      rootSystemAssetId: normalized.bundle.manifest.package.rootSystemAssetId,
+      rootSystemVersionId: normalized.bundle.manifest.package.rootSystemVersionId,
+      targetId: normalized.target.targetId.value,
+      targetType: normalized.target.type,
+    });
+    this.assertDeploymentQuota({
+      action: DeploymentQuotaActions.executeDeployment,
+      accessContext: governance?.accessContext,
+      rootSystemAssetId: normalized.bundle.manifest.package.rootSystemAssetId,
+      rootSystemVersionId: normalized.bundle.manifest.package.rootSystemVersionId,
+      targetId: normalized.target.targetId.value,
+      targetType: normalized.target.type,
+    });
+
     const deploymentId = this.deriveDeploymentId({
       requestId: normalized.requestId,
       bundleId: normalized.bundle.bundleId.value,
@@ -165,13 +198,47 @@ export class DeploymentExecutionService {
       target: normalized.target,
       provisionedEnvironment: provisioning.provisionedEnvironment,
       requestedAt: normalized.requestedAt,
-    }, record);
+    }, record, {
+      skipGovernanceChecks: true,
+      accessContext: governance?.accessContext,
+      resourceTenantId: governance?.resourceTenantId,
+      requestSource: governance?.requestSource,
+    });
 
     return execution;
   }
 
-  public execute(request: DeploymentExecutionRequest, existingRecord?: DeploymentRecord): DeploymentExecutionResult {
+  public execute(
+    request: DeploymentExecutionRequest,
+    existingRecord?: DeploymentRecord,
+    governance?: {
+      readonly skipGovernanceChecks?: boolean;
+      readonly accessContext?: DeploymentAccessContext;
+      readonly resourceTenantId?: string;
+      readonly requestSource?: string;
+    },
+  ): DeploymentExecutionResult {
     const normalizedRequest = createDeploymentExecutionRequest(request);
+    if (!governance?.skipGovernanceChecks) {
+      this.assertDeploymentAccess({
+        action: DeploymentAccessActions.executeDeployment,
+        accessContext: governance?.accessContext,
+        resourceTenantId: governance?.resourceTenantId,
+        requestSource: governance?.requestSource,
+        rootSystemAssetId: normalizedRequest.bundle.manifest.package.rootSystemAssetId,
+        rootSystemVersionId: normalizedRequest.bundle.manifest.package.rootSystemVersionId,
+        targetId: normalizedRequest.target.targetId.value,
+        targetType: normalizedRequest.target.type,
+      });
+      this.assertDeploymentQuota({
+        action: DeploymentQuotaActions.executeDeployment,
+        accessContext: governance?.accessContext,
+        rootSystemAssetId: normalizedRequest.bundle.manifest.package.rootSystemAssetId,
+        rootSystemVersionId: normalizedRequest.bundle.manifest.package.rootSystemVersionId,
+        targetId: normalizedRequest.target.targetId.value,
+        targetType: normalizedRequest.target.type,
+      });
+    }
 
     let record = existingRecord ?? this.createDeploymentRecord(normalizedRequest);
     if (!existingRecord) {
@@ -515,5 +582,51 @@ export class DeploymentExecutionService {
   }): string {
     const determinismPayload = JSON.stringify(input);
     return createHash("sha256").update(determinismPayload).digest("hex");
+  }
+
+  private assertDeploymentAccess(input: {
+    readonly action: typeof DeploymentAccessActions[keyof typeof DeploymentAccessActions];
+    readonly accessContext?: DeploymentAccessContext;
+    readonly resourceTenantId?: string;
+    readonly requestSource?: string;
+    readonly rootSystemAssetId?: string;
+    readonly rootSystemVersionId?: string;
+    readonly deploymentId?: string;
+    readonly targetId?: string;
+    readonly targetType?: DeploymentRecord["targetType"];
+  }): void {
+    this.accessEvaluator.assertAllowed({
+      action: input.action,
+      context: input.accessContext
+        ? Object.freeze({
+          ...input.accessContext,
+          source: input.requestSource ?? input.accessContext.source,
+        })
+        : undefined,
+      resourceTenantId: input.resourceTenantId,
+      rootSystemAssetId: input.rootSystemAssetId,
+      rootSystemVersionId: input.rootSystemVersionId,
+      deploymentId: input.deploymentId,
+      targetId: input.targetId,
+      targetType: input.targetType,
+    });
+  }
+
+  private assertDeploymentQuota(input: {
+    readonly action: typeof DeploymentQuotaActions[keyof typeof DeploymentQuotaActions];
+    readonly accessContext?: DeploymentAccessContext;
+    readonly rootSystemAssetId?: string;
+    readonly rootSystemVersionId?: string;
+    readonly targetId?: string;
+    readonly targetType?: DeploymentRecord["targetType"];
+  }): void {
+    this.quotaEvaluator.assertAllowed({
+      action: input.action,
+      accessContext: input.accessContext,
+      rootSystemAssetId: input.rootSystemAssetId,
+      rootSystemVersionId: input.rootSystemVersionId,
+      targetId: input.targetId,
+      targetType: input.targetType,
+    });
   }
 }
