@@ -7,12 +7,12 @@ export interface SearchBarProps {
 export function SearchBar({ value, onChange, disabled }: SearchBarProps): JSX.Element {
   return (
     <label className="ui-stack ui-stack--2xs" data-testid="registry-search-bar">
-      <span className="ui-text-small">Search registry</span>
+      <span className="ui-text-small">Search assets</span>
       <input
         type="search"
         value={value}
-        placeholder="Search by name, taxonomy, contract, provenance…"
-        onChange={(event) => onChange(event.target.value)}
+        placeholder="Name, ID, taxonomy, contract, provenance…"
+        onChange={(event) => onChange(event.target.value.trimStart())}
         disabled={disabled}
       />
     </label>

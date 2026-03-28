@@ -29,9 +29,9 @@ export function AssetListItem({ asset, registryContextQuery }: AssetListItemProp
         </div>
         <div className="ui-text-small ui-text-secondary">{asset.assetId}</div>
         <div className="ui-row ui-row--wrap" style={{ gap: "0.5rem" }}>
-          <span className="ui-badge">{asset.taxonomy?.structuralKind ?? "n/a"}</span>
-          <span className="ui-badge">{asset.taxonomy?.semanticRole ?? "n/a"}</span>
-          <span className="ui-badge">{asset.taxonomy?.behaviorKind ?? "n/a"}</span>
+          <span className="ui-badge">Structure: {asset.taxonomy?.structuralKind ?? "n/a"}</span>
+          <span className="ui-badge">Role: {asset.taxonomy?.semanticRole ?? "n/a"}</span>
+          <span className="ui-badge">Behavior: {asset.taxonomy?.behaviorKind ?? "n/a"}</span>
         </div>
         <div className="ui-text-small ui-text-secondary">
           Latest version: {asset.versionId ?? "unavailable"} · Dependencies: {asset.dependencies.length}
@@ -45,7 +45,7 @@ export function AssetListItem({ asset, registryContextQuery }: AssetListItemProp
               to={`${studioRoute}?${buildStudioHandoffQuery(asset)}`}
               className="ui-button ui-button--ghost ui-button--small"
             >
-              Open studio
+              Open in studio
             </Link>
           ) : null}
         </div>
