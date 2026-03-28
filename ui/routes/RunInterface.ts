@@ -15,6 +15,9 @@ export interface RunLaunchRequest {
   readonly versionId?: string;
   readonly source?: "build" | "explore" | "detail" | "direct";
   readonly runIntentLabel?: string;
+  readonly actionKind?: "run" | "test";
+  readonly originPath?: string;
+  readonly originLabel?: string;
 }
 
 export interface RunSurfaceModel {
@@ -30,6 +33,7 @@ export interface RunPresentationModel {
   readonly shellTitle: string;
   readonly shellSubtitle: string;
   readonly surface: RunSurfaceModel;
+  readonly request: RunLaunchRequest;
 }
 
 function appendQuery(path: string, params: URLSearchParams): string {
@@ -50,6 +54,9 @@ export class RunContextResolver {
       versionId: params.get("versionId")?.trim() || undefined,
       source: (params.get("source")?.trim() as RunLaunchRequest["source"]) || undefined,
       runIntentLabel: params.get("intent")?.trim() || undefined,
+      actionKind: (params.get("action")?.trim() as RunLaunchRequest["actionKind"]) || undefined,
+      originPath: params.get("originPath")?.trim() || undefined,
+      originLabel: params.get("originLabel")?.trim() || undefined,
     });
   }
 
@@ -67,6 +74,15 @@ export class RunContextResolver {
     }
     if (request.runIntentLabel) {
       params.set("intent", request.runIntentLabel);
+    }
+    if (request.actionKind) {
+      params.set("action", request.actionKind);
+    }
+    if (request.originPath) {
+      params.set("originPath", request.originPath);
+    }
+    if (request.originLabel) {
+      params.set("originLabel", request.originLabel);
     }
     return params;
   }
@@ -87,6 +103,7 @@ export class RunInterfaceService {
       shellTitle: "Run",
       shellSubtitle: "Use one run surface to launch tests and review execution outcomes.",
       surface,
+      request,
     });
   }
 
@@ -111,8 +128,10 @@ export class RunInterfaceService {
       });
     }
     return Object.freeze({
-      title: "Run and test",
-      subtitle: "Start execution from a bounded context and monitor outcomes in UX-facing run history.",
+      title: request.actionKind === "test" ? "Test from context" : "Run and test",
+      subtitle: request.actionKind === "test"
+        ? "Launch a contextual test and monitor outcomes without leaving your workflow context."
+        : "Start execution from a bounded context and monitor outcomes in UX-facing run history.",
       contextLabel: label,
       primaryActionLabel: "Open tool runs",
       primaryActionPath: ROUTE_PATHS.tools,

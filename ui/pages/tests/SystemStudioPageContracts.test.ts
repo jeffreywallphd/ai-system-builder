@@ -84,7 +84,8 @@ describe("SystemStudioPage contracts", () => {
     const runtimePanelSource = readSource("ui/components/studio-shell/SystemRuntimeRunPanel.tsx");
     expect(runtimePanelSource).toContain("data-testid=\"system-runtime-run-panel\"");
     expect(runtimePanelSource).toContain("Run System");
-    expect(runtimePanelSource).toContain("startSystemExecution");
+    expect(runtimePanelSource).toContain("UxRuntimeService");
+    expect(runtimePanelSource).toContain("launchSystemRun");
     expect(runtimePanelSource).toContain("getSystemExecutionStatus");
     expect(runtimePanelSource).toContain("getSystemExecutionTrace");
     expect(runtimePanelSource).toContain("getSystemExecutionResult");

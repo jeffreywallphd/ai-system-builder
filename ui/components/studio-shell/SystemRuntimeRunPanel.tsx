@@ -3,6 +3,7 @@ import { AssetDraftLifecycleStatuses } from "../../../domain/studio-shell/Studio
 import type { StudioShellExtensionContext } from "../../studio-shell/StudioShellExtensions";
 import { ExecutionMonitorPanel } from "./runtime/ExecutionMonitorPanel";
 import { ExecutionResultPanel } from "./runtime/ExecutionResultPanel";
+import { UxRuntimeService } from "../../runtime/UxRuntimeService";
 
 interface SystemRuntimeRunPanelProps {
   readonly context: StudioShellExtensionContext;
@@ -14,6 +15,7 @@ export function SystemRuntimeRunPanel({ context }: SystemRuntimeRunPanelProps): 
   const [status, setStatus] = useState<Awaited<ReturnType<NonNullable<StudioShellExtensionContext["operations"]["getSystemExecutionStatus"]>>>["data"]>();
   const [trace, setTrace] = useState<Awaited<ReturnType<NonNullable<StudioShellExtensionContext["operations"]["getSystemExecutionTrace"]>>>["data"]>();
   const [result, setResult] = useState<Awaited<ReturnType<NonNullable<StudioShellExtensionContext["operations"]["getSystemExecutionResult"]>>>["data"]>();
+  const uxRuntimeService = useMemo(() => new UxRuntimeService(), []);
   const [isRunning, setIsRunning] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
@@ -30,30 +32,17 @@ export function SystemRuntimeRunPanel({ context }: SystemRuntimeRunPanelProps): 
   const isTerminal = status?.status === "succeeded" || status?.status === "failed" || status?.status === "cancelled";
 
   const refreshExecutionDetails = async (executionId: string): Promise<void> => {
-    if (!context.operations.getSystemExecutionStatus) {
-      return;
-    }
-
     setIsRefreshing(true);
     try {
-      const [statusResponse, traceResponse, resultResponse] = await Promise.all([
-        context.operations.getSystemExecutionStatus(executionId),
-        context.operations.getSystemExecutionTrace?.({ executionId, eventLimit: 20, logLimit: 20 }),
-        context.operations.getSystemExecutionResult?.(executionId),
-      ]);
-
-      if (!statusResponse.ok || !statusResponse.data) {
-        setMessage(statusResponse.error?.message ?? "Unable to refresh execution status.");
+      const snapshot = await uxRuntimeService.readSystemRunSnapshot(executionId, context.operations);
+      if (!snapshot.ok || !snapshot.data) {
+        setMessage(snapshot.message ?? "Unable to refresh execution status.");
         return;
       }
 
-      setStatus(statusResponse.data);
-      if (traceResponse?.ok) {
-        setTrace(traceResponse.data);
-      }
-      if (resultResponse?.ok) {
-        setResult(resultResponse.data);
-      }
+      setStatus(snapshot.data.raw.status);
+      setTrace(snapshot.data.raw.trace);
+      setResult(snapshot.data.raw.result);
       setMessage(undefined);
     } finally {
       setIsRefreshing(false);
@@ -86,14 +75,14 @@ export function SystemRuntimeRunPanel({ context }: SystemRuntimeRunPanelProps): 
             }
             setIsRunning(true);
             setMessage(undefined);
-            void context.operations.startSystemExecution({
+            void uxRuntimeService.launchSystemRun({
               studioId: context.studioId,
               draftId: draft.draftId,
               context: {
                 trigger: "manual",
                 actorId: "system-studio-ui",
               },
-            }).then(async (response) => {
+            }, context.operations).then(async (response) => {
               if (!response.ok || !response.data) {
                 setMessage(response.error?.message ?? "Runtime execution failed to start.");
                 return;

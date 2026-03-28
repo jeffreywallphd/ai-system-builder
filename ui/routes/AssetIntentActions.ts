@@ -4,13 +4,15 @@ import { BuildIntents, type BuildIntent } from "./BuildIntentModels";
 import { InlineAssetCreationModes, InlineAssetCreationService } from "./InlineAssetCreation";
 import { StudioEntryModes, type StudioEntryRequest, type StudioEntryResolution } from "../../application/studio-entry/StudioEntryContracts";
 import { StudioEntryResolver, StudioEntryService } from "./StudioRouteMapping";
-import { RunContextKinds, RunInterfaceService } from "./RunInterface";
+import { InlineRunActionResolver, InlineRunLaunchService } from "./InlineRunActions";
+import { UxRunActionKinds } from "../runtime/UxRuntimeService";
 
 export const AssetIntentActionTypes = Object.freeze({
   buildFromThis: "build-from-this",
   openAndModify: "open-and-modify",
   addToSystem: "add-to-system",
-  runOrTest: "run-or-test",
+  runHere: "run-here",
+  testHere: "test-here",
   extendOrConnect: "extend-or-connect",
 });
 
@@ -71,17 +73,19 @@ function resolveBuildIntent(asset: Pick<RegistryAsset, "taxonomy">): BuildIntent
 }
 
 export class AssetIntentActionResolver {
+  private readonly inlineRunResolver = new InlineRunActionResolver();
+
   public resolveActions(context: AssetActionContext): ReadonlyArray<AssetIntentAction> {
-    const role = context.asset.taxonomy?.semanticRole;
     const structuralKind = context.asset.taxonomy?.structuralKind;
-    const canRun = role === "workflow" || role === "agent" || role === "system" || role === "tool-chain";
     const canAddToSystem = structuralKind !== "system";
+    const inlineRunActions = this.inlineRunResolver.resolveForAsset(context);
 
     return Object.freeze([
       Object.freeze({ type: AssetIntentActionTypes.buildFromThis, label: "Build from this", enabled: true }),
       Object.freeze({ type: AssetIntentActionTypes.openAndModify, label: "Open and modify", enabled: true }),
       Object.freeze({ type: AssetIntentActionTypes.addToSystem, label: "Add to system", enabled: canAddToSystem, reason: canAddToSystem ? undefined : "Already a system" }),
-      Object.freeze({ type: AssetIntentActionTypes.runOrTest, label: "Run / test", enabled: canRun, reason: canRun ? undefined : "Run flow not available for this asset" }),
+      Object.freeze({ type: AssetIntentActionTypes.runHere, label: inlineRunActions[0].label, enabled: inlineRunActions[0].enabled, reason: inlineRunActions[0].reason }),
+      Object.freeze({ type: AssetIntentActionTypes.testHere, label: inlineRunActions[1].label, enabled: inlineRunActions[1].enabled, reason: inlineRunActions[1].reason }),
       Object.freeze({ type: AssetIntentActionTypes.extendOrConnect, label: "Extend / connect", enabled: true }),
     ]);
   }
@@ -92,7 +96,7 @@ export class AssetActionExecutionService {
   private readonly studioEntryService = new StudioEntryService();
   private readonly buildIntentRoutingService = new BuildIntentRoutingService();
   private readonly inlineCreationService = new InlineAssetCreationService();
-  private readonly runInterfaceService = new RunInterfaceService();
+  private readonly inlineRunLaunchService = new InlineRunLaunchService();
 
   public execute(action: AssetIntentActionType, context: AssetActionContext): AssetActionExecutionResult | undefined {
     if (action === AssetIntentActionTypes.buildFromThis) {
@@ -138,18 +142,27 @@ export class AssetActionExecutionService {
       return Object.freeze({ launchPath: appendContext(inline.launchPath, context), studioEntry: inline.studioEntry });
     }
 
-
-    if (action === AssetIntentActionTypes.runOrTest) {
-      const isSystem = context.asset.taxonomy?.semanticRole === "system";
-      const launchPath = this.runInterfaceService.resolveLaunchPath({
-        contextKind: isSystem ? RunContextKinds.system : RunContextKinds.asset,
-        assetId: context.asset.assetId,
-        versionId: context.asset.versionId,
-        source: context.source,
-        runIntentLabel: "Run / test",
+    if (action === AssetIntentActionTypes.runHere || action === AssetIntentActionTypes.testHere) {
+      const inlineRun = this.inlineRunLaunchService.launch({
+        action: action === AssetIntentActionTypes.testHere ? UxRunActionKinds.test : UxRunActionKinds.run,
+        target: {
+          kind: context.asset.taxonomy?.semanticRole === "system" ? "system" : "asset",
+          assetId: context.asset.assetId,
+          versionId: context.asset.versionId,
+        },
+        context: {
+          source: context.source,
+          registryContextQuery: context.registryContextQuery,
+          buildFlowSessionId: context.buildFlowSessionId,
+          buildIntent: context.buildIntent,
+          buildIntentSelectedAt: context.buildIntentSelectedAt,
+          originPath: context.source === "detail" ? `/registry/${encodeURIComponent(context.asset.assetId)}` : "/explore",
+          originLabel: context.source === "detail" ? "Asset detail" : "Explore",
+        },
       });
-      return Object.freeze({ launchPath: appendContext(launchPath, context) });
+      return Object.freeze({ launchPath: appendContext(inlineRun.launchPath, context) });
     }
+
     const request = this.toStudioEntryRequest(action, context);
     if (!request) {
       return undefined;
