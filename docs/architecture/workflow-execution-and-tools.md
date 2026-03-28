@@ -47,6 +47,13 @@ Execution plans now carry a lightweight explicit runtime capability profile in m
 
 This keeps capability claims small and truthful: higher layers can reason about what semantics are honestly available without inventing progress/cancellation behavior for runtimes that do not expose it.
 
+### Direction 5 Epic 6 runtime progression (stories 6.19–6.20)
+
+- Runtime execution records are now persisted as runtime-scoped metadata snapshots (execution identity, executed system/version identity, status, bounded trace/result summaries, timestamps, environment metadata, and version-aware execution references).
+- Desktop system-runtime host wiring now uses a SQLite-backed execution-record store so status/result/trace views can reload across sessions.
+- System-of-systems execution is now first-class through the same runtime stack: nested system nodes invoke recursive child executions via the existing orchestration seam, and parent records carry child execution linkage metadata.
+- Boundaries remain explicit: this is still bounded runtime metadata persistence and recursive orchestration support, not a full replay/event-sourcing/distributed execution platform.
+
 ### Workflow path now routed through the engine
 
 `application/workflows/ExecuteWorkflowUseCase.ts` now builds a one-unit execution plan for **both** the immediate workflow run path and the `startExecution(...)` path, then submits that plan to the unified execution engine.

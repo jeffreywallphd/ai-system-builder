@@ -61,6 +61,11 @@ export interface ExecutionOrchestrationRequest {
   readonly startedAt?: string;
   readonly maxIterationsPerNode?: number;
   readonly maxPlanningCyclesPerNode?: number;
+  readonly executeNestedSystemStep?: (input: {
+    readonly node: ExecutionPlan["nodes"][number];
+    readonly parentExecution: SystemExecution;
+    readonly passIndex: number;
+  }) => Promise<StepExecutionResult>;
 }
 
 export interface ExecutionOrchestrationResult {
@@ -365,19 +370,25 @@ export class ExecutionOrchestrationService {
           },
         });
 
-        const stepResult = await this.stepExecutionEngine.executeStep({
-          plan,
-          node,
-          execution,
-          environment,
-          input: request.inputPayload,
-          progression: {
-            iteration,
-            planningCycle,
-            maxIterations: maxIterationsPerNode,
-            maxPlanningCycles: maxPlanningCyclesPerNode,
-          },
-        });
+        const stepResult = node.componentKind === "system" && request.executeNestedSystemStep
+          ? await request.executeNestedSystemStep({
+            node,
+            parentExecution: execution,
+            passIndex,
+          })
+          : await this.stepExecutionEngine.executeStep({
+            plan,
+            node,
+            execution,
+            environment,
+            input: request.inputPayload,
+            progression: {
+              iteration,
+              planningCycle,
+              maxIterations: maxIterationsPerNode,
+              maxPlanningCycles: maxPlanningCyclesPerNode,
+            },
+          });
         stepResults[node.nodeId] = stepResult;
 
         const decision = mapDecisionKind(stepResult);

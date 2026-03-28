@@ -31,6 +31,11 @@ Workflow -> `ExecuteWorkflowUseCase` -> one-unit `ExecutionPlan` -> `UnifiedExec
   - runtime executions are projected into registry system-detail read models as recent execution summaries (status/result/timestamps plus bounded trace-reference counts),
   - registry remains read-only (no runtime command surface),
   - execution planning/orchestration enforces version-pinned component references and records executed version maps on runtime status/result APIs for truthful lineage and reproducibility.
+- Direction 5 Epic 6 stories 6.19–6.20 now add bounded runtime durability + nested execution truth without creating a second runtime stack:
+  - system-runtime execution records are persisted as runtime-scoped metadata snapshots (execution/root identity, status, bounded trace/result summaries, environment/version maps, timestamps, and parent/child execution linkage),
+  - desktop host wiring now uses a SQLite-backed system-runtime execution store instead of in-memory-only run state,
+  - nested system components execute recursively through the same orchestration service (parent node -> child execution), and parent run outputs/metadata carry child execution ids for monitor/detail linkage,
+  - this remains bounded (cycle/depth safeguards stay in dependency/plan recursion seams; no replay/event-sourcing platform introduced).
 
 ## Runtime orchestration update
 - Delegated workflow execution selection can now consult the shared runtime dependency orchestrator before choosing a delegated strategy.
