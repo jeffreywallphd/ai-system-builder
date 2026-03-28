@@ -3,7 +3,9 @@ import type { AssetDraftDependencyReference, AssetMetadataPatch } from "../../do
 import { TaxonomySemanticRoles, type TaxonomyBehaviorKind, type TaxonomySemanticRole } from "../../domain/taxonomy/CompositionTaxonomy";
 import type { StudioShellSnapshotReadModel, StudioShellValidationIssue } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
 import type {
+  RuntimeExecutionResultReadModel,
   RuntimeExecutionStatusReadModel,
+  RuntimeExecutionTraceReadModel,
   StartSystemRuntimeExecutionRequest,
   StartSystemRuntimeExecutionResponse,
   SystemRuntimeApiResponse,
@@ -33,6 +35,8 @@ export interface StudioShellExtensionOperations {
   refresh(): Promise<void>;
   startSystemExecution?(request: StartSystemRuntimeExecutionRequest): Promise<SystemRuntimeApiResponse<StartSystemRuntimeExecutionResponse>>;
   getSystemExecutionStatus?(executionId: string): Promise<SystemRuntimeApiResponse<RuntimeExecutionStatusReadModel>>;
+  getSystemExecutionTrace?(request: { readonly executionId: string; readonly eventLimit?: number; readonly logLimit?: number }): Promise<SystemRuntimeApiResponse<RuntimeExecutionTraceReadModel>>;
+  getSystemExecutionResult?(executionId: string): Promise<SystemRuntimeApiResponse<RuntimeExecutionResultReadModel>>;
   saveSystemChildComponent?(request: AddSystemChildComponentRequest): Promise<boolean>;
   removeSystemChildComponent?(request: RemoveSystemChildComponentRequest): Promise<boolean>;
   reorderSystemChildComponent?(request: ReorderSystemChildComponentRequest): Promise<boolean>;

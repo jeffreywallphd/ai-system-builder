@@ -183,6 +183,8 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
       refresh: refreshSnapshot,
       startSystemExecution: async (request) => service.startSystemExecution(request),
       getSystemExecutionStatus: async (executionId) => service.getSystemExecutionStatus(executionId),
+      getSystemExecutionTrace: async (request) => service.getSystemExecutionTrace(request),
+      getSystemExecutionResult: async (executionId) => service.getSystemExecutionResult(executionId),
       saveSystemChildComponent: async (request) => {
         const response = await service.addSystemChildComponent(request);
         if (!response.ok) {

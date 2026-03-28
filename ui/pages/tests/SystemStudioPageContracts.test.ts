@@ -84,6 +84,11 @@ describe("SystemStudioPage contracts", () => {
     expect(runtimePanelSource).toContain("Run System");
     expect(runtimePanelSource).toContain("startSystemExecution");
     expect(runtimePanelSource).toContain("getSystemExecutionStatus");
+    expect(runtimePanelSource).toContain("getSystemExecutionTrace");
+    expect(runtimePanelSource).toContain("getSystemExecutionResult");
+    expect(runtimePanelSource).toContain("ExecutionMonitorPanel");
+    expect(runtimePanelSource).toContain("ExecutionResultPanel");
+    expect(runtimePanelSource).toContain("Auto-refresh every 2s");
     expect(runtimePanelSource).toContain("AssetDraftLifecycleStatuses.validated");
   });
 

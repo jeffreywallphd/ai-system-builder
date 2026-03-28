@@ -15,6 +15,10 @@ import type { IStudioShellRepository } from "../ports/interfaces/IStudioShellRep
 import { RuntimeEnvironmentKinds } from "../../domain/system-runtime/RuntimeEnvironmentDomain";
 import {
   createExecutionTraceSnapshot,
+  ExecutionLogLevels,
+  ExecutionNodeStatusKinds,
+  ExecutionStatusKinds,
+  ExecutionTraceEventKinds,
   type ExecutionContext,
   type ExecutionProgressSnapshot,
   type ExecutionStatusKind,
@@ -59,6 +63,40 @@ export interface RuntimeExecutionStatusReadModel {
   readonly completedAt?: string;
   readonly progress: ExecutionProgressSnapshot;
   readonly errorCount: number;
+  readonly nodeStatuses: ReadonlyArray<{
+    readonly nodeId: string;
+    readonly parentNodeId?: string;
+    readonly path: ReadonlyArray<string>;
+    readonly structuralKind: SystemExecution["nodes"][number]["target"]["taxonomy"]["structuralKind"];
+    readonly semanticRole: SystemExecution["nodes"][number]["target"]["taxonomy"]["semanticRole"];
+    readonly behaviorKind: SystemExecution["nodes"][number]["target"]["taxonomy"]["behaviorKind"];
+    readonly status: SystemExecution["runtimeState"]["nodeStates"][number]["status"];
+    readonly iterationCount: number;
+    readonly planningCycleCount: number;
+    readonly startedAt?: string;
+    readonly updatedAt: string;
+    readonly completedAt?: string;
+    readonly lastError?: {
+      readonly code: string;
+      readonly message: string;
+    };
+    readonly lastDecision?: {
+      readonly kind: string;
+      readonly reason?: string;
+      readonly decidedAt: string;
+    };
+  }>;
+  readonly nestedSystems: ReadonlyArray<{
+    readonly nodeId: string;
+    readonly status: SystemExecution["runtimeState"]["nodeStates"][number]["status"];
+    readonly path: ReadonlyArray<string>;
+    readonly parentNodeId?: string;
+  }>;
+  readonly recovery: {
+    readonly decisionCount: number;
+    readonly retryDecisionCount: number;
+    readonly lastDecisionAt?: string;
+  };
 }
 
 export interface RuntimeExecutionResultReadModel {
@@ -68,6 +106,36 @@ export interface RuntimeExecutionResultReadModel {
   readonly rootAssetId: string;
   readonly rootVersionId?: string;
   readonly completedAt?: string;
+  readonly outputSummary: {
+    readonly hasOutput: boolean;
+    readonly hasError: boolean;
+    readonly outputFieldCount: number;
+    readonly contractOutputIds: ReadonlyArray<string>;
+  };
+  readonly nodeResults: ReadonlyArray<{
+    readonly nodeId: string;
+    readonly path: ReadonlyArray<string>;
+    readonly structuralKind: SystemExecution["nodes"][number]["target"]["taxonomy"]["structuralKind"];
+    readonly semanticRole: SystemExecution["nodes"][number]["target"]["taxonomy"]["semanticRole"];
+    readonly status: SystemExecution["runtimeState"]["nodeStates"][number]["status"];
+    readonly outputSummary?: string;
+    readonly hasOutput: boolean;
+    readonly hasError: boolean;
+  }>;
+  readonly nestedSystemResults: ReadonlyArray<{
+    readonly nodeId: string;
+    readonly status: SystemExecution["runtimeState"]["nodeStates"][number]["status"];
+    readonly outputSummary?: string;
+    readonly path: ReadonlyArray<string>;
+  }>;
+  readonly diagnostics: ReadonlyArray<{
+    readonly source: "output" | "runtime-error" | "trace-log";
+    readonly severity: "info" | "warning" | "error";
+    readonly code?: string;
+    readonly message: string;
+    readonly nodeId?: string;
+    readonly at?: string;
+  }>;
 }
 
 export interface RuntimeExecutionTraceReadModel {
@@ -138,6 +206,25 @@ function narrowTrace(trace: ExecutionTrace, eventLimit?: number, logLimit?: numb
   });
 }
 
+function summarizeOutput(value: unknown): string | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (typeof value === "string") {
+    return value.length > 160 ? `${value.slice(0, 157)}...` : value;
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return `${value}`;
+  }
+  if (Array.isArray(value)) {
+    return `Array(${value.length})`;
+  }
+  if (typeof value === "object") {
+    return `Object(${Object.keys(value as Record<string, unknown>).length} fields)`;
+  }
+  return undefined;
+}
+
 export class SystemRuntimeApplicationService {
   private readonly contractResolver = new CompositionAssetContractResolver();
   private readonly orchestration = new ExecutionOrchestrationService(new StepExecutionEngine(), new ExecutionPlanBuilder());
@@ -191,12 +278,61 @@ export class SystemRuntimeApplicationService {
       throw new Error(`invalid-request:${result.errors[0] ?? "Unable to create runtime execution."}`);
     }
 
-    this.executionsById.set(result.execution.executionId, result.execution);
-    return Object.freeze({ execution: result.execution, runtimeBehavior: behavior });
+    const normalizedExecution: SystemExecution = result.execution.output
+      ? Object.freeze({
+        ...result.execution,
+        output: Object.freeze({
+          ...result.execution.output,
+          payload: Object.freeze({
+            ...(result.execution.output.payload && typeof result.execution.output.payload === "object"
+              ? result.execution.output.payload as Record<string, unknown>
+              : {}),
+            contractOutputs: runtimeContract.outputs.map((entry) => entry.id),
+          }),
+        }),
+      })
+      : result.execution;
+
+    this.executionsById.set(normalizedExecution.executionId, normalizedExecution);
+    return Object.freeze({ execution: normalizedExecution, runtimeBehavior: behavior });
   }
 
   public getExecutionStatus(executionId: string): RuntimeExecutionStatusReadModel {
     const execution = this.requireExecution(executionId);
+    const nodeStateById = new Map(execution.runtimeState.nodeStates.map((entry) => [entry.executionNodeId, entry] as const));
+    const nodeStatuses = Object.freeze(execution.nodes
+      .map((node) => {
+        const state = nodeStateById.get(node.executionNodeId);
+        if (!state) {
+          return undefined;
+        }
+        return Object.freeze({
+          nodeId: node.executionNodeId,
+          parentNodeId: node.parentExecutionNodeId,
+          path: node.path,
+          structuralKind: node.target.taxonomy.structuralKind,
+          semanticRole: node.target.taxonomy.semanticRole,
+          behaviorKind: node.target.taxonomy.behaviorKind,
+          status: state.status,
+          iterationCount: state.iterationCount,
+          planningCycleCount: state.planningCycleCount,
+          startedAt: state.startedAt,
+          updatedAt: state.updatedAt,
+          completedAt: state.completedAt,
+          lastError: state.lastError,
+          lastDecision: state.lastDecision,
+        });
+      })
+      .filter((entry): entry is NonNullable<typeof entry> => !!entry)
+      .sort((left, right) => left.nodeId.localeCompare(right.nodeId)));
+
+    const recoveryEvents = execution.runtimeState.trace.events.filter((entry) => entry.kind === ExecutionTraceEventKinds.recoveryDecided);
+    const recovery = Object.freeze({
+      decisionCount: recoveryEvents.length,
+      retryDecisionCount: recoveryEvents.filter((entry) => entry.summary?.includes("Retrying")).length,
+      lastDecisionAt: recoveryEvents.length > 0 ? recoveryEvents[recoveryEvents.length - 1]!.at : undefined,
+    });
+
     return Object.freeze({
       executionId: execution.executionId,
       status: execution.status,
@@ -207,6 +343,16 @@ export class SystemRuntimeApplicationService {
       completedAt: execution.completedAt,
       progress: execution.runtimeState.snapshot,
       errorCount: execution.runtimeState.errors.length,
+      nodeStatuses,
+      nestedSystems: Object.freeze(nodeStatuses
+        .filter((entry) => entry.structuralKind === "system")
+        .map((entry) => Object.freeze({
+          nodeId: entry.nodeId,
+          status: entry.status,
+          path: entry.path,
+          parentNodeId: entry.parentNodeId,
+        }))),
+      recovery,
     });
   }
 
@@ -220,6 +366,60 @@ export class SystemRuntimeApplicationService {
 
   public getExecutionResult(executionId: string): RuntimeExecutionResultReadModel {
     const execution = this.requireExecution(executionId);
+    const nodeStateById = new Map(execution.runtimeState.nodeStates.map((entry) => [entry.executionNodeId, entry] as const));
+    const outputPayload = execution.output?.payload as {
+      readonly nodeResults?: Record<string, unknown>;
+      readonly contractOutputs?: ReadonlyArray<string>;
+    } | undefined;
+    const nodeResults = outputPayload?.nodeResults ?? {};
+    const nodeOutputIds = Object.keys(nodeResults);
+    const diagnostics = Object.freeze([
+      ...(execution.output?.error ? [Object.freeze({
+        source: "output" as const,
+        severity: "error" as const,
+        code: execution.output.error.code,
+        message: execution.output.error.message,
+      })] : []),
+      ...execution.runtimeState.errors.map((error) => Object.freeze({
+        source: "runtime-error" as const,
+        severity: "error" as const,
+        code: error.code,
+        message: error.message,
+        nodeId: error.nodeId,
+        at: error.at,
+      })),
+      ...execution.runtimeState.trace.logs
+        .filter((entry) => entry.level !== ExecutionLogLevels.info)
+        .map((entry) => Object.freeze({
+          source: "trace-log" as const,
+          severity: entry.level,
+          message: entry.message,
+          nodeId: entry.nodeId,
+          at: entry.emittedAt,
+        })),
+    ]);
+
+    const projectedNodeResults = Object.freeze(execution.nodes
+      .map((node) => {
+        const state = nodeStateById.get(node.executionNodeId);
+        if (!state) {
+          return undefined;
+        }
+        const nodeOutput = nodeResults[node.executionNodeId];
+        return Object.freeze({
+          nodeId: node.executionNodeId,
+          path: node.path,
+          structuralKind: node.target.taxonomy.structuralKind,
+          semanticRole: node.target.taxonomy.semanticRole,
+          status: state.status,
+          outputSummary: summarizeOutput(nodeOutput),
+          hasOutput: nodeOutput !== undefined,
+          hasError: state.status === ExecutionNodeStatusKinds.failed || state.status === ExecutionNodeStatusKinds.cancelled,
+        });
+      })
+      .filter((entry): entry is NonNullable<typeof entry> => !!entry)
+      .sort((left, right) => left.nodeId.localeCompare(right.nodeId)));
+
     return Object.freeze({
       executionId: execution.executionId,
       status: execution.status,
@@ -227,6 +427,22 @@ export class SystemRuntimeApplicationService {
       rootAssetId: execution.root.assetId,
       rootVersionId: execution.root.versionId,
       completedAt: execution.completedAt,
+      outputSummary: Object.freeze({
+        hasOutput: Boolean(execution.output),
+        hasError: Boolean(execution.output?.error) || execution.status === ExecutionStatusKinds.failed,
+        outputFieldCount: nodeOutputIds.length,
+        contractOutputIds: Object.freeze([...(outputPayload?.contractOutputs ?? [])]),
+      }),
+      nodeResults: projectedNodeResults,
+      nestedSystemResults: Object.freeze(projectedNodeResults
+        .filter((entry) => entry.structuralKind === "system")
+        .map((entry) => Object.freeze({
+          nodeId: entry.nodeId,
+          status: entry.status,
+          outputSummary: entry.outputSummary,
+          path: entry.path,
+        }))),
+      diagnostics,
     });
   }
 
