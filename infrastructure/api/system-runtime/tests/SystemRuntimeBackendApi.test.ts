@@ -1,12 +1,17 @@
 import { describe, expect, it } from "bun:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import path from "node:path";
+import { tmpdir } from "node:os";
 import type { IStudioShellRepository } from "../../../../application/ports/interfaces/IStudioShellRepository";
 import type { Studio, AssetSession, AssetDraft } from "../../../../domain/studio-shell/StudioShellDomain";
-import type { AssetVersion } from "../../../../domain/assets/AssetVersion";
+import { AssetVersion } from "../../../../domain/assets/AssetVersion";
 import { DefaultStudioShellApplicationService } from "../../../../application/studio-shell/DefaultStudioShellApplicationService";
 import { SystemStudioApplicationService } from "../../../../application/system-studio/SystemStudioApplicationService";
-import { SystemStudioIdentity } from "../../../../domain/system-studio/SystemAssetDomain";
+import { SystemStudioIdentity, createSystemStudioTaxonomy } from "../../../../domain/system-studio/SystemAssetDomain";
 import { AssetDraftLifecycleStatuses } from "../../../../domain/studio-shell/StudioShellDomain";
 import { SystemRuntimeBackendApi } from "../SystemRuntimeBackendApi";
+import { SqliteStudioShellRepository } from "../../../filesystem/studio-shell/SqliteStudioShellRepository";
+import { SqliteSystemRuntimeExecutionStore } from "../../../filesystem/system-runtime/SqliteSystemRuntimeExecutionStore";
 
 class InMemoryStudioShellRepository implements IStudioShellRepository {
   private readonly studios = new Map<string, Studio>();
@@ -169,5 +174,236 @@ describe("SystemRuntimeBackendApi", () => {
     expect(recent.ok).toBeTrue();
     expect(recent.data?.length).toBeGreaterThan(0);
     expect(recent.data?.[0]?.executionId).toBe(started.data?.executionId);
+  });
+
+  it("keeps lifecycle/status/result coherent across sqlite persistence reload for nested executions", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-runtime-backend-reload-"));
+    try {
+      const studioDatabasePath = path.join(root, "studio-shell.sqlite");
+      const runtimeDatabasePath = path.join(root, "system-runtime.sqlite");
+      const repository = new SqliteStudioShellRepository(studioDatabasePath);
+      const runtimeStore = new SqliteSystemRuntimeExecutionStore(runtimeDatabasePath);
+      const runtimeApi = new SystemRuntimeBackendApi(repository, runtimeStore);
+
+      await repository.saveAssetVersion(new AssetVersion({
+        assetId: "system:nested",
+        versionId: "system:nested:v1",
+        metadata: {
+          metadata: {
+            taxonomy: createSystemStudioTaxonomy("system", "deterministic"),
+          },
+          content: JSON.stringify({
+            systemSpec: {
+              components: [],
+              inputs: [{ inputId: "request", valueType: "string", required: true }],
+              outputs: [{ outputId: "response", valueType: "string" }],
+            },
+          }),
+          dependencies: [],
+        },
+      }));
+      await repository.saveAssetVersion(new AssetVersion({
+        assetId: "system:root",
+        versionId: "system:root:v1",
+        metadata: {
+          metadata: {
+            taxonomy: createSystemStudioTaxonomy("system", "deterministic"),
+          },
+          content: JSON.stringify({
+            systemSpec: {
+              components: [
+                {
+                  componentKind: "system",
+                  alias: "nested",
+                  assetId: "system:nested",
+                  versionId: "system:nested:v1",
+                  taxonomy: createSystemStudioTaxonomy("system", "deterministic"),
+                },
+              ],
+              nestedSystems: [{ alias: "nested", assetId: "system:nested", versionId: "system:nested:v1" }],
+              inputs: [{ inputId: "request", valueType: "string", required: true }],
+              outputs: [{ outputId: "response", valueType: "string" }],
+            },
+          }),
+          dependencies: [],
+        },
+      }));
+
+      const started = await runtimeApi.startExecution({
+        versionId: "system:root:v1",
+        maxDepth: 4,
+      });
+      expect(started.ok).toBeTrue();
+      expect(started.data?.executionId).toBeDefined();
+
+      const status = await runtimeApi.getExecutionStatus(started.data!.executionId);
+      expect(status.ok).toBeTrue();
+      expect(status.data?.nestedSystems.length).toBeGreaterThan(0);
+
+      const trace = await runtimeApi.getExecutionTrace({ executionId: started.data!.executionId });
+      expect(trace.ok).toBeTrue();
+      expect((trace.data?.trace.events.length ?? 0) > 0).toBeTrue();
+
+      const result = await runtimeApi.getExecutionResult(started.data!.executionId);
+      expect(result.ok).toBeTrue();
+      expect(result.data?.nestedSystemResults.length).toBeGreaterThan(0);
+
+      repository.dispose();
+
+      const reopenedRepository = new SqliteStudioShellRepository(studioDatabasePath);
+      const reopenedRuntimeApi = new SystemRuntimeBackendApi(
+        reopenedRepository,
+        new SqliteSystemRuntimeExecutionStore(runtimeDatabasePath),
+      );
+
+      const reloadedStatus = await reopenedRuntimeApi.getExecutionStatus(started.data!.executionId);
+      expect(reloadedStatus.ok).toBeTrue();
+      expect(reloadedStatus.data?.executionId).toBe(started.data?.executionId);
+
+      const reloadedResult = await reopenedRuntimeApi.getExecutionResult(started.data!.executionId);
+      expect(reloadedResult.ok).toBeTrue();
+      expect(reloadedResult.data?.executedVersionMap.rootVersionId).toBe("system:root:v1");
+
+      const recent = await reopenedRuntimeApi.listRecentExecutionsForSystem({
+        assetId: "system:root",
+        versionId: "system:root:v1",
+      });
+      expect(recent.ok).toBeTrue();
+      expect(recent.data?.[0]?.executionId).toBe(started.data?.executionId);
+
+      reopenedRepository.dispose();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("executes mixed atomic/composite/system nodes and reports bounded interop failures truthfully", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const runtimeApi = new SystemRuntimeBackendApi(repository);
+
+    await repository.saveAssetVersion(new AssetVersion({
+      assetId: "system:child",
+      versionId: "system:child:v3",
+      metadata: {
+        metadata: {
+          taxonomy: createSystemStudioTaxonomy("system", "deterministic"),
+        },
+        content: JSON.stringify({
+          systemSpec: {
+            components: [
+              {
+                componentKind: "atomic",
+                alias: "child-model",
+                assetId: "asset:model:child",
+                versionId: "asset:model:child:v1",
+                taxonomy: { structuralKind: "atomic", semanticRole: "model", behaviorKind: "none" },
+              },
+            ],
+            inputs: [{ inputId: "request", valueType: "string", required: true }],
+            outputs: [{ outputId: "response", valueType: "string" }],
+          },
+        }),
+        dependencies: [{ assetId: "asset:model:child", versionId: "asset:model:child:v1" }],
+      },
+    }));
+
+    await repository.saveAssetVersion(new AssetVersion({
+      assetId: "system:mixed",
+      versionId: "system:mixed:v5",
+      metadata: {
+        metadata: {
+          taxonomy: createSystemStudioTaxonomy("system", "deterministic"),
+        },
+        content: JSON.stringify({
+          systemSpec: {
+            components: [
+              {
+                componentKind: "atomic",
+                alias: "model",
+                assetId: "asset:model",
+                versionId: "asset:model:v2",
+                taxonomy: { structuralKind: "atomic", semanticRole: "model", behaviorKind: "none" },
+              },
+              {
+                componentKind: "composite",
+                alias: "workflow",
+                assetId: "asset:workflow",
+                versionId: "asset:workflow:v7",
+                taxonomy: { structuralKind: "composite", semanticRole: "workflow", behaviorKind: "deterministic" },
+              },
+              {
+                componentKind: "system",
+                alias: "child-system",
+                assetId: "system:child",
+                versionId: "system:child:v3",
+                taxonomy: createSystemStudioTaxonomy("system", "deterministic"),
+              },
+            ],
+            nestedSystems: [{ alias: "child-system", assetId: "system:child", versionId: "system:child:v3" }],
+            inputs: [{ inputId: "request", valueType: "string", required: true }],
+            outputs: [{ outputId: "response", valueType: "string" }],
+          },
+        }),
+        dependencies: [
+          { assetId: "asset:model", versionId: "asset:model:v2" },
+          { assetId: "asset:workflow", versionId: "asset:workflow:v7" },
+          { assetId: "system:child", versionId: "system:child:v3" },
+        ],
+      },
+    }));
+
+    const started = await runtimeApi.startExecution({ versionId: "system:mixed:v5", maxDepth: 4 });
+    expect(started.ok).toBeTrue();
+
+    const status = await runtimeApi.getExecutionStatus(started.data!.executionId);
+    expect(status.ok).toBeTrue();
+    const structuralKinds = new Set(status.data?.nodeStatuses.map((node) => node.structuralKind) ?? []);
+    expect(structuralKinds.has("atomic")).toBeTrue();
+    expect(structuralKinds.has("composite")).toBeTrue();
+    expect(structuralKinds.has("system")).toBeTrue();
+    expect(status.data?.nestedSystems.length).toBeGreaterThan(0);
+
+    const result = await runtimeApi.getExecutionResult(started.data!.executionId);
+    expect(result.ok).toBeTrue();
+    const resultKinds = new Set(result.data?.nodeResults.map((node) => node.structuralKind) ?? []);
+    expect(resultKinds.has("atomic")).toBeTrue();
+    expect(resultKinds.has("composite")).toBeTrue();
+    expect(resultKinds.has("system")).toBeTrue();
+    expect(result.data?.nestedSystemResults.length).toBeGreaterThan(0);
+    expect(Object.values(result.data?.executedVersionMap.nodeVersionIds ?? {})).toEqual(expect.arrayContaining([
+      "asset:model:v2",
+      "asset:workflow:v7",
+      "system:child:v3",
+    ]));
+
+    await repository.saveAssetVersion(new AssetVersion({
+      assetId: "system:invalid-mixed",
+      versionId: "system:invalid-mixed:v1",
+      metadata: {
+        metadata: {
+          taxonomy: createSystemStudioTaxonomy("system", "deterministic"),
+        },
+        content: JSON.stringify({
+          systemSpec: {
+            components: [
+              {
+                componentKind: "composite",
+                alias: "workflow",
+                assetId: "asset:workflow",
+                taxonomy: { structuralKind: "composite", semanticRole: "workflow", behaviorKind: "deterministic" },
+              },
+            ],
+            inputs: [{ inputId: "request", valueType: "string", required: true }],
+            outputs: [{ outputId: "response", valueType: "string" }],
+          },
+        }),
+        dependencies: [],
+      },
+    }));
+
+    const rejected = await runtimeApi.startExecution({ versionId: "system:invalid-mixed:v1" });
+    expect(rejected.ok).toBeFalse();
+    expect(rejected.error?.code).toBe("invalid-request");
+    expect(rejected.error?.message).toContain("pinned component versions");
   });
 });

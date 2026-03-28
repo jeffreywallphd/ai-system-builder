@@ -7,6 +7,7 @@ import { StudioShellBackendApi } from "../../../infrastructure/api/studio-shell/
 import { SystemStudioBackendApi } from "../../../infrastructure/api/system-studio/SystemStudioBackendApi";
 import { SystemRuntimeBackendApi } from "../../../infrastructure/api/system-runtime/SystemRuntimeBackendApi";
 import { SqliteStudioShellRepository } from "../../../infrastructure/filesystem/studio-shell/SqliteStudioShellRepository";
+import { SqliteSystemRuntimeExecutionStore } from "../../../infrastructure/filesystem/system-runtime/SqliteSystemRuntimeExecutionStore";
 import { AssetDraftLifecycleStatuses } from "../../../domain/studio-shell/StudioShellDomain";
 import { StudioShellService } from "../StudioShellService";
 import { CompositionAssetContractResolver } from "../../../application/contracts/CompositionAssetContractResolver";
@@ -1818,5 +1819,188 @@ describe("StudioShellService integration", () => {
     expect(result.data?.diagnostics.length).toBeGreaterThanOrEqual(0);
 
     repository.dispose();
+  });
+
+  it("runs nested mixed interop systems from Studio Shell runtime path and reloads persisted runtime records", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-system-runtime-interop-service-"));
+    createdRoots.push(root);
+    const databasePath = path.join(root, "studio-shell.sqlite");
+    const runtimeDbPath = path.join(root, "system-runtime.sqlite");
+    const repository = new SqliteStudioShellRepository(databasePath);
+    const backendApi = new StudioShellBackendApi(repository);
+    const systemApi = new SystemStudioBackendApi(repository);
+    const runtimeStore = new SqliteSystemRuntimeExecutionStore(runtimeDbPath);
+    const runtimeApi = new SystemRuntimeBackendApi(repository, runtimeStore);
+    installBridge(backendApi, systemApi, runtimeApi);
+
+    const service = new StudioShellService();
+    const initialized = await service.initializeStudio("studio-systems-interop-runtime", "System Studio");
+    expect(initialized.ok).toBeTrue();
+    const sessionId = initialized.data?.activeSessionId;
+    expect(sessionId).toBeDefined();
+
+    const childCreated = await service.createDraft({
+      studioId: "studio-systems-interop-runtime",
+      sessionId: sessionId!,
+      content: JSON.stringify({
+        systemSpec: {
+          components: [
+            {
+              componentKind: "atomic",
+              alias: "child-model",
+              assetId: "asset:model:child",
+              versionId: "asset:model:child:v1",
+              taxonomy: { structuralKind: "atomic", semanticRole: "model", behaviorKind: "none" },
+            },
+          ],
+          inputs: [{ inputId: "request", valueType: "string", required: true }],
+          outputs: [{ outputId: "response", valueType: "string" }],
+        },
+      }),
+      metadata: {
+        title: "Child Runtime System",
+        taxonomy: {
+          structuralKind: "system",
+          semanticRole: "system",
+          behaviorKind: "deterministic",
+        },
+      },
+      dependencies: [{ assetId: "asset:model:child", versionId: "asset:model:child:v1" }],
+    });
+    expect(childCreated.ok).toBeTrue();
+
+    const childValidated = await service.transitionLifecycle({
+      studioId: "studio-systems-interop-runtime",
+      sessionId: sessionId!,
+      draftId: childCreated.data!.draft!.draftId,
+      targetStatus: AssetDraftLifecycleStatuses.validated,
+    });
+    expect(childValidated.ok).toBeTrue();
+
+    const childPublished = await service.publishVersion({
+      studioId: "studio-systems-interop-runtime",
+      sessionId: sessionId!,
+      draftId: childCreated.data!.draft!.draftId,
+      versionId: "asset:studio-systems-interop-runtime-child:v1",
+      versionLabel: "v1",
+      createdBy: "runtime-interop-test",
+      upstreamVersionIds: ["asset:model:child:v1"],
+    });
+    expect(childPublished.ok).toBeTrue();
+
+    const rootCreated = await service.createDraft({
+      studioId: "studio-systems-interop-runtime",
+      sessionId: sessionId!,
+      content: JSON.stringify({
+        systemSpec: {
+          components: [
+            {
+              componentKind: "atomic",
+              alias: "model",
+              assetId: "asset:model",
+              versionId: "asset:model:v2",
+              taxonomy: { structuralKind: "atomic", semanticRole: "model", behaviorKind: "none" },
+            },
+            {
+              componentKind: "composite",
+              alias: "workflow",
+              assetId: "asset:workflow",
+              versionId: "asset:workflow:v7",
+              taxonomy: { structuralKind: "composite", semanticRole: "workflow", behaviorKind: "deterministic" },
+            },
+            {
+              componentKind: "system",
+              alias: "child-system",
+              assetId: childCreated.data!.draft!.assetId,
+              versionId: "asset:studio-systems-interop-runtime-child:v1",
+              taxonomy: { structuralKind: "system", semanticRole: "system", behaviorKind: "deterministic" },
+            },
+          ],
+          nestedSystems: [
+            {
+              alias: "child-system",
+              assetId: childCreated.data!.draft!.assetId,
+              versionId: "asset:studio-systems-interop-runtime-child:v1",
+            },
+          ],
+          inputs: [{ inputId: "request", valueType: "string", required: true }],
+          outputs: [{ outputId: "response", valueType: "string" }],
+        },
+      }),
+      metadata: {
+        title: "Mixed Runtime Interop System",
+        taxonomy: {
+          structuralKind: "system",
+          semanticRole: "system",
+          behaviorKind: "deterministic",
+        },
+      },
+      dependencies: [
+        { assetId: "asset:model", versionId: "asset:model:v2" },
+        { assetId: "asset:workflow", versionId: "asset:workflow:v7" },
+        { assetId: childCreated.data!.draft!.assetId, versionId: "asset:studio-systems-interop-runtime-child:v1" },
+      ],
+    });
+    expect(rootCreated.ok).toBeTrue();
+
+    const rootValidated = await service.transitionLifecycle({
+      studioId: "studio-systems-interop-runtime",
+      sessionId: sessionId!,
+      draftId: rootCreated.data!.draft!.draftId,
+      targetStatus: AssetDraftLifecycleStatuses.validated,
+    });
+    expect(rootValidated.ok).toBeTrue();
+
+    const started = await service.startSystemExecution({
+      studioId: "studio-systems-interop-runtime",
+      draftId: rootCreated.data!.draft!.draftId,
+      context: { trigger: "manual", actorId: "system-runtime-interop-test" },
+    });
+    expect(started.ok).toBeTrue();
+
+    const status = await service.getSystemExecutionStatus(started.data!.executionId);
+    expect(status.ok).toBeTrue();
+    expect(status.data?.nodeStatuses.length).toBeGreaterThan(0);
+    expect(status.data?.nestedSystems.length).toBeGreaterThan(0);
+    expect(Object.values(status.data?.executedVersionMap.nodeVersionIds ?? {})).toContain("asset:studio-systems-interop-runtime-child:v1");
+
+    const trace = await service.getSystemExecutionTrace({ executionId: started.data!.executionId });
+    expect(trace.ok).toBeTrue();
+    const traceKinds = new Set(trace.data?.trace.events.map((event) => event.kind) ?? []);
+    expect(traceKinds.has("execution-created")).toBeTrue();
+    expect(traceKinds.has("node-status-changed")).toBeTrue();
+    expect(traceKinds.has("nested-system-entered")).toBeTrue();
+    expect(traceKinds.has("nested-system-completed") || traceKinds.has("error-recorded")).toBeTrue();
+
+    const result = await service.getSystemExecutionResult(started.data!.executionId);
+    expect(result.ok).toBeTrue();
+    expect(result.data?.nestedSystemResults.length).toBeGreaterThan(0);
+    expect(Object.values(result.data?.executedVersionMap.nodeVersionIds ?? {})).toContain("asset:studio-systems-interop-runtime-child:v1");
+
+    const recent = await runtimeApi.listRecentExecutionsForSystem({
+      assetId: rootCreated.data!.draft!.assetId,
+      limit: 5,
+    });
+    expect(recent.ok).toBeTrue();
+    expect(recent.data?.some((entry) => entry.executionId === started.data!.executionId)).toBeTrue();
+
+    repository.dispose();
+
+    const reopenedRepository = new SqliteStudioShellRepository(databasePath);
+    const reopenedRuntimeApi = new SystemRuntimeBackendApi(
+      reopenedRepository,
+      new SqliteSystemRuntimeExecutionStore(runtimeDbPath),
+    );
+    installBridge(new StudioShellBackendApi(reopenedRepository), new SystemStudioBackendApi(reopenedRepository), reopenedRuntimeApi);
+
+    const reloadedStatus = await service.getSystemExecutionStatus(started.data!.executionId);
+    expect(reloadedStatus.ok).toBeTrue();
+    expect(reloadedStatus.data?.executionId).toBe(started.data?.executionId);
+
+    const reloadedResult = await service.getSystemExecutionResult(started.data!.executionId);
+    expect(reloadedResult.ok).toBeTrue();
+    expect(reloadedResult.data?.outputSummary.hasOutput).toBeTrue();
+
+    reopenedRepository.dispose();
   });
 });
