@@ -11,6 +11,14 @@ import type {
   StudioShellValidationIssue,
 } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
 import type {
+  StartSystemRuntimeExecutionRequest,
+  StartSystemRuntimeExecutionResponse,
+  SystemRuntimeApiResponse,
+  RuntimeExecutionStatusReadModel,
+  RuntimeExecutionTraceReadModel,
+  RuntimeExecutionResultReadModel,
+} from "../../infrastructure/api/system-runtime/SystemRuntimeBackendApi";
+import type {
   AddSystemChildComponentRequest,
   ListSystemChildComponentsRequest,
   RemoveSystemChildComponentRequest,
@@ -116,5 +124,25 @@ export class StudioShellService {
   public async getSystemCompatibilityInsights(request: ListSystemChildComponentsRequest): Promise<SystemStudioApiResponse<SystemCompatibilityInsightsReadModel>> {
     const raw = await this.requireBridge().getSystemCompatibilityInsights(JSON.stringify(request));
     return JSON.parse(raw) as SystemStudioApiResponse<SystemCompatibilityInsightsReadModel>;
+  }
+
+  public async startSystemExecution(request: StartSystemRuntimeExecutionRequest): Promise<SystemRuntimeApiResponse<StartSystemRuntimeExecutionResponse>> {
+    const raw = await this.requireBridge().startSystemExecution(JSON.stringify(request));
+    return JSON.parse(raw) as SystemRuntimeApiResponse<StartSystemRuntimeExecutionResponse>;
+  }
+
+  public async getSystemExecutionStatus(executionId: string): Promise<SystemRuntimeApiResponse<RuntimeExecutionStatusReadModel>> {
+    const raw = await this.requireBridge().getSystemExecutionStatus(executionId);
+    return JSON.parse(raw) as SystemRuntimeApiResponse<RuntimeExecutionStatusReadModel>;
+  }
+
+  public async getSystemExecutionTrace(request: { readonly executionId: string; readonly eventLimit?: number; readonly logLimit?: number }): Promise<SystemRuntimeApiResponse<RuntimeExecutionTraceReadModel>> {
+    const raw = await this.requireBridge().getSystemExecutionTrace(JSON.stringify(request));
+    return JSON.parse(raw) as SystemRuntimeApiResponse<RuntimeExecutionTraceReadModel>;
+  }
+
+  public async getSystemExecutionResult(executionId: string): Promise<SystemRuntimeApiResponse<RuntimeExecutionResultReadModel>> {
+    const raw = await this.requireBridge().getSystemExecutionResult(executionId);
+    return JSON.parse(raw) as SystemRuntimeApiResponse<RuntimeExecutionResultReadModel>;
   }
 }

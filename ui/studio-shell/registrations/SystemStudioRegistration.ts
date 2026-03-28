@@ -8,6 +8,7 @@ import { SystemInterfaceEditor } from "../../components/studio-shell/SystemInter
 import { SystemParameterConfigEditor } from "../../components/studio-shell/SystemParameterConfigEditor";
 import { SystemExecutionMetadataEditor } from "../../components/studio-shell/SystemExecutionMetadataEditor";
 import { SystemCompatibilityInsightsPanel } from "../../components/studio-shell/SystemCompatibilityInsightsPanel";
+import { SystemRuntimeRunPanel } from "../../components/studio-shell/SystemRuntimeRunPanel";
 import type { SystemStudioRegistration } from "../StudioShellExtensions";
 import { createSystemStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
 
@@ -86,6 +87,14 @@ export const systemStudioRegistration: SystemStudioRegistration = Object.freeze(
       subtitle: "Bounded execution/runtime metadata authoring for future runtime/deployment orchestration.",
       order: 11,
       render: (context) => createElement(SystemExecutionMetadataEditor, { context }),
+    },
+    {
+      id: "system-studio-runtime-run-trigger",
+      slot: "lifecycle",
+      title: "System runtime run trigger",
+      subtitle: "Bounded run trigger wired through StudioShell service bridge and backend runtime API.",
+      order: 12,
+      render: (context) => createElement(SystemRuntimeRunPanel, { context }),
     },
     {
       id: "system-studio-compatibility-insights",

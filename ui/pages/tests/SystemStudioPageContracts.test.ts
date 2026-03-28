@@ -21,11 +21,13 @@ describe("SystemStudioPage contracts", () => {
     expect(registrationSource).toContain("SystemInterfaceEditor");
     expect(registrationSource).toContain("SystemParameterConfigEditor");
     expect(registrationSource).toContain("SystemExecutionMetadataEditor");
+    expect(registrationSource).toContain("SystemRuntimeRunPanel");
     expect(registrationSource).toContain("SystemCompatibilityInsightsPanel");
     expect(registrationSource).toContain("system-studio-structure-editor");
     expect(registrationSource).toContain("system-studio-interface-editor");
     expect(registrationSource).toContain("system-studio-parameter-editor");
     expect(registrationSource).toContain("system-studio-execution-metadata-editor");
+    expect(registrationSource).toContain("system-studio-runtime-run-trigger");
     expect(registrationSource).toContain("system-studio-compatibility-insights");
     expect(registrationSource).toContain('slot: "dependencies"');
     expect(registrationSource).toContain('slot: "metadata"');
@@ -74,6 +76,15 @@ describe("SystemStudioPage contracts", () => {
     expect(executionMetadataSource).toContain("data-testid=\"system-execution-metadata-editor\"");
     expect(executionMetadataSource).toContain("System execution metadata");
     expect(executionMetadataSource).toContain("updateSystemExecutionMetadata");
+  });
+
+  it("wires a bounded run trigger panel through the shared System Studio extension surface", () => {
+    const runtimePanelSource = readSource("ui/components/studio-shell/SystemRuntimeRunPanel.tsx");
+    expect(runtimePanelSource).toContain("data-testid=\"system-runtime-run-panel\"");
+    expect(runtimePanelSource).toContain("Run System");
+    expect(runtimePanelSource).toContain("startSystemExecution");
+    expect(runtimePanelSource).toContain("getSystemExecutionStatus");
+    expect(runtimePanelSource).toContain("AssetDraftLifecycleStatuses.validated");
   });
 
   it("renders bounded recursive compatibility insights from system validation outputs", () => {

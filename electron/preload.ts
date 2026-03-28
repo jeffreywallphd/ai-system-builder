@@ -173,6 +173,18 @@ contextBridge.exposeInMainWorld("aiLoomDesktop", {
     getSystemCompatibilityInsights(requestJson: string) {
       return ipcRenderer.invoke("ai-loom-desktop-studio-shell:system-compatibility:insights", requestJson) as Promise<string>;
     },
+    startSystemExecution(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:system-runtime:start", requestJson) as Promise<string>;
+    },
+    getSystemExecutionStatus(executionId: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:system-runtime:status", executionId) as Promise<string>;
+    },
+    getSystemExecutionTrace(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:system-runtime:trace", requestJson) as Promise<string>;
+    },
+    getSystemExecutionResult(executionId: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:system-runtime:result", executionId) as Promise<string>;
+    },
   },
   registry: {
     listAssets(limit?: number) {

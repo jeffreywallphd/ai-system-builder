@@ -23,6 +23,10 @@ describe("StudioShellService", () => {
     expect(source).toContain("updateSystemParameters(");
     expect(source).toContain("updateSystemExecutionMetadata(");
     expect(source).toContain("getSystemCompatibilityInsights(");
+    expect(source).toContain("startSystemExecution(");
+    expect(source).toContain("getSystemExecutionStatus(");
+    expect(source).toContain("getSystemExecutionTrace(");
+    expect(source).toContain("getSystemExecutionResult(");
     expect(source).not.toContain("fetch(");
   });
 });
