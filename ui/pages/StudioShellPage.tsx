@@ -170,6 +170,7 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
 
   const sessionId = snapshot?.activeSessionId;
   const draftId = snapshot?.draft?.draftId;
+  const searchParams = new URLSearchParams(location.search);
 
   const extensionContext: StudioShellExtensionContext = {
     studioId,
@@ -178,14 +179,12 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
     systemCompatibility,
     handoffContext: {
       assetId: contextualInitialization.context.authoritativeAsset?.assetId
-        ?? new URLSearchParams(location.search).get("assetId")?.trim()
-        || undefined,
+        ?? (searchParams.get("assetId")?.trim() || undefined),
       versionId: contextualInitialization.context.authoritativeAsset?.versionId
-        ?? new URLSearchParams(location.search).get("versionId")?.trim()
-        || undefined,
-      handoff: new URLSearchParams(location.search).get("handoff")?.trim() || undefined,
-      registryContext: new URLSearchParams(location.search).get("registryContext")?.trim() || undefined,
-      selectedComponent: new URLSearchParams(location.search).get("selectedComponent")?.trim() || undefined,
+        ?? (searchParams.get("versionId")?.trim() || undefined),
+      handoff: searchParams.get("handoff")?.trim() || undefined,
+      registryContext: searchParams.get("registryContext")?.trim() || undefined,
+      selectedComponent: searchParams.get("selectedComponent")?.trim() || undefined,
     },
     operationError: error,
     isBusy,
