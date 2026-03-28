@@ -362,4 +362,26 @@ describe("StudioInputAdapterLayer", () => {
     expect(grouped.bundledAssets).toHaveLength(2);
     expect(grouped.bundledAssets[1]?.roleLabel).toBe("model");
   });
+
+  it("reuses bounded input adaptation results for unchanged handoff/context inputs", () => {
+    const layer = createAdapterLayer();
+    const capabilities = createCapabilities();
+    const handoff = createHandoff({
+      id: "cached-input",
+      sourceStudioType: "dataset-studio",
+      targetStudioType: "workflow-studio",
+      assetId: "asset:dataset",
+      versionId: "asset:dataset:v1",
+      contractId: "workflow-default-input",
+      taxonomy: {
+        structuralKind: "atomic",
+        semanticRole: "dataset",
+        behaviorKind: "none",
+      },
+    });
+
+    const first = layer.adapt({ handoff, targetCapabilities: capabilities });
+    const second = layer.adapt({ handoff, targetCapabilities: capabilities });
+    expect(second).toBe(first);
+  });
 });

@@ -13,6 +13,7 @@ import type {
   StudioHandoffRevision,
 } from "./StudioHandoffOrchestrationService";
 import type { StudioHandoffFailure } from "./StudioHandoffFailure";
+import { HandoffBoundedCache } from "./HandoffBoundedCache";
 
 export interface StudioHandoffRevisionRecord {
   readonly revisionId: string;
@@ -71,9 +72,9 @@ export interface PersistedStudioHandoffRecord {
 export interface StudioHandoffRepository {
   saveRecord(record: PersistedStudioHandoffRecord): Promise<PersistedStudioHandoffRecord>;
   getRecordByHandoffId(handoffId: string): Promise<PersistedStudioHandoffRecord | undefined>;
-  listRecordsBySourceStudio(sourceStudioId: string): Promise<ReadonlyArray<PersistedStudioHandoffRecord>>;
-  listRecordsByTargetStudio(targetStudioId: string): Promise<ReadonlyArray<PersistedStudioHandoffRecord>>;
-  listRecordsByAssetVersion(params: { assetId: string; versionId?: string }): Promise<ReadonlyArray<PersistedStudioHandoffRecord>>;
+  listRecordsBySourceStudio(sourceStudioId: string, limit?: number): Promise<ReadonlyArray<PersistedStudioHandoffRecord>>;
+  listRecordsByTargetStudio(targetStudioId: string, limit?: number): Promise<ReadonlyArray<PersistedStudioHandoffRecord>>;
+  listRecordsByAssetVersion(params: { assetId: string; versionId?: string; limit?: number }): Promise<ReadonlyArray<PersistedStudioHandoffRecord>>;
 }
 
 function extractBundledAssets(handoff: StudioHandoffContract): ReadonlyArray<PersistedStudioHandoffRecord["bundledAssets"][number]> {
@@ -247,21 +248,60 @@ export class StudioHandoffPersistenceService {
 }
 
 export class StudioHandoffQueryService {
+  private static readonly DEFAULT_LIST_LIMIT = 100;
+  private static readonly MAX_LIST_LIMIT = 500;
+  private readonly queryCache = new HandoffBoundedCache<string, Promise<ReadonlyArray<PersistedStudioHandoffRecord>>>({
+    maxEntries: 128,
+  });
+
   public constructor(private readonly repository: StudioHandoffRepository) {}
 
   public getByHandoffId(handoffId: string): Promise<PersistedStudioHandoffRecord | undefined> {
     return this.repository.getRecordByHandoffId(handoffId);
   }
 
-  public listBySourceStudio(sourceStudioId: string): Promise<ReadonlyArray<PersistedStudioHandoffRecord>> {
-    return this.repository.listRecordsBySourceStudio(sourceStudioId);
+  public listBySourceStudio(sourceStudioId: string, limit?: number): Promise<ReadonlyArray<PersistedStudioHandoffRecord>> {
+    const normalizedLimit = this.normalizeLimit(limit);
+    return this.fromCache(
+      `source::${sourceStudioId.trim()}::${normalizedLimit}`,
+      () => this.repository.listRecordsBySourceStudio(sourceStudioId, normalizedLimit),
+    );
   }
 
-  public listByTargetStudio(targetStudioId: string): Promise<ReadonlyArray<PersistedStudioHandoffRecord>> {
-    return this.repository.listRecordsByTargetStudio(targetStudioId);
+  public listByTargetStudio(targetStudioId: string, limit?: number): Promise<ReadonlyArray<PersistedStudioHandoffRecord>> {
+    const normalizedLimit = this.normalizeLimit(limit);
+    return this.fromCache(
+      `target::${targetStudioId.trim()}::${normalizedLimit}`,
+      () => this.repository.listRecordsByTargetStudio(targetStudioId, normalizedLimit),
+    );
   }
 
-  public listByAssetVersion(assetId: string, versionId?: string): Promise<ReadonlyArray<PersistedStudioHandoffRecord>> {
-    return this.repository.listRecordsByAssetVersion({ assetId, versionId });
+  public listByAssetVersion(assetId: string, versionId?: string, limit?: number): Promise<ReadonlyArray<PersistedStudioHandoffRecord>> {
+    const normalizedLimit = this.normalizeLimit(limit);
+    return this.fromCache(
+      `asset::${assetId.trim()}::${versionId?.trim() ?? "any"}::${normalizedLimit}`,
+      () => this.repository.listRecordsByAssetVersion({ assetId, versionId, limit: normalizedLimit }),
+    );
+  }
+
+  private fromCache(
+    key: string,
+    factory: () => Promise<ReadonlyArray<PersistedStudioHandoffRecord>>,
+  ): Promise<ReadonlyArray<PersistedStudioHandoffRecord>> {
+    const cached = this.queryCache.get(key);
+    if (cached) {
+      return cached;
+    }
+
+    const result = factory();
+    this.queryCache.set(key, result);
+    return result;
+  }
+
+  private normalizeLimit(limit: number | undefined): number {
+    const raw = typeof limit === "number" && Number.isFinite(limit)
+      ? Math.floor(limit)
+      : StudioHandoffQueryService.DEFAULT_LIST_LIMIT;
+    return Math.min(StudioHandoffQueryService.MAX_LIST_LIMIT, Math.max(0, raw));
   }
 }

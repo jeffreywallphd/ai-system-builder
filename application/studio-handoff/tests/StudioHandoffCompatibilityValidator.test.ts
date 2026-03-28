@@ -351,4 +351,24 @@ describe("StudioHandoffCompatibilityValidator", () => {
     expect(decision.issues.map((entry) => entry.code)).toContain(StudioHandoffCompatibilityIssueCodes.bundleAssetIncompatible);
     expect(decision.multiAsset?.entries[1]?.issues.map((entry) => entry.code)).toContain(StudioHandoffCompatibilityIssueCodes.versionReferenceInvalid);
   });
+
+  it("reuses bounded compatibility decisions for repeated equivalent inputs", () => {
+    const validator = new StudioHandoffCompatibilityValidator({
+      validateVersionReference: () => true,
+      cacheMaxEntries: 4,
+    });
+    const handoff = createHandoff({
+      id: "cached",
+      sourceType: "dataset-studio",
+      targetType: "workflow-studio",
+      taxonomy: { structuralKind: "atomic", semanticRole: "dataset", behaviorKind: "none" },
+      targetInputContractId: "workflow-dataset-input",
+      context: { datasetSplit: "train" },
+    });
+    const capabilities = createCapabilities();
+
+    const first = validator.validate({ handoff, targetCapabilities: capabilities });
+    const second = validator.validate({ handoff, targetCapabilities: capabilities });
+    expect(second).toBe(first);
+  });
 });

@@ -1,5 +1,6 @@
 import type { AssetContractDescriptor } from "../../domain/contracts/AssetContract";
 import type { CompositionTaxonomyDescriptor } from "../../domain/taxonomy/CompositionTaxonomy";
+import { HandoffBoundedCache } from "./HandoffBoundedCache";
 
 export const AdaptedStudioOutputKinds = Object.freeze({
   atomic: "atomic",
@@ -246,42 +247,64 @@ export class StudioOutputAdapterRegistry {
 }
 
 export class StudioOutputAdapterLayer {
+  private readonly adaptationCache = new HandoffBoundedCache<string, StudioOutputAdaptationResult>({ maxEntries: 256 });
+
   public constructor(private readonly adapterRegistry: StudioOutputAdapterRegistry) {}
 
   public adapt(input: StudioProducedOutput): StudioOutputAdaptationResult {
+    const cacheKey = this.createAdaptationCacheKey(input);
+    const cached = this.adaptationCache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     try {
       normalizeRequired(input.sourceStudioType, "Studio output source studio type");
       normalizeRequired(input.sourceStudioId, "Studio output source studio id");
       normalizeRequired(input.authoritativeAsset.assetId, "Studio output authoritative asset id");
       normalizeRequired(input.authoritativeAsset.versionId, "Studio output authoritative asset version id");
     } catch (error) {
-      return Object.freeze({
+      return this.adaptationCache.set(cacheKey, Object.freeze({
         ok: false,
         issues: Object.freeze([{
           code: "source-output-invalid",
           message: error instanceof Error ? error.message : "Studio output is invalid.",
           path: "sourceOutput",
         }]),
-      });
+      }));
     }
 
     const adapter = this.adapterRegistry.findForSourceStudio(input.sourceStudioType);
     if (!adapter) {
-      return Object.freeze({
+      return this.adaptationCache.set(cacheKey, Object.freeze({
         ok: false,
         issues: Object.freeze([{
           code: "adapter-not-found",
           message: `No studio output adapter is registered for source studio type '${input.sourceStudioType}'.`,
           path: "sourceStudioType",
         }]),
-      });
+      }));
     }
 
     const adapted = adapter.adapt(input);
-    return Object.freeze({
+    return this.adaptationCache.set(cacheKey, Object.freeze({
       ok: true,
       adapted,
       issues: Object.freeze([]),
-    });
+    }));
+  }
+
+  private createAdaptationCacheKey(input: StudioProducedOutput): string {
+    const sourceRefs = (input.sourceReferences ?? [])
+      .map((entry) => `${entry.assetId}:${entry.versionId}:${entry.relation ?? "none"}`)
+      .join("|");
+    return [
+      (input.sourceStudioType ?? "").trim(),
+      (input.sourceStudioId ?? "").trim(),
+      (input.authoritativeAsset.assetId ?? "").trim(),
+      (input.authoritativeAsset.versionId ?? "").trim(),
+      sourceRefs,
+      Object.keys(input.handoffHints ?? {}).sort().join(","),
+    ].join("::");
   }
 }

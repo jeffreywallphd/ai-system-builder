@@ -13,6 +13,7 @@ import { createStudioHandoffContext, type StudioHandoffContext } from "../../dom
 import type { StudioHandoffCompatibilityDecision, StudioHandoffCompatibilityValidator } from "./StudioHandoffCompatibilityValidator";
 import type { StudioCapabilityDescriptor, StudioCapabilityQueryService } from "./StudioCapabilityRegistry";
 import type { StudioProducedOutput } from "./StudioOutputAdapter";
+import { HandoffBoundedCache } from "./HandoffBoundedCache";
 
 export const StudioHandoffRoutingReasonCodes = Object.freeze({
   noCapabilitiesRegistered: "no-capabilities-registered",
@@ -310,6 +311,7 @@ function ensureContext(handoff: StudioHandoffContract): StudioHandoffContext {
 
 export class StudioHandoffRoutingService {
   private readonly rules: ReadonlyArray<StudioHandoffRoutingRule>;
+  private readonly routeCache = new HandoffBoundedCache<string, StudioHandoffRouteDecision>({ maxEntries: 128 });
 
   public constructor(
     private readonly capabilityQuery: Pick<StudioCapabilityQueryService, "listCapabilities">,
@@ -323,6 +325,12 @@ export class StudioHandoffRoutingService {
   }
 
   public route(request: StudioHandoffRoutingRequest): StudioHandoffRouteDecision {
+    const cacheKey = this.createRouteCacheKey(request);
+    const cached = this.routeCache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const descriptors = this.capabilityQuery.listCapabilities();
     const reasons: StudioHandoffRoutingReason[] = [];
     if (descriptors.length === 0) {
@@ -330,13 +338,13 @@ export class StudioHandoffRoutingService {
         code: StudioHandoffRoutingReasonCodes.noCapabilitiesRegistered,
         message: "No studio capability descriptors are registered for handoff routing.",
       }));
-      return Object.freeze({
+      return this.routeCache.set(cacheKey, Object.freeze({
         candidates: Object.freeze([]),
         compatibleCandidates: Object.freeze([]),
         alternateCandidates: Object.freeze([]),
         reasons: Object.freeze(reasons),
         deterministicSignature: "none",
-      });
+      }));
     }
 
     const candidates: StudioHandoffRouteCandidate[] = [];
@@ -468,17 +476,30 @@ export class StudioHandoffRoutingService {
       ...ordered.map((entry) => `${entry.studioType}:${entry.matchedContractId ?? "none"}:${entry.score}:${entry.compatible ? "1" : "0"}`),
     ].join("|");
 
-    return Object.freeze({
+    return this.routeCache.set(cacheKey, Object.freeze({
       preferred,
       candidates: ordered,
       compatibleCandidates: compatible,
       alternateCandidates: Object.freeze(compatible.slice(1)),
       reasons: Object.freeze(finalReasons),
       deterministicSignature,
-    });
+    }));
   }
 
   public reevaluate(request: StudioHandoffRoutingRequest): StudioHandoffRouteDecision {
     return this.route(request);
+  }
+
+  private createRouteCacheKey(request: StudioHandoffRoutingRequest): string {
+    return [
+      request.handoffId ?? "generated",
+      request.sourceOutput.sourceStudioType,
+      request.sourceOutput.sourceStudioId,
+      request.sourceOutput.authoritativeAsset.assetId,
+      request.sourceOutput.authoritativeAsset.versionId,
+      request.intent?.kind ?? "none",
+      request.multiAsset?.assets.map((entry) => `${entry.assetId}:${entry.versionId}:${entry.role}`).join(",") ?? "single",
+      request.existingHandoff?.id.value ?? "none",
+    ].join("::");
   }
 }

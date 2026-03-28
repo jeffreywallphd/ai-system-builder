@@ -134,4 +134,33 @@ describe("StudioHandoffLineageTracker", () => {
     expect(event.record.previousHandoffId).toBe("lineage-handoff");
     expect(event.record.edges[0]?.handoffRevisionId).toBe("rev-7");
   });
+
+  it("supports bounded lineage record reads", () => {
+    const tracker = new StudioHandoffLineageTracker();
+    const first = createPreparation();
+    tracker.track({ preparation: first });
+    const second = createPreparation();
+    tracker.track({
+      preparation: Object.freeze({
+        ...second,
+        handoff: createStudioHandoffContract({
+          id: "lineage-handoff:second",
+          source: second.handoff.source,
+          target: second.handoff.target,
+          payload: second.handoff.payload,
+          multiAsset: second.handoff.multiAsset,
+          intent: second.handoff.intent,
+          context: {
+            sourceReferences: second.handoff.context?.sourceReferences ?? [],
+            prefill: second.handoff.context?.prefill,
+            provenance: second.handoff.context?.provenance,
+          },
+        }),
+      }),
+    });
+
+    const recent = tracker.listRecords(1);
+    expect(recent).toHaveLength(1);
+    expect(recent[0]?.handoffId).toBe("lineage-handoff:second");
+  });
 });

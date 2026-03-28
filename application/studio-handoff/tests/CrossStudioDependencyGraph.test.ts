@@ -233,4 +233,33 @@ describe("CrossStudioDependencyGraphBuilder/Tracker", () => {
     expect(graph.edges.some((edge) => edge.handoffId === "handoff:system")).toBeTrue();
     expect(graph.edges.some((edge) => edge.handoffId === "handoff:system:rev1")).toBeTrue();
   });
+
+  it("supports bounded record listing and graph projection windows", () => {
+    const tracker = new StudioHandoffDependencyTracker();
+    const first = createPreparation();
+    tracker.track({ preparation: first });
+    const second = createPreparation();
+    tracker.track({
+      preparation: Object.freeze({
+        ...second,
+        handoff: createStudioHandoffContract({
+          id: "handoff:system:second",
+          source: second.handoff.source,
+          target: second.handoff.target,
+          payload: second.handoff.payload,
+          multiAsset: second.handoff.multiAsset,
+          intent: second.handoff.intent,
+          context: {
+            sourceReferences: second.handoff.context?.sourceReferences ?? [],
+            prefill: second.handoff.context?.prefill,
+            provenance: second.handoff.context?.provenance,
+          },
+        }),
+      }),
+    });
+
+    expect(tracker.listRecords(1)).toHaveLength(1);
+    const graph = tracker.buildGraph(1);
+    expect(graph.edges.every((edge) => edge.handoffId === "handoff:system:second")).toBeTrue();
+  });
 });

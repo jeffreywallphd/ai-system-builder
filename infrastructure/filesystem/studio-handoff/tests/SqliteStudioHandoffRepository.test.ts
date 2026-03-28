@@ -140,11 +140,12 @@ describe("SqliteStudioHandoffRepository + query/persistence services", () => {
     const repository = createRepository();
     await repository.saveRecord(createPreparedRecord("handoff:a", "asset:dataset:v1"));
     await repository.saveRecord(createPreparedRecord("handoff:b", "asset:dataset:v2"));
+    await repository.saveRecord(createPreparedRecord("handoff:c", "asset:dataset:v3"));
 
     const query = new StudioHandoffQueryService(repository);
-    const bySource = await query.listBySourceStudio("dataset-studio-default");
-    const byTarget = await query.listByTargetStudio("workflow-studio-default");
-    const byAssetVersion = await query.listByAssetVersion("asset:dataset", "asset:dataset:v2");
+    const bySource = await query.listBySourceStudio("dataset-studio-default", 2);
+    const byTarget = await query.listByTargetStudio("workflow-studio-default", 2);
+    const byAssetVersion = await query.listByAssetVersion("asset:dataset", "asset:dataset:v2", 2);
 
     expect(bySource.length).toBe(2);
     expect(byTarget.length).toBe(2);

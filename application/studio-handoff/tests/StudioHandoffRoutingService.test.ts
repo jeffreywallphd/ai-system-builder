@@ -249,4 +249,33 @@ describe("StudioHandoffRoutingService", () => {
     expect(reevaluated.preferred?.studioType).toBe("system-studio");
     expect(initial.deterministicSignature).not.toBe(reevaluated.deterministicSignature);
   });
+
+  it("reuses bounded routing decisions for repeated equivalent requests", () => {
+    const service = createRoutingService();
+    const taxonomy = createCompositionTaxonomyDescriptor({
+      structuralKind: TaxonomyStructuralKinds.atomic,
+      semanticRole: TaxonomySemanticRoles.dataset,
+      behaviorKind: TaxonomyBehaviorKinds.none,
+    });
+    const request = {
+      sourceOutput: {
+        sourceStudioType: "dataset-studio",
+        sourceStudioId: "dataset-studio-default",
+        authoritativeAsset: {
+          assetId: "asset:dataset",
+          versionId: "asset:dataset:v1",
+          pinnedVersion: { assetId: "asset:dataset", versionId: "asset:dataset:v1" },
+          taxonomy,
+          contract: resolver.resolveContractForTaxonomy(taxonomy),
+        },
+      },
+      intent: {
+        kind: StudioHandoffIntentKinds.authoringContinuation,
+      },
+    } as const;
+
+    const first = service.route(request);
+    const second = service.route(request);
+    expect(second).toBe(first);
+  });
 });

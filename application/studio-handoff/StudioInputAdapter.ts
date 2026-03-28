@@ -7,6 +7,7 @@ import {
   type StudioHandoffCompatibilityValidator,
 } from "./StudioHandoffCompatibilityValidator";
 import type { StudioCapabilityDescriptor } from "./StudioCapabilityRegistry";
+import { HandoffBoundedCache } from "./HandoffBoundedCache";
 
 export const AdaptedStudioInputKinds = Object.freeze({
   atomic: "atomic",
@@ -283,6 +284,8 @@ export class StudioInputAdapterRegistry {
 }
 
 export class StudioInputAdapterLayer {
+  private readonly adaptationCache = new HandoffBoundedCache<string, StudioInputAdaptationResult>({ maxEntries: 256 });
+
   public constructor(
     private readonly compatibilityValidator: Pick<StudioHandoffCompatibilityValidator, "validate">,
     private readonly adapterRegistry: StudioInputAdapterRegistry,
@@ -293,6 +296,12 @@ export class StudioInputAdapterLayer {
     readonly context?: StudioHandoffContext;
     readonly targetCapabilities: ReadonlyArray<StudioCapabilityDescriptor>;
   }): StudioInputAdaptationResult {
+    const cacheKey = this.createAdaptationCacheKey(input);
+    const cached = this.adaptationCache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const context = input.context ?? input.handoff.context;
     if (!context) {
       const compatibility = Object.freeze({
@@ -300,7 +309,7 @@ export class StudioInputAdapterLayer {
         targetStudioType: input.handoff.target.studioType,
         issues: Object.freeze([]),
       });
-      return Object.freeze({
+      return this.adaptationCache.set(cacheKey, Object.freeze({
         ok: false,
         compatibility,
         issues: Object.freeze([{
@@ -308,7 +317,7 @@ export class StudioInputAdapterLayer {
           message: "Studio handoff context is required before studio input adaptation.",
           path: "context",
         }]),
-      });
+      }));
     }
 
     if (
@@ -322,7 +331,7 @@ export class StudioInputAdapterLayer {
         targetStudioType: input.handoff.target.studioType,
         issues: Object.freeze([]),
       });
-      return Object.freeze({
+      return this.adaptationCache.set(cacheKey, Object.freeze({
         ok: false,
         compatibility,
         issues: Object.freeze([{
@@ -330,7 +339,7 @@ export class StudioInputAdapterLayer {
           message: "Studio handoff context source/target identity must match handoff contract source/target.",
           path: "context.targetStudioType",
         }]),
-      });
+      }));
     }
 
     const compatibility = this.compatibilityValidator.validate({
@@ -339,7 +348,7 @@ export class StudioInputAdapterLayer {
     });
 
     if (!compatibility.compatible) {
-      return Object.freeze({
+      return this.adaptationCache.set(cacheKey, Object.freeze({
         ok: false,
         compatibility,
         issues: Object.freeze([
@@ -350,12 +359,12 @@ export class StudioInputAdapterLayer {
           },
           ...compatibility.issues,
         ]),
-      });
+      }));
     }
 
     const adapter = this.adapterRegistry.findForTargetStudio(input.handoff.target.studioType);
     if (!adapter) {
-      return Object.freeze({
+      return this.adaptationCache.set(cacheKey, Object.freeze({
         ok: false,
         compatibility: Object.freeze({
           ...compatibility,
@@ -374,7 +383,7 @@ export class StudioInputAdapterLayer {
           message: `No studio input adapter is registered for target studio type '${input.handoff.target.studioType}'.`,
           path: "target.studioType",
         }]),
-      });
+      }));
     }
 
     const adapted = adapter.adapt({
@@ -383,11 +392,29 @@ export class StudioInputAdapterLayer {
       compatibility,
     });
 
-    return Object.freeze({
+    return this.adaptationCache.set(cacheKey, Object.freeze({
       ok: true,
       compatibility,
       adapted,
       issues: Object.freeze([]),
-    });
+    }));
+  }
+
+  private createAdaptationCacheKey(input: {
+    readonly handoff: StudioHandoffContract;
+    readonly context?: StudioHandoffContext;
+    readonly targetCapabilities: ReadonlyArray<StudioCapabilityDescriptor>;
+  }): string {
+    const context = input.context ?? input.handoff.context;
+    return [
+      input.handoff.id.value,
+      input.handoff.payload.assetId,
+      input.handoff.payload.versionId,
+      input.handoff.target.studioType,
+      input.handoff.payload.targetInputContract.contractId,
+      context?.initiatedAt ?? "none",
+      Object.keys(context?.prefill?.values ?? {}).sort().join(","),
+      input.targetCapabilities.map((entry) => `${entry.studioType}:${entry.acceptedInputs.length}`).sort().join("|"),
+    ].join("::");
   }
 }

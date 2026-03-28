@@ -43,6 +43,7 @@ export interface StudioHandoffLineageEvent {
 }
 
 export class StudioHandoffLineageTracker {
+  private static readonly MAX_RECORDS = 1000;
   private readonly records: StudioHandoffLineageRecord[] = [];
 
   public track(input: {
@@ -106,13 +107,16 @@ export class StudioHandoffLineageTracker {
     });
 
     this.records.push(record);
+    if (this.records.length > StudioHandoffLineageTracker.MAX_RECORDS) {
+      this.records.splice(0, this.records.length - StudioHandoffLineageTracker.MAX_RECORDS);
+    }
     return Object.freeze({
       kind: "studio-handoff-lineage-recorded",
       record,
     });
   }
 
-  public listRecords(): ReadonlyArray<StudioHandoffLineageRecord> {
-    return Object.freeze([...this.records]);
+  public listRecords(limit = 100): ReadonlyArray<StudioHandoffLineageRecord> {
+    return Object.freeze([...this.records].slice(Math.max(0, this.records.length - Math.max(0, limit))));
   }
 }
