@@ -72,6 +72,7 @@ import { RegistryCacheLayer } from "../../application/asset-registry/RegistryCac
 import { CompositionAssetContractResolver } from "../../application/contracts/CompositionAssetContractResolver";
 import { SystemStudioBackendApi } from "../../infrastructure/api/system-studio/SystemStudioBackendApi";
 import { SystemRuntimeBackendApi } from "../../infrastructure/api/system-runtime/SystemRuntimeBackendApi";
+import { InMemorySystemRuntimeExecutionStore } from "../../application/system-runtime/SystemRuntimeExecutionStore";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 if (started) {
@@ -297,7 +298,8 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   studioShellRepository = new SqliteStudioShellRepository(path.join(storagePaths.storageDirectory, "studio-shell", "studio-shell.sqlite"));
   const studioShellBackendApi = new StudioShellBackendApi(studioShellRepository);
   const systemStudioBackendApi = new SystemStudioBackendApi(studioShellRepository);
-  const systemRuntimeBackendApi = new SystemRuntimeBackendApi(studioShellRepository);
+  const runtimeExecutionStore = new InMemorySystemRuntimeExecutionStore();
+  const systemRuntimeBackendApi = new SystemRuntimeBackendApi(studioShellRepository, runtimeExecutionStore);
   const executionHistoryInfrastructure = createExecutionHistoryInfrastructure(executionRunRepository);
   getExecutionRunUseCase = new GetExecutionRunUseCase(executionRunRepository);
   listExecutionRunsUseCase = executionHistoryInfrastructure.listExecutionRunsUseCase;
@@ -574,6 +576,12 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     undefined,
     registryCacheLayer,
     canonicalAssetSystemRepository,
+    {
+      async listRecentExecutionsForSystem(input) {
+        const response = await systemRuntimeBackendApi.listRecentExecutionsForSystem(input);
+        return response.ok && response.data ? response.data : [];
+      },
+    },
   );
   const registryBackendApi = new RegistryBackendApi(
     new CrossStudioRegistryQueryService(registryQueryService),

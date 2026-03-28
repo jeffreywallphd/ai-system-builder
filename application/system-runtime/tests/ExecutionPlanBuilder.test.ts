@@ -218,4 +218,29 @@ describe("ExecutionPlanBuilder", () => {
     expect(unsupportedEnvironment.status).toBe("invalid");
     expect(unsupportedEnvironment.errors[0]).toContain("No runtime environment");
   });
+
+  it("rejects plans that include unpinned component versions", async () => {
+    const root = createSystem({
+      assetId: "system:unpinned",
+      versionId: "system:unpinned:v1",
+      components: [
+        {
+          componentKind: "atomic",
+          alias: "model",
+          assetId: "asset:model",
+          taxonomy: { structuralKind: "atomic", semanticRole: "model", behaviorKind: "none" },
+        },
+      ],
+    });
+    const runtimeContract = await mapSystemContractToRuntimeExecutionContract({
+      root,
+      contract: await resolver.resolveSystemContract({ root, resolveSystem: async () => undefined, resolveChildContract: async () => undefined }),
+    });
+    const deps = await resolveSystemRuntimeDependencies({ root, resolveSystem: async () => undefined });
+    const behavior = behaviorAlignment.resolveSystemRuntimeBehavior("system", "deterministic");
+
+    const result = new ExecutionPlanBuilder().build({ root, runtimeContract, dependencyResolution: deps, behavior });
+    expect(result.status).toBe("invalid");
+    expect(result.errors[0]).toContain("version-pinned components");
+  });
 });

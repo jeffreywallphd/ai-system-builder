@@ -100,4 +100,74 @@ describe("SystemRuntimeBackendApi", () => {
     expect(invalid.ok).toBeFalse();
     expect(invalid.error?.code).toBe("invalid-request");
   });
+
+  it("enforces version-aware execution and projects executed version maps", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const idQueue = ["session-versioned", "draft-versioned"];
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => idQueue.shift() ?? "generated");
+    const systemService = new SystemStudioApplicationService(studioShell, repository);
+    const runtimeApi = new SystemRuntimeBackendApi(repository);
+
+    const ensured = await systemService.ensureStudioInitialized();
+    const created = await systemService.createSystemDraft({
+      studioId: SystemStudioIdentity.defaultStudioId,
+      sessionId: ensured.session.id,
+      draftId: "draft-versioned",
+      title: "Version-aware runtime target",
+      content: JSON.stringify({
+        systemSpec: {
+          components: [
+            {
+              componentKind: "atomic",
+              alias: "model",
+              assetId: "asset:model",
+              taxonomy: { structuralKind: "atomic", semanticRole: "model", behaviorKind: "none" },
+            },
+          ],
+          inputs: [{ inputId: "request", valueType: "string", required: true }],
+          outputs: [{ outputId: "response", valueType: "string" }],
+        },
+      }),
+      behaviorKind: "deterministic",
+    });
+
+    await studioShell.transitionAssetDraftLifecycle({
+      studioId: SystemStudioIdentity.defaultStudioId,
+      sessionId: ensured.session.id,
+      draftId: created.draft.id,
+      targetStatus: AssetDraftLifecycleStatuses.validated,
+    });
+
+    const rejected = await runtimeApi.startExecution({
+      studioId: SystemStudioIdentity.defaultStudioId,
+      draftId: created.draft.id,
+    });
+    expect(rejected.ok).toBeFalse();
+    expect(rejected.error?.code).toBe("invalid-request");
+    expect(rejected.error?.message).toContain("pinned component versions");
+
+    const started = await runtimeApi.startExecution({
+      studioId: SystemStudioIdentity.defaultStudioId,
+      draftId: created.draft.id,
+      componentVersionPins: {
+        model: "asset:model:v42",
+      },
+    });
+    expect(started.ok).toBeTrue();
+    expect(started.data?.executedVersionMap.nodeVersionIds).toBeDefined();
+    const pinnedNodeVersion = Object.values(started.data?.executedVersionMap.nodeVersionIds ?? {}).find((entry) => entry === "asset:model:v42");
+    expect(pinnedNodeVersion).toBe("asset:model:v42");
+
+    const result = await runtimeApi.getExecutionResult(started.data!.executionId);
+    expect(result.ok).toBeTrue();
+    expect(Object.values(result.data?.executedVersionMap.nodeVersionIds ?? {})).toContain("asset:model:v42");
+
+    const recent = await runtimeApi.listRecentExecutionsForSystem({
+      assetId: created.draft.assetId,
+      limit: 5,
+    });
+    expect(recent.ok).toBeTrue();
+    expect(recent.data?.length).toBeGreaterThan(0);
+    expect(recent.data?.[0]?.executionId).toBe(started.data?.executionId);
+  });
 });

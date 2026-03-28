@@ -31,6 +31,10 @@ import { mapSystemContractToRuntimeExecutionContract } from "./RuntimeExecutionC
 import { resolveSystemRuntimeDependencies } from "./RuntimeDependencyResolution";
 import { StepExecutionEngine } from "./StepExecutionEngine";
 import { CompositionAssetContractResolver } from "../contracts/CompositionAssetContractResolver";
+import {
+  InMemorySystemRuntimeExecutionStore,
+  type ISystemRuntimeExecutionStore,
+} from "./SystemRuntimeExecutionStore";
 
 export interface StartSystemRuntimeExecutionRequest {
   readonly studioId?: string;
@@ -46,6 +50,8 @@ export interface StartSystemRuntimeExecutionRequest {
   readonly maxDepth?: number;
   readonly maxIterationsPerNode?: number;
   readonly maxPlanningCyclesPerNode?: number;
+  readonly componentVersionPins?: Readonly<Record<string, string>>;
+  readonly enforceVersionPinning?: boolean;
 }
 
 export interface StartSystemRuntimeExecutionResult {
@@ -97,6 +103,10 @@ export interface RuntimeExecutionStatusReadModel {
     readonly retryDecisionCount: number;
     readonly lastDecisionAt?: string;
   };
+  readonly executedVersionMap: {
+    readonly rootVersionId?: string;
+    readonly nodeVersionIds: Readonly<Record<string, string>>;
+  };
 }
 
 export interface RuntimeExecutionResultReadModel {
@@ -136,11 +146,26 @@ export interface RuntimeExecutionResultReadModel {
     readonly nodeId?: string;
     readonly at?: string;
   }>;
+  readonly executedVersionMap: {
+    readonly rootVersionId?: string;
+    readonly nodeVersionIds: Readonly<Record<string, string>>;
+  };
 }
 
 export interface RuntimeExecutionTraceReadModel {
   readonly executionId: string;
   readonly trace: ExecutionTrace;
+}
+
+export interface RuntimeExecutionSummaryReadModel {
+  readonly executionId: string;
+  readonly status: SystemExecution["status"];
+  readonly startedAt: string;
+  readonly completedAt?: string;
+  readonly rootVersionId?: string;
+  readonly result: "succeeded" | "failed" | "cancelled" | "running";
+  readonly traceEventCount: number;
+  readonly traceLogCount: number;
 }
 
 interface SystemSpecContent {
@@ -228,10 +253,10 @@ function summarizeOutput(value: unknown): string | undefined {
 export class SystemRuntimeApplicationService {
   private readonly contractResolver = new CompositionAssetContractResolver();
   private readonly orchestration = new ExecutionOrchestrationService(new StepExecutionEngine(), new ExecutionPlanBuilder());
-  private readonly executionsById = new Map<string, SystemExecution>();
 
   public constructor(
     private readonly repository: IStudioShellRepository,
+    private readonly executionStore: ISystemRuntimeExecutionStore = new InMemorySystemRuntimeExecutionStore(),
   ) {}
 
   public async startExecution(request: StartSystemRuntimeExecutionRequest): Promise<StartSystemRuntimeExecutionResult> {
@@ -240,9 +265,14 @@ export class SystemRuntimeApplicationService {
       throw new Error("invalid-request:Exactly one of draftId or versionId is required.");
     }
 
-    const root = request.draftId
+    const unresolvedRoot = request.draftId
       ? await this.loadSystemFromDraft(request.studioId, request.draftId)
       : await this.loadSystemFromVersion(request.versionId!);
+    const root = this.applyVersionPins(unresolvedRoot, request.componentVersionPins);
+    this.assertVersionPinnedExecution({
+      root,
+      enforceVersionPinning: request.enforceVersionPinning ?? true,
+    });
 
     const behavior = classifyExecutableBehavior(root.taxonomy);
     const runtimeContract = await mapSystemContractToRuntimeExecutionContract({
@@ -293,7 +323,7 @@ export class SystemRuntimeApplicationService {
       })
       : result.execution;
 
-    this.executionsById.set(normalizedExecution.executionId, normalizedExecution);
+    this.executionStore.saveExecution(normalizedExecution);
     return Object.freeze({ execution: normalizedExecution, runtimeBehavior: behavior });
   }
 
@@ -353,6 +383,10 @@ export class SystemRuntimeApplicationService {
           parentNodeId: entry.parentNodeId,
         }))),
       recovery,
+      executedVersionMap: Object.freeze({
+        rootVersionId: execution.root.versionId,
+        nodeVersionIds: this.buildNodeVersionMap(execution),
+      }),
     });
   }
 
@@ -443,6 +477,10 @@ export class SystemRuntimeApplicationService {
           path: entry.path,
         }))),
       diagnostics,
+      executedVersionMap: Object.freeze({
+        rootVersionId: execution.root.versionId,
+        nodeVersionIds: this.buildNodeVersionMap(execution),
+      }),
     });
   }
 
@@ -452,7 +490,7 @@ export class SystemRuntimeApplicationService {
       throw new Error("invalid-request:Execution id is required.");
     }
 
-    const execution = this.executionsById.get(normalized);
+    const execution = this.executionStore.getExecution(normalized);
     if (!execution) {
       throw new Error(`not-found:Execution '${normalized}' was not found.`);
     }
@@ -549,5 +587,112 @@ export class SystemRuntimeApplicationService {
     }
 
     return this.contractResolver.resolveContractForTaxonomy(component.taxonomy);
+  }
+
+  public listRecentExecutionsForSystem(input: {
+    readonly assetId: string;
+    readonly versionId?: string;
+    readonly limit?: number;
+  }): ReadonlyArray<RuntimeExecutionSummaryReadModel> {
+    return Object.freeze(this.executionStore.listExecutionsByRoot(input).map((execution) => Object.freeze({
+      executionId: execution.executionId,
+      status: execution.status,
+      startedAt: execution.startedAt,
+      completedAt: execution.completedAt,
+      rootVersionId: execution.root.versionId,
+      result: execution.status === ExecutionStatusKinds.succeeded
+        ? "succeeded"
+        : execution.status === ExecutionStatusKinds.failed
+          ? "failed"
+          : execution.status === ExecutionStatusKinds.cancelled
+            ? "cancelled"
+            : "running",
+      traceEventCount: execution.runtimeState.trace.events.length,
+      traceLogCount: execution.runtimeState.trace.logs.length,
+    })));
+  }
+
+  private buildNodeVersionMap(execution: SystemExecution): Readonly<Record<string, string>> {
+    return Object.freeze(Object.fromEntries(execution.nodes
+      .filter((node) => Boolean(node.target.versionId))
+      .map((node) => [node.executionNodeId, node.target.versionId!])
+      .sort(([left], [right]) => left.localeCompare(right))));
+  }
+
+  private applyVersionPins(system: SystemAsset, pins?: Readonly<Record<string, string>>): SystemAsset {
+    if (!pins || Object.keys(pins).length === 0) {
+      return system;
+    }
+
+    const normalizedPins = new Map<string, string>();
+    for (const [rawKey, rawVersionId] of Object.entries(pins)) {
+      const key = rawKey.trim();
+      const versionId = rawVersionId.trim();
+      if (key && versionId) {
+        normalizedPins.set(key, versionId);
+      }
+    }
+
+    if (normalizedPins.size === 0) {
+      return system;
+    }
+
+    const withPinnedComponents = system.components.map((component) => {
+      const pin = normalizedPins.get(component.alias ?? "")
+        ?? normalizedPins.get(component.assetId)
+        ?? component.versionId;
+      return Object.freeze({
+        ...component,
+        versionId: pin,
+      });
+    });
+
+    const withPinnedNestedSystems = system.nestedSystems.map((entry) => {
+      const pin = normalizedPins.get(entry.alias ?? "")
+        ?? normalizedPins.get(entry.assetId)
+        ?? entry.versionId;
+      return Object.freeze({
+        ...entry,
+        versionId: pin,
+      });
+    });
+
+    const withPinnedDependencies = system.dependencies.map((dependency) => {
+      const pin = normalizedPins.get(dependency.assetId) ?? dependency.versionId;
+      return Object.freeze({
+        ...dependency,
+        versionId: pin,
+      });
+    });
+
+    return createSystemAsset({
+      ...system,
+      components: withPinnedComponents,
+      nestedSystems: withPinnedNestedSystems,
+      dependencies: withPinnedDependencies,
+    });
+  }
+
+  private assertVersionPinnedExecution(input: {
+    readonly root: SystemAsset;
+    readonly enforceVersionPinning: boolean;
+  }): void {
+    if (!input.enforceVersionPinning) {
+      return;
+    }
+
+    const unresolvedChildren = input.root.components
+      .filter((component) => !component.versionId)
+      .map((component) => component.alias ?? component.assetId);
+    if (unresolvedChildren.length > 0) {
+      throw new Error(`invalid-request:Execution requires pinned component versions. Missing version for: ${unresolvedChildren.join(", ")}.`);
+    }
+
+    const unresolvedDependencies = input.root.dependencies
+      .filter((dependency) => !dependency.versionId)
+      .map((dependency) => dependency.assetId);
+    if (unresolvedDependencies.length > 0) {
+      throw new Error(`invalid-request:Execution requires pinned dependency versions. Missing version for: ${unresolvedDependencies.join(", ")}.`);
+    }
   }
 }

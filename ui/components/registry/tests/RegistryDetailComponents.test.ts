@@ -11,6 +11,8 @@ describe("registry detail UI components", () => {
     expect(source).toContain("registry-asset-dependency-summary-panel");
     expect(source).toContain("registry-asset-version-history-panel");
     expect(source).toContain("registry-asset-lineage-panel");
+    expect(source).toContain("Runtime activity:");
+    expect(source).toContain("trace events");
   });
 
   it("provides dependency graph panel with upstream and downstream sections", () => {

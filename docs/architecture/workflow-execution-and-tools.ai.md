@@ -27,6 +27,10 @@ Workflow -> `ExecuteWorkflowUseCase` -> one-unit `ExecutionPlan` -> `UnifiedExec
 - Execution-plan metadata now includes a lightweight explicit runtime capability profile (`supportsProgressEvents`, `supportsPollingProgress`, `supportsCancellation`, `supportsIntermediateArtifacts`, `supportsPartialResults`, `supportsReconnectOrResume`, `supportsMultiUnitComposition`) so higher layers can keep truthfulness language aligned with what a runtime really supports.
 - The workflow adapter wraps the existing workflow executor instead of rewriting runtime selection or strategy internals.
 - Workflow/model/dataset/MCP-specific payloads are still preserved as artifacts, but execution-native summaries now carry the data that generic history/reporting flows need first.
+- Direction 5 Epic 6 stories 6.17–6.18 now keep system-runtime execution read integration bounded and version-aware:
+  - runtime executions are projected into registry system-detail read models as recent execution summaries (status/result/timestamps plus bounded trace-reference counts),
+  - registry remains read-only (no runtime command surface),
+  - execution planning/orchestration enforces version-pinned component references and records executed version maps on runtime status/result APIs for truthful lineage and reproducibility.
 
 ## Runtime orchestration update
 - Delegated workflow execution selection can now consult the shared runtime dependency orchestrator before choosing a delegated strategy.

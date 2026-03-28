@@ -119,6 +119,29 @@ export interface RegistrySystemDetailsView {
     readonly ownerTeam?: string;
     readonly hasSupportContact: boolean;
   };
+  readonly runtimeActivity?: {
+    readonly recentExecutionCount: number;
+    readonly latestExecution?: {
+      readonly executionId: string;
+      readonly status: "pending" | "running" | "succeeded" | "failed" | "cancelled";
+      readonly result: "succeeded" | "failed" | "cancelled" | "running";
+      readonly startedAt: string;
+      readonly completedAt?: string;
+      readonly rootVersionId?: string;
+      readonly traceEventCount: number;
+      readonly traceLogCount: number;
+    };
+    readonly recentExecutions: ReadonlyArray<{
+      readonly executionId: string;
+      readonly status: "pending" | "running" | "succeeded" | "failed" | "cancelled";
+      readonly result: "succeeded" | "failed" | "cancelled" | "running";
+      readonly startedAt: string;
+      readonly completedAt?: string;
+      readonly rootVersionId?: string;
+      readonly traceEventCount: number;
+      readonly traceLogCount: number;
+    }>;
+  };
 }
 
 export interface RegistryAssetValidationIssue {
@@ -293,6 +316,33 @@ export function createRegistryAsset(input: RegistryAsset): RegistryAsset {
             executionLatencyTier: input.systemDetails.executionMetadata.executionLatencyTier,
             ownerTeam: input.systemDetails.executionMetadata.ownerTeam?.trim() || undefined,
             hasSupportContact: Boolean(input.systemDetails.executionMetadata.hasSupportContact),
+          })
+          : undefined,
+        runtimeActivity: input.systemDetails.runtimeActivity
+          ? Object.freeze({
+            recentExecutionCount: Math.max(0, Math.floor(input.systemDetails.runtimeActivity.recentExecutionCount)),
+            latestExecution: input.systemDetails.runtimeActivity.latestExecution
+              ? Object.freeze({
+                executionId: input.systemDetails.runtimeActivity.latestExecution.executionId.trim(),
+                status: input.systemDetails.runtimeActivity.latestExecution.status,
+                result: input.systemDetails.runtimeActivity.latestExecution.result,
+                startedAt: input.systemDetails.runtimeActivity.latestExecution.startedAt,
+                completedAt: input.systemDetails.runtimeActivity.latestExecution.completedAt,
+                rootVersionId: input.systemDetails.runtimeActivity.latestExecution.rootVersionId?.trim() || undefined,
+                traceEventCount: Math.max(0, Math.floor(input.systemDetails.runtimeActivity.latestExecution.traceEventCount)),
+                traceLogCount: Math.max(0, Math.floor(input.systemDetails.runtimeActivity.latestExecution.traceLogCount)),
+              })
+              : undefined,
+            recentExecutions: Object.freeze((input.systemDetails.runtimeActivity.recentExecutions ?? []).map((entry) => Object.freeze({
+              executionId: entry.executionId.trim(),
+              status: entry.status,
+              result: entry.result,
+              startedAt: entry.startedAt,
+              completedAt: entry.completedAt,
+              rootVersionId: entry.rootVersionId?.trim() || undefined,
+              traceEventCount: Math.max(0, Math.floor(entry.traceEventCount)),
+              traceLogCount: Math.max(0, Math.floor(entry.traceLogCount)),
+            }))),
           })
           : undefined,
       })

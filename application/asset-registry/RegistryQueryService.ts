@@ -55,6 +55,32 @@ interface RegistrySourceSignatureProvider {
   getCurrentSourceSignature?(): Promise<{ readonly versionCount: number; readonly lineageEdgeCount: number }>;
 }
 
+export interface RegistryRuntimeSummaryProvider {
+  listRecentExecutionsForSystem(input: {
+    readonly assetId: string;
+    readonly versionId?: string;
+    readonly limit?: number;
+  }): Promise<ReadonlyArray<{
+    readonly executionId: string;
+    readonly status: "pending" | "running" | "succeeded" | "failed" | "cancelled";
+    readonly result: "succeeded" | "failed" | "cancelled" | "running";
+    readonly startedAt: string;
+    readonly completedAt?: string;
+    readonly rootVersionId?: string;
+    readonly traceEventCount: number;
+    readonly traceLogCount: number;
+  }>> | ReadonlyArray<{
+    readonly executionId: string;
+    readonly status: "pending" | "running" | "succeeded" | "failed" | "cancelled";
+    readonly result: "succeeded" | "failed" | "cancelled" | "running";
+    readonly startedAt: string;
+    readonly completedAt?: string;
+    readonly rootVersionId?: string;
+    readonly traceEventCount: number;
+    readonly traceLogCount: number;
+  }>;
+}
+
 export class RegistryQueryService {
   private readonly taxonomyClassifier: CompositionTaxonomyClassifier;
   private readonly sourceSignatureProvider?: RegistrySourceSignatureProvider;
@@ -68,6 +94,7 @@ export class RegistryQueryService {
     taxonomyClassifier: CompositionTaxonomyClassifier = new CompositionTaxonomyClassifier(),
     private readonly cacheLayer: RegistryCacheLayer = new RegistryCacheLayer(),
     sourceSignatureProvider?: RegistrySourceSignatureProvider,
+    private readonly runtimeSummaryProvider?: RegistryRuntimeSummaryProvider,
   ) {
     this.taxonomyClassifier = taxonomyClassifier;
     this.sourceSignatureProvider = sourceSignatureProvider
@@ -142,7 +169,7 @@ export class RegistryQueryService {
           versionHistory: await this.buildVersionHistory(asset.id),
           lineage: await this.buildLineageContext(latestVersion?.versionId, assets),
           validation,
-          systemDetails: await this.buildSystemDetails(latestVersion),
+          systemDetails: await this.buildSystemDetails(asset.id, latestVersion),
         });
       }));
 
@@ -379,7 +406,7 @@ export class RegistryQueryService {
     return Object.freeze([...resolved.values()]);
   }
 
-  private async buildSystemDetails(version?: AssetVersion): Promise<RegistryAsset["systemDetails"] | undefined> {
+  private async buildSystemDetails(assetId: string, version?: AssetVersion): Promise<RegistryAsset["systemDetails"] | undefined> {
     if (!version) {
       return undefined;
     }
@@ -390,6 +417,14 @@ export class RegistryQueryService {
     }
 
     const aggregation = await this.aggregateSystemDependenciesForRegistry(system);
+    const recentExecutions = this.runtimeSummaryProvider
+      ? await this.runtimeSummaryProvider.listRecentExecutionsForSystem({
+      assetId,
+      versionId: version.versionId,
+      limit: 5,
+      })
+      : [];
+
     return Object.freeze({
       selectedChildren: Object.freeze(system.components.map((component) => Object.freeze({
         alias: component.alias,
@@ -456,6 +491,11 @@ export class RegistryQueryService {
           hasSupportContact: Boolean(system.executionMetadata.operations?.supportContact),
         })
         : undefined,
+      runtimeActivity: Object.freeze({
+        recentExecutionCount: recentExecutions.length,
+        latestExecution: recentExecutions[0],
+        recentExecutions: Object.freeze(recentExecutions),
+      }),
     });
   }
 

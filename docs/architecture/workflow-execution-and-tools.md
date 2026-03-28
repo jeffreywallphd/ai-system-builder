@@ -60,6 +60,11 @@ The remaining MCP areas stay out of scope for Direction 1 because the current ru
 
 This gives the codebase one real production seam for synchronous workflow runs, started workflow runs, and a second non-workflow execution-backed product area without forcing a broad refactor.
 
+Direction 5 Epic 6 stories 6.17–6.18 now keep system-runtime execution read integration bounded and version-aware:
+- runtime executions are projected into registry system-detail read models as recent execution summaries (status/result/timestamps plus bounded trace-reference counts),
+- registry remains read-only (no runtime command surface),
+- execution planning/orchestration enforces version-pinned component references and records executed version maps on runtime status/result APIs for truthful lineage and reproducibility.
+
 ## Execution flow for workflows
 
 ### 1. A workflow enters through a UI service/store

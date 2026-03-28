@@ -180,6 +180,12 @@ function validatePlanForRequest(input: {
   if (input.plan.nodes.length === 0 || input.plan.orderedNodeIds.length === 0) {
     errors.push("Execution plan must include at least one executable node.");
   }
+  const unpinnedComponentNodes = input.plan.nodes
+    .filter((node) => node.nodeType === "component" && !node.versionId)
+    .map((node) => node.alias ?? node.assetId);
+  if (unpinnedComponentNodes.length > 0) {
+    errors.push(`Execution plan contains unpinned component versions: ${unpinnedComponentNodes.join(", ")}.`);
+  }
 
   return Object.freeze(errors);
 }

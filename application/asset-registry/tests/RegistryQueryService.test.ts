@@ -443,4 +443,89 @@ describe("RegistryQueryService", () => {
     expect(result[0]?.systemDetails?.executionMetadata?.publishVisibility).toBe("team");
     expect(result[0]?.validation?.issues.some((issue) => issue.code === "taxonomy-semantic-role-mismatch")).toBeFalse();
   });
+
+  it("projects bounded runtime activity summaries onto system registry detail views", async () => {
+    const systemAsset = buildAsset("asset:runtime-system", "Runtime System", "system-composition");
+    const systemVersion = buildVersion({
+      assetId: "asset:runtime-system",
+      versionId: "asset:runtime-system:v1",
+      metadata: {
+        metadata: {
+          taxonomy: {
+            structuralKind: TaxonomyStructuralKinds.system,
+            semanticRole: TaxonomySemanticRoles.system,
+            behaviorKind: TaxonomyBehaviorKinds.deterministic,
+          },
+        },
+        content: JSON.stringify({
+          systemSpec: {
+            components: [],
+            inputs: [{ inputId: "request", valueType: "string", required: true }],
+            outputs: [{ outputId: "response", valueType: "string" }],
+            parameters: [],
+          },
+        }),
+      },
+    });
+
+    const queryRepository: Pick<IAssetSystemQueryRepository, "listAssetsByCriteria" | "getLatestVersionForAsset" | "listCanonicalIdentities"> = {
+      async listAssetsByCriteria() { return [systemAsset]; },
+      async getLatestVersionForAsset() { return systemVersion; },
+      async listCanonicalIdentities() {
+        return [{
+          entityType: "workflow-definition",
+          entityId: "entity:runtime-system",
+          assetId: "asset:runtime-system",
+          latestVersionId: "asset:runtime-system:v1",
+          taxonomy: {
+            structuralKind: TaxonomyStructuralKinds.system,
+            semanticRole: TaxonomySemanticRoles.system,
+            behaviorKind: TaxonomyBehaviorKinds.deterministic,
+          },
+          updatedAt: new Date("2026-03-28T00:00:00.000Z"),
+        }];
+      },
+    };
+
+    const service = new RegistryQueryService(
+      new InMemoryAssetRecordRepository([systemAsset]),
+      new InMemoryAssetVersionRepository([systemVersion]),
+      new InMemoryLineageRepository([]),
+      {
+        async resolveCanonicalEntityContract() {
+          return undefined;
+        },
+        resolveContractForTaxonomy() {
+          return {
+            version: "1.0.0",
+            parameters: [],
+            execution: { invocationMode: "deferred", sideEffects: "bounded" },
+          };
+        },
+      },
+      queryRepository,
+      undefined,
+      undefined,
+      undefined,
+      {
+        listRecentExecutionsForSystem() {
+          return [{
+            executionId: "exec:runtime-system:v1:1",
+            status: "succeeded",
+            result: "succeeded",
+            startedAt: "2026-03-28T10:00:00.000Z",
+            completedAt: "2026-03-28T10:00:05.000Z",
+            rootVersionId: "asset:runtime-system:v1",
+            traceEventCount: 12,
+            traceLogCount: 6,
+          }];
+        },
+      },
+    );
+
+    const detail = await service.getAssetDetailByAssetId("asset:runtime-system");
+    expect(detail?.systemDetails?.runtimeActivity?.recentExecutionCount).toBe(1);
+    expect(detail?.systemDetails?.runtimeActivity?.latestExecution?.executionId).toBe("exec:runtime-system:v1:1");
+    expect(detail?.systemDetails?.runtimeActivity?.recentExecutions[0]?.rootVersionId).toBe("asset:runtime-system:v1");
+  });
 });
