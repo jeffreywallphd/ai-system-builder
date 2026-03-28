@@ -773,3 +773,24 @@ Explicitly later than this scope:
   - no health-triggered automatic rollback,
   - no endpoint-routing/traffic-shifting orchestration,
   - no merge with runtime retry/recovery semantics.
+
+## Direction 5 update: Deployment access control + quotas (stories 8.11–8.12)
+
+- Deployment governance now reuses Epic 7 caller-context patterns (authenticated caller kind/id, roles, session, tenant context) through bounded deployment services rather than introducing a second auth universe.
+- `application/deployment/DeploymentAccessControl.ts` introduces explicit deployment access contracts:
+  - `DeploymentAccessContext`, `DeploymentAccessPolicy`, `DeploymentAccessEvaluator`, and structured `DeploymentAccessDecision`.
+  - bounded role-based policy defaults for deploy, activation, rollback, and deployment history/detail reads.
+  - structured denial errors (`DeploymentAccessDeniedError`) that preserve caller/tenant/system/target linkage metadata.
+- Authoritative deployment entry seams now enforce access checks before mutation:
+  - deployment execution entry (`DeploymentExecutionService.execute`/`executeLifecycle`),
+  - deployment activation/version management (`DeploymentVersionManager.setActiveDeployment`),
+  - rollback execution (`DeploymentRollbackService.rollback`),
+  - deployment-history/detail reads where exposed (`DeploymentVersionManager`, rollback action listing).
+- Deployment quotas remain distinct from access control through `application/deployment/DeploymentQuotaEvaluator.ts`:
+  - explicit `DeploymentQuotaPolicy`, `DeploymentQuotaDecision`, and structured `DeploymentQuotaExceededError`,
+  - bounded windowed limits for deployments per caller, deployments per target scope, activation-change frequency, and rollback frequency.
+- Quota evaluation is centralized at the same authoritative deployment boundaries (execution/activation/rollback) and is tenant-aware in scoped key derivation.
+- Scope remains intentionally bounded:
+  - no billing/subscription framework,
+  - no distributed/global quota coordination,
+  - no merging deployment quotas into runtime execution quotas/rate limits.

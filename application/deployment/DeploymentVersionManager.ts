@@ -6,28 +6,59 @@ import {
 } from "../../domain/deployment/DeploymentVersionManagementDomain";
 import { DeploymentStates } from "../../domain/deployment/DeploymentStateDomain";
 import type { DeploymentExecutionService, DeploymentRecordRepository } from "./DeploymentExecutionService";
+import {
+  DeploymentAccessActions,
+  DeploymentAccessEvaluator,
+  type DeploymentAccessContext,
+} from "./DeploymentAccessControl";
+import {
+  DeploymentQuotaActions,
+  DeploymentQuotaEvaluator,
+} from "./DeploymentQuotaEvaluator";
 
 export class DeploymentVersionManager {
   public constructor(
     private readonly repository: DeploymentRecordRepository,
     private readonly deploymentExecutionService: Pick<DeploymentExecutionService, "setDeploymentActivationState">,
+    private readonly accessEvaluator: DeploymentAccessEvaluator = new DeploymentAccessEvaluator(),
+    private readonly quotaEvaluator: DeploymentQuotaEvaluator = new DeploymentQuotaEvaluator(),
   ) {}
 
   public listDeploymentsForSystemVersion(input: {
     readonly rootSystemAssetId: string;
     readonly rootSystemVersionId: string;
+    readonly accessContext?: DeploymentAccessContext;
+    readonly resourceTenantId?: string;
+    readonly requestSource?: string;
   }): ReadonlyArray<ManagedDeploymentVersion> {
     return this.listDeploymentHistory({
       rootSystemAssetId: input.rootSystemAssetId,
       rootSystemVersionId: input.rootSystemVersionId,
+      accessContext: input.accessContext,
+      resourceTenantId: input.resourceTenantId,
+      requestSource: input.requestSource,
     });
   }
 
-  public listDeploymentHistory(query: DeploymentHistoryQuery): ReadonlyArray<ManagedDeploymentVersion> {
+  public listDeploymentHistory(query: DeploymentHistoryQuery & {
+    readonly accessContext?: DeploymentAccessContext;
+    readonly resourceTenantId?: string;
+    readonly requestSource?: string;
+  }): ReadonlyArray<ManagedDeploymentVersion> {
     const rootSystemAssetId = query.rootSystemAssetId.trim();
     if (!rootSystemAssetId) {
       throw new Error("Deployment history query rootSystemAssetId is required.");
     }
+    this.assertAccess({
+      action: DeploymentAccessActions.readDeploymentHistory,
+      accessContext: query.accessContext,
+      resourceTenantId: query.resourceTenantId,
+      requestSource: query.requestSource,
+      rootSystemAssetId,
+      rootSystemVersionId: query.rootSystemVersionId,
+      targetId: query.targetId,
+      targetType: query.targetType,
+    });
 
     const rootSystemVersionId = query.rootSystemVersionId?.trim();
     const targetId = query.targetId?.trim();
@@ -45,12 +76,24 @@ export class DeploymentVersionManager {
     readonly rootSystemAssetId: string;
     readonly targetId: string;
     readonly targetType: DeploymentRecord["targetType"];
+    readonly accessContext?: DeploymentAccessContext;
+    readonly resourceTenantId?: string;
+    readonly requestSource?: string;
   }): ManagedDeploymentVersion | undefined {
     const rootSystemAssetId = input.rootSystemAssetId.trim();
     const targetId = input.targetId.trim();
     if (!rootSystemAssetId || !targetId) {
       throw new Error("Active deployment lookup requires rootSystemAssetId and targetId.");
     }
+    this.assertAccess({
+      action: DeploymentAccessActions.readDeploymentDetails,
+      accessContext: input.accessContext,
+      resourceTenantId: input.resourceTenantId,
+      requestSource: input.requestSource,
+      rootSystemAssetId,
+      targetId,
+      targetType: input.targetType,
+    });
 
     const record = this.repository.listAll()
       .filter((candidate) => candidate.rootSystemAssetId === rootSystemAssetId)
@@ -66,6 +109,9 @@ export class DeploymentVersionManager {
     readonly deploymentId: string;
     readonly reason?: string;
     readonly actionKind?: "version-management" | "rollback";
+    readonly accessContext?: DeploymentAccessContext;
+    readonly resourceTenantId?: string;
+    readonly requestSource?: string;
   }): {
     readonly active: ManagedDeploymentVersion;
     readonly superseded: ReadonlyArray<ManagedDeploymentVersion>;
@@ -83,6 +129,25 @@ export class DeploymentVersionManager {
     if (selected.status !== DeploymentStatuses.succeeded || selected.state !== DeploymentStates.active) {
       throw new Error(`Deployment '${deploymentId}' is not eligible for activation.`);
     }
+    this.assertAccess({
+      action: DeploymentAccessActions.changeActiveDeployment,
+      accessContext: input.accessContext,
+      resourceTenantId: input.resourceTenantId,
+      requestSource: input.requestSource,
+      deploymentId,
+      rootSystemAssetId: selected.rootSystemAssetId,
+      rootSystemVersionId: selected.rootSystemVersionId,
+      targetId: selected.targetId,
+      targetType: selected.targetType,
+    });
+    this.quotaEvaluator.assertAllowed({
+      action: DeploymentQuotaActions.changeActiveDeployment,
+      accessContext: input.accessContext,
+      rootSystemAssetId: selected.rootSystemAssetId,
+      rootSystemVersionId: selected.rootSystemVersionId,
+      targetId: selected.targetId,
+      targetType: selected.targetType,
+    });
 
     const reason = input.reason?.trim() || "active-deployment-selected";
     const actionKind = input.actionKind ?? "version-management";
@@ -122,6 +187,34 @@ export class DeploymentVersionManager {
     return Object.freeze({
       active: toManagedDeploymentVersion(activeRecord),
       superseded: Object.freeze(superseded.sort((left, right) => right.activationUpdatedAt.localeCompare(left.activationUpdatedAt))),
+    });
+  }
+
+  private assertAccess(input: {
+    readonly action: typeof DeploymentAccessActions[keyof typeof DeploymentAccessActions];
+    readonly accessContext?: DeploymentAccessContext;
+    readonly resourceTenantId?: string;
+    readonly requestSource?: string;
+    readonly rootSystemAssetId?: string;
+    readonly rootSystemVersionId?: string;
+    readonly deploymentId?: string;
+    readonly targetId?: string;
+    readonly targetType?: DeploymentRecord["targetType"];
+  }): void {
+    this.accessEvaluator.assertAllowed({
+      action: input.action,
+      context: input.accessContext
+        ? Object.freeze({
+          ...input.accessContext,
+          source: input.requestSource ?? input.accessContext.source,
+        })
+        : undefined,
+      resourceTenantId: input.resourceTenantId,
+      rootSystemAssetId: input.rootSystemAssetId,
+      rootSystemVersionId: input.rootSystemVersionId,
+      deploymentId: input.deploymentId,
+      targetId: input.targetId,
+      targetType: input.targetType,
     });
   }
 }

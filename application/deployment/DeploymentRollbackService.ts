@@ -11,6 +11,15 @@ import { DeploymentLogLevels } from "../../domain/deployment/DeploymentDiagnosti
 import { type DeploymentVersionManager } from "./DeploymentVersionManager";
 import type { DeploymentDiagnosticsService } from "./DeploymentDiagnosticsService";
 import type { DeploymentRecordRepository } from "./DeploymentExecutionService";
+import {
+  DeploymentAccessActions,
+  DeploymentAccessEvaluator,
+  type DeploymentAccessContext,
+} from "./DeploymentAccessControl";
+import {
+  DeploymentQuotaActions,
+  DeploymentQuotaEvaluator,
+} from "./DeploymentQuotaEvaluator";
 
 export interface DeploymentRollbackActionRepository {
   save(record: RollbackActionRecord): RollbackActionRecord;
@@ -41,20 +50,54 @@ export class DeploymentRollbackService {
     private readonly diagnosticsService: Pick<DeploymentDiagnosticsService, "logEvent">,
     private readonly rollbackRepository: DeploymentRollbackActionRepository = new InMemoryDeploymentRollbackActionRepository(),
     private readonly clock: () => Date = () => new Date(),
+    private readonly accessEvaluator: DeploymentAccessEvaluator = new DeploymentAccessEvaluator(),
+    private readonly quotaEvaluator: DeploymentQuotaEvaluator = new DeploymentQuotaEvaluator(),
   ) {}
 
   public isRollbackEligible(request: RollbackRequest): RollbackDecision {
     return this.evaluateRollbackDecision(request).decision;
   }
 
-  public rollback(request: RollbackRequest): RollbackResult {
+  public rollback(request: RollbackRequest & {
+    readonly accessContext?: DeploymentAccessContext;
+    readonly resourceTenantId?: string;
+    readonly requestSource?: string;
+  }): RollbackResult {
     const normalized = this.normalizeRequest(request);
-    const evaluated = this.evaluateRollbackDecision(normalized);
+    this.accessEvaluator.assertAllowed({
+      action: DeploymentAccessActions.rollbackDeployment,
+      context: request.accessContext
+        ? Object.freeze({
+          ...request.accessContext,
+          source: request.requestSource ?? request.accessContext.source,
+        })
+        : undefined,
+      resourceTenantId: request.resourceTenantId,
+      rootSystemAssetId: normalized.rootSystemAssetId,
+      targetId: normalized.targetId,
+      targetType: normalized.targetType,
+      deploymentId: normalized.toDeploymentId,
+    });
+    this.quotaEvaluator.assertAllowed({
+      action: DeploymentQuotaActions.rollbackDeployment,
+      accessContext: request.accessContext,
+      rootSystemAssetId: normalized.rootSystemAssetId,
+      targetId: normalized.targetId,
+      targetType: normalized.targetType,
+    });
+    const evaluated = this.evaluateRollbackDecision(normalized, {
+      accessContext: request.accessContext,
+      resourceTenantId: request.resourceTenantId,
+      requestSource: request.requestSource,
+    });
     if (evaluated.decision.eligible && evaluated.currentDeployment && evaluated.targetDeployment) {
       this.versionManager.setActiveDeployment({
         deploymentId: evaluated.targetDeployment.deploymentId,
         reason: normalized.reason?.trim() || `rollback:${normalized.requestId}`,
         actionKind: "rollback",
+        accessContext: request.accessContext,
+        resourceTenantId: request.resourceTenantId,
+        requestSource: request.requestSource,
       });
 
       this.diagnosticsService.logEvent({
@@ -99,7 +142,27 @@ export class DeploymentRollbackService {
     });
   }
 
-  public listRollbackActions(input: { readonly rootSystemAssetId: string; readonly targetId: string; readonly targetType: DeploymentRecord["targetType"] }): ReadonlyArray<RollbackActionRecord> {
+  public listRollbackActions(input: {
+    readonly rootSystemAssetId: string;
+    readonly targetId: string;
+    readonly targetType: DeploymentRecord["targetType"];
+    readonly accessContext?: DeploymentAccessContext;
+    readonly resourceTenantId?: string;
+    readonly requestSource?: string;
+  }): ReadonlyArray<RollbackActionRecord> {
+    this.accessEvaluator.assertAllowed({
+      action: DeploymentAccessActions.readDeploymentHistory,
+      context: input.accessContext
+        ? Object.freeze({
+          ...input.accessContext,
+          source: input.requestSource ?? input.accessContext.source,
+        })
+        : undefined,
+      resourceTenantId: input.resourceTenantId,
+      rootSystemAssetId: input.rootSystemAssetId,
+      targetId: input.targetId,
+      targetType: input.targetType,
+    });
     return this.rollbackRepository.listBySystemAndTarget(input);
   }
 
@@ -125,7 +188,11 @@ export class DeploymentRollbackService {
     });
   }
 
-  private evaluateRollbackDecision(request: RollbackRequest): {
+  private evaluateRollbackDecision(request: RollbackRequest, governance?: {
+    readonly accessContext?: DeploymentAccessContext;
+    readonly resourceTenantId?: string;
+    readonly requestSource?: string;
+  }): {
     readonly decision: RollbackDecision;
     readonly currentDeployment?: DeploymentRecord;
     readonly targetDeployment?: DeploymentRecord;
@@ -134,6 +201,9 @@ export class DeploymentRollbackService {
       rootSystemAssetId: request.rootSystemAssetId,
       targetId: request.targetId,
       targetType: request.targetType,
+      accessContext: governance?.accessContext,
+      resourceTenantId: governance?.resourceTenantId,
+      requestSource: governance?.requestSource,
     });
     if (!active) {
       return { decision: { eligible: false, code: "no-active-deployment", message: "No active deployment exists for this system/target scope." } };
