@@ -91,6 +91,8 @@ describe("SystemRuntimeBackendApi", () => {
     expect(result.data?.outputSummary.hasOutput).toBeTrue();
     expect((result.data?.nodeResults.length ?? 0) > 0).toBeTrue();
     expect(result.data?.diagnostics.length).toBeGreaterThanOrEqual(0);
+    expect(result.data?.serialized.identity.executionId).toBe(started.data?.executionId);
+    expect(result.data?.serialized.summary.nestedSystemResultCount).toBe(result.data?.nestedSystemResults.length);
   });
 
   it("returns coherent not-found and invalid-request errors", async () => {
@@ -104,6 +106,37 @@ describe("SystemRuntimeBackendApi", () => {
     const invalid = await runtimeApi.startExecution({});
     expect(invalid.ok).toBeFalse();
     expect(invalid.error?.code).toBe("invalid-request");
+  });
+
+  it("returns structured runtime input validation errors before orchestration", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    await repository.saveAssetVersion(new AssetVersion({
+      assetId: "system:validated",
+      versionId: "system:validated:v1",
+      metadata: {
+        metadata: {
+          taxonomy: createSystemStudioTaxonomy("system", "deterministic"),
+        },
+        content: JSON.stringify({
+          systemSpec: {
+            components: [],
+            inputs: [{ inputId: "request", valueType: "string", required: true }],
+            outputs: [{ outputId: "response", valueType: "string" }],
+          },
+        }),
+        dependencies: [],
+      },
+    }));
+
+    const runtimeApi = new SystemRuntimeBackendApi(repository);
+    const invalid = await runtimeApi.startExecution({
+      versionId: "system:validated:v1",
+      inputPayload: {},
+    });
+
+    expect(invalid.ok).toBeFalse();
+    expect(invalid.error?.code).toBe("invalid-request");
+    expect(invalid.error?.validationErrors?.some((entry) => entry.code === "missing-required-input")).toBeTrue();
   });
 
   it("enforces version-aware execution and projects executed version maps", async () => {

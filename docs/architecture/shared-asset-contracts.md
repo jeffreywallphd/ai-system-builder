@@ -142,3 +142,19 @@ Not implemented in this slice:
   - implemented behavior (runtime domain, mapping/resolution, environment/plan, orchestration/step execution, state/trace/recovery, API/UI/status/result, persistence, version awareness, nested systems, and bounded stability controls),
   - bounded/partial behavior (single-host bounded loops/planning, bounded retention/read-model summaries),
   - future work (broader scheduling/distributed execution/advanced observability not yet implemented).
+
+## Direction 5 update: Runtime input validation + output serialization (stories 7.5–7.6)
+
+- External runtime execution now validates invocation payloads through a centralized seam (`application/system-runtime/RuntimeInputValidationService.ts`) before orchestration begins.
+- Validation is derived from existing runtime execution contract truth (`RuntimeExecutionContractMapping` + resolved system contract) and stays bounded to current model expressiveness:
+  - missing required inputs,
+  - unsupported input keys where contract semantics are explicit,
+  - bounded parameter/config object shape and declared type checks.
+- Validation failures are deterministic and structured (`RuntimeValidationError`) and are returned to runtime API consumers as `invalid-request` responses with machine-readable issue lists.
+- Runtime result retrieval now uses a transport-layer serialization seam (`infrastructure/api/system-runtime/RuntimeOutputSerializer.ts`) that projects:
+  - version-aware execution identity,
+  - execution summary,
+  - contract-labeled output payload entries,
+  - bounded nested-system summaries,
+  - bounded diagnostics summary + entries.
+- Serializer behavior is intentionally thin over existing runtime result truth and does not re-derive execution business logic.

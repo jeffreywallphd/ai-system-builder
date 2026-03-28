@@ -33,6 +33,10 @@ import { resolveSystemRuntimeDependencies } from "./RuntimeDependencyResolution"
 import { StepExecutionEngine } from "./StepExecutionEngine";
 import { CompositionAssetContractResolver } from "../contracts/CompositionAssetContractResolver";
 import {
+  RuntimeInputValidationFailure,
+  RuntimeInputValidationService,
+} from "./RuntimeInputValidationService";
+import {
   InMemorySystemRuntimeExecutionStore,
   type ExecutionMetadataSnapshot,
   type ISystemRuntimeExecutionStore,
@@ -278,6 +282,7 @@ function normalizeOptionalBoundedInteger(input: {
 export class SystemRuntimeApplicationService {
   private readonly contractResolver = new CompositionAssetContractResolver();
   private readonly orchestration = new ExecutionOrchestrationService(new StepExecutionEngine(), new ExecutionPlanBuilder());
+  private readonly runtimeInputValidation = new RuntimeInputValidationService();
 
   public constructor(
     private readonly repository: IStudioShellRepository,
@@ -323,13 +328,22 @@ export class SystemRuntimeApplicationService {
     });
 
     const behavior = classifyExecutableBehavior(root.taxonomy);
+    const rootContract = await this.resolveRootContract(root);
     const runtimeContract = await mapSystemContractToRuntimeExecutionContract({
       root,
-      contract: await this.resolveRootContract(root),
+      contract: rootContract,
       resolveSystem: async (reference) => this.resolveSystemFromReference(reference),
       resolveChildContract: async (component) => this.resolveComponentContract(component),
       maxDepth,
     });
+    const inputValidation = this.runtimeInputValidation.validate({
+      inputPayload: request.inputPayload,
+      runtimeContract,
+      contract: rootContract,
+    });
+    if (!inputValidation.valid) {
+      throw new RuntimeInputValidationFailure(inputValidation.errors);
+    }
     const dependencyResolution = await resolveSystemRuntimeDependencies({
       root,
       resolveSystem: async (reference) => this.resolveSystemFromReference(reference),
@@ -707,13 +721,32 @@ export class SystemRuntimeApplicationService {
     }
 
     const childBehavior = classifyExecutableBehavior(childRoot.taxonomy);
+    const childRootContract = await this.resolveRootContract(childRoot);
     const childRuntimeContract = await mapSystemContractToRuntimeExecutionContract({
       root: childRoot,
-      contract: await this.resolveRootContract(childRoot),
+      contract: childRootContract,
       resolveSystem: async (reference) => this.resolveSystemFromReference(reference),
       resolveChildContract: async (component) => this.resolveComponentContract(component),
       maxDepth: input.rootRequest.maxDepth,
     });
+    const childInputValidation = this.runtimeInputValidation.validate({
+      inputPayload: input.parentExecution.input.payload,
+      runtimeContract: childRuntimeContract,
+      contract: childRootContract,
+    });
+    if (!childInputValidation.valid) {
+      return Object.freeze({
+        nodeId: input.node.nodeId,
+        status: "failed",
+        startedAt,
+        completedAt: new Date().toISOString(),
+        error: {
+          code: "nested-system-invalid-input",
+          message: childInputValidation.errors[0]?.message ?? "Nested execution input validation failed.",
+        },
+        diagnostics: Object.freeze(childInputValidation.errors.map((entry) => `${entry.path}:${entry.code}`)),
+      });
+    }
     const childDependencyResolution = await resolveSystemRuntimeDependencies({
       root: childRoot,
       resolveSystem: async (reference) => this.resolveSystemFromReference(reference),

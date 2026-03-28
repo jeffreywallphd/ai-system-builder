@@ -11,10 +11,18 @@ import type { ISystemRuntimeExecutionStore } from "../../../application/system-r
 import { RuntimeAccessControlService, type ExecutionAccessContext } from "../../../application/system-runtime/RuntimeAccessControlService";
 import { ExecutionQuotaEvaluator } from "../../../application/system-runtime/ExecutionQuotaEvaluator";
 import {
+  type RuntimeValidationError,
+  RuntimeInputValidationFailure,
+} from "../../../application/system-runtime/RuntimeInputValidationService";
+import {
   PermissiveRuntimeApiAuthenticator,
   type RuntimeApiAuthenticationRequest,
   type RuntimeApiAuthenticator,
 } from "./RuntimeApiAuthentication";
+import {
+  RuntimeOutputSerializer,
+  type SerializedExecutionResult,
+} from "./RuntimeOutputSerializer";
 
 export type {
   RuntimeExecutionResultReadModel,
@@ -26,6 +34,7 @@ export type {
 export interface SystemRuntimeApiError {
   readonly code: "not-found" | "invalid-request" | "forbidden" | "unauthorized" | "quota-exceeded" | "internal";
   readonly message: string;
+  readonly validationErrors?: ReadonlyArray<RuntimeValidationError>;
 }
 
 export interface SystemRuntimeApiResponse<T> {
@@ -61,6 +70,10 @@ export interface GetSystemRuntimeExecutionResultRequest {
   readonly diagnosticsLimit?: number;
 }
 
+export interface RuntimeExecutionResultApiModel extends RuntimeExecutionResultReadModel {
+  readonly serialized: SerializedExecutionResult;
+}
+
 export interface RuntimeApiRequestContext {
   readonly trustedInternal?: boolean;
   readonly requireAuthentication?: boolean;
@@ -70,6 +83,7 @@ export interface RuntimeApiRequestContext {
 
 export class SystemRuntimeBackendApi {
   private readonly service: SystemRuntimeApplicationService;
+  private readonly outputSerializer = new RuntimeOutputSerializer();
 
   public constructor(
     repository: IStudioShellRepository,
@@ -146,22 +160,26 @@ export class SystemRuntimeBackendApi {
   public async getExecutionResult(
     executionId: string,
     requestContext?: RuntimeApiRequestContext,
-  ): Promise<SystemRuntimeApiResponse<RuntimeExecutionResultReadModel>> {
+  ): Promise<SystemRuntimeApiResponse<RuntimeExecutionResultApiModel>> {
     return this.getExecutionResultBounded({ executionId, requestContext });
   }
 
   public async getExecutionResultBounded(
     request: GetSystemRuntimeExecutionResultRequest & { readonly requestContext?: RuntimeApiRequestContext },
-  ): Promise<SystemRuntimeApiResponse<RuntimeExecutionResultReadModel>> {
+  ): Promise<SystemRuntimeApiResponse<RuntimeExecutionResultApiModel>> {
     return this.wrap(async () => {
       await this.getExecutionStatusAuthorized(request.executionId, request.requestContext);
       const base = this.service.getExecutionResult(request.executionId);
       const nodeResultLimit = this.normalizeOptionalBoundedInteger(request.nodeResultLimit, 1, 500, "nodeResultLimit");
       const diagnosticsLimit = this.normalizeOptionalBoundedInteger(request.diagnosticsLimit, 1, 500, "diagnosticsLimit");
-      return Object.freeze({
+      const bounded = Object.freeze({
         ...base,
         nodeResults: Object.freeze(nodeResultLimit ? base.nodeResults.slice(0, nodeResultLimit) : [...base.nodeResults]),
         diagnostics: Object.freeze(diagnosticsLimit ? base.diagnostics.slice(0, diagnosticsLimit) : [...base.diagnostics]),
+      });
+      return Object.freeze({
+        ...bounded,
+        serialized: this.outputSerializer.serialize(bounded),
       });
     });
   }
@@ -255,6 +273,13 @@ export class SystemRuntimeBackendApi {
   }
 
   private toApiError(error: unknown): SystemRuntimeApiError {
+    if (error instanceof RuntimeInputValidationFailure) {
+      return Object.freeze({
+        code: "invalid-request",
+        message: "Runtime input validation failed.",
+        validationErrors: error.validationErrors,
+      });
+    }
     const message = error instanceof Error ? error.message : "Unexpected backend runtime error.";
     if (message.startsWith("not-found:")) {
       return Object.freeze({ code: "not-found", message: message.slice("not-found:".length) });
