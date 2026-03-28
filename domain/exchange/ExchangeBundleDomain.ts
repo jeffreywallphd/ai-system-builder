@@ -1,6 +1,7 @@
 import { AssetId } from "../assets/AssetId";
 import type { CompositionTaxonomyDescriptor } from "../taxonomy/CompositionTaxonomy";
 import { createCompositionTaxonomyDescriptor } from "../taxonomy/CompositionTaxonomy";
+import { ExchangeFormatVersion } from "./ExchangeFormatVersioning";
 
 export class ExchangeBundleId {
   public readonly value: string;
@@ -25,13 +26,10 @@ export class ExchangeBundleFormatVersion {
     this.value = value;
   }
 
-  public static readonly current = "ai-loom.exchange-bundle.v1" as const;
+  public static readonly current = ExchangeFormatVersion.current;
 
   public static from(value?: string): ExchangeBundleFormatVersion {
-    const normalized = (value ?? ExchangeBundleFormatVersion.current).trim();
-    if (!normalized) {
-      throw new Error("ExchangeBundleFormatVersion cannot be empty.");
-    }
+    const normalized = ExchangeFormatVersion.from(value ?? ExchangeBundleFormatVersion.current).value;
     return new ExchangeBundleFormatVersion(normalized);
   }
 }
