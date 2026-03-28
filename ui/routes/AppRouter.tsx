@@ -36,6 +36,7 @@ import ConfigProfileStudioPage from "../pages/ConfigProfileStudioPage";
 import BuildPage from "../pages/BuildPage";
 import RegistryPage from "../pages/RegistryPage";
 import AssetDetailPage from "../pages/AssetDetailPage";
+import RunPage from "../pages/RunPage";
 import ProtectedRoute from "./ProtectedRoute";
 import { ROUTE_PATHS } from "./RouteConfig";
 import { BuildEntryFeatureFlag } from "../features/BuildEntryFeatureFlag";
@@ -67,6 +68,8 @@ export default function AppRouter({
               ? <BuildPage />
               : <Navigate to={ROUTE_PATHS.workflows} replace />,
           },
+          { path: ROUTE_PATHS.explore, element: <RegistryPage /> },
+          { path: ROUTE_PATHS.run, element: <RunPage /> },
           { path: ROUTE_PATHS.tools, element: <ToolsPage /> },
           { path: ROUTE_PATHS.toolRun, element: <ToolRunPage /> },
           { path: ROUTE_PATHS.workflows, element: <WorkflowsPage /> },
