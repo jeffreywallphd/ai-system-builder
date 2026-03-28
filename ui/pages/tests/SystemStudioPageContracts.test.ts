@@ -58,6 +58,8 @@ describe("SystemStudioPage contracts", () => {
     expect(source).toContain("Open child in studio");
     expect(source).toContain("Open nested system");
     expect(source).toContain("buildStudioHandoffQuery");
+    expect(source).toContain("InlineAssetCreationService");
+    expect(source).toContain("inlineCreationLinks");
     expect(source).toContain("saveSystemChildComponent");
     expect(source).toContain("removeSystemChildComponent");
     expect(source).toContain("reorderSystemChildComponent");

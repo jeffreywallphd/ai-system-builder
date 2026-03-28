@@ -25,7 +25,7 @@ describe("AssetDetailPage", () => {
     const source = readSource("ui/pages/AssetDetailPage.tsx");
 
     expect(source).toContain("Back to results");
-    expect(source).toContain("Open in studio");
+    expect(source).toContain("resolveOpenLabel");
     expect(source).toContain("registryContext");
     expect(source).toContain("Unified detail view across taxonomy, contract, provenance, dependency graph, and lineage");
   });

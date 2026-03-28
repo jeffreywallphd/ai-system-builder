@@ -18,6 +18,7 @@ import {
 import { AssetValidationSummary, DependencyCompatibilityPanel } from "../components/registry/AssetValidationPanels";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import { StudioEntryService } from "../routes/StudioRouteMapping";
+import { UxStudioEntryLabelResolver } from "../taxonomy/UxTaxonomySuppression";
 import { RegistryService } from "../services/RegistryService";
 
 function removeRoot(
@@ -32,6 +33,7 @@ export default function AssetDetailPage(): JSX.Element {
   const location = useLocation();
   const service = useMemo(() => new RegistryService(), []);
   const studioEntryService = useMemo(() => new StudioEntryService(), []);
+  const labelResolver = useMemo(() => new UxStudioEntryLabelResolver(), []);
   const [asset, setAsset] = useState<RegistryAsset>();
   const [upstream, setUpstream] = useState<RegistryDependencyGraph>();
   const [downstream, setDownstream] = useState<RegistryDependencyGraph>();
@@ -143,7 +145,7 @@ export default function AssetDetailPage(): JSX.Element {
                   className="ui-button ui-button--ghost ui-button--small"
                   to={studioEntryPath}
                 >
-                  Open in studio
+                  {labelResolver.resolveOpenLabel(asset.taxonomy)}
                 </Link>
               ) : null}
               <Link className="ui-button ui-button--ghost ui-button--small" to={registryBackPath}>Back to results</Link>
