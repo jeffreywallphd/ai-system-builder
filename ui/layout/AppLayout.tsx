@@ -1,13 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Link,
-  NavLink,
   Outlet,
   useBlocker,
   useBeforeUnload,
   useLocation,
 } from "react-router-dom";
-import { IntentNavigationShell } from "../routes/IntentNavigationShell";
 import { ContextNavigationService } from "../routes/ContextNavigation";
 import DevSyncButton from "../dev/DevSyncButton";
 import { useUiDependencies } from "../composition/AppProviders";
@@ -19,12 +17,6 @@ import ContextNavigationBar from "../components/navigation/ContextNavigationBar"
 import CommandPalette from "../components/navigation/CommandPalette";
 import { GlobalCommandTrigger } from "../routes/CommandPalette";
 import GuidedOnboardingFlowSurface from "../components/navigation/GuidedOnboardingFlow";
-
-function navLinkClassName(isActive: boolean): string {
-  return isActive
-    ? "ui-app__nav-link ui-app__nav-link--active"
-    : "ui-app__nav-link";
-}
 
 const fallbackConsoleState: RuntimeConsoleState = Object.freeze({
   isExpanded: false,
@@ -61,9 +53,7 @@ function getWorkflowEditorExitPrompt(workflowName?: string): string {
 export default function AppLayout(): JSX.Element {
   const { config, runtimeConsoleStore, workflowStore } = useUiDependencies();
   const location = useLocation();
-  const navigationShell = useMemo(() => new IntentNavigationShell(), []);
   const contextNavigationService = useMemo(() => new ContextNavigationService(), []);
-  const navigationModel = navigationShell.resolvePrimaryNavigation({ pathname: location.pathname });
   const contextNavigation = contextNavigationService.resolve({ pathname: location.pathname, search: location.search });
   const [runtimeConsoleState, setRuntimeConsoleState] = useState<RuntimeConsoleState>(fallbackConsoleState);
   const [isCommandPaletteOpen, setCommandPaletteOpen] = useState(false);
@@ -191,19 +181,6 @@ export default function AppLayout(): JSX.Element {
             >
               Command palette
             </button>
-
-            <nav className="ui-app__nav" aria-label="Primary">
-              {navigationModel.items.map((route) => (
-                <NavLink
-                  key={route.key}
-                  to={route.path}
-                  className={({ isActive }) => navLinkClassName(isActive)}
-                  end={route.path === "/"}
-                >
-                  {route.title}
-                </NavLink>
-              ))}
-            </nav>
           </div>
         </div>
       </header>
