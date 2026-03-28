@@ -13,6 +13,7 @@ import {
   type StudioShellExtensionContribution,
   type StudioShellExtensionSlot,
 } from "../studio-shell/StudioShellExtensions";
+import { StudioEntryService } from "../routes/StudioRouteMapping";
 
 function safeParseJson<T>(value: string, fallback: T): T {
   try {
@@ -87,6 +88,11 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
       : "Reusable bounded shell for studio/session context, authoring, taxonomy/contract/provenance/dependencies, lifecycle/version state, and validation.");
   const service = useMemo(() => new StudioShellService(), []);
   const location = useLocation();
+  const studioEntryService = useMemo(() => new StudioEntryService(), []);
+  const contextualInitialization = useMemo(
+    () => studioEntryService.parseInitializationFromSearch(location.search),
+    [location.search, studioEntryService],
+  );
   const extensionRegistry = useMemo(() => {
     const registry = new StudioShellExtensionRegistry();
     registry.registerMany([...(studioRegistration?.extensions ?? []), ...extensions]);
@@ -171,8 +177,12 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
     validationIssues,
     systemCompatibility,
     handoffContext: {
-      assetId: new URLSearchParams(location.search).get("assetId")?.trim() || undefined,
-      versionId: new URLSearchParams(location.search).get("versionId")?.trim() || undefined,
+      assetId: contextualInitialization.context.authoritativeAsset?.assetId
+        ?? new URLSearchParams(location.search).get("assetId")?.trim()
+        || undefined,
+      versionId: contextualInitialization.context.authoritativeAsset?.versionId
+        ?? new URLSearchParams(location.search).get("versionId")?.trim()
+        || undefined,
       handoff: new URLSearchParams(location.search).get("handoff")?.trim() || undefined,
       registryContext: new URLSearchParams(location.search).get("registryContext")?.trim() || undefined,
       selectedComponent: new URLSearchParams(location.search).get("selectedComponent")?.trim() || undefined,

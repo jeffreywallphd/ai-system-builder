@@ -17,7 +17,7 @@ import {
 } from "../components/registry/AssetDetailPanels";
 import { AssetValidationSummary, DependencyCompatibilityPanel } from "../components/registry/AssetValidationPanels";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
-import { buildStudioHandoffQuery, resolveStudioRouteFromAsset } from "../routes/StudioRouteMapping";
+import { StudioEntryService } from "../routes/StudioRouteMapping";
 import { RegistryService } from "../services/RegistryService";
 
 function removeRoot(
@@ -31,6 +31,7 @@ export default function AssetDetailPage(): JSX.Element {
   const { assetId } = useParams<{ assetId: string }>();
   const location = useLocation();
   const service = useMemo(() => new RegistryService(), []);
+  const studioEntryService = useMemo(() => new StudioEntryService(), []);
   const [asset, setAsset] = useState<RegistryAsset>();
   const [upstream, setUpstream] = useState<RegistryDependencyGraph>();
   const [downstream, setDownstream] = useState<RegistryDependencyGraph>();
@@ -40,6 +41,17 @@ export default function AssetDetailPage(): JSX.Element {
   const registryBackPath = registryContextQuery
     ? `${ROUTE_PATHS.registry}?${registryContextQuery}`
     : ROUTE_PATHS.registry;
+  const studioEntryPath = asset
+    ? studioEntryService.buildStudioRoute({
+      requestedRole: asset.taxonomy?.semanticRole,
+      mode: "asset",
+      asset: { assetId: asset.assetId, versionId: asset.versionId, taxonomy: asset.taxonomy },
+      entryContext: {
+        source: "registry",
+        registryContext: registryContextQuery ?? undefined,
+      },
+    })
+    : undefined;
 
   useEffect(() => {
     let active = true;
@@ -126,13 +138,10 @@ export default function AssetDetailPage(): JSX.Element {
           <div className="ui-row ui-row--wrap" style={{ justifyContent: "space-between" }}>
             <h1 className="ui-page__title" style={{ margin: 0 }}>{asset.name}</h1>
             <div className="ui-row ui-row--wrap" style={{ gap: "0.5rem" }}>
-              {resolveStudioRouteFromAsset(asset) ? (
+              {studioEntryPath ? (
                 <Link
                   className="ui-button ui-button--ghost ui-button--small"
-                  to={`${resolveStudioRouteFromAsset(asset)}?${buildStudioHandoffQuery(asset, {
-                    handoff: "registry",
-                    registryContext: registryContextQuery ?? undefined,
-                  })}`}
+                  to={studioEntryPath}
                 >
                   Open in studio
                 </Link>
