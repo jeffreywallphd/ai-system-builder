@@ -3,7 +3,7 @@ import type { ExecutionAccessContext } from "../../../application/system-runtime
 import {
   type GetSystemRuntimeExecutionResultRequest,
   type GetSystemRuntimeExecutionTraceRequest,
-  type RuntimeExecutionResultReadModel,
+  type RuntimeExecutionResultApiModel,
   type RuntimeExecutionStatusReadModel,
   type RuntimeExecutionTraceReadModel,
   SystemRuntimeBackendApi,
@@ -36,7 +36,7 @@ export interface ExternalExecutionResponse {
 
 export interface ExternalExecutionStatus extends RuntimeExecutionStatusReadModel {}
 
-export interface ExternalExecutionResult extends RuntimeExecutionResultReadModel {
+export interface ExternalExecutionResult extends RuntimeExecutionResultApiModel {
   readonly bounded: {
     readonly nodeResultsTruncated: boolean;
     readonly diagnosticsTruncated: boolean;

@@ -109,3 +109,19 @@
   - fully implemented capabilities,
   - bounded/partial behavior,
   - future runtime work not yet implemented.
+
+## Direction 5 update: Runtime input validation + output serialization (stories 7.5–7.6)
+
+- External runtime start now validates payloads through a centralized application seam (`RuntimeInputValidationService`) before plan/orchestration work begins.
+- Validation is contract-derived (resolved system contract + runtime execution contract mapping), deterministic, and bounded to current expressiveness:
+  - required-input checks,
+  - unsupported-key checks where meaningful,
+  - bounded parameter/config object + declared-type checks.
+- Validation denials are structured runtime issues (`RuntimeValidationError`) surfaced as `invalid-request` API errors with machine-readable details.
+- Runtime result reads now pass through `RuntimeOutputSerializer` in the API layer for deterministic external envelopes covering:
+  - execution/version identity,
+  - summary,
+  - contract-labeled outputs,
+  - bounded nested-system summaries,
+  - bounded diagnostics counts + entries.
+- The serializer is intentionally thin over runtime read-model truth and does not duplicate orchestration logic.

@@ -81,6 +81,7 @@ async function seedVersion(repository: InMemoryStudioShellRepository): Promise<v
           ],
           inputs: [{ inputId: "request", valueType: "string", required: true }],
           outputs: [{ outputId: "response", valueType: "string" }],
+          parameters: [{ parameterId: "temperature", valueType: "number", required: false }],
         },
       }),
       dependencies: [{ assetId: "asset:model", versionId: "asset:model:v1" }],
@@ -141,6 +142,8 @@ describe("ExternalSystemRuntimeInterface", () => {
     expect((result.data?.nodeResults.length ?? 0) <= 1).toBeTrue();
     expect((result.data?.diagnostics.length ?? 0) <= 1).toBeTrue();
     expect(result.data?.bounded).toBeDefined();
+    expect(result.data?.serialized.identity.executionId).toBe(started.data?.executionId);
+    expect(result.data?.serialized.summary.nodeResultCount).toBe(result.data?.nodeResults.length);
   });
 
   it("rejects invalid external identity inputs consistently", async () => {
@@ -295,6 +298,109 @@ describe("ExternalSystemRuntimeInterface", () => {
     });
     expect(blocked.ok).toBeFalse();
     expect(blocked.error?.code).toBe("quota-exceeded");
+  });
+
+  it("rejects missing required inputs before runtime orchestration begins", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    await seedVersion(repository);
+    const backend = new SystemRuntimeBackendApi(
+      repository,
+      undefined,
+      new RuntimeAccessControlService(),
+      new StaticTokenRuntimeApiAuthenticator({
+        "token-user-1": { callerKind: "user", callerId: "user-1" },
+      }),
+    );
+    const external = new ExternalSystemRuntimeInterface(backend);
+
+    const invalid = await external.startExecution({
+      systemId: "system:external",
+      versionId: "system:external:v1",
+      inputPayload: {},
+      authentication: { bearerToken: "token-user-1" },
+    });
+    expect(invalid.ok).toBeFalse();
+    expect(invalid.error?.code).toBe("invalid-request");
+    expect(invalid.error?.validationErrors?.some((entry) => entry.code === "missing-required-input")).toBeTrue();
+  });
+
+  it("rejects invalid runtime parameters/config payload shapes with structured validation errors", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    await seedVersion(repository);
+    const backend = new SystemRuntimeBackendApi(
+      repository,
+      undefined,
+      new RuntimeAccessControlService(),
+      new StaticTokenRuntimeApiAuthenticator({
+        "token-user-1": { callerKind: "user", callerId: "user-1" },
+      }),
+    );
+    const external = new ExternalSystemRuntimeInterface(backend);
+
+    const invalid = await external.startExecution({
+      systemId: "system:external",
+      versionId: "system:external:v1",
+      inputPayload: {
+        request: "ok",
+        parameters: { temperature: "hot" },
+        config: "bad-config",
+      },
+      authentication: { bearerToken: "token-user-1" },
+    });
+    expect(invalid.ok).toBeFalse();
+    expect(invalid.error?.code).toBe("invalid-request");
+    const issueCodes = new Set(invalid.error?.validationErrors?.map((entry) => entry.code) ?? []);
+    expect(issueCodes.has("invalid-parameter-type")).toBeTrue();
+    expect(issueCodes.has("invalid-config-payload")).toBeTrue();
+  });
+
+  it("applies version-aware runtime input validation using the pinned version contract", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    await seedVersion(repository);
+    await repository.saveAssetVersion(new AssetVersion({
+      assetId: "system:external",
+      versionId: "system:external:v2",
+      metadata: {
+        metadata: {
+          taxonomy: { structuralKind: "system", semanticRole: "system", behaviorKind: "deterministic" },
+        },
+        content: JSON.stringify({
+          systemSpec: {
+            components: [],
+            inputs: [{ inputId: "prompt", valueType: "string", required: true }],
+            outputs: [{ outputId: "response", valueType: "string" }],
+          },
+        }),
+        dependencies: [],
+      },
+    }));
+
+    const backend = new SystemRuntimeBackendApi(
+      repository,
+      undefined,
+      new RuntimeAccessControlService(),
+      new StaticTokenRuntimeApiAuthenticator({
+        "token-user-1": { callerKind: "user", callerId: "user-1" },
+      }),
+    );
+    const external = new ExternalSystemRuntimeInterface(backend);
+
+    const invalidV2 = await external.startExecution({
+      systemId: "system:external",
+      versionId: "system:external:v2",
+      inputPayload: { request: "legacy-field" },
+      authentication: { bearerToken: "token-user-1" },
+    });
+    expect(invalidV2.ok).toBeFalse();
+    expect(invalidV2.error?.validationErrors?.some((entry) => entry.path === "inputPayload.prompt")).toBeTrue();
+
+    const validV2 = await external.startExecution({
+      systemId: "system:external",
+      versionId: "system:external:v2",
+      inputPayload: { prompt: "new-field" },
+      authentication: { bearerToken: "token-user-1" },
+    });
+    expect(validV2.ok).toBeTrue();
   });
 
   it("preserves trusted internal runtime path without external authentication", async () => {
