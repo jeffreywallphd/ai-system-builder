@@ -31,6 +31,12 @@ import type { CompositionTaxonomyDescriptor } from "../../domain/taxonomy/Compos
 import type { IAssetRecordRepository } from "../ports/interfaces/IAssetRecordRepository";
 import type { IAssetVersionRepository } from "../ports/interfaces/IAssetVersionRepository";
 import { CompositionTaxonomyClassifier } from "../taxonomy/CompositionTaxonomyClassifier";
+import {
+  ExchangeAccessActions,
+  ExchangeAccessDeniedError,
+  ExchangeAccessEvaluator,
+  type ExchangeAccessContext,
+} from "./ExchangeAccessControl";
 
 export interface AtomicAssetExportRequest {
   readonly assetId: string;
@@ -38,6 +44,8 @@ export interface AtomicAssetExportRequest {
   readonly bundleFormatVersion?: string;
   readonly exportedAt?: string;
   readonly tags?: ReadonlyArray<string>;
+  readonly accessContext?: ExchangeAccessContext;
+  readonly resourceTenantId?: string;
 }
 
 export interface CompositeAssetExportRequest {
@@ -46,6 +54,8 @@ export interface CompositeAssetExportRequest {
   readonly bundleFormatVersion?: string;
   readonly exportedAt?: string;
   readonly tags?: ReadonlyArray<string>;
+  readonly accessContext?: ExchangeAccessContext;
+  readonly resourceTenantId?: string;
 }
 
 export interface SystemAssetExportRequest {
@@ -55,6 +65,8 @@ export interface SystemAssetExportRequest {
   readonly exportedAt?: string;
   readonly tags?: ReadonlyArray<string>;
   readonly maxDepth?: number;
+  readonly accessContext?: ExchangeAccessContext;
+  readonly resourceTenantId?: string;
 }
 
 export interface AssetExportArtifact {
@@ -75,7 +87,7 @@ export type AtomicAssetExportResult = {
 } | {
   readonly ok: false;
   readonly subjectKind: "atomic-asset";
-  readonly code: "invalid-request" | "asset-not-found" | "version-not-found" | "version-mismatch" | "validation-failed";
+  readonly code: "invalid-request" | "forbidden" | "asset-not-found" | "version-not-found" | "version-mismatch" | "validation-failed";
   readonly message: string;
   readonly details?: Readonly<Record<string, unknown>>;
 };
@@ -91,7 +103,7 @@ export type CompositeAssetExportResult = {
 } | {
   readonly ok: false;
   readonly subjectKind: "composite-asset";
-  readonly code: "invalid-request" | "asset-not-found" | "version-not-found" | "version-mismatch" | "validation-failed";
+  readonly code: "invalid-request" | "forbidden" | "asset-not-found" | "version-not-found" | "version-mismatch" | "validation-failed";
   readonly message: string;
   readonly details?: Readonly<Record<string, unknown>>;
 };
@@ -108,21 +120,27 @@ export type SystemAssetExportResult = {
 } | {
   readonly ok: false;
   readonly subjectKind: "system-asset";
-  readonly code: "invalid-request" | "asset-not-found" | "version-not-found" | "version-mismatch" | "validation-failed";
+  readonly code: "invalid-request" | "forbidden" | "asset-not-found" | "version-not-found" | "version-mismatch" | "validation-failed";
   readonly message: string;
   readonly details?: Readonly<Record<string, unknown>>;
 };
 
 export interface AtomicAssetImportRequest {
   readonly artifactContent: string;
+  readonly accessContext?: ExchangeAccessContext;
+  readonly resourceTenantId?: string;
 }
 
 export interface CompositeAssetImportRequest {
   readonly artifactContent: string;
+  readonly accessContext?: ExchangeAccessContext;
+  readonly resourceTenantId?: string;
 }
 
 export interface SystemAssetImportRequest {
   readonly artifactContent: string;
+  readonly accessContext?: ExchangeAccessContext;
+  readonly resourceTenantId?: string;
 }
 
 export interface ImportedAtomicAssetRecord {
@@ -172,6 +190,7 @@ export type AtomicAssetImportResult = {
   readonly subjectKind: "atomic-asset";
   readonly code:
     | "invalid-request"
+    | "forbidden"
     | "deserialization-failed"
     | "unsupported-format-version"
     | "validation-failed"
@@ -190,6 +209,7 @@ export type CompositeAssetImportResult = {
   readonly subjectKind: "composite-asset";
   readonly code:
     | "invalid-request"
+    | "forbidden"
     | "deserialization-failed"
     | "unsupported-format-version"
     | "validation-failed"
@@ -208,6 +228,7 @@ export type SystemAssetImportResult = {
   readonly subjectKind: "system-asset";
   readonly code:
     | "invalid-request"
+    | "forbidden"
     | "deserialization-failed"
     | "unsupported-format-version"
     | "validation-failed"
@@ -869,6 +890,7 @@ export class AtomicAssetExportService {
   public constructor(
     private readonly assetRepository: IAssetRecordRepository,
     private readonly versionRepository: IAssetVersionRepository,
+    private readonly accessEvaluator: ExchangeAccessEvaluator = new ExchangeAccessEvaluator(),
     serializer: ExchangeBundleSerializer = new ExchangeBundleSerializer({ validator: new ExchangeBundleValidator() }),
   ) {
     this.serializer = serializer;
@@ -879,6 +901,13 @@ export class AtomicAssetExportService {
     try {
       const assetId = normalizeRequired(request.assetId, "Atomic export asset id");
       const versionId = normalizeRequired(request.versionId, "Atomic export version id");
+      this.accessEvaluator.assertAllowed({
+        action: ExchangeAccessActions.exportAtomic,
+        context: request.accessContext,
+        sourceAssetId: assetId,
+        sourceVersionId: versionId,
+        resourceTenantId: request.resourceTenantId,
+      });
       const asset = await this.assetRepository.getById(assetId);
       if (!asset) {
         return { ok: false, subjectKind: "atomic-asset", code: "asset-not-found", message: `Asset '${assetId}' was not found.` };
@@ -913,6 +942,15 @@ export class AtomicAssetExportService {
         }),
       });
     } catch (error) {
+      if (error instanceof ExchangeAccessDeniedError) {
+        return {
+          ok: false,
+          subjectKind: "atomic-asset",
+          code: "forbidden",
+          message: error.decision.message ?? "Exchange access denied.",
+          details: { decision: error.decision },
+        };
+      }
       return {
         ok: false,
         subjectKind: "atomic-asset",
@@ -930,6 +968,7 @@ export class CompositeAssetExportService {
   public constructor(
     private readonly assetRepository: IAssetRecordRepository,
     private readonly versionRepository: IAssetVersionRepository,
+    private readonly accessEvaluator: ExchangeAccessEvaluator = new ExchangeAccessEvaluator(),
     serializer: ExchangeBundleSerializer = new ExchangeBundleSerializer({ validator: new ExchangeBundleValidator() }),
   ) {
     this.serializer = serializer;
@@ -940,6 +979,13 @@ export class CompositeAssetExportService {
     try {
       const assetId = normalizeRequired(request.assetId, "Composite export asset id");
       const versionId = normalizeRequired(request.versionId, "Composite export version id");
+      this.accessEvaluator.assertAllowed({
+        action: ExchangeAccessActions.exportComposite,
+        context: request.accessContext,
+        sourceAssetId: assetId,
+        sourceVersionId: versionId,
+        resourceTenantId: request.resourceTenantId,
+      });
       const asset = await this.assetRepository.getById(assetId);
       if (!asset) {
         return { ok: false, subjectKind: "composite-asset", code: "asset-not-found", message: `Asset '${assetId}' was not found.` };
@@ -975,6 +1021,15 @@ export class CompositeAssetExportService {
         }),
       });
     } catch (error) {
+      if (error instanceof ExchangeAccessDeniedError) {
+        return {
+          ok: false,
+          subjectKind: "composite-asset",
+          code: "forbidden",
+          message: error.decision.message ?? "Exchange access denied.",
+          details: { decision: error.decision },
+        };
+      }
       return {
         ok: false,
         subjectKind: "composite-asset",
@@ -992,6 +1047,7 @@ export class SystemAssetExportService {
   public constructor(
     private readonly assetRepository: IAssetRecordRepository,
     private readonly versionRepository: IAssetVersionRepository,
+    private readonly accessEvaluator: ExchangeAccessEvaluator = new ExchangeAccessEvaluator(),
     serializer: ExchangeBundleSerializer = new ExchangeBundleSerializer({ validator: new ExchangeBundleValidator() }),
   ) {
     this.serializer = serializer;
@@ -1002,6 +1058,13 @@ export class SystemAssetExportService {
     try {
       const assetId = normalizeRequired(request.assetId, "System export asset id");
       const versionId = normalizeRequired(request.versionId, "System export version id");
+      this.accessEvaluator.assertAllowed({
+        action: ExchangeAccessActions.exportSystem,
+        context: request.accessContext,
+        sourceAssetId: assetId,
+        sourceVersionId: versionId,
+        resourceTenantId: request.resourceTenantId,
+      });
       const asset = await this.assetRepository.getById(assetId);
       if (!asset) {
         return { ok: false, subjectKind: "system-asset", code: "asset-not-found", message: `Asset '${assetId}' was not found.` };
@@ -1038,6 +1101,15 @@ export class SystemAssetExportService {
         }),
       });
     } catch (error) {
+      if (error instanceof ExchangeAccessDeniedError) {
+        return {
+          ok: false,
+          subjectKind: "system-asset",
+          code: "forbidden",
+          message: error.decision.message ?? "Exchange access denied.",
+          details: { decision: error.decision },
+        };
+      }
       return {
         ok: false,
         subjectKind: "system-asset",
@@ -1204,6 +1276,7 @@ export class AtomicAssetImportService {
   public constructor(
     private readonly assetRepository: IAssetRecordRepository,
     private readonly versionRepository: IAssetVersionRepository,
+    private readonly accessEvaluator: ExchangeAccessEvaluator = new ExchangeAccessEvaluator(),
     deserializer: ExchangeBundleDeserializer = new ExchangeBundleDeserializer({ validator: new ExchangeBundleValidator() }),
     resolver: AtomicAssetBundleImportResolver = new AtomicAssetBundleImportResolver(),
     private readonly clock: () => Date = () => new Date(),
@@ -1219,6 +1292,11 @@ export class AtomicAssetImportService {
   public async import(request: AtomicAssetImportRequest): Promise<AtomicAssetImportResult> {
     try {
       const content = normalizeRequired(request.artifactContent, "Atomic import artifact content");
+      this.accessEvaluator.assertAllowed({
+        action: ExchangeAccessActions.importAtomic,
+        context: request.accessContext,
+        resourceTenantId: request.resourceTenantId,
+      });
       const deserialized = this.deserializer.deserialize({ content });
       if (!deserialized.ok) {
         if (deserialized.formatVersionSupport
@@ -1391,6 +1469,15 @@ export class AtomicAssetImportService {
         }),
       };
     } catch (error) {
+      if (error instanceof ExchangeAccessDeniedError) {
+        return {
+          ok: false,
+          subjectKind: "atomic-asset",
+          code: "forbidden",
+          message: error.decision.message ?? "Exchange access denied.",
+          details: { decision: error.decision },
+        };
+      }
       return {
         ok: false,
         subjectKind: "atomic-asset",
@@ -1410,6 +1497,7 @@ export class CompositeAssetImportService {
   public constructor(
     private readonly assetRepository: IAssetRecordRepository,
     private readonly versionRepository: IAssetVersionRepository,
+    private readonly accessEvaluator: ExchangeAccessEvaluator = new ExchangeAccessEvaluator(),
     deserializer: ExchangeBundleDeserializer = new ExchangeBundleDeserializer({ validator: new ExchangeBundleValidator() }),
     resolver: CompositeAssetBundleImportResolver = new CompositeAssetBundleImportResolver(),
     private readonly clock: () => Date = () => new Date(),
@@ -1425,6 +1513,11 @@ export class CompositeAssetImportService {
   public async import(request: CompositeAssetImportRequest): Promise<CompositeAssetImportResult> {
     try {
       const content = normalizeRequired(request.artifactContent, "Composite import artifact content");
+      this.accessEvaluator.assertAllowed({
+        action: ExchangeAccessActions.importComposite,
+        context: request.accessContext,
+        resourceTenantId: request.resourceTenantId,
+      });
       const deserialized = this.deserializer.deserialize({ content });
       if (!deserialized.ok) {
         if (deserialized.formatVersionSupport
@@ -1607,6 +1700,15 @@ export class CompositeAssetImportService {
         }),
       };
     } catch (error) {
+      if (error instanceof ExchangeAccessDeniedError) {
+        return {
+          ok: false,
+          subjectKind: "composite-asset",
+          code: "forbidden",
+          message: error.decision.message ?? "Exchange access denied.",
+          details: { decision: error.decision },
+        };
+      }
       return {
         ok: false,
         subjectKind: "composite-asset",
@@ -1626,6 +1728,7 @@ export class SystemAssetImportService {
   public constructor(
     private readonly assetRepository: IAssetRecordRepository,
     private readonly versionRepository: IAssetVersionRepository,
+    private readonly accessEvaluator: ExchangeAccessEvaluator = new ExchangeAccessEvaluator(),
     deserializer: ExchangeBundleDeserializer = new ExchangeBundleDeserializer({ validator: new ExchangeBundleValidator() }),
     resolver: SystemAssetBundleImportResolver = new SystemAssetBundleImportResolver(),
     private readonly clock: () => Date = () => new Date(),
@@ -1641,6 +1744,11 @@ export class SystemAssetImportService {
   public async import(request: SystemAssetImportRequest): Promise<SystemAssetImportResult> {
     try {
       const content = normalizeRequired(request.artifactContent, "System import artifact content");
+      this.accessEvaluator.assertAllowed({
+        action: ExchangeAccessActions.importSystem,
+        context: request.accessContext,
+        resourceTenantId: request.resourceTenantId,
+      });
       const deserialized = this.deserializer.deserialize({ content });
       if (!deserialized.ok) {
         if (deserialized.formatVersionSupport
@@ -1831,6 +1939,15 @@ export class SystemAssetImportService {
         }),
       };
     } catch (error) {
+      if (error instanceof ExchangeAccessDeniedError) {
+        return {
+          ok: false,
+          subjectKind: "system-asset",
+          code: "forbidden",
+          message: error.decision.message ?? "Exchange access denied.",
+          details: { decision: error.decision },
+        };
+      }
       return {
         ok: false,
         subjectKind: "system-asset",
