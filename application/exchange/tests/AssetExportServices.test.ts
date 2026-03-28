@@ -13,6 +13,7 @@ import {
   SystemAssetExportService,
   SystemAssetImportService,
 } from "../AssetExportServices";
+import { ExchangeAccessEvaluator, RoleBasedExchangeAccessPolicy } from "../ExchangeAccessControl";
 
 class InMemoryAssetRecordRepository implements IAssetRecordRepository {
   private readonly records = new Map<string, IAsset>();
@@ -108,6 +109,43 @@ describe("Asset export services", () => {
     expect(missingAsset.ok).toBeFalse();
     if (!missingAsset.ok) {
       expect(missingAsset.code).toBe("asset-not-found");
+    }
+  });
+
+  it("denies unauthorized exchange export/import at authoritative service entry points", async () => {
+    const assets = new InMemoryAssetRecordRepository();
+    const versions = new InMemoryAssetVersionRepository();
+    await assets.save(createAsset({ id: "asset:secure-a", kind: "json" }));
+    await versions.saveVersion(new AssetVersion({ assetId: "asset:secure-a", versionId: "asset:secure-a:v1" }));
+
+    const access = new ExchangeAccessEvaluator(new RoleBasedExchangeAccessPolicy());
+    const exportService = new AtomicAssetExportService(assets, versions, access);
+    const exportDenied = await exportService.export({
+      assetId: "asset:secure-a",
+      versionId: "asset:secure-a:v1",
+      accessContext: {
+        tenantId: "tenant-a",
+        caller: { callerKind: "user", callerId: "import-only", roles: ["exchange-importer"] },
+      },
+      resourceTenantId: "tenant-a",
+    });
+    expect(exportDenied.ok).toBeFalse();
+    if (!exportDenied.ok) {
+      expect(exportDenied.code).toBe("forbidden");
+    }
+
+    const importService = new AtomicAssetImportService(new InMemoryAssetRecordRepository(), new InMemoryAssetVersionRepository(), access);
+    const importDenied = await importService.import({
+      artifactContent: "{\"broken\":true}",
+      accessContext: {
+        tenantId: "tenant-a",
+        caller: { callerKind: "user", callerId: "export-only", roles: ["exchange-exporter"] },
+      },
+      resourceTenantId: "tenant-a",
+    });
+    expect(importDenied.ok).toBeFalse();
+    if (!importDenied.ok) {
+      expect(importDenied.code).toBe("forbidden");
     }
   });
 
@@ -318,7 +356,7 @@ describe("Asset export services", () => {
 
     const importAssets = new InMemoryAssetRecordRepository();
     const importVersions = new InMemoryAssetVersionRepository();
-    const imported = await new AtomicAssetImportService(importAssets, importVersions, undefined, undefined, () => new Date("2026-03-28T01:00:00.000Z")).import({
+    const imported = await new AtomicAssetImportService(importAssets, importVersions, undefined, undefined, undefined, () => new Date("2026-03-28T01:00:00.000Z")).import({
       artifactContent: exported.artifact.content,
     });
 
@@ -386,7 +424,7 @@ describe("Asset export services", () => {
 
     const importAssets = new InMemoryAssetRecordRepository();
     const importVersions = new InMemoryAssetVersionRepository();
-    const imported = await new CompositeAssetImportService(importAssets, importVersions, undefined, undefined, () => new Date("2026-03-28T02:00:00.000Z")).import({
+    const imported = await new CompositeAssetImportService(importAssets, importVersions, undefined, undefined, undefined, () => new Date("2026-03-28T02:00:00.000Z")).import({
       artifactContent: exported.artifact.content,
     });
 
@@ -460,7 +498,7 @@ describe("Asset export services", () => {
 
     const importAssets = new InMemoryAssetRecordRepository();
     const importVersions = new InMemoryAssetVersionRepository();
-    const imported = await new SystemAssetImportService(importAssets, importVersions, undefined, undefined, () => new Date("2026-03-28T03:00:00.000Z")).import({
+    const imported = await new SystemAssetImportService(importAssets, importVersions, undefined, undefined, undefined, () => new Date("2026-03-28T03:00:00.000Z")).import({
       artifactContent: exported.artifact.content,
     });
 
