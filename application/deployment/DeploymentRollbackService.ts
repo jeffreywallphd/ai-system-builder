@@ -22,6 +22,8 @@ import {
 } from "./DeploymentQuotaEvaluator";
 import { DeploymentIsolationEvaluator } from "./DeploymentIsolationEvaluator";
 import type { DeploymentEnvironmentContext } from "../../domain/deployment/DeploymentIsolationDomain";
+import { DeploymentAuditEventKinds, DeploymentAuditOutcomes } from "../../domain/deployment/DeploymentAuditTrailDomain";
+import type { DeploymentAuditTrailService } from "./DeploymentAuditTrailService";
 
 export interface DeploymentRollbackActionRepository {
   save(record: RollbackActionRecord): RollbackActionRecord;
@@ -55,6 +57,7 @@ export class DeploymentRollbackService {
     private readonly accessEvaluator: DeploymentAccessEvaluator = new DeploymentAccessEvaluator(),
     private readonly quotaEvaluator: DeploymentQuotaEvaluator = new DeploymentQuotaEvaluator(),
     private readonly isolationEvaluator: DeploymentIsolationEvaluator = new DeploymentIsolationEvaluator(),
+    private readonly auditTrailService?: DeploymentAuditTrailService,
   ) {}
 
   public isRollbackEligible(request: RollbackRequest): RollbackDecision {
@@ -67,6 +70,25 @@ export class DeploymentRollbackService {
     readonly requestSource?: string;
   }): RollbackResult {
     const normalized = this.normalizeRequest(request);
+    this.auditTrailService?.record({
+      eventKind: DeploymentAuditEventKinds.rollbackRequested,
+      outcome: DeploymentAuditOutcomes.accepted,
+      requestSource: this.normalizeRequestSource(request.requestSource),
+      caller: this.normalizeCaller(request.accessContext, normalized.requestedBy),
+      tenant: Object.freeze({
+        tenantId: request.resourceTenantId ?? request.accessContext?.tenantId,
+        source: request.requestSource,
+      }),
+      deployment: Object.freeze({
+        deploymentId: normalized.toDeploymentId,
+        requestId: normalized.requestId,
+        rootSystemAssetId: normalized.rootSystemAssetId,
+        targetId: normalized.targetId,
+        targetType: normalized.targetType,
+      }),
+      detail: Object.freeze({ message: "Rollback requested." }),
+      occurredAt: this.clock().toISOString(),
+    });
     this.accessEvaluator.assertAllowed({
       action: DeploymentAccessActions.rollbackDeployment,
       context: request.accessContext
@@ -129,6 +151,36 @@ export class DeploymentRollbackService {
       performed: evaluated.decision.eligible,
       decision: evaluated.decision,
     }));
+    const auditedDeployment = evaluated.targetDeployment ?? evaluated.currentDeployment;
+    const auditOutcome = action.performed ? DeploymentAuditOutcomes.succeeded : DeploymentAuditOutcomes.rejected;
+    this.auditTrailService?.record({
+      eventKind: action.performed ? DeploymentAuditEventKinds.rollbackCompleted : DeploymentAuditEventKinds.rollbackRejected,
+      outcome: auditOutcome,
+      requestSource: this.normalizeRequestSource(request.requestSource),
+      caller: this.normalizeCaller(request.accessContext, normalized.requestedBy),
+      tenant: Object.freeze({
+        tenantId: request.resourceTenantId ?? request.accessContext?.tenantId,
+        source: request.requestSource,
+      }),
+      deployment: Object.freeze({
+        deploymentId: action.toDeploymentId,
+        requestId: action.requestId,
+        rootSystemAssetId: action.rootSystemAssetId,
+        rootSystemVersionId: auditedDeployment?.rootSystemVersionId,
+        bundleId: auditedDeployment?.bundleId,
+        bundleVersionKey: auditedDeployment?.bundleVersionKey,
+        deploymentConfigurationId: auditedDeployment?.deploymentConfigurationId,
+        targetId: action.targetId,
+        targetType: action.targetType,
+        deploymentEnvironmentId: auditedDeployment?.provisionedEnvironmentId,
+      }),
+      detail: Object.freeze({
+        message: action.performed ? "Rollback completed." : "Rollback rejected.",
+        errorCode: action.performed ? undefined : action.decision.code,
+        relatedDeploymentId: action.fromDeploymentId,
+      }),
+      occurredAt: this.clock().toISOString(),
+    });
 
     return Object.freeze({
       requestId: action.requestId,
@@ -322,5 +374,22 @@ export class DeploymentRollbackService {
       callerId: input.accessContext?.caller?.callerId?.trim() || undefined,
       sessionId: input.accessContext?.caller?.sessionId?.trim() || undefined,
     });
+  }
+
+  private normalizeCaller(accessContext: DeploymentAccessContext | undefined, requestedBy: string) {
+    return Object.freeze({
+      callerKind: accessContext?.caller?.callerKind,
+      callerId: accessContext?.caller?.callerId ?? requestedBy,
+      sessionId: accessContext?.caller?.sessionId,
+      roles: accessContext?.caller?.roles,
+      authenticatedPrincipalId: accessContext?.caller?.authenticatedPrincipalId,
+    });
+  }
+
+  private normalizeRequestSource(source?: string): "deployment-api" | "external-api" | "studio-shell-internal" | "internal-trusted" | "unknown" {
+    if (source === "deployment-api" || source === "external-api" || source === "studio-shell-internal" || source === "internal-trusted") {
+      return source;
+    }
+    return "unknown";
   }
 }

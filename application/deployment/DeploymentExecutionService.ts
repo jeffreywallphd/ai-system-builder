@@ -36,6 +36,8 @@ import {
   DeploymentQuotaEvaluator,
 } from "./DeploymentQuotaEvaluator";
 import { DeploymentIsolationEvaluator } from "./DeploymentIsolationEvaluator";
+import { DeploymentAuditEventKinds, DeploymentAuditOutcomes } from "../../domain/deployment/DeploymentAuditTrailDomain";
+import type { DeploymentAuditTrailService } from "./DeploymentAuditTrailService";
 
 export interface DeploymentRecordRepository {
   save(record: DeploymentRecord): DeploymentRecord;
@@ -103,6 +105,7 @@ export class DeploymentExecutionService {
     private readonly accessEvaluator: DeploymentAccessEvaluator = new DeploymentAccessEvaluator(),
     private readonly quotaEvaluator: DeploymentQuotaEvaluator = new DeploymentQuotaEvaluator(),
     private readonly isolationEvaluator: DeploymentIsolationEvaluator = new DeploymentIsolationEvaluator(),
+    private readonly auditTrailService?: DeploymentAuditTrailService,
   ) {}
 
   public executeLifecycle(
@@ -127,6 +130,28 @@ export class DeploymentExecutionService {
       rootSystemVersionId: normalized.bundle.manifest.package.rootSystemVersionId,
       targetId: normalized.target.targetId.value,
       targetType: normalized.target.type,
+    });
+    this.auditTrailService?.record({
+      eventKind: DeploymentAuditEventKinds.deploymentRequested,
+      outcome: DeploymentAuditOutcomes.accepted,
+      requestSource: this.normalizeRequestSource(governance?.requestSource),
+      caller: this.normalizeCaller(governance?.accessContext),
+      tenant: Object.freeze({
+        tenantId: governance?.resourceTenantId ?? governance?.accessContext?.tenantId,
+        source: governance?.requestSource,
+      }),
+      deployment: Object.freeze({
+        requestId: normalized.requestId,
+        rootSystemAssetId: normalized.bundle.manifest.package.rootSystemAssetId,
+        rootSystemVersionId: normalized.bundle.manifest.package.rootSystemVersionId,
+        bundleId: normalized.bundle.bundleId.value,
+        bundleVersionKey: normalized.bundle.manifest.build.reproducibilityKey,
+        deploymentConfigurationId: normalized.deploymentConfiguration.configurationId.value,
+        targetId: normalized.target.targetId.value,
+        targetType: normalized.target.type,
+      }),
+      detail: Object.freeze({ message: "Deployment lifecycle execution requested." }),
+      occurredAt: this.clock().toISOString(),
     });
 
     const deploymentId = this.deriveDeploymentId({
@@ -195,6 +220,16 @@ export class DeploymentExecutionService {
       }
       const failed = this.transitionRecord(record, DeploymentStates.failed, "provisioning-failed");
       this.repository.save(failed);
+      this.recordDeploymentOutcomeAudit({
+        eventKind: DeploymentAuditEventKinds.deploymentRejected,
+        outcome: DeploymentAuditOutcomes.rejected,
+        record: failed,
+        requestSource: governance?.requestSource,
+        accessContext: governance?.accessContext,
+        resourceTenantId: governance?.resourceTenantId,
+        message: "Deployment rejected because provisioning did not produce a ready environment.",
+        errorCode: provisioning.issues[0]?.code,
+      });
       return Object.freeze({
         status: DeploymentStatuses.rejected,
         deployment: failed,
@@ -273,6 +308,16 @@ export class DeploymentExecutionService {
       }
       const failed = this.transitionRecord(record, DeploymentStates.failed, "deployment-preconditions-failed");
       this.repository.save(failed);
+      this.recordDeploymentOutcomeAudit({
+        eventKind: DeploymentAuditEventKinds.deploymentRejected,
+        outcome: DeploymentAuditOutcomes.rejected,
+        record: failed,
+        requestSource: governance?.requestSource,
+        accessContext: governance?.accessContext,
+        resourceTenantId: governance?.resourceTenantId,
+        message: "Deployment rejected because preconditions failed.",
+        errorCode: issues[0]?.code,
+      });
       return Object.freeze({
         status: DeploymentStatuses.rejected,
         deployment: failed,
@@ -295,6 +340,15 @@ export class DeploymentExecutionService {
         environmentId: normalizedRequest.provisionedEnvironment.environmentId,
         targetId: normalizedRequest.target.targetId.value,
       }),
+    });
+    this.recordDeploymentOutcomeAudit({
+      eventKind: DeploymentAuditEventKinds.deploymentSucceeded,
+      outcome: DeploymentAuditOutcomes.succeeded,
+      record: persisted,
+      requestSource: governance?.requestSource,
+      accessContext: governance?.accessContext,
+      resourceTenantId: governance?.resourceTenantId,
+      message: "Deployment execution completed successfully.",
     });
 
     return Object.freeze({
@@ -791,6 +845,62 @@ export class DeploymentExecutionService {
         runtimeTenantId: input.tenantId,
         runtimeContextKey: ids.runtimeContextKey,
       }),
+    });
+  }
+
+  private normalizeCaller(accessContext?: DeploymentAccessContext) {
+    return Object.freeze({
+      callerKind: accessContext?.caller?.callerKind,
+      callerId: accessContext?.caller?.callerId,
+      sessionId: accessContext?.caller?.sessionId,
+      roles: accessContext?.caller?.roles,
+      authenticatedPrincipalId: accessContext?.caller?.authenticatedPrincipalId,
+    });
+  }
+
+  private normalizeRequestSource(source?: string): "deployment-api" | "external-api" | "studio-shell-internal" | "internal-trusted" | "unknown" {
+    if (source === "deployment-api" || source === "external-api" || source === "studio-shell-internal" || source === "internal-trusted") {
+      return source;
+    }
+    return "unknown";
+  }
+
+  private recordDeploymentOutcomeAudit(input: {
+    readonly eventKind: typeof DeploymentAuditEventKinds[keyof typeof DeploymentAuditEventKinds];
+    readonly outcome: typeof DeploymentAuditOutcomes[keyof typeof DeploymentAuditOutcomes];
+    readonly record: DeploymentRecord;
+    readonly requestSource?: string;
+    readonly accessContext?: DeploymentAccessContext;
+    readonly resourceTenantId?: string;
+    readonly message: string;
+    readonly errorCode?: string;
+  }): void {
+    this.auditTrailService?.record({
+      eventKind: input.eventKind,
+      outcome: input.outcome,
+      requestSource: this.normalizeRequestSource(input.requestSource),
+      caller: this.normalizeCaller(input.accessContext),
+      tenant: Object.freeze({
+        tenantId: input.resourceTenantId ?? input.accessContext?.tenantId ?? input.record.isolation.boundary.tenantId,
+        source: input.requestSource,
+      }),
+      deployment: Object.freeze({
+        deploymentId: input.record.deploymentId,
+        requestId: input.record.requestId,
+        rootSystemAssetId: input.record.rootSystemAssetId,
+        rootSystemVersionId: input.record.rootSystemVersionId,
+        bundleId: input.record.bundleId,
+        bundleVersionKey: input.record.bundleVersionKey,
+        deploymentConfigurationId: input.record.deploymentConfigurationId,
+        targetId: input.record.targetId,
+        targetType: input.record.targetType,
+        deploymentEnvironmentId: input.record.provisionedEnvironmentId,
+      }),
+      detail: Object.freeze({
+        message: input.message,
+        errorCode: input.errorCode,
+      }),
+      occurredAt: this.clock().toISOString(),
     });
   }
 }
