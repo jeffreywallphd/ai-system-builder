@@ -27,13 +27,16 @@ import {
 } from "../../domain/system-runtime/SystemRuntimeDomain";
 import { ExecutionPlanBuilder } from "./ExecutionPlanBuilder";
 import { ExecutionOrchestrationService } from "./ExecutionOrchestrationService";
+import type { StepExecutionResult } from "./StepExecutionEngine";
 import { mapSystemContractToRuntimeExecutionContract } from "./RuntimeExecutionContractMapping";
 import { resolveSystemRuntimeDependencies } from "./RuntimeDependencyResolution";
 import { StepExecutionEngine } from "./StepExecutionEngine";
 import { CompositionAssetContractResolver } from "../contracts/CompositionAssetContractResolver";
 import {
   InMemorySystemRuntimeExecutionStore,
+  type ExecutionMetadataSnapshot,
   type ISystemRuntimeExecutionStore,
+  type PersistedExecutionRecord,
 } from "./SystemRuntimeExecutionStore";
 
 export interface StartSystemRuntimeExecutionRequest {
@@ -302,6 +305,10 @@ export class SystemRuntimeApplicationService {
       requestedEnvironmentKind: request.requestedEnvironmentKind,
       maxIterationsPerNode: request.maxIterationsPerNode,
       maxPlanningCyclesPerNode: request.maxPlanningCyclesPerNode,
+      executeNestedSystemStep: async (input) => this.executeNestedSystemStep({
+        ...input,
+        rootRequest: request,
+      }),
     });
 
     if (!result.execution) {
@@ -323,7 +330,7 @@ export class SystemRuntimeApplicationService {
       })
       : result.execution;
 
-    this.executionStore.saveExecution(normalizedExecution);
+    this.executionStore.saveExecutionRecord(this.createExecutionRecord(normalizedExecution));
     return Object.freeze({ execution: normalizedExecution, runtimeBehavior: behavior });
   }
 
@@ -490,7 +497,7 @@ export class SystemRuntimeApplicationService {
       throw new Error("invalid-request:Execution id is required.");
     }
 
-    const execution = this.executionStore.getExecution(normalized);
+    const execution = this.executionStore.getExecutionRecord(normalized)?.execution;
     if (!execution) {
       throw new Error(`not-found:Execution '${normalized}' was not found.`);
     }
@@ -594,22 +601,187 @@ export class SystemRuntimeApplicationService {
     readonly versionId?: string;
     readonly limit?: number;
   }): ReadonlyArray<RuntimeExecutionSummaryReadModel> {
-    return Object.freeze(this.executionStore.listExecutionsByRoot(input).map((execution) => Object.freeze({
-      executionId: execution.executionId,
-      status: execution.status,
-      startedAt: execution.startedAt,
-      completedAt: execution.completedAt,
-      rootVersionId: execution.root.versionId,
-      result: execution.status === ExecutionStatusKinds.succeeded
+    return Object.freeze(this.executionStore.listExecutionRecordsForSystem(input).map((record) => Object.freeze({
+      executionId: record.executionId,
+      status: record.execution.status,
+      startedAt: record.execution.startedAt,
+      completedAt: record.execution.completedAt,
+      rootVersionId: record.execution.root.versionId,
+      result: record.execution.status === ExecutionStatusKinds.succeeded
         ? "succeeded"
-        : execution.status === ExecutionStatusKinds.failed
+        : record.execution.status === ExecutionStatusKinds.failed
           ? "failed"
-          : execution.status === ExecutionStatusKinds.cancelled
+          : record.execution.status === ExecutionStatusKinds.cancelled
             ? "cancelled"
             : "running",
-      traceEventCount: execution.runtimeState.trace.events.length,
-      traceLogCount: execution.runtimeState.trace.logs.length,
+      traceEventCount: record.metadata.trace.eventCount,
+      traceLogCount: record.metadata.trace.logCount,
     })));
+  }
+
+  private async executeNestedSystemStep(input: {
+    readonly node: { readonly nodeId: string; readonly assetId: string; readonly versionId?: string };
+    readonly parentExecution: SystemExecution;
+    readonly passIndex: number;
+    readonly rootRequest: StartSystemRuntimeExecutionRequest;
+  }): Promise<StepExecutionResult> {
+    const startedAt = new Date().toISOString();
+    if (!input.node.versionId) {
+      return Object.freeze({
+        nodeId: input.node.nodeId,
+        status: "failed",
+        startedAt,
+        completedAt: new Date().toISOString(),
+        error: {
+          code: "nested-system-unpinned-version",
+          message: `Nested system node '${input.node.nodeId}' requires a pinned child version.`,
+        },
+      });
+    }
+
+    const childRoot = await this.resolveSystemFromReference({
+      assetId: input.node.assetId,
+      versionId: input.node.versionId,
+      alias: input.node.nodeId,
+    });
+    if (!childRoot) {
+      return Object.freeze({
+        nodeId: input.node.nodeId,
+        status: "failed",
+        startedAt,
+        completedAt: new Date().toISOString(),
+        error: {
+          code: "nested-system-unresolved",
+          message: `Nested system '${input.node.assetId}@${input.node.versionId}' could not be resolved.`,
+        },
+      });
+    }
+
+    const childBehavior = classifyExecutableBehavior(childRoot.taxonomy);
+    const childRuntimeContract = await mapSystemContractToRuntimeExecutionContract({
+      root: childRoot,
+      contract: await this.resolveRootContract(childRoot),
+      resolveSystem: async (reference) => this.resolveSystemFromReference(reference),
+      resolveChildContract: async (component) => this.resolveComponentContract(component),
+      maxDepth: input.rootRequest.maxDepth,
+    });
+    const childDependencyResolution = await resolveSystemRuntimeDependencies({
+      root: childRoot,
+      resolveSystem: async (reference) => this.resolveSystemFromReference(reference),
+      maxDepth: input.rootRequest.maxDepth,
+    });
+
+    const childResult = await this.orchestration.orchestrate({
+      root: childRoot,
+      runtimeContract: childRuntimeContract,
+      dependencyResolution: childDependencyResolution,
+      behavior: childBehavior,
+      executionId: `${input.parentExecution.executionId}:child:${input.node.nodeId}:${input.passIndex}`,
+      context: {
+        ...input.parentExecution.context,
+        metadata: Object.freeze({
+          ...(input.parentExecution.context.metadata ?? {}),
+          parentExecutionId: input.parentExecution.executionId,
+          parentNodeId: input.node.nodeId,
+        }),
+      },
+      inputPayload: input.parentExecution.input.payload,
+      inputContentType: input.parentExecution.input.contentType,
+      inputSchemaVersion: input.parentExecution.input.schemaVersion,
+      maxIterationsPerNode: input.rootRequest.maxIterationsPerNode,
+      maxPlanningCyclesPerNode: input.rootRequest.maxPlanningCyclesPerNode,
+      executeNestedSystemStep: async (nested) => this.executeNestedSystemStep({
+        ...nested,
+        rootRequest: input.rootRequest,
+      }),
+    });
+
+    if (!childResult.execution) {
+      return Object.freeze({
+        nodeId: input.node.nodeId,
+        status: "failed",
+        startedAt,
+        completedAt: new Date().toISOString(),
+        error: {
+          code: "nested-system-orchestration-failed",
+          message: childResult.errors[0] ?? `Nested execution failed for node '${input.node.nodeId}'.`,
+        },
+      });
+    }
+
+    this.executionStore.saveExecutionRecord(this.createExecutionRecord(childResult.execution));
+
+    return Object.freeze({
+      nodeId: input.node.nodeId,
+      status: childResult.execution.status === "succeeded" ? "succeeded" : "failed",
+      startedAt,
+      completedAt: childResult.execution.completedAt ?? childResult.execution.updatedAt,
+      output: Object.freeze({
+        nestedExecution: Object.freeze({
+          executionId: childResult.execution.executionId,
+          status: childResult.execution.status,
+          rootAssetId: childResult.execution.root.assetId,
+          rootVersionId: childResult.execution.root.versionId,
+        }),
+        output: childResult.execution.output,
+      }),
+      error: childResult.execution.status === "failed"
+        ? Object.freeze({
+          code: "nested-system-failure",
+          message: `Nested execution '${childResult.execution.executionId}' failed.`,
+        })
+        : undefined,
+    });
+  }
+
+  private createExecutionRecord(execution: SystemExecution): PersistedExecutionRecord {
+    const nodeVersionIds = this.buildNodeVersionMap(execution);
+    const outputPayload = execution.output?.payload as { readonly nodeResults?: Record<string, unknown> } | undefined;
+    const childExecutionIds = Object.values(outputPayload?.nodeResults ?? {})
+      .flatMap((entry) => {
+        if (!entry || typeof entry !== "object") {
+          return [];
+        }
+        const nested = (entry as { readonly nestedExecution?: { readonly executionId?: string } }).nestedExecution;
+        return nested?.executionId ? [nested.executionId] : [];
+      });
+    const summary: ExecutionMetadataSnapshot = Object.freeze({
+      executionId: execution.executionId,
+      rootAssetId: execution.root.assetId,
+      rootVersionId: execution.root.versionId,
+      status: execution.status,
+      startedAt: execution.startedAt,
+      updatedAt: execution.updatedAt,
+      completedAt: execution.completedAt,
+      environmentId: execution.environment?.environmentId,
+      trace: Object.freeze({
+        eventCount: execution.runtimeState.trace.events.length,
+        logCount: execution.runtimeState.trace.logs.length,
+        lastEventAt: execution.runtimeState.trace.lastEventAt,
+      }),
+      result: Object.freeze({
+        hasOutput: Boolean(execution.output),
+        hasError: Boolean(execution.output?.error) || execution.status === ExecutionStatusKinds.failed,
+        outputSummary: summarizeOutput(execution.output?.payload),
+      }),
+      executedVersionMap: Object.freeze({
+        rootVersionId: execution.root.versionId,
+        nodeVersionIds,
+      }),
+      parentExecutionId: typeof execution.context.metadata?.parentExecutionId === "string"
+        ? execution.context.metadata.parentExecutionId
+        : undefined,
+      parentNodeId: typeof execution.context.metadata?.parentNodeId === "string"
+        ? execution.context.metadata.parentNodeId
+        : undefined,
+      childExecutionIds: Object.freeze([...new Set(childExecutionIds)].sort((left, right) => left.localeCompare(right))),
+    });
+
+    return Object.freeze({
+      executionId: execution.executionId,
+      execution,
+      metadata: summary,
+    });
   }
 
   private buildNodeVersionMap(execution: SystemExecution): Readonly<Record<string, string>> {
