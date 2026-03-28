@@ -224,12 +224,16 @@ describe("InMemoryServiceSupervisor", () => {
 
     expect(provisioned.diagnostics.provisioning.state).toBe("provisioned");
     expect(provisioned.diagnostics.provisioning.resolvedVersion).toBe("3.12.7");
-    expect(commands.map((entry) => entry.args.join(" "))).toEqual([
+    const executed = commands
+      .map((entry) => entry.args.join(" "))
+      .filter((entry) => !entry.startsWith("-c import json,pathlib,sysconfig;"));
+    expect(executed).toEqual([
       "-m venv " + path.join(tempDir, ".venv"),
       "-c import pip; import pip._internal.cli.main",
       "-m pip --version",
-      "-m pip install --upgrade pip",
       "-m pip install -r " + path.join(tempDir, "requirements.txt"),
+      "-c import pip; import pip._internal.cli.main",
+      "-m pip --version",
     ]);
     expect(provisioned.diagnostics.provisioning.needsReprovision).toBeFalse();
     expect(started.state).toBe(ServiceStates.healthy);
@@ -277,13 +281,17 @@ describe("InMemoryServiceSupervisor", () => {
     const provisioned = await supervisor.provision("python-runtime");
 
     expect(provisioned.diagnostics.provisioning.state).toBe("provisioned");
-    expect(commands.map((entry) => entry.args.join(" "))).toEqual([
+    const executed = commands
+      .map((entry) => entry.args.join(" "))
+      .filter((entry) => !entry.startsWith("-c import json,pathlib,sysconfig;"));
+    expect(executed).toEqual([
       "-c import pip; import pip._internal.cli.main",
       "-m ensurepip --upgrade",
       "-c import pip; import pip._internal.cli.main",
       "-m pip --version",
-      "-m pip install --upgrade pip",
       "-m pip install -r " + path.join(tempDir, "requirements.txt"),
+      "-c import pip; import pip._internal.cli.main",
+      "-m pip --version",
     ]);
   });
 
@@ -325,7 +333,7 @@ describe("InMemoryServiceSupervisor", () => {
         }
       }
       if (args.includes("venv")) {
-        const recreatedVenvPython = path.join(environmentPath, "bin", "python");
+        const recreatedVenvPython = path.join(args[args.length - 1], "bin", "python");
         mkdirSync(path.dirname(recreatedVenvPython), { recursive: true });
         writeFileSync(recreatedVenvPython, "#!/usr/bin/env python\n", "utf8");
       }
@@ -335,16 +343,115 @@ describe("InMemoryServiceSupervisor", () => {
     const provisioned = await supervisor.provision("python-runtime");
 
     expect(provisioned.diagnostics.provisioning.state).toBe("provisioned");
-    expect(commands.map((entry) => entry.args.join(" "))).toEqual([
+    expect(provisioned.diagnostics.provisioning.environmentPath).not.toBe(environmentPath);
+    const executed = commands
+      .map((entry) => entry.args.join(" "))
+      .filter((entry) => !entry.startsWith("-c import json,pathlib,sysconfig;"));
+    expect(executed).toEqual([
       "-c import pip; import pip._internal.cli.main",
       "-m ensurepip --upgrade",
       "-c import pip; import pip._internal.cli.main",
-      "-m venv " + environmentPath,
+      expect.stringMatching(/-m venv .*\.venv\.managed\/env-/),
       "-c import pip; import pip._internal.cli.main",
       "-m pip --version",
-      "-m pip install --upgrade pip",
-      "-m pip install -r " + path.join(tempDir, "requirements.txt"),
+      expect.stringContaining("-m pip install -r " + path.join(tempDir, "requirements.txt")),
+      "-c import pip; import pip._internal.cli.main",
+      "-m pip --version",
     ]);
+  });
+
+  it("recreates the environment when invalid pip distributions are detected", async () => {
+    const tempRoot = mkdtempSync(path.join(os.tmpdir(), "python-runtime-invalid-dist-"));
+    const tempDir = path.join(tempRoot, "python-runtime");
+    const environmentPath = path.join(tempDir, ".venv");
+    const venvPython = path.join(environmentPath, "bin", "python");
+    mkdirSync(path.dirname(venvPython), { recursive: true });
+    writeFileSync(venvPython, "#!/usr/bin/env python\n", "utf8");
+    writeFileSync(path.join(tempDir, "requirements.txt"), "fastapi==0.115.0\n", "utf8");
+    tempDirectories.push(tempRoot);
+
+    let distributionScanAttempts = 0;
+    const supervisor = new InMemoryServiceSupervisor({
+      runtime: createStubProcessRuntime(),
+      services: [createRuntimeDefinition({ command: "python", cwd: tempDir, pythonVersion: "3.12" })],
+      allowedPaths: [repoRoot, tempRoot],
+    });
+    supervisor.resolvePythonInterpreter = async () => ({
+      command: "python3.12",
+      args: [],
+      executable: "/usr/bin/python3.12",
+      version: "3.12.7",
+      requestedVersion: "3.12",
+      label: "python3.12",
+    });
+    supervisor.runCommand = async (_command: string, args: string[]) => {
+      if (args[0] === "-c" && args[1]?.includes("invalidDistributions")) {
+        distributionScanAttempts += 1;
+        if (distributionScanAttempts === 1) {
+          return { code: 0, signal: null, stdout: JSON.stringify({ invalidDistributions: ["~ip-24.0.dist-info"] }), stderr: "" };
+        }
+      }
+      if (args.includes("venv")) {
+        const stagedTarget = args[args.length - 1];
+        const pythonPath = path.join(stagedTarget, "bin", "python");
+        mkdirSync(path.dirname(pythonPath), { recursive: true });
+        writeFileSync(pythonPath, "#!/usr/bin/env python\n", "utf8");
+      }
+      return { code: 0, signal: null, stdout: "", stderr: "" };
+    };
+
+    const provisioned = await supervisor.provision("python-runtime");
+    expect(provisioned.diagnostics.provisioning.state).toBe("provisioned");
+    expect(provisioned.diagnostics.provisioning.environmentPath).not.toBe(environmentPath);
+  });
+
+  it("marks invalid environments as corrupted on next startup instead of reusing them", async () => {
+    const tempRoot = mkdtempSync(path.join(os.tmpdir(), "python-runtime-invalidated-state-"));
+    const tempDir = path.join(tempRoot, "python-runtime");
+    const environmentPath = path.join(tempDir, ".venv");
+    const venvPython = path.join(environmentPath, "bin", "python");
+    const metadataPath = path.join(environmentPath, ".ai-loom-python-provisioning.json");
+    const runtimeStatePath = path.join(tempDir, ".ai-loom-python-runtime-state.json");
+    mkdirSync(path.dirname(venvPython), { recursive: true });
+    writeFileSync(venvPython, "#!/usr/bin/env python\n", "utf8");
+    writeFileSync(path.join(tempDir, "requirements.txt"), "fastapi==0.116.0\n", "utf8");
+    writeFileSync(metadataPath, JSON.stringify({
+      schemaVersion: 3,
+      requestedVersion: "3.12",
+      resolvedVersion: "3.12.7",
+      resolvedInterpreter: venvPython,
+      environmentPath,
+      fingerprint: {
+        schemaVersion: 3,
+        requirementsHash: "same-hash",
+        platform: process.platform,
+        arch: process.arch,
+      },
+      provisionedAt: new Date().toISOString(),
+    }, null, 2), "utf8");
+    writeFileSync(runtimeStatePath, JSON.stringify({
+      schemaVersion: 1,
+      activeEnvironmentPath: environmentPath,
+      cleanupPendingPaths: [],
+      invalidEnvironments: {
+        [environmentPath]: {
+          at: new Date().toISOString(),
+          reason: "Corrupted pip metadata",
+        },
+      },
+    }, null, 2), "utf8");
+    tempDirectories.push(tempRoot);
+
+    const supervisor = new InMemoryServiceSupervisor({
+      runtime: createStubProcessRuntime(),
+      services: [createRuntimeDefinition({ command: "python", cwd: tempDir, pythonVersion: "3.12" })],
+      allowedPaths: [repoRoot, tempRoot],
+    });
+
+    const provisioning = supervisor.getService("python-runtime")?.diagnostics.provisioning;
+    expect(provisioning?.state).toBe("corrupted");
+    expect(provisioning?.needsReprovision).toBeTrue();
+    expect(provisioning?.lastError?.code).toBe("PYTHON_RUNTIME_ENV_INVALIDATED");
   });
 
   it("fails provisioning with a clear error for unsupported python versions", async () => {
@@ -408,6 +515,28 @@ describe("InMemoryServiceSupervisor", () => {
     expect(provisioning?.state).toBe("provisioned");
     expect(provisioning?.fingerprintMismatch).toBeTrue();
     expect(provisioning?.needsReprovision).toBeTrue();
+  });
+
+  it("keeps packaged/private runtime definitions outside dev venv provisioning while preserving provisioning diagnostics contract", () => {
+    const tempRoot = mkdtempSync(path.join(os.tmpdir(), "python-runtime-packaged-contract-"));
+    const tempDir = path.join(tempRoot, "runtime-workspace");
+    mkdirSync(tempDir, { recursive: true });
+    tempDirectories.push(tempRoot);
+
+    const supervisor = new InMemoryServiceSupervisor({
+      runtime: createStubProcessRuntime(),
+      services: [createRuntimeDefinition({
+        command: path.join(tempRoot, "runtime-assets", "python", "python.exe"),
+        cwd: tempDir,
+        pythonVersion: "3.12",
+      })],
+      allowedPaths: [repoRoot, tempRoot],
+    });
+
+    const provisioning = supervisor.getService("python-runtime")?.diagnostics.provisioning;
+    expect(provisioning?.required).toBeFalse();
+    expect(provisioning?.state).toBe("unsupported");
+    expect(provisioning?.needsReprovision).toBeFalse();
   });
 
   it("starts dependencies before dependents and reports dependency readiness", async () => {
