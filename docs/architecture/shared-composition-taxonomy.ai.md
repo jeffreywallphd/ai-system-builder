@@ -40,10 +40,11 @@ Current Direction 5 target shape remains:
 - composite assets: workflow, context-bundle, dataset-pipeline, training-recipe, tool-chain
 - system assets: system, app-template
 
-## Implementation status snapshot (story 3.19)
-- Fully implemented now: shared taxonomy model + combination validation, shared studio registration taxonomy defaults, and active composite studio roles (`workflow`, `context-bundle`, `dataset-pipeline`, `training-recipe`, `tool-chain`).
+## Implementation status snapshot (Direction 5 through stories 5.24)
+- Fully implemented now: shared taxonomy model + combination validation, shared studio registration taxonomy defaults, active composite studio roles (`workflow`, `context-bundle`, `dataset-pipeline`, `training-recipe`, `tool-chain`), and bounded System Studio registration/authoring for first-class `system` assets on the shared shell route (`/studio-shell/system`).
+- Fully implemented now: registry list/detail/graph/lineage projections include system assets and nested-system references through the same shared registry query + graph seams (no parallel taxonomy universe).
 - Partially implemented / bounded: specialized composite semantics are currently taxonomy/authoring semantics (workflow orchestrator, agent decision unit, context-bundle input preparer); only workflow/context-bundle have specialized composite Studio Shell surfaces in this slice.
-- System-level taxonomy authoring is now integrated through shared Studio Shell routing/registration (`/studio-shell/system`) with bounded System Studio application orchestration; richer composition-canvas UX is still intentionally out of scope while recursive composition semantics remain in the inner system domain foundation (`domain/system-studio/SystemAssetDomain.ts`).
+- System-level taxonomy authoring is integrated through shared Studio Shell routing/registration (`/studio-shell/system`) with bounded System Studio orchestration; richer visual composition-canvas UX remains intentionally out of scope while recursive semantics stay in the inner system domain foundation (`domain/system-studio/SystemAssetDomain.ts`).
 
 
 ## Specialized composite role interpretation

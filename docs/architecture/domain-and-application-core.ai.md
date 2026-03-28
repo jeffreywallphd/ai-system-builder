@@ -597,7 +597,7 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
 - Shared validation and publish seams now carry composite dependency identity/version checks, semantic-role compatibility checks, taxonomy/contract consistency checks, and publish-time dependency pinning requirements (`application/studio-shell/StudioShellValidation.ts`, `application/studio-shell/AtomicStudioAssetEnforcement.ts`).
 - Composite-to-atomic interop in this slice is dependency + taxonomy + contract driven (composites reference atomic versions and are validated by shared seams); this slice does not add a separate composite runtime orchestration subsystem.
 
-## Direction 5 implementation status (story 3.19 alignment)
+## Direction 5 implementation status (through stories 5.24)
 
 Fully implemented now:
 - Shared Studio Shell lifecycle/session/draft/version/persistence/validation/publish seams for both atomic and composite studios.
@@ -609,9 +609,9 @@ Partially implemented / intentionally bounded:
 - Composite behavior semantics are currently enforced as metadata + validation/publish constraints, not as a separate runtime behavior engine in Direction 5.
 - Specialized composite role semantics are fully represented in taxonomy/contract language (`workflow` orchestrator, `agent` decision unit, `context-bundle` input preparer), but only workflow/context-bundle are currently implemented as specialized composite Studio Shell surfaces.
 
-Explicitly later than this story:
-- System-asset Studio Shell surfaces for Full AI System and App Template / Deployment Unit.
+Explicitly later than this scope:
 - Any broader system-composer architecture beyond current shared shell + taxonomy/contract/dependency enforcement seams.
+- Rich visual graph-canvas tooling or runtime/deployment orchestration beyond current bounded system authoring + registry projection seams.
 
 ## Direction 5 update: System consistency + interop integration coverage (stories 5.21–5.22)
 
@@ -626,6 +626,12 @@ Explicitly later than this story:
 - Dependency graph caching now memoizes adjacency/direct-expansion/traversal results; projection dirty/signature checks still govern rebuild truth through `IRegistryGraphProjectionRepository`.
 - Cross-studio correctness now has integration-style coverage that spans atomic + composite assets across publish visibility, taxonomy/contract/provenance projection, dependency graph traversal, lineage, filtering/search, and dependency replacement after version updates.
 
+## Direction 5 update: System registry graph + lineage validation (story 5.23)
+
+- Registry integration coverage now explicitly exercises published system assets over the real query/graph/API/SQLite seams (no mocked graph truth).
+- Coverage now includes parent-system -> child (atomic/composite/system) edges, nested system edges, mixed dependency + lineage consistency across detail/graph/traversal reads, and version-aware parent/child system lineage coherence.
+- This extends the existing registry projection stack (`RegistryQueryService`, `RegistryDependencyGraphService`, `RegistryBackendApi`) rather than introducing a second graph or lineage architecture.
+
 ## Direction 5 update: Registry docs + UX alignment (stories 4.17–4.18)
 
 - Registry remains projection-only: `RegistryQueryService` materializes `RegistryAsset` read models from canonical asset/version/lineage/taxonomy/contract/validation data; it is not a source-of-truth store.
@@ -638,4 +644,4 @@ Explicitly later than this story:
 - Registry API remains bounded to list/filter/search/detail + dependency/dependent traversal endpoints with typed transport errors (`not-found`/`invalid-request`/`internal`).
 - Scope truth:
   - atomic + composite assets are fully covered in registry browse/detail/graph/navigation flows.
-  - system-kind taxonomy is filterable, but dedicated system-studio authoring surfaces are still future work.
+  - system assets are now first-class in registry browse/detail/graph/lineage flows, including nested-system child references and bounded version-lineage summaries.

@@ -38,7 +38,7 @@
 - No system-composer UI in this slice.
 - Direction 5 atomic studio slices now consume taxonomy-driven atomic contract projection for Prompt Template, Embedding Index, and Config Profile (`atomic/prompt-template/none`, `atomic/embedding-index/none`, `atomic/config-profile/none`) through shared shell metadata + publish-enforcement seams.
 
-## Implementation status snapshot (story 3.19)
+## Implementation status snapshot (Direction 5 through stories 5.24)
 - Fully implemented now: shared taxonomy-driven contract projection for implemented atomic/composite studios, shared composite publish-consistency enforcement, and composite-to-atomic interop validation through shared dependency + taxonomy/contract seams.
+- Fully implemented now: bounded System Studio authoring/publish orchestration uses recursive system contract projection through shared Studio Shell seams, and registry detail/lineage projections surface system child/nested-version lineage alignment (`includedInUpstream`) for published system versions.
 - Partially implemented / bounded: projections are baseline authoring/publish-gating contracts, not a full runtime behavior-contract system.
-- Implemented in this slice: bounded System Studio authoring/publish orchestration now uses recursive system contract projection through shared Studio Shell seams, and System Studio now includes a truthful bounded structural editor (add/remove/reorder + nested-system visibility) backed by the same draft/application contracts.

@@ -63,7 +63,7 @@ Specialized composite semantics remain explicit in these shared contracts: workf
 - Agents continue to extend the shared composition model and use the shared contract seam.
 - Direction 5 atomic studio slices now consume taxonomy-driven atomic contract projection for Prompt Template, Embedding Index, and Config Profile (`atomic/prompt-template/none`, `atomic/embedding-index/none`, `atomic/config-profile/none`) through shared shell metadata + publish-enforcement seams.
 
-## Implementation status snapshot (story 3.19)
+## Implementation status snapshot (Direction 5 through stories 5.24)
 
 Fully implemented now:
 - Shared taxonomy-driven contract projection for implemented atomic and composite Studio Shell roles.
@@ -74,4 +74,4 @@ Partially implemented / bounded:
 - Contract projections are baseline interaction contracts for authoring/publish-gating alignment; they are not a full runtime behavior execution contract system.
 
 Not implemented in this slice:
-- Dedicated system-asset contract authoring surfaces in Studio Shell (Full AI System, App Template / Deployment Unit UX).
+- Rich visual/system-runtime contract tooling beyond current bounded System Studio panels and shared publish enforcement.
