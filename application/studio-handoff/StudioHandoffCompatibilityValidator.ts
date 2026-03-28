@@ -7,6 +7,7 @@ import type {
 import type { CompositionTaxonomyDescriptor } from "../../domain/taxonomy/CompositionTaxonomy";
 import { listStudioHandoffPrefillKeys } from "../../domain/studio-handoff/StudioHandoffContext";
 import type { StudioCapabilityDescriptor, StudioCapabilityQueryService } from "./StudioCapabilityRegistry";
+import { HandoffBoundedCache } from "./HandoffBoundedCache";
 
 export const StudioHandoffCompatibilityIssueCodes = Object.freeze({
   targetStudioUnsupported: "target-studio-unsupported",
@@ -110,12 +111,19 @@ function isContractCompatible(
 }
 
 export class StudioHandoffCompatibilityValidator {
+  private readonly decisionCache: HandoffBoundedCache<string, StudioHandoffCompatibilityDecision>;
+
   public constructor(
     private readonly options: {
       readonly validateVersionReference?: (reference: { readonly assetId: string; readonly versionId: string }) => boolean;
       readonly capabilityQueryService?: Pick<StudioCapabilityQueryService, "listCapabilities" | "getStudioDescriptor">;
+      readonly cacheMaxEntries?: number;
     } = {},
-  ) {}
+  ) {
+    this.decisionCache = new HandoffBoundedCache<string, StudioHandoffCompatibilityDecision>({
+      maxEntries: options.cacheMaxEntries ?? 256,
+    });
+  }
 
   private validateSingleAssetAgainstContract(input: {
     readonly contract: TargetStudioInputContract;
@@ -246,6 +254,12 @@ export class StudioHandoffCompatibilityValidator {
     readonly handoff: StudioHandoffContract;
     readonly targetCapabilities?: ReadonlyArray<StudioCapabilityDescriptor>;
   }): StudioHandoffCompatibilityDecision {
+    const cacheKey = this.createDecisionCacheKey(input);
+    const cached = this.decisionCache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const issues: StudioHandoffCompatibilityIssue[] = [];
 
     if (
@@ -271,11 +285,11 @@ export class StudioHandoffCompatibilityValidator {
         message: `Target studio type '${input.handoff.target.studioType}' has no registered handoff capability descriptor.`,
         path: "target.studioType",
       }));
-      return Object.freeze({
+      return this.decisionCache.set(cacheKey, Object.freeze({
         compatible: false,
         targetStudioType: input.handoff.target.studioType,
         issues: Object.freeze(issues),
-      });
+      }));
     }
 
     const requestedContractId = input.handoff.payload.targetInputContract.contractId;
@@ -321,12 +335,35 @@ export class StudioHandoffCompatibilityValidator {
         })));
     }
 
-    return Object.freeze({
+    return this.decisionCache.set(cacheKey, Object.freeze({
       compatible: issues.length === 0,
       targetStudioType: input.handoff.target.studioType,
       matchedContractId: acceptedContract?.contractId,
       multiAsset: multiAssetDecision,
       issues: Object.freeze(issues),
-    });
+    }));
+  }
+
+  private createDecisionCacheKey(input: {
+    readonly handoff: StudioHandoffContract;
+    readonly targetCapabilities?: ReadonlyArray<StudioCapabilityDescriptor>;
+  }): string {
+    const capabilitySignature = (input.targetCapabilities ?? [])
+      .map((entry) => `${entry.studioType}:${entry.acceptedInputs.map((accept) => accept.contract.contractId).join(",")}`)
+      .sort()
+      .join("|");
+    return [
+      input.handoff.id.value,
+      input.handoff.source.studioType,
+      input.handoff.source.studioId,
+      input.handoff.target.studioType,
+      input.handoff.target.studioId,
+      input.handoff.payload.assetId,
+      input.handoff.payload.versionId,
+      input.handoff.payload.targetInputContract.contractId,
+      input.handoff.multiAsset?.assets.map((entry) => `${entry.assetId}:${entry.versionId}:${entry.role}`).join(",") ?? "single",
+      Object.keys(input.handoff.context?.prefill?.values ?? {}).sort().join(","),
+      capabilitySignature,
+    ].join("::");
   }
 }

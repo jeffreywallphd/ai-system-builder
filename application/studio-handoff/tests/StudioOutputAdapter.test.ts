@@ -126,4 +126,30 @@ describe("StudioOutputAdapterLayer", () => {
     expect(output.adapted?.handoffMetadata.hints.assetId).toBe("hint-override-attempt");
     expect(output.adapted?.authoritativeAsset.assetId).not.toBe(output.adapted?.handoffMetadata.hints.assetId as string);
   });
+
+  it("reuses bounded output adaptation results for unchanged version-pinned source output", () => {
+    const layer = createAdapterLayer();
+    const taxonomy = createCompositionTaxonomyDescriptor({
+      structuralKind: TaxonomyStructuralKinds.atomic,
+      semanticRole: TaxonomySemanticRoles.dataset,
+      behaviorKind: TaxonomyBehaviorKinds.none,
+    });
+
+    const output = {
+      sourceStudioType: "dataset-studio",
+      sourceStudioId: "dataset-studio-default",
+      authoritativeAsset: {
+        assetId: "asset:dataset",
+        versionId: "asset:dataset:v3",
+        taxonomy,
+      },
+      handoffHints: {
+        split: "train",
+      },
+    } as const;
+
+    const first = layer.adapt(output);
+    const second = layer.adapt(output);
+    expect(second).toBe(first);
+  });
 });

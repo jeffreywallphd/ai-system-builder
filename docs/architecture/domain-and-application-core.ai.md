@@ -839,3 +839,30 @@ Explicitly later than this scope:
 - Current boundaries (implemented vs future):
   - implemented now: packaging -> target/config validation -> build/bundle -> provisioning/execution -> state/diagnostics -> versioning/rollback -> access/quota/isolation -> endpoint exposure/routing -> health -> autoscaling interface -> deployment audit trail -> SDK/public API + e2e/interop tests + bounded read-path safeguards.
   - future work: provider-specific deployment infrastructure, distributed deployment orchestration/backpressure/observability platforms, and autonomous autoscaling/remediation loops.
+
+## Direction 5 update: Studio–Studio handoff platform + bounded stability safeguards (stories 9.1–9.24)
+
+- Epic 9 is implemented as a bounded Studio–Studio handoff stack in existing inner/application seams (`domain/studio-handoff/*`, `application/studio-handoff/*`, `infrastructure/filesystem/studio-handoff/*`, `infrastructure/api/studio-handoff/*`), not as a second orchestration platform.
+- Implemented handoff model/surfaces now include:
+  - first-class handoff contract + context (`StudioHandoffContract`, `StudioHandoffContext`) with version-pinned asset identity and intent/provenance metadata,
+  - compatibility validation grounded in taxonomy/contract/capability truth (`StudioHandoffCompatibilityValidator`),
+  - source output + target input adapter layers (`StudioOutputAdapterLayer`, `StudioInputAdapterLayer`) with grouped multi-asset support,
+  - deterministic routing (`StudioHandoffRoutingService`) over capability descriptors and target contract matching,
+  - orchestration + incremental revision flow (`StudioHandoffOrchestrationService`, `refreshStudioHandoff`) preserving version-aware handoff identity.
+- Implemented persistence/traceability now include:
+  - persisted handoff records + query surfaces (`StudioHandoffPersistenceService`, `StudioHandoffQueryService`, SQLite repo),
+  - lineage records (`StudioHandoffLineageTracker`) and cross-studio dependency graph records (`CrossStudioDependencyGraphBuilder`, `StudioHandoffDependencyTracker`),
+  - handoff audit trail (`StudioHandoffAuditTrailService` + SQLite audit repo),
+  - structured failure/retry/reconciliation semantics (`StudioHandoffFailure*`, `StudioHandoffRetryService`) with explicit retry linkage records.
+- Implemented System Studio integration/public surfaces:
+  - System Studio handoff intake/composition initialization (`SystemStudioHandoffIntegrationService`) including grouped/system-of-systems intake context,
+  - public SDK contract + mapper/client transport seams (`infrastructure/api/studio-handoff/sdk/*`),
+  - end-to-end and cross-studio interop coverage (`StudioHandoffPipeline.integration.test.ts`, `CrossStudioInterop.integration.test.ts`).
+- Story 9.23 bounded safeguard additions (correctness-preserving, in-process):
+  - repeated compatibility/routing/input-adaptation/output-adaptation calls now use bounded in-memory decision caches for stable version-pinned inputs,
+  - handoff query history reads are now explicitly bounded by default and capped by max-limit shaping (application + SQLite query `LIMIT`),
+  - lineage/dependency trackers now keep bounded record windows and bounded read/build projections to avoid unbounded growth/query amplification.
+- Current boundaries (implemented vs bounded/future):
+  - implemented now: deterministic, version-aware handoff contracts/routing/adaptation/orchestration + persistence/lineage/dependency/audit + retry/reconciliation + System Studio intake + SDK + e2e/interop tests + bounded hot-path safeguards.
+  - bounded/partial by design: in-process caches/record windows only; no distributed cache/queue/control-plane and no separate runtime/deployment architecture for handoffs.
+  - future work: larger-scale distributed reliability/observability/backpressure systems, if and when required by product scope.

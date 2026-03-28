@@ -103,28 +103,28 @@ export class SqliteStudioHandoffRepository implements StudioHandoffRepository {
     return row ? this.parse(row.snapshot_json) : undefined;
   }
 
-  public async listRecordsBySourceStudio(sourceStudioId: string): Promise<ReadonlyArray<PersistedStudioHandoffRecord>> {
+  public async listRecordsBySourceStudio(sourceStudioId: string, limit = 100): Promise<ReadonlyArray<PersistedStudioHandoffRecord>> {
     const normalized = sourceStudioId.trim();
     if (!normalized) {
       return Object.freeze([]);
     }
 
     const rows = this.getDatabase()
-      .prepare("SELECT snapshot_json FROM studio_handoff_records WHERE source_studio_id = ? ORDER BY updated_at DESC")
-      .all(normalized) as SnapshotRow[];
+      .prepare("SELECT snapshot_json FROM studio_handoff_records WHERE source_studio_id = ? ORDER BY updated_at DESC LIMIT ?")
+      .all(normalized, Math.max(0, limit)) as SnapshotRow[];
 
     return Object.freeze(rows.map((row) => this.parse(row.snapshot_json)));
   }
 
-  public async listRecordsByTargetStudio(targetStudioId: string): Promise<ReadonlyArray<PersistedStudioHandoffRecord>> {
+  public async listRecordsByTargetStudio(targetStudioId: string, limit = 100): Promise<ReadonlyArray<PersistedStudioHandoffRecord>> {
     const normalized = targetStudioId.trim();
     if (!normalized) {
       return Object.freeze([]);
     }
 
     const rows = this.getDatabase()
-      .prepare("SELECT snapshot_json FROM studio_handoff_records WHERE target_studio_id = ? ORDER BY updated_at DESC")
-      .all(normalized) as SnapshotRow[];
+      .prepare("SELECT snapshot_json FROM studio_handoff_records WHERE target_studio_id = ? ORDER BY updated_at DESC LIMIT ?")
+      .all(normalized, Math.max(0, limit)) as SnapshotRow[];
 
     return Object.freeze(rows.map((row) => this.parse(row.snapshot_json)));
   }
@@ -132,6 +132,7 @@ export class SqliteStudioHandoffRepository implements StudioHandoffRepository {
   public async listRecordsByAssetVersion(params: {
     assetId: string;
     versionId?: string;
+    limit?: number;
   }): Promise<ReadonlyArray<PersistedStudioHandoffRecord>> {
     const normalizedAssetId = params.assetId.trim();
     const normalizedVersionId = params.versionId?.trim();
@@ -140,6 +141,7 @@ export class SqliteStudioHandoffRepository implements StudioHandoffRepository {
       return Object.freeze([]);
     }
 
+    const normalizedLimit = Math.max(0, params.limit ?? 100);
     const rows = normalizedVersionId
       ? this.getDatabase()
         .prepare(`
@@ -148,16 +150,18 @@ export class SqliteStudioHandoffRepository implements StudioHandoffRepository {
           WHERE authoritative_asset_id = ?
             AND authoritative_version_id = ?
           ORDER BY updated_at DESC
+          LIMIT ?
         `)
-        .all(normalizedAssetId, normalizedVersionId) as SnapshotRow[]
+        .all(normalizedAssetId, normalizedVersionId, normalizedLimit) as SnapshotRow[]
       : this.getDatabase()
         .prepare(`
           SELECT snapshot_json
           FROM studio_handoff_records
           WHERE authoritative_asset_id = ?
           ORDER BY updated_at DESC
+          LIMIT ?
         `)
-        .all(normalizedAssetId) as SnapshotRow[];
+        .all(normalizedAssetId, normalizedLimit) as SnapshotRow[];
 
     return Object.freeze(rows.map((row) => this.parse(row.snapshot_json)));
   }

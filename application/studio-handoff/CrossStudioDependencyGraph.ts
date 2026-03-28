@@ -289,6 +289,7 @@ export class CrossStudioDependencyGraphBuilder {
 }
 
 export class StudioHandoffDependencyTracker {
+  private static readonly MAX_RECORDS = 1000;
   private readonly records: StudioHandoffDependencyRecord[] = [];
 
   public constructor(private readonly graphBuilder: CrossStudioDependencyGraphBuilder = new CrossStudioDependencyGraphBuilder()) {}
@@ -296,18 +297,22 @@ export class StudioHandoffDependencyTracker {
   public track(input: StudioHandoffDependencyBuildInput): StudioHandoffDependencyRecord {
     const record = this.graphBuilder.build(input);
     this.records.push(record);
+    if (this.records.length > StudioHandoffDependencyTracker.MAX_RECORDS) {
+      this.records.splice(0, this.records.length - StudioHandoffDependencyTracker.MAX_RECORDS);
+    }
     return record;
   }
 
-  public listRecords(): ReadonlyArray<StudioHandoffDependencyRecord> {
-    return Object.freeze([...this.records]);
+  public listRecords(limit = 100): ReadonlyArray<StudioHandoffDependencyRecord> {
+    return Object.freeze([...this.records].slice(Math.max(0, this.records.length - Math.max(0, limit))));
   }
 
-  public buildGraph(): CrossStudioDependencyGraph {
+  public buildGraph(limit = 250): CrossStudioDependencyGraph {
     const nodes = new Map<string, StudioHandoffDependencyNode>();
     const edges = new Map<string, StudioHandoffDependencyEdge>();
 
-    for (const record of this.records) {
+    const boundedRecords = this.records.slice(Math.max(0, this.records.length - Math.max(0, limit)));
+    for (const record of boundedRecords) {
       for (const node of record.graph.nodes) {
         nodes.set(node.nodeId, node);
       }
