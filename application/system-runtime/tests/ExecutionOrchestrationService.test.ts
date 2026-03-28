@@ -101,7 +101,8 @@ describe("ExecutionOrchestrationService", () => {
     expect(result.status).toBe("completed");
     expect(result.execution?.status).toBe("succeeded");
     expect(result.execution?.nodes.map((entry) => entry.executionNodeId)).toEqual(result.plan?.orderedNodeIds);
-    expect(result.progression.map((entry) => entry.nodeId)).toEqual(result.plan?.orderedNodeIds);
+    expect(result.progression.filter((entry) => entry.passIndex === 0).map((entry) => entry.nodeId)).toEqual(result.plan?.orderedNodeIds);
+    expect(result.execution?.runtimeState.snapshot.totalNodeCount).toBe(result.plan?.orderedNodeIds.length);
   });
 
   it("delegates step execution to the step engine seam", async () => {
@@ -150,6 +151,7 @@ describe("ExecutionOrchestrationService", () => {
     expect(result.status).toBe("completed");
     expect(result.plan?.recursion.status).toBe("complete");
     expect(result.progression.some((entry) => entry.nodeId.includes("child"))).toBe(true);
+    expect(result.execution?.runtimeState.nodeStates.some((entry) => entry.executionNodeId.includes("child"))).toBe(true);
   });
 
   it("surfaces invalid plan/environment mismatches truthfully", async () => {
@@ -176,5 +178,60 @@ describe("ExecutionOrchestrationService", () => {
 
     expect(result.status).toBe("invalid");
     expect(result.errors[0]).toContain("does not match requested environment");
+  });
+
+  it("runs bounded iterative progression only for iterative-capable behavior", async () => {
+    const root = createSystem({ assetId: "system:iter", versionId: "system:iter:v1", behaviorKind: "iterative" });
+    const runtime = await createRuntimeBundle(root, async () => undefined);
+    const service = new ExecutionOrchestrationService(new StepExecutionEngine());
+
+    const result = await service.orchestrate({
+      root,
+      ...runtime,
+      inputPayload: { loop: true },
+      maxIterationsPerNode: 2,
+    });
+
+    expect(result.status).toBe("completed");
+    const rootProgression = result.progression.filter((entry) => entry.nodeId.startsWith("system:"));
+    expect(rootProgression.length).toBe(2);
+    expect(rootProgression[0]?.decision).toBe("iterate");
+    expect(rootProgression[1]?.decision).toBe("complete");
+  });
+
+  it("runs bounded autonomous planning progression", async () => {
+    const root = createSystem({ assetId: "system:auto", versionId: "system:auto:v1", behaviorKind: "autonomous" });
+    const runtime = await createRuntimeBundle(root, async () => undefined);
+    const service = new ExecutionOrchestrationService(new StepExecutionEngine());
+
+    const result = await service.orchestrate({
+      root,
+      ...runtime,
+      inputPayload: { plan: true },
+      maxPlanningCyclesPerNode: 2,
+    });
+
+    expect(result.status).toBe("completed");
+    const rootProgression = result.progression.filter((entry) => entry.nodeId.startsWith("system:"));
+    expect(rootProgression.length).toBe(2);
+    expect(rootProgression[0]?.decision).toBe("replan");
+    expect(rootProgression[1]?.decision).toBe("complete");
+  });
+
+  it("keeps deterministic profiles on single-pass progression", async () => {
+    const root = createSystem({ assetId: "system:det", versionId: "system:det:v1", behaviorKind: "deterministic" });
+    const runtime = await createRuntimeBundle(root, async () => undefined);
+    const service = new ExecutionOrchestrationService(new StepExecutionEngine());
+
+    const result = await service.orchestrate({
+      root,
+      ...runtime,
+      inputPayload: { run: true },
+      maxIterationsPerNode: 4,
+      maxPlanningCyclesPerNode: 4,
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.progression.filter((entry) => entry.nodeId.startsWith("system:")).length).toBe(1);
   });
 });

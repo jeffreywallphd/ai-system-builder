@@ -155,13 +155,19 @@ describe("StepExecutionEngine", () => {
 
     const atomic = await engine.executeStep({ plan, node: plan.nodes[1]!, environment, execution });
     const composite = await engine.executeStep({ plan, node: plan.nodes[2]!, environment, execution });
-    const system = await engine.executeStep({ plan, node: plan.nodes[3]!, environment, execution });
+    const system = await engine.executeStep({
+      plan,
+      node: plan.nodes[3]!,
+      environment,
+      execution,
+      progression: { iteration: 0, planningCycle: 0, maxIterations: 2, maxPlanningCycles: 1 },
+    });
 
     expect(atomic.status).toBe("succeeded");
     expect(composite.status).toBe("succeeded");
     expect(system.status).toBe("succeeded");
     expect(composite.diagnostics?.[0]).toContain("branch-capable");
-    expect(system.diagnostics?.some((entry) => entry.includes("single bounded pass"))).toBe(true);
+    expect(system.progressionDecision?.kind).toBe("iterate");
   });
 
   it("respects runtime environment capabilities for nested systems", async () => {
@@ -207,5 +213,57 @@ describe("StepExecutionEngine", () => {
 
     expect(result.status).toBe("failed");
     expect(result.error?.code).toBe("unsupported-step-type");
+  });
+
+  it("keeps deterministic and conditional profiles single-pass", async () => {
+    const environment = createEnvironment();
+    const plan = createExecutionPlan(environment);
+    const engine = new StepExecutionEngine();
+    const execution = createExecution();
+
+    const deterministic = await engine.executeStep({ plan, node: plan.nodes[0]!, environment, execution });
+    const conditional = await engine.executeStep({ plan, node: plan.nodes[2]!, environment, execution });
+
+    expect(deterministic.progressionDecision?.kind).toBe("complete");
+    expect(conditional.progressionDecision?.kind).toBe("complete");
+  });
+
+  it("supports bounded autonomous planner progression decisions", async () => {
+    const environment = createEnvironment();
+    const plan = createExecutionPlan(environment);
+    const engine = new StepExecutionEngine();
+    const execution = createExecution();
+    const autonomousNode = {
+      ...plan.nodes[0]!,
+      nodeId: "component:autonomous",
+      nodeType: "component" as const,
+      componentKind: "composite" as const,
+      taxonomy: { structuralKind: "composite", semanticRole: "workflow", behaviorKind: "autonomous" as const },
+      behavior: {
+        behaviorKind: "autonomous" as const,
+        executionPattern: "planner-capable" as const,
+        supportsBranching: true,
+        supportsIteration: true,
+        supportsPlanning: true,
+      },
+    };
+
+    const first = await engine.executeStep({
+      plan,
+      node: autonomousNode,
+      environment,
+      execution,
+      progression: { iteration: 0, planningCycle: 0, maxIterations: 2, maxPlanningCycles: 2 },
+    });
+    const second = await engine.executeStep({
+      plan,
+      node: autonomousNode,
+      environment,
+      execution,
+      progression: { iteration: 0, planningCycle: 1, maxIterations: 2, maxPlanningCycles: 2 },
+    });
+
+    expect(first.progressionDecision?.kind).toBe("replan");
+    expect(second.progressionDecision?.kind).toBe("complete");
   });
 });
