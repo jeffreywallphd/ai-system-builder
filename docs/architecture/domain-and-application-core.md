@@ -613,6 +613,12 @@ Explicitly later than this story:
 - System-asset Studio Shell surfaces for Full AI System and App Template / Deployment Unit.
 - Any broader system-composer architecture beyond current shared shell + taxonomy/contract/dependency enforcement seams.
 
+## Direction 5 update: System consistency + interop integration coverage (stories 5.21–5.22)
+
+- Shared integration coverage now includes bounded end-to-end consistency for System Studio across create/update/validate/publish/reload over the real renderer service -> desktop bridge -> backend API -> application orchestration -> SQLite path (`ui/services/tests/StudioShellService.integration.test.ts`).
+- System-specific operations are now exercised over that same seam (list/add/remove/reorder child components, interface updates, parameter updates, execution-metadata updates, and compatibility-insights queries) using the actual `SystemStudioBackendApi` bridge contract, not test-only direct application calls.
+- Cross-kind interop coverage now validates mixed atomic/composite/system child composition in a single system draft with pinned versions, clean compatibility-insights status, and persisted upstream version lineage after publish/reload.
+
 ## Direction 5 update: Registry performance + consistency hardening (stories 4.15–4.16)
 
 - Registry reads now include a bounded in-memory cache layer (`application/asset-registry/RegistryCacheLayer.ts`) used by query and dependency-graph services with cache-aside/read-through behavior.

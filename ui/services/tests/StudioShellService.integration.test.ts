@@ -4,6 +4,7 @@ import path from "node:path";
 import { tmpdir } from "node:os";
 import type { DesktopStudioShellBridge } from "../../../electron/shared/DesktopContracts";
 import { StudioShellBackendApi } from "../../../infrastructure/api/studio-shell/StudioShellBackendApi";
+import { SystemStudioBackendApi } from "../../../infrastructure/api/system-studio/SystemStudioBackendApi";
 import { SqliteStudioShellRepository } from "../../../infrastructure/filesystem/studio-shell/SqliteStudioShellRepository";
 import { AssetDraftLifecycleStatuses } from "../../../domain/studio-shell/StudioShellDomain";
 import { StudioShellService } from "../StudioShellService";
@@ -21,7 +22,14 @@ afterEach(() => {
   }
 });
 
-function installBridge(api: StudioShellBackendApi): void {
+function unsupportedSystemOperation() {
+  return Promise.resolve(JSON.stringify({ ok: false, error: { code: "invalid-request", message: "not configured in this integration bridge" } }));
+}
+
+function installBridge(
+  api: StudioShellBackendApi,
+  systemApi?: SystemStudioBackendApi,
+): void {
   const bridge: DesktopStudioShellBridge = {
     initializeStudio(studioId: string, name: string) {
       return api.initializeStudio(studioId, name).then((response) => JSON.stringify(response));
@@ -50,29 +58,53 @@ function installBridge(api: StudioShellBackendApi): void {
     validateDraft(requestJson: string) {
       return api.validateDraft(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
     },
-    listSystemChildComponents() {
-      return Promise.resolve(JSON.stringify({ ok: false, error: { code: "invalid-request", message: "not configured in this integration bridge" } }));
+    listSystemChildComponents(requestJson: string) {
+      if (!systemApi) {
+        return unsupportedSystemOperation();
+      }
+      return systemApi.listChildComponents(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
     },
-    addSystemChildComponent() {
-      return Promise.resolve(JSON.stringify({ ok: false, error: { code: "invalid-request", message: "not configured in this integration bridge" } }));
+    addSystemChildComponent(requestJson: string) {
+      if (!systemApi) {
+        return unsupportedSystemOperation();
+      }
+      return systemApi.addChildComponent(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
     },
-    removeSystemChildComponent() {
-      return Promise.resolve(JSON.stringify({ ok: false, error: { code: "invalid-request", message: "not configured in this integration bridge" } }));
+    removeSystemChildComponent(requestJson: string) {
+      if (!systemApi) {
+        return unsupportedSystemOperation();
+      }
+      return systemApi.removeChildComponent(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
     },
-    reorderSystemChildComponent() {
-      return Promise.resolve(JSON.stringify({ ok: false, error: { code: "invalid-request", message: "not configured in this integration bridge" } }));
+    reorderSystemChildComponent(requestJson: string) {
+      if (!systemApi) {
+        return unsupportedSystemOperation();
+      }
+      return systemApi.reorderChildComponent(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
     },
-    updateSystemInterfaces() {
-      return Promise.resolve(JSON.stringify({ ok: false, error: { code: "invalid-request", message: "not configured in this integration bridge" } }));
+    updateSystemInterfaces(requestJson: string) {
+      if (!systemApi) {
+        return unsupportedSystemOperation();
+      }
+      return systemApi.updateInterfaces(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
     },
-    updateSystemParameters() {
-      return Promise.resolve(JSON.stringify({ ok: false, error: { code: "invalid-request", message: "not configured in this integration bridge" } }));
+    updateSystemParameters(requestJson: string) {
+      if (!systemApi) {
+        return unsupportedSystemOperation();
+      }
+      return systemApi.updateParameters(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
     },
-    updateSystemExecutionMetadata() {
-      return Promise.resolve(JSON.stringify({ ok: false, error: { code: "invalid-request", message: "not configured in this integration bridge" } }));
+    updateSystemExecutionMetadata(requestJson: string) {
+      if (!systemApi) {
+        return unsupportedSystemOperation();
+      }
+      return systemApi.updateExecutionMetadata(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
     },
-    getSystemCompatibilityInsights() {
-      return Promise.resolve(JSON.stringify({ ok: false, error: { code: "invalid-request", message: "not configured in this integration bridge" } }));
+    getSystemCompatibilityInsights(requestJson: string) {
+      if (!systemApi) {
+        return unsupportedSystemOperation();
+      }
+      return systemApi.getCompatibilityInsights(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
     },
   };
 
@@ -1195,6 +1227,385 @@ describe("StudioShellService integration", () => {
     expect(published.data?.versions.map((entry) => entry.versionId)).toEqual(["asset:studio-systems:v1"]);
 
     repository.dispose();
+  });
+
+  it("keeps System Studio end-to-end consistency across system child operations, contract projection, publish, and reload", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-system-studio-consistency-"));
+    createdRoots.push(root);
+    const databasePath = path.join(root, "system-studio-consistency.sqlite");
+    const repository = new SqliteStudioShellRepository(databasePath);
+    const backendApi = new StudioShellBackendApi(repository);
+    const systemBackendApi = new SystemStudioBackendApi(repository);
+    installBridge(backendApi, systemBackendApi);
+
+    const service = new StudioShellService();
+    const contractResolver = new CompositionAssetContractResolver();
+
+    const modelStudio = await service.initializeStudio("studio-models", "Model Studio");
+    expect(modelStudio.ok).toBeTrue();
+    const modelCreated = await service.createDraft({
+      studioId: "studio-models",
+      sessionId: modelStudio.data!.activeSessionId,
+      content: "{\"modelSpec\":{\"provider\":\"local\",\"modelId\":\"consistency-model\"}}",
+      metadata: {
+        title: "Consistency Model",
+        taxonomy: { structuralKind: "atomic", semanticRole: "model", behaviorKind: "none" },
+        contract: contractResolver.resolveContractForTaxonomy({ structuralKind: "atomic", semanticRole: "model", behaviorKind: "none" }),
+      },
+      dependencies: [{ assetId: "asset:model-seed", versionId: "asset:model-seed:v1" }],
+    });
+    expect(modelCreated.ok).toBeTrue();
+    await service.transitionLifecycle({
+      studioId: "studio-models",
+      sessionId: modelStudio.data!.activeSessionId,
+      draftId: modelCreated.data!.draft!.draftId,
+      targetStatus: AssetDraftLifecycleStatuses.validated,
+    });
+    await service.publishVersion({
+      studioId: "studio-models",
+      sessionId: modelStudio.data!.activeSessionId,
+      draftId: modelCreated.data!.draft!.draftId,
+      versionId: "asset:studio-models:consistency:v1",
+      versionLabel: "v1",
+      createdBy: "system-consistency",
+    });
+
+    const childStudio = await service.initializeStudio("studio-systems-child", "System Studio Child");
+    expect(childStudio.ok).toBeTrue();
+    const childDraft = await service.createDraft({
+      studioId: "studio-systems-child",
+      sessionId: childStudio.data!.activeSessionId,
+      content: "{\"systemSpec\":{\"components\":[],\"nestedSystems\":[],\"inputs\":[],\"outputs\":[],\"parameters\":[],\"bindings\":[]}}",
+      metadata: {
+        title: "Nested Child System",
+        taxonomy: { structuralKind: "system", semanticRole: "system", behaviorKind: "deterministic" },
+        contract: contractResolver.resolveContractForTaxonomy({ structuralKind: "system", semanticRole: "system", behaviorKind: "deterministic" }),
+      },
+      dependencies: [],
+    });
+    expect(childDraft.ok).toBeTrue();
+    await service.transitionLifecycle({
+      studioId: "studio-systems-child",
+      sessionId: childStudio.data!.activeSessionId,
+      draftId: childDraft.data!.draft!.draftId,
+      targetStatus: AssetDraftLifecycleStatuses.validated,
+    });
+    await service.publishVersion({
+      studioId: "studio-systems-child",
+      sessionId: childStudio.data!.activeSessionId,
+      draftId: childDraft.data!.draft!.draftId,
+      versionId: "asset:studio-systems-child:v1",
+      versionLabel: "v1",
+      createdBy: "system-consistency",
+    });
+
+    const systemStudio = await service.initializeStudio("studio-systems", "System Studio");
+    expect(systemStudio.ok).toBeTrue();
+    const systemSessionId = systemStudio.data!.activeSessionId;
+    const created = await service.createDraft({
+      studioId: "studio-systems",
+      sessionId: systemSessionId,
+      content: "{\"systemSpec\":{\"components\":[],\"nestedSystems\":[],\"inputs\":[],\"outputs\":[],\"parameters\":[],\"bindings\":[]}}",
+      metadata: {
+        title: "System Consistency Root",
+        taxonomy: { structuralKind: "system", semanticRole: "system", behaviorKind: "deterministic" },
+        contract: contractResolver.resolveContractForTaxonomy({ structuralKind: "system", semanticRole: "system", behaviorKind: "deterministic" }),
+      },
+      dependencies: [],
+    });
+    expect(created.ok).toBeTrue();
+    const draftId = created.data!.draft!.draftId;
+
+    const addModel = await service.addSystemChildComponent({
+      studioId: "studio-systems",
+      sessionId: systemSessionId,
+      draftId,
+      component: {
+        componentKind: "atomic",
+        assetId: modelCreated.data!.draft!.assetId,
+        versionId: "asset:studio-models:consistency:v1",
+        alias: "model-a",
+      },
+    });
+    expect(addModel.ok).toBeTrue();
+    const addChildSystem = await service.addSystemChildComponent({
+      studioId: "studio-systems",
+      sessionId: systemSessionId,
+      draftId,
+      component: {
+        componentKind: "system",
+        assetId: childDraft.data!.draft!.assetId,
+        versionId: "asset:studio-systems-child:v1",
+        alias: "nested-a",
+      },
+    });
+    expect(addChildSystem.ok).toBeTrue();
+
+    const updatedInterfaces = await service.updateSystemInterfaces({
+      studioId: "studio-systems",
+      sessionId: systemSessionId,
+      draftId,
+      inputs: [{ inputId: "prompt", valueType: "string", required: true }],
+      outputs: [{ outputId: "answer", valueType: "string" }],
+    });
+    expect(updatedInterfaces.ok).toBeTrue();
+    const updatedParameters = await service.updateSystemParameters({
+      studioId: "studio-systems",
+      sessionId: systemSessionId,
+      draftId,
+      parameters: [{ parameterId: "temperature", valueType: "number", defaultValue: 0.2 }],
+    });
+    expect(updatedParameters.ok).toBeTrue();
+    const updatedExecutionMetadata = await service.updateSystemExecutionMetadata({
+      studioId: "studio-systems",
+      sessionId: systemSessionId,
+      draftId,
+      executionMetadata: {
+        runtime: { environment: "python-3.11", requirements: ["numpy"] },
+        orchestration: { mode: "queued", hints: ["retryable"] },
+      },
+    });
+    expect(updatedExecutionMetadata.ok).toBeTrue();
+
+    const list = await service.listSystemChildComponents({ studioId: "studio-systems", draftId });
+    expect(list.ok).toBeTrue();
+    expect(list.data?.map((entry) => entry.structuralKind)).toEqual(["atomic", "system"]);
+
+    const compatibility = await service.getSystemCompatibilityInsights({ studioId: "studio-systems", draftId });
+    expect(compatibility.ok).toBeTrue();
+    expect(compatibility.data?.summary.status).toBe("clean");
+
+    const validated = await service.transitionLifecycle({
+      studioId: "studio-systems",
+      sessionId: systemSessionId,
+      draftId,
+      targetStatus: AssetDraftLifecycleStatuses.validated,
+    });
+    expect(validated.ok).toBeTrue();
+    const published = await service.publishVersion({
+      studioId: "studio-systems",
+      sessionId: systemSessionId,
+      draftId,
+      versionId: "asset:studio-systems:consistency:v1",
+      versionLabel: "v1",
+      createdBy: "system-consistency",
+    });
+    expect(published.ok).toBeTrue();
+
+    repository.dispose();
+    const reopenedRepository = new SqliteStudioShellRepository(databasePath);
+    const reopenedApi = new StudioShellBackendApi(reopenedRepository);
+    const reopenedSystemApi = new SystemStudioBackendApi(reopenedRepository);
+    installBridge(reopenedApi, reopenedSystemApi);
+
+    const reloaded = await service.loadSnapshot("studio-systems");
+    expect(reloaded.ok).toBeTrue();
+    expect(reloaded.data?.draft?.lifecycleStatus).toBe(AssetDraftLifecycleStatuses.published);
+    expect(reloaded.data?.draft?.metadata.taxonomy).toEqual({
+      structuralKind: "system",
+      semanticRole: "system",
+      behaviorKind: "deterministic",
+    });
+    const reloadedSpec = JSON.parse(reloaded.data!.draft!.content) as {
+      readonly systemSpec?: {
+        readonly components?: ReadonlyArray<{ readonly componentKind: string }>;
+        readonly inputs?: ReadonlyArray<{ readonly inputId: string }>;
+        readonly outputs?: ReadonlyArray<{ readonly outputId: string }>;
+        readonly parameters?: ReadonlyArray<{ readonly parameterId: string; readonly defaultValue?: unknown }>;
+      };
+    };
+    expect(reloadedSpec.systemSpec?.components?.map((entry) => entry.componentKind)).toEqual(["atomic", "system"]);
+    expect(reloadedSpec.systemSpec?.inputs?.map((entry) => entry.inputId)).toEqual(["prompt"]);
+    expect(reloadedSpec.systemSpec?.outputs?.map((entry) => entry.outputId)).toEqual(["answer"]);
+    expect(reloadedSpec.systemSpec?.parameters?.[0]).toEqual(expect.objectContaining({
+      parameterId: "temperature",
+      defaultValue: 0.2,
+    }));
+    expect(reloaded.data?.versions.map((entry) => entry.versionId)).toEqual(["asset:studio-systems:consistency:v1"]);
+
+    reopenedRepository.dispose();
+  });
+
+  it("verifies atomic/composite/system interop with pinned dependencies and clean system compatibility insights", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-system-interop-"));
+    createdRoots.push(root);
+    const databasePath = path.join(root, "system-interop.sqlite");
+    const repository = new SqliteStudioShellRepository(databasePath);
+    const backendApi = new StudioShellBackendApi(repository);
+    const systemBackendApi = new SystemStudioBackendApi(repository);
+    installBridge(backendApi, systemBackendApi);
+
+    const service = new StudioShellService();
+    const contractResolver = new CompositionAssetContractResolver();
+
+    const atomicStudio = await service.initializeStudio("studio-models", "Model Studio");
+    const atomicCreated = await service.createDraft({
+      studioId: "studio-models",
+      sessionId: atomicStudio.data!.activeSessionId,
+      content: "{\"modelSpec\":{\"provider\":\"local\",\"modelId\":\"interop-model\"}}",
+      metadata: {
+        title: "Interop Model",
+        taxonomy: { structuralKind: "atomic", semanticRole: "model", behaviorKind: "none" },
+        contract: contractResolver.resolveContractForTaxonomy({ structuralKind: "atomic", semanticRole: "model", behaviorKind: "none" }),
+      },
+      dependencies: [{ assetId: "asset:model-seed", versionId: "asset:model-seed:v1" }],
+    });
+    await service.transitionLifecycle({
+      studioId: "studio-models",
+      sessionId: atomicStudio.data!.activeSessionId,
+      draftId: atomicCreated.data!.draft!.draftId,
+      targetStatus: AssetDraftLifecycleStatuses.validated,
+    });
+    await service.publishVersion({
+      studioId: "studio-models",
+      sessionId: atomicStudio.data!.activeSessionId,
+      draftId: atomicCreated.data!.draft!.draftId,
+      versionId: "asset:studio-models:interop:v1",
+      versionLabel: "v1",
+      createdBy: "interop-author",
+    });
+
+    const composite = await runLifecycleScenario(service, contractResolver, {
+      studioId: "studio-workflows",
+      studioName: "Workflow Studio",
+      semanticRole: "workflow",
+      behaviorKind: "conditional",
+      content: "{\"workflowSpec\":{\"metadata\":{\"name\":\"interop-workflow\"},\"nodes\":[],\"connections\":[]}}",
+      dependencies: [
+        { assetId: atomicCreated.data!.draft!.assetId, versionId: "asset:studio-models:interop:v1" },
+      ],
+    });
+    const compositeVersion = await repository.getAssetVersion(composite.versionId);
+    expect(compositeVersion).toBeDefined();
+
+    const childSystemStudio = await service.initializeStudio("studio-systems-interop-child", "System Interop Child");
+    const childSystemCreated = await service.createDraft({
+      studioId: "studio-systems-interop-child",
+      sessionId: childSystemStudio.data!.activeSessionId,
+      content: "{\"systemSpec\":{\"components\":[],\"nestedSystems\":[],\"inputs\":[],\"outputs\":[],\"parameters\":[],\"bindings\":[]}}",
+      metadata: {
+        title: "Interop Child System",
+        taxonomy: { structuralKind: "system", semanticRole: "system", behaviorKind: "deterministic" },
+        contract: contractResolver.resolveContractForTaxonomy({ structuralKind: "system", semanticRole: "system", behaviorKind: "deterministic" }),
+      },
+      dependencies: [],
+    });
+    await service.transitionLifecycle({
+      studioId: "studio-systems-interop-child",
+      sessionId: childSystemStudio.data!.activeSessionId,
+      draftId: childSystemCreated.data!.draft!.draftId,
+      targetStatus: AssetDraftLifecycleStatuses.validated,
+    });
+    await service.publishVersion({
+      studioId: "studio-systems-interop-child",
+      sessionId: childSystemStudio.data!.activeSessionId,
+      draftId: childSystemCreated.data!.draft!.draftId,
+      versionId: "asset:studio-systems-interop-child:v1",
+      versionLabel: "v1",
+      createdBy: "interop-author",
+    });
+
+    const systemStudio = await service.initializeStudio("studio-systems-interop", "System Interop");
+    const systemSessionId = systemStudio.data!.activeSessionId;
+    const systemCreated = await service.createDraft({
+      studioId: "studio-systems-interop",
+      sessionId: systemSessionId,
+      content: "{\"systemSpec\":{\"components\":[],\"nestedSystems\":[],\"inputs\":[],\"outputs\":[],\"parameters\":[],\"bindings\":[]}}",
+      metadata: {
+        title: "Interop Root System",
+        taxonomy: { structuralKind: "system", semanticRole: "system", behaviorKind: "deterministic" },
+      },
+      dependencies: [],
+    });
+    const systemDraftId = systemCreated.data!.draft!.draftId;
+    const rootAssetId = systemCreated.data!.draft!.assetId;
+
+    await service.addSystemChildComponent({
+      studioId: "studio-systems-interop",
+      sessionId: systemSessionId,
+      draftId: systemDraftId,
+      component: {
+        componentKind: "atomic",
+        assetId: atomicCreated.data!.draft!.assetId,
+        versionId: "asset:studio-models:interop:v1",
+        alias: "model",
+      },
+    });
+    await service.addSystemChildComponent({
+      studioId: "studio-systems-interop",
+      sessionId: systemSessionId,
+      draftId: systemDraftId,
+      component: {
+        componentKind: "composite",
+        assetId: compositeVersion!.assetId.value,
+        versionId: composite.versionId,
+        alias: "workflow",
+      },
+    });
+    await service.addSystemChildComponent({
+      studioId: "studio-systems-interop",
+      sessionId: systemSessionId,
+      draftId: systemDraftId,
+      component: {
+        componentKind: "system",
+        assetId: childSystemCreated.data!.draft!.assetId,
+        versionId: "asset:studio-systems-interop-child:v1",
+        alias: "nested",
+      },
+    });
+
+    const listed = await service.listSystemChildComponents({ studioId: "studio-systems-interop", draftId: systemDraftId });
+    expect(listed.ok).toBeTrue();
+    expect(listed.data?.map((entry) => entry.structuralKind)).toEqual(["atomic", "composite", "system"]);
+
+    const insights = await service.getSystemCompatibilityInsights({ studioId: "studio-systems-interop", draftId: systemDraftId });
+    expect(insights.ok).toBeTrue();
+    expect(insights.data?.summary.status).toBe("clean");
+    expect(insights.data?.summary.totalIssueCount).toBe(0);
+
+    await service.transitionLifecycle({
+      studioId: "studio-systems-interop",
+      sessionId: systemSessionId,
+      draftId: systemDraftId,
+      targetStatus: AssetDraftLifecycleStatuses.validated,
+    });
+    const published = await service.publishVersion({
+      studioId: "studio-systems-interop",
+      sessionId: systemSessionId,
+      draftId: systemDraftId,
+      versionId: "asset:studio-systems-interop:v1",
+      versionLabel: "v1",
+      createdBy: "interop-author",
+    });
+    expect(published.ok).toBeTrue();
+
+    const systemVersion = await repository.getAssetVersion("asset:studio-systems-interop:v1");
+    expect(systemVersion).toBeDefined();
+    expect(systemVersion?.assetId.value).toBe(rootAssetId);
+    expect(systemVersion?.upstreamVersionIds).toEqual(expect.arrayContaining([
+      "asset:studio-models:interop:v1",
+      composite.versionId,
+      "asset:studio-systems-interop-child:v1",
+    ]));
+
+    repository.dispose();
+    const reopenedRepository = new SqliteStudioShellRepository(databasePath);
+    const reopenedApi = new StudioShellBackendApi(reopenedRepository);
+    const reopenedSystemApi = new SystemStudioBackendApi(reopenedRepository);
+    installBridge(reopenedApi, reopenedSystemApi);
+
+    const snapshot = await service.loadSnapshot("studio-systems-interop");
+    expect(snapshot.ok).toBeTrue();
+    expect(snapshot.data?.draft?.dependencies).toEqual(expect.arrayContaining([
+      { assetId: atomicCreated.data!.draft!.assetId, versionId: "asset:studio-models:interop:v1" },
+      { assetId: compositeVersion!.assetId.value, versionId: composite.versionId },
+      { assetId: childSystemCreated.data!.draft!.assetId, versionId: "asset:studio-systems-interop-child:v1" },
+    ]));
+    expect(snapshot.data?.validationIssues.some((entry) => entry.code === "dependency-version-not-found")).toBeFalse();
+    expect(snapshot.data?.validationIssues.some((entry) => entry.code === "dependency-asset-version-mismatch")).toBeFalse();
+    expect(snapshot.data?.validationIssues.some((entry) => entry.code === "system-child-reference-missing")).toBeFalse();
+
+    reopenedRepository.dispose();
   });
 
   it("executes the Studio Shell vertical flow through bridge -> backend -> application -> sqlite persistence", async () => {
