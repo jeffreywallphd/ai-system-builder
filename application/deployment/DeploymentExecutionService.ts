@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 import {
   createDeploymentExecutionRequest,
   createDeploymentLifecycleRequest,
+  DeploymentActivationActionKinds,
+  DeploymentActivationStates,
   DeploymentStatuses,
   type DeploymentExecutionRequest,
   type DeploymentExecutionResult,
@@ -23,6 +25,7 @@ import { DeploymentStateTracker } from "./DeploymentStateTracker";
 export interface DeploymentRecordRepository {
   save(record: DeploymentRecord): DeploymentRecord;
   getById(deploymentId: string): DeploymentRecord | undefined;
+  listAll(): ReadonlyArray<DeploymentRecord>;
   listByEnvironment(environmentId: string): ReadonlyArray<DeploymentRecord>;
   listByState(state: DeploymentRecord["state"]): ReadonlyArray<DeploymentRecord>;
 }
@@ -45,6 +48,10 @@ export class InMemoryDeploymentRecordRepository implements DeploymentRecordRepos
   public getById(deploymentId: string): DeploymentRecord | undefined {
     const normalized = deploymentId.trim();
     return normalized ? this.recordsById.get(normalized) : undefined;
+  }
+
+  public listAll(): ReadonlyArray<DeploymentRecord> {
+    return Object.freeze([...this.recordsById.values()].sort((left, right) => right.deployedAt.localeCompare(left.deployedAt)));
   }
 
   public listByEnvironment(environmentId: string): ReadonlyArray<DeploymentRecord> {
@@ -379,6 +386,16 @@ export class DeploymentExecutionService {
       state: initial.state,
       stateSnapshot: initial.snapshot,
       stateTransitions: initial.transitions,
+      activationState: DeploymentActivationStates.inactive,
+      activationUpdatedAt: input.deployedAt,
+      activationHistory: Object.freeze([{
+        eventId: `${input.deploymentId}:activation:0`,
+        deploymentId: input.deploymentId,
+        toState: DeploymentActivationStates.inactive,
+        actionKind: DeploymentActivationActionKinds.initialized,
+        reason: "deployment-record-initialized",
+        at: input.deployedAt,
+      }]),
       bundleId: input.bundleId,
       bundleVersionKey: input.bundleVersionKey,
       packageId: input.packageId,
@@ -412,6 +429,55 @@ export class DeploymentExecutionService {
       stateTransitions: transitioned.transitions,
       status: transitioned.state === DeploymentStates.failed ? DeploymentStatuses.rejected : record.status,
     });
+  }
+
+  public setDeploymentActivationState(input: {
+    readonly deploymentId: string;
+    readonly toState: DeploymentRecord["activationState"];
+    readonly reason: string;
+    readonly actionKind: "deployment" | "version-management" | "rollback";
+    readonly relatedDeploymentId?: string;
+  }): DeploymentRecord {
+    const record = this.repository.getById(input.deploymentId);
+    if (!record) {
+      throw new Error(`Deployment '${input.deploymentId}' was not found.`);
+    }
+
+    if (record.activationState === input.toState) {
+      return record;
+    }
+
+    const at = this.clock().toISOString();
+    const activationEvent = Object.freeze({
+      eventId: `${record.deploymentId}:activation:${record.activationHistory.length}`,
+      deploymentId: record.deploymentId,
+      fromState: record.activationState,
+      toState: input.toState,
+      actionKind: input.actionKind,
+      reason: input.reason,
+      at,
+      relatedDeploymentId: input.relatedDeploymentId,
+    } satisfies DeploymentRecord["activationHistory"][number]);
+
+    const updated = Object.freeze({
+      ...record,
+      activationState: input.toState,
+      activationUpdatedAt: at,
+      activationHistory: Object.freeze([...record.activationHistory, activationEvent]),
+    });
+
+    this.diagnosticsService.logEvent({
+      deploymentId: updated.deploymentId,
+      eventKind: "activation-transition",
+      message: `Deployment activation changed from '${record.activationState}' to '${updated.activationState}'.`,
+      details: Object.freeze({
+        fromState: record.activationState,
+        toState: updated.activationState,
+        actionKind: input.actionKind,
+      }),
+    });
+
+    return this.repository.save(updated);
   }
 
   private withProvisionedEnvironment(record: DeploymentRecord, environment: ProvisionedDeploymentEnvironment): DeploymentRecord {

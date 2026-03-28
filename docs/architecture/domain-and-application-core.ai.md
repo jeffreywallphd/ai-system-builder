@@ -739,3 +739,21 @@ Explicitly later than this scope:
   - deployment state/diagnostics are not merged into system runtime execution-state or trace/log models,
   - no rollback/health/endpoint/autoscaling behavior is added yet,
   - storage remains intentionally bounded (in-memory repositories) while preserving durable-in-process queryability for later API/UI stories.
+
+## Direction 5 update: Deployment version management + rollback (stories 8.9–8.10)
+
+- Deployment activation is now an explicit management concern separated from deployment lifecycle state:
+  - deployment records track activation state (`active`/`inactive`/`superseded`) and activation history events with action-kind metadata.
+  - successful deployments are not implicitly active; activation is explicitly selected by management actions.
+- Versioned deployment management now has a bounded application service (`application/deployment/DeploymentVersionManager.ts`) that:
+  - lists deployment history by system/version/target scope,
+  - exposes active deployment lookup for a bounded target context,
+  - applies explicit active selection while superseding prior active records in-scope.
+- Rollback is now an explicit bounded deployment-management action via `application/deployment/DeploymentRollbackService.ts` with contracts in `domain/deployment/DeploymentRollbackDomain.ts`:
+  - rollback eligibility is explicit and structured (`isRollbackEligible`),
+  - rollback actions record request/decision/outcome separately from ordinary deployment actions,
+  - rollback re-activation preserves deployment-version traceability (asset version, bundle, config, target, deployment identity).
+- Scope remains intentionally bounded:
+  - no health-triggered automatic rollback,
+  - no endpoint-routing/traffic-shifting orchestration,
+  - no merge with runtime retry/recovery semantics.
