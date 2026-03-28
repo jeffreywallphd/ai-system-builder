@@ -75,3 +75,16 @@ Partially implemented / bounded:
 
 Not implemented in this slice:
 - Rich visual/system-runtime contract tooling beyond current bounded System Studio panels and shared publish enforcement.
+
+## Direction 5 update: Runtime execution contract + dependency resolution foundation (stories 6.3–6.4)
+
+- Runtime now has an explicit execution-contract mapping seam in `application/system-runtime/RuntimeExecutionContractMapping.ts`.
+- Mapping stays derived from existing shared system contract truth (`CompositionAssetContractResolver.resolveSystemContract`) plus system definitions, rather than creating a second contract universe.
+- Runtime execution contract mapping now projects:
+  - runtime execution inputs/outputs
+  - runtime execution parameters/configuration (system-authored + contract-derived)
+  - runtime-visible child component interface references for atomic/composite/system children
+  - bounded recursive nested-system traversal status for system-of-systems readiness.
+- Runtime now has an explicit dependency-resolution seam in `application/system-runtime/RuntimeDependencyResolution.ts`.
+- Dependency resolution reuses existing version-aware recursive dependency truth (`collectSystemDirectDependencies` + nested-system traversal) and does not create a second dependency graph model.
+- Recursive resolution is bounded and cycle-safe, producing deterministic runtime-oriented outputs (resolved component set, direct/transitive dependencies, ordering hints) suitable for later execution-plan construction without implementing the runtime planner/orchestrator in this slice.
