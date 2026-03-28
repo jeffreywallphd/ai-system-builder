@@ -671,3 +671,18 @@ Explicitly later than this scope:
   - runtime behavior profile
   - selected runtime environment
 - Plan outputs are deterministic and cycle-safe (with explicit invalid results) and remain runtime-only artifacts, preserving separation from asset-definition models and UI state.
+
+## Direction 5 update: Execution orchestration + step execution seams (stories 6.7–6.8)
+
+- Runtime execution now includes an application-authoritative orchestration seam in `application/system-runtime/ExecutionOrchestrationService.ts`.
+- The orchestration service:
+  - accepts a built plan (or builds one through `ExecutionPlanBuilder`)
+  - initializes runtime execution state in `SystemRuntimeDomain`
+  - sequences plan nodes deterministically through `orderedNodeIds`
+  - delegates all unit execution to a lower-level step engine seam.
+- Runtime step execution now includes a bounded engine seam in `application/system-runtime/StepExecutionEngine.ts`.
+- The step engine:
+  - consumes execution-plan nodes + selected runtime environment
+  - supports atomic/composite/system step categories with bounded system-step recursion readiness
+  - reflects conditional/iterative/autonomous behavior profiles only to currently truthful bounded capability depth (single-pass branching/iteration/planning markers, no full loop/retry/autonomy runtime yet)
+  - returns runtime-domain-consistent step status/output/diagnostics without mutating asset-definition models.
