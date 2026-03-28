@@ -12,6 +12,34 @@ export const DeploymentStatuses = Object.freeze({
 
 export type DeploymentStatus = typeof DeploymentStatuses[keyof typeof DeploymentStatuses];
 
+export const DeploymentActivationStates = Object.freeze({
+  active: "active",
+  inactive: "inactive",
+  superseded: "superseded",
+});
+
+export type DeploymentActivationState = typeof DeploymentActivationStates[keyof typeof DeploymentActivationStates];
+
+export const DeploymentActivationActionKinds = Object.freeze({
+  initialized: "initialized",
+  deployment: "deployment",
+  versionManagement: "version-management",
+  rollback: "rollback",
+});
+
+export type DeploymentActivationActionKind = typeof DeploymentActivationActionKinds[keyof typeof DeploymentActivationActionKinds];
+
+export interface DeploymentActivationEvent {
+  readonly eventId: string;
+  readonly deploymentId: string;
+  readonly fromState?: DeploymentActivationState;
+  readonly toState: DeploymentActivationState;
+  readonly actionKind: DeploymentActivationActionKind;
+  readonly reason: string;
+  readonly at: string;
+  readonly relatedDeploymentId?: string;
+}
+
 export interface DeploymentExecutionRequest {
   readonly requestId: string;
   readonly bundle: DeploymentBundle;
@@ -28,6 +56,9 @@ export interface DeploymentRecord {
   readonly state: DeploymentState;
   readonly stateSnapshot: DeploymentStateSnapshot;
   readonly stateTransitions: ReadonlyArray<DeploymentStateTransition>;
+  readonly activationState: DeploymentActivationState;
+  readonly activationUpdatedAt: string;
+  readonly activationHistory: ReadonlyArray<DeploymentActivationEvent>;
   readonly bundleId: string;
   readonly bundleVersionKey: string;
   readonly packageId: string;
