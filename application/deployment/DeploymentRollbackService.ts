@@ -20,6 +20,8 @@ import {
   DeploymentQuotaActions,
   DeploymentQuotaEvaluator,
 } from "./DeploymentQuotaEvaluator";
+import { DeploymentIsolationEvaluator } from "./DeploymentIsolationEvaluator";
+import type { DeploymentEnvironmentContext } from "../../domain/deployment/DeploymentIsolationDomain";
 
 export interface DeploymentRollbackActionRepository {
   save(record: RollbackActionRecord): RollbackActionRecord;
@@ -52,6 +54,7 @@ export class DeploymentRollbackService {
     private readonly clock: () => Date = () => new Date(),
     private readonly accessEvaluator: DeploymentAccessEvaluator = new DeploymentAccessEvaluator(),
     private readonly quotaEvaluator: DeploymentQuotaEvaluator = new DeploymentQuotaEvaluator(),
+    private readonly isolationEvaluator: DeploymentIsolationEvaluator = new DeploymentIsolationEvaluator(),
   ) {}
 
   public isRollbackEligible(request: RollbackRequest): RollbackDecision {
@@ -215,6 +218,16 @@ export class DeploymentRollbackService {
     }
 
     const candidates = this.deploymentRepository.listAll()
+      .filter((entry) => this.isolationEvaluator.filterRecords({
+        records: [entry],
+        context: this.resolveIsolationContext({
+          accessContext: governance?.accessContext,
+          resourceTenantId: governance?.resourceTenantId,
+          requestSource: governance?.requestSource,
+          targetId: request.targetId,
+          targetType: request.targetType,
+        }),
+      }).length > 0)
       .filter((entry) => entry.rootSystemAssetId === request.rootSystemAssetId)
       .filter((entry) => entry.targetId === request.targetId)
       .filter((entry) => entry.targetType === request.targetType)
@@ -290,5 +303,24 @@ export class DeploymentRollbackService {
       .digest("hex")
       .slice(0, 20);
     return `rollback:${request.rootSystemAssetId}:${value}`;
+  }
+
+  private resolveIsolationContext(input: {
+    readonly accessContext?: DeploymentAccessContext;
+    readonly resourceTenantId?: string;
+    readonly requestSource?: string;
+    readonly targetId?: string;
+    readonly targetType?: DeploymentRecord["targetType"];
+    readonly deploymentEnvironmentId?: string;
+  }): DeploymentEnvironmentContext {
+    return Object.freeze({
+      tenantId: input.resourceTenantId?.trim() || input.accessContext?.tenantId?.trim() || undefined,
+      deploymentEnvironmentId: input.deploymentEnvironmentId?.trim() || undefined,
+      targetId: input.targetId?.trim() || undefined,
+      targetType: input.targetType,
+      source: input.requestSource?.trim() || input.accessContext?.source?.trim() || undefined,
+      callerId: input.accessContext?.caller?.callerId?.trim() || undefined,
+      sessionId: input.accessContext?.caller?.sessionId?.trim() || undefined,
+    });
   }
 }

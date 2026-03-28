@@ -15,6 +15,8 @@ import {
   DeploymentQuotaActions,
   DeploymentQuotaEvaluator,
 } from "./DeploymentQuotaEvaluator";
+import { DeploymentIsolationEvaluator } from "./DeploymentIsolationEvaluator";
+import type { DeploymentEnvironmentContext } from "../../domain/deployment/DeploymentIsolationDomain";
 
 export class DeploymentVersionManager {
   public constructor(
@@ -22,6 +24,7 @@ export class DeploymentVersionManager {
     private readonly deploymentExecutionService: Pick<DeploymentExecutionService, "setDeploymentActivationState">,
     private readonly accessEvaluator: DeploymentAccessEvaluator = new DeploymentAccessEvaluator(),
     private readonly quotaEvaluator: DeploymentQuotaEvaluator = new DeploymentQuotaEvaluator(),
+    private readonly isolationEvaluator: DeploymentIsolationEvaluator = new DeploymentIsolationEvaluator(),
   ) {}
 
   public listDeploymentsForSystemVersion(input: {
@@ -62,8 +65,15 @@ export class DeploymentVersionManager {
 
     const rootSystemVersionId = query.rootSystemVersionId?.trim();
     const targetId = query.targetId?.trim();
+    const isolationContext = this.resolveIsolationContext({
+      accessContext: query.accessContext,
+      resourceTenantId: query.resourceTenantId,
+      requestSource: query.requestSource,
+      targetId,
+      targetType: query.targetType,
+    });
 
-    return Object.freeze(this.repository.listAll()
+    return Object.freeze(this.isolationEvaluator.filterRecords({ records: this.repository.listAll(), context: isolationContext })
       .filter((record) => record.rootSystemAssetId === rootSystemAssetId)
       .filter((record) => !rootSystemVersionId || record.rootSystemVersionId === rootSystemVersionId)
       .filter((record) => !targetId || record.targetId === targetId)
@@ -94,8 +104,15 @@ export class DeploymentVersionManager {
       targetId,
       targetType: input.targetType,
     });
+    const isolationContext = this.resolveIsolationContext({
+      accessContext: input.accessContext,
+      resourceTenantId: input.resourceTenantId,
+      requestSource: input.requestSource,
+      targetId,
+      targetType: input.targetType,
+    });
 
-    const record = this.repository.listAll()
+    const record = this.isolationEvaluator.filterRecords({ records: this.repository.listAll(), context: isolationContext })
       .filter((candidate) => candidate.rootSystemAssetId === rootSystemAssetId)
       .filter((candidate) => candidate.targetId === targetId)
       .filter((candidate) => candidate.targetType === input.targetType)
@@ -147,6 +164,18 @@ export class DeploymentVersionManager {
       rootSystemVersionId: selected.rootSystemVersionId,
       targetId: selected.targetId,
       targetType: selected.targetType,
+    });
+    this.isolationEvaluator.assertRecordAccessible({
+      record: selected,
+      context: this.resolveIsolationContext({
+        accessContext: input.accessContext,
+        resourceTenantId: input.resourceTenantId,
+        requestSource: input.requestSource,
+        targetId: selected.targetId,
+        targetType: selected.targetType,
+        deploymentEnvironmentId: selected.provisionedEnvironmentId,
+      }),
+      expectedDeploymentId: selected.deploymentId,
     });
 
     const reason = input.reason?.trim() || "active-deployment-selected";
@@ -215,6 +244,25 @@ export class DeploymentVersionManager {
       deploymentId: input.deploymentId,
       targetId: input.targetId,
       targetType: input.targetType,
+    });
+  }
+
+  private resolveIsolationContext(input: {
+    readonly accessContext?: DeploymentAccessContext;
+    readonly resourceTenantId?: string;
+    readonly requestSource?: string;
+    readonly targetId?: string;
+    readonly targetType?: DeploymentRecord["targetType"];
+    readonly deploymentEnvironmentId?: string;
+  }): DeploymentEnvironmentContext {
+    return Object.freeze({
+      tenantId: input.resourceTenantId?.trim() || input.accessContext?.tenantId?.trim() || undefined,
+      deploymentEnvironmentId: input.deploymentEnvironmentId?.trim() || undefined,
+      targetId: input.targetId?.trim() || undefined,
+      targetType: input.targetType,
+      source: input.requestSource?.trim() || input.accessContext?.source?.trim() || undefined,
+      callerId: input.accessContext?.caller?.callerId?.trim() || undefined,
+      sessionId: input.accessContext?.caller?.sessionId?.trim() || undefined,
     });
   }
 }
