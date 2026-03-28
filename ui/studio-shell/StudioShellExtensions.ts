@@ -6,6 +6,8 @@ import type {
   AddSystemChildComponentRequest,
   RemoveSystemChildComponentRequest,
   ReorderSystemChildComponentRequest,
+  UpdateSystemInterfacesRequest,
+  UpdateSystemParametersRequest,
 } from "../../infrastructure/api/system-studio/SystemStudioBackendApi";
 
 export const StudioShellExtensionSlots = Object.freeze({
@@ -24,6 +26,8 @@ export interface StudioShellExtensionOperations {
   saveSystemChildComponent?(request: AddSystemChildComponentRequest): Promise<boolean>;
   removeSystemChildComponent?(request: RemoveSystemChildComponentRequest): Promise<boolean>;
   reorderSystemChildComponent?(request: ReorderSystemChildComponentRequest): Promise<boolean>;
+  updateSystemInterfaces?(request: UpdateSystemInterfacesRequest): Promise<boolean>;
+  updateSystemParameters?(request: UpdateSystemParametersRequest): Promise<boolean>;
 }
 
 export interface StudioShellExtensionContext {

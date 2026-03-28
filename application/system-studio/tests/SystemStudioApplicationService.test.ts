@@ -291,4 +291,93 @@ describe("SystemStudioApplicationService", () => {
       versionId: "asset:system-root:invalid-selection",
     })).rejects.toThrow("system-child-reference-missing");
   });
+
+  it("persists authored system interfaces and parameter defaults through update/validate/publish/reload with nested systems", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    await repository.saveAssetVersion(createPublishedVersion({
+      assetId: "system:child",
+      versionId: "system:child:v1",
+      taxonomy: { structuralKind: "system", semanticRole: "system", behaviorKind: "deterministic" },
+      content: JSON.stringify({
+        systemSpec: {
+          inputs: [{ inputId: "childPrompt", valueType: "string", required: true }],
+          outputs: [{ outputId: "childAnswer", valueType: "string" }],
+          parameters: [{ parameterId: "childTemperature", valueType: "number", defaultValue: 0.5 }],
+          components: [],
+          nestedSystems: [],
+          bindings: [],
+        },
+      }),
+    }));
+    const ids = ["session-1", "draft-root"];
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => ids.shift() ?? "generated");
+    const service = new SystemStudioApplicationService(studioShell, repository);
+    const ensure = await service.ensureStudioInitialized();
+    const created = await service.createSystemDraft({
+      sessionId: ensure.session.id,
+      draftId: "draft-root",
+      title: "System Root",
+      content: JSON.stringify({
+        systemSpec: {
+          components: [
+            { componentKind: "system", alias: "child", assetId: "system:child", versionId: "system:child:v1" },
+          ],
+          nestedSystems: [{ assetId: "system:child", versionId: "system:child:v1", alias: "child" }],
+          inputs: [],
+          outputs: [],
+          parameters: [],
+          bindings: [],
+        },
+      }),
+      dependencies: [{ assetId: "system:child", versionId: "system:child:v1" }],
+    });
+
+    const withInterfaces = await service.updateSystemInterfaces({
+      sessionId: ensure.session.id,
+      draftId: created.draft.id,
+      inputs: [{ inputId: "prompt", valueType: "string", required: true }],
+      outputs: [{ outputId: "answer", valueType: "string" }],
+    });
+    const withParameters = await service.updateSystemParameters({
+      sessionId: ensure.session.id,
+      draftId: created.draft.id,
+      parameters: [{ parameterId: "temperature", valueType: "number", required: false, defaultValue: 0.2 }],
+    });
+
+    expect(withInterfaces.draft.revision).toBeGreaterThan(1);
+    expect(withParameters.draft.revision).toBeGreaterThan(withInterfaces.draft.revision - 1);
+
+    const validation = await service.validateSystemDraft({ draftId: created.draft.id });
+    expect(validation.issues.filter((entry) => entry.code !== "contract-mismatch")).toHaveLength(0);
+
+    const published = await service.publishSystemDraft({
+      sessionId: ensure.session.id,
+      draftId: created.draft.id,
+      versionId: "asset:system-root:v3",
+      versionLabel: "v3",
+    });
+    expect(published.version.versionId).toBe("asset:system-root:v3");
+
+    const reloaded = await studioShell.loadAssetDraft({ studioId: SystemStudioIdentity.defaultStudioId, draftId: created.draft.id });
+    const reloadedSpec = JSON.parse(reloaded!.draft.content) as {
+      readonly systemSpec?: {
+        readonly inputs?: ReadonlyArray<{ readonly inputId: string }>;
+        readonly outputs?: ReadonlyArray<{ readonly outputId: string }>;
+        readonly parameters?: ReadonlyArray<{ readonly parameterId: string; readonly defaultValue?: unknown }>;
+      };
+    };
+    expect(reloadedSpec.systemSpec?.inputs?.map((entry) => entry.inputId)).toEqual(["prompt"]);
+    expect(reloadedSpec.systemSpec?.outputs?.map((entry) => entry.outputId)).toEqual(["answer"]);
+    expect(reloadedSpec.systemSpec?.parameters?.[0]).toEqual(expect.objectContaining({
+      parameterId: "temperature",
+      defaultValue: 0.2,
+    }));
+
+    const projectedContract = reloaded!.draft.metadata.contract;
+    const inputSchema = projectedContract?.input?.schema as { readonly properties?: Record<string, unknown> } | undefined;
+    const outputSchema = projectedContract?.output?.schema as { readonly properties?: Record<string, unknown> } | undefined;
+    expect(Object.keys(inputSchema?.properties ?? {})).toContain("prompt");
+    expect(Object.keys(outputSchema?.properties ?? {})).toContain("answer");
+    expect(projectedContract?.parameters.some((parameter) => parameter.id === "systemParameter:temperature")).toBeTrue();
+  });
 });

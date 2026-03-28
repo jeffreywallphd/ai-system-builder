@@ -17,6 +17,8 @@ import type {
   ReorderSystemChildComponentRequest,
   SystemStudioApiResponse,
   SystemStudioChildComponentReadModel,
+  UpdateSystemInterfacesRequest,
+  UpdateSystemParametersRequest,
 } from "../../infrastructure/api/system-studio/SystemStudioBackendApi";
 import { resolveDesktopStudioShellBridge } from "../composition/DesktopStudioShellBridgeAdapter";
 
@@ -91,6 +93,16 @@ export class StudioShellService {
 
   public async reorderSystemChildComponent(request: ReorderSystemChildComponentRequest): Promise<SystemStudioApiResponse<{ readonly updated: boolean }>> {
     const raw = await this.requireBridge().reorderSystemChildComponent(JSON.stringify(request));
+    return JSON.parse(raw) as SystemStudioApiResponse<{ readonly updated: boolean }>;
+  }
+
+  public async updateSystemInterfaces(request: UpdateSystemInterfacesRequest): Promise<SystemStudioApiResponse<{ readonly updated: boolean }>> {
+    const raw = await this.requireBridge().updateSystemInterfaces(JSON.stringify(request));
+    return JSON.parse(raw) as SystemStudioApiResponse<{ readonly updated: boolean }>;
+  }
+
+  public async updateSystemParameters(request: UpdateSystemParametersRequest): Promise<SystemStudioApiResponse<{ readonly updated: boolean }>> {
+    const raw = await this.requireBridge().updateSystemParameters(JSON.stringify(request));
     return JSON.parse(raw) as SystemStudioApiResponse<{ readonly updated: boolean }>;
   }
 }

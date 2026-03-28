@@ -452,6 +452,14 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["reorderChildComponent"]>[0];
     return JSON.stringify(await systemStudioBackendApi.reorderChildComponent(request));
   });
+  ipcMain.handle("ai-loom-desktop-studio-shell:system-interfaces:update", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["updateInterfaces"]>[0];
+    return JSON.stringify(await systemStudioBackendApi.updateInterfaces(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:system-parameters:update", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["updateParameters"]>[0];
+    return JSON.stringify(await systemStudioBackendApi.updateParameters(request));
+  });
   ipcMain.on("ai-loom-desktop-model-files:exists", (event, targetPath: string) => {
     event.returnValue = fs.existsSync(targetPath);
   });

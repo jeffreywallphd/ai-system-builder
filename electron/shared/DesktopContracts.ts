@@ -117,6 +117,8 @@ export interface DesktopStudioShellBridge {
   addSystemChildComponent(requestJson: string): Promise<string>;
   removeSystemChildComponent(requestJson: string): Promise<string>;
   reorderSystemChildComponent(requestJson: string): Promise<string>;
+  updateSystemInterfaces(requestJson: string): Promise<string>;
+  updateSystemParameters(requestJson: string): Promise<string>;
 }
 
 export interface DesktopRegistryBridge {

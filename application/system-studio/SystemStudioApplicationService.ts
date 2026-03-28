@@ -113,14 +113,31 @@ export interface ReorderSystemChildComponentCommand {
   readonly toIndex: number;
 }
 
-function parseSystemContent(content: string): {
+interface SystemSpecContent {
   readonly components?: ReadonlyArray<SystemAsset["components"][number]>;
   readonly nestedSystems?: ReadonlyArray<SystemAsset["nestedSystems"][number]>;
   readonly inputs?: ReadonlyArray<SystemAsset["inputs"][number]>;
   readonly outputs?: ReadonlyArray<SystemAsset["outputs"][number]>;
   readonly parameters?: ReadonlyArray<SystemAsset["parameters"][number]>;
   readonly bindings?: ReadonlyArray<SystemAsset["bindings"][number]>;
-} {
+}
+
+export interface UpdateSystemInterfacesCommand {
+  readonly studioId?: string;
+  readonly sessionId: string;
+  readonly draftId: string;
+  readonly inputs: ReadonlyArray<SystemAsset["inputs"][number]>;
+  readonly outputs: ReadonlyArray<SystemAsset["outputs"][number]>;
+}
+
+export interface UpdateSystemParametersCommand {
+  readonly studioId?: string;
+  readonly sessionId: string;
+  readonly draftId: string;
+  readonly parameters: ReadonlyArray<SystemAsset["parameters"][number]>;
+}
+
+function parseSystemContent(content: string): SystemSpecContent {
   if (!content.trim()) {
     return Object.freeze({});
   }
@@ -171,8 +188,7 @@ function parseSystemContentEnvelope(content: string): Record<string, unknown> {
 
 function serializeSystemContent(input: {
   readonly content: string;
-  readonly components: ReadonlyArray<SystemComponentReference>;
-  readonly nestedSystems: ReadonlyArray<SystemCompositionReference>;
+  readonly spec: SystemSpecContent;
 }): string {
   const root = parseSystemContentEnvelope(input.content);
   const existingSpec = (root.systemSpec && typeof root.systemSpec === "object" && !Array.isArray(root.systemSpec))
@@ -180,8 +196,7 @@ function serializeSystemContent(input: {
     : {};
   root.systemSpec = {
     ...existingSpec,
-    components: input.components,
-    nestedSystems: input.nestedSystems,
+    ...input.spec,
   };
   return JSON.stringify(root, null, 2);
 }
@@ -480,8 +495,10 @@ export class SystemStudioApplicationService {
       draftId: command.draftId,
       content: serializeSystemContent({
         content: loaded.draft.content,
-        components: nextSystem.components,
-        nestedSystems: buildNestedSystemReferences(nextSystem),
+        spec: {
+          components: nextSystem.components,
+          nestedSystems: buildNestedSystemReferences(nextSystem),
+        },
       }),
       dependencies,
     });
@@ -521,8 +538,10 @@ export class SystemStudioApplicationService {
       draftId: command.draftId,
       content: serializeSystemContent({
         content: loaded.draft.content,
-        components: nextSystem.components,
-        nestedSystems: buildNestedSystemReferences(nextSystem),
+        spec: {
+          components: nextSystem.components,
+          nestedSystems: buildNestedSystemReferences(nextSystem),
+        },
       }),
       dependencies,
     });
@@ -553,19 +572,99 @@ export class SystemStudioApplicationService {
       draftId: command.draftId,
       content: serializeSystemContent({
         content: loaded.draft.content,
-        components,
-        nestedSystems: buildNestedSystemReferences(createSystemAsset({
-          assetId: loaded.draft.assetId,
-          taxonomy: loaded.draft.metadata.taxonomy ?? createSystemStudioTaxonomy(),
-          dependencies: loaded.draft.dependencies,
+        spec: {
           components,
-          nestedSystems: spec.nestedSystems,
-          inputs: spec.inputs,
-          outputs: spec.outputs,
-          parameters: spec.parameters,
-          bindings: spec.bindings,
-        })),
+          nestedSystems: buildNestedSystemReferences(createSystemAsset({
+            assetId: loaded.draft.assetId,
+            taxonomy: loaded.draft.metadata.taxonomy ?? createSystemStudioTaxonomy(),
+            dependencies: loaded.draft.dependencies,
+            components,
+            nestedSystems: spec.nestedSystems,
+            inputs: spec.inputs,
+            outputs: spec.outputs,
+            parameters: spec.parameters,
+            bindings: spec.bindings,
+          })),
+        },
       }),
+    });
+  }
+
+  public async updateSystemInterfaces(command: UpdateSystemInterfacesCommand): Promise<AssetDraftResult> {
+    const studioId = command.studioId?.trim() || SystemStudioIdentity.defaultStudioId;
+    const loaded = await this.studioShellService.loadAssetDraft({ studioId, draftId: command.draftId });
+    if (!loaded) {
+      throw new StudioShellInvalidRequestError(`Draft '${command.draftId}' is not available in studio '${studioId}'.`);
+    }
+
+    const spec = parseSystemContent(loaded.draft.content);
+    const nextSystem = createSystemAsset({
+      assetId: loaded.draft.assetId,
+      taxonomy: loaded.draft.metadata.taxonomy ?? createSystemStudioTaxonomy(),
+      dependencies: loaded.draft.dependencies,
+      components: spec.components,
+      nestedSystems: spec.nestedSystems,
+      inputs: command.inputs,
+      outputs: command.outputs,
+      parameters: spec.parameters,
+      bindings: spec.bindings,
+    });
+
+    return this.updateSystemDraft({
+      studioId,
+      sessionId: command.sessionId,
+      draftId: command.draftId,
+      content: serializeSystemContent({
+        content: loaded.draft.content,
+        spec: {
+          components: nextSystem.components,
+          nestedSystems: buildNestedSystemReferences(nextSystem),
+          inputs: nextSystem.inputs,
+          outputs: nextSystem.outputs,
+          parameters: nextSystem.parameters,
+          bindings: nextSystem.bindings,
+        },
+      }),
+      dependencies: collectSystemDirectDependencies(nextSystem),
+    });
+  }
+
+  public async updateSystemParameters(command: UpdateSystemParametersCommand): Promise<AssetDraftResult> {
+    const studioId = command.studioId?.trim() || SystemStudioIdentity.defaultStudioId;
+    const loaded = await this.studioShellService.loadAssetDraft({ studioId, draftId: command.draftId });
+    if (!loaded) {
+      throw new StudioShellInvalidRequestError(`Draft '${command.draftId}' is not available in studio '${studioId}'.`);
+    }
+
+    const spec = parseSystemContent(loaded.draft.content);
+    const nextSystem = createSystemAsset({
+      assetId: loaded.draft.assetId,
+      taxonomy: loaded.draft.metadata.taxonomy ?? createSystemStudioTaxonomy(),
+      dependencies: loaded.draft.dependencies,
+      components: spec.components,
+      nestedSystems: spec.nestedSystems,
+      inputs: spec.inputs,
+      outputs: spec.outputs,
+      parameters: command.parameters,
+      bindings: spec.bindings,
+    });
+
+    return this.updateSystemDraft({
+      studioId,
+      sessionId: command.sessionId,
+      draftId: command.draftId,
+      content: serializeSystemContent({
+        content: loaded.draft.content,
+        spec: {
+          components: nextSystem.components,
+          nestedSystems: buildNestedSystemReferences(nextSystem),
+          inputs: nextSystem.inputs,
+          outputs: nextSystem.outputs,
+          parameters: nextSystem.parameters,
+          bindings: nextSystem.bindings,
+        },
+      }),
+      dependencies: collectSystemDirectDependencies(nextSystem),
     });
   }
 

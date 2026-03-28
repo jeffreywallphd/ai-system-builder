@@ -4,6 +4,8 @@ import {
 } from "../../../domain/system-studio/SystemAssetDomain";
 import { createElement } from "react";
 import { SystemCompositionEditor } from "../../components/studio-shell/SystemCompositionEditor";
+import { SystemInterfaceEditor } from "../../components/studio-shell/SystemInterfaceEditor";
+import { SystemParameterConfigEditor } from "../../components/studio-shell/SystemParameterConfigEditor";
 import type { SystemStudioRegistration } from "../StudioShellExtensions";
 import { createSystemStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
 
@@ -58,6 +60,22 @@ export const systemStudioRegistration: SystemStudioRegistration = Object.freeze(
       subtitle: "Bounded, backend-authoritative structure editor for multi-level system composition.",
       order: 8,
       render: (context) => createElement(SystemCompositionEditor, { context }),
+    },
+    {
+      id: "system-studio-interface-editor",
+      slot: "draft-authoring",
+      title: "System input/output definition",
+      subtitle: "First-class authoring for explicit system interfaces (inputs + outputs).",
+      order: 9,
+      render: (context) => createElement(SystemInterfaceEditor, { context }),
+    },
+    {
+      id: "system-studio-parameter-editor",
+      slot: "draft-authoring",
+      title: "System parameter/configuration defaults",
+      subtitle: "First-class authoring for system parameters and bounded default configuration values.",
+      order: 10,
+      render: (context) => createElement(SystemParameterConfigEditor, { context }),
     },
     {
       id: "system-studio-composition-capabilities",
