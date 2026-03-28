@@ -14,8 +14,8 @@ import {
 } from "../../../domain/taxonomy/CompositionTaxonomy";
 import {
   StudioHandoffCompatibilityValidator,
-  type StudioCapabilityDescriptor,
 } from "../StudioHandoffCompatibilityValidator";
+import type { StudioCapabilityDescriptor } from "../StudioCapabilityRegistry";
 import {
   AtomicStudioInputAdapter,
   CompositeStudioInputAdapter,
@@ -39,25 +39,39 @@ function createCapabilities(): ReadonlyArray<StudioCapabilityDescriptor> {
   return Object.freeze([
     {
       studioType: "workflow-studio",
+      acceptsMultiAssetHandoffs: true,
+      producesMultiAssetHandoffs: true,
+      producedOutputs: Object.freeze([]),
       acceptedInputs: Object.freeze([
         {
-          contractId: "workflow-default-input",
-          acceptedStructuralKinds: ["atomic", "composite"],
-          acceptedSemanticRoles: ["dataset", "workflow"],
-          acceptedBehaviorKinds: ["none", "deterministic"],
-          allowedContextKeys: ["split", "trainingObjective"],
+          capabilityId: "workflow-default-input",
+          supportsGroupedMultiAsset: true,
+          contract: {
+            contractId: "workflow-default-input",
+            acceptedStructuralKinds: ["atomic", "composite"],
+            acceptedSemanticRoles: ["dataset", "workflow"],
+            acceptedBehaviorKinds: ["none", "deterministic"],
+            allowedContextKeys: ["split", "trainingObjective"],
+          },
         },
       ]),
     },
     {
       studioType: "system-studio",
+      acceptsMultiAssetHandoffs: true,
+      producesMultiAssetHandoffs: true,
+      producedOutputs: Object.freeze([]),
       acceptedInputs: Object.freeze([
         {
-          contractId: "system-default-input",
-          acceptedStructuralKinds: ["atomic", "composite", "system"],
-          acceptedSemanticRoles: ["workflow", "system", "dataset", "model"],
-          acceptedBehaviorKinds: ["none", "deterministic", "iterative", "autonomous"],
-          allowedContextKeys: ["nestedStrategy", "priority"],
+          capabilityId: "system-default-input",
+          supportsGroupedMultiAsset: true,
+          contract: {
+            contractId: "system-default-input",
+            acceptedStructuralKinds: ["atomic", "composite", "system"],
+            acceptedSemanticRoles: ["workflow", "system", "dataset", "model"],
+            acceptedBehaviorKinds: ["none", "deterministic", "iterative", "autonomous"],
+            allowedContextKeys: ["nestedStrategy", "priority"],
+          },
         },
       ]),
     },

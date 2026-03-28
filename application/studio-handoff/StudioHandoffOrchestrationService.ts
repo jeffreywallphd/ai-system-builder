@@ -7,7 +7,13 @@ import {
   type TargetStudioInputContract,
 } from "../../domain/studio-handoff/StudioHandoffContract";
 import { createStudioHandoffContext, type StudioHandoffContext } from "../../domain/studio-handoff/StudioHandoffContext";
-import type { StudioCapabilityDescriptor, StudioHandoffCompatibilityDecision } from "./StudioHandoffCompatibilityValidator";
+import type { StudioHandoffCompatibilityDecision } from "./StudioHandoffCompatibilityValidator";
+import type { StudioCapabilityDescriptor } from "./StudioCapabilityRegistry";
+import {
+  StudioHandoffAuditEventKinds,
+  StudioHandoffAuditOutcomes,
+} from "../../domain/studio-handoff/StudioHandoffAuditTrail";
+import type { StudioHandoffAuditTrailService } from "./StudioHandoffAuditTrailService";
 import type { AdaptedStudioInput, StudioInputAdapterLayer } from "./StudioInputAdapter";
 import type { AdaptedStudioOutput, StudioOutputAdapterLayer, StudioProducedOutput } from "./StudioOutputAdapter";
 import type { StudioHandoffLineageRecord, StudioHandoffLineageTracker } from "./StudioHandoffLineageTracker";
@@ -352,6 +358,27 @@ function applyIncrementalUpdate(input: {
   });
 }
 
+
+function toAuditedAssets(handoff: StudioHandoffContract): ReadonlyArray<{
+  readonly assetId: string;
+  readonly versionId: string;
+  readonly role?: string;
+}> {
+  if (!handoff.multiAsset) {
+    return Object.freeze([{
+      assetId: handoff.payload.pinnedVersion?.assetId ?? handoff.payload.assetId,
+      versionId: handoff.payload.pinnedVersion?.versionId ?? handoff.payload.versionId,
+      role: "primary",
+    }]);
+  }
+
+  return Object.freeze(handoff.multiAsset.assets.map((entry) => Object.freeze({
+    assetId: entry.pinnedVersion?.assetId ?? entry.assetId,
+    versionId: entry.pinnedVersion?.versionId ?? entry.versionId,
+    role: entry.role,
+  })));
+}
+
 export class StudioHandoffOrchestrationService {
   public constructor(
     private readonly outputAdapterLayer: Pick<StudioOutputAdapterLayer, "adapt">,
@@ -359,6 +386,7 @@ export class StudioHandoffOrchestrationService {
     private readonly options: {
       readonly versionPolicy?: StudioHandoffVersionResolutionPolicy;
       readonly lineageTracker?: Pick<StudioHandoffLineageTracker, "track">;
+      readonly auditTrail?: Pick<StudioHandoffAuditTrailService, "record">;
     } = {},
   ) {}
 
@@ -399,13 +427,56 @@ export class StudioHandoffOrchestrationService {
       adaptedOutput: outputAdaptation.adapted,
     });
 
+    this.options.auditTrail?.record({
+      eventKind: StudioHandoffAuditEventKinds.handoffCreated,
+      outcome: StudioHandoffAuditOutcomes.accepted,
+      handoff: { handoffId: contract.id.value },
+      actor: context.actor,
+      sourceStudio: { studioId: contract.source.studioId, studioType: contract.source.studioType },
+      targetStudio: { studioId: contract.target.studioId, studioType: contract.target.studioType },
+      assets: toAuditedAssets(contract),
+      detail: {
+        statusCode: "created",
+      },
+    });
+
     const inputAdaptation = this.inputAdapterLayer.adapt({
       handoff: contract,
       context,
       targetCapabilities: request.targetCapabilities,
     });
 
+    this.options.auditTrail?.record({
+      eventKind: StudioHandoffAuditEventKinds.compatibilityEvaluated,
+      outcome: inputAdaptation.compatibility.compatible ? StudioHandoffAuditOutcomes.succeeded : StudioHandoffAuditOutcomes.rejected,
+      handoff: { handoffId: contract.id.value },
+      actor: context.actor,
+      sourceStudio: { studioId: contract.source.studioId, studioType: contract.source.studioType },
+      targetStudio: { studioId: contract.target.studioId, studioType: contract.target.studioType },
+      assets: toAuditedAssets(contract),
+      detail: {
+        statusCode: inputAdaptation.compatibility.compatible ? "compatible" : "incompatible",
+        issueCodes: inputAdaptation.compatibility.issues.map((entry) => entry.code),
+        matchedContractId: inputAdaptation.compatibility.matchedContractId,
+        compatibilityPassed: inputAdaptation.compatibility.compatible,
+      },
+    });
+
     if (!inputAdaptation.ok || !inputAdaptation.adapted) {
+      this.options.auditTrail?.record({
+        eventKind: StudioHandoffAuditEventKinds.handoffFailed,
+        outcome: StudioHandoffAuditOutcomes.failed,
+        handoff: { handoffId: contract.id.value },
+        actor: context.actor,
+        sourceStudio: { studioId: contract.source.studioId, studioType: contract.source.studioType },
+        targetStudio: { studioId: contract.target.studioId, studioType: contract.target.studioType },
+        assets: toAuditedAssets(contract),
+        detail: {
+          statusCode: "input-adaptation-failed",
+          issueCodes: ["input-adaptation-failed", ...inputAdaptation.issues.map((entry) => entry.code)],
+          compatibilityPassed: false,
+        },
+      });
       return Object.freeze({
         ok: false,
         failure: Object.freeze({
@@ -426,6 +497,22 @@ export class StudioHandoffOrchestrationService {
       targetInput: inputAdaptation.adapted,
     });
     const lineageEvent = this.options.lineageTracker?.track({ preparation });
+
+    this.options.auditTrail?.record({
+      eventKind: StudioHandoffAuditEventKinds.handoffOrchestrated,
+      outcome: StudioHandoffAuditOutcomes.succeeded,
+      handoff: { handoffId: contract.id.value },
+      actor: context.actor,
+      sourceStudio: { studioId: contract.source.studioId, studioType: contract.source.studioType },
+      targetStudio: { studioId: contract.target.studioId, studioType: contract.target.studioType },
+      assets: toAuditedAssets(contract),
+      detail: {
+        statusCode: "prepared",
+        matchedContractId: inputAdaptation.compatibility.matchedContractId,
+        targetInputKind: inputAdaptation.adapted.kind,
+        compatibilityPassed: true,
+      },
+    });
 
     return Object.freeze({
       ok: true,
@@ -462,6 +549,23 @@ export class StudioHandoffOrchestrationService {
     });
 
     if (!result.ok || !result.preparation || !this.options.lineageTracker) {
+      this.options.auditTrail?.record({
+        eventKind: StudioHandoffAuditEventKinds.handoffUpdated,
+        outcome: result.ok ? StudioHandoffAuditOutcomes.accepted : StudioHandoffAuditOutcomes.rejected,
+        handoff: {
+          handoffId: revised.handoff.id.value,
+          revisionId: revised.revision.revisionId,
+          previousHandoffId: revised.revision.previousHandoffId,
+        },
+        actor: revised.handoff.context?.actor,
+        sourceStudio: { studioId: revised.handoff.source.studioId, studioType: revised.handoff.source.studioType },
+        targetStudio: { studioId: revised.handoff.target.studioId, studioType: revised.handoff.target.studioType },
+        assets: toAuditedAssets(revised.handoff),
+        detail: {
+          statusCode: result.ok ? "revision-prepared" : "revision-rejected",
+          compatibilityPassed: result.ok,
+        },
+      });
       return Object.freeze({
         ...result,
         revision: revised.revision,
@@ -472,6 +576,24 @@ export class StudioHandoffOrchestrationService {
     const lineageEvent = this.options.lineageTracker.track({
       preparation: result.preparation,
       revision: revised.revision,
+    });
+
+    this.options.auditTrail?.record({
+      eventKind: StudioHandoffAuditEventKinds.handoffUpdated,
+      outcome: StudioHandoffAuditOutcomes.succeeded,
+      handoff: {
+        handoffId: revised.handoff.id.value,
+        revisionId: revised.revision.revisionId,
+        previousHandoffId: revised.revision.previousHandoffId,
+      },
+      actor: revised.handoff.context?.actor,
+      sourceStudio: { studioId: revised.handoff.source.studioId, studioType: revised.handoff.source.studioType },
+      targetStudio: { studioId: revised.handoff.target.studioId, studioType: revised.handoff.target.studioType },
+      assets: toAuditedAssets(revised.handoff),
+      detail: {
+        statusCode: "revision-prepared",
+        compatibilityPassed: true,
+      },
     });
 
     return Object.freeze({

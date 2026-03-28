@@ -22,8 +22,8 @@ import {
 import {
   StudioHandoffCompatibilityIssueCodes,
   StudioHandoffCompatibilityValidator,
-  type StudioCapabilityDescriptor,
 } from "../StudioHandoffCompatibilityValidator";
+import type { StudioCapabilityDescriptor } from "../StudioCapabilityRegistry";
 
 const resolver = new CompositionAssetContractResolver();
 
@@ -31,37 +31,58 @@ function createCapabilities(): ReadonlyArray<StudioCapabilityDescriptor> {
   return Object.freeze([
     {
       studioType: "dataset-studio",
+      acceptsMultiAssetHandoffs: false,
+      producesMultiAssetHandoffs: false,
+      producedOutputs: Object.freeze([]),
       acceptedInputs: Object.freeze([
         {
-          contractId: "dataset-default-input",
-          acceptedStructuralKinds: ["atomic"],
-          acceptedSemanticRoles: ["dataset"],
-          acceptedBehaviorKinds: ["none"],
-          allowedContextKeys: ["split", "seed", "assetId"],
+          capabilityId: "dataset-default-input",
+          supportsGroupedMultiAsset: false,
+          contract: {
+            contractId: "dataset-default-input",
+            acceptedStructuralKinds: ["atomic"],
+            acceptedSemanticRoles: ["dataset"],
+            acceptedBehaviorKinds: ["none"],
+            allowedContextKeys: ["split", "seed", "assetId"],
+          },
         },
       ]),
     },
     {
       studioType: "workflow-studio",
+      acceptsMultiAssetHandoffs: true,
+      producesMultiAssetHandoffs: true,
+      producedOutputs: Object.freeze([]),
       acceptedInputs: Object.freeze([
         {
-          contractId: "workflow-default-input",
-          acceptedStructuralKinds: ["composite", "atomic"],
-          acceptedSemanticRoles: ["workflow", "dataset"],
-          acceptedBehaviorKinds: ["deterministic", "none"],
-          allowedContextKeys: ["split", "trainingObjective", "assetId"],
+          capabilityId: "workflow-default-input",
+          supportsGroupedMultiAsset: true,
+          contract: {
+            contractId: "workflow-default-input",
+            acceptedStructuralKinds: ["composite", "atomic"],
+            acceptedSemanticRoles: ["workflow", "dataset"],
+            acceptedBehaviorKinds: ["deterministic", "none"],
+            allowedContextKeys: ["split", "trainingObjective", "assetId"],
+          },
         },
       ]),
     },
     {
       studioType: "system-studio",
+      acceptsMultiAssetHandoffs: true,
+      producesMultiAssetHandoffs: true,
+      producedOutputs: Object.freeze([]),
       acceptedInputs: Object.freeze([
         {
-          contractId: "system-default-input",
-          acceptedStructuralKinds: ["atomic", "composite", "system"],
-          acceptedSemanticRoles: ["dataset", "workflow", "system", "model"],
-          acceptedBehaviorKinds: ["none", "deterministic", "iterative", "autonomous"],
-          allowedContextKeys: ["split", "trainingObjective", "priority", "nestedStrategy", "assetId"],
+          capabilityId: "system-default-input",
+          supportsGroupedMultiAsset: true,
+          contract: {
+            contractId: "system-default-input",
+            acceptedStructuralKinds: ["atomic", "composite", "system"],
+            acceptedSemanticRoles: ["dataset", "workflow", "system", "model"],
+            acceptedBehaviorKinds: ["none", "deterministic", "iterative", "autonomous"],
+            allowedContextKeys: ["split", "trainingObjective", "priority", "nestedStrategy", "assetId"],
+          },
         },
       ]),
     },

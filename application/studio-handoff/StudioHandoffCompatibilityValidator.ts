@@ -6,6 +6,7 @@ import type {
 } from "../../domain/studio-handoff/StudioHandoffContract";
 import type { CompositionTaxonomyDescriptor } from "../../domain/taxonomy/CompositionTaxonomy";
 import { listStudioHandoffPrefillKeys } from "../../domain/studio-handoff/StudioHandoffContext";
+import type { StudioCapabilityDescriptor, StudioCapabilityQueryService } from "./StudioCapabilityRegistry";
 
 export const StudioHandoffCompatibilityIssueCodes = Object.freeze({
   targetStudioUnsupported: "target-studio-unsupported",
@@ -49,12 +50,6 @@ export interface MultiAssetCompatibilityDecision {
     readonly compatible: boolean;
     readonly issues: ReadonlyArray<StudioHandoffCompatibilityIssue>;
   }>;
-}
-
-export interface StudioCapabilityDescriptor {
-  readonly studioType: string;
-  readonly displayName?: string;
-  readonly acceptedInputs: ReadonlyArray<TargetStudioInputContract>;
 }
 
 function isTaxonomyAccepted(
@@ -118,6 +113,7 @@ export class StudioHandoffCompatibilityValidator {
   public constructor(
     private readonly options: {
       readonly validateVersionReference?: (reference: { readonly assetId: string; readonly versionId: string }) => boolean;
+      readonly capabilityQueryService?: Pick<StudioCapabilityQueryService, "listCapabilities" | "getStudioDescriptor">;
     } = {},
   ) {}
 
@@ -248,7 +244,7 @@ export class StudioHandoffCompatibilityValidator {
 
   public validate(input: {
     readonly handoff: StudioHandoffContract;
-    readonly targetCapabilities: ReadonlyArray<StudioCapabilityDescriptor>;
+    readonly targetCapabilities?: ReadonlyArray<StudioCapabilityDescriptor>;
   }): StudioHandoffCompatibilityDecision {
     const issues: StudioHandoffCompatibilityIssue[] = [];
 
@@ -263,7 +259,12 @@ export class StudioHandoffCompatibilityValidator {
       }));
     }
 
-    const targetCapability = input.targetCapabilities.find((entry) => entry.studioType === input.handoff.target.studioType);
+    const capabilities = input.targetCapabilities
+      ?? this.options.capabilityQueryService?.listCapabilities()
+      ?? Object.freeze([]);
+
+    const targetCapability = capabilities.find((entry) => entry.studioType === input.handoff.target.studioType)
+      ?? this.options.capabilityQueryService?.getStudioDescriptor(input.handoff.target.studioType);
     if (!targetCapability) {
       issues.push(Object.freeze({
         code: StudioHandoffCompatibilityIssueCodes.targetStudioUnsupported,
@@ -278,7 +279,7 @@ export class StudioHandoffCompatibilityValidator {
     }
 
     const requestedContractId = input.handoff.payload.targetInputContract.contractId;
-    const acceptedContract = targetCapability.acceptedInputs.find((entry) => entry.contractId === requestedContractId);
+    const acceptedContract = targetCapability.acceptedInputs.find((entry) => entry.contract.contractId === requestedContractId)?.contract;
     if (!acceptedContract) {
       issues.push(Object.freeze({
         code: StudioHandoffCompatibilityIssueCodes.targetInputContractMissing,
