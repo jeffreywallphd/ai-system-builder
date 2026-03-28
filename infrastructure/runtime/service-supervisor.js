@@ -360,7 +360,14 @@ function validateWorkingDirectory(cwd, securityPolicy) {
   return resolvedCwd;
 }
 
-function validateExecutable(command, securityPolicy) {
+function isTrustedBuiltinPythonLauncher(command, context) {
+  return command === "py"
+    && context?.serviceId === "python-runtime"
+    && context?.kind === "python-runtime"
+    && context?.source === "builtin";
+}
+
+function validateExecutable(command, securityPolicy, context = undefined) {
   assertNoUnsafeShellInterpolation(command, "Service command");
 
   if (/\s/.test(command.trim())) {
@@ -388,7 +395,7 @@ function validateExecutable(command, securityPolicy) {
     throw new Error("Relative executable paths are not allowed; use an approved absolute path or command name.");
   }
 
-  if (!securityPolicy.allowedExecutableNames.has(command)) {
+  if (!securityPolicy.allowedExecutableNames.has(command) && !isTrustedBuiltinPythonLauncher(command, context)) {
     throw new Error(`Executable '${command}' is not in the allowed executable list.`);
   }
 
@@ -525,12 +532,31 @@ function normalizeServiceDefinition(definition, options = {}) {
     throw new Error(`Service '${serviceId}' healthCheckPath must begin with '/'.`);
   }
 
+  const normalizedKind = typeof definition.kind === "string" && definition.kind.trim()
+    ? definition.kind.trim()
+    : typeof metadata.kind === "string" && metadata.kind.trim()
+      ? metadata.kind.trim()
+      : serviceId === "python-runtime"
+        ? "python-runtime"
+        : "custom";
+  const normalizedSource = typeof definition.source === "string" && definition.source.trim()
+    ? definition.source.trim()
+    : typeof metadata.source === "string" && metadata.source.trim()
+      ? metadata.source.trim()
+      : serviceId === "python-runtime"
+        ? "builtin"
+        : "custom";
+
   const normalized = Object.freeze({
     serviceId,
     name: name || serviceId,
     dependencies: Object.freeze(normalizeDependencyList(definition.dependencies, serviceId)),
     command: typeof definition.command === "string" && definition.command.trim()
-      ? validateExecutable(definition.command.trim(), securityPolicy)
+      ? validateExecutable(definition.command.trim(), securityPolicy, {
+        serviceId,
+        kind: normalizedKind,
+        source: normalizedSource,
+      })
       : undefined,
     args,
     cwd,
@@ -542,20 +568,8 @@ function normalizeServiceDefinition(definition, options = {}) {
     stopTimeoutMs: normalizePositiveNumber(definition.stopTimeoutMs, DEFAULT_STOP_TIMEOUT_MS),
     metadata: {
       ...metadata,
-      kind: typeof definition.kind === "string" && definition.kind.trim()
-        ? definition.kind.trim()
-        : typeof metadata.kind === "string" && metadata.kind.trim()
-          ? metadata.kind.trim()
-          : serviceId === "python-runtime"
-            ? "python-runtime"
-            : "custom",
-      source: typeof definition.source === "string" && definition.source.trim()
-        ? definition.source.trim()
-        : typeof metadata.source === "string" && metadata.source.trim()
-          ? metadata.source.trim()
-          : serviceId === "python-runtime"
-            ? "builtin"
-            : "custom",
+      kind: normalizedKind,
+      source: normalizedSource,
       transport,
       autoStartPolicy: typeof definition.autoStartPolicy === "string" && definition.autoStartPolicy.trim()
         ? definition.autoStartPolicy.trim()
@@ -970,6 +984,32 @@ function isFingerprintMismatch(currentFingerprint, savedFingerprint) {
 }
 
 function buildInitialProvisioningState(clock, definition) {
+  const isBuiltinPythonWorkspace = definition?.serviceId === "python-runtime"
+    && path.basename(definition?.cwd || "") === "python-runtime";
+  if (definition?.invalid && isBuiltinPythonWorkspace) {
+    return {
+      state: ProvisioningStates.provisionFailed,
+      required: true,
+      requestedVersion: resolveRequestedPythonVersion(definition),
+      resolvedVersion: null,
+      resolvedInterpreter: null,
+      environmentPath: getPythonEnvironmentPath(definition),
+      versionMismatch: false,
+      fingerprintMismatch: false,
+      needsReprovision: true,
+      lastUpdatedAt: createClockTimestamp(clock),
+      lastError: createDiagnosticError(
+        clock,
+        "config",
+        `Invalid service configuration: ${definition.invalidReason ?? "Unknown configuration error."}`,
+        {
+          code: "SERVICE_CONFIGURATION_INVALID",
+          serviceId: definition.serviceId,
+        },
+      ),
+    };
+  }
+
   if (!isProvisioningRequired(definition)) {
     return {
       state: ProvisioningStates.unsupported,
@@ -1334,12 +1374,15 @@ export class InMemoryServiceSupervisor {
           ? rawDefinition.serviceId.trim()
           : `invalid-service-${this.definitions.size + this.states.size + 1}`;
         const name = typeof rawDefinition?.name === "string" && rawDefinition.name.trim() ? rawDefinition.name.trim() : serviceId;
+        const fallbackCwd = typeof rawDefinition?.cwd === "string" && rawDefinition.cwd.trim()
+          ? rawDefinition.cwd.trim()
+          : process.cwd();
         const fallbackDefinition = Object.freeze({
           serviceId,
           name,
           command: undefined,
           args: [],
-          cwd: process.cwd(),
+          cwd: fallbackCwd,
           env: {},
           baseUrl: undefined,
       healthCheckPath: DEFAULT_PYTHON_RUNTIME_HEALTH_PATH,
