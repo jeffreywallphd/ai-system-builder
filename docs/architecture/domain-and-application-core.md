@@ -236,6 +236,13 @@ The studio shell now has a bounded inner-layer model and application orchestrati
 - Some concepts currently live more in the application layer than the domain layer because they are orchestration-heavy. That is reasonable, but over time the team may want to clarify which context-engineering rules are true domain policy versus application assembly policy.
 - The workflow aggregate is clearly central, but some adjacent concepts—especially tool publication metadata and certain authoring concerns—could eventually deserve stronger domain-level abstractions if they continue to grow.
 
+## Direction 5 update: External runtime bounded safeguards alignment (stories 7.23–7.24)
+
+- External runtime safeguards continue to live on the current inner-layer seams (runtime backend API + existing access/quota/rate-limit/tenant policies + streaming/callback adapters); this epic does not introduce a second runtime architecture.
+- External hot-path guardrails are now explicitly bounded and testable: short-lived caller/tenant-scoped poll/status caching, bounded callback registration counts per execution session, bounded streaming subscription/fan-out behavior, bounded async in-flight tracking, and bounded stream emission cadence.
+- These additions are additive and correctness-preserving: authentication, access control, tenant isolation, and version-aware execution semantics remain enforced before protected reads are returned.
+- Documentation now explicitly distinguishes what is implemented now (external runtime stories 7.1–7.23), what is bounded by design, and what remains future work (for example distributed external backpressure/observability infrastructure).
+
 ## Asset system foundation (Direction 2, first slice)
 
 The asset layer is now moving from a simple catalog toward a cross-cutting system-of-record envelope for durable artifacts.

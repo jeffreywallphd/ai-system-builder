@@ -1041,4 +1041,91 @@ describe("SystemRuntimeBackendApi", () => {
     expect(second.error?.code).toBe("rate-limit-exceeded");
   });
 
+  it("serves burst external polling from a short-lived cache to avoid runaway hot-path amplification", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    await repository.saveAssetVersion(new AssetVersion({
+      assetId: "system:poll-cache",
+      versionId: "system:poll-cache:v1",
+      metadata: {
+        metadata: {
+          taxonomy: createSystemStudioTaxonomy("system", "deterministic"),
+        },
+        content: JSON.stringify({
+          systemSpec: {
+            components: [],
+            inputs: [{ inputId: "request", valueType: "string", required: false }],
+            outputs: [{ outputId: "response", valueType: "string" }],
+          },
+        }),
+        dependencies: [],
+      },
+    }));
+    const runtimeApi = new SystemRuntimeBackendApi(
+      repository,
+      undefined,
+      undefined,
+      new StaticTokenRuntimeApiAuthenticator({
+        "token-poller": { callerKind: "user", callerId: "poller-1", metadata: { tenantId: "tenant-a" } },
+      }),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      new RuntimeRateLimitEvaluator({
+        maxRequestsPerCallerPerWindow: 2,
+        maxRequestsPerTenantPerWindow: 10,
+        maxRequestsPerSourceOperationPerWindow: 10,
+        windowMs: 60_000,
+      }),
+    );
+
+    const started = await runtimeApi.startExecutionAsync({
+      systemId: "system:poll-cache",
+      versionId: "system:poll-cache:v1",
+      requestContext: {
+        authentication: { bearerToken: "token-poller" },
+        requireAuthentication: true,
+        tenantId: "tenant-a",
+        requestSource: "external-api",
+      },
+    });
+    expect(started.ok).toBeTrue();
+
+    const firstPoll = await runtimeApi.pollExecution({
+      executionId: started.data!.executionId,
+      requestContext: {
+        authentication: { bearerToken: "token-poller" },
+        requireAuthentication: true,
+        tenantId: "tenant-a",
+        requestSource: "external-api",
+      },
+    });
+    expect(firstPoll.ok).toBeTrue();
+
+    const secondPoll = await runtimeApi.pollExecution({
+      executionId: started.data!.executionId,
+      requestContext: {
+        authentication: { bearerToken: "token-poller" },
+        requireAuthentication: true,
+        tenantId: "tenant-a",
+        requestSource: "external-api",
+      },
+    });
+    expect(secondPoll.ok).toBeTrue();
+    expect(secondPoll.data?.executionId).toBe(firstPoll.data?.executionId);
+
+    await Bun.sleep(90);
+    const thirdPoll = await runtimeApi.pollExecution({
+      executionId: started.data!.executionId,
+      requestContext: {
+        authentication: { bearerToken: "token-poller" },
+        requireAuthentication: true,
+        tenantId: "tenant-a",
+        requestSource: "external-api",
+      },
+    });
+    expect(thirdPoll.ok).toBeFalse();
+    expect(thirdPoll.error?.code).toBe("rate-limit-exceeded");
+  });
+
 });

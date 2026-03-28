@@ -157,6 +157,12 @@ export interface ExecutionCallbackRegistrationRequest {
 }
 
 export class SystemRuntimeBackendApi {
+  private static readonly EXTERNAL_POLL_RESPONSE_CACHE_TTL_MS = 75;
+  private static readonly EXTERNAL_STATUS_RESPONSE_CACHE_TTL_MS = 75;
+  private static readonly STREAM_EMIT_MIN_INTERVAL_MS = 50;
+  private static readonly MAX_IN_FLIGHT_ASYNC_RUNS = 500;
+  private static readonly MAX_CALLBACK_REGISTRATIONS_PER_SESSION = 20;
+
   private readonly service: SystemRuntimeApplicationService;
   private readonly outputSerializer = new RuntimeOutputSerializer();
   private readonly asyncRunsByExecutionId = new Map<string, {
@@ -168,6 +174,15 @@ export class SystemRuntimeBackendApi {
   }>();
   private readonly updateStream = new ExecutionUpdateStream();
   private readonly emittedTraceCountsByExecutionId = new Map<string, number>();
+  private readonly lastStreamEmitByExecutionId = new Map<string, number>();
+  private readonly cachedExternalPollsByKey = new Map<string, {
+    readonly expiresAtMs: number;
+    readonly response: ExecutionPollResponse;
+  }>();
+  private readonly cachedExternalStatusByKey = new Map<string, {
+    readonly expiresAtMs: number;
+    readonly response: RuntimeExecutionStatusReadModel;
+  }>();
   private readonly tenantIsolationPolicy = new TenantExecutionIsolationPolicy();
   private readonly auditTrailService: ExecutionAuditTrailService;
 
@@ -351,6 +366,9 @@ export class SystemRuntimeBackendApi {
         executionId,
       }));
       const sessionId = session.sessionId;
+      if (this.asyncRunsByExecutionId.size >= SystemRuntimeBackendApi.MAX_IN_FLIGHT_ASYNC_RUNS) {
+        throw new Error(`rate-limit-exceeded:Too many asynchronous runtime executions are currently in-flight (max ${SystemRuntimeBackendApi.MAX_IN_FLIGHT_ASYNC_RUNS}).`);
+      }
       this.asyncRunsByExecutionId.set(executionId, {
         executionId,
         sessionId,
@@ -437,6 +455,7 @@ export class SystemRuntimeBackendApi {
               childExecutionIds: this.service.getExecutionResult(executionId).nestedExecutionLineage.map((entry) => entry.executionId),
             },
           });
+          this.asyncRunsByExecutionId.delete(executionId);
           reservation.reservation?.release();
           return result;
         })
@@ -480,6 +499,7 @@ export class SystemRuntimeBackendApi {
               errorCode: "runtime-async-failure",
             },
           });
+          this.asyncRunsByExecutionId.delete(executionId);
           reservation.reservation?.release();
         });
 
@@ -576,6 +596,11 @@ export class SystemRuntimeBackendApi {
     return this.wrap(async () => {
       const pollCaller = this.resolveCallerContext({ requestContext: input.requestContext });
       const pollTenant = this.resolveTenantContext({ requestContext: input.requestContext, callerContext: pollCaller });
+      const cacheKey = this.buildExternalPollCacheKey(input, pollCaller, pollTenant?.tenantId);
+      const cached = cacheKey ? this.readExternalPollCache(cacheKey) : undefined;
+      if (cached) {
+        return cached;
+      }
       this.assertExternalRateLimit({ requestContext: input.requestContext, callerContext: pollCaller, tenantId: pollTenant?.tenantId, operation: "poll-execution" });
       const executionId = input.executionId?.trim() || this.executionSessionRepository.getById(input.sessionId?.trim() ?? "")?.lastExecutionId;
       if (!executionId) {
@@ -588,7 +613,7 @@ export class SystemRuntimeBackendApi {
           sessionId: this.executionSessionRepository.getByExecutionId(executionId)?.sessionId,
           status,
         });
-        return Object.freeze({
+        const response = Object.freeze({
           executionId,
           sessionId: this.executionSessionRepository.getByExecutionId(executionId)?.sessionId,
           acceptedState: status.status === "failed" ? "failed" : status.status === "succeeded" ? "completed" : "running",
@@ -596,6 +621,10 @@ export class SystemRuntimeBackendApi {
           rootAssetId: status.rootAssetId,
           rootVersionId: status.rootVersionId,
         });
+        if (cacheKey) {
+          this.rememberExternalPollCache(cacheKey, response);
+        }
+        return response;
       }
 
       const pending = this.asyncRunsByExecutionId.get(executionId);
@@ -610,13 +639,17 @@ export class SystemRuntimeBackendApi {
           access: { caller, tenant: tenantContext },
           resourceTenantId: session?.context?.tenantId,
         });
-        return Object.freeze({
+        const response = Object.freeze({
           executionId,
           sessionId: pending.sessionId,
           acceptedState: pending.state === "completed" || pending.state === "failed" ? pending.state : "running",
           rootAssetId: pending.rootAssetId,
           rootVersionId: pending.rootVersionId,
         });
+        if (cacheKey) {
+          this.rememberExternalPollCache(cacheKey, response);
+        }
+        return response;
       }
       throw new Error(`not-found:Execution '${executionId}' was not found.`);
     });
@@ -660,6 +693,9 @@ export class SystemRuntimeBackendApi {
       const tenantContext = this.resolveTenantContext({ requestContext: input.requestContext, callerContext: caller });
       this.assertExternalRateLimit({ requestContext: input.requestContext, callerContext: caller, tenantId: tenantContext?.tenantId, operation: "register-execution-callback" });
       const session = await this.resolveSessionForUpdate(input.sessionId, input.executionId, input.requestContext);
+      if ((session.callbacks?.length ?? 0) >= SystemRuntimeBackendApi.MAX_CALLBACK_REGISTRATIONS_PER_SESSION) {
+        throw new Error(`invalid-request:Execution session callback registration exceeds bounded limit (${SystemRuntimeBackendApi.MAX_CALLBACK_REGISTRATIONS_PER_SESSION}).`);
+      }
       const updated = this.executionSessionRepository.save(registerExecutionSessionCallback({
         session,
         callback: input.callback,
@@ -930,6 +966,12 @@ export class SystemRuntimeBackendApi {
     readonly status?: RuntimeExecutionStatusReadModel;
   }): void {
     try {
+      const nowMs = Date.now();
+      const lastEmittedAt = this.lastStreamEmitByExecutionId.get(input.executionId) ?? 0;
+      if (nowMs - lastEmittedAt < SystemRuntimeBackendApi.STREAM_EMIT_MIN_INTERVAL_MS) {
+        return;
+      }
+      this.lastStreamEmitByExecutionId.set(input.executionId, nowMs);
       const status = input.status ?? this.service.getExecutionStatus(input.executionId);
       const trace = this.service.getExecutionTrace(input.executionId, { eventLimit: 50 }).trace;
       const priorTraceCount = this.emittedTraceCountsByExecutionId.get(input.executionId) ?? 0;
@@ -990,9 +1032,14 @@ export class SystemRuntimeBackendApi {
     executionId: string,
     requestContext?: RuntimeApiRequestContext,
   ): Promise<RuntimeExecutionStatusReadModel> {
-    const status = await this.service.getExecutionStatus(executionId);
     const callerContext = this.resolveCallerContext({ requestContext });
     const tenantContext = this.resolveTenantContext({ requestContext, callerContext });
+    const cacheKey = this.buildExternalStatusCacheKey(executionId, requestContext, callerContext, tenantContext?.tenantId);
+    const cached = cacheKey ? this.readExternalStatusCache(cacheKey) : undefined;
+    if (cached) {
+      return cached;
+    }
+    const status = await this.service.getExecutionStatus(executionId);
     this.assertExternalRateLimit({ requestContext, callerContext, tenantId: tenantContext?.tenantId, operation: "get-execution-status" });
     this.assertExecutionAccess({
       accessContext: callerContext,
@@ -1003,6 +1050,9 @@ export class SystemRuntimeBackendApi {
       access: { caller: callerContext, tenant: tenantContext },
       resourceTenantId: this.readExecutionTenantId(executionId),
     });
+    if (cacheKey) {
+      this.rememberExternalStatusCache(cacheKey, status);
+    }
     return status;
   }
 
@@ -1087,6 +1137,78 @@ export class SystemRuntimeBackendApi {
       throw new Error(`invalid-request:${label} must be between ${min} and ${max}.`);
     }
     return value;
+  }
+
+  private buildExternalPollCacheKey(
+    input: { readonly executionId?: string; readonly sessionId?: string; readonly requestContext?: RuntimeApiRequestContext },
+    callerContext?: ExecutionAccessContext,
+    tenantId?: string,
+  ): string | undefined {
+    if (input.requestContext?.trustedInternal) {
+      return undefined;
+    }
+    const executionId = input.executionId?.trim() || "";
+    const sessionId = input.sessionId?.trim() || "";
+    const identity = `${callerContext?.callerKind ?? "anonymous"}:${callerContext?.callerId ?? "unknown"}:${tenantId ?? "no-tenant"}`;
+    if (!executionId && !sessionId) {
+      return undefined;
+    }
+    return `${identity}:${executionId || `session:${sessionId}`}`;
+  }
+
+  private readExternalPollCache(cacheKey: string): ExecutionPollResponse | undefined {
+    const cached = this.cachedExternalPollsByKey.get(cacheKey);
+    if (!cached) {
+      return undefined;
+    }
+    if (Date.now() > cached.expiresAtMs) {
+      this.cachedExternalPollsByKey.delete(cacheKey);
+      return undefined;
+    }
+    return cached.response;
+  }
+
+  private rememberExternalPollCache(cacheKey: string, response: ExecutionPollResponse): void {
+    this.cachedExternalPollsByKey.set(cacheKey, Object.freeze({
+      expiresAtMs: Date.now() + SystemRuntimeBackendApi.EXTERNAL_POLL_RESPONSE_CACHE_TTL_MS,
+      response,
+    }));
+  }
+
+  private buildExternalStatusCacheKey(
+    executionId: string,
+    requestContext: RuntimeApiRequestContext | undefined,
+    callerContext: ExecutionAccessContext | undefined,
+    tenantId: string | undefined,
+  ): string | undefined {
+    if (requestContext?.trustedInternal) {
+      return undefined;
+    }
+    const normalizedExecutionId = executionId.trim();
+    if (!normalizedExecutionId) {
+      return undefined;
+    }
+    const identity = `${callerContext?.callerKind ?? "anonymous"}:${callerContext?.callerId ?? "unknown"}:${tenantId ?? "no-tenant"}`;
+    return `${identity}:${normalizedExecutionId}`;
+  }
+
+  private readExternalStatusCache(cacheKey: string): RuntimeExecutionStatusReadModel | undefined {
+    const cached = this.cachedExternalStatusByKey.get(cacheKey);
+    if (!cached) {
+      return undefined;
+    }
+    if (Date.now() > cached.expiresAtMs) {
+      this.cachedExternalStatusByKey.delete(cacheKey);
+      return undefined;
+    }
+    return cached.response;
+  }
+
+  private rememberExternalStatusCache(cacheKey: string, response: RuntimeExecutionStatusReadModel): void {
+    this.cachedExternalStatusByKey.set(cacheKey, Object.freeze({
+      expiresAtMs: Date.now() + SystemRuntimeBackendApi.EXTERNAL_STATUS_RESPONSE_CACHE_TTL_MS,
+      response,
+    }));
   }
 
   private async wrap<T>(action: () => Promise<T>): Promise<SystemRuntimeApiResponse<T>> {
