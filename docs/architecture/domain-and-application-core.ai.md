@@ -202,6 +202,16 @@ The studio shell now has a bounded inner-layer model and application orchestrati
 - System publish flow now enforces recursive system consistency through existing shared seams (`evaluate/assertSystemStudioDraftPublishConsistency`) including nested system resolution, child contract resolution, recursive contract projection, and recursion safety checks.
 - System Studio UI integration remains on the shared `StudioShellPage` registration/route architecture (`/studio-shell/system`) with backend-authoritative draft/session/validation/publish behavior.
 
+## Direction 5 update: External runtime bounded safeguards alignment (stories 7.23–7.24)
+
+- External runtime safeguards stay in existing application/infrastructure seams (`SystemRuntimeBackendApi`, `ExecutionUpdateStream`, quota/rate-limit/access/tenant services) instead of introducing a second execution platform.
+- Hot-path protections are explicitly bounded and testable: short-lived caller/tenant-scoped poll/status caching, bounded callback registrations per session, bounded streaming subscription/fan-out controls, bounded async in-flight tracking, and bounded emit cadence on execution updates.
+- These guards are additive and preserve current correctness constraints (auth/access/tenant/version-aware semantics remain required before returning cached/projection reads).
+- Architecture docs now explicitly separate:
+  - implemented external runtime surface (stories 7.1–7.23),
+  - bounded behavior/limits (in-process, non-distributed),
+  - future work (distributed backpressure/observability platforms not in this scope).
+
 ## Direction 5 update: Composite dependency semantics + behavior enforcement (stories 3.15–3.16)
 
 - Shared studio-shell dependency validation now performs version-aware identity checks for pinned dependencies (`assetId` must match the resolved `versionId` owner when resolvable through repository/version seams).

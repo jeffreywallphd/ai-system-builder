@@ -76,6 +76,23 @@ This keeps capability claims small and truthful: higher layers can reason about 
 - Callback delivery retries are bounded by callback registration max-attempt settings and audited as retry-attempted/retry-exhausted outcomes.
 - External entrypoint rate limiting is now centralized at runtime API boundaries (caller/tenant/source-operation windows), remains separate from execution quota policy, and returns structured `rate-limit-exceeded` errors.
 
+### Direction 5 Epic 7 external runtime alignment snapshot (stories 7.1–7.24)
+
+Implemented now (external surface is real and bounded, not a second runtime architecture):
+- External runtime interface contract, access control, API authentication integration, and execution quota/rate-limit checks on entry paths.
+- External input validation/output serialization, execution session model, async start/poll flows, callback registration/delivery, streaming update subscriptions, request routing, tool-bridge invocation, and external SDK contract/reference client.
+- External environment selection exposure, tenant-isolation enforcement, nested system-of-systems execution lineage, execution audit trail, retry classification/idempotent replay handling, and end-to-end + cross-system interop tests.
+- External read-side safeguards now include bounded status/result shaping, short-lived status/poll response caching for burst polling patterns, bounded callback registration counts, bounded stream subscription/fan-out limits, and throttled stream emission cadence to reduce load amplification on hot paths.
+
+Bounded/partial by design:
+- Callback/streaming safeguards are in-process bounded guards (no distributed queue/event bus).
+- Poll/status response caching is intentionally short-lived and caller/tenant scoped to reduce repeated resolution pressure without changing correctness semantics.
+- Retry behavior is bounded and classification-based; it does not attempt long-horizon orchestration recovery.
+
+Future work (not implemented in this epic):
+- Distributed runtime backpressure infrastructure (external queues, distributed cache tiers, or cross-host stream brokers).
+- Advanced observability/analytics platforms beyond current runtime/audit/read-model seams.
+
 ### Workflow path now routed through the engine
 
 `application/workflows/ExecuteWorkflowUseCase.ts` now builds a one-unit execution plan for **both** the immediate workflow run path and the `startExecution(...)` path, then submits that plan to the unified execution engine.
