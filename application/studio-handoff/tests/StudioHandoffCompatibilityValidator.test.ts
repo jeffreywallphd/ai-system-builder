@@ -241,6 +241,32 @@ describe("StudioHandoffCompatibilityValidator", () => {
     ]);
   });
 
+  it("rejects mismatched pinned version references instead of floating version identity", () => {
+    const validator = new StudioHandoffCompatibilityValidator({
+      validateVersionReference: () => true,
+    });
+    const basis = createHandoff({
+      id: "pinned-mismatch",
+      sourceType: "dataset-studio",
+      targetType: "system-studio",
+      taxonomy: { structuralKind: "atomic", semanticRole: "dataset", behaviorKind: "none" },
+    });
+    const handoff = Object.freeze({
+      ...basis,
+      payload: Object.freeze({
+        ...basis.payload,
+        pinnedVersion: Object.freeze({
+          assetId: basis.payload.assetId,
+          versionId: "asset:dataset:v999",
+        }),
+      }),
+    });
+
+    const decision = validator.validate({ handoff, targetCapabilities: createCapabilities() });
+    expect(decision.compatible).toBeFalse();
+    expect(decision.issues.map((entry) => entry.code)).toContain(StudioHandoffCompatibilityIssueCodes.versionReferenceMismatch);
+  });
+
   it("evaluates grouped multi-asset compatibility with per-asset and aggregate bundle decisions", () => {
     const validator = new StudioHandoffCompatibilityValidator({
       validateVersionReference: ({ versionId }) => versionId.includes(":v"),

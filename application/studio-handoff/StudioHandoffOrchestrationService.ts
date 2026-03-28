@@ -10,6 +10,7 @@ import { createStudioHandoffContext, type StudioHandoffContext } from "../../dom
 import type { StudioCapabilityDescriptor, StudioHandoffCompatibilityDecision } from "./StudioHandoffCompatibilityValidator";
 import type { AdaptedStudioInput, StudioInputAdapterLayer } from "./StudioInputAdapter";
 import type { AdaptedStudioOutput, StudioOutputAdapterLayer, StudioProducedOutput } from "./StudioOutputAdapter";
+import type { StudioHandoffLineageRecord, StudioHandoffLineageTracker } from "./StudioHandoffLineageTracker";
 
 export interface StudioHandoffRequest {
   readonly handoff?: StudioHandoffContract;
@@ -29,6 +30,7 @@ export interface StudioHandoffPreparation {
   readonly context: StudioHandoffContext;
   readonly compatibility: StudioHandoffCompatibilityDecision;
   readonly targetInput: AdaptedStudioInput;
+  readonly lineage?: StudioHandoffLineageRecord;
 }
 
 export interface StudioHandoffFailure {
@@ -54,6 +56,13 @@ export interface StudioHandoffResult {
   readonly failure?: StudioHandoffFailure;
 }
 
+export const StudioHandoffVersionResolutionPolicyKinds = Object.freeze({
+  strictPinned: "strict-pinned",
+});
+
+export type StudioHandoffVersionResolutionPolicy =
+  typeof StudioHandoffVersionResolutionPolicyKinds[keyof typeof StudioHandoffVersionResolutionPolicyKinds];
+
 export interface StudioHandoffRevision {
   readonly revisionId: string;
   readonly previousHandoffId: string;
@@ -78,6 +87,11 @@ export interface IncrementalStudioHandoffUpdate {
 
 export interface StudioHandoffChangeSet {
   readonly updatedAuthoritativeAsset: boolean;
+  readonly updatedAuthoritativeVersion?: {
+    readonly assetId: string;
+    readonly previousVersionId: string;
+    readonly nextVersionId: string;
+  };
   readonly updatedBundleAssets: ReadonlyArray<{
     readonly assetId: string;
     readonly previousVersionId: string;
@@ -236,6 +250,10 @@ function applyIncrementalUpdate(input: {
     return Object.freeze({
       ...entry,
       versionId: update?.versionId ?? entry.versionId,
+      pinnedVersion: Object.freeze({
+        assetId: entry.assetId,
+        versionId: update?.versionId ?? entry.versionId,
+      }),
       role: update?.role ?? entry.role,
     });
   });
@@ -277,6 +295,10 @@ function applyIncrementalUpdate(input: {
     payload: {
       ...input.basis.payload,
       versionId: nextPayloadVersionId,
+      pinnedVersion: {
+        assetId: input.basis.payload.assetId,
+        versionId: nextPayloadVersionId,
+      },
     },
     multiAsset: input.basis.multiAsset
       ? {
@@ -316,6 +338,13 @@ function applyIncrementalUpdate(input: {
     }),
     changes: Object.freeze({
       updatedAuthoritativeAsset,
+      updatedAuthoritativeVersion: updatedAuthoritativeAsset
+        ? Object.freeze({
+          assetId: input.basis.payload.assetId,
+          previousVersionId: input.basis.payload.versionId,
+          nextVersionId: nextPayloadVersionId,
+        })
+        : undefined,
       updatedBundleAssets: Object.freeze(updatedBundleAssets),
       updatedContextPrefillKeys: Object.freeze(updatedContextPrefillKeys),
       updatedContextProvenanceFields: Object.freeze(updatedContextProvenanceFields),
@@ -327,9 +356,18 @@ export class StudioHandoffOrchestrationService {
   public constructor(
     private readonly outputAdapterLayer: Pick<StudioOutputAdapterLayer, "adapt">,
     private readonly inputAdapterLayer: Pick<StudioInputAdapterLayer, "adapt">,
+    private readonly options: {
+      readonly versionPolicy?: StudioHandoffVersionResolutionPolicy;
+      readonly lineageTracker?: Pick<StudioHandoffLineageTracker, "track">;
+    } = {},
   ) {}
 
   public orchestrate(request: StudioHandoffRequest): StudioHandoffResult {
+    const versionPolicy = this.options.versionPolicy ?? StudioHandoffVersionResolutionPolicyKinds.strictPinned;
+    if (versionPolicy !== StudioHandoffVersionResolutionPolicyKinds.strictPinned) {
+      throw new Error(`Unsupported StudioHandoffVersionResolutionPolicy '${versionPolicy}'.`);
+    }
+
     const outputAdaptation = this.outputAdapterLayer.adapt(request.sourceOutput);
     if (!outputAdaptation.ok || !outputAdaptation.adapted) {
       return Object.freeze({
@@ -380,14 +418,20 @@ export class StudioHandoffOrchestrationService {
       });
     }
 
+    const preparation: StudioHandoffPreparation = Object.freeze({
+      sourceOutput: outputAdaptation.adapted,
+      handoff: contract,
+      context,
+      compatibility: inputAdaptation.compatibility,
+      targetInput: inputAdaptation.adapted,
+    });
+    const lineageEvent = this.options.lineageTracker?.track({ preparation });
+
     return Object.freeze({
       ok: true,
       preparation: Object.freeze({
-        sourceOutput: outputAdaptation.adapted,
-        handoff: contract,
-        context,
-        compatibility: inputAdaptation.compatibility,
-        targetInput: inputAdaptation.adapted,
+        ...preparation,
+        lineage: lineageEvent?.record,
       }),
     });
   }
@@ -403,14 +447,39 @@ export class StudioHandoffOrchestrationService {
       update: input.update,
     });
 
-    const result = this.orchestrate({
+    const orchestrationForRefresh = this.options.lineageTracker
+      ? new StudioHandoffOrchestrationService(
+        this.outputAdapterLayer,
+        this.inputAdapterLayer,
+        { versionPolicy: this.options.versionPolicy },
+      )
+      : this;
+
+    const result = orchestrationForRefresh.orchestrate({
       handoff: revised.handoff,
       sourceOutput: input.sourceOutput,
       targetCapabilities: input.targetCapabilities,
     });
 
+    if (!result.ok || !result.preparation || !this.options.lineageTracker) {
+      return Object.freeze({
+        ...result,
+        revision: revised.revision,
+        changes: revised.changes,
+      });
+    }
+
+    const lineageEvent = this.options.lineageTracker.track({
+      preparation: result.preparation,
+      revision: revised.revision,
+    });
+
     return Object.freeze({
       ...result,
+      preparation: Object.freeze({
+        ...result.preparation,
+        lineage: lineageEvent.record,
+      }),
       revision: revised.revision,
       changes: revised.changes,
     });

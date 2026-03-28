@@ -23,6 +23,10 @@ export interface StudioProducedOutput {
   readonly authoritativeAsset: {
     readonly assetId: string;
     readonly versionId: string;
+    readonly pinnedVersion: {
+      readonly assetId: string;
+      readonly versionId: string;
+    };
     readonly taxonomy: CompositionTaxonomyDescriptor;
     readonly contract?: AssetContractDescriptor;
   };
@@ -107,6 +111,10 @@ function createBaseAdaptedOutput(kind: AdaptedStudioOutputKind, input: StudioPro
     authoritativeAsset: Object.freeze({
       assetId: normalizeRequired(input.authoritativeAsset.assetId, "Studio output authoritative asset id"),
       versionId: normalizeRequired(input.authoritativeAsset.versionId, "Studio output authoritative asset version id"),
+      pinnedVersion: Object.freeze({
+        assetId: normalizeRequired(input.authoritativeAsset.assetId, "Studio output authoritative asset id"),
+        versionId: normalizeRequired(input.authoritativeAsset.versionId, "Studio output authoritative asset version id"),
+      }),
       taxonomy: input.authoritativeAsset.taxonomy,
       contract: input.authoritativeAsset.contract,
     }),

@@ -112,6 +112,7 @@ describe("createStudioHandoffContract", () => {
     expect(system.payload.taxonomy.structuralKind).toBe("system");
     expect(systemOfSystems.payload.taxonomy.semanticRole).toBe("system");
     expect(systemOfSystems.payload.versionId).toBe("handoff-system-of-systems:v1");
+    expect(systemOfSystems.payload.pinnedVersion?.versionId).toBe("handoff-system-of-systems:v1");
   });
 
   it("preserves source/target identities and remains scoped to studio-handoff contracts", () => {
@@ -224,5 +225,6 @@ describe("createStudioHandoffContract", () => {
     expect(handoff.multiAsset?.assets).toHaveLength(2);
     expect(handoff.multiAsset?.assets[1]?.roleLabel).toBe("model");
     expect(handoff.multiAsset?.assets[1]?.versionId).toBe("asset:model:v3");
+    expect(handoff.multiAsset?.assets[1]?.pinnedVersion?.versionId).toBe("asset:model:v3");
   });
 });

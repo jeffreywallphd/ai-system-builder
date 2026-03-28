@@ -120,6 +120,7 @@ describe("StudioOutputAdapterLayer", () => {
     expect(output.ok).toBeTrue();
     expect(output.adapted?.authoritativeAsset.assetId).toBe("asset:authoritative");
     expect(output.adapted?.authoritativeAsset.versionId).toBe("asset:authoritative:v11");
+    expect(output.adapted?.authoritativeAsset.pinnedVersion.versionId).toBe("asset:authoritative:v11");
     expect(output.adapted?.authoritativeAsset.taxonomy.semanticRole).toBe(TaxonomySemanticRoles.dataset);
     expect(output.adapted?.authoritativeAsset.contract?.id).toBe(contract.id);
     expect(output.adapted?.handoffMetadata.hints.assetId).toBe("hint-override-attempt");

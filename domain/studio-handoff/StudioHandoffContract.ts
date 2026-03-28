@@ -83,6 +83,7 @@ export interface TargetStudioInputContract {
 export interface StudioHandoffPayload {
   readonly assetId: string;
   readonly versionId: string;
+  readonly pinnedVersion?: PinnedStudioHandoffAssetVersion;
   readonly taxonomy: CompositionTaxonomyDescriptor;
   readonly contract?: AssetContractDescriptor;
   readonly targetInputContract: TargetStudioInputContract;
@@ -105,9 +106,20 @@ export interface StudioHandoffAssetEntry {
   readonly roleLabel?: string;
   readonly assetId: string;
   readonly versionId: string;
+  readonly pinnedVersion?: PinnedStudioHandoffAssetVersion;
   readonly taxonomy: CompositionTaxonomyDescriptor;
   readonly contract?: AssetContractDescriptor;
   readonly context?: Readonly<Record<string, unknown>>;
+}
+
+export interface PinnedStudioHandoffAssetVersion {
+  readonly assetId: string;
+  readonly versionId: string;
+}
+
+export interface VersionAwareStudioHandoffReference extends PinnedStudioHandoffAssetVersion {
+  readonly role?: StudioHandoffAssetRole;
+  readonly relation?: string;
 }
 
 export interface MultiAssetStudioHandoffContract {
@@ -149,12 +161,25 @@ function normalizeAssetEntry(
     throw new Error(`Studio handoff asset role '${entry.role}' is not supported.`);
   }
 
+  const assetId = normalizeRequired(entry.assetId, `Studio handoff multi-asset entry[${index}] asset id`);
+  const versionId = normalizeRequired(entry.versionId, `Studio handoff multi-asset entry[${index}] version id`);
+  if (
+    entry.pinnedVersion
+    && (entry.pinnedVersion.assetId.trim() !== assetId || entry.pinnedVersion.versionId.trim() !== versionId)
+  ) {
+    throw new Error(`Studio handoff multi-asset entry[${index}] pinned version must match assetId/versionId.`);
+  }
+
   return Object.freeze({
     role: entry.role,
     ordinal: entry.ordinal,
     roleLabel: normalizeOptional(entry.roleLabel),
-    assetId: normalizeRequired(entry.assetId, `Studio handoff multi-asset entry[${index}] asset id`),
-    versionId: normalizeRequired(entry.versionId, `Studio handoff multi-asset entry[${index}] version id`),
+    assetId,
+    versionId,
+    pinnedVersion: Object.freeze({
+      assetId,
+      versionId,
+    }),
     taxonomy: entry.taxonomy,
     contract: entry.contract,
     context: entry.context ? Object.freeze({ ...entry.context }) : undefined,
@@ -182,6 +207,10 @@ function normalizeMultiAssetContract(
       roleLabel: "authoritative",
       assetId: normalizeRequired(fallbackPayload.assetId, "Studio handoff payload asset id"),
       versionId: normalizeRequired(fallbackPayload.versionId, "Studio handoff payload asset version id"),
+      pinnedVersion: Object.freeze({
+        assetId: normalizeRequired(fallbackPayload.assetId, "Studio handoff payload asset id"),
+        versionId: normalizeRequired(fallbackPayload.versionId, "Studio handoff payload asset version id"),
+      }),
       taxonomy: fallbackPayload.taxonomy,
       contract: fallbackPayload.contract,
     }));
@@ -218,9 +247,25 @@ export function createStudioHandoffContract(input: {
   const targetInputContract = input.payload.targetInputContract;
   const contractId = normalizeRequired(targetInputContract.contractId, "Target studio input contract id");
 
+  const payloadAssetId = normalizeRequired(input.payload.assetId, "Studio handoff payload asset id");
+  const payloadVersionId = normalizeRequired(input.payload.versionId, "Studio handoff payload asset version id");
+  if (
+    input.payload.pinnedVersion
+    && (
+      input.payload.pinnedVersion.assetId.trim() !== payloadAssetId
+      || input.payload.pinnedVersion.versionId.trim() !== payloadVersionId
+    )
+  ) {
+    throw new Error("Studio handoff payload pinned version must match payload assetId/versionId.");
+  }
+
   const normalizedPayload = Object.freeze({
-    assetId: normalizeRequired(input.payload.assetId, "Studio handoff payload asset id"),
-    versionId: normalizeRequired(input.payload.versionId, "Studio handoff payload asset version id"),
+    assetId: payloadAssetId,
+    versionId: payloadVersionId,
+    pinnedVersion: Object.freeze({
+      assetId: payloadAssetId,
+      versionId: payloadVersionId,
+    }),
     taxonomy: input.payload.taxonomy,
     contract: input.payload.contract,
     targetInputContract: Object.freeze({
