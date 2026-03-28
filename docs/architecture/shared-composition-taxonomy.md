@@ -65,7 +65,7 @@ Fully implemented now:
 
 Partially implemented / bounded:
 - Specialized composite semantics are currently classification and authoring semantics (`workflow` orchestrator, `agent` decision unit, `context-bundle` input preparer); only workflow and context-bundle are implemented as specialized composite Studio Shell surfaces in this Direction 5 slice.
-- System-level target roles (`app-template`, `system`) exist in taxonomy but do not yet have Studio Shell authoring surfaces in this slice.
+- System-level target roles (`app-template`, `system`) exist in taxonomy; UI authoring surfaces are still pending, but bounded inner recursion-capable system composition modeling now exists in `domain/system-studio/SystemAssetDomain.ts`.
 
 This shared taxonomy is a guardrail to keep workflow/agent/asset/system language coherent while implementation continues in parallel.
 - Direction 5 atomic studio usage now also concretely applies `atomic/prompt-template/none`, `atomic/embedding-index/none`, and `atomic/config-profile/none` through Prompt Template / Embedding Index / Config Profile studios (`domain/prompt-template-studio/*`, `application/prompt-template-studio/*`, `domain/embedding-index-studio/*`, `application/embedding-index-studio/*`, `domain/config-profile-studio/*`, `application/config-profile-studio/*`, and registration-driven UI shell integration).

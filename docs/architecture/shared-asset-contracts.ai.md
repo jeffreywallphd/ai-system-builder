@@ -16,7 +16,7 @@
 
 ## Current grounded coverage
 - Workflow, agent, tool capability, context package, and context recipe contract projections are supported.
-- Taxonomy-driven bounded contract projections now cover all planned Direction 5 composite roles with truthful baselines (`workflow`, `context-bundle`, `dataset-pipeline`, `training-recipe`, `tool-chain`) plus system role `app-template`, while preserving existing atomic role coverage.
+- Taxonomy-driven bounded contract projections now cover all planned Direction 5 composite roles with truthful baselines (`workflow`, `context-bundle`, `dataset-pipeline`, `training-recipe`, `tool-chain`) plus system roles (`app-template`, `system`) for recursive system composition foundations, while preserving existing atomic role coverage.
 - Projection remains combination-aware (structural/semantic/behavior). Unsupported taxonomy combinations intentionally return no projection rather than fabricating speculative contracts.
 - Canonical operational reads expose optional `contract` where resolver-backed projection is available (workflow-definition, installed-model, base-model, and execution-artifact when backing adapters are available).
 - Agent Studio output/memory reference UX reuses canonical asset-management read seams (asset detail + version chain lineage) instead of adding agent-only output contract surfaces.

@@ -143,4 +143,76 @@ describe("buildStudioShellValidationIssues", () => {
 
     expect(issues.some((issue) => issue.code === "composite-dependency-semantic-role-disallowed")).toBeTrue();
   });
+
+  it("allows system drafts to depend on atomic/composite/system roles for system-of-systems composition", async () => {
+    const systemTaxonomy = createCompositionTaxonomyDescriptor({
+      structuralKind: TaxonomyStructuralKinds.system,
+      semanticRole: TaxonomySemanticRoles.system,
+      behaviorKind: TaxonomyBehaviorKinds.iterative,
+    });
+    const systemDraft = createDraftWithTaxonomy(
+      "draft-system-composition",
+      systemTaxonomy,
+      [
+        { assetId: "asset:model", versionId: "asset:model:v1" },
+        { assetId: "asset:workflow", versionId: "asset:workflow:v1" },
+        { assetId: "asset:system", versionId: "asset:system:v1" },
+      ],
+    );
+
+    const byVersionId: Record<string, CompositionTaxonomyDescriptor> = {
+      "asset:model:v1": createModelStudioTaxonomy(),
+      "asset:workflow:v1": createCompositionTaxonomyDescriptor({
+        structuralKind: TaxonomyStructuralKinds.composite,
+        semanticRole: TaxonomySemanticRoles.workflow,
+        behaviorKind: TaxonomyBehaviorKinds.deterministic,
+      }),
+      "asset:system:v1": createCompositionTaxonomyDescriptor({
+        structuralKind: TaxonomyStructuralKinds.system,
+        semanticRole: TaxonomySemanticRoles.system,
+        behaviorKind: TaxonomyBehaviorKinds.deterministic,
+      }),
+    };
+
+    const issues = await buildStudioShellValidationIssues({
+      draft: systemDraft,
+      knownVersionIds: Object.keys(byVersionId),
+      versionExists: async () => true,
+      resolveDependencyVersion: async (versionId) => Object.freeze({
+        assetId: versionId.split(":v")[0]!,
+        taxonomy: byVersionId[versionId],
+      }),
+    });
+
+    expect(issues.some((issue) => issue.code === "composite-dependency-semantic-role-disallowed")).toBeFalse();
+  });
+
+  it("flags disallowed dependencies for system drafts when dependency semantic role is outside system scope", async () => {
+    const systemTaxonomy = createCompositionTaxonomyDescriptor({
+      structuralKind: TaxonomyStructuralKinds.system,
+      semanticRole: TaxonomySemanticRoles.system,
+      behaviorKind: TaxonomyBehaviorKinds.deterministic,
+    });
+    const systemDraft = createDraftWithTaxonomy(
+      "draft-system-disallowed",
+      systemTaxonomy,
+      [{ assetId: "asset:agent", versionId: "asset:agent:v1" }],
+    );
+
+    const issues = await buildStudioShellValidationIssues({
+      draft: systemDraft,
+      knownVersionIds: ["asset:agent:v1"],
+      versionExists: async () => true,
+      resolveDependencyVersion: async () => Object.freeze({
+        assetId: "asset:agent",
+        taxonomy: createCompositionTaxonomyDescriptor({
+          structuralKind: TaxonomyStructuralKinds.composite,
+          semanticRole: TaxonomySemanticRoles.agent,
+          behaviorKind: TaxonomyBehaviorKinds.autonomous,
+        }),
+      }),
+    });
+
+    expect(issues.some((issue) => issue.code === "composite-dependency-semantic-role-disallowed")).toBeTrue();
+  });
 });

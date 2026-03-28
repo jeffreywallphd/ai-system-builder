@@ -156,4 +156,17 @@ describe("CompositionTaxonomyClassifier", () => {
       behaviorKind: "iterative",
     });
   });
+
+  it("classifies first-class system assets without collapsing them into composite roles", () => {
+    expect(classifier.classifySystemAsset("system", "autonomous")).toEqual({
+      structuralKind: "system",
+      semanticRole: "system",
+      behaviorKind: "autonomous",
+    });
+    expect(classifier.classifySystemAsset("app-template", "conditional")).toEqual({
+      structuralKind: "system",
+      semanticRole: "app-template",
+      behaviorKind: "conditional",
+    });
+  });
 });

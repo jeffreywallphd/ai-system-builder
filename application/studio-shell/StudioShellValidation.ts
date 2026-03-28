@@ -133,7 +133,7 @@ export async function buildStudioShellValidationIssues(input: {
         code: StudioShellValidationIssueCodes.compositeDependencySemanticRoleDisallowed,
         section: StudioShellValidationSections.dependencies,
         severity: "error",
-        message: `Composite draft semantic role '${taxonomy?.semanticRole}' does not allow dependency taxonomy '${resolvedVersion.taxonomy.structuralKind}/${resolvedVersion.taxonomy.semanticRole}/${resolvedVersion.taxonomy.behaviorKind}'.`,
+        message: `Draft semantic role '${taxonomy?.semanticRole}' does not allow dependency taxonomy '${resolvedVersion.taxonomy.structuralKind}/${resolvedVersion.taxonomy.semanticRole}/${resolvedVersion.taxonomy.behaviorKind}'.`,
         path: `dependencies[${index}]`,
       });
     }
@@ -168,7 +168,7 @@ function isDependencyTaxonomyAllowed(
   dependencyTaxonomy: CompositionTaxonomyDescriptor,
 ): boolean {
   const taxonomy = draft.metadata.taxonomy;
-  if (!taxonomy || taxonomy.structuralKind !== TaxonomyStructuralKinds.composite) {
+  if (!taxonomy || (taxonomy.structuralKind !== TaxonomyStructuralKinds.composite && taxonomy.structuralKind !== TaxonomyStructuralKinds.system)) {
     return true;
   }
 
@@ -234,6 +234,36 @@ const allowedDependencyRolesByCompositeRole: Readonly<
     TaxonomySemanticRoles.promptTemplate,
     TaxonomySemanticRoles.configProfile,
     TaxonomySemanticRoles.toolChain,
+  ]),
+  [TaxonomySemanticRoles.system]: new Set<TaxonomySemanticRole>([
+    TaxonomySemanticRoles.model,
+    TaxonomySemanticRoles.dataset,
+    TaxonomySemanticRoles.tool,
+    TaxonomySemanticRoles.promptTemplate,
+    TaxonomySemanticRoles.embeddingIndex,
+    TaxonomySemanticRoles.configProfile,
+    TaxonomySemanticRoles.workflow,
+    TaxonomySemanticRoles.contextBundle,
+    TaxonomySemanticRoles.datasetPipeline,
+    TaxonomySemanticRoles.trainingRecipe,
+    TaxonomySemanticRoles.toolChain,
+    TaxonomySemanticRoles.appTemplate,
+    TaxonomySemanticRoles.system,
+  ]),
+  [TaxonomySemanticRoles.appTemplate]: new Set<TaxonomySemanticRole>([
+    TaxonomySemanticRoles.model,
+    TaxonomySemanticRoles.dataset,
+    TaxonomySemanticRoles.tool,
+    TaxonomySemanticRoles.promptTemplate,
+    TaxonomySemanticRoles.embeddingIndex,
+    TaxonomySemanticRoles.configProfile,
+    TaxonomySemanticRoles.workflow,
+    TaxonomySemanticRoles.contextBundle,
+    TaxonomySemanticRoles.datasetPipeline,
+    TaxonomySemanticRoles.trainingRecipe,
+    TaxonomySemanticRoles.toolChain,
+    TaxonomySemanticRoles.appTemplate,
+    TaxonomySemanticRoles.system,
   ]),
 });
 
