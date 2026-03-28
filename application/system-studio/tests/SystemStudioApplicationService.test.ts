@@ -195,4 +195,100 @@ describe("SystemStudioApplicationService", () => {
       versionId: "asset:system-root:invalid",
     })).rejects.toThrow("system-child-reference-missing");
   });
+
+  it("adds/removes/reorders atomic/composite/system child selections through system studio orchestration", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    await repository.saveAssetVersion(createPublishedVersion({
+      assetId: "asset:model",
+      versionId: "asset:model:v1",
+      taxonomy: { structuralKind: "atomic", semanticRole: "model", behaviorKind: "none" },
+    }));
+    await repository.saveAssetVersion(createPublishedVersion({
+      assetId: "asset:workflow",
+      versionId: "asset:workflow:v1",
+      taxonomy: { structuralKind: "composite", semanticRole: "workflow", behaviorKind: "deterministic" },
+    }));
+    await repository.saveAssetVersion(createPublishedVersion({
+      assetId: "system:child",
+      versionId: "system:child:v1",
+      taxonomy: { structuralKind: "system", semanticRole: "system", behaviorKind: "deterministic" },
+      content: JSON.stringify({ systemSpec: { components: [] } }),
+    }));
+    const ids = ["session-1", "draft-root"];
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => ids.shift() ?? "generated");
+    const service = new SystemStudioApplicationService(studioShell, repository);
+    const ensure = await service.ensureStudioInitialized();
+    const created = await service.createSystemDraft({
+      sessionId: ensure.session.id,
+      draftId: "draft-root",
+      title: "System Root",
+      content: JSON.stringify({ systemSpec: { components: [] } }),
+    });
+
+    await service.addSystemChildComponent({
+      sessionId: ensure.session.id,
+      draftId: created.draft.id,
+      component: { componentKind: "atomic", assetId: "asset:model", versionId: "asset:model:v1", alias: "model-a" },
+    });
+    await service.addSystemChildComponent({
+      sessionId: ensure.session.id,
+      draftId: created.draft.id,
+      component: { componentKind: "composite", assetId: "asset:workflow", versionId: "asset:workflow:v1", alias: "flow-a" },
+    });
+    await service.addSystemChildComponent({
+      sessionId: ensure.session.id,
+      draftId: created.draft.id,
+      component: { componentKind: "system", assetId: "system:child", versionId: "system:child:v1", alias: "child-a" },
+    });
+
+    await service.reorderSystemChildComponent({
+      sessionId: ensure.session.id,
+      draftId: created.draft.id,
+      componentAssetId: "system:child",
+      componentVersionId: "system:child:v1",
+      toIndex: 0,
+    });
+
+    await service.removeSystemChildComponent({
+      sessionId: ensure.session.id,
+      draftId: created.draft.id,
+      componentAssetId: "asset:workflow",
+      componentVersionId: "asset:workflow:v1",
+    });
+
+    const loaded = await studioShell.loadAssetDraft({ studioId: SystemStudioIdentity.defaultStudioId, draftId: created.draft.id });
+    expect(loaded).toBeDefined();
+    const spec = JSON.parse(loaded!.draft.content) as { readonly systemSpec?: { readonly components?: ReadonlyArray<{ readonly assetId: string }> } };
+    expect(spec.systemSpec?.components?.map((component) => component.assetId)).toEqual(["system:child", "asset:model"]);
+    expect(loaded!.draft.dependencies.map((entry) => entry.assetId).sort()).toEqual(["asset:model", "system:child"]);
+  });
+
+  it("surfaces invalid/cyclic multi-level selection through existing validation/publish path", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const ids = ["session-1", "draft-root"];
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => ids.shift() ?? "generated");
+    const service = new SystemStudioApplicationService(studioShell, repository);
+    const ensure = await service.ensureStudioInitialized();
+    const created = await service.createSystemDraft({
+      sessionId: ensure.session.id,
+      draftId: "draft-root",
+      title: "System Root",
+      content: JSON.stringify({ systemSpec: { components: [] } }),
+    });
+
+    await service.addSystemChildComponent({
+      sessionId: ensure.session.id,
+      draftId: created.draft.id,
+      component: { componentKind: "system", assetId: "system:missing", versionId: "system:missing:v1", alias: "missing" },
+    });
+
+    const validation = await service.validateSystemDraft({ draftId: created.draft.id });
+    expect(validation.issues.map((entry) => entry.code)).toContain("system-child-reference-missing");
+
+    await expect(service.publishSystemDraft({
+      sessionId: ensure.session.id,
+      draftId: created.draft.id,
+      versionId: "asset:system-root:invalid-selection",
+    })).rejects.toThrow("system-child-reference-missing");
+  });
 });

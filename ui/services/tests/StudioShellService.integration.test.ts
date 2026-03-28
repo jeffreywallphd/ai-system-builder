@@ -50,6 +50,18 @@ function installBridge(api: StudioShellBackendApi): void {
     validateDraft(requestJson: string) {
       return api.validateDraft(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
     },
+    listSystemChildComponents() {
+      return Promise.resolve(JSON.stringify({ ok: false, error: { code: "invalid-request", message: "not configured in this integration bridge" } }));
+    },
+    addSystemChildComponent() {
+      return Promise.resolve(JSON.stringify({ ok: false, error: { code: "invalid-request", message: "not configured in this integration bridge" } }));
+    },
+    removeSystemChildComponent() {
+      return Promise.resolve(JSON.stringify({ ok: false, error: { code: "invalid-request", message: "not configured in this integration bridge" } }));
+    },
+    reorderSystemChildComponent() {
+      return Promise.resolve(JSON.stringify({ ok: false, error: { code: "invalid-request", message: "not configured in this integration bridge" } }));
+    },
   };
 
   (globalThis as { window?: Window }).window = {

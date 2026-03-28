@@ -159,6 +159,39 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
     validationIssues,
     operationError: error,
     isBusy,
+    operations: {
+      refresh: refreshSnapshot,
+      saveSystemChildComponent: async (request) => {
+        const response = await service.addSystemChildComponent(request);
+        if (!response.ok) {
+          setError(response.error?.message ?? "Failed to add system child component.");
+          return false;
+        }
+        await refreshSnapshot();
+        setError(undefined);
+        return true;
+      },
+      removeSystemChildComponent: async (request) => {
+        const response = await service.removeSystemChildComponent(request);
+        if (!response.ok) {
+          setError(response.error?.message ?? "Failed to remove system child component.");
+          return false;
+        }
+        await refreshSnapshot();
+        setError(undefined);
+        return true;
+      },
+      reorderSystemChildComponent: async (request) => {
+        const response = await service.reorderSystemChildComponent(request);
+        if (!response.ok) {
+          setError(response.error?.message ?? "Failed to reorder system child component.");
+          return false;
+        }
+        await refreshSnapshot();
+        setError(undefined);
+        return true;
+      },
+    },
   };
 
   return (
