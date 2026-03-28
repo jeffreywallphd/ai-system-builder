@@ -5,7 +5,7 @@ import { AssetVersion } from "../../../domain/assets/AssetVersion";
 import type { IAsset } from "../../../domain/assets/interfaces/IAsset";
 import type { IAssetRecordRepository } from "../../ports/interfaces/IAssetRecordRepository";
 import type { IAssetVersionRepository } from "../../ports/interfaces/IAssetVersionRepository";
-import { AtomicAssetExportService, CompositeAssetExportService } from "../AssetExportServices";
+import { AtomicAssetExportService, AtomicAssetImportService, CompositeAssetExportService, SystemAssetExportService } from "../AssetExportServices";
 
 class InMemoryAssetRecordRepository implements IAssetRecordRepository {
   private readonly records = new Map<string, IAsset>();
@@ -176,6 +176,203 @@ describe("Asset export services", () => {
     if (!result.ok) {
       expect(result.code).toBe("invalid-request");
       expect(result.message).toContain("pinned version id");
+    }
+  });
+
+  it("exports a version-pinned system asset with nested system-of-systems composition deterministically", async () => {
+    const assets = new InMemoryAssetRecordRepository();
+    const versions = new InMemoryAssetVersionRepository();
+
+    await assets.save(createAsset({ id: "system:root", kind: "json" }));
+    await assets.save(createAsset({ id: "system:child", kind: "json" }));
+    await assets.save(createAsset({ id: "system:grandchild", kind: "json" }));
+    await assets.save(createAsset({ id: "asset:model", kind: "json" }));
+    await assets.save(createAsset({ id: "asset:workflow", kind: "workflow-definition" }));
+    await assets.save(createAsset({ id: "asset:dataset", kind: "dataset" }));
+
+    await versions.saveVersion(new AssetVersion({ assetId: "asset:model", versionId: "asset:model:v2" }));
+    await versions.saveVersion(new AssetVersion({ assetId: "asset:workflow", versionId: "asset:workflow:v4" }));
+    await versions.saveVersion(new AssetVersion({ assetId: "asset:dataset", versionId: "asset:dataset:v6" }));
+
+    await versions.saveVersion(new AssetVersion({
+      assetId: "system:grandchild",
+      versionId: "system:grandchild:v1",
+      createdAt: new Date("2026-03-28T00:00:00.000Z"),
+      metadata: {
+        metadata: {
+          taxonomy: { structuralKind: "system", semanticRole: "system", behaviorKind: "conditional" },
+          title: "Grandchild",
+        },
+        content: JSON.stringify({
+          systemSpec: {
+            components: [{ componentKind: "atomic", alias: "dataset", assetId: "asset:dataset", versionId: "asset:dataset:v6" }],
+          },
+        }),
+      },
+    }));
+
+    await versions.saveVersion(new AssetVersion({
+      assetId: "system:child",
+      versionId: "system:child:v3",
+      createdAt: new Date("2026-03-28T00:00:00.000Z"),
+      metadata: {
+        metadata: {
+          taxonomy: { structuralKind: "system", semanticRole: "system", behaviorKind: "deterministic" },
+          title: "Child",
+        },
+        content: JSON.stringify({
+          systemSpec: {
+            components: [{ componentKind: "composite", alias: "workflow", assetId: "asset:workflow", versionId: "asset:workflow:v4" }],
+            nestedSystems: [{ assetId: "system:grandchild", versionId: "system:grandchild:v1", alias: "grandchild" }],
+          },
+        }),
+      },
+    }));
+
+    await versions.saveVersion(new AssetVersion({
+      assetId: "system:root",
+      versionId: "system:root:v5",
+      createdAt: new Date("2026-03-28T00:00:00.000Z"),
+      metadata: {
+        metadata: {
+          taxonomy: { structuralKind: "system", semanticRole: "system", behaviorKind: "conditional" },
+          title: "Root System",
+          summary: "System-of-systems root",
+          tags: ["system", "portable"],
+        },
+        dependencies: [{ assetId: "asset:model", versionId: "asset:model:v2" }],
+        content: JSON.stringify({
+          systemSpec: {
+            components: [{ componentKind: "atomic", alias: "model", assetId: "asset:model", versionId: "asset:model:v2" }],
+            nestedSystems: [{ assetId: "system:child", versionId: "system:child:v3", alias: "child" }],
+            executionMetadata: {
+              runtime: { requirements: ["gpu"] },
+              orchestration: { hints: ["lane-aware"] },
+            },
+          },
+        }),
+      },
+    }));
+
+    const service = new SystemAssetExportService(assets, versions);
+    const first = await service.export({ assetId: "system:root", versionId: "system:root:v5" });
+    const second = await service.export({ assetId: "system:root", versionId: "system:root:v5" });
+
+    expect(first.ok).toBeTrue();
+    expect(second.ok).toBeTrue();
+    if (first.ok && second.ok) {
+      expect(first.bundleId).toBe("exchange:system:system:root:system:root:v5");
+      expect(first.artifact.content).toBe(second.artifact.content);
+      expect(first.compositionCount).toBeGreaterThanOrEqual(4);
+      expect(first.nodeCount).toBeGreaterThanOrEqual(6);
+      expect(first.artifact.content).toContain('"kind": "system-asset"');
+      expect(first.artifact.content).toContain('"edgeKind": "nested-system"');
+      expect(first.artifact.content).toContain('"assetId": "system:grandchild"');
+      expect(first.artifact.content).toContain('"assetId": "asset:dataset"');
+      expect(first.artifact.content).not.toContain("runtimeState");
+      expect(first.artifact.content).not.toContain("deploymentState");
+    }
+  });
+
+  it("imports serialized atomic bundles through the authoritative flow and preserves provenance linkage", async () => {
+    const assets = new InMemoryAssetRecordRepository();
+    const versions = new InMemoryAssetVersionRepository();
+
+    await assets.save(createAsset({ id: "asset:tokenizer", kind: "json" }));
+    await versions.saveVersion(new AssetVersion({
+      assetId: "asset:tokenizer",
+      versionId: "asset:tokenizer:v1",
+      createdAt: new Date("2026-03-28T00:00:00.000Z"),
+    }));
+
+    const exporterAsset = createAsset({ id: "asset:import-me", kind: "json" });
+    await assets.save(exporterAsset);
+    await versions.saveVersion(new AssetVersion({
+      assetId: "asset:import-me",
+      versionId: "asset:import-me:v3",
+      createdAt: new Date("2026-03-28T00:00:00.000Z"),
+      metadata: {
+        metadata: {
+          title: "Import Me",
+          taxonomy: { structuralKind: "atomic", semanticRole: "model", behaviorKind: "none" },
+        },
+        dependencies: [{ assetId: "asset:tokenizer", versionId: "asset:tokenizer:v1", relation: "dependency" }],
+      },
+    }));
+
+    const exported = await new AtomicAssetExportService(assets, versions).export({
+      assetId: "asset:import-me",
+      versionId: "asset:import-me:v3",
+    });
+    expect(exported.ok).toBeTrue();
+    if (!exported.ok) {
+      return;
+    }
+
+    const importAssets = new InMemoryAssetRecordRepository();
+    const importVersions = new InMemoryAssetVersionRepository();
+    const imported = await new AtomicAssetImportService(importAssets, importVersions, undefined, undefined, () => new Date("2026-03-28T01:00:00.000Z")).import({
+      artifactContent: exported.artifact.content,
+    });
+
+    expect(imported.ok).toBeTrue();
+    if (imported.ok) {
+      expect(imported.imported.assetId).toBe("asset:import-me");
+      expect(imported.imported.versionId).toBe("asset:import-me:v3");
+      expect(imported.dependencyCount).toBe(1);
+      expect(imported.imported.sourceVersionLineage).toEqual([]);
+      expect(imported.imported.existingAsset).toBeFalse();
+      expect(imported.imported.existingVersion).toBeFalse();
+    }
+
+    const storedAsset = await importAssets.getById("asset:import-me");
+    const storedVersion = await importVersions.getByVersionId("asset:import-me:v3");
+    expect(storedAsset?.source.type).toBe("imported");
+    expect(storedAsset?.location.location).toContain("exchange://exchange:atomic:asset:import-me:asset:import-me:v3");
+    expect(storedVersion?.metadata).toMatchObject({
+      metadata: {
+        taxonomy: { structuralKind: "atomic", semanticRole: "model", behaviorKind: "none" },
+        provenance: { sourceType: "imported", sourceLabel: "exchange-bundle" },
+      },
+      dependencies: [{ assetId: "asset:tokenizer", versionId: "asset:tokenizer:v1", relation: "dependency" }],
+    });
+    expect(JSON.stringify(storedVersion?.metadata)).not.toContain("runtimeState");
+    expect(JSON.stringify(storedVersion?.metadata)).not.toContain("deploymentState");
+  });
+
+  it("returns structured failures for malformed and unsupported atomic import artifacts", async () => {
+    const service = new AtomicAssetImportService(new InMemoryAssetRecordRepository(), new InMemoryAssetVersionRepository());
+
+    const malformed = await service.import({ artifactContent: "not-json" });
+    expect(malformed.ok).toBeFalse();
+    if (!malformed.ok) {
+      expect(malformed.code).toBe("deserialization-failed");
+    }
+
+    const exportAssets = new InMemoryAssetRecordRepository();
+    const exportVersions = new InMemoryAssetVersionRepository();
+    await exportAssets.save(createAsset({ id: "asset:source", kind: "json" }));
+    await exportVersions.saveVersion(new AssetVersion({
+      assetId: "asset:source",
+      versionId: "asset:source:v1",
+      metadata: {
+        metadata: { taxonomy: { structuralKind: "atomic", semanticRole: "model", behaviorKind: "none" } },
+      },
+    }));
+    const exported = await new AtomicAssetExportService(exportAssets, exportVersions).export({
+      assetId: "asset:source",
+      versionId: "asset:source:v1",
+    });
+    expect(exported.ok).toBeTrue();
+    if (!exported.ok) {
+      return;
+    }
+    const unsupported = await service.import({
+      artifactContent: exported.artifact.content.replaceAll("ai-loom.exchange-bundle.v1", "ai-loom.exchange-bundle.v9"),
+    });
+    expect(unsupported.ok).toBeFalse();
+    if (!unsupported.ok) {
+      expect(unsupported.code).toBe("unsupported-format-version");
     }
   });
 });
