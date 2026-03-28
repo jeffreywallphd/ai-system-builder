@@ -49,7 +49,15 @@ function createHandoff(input: {
         contractId: input.targetInputContractId ?? "system-default-input",
       },
     },
-    context: input.context ? { config: input.context } : undefined,
+    context: input.context
+      ? {
+        sourceReferences: [{ assetId: `asset:${input.id}`, versionId: input.versionId ?? `${input.id}:v1`, relation: "primary" }],
+        prefill: { values: input.context, hintOnlyKeys: Object.keys(input.context) },
+        provenance: { correlationId: `${input.id}-corr` },
+      }
+      : {
+        sourceReferences: [{ assetId: `asset:${input.id}`, versionId: input.versionId ?? `${input.id}:v1`, relation: "primary" }],
+      },
     intent: {
       kind: StudioHandoffIntentKinds.authoringContinuation,
     },

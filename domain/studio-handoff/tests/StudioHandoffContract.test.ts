@@ -50,8 +50,18 @@ function createHandoffForTaxonomy(input: {
       },
     },
     context: {
-      correlationId: `${input.id}-corr`,
-      config: { reason: "compose", priority: "high" },
+      sourceReferences: [{ assetId: `asset:${input.id}`, versionId: `${input.id}:v1`, relation: "primary" }],
+      prefill: {
+        values: { reason: "compose", priority: "high" },
+        hintOnlyKeys: ["reason", "priority"],
+        note: "Hints only; authoritative values come from the source asset version.",
+      },
+      provenance: {
+        correlationId: `${input.id}-corr`,
+        sourceSessionId: "session-source",
+        sourceDraftId: "draft-source",
+        sourceVersionLineage: [`${input.id}:v0`, `${input.id}:v1`],
+      },
     },
     intent: {
       kind: StudioHandoffIntentKinds.systemIntegration,
