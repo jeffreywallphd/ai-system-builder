@@ -3,6 +3,8 @@ export const ExecutionAuditEventKinds = Object.freeze({
   accepted: "accepted",
   completed: "completed",
   failed: "failed",
+  retryAttempted: "retry-attempted",
+  retryExhausted: "retry-exhausted",
 } as const);
 
 export type ExecutionAuditEventKind = typeof ExecutionAuditEventKinds[keyof typeof ExecutionAuditEventKinds];
@@ -36,6 +38,9 @@ export interface ExecutionAuditRecord {
   readonly detail?: {
     readonly message?: string;
     readonly errorCode?: string;
+    readonly retryAttempt?: number;
+    readonly retryMaxAttempts?: number;
+    readonly retryClassification?: string;
   };
 }
 

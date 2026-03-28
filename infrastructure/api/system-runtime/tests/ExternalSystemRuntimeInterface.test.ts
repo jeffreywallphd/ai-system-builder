@@ -12,6 +12,7 @@ import {
 } from "../../../../application/system-runtime/RuntimeAccessControlService";
 import { StaticTokenRuntimeApiAuthenticator } from "../RuntimeApiAuthentication";
 import { ExecutionQuotaEvaluator } from "../../../../application/system-runtime/ExecutionQuotaEvaluator";
+import { RuntimeRateLimitEvaluator } from "../../../../application/system-runtime/RuntimeRateLimitEvaluator";
 
 class InMemoryStudioShellRepository implements IStudioShellRepository {
   private readonly studios = new Map<string, Studio>();
@@ -634,4 +635,75 @@ describe("ExternalSystemRuntimeInterface", () => {
     expect(crossTenantTrace.ok).toBeFalse();
     expect(crossTenantTrace.error?.code).toBe("forbidden");
   });
+
+  it("reuses execution identity for idempotent external start retries", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    await seedVersion(repository);
+    const backend = new SystemRuntimeBackendApi(
+      repository,
+      undefined,
+      new RuntimeAccessControlService(),
+      new StaticTokenRuntimeApiAuthenticator({
+        "token-user-1": { callerKind: "user", callerId: "user-1", roles: ["external-runtime"] },
+      }),
+    );
+    const external = new ExternalSystemRuntimeInterface(backend);
+
+    const first = await external.startExecution({
+      systemId: "system:external",
+      versionId: "system:external:v1",
+      authentication: { bearerToken: "token-user-1" },
+      idempotencyKey: "idem-777",
+    });
+    const replayed = await external.startExecution({
+      systemId: "system:external",
+      versionId: "system:external:v1",
+      authentication: { bearerToken: "token-user-1" },
+      idempotencyKey: "idem-777",
+    });
+
+    expect(first.ok).toBeTrue();
+    expect(replayed.ok).toBeTrue();
+    expect(replayed.data?.executionId).toBe(first.data?.executionId);
+  });
+
+  it("returns structured rate-limit errors without retry storms", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    await seedVersion(repository);
+    const backend = new SystemRuntimeBackendApi(
+      repository,
+      undefined,
+      new RuntimeAccessControlService(),
+      new StaticTokenRuntimeApiAuthenticator({
+        "token-user-1": { callerKind: "user", callerId: "user-1", roles: ["external-runtime"] },
+      }),
+      new ExecutionQuotaEvaluator({ maxConcurrentExecutionsPerCaller: 10, maxExecutionsPerWindow: 100, windowMs: 60_000 }),
+      undefined,
+      undefined,
+      undefined,
+      new RuntimeRateLimitEvaluator({
+        maxRequestsPerCallerPerWindow: 1,
+        maxRequestsPerTenantPerWindow: 10,
+        maxRequestsPerSourceOperationPerWindow: 10,
+        windowMs: 60_000,
+      }),
+    );
+    const external = new ExternalSystemRuntimeInterface(backend);
+
+    const first = await external.startExecution({
+      systemId: "system:external",
+      versionId: "system:external:v1",
+      authentication: { bearerToken: "token-user-1" },
+    });
+    expect(first.ok).toBeTrue();
+
+    const second = await external.startExecution({
+      systemId: "system:external",
+      versionId: "system:external:v1",
+      authentication: { bearerToken: "token-user-1" },
+    });
+    expect(second.ok).toBeFalse();
+    expect(second.error?.code).toBe("rate-limit-exceeded");
+  });
+
 });

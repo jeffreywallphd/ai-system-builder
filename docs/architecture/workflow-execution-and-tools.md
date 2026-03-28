@@ -68,6 +68,14 @@ This keeps capability claims small and truthful: higher layers can reason about 
 - Runtime execution audit now has a separate durable trail model (requested/accepted/completed/failed) that stores caller identity, tenant context, request source, system/version identity, execution/session ids, and bounded nested-child attribution where available.
 - Audit records are intentionally distinct from runtime trace/log events and from asset version history; they are queryable through runtime backend seams without introducing a broader compliance platform.
 
+
+### Direction 5 Epic 7 external resilience/rate-control slice (stories 7.17–7.18)
+
+- External start/invocation paths now apply an explicit bounded external retry policy: retryable classification is limited to transport/internal failures, while auth/validation/quota/rate-limit failures fail fast.
+- External replay/idempotency support is now bounded at start boundary, so repeated idempotency-key requests reuse the same execution identity instead of silently creating duplicate runs.
+- Callback delivery retries are bounded by callback registration max-attempt settings and audited as retry-attempted/retry-exhausted outcomes.
+- External entrypoint rate limiting is now centralized at runtime API boundaries (caller/tenant/source-operation windows), remains separate from execution quota policy, and returns structured `rate-limit-exceeded` errors.
+
 ### Workflow path now routed through the engine
 
 `application/workflows/ExecuteWorkflowUseCase.ts` now builds a one-unit execution plan for **both** the immediate workflow run path and the `startExecution(...)` path, then submits that plan to the unified execution engine.

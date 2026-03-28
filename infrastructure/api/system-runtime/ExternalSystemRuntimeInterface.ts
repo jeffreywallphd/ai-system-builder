@@ -17,6 +17,7 @@ import {
 import type { RuntimeApiAuthenticationRequest } from "./RuntimeApiAuthentication";
 import type { ExecutionCallbackRegistration } from "../../../domain/system-runtime/ExecutionCallbackDomain";
 import type { ExecutionUpdateEvent, ExecutionUpdateEventKind, ExecutionUpdateSubscription } from "./ExecutionUpdateStream";
+import { BoundedExternalRetryPolicy, buildRetryAttemptRecord, InMemoryRequestReplayGuard, type ExternalRetryPolicy, type RequestReplayGuard } from "./ExternalRetryPolicy";
 
 export interface ExternalExecutionRequest {
   readonly systemId: string;
@@ -33,6 +34,7 @@ export interface ExternalExecutionRequest {
   readonly requestedEnvironment?: ExternalExecutionEnvironmentRequest;
   readonly tenantId?: string;
   readonly requestSource?: RuntimeApiRequestContext["requestSource"];
+  readonly idempotencyKey?: string;
 }
 
 export interface ExternalExecutionResponse {
@@ -67,6 +69,7 @@ export interface ExternalExecutionResultRequest {
   readonly authentication?: RuntimeApiAuthenticationRequest;
   readonly tenantId?: string;
   readonly requestSource?: RuntimeApiRequestContext["requestSource"];
+  readonly idempotencyKey?: string;
 }
 
 export interface ExternalExecutionTraceRequest extends GetSystemRuntimeExecutionTraceRequest {
@@ -74,6 +77,7 @@ export interface ExternalExecutionTraceRequest extends GetSystemRuntimeExecution
   readonly authentication?: RuntimeApiAuthenticationRequest;
   readonly tenantId?: string;
   readonly requestSource?: RuntimeApiRequestContext["requestSource"];
+  readonly idempotencyKey?: string;
 }
 
 export interface ExternalExecutionStatusRequest {
@@ -83,6 +87,7 @@ export interface ExternalExecutionStatusRequest {
   readonly authentication?: RuntimeApiAuthenticationRequest;
   readonly tenantId?: string;
   readonly requestSource?: RuntimeApiRequestContext["requestSource"];
+  readonly idempotencyKey?: string;
 }
 
 function normalizeRequired(value: string, label: string): string {
@@ -106,8 +111,17 @@ function deriveSystemIdFromVersionId(versionId: string): string | undefined {
   return systemId || undefined;
 }
 
+
+function createExternalExecutionId(): string {
+  return `ext-exec-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 export class ExternalSystemRuntimeInterface {
-  public constructor(private readonly runtimeApi: SystemRuntimeBackendApi) {}
+  public constructor(
+    private readonly runtimeApi: SystemRuntimeBackendApi,
+    private readonly retryPolicy: ExternalRetryPolicy = new BoundedExternalRetryPolicy(),
+    private readonly replayGuard: RequestReplayGuard<ExternalExecutionResponse> = new InMemoryRequestReplayGuard<ExternalExecutionResponse>(),
+  ) {}
 
   public async startExecution(request: ExternalExecutionRequest): Promise<SystemRuntimeApiResponse<ExternalExecutionResponse>> {
     try {
@@ -121,66 +135,111 @@ export class ExternalSystemRuntimeInterface {
         throw new Error("invalid-request:systemId must match the system encoded in versionId.");
       }
 
-      const started = request.async
-        ? await this.runtimeApi.startExecutionAsync({
-          versionId,
-          systemId,
-          executionId: request.executionId,
-          inputPayload: request.inputPayload,
-          inputContentType: request.inputContentType,
-          inputSchemaVersion: request.inputSchemaVersion,
-          context: request.context,
-          accessContext: request.callerContext,
-          requestContext: {
-            requireAuthentication: true,
-            authentication: request.authentication,
-            accessContext: request.callerContext,
-            tenantId: request.tenantId,
-            requestSource: request.requestSource ?? "external-api",
-          },
-          callback: request.callback,
-          requestedEnvironment: request.requestedEnvironment,
+      const requestSource = request.requestSource ?? "external-api";
+      const executionId = request.executionId?.trim() || createExternalExecutionId();
+      const idempotencyKey = request.idempotencyKey?.trim();
+      const replayIdentity = idempotencyKey
+        ? Object.freeze({
+          operation: "start-execution" as const,
+          idempotencyKey,
+          callerId: request.callerContext?.callerId,
           tenantId: request.tenantId,
+          requestSource,
         })
-        : await this.runtimeApi.startExecution({
-        versionId,
-        systemId,
-        executionId: request.executionId,
-        inputPayload: request.inputPayload,
-        inputContentType: request.inputContentType,
-        inputSchemaVersion: request.inputSchemaVersion,
-        context: request.context,
-        accessContext: request.callerContext,
-        requestContext: {
-          requireAuthentication: true,
-          authentication: request.authentication,
-          accessContext: request.callerContext,
-          tenantId: request.tenantId,
-          requestSource: request.requestSource ?? "external-api",
-        },
-        callback: request.callback,
-        requestedEnvironment: request.requestedEnvironment,
-        tenantId: request.tenantId,
-      });
-
-      if (!started.ok || !started.data) {
-        return started;
+        : undefined;
+      if (replayIdentity) {
+        const replayed = this.replayGuard.get(replayIdentity);
+        if (replayed) {
+          return replayed;
+        }
       }
 
-      return Object.freeze({
-        ok: true,
-        data: Object.freeze({
-          executionId: started.data.executionId,
-          sessionId: started.data.sessionId,
-          status: started.data.status,
-          acceptedState: "acceptedState" in started.data ? started.data.acceptedState : undefined,
-          systemId,
-          versionId,
-          executedVersionMap: started.data.executedVersionMap,
-          executionEnvironment: started.data.executionEnvironment,
-          nestedExecutionLineage: started.data.nestedExecutionLineage,
-        }),
-      });
+      let lastResponse: SystemRuntimeApiResponse<ExternalExecutionResponse> | undefined;
+      for (let attempt = 1; attempt <= this.retryPolicy.maxAttempts; attempt += 1) {
+        const retryAttempt = buildRetryAttemptRecord({
+          attempt,
+          maxAttempts: this.retryPolicy.maxAttempts,
+          decision: {
+            shouldRetry: attempt < this.retryPolicy.maxAttempts,
+            classification: "retryable-transport",
+            reason: "External start attempt in progress.",
+          },
+        });
+        const started = request.async
+          ? await this.runtimeApi.startExecutionAsync({
+            versionId,
+            systemId,
+            executionId,
+            inputPayload: request.inputPayload,
+            inputContentType: request.inputContentType,
+            inputSchemaVersion: request.inputSchemaVersion,
+            context: request.context,
+            accessContext: request.callerContext,
+            requestContext: {
+              requireAuthentication: true,
+              authentication: request.authentication,
+              accessContext: request.callerContext,
+              tenantId: request.tenantId,
+              requestSource,
+              retryAttempt,
+            },
+            callback: request.callback,
+            requestedEnvironment: request.requestedEnvironment,
+            tenantId: request.tenantId,
+          })
+          : await this.runtimeApi.startExecution({
+            versionId,
+            systemId,
+            executionId,
+            inputPayload: request.inputPayload,
+            inputContentType: request.inputContentType,
+            inputSchemaVersion: request.inputSchemaVersion,
+            context: request.context,
+            accessContext: request.callerContext,
+            requestContext: {
+              requireAuthentication: true,
+              authentication: request.authentication,
+              accessContext: request.callerContext,
+              tenantId: request.tenantId,
+              requestSource,
+              retryAttempt,
+            },
+            callback: request.callback,
+            requestedEnvironment: request.requestedEnvironment,
+            tenantId: request.tenantId,
+          });
+
+        if (started.ok && started.data) {
+          const response: SystemRuntimeApiResponse<ExternalExecutionResponse> = Object.freeze({
+            ok: true,
+            data: Object.freeze({
+              executionId: started.data.executionId,
+              sessionId: started.data.sessionId,
+              status: started.data.status,
+              acceptedState: "acceptedState" in started.data ? started.data.acceptedState : undefined,
+              systemId,
+              versionId,
+              executedVersionMap: started.data.executedVersionMap,
+              executionEnvironment: started.data.executionEnvironment,
+              nestedExecutionLineage: started.data.nestedExecutionLineage,
+            }),
+          });
+          if (replayIdentity) {
+            this.replayGuard.remember(replayIdentity, response);
+          }
+          return response;
+        }
+
+        lastResponse = started;
+        const decision = this.retryPolicy.classify(started.error ?? { code: "internal", message: "Unknown external runtime error." });
+        if (!decision.shouldRetry || attempt >= this.retryPolicy.maxAttempts) {
+          if (replayIdentity && started.error?.code === "rate-limit-exceeded") {
+            this.replayGuard.remember(replayIdentity, started);
+          }
+          return started;
+        }
+      }
+      return lastResponse ?? Object.freeze({ ok: false, error: { code: "internal", message: "External runtime start failed." } });
     } catch (error) {
       return Object.freeze({
         ok: false,
