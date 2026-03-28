@@ -1,6 +1,8 @@
 import type { ExecutionContext } from "../../../domain/system-runtime/SystemRuntimeDomain";
 import type { ExecutionAccessContext } from "../../../application/system-runtime/RuntimeAccessControlService";
 import {
+  type AsyncExecutionStartResponse,
+  type ExecutionPollResponse,
   type GetSystemRuntimeExecutionResultRequest,
   type GetSystemRuntimeExecutionTraceRequest,
   type RuntimeExecutionResultApiModel,
@@ -21,11 +23,14 @@ export interface ExternalExecutionRequest {
   readonly callerContext?: ExecutionAccessContext;
   readonly authentication?: RuntimeApiAuthenticationRequest;
   readonly executionId?: string;
+  readonly async?: boolean;
 }
 
 export interface ExternalExecutionResponse {
   readonly executionId: string;
+  readonly sessionId?: string;
   readonly status: RuntimeExecutionStatusReadModel["status"];
+  readonly acceptedState?: "accepted" | "running";
   readonly systemId: string;
   readonly versionId: string;
   readonly executedVersionMap: {
@@ -57,7 +62,8 @@ export interface ExternalExecutionTraceRequest extends GetSystemRuntimeExecution
 }
 
 export interface ExternalExecutionStatusRequest {
-  readonly executionId: string;
+  readonly executionId?: string;
+  readonly sessionId?: string;
   readonly callerContext?: ExecutionAccessContext;
   readonly authentication?: RuntimeApiAuthenticationRequest;
 }
@@ -98,7 +104,23 @@ export class ExternalSystemRuntimeInterface {
         throw new Error("invalid-request:systemId must match the system encoded in versionId.");
       }
 
-      const started = await this.runtimeApi.startExecution({
+      const started = request.async
+        ? await this.runtimeApi.startExecutionAsync({
+          versionId,
+          systemId,
+          executionId: request.executionId,
+          inputPayload: request.inputPayload,
+          inputContentType: request.inputContentType,
+          inputSchemaVersion: request.inputSchemaVersion,
+          context: request.context,
+          accessContext: request.callerContext,
+          requestContext: {
+            requireAuthentication: true,
+            authentication: request.authentication,
+            accessContext: request.callerContext,
+          },
+        })
+        : await this.runtimeApi.startExecution({
         versionId,
         systemId,
         executionId: request.executionId,
@@ -122,7 +144,9 @@ export class ExternalSystemRuntimeInterface {
         ok: true,
         data: Object.freeze({
           executionId: started.data.executionId,
+          sessionId: started.data.sessionId,
           status: started.data.status,
+          acceptedState: "acceptedState" in started.data ? started.data.acceptedState : undefined,
           systemId,
           versionId,
           executedVersionMap: started.data.executedVersionMap,
@@ -142,10 +166,45 @@ export class ExternalSystemRuntimeInterface {
     const normalized = typeof request === "string"
       ? Object.freeze({ executionId: request })
       : request;
-    return this.runtimeApi.getExecutionStatus(normalized.executionId, {
+    if (normalized.executionId?.trim()) {
+      return this.runtimeApi.getExecutionStatus(normalized.executionId, {
+        requireAuthentication: true,
+        authentication: normalized.authentication,
+        accessContext: normalized.callerContext,
+      });
+    }
+    const poll = await this.runtimeApi.pollExecution({
+      sessionId: normalized.sessionId,
+      requestContext: {
+        requireAuthentication: true,
+        authentication: normalized.authentication,
+        accessContext: normalized.callerContext,
+      },
+    });
+    if (!poll.ok || !poll.data) {
+      return poll as SystemRuntimeApiResponse<ExternalExecutionStatus>;
+    }
+    return this.runtimeApi.getExecutionStatus(poll.data.executionId, {
       requireAuthentication: true,
       authentication: normalized.authentication,
       accessContext: normalized.callerContext,
+    });
+  }
+
+  public async pollExecution(request: {
+    readonly executionId?: string;
+    readonly sessionId?: string;
+    readonly callerContext?: ExecutionAccessContext;
+    readonly authentication?: RuntimeApiAuthenticationRequest;
+  }): Promise<SystemRuntimeApiResponse<ExecutionPollResponse>> {
+    return this.runtimeApi.pollExecution({
+      executionId: request.executionId,
+      sessionId: request.sessionId,
+      requestContext: {
+        requireAuthentication: true,
+        authentication: request.authentication,
+        accessContext: request.callerContext,
+      },
     });
   }
 
