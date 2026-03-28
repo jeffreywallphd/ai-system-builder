@@ -94,6 +94,21 @@ describe("SystemRuntimeBackendApi", () => {
     });
 
     expect(started.ok).toBeTrue();
+
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      const poll = await runtimeApi.pollExecution({
+        executionId: started.data!.executionId,
+        requestContext: {
+          trustedInternal: true,
+          accessContext: { callerKind: "user", callerId: "tenant-user-a", metadata: { tenantId: "tenant-a" } },
+          tenantId: "tenant-a",
+        },
+      });
+      if (poll.ok && (poll.data?.acceptedState === "completed" || poll.data?.acceptedState === "failed")) {
+        break;
+      }
+      await Bun.sleep(5);
+    }
     expect(started.data?.executionId).toBeDefined();
 
     const status = await runtimeApi.getExecutionStatus(started.data!.executionId);
@@ -204,6 +219,89 @@ describe("SystemRuntimeBackendApi", () => {
     const result = await runtimeApi.getExecutionResult(started.data!.executionId);
     expect(result.ok).toBeTrue();
     expect(result.data?.executionId).toBe(started.data?.executionId);
+  });
+
+  it("applies tenant-scoped isolation for async session and execution retrieval", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    await repository.saveAssetVersion(new AssetVersion({
+      assetId: "system:tenant",
+      versionId: "system:tenant:v1",
+      metadata: {
+        metadata: {
+          taxonomy: createSystemStudioTaxonomy("system", "deterministic"),
+        },
+        content: JSON.stringify({
+          systemSpec: {
+            components: [],
+            inputs: [{ inputId: "request", valueType: "string", required: false }],
+            outputs: [{ outputId: "response", valueType: "string" }],
+          },
+        }),
+        dependencies: [],
+      },
+    }));
+
+    const runtimeApi = new SystemRuntimeBackendApi(repository);
+    const started = await runtimeApi.startExecutionAsync({
+      versionId: "system:tenant:v1",
+      systemId: "system:tenant",
+      requestContext: {
+        trustedInternal: true,
+        accessContext: { callerKind: "user", callerId: "tenant-user-a", metadata: { tenantId: "tenant-a" } },
+        tenantId: "tenant-a",
+      },
+    });
+    expect(started.ok).toBeTrue();
+
+    const sessionAllowed = await runtimeApi.getExecutionSession(started.data!.sessionId!, {
+      trustedInternal: true,
+      accessContext: { callerKind: "user", callerId: "tenant-user-a", metadata: { tenantId: "tenant-a" } },
+      tenantId: "tenant-a",
+    });
+    expect(sessionAllowed.ok).toBeTrue();
+    expect(sessionAllowed.data?.context?.tenantId).toBe("tenant-a");
+
+    const sessionDenied = await runtimeApi.getExecutionSession(started.data!.sessionId!, {
+      trustedInternal: true,
+      accessContext: { callerKind: "user", callerId: "tenant-user-b", metadata: { tenantId: "tenant-b" } },
+      tenantId: "tenant-b",
+    });
+    expect(sessionDenied.ok).toBeFalse();
+    expect(sessionDenied.error?.code).toBe("forbidden");
+
+    const statusDenied = await runtimeApi.pollExecution({
+      executionId: started.data!.executionId,
+      requestContext: {
+        trustedInternal: true,
+        accessContext: { callerKind: "user", callerId: "tenant-user-b", metadata: { tenantId: "tenant-b" } },
+        tenantId: "tenant-b",
+      },
+    });
+    expect(statusDenied.ok).toBeFalse();
+    expect(statusDenied.error?.code).toBe("forbidden");
+
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      const poll = await runtimeApi.pollExecution({
+        executionId: started.data!.executionId,
+        requestContext: {
+          trustedInternal: true,
+          accessContext: { callerKind: "user", callerId: "tenant-user-a", metadata: { tenantId: "tenant-a" } },
+          tenantId: "tenant-a",
+        },
+      });
+      if (poll.ok && (poll.data?.acceptedState === "completed" || poll.data?.acceptedState === "failed")) {
+        break;
+      }
+      await Bun.sleep(5);
+    }
+
+    const resultDenied = await runtimeApi.getExecutionResult(started.data!.executionId, {
+      trustedInternal: true,
+      accessContext: { callerKind: "user", callerId: "tenant-user-b", metadata: { tenantId: "tenant-b" } },
+      tenantId: "tenant-b",
+    });
+    expect(resultDenied.ok).toBeFalse();
+    expect(resultDenied.error?.code).toBe("forbidden");
   });
 
   it("registers callbacks on async start and dispatches accepted/completed events with bounded payload summaries", async () => {

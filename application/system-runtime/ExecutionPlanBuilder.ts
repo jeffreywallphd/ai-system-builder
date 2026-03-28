@@ -63,6 +63,8 @@ export interface ExecutionPlanBuilderInput {
   readonly behavior: RuntimeBehaviorProfile;
   readonly requestedEnvironmentId?: string;
   readonly requestedEnvironmentKind?: RuntimeEnvironmentKind;
+  readonly requireNestedSystems?: boolean;
+  readonly requireMcpMediatedExecution?: boolean;
 }
 
 function makeNodeId(input: { readonly parentSystemAssetId: string; readonly alias?: string; readonly assetId: string; readonly versionId?: string }): string {
@@ -129,10 +131,11 @@ export class ExecutionPlanBuilder {
       requestedEnvironmentId: input.requestedEnvironmentId,
       requestedKind: input.requestedEnvironmentKind,
       executableTaxonomies: collectTaxonomies(input),
-      requiresNestedSystems: input.dependencyResolution.recursion.status !== "complete"
+      requiresNestedSystems: input.requireNestedSystems ?? (input.dependencyResolution.recursion.status !== "complete"
         ? true
-        : input.root.components.some((component) => component.componentKind === "system"),
-      requiresMcpMediatedExecution: input.root.executionMetadata?.runtime?.requirements?.includes("mcp") ?? false,
+        : input.root.components.some((component) => component.componentKind === "system")),
+      requiresMcpMediatedExecution: input.requireMcpMediatedExecution
+        ?? (input.root.executionMetadata?.runtime?.requirements?.includes("mcp") ?? false),
     };
 
     const environmentResolution = this.environmentSelector.selectEnvironment(environmentRequest);

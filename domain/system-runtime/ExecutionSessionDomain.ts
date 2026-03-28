@@ -20,6 +20,7 @@ export interface ExecutionSessionContext {
   readonly callerId: string;
   readonly roles?: ReadonlyArray<string>;
   readonly callerSessionId?: string;
+  readonly tenantId?: string;
   readonly metadata?: Readonly<Record<string, unknown>>;
 }
 
@@ -62,6 +63,7 @@ function normalizeContext(context?: ExecutionSessionContext): ExecutionSessionCo
     callerId,
     roles: normalizeStringList(context.roles),
     callerSessionId: normalizeOptional(context.callerSessionId),
+    tenantId: normalizeOptional(context.tenantId),
     metadata: context.metadata ? Object.freeze({ ...context.metadata }) : undefined,
   });
 }

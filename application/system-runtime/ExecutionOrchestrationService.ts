@@ -53,6 +53,8 @@ export interface ExecutionOrchestrationRequest {
   readonly executionPlan?: ExecutionPlan;
   readonly requestedEnvironmentId?: string;
   readonly requestedEnvironmentKind?: RuntimeEnvironmentKind;
+  readonly requireNestedSystems?: boolean;
+  readonly requireMcpMediatedExecution?: boolean;
   readonly environment?: RuntimeEnvironment;
   readonly executionId?: string;
   readonly context?: ExecutionContext;
@@ -766,6 +768,8 @@ export class ExecutionOrchestrationService {
       behavior: request.behavior,
       requestedEnvironmentId: request.environment?.environmentId ?? request.requestedEnvironmentId,
       requestedEnvironmentKind: request.environment?.kind ?? request.requestedEnvironmentKind ?? RuntimeEnvironmentKinds.local,
+      requireNestedSystems: request.requireNestedSystems,
+      requireMcpMediatedExecution: request.requireMcpMediatedExecution,
     });
 
     if (result.status !== "built") {
