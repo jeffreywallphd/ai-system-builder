@@ -88,3 +88,16 @@ Not implemented in this slice:
 - Runtime now has an explicit dependency-resolution seam in `application/system-runtime/RuntimeDependencyResolution.ts`.
 - Dependency resolution reuses existing version-aware recursive dependency truth (`collectSystemDirectDependencies` + nested-system traversal) and does not create a second dependency graph model.
 - Recursive resolution is bounded and cycle-safe, producing deterministic runtime-oriented outputs (resolved component set, direct/transitive dependencies, ordering hints) suitable for later execution-plan construction without implementing the runtime planner/orchestrator in this slice.
+
+
+## Direction 5 update: Runtime environment abstraction + execution plan builder (stories 6.5–6.6)
+
+- Runtime now includes a bounded environment abstraction in `domain/system-runtime/RuntimeEnvironmentDomain.ts` and `application/system-runtime/RuntimeEnvironmentSelector.ts`:
+  - typed environment kinds (`local`, `mcp`, `remote`)
+  - capability contracts for supported structural kinds, nested-system support, and MCP-mediated execution posture
+  - deterministic resolution results (`resolved` vs `unsupported`) for plan-time environment targeting without infrastructure launch coupling.
+- Runtime plan-building now has an explicit seam in `application/system-runtime/ExecutionPlanBuilder.ts`:
+  - deterministic `ExecutionPlan`/node/edge model derived from existing system structure + bindings + runtime contract/dependency outputs
+  - environment assignment through the selector seam (no hardcoded single-host execution)
+  - cycle-safe invalidation for binding/dependency cycles and truthful unsupported-environment surfacing
+  - no orchestrator/runtime engine state machine added in this slice.

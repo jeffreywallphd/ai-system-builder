@@ -658,3 +658,16 @@ Explicitly later than this scope:
   - execution node refs
 - Execution node refs include `parentExecutionNodeId` and `path` for nested-system readiness without implementing recursive orchestration.
 - Runtime behavior alignment is now explicit in application layer (`application/system-runtime/RuntimeBehaviorAlignment.ts`) and consumes shared taxonomy truth rather than introducing parallel runtime taxonomy rules.
+
+
+## Direction 5 update: Runtime environment abstraction + execution plan builder (stories 6.5–6.6)
+
+- Runtime environment selection is now a bounded domain/application seam (`RuntimeEnvironmentDomain` + `RuntimeEnvironmentSelector`) rather than an implicit local-host assumption.
+- The selector models current truthful local capabilities and explicit extension points for MCP-mediated and remote/distributed environments without implementing infrastructure adapters in this slice.
+- Runtime planning now has an explicit `ExecutionPlanBuilder` in `application/system-runtime/ExecutionPlanBuilder.ts` that composes:
+  - system structure + bindings
+  - runtime execution contract mapping outputs
+  - runtime dependency resolution outputs
+  - runtime behavior profile
+  - selected runtime environment
+- Plan outputs are deterministic and cycle-safe (with explicit invalid results) and remain runtime-only artifacts, preserving separation from asset-definition models and UI state.
