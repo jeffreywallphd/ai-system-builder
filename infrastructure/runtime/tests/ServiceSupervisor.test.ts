@@ -925,6 +925,71 @@ describe("InMemoryServiceSupervisor", () => {
     expect(status?.processHistory.at(-1)?.outcome).toBe("config-rejected");
   });
 
+  it("allows the built-in python runtime to use the Windows py launcher without broadening custom executable allowlists", () => {
+    const tempRoot = mkdtempSync(path.join(os.tmpdir(), "python-runtime-py-launcher-"));
+    const tempDir = path.join(tempRoot, "python-runtime");
+    mkdirSync(tempDir, { recursive: true });
+    tempDirectories.push(tempRoot);
+
+    const supervisor = new InMemoryServiceSupervisor({
+      runtime: createStubProcessRuntime(),
+      services: [createRuntimeDefinition({
+        command: "py",
+        cwd: tempDir,
+        kind: "python-runtime",
+        source: "builtin",
+      })],
+      allowedPaths: [repoRoot, tempRoot],
+      allowedExecutables: [process.execPath, "python", "python3", "node", "bun", "uv"],
+    });
+
+    const status = supervisor.getService("python-runtime");
+    expect(status?.state).toBe(ServiceStates.stopped);
+    expect(status?.detail).toContain("stopped");
+    expect(status?.diagnostics.provisioning.required).toBeTrue();
+  });
+
+  it("keeps custom service definitions rejected when they use disallowed executables", () => {
+    const supervisor = createManagedSupervisor(createRuntimeDefinition({
+      serviceId: "custom-runtime",
+      kind: "custom",
+      source: "custom",
+      command: "py",
+      args: [fixtureScriptPath],
+    }));
+
+    const status = supervisor.getService("custom-runtime");
+    expect(status?.state).toBe(ServiceStates.failed);
+    expect(status?.detail).toContain("Invalid service configuration");
+    expect(status?.detail).toContain("not in the allowed executable list");
+    expect(status?.diagnostics.lastError?.category).toBe("config");
+  });
+
+  it("marks invalid built-in python configuration as provision-failed instead of unsupported", () => {
+    const tempRoot = mkdtempSync(path.join(os.tmpdir(), "python-runtime-invalid-config-"));
+    const tempDir = path.join(tempRoot, "python-runtime");
+    mkdirSync(tempDir, { recursive: true });
+    tempDirectories.push(tempRoot);
+
+    const supervisor = new InMemoryServiceSupervisor({
+      runtime: createStubProcessRuntime(),
+      services: [createRuntimeDefinition({
+        command: "totally-disallowed-python",
+        cwd: tempDir,
+        kind: "python-runtime",
+        source: "builtin",
+      })],
+      allowedPaths: [repoRoot, tempRoot],
+    });
+
+    const status = supervisor.getService("python-runtime");
+    expect(status?.state).toBe(ServiceStates.failed);
+    expect(status?.diagnostics.provisioning.required).toBeTrue();
+    expect(status?.diagnostics.provisioning.state).toBe("provision-failed");
+    expect(status?.diagnostics.provisioning.lastError?.category).toBe("config");
+    expect(status?.diagnostics.provisioning.lastError?.code).toBe("SERVICE_CONFIGURATION_INVALID");
+  });
+
   it("reports permission problems for non-executable commands", () => {
     const tempDir = mkdtempSync(path.join(os.tmpdir(), "service-supervisor-"));
     tempDirectories.push(tempDir);
