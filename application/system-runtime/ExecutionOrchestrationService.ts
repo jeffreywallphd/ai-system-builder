@@ -2,6 +2,7 @@ import {
   appendExecutionTraceEvent,
   attachExecutionNode,
   decideRecoveryAction,
+  enforceExecutionRuntimeStateBounds,
   ExecutionLogLevels,
   ExecutionTraceEventKinds,
   createSystemExecution,
@@ -66,6 +67,10 @@ export interface ExecutionOrchestrationRequest {
     readonly parentExecution: SystemExecution;
     readonly passIndex: number;
   }) => Promise<StepExecutionResult>;
+  readonly maxTraceEvents?: number;
+  readonly maxTraceLogs?: number;
+  readonly maxRuntimeErrors?: number;
+  readonly maxProgressionEntries?: number;
 }
 
 export interface ExecutionOrchestrationResult {
@@ -164,6 +169,17 @@ function mapDecisionKind(result: StepExecutionResult): ExecutionDecisionKind {
 
 function normalizePositive(value: number | undefined, fallback: number): number {
   return Number.isFinite(value) && (value as number) > 0 ? Math.floor(value as number) : fallback;
+}
+
+function appendBoundedProgression(
+  progression: ExecutionProgression[],
+  entry: ExecutionProgression,
+  maxEntries: number,
+): void {
+  progression.push(entry);
+  if (progression.length > maxEntries) {
+    progression.splice(0, progression.length - maxEntries);
+  }
 }
 
 function validatePlanForRequest(input: {
@@ -286,6 +302,16 @@ export class ExecutionOrchestrationService {
     const stepResults: Record<string, StepExecutionResult> = {};
     const maxIterationsPerNode = normalizePositive(request.maxIterationsPerNode, 3);
     const maxPlanningCyclesPerNode = normalizePositive(request.maxPlanningCyclesPerNode, 2);
+    const maxTraceEvents = normalizePositive(request.maxTraceEvents, 400);
+    const maxTraceLogs = normalizePositive(request.maxTraceLogs, 200);
+    const maxRuntimeErrors = normalizePositive(request.maxRuntimeErrors, 100);
+    const maxProgressionEntries = normalizePositive(request.maxProgressionEntries, 500);
+    const applyRuntimeBounds = (current: SystemExecution): SystemExecution => enforceExecutionRuntimeStateBounds({
+      execution: current,
+      maxTraceEvents,
+      maxTraceLogs,
+      maxRuntimeErrors,
+    });
 
     for (const nodeId of plan.orderedNodeIds) {
       const node = nodesById.get(nodeId);
@@ -326,6 +352,7 @@ export class ExecutionOrchestrationService {
           summary: `Execution node '${node.nodeId}' attached.`,
         },
       });
+      execution = applyRuntimeBounds(execution);
       if (node.componentKind === "system") {
         execution = appendExecutionTraceEvent({
           execution,
@@ -339,6 +366,7 @@ export class ExecutionOrchestrationService {
             summary: `Entered nested system node '${node.nodeId}'.`,
           },
         });
+        execution = applyRuntimeBounds(execution);
       }
       let passIndex = 0;
       let iteration = 0;
@@ -369,6 +397,7 @@ export class ExecutionOrchestrationService {
             summary: `Node '${node.nodeId}' is running.`,
           },
         });
+        execution = applyRuntimeBounds(execution);
 
         const stepResult = node.componentKind === "system" && request.executeNestedSystemStep
           ? await request.executeNestedSystemStep({
@@ -392,7 +421,7 @@ export class ExecutionOrchestrationService {
         stepResults[node.nodeId] = stepResult;
 
         const decision = mapDecisionKind(stepResult);
-        progression.push(Object.freeze({
+        appendBoundedProgression(progression, Object.freeze({
           nodeId: node.nodeId,
           passIndex,
           iteration,
@@ -402,7 +431,7 @@ export class ExecutionOrchestrationService {
           startedAt: stepResult.startedAt,
           completedAt: stepResult.completedAt,
           diagnostics: stepResult.diagnostics,
-        }));
+        }), maxProgressionEntries);
 
         if (stepResult.status !== StepExecutionStatusKinds.succeeded) {
           const errorKind = classifyRuntimeErrorKind({ node, decision, stepResult });
@@ -438,6 +467,7 @@ export class ExecutionOrchestrationService {
                 errorCode: runtimeError.code,
               },
             });
+            execution = applyRuntimeBounds(execution);
             passIndex += 1;
             continue;
           }
@@ -464,6 +494,7 @@ export class ExecutionOrchestrationService {
             updatedAt: stepResult.completedAt,
             completedAt: stepResult.completedAt,
           });
+          execution = applyRuntimeBounds(execution);
 
           return Object.freeze({
             status: "failed",
@@ -504,6 +535,7 @@ export class ExecutionOrchestrationService {
               diagnostics: stepResult.diagnostics,
             },
           });
+          execution = applyRuntimeBounds(execution);
           passIndex += 1;
           if (iteration >= maxIterationsPerNode) {
             execution = updateExecutionNodeState({
@@ -570,6 +602,7 @@ export class ExecutionOrchestrationService {
               diagnostics: stepResult.diagnostics,
             },
           });
+          execution = applyRuntimeBounds(execution);
           passIndex += 1;
           if (planningCycle >= maxPlanningCyclesPerNode) {
             execution = updateExecutionNodeState({
@@ -669,6 +702,7 @@ export class ExecutionOrchestrationService {
             diagnostics: stepResult.diagnostics,
           },
         });
+        execution = applyRuntimeBounds(execution);
         if (node.componentKind === "system") {
           execution = appendExecutionTraceEvent({
             execution,
@@ -682,6 +716,7 @@ export class ExecutionOrchestrationService {
               summary: `Nested system node '${node.nodeId}' completed.`,
             },
           });
+          execution = applyRuntimeBounds(execution);
         }
 
         continueProgression = false;
@@ -711,6 +746,7 @@ export class ExecutionOrchestrationService {
         emittedAt: execution.updatedAt,
       },
     });
+    execution = applyRuntimeBounds(execution);
 
     return Object.freeze({
       status: "completed",

@@ -282,6 +282,26 @@ describe("ExecutionOrchestrationService", () => {
     expect(traceEvents.some((entry) => entry.kind === "nested-system-completed")).toBe(true);
   });
 
+  it("enforces bounded trace/runtime-state growth under iterative progression", async () => {
+    const root = createSystem({ assetId: "system:bounded", versionId: "system:bounded:v1", behaviorKind: "iterative" });
+    const runtime = await createRuntimeBundle(root, async () => undefined);
+    const result = await new ExecutionOrchestrationService(new StepExecutionEngine()).orchestrate({
+      root,
+      ...runtime,
+      inputPayload: { bounded: true },
+      maxIterationsPerNode: 8,
+      maxTraceEvents: 6,
+      maxTraceLogs: 2,
+      maxRuntimeErrors: 2,
+      maxProgressionEntries: 5,
+    });
+
+    expect(result.status).toBe("completed");
+    expect((result.execution?.runtimeState.trace.events.length ?? 0) <= 6).toBe(true);
+    expect((result.execution?.runtimeState.trace.logs.length ?? 0) <= 2).toBe(true);
+    expect(result.progression.length <= 5).toBe(true);
+  });
+
   it("applies bounded retry for transient step failures and records recovery traces", async () => {
     const root = createSystem({ assetId: "system:retry", versionId: "system:retry:v1" });
     const runtime = await createRuntimeBundle(root, async () => undefined);

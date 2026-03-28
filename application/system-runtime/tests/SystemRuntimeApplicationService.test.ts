@@ -98,4 +98,18 @@ describe("SystemRuntimeApplicationService", () => {
     const recent = service.listRecentExecutionsForSystem({ assetId: "system:root", versionId: "system:root:v1" });
     expect(recent.length).toBe(1);
   });
+
+  it("rejects pathological runtime bound requests with typed invalid-request errors", async () => {
+    const repository = new RuntimeRepo();
+    await repository.saveAssetVersion(createVersion({
+      assetId: "system:root",
+      versionId: "system:root:v1",
+    }));
+    const service = new SystemRuntimeApplicationService(repository, new InMemorySystemRuntimeExecutionStore());
+
+    await expect(service.startExecution({
+      versionId: "system:root:v1",
+      maxIterationsPerNode: 1000,
+    })).rejects.toThrow("invalid-request:maxIterationsPerNode must be between 1 and 25.");
+  });
 });

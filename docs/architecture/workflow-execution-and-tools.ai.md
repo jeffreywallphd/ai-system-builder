@@ -36,6 +36,11 @@ Workflow -> `ExecuteWorkflowUseCase` -> one-unit `ExecutionPlan` -> `UnifiedExec
   - desktop host wiring now uses a SQLite-backed system-runtime execution store instead of in-memory-only run state,
   - nested system components execute recursively through the same orchestration service (parent node -> child execution), and parent run outputs/metadata carry child execution ids for monitor/detail linkage,
   - this remains bounded (cycle/depth safeguards stay in dependency/plan recursion seams; no replay/event-sourcing platform introduced).
+- Direction 5 Epic 6 story 6.23 now adds bounded runtime hardening on the same seams:
+  - orchestration enforces bounded trace/log/error/progression retention,
+  - runtime start requests validate depth/iteration/planning/retention bounds with deterministic invalid-request failures on pathological values,
+  - in-memory and SQLite runtime execution stores prune oldest records on capacity overflow,
+  - no distributed scheduler/queue/observability architecture is introduced.
 
 ## Runtime orchestration update
 - Delegated workflow execution selection can now consult the shared runtime dependency orchestrator before choosing a delegated strategy.
@@ -119,6 +124,7 @@ Use "workflow-first", "tool projection", and "truthful execution provenance" whe
 - If asked whether tools and workflows are separate bounded contexts, answer: "not really; tools are primarily a projected and published workflow surface in the current implementation."
 - If asked what should migrate next, answer: execution areas that still cannot report real progress/cancellation truthfully yet, especially MCP/runtime-backed orchestration beyond the current narrow server-operation slice.
 - If asked whether Direction 1 is finished, answer: "done enough that the execution substrate is no longer the obvious bottleneck; the next focus should likely move to Direction 2 unless a new truthful runtime-backed slice is clearly ready."
+- Keep runtime docs aligned with implementation: when runtime seams or bounds change, update both `.md` and `.ai.md` architecture docs in the same change.
 
 ## Direction 4 update: agent execution placement (bounded first implementation)
 - Agent planning/execution sits above the existing execution backbone; it does not introduce a second runtime.

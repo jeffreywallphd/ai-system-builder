@@ -46,6 +46,11 @@ export interface ISystemRuntimeExecutionStore {
 
 export class InMemorySystemRuntimeExecutionStore implements ISystemRuntimeExecutionStore {
   private readonly recordsById = new Map<string, PersistedExecutionRecord>();
+  private readonly maxRecords: number;
+
+  public constructor(maxRecords = 2000) {
+    this.maxRecords = Number.isFinite(maxRecords) && maxRecords > 0 ? Math.floor(maxRecords) : 2000;
+  }
 
   public saveExecutionRecord(record: PersistedExecutionRecord): void {
     this.recordsById.set(record.executionId, Object.freeze({
@@ -59,6 +64,7 @@ export class InMemorySystemRuntimeExecutionStore implements ISystemRuntimeExecut
         }),
       }),
     }));
+    this.pruneToCapacity();
   }
 
   public getExecutionRecord(executionId: string): PersistedExecutionRecord | undefined {
@@ -85,5 +91,19 @@ export class InMemorySystemRuntimeExecutionStore implements ISystemRuntimeExecut
       ? Math.floor(input.limit)
       : undefined;
     return Object.freeze((limit ? filtered.slice(0, limit) : filtered));
+  }
+
+  private pruneToCapacity(): void {
+    if (this.recordsById.size <= this.maxRecords) {
+      return;
+    }
+
+    const overflow = this.recordsById.size - this.maxRecords;
+    const oldest = [...this.recordsById.values()]
+      .sort((left, right) => left.execution.startedAt.localeCompare(right.execution.startedAt))
+      .slice(0, overflow);
+    for (const record of oldest) {
+      this.recordsById.delete(record.executionId);
+    }
   }
 }

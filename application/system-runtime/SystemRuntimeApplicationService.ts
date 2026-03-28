@@ -53,6 +53,10 @@ export interface StartSystemRuntimeExecutionRequest {
   readonly maxDepth?: number;
   readonly maxIterationsPerNode?: number;
   readonly maxPlanningCyclesPerNode?: number;
+  readonly maxTraceEvents?: number;
+  readonly maxTraceLogs?: number;
+  readonly maxRuntimeErrors?: number;
+  readonly maxProgressionEntries?: number;
   readonly componentVersionPins?: Readonly<Record<string, string>>;
   readonly enforceVersionPinning?: boolean;
 }
@@ -253,6 +257,24 @@ function summarizeOutput(value: unknown): string | undefined {
   return undefined;
 }
 
+function normalizeOptionalBoundedInteger(input: {
+  readonly value: number | undefined;
+  readonly label: string;
+  readonly min: number;
+  readonly max: number;
+}): number | undefined {
+  if (input.value === undefined) {
+    return undefined;
+  }
+  if (!Number.isFinite(input.value) || Math.floor(input.value) !== input.value) {
+    throw new Error(`invalid-request:${input.label} must be an integer.`);
+  }
+  if (input.value < input.min || input.value > input.max) {
+    throw new Error(`invalid-request:${input.label} must be between ${input.min} and ${input.max}.`);
+  }
+  return input.value;
+}
+
 export class SystemRuntimeApplicationService {
   private readonly contractResolver = new CompositionAssetContractResolver();
   private readonly orchestration = new ExecutionOrchestrationService(new StepExecutionEngine(), new ExecutionPlanBuilder());
@@ -267,6 +289,29 @@ export class SystemRuntimeApplicationService {
     if (referenceCount !== 1) {
       throw new Error("invalid-request:Exactly one of draftId or versionId is required.");
     }
+
+    const maxDepth = normalizeOptionalBoundedInteger({ value: request.maxDepth, label: "maxDepth", min: 1, max: 12 });
+    const maxIterationsPerNode = normalizeOptionalBoundedInteger({
+      value: request.maxIterationsPerNode,
+      label: "maxIterationsPerNode",
+      min: 1,
+      max: 25,
+    });
+    const maxPlanningCyclesPerNode = normalizeOptionalBoundedInteger({
+      value: request.maxPlanningCyclesPerNode,
+      label: "maxPlanningCyclesPerNode",
+      min: 1,
+      max: 25,
+    });
+    const maxTraceEvents = normalizeOptionalBoundedInteger({ value: request.maxTraceEvents, label: "maxTraceEvents", min: 10, max: 4000 });
+    const maxTraceLogs = normalizeOptionalBoundedInteger({ value: request.maxTraceLogs, label: "maxTraceLogs", min: 10, max: 4000 });
+    const maxRuntimeErrors = normalizeOptionalBoundedInteger({ value: request.maxRuntimeErrors, label: "maxRuntimeErrors", min: 1, max: 1000 });
+    const maxProgressionEntries = normalizeOptionalBoundedInteger({
+      value: request.maxProgressionEntries,
+      label: "maxProgressionEntries",
+      min: 10,
+      max: 4000,
+    });
 
     const unresolvedRoot = request.draftId
       ? await this.loadSystemFromDraft(request.studioId, request.draftId)
@@ -283,12 +328,12 @@ export class SystemRuntimeApplicationService {
       contract: await this.resolveRootContract(root),
       resolveSystem: async (reference) => this.resolveSystemFromReference(reference),
       resolveChildContract: async (component) => this.resolveComponentContract(component),
-      maxDepth: request.maxDepth,
+      maxDepth,
     });
     const dependencyResolution = await resolveSystemRuntimeDependencies({
       root,
       resolveSystem: async (reference) => this.resolveSystemFromReference(reference),
-      maxDepth: request.maxDepth,
+      maxDepth,
     });
 
     const result = await this.orchestration.orchestrate({
@@ -303,8 +348,12 @@ export class SystemRuntimeApplicationService {
       inputSchemaVersion: request.inputSchemaVersion,
       requestedEnvironmentId: request.requestedEnvironmentId,
       requestedEnvironmentKind: request.requestedEnvironmentKind,
-      maxIterationsPerNode: request.maxIterationsPerNode,
-      maxPlanningCyclesPerNode: request.maxPlanningCyclesPerNode,
+      maxIterationsPerNode,
+      maxPlanningCyclesPerNode,
+      maxTraceEvents,
+      maxTraceLogs,
+      maxRuntimeErrors,
+      maxProgressionEntries,
       executeNestedSystemStep: async (input) => this.executeNestedSystemStep({
         ...input,
         rootRequest: request,
@@ -690,6 +739,10 @@ export class SystemRuntimeApplicationService {
       inputSchemaVersion: input.parentExecution.input.schemaVersion,
       maxIterationsPerNode: input.rootRequest.maxIterationsPerNode,
       maxPlanningCyclesPerNode: input.rootRequest.maxPlanningCyclesPerNode,
+      maxTraceEvents: input.rootRequest.maxTraceEvents,
+      maxTraceLogs: input.rootRequest.maxTraceLogs,
+      maxRuntimeErrors: input.rootRequest.maxRuntimeErrors,
+      maxProgressionEntries: input.rootRequest.maxProgressionEntries,
       executeNestedSystemStep: async (nested) => this.executeNestedSystemStep({
         ...nested,
         rootRequest: input.rootRequest,
