@@ -283,6 +283,8 @@ describe("StudioHandoffOrchestrationService", () => {
 
     expect(invalid.ok).toBeFalse();
     expect(invalid.failure?.stage).toBe("input-adaptation");
+    expect(invalid.failure?.kind).toBe("version-reference-failure");
+    expect(invalid.failure?.rejectionReason).toBe("version-reference-rejected");
     expect(invalid.failure?.compatibility?.compatible).toBeFalse();
     expect(invalid.failure?.compatibility?.issues.map((entry) => entry.code)).toContain("version-reference-invalid");
     expect(invalid.failure?.compatibility?.issues.map((entry) => entry.code)).toContain("context-key-not-allowed");

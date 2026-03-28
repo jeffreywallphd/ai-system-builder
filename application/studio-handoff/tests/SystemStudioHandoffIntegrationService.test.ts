@@ -294,6 +294,7 @@ describe("SystemStudioHandoffIntegrationService", () => {
     expect(updated.handoffInput.authoritativeAsset.versionId).toBe("system:child:v2");
     expect(updated.handoffInput.revision?.previousHandoffId).toBe("handoff:system");
     expect(updated.handoffInput.revision?.updatedHandoffId).toContain("handoff:system:rev");
+    expect(updated.systemOfSystems?.rootSystem.assetId).toBe("system:child");
     const spec = JSON.parse(updated.prefill.content) as { systemSpec: { nestedSystems: Array<{ assetId: string; versionId: string }> } };
     expect(spec.systemSpec.nestedSystems[0]).toEqual({ assetId: "system:child", versionId: "system:child:v2", alias: "primary-1" });
   });

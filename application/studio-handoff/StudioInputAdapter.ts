@@ -240,11 +240,13 @@ export class SystemStudioInputAdapter extends BaseStudioInputAdapter {
     readonly compatibility: StudioHandoffCompatibilityDecision;
   }): AdaptedStudioInput {
     const base = createBaseAdaptedInput(this.kind, input.handoff, input.context);
+    const systemOfSystems = input.handoff.payload.systemOfSystems;
     return maybeAttachGroupedInput(input.handoff, Object.freeze({
       ...base,
       studioSpecific: Object.freeze({
         expectedInputContractId: input.compatibility.matchedContractId ?? input.handoff.payload.targetInputContract.contractId,
         supportsNestedSystemContext: true,
+        systemOfSystems,
         systemReferences: Object.freeze(
           input.context.sourceReferences
             .filter((entry) => entry.relation?.includes("system") ?? false)
@@ -257,6 +259,8 @@ export class SystemStudioInputAdapter extends BaseStudioInputAdapter {
     }));
   }
 }
+
+export class SystemAwareStudioInputAdapter extends SystemStudioInputAdapter {}
 
 export class StudioInputAdapterRegistry {
   private readonly adapters = new Map<string, StudioInputAdapter>();

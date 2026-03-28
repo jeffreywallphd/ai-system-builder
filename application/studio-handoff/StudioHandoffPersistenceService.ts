@@ -9,10 +9,10 @@ import type { StudioHandoffDependencyRecord } from "./CrossStudioDependencyGraph
 import type { StudioHandoffLineageRecord } from "./StudioHandoffLineageTracker";
 import type {
   StudioHandoffChangeSet,
-  StudioHandoffFailure,
   StudioHandoffPreparation,
   StudioHandoffRevision,
 } from "./StudioHandoffOrchestrationService";
+import type { StudioHandoffFailure } from "./StudioHandoffFailure";
 
 export interface StudioHandoffRevisionRecord {
   readonly revisionId: string;
