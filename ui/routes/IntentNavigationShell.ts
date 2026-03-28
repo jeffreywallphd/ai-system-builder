@@ -1,6 +1,7 @@
 import { BuildEntryService } from "./BuildEntry";
 import { APP_ROUTES, ROUTE_PATHS, type AppRouteDefinition } from "./RouteConfig";
 import { IntentNavigationFeatureFlag } from "../features/IntentNavigationFeatureFlag";
+import { NavigationMigrationService } from "./LegacyNavigationSunset";
 
 export const PrimaryNavigationItemKeys = Object.freeze({
   build: "build",
@@ -61,8 +62,14 @@ export class ShellRouteResolver {
 export class IntentNavigationShell {
   private readonly routeResolver = new ShellRouteResolver();
   private readonly buildEntryService = new BuildEntryService();
+  private readonly migrationService: NavigationMigrationService;
 
-  constructor(private readonly featureFlag = new IntentNavigationFeatureFlag()) {}
+  constructor(
+    private readonly featureFlag = new IntentNavigationFeatureFlag(),
+    migrationService = new NavigationMigrationService({ intentNavigationFlag: featureFlag }),
+  ) {
+    this.migrationService = migrationService;
+  }
 
   public resolvePrimaryNavigation(context: ShellNavigationContext): PrimaryNavigationModel {
     const routeResolution = this.routeResolver.resolve(context.pathname);
@@ -70,6 +77,9 @@ export class IntentNavigationShell {
       return Object.freeze({
         isIntentNavigationEnabled: false,
         items: toLegacyNavigationRoutes(APP_ROUTES).filter((route) => {
+          if (!this.migrationService.shouldShowNavigationRoute(route.key)) {
+            return false;
+          }
           if (route.key === "build") {
             return this.buildEntryService.isBuildEntryEnabled();
           }

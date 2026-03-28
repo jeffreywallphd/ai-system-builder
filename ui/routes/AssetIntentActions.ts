@@ -4,6 +4,7 @@ import { BuildIntents, type BuildIntent } from "./BuildIntentModels";
 import { InlineAssetCreationModes, InlineAssetCreationService } from "./InlineAssetCreation";
 import { StudioEntryModes, type StudioEntryRequest, type StudioEntryResolution } from "../../application/studio-entry/StudioEntryContracts";
 import { StudioEntryResolver, StudioEntryService } from "./StudioRouteMapping";
+import { RunContextKinds, RunInterfaceService } from "./RunInterface";
 
 export const AssetIntentActionTypes = Object.freeze({
   buildFromThis: "build-from-this",
@@ -91,6 +92,7 @@ export class AssetActionExecutionService {
   private readonly studioEntryService = new StudioEntryService();
   private readonly buildIntentRoutingService = new BuildIntentRoutingService();
   private readonly inlineCreationService = new InlineAssetCreationService();
+  private readonly runInterfaceService = new RunInterfaceService();
 
   public execute(action: AssetIntentActionType, context: AssetActionContext): AssetActionExecutionResult | undefined {
     if (action === AssetIntentActionTypes.buildFromThis) {
@@ -136,6 +138,18 @@ export class AssetActionExecutionService {
       return Object.freeze({ launchPath: appendContext(inline.launchPath, context), studioEntry: inline.studioEntry });
     }
 
+
+    if (action === AssetIntentActionTypes.runOrTest) {
+      const isSystem = context.asset.taxonomy?.semanticRole === "system";
+      const launchPath = this.runInterfaceService.resolveLaunchPath({
+        contextKind: isSystem ? RunContextKinds.system : RunContextKinds.asset,
+        assetId: context.asset.assetId,
+        versionId: context.asset.versionId,
+        source: context.source,
+        runIntentLabel: "Run / test",
+      });
+      return Object.freeze({ launchPath: appendContext(launchPath, context) });
+    }
     const request = this.toStudioEntryRequest(action, context);
     if (!request) {
       return undefined;
@@ -181,22 +195,6 @@ export class AssetActionExecutionService {
             componentAssetId: context.asset.assetId,
             componentVersionId: context.asset.versionId,
           },
-        },
-      };
-    }
-
-    if (action === AssetIntentActionTypes.runOrTest) {
-      return {
-        requestedRole: context.asset.taxonomy?.semanticRole,
-        mode: StudioEntryModes.intent,
-        asset: {
-          assetId: context.asset.assetId,
-          versionId: context.asset.versionId,
-          taxonomy: context.asset.taxonomy,
-        },
-        intent: {
-          key: "run-or-test",
-          label: "Run / test",
         },
       };
     }

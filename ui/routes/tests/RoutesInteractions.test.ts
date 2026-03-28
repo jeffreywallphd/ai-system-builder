@@ -18,8 +18,8 @@ describe("ui/routes interactions", () => {
     expect(appRouterSource).toContain("element: buildEntryEnabled");
     expect(appRouterSource).toContain("<BuildPage />");
     expect(appRouterSource).toContain("element: <SettingsPage />");
-    expect(appRouterSource).toContain("element: <AgentStudioPage />");
-    expect(appRouterSource).toContain("element: <StudioShellPage />");
+    expect(appRouterSource).toContain("resolveLegacyRouteElement(ROUTE_PATHS.agentStudio");
+    expect(appRouterSource).toContain("resolveLegacyRouteElement(ROUTE_PATHS.studioShell");
     expect(appRouterSource).toContain("element: <RegistryPage />");
     expect(appRouterSource).toContain("element: <AssetDetailPage />");
     expect(appRouterSource).toContain("element: <WorkflowStudioPage />");
@@ -33,8 +33,8 @@ describe("ui/routes interactions", () => {
     expect(appRouterSource).toContain("element: <PromptTemplateStudioPage />");
     expect(appRouterSource).toContain("element: <EmbeddingIndexStudioPage />");
     expect(appRouterSource).toContain("element: <ConfigProfileStudioPage />");
-    expect(appRouterSource).toContain("element: <McpPage />");
-    expect(appRouterSource).toContain("element: <ContextPage />");
+    expect(appRouterSource).toContain("resolveLegacyRouteElement(ROUTE_PATHS.mcp");
+    expect(appRouterSource).toContain("resolveLegacyRouteElement(ROUTE_PATHS.context");
     expect(appRouterSource).toContain("element: <ContextWorkbenchPage />");
   });
 });

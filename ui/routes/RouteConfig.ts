@@ -16,6 +16,8 @@ export const ROUTE_PATHS = Object.freeze({
   build: "/build",
   explore: "/explore",
   run: "/run",
+  create: "/create",
+  compose: "/compose",
   workflows: "/workflows",
   workflowEditor: "/workflows/:workflowId",
   workflowContextWorkbench: "/workflows/:workflowId/context-workbench",
@@ -69,6 +71,18 @@ export const APP_ROUTES: ReadonlyArray<AppRouteDefinition> = Object.freeze([
     key: "run",
     path: ROUTE_PATHS.run,
     title: "Run",
+    showInNavigation: false,
+  }),
+  Object.freeze({
+    key: "create",
+    path: ROUTE_PATHS.create,
+    title: "Create",
+    showInNavigation: false,
+  }),
+  Object.freeze({
+    key: "compose",
+    path: ROUTE_PATHS.compose,
+    title: "Compose",
     showInNavigation: false,
   }),
   Object.freeze({
