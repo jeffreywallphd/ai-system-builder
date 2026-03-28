@@ -1,10 +1,16 @@
 import {
+  appendExecutionTraceEvent,
   attachExecutionNode,
+  decideRecoveryAction,
+  ExecutionLogLevels,
+  ExecutionTraceEventKinds,
   createSystemExecution,
   ExecutionDecisionKinds,
   ExecutionNodeStatusKinds,
   ExecutionStatusKinds,
   initializeExecutionRuntimeState,
+  propagateExecutionFailure,
+  RuntimeExecutionErrorKinds,
   transitionSystemExecutionStatus,
   updateExecutionNodeState,
   type ExecutionContext,
@@ -68,6 +74,30 @@ export interface ExecutionOrchestrationResult {
 
 function nowIso(): string {
   return new Date().toISOString();
+}
+
+function isRetriableErrorCode(code?: string): boolean {
+  return code === "step-transient-failure" || code === "nested-system-transient-failure";
+}
+
+function classifyRuntimeErrorKind(input: {
+  readonly node: ExecutionPlan["nodes"][number];
+  readonly decision: ExecutionDecisionKind;
+  readonly stepResult: StepExecutionResult;
+}): keyof typeof RuntimeExecutionErrorKinds {
+  if (input.stepResult.error?.code === "environment-unsupported-taxonomy" || input.stepResult.error?.code === "nested-systems-unsupported") {
+    return "environmentMismatch";
+  }
+  if (input.node.componentKind === "system") {
+    return "nestedSystemFailure";
+  }
+  if (input.decision === ExecutionDecisionKinds.iterate || input.stepResult.error?.code === "iteration-limit-exceeded") {
+    return "iterativeProgressionFailure";
+  }
+  if (input.decision === ExecutionDecisionKinds.replan || input.stepResult.error?.code === "planning-limit-exceeded") {
+    return "autonomousPlanningFailure";
+  }
+  return "stepFailure";
 }
 
 function buildExecutionEnvironmentRef(environment: RuntimeEnvironment): ExecutionEnvironmentRef {
@@ -218,6 +248,23 @@ export class ExecutionOrchestrationService {
       nextStatus: ExecutionStatusKinds.running,
       updatedAt: startedAt,
     });
+    execution = appendExecutionTraceEvent({
+      execution,
+      event: {
+        eventId: `${execution.executionId}:trace:event:start`,
+        kind: ExecutionTraceEventKinds.executionStatusChanged,
+        at: startedAt,
+        executionId: execution.executionId,
+        status: ExecutionStatusKinds.running,
+        summary: "Execution started.",
+      },
+      logEntry: {
+        entryId: `${execution.executionId}:trace:log:start`,
+        level: ExecutionLogLevels.info,
+        message: `Execution '${execution.executionId}' transitioned to running.`,
+        emittedAt: startedAt,
+      },
+    });
     execution = initializeExecutionRuntimeState({
       execution,
       nodeIds: plan.orderedNodeIds,
@@ -256,6 +303,32 @@ export class ExecutionOrchestrationService {
         },
         updatedAt: nowIso(),
       });
+      execution = appendExecutionTraceEvent({
+        execution,
+        event: {
+          eventId: `${execution.executionId}:trace:event:node-attached:${node.nodeId}`,
+          kind: ExecutionTraceEventKinds.nodeAttached,
+          at: execution.updatedAt,
+          executionId: execution.executionId,
+          nodeId: node.nodeId,
+          parentNodeId: node.parentNodeId,
+          summary: `Execution node '${node.nodeId}' attached.`,
+        },
+      });
+      if (node.componentKind === "system") {
+        execution = appendExecutionTraceEvent({
+          execution,
+          event: {
+            eventId: `${execution.executionId}:trace:event:nested-enter:${node.nodeId}`,
+            kind: ExecutionTraceEventKinds.nestedSystemEntered,
+            at: execution.updatedAt,
+            executionId: execution.executionId,
+            nodeId: node.nodeId,
+            parentNodeId: node.parentNodeId,
+            summary: `Entered nested system node '${node.nodeId}'.`,
+          },
+        });
+      }
       let passIndex = 0;
       let iteration = 0;
       let planningCycle = 0;
@@ -269,6 +342,21 @@ export class ExecutionOrchestrationService {
           status: ExecutionNodeStatusKinds.running,
           startedAt: startedAtNode,
           updatedAt: startedAtNode,
+        });
+        execution = appendExecutionTraceEvent({
+          execution,
+          event: {
+            eventId: `${execution.executionId}:trace:event:node-running:${node.nodeId}:${passIndex}`,
+            kind: ExecutionTraceEventKinds.nodeStatusChanged,
+            at: startedAtNode,
+            executionId: execution.executionId,
+            nodeId: node.nodeId,
+            parentNodeId: node.parentNodeId,
+            status: ExecutionNodeStatusKinds.running,
+            iteration,
+            planningCycle,
+            summary: `Node '${node.nodeId}' is running.`,
+          },
         });
 
         const stepResult = await this.stepExecutionEngine.executeStep({
@@ -300,6 +388,43 @@ export class ExecutionOrchestrationService {
         }));
 
         if (stepResult.status !== StepExecutionStatusKinds.succeeded) {
+          const errorKind = classifyRuntimeErrorKind({ node, decision, stepResult });
+          const runtimeError = Object.freeze({
+            errorId: `${execution.executionId}:error:${node.nodeId}:${passIndex}`,
+            kind: RuntimeExecutionErrorKinds[errorKind],
+            code: stepResult.error?.code ?? "step-failed",
+            message: stepResult.error?.message ?? "Step execution failed.",
+            at: stepResult.completedAt,
+            executionId: execution.executionId,
+            nodeId: node.nodeId,
+            parentNodeId: node.parentNodeId,
+            retriable: isRetriableErrorCode(stepResult.error?.code),
+            diagnostics: stepResult.diagnostics,
+          });
+          const recovery = decideRecoveryAction({
+            error: runtimeError,
+            retryCount: passIndex,
+            maxRetries: 1,
+          });
+
+          if (recovery.action !== "fail-execution") {
+            execution = appendExecutionTraceEvent({
+              execution,
+              event: {
+                eventId: `${execution.executionId}:trace:event:retry:${node.nodeId}:${passIndex}`,
+                kind: ExecutionTraceEventKinds.recoveryDecided,
+                at: stepResult.completedAt,
+                executionId: execution.executionId,
+                nodeId: node.nodeId,
+                summary: `Retrying node '${node.nodeId}' after recoverable failure.`,
+                diagnostics: Object.freeze([recovery.reason]),
+                errorCode: runtimeError.code,
+              },
+            });
+            passIndex += 1;
+            continue;
+          }
+
           execution = updateExecutionNodeState({
             execution,
             executionNodeId: node.nodeId,
@@ -315,15 +440,12 @@ export class ExecutionOrchestrationService {
             },
             error: stepResult.error,
           });
-
-          execution = transitionSystemExecutionStatus({
+          execution = propagateExecutionFailure({
             execution,
-            nextStatus: stepResult.status === StepExecutionStatusKinds.cancelled
-              ? ExecutionStatusKinds.cancelled
-              : ExecutionStatusKinds.failed,
+            error: runtimeError,
+            decision: recovery,
             updatedAt: stepResult.completedAt,
             completedAt: stepResult.completedAt,
-            output: resolveOutput(stepResults),
           });
 
           return Object.freeze({
@@ -349,6 +471,21 @@ export class ExecutionOrchestrationService {
               decidedAt: stepResult.completedAt,
             },
             incrementIteration: true,
+          });
+          execution = appendExecutionTraceEvent({
+            execution,
+            event: {
+              eventId: `${execution.executionId}:trace:event:iterate:${node.nodeId}:${passIndex}`,
+              kind: ExecutionTraceEventKinds.loopProgressed,
+              at: stepResult.completedAt,
+              executionId: execution.executionId,
+              nodeId: node.nodeId,
+              parentNodeId: node.parentNodeId,
+              iteration: iteration + 1,
+              planningCycle,
+              summary: `Node '${node.nodeId}' requested another iteration.`,
+              diagnostics: stepResult.diagnostics,
+            },
           });
           passIndex += 1;
           if (iteration >= maxIterationsPerNode) {
@@ -400,6 +537,21 @@ export class ExecutionOrchestrationService {
               decidedAt: stepResult.completedAt,
             },
             incrementPlanningCycle: true,
+          });
+          execution = appendExecutionTraceEvent({
+            execution,
+            event: {
+              eventId: `${execution.executionId}:trace:event:replan:${node.nodeId}:${passIndex}`,
+              kind: ExecutionTraceEventKinds.autonomousPlanningProgressed,
+              at: stepResult.completedAt,
+              executionId: execution.executionId,
+              nodeId: node.nodeId,
+              parentNodeId: node.parentNodeId,
+              iteration,
+              planningCycle: planningCycle + 1,
+              summary: `Node '${node.nodeId}' requested replanning.`,
+              diagnostics: stepResult.diagnostics,
+            },
           });
           passIndex += 1;
           if (planningCycle >= maxPlanningCyclesPerNode) {
@@ -484,6 +636,36 @@ export class ExecutionOrchestrationService {
             decidedAt: stepResult.completedAt,
           },
         });
+        execution = appendExecutionTraceEvent({
+          execution,
+          event: {
+            eventId: `${execution.executionId}:trace:event:node-succeeded:${node.nodeId}:${passIndex}`,
+            kind: ExecutionTraceEventKinds.nodeStatusChanged,
+            at: stepResult.completedAt,
+            executionId: execution.executionId,
+            nodeId: node.nodeId,
+            parentNodeId: node.parentNodeId,
+            status: ExecutionNodeStatusKinds.succeeded,
+            iteration,
+            planningCycle,
+            summary: `Node '${node.nodeId}' succeeded.`,
+            diagnostics: stepResult.diagnostics,
+          },
+        });
+        if (node.componentKind === "system") {
+          execution = appendExecutionTraceEvent({
+            execution,
+            event: {
+              eventId: `${execution.executionId}:trace:event:nested-complete:${node.nodeId}:${passIndex}`,
+              kind: ExecutionTraceEventKinds.nestedSystemCompleted,
+              at: stepResult.completedAt,
+              executionId: execution.executionId,
+              nodeId: node.nodeId,
+              parentNodeId: node.parentNodeId,
+              summary: `Nested system node '${node.nodeId}' completed.`,
+            },
+          });
+        }
 
         continueProgression = false;
       }
@@ -494,6 +676,23 @@ export class ExecutionOrchestrationService {
       nextStatus: ExecutionStatusKinds.succeeded,
       updatedAt: nowIso(),
       output: resolveOutput(stepResults),
+    });
+    execution = appendExecutionTraceEvent({
+      execution,
+      event: {
+        eventId: `${execution.executionId}:trace:event:complete`,
+        kind: ExecutionTraceEventKinds.executionStatusChanged,
+        at: execution.updatedAt,
+        executionId: execution.executionId,
+        status: ExecutionStatusKinds.succeeded,
+        summary: "Execution completed successfully.",
+      },
+      logEntry: {
+        entryId: `${execution.executionId}:trace:log:complete`,
+        level: ExecutionLogLevels.info,
+        message: `Execution '${execution.executionId}' completed.`,
+        emittedAt: execution.updatedAt,
+      },
     });
 
     return Object.freeze({

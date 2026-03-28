@@ -1,12 +1,21 @@
 import { describe, expect, it } from "bun:test";
 import {
+  appendExecutionTraceEvent,
+  appendRuntimeExecutionError,
   attachExecutionNode,
+  createExecutionTraceSnapshot,
   createSystemExecution,
+  decideRecoveryAction,
   ExecutionDecisionKinds,
+  ExecutionLogLevels,
+  ExecutionTraceEventKinds,
   ExecutionNodeStatusKinds,
   ExecutionStatusKinds,
   initializeExecutionRuntimeState,
   isTerminalExecutionStatus,
+  propagateExecutionFailure,
+  RecoveryActionKinds,
+  RuntimeExecutionErrorKinds,
   transitionSystemExecutionStatus,
   updateExecutionNodeState,
 } from "../SystemRuntimeDomain";
@@ -262,5 +271,109 @@ describe("SystemRuntimeDomain", () => {
     expect(complete.runtimeState.snapshot.completedNodeCount).toBe(1);
     expect(complete.runtimeState.nodeStates.find((entry) => entry.executionNodeId === "node:root")?.iterationCount).toBe(1);
     expect(complete.runtimeState.nodeStates.find((entry) => entry.executionNodeId === "node:root")?.planningCycleCount).toBe(1);
+  });
+
+  it("records typed trace events and snapshots for execution and node progression", () => {
+    const base = createSystemExecution({
+      executionId: "exec-trace",
+      root: {
+        assetId: "asset:system-root",
+        taxonomy: {
+          structuralKind: "system",
+          semanticRole: "system",
+          behaviorKind: "deterministic",
+        },
+      },
+      input: {
+        payload: { request: true },
+        capturedAt: "2026-03-28T14:00:00.000Z",
+      },
+      startedAt: "2026-03-28T14:00:00.000Z",
+    });
+
+    const traced = appendExecutionTraceEvent({
+      execution: base,
+      event: {
+        eventId: "exec-trace:event:1",
+        kind: ExecutionTraceEventKinds.nodeStatusChanged,
+        at: "2026-03-28T14:00:01.000Z",
+        executionId: "exec-trace",
+        nodeId: "node:root",
+        status: "running",
+        summary: "root running",
+      },
+      logEntry: {
+        entryId: "exec-trace:log:1",
+        level: ExecutionLogLevels.info,
+        message: "root running",
+        emittedAt: "2026-03-28T14:00:01.000Z",
+        nodeId: "node:root",
+      },
+    });
+    const snapshot = createExecutionTraceSnapshot(traced);
+
+    expect(snapshot.events.some((event) => event.kind === "execution-created")).toBe(true);
+    expect(snapshot.events.some((event) => event.nodeId === "node:root")).toBe(true);
+    expect(snapshot.logs[0]?.level).toBe("info");
+  });
+
+  it("applies bounded recovery decisions and failure propagation", () => {
+    const base = createSystemExecution({
+      executionId: "exec-error",
+      root: {
+        assetId: "asset:system-root",
+        taxonomy: {
+          structuralKind: "system",
+          semanticRole: "system",
+          behaviorKind: "iterative",
+        },
+      },
+      input: {
+        payload: {},
+        capturedAt: "2026-03-28T15:00:00.000Z",
+      },
+      startedAt: "2026-03-28T15:00:00.000Z",
+    });
+    const running = transitionSystemExecutionStatus({
+      execution: base,
+      nextStatus: ExecutionStatusKinds.running,
+      updatedAt: "2026-03-28T15:00:01.000Z",
+    });
+    const withError = appendRuntimeExecutionError({
+      execution: running,
+      error: {
+        errorId: "exec-error:error:1",
+        kind: RuntimeExecutionErrorKinds.stepFailure,
+        code: "step-transient-failure",
+        message: "Transient network failure.",
+        at: "2026-03-28T15:00:02.000Z",
+        executionId: "exec-error",
+        nodeId: "node:root",
+        retriable: true,
+      },
+    });
+
+    const retryDecision = decideRecoveryAction({
+      error: withError.runtimeState.errors[0]!,
+      retryCount: 0,
+      maxRetries: 1,
+    });
+    expect(retryDecision.action).toBe(RecoveryActionKinds.retryStep);
+
+    const failDecision = decideRecoveryAction({
+      error: withError.runtimeState.errors[0]!,
+      retryCount: 1,
+      maxRetries: 1,
+    });
+    const failed = propagateExecutionFailure({
+      execution: withError,
+      error: withError.runtimeState.errors[0]!,
+      decision: failDecision,
+      updatedAt: "2026-03-28T15:00:03.000Z",
+    });
+
+    expect(failDecision.action).toBe(RecoveryActionKinds.failExecution);
+    expect(failed.status).toBe("failed");
+    expect(failed.runtimeState.trace.events.some((event) => event.kind === "recovery-decided")).toBe(true);
   });
 });

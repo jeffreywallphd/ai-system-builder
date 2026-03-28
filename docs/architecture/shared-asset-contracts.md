@@ -111,3 +111,18 @@ Not implemented in this slice:
   - deterministic steps execute fixed-pass
   - conditional/iterative/autonomous steps expose only truthful bounded markers/diagnostics currently supported
   - no full retry/distributed/autonomous-loop runtime stack is introduced in this slice.
+
+## Direction 5 update: Runtime trace + bounded recovery semantics (stories 6.11–6.12)
+
+- Runtime execution state now carries typed trace/log artifacts (`ExecutionTrace`, `ExecutionTraceEvent`, `ExecutionLogEntry`) in `domain/system-runtime/SystemRuntimeDomain.ts`.
+- Trace events are emitted from authoritative seams in `application/system-runtime/ExecutionOrchestrationService.ts` for:
+  - execution lifecycle transitions
+  - node attach/start/complete state transitions
+  - bounded loop/planner progression (`iterate`, `replan`)
+  - nested system entry/exit progression
+  - structured error + recovery decisions.
+- Runtime failure handling now uses typed bounded contracts (`RuntimeExecutionError`, `RuntimeExecutionErrorKind`, `RecoveryDecision`, `RecoveryActionKind`) with explicit fail-fast propagation and bounded retry where truthfully supported.
+- Recovery behavior remains intentionally narrow:
+  - unsupported/unrecoverable conditions fail the execution immediately
+  - transient step failures can retry in a bounded single-attempt window
+  - propagated failures are recorded in runtime state + trace for later API/UI inspection.

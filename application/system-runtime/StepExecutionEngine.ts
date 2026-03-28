@@ -51,6 +51,7 @@ export interface StepExecutionResult {
   readonly error?: {
     readonly code: string;
     readonly message: string;
+    readonly retriable?: boolean;
   };
 }
 
@@ -73,6 +74,7 @@ function createFailedResult(input: {
   readonly startedAt: string;
   readonly code: string;
   readonly message: string;
+  readonly retriable?: boolean;
   readonly diagnostics?: ReadonlyArray<string>;
   readonly progressionDecision?: StepProgressionDecision;
 }): StepExecutionResult {
@@ -86,6 +88,7 @@ function createFailedResult(input: {
     error: Object.freeze({
       code: input.code,
       message: input.message,
+      retriable: input.retriable ?? false,
     }),
   });
 }
@@ -222,9 +225,19 @@ export class StepExecutionEngine implements IStepExecutionEngine {
       });
     }
 
-    return adapter.execute({
-      ...request,
-      startedAt,
-    });
+    try {
+      return await adapter.execute({
+        ...request,
+        startedAt,
+      });
+    } catch (error) {
+      return createFailedResult({
+        nodeId: request.node.nodeId,
+        startedAt,
+        code: "step-transient-failure",
+        message: error instanceof Error ? error.message : "Step execution failed with an unexpected runtime error.",
+        retriable: true,
+      });
+    }
   }
 }
