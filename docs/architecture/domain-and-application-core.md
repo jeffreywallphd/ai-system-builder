@@ -743,3 +743,15 @@ Explicitly later than this scope:
   - no provider-specific provisioning/deployment adapters,
   - no health monitoring, rollback, autoscaling, or endpoint exposure,
   - no merging with runtime execution orchestration.
+
+## Direction 5 update: Deployment state tracking + diagnostics (stories 8.7–8.8)
+
+- Deployment now has explicit lifecycle state contracts in `domain/deployment/DeploymentStateDomain.ts` (`requested`, provisioning progress/completion, deployment-in-progress, `active`, `failed`, `inactive`) with bounded transition validation.
+- `application/deployment/DeploymentExecutionService.ts` now orchestrates provisioning + execution through `executeLifecycle`, persists state snapshots/transitions on deployment records, and exposes query seams (`listDeploymentsByState`, `getDeploymentStateSnapshot`, `listStateTransitions`).
+- Deployment diagnostics are now explicit and separate from runtime execution trace/audit semantics via `domain/deployment/DeploymentDiagnosticsDomain.ts` + `application/deployment/DeploymentDiagnosticsService.ts`:
+  - authoritative provisioning/deployment/state-transition points emit bounded deployment log entries,
+  - failure paths emit structured deployment diagnostic records linked to deployment identity and version-pinned linkage metadata.
+- Boundaries remain explicit in this slice:
+  - deployment state/diagnostics are not merged into system runtime execution-state or trace/log models,
+  - no rollback/health/endpoint/autoscaling behavior is added yet,
+  - storage remains intentionally bounded (in-memory repositories) while preserving durable-in-process queryability for later API/UI stories.
