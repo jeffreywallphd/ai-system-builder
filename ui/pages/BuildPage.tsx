@@ -1,4 +1,8 @@
 import { useMemo } from "react";
+import ContextualRecommendationsPanel from "../components/navigation/ContextualRecommendationsPanel";
+import RecentAndFavoritesPanel from "../components/navigation/RecentAndFavoritesPanel";
+import { ContextualRecommendationService, ContextualRecommendationSurfaces } from "../routes/ContextualRecommendations";
+import { RecentAndFavoritesService } from "../routes/RecentAndFavorites";
 import { Link, useNavigate } from "react-router-dom";
 import { BuildEntryService, type BuildIntentOption, type BuildIntentSelection } from "../routes/BuildEntry";
 import { InlineRunLaunchService } from "../routes/InlineRunActions";
@@ -16,6 +20,11 @@ export default function BuildPage(): JSX.Element {
   const inlineRunLaunchService = useMemo(() => new InlineRunLaunchService(), []);
   const navigate = useNavigate();
   const model = service.getLandingModel();
+  const recommendationService = useMemo(() => new ContextualRecommendationService(), []);
+  const recentAndFavoritesService = useMemo(() => new RecentAndFavoritesService(), []);
+  const recents = recentAndFavoritesService.listRecents(4);
+  const favorites = recentAndFavoritesService.listFavorites();
+  const recommendations = recommendationService.resolve({ surface: ContextualRecommendationSurfaces.build });
 
   const runHere = inlineRunLaunchService.launch({
     action: UxRunActionKinds.run,
@@ -34,6 +43,7 @@ export default function BuildPage(): JSX.Element {
       selection: createSelection(intent),
       entryContext: { source: "intent" },
     });
+    recentAndFavoritesService.recordRecentBuildFlow({ intent, launchPath: launchContext.launchPath });
     void navigate(launchContext.launchPath);
   };
 
@@ -58,6 +68,10 @@ export default function BuildPage(): JSX.Element {
           </div>
         </div>
       </div>
+
+
+      <ContextualRecommendationsPanel recommendations={recommendations} />
+      <RecentAndFavoritesPanel service={recentAndFavoritesService} recents={recents} favorites={favorites} />
 
       <div className="ui-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem" }}>
         {model.options.map((option) => (
