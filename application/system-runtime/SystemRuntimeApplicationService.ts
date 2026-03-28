@@ -127,6 +127,16 @@ export interface RuntimeExecutionStatusReadModel {
     readonly rootVersionId?: string;
     readonly nodeVersionIds: Readonly<Record<string, string>>;
   };
+  readonly nestedExecutionLineage: ReadonlyArray<{
+    readonly executionId: string;
+    readonly parentExecutionId?: string;
+    readonly parentNodeId?: string;
+    readonly rootAssetId: string;
+    readonly rootVersionId?: string;
+    readonly status: ExecutionStatusKind;
+    readonly startedAt: string;
+    readonly completedAt?: string;
+  }>;
 }
 
 export interface RuntimeExecutionResultReadModel {
@@ -170,6 +180,16 @@ export interface RuntimeExecutionResultReadModel {
     readonly rootVersionId?: string;
     readonly nodeVersionIds: Readonly<Record<string, string>>;
   };
+  readonly nestedExecutionLineage: ReadonlyArray<{
+    readonly executionId: string;
+    readonly parentExecutionId?: string;
+    readonly parentNodeId?: string;
+    readonly rootAssetId: string;
+    readonly rootVersionId?: string;
+    readonly status: ExecutionStatusKind;
+    readonly startedAt: string;
+    readonly completedAt?: string;
+  }>;
 }
 
 export interface RuntimeExecutionTraceReadModel {
@@ -487,6 +507,7 @@ export class SystemRuntimeApplicationService {
         rootVersionId: execution.root.versionId,
         nodeVersionIds: this.buildNodeVersionMap(execution),
       }),
+      nestedExecutionLineage: this.buildNestedExecutionLineage(execution.executionId),
     });
   }
 
@@ -581,6 +602,7 @@ export class SystemRuntimeApplicationService {
         rootVersionId: execution.root.versionId,
         nodeVersionIds: this.buildNodeVersionMap(execution),
       }),
+      nestedExecutionLineage: this.buildNestedExecutionLineage(execution.executionId),
     });
   }
 
@@ -914,6 +936,30 @@ export class SystemRuntimeApplicationService {
       .filter((node) => Boolean(node.target.versionId))
       .map((node) => [node.executionNodeId, node.target.versionId!])
       .sort(([left], [right]) => left.localeCompare(right))));
+  }
+
+  private buildNestedExecutionLineage(executionId: string): RuntimeExecutionResultReadModel["nestedExecutionLineage"] {
+    const record = this.executionStore.getExecutionRecord(executionId);
+    const childIds = record?.metadata.childExecutionIds ?? [];
+    return Object.freeze(childIds
+      .map((childExecutionId) => {
+        const child = this.executionStore.getExecutionRecord(childExecutionId)?.metadata;
+        if (!child) {
+          return undefined;
+        }
+        return Object.freeze({
+          executionId: child.executionId,
+          parentExecutionId: child.parentExecutionId,
+          parentNodeId: child.parentNodeId,
+          rootAssetId: child.rootAssetId,
+          rootVersionId: child.rootVersionId,
+          status: child.status,
+          startedAt: child.startedAt,
+          completedAt: child.completedAt,
+        });
+      })
+      .filter((entry): entry is NonNullable<typeof entry> => !!entry)
+      .slice(0, 100));
   }
 
   private applyVersionPins(system: SystemAsset, pins?: Readonly<Record<string, string>>): SystemAsset {

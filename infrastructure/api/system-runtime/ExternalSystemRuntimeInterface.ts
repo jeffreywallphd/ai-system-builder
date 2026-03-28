@@ -32,6 +32,7 @@ export interface ExternalExecutionRequest {
   readonly callback?: ExecutionCallbackRegistrationRequest;
   readonly requestedEnvironment?: ExternalExecutionEnvironmentRequest;
   readonly tenantId?: string;
+  readonly requestSource?: RuntimeApiRequestContext["requestSource"];
 }
 
 export interface ExternalExecutionResponse {
@@ -46,6 +47,7 @@ export interface ExternalExecutionResponse {
     readonly nodeVersionIds: Readonly<Record<string, string>>;
   };
   readonly executionEnvironment?: SerializedExecutionEnvironment;
+  readonly nestedExecutionLineage: RuntimeExecutionStatusReadModel["nestedExecutionLineage"];
 }
 
 export interface ExternalExecutionStatus extends RuntimeExecutionStatusReadModel {}
@@ -64,12 +66,14 @@ export interface ExternalExecutionResultRequest {
   readonly callerContext?: ExecutionAccessContext;
   readonly authentication?: RuntimeApiAuthenticationRequest;
   readonly tenantId?: string;
+  readonly requestSource?: RuntimeApiRequestContext["requestSource"];
 }
 
 export interface ExternalExecutionTraceRequest extends GetSystemRuntimeExecutionTraceRequest {
   readonly callerContext?: ExecutionAccessContext;
   readonly authentication?: RuntimeApiAuthenticationRequest;
   readonly tenantId?: string;
+  readonly requestSource?: RuntimeApiRequestContext["requestSource"];
 }
 
 export interface ExternalExecutionStatusRequest {
@@ -78,6 +82,7 @@ export interface ExternalExecutionStatusRequest {
   readonly callerContext?: ExecutionAccessContext;
   readonly authentication?: RuntimeApiAuthenticationRequest;
   readonly tenantId?: string;
+  readonly requestSource?: RuntimeApiRequestContext["requestSource"];
 }
 
 function normalizeRequired(value: string, label: string): string {
@@ -131,6 +136,7 @@ export class ExternalSystemRuntimeInterface {
             authentication: request.authentication,
             accessContext: request.callerContext,
             tenantId: request.tenantId,
+            requestSource: request.requestSource ?? "external-api",
           },
           callback: request.callback,
           requestedEnvironment: request.requestedEnvironment,
@@ -150,6 +156,7 @@ export class ExternalSystemRuntimeInterface {
           authentication: request.authentication,
           accessContext: request.callerContext,
           tenantId: request.tenantId,
+          requestSource: request.requestSource ?? "external-api",
         },
         callback: request.callback,
         requestedEnvironment: request.requestedEnvironment,
@@ -171,6 +178,7 @@ export class ExternalSystemRuntimeInterface {
           versionId,
           executedVersionMap: started.data.executedVersionMap,
           executionEnvironment: started.data.executionEnvironment,
+          nestedExecutionLineage: started.data.nestedExecutionLineage,
         }),
       });
     } catch (error) {
@@ -193,6 +201,7 @@ export class ExternalSystemRuntimeInterface {
         authentication: normalized.authentication,
         accessContext: normalized.callerContext,
         tenantId: normalized.tenantId,
+        requestSource: normalized.requestSource ?? "external-api",
       });
     }
     const poll = await this.runtimeApi.pollExecution({
@@ -212,6 +221,7 @@ export class ExternalSystemRuntimeInterface {
       authentication: normalized.authentication,
       accessContext: normalized.callerContext,
       tenantId: normalized.tenantId,
+      requestSource: normalized.requestSource ?? "external-api",
     });
   }
 
@@ -230,6 +240,7 @@ export class ExternalSystemRuntimeInterface {
         authentication: request.authentication,
         accessContext: request.callerContext,
         tenantId: request.tenantId,
+        requestSource: request.requestSource ?? "external-api",
       },
     });
   }
@@ -242,6 +253,7 @@ export class ExternalSystemRuntimeInterface {
         authentication: request.authentication,
         accessContext: request.callerContext,
         tenantId: request.tenantId,
+        requestSource: request.requestSource ?? "external-api",
       },
     });
     if (!result.ok || !result.data) {
@@ -270,6 +282,7 @@ export class ExternalSystemRuntimeInterface {
         authentication: request.authentication,
         accessContext: request.callerContext,
         tenantId: request.tenantId,
+        requestSource: "external-api",
       },
     });
   }
@@ -281,12 +294,13 @@ export class ExternalSystemRuntimeInterface {
     readonly callerContext?: ExecutionAccessContext;
     readonly authentication?: RuntimeApiAuthenticationRequest;
     readonly tenantId?: string;
+    readonly requestSource?: RuntimeApiRequestContext["requestSource"];
   }): Promise<SystemRuntimeApiResponse<ExecutionCallbackRegistration>> {
     return this.runtimeApi.registerExecutionCallback({
       sessionId: request.sessionId,
       executionId: request.executionId,
       callback: request.callback,
-      requestContext: this.toRequestContext(request.callerContext, request.authentication, request.tenantId),
+      requestContext: this.toRequestContext(request.callerContext, request.authentication, request.tenantId, request.requestSource),
     });
   }
 
@@ -297,13 +311,14 @@ export class ExternalSystemRuntimeInterface {
     readonly callerContext?: ExecutionAccessContext;
     readonly authentication?: RuntimeApiAuthenticationRequest;
     readonly tenantId?: string;
+    readonly requestSource?: RuntimeApiRequestContext["requestSource"];
     readonly listener: (event: ExecutionUpdateEvent) => void;
   }): SystemRuntimeApiResponse<ExecutionUpdateSubscription> {
     return this.runtimeApi.subscribeToExecutionUpdates({
       executionId: request.executionId,
       sessionId: request.sessionId,
       eventKinds: request.eventKinds,
-      requestContext: this.toRequestContext(request.callerContext, request.authentication, request.tenantId),
+      requestContext: this.toRequestContext(request.callerContext, request.authentication, request.tenantId, request.requestSource),
       listener: request.listener,
     });
   }
@@ -320,12 +335,14 @@ export class ExternalSystemRuntimeInterface {
     callerContext?: ExecutionAccessContext,
     authentication?: RuntimeApiAuthenticationRequest,
     tenantId?: string,
+    requestSource?: RuntimeApiRequestContext["requestSource"],
   ): RuntimeApiRequestContext {
     return Object.freeze({
       requireAuthentication: true,
       authentication,
       accessContext: callerContext,
       tenantId: tenantId?.trim() || undefined,
+      requestSource: requestSource ?? "external-api",
     });
   }
 }

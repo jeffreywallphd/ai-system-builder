@@ -14,6 +14,8 @@ import { SqliteStudioShellRepository } from "../../../filesystem/studio-shell/Sq
 import { SqliteSystemRuntimeExecutionStore } from "../../../filesystem/system-runtime/SqliteSystemRuntimeExecutionStore";
 import type { ExecutionCallbackDispatcher, ExecutionCallbackPayload } from "../ExecutionCallbackDispatcher";
 import { ExecutionUpdateEventKinds } from "../ExecutionUpdateStream";
+import { InMemoryExecutionAuditRepository } from "../../../../application/system-runtime/ExecutionAuditRepository";
+import { ExecutionAuditEventKinds } from "../../../../domain/system-runtime/ExecutionAuditTrailDomain";
 
 class RecordingCallbackDispatcher implements ExecutionCallbackDispatcher {
   public readonly deliveries: Array<{ payload: ExecutionCallbackPayload; targetUrl: string }> = [];
@@ -667,6 +669,9 @@ describe("SystemRuntimeBackendApi", () => {
       const result = await runtimeApi.getExecutionResult(started.data!.executionId);
       expect(result.ok).toBeTrue();
       expect(result.data?.nestedSystemResults.length).toBeGreaterThan(0);
+      expect(result.data?.nestedExecutionLineage.length).toBeGreaterThan(0);
+      expect(result.data?.nestedExecutionLineage[0]?.parentExecutionId).toBe(started.data?.executionId);
+      expect(started.data?.nestedExecutionLineage.length).toBeGreaterThan(0);
 
       repository.dispose();
 
@@ -825,5 +830,95 @@ describe("SystemRuntimeBackendApi", () => {
     expect(rejected.ok).toBeFalse();
     expect(rejected.error?.code).toBe("invalid-request");
     expect(rejected.error?.message).toContain("pinned component versions");
+  });
+
+  it("writes durable execution audit records for external request lifecycle with nested attribution", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const auditRepository = new InMemoryExecutionAuditRepository();
+    const runtimeApi = new SystemRuntimeBackendApi(repository, undefined, undefined, undefined, undefined, undefined, undefined, auditRepository);
+
+    await repository.saveAssetVersion(new AssetVersion({
+      assetId: "system:audit-child",
+      versionId: "system:audit-child:v1",
+      metadata: {
+        metadata: {
+          taxonomy: createSystemStudioTaxonomy("system", "deterministic"),
+        },
+        content: JSON.stringify({
+          systemSpec: {
+            components: [],
+            inputs: [{ inputId: "request", valueType: "string", required: false }],
+            outputs: [{ outputId: "response", valueType: "string" }],
+          },
+        }),
+        dependencies: [],
+      },
+    }));
+    await repository.saveAssetVersion(new AssetVersion({
+      assetId: "system:audit-root",
+      versionId: "system:audit-root:v1",
+      metadata: {
+        metadata: {
+          taxonomy: createSystemStudioTaxonomy("system", "deterministic"),
+        },
+        content: JSON.stringify({
+          systemSpec: {
+            components: [
+              {
+                componentKind: "system",
+                alias: "child",
+                assetId: "system:audit-child",
+                versionId: "system:audit-child:v1",
+                taxonomy: createSystemStudioTaxonomy("system", "deterministic"),
+              },
+            ],
+            nestedSystems: [{ alias: "child", assetId: "system:audit-child", versionId: "system:audit-child:v1" }],
+            inputs: [{ inputId: "request", valueType: "string", required: false }],
+            outputs: [{ outputId: "response", valueType: "string" }],
+          },
+        }),
+        dependencies: [],
+      },
+    }));
+
+    const started = await runtimeApi.startExecution({
+      versionId: "system:audit-root:v1",
+      systemId: "system:audit-root",
+      requestContext: {
+        requireAuthentication: false,
+        accessContext: {
+          callerKind: "user",
+          callerId: "audit-user-1",
+          sessionId: "audit-session-1",
+          metadata: { tenantId: "tenant-audit" },
+        },
+        tenantId: "tenant-audit",
+        requestSource: "external-api",
+      },
+    });
+    expect(started.ok).toBeTrue();
+    expect(started.data?.nestedExecutionLineage.length).toBeGreaterThan(0);
+
+    const audit = await runtimeApi.getExecutionAuditTrail({
+      executionId: started.data!.executionId,
+      requestContext: {
+        requireAuthentication: false,
+        accessContext: { callerKind: "user", callerId: "audit-user-1", metadata: { tenantId: "tenant-audit" } },
+        tenantId: "tenant-audit",
+      },
+    });
+    expect(audit.ok).toBeTrue();
+    const eventKinds = audit.data?.map((entry) => entry.eventKind) ?? [];
+    expect(eventKinds).toEqual(expect.arrayContaining([
+      ExecutionAuditEventKinds.requested,
+      ExecutionAuditEventKinds.accepted,
+      ExecutionAuditEventKinds.completed,
+    ]));
+    const completed = audit.data?.find((entry) => entry.eventKind === ExecutionAuditEventKinds.completed);
+    expect(completed?.requestSource).toBe("external-api");
+    expect(completed?.caller.callerId).toBe("audit-user-1");
+    expect(completed?.tenant.tenantId).toBe("tenant-audit");
+    expect(completed?.execution.versionId).toBe("system:audit-root:v1");
+    expect((completed?.execution.childExecutionIds?.length ?? 0) > 0).toBeTrue();
   });
 });

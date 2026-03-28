@@ -149,6 +149,7 @@ export class ToolInvocationBridge {
       tenantId: request.tenantId,
       callerContext: request.invocationContext?.callerContext,
       authentication: request.invocationContext?.authentication,
+      requestSource: "external-tool",
     });
     if (!started.ok || !started.data) {
       return started;
@@ -190,6 +191,7 @@ export class ToolInvocationBridge {
       tenantId: request.tenantId,
       callerContext: request.invocationContext?.callerContext,
       authentication: request.invocationContext?.authentication,
+      requestSource: "external-tool",
     });
     const status = await this.externalRuntime.getExecutionStatus(statusRequest);
     if (!status.ok || !status.data) {
@@ -210,6 +212,7 @@ export class ToolInvocationBridge {
       tenantId: request.tenantId,
       callerContext: request.invocationContext?.callerContext,
       authentication: request.invocationContext?.authentication,
+      requestSource: "external-tool",
     });
     const result = await this.externalRuntime.getExecutionResult(resultRequest);
     if (!result.ok || !result.data) {
@@ -255,6 +258,7 @@ export class ToolInvocationBridge {
       tenantId: request.tenantId,
       callerContext: request.invocationContext?.callerContext,
       authentication: request.invocationContext?.authentication,
+      requestSource: "external-tool",
     });
     const trace = await this.externalRuntime.getExecutionTrace(traceRequest);
     if (!trace.ok || !trace.data) {

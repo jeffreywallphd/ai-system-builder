@@ -41,6 +41,11 @@ Workflow -> `ExecuteWorkflowUseCase` -> one-unit `ExecutionPlan` -> `UnifiedExec
   - runtime start requests validate depth/iteration/planning/retention bounds with deterministic invalid-request failures on pathological values,
   - in-memory and SQLite runtime execution stores prune oldest records on capacity overflow,
   - no distributed scheduler/queue/observability architecture is introduced.
+- Direction 5 Epic 7 stories 7.15–7.16 now keep external system invocation + audit truth on the same runtime seams:
+  - external API/tool invocation now supports nested system-of-systems execution as a first-class runtime path (no separate nested runtime), with bounded parent/child execution lineage summaries surfaced on start/status/result read models,
+  - external invocation lineage remains version-aware (root + child version ids) and preserves existing auth/access/quota/tenant/session bounds,
+  - execution audit is now a separate durable trail (requested/accepted/completed/failed) capturing caller, tenant, request source, system/version, and execution/session identity with bounded nested-child attribution,
+  - audit trail remains distinct from runtime trace/log streams and asset-version history (no broad compliance analytics subsystem added).
 
 ## Runtime orchestration update
 - Delegated workflow execution selection can now consult the shared runtime dependency orchestrator before choosing a delegated strategy.

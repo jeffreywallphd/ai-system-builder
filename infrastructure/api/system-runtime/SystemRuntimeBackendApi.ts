@@ -62,6 +62,12 @@ import {
   type ExecutionCallbackDispatcher,
   type ExecutionCallbackPayload,
 } from "./ExecutionCallbackDispatcher";
+import { ExecutionAuditEventKinds, type ExecutionAuditRecord } from "../../../domain/system-runtime/ExecutionAuditTrailDomain";
+import { ExecutionAuditTrailService } from "../../../application/system-runtime/ExecutionAuditTrailService";
+import {
+  InMemoryExecutionAuditRepository,
+  type ExecutionAuditRepository,
+} from "../../../application/system-runtime/ExecutionAuditRepository";
 
 export type {
   RuntimeExecutionResultReadModel,
@@ -97,6 +103,7 @@ export interface StartSystemRuntimeExecutionResponse {
     readonly nodeVersionIds: Readonly<Record<string, string>>;
   };
   readonly executionEnvironment?: SerializedExecutionEnvironment;
+  readonly nestedExecutionLineage: RuntimeExecutionStatusReadModel["nestedExecutionLineage"];
 }
 export interface AsyncExecutionStartResponse extends StartSystemRuntimeExecutionResponse {
   readonly acceptedState: "accepted" | "running";
@@ -133,6 +140,7 @@ export interface RuntimeApiRequestContext {
   readonly authentication?: RuntimeApiAuthenticationRequest;
   readonly accessContext?: ExecutionAccessContext;
   readonly tenantId?: string;
+  readonly requestSource?: ExecutionAuditRecord["requestSource"];
 }
 
 export interface ExecutionCallbackRegistrationRequest {
@@ -158,6 +166,7 @@ export class SystemRuntimeBackendApi {
   private readonly updateStream = new ExecutionUpdateStream();
   private readonly emittedTraceCountsByExecutionId = new Map<string, number>();
   private readonly tenantIsolationPolicy = new TenantExecutionIsolationPolicy();
+  private readonly auditTrailService: ExecutionAuditTrailService;
 
   public constructor(
     repository: IStudioShellRepository,
@@ -167,8 +176,10 @@ export class SystemRuntimeBackendApi {
     private readonly executionQuotaEvaluator = new ExecutionQuotaEvaluator(),
     private readonly executionSessionRepository: ExecutionSessionRepository = new InMemoryExecutionSessionRepository(),
     private readonly callbackDispatcher: ExecutionCallbackDispatcher = new HttpExecutionCallbackDispatcher(),
+    executionAuditRepository: ExecutionAuditRepository = new InMemoryExecutionAuditRepository(),
   ) {
     this.service = new SystemRuntimeApplicationService(repository, executionStore);
+    this.auditTrailService = new ExecutionAuditTrailService(executionAuditRepository);
   }
 
   public async startExecution(request: StartSystemRuntimeExecutionRequest & {
@@ -182,6 +193,7 @@ export class SystemRuntimeBackendApi {
     return this.wrap(async () => {
       const callerContext = this.resolveCallerContext(request);
       const tenantContext = this.resolveTenantContext({ requestContext: request.requestContext, callerContext, requestTenantId: request.tenantId });
+      const requestSource = this.resolveRequestSource(request.requestContext);
       this.assertExecutionAccess({
         accessContext: callerContext,
         systemId: request.systemId,
@@ -216,6 +228,48 @@ export class SystemRuntimeBackendApi {
           : ExecutionSessionStatuses.completed,
         executionId: started.execution.executionId,
       }));
+      this.recordAudit({
+        eventKind: ExecutionAuditEventKinds.requested,
+        requestSource,
+        callerContext,
+        tenantContext,
+        execution: {
+          executionId: started.execution.executionId,
+          sessionId: finalizedSession.sessionId,
+          status: "pending",
+          systemId: started.execution.root.assetId,
+          versionId: started.execution.root.versionId,
+        },
+      });
+      this.recordAudit({
+        eventKind: ExecutionAuditEventKinds.accepted,
+        requestSource,
+        callerContext,
+        tenantContext,
+        execution: {
+          executionId: started.execution.executionId,
+          sessionId: finalizedSession.sessionId,
+          status: started.execution.status,
+          systemId: started.execution.root.assetId,
+          versionId: started.execution.root.versionId,
+        },
+      });
+      this.recordAudit({
+        eventKind: started.execution.status === "failed"
+          ? ExecutionAuditEventKinds.failed
+          : ExecutionAuditEventKinds.completed,
+        requestSource,
+        callerContext,
+        tenantContext,
+        execution: {
+          executionId: started.execution.executionId,
+          sessionId: finalizedSession.sessionId,
+          status: started.execution.status,
+          systemId: started.execution.root.assetId,
+          versionId: started.execution.root.versionId,
+          childExecutionIds: this.service.getExecutionResult(started.execution.executionId).nestedExecutionLineage.map((entry) => entry.executionId),
+        },
+      });
       await this.dispatchExecutionCallbacks({
         session: finalizedSession,
         eventKind: started.execution.status === "failed"
@@ -247,6 +301,7 @@ export class SystemRuntimeBackendApi {
         executionEnvironment: started.executionEnvironment
           ? this.serializeExecutionEnvironment(started.executionEnvironment)
           : undefined,
+        nestedExecutionLineage: this.service.getExecutionStatus(started.execution.executionId).nestedExecutionLineage,
       });
     });
   }
@@ -263,6 +318,7 @@ export class SystemRuntimeBackendApi {
     return this.wrap(async () => {
       const callerContext = this.resolveCallerContext(request);
       const tenantContext = this.resolveTenantContext({ requestContext: request.requestContext, callerContext, requestTenantId: request.tenantId });
+      const requestSource = this.resolveRequestSource(request.requestContext);
       this.assertExecutionAccess({
         accessContext: callerContext,
         systemId: request.systemId,
@@ -305,6 +361,32 @@ export class SystemRuntimeBackendApi {
         kind: ExecutionUpdateEventKinds.executionAccepted,
         status: "pending",
       });
+      this.recordAudit({
+        eventKind: ExecutionAuditEventKinds.requested,
+        requestSource,
+        callerContext,
+        tenantContext,
+        execution: {
+          executionId,
+          sessionId,
+          systemId: request.systemId,
+          versionId: request.versionId,
+          status: "pending",
+        },
+      });
+      this.recordAudit({
+        eventKind: ExecutionAuditEventKinds.accepted,
+        requestSource,
+        callerContext,
+        tenantContext,
+        execution: {
+          executionId,
+          sessionId,
+          systemId: request.systemId,
+          versionId: request.versionId,
+          status: "pending",
+        },
+      });
 
       const asyncRequest: StartSystemRuntimeExecutionRequest = Object.freeze({
         ...request,
@@ -333,6 +415,20 @@ export class SystemRuntimeBackendApi {
             executionId: result.execution.executionId,
             sessionId,
           });
+          this.recordAudit({
+            eventKind: ExecutionAuditEventKinds.completed,
+            requestSource,
+            callerContext,
+            tenantContext,
+            execution: {
+              executionId,
+              sessionId,
+              status: result.execution.status,
+              systemId: result.execution.root.assetId,
+              versionId: result.execution.root.versionId,
+              childExecutionIds: this.service.getExecutionResult(executionId).nestedExecutionLineage.map((entry) => entry.executionId),
+            },
+          });
           reservation.reservation?.release();
           return result;
         })
@@ -359,6 +455,23 @@ export class SystemRuntimeBackendApi {
             executionId,
             sessionId,
           });
+          this.recordAudit({
+            eventKind: ExecutionAuditEventKinds.failed,
+            requestSource,
+            callerContext,
+            tenantContext,
+            execution: {
+              executionId,
+              sessionId,
+              status: "failed",
+              systemId: request.systemId,
+              versionId: request.versionId,
+            },
+            detail: {
+              message: error instanceof Error ? error.message : "Asynchronous runtime execution failed.",
+              errorCode: "runtime-async-failure",
+            },
+          });
           reservation.reservation?.release();
         });
 
@@ -377,6 +490,7 @@ export class SystemRuntimeBackendApi {
           rootVersionId: request.versionId,
           nodeVersionIds: Object.freeze({}),
         }),
+        nestedExecutionLineage: Object.freeze([]),
       });
     });
   }
@@ -433,6 +547,17 @@ export class SystemRuntimeBackendApi {
     readonly limit?: number;
   }): Promise<SystemRuntimeApiResponse<ReadonlyArray<RuntimeExecutionSummaryReadModel>>> {
     return this.wrap(async () => this.service.listRecentExecutionsForSystem(input));
+  }
+
+  public async getExecutionAuditTrail(input: {
+    readonly executionId: string;
+    readonly limit?: number;
+    readonly requestContext?: RuntimeApiRequestContext;
+  }): Promise<SystemRuntimeApiResponse<ReadonlyArray<ExecutionAuditRecord>>> {
+    return this.wrap(async () => {
+      await this.getExecutionStatusAuthorized(input.executionId, input.requestContext);
+      return this.auditTrailService.listByExecutionId(input.executionId, input.limit);
+    });
   }
 
   public async pollExecution(input: {
@@ -910,6 +1035,60 @@ export class SystemRuntimeBackendApi {
     } catch (error) {
       return Object.freeze({ ok: false, error: this.toApiError(error) });
     }
+  }
+
+  private resolveRequestSource(requestContext?: RuntimeApiRequestContext): ExecutionAuditRecord["requestSource"] {
+    if (requestContext?.requestSource) {
+      return requestContext.requestSource;
+    }
+    if (requestContext?.trustedInternal) {
+      return "internal-trusted";
+    }
+    return "unknown";
+  }
+
+  private recordAudit(input: {
+    readonly eventKind: typeof ExecutionAuditEventKinds[keyof typeof ExecutionAuditEventKinds];
+    readonly requestSource: ExecutionAuditRecord["requestSource"];
+    readonly callerContext?: ExecutionAccessContext;
+    readonly tenantContext?: ExecutionTenantContext;
+    readonly execution: {
+      readonly executionId: string;
+      readonly sessionId?: string;
+      readonly status?: string;
+      readonly systemId?: string;
+      readonly versionId?: string;
+      readonly childExecutionIds?: ReadonlyArray<string>;
+    };
+    readonly detail?: {
+      readonly message?: string;
+      readonly errorCode?: string;
+    };
+  }): void {
+    this.auditTrailService.record({
+      eventKind: input.eventKind,
+      requestSource: input.requestSource,
+      caller: Object.freeze({
+        callerKind: input.callerContext?.callerKind,
+        callerId: input.callerContext?.callerId,
+        sessionId: input.callerContext?.sessionId,
+        roles: input.callerContext?.roles,
+        authenticatedPrincipalId: input.callerContext?.callerId,
+      }),
+      tenant: Object.freeze({
+        tenantId: input.tenantContext?.tenantId,
+        source: input.tenantContext?.source,
+      }),
+      execution: Object.freeze({
+        executionId: input.execution.executionId,
+        sessionId: input.execution.sessionId,
+        status: input.execution.status,
+        systemId: input.execution.systemId,
+        versionId: input.execution.versionId,
+        childExecutionIds: input.execution.childExecutionIds,
+      }),
+      detail: input.detail,
+    });
   }
 
   private toApiError(error: unknown): SystemRuntimeApiError {
