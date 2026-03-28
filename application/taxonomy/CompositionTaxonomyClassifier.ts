@@ -19,6 +19,7 @@ export interface ICompositionTaxonomyClassifier {
   classifyAsset(asset: IAsset): CompositionTaxonomyDescriptor | undefined;
   classifyWorkflow(workflow: IWorkflow, behaviorKind?: Extract<TaxonomyBehaviorKind, "deterministic" | "conditional" | "iterative">): CompositionTaxonomyDescriptor;
   classifyAgent(agent: Agent): CompositionTaxonomyDescriptor;
+  classifySystemAsset(semanticRole?: Extract<CompositionTaxonomyDescriptor["semanticRole"], "system" | "app-template">, behaviorKind?: Extract<TaxonomyBehaviorKind, "deterministic" | "conditional" | "iterative" | "autonomous">): CompositionTaxonomyDescriptor;
   classifyContextPackage(contextPackage: ContextPackage): CompositionTaxonomyDescriptor;
   classifyContextRecipe(contextRecipe: ContextRecipe): CompositionTaxonomyDescriptor;
   classifyToolCapability(capability: ToolCapabilityDescriptor): CompositionTaxonomyDescriptor;
@@ -126,6 +127,17 @@ export class CompositionTaxonomyClassifier implements ICompositionTaxonomyClassi
 
   public classifyAgent(_agent: Agent): CompositionTaxonomyDescriptor {
     return classifySpecializedCompositeRole(TaxonomySemanticRoles.agent);
+  }
+
+  public classifySystemAsset(
+    semanticRole: Extract<CompositionTaxonomyDescriptor["semanticRole"], "system" | "app-template"> = TaxonomySemanticRoles.system,
+    behaviorKind: Extract<TaxonomyBehaviorKind, "deterministic" | "conditional" | "iterative" | "autonomous"> = TaxonomyBehaviorKinds.deterministic,
+  ): CompositionTaxonomyDescriptor {
+    return createCompositionTaxonomyDescriptor({
+      structuralKind: TaxonomyStructuralKinds.system,
+      semanticRole,
+      behaviorKind,
+    });
   }
 
   public classifyContextPackage(_contextPackage: ContextPackage): CompositionTaxonomyDescriptor {

@@ -140,6 +140,11 @@ describe("CompositionAssetContractResolver", () => {
       semanticRole: TaxonomySemanticRoles.appTemplate,
       behaviorKind: TaxonomyBehaviorKinds.conditional,
     });
+    const systemContract = resolver.resolveContractForTaxonomy({
+      structuralKind: "system",
+      semanticRole: TaxonomySemanticRoles.system,
+      behaviorKind: TaxonomyBehaviorKinds.autonomous,
+    });
 
     expect(modelContract?.execution?.invocationMode).toBe("async");
     expect(toolContract?.parameters.find((parameter) => parameter.id === "providerKind")?.defaultValue).toBe("mcp-or-api");
@@ -154,6 +159,9 @@ describe("CompositionAssetContractResolver", () => {
     expect(trainingRecipeContract?.execution?.sideEffects).toBe("external");
     expect(toolChainContract?.parameters.find((parameter) => parameter.id === "executionOrdering")?.required).toBeTrue();
     expect(appTemplateContract?.parameters.find((parameter) => parameter.id === "targetRuntime")?.defaultValue).toBe("container");
+    expect(systemContract?.parameters.find((parameter) => parameter.id === "allowsNestedSystems")?.defaultValue).toBeTrue();
+    expect(systemContract?.parameters.find((parameter) => parameter.id === "systemMode")?.defaultValue).toBe("autonomous");
+    expect(systemContract?.execution?.invocationMode).toBe("async");
   });
 
   it("keeps contract projection bounded for unsupported taxonomy combinations", () => {
@@ -172,10 +180,16 @@ describe("CompositionAssetContractResolver", () => {
       semanticRole: TaxonomySemanticRoles.workflow,
       behaviorKind: TaxonomyBehaviorKinds.deterministic,
     });
+    const invalidSystemShape = resolver.resolveContractForTaxonomy({
+      structuralKind: "composite",
+      semanticRole: TaxonomySemanticRoles.system,
+      behaviorKind: TaxonomyBehaviorKinds.iterative,
+    });
 
     expect(invalidTrainingRecipe).toBeUndefined();
     expect(invalidToolChain).toBeUndefined();
     expect(invalidWorkflowShape).toBeUndefined();
+    expect(invalidSystemShape).toBeUndefined();
   });
 
   it("keeps specialized composite semantics explicit for workflow, agent, and context-bundle contracts", () => {

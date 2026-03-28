@@ -344,6 +344,33 @@ function defaultTaxonomyContract(descriptor: CompositionTaxonomyDescriptor): Ass
     });
   }
 
+  if (semanticRole === TaxonomySemanticRoles.system) {
+    if (structuralKind !== "system") {
+      return undefined;
+    }
+
+    return createAssetContractDescriptor({
+      version: "1.0.0",
+      input: {
+        kind: AssetContractShapeKinds.jsonSchema,
+        description: "Full AI system composition payload, including child asset references and environment-independent system parameters.",
+      },
+      output: {
+        kind: AssetContractShapeKinds.jsonSchema,
+        description: "System composition manifest with normalized child references, dependency lineage posture, and publish-ready topology metadata.",
+      },
+      parameters: [
+        parameter("systemMode", true, "Declared system behavior mode.", "string", behaviorKind),
+        parameter("childBindingMode", true, "Baseline child-binding strategy across atomic/composite/system children.", "string", "explicit"),
+        parameter("allowsNestedSystems", true, "Whether nested system references are allowed.", "boolean", true),
+      ],
+      execution: {
+        invocationMode: behaviorKind === TaxonomyBehaviorKinds.autonomous ? "async" : "deferred",
+        sideEffects: "bounded",
+      },
+    });
+  }
+
   if (semanticRole === TaxonomySemanticRoles.contextBundle) {
     if (structuralKind !== "composite") {
       return undefined;

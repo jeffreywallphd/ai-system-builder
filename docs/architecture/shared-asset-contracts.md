@@ -37,6 +37,7 @@ Specialized composite semantics remain explicit in these shared contracts: workf
   - `training-recipe`
   - `tool-chain`
   - `app-template`
+  - `system`
 - Projections are intentionally taxonomy-combination aware (structural + semantic + behavior). Unsupported combinations return no projection, which keeps publish enforcement truthful and bounded.
 - Canonical-entity contract resolution now includes workflow definitions plus installed/base models and execution artifacts when matching repositories/catalogs are wired.
 - Direction 5 atomic studios now use this same taxonomy-driven contract seam for authoring/publish enforcement:
