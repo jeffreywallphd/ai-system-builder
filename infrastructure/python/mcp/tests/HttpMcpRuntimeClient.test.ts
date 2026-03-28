@@ -240,4 +240,27 @@ describe("HttpMcpRuntimeClient", () => {
     await expect(client.getConnectionStatus()).rejects.toThrow("503");
     expect(events.list().at(-1)?.details).toMatchObject({ eventType: "mcp-connection-failure" });
   });
+
+  it("classifies aborted status checks as cancelled lifecycle without emitting runtime-failure events", async () => {
+    const events = new RuntimeEventBuffer();
+    const client = new HttpMcpRuntimeClient(
+      new PythonRuntimeConfig({ mode: "local-http", baseUrl: "http://runtime", timeoutMs: 1_000 }),
+      (async () => {
+        throw new DOMException("signal is aborted without reason", "AbortError");
+      }) as typeof fetch,
+      { emit: (event) => events.append(event as never) }
+    );
+
+    await expect(client.getConnectionStatus()).rejects.toMatchObject({
+      diagnostics: {
+        details: {
+          requestLifecycle: "cancelled",
+        },
+      },
+    });
+    expect(events.list().map((event) => event.message)).toEqual([
+      "MCP status check started.",
+      "MCP status check cancelled.",
+    ]);
+  });
 });

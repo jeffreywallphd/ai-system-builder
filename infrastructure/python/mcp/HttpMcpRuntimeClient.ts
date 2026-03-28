@@ -31,6 +31,8 @@ interface InvocationHistoryResponse {
   readonly traces: ReadonlyArray<McpToolInvocationTrace>;
 }
 
+type McpRequestLifecycle = "cancelled" | "timed-out";
+
 export class HttpMcpRuntimeClient implements IMcpRuntimeClient {
   private readonly baseUrl: string;
   private readonly timeoutMs: number;
@@ -61,6 +63,10 @@ export class HttpMcpRuntimeClient implements IMcpRuntimeClient {
       this.emit("success", "MCP status check completed.", { eventType: "mcp-status-check", state: status.state, enabled: status.enabled });
       return status;
     } catch (error) {
+      if (isMcpRequestLifecycleError(error, "cancelled")) {
+        this.emit("info", "MCP status check cancelled.", { eventType: "mcp-status-check-cancelled" });
+        throw error;
+      }
       this.emitError("MCP status check failed.", error, "mcp-connection-failure");
       throw error;
     }
@@ -195,7 +201,7 @@ export class HttpMcpRuntimeClient implements IMcpRuntimeClient {
 
   private async request<T>(method: "GET" | "POST" | "DELETE", path: string, body?: unknown): Promise<T> {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+    const timeout = setTimeout(() => controller.abort("timeout"), this.timeoutMs);
     const target = `${this.baseUrl}${path}`;
     try {
       const response = await this.fetchImpl(target, {
@@ -226,9 +232,16 @@ export class HttpMcpRuntimeClient implements IMcpRuntimeClient {
     } catch (error) {
       if (error instanceof PythonRuntimeError) throw error;
       if (error instanceof Error && error.name === "AbortError") {
+        if (controller.signal.aborted && controller.signal.reason === "timeout") {
+          throw this.createRequestAbortError("timed-out", error, target, method, body);
+        }
+
+        throw this.createRequestAbortError("cancelled", error, target, method, body);
+      }
+      if (controller.signal.aborted && controller.signal.reason === "timeout") {
         throw new PythonRuntimeError(`Python runtime MCP request timed out after ${this.timeoutMs}ms.`, {
           cause: error,
-          details: body,
+          details: { requestLifecycle: "timed-out", requestBody: body },
           subsystem: "mcp-runtime",
           className: "HttpMcpRuntimeClient",
           methodName: "request",
@@ -254,6 +267,35 @@ export class HttpMcpRuntimeClient implements IMcpRuntimeClient {
     }
   }
 
+  private createRequestAbortError(
+    lifecycle: McpRequestLifecycle,
+    cause: unknown,
+    target: string,
+    requestMethod: "GET" | "POST" | "DELETE",
+    requestBody?: unknown,
+  ): PythonRuntimeError {
+    const isTimeout = lifecycle === "timed-out";
+    return new PythonRuntimeError(
+      isTimeout
+        ? `Python runtime MCP request timed out after ${this.timeoutMs}ms.`
+        : "Python runtime MCP request was cancelled.",
+      {
+        cause,
+        details: {
+          requestLifecycle: lifecycle,
+          requestBody,
+        },
+        subsystem: "mcp-runtime",
+        className: "HttpMcpRuntimeClient",
+        methodName: "request",
+        operation: "mcp-runtime-http-request",
+        target,
+        requestMethod,
+        failedBeforeResponse: true,
+      },
+    );
+  }
+
   private emit(severity: "debug" | "info" | "warning" | "error" | "success", message: string, details?: Readonly<Record<string, unknown>>): void {
     this.eventSink?.emit({ source: RuntimeEventSources.pythonRuntime, severity, message, details, timestamp: new Date().toISOString() });
   }
@@ -276,4 +318,17 @@ export class HttpMcpRuntimeClient implements IMcpRuntimeClient {
       timestamp: new Date().toISOString(),
     });
   }
+}
+
+function isMcpRequestLifecycleError(error: unknown, expected: McpRequestLifecycle): boolean {
+  if (!(error instanceof PythonRuntimeError)) {
+    return false;
+  }
+
+  const details = error.diagnostics.details;
+  if (!details || typeof details !== "object") {
+    return false;
+  }
+
+  return (details as { requestLifecycle?: unknown }).requestLifecycle === expected;
 }
