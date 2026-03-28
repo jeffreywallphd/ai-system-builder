@@ -68,3 +68,13 @@
   - environment assignment through the selector seam (no hardcoded single-host execution)
   - cycle-safe invalidation for binding/dependency cycles and truthful unsupported-environment surfacing
   - no orchestrator/runtime engine state machine added in this slice.
+
+## Direction 5 update: Runtime orchestration + step execution seams (stories 6.7–6.8)
+
+- Runtime now has a bounded orchestration seam in `application/system-runtime/ExecutionOrchestrationService.ts` that composes runtime-contract mapping, dependency resolution, environment selection, and plan progression into runtime execution lifecycle state.
+- Orchestration remains application-layer and delegates all per-node work to the step engine seam; it does not embed infrastructure-specific execution paths.
+- Runtime now has a bounded step engine seam in `application/system-runtime/StepExecutionEngine.ts` that executes plan nodes for atomic/composite/system components using runtime-domain status/output semantics.
+- Bounded behavior handling is explicit:
+  - deterministic steps execute fixed-pass
+  - conditional/iterative/autonomous steps expose only truthful bounded markers/diagnostics currently supported
+  - no full retry/distributed/autonomous-loop runtime stack is introduced in this slice.
