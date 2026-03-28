@@ -97,5 +97,6 @@ Direction 5 Epic 11 final hardening status (stories 11.23-11.24):
 
 Intent UX documentation alignment checklist (implemented scope):
 - Implemented now: Build/Explore/Run primary navigation shell, intent-based Build entry/routing, contextual breadcrumbs/return paths, unified Run launch model, command palette onboarding/recommendations/recents integration, and legacy-route sunset controls.
+- Primary route switching is now command-palette-driven in the app shell header; the legacy header link strip is removed, and Home remains accessible through the AI Loom Studio logo link.
 - Partially implemented / bounded: legacy route compatibility remains available behind sunset mode for staged rollout; legacy screens are redirected/hidden by policy rather than fully deleted.
 - Future work (not implemented here): full removal of legacy feature-flag compatibility paths after rollout criteria are complete.
