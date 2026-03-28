@@ -1,5 +1,6 @@
 export const BuildIntents = Object.freeze({
   automateTask: "automate-task",
+  createAiAssistant: "create-ai-assistant",
   createAssistant: "create-ai-assistant",
   trainModel: "train-model",
   workWithData: "work-with-data",
