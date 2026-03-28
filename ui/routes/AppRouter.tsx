@@ -33,10 +33,12 @@ import ToolStudioPage from "../pages/ToolStudioPage";
 import PromptTemplateStudioPage from "../pages/PromptTemplateStudioPage";
 import EmbeddingIndexStudioPage from "../pages/EmbeddingIndexStudioPage";
 import ConfigProfileStudioPage from "../pages/ConfigProfileStudioPage";
+import BuildPage from "../pages/BuildPage";
 import RegistryPage from "../pages/RegistryPage";
 import AssetDetailPage from "../pages/AssetDetailPage";
 import ProtectedRoute from "./ProtectedRoute";
 import { ROUTE_PATHS } from "./RouteConfig";
+import { BuildEntryFeatureFlag } from "../features/BuildEntryFeatureFlag";
 
 export interface AppRouterProps {
   readonly isAuthenticated?: boolean;
@@ -45,6 +47,7 @@ export interface AppRouterProps {
 export default function AppRouter({
   isAuthenticated = true,
 }: AppRouterProps): JSX.Element {
+  const buildEntryEnabled = useMemo(() => new BuildEntryFeatureFlag().isEnabled(), []);
   const routes = useMemo<ReadonlyArray<RouteObject>>(
     () => [
       {
@@ -58,6 +61,12 @@ export default function AppRouter({
         ),
         children: [
           { path: ROUTE_PATHS.home, element: <HomePage /> },
+          {
+            path: ROUTE_PATHS.build,
+            element: buildEntryEnabled
+              ? <BuildPage />
+              : <Navigate to={ROUTE_PATHS.workflows} replace />,
+          },
           { path: ROUTE_PATHS.tools, element: <ToolsPage /> },
           { path: ROUTE_PATHS.toolRun, element: <ToolRunPage /> },
           { path: ROUTE_PATHS.workflows, element: <WorkflowsPage /> },
@@ -96,7 +105,7 @@ export default function AppRouter({
       },
       { path: ROUTE_PATHS.notFound, element: <NotFoundPage /> },
     ],
-    [isAuthenticated]
+    [buildEntryEnabled, isAuthenticated]
   );
   const router = useMemo(() => createBrowserRouter([...routes]), [routes]);
 

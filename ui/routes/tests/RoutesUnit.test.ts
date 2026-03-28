@@ -6,9 +6,11 @@ describe("ui/routes unit coverage", () => {
     const source = readSource("ui/routes/RouteConfig.ts");
 
     expect(source).toContain('export const ROUTE_PATHS = Object.freeze({');
+    expect(source).toContain('build: "/build"');
     expect(source).toContain('workflowEditor: "/workflows/:workflowId"');
     expect(source).toContain('workflowContextWorkbench: "/workflows/:workflowId/context-workbench"');
     expect(source).toContain("export const APP_ROUTES");
+    expect(source).toContain('key: "build"');
     expect(source).toContain('key: "workflow-editor"');
     expect(source).toContain('key: "settings"');
     expect(source).toContain('key: "mcp"');
@@ -59,6 +61,7 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain("createBrowserRouter");
     expect(source).toContain("<RouterProvider router={router} />");
     expect(source).toContain("<ProtectedRoute");
+    expect(source).toContain("path: ROUTE_PATHS.build");
     expect(source).toContain("path: ROUTE_PATHS.notFound");
     expect(source).toContain('path: "/index.html"');
     expect(source).toContain("path: ROUTE_PATHS.settings");

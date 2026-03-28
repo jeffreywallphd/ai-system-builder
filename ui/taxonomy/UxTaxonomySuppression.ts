@@ -89,6 +89,7 @@ export class UxStudioEntryLabelResolver {
   public resolveNavigationTitle(routeKey: string, fallback: string): string {
     const navigationLabels: Readonly<Record<string, string>> = Object.freeze({
       home: "Home",
+      build: "Build",
       workflows: "Build",
       tools: "Capabilities",
       models: "AI Library",
