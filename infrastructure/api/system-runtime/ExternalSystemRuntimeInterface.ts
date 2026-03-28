@@ -9,6 +9,7 @@ import {
   SystemRuntimeBackendApi,
   type SystemRuntimeApiResponse,
 } from "./SystemRuntimeBackendApi";
+import type { RuntimeApiAuthenticationRequest } from "./RuntimeApiAuthentication";
 
 export interface ExternalExecutionRequest {
   readonly systemId: string;
@@ -18,6 +19,7 @@ export interface ExternalExecutionRequest {
   readonly inputSchemaVersion?: string;
   readonly context?: ExecutionContext;
   readonly callerContext?: ExecutionAccessContext;
+  readonly authentication?: RuntimeApiAuthenticationRequest;
   readonly executionId?: string;
 }
 
@@ -45,9 +47,20 @@ export interface ExternalExecutionResultRequest {
   readonly executionId: string;
   readonly nodeResultLimit?: number;
   readonly diagnosticsLimit?: number;
+  readonly callerContext?: ExecutionAccessContext;
+  readonly authentication?: RuntimeApiAuthenticationRequest;
 }
 
-export interface ExternalExecutionTraceRequest extends GetSystemRuntimeExecutionTraceRequest {}
+export interface ExternalExecutionTraceRequest extends GetSystemRuntimeExecutionTraceRequest {
+  readonly callerContext?: ExecutionAccessContext;
+  readonly authentication?: RuntimeApiAuthenticationRequest;
+}
+
+export interface ExternalExecutionStatusRequest {
+  readonly executionId: string;
+  readonly callerContext?: ExecutionAccessContext;
+  readonly authentication?: RuntimeApiAuthenticationRequest;
+}
 
 function normalizeRequired(value: string, label: string): string {
   const normalized = value.trim();
@@ -94,6 +107,11 @@ export class ExternalSystemRuntimeInterface {
         inputSchemaVersion: request.inputSchemaVersion,
         context: request.context,
         accessContext: request.callerContext,
+        requestContext: {
+          requireAuthentication: true,
+          authentication: request.authentication,
+          accessContext: request.callerContext,
+        },
       });
 
       if (!started.ok || !started.data) {
@@ -118,12 +136,28 @@ export class ExternalSystemRuntimeInterface {
     }
   }
 
-  public async getExecutionStatus(executionId: string): Promise<SystemRuntimeApiResponse<ExternalExecutionStatus>> {
-    return this.runtimeApi.getExecutionStatus(executionId);
+  public async getExecutionStatus(
+    request: string | ExternalExecutionStatusRequest,
+  ): Promise<SystemRuntimeApiResponse<ExternalExecutionStatus>> {
+    const normalized = typeof request === "string"
+      ? Object.freeze({ executionId: request })
+      : request;
+    return this.runtimeApi.getExecutionStatus(normalized.executionId, {
+      requireAuthentication: true,
+      authentication: normalized.authentication,
+      accessContext: normalized.callerContext,
+    });
   }
 
   public async getExecutionResult(request: ExternalExecutionResultRequest): Promise<SystemRuntimeApiResponse<ExternalExecutionResult>> {
-    const result = await this.runtimeApi.getExecutionResultBounded(request as GetSystemRuntimeExecutionResultRequest);
+    const result = await this.runtimeApi.getExecutionResultBounded({
+      ...(request as GetSystemRuntimeExecutionResultRequest),
+      requestContext: {
+        requireAuthentication: true,
+        authentication: request.authentication,
+        accessContext: request.callerContext,
+      },
+    });
     if (!result.ok || !result.data) {
       return result;
     }
@@ -143,7 +177,14 @@ export class ExternalSystemRuntimeInterface {
   }
 
   public async getExecutionTrace(request: ExternalExecutionTraceRequest): Promise<SystemRuntimeApiResponse<RuntimeExecutionTraceReadModel>> {
-    return this.runtimeApi.getExecutionTrace(request);
+    return this.runtimeApi.getExecutionTrace({
+      ...request,
+      requestContext: {
+        requireAuthentication: true,
+        authentication: request.authentication,
+        accessContext: request.callerContext,
+      },
+    });
   }
 
   private toApiError(error: unknown): { readonly code: "invalid-request" | "internal"; readonly message: string } {
