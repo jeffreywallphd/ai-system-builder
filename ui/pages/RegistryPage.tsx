@@ -122,7 +122,7 @@ export default function RegistryPage(): JSX.Element {
         <div className="ui-page__hero-copy">
           <h1 className="ui-page__title">Registry</h1>
           <p className="ui-page__subtitle">
-            Browse cross-studio assets through the shared registry API with clear taxonomy filters.
+            Browse cross-studio assets with consistent taxonomy labels, focused filters, and linked studio navigation.
           </p>
         </div>
       </div>
@@ -133,11 +133,11 @@ export default function RegistryPage(): JSX.Element {
             <div className="ui-stack ui-stack--2xs">
               <h2 style={{ margin: 0 }}>Filters</h2>
               <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
-                Structural kind is always visible; semantic role and behavior are in advanced filters.
+                Search and filters are applied together. Structural kind is always visible; role and behavior are in Advanced filters.
               </p>
             </div>
-            <SearchBar value={keyword} onChange={setKeyword} disabled={isLoading} />
-            <AssetFilterPanel value={filters} onChange={setFilters} disabled={isLoading} />
+            <SearchBar value={keyword} onChange={setKeyword} />
+            <AssetFilterPanel value={filters} onChange={setFilters} />
             <label className="ui-stack ui-stack--2xs">
               <span className="ui-text-small">Max results</span>
               <select value={limit} onChange={(event) => setLimit(Number(event.target.value))}>

@@ -612,3 +612,17 @@ Explicitly later than this story:
 - Query caching is keyed by filter/search shape and guarded by source signatures (`versionCount` + `lineageEdgeCount`) so publish/version/dependency changes invalidate cached projections deterministically.
 - Dependency graph caching now memoizes adjacency/direct-expansion/traversal results; projection dirty/signature checks still govern rebuild truth through `IRegistryGraphProjectionRepository`.
 - Cross-studio correctness now has integration-style coverage that spans atomic + composite assets across publish visibility, taxonomy/contract/provenance projection, dependency graph traversal, lineage, filtering/search, and dependency replacement after version updates.
+
+## Direction 5 update: Registry docs + UX alignment (stories 4.17–4.18)
+
+- Registry remains projection-only: `RegistryQueryService` materializes `RegistryAsset` read models from canonical asset/version/lineage/taxonomy/contract/validation data; it is not a source-of-truth store.
+- Query stack boundaries are explicit:
+  - `RegistryQueryService` = projection/filter/search/detail
+  - `CrossStudioRegistryQueryService` = API-facing facet wrappers
+  - `RegistryDependencyGraphService` = direct + traversal dependency graph reads
+- Dependency semantics in registry read models are explicit by source: `version-upstream`, `lineage-edge`, `draft-dependency`.
+- Cache behavior remains in-memory/disposable and signature-invalidated (`versionCount:lineageEdgeCount`) across query + graph namespaces.
+- Registry API remains bounded to list/filter/search/detail + dependency/dependent traversal endpoints with typed transport errors (`not-found`/`invalid-request`/`internal`).
+- Scope truth:
+  - atomic + composite assets are fully covered in registry browse/detail/graph/navigation flows.
+  - system-kind taxonomy is filterable, but dedicated system-studio authoring surfaces are still future work.

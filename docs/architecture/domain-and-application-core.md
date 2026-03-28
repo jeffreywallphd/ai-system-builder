@@ -619,3 +619,38 @@ Explicitly later than this story:
 - Registry query caching is keyed by filter/search shape and invalidated by source-signature changes (`versionCount` + `lineageEdgeCount`) so cache entries remain derived from canonical asset/version/lineage truth.
 - Dependency graph expansion/traversal now caches adjacency and frequently repeated traversals, while projection rebuild remains tied to projection dirty/signature checks (`IRegistryGraphProjectionRepository`) rather than a second persistence layer.
 - Cross-studio registry consistency now has integration-style coverage for atomic + composite publish/read/query/graph/lineage/search flows, including version update and dependency replacement scenarios (`application/asset-registry/tests/CrossStudioRegistryConsistency.integration.test.ts`).
+
+## Direction 5 update: Registry alignment + UX refinement (stories 4.17–4.18)
+
+### Registry architecture truth (as implemented)
+- Registry data is a **derived projection**, not a source of truth. `RegistryQueryService` composes asset records, latest versions, lineage edges, taxonomy classification, contract resolution, and validation projection into `RegistryAsset` read models (`domain/asset-registry/RegistryAsset.ts`, `application/asset-registry/RegistryQueryService.ts`).
+- Query/read surfaces are split cleanly:
+  - `RegistryQueryService`: list/filter/search + detail by asset/version.
+  - `CrossStudioRegistryQueryService`: taxonomy/contract/provenance/dependency-focused query wrappers used by API.
+  - `RegistryDependencyGraphService`: direct and traversal graph reads (upstream/downstream) over rebuilt or persisted projection snapshots.
+- Dependency semantics are explicit:
+  - `version-upstream`: declared version upstream references.
+  - `lineage-edge`: lineage relationships from canonical lineage edges.
+  - `draft-dependency`: metadata-declared dependency references.
+  These are projected into one dependency view without introducing a second graph model.
+- Lineage semantics are version-centric and bounded: lineage lists and graph traversals are read projections with depth limits, not global causality proofs.
+- Registry validation is projected from shared Studio Shell validation + atomic/composite consistency enforcement; the registry UI/API does not invent independent validation logic.
+
+### Caching strategy (implemented)
+- Caching is in-memory only (`RegistryCacheLayer`) and always disposable.
+- Caches are keyed by query/traversal parameters and guarded by source signatures (`versionCount`, `lineageEdgeCount`), with namespace invalidation on signature drift.
+- Graph caching includes adjacency/direct/traversal memoization. Projection rebuild remains governed by projection dirty/signature checks when `IRegistryGraphProjectionRepository` is present.
+- No cache layer acts as durable truth; canonical asset/version/lineage repositories remain authoritative.
+
+### API and usage patterns (implemented)
+- Registry API (`infrastructure/api/registry/RegistryBackendApi.ts`) exposes:
+  - list/filter/search assets
+  - detail by asset id or version id
+  - direct dependencies/dependents
+  - upstream/downstream traversal
+- API contracts intentionally use bounded typed error mapping (`not-found`, `invalid-request`, `internal`) over internal service failures.
+
+### Atomic vs composite vs system handling (current scope)
+- **Atomic and composite assets** are fully represented in current registry query/filter/detail/graph flows through taxonomy + contract projections and shared validation insights.
+- **System structural kind** is filterable and taxonomy-valid at registry level, but dedicated system authoring/management surfaces remain outside this slice.
+- Future work remains explicit: richer system-asset studio flows and any broader system composer UX are not implemented in registry stories 4.17–4.18.

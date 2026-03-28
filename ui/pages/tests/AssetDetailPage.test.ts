@@ -23,9 +23,9 @@ describe("AssetDetailPage", () => {
   it("keeps registry navigation handoff links and progressive detail wording", () => {
     const source = readSource("ui/pages/AssetDetailPage.tsx");
 
-    expect(source).toContain("Back to registry");
+    expect(source).toContain("Back to results");
     expect(source).toContain("Open in studio");
     expect(source).toContain("registryContext");
-    expect(source).toContain("Unified detail view for registry taxonomy, contract, provenance, versions, and dependency lineage");
+    expect(source).toContain("Unified detail view across taxonomy, contract, provenance, dependency graph, and lineage");
   });
 });

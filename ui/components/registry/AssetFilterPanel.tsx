@@ -12,6 +12,12 @@ export interface AssetFilterPanelProps {
   readonly disabled?: boolean;
 }
 
+const emptyFilterState: RegistryFilterState = Object.freeze({
+  structuralKinds: Object.freeze([]),
+  semanticRoles: Object.freeze([]),
+  behaviorKinds: Object.freeze([]),
+});
+
 interface FilterOption<T extends string> {
   readonly value: T;
   readonly label: string;
@@ -84,8 +90,20 @@ function FilterGroup<T extends string>({
 }
 
 export function AssetFilterPanel({ value, onChange, disabled }: AssetFilterPanelProps): JSX.Element {
+  const activeFilterCount = value.structuralKinds.length + value.semanticRoles.length + value.behaviorKinds.length;
   return (
     <div className="ui-stack ui-stack--sm" data-testid="registry-filter-panel">
+      <div className="ui-row ui-row--wrap" style={{ justifyContent: "space-between", alignItems: "center" }}>
+        <span className="ui-text-small ui-text-secondary">{activeFilterCount} active filter(s)</span>
+        <button
+          type="button"
+          className="ui-button ui-button--ghost ui-button--small"
+          onClick={() => onChange(emptyFilterState)}
+          disabled={disabled || activeFilterCount === 0}
+        >
+          Clear filters
+        </button>
+      </div>
       <FilterGroup
         title="Structural kind"
         options={structuralKindOptions}

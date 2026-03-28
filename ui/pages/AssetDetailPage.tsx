@@ -111,7 +111,7 @@ export default function AssetDetailPage(): JSX.Element {
       <section className="ui-page ui-stack ui-stack--sm" data-testid="registry-asset-detail-page">
         <div className="ui-row ui-row--wrap" style={{ justifyContent: "space-between" }}>
           <h1 className="ui-page__title" style={{ margin: 0 }}>Registry Asset</h1>
-          <Link className="ui-button ui-button--ghost ui-button--small" to={registryBackPath}>Back to registry</Link>
+          <Link className="ui-button ui-button--ghost ui-button--small" to={registryBackPath}>Back to results</Link>
         </div>
         <p className="ui-text-secondary">{error ?? "Asset detail is unavailable."}</p>
       </section>
@@ -133,11 +133,11 @@ export default function AssetDetailPage(): JSX.Element {
                   Open in studio
                 </Link>
               ) : null}
-              <Link className="ui-button ui-button--ghost ui-button--small" to={registryBackPath}>Back to registry</Link>
+              <Link className="ui-button ui-button--ghost ui-button--small" to={registryBackPath}>Back to results</Link>
             </div>
           </div>
           <p className="ui-page__subtitle" style={{ margin: 0 }}>
-            Unified detail view for registry taxonomy, contract, provenance, versions, and dependency lineage.
+            Unified detail view across taxonomy, contract, provenance, dependency graph, and lineage.
           </p>
         </div>
       </div>

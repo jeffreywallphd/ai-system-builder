@@ -72,6 +72,9 @@ Current Direction 5 UI status:
 - Fully implemented now in renderer: atomic studios + composite studios (Workflow, Context Bundle, Dataset Pipeline, Training Recipe, Tool Chain) on one shared `StudioShellPage` architecture.
 - Registry is now a first-class Studio Shell surface (`/studio-shell/registry`) routed through the same app shell/navigation and powered by a thin desktop bridge-backed `RegistryService` plus shared page/card/layout primitives.
 - Registry asset browsing uses API-driven taxonomy filters (structural kind, semantic role, behavior kind) with progressive disclosure (`Advanced filters`) so renderer state remains minimal and business filtering stays backend-authoritative.
+- Registry terminology is normalized across list/filter/detail surfaces around `Structure`, `Role`, and `Behavior` labels.
+- Search + filter coherence is URL-driven and combined (same request context), with preserved list-return context via `registryContext` in detail links.
 - Registry cross-studio handoffs are now URL-driven and taxonomy-derived (`semanticRole -> studio route` mapping), so asset list/detail/graph interactions can deep-link to studio editors without introducing a second navigation model.
 - Registry asset detail now renders backend-projected validation/compatibility summaries (including dependency incompatibilities and behavior mismatches) from the registry API payload instead of UI-side validation reimplementation.
+- Dependency/lineage rendering remains read-model-driven with bounded UX refinements only (stable ordering, node counts, consistent action labels).
 - Intentionally not implemented in renderer in this slice: dedicated system-asset studio surfaces (Full AI System, App Template / Deployment Unit) and any separate composite-runtime authoring UX beyond shared shell metadata/dependency/lifecycle/publish flows.
