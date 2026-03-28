@@ -35,8 +35,11 @@ const MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
 export class SqliteSystemRuntimeExecutionStore implements ISystemRuntimeExecutionStore {
   private database?: SqliteCompatDatabase;
   private initialized = false;
+  private readonly maxRecords: number;
 
-  public constructor(private readonly databasePath: string) {}
+  public constructor(private readonly databasePath: string, maxRecords = 10000) {
+    this.maxRecords = Number.isFinite(maxRecords) && maxRecords > 0 ? Math.floor(maxRecords) : 10000;
+  }
 
   public saveExecutionRecord(record: PersistedExecutionRecord): void {
     this.getDatabase()
@@ -76,6 +79,7 @@ export class SqliteSystemRuntimeExecutionStore implements ISystemRuntimeExecutio
         record.metadata.parentNodeId ?? null,
         JSON.stringify(record),
       );
+    this.pruneToCapacity();
   }
 
   public getExecutionRecord(executionId: string): PersistedExecutionRecord | undefined {
@@ -162,6 +166,26 @@ export class SqliteSystemRuntimeExecutionStore implements ISystemRuntimeExecutio
     }
 
     db.pragma(`user_version = ${SCHEMA_VERSION}`);
+  }
+
+  private pruneToCapacity(): void {
+    const overflowRow = this.getDatabase()
+      .prepare("SELECT COUNT(*) as count FROM system_runtime_executions")
+      .get() as { readonly count: number };
+    const overflow = overflowRow.count - this.maxRecords;
+    if (overflow <= 0) {
+      return;
+    }
+
+    this.getDatabase().prepare(`
+      DELETE FROM system_runtime_executions
+      WHERE execution_id IN (
+        SELECT execution_id
+        FROM system_runtime_executions
+        ORDER BY started_at ASC, execution_id ASC
+        LIMIT ?
+      )
+    `).run(overflow);
   }
 }
 

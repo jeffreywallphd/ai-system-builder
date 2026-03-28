@@ -54,6 +54,13 @@ This keeps capability claims small and truthful: higher layers can reason about 
 - System-of-systems execution is now first-class through the same runtime stack: nested system nodes invoke recursive child executions via the existing orchestration seam, and parent records carry child execution linkage metadata.
 - Boundaries remain explicit: this is still bounded runtime metadata persistence and recursive orchestration support, not a full replay/event-sourcing/distributed execution platform.
 
+### Direction 5 Epic 6 runtime hardening (story 6.23)
+
+- Runtime orchestration now enforces explicit bounded runtime-state retention (trace/log/error/progression retention caps) so iterative/autonomous runs remain stable under repeated progression.
+- Runtime start requests now validate runtime safety bounds (`maxDepth`, `maxIterationsPerNode`, `maxPlanningCyclesPerNode`, and runtime-state retention limits) and fail cleanly with deterministic invalid-request semantics when pathological values are supplied.
+- Runtime execution metadata persistence now includes bounded retention policies in both in-memory and SQLite execution stores (oldest records are pruned on overflow).
+- This is bounded performance/stability hardening only; no distributed scheduling/queue/event-sourcing infrastructure was introduced.
+
 ### Workflow path now routed through the engine
 
 `application/workflows/ExecuteWorkflowUseCase.ts` now builds a one-unit execution plan for **both** the immediate workflow run path and the `startExecution(...)` path, then submits that plan to the unified execution engine.
@@ -309,6 +316,7 @@ That is "done enough" for Direction 1: the unified execution engine now includes
 
 - Tool running, model/dataset runs, and the narrow MCP server-operation slice now share the same engine seam and persisted run model, but broader composition still has multiple roots. Further convergence should happen incrementally instead of through a giant rewrite.
 - The interpreted fallback is clearly useful, but the product docs should eventually define which node types are expected to be fully trustworthy under scaffold execution versus only under delegated runtimes.
+- Runtime documentation is now aligned with implemented Epic 6 seams through story 6.23; future updates should keep `.md`/`.ai.md` runtime sections in lockstep whenever runtime behavior changes.
 
 ## Direction 3 trust update: MCP auth/secrets and permission policy
 

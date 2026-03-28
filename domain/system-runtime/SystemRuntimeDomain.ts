@@ -715,6 +715,53 @@ export function createExecutionTraceSnapshot(execution: SystemExecution): Execut
   });
 }
 
+export function enforceExecutionRuntimeStateBounds(input: {
+  readonly execution: SystemExecution;
+  readonly maxTraceEvents?: number;
+  readonly maxTraceLogs?: number;
+  readonly maxRuntimeErrors?: number;
+}): SystemExecution {
+  const normalizeLimit = (value: number | undefined): number | undefined => (
+    typeof value === "number" && Number.isFinite(value) && value > 0
+      ? Math.floor(value)
+      : undefined
+  );
+  const maxTraceEvents = normalizeLimit(input.maxTraceEvents);
+  const maxTraceLogs = normalizeLimit(input.maxTraceLogs);
+  const maxRuntimeErrors = normalizeLimit(input.maxRuntimeErrors);
+
+  const traceEvents = maxTraceEvents
+    ? input.execution.runtimeState.trace.events.slice(Math.max(0, input.execution.runtimeState.trace.events.length - maxTraceEvents))
+    : input.execution.runtimeState.trace.events;
+  const traceLogs = maxTraceLogs
+    ? input.execution.runtimeState.trace.logs.slice(Math.max(0, input.execution.runtimeState.trace.logs.length - maxTraceLogs))
+    : input.execution.runtimeState.trace.logs;
+  const runtimeErrors = maxRuntimeErrors
+    ? input.execution.runtimeState.errors.slice(Math.max(0, input.execution.runtimeState.errors.length - maxRuntimeErrors))
+    : input.execution.runtimeState.errors;
+
+  if (
+    traceEvents.length === input.execution.runtimeState.trace.events.length
+    && traceLogs.length === input.execution.runtimeState.trace.logs.length
+    && runtimeErrors.length === input.execution.runtimeState.errors.length
+  ) {
+    return input.execution;
+  }
+
+  return Object.freeze({
+    ...input.execution,
+    runtimeState: Object.freeze({
+      ...input.execution.runtimeState,
+      trace: Object.freeze({
+        ...input.execution.runtimeState.trace,
+        events: Object.freeze([...traceEvents]),
+        logs: Object.freeze([...traceLogs]),
+      }),
+      errors: Object.freeze([...runtimeErrors]),
+    }),
+  });
+}
+
 export function appendRuntimeExecutionError(input: {
   readonly execution: SystemExecution;
   readonly error: RuntimeExecutionError;

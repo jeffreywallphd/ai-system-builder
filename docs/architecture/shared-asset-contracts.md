@@ -126,3 +126,19 @@ Not implemented in this slice:
   - unsupported/unrecoverable conditions fail the execution immediately
   - transient step failures can retry in a bounded single-attempt window
   - propagated failures are recorded in runtime state + trace for later API/UI inspection.
+
+## Direction 5 update: Runtime performance + stability safeguards (story 6.23)
+
+- Runtime orchestration now enforces bounded runtime-state retention in hot paths (trace events, trace logs, runtime errors, and progression history) so long-running iterative/autonomous requests stay memory-bounded.
+- Pathological runtime bound requests now fail deterministically as `invalid-request` (for depth, iteration/planning-cycle, and runtime-state retention limits) instead of allowing runaway progression.
+- Runtime execution persistence now has bounded retention behavior:
+  - in-memory runtime execution store prunes oldest records when capacity is exceeded
+  - SQLite runtime execution store prunes oldest persisted records when capacity is exceeded.
+- These safeguards preserve current correctness/version-aware behavior while avoiding speculative infrastructure (no distributed scheduler/queue/observability architecture added).
+
+## Direction 5 update: Runtime documentation alignment (story 6.24)
+
+- Runtime architecture docs now align to implemented seams through stories 6.1–6.23 and explicitly distinguish:
+  - implemented behavior (runtime domain, mapping/resolution, environment/plan, orchestration/step execution, state/trace/recovery, API/UI/status/result, persistence, version awareness, nested systems, and bounded stability controls),
+  - bounded/partial behavior (single-host bounded loops/planning, bounded retention/read-model summaries),
+  - future work (broader scheduling/distributed execution/advanced observability not yet implemented).

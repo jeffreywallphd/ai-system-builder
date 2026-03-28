@@ -116,4 +116,41 @@ describe("SqliteSystemRuntimeExecutionStore", () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it("prunes oldest persisted records when capacity is exceeded", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-system-runtime-store-prune-"));
+    try {
+      const store = new SqliteSystemRuntimeExecutionStore(path.join(root, "system-runtime.sqlite"), 2);
+      const first = createExecution("exec:prune:1", "system:root:v1");
+      const second = createExecution("exec:prune:2", "system:root:v1");
+      const third = createExecution("exec:prune:3", "system:root:v1");
+      const toRecord = (execution: ReturnType<typeof createExecution>) => ({
+        executionId: execution.executionId,
+        execution,
+        metadata: {
+          executionId: execution.executionId,
+          rootAssetId: execution.root.assetId,
+          rootVersionId: execution.root.versionId,
+          status: execution.status,
+          startedAt: execution.startedAt,
+          updatedAt: execution.updatedAt,
+          completedAt: execution.completedAt,
+          trace: { eventCount: 1, logCount: 1 },
+          result: { hasOutput: true, hasError: false },
+          executedVersionMap: { rootVersionId: execution.root.versionId, nodeVersionIds: {} },
+          childExecutionIds: [],
+        },
+      } as const);
+
+      store.saveExecutionRecord(toRecord(first));
+      store.saveExecutionRecord(toRecord(second));
+      store.saveExecutionRecord(toRecord(third));
+
+      expect(store.getExecutionRecord("exec:prune:1")).toBeUndefined();
+      expect(store.getExecutionRecord("exec:prune:2")).toBeDefined();
+      expect(store.getExecutionRecord("exec:prune:3")).toBeDefined();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
