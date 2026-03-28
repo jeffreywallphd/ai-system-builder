@@ -19,9 +19,16 @@ import { createAssetDraft, createAssetSession } from "../../../domain/studio-she
 import {
   evaluateAtomicStudioDraftConsistency,
   evaluateCompositeStudioDraftConsistency,
+  evaluateSystemStudioDraftConsistency,
   evaluateStudioDraftConsistency,
 } from "../AtomicStudioAssetEnforcement";
 import type { AssetMetadata } from "../../../domain/studio-shell/StudioShellDomain";
+import {
+  createSystemAsset,
+  createSystemStudioTaxonomy,
+  SystemBindingEndpointScopes,
+  SystemComponentKinds,
+} from "../../../domain/system-studio/SystemAssetDomain";
 
 const resolver = new CompositionAssetContractResolver();
 
@@ -380,5 +387,151 @@ describe("evaluateCompositeStudioDraftConsistency", () => {
 
       expect(issues.map((issue) => issue.code)).toContain("taxonomy-behavior-kind-mismatch");
     }
+  });
+});
+
+describe("evaluateSystemStudioDraftConsistency", () => {
+  it("accepts valid bounded recursive system drafts for publish enforcement", async () => {
+    const child = createSystemAsset({
+      assetId: "system:child",
+      versionId: "system:child:v1",
+      components: [{
+        componentKind: SystemComponentKinds.atomic,
+        assetId: "asset:model",
+        versionId: "asset:model:v1",
+        alias: "child-model",
+        taxonomy: { structuralKind: "atomic", semanticRole: "model", behaviorKind: "none" },
+      }],
+      inputs: [{ inputId: "childPrompt", valueType: "string", required: true }],
+      outputs: [{ outputId: "childAnswer", valueType: "string" }],
+    });
+    const root = createSystemAsset({
+      assetId: "system:root",
+      versionId: "system:root:v1",
+      components: [{
+        componentKind: SystemComponentKinds.system,
+        assetId: "system:child",
+        versionId: "system:child:v1",
+        alias: "child",
+        taxonomy: createSystemStudioTaxonomy(),
+      }],
+      inputs: [{ inputId: "prompt", valueType: "string", required: true }],
+      outputs: [{ outputId: "answer", valueType: "string" }],
+      bindings: [{
+        bindingId: "bind-parent-child",
+        source: { scope: SystemBindingEndpointScopes.systemInput, endpointId: "prompt" },
+        target: { scope: SystemBindingEndpointScopes.componentInput, componentAlias: "child", endpointId: "childPrompt" },
+      }],
+      taxonomy: createSystemStudioTaxonomy(),
+    });
+
+    const projected = await resolver.resolveSystemContract({
+      root,
+      resolveSystem: async (reference) => (reference.assetId === "system:child" ? child : undefined),
+      resolveChildContract: async (component) => component.taxonomy
+        ? resolver.resolveContractForTaxonomy(component.taxonomy)
+        : undefined,
+    });
+
+    const draft = createAtomicDraft({
+      draftId: "draft-system",
+      studioId: "studio-systems",
+      metadata: {
+        title: "System Draft",
+        tags: ["system"],
+        taxonomy: root.taxonomy,
+        contract: projected,
+        provenance: { sourceType: "generated", sourceLabel: "system-studio" },
+      },
+    });
+
+    const issues = await evaluateSystemStudioDraftConsistency({
+      draft,
+      expectation: {
+        studioType: "system-studio",
+        semanticRole: "system",
+        allowedBehaviorKinds: ["deterministic", "conditional", "iterative", "autonomous"],
+      },
+      contractResolver: resolver,
+      systemAsset: root,
+      resolveSystem: async (reference) => (reference.assetId === "system:child" ? child : undefined),
+      resolveChildContract: async (component) => {
+        if (component.componentKind === SystemComponentKinds.system) {
+          const nested = component.assetId === "system:child" ? child : undefined;
+          return nested ? resolver.resolveSystemContract({
+            root: nested,
+            resolveSystem: async () => undefined,
+          }) : undefined;
+        }
+        return component.taxonomy ? resolver.resolveContractForTaxonomy(component.taxonomy) : undefined;
+      },
+    });
+
+    expect(issues).toEqual([]);
+  });
+
+  it("blocks invalid child references, incompatible bindings, and recursive cycles", async () => {
+    const root = createSystemAsset({
+      assetId: "system:root",
+      versionId: "system:root:v1",
+      components: [{
+        componentKind: SystemComponentKinds.system,
+        assetId: "system:missing",
+        versionId: "system:missing:v1",
+        alias: "missing",
+        taxonomy: createSystemStudioTaxonomy(),
+      }],
+      nestedSystems: [{ assetId: "system:child", versionId: "system:child:v1", alias: "child" }],
+      inputs: [{ inputId: "prompt", valueType: "string", required: true }],
+      outputs: [{ outputId: "answer", valueType: "string" }],
+      bindings: [{
+        bindingId: "bad-binding",
+        source: { scope: SystemBindingEndpointScopes.systemInput, endpointId: "prompt" },
+        target: { scope: SystemBindingEndpointScopes.componentInput, componentAlias: "missing", endpointId: "childPrompt" },
+      }],
+      taxonomy: createSystemStudioTaxonomy(),
+    });
+    const child = createSystemAsset({
+      assetId: "system:child",
+      versionId: "system:child:v1",
+      nestedSystems: [{ assetId: "system:root", versionId: "system:root:v1", alias: "root" }],
+      inputs: [{ inputId: "childPrompt", valueType: "number", required: true }],
+      outputs: [{ outputId: "childAnswer", valueType: "string" }],
+      taxonomy: createSystemStudioTaxonomy(),
+    });
+
+    const draft = createAtomicDraft({
+      draftId: "draft-system-invalid",
+      studioId: "studio-systems",
+      metadata: {
+        title: "System Draft Invalid",
+        tags: ["system"],
+        taxonomy: root.taxonomy,
+        contract: resolver.resolveContractForTaxonomy(root.taxonomy),
+        provenance: { sourceType: "generated", sourceLabel: "system-studio" },
+      },
+    });
+
+    const issues = await evaluateSystemStudioDraftConsistency({
+      draft,
+      expectation: {
+        studioType: "system-studio",
+        semanticRole: "system",
+        allowedBehaviorKinds: ["deterministic", "conditional", "iterative", "autonomous"],
+      },
+      contractResolver: resolver,
+      systemAsset: root,
+      resolveSystem: async (reference) => (
+        reference.assetId === "system:child" ? child : reference.assetId === "system:root" ? root : undefined
+      ),
+      resolveChildContract: async () => undefined,
+      maxDepth: 2,
+    });
+
+    const codes = issues.map((issue) => issue.code);
+    expect(codes).toContain("system-child-reference-missing");
+    expect(codes).toContain("system-binding-endpoint-not-found");
+    expect(codes).toContain("system-recursion-cycle-detected");
+    expect(codes).toContain("contract-mismatch");
   });
 });

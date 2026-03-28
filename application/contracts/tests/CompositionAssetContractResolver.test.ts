@@ -6,6 +6,11 @@ import { ContextRecipe } from "../../context/models/ContextRecipe";
 import { CompositionTaxonomyClassifier } from "../../taxonomy/CompositionTaxonomyClassifier";
 import { TaxonomyBehaviorKinds, TaxonomySemanticRoles } from "../../../domain/taxonomy/CompositionTaxonomy";
 import { CompositionAssetContractResolver } from "../CompositionAssetContractResolver";
+import {
+  createSystemAsset,
+  SystemBindingEndpointScopes,
+  SystemComponentKinds,
+} from "../../../domain/system-studio/SystemAssetDomain";
 
 describe("CompositionAssetContractResolver", () => {
   const resolver = new CompositionAssetContractResolver();
@@ -190,6 +195,112 @@ describe("CompositionAssetContractResolver", () => {
     expect(invalidToolChain).toBeUndefined();
     expect(invalidWorkflowShape).toBeUndefined();
     expect(invalidSystemShape).toBeUndefined();
+  });
+
+  it("projects recursive system contracts from explicit inputs/outputs/parameters/bindings", async () => {
+    const childSystem = createSystemAsset({
+      assetId: "system:child",
+      versionId: "system:child:v1",
+      components: [{
+        componentKind: SystemComponentKinds.atomic,
+        assetId: "asset:model",
+        versionId: "asset:model:v1",
+        alias: "model",
+        taxonomy: { structuralKind: "atomic", semanticRole: "model", behaviorKind: "none" },
+      }],
+      inputs: [{ inputId: "childPrompt", valueType: "string", required: true }],
+      outputs: [{ outputId: "childAnswer", valueType: "string" }],
+      parameters: [{ parameterId: "childTemperature", valueType: "number", defaultValue: 0.2 }],
+      bindings: [{
+        bindingId: "child-bind",
+        source: { scope: SystemBindingEndpointScopes.systemInput, endpointId: "childPrompt" },
+        target: { scope: SystemBindingEndpointScopes.componentInput, componentAlias: "model", endpointId: "prompt" },
+      }],
+    });
+    const root = createSystemAsset({
+      assetId: "system:root",
+      versionId: "system:root:v1",
+      components: [
+        {
+          componentKind: SystemComponentKinds.atomic,
+          assetId: "asset:model",
+          versionId: "asset:model:v2",
+          alias: "root-model",
+          taxonomy: { structuralKind: "atomic", semanticRole: "model", behaviorKind: "none" },
+        },
+        {
+          componentKind: SystemComponentKinds.system,
+          assetId: "system:child",
+          versionId: "system:child:v1",
+          alias: "child",
+          taxonomy: { structuralKind: "system", semanticRole: "system", behaviorKind: "deterministic" },
+        },
+      ],
+      inputs: [{ inputId: "prompt", valueType: "string", required: true }],
+      outputs: [{ outputId: "answer", valueType: "string" }],
+      parameters: [{ parameterId: "temperature", valueType: "number", defaultValue: 0.1 }],
+      bindings: [{
+        bindingId: "root-bind",
+        source: { scope: SystemBindingEndpointScopes.systemInput, endpointId: "prompt" },
+        target: { scope: SystemBindingEndpointScopes.componentInput, componentAlias: "child", endpointId: "childPrompt" },
+      }],
+    });
+
+    const contract = await resolver.resolveSystemContract({
+      root,
+      resolveSystem: async (reference) => (reference.assetId === childSystem.assetId ? childSystem : undefined),
+      resolveChildContract: async (component) => component.taxonomy
+        ? resolver.resolveContractForTaxonomy(component.taxonomy)
+        : undefined,
+      maxDepth: 4,
+    });
+
+    expect(contract.input?.schema).toEqual({
+      type: "object",
+      properties: {
+        prompt: { type: "string", description: undefined },
+      },
+      required: ["prompt"],
+    });
+    expect(contract.parameters.find((entry) => entry.id === "systemParameter:temperature")?.defaultValue).toBe(0.1);
+    expect(contract.parameters.find((entry) => entry.id === "nestedSystemCount")?.defaultValue).toBe(1);
+    expect(contract.parameters.find((entry) => entry.id === "recursiveTraversalStatus")?.defaultValue).toBe("complete");
+  });
+
+  it("keeps recursive system contract projection deterministic and cycle-safe", async () => {
+    const root = createSystemAsset({
+      assetId: "system:root",
+      versionId: "system:root:v1",
+      nestedSystems: [{ assetId: "system:child", versionId: "system:child:v1", alias: "child" }],
+      inputs: [{ inputId: "prompt", valueType: "string" }],
+      outputs: [{ outputId: "answer", valueType: "string" }],
+    });
+    const child = createSystemAsset({
+      assetId: "system:child",
+      versionId: "system:child:v1",
+      nestedSystems: [{ assetId: "system:root", versionId: "system:root:v1", alias: "root" }],
+      inputs: [{ inputId: "childPrompt", valueType: "string" }],
+      outputs: [{ outputId: "childAnswer", valueType: "string" }],
+    });
+
+    const resolveSystem = async (reference: { assetId: string }) => (
+      reference.assetId === "system:child" ? child : reference.assetId === "system:root" ? root : undefined
+    );
+
+    const first = await resolver.resolveSystemContract({
+      root,
+      resolveSystem,
+      maxDepth: 4,
+    });
+    const second = await resolver.resolveSystemContract({
+      root,
+      resolveSystem,
+      maxDepth: 4,
+    });
+
+    expect(first).toEqual(second);
+    expect(first.parameters.find((entry) => entry.id === "recursiveTraversalStatus")?.defaultValue).toBe("cycle-detected");
+    expect(first.parameters.find((entry) => entry.id === "recursiveTraversalCycleSafe")?.defaultValue).toBeFalse();
   });
 
   it("keeps specialized composite semantics explicit for workflow, agent, and context-bundle contracts", () => {
