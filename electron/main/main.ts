@@ -73,6 +73,7 @@ import { CompositionAssetContractResolver } from "../../application/contracts/Co
 import { SystemStudioBackendApi } from "../../infrastructure/api/system-studio/SystemStudioBackendApi";
 import { SystemRuntimeBackendApi } from "../../infrastructure/api/system-runtime/SystemRuntimeBackendApi";
 import { SqliteSystemRuntimeExecutionStore } from "../../infrastructure/filesystem/system-runtime/SqliteSystemRuntimeExecutionStore";
+import { SqliteExecutionAuditRepository } from "../../infrastructure/filesystem/system-runtime/SqliteExecutionAuditRepository";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 if (started) {
@@ -299,7 +300,8 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   const studioShellBackendApi = new StudioShellBackendApi(studioShellRepository);
   const systemStudioBackendApi = new SystemStudioBackendApi(studioShellRepository);
   const runtimeExecutionStore = new SqliteSystemRuntimeExecutionStore(path.join(storagePaths.assetsDirectory, "system-runtime.sqlite"));
-  const systemRuntimeBackendApi = new SystemRuntimeBackendApi(studioShellRepository, runtimeExecutionStore);
+  const runtimeExecutionAuditRepository = new SqliteExecutionAuditRepository(path.join(storagePaths.assetsDirectory, "system-runtime-audit.sqlite"));
+  const systemRuntimeBackendApi = new SystemRuntimeBackendApi(studioShellRepository, runtimeExecutionStore, undefined, undefined, undefined, undefined, undefined, runtimeExecutionAuditRepository);
   const executionHistoryInfrastructure = createExecutionHistoryInfrastructure(executionRunRepository);
   getExecutionRunUseCase = new GetExecutionRunUseCase(executionRunRepository);
   listExecutionRunsUseCase = executionHistoryInfrastructure.listExecutionRunsUseCase;

@@ -78,6 +78,7 @@ export class RuntimeRequestRouter {
     const context = request.request as { readonly requestContext?: Parameters<SystemRuntimeBackendApi["startExecution"]>[0]["requestContext"] };
     const internalRequestContext = Object.freeze({
       trustedInternal: true,
+      requestSource: RuntimeRequestSources.studioShellInternal,
       ...(context.requestContext ?? {}),
     });
     if (request.operation === "start-execution") {

@@ -61,6 +61,13 @@ This keeps capability claims small and truthful: higher layers can reason about 
 - Runtime execution metadata persistence now includes bounded retention policies in both in-memory and SQLite execution stores (oldest records are pruned on overflow).
 - This is bounded performance/stability hardening only; no distributed scheduling/queue/event-sourcing infrastructure was introduced.
 
+### Direction 5 Epic 7 external invocation + audit slice (stories 7.15–7.16)
+
+- External runtime invocation (API + tool bridge) now keeps system-of-systems execution lineage explicit on the same runtime stack: flat and nested systems both execute through existing version-aware orchestration paths, and status/result/start projections expose bounded parent/child execution linkage summaries.
+- External invocation lineage remains version-aware and session/tenant/auth/access/quota bounded; nested system identity is preserved rather than flattened into opaque node output.
+- Runtime execution audit now has a separate durable trail model (requested/accepted/completed/failed) that stores caller identity, tenant context, request source, system/version identity, execution/session ids, and bounded nested-child attribution where available.
+- Audit records are intentionally distinct from runtime trace/log events and from asset version history; they are queryable through runtime backend seams without introducing a broader compliance platform.
+
 ### Workflow path now routed through the engine
 
 `application/workflows/ExecuteWorkflowUseCase.ts` now builds a one-unit execution plan for **both** the immediate workflow run path and the `startExecution(...)` path, then submits that plan to the unified execution engine.

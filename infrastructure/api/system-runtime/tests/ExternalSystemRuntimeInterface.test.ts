@@ -89,6 +89,52 @@ async function seedVersion(repository: InMemoryStudioShellRepository): Promise<v
   }));
 }
 
+async function seedNestedVersions(repository: InMemoryStudioShellRepository): Promise<void> {
+  await repository.saveAssetVersion(new AssetVersion({
+    assetId: "system:external-child",
+    versionId: "system:external-child:v1",
+    metadata: {
+      metadata: {
+        taxonomy: { structuralKind: "system", semanticRole: "system", behaviorKind: "deterministic" },
+      },
+      content: JSON.stringify({
+        systemSpec: {
+          components: [],
+          inputs: [{ inputId: "request", valueType: "string", required: false }],
+          outputs: [{ outputId: "response", valueType: "string" }],
+        },
+      }),
+      dependencies: [],
+    },
+  }));
+  await repository.saveAssetVersion(new AssetVersion({
+    assetId: "system:external-parent",
+    versionId: "system:external-parent:v1",
+    metadata: {
+      metadata: {
+        taxonomy: { structuralKind: "system", semanticRole: "system", behaviorKind: "deterministic" },
+      },
+      content: JSON.stringify({
+        systemSpec: {
+          components: [
+            {
+              componentKind: "system",
+              alias: "child",
+              assetId: "system:external-child",
+              versionId: "system:external-child:v1",
+              taxonomy: { structuralKind: "system", semanticRole: "system", behaviorKind: "deterministic" },
+            },
+          ],
+          nestedSystems: [{ alias: "child", assetId: "system:external-child", versionId: "system:external-child:v1" }],
+          inputs: [{ inputId: "request", valueType: "string", required: false }],
+          outputs: [{ outputId: "response", valueType: "string" }],
+        },
+      }),
+      dependencies: [],
+    },
+  }));
+}
+
 describe("ExternalSystemRuntimeInterface", () => {
   it("starts and reads execution through the existing runtime backend path", async () => {
     const repository = new InMemoryStudioShellRepository();
@@ -167,6 +213,46 @@ describe("ExternalSystemRuntimeInterface", () => {
     expect(result.data?.bounded).toBeDefined();
     expect(result.data?.serialized.identity.executionId).toBe(started.data?.executionId);
     expect(result.data?.serialized.summary.nodeResultCount).toBe(result.data?.nodeResults.length);
+  });
+
+  it("keeps nested system invocation lineage visible for external callers", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    await seedNestedVersions(repository);
+    const backend = new SystemRuntimeBackendApi(
+      repository,
+      undefined,
+      new RuntimeAccessControlService(),
+      new StaticTokenRuntimeApiAuthenticator({
+        "token-user-1": { callerKind: "user", callerId: "user-1", roles: ["external-runtime"], metadata: { tenantId: "tenant-a" } },
+      }),
+    );
+    const external = new ExternalSystemRuntimeInterface(backend);
+    const started = await external.startExecution({
+      systemId: "system:external-parent",
+      versionId: "system:external-parent:v1",
+      authentication: { bearerToken: "token-user-1" },
+      tenantId: "tenant-a",
+    });
+    expect(started.ok).toBeTrue();
+    expect(started.data?.nestedExecutionLineage.length).toBeGreaterThan(0);
+
+    const status = await external.getExecutionStatus({
+      executionId: started.data!.executionId,
+      authentication: { bearerToken: "token-user-1" },
+      tenantId: "tenant-a",
+    });
+    expect(status.ok).toBeTrue();
+    expect(status.data?.nestedExecutionLineage.length).toBeGreaterThan(0);
+    expect(status.data?.nestedExecutionLineage[0]?.parentExecutionId).toBe(started.data?.executionId);
+
+    const result = await external.getExecutionResult({
+      executionId: started.data!.executionId,
+      authentication: { bearerToken: "token-user-1" },
+      tenantId: "tenant-a",
+    });
+    expect(result.ok).toBeTrue();
+    expect(result.data?.nestedExecutionLineage.length).toBeGreaterThan(0);
+    expect(result.data?.nestedExecutionLineage[0]?.rootVersionId).toBe("system:external-child:v1");
   });
 
   it("rejects invalid external identity inputs consistently", async () => {
