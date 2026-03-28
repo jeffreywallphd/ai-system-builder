@@ -14,6 +14,7 @@ import {
 } from "../../../application/system-runtime/ExecutionSessionRepository";
 import { RuntimeAccessControlService, type ExecutionAccessContext } from "../../../application/system-runtime/RuntimeAccessControlService";
 import { ExecutionQuotaEvaluator } from "../../../application/system-runtime/ExecutionQuotaEvaluator";
+import { RuntimeRateLimitEvaluator } from "../../../application/system-runtime/RuntimeRateLimitEvaluator";
 import {
   type RuntimeValidationError,
   RuntimeInputValidationFailure,
@@ -63,6 +64,7 @@ import {
   type ExecutionCallbackPayload,
 } from "./ExecutionCallbackDispatcher";
 import { ExecutionAuditEventKinds, type ExecutionAuditRecord } from "../../../domain/system-runtime/ExecutionAuditTrailDomain";
+import type { RetryAttemptRecord } from "./ExternalRetryPolicy";
 import { ExecutionAuditTrailService } from "../../../application/system-runtime/ExecutionAuditTrailService";
 import {
   InMemoryExecutionAuditRepository,
@@ -77,7 +79,7 @@ export type {
 };
 
 export interface SystemRuntimeApiError {
-  readonly code: "not-found" | "invalid-request" | "forbidden" | "unauthorized" | "quota-exceeded" | "internal";
+  readonly code: "not-found" | "invalid-request" | "forbidden" | "unauthorized" | "quota-exceeded" | "rate-limit-exceeded" | "internal";
   readonly message: string;
   readonly validationErrors?: ReadonlyArray<RuntimeValidationError>;
 }
@@ -141,6 +143,7 @@ export interface RuntimeApiRequestContext {
   readonly accessContext?: ExecutionAccessContext;
   readonly tenantId?: string;
   readonly requestSource?: ExecutionAuditRecord["requestSource"];
+  readonly retryAttempt?: RetryAttemptRecord;
 }
 
 export interface ExecutionCallbackRegistrationRequest {
@@ -177,6 +180,7 @@ export class SystemRuntimeBackendApi {
     private readonly executionSessionRepository: ExecutionSessionRepository = new InMemoryExecutionSessionRepository(),
     private readonly callbackDispatcher: ExecutionCallbackDispatcher = new HttpExecutionCallbackDispatcher(),
     executionAuditRepository: ExecutionAuditRepository = new InMemoryExecutionAuditRepository(),
+    private readonly runtimeRateLimitEvaluator = new RuntimeRateLimitEvaluator(),
   ) {
     this.service = new SystemRuntimeApplicationService(repository, executionStore);
     this.auditTrailService = new ExecutionAuditTrailService(executionAuditRepository);
@@ -194,6 +198,8 @@ export class SystemRuntimeBackendApi {
       const callerContext = this.resolveCallerContext(request);
       const tenantContext = this.resolveTenantContext({ requestContext: request.requestContext, callerContext, requestTenantId: request.tenantId });
       const requestSource = this.resolveRequestSource(request.requestContext);
+      this.assertExternalRateLimit({ requestContext: request.requestContext, callerContext, tenantId: tenantContext?.tenantId, operation: "start-execution" });
+      this.recordRetryAuditFromContext(request.requestContext, requestSource, request.executionId);
       this.assertExecutionAccess({
         accessContext: callerContext,
         systemId: request.systemId,
@@ -319,6 +325,7 @@ export class SystemRuntimeBackendApi {
       const callerContext = this.resolveCallerContext(request);
       const tenantContext = this.resolveTenantContext({ requestContext: request.requestContext, callerContext, requestTenantId: request.tenantId });
       const requestSource = this.resolveRequestSource(request.requestContext);
+      this.assertExternalRateLimit({ requestContext: request.requestContext, callerContext, tenantId: tenantContext?.tenantId, operation: "start-execution-async" });
       this.assertExecutionAccess({
         accessContext: callerContext,
         systemId: request.systemId,
@@ -330,6 +337,7 @@ export class SystemRuntimeBackendApi {
       }
 
       const executionId = request.executionId?.trim() || `sys-exec-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+      this.recordRetryAuditFromContext(request.requestContext, requestSource, executionId);
       let session = this.requireOrCreateSession({
         requestedSessionId: request.sessionId,
         executionId,
@@ -566,6 +574,9 @@ export class SystemRuntimeBackendApi {
     readonly requestContext?: RuntimeApiRequestContext;
   }): Promise<SystemRuntimeApiResponse<ExecutionPollResponse>> {
     return this.wrap(async () => {
+      const pollCaller = this.resolveCallerContext({ requestContext: input.requestContext });
+      const pollTenant = this.resolveTenantContext({ requestContext: input.requestContext, callerContext: pollCaller });
+      this.assertExternalRateLimit({ requestContext: input.requestContext, callerContext: pollCaller, tenantId: pollTenant?.tenantId, operation: "poll-execution" });
       const executionId = input.executionId?.trim() || this.executionSessionRepository.getById(input.sessionId?.trim() ?? "")?.lastExecutionId;
       if (!executionId) {
         throw new Error("invalid-request:executionId or sessionId is required.");
@@ -625,10 +636,11 @@ export class SystemRuntimeBackendApi {
         throw new Error(`not-found:Execution session '${normalized}' was not found.`);
       }
       const caller = this.resolveCallerContext({ requestContext });
+      const tenantContext = this.resolveTenantContext({ requestContext, callerContext: caller });
+      this.assertExternalRateLimit({ requestContext, callerContext: caller, tenantId: tenantContext?.tenantId, operation: "get-execution-session" });
       if (caller?.callerId && session.context?.callerId && caller.callerId !== session.context.callerId) {
         throw new Error("forbidden:Runtime execution session does not belong to caller.");
       }
-      const tenantContext = this.resolveTenantContext({ requestContext, callerContext: caller });
       this.assertTenantIsolation({
         access: { caller, tenant: tenantContext },
         resourceTenantId: session.context?.tenantId,
@@ -644,6 +656,9 @@ export class SystemRuntimeBackendApi {
     readonly requestContext?: RuntimeApiRequestContext;
   }): Promise<SystemRuntimeApiResponse<ExecutionCallbackRegistration>> {
     return this.wrap(async () => {
+      const caller = this.resolveCallerContext({ requestContext: input.requestContext });
+      const tenantContext = this.resolveTenantContext({ requestContext: input.requestContext, callerContext: caller });
+      this.assertExternalRateLimit({ requestContext: input.requestContext, callerContext: caller, tenantId: tenantContext?.tenantId, operation: "register-execution-callback" });
       const session = await this.resolveSessionForUpdate(input.sessionId, input.executionId, input.requestContext);
       const updated = this.executionSessionRepository.save(registerExecutionSessionCallback({
         session,
@@ -666,6 +681,7 @@ export class SystemRuntimeBackendApi {
       }
       const caller = this.resolveCallerContext({ requestContext: input.requestContext });
       const tenantContext = this.resolveTenantContext({ requestContext: input.requestContext, callerContext: caller });
+      this.assertExternalRateLimit({ requestContext: input.requestContext, callerContext: caller, tenantId: tenantContext?.tenantId, operation: "subscribe-execution-updates" });
       if (input.executionId?.trim()) {
         this.assertTenantIsolation({
           access: { caller, tenant: tenantContext },
@@ -839,12 +855,34 @@ export class SystemRuntimeBackendApi {
     }
     for (const callback of callbacks) {
       const payload = await this.buildCallbackPayload(input, callback);
-      const delivery = await this.callbackDispatcher.dispatch(callback, payload);
-      const currentSession = this.executionSessionRepository.getById(input.session.sessionId) ?? input.session;
-      this.executionSessionRepository.save(appendExecutionSessionCallbackDelivery({
-        session: currentSession,
-        delivery,
-      }));
+      const maxAttempts = Math.max(1, callback.maxAttempts ?? 1);
+      for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        const delivery = await this.callbackDispatcher.dispatch(callback, payload);
+        const currentSession = this.executionSessionRepository.getById(input.session.sessionId) ?? input.session;
+        this.executionSessionRepository.save(appendExecutionSessionCallbackDelivery({
+          session: currentSession,
+          delivery,
+        }));
+        if (delivery.succeeded) {
+          break;
+        }
+        const retryable = delivery.statusCode === undefined || delivery.statusCode >= 500;
+        this.recordAudit({
+          eventKind: attempt < maxAttempts && retryable ? ExecutionAuditEventKinds.retryAttempted : ExecutionAuditEventKinds.retryExhausted,
+          requestSource: "unknown",
+          execution: { executionId: input.executionId, sessionId: input.session.sessionId, status: input.session.status },
+          detail: {
+            message: delivery.message,
+            errorCode: `callback-delivery-${delivery.statusCode ?? "unknown"}`,
+            retryAttempt: attempt,
+            retryMaxAttempts: maxAttempts,
+            retryClassification: retryable ? "retryable-callback-delivery" : "non-retryable-callback-delivery",
+          },
+        });
+        if (!retryable || attempt >= maxAttempts) {
+          break;
+        }
+      }
     }
   }
 
@@ -955,6 +993,7 @@ export class SystemRuntimeBackendApi {
     const status = await this.service.getExecutionStatus(executionId);
     const callerContext = this.resolveCallerContext({ requestContext });
     const tenantContext = this.resolveTenantContext({ requestContext, callerContext });
+    this.assertExternalRateLimit({ requestContext, callerContext, tenantId: tenantContext?.tenantId, operation: "get-execution-status" });
     this.assertExecutionAccess({
       accessContext: callerContext,
       systemId: status.rootAssetId,
@@ -1003,6 +1042,27 @@ export class SystemRuntimeBackendApi {
     }
   }
 
+
+  private assertExternalRateLimit(input: {
+    readonly requestContext?: RuntimeApiRequestContext;
+    readonly callerContext?: ExecutionAccessContext;
+    readonly tenantId?: string;
+    readonly operation: string;
+  }): void {
+    if (input.requestContext?.trustedInternal) {
+      return;
+    }
+    const decision = this.runtimeRateLimitEvaluator.evaluate({
+      callerContext: input.callerContext,
+      tenantId: input.tenantId,
+      requestSource: this.resolveRequestSource(input.requestContext),
+      operation: input.operation,
+    });
+    if (!decision.allowed) {
+      throw new Error(`rate-limit-exceeded:${decision.message ?? "Runtime request rate limit exceeded."}`);
+    }
+  }
+
   private serializeExecutionEnvironment(input: RuntimeEnvironment): SerializedExecutionEnvironment {
     return Object.freeze({
       environmentId: input.environmentId,
@@ -1047,6 +1107,33 @@ export class SystemRuntimeBackendApi {
     return "unknown";
   }
 
+  private recordRetryAuditFromContext(
+    requestContext: RuntimeApiRequestContext | undefined,
+    requestSource: ExecutionAuditRecord["requestSource"],
+    executionId: string | undefined,
+  ): void {
+    const attempt = requestContext?.retryAttempt;
+    if (!attempt || attempt.attempt <= 1 || !executionId) {
+      return;
+    }
+    this.recordAudit({
+      eventKind: ExecutionAuditEventKinds.retryAttempted,
+      requestSource,
+      callerContext: requestContext.accessContext,
+      tenantContext: this.resolveTenantContext({ requestContext, callerContext: requestContext.accessContext }),
+      execution: {
+        executionId,
+        status: "pending",
+      },
+      detail: {
+        message: attempt.reason,
+        retryAttempt: attempt.attempt,
+        retryMaxAttempts: attempt.maxAttempts,
+        retryClassification: attempt.classification,
+      },
+    });
+  }
+
   private recordAudit(input: {
     readonly eventKind: typeof ExecutionAuditEventKinds[keyof typeof ExecutionAuditEventKinds];
     readonly requestSource: ExecutionAuditRecord["requestSource"];
@@ -1063,6 +1150,9 @@ export class SystemRuntimeBackendApi {
     readonly detail?: {
       readonly message?: string;
       readonly errorCode?: string;
+      readonly retryAttempt?: number;
+      readonly retryMaxAttempts?: number;
+      readonly retryClassification?: string;
     };
   }): void {
     this.auditTrailService.record({
@@ -1114,6 +1204,9 @@ export class SystemRuntimeBackendApi {
     }
     if (message.startsWith("quota-exceeded:")) {
       return Object.freeze({ code: "quota-exceeded", message: message.slice("quota-exceeded:".length) });
+    }
+    if (message.startsWith("rate-limit-exceeded:")) {
+      return Object.freeze({ code: "rate-limit-exceeded", message: message.slice("rate-limit-exceeded:".length) });
     }
 
     return Object.freeze({ code: "internal", message });

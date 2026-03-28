@@ -47,6 +47,12 @@ Workflow -> `ExecuteWorkflowUseCase` -> one-unit `ExecutionPlan` -> `UnifiedExec
   - execution audit is now a separate durable trail (requested/accepted/completed/failed) capturing caller, tenant, request source, system/version, and execution/session identity with bounded nested-child attribution,
   - audit trail remains distinct from runtime trace/log streams and asset-version history (no broad compliance analytics subsystem added).
 
+- Direction 5 Epic 7 stories 7.17–7.18 now add bounded external-boundary resilience controls on the same seams:
+  - external start/invocation paths now apply explicit external retry classification (retryable transport/internal failures only) with bounded attempts,
+  - idempotent replay protection at external start boundary reuses execution identity for repeated idempotency-key requests instead of creating duplicate runs,
+  - callback delivery retries are bounded by callback registration max-attempts and audited as retry-attempted/retry-exhausted outcomes,
+  - external entrypoint rate limiting is evaluated centrally at runtime API boundaries (caller/tenant/source-operation windows), remains distinct from execution quotas, and returns structured `rate-limit-exceeded` errors.
+
 ## Runtime orchestration update
 - Delegated workflow execution selection can now consult the shared runtime dependency orchestrator before choosing a delegated strategy.
 - When the delegated workflow runtime gate is unavailable, selection falls back to a compatible interpreted strategy instead of pretending delegated execution is still ready.
