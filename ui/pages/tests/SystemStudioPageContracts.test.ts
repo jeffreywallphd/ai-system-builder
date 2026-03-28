@@ -20,10 +20,12 @@ describe("SystemStudioPage contracts", () => {
     expect(registrationSource).toContain("SystemCompositionEditor");
     expect(registrationSource).toContain("SystemInterfaceEditor");
     expect(registrationSource).toContain("SystemParameterConfigEditor");
+    expect(registrationSource).toContain("SystemExecutionMetadataEditor");
     expect(registrationSource).toContain("SystemCompatibilityInsightsPanel");
     expect(registrationSource).toContain("system-studio-structure-editor");
     expect(registrationSource).toContain("system-studio-interface-editor");
     expect(registrationSource).toContain("system-studio-parameter-editor");
+    expect(registrationSource).toContain("system-studio-execution-metadata-editor");
     expect(registrationSource).toContain("system-studio-compatibility-insights");
     expect(registrationSource).toContain('slot: "dependencies"');
     expect(registrationSource).toContain('slot: "metadata"');
@@ -62,12 +64,16 @@ describe("SystemStudioPage contracts", () => {
   it("renders first-class system interface and parameter authoring panels", () => {
     const interfaceSource = readSource("ui/components/studio-shell/SystemInterfaceEditor.tsx");
     const parameterSource = readSource("ui/components/studio-shell/SystemParameterConfigEditor.tsx");
+    const executionMetadataSource = readSource("ui/components/studio-shell/SystemExecutionMetadataEditor.tsx");
     expect(interfaceSource).toContain("data-testid=\"system-interface-editor\"");
     expect(interfaceSource).toContain("System inputs and outputs");
     expect(interfaceSource).toContain("updateSystemInterfaces");
     expect(parameterSource).toContain("data-testid=\"system-parameter-config-editor\"");
     expect(parameterSource).toContain("System parameters and defaults");
     expect(parameterSource).toContain("updateSystemParameters");
+    expect(executionMetadataSource).toContain("data-testid=\"system-execution-metadata-editor\"");
+    expect(executionMetadataSource).toContain("System execution metadata");
+    expect(executionMetadataSource).toContain("updateSystemExecutionMetadata");
   });
 
   it("renders bounded recursive compatibility insights from system validation outputs", () => {

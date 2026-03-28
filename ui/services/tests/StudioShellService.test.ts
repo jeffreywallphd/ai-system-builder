@@ -21,6 +21,7 @@ describe("StudioShellService", () => {
     expect(source).toContain("reorderSystemChildComponent(");
     expect(source).toContain("updateSystemInterfaces(");
     expect(source).toContain("updateSystemParameters(");
+    expect(source).toContain("updateSystemExecutionMetadata(");
     expect(source).toContain("getSystemCompatibilityInsights(");
     expect(source).not.toContain("fetch(");
   });

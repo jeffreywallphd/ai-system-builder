@@ -13,6 +13,7 @@ import {
   type SystemAsset,
   type SystemCompositionReference,
   type SystemComponentReference,
+  type SystemExecutionMetadata,
 } from "../../domain/system-studio/SystemAssetDomain";
 import { AssetDraftLifecycleStatuses, type AssetDraftDependencyReference } from "../../domain/studio-shell/StudioShellDomain";
 import type {
@@ -121,6 +122,7 @@ interface SystemSpecContent {
   readonly outputs?: ReadonlyArray<SystemAsset["outputs"][number]>;
   readonly parameters?: ReadonlyArray<SystemAsset["parameters"][number]>;
   readonly bindings?: ReadonlyArray<SystemAsset["bindings"][number]>;
+  readonly executionMetadata?: SystemExecutionMetadata;
 }
 
 export interface UpdateSystemInterfacesCommand {
@@ -136,6 +138,13 @@ export interface UpdateSystemParametersCommand {
   readonly sessionId: string;
   readonly draftId: string;
   readonly parameters: ReadonlyArray<SystemAsset["parameters"][number]>;
+}
+
+export interface UpdateSystemExecutionMetadataCommand {
+  readonly studioId?: string;
+  readonly sessionId: string;
+  readonly draftId: string;
+  readonly executionMetadata?: SystemExecutionMetadata;
 }
 
 function parseSystemContent(content: string): SystemSpecContent {
@@ -163,6 +172,7 @@ function parseSystemContent(content: string): SystemSpecContent {
       readonly outputs?: ReadonlyArray<SystemAsset["outputs"][number]>;
       readonly parameters?: ReadonlyArray<SystemAsset["parameters"][number]>;
       readonly bindings?: ReadonlyArray<SystemAsset["bindings"][number]>;
+      readonly executionMetadata?: SystemExecutionMetadata;
     }
     : undefined;
 
@@ -173,6 +183,7 @@ function parseSystemContent(content: string): SystemSpecContent {
     outputs: spec?.outputs,
     parameters: spec?.parameters,
     bindings: spec?.bindings,
+    executionMetadata: spec?.executionMetadata,
   });
 }
 
@@ -664,6 +675,48 @@ export class SystemStudioApplicationService {
           outputs: nextSystem.outputs,
           parameters: nextSystem.parameters,
           bindings: nextSystem.bindings,
+          executionMetadata: nextSystem.executionMetadata,
+        },
+      }),
+      dependencies: collectSystemDirectDependencies(nextSystem),
+    });
+  }
+
+  public async updateSystemExecutionMetadata(command: UpdateSystemExecutionMetadataCommand): Promise<AssetDraftResult> {
+    const studioId = command.studioId?.trim() || SystemStudioIdentity.defaultStudioId;
+    const loaded = await this.studioShellService.loadAssetDraft({ studioId, draftId: command.draftId });
+    if (!loaded) {
+      throw new StudioShellInvalidRequestError(`Draft '${command.draftId}' is not available in studio '${studioId}'.`);
+    }
+
+    const spec = parseSystemContent(loaded.draft.content);
+    const nextSystem = createSystemAsset({
+      assetId: loaded.draft.assetId,
+      taxonomy: loaded.draft.metadata.taxonomy ?? createSystemStudioTaxonomy(),
+      dependencies: loaded.draft.dependencies,
+      components: spec.components,
+      nestedSystems: spec.nestedSystems,
+      inputs: spec.inputs,
+      outputs: spec.outputs,
+      parameters: spec.parameters,
+      bindings: spec.bindings,
+      executionMetadata: command.executionMetadata,
+    });
+
+    return this.updateSystemDraft({
+      studioId,
+      sessionId: command.sessionId,
+      draftId: command.draftId,
+      content: serializeSystemContent({
+        content: loaded.draft.content,
+        spec: {
+          components: nextSystem.components,
+          nestedSystems: buildNestedSystemReferences(nextSystem),
+          inputs: nextSystem.inputs,
+          outputs: nextSystem.outputs,
+          parameters: nextSystem.parameters,
+          bindings: nextSystem.bindings,
+          executionMetadata: nextSystem.executionMetadata,
         },
       }),
       dependencies: collectSystemDirectDependencies(nextSystem),

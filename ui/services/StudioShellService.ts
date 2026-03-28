@@ -18,6 +18,7 @@ import type {
   SystemStudioApiResponse,
   SystemStudioChildComponentReadModel,
   SystemCompatibilityInsightsReadModel,
+  UpdateSystemExecutionMetadataRequest,
   UpdateSystemInterfacesRequest,
   UpdateSystemParametersRequest,
 } from "../../infrastructure/api/system-studio/SystemStudioBackendApi";
@@ -104,6 +105,11 @@ export class StudioShellService {
 
   public async updateSystemParameters(request: UpdateSystemParametersRequest): Promise<SystemStudioApiResponse<{ readonly updated: boolean }>> {
     const raw = await this.requireBridge().updateSystemParameters(JSON.stringify(request));
+    return JSON.parse(raw) as SystemStudioApiResponse<{ readonly updated: boolean }>;
+  }
+
+  public async updateSystemExecutionMetadata(request: UpdateSystemExecutionMetadataRequest): Promise<SystemStudioApiResponse<{ readonly updated: boolean }>> {
+    const raw = await this.requireBridge().updateSystemExecutionMetadata(JSON.stringify(request));
     return JSON.parse(raw) as SystemStudioApiResponse<{ readonly updated: boolean }>;
   }
 

@@ -146,6 +146,25 @@ describe("SystemAssetDomain", () => {
     expect(system.bindings).toHaveLength(3);
   });
 
+  it("normalizes bounded execution metadata on system assets", () => {
+    const system = createSystemAsset({
+      assetId: "system:execution-metadata",
+      executionMetadata: {
+        runtime: { environment: "  python-3.11  ", requirements: ["numpy", "numpy", "  pandas  "] },
+        orchestration: { mode: "queued", hints: ["retryable", "retryable"] },
+        publish: { visibility: "team", exportTargets: ["registry", "registry"] },
+        executionProfile: { profileId: "profile:latency", latencyTier: "low-latency" },
+        operations: { ownerTeam: "runtime", supportContact: "ops@loom.local" },
+      },
+    });
+
+    expect(system.executionMetadata?.runtime?.environment).toBe("python-3.11");
+    expect(system.executionMetadata?.runtime?.requirements).toEqual(["numpy", "pandas"]);
+    expect(system.executionMetadata?.orchestration?.hints).toEqual(["retryable"]);
+    expect(system.executionMetadata?.publish?.exportTargets).toEqual(["registry"]);
+    expect(system.executionMetadata?.executionProfile?.latencyTier).toBe("low-latency");
+  });
+
   it("rejects invalid system binding shapes and unknown endpoint references", () => {
     expect(() => createSystemAsset({
       assetId: "system:binding-invalid",

@@ -64,6 +64,30 @@ export interface SystemParameterDefinition {
   readonly defaultValue?: unknown;
 }
 
+export interface SystemExecutionMetadata {
+  readonly runtime?: {
+    readonly environment?: string;
+    readonly requirements?: ReadonlyArray<string>;
+  };
+  readonly orchestration?: {
+    readonly mode?: string;
+    readonly hints?: ReadonlyArray<string>;
+  };
+  readonly publish?: {
+    readonly visibility?: "private" | "team" | "public";
+    readonly exportTargets?: ReadonlyArray<string>;
+  };
+  readonly executionProfile?: {
+    readonly profileId?: string;
+    readonly latencyTier?: "standard" | "low-latency" | "batch";
+  };
+  readonly operations?: {
+    readonly ownerTeam?: string;
+    readonly supportContact?: string;
+    readonly notes?: string;
+  };
+}
+
 export const SystemBindingEndpointScopes = Object.freeze({
   systemInput: "system-input",
   systemOutput: "system-output",
@@ -101,6 +125,7 @@ export interface SystemAsset {
   readonly outputs: ReadonlyArray<SystemOutputDefinition>;
   readonly parameters: ReadonlyArray<SystemParameterDefinition>;
   readonly bindings: ReadonlyArray<SystemBinding>;
+  readonly executionMetadata?: SystemExecutionMetadata;
 }
 
 export interface SystemCompositionNode {
@@ -219,6 +244,66 @@ function normalizeSystemBinding(input: SystemBinding): SystemBinding {
     target,
     description: normalizeOptional(input.description),
   });
+}
+
+function normalizeStringList(values?: ReadonlyArray<string>): ReadonlyArray<string> | undefined {
+  const normalized = [...new Set((values ?? []).map((entry) => entry.trim()).filter(Boolean))];
+  return normalized.length > 0 ? Object.freeze(normalized) : undefined;
+}
+
+function normalizeSystemExecutionMetadata(input?: SystemExecutionMetadata): SystemExecutionMetadata | undefined {
+  if (!input) {
+    return undefined;
+  }
+
+  const normalized: SystemExecutionMetadata = Object.freeze({
+    runtime: input.runtime
+      ? Object.freeze({
+        environment: normalizeOptional(input.runtime.environment),
+        requirements: normalizeStringList(input.runtime.requirements),
+      })
+      : undefined,
+    orchestration: input.orchestration
+      ? Object.freeze({
+        mode: normalizeOptional(input.orchestration.mode),
+        hints: normalizeStringList(input.orchestration.hints),
+      })
+      : undefined,
+    publish: input.publish
+      ? Object.freeze({
+        visibility: input.publish.visibility,
+        exportTargets: normalizeStringList(input.publish.exportTargets),
+      })
+      : undefined,
+    executionProfile: input.executionProfile
+      ? Object.freeze({
+        profileId: normalizeOptional(input.executionProfile.profileId),
+        latencyTier: input.executionProfile.latencyTier,
+      })
+      : undefined,
+    operations: input.operations
+      ? Object.freeze({
+        ownerTeam: normalizeOptional(input.operations.ownerTeam),
+        supportContact: normalizeOptional(input.operations.supportContact),
+        notes: normalizeOptional(input.operations.notes),
+      })
+      : undefined,
+  });
+
+  const hasEntries = Boolean(
+    normalized.runtime?.environment
+    || normalized.runtime?.requirements?.length
+    || normalized.orchestration?.mode
+    || normalized.orchestration?.hints?.length
+    || normalized.publish?.visibility
+    || normalized.publish?.exportTargets?.length
+    || normalized.executionProfile?.profileId
+    || normalized.executionProfile?.latencyTier
+    || normalized.operations?.ownerTeam
+    || normalized.operations?.supportContact
+    || normalized.operations?.notes,
+  );
+  return hasEntries ? normalized : undefined;
 }
 
 function normalizeSystemDependencies(dependencies?: ReadonlyArray<AssetDraftDependencyReference>): ReadonlyArray<AssetDraftDependencyReference> {
@@ -354,6 +439,7 @@ export function createSystemAsset(input: {
   readonly outputs?: ReadonlyArray<SystemOutputDefinition>;
   readonly parameters?: ReadonlyArray<SystemParameterDefinition>;
   readonly bindings?: ReadonlyArray<SystemBinding>;
+  readonly executionMetadata?: SystemExecutionMetadata;
 }): SystemAsset {
   const assetId = AssetId.from(input.assetId).value;
   const versionId = normalizeOptional(input.versionId);
@@ -396,6 +482,7 @@ export function createSystemAsset(input: {
     outputs,
     parameters,
     bindings,
+    executionMetadata: normalizeSystemExecutionMetadata(input.executionMetadata),
   });
 }
 

@@ -1,4 +1,4 @@
-import type { SystemComponentReference } from "../../../domain/system-studio/SystemAssetDomain";
+import type { SystemComponentReference, SystemExecutionMetadata } from "../../../domain/system-studio/SystemAssetDomain";
 import { SystemStudioIdentity } from "../../../domain/system-studio/SystemAssetDomain";
 import { DefaultStudioShellApplicationService } from "../../../application/studio-shell/DefaultStudioShellApplicationService";
 import type { IStudioShellRepository } from "../../../application/ports/interfaces/IStudioShellRepository";
@@ -65,6 +65,10 @@ export interface UpdateSystemParametersRequest extends MutateSystemChildComponen
     readonly required?: boolean;
     readonly defaultValue?: unknown;
   }>;
+}
+
+export interface UpdateSystemExecutionMetadataRequest extends MutateSystemChildComponentRequest {
+  readonly executionMetadata?: SystemExecutionMetadata;
 }
 
 export interface SystemCompatibilitySummaryReadModel {
@@ -142,6 +146,13 @@ export class SystemStudioBackendApi {
   public async updateParameters(request: UpdateSystemParametersRequest) {
     return this.wrap(async () => {
       await this.service.updateSystemParameters(request);
+      return Object.freeze({ updated: true });
+    });
+  }
+
+  public async updateExecutionMetadata(request: UpdateSystemExecutionMetadataRequest) {
+    return this.wrap(async () => {
+      await this.service.updateSystemExecutionMetadata(request);
       return Object.freeze({ updated: true });
     });
   }

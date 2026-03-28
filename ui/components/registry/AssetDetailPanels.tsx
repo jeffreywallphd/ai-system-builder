@@ -115,6 +115,29 @@ export function SystemAssetDetailsPanel({ asset }: { readonly asset: RegistryAss
       <div className="ui-text-small ui-text-secondary">
         Binding ids: {asset.systemDetails.bindings.bindingIds.join(", ") || "none"}
       </div>
+      <div className="ui-text-small ui-text-secondary">
+        Version lineage: {asset.systemDetails.versionLineage.currentVersionId}
+        {asset.systemDetails.versionLineage.parentVersionId ? ` · parent ${asset.systemDetails.versionLineage.parentVersionId}` : ""}
+        {asset.systemDetails.versionLineage.rootVersionId ? ` · root ${asset.systemDetails.versionLineage.rootVersionId}` : ""}
+      </div>
+      <div className="ui-text-small ui-text-secondary">
+        Nested system refs in upstream: {asset.systemDetails.versionLineage.nestedSystemVersionReferences
+          .filter((entry) => entry.includedInUpstream).length}
+        {" / "}{asset.systemDetails.versionLineage.nestedSystemVersionReferences.length}
+        {" · "}Child refs in upstream: {asset.systemDetails.versionLineage.childVersionReferences
+          .filter((entry) => entry.includedInUpstream).length}
+        {" / "}{asset.systemDetails.versionLineage.childVersionReferences.length}
+      </div>
+      {asset.systemDetails.executionMetadata ? (
+        <div className="ui-text-small ui-text-secondary">
+          Execution metadata: runtime {asset.systemDetails.executionMetadata.runtimeEnvironment ?? "unspecified"}
+          {" · "}orchestration {asset.systemDetails.executionMetadata.orchestrationMode ?? "unspecified"}
+          {" · "}publish {asset.systemDetails.executionMetadata.publishVisibility ?? "unspecified"}
+          {" · "}profile {asset.systemDetails.executionMetadata.executionProfileId ?? "none"}
+        </div>
+      ) : (
+        <div className="ui-text-small ui-text-secondary">Execution metadata: none authored.</div>
+      )}
     </DetailPanel>
   );
 }
