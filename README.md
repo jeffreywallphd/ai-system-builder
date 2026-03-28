@@ -46,6 +46,12 @@ Desktop development is now the main truthful development runtime:
 - scaffold execution remains available only as an explicit fallback path and is labeled as such in execution metadata
 - the primary node catalog is registry-backed rather than mock-only
 
+The Python runtime provisioning path in development also treats `.venv` as a disposable managed artifact:
+
+- the supervisor performs explicit virtual-environment/pip integrity checks before package installation
+- if pip is corrupted, the supervisor attempts `ensurepip --upgrade` repair and revalidates
+- if repair fails, the supervisor recreates `.venv` deterministically and reports corrupted/provisioning states truthfully in managed-runtime diagnostics
+
 ## Production desktop mode
 
 Production is now modeled as a packaged Electron app for **Windows** and **macOS**.
