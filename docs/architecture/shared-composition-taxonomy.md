@@ -56,16 +56,18 @@ What is **not** implemented in this slice:
 - Models and dataset versions are **atomic** with behavior `none` in this taxonomy layer.
 - Execution artifacts now map to **system/system/iterative** in canonical classification seams, avoiding outdated atomic/system mappings.
 
-## Implementation status snapshot (story 3.19)
+## Implementation status snapshot (Direction 5 through stories 5.24)
 
 Fully implemented now:
 - Shared taxonomy model + allowed combination validation.
 - Studio-shell atomic and composite registrations using shared taxonomy descriptors.
 - Implemented composite studio roles in active use: `workflow`, `context-bundle`, `dataset-pipeline`, `training-recipe`, `tool-chain`.
+- System Studio registration and authoring now runs on the same shared Studio Shell path (`/studio-shell/system`) with first-class `system` structural kind handling and bounded recursive system-of-systems composition.
+- Registry list/detail/graph/lineage surfaces now project system assets as first-class records (including nested system references and version-lineage summaries) using shared registry query/graph seams.
 
 Partially implemented / bounded:
 - Specialized composite semantics are currently classification and authoring semantics (`workflow` orchestrator, `agent` decision unit, `context-bundle` input preparer); only workflow and context-bundle are implemented as specialized composite Studio Shell surfaces in this Direction 5 slice.
-- System-level target roles (`app-template`, `system`) exist in taxonomy; UI authoring surfaces are still pending, but bounded inner modeling now includes recursion-capable system composition plus explicit binding/dependency semantics in `domain/system-studio/SystemAssetDomain.ts`.
+- System composition editing remains intentionally bounded to structural authoring (add/remove/reorder child assets, nested-system visibility, interface/parameter/config surfaces, compatibility summaries). Rich visual graph-canvas editing remains later work.
 
 This shared taxonomy is a guardrail to keep workflow/agent/asset/system language coherent while implementation continues in parallel.
 - Direction 5 atomic studio usage now also concretely applies `atomic/prompt-template/none`, `atomic/embedding-index/none`, and `atomic/config-profile/none` through Prompt Template / Embedding Index / Config Profile studios (`domain/prompt-template-studio/*`, `application/prompt-template-studio/*`, `domain/embedding-index-studio/*`, `application/embedding-index-studio/*`, `domain/config-profile-studio/*`, `application/config-profile-studio/*`, and registration-driven UI shell integration).

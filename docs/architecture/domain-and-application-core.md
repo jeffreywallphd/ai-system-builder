@@ -597,7 +597,7 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
 - Shared validation and publish seams now carry composite dependency identity/version checks, semantic-role compatibility checks, taxonomy/contract consistency checks, and publish-time dependency pinning requirements (`application/studio-shell/StudioShellValidation.ts`, `application/studio-shell/AtomicStudioAssetEnforcement.ts`).
 - Composite-to-atomic interop in this slice is dependency + taxonomy + contract driven (composites reference atomic versions and are validated by shared seams); this slice does not add a separate composite runtime orchestration subsystem.
 
-## Direction 5 implementation status (story 3.19 alignment)
+## Direction 5 implementation status (through stories 5.24)
 
 Fully implemented now:
 - Shared Studio Shell lifecycle/session/draft/version/persistence/validation/publish seams for both atomic and composite studios.
@@ -609,9 +609,9 @@ Partially implemented / intentionally bounded:
 - Composite behavior semantics are currently enforced as metadata + validation/publish constraints, not as a separate runtime behavior engine in Direction 5.
 - Specialized composite role semantics are fully represented in taxonomy/contract language (`workflow` orchestrator, `agent` decision unit, `context-bundle` input preparer), but only workflow/context-bundle are currently implemented as specialized composite Studio Shell surfaces.
 
-Explicitly later than this story:
-- System-asset Studio Shell surfaces for Full AI System and App Template / Deployment Unit.
+Explicitly later than this scope:
 - Any broader system-composer architecture beyond current shared shell + taxonomy/contract/dependency enforcement seams.
+- Rich visual graph-canvas tooling or runtime/deployment orchestration layers beyond current bounded system authoring + registry projection.
 
 ## Direction 5 update: System consistency + interop integration coverage (stories 5.21–5.22)
 
@@ -625,6 +625,16 @@ Explicitly later than this story:
 - Registry query caching is keyed by filter/search shape and invalidated by source-signature changes (`versionCount` + `lineageEdgeCount`) so cache entries remain derived from canonical asset/version/lineage truth.
 - Dependency graph expansion/traversal now caches adjacency and frequently repeated traversals, while projection rebuild remains tied to projection dirty/signature checks (`IRegistryGraphProjectionRepository`) rather than a second persistence layer.
 - Cross-studio registry consistency now has integration-style coverage for atomic + composite publish/read/query/graph/lineage/search flows, including version update and dependency replacement scenarios (`application/asset-registry/tests/CrossStudioRegistryConsistency.integration.test.ts`).
+
+## Direction 5 update: System registry graph + lineage validation (story 5.23)
+
+- Registry integration coverage now explicitly validates system assets over the real registry seams (query service + graph service + backend API + SQLite persistence + published versions/lineage).
+- Coverage includes:
+  - parent system -> child asset edges (atomic/composite/system),
+  - nested system -> parent system edges,
+  - mixed lineage/dependency projection consistency across list/detail/graph/traversal surfaces,
+  - version-aware system lineage coherence (parent/child version updates reflected in version history and system lineage projections).
+- This remains an extension of the existing registry projection architecture (`RegistryQueryService`, `RegistryDependencyGraphService`, `RegistryBackendApi`), not a second graph/lineage subsystem.
 
 ## Direction 5 update: Registry alignment + UX refinement (stories 4.17–4.18)
 
@@ -658,5 +668,5 @@ Explicitly later than this story:
 
 ### Atomic vs composite vs system handling (current scope)
 - **Atomic and composite assets** are fully represented in current registry query/filter/detail/graph flows through taxonomy + contract projections and shared validation insights.
-- **System structural kind** is filterable and taxonomy-valid at registry level, but dedicated system authoring/management surfaces remain outside this slice.
-- Future work remains explicit: richer system-asset studio flows and any broader system composer UX are not implemented in registry stories 4.17–4.18.
+- **System assets** are first-class in current registry query/filter/detail/graph/lineage flows, including system-of-systems child references and bounded version-lineage projections for nested/child version inclusion.
+- Future work remains explicit: broader visual graph editing and runtime/deployment orchestration UX are still outside current registry/system stories.
