@@ -46,6 +46,9 @@ export default function RunPage(): JSX.Element {
           <h2 style={{ margin: 0 }}>{presentation.surface.title}</h2>
           <p className="ui-text-secondary" style={{ margin: 0 }}>{presentation.surface.subtitle}</p>
           <span className="ui-badge">Context: {presentation.surface.contextLabel}</span>
+          {presentation.request.originPath ? (
+            <span className="ui-text-small ui-text-secondary">Origin: {presentation.request.originLabel ?? presentation.request.originPath}</span>
+          ) : null}
           <div className="ui-row ui-row--wrap" style={{ gap: "0.75rem" }}>
             <Link className="ui-button ui-button--primary ui-button--sm" to={presentation.surface.primaryActionPath}>
               {presentation.surface.primaryActionLabel}

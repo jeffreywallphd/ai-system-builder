@@ -1,6 +1,8 @@
 import { useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { BuildEntryService, type BuildIntentOption, type BuildIntentSelection } from "../routes/BuildEntry";
+import { InlineRunLaunchService } from "../routes/InlineRunActions";
+import { UxRunActionKinds } from "../runtime/UxRuntimeService";
 
 function createSelection(intent: BuildIntentOption["intent"]): BuildIntentSelection {
   return Object.freeze({
@@ -11,8 +13,21 @@ function createSelection(intent: BuildIntentOption["intent"]): BuildIntentSelect
 
 export default function BuildPage(): JSX.Element {
   const service = useMemo(() => new BuildEntryService(), []);
+  const inlineRunLaunchService = useMemo(() => new InlineRunLaunchService(), []);
   const navigate = useNavigate();
   const model = service.getLandingModel();
+
+  const runHere = inlineRunLaunchService.launch({
+    action: UxRunActionKinds.run,
+    target: { kind: "general" },
+    context: { source: "build", originPath: "/build", originLabel: "Build" },
+  });
+
+  const testHere = inlineRunLaunchService.launch({
+    action: UxRunActionKinds.test,
+    target: { kind: "general" },
+    context: { source: "build", originPath: "/build", originLabel: "Build" },
+  });
 
   const onSelectIntent = (intent: BuildIntentOption["intent"]): void => {
     const launchContext = service.resolveIntentLaunchContext({
@@ -37,6 +52,10 @@ export default function BuildPage(): JSX.Element {
           <p className="ui-text-secondary" style={{ margin: 0 }}>
             Choose an intent to continue. You can refine details in the next step.
           </p>
+          <div className="ui-row ui-row--wrap" style={{ gap: "0.5rem" }}>
+            <Link className="ui-button ui-button--ghost ui-button--small" to={runHere.launchPath}>Run here</Link>
+            <Link className="ui-button ui-button--ghost ui-button--small" to={testHere.launchPath}>Test here</Link>
+          </div>
         </div>
       </div>
 
@@ -62,4 +81,3 @@ export default function BuildPage(): JSX.Element {
     </section>
   );
 }
-

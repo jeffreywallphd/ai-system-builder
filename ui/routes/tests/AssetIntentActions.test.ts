@@ -46,10 +46,12 @@ describe("AssetIntentActionResolver", () => {
       "Build from this",
       "Open and modify",
       "Add to system",
-      "Run / test",
+      "Run here",
+      "Test here",
       "Extend / connect",
     ]);
-    expect(workflowActions.find((entry) => entry.type === AssetIntentActionTypes.runOrTest)?.enabled).toBe(true);
+    expect(workflowActions.find((entry) => entry.type === AssetIntentActionTypes.runHere)?.enabled).toBe(true);
+    expect(workflowActions.find((entry) => entry.type === AssetIntentActionTypes.testHere)?.enabled).toBe(true);
     expect(systemActions.find((entry) => entry.type === AssetIntentActionTypes.addToSystem)?.enabled).toBe(false);
   });
 });
@@ -59,7 +61,8 @@ describe("AssetActionExecutionService", () => {
     const service = new AssetActionExecutionService();
     const open = service.execute(AssetIntentActionTypes.openAndModify, makeContext());
     const build = service.execute(AssetIntentActionTypes.buildFromThis, makeContext());
-    const run = service.execute(AssetIntentActionTypes.runOrTest, makeContext());
+    const run = service.execute(AssetIntentActionTypes.runHere, makeContext());
+    const test = service.execute(AssetIntentActionTypes.testHere, makeContext());
 
     expect(open?.launchPath).toContain("assetId=asset%3Aworkflow%3A1");
     expect(open?.launchPath).toContain("entryMode=asset");
@@ -69,7 +72,9 @@ describe("AssetActionExecutionService", () => {
     expect(build?.studioEntry?.initializationPayload.initialization.context.intent?.key).toBe("automate-task");
     expect(run?.launchPath).toContain("/run?");
     expect(run?.launchPath).toContain("context=asset");
-    expect(run?.launchPath).toContain("intent=Run+%2F+test");
+    expect(run?.launchPath).toContain("intent=Run+here");
+    expect(test?.launchPath).toContain("intent=Test+here");
+    expect(test?.launchPath).toContain("action=test");
   });
 
   it("uses inline creation flow for extend/connect on system assets", () => {
