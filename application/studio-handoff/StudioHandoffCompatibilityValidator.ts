@@ -1,5 +1,6 @@
 import type { AssetContractDescriptor } from "../../domain/contracts/AssetContract";
 import type {
+  MultiAssetStudioHandoffContract,
   StudioHandoffContract,
   TargetStudioInputContract,
 } from "../../domain/studio-handoff/StudioHandoffContract";
@@ -14,6 +15,8 @@ export const StudioHandoffCompatibilityIssueCodes = Object.freeze({
   contractIncompatible: "contract-incompatible",
   versionReferenceInvalid: "version-reference-invalid",
   contextKeyNotAllowed: "context-key-not-allowed",
+  bundleAssetMissing: "bundle-asset-missing",
+  bundleAssetIncompatible: "bundle-asset-incompatible",
 });
 
 export type StudioHandoffCompatibilityIssueCode =
@@ -29,7 +32,22 @@ export interface StudioHandoffCompatibilityDecision {
   readonly compatible: boolean;
   readonly targetStudioType: string;
   readonly matchedContractId?: string;
+  readonly multiAsset?: MultiAssetCompatibilityDecision;
   readonly issues: ReadonlyArray<StudioHandoffCompatibilityIssue>;
+}
+
+export interface MultiAssetCompatibilityDecision {
+  readonly grouped: true;
+  readonly requireAllAssets: boolean;
+  readonly compatible: boolean;
+  readonly entries: ReadonlyArray<{
+    readonly role: string;
+    readonly ordinal: number;
+    readonly assetId: string;
+    readonly versionId: string;
+    readonly compatible: boolean;
+    readonly issues: ReadonlyArray<StudioHandoffCompatibilityIssue>;
+  }>;
 }
 
 export interface StudioCapabilityDescriptor {
@@ -102,6 +120,119 @@ export class StudioHandoffCompatibilityValidator {
     } = {},
   ) {}
 
+  private validateSingleAssetAgainstContract(input: {
+    readonly contract: TargetStudioInputContract;
+    readonly taxonomy: CompositionTaxonomyDescriptor;
+    readonly actualContract?: AssetContractDescriptor;
+    readonly assetId: string;
+    readonly versionId: string;
+    readonly allowedContextKeys?: ReadonlyArray<string>;
+    readonly contextPathPrefix?: string;
+    readonly sourcePathPrefix?: string;
+  }): ReadonlyArray<StudioHandoffCompatibilityIssue> {
+    const issues: StudioHandoffCompatibilityIssue[] = [];
+
+    if (!isTaxonomyAccepted(input.taxonomy, input.contract)) {
+      issues.push(Object.freeze({
+        code: StudioHandoffCompatibilityIssueCodes.taxonomyIncompatible,
+        message: `Handoff taxonomy '${input.taxonomy.structuralKind}/${input.taxonomy.semanticRole}/${input.taxonomy.behaviorKind}' is not accepted by target studio contract '${input.contract.contractId}'.`,
+        path: input.sourcePathPrefix ? `${input.sourcePathPrefix}.taxonomy` : "payload.taxonomy",
+      }));
+    }
+
+    if (input.contract.expectedContract && !isContractCompatible(input.contract.expectedContract, input.actualContract)) {
+      issues.push(Object.freeze({
+        code: StudioHandoffCompatibilityIssueCodes.contractIncompatible,
+        message: `Handoff asset contract is incompatible with target studio input contract '${input.contract.contractId}'.`,
+        path: input.sourcePathPrefix ? `${input.sourcePathPrefix}.contract` : "payload.contract",
+      }));
+    }
+
+    if (input.contract.requireVersionedAsset ?? true) {
+      const referenceIsValid = this.options.validateVersionReference
+        ? this.options.validateVersionReference({
+          assetId: input.assetId,
+          versionId: input.versionId,
+        })
+        : input.versionId.trim().length > 0;
+
+      if (!referenceIsValid) {
+        issues.push(Object.freeze({
+          code: StudioHandoffCompatibilityIssueCodes.versionReferenceInvalid,
+          message: `Asset '${input.assetId}' version reference '${input.versionId}' is invalid for handoff.`,
+          path: input.sourcePathPrefix ? `${input.sourcePathPrefix}.versionId` : "payload.versionId",
+        }));
+      }
+    }
+
+    if (input.contract.allowedContextKeys && input.allowedContextKeys) {
+      const allowed = new Set(input.contract.allowedContextKeys);
+      for (const key of input.allowedContextKeys) {
+        if (!allowed.has(key)) {
+          issues.push(Object.freeze({
+            code: StudioHandoffCompatibilityIssueCodes.contextKeyNotAllowed,
+            message: `Handoff context key '${key}' is not accepted by target input contract '${input.contract.contractId}'.`,
+            path: input.contextPathPrefix ? `${input.contextPathPrefix}.${key}` : `context.config.${key}`,
+          }));
+        }
+      }
+    }
+
+    return Object.freeze(issues);
+  }
+
+  private validateMultiAssetBundle(input: {
+    readonly bundle: MultiAssetStudioHandoffContract;
+    readonly contract: TargetStudioInputContract;
+    readonly contextKeys: ReadonlyArray<string>;
+  }): MultiAssetCompatibilityDecision {
+    const entries = input.bundle.assets.map((entry, index) => {
+      const assetIssues = this.validateSingleAssetAgainstContract({
+        contract: input.contract,
+        taxonomy: entry.taxonomy,
+        actualContract: entry.contract,
+        assetId: entry.assetId,
+        versionId: entry.versionId,
+        allowedContextKeys: input.contextKeys,
+        contextPathPrefix: "context.config",
+        sourcePathPrefix: `multiAsset.assets[${index}]`,
+      });
+      return Object.freeze({
+        role: entry.role,
+        ordinal: entry.ordinal ?? index,
+        assetId: entry.assetId,
+        versionId: entry.versionId,
+        compatible: assetIssues.length === 0,
+        issues: assetIssues,
+      });
+    });
+
+    const bundleIssues: StudioHandoffCompatibilityIssue[] = [];
+    if (entries.length === 0) {
+      bundleIssues.push(Object.freeze({
+        code: StudioHandoffCompatibilityIssueCodes.bundleAssetMissing,
+        message: "Grouped multi-asset handoff requires at least one asset entry.",
+        path: "multiAsset.assets",
+      }));
+    }
+    for (const entry of entries) {
+      if (!entry.compatible) {
+        bundleIssues.push(Object.freeze({
+          code: StudioHandoffCompatibilityIssueCodes.bundleAssetIncompatible,
+          message: `Bundled handoff asset '${entry.assetId}' is incompatible with the target studio input contract.`,
+          path: `multiAsset.assets[${entry.ordinal}]`,
+        }));
+      }
+    }
+
+    return Object.freeze({
+      grouped: true,
+      requireAllAssets: input.bundle.requireAllAssets,
+      compatible: bundleIssues.length === 0,
+      entries: Object.freeze(entries),
+    });
+  }
+
   public validate(input: {
     readonly handoff: StudioHandoffContract;
     readonly targetCapabilities: ReadonlyArray<StudioCapabilityDescriptor>;
@@ -144,56 +275,41 @@ export class StudioHandoffCompatibilityValidator {
     }
 
     const contractForValidation = acceptedContract ?? input.handoff.payload.targetInputContract;
-    if (!isTaxonomyAccepted(input.handoff.payload.taxonomy, contractForValidation)) {
-      issues.push(Object.freeze({
-        code: StudioHandoffCompatibilityIssueCodes.taxonomyIncompatible,
-        message: `Handoff taxonomy '${input.handoff.payload.taxonomy.structuralKind}/${input.handoff.payload.taxonomy.semanticRole}/${input.handoff.payload.taxonomy.behaviorKind}' is not accepted by target studio contract '${contractForValidation.contractId}'.`,
-        path: "payload.taxonomy",
-      }));
-    }
+    const contextKeys = listStudioHandoffPrefillKeys(input.handoff.context);
+    issues.push(
+      ...this.validateSingleAssetAgainstContract({
+        contract: contractForValidation,
+        taxonomy: input.handoff.payload.taxonomy,
+        actualContract: input.handoff.payload.contract,
+        assetId: input.handoff.payload.assetId,
+        versionId: input.handoff.payload.versionId,
+        allowedContextKeys: contextKeys,
+      }),
+    );
 
-    if (contractForValidation.expectedContract && !isContractCompatible(contractForValidation.expectedContract, input.handoff.payload.contract)) {
-      issues.push(Object.freeze({
-        code: StudioHandoffCompatibilityIssueCodes.contractIncompatible,
-        message: `Handoff asset contract is incompatible with target studio input contract '${contractForValidation.contractId}'.`,
-        path: "payload.contract",
-      }));
-    }
-
-    if (contractForValidation.requireVersionedAsset ?? true) {
-      const referenceIsValid = this.options.validateVersionReference
-        ? this.options.validateVersionReference({
-          assetId: input.handoff.payload.assetId,
-          versionId: input.handoff.payload.versionId,
-        })
-        : input.handoff.payload.versionId.trim().length > 0;
-
-      if (!referenceIsValid) {
-        issues.push(Object.freeze({
-          code: StudioHandoffCompatibilityIssueCodes.versionReferenceInvalid,
-          message: `Asset '${input.handoff.payload.assetId}' version reference '${input.handoff.payload.versionId}' is invalid for handoff.`,
-          path: "payload.versionId",
-        }));
-      }
-    }
-
-    if (contractForValidation.allowedContextKeys) {
-      const allowed = new Set(contractForValidation.allowedContextKeys);
-      for (const key of listStudioHandoffPrefillKeys(input.handoff.context)) {
-        if (!allowed.has(key)) {
-          issues.push(Object.freeze({
-            code: StudioHandoffCompatibilityIssueCodes.contextKeyNotAllowed,
-            message: `Handoff context key '${key}' is not accepted by target input contract '${contractForValidation.contractId}'.`,
-            path: `context.config.${key}`,
-          }));
-        }
-      }
+    const multiAssetDecision = input.handoff.multiAsset
+      ? this.validateMultiAssetBundle({
+        bundle: input.handoff.multiAsset,
+        contract: contractForValidation,
+        contextKeys,
+      })
+      : undefined;
+    if (multiAssetDecision && !multiAssetDecision.compatible) {
+      issues.push(...multiAssetDecision.entries.flatMap((entry) => entry.issues));
+      issues.push(...multiAssetDecision.entries
+        .filter((entry) => !entry.compatible)
+        .map((entry) => Object.freeze({
+          code: StudioHandoffCompatibilityIssueCodes.bundleAssetIncompatible,
+          message: `Bundled handoff asset '${entry.assetId}' is incompatible with target contract '${contractForValidation.contractId}'.`,
+          path: `multiAsset.assets[${entry.ordinal}]`,
+        })));
     }
 
     return Object.freeze({
       compatible: issues.length === 0,
       targetStudioType: input.handoff.target.studioType,
       matchedContractId: acceptedContract?.contractId,
+      multiAsset: multiAssetDecision,
       issues: Object.freeze(issues),
     });
   }
