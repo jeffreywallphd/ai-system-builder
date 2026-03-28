@@ -2,6 +2,12 @@ import type { CrossStudioRegistryQueryService } from "../../../application/asset
 import type { RegistryDependencyGraphService, RegistryDependencyTraversalOptions } from "../../../application/asset-registry/RegistryDependencyGraphService";
 import type { RegistryAsset } from "../../../domain/asset-registry/RegistryAsset";
 import type { RegistryFilterParams } from "../../../application/asset-registry/RegistryQueryService";
+import {
+  ExploreAssetQueryService,
+  type ExploreSearchQuery,
+  type ExploreSearchResult,
+  type UnifiedExploreAssetLibrary,
+} from "../../../application/asset-registry/ExploreAssetQueryService";
 
 export interface RegistryApiError {
   readonly code: "not-found" | "invalid-request" | "internal";
@@ -44,10 +50,14 @@ function normalizeTraversalOptions(query: RegistryTraversalEndpointQuery): Regis
 }
 
 export class RegistryBackendApi {
+  private readonly exploreAssetQueryService: ExploreAssetQueryService;
+
   constructor(
     private readonly registryQueryService: CrossStudioRegistryQueryService,
     private readonly graphService: RegistryDependencyGraphService,
-  ) {}
+  ) {
+    this.exploreAssetQueryService = new ExploreAssetQueryService(this.registryQueryService);
+  }
 
   public async listAssets(limit?: number): Promise<RegistryApiResponse<ReadonlyArray<RegistryAsset>>> {
     return this.wrap(() => this.registryQueryService.listAllAssets(limit));
@@ -95,6 +105,14 @@ export class RegistryBackendApi {
       sourceTypes: query.provenanceSourceTypes,
       limit: query.limit,
     }));
+  }
+
+  public async listExploreAssets(limit?: number): Promise<RegistryApiResponse<UnifiedExploreAssetLibrary>> {
+    return this.wrap(() => this.exploreAssetQueryService.listLibrary(limit));
+  }
+
+  public async searchExploreAssets(query: ExploreSearchQuery): Promise<RegistryApiResponse<ExploreSearchResult>> {
+    return this.wrap(() => this.exploreAssetQueryService.search(query));
   }
 
   public async getAssetDetail(query: RegistryAssetDetailQuery): Promise<RegistryApiResponse<RegistryAsset>> {

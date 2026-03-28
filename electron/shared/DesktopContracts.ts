@@ -131,6 +131,8 @@ export interface DesktopRegistryBridge {
   listAssets(limit?: number): Promise<string>;
   filterAssets(filtersJson: string): Promise<string>;
   searchAssets(queryJson: string): Promise<string>;
+  listExploreAssets(limit?: number): Promise<string>;
+  searchExploreAssets(queryJson: string): Promise<string>;
   getAssetDetail(queryJson: string): Promise<string>;
   getDependencies(queryJson: string): Promise<string>;
   getDependents(queryJson: string): Promise<string>;

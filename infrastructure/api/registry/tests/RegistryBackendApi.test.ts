@@ -138,6 +138,16 @@ describe("RegistryBackendApi", () => {
     expect(searched.ok).toBeTrue();
     expect(searched.data?.length).toBe(1);
     expect(searched.data?.[0]?.assetId).toBe("asset:workflow");
+
+    const exploreListed = await api.listExploreAssets();
+    expect(exploreListed.ok).toBeTrue();
+    expect(exploreListed.data?.assets.length).toBe(2);
+    expect(exploreListed.data?.availableKinds.length).toBeGreaterThan(0);
+
+    const exploreSearched = await api.searchExploreAssets({ keyword: "workflow" });
+    expect(exploreSearched.ok).toBeTrue();
+    expect(exploreSearched.data?.assets.length).toBe(1);
+    expect(exploreSearched.data?.facets.some((facet) => facet.key === "semanticRole" && facet.visibility === "secondary")).toBeTrue();
   });
 
   it("exposes dependency and dependent traversal endpoints with bounded depth", async () => {
