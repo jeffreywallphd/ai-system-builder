@@ -113,6 +113,104 @@ export interface ExecutionProgressSnapshot {
 export interface ExecutionRuntimeState {
   readonly snapshot: ExecutionProgressSnapshot;
   readonly nodeStates: ReadonlyArray<ExecutionNodeState>;
+  readonly trace: ExecutionTrace;
+  readonly errors: ReadonlyArray<RuntimeExecutionError>;
+}
+
+export const ExecutionTraceEventKinds = Object.freeze({
+  executionCreated: "execution-created",
+  executionStatusChanged: "execution-status-changed",
+  nodeAttached: "node-attached",
+  nodeStatusChanged: "node-status-changed",
+  nodeIterationProgressed: "node-iteration-progressed",
+  nodePlanningProgressed: "node-planning-progressed",
+  loopProgressed: "loop-progressed",
+  autonomousPlanningProgressed: "autonomous-planning-progressed",
+  nestedSystemEntered: "nested-system-entered",
+  nestedSystemCompleted: "nested-system-completed",
+  errorRecorded: "error-recorded",
+  recoveryDecided: "recovery-decided",
+});
+
+export type ExecutionTraceEventKind = typeof ExecutionTraceEventKinds[keyof typeof ExecutionTraceEventKinds];
+
+export const ExecutionLogLevels = Object.freeze({
+  info: "info",
+  warning: "warning",
+  error: "error",
+});
+
+export type ExecutionLogLevel = typeof ExecutionLogLevels[keyof typeof ExecutionLogLevels];
+
+export interface ExecutionLogEntry {
+  readonly entryId: string;
+  readonly level: ExecutionLogLevel;
+  readonly message: string;
+  readonly emittedAt: string;
+  readonly nodeId?: string;
+  readonly diagnostics?: ReadonlyArray<string>;
+}
+
+export interface ExecutionTraceEvent {
+  readonly eventId: string;
+  readonly kind: ExecutionTraceEventKind;
+  readonly at: string;
+  readonly executionId: string;
+  readonly nodeId?: string;
+  readonly parentNodeId?: string;
+  readonly status?: ExecutionStatusKind | ExecutionNodeStatusKind;
+  readonly iteration?: number;
+  readonly planningCycle?: number;
+  readonly summary?: string;
+  readonly diagnostics?: ReadonlyArray<string>;
+  readonly errorCode?: string;
+}
+
+export interface ExecutionTrace {
+  readonly events: ReadonlyArray<ExecutionTraceEvent>;
+  readonly logs: ReadonlyArray<ExecutionLogEntry>;
+  readonly lastEventAt?: string;
+}
+
+export const RuntimeExecutionErrorKinds = Object.freeze({
+  stepFailure: "step-failure",
+  environmentMismatch: "environment-mismatch",
+  dependencyResolutionFailure: "dependency-resolution-failure",
+  iterativeProgressionFailure: "iterative-progression-failure",
+  autonomousPlanningFailure: "autonomous-planning-failure",
+  nestedSystemFailure: "nested-system-failure",
+  orchestrationFailure: "orchestration-failure",
+});
+
+export type RuntimeExecutionErrorKind = typeof RuntimeExecutionErrorKinds[keyof typeof RuntimeExecutionErrorKinds];
+
+export interface RuntimeExecutionError {
+  readonly errorId: string;
+  readonly kind: RuntimeExecutionErrorKind;
+  readonly code: string;
+  readonly message: string;
+  readonly at: string;
+  readonly executionId: string;
+  readonly nodeId?: string;
+  readonly parentNodeId?: string;
+  readonly retriable: boolean;
+  readonly diagnostics?: ReadonlyArray<string>;
+}
+
+export const RecoveryActionKinds = Object.freeze({
+  failExecution: "fail-execution",
+  retryStep: "retry-step",
+  retryLoopPass: "retry-loop-pass",
+});
+
+export type RecoveryActionKind = typeof RecoveryActionKinds[keyof typeof RecoveryActionKinds];
+
+export interface RecoveryDecision {
+  readonly action: RecoveryActionKind;
+  readonly reason: string;
+  readonly decidedAt: string;
+  readonly retryCount: number;
+  readonly maxRetries: number;
 }
 
 export interface SystemExecution {
@@ -295,12 +393,51 @@ function normalizeRuntimeState(runtimeState?: ExecutionRuntimeState, updatedAt?:
         updatedAt: normalizeRequired(updatedAt ?? new Date().toISOString(), "Execution runtime-state updated timestamp"),
       }),
       nodeStates: Object.freeze([]),
+      trace: Object.freeze({
+        events: Object.freeze([]),
+        logs: Object.freeze([]),
+      }),
+      errors: Object.freeze([]),
     });
   }
 
   return Object.freeze({
     snapshot: normalizeProgressSnapshot(runtimeState.snapshot),
     nodeStates: Object.freeze(runtimeState.nodeStates.map(normalizeNodeState)),
+    trace: Object.freeze({
+      events: Object.freeze(runtimeState.trace.events.map((entry) => Object.freeze({
+        ...entry,
+        eventId: normalizeRequired(entry.eventId, "Execution trace event id"),
+        kind: entry.kind,
+        at: normalizeRequired(entry.at, "Execution trace event timestamp"),
+        executionId: normalizeRequired(entry.executionId, "Execution trace event execution id"),
+        nodeId: normalizeOptional(entry.nodeId),
+        parentNodeId: normalizeOptional(entry.parentNodeId),
+        summary: normalizeOptional(entry.summary),
+        diagnostics: normalizeStringList(entry.diagnostics),
+        errorCode: normalizeOptional(entry.errorCode),
+      }))),
+      logs: Object.freeze(runtimeState.trace.logs.map((entry) => Object.freeze({
+        ...entry,
+        entryId: normalizeRequired(entry.entryId, "Execution log entry id"),
+        message: normalizeRequired(entry.message, "Execution log entry message"),
+        emittedAt: normalizeRequired(entry.emittedAt, "Execution log entry timestamp"),
+        nodeId: normalizeOptional(entry.nodeId),
+        diagnostics: normalizeStringList(entry.diagnostics),
+      }))),
+      lastEventAt: normalizeOptional(runtimeState.trace.lastEventAt),
+    }),
+    errors: Object.freeze(runtimeState.errors.map((entry) => Object.freeze({
+      ...entry,
+      errorId: normalizeRequired(entry.errorId, "Runtime execution error id"),
+      code: normalizeRequired(entry.code, "Runtime execution error code"),
+      message: normalizeRequired(entry.message, "Runtime execution error message"),
+      at: normalizeRequired(entry.at, "Runtime execution error timestamp"),
+      executionId: normalizeRequired(entry.executionId, "Runtime execution error execution id"),
+      nodeId: normalizeOptional(entry.nodeId),
+      parentNodeId: normalizeOptional(entry.parentNodeId),
+      diagnostics: normalizeStringList(entry.diagnostics),
+    }))),
   });
 }
 
@@ -360,9 +497,11 @@ export function createSystemExecution(input: {
 }): SystemExecution {
   const status = input.status ?? ExecutionStatusKinds.pending;
   const updatedAt = normalizeRequired(input.updatedAt ?? input.startedAt, "Execution updated timestamp");
+  const executionId = normalizeRequired(input.executionId, "Execution id");
+  const runtimeState = normalizeRuntimeState(input.runtimeState, updatedAt);
 
-  return Object.freeze({
-    executionId: normalizeRequired(input.executionId, "Execution id"),
+  let execution = Object.freeze({
+    executionId,
     root: normalizeExecutionAssetRef(input.root),
     context: normalizeExecutionContext(input.context),
     environment: normalizeExecutionEnvironmentRef(input.environment),
@@ -370,11 +509,30 @@ export function createSystemExecution(input: {
     nodes: Object.freeze((input.nodes ?? []).map(normalizeExecutionNodeRef)),
     input: normalizeInputEnvelope(input.input),
     output: input.output ? normalizeOutputEnvelope(input.output) : undefined,
-    runtimeState: normalizeRuntimeState(input.runtimeState, updatedAt),
+    runtimeState,
     startedAt: normalizeRequired(input.startedAt, "Execution started timestamp"),
     updatedAt,
     completedAt: normalizeOptional(input.completedAt),
   });
+  execution = appendExecutionTraceEvent({
+    execution,
+    event: {
+      eventId: `${execution.executionId}:trace:event:0`,
+      kind: ExecutionTraceEventKinds.executionCreated,
+      at: updatedAt,
+      executionId,
+      status,
+      summary: "Execution created.",
+    },
+    logEntry: {
+      entryId: `${execution.executionId}:trace:log:0`,
+      level: ExecutionLogLevels.info,
+      message: `Execution '${execution.executionId}' created.`,
+      emittedAt: updatedAt,
+    },
+  });
+
+  return execution;
 }
 
 export function transitionSystemExecutionStatus(input: {
@@ -442,6 +600,8 @@ export function initializeExecutionRuntimeState(input: {
     runtimeState: Object.freeze({
       nodeStates,
       snapshot: buildSnapshotFromNodeStates(nodeStates, normalizedNodeIds.length, input.updatedAt),
+      trace: input.execution.runtimeState.trace,
+      errors: input.execution.runtimeState.errors,
     }),
     updatedAt: normalizeRequired(input.updatedAt, "Execution updated timestamp"),
   });
@@ -496,7 +656,184 @@ export function updateExecutionNodeState(input: {
     runtimeState: Object.freeze({
       nodeStates,
       snapshot: buildSnapshotFromNodeStates(nodeStates, input.execution.runtimeState.snapshot.totalNodeCount, updatedAt),
+      trace: input.execution.runtimeState.trace,
+      errors: input.execution.runtimeState.errors,
     }),
     updatedAt,
+  });
+}
+
+export function appendExecutionTraceEvent(input: {
+  readonly execution: SystemExecution;
+  readonly event: ExecutionTraceEvent;
+  readonly logEntry?: ExecutionLogEntry;
+}): SystemExecution {
+  const event = Object.freeze({
+    ...input.event,
+    eventId: normalizeRequired(input.event.eventId, "Execution trace event id"),
+    at: normalizeRequired(input.event.at, "Execution trace event timestamp"),
+    executionId: normalizeRequired(input.event.executionId, "Execution trace event execution id"),
+    nodeId: normalizeOptional(input.event.nodeId),
+    parentNodeId: normalizeOptional(input.event.parentNodeId),
+    summary: normalizeOptional(input.event.summary),
+    diagnostics: normalizeStringList(input.event.diagnostics),
+    errorCode: normalizeOptional(input.event.errorCode),
+  });
+  const logs = input.logEntry
+    ? Object.freeze([
+      ...input.execution.runtimeState.trace.logs,
+      Object.freeze({
+        ...input.logEntry,
+        entryId: normalizeRequired(input.logEntry.entryId, "Execution log entry id"),
+        message: normalizeRequired(input.logEntry.message, "Execution log entry message"),
+        emittedAt: normalizeRequired(input.logEntry.emittedAt, "Execution log entry timestamp"),
+        nodeId: normalizeOptional(input.logEntry.nodeId),
+        diagnostics: normalizeStringList(input.logEntry.diagnostics),
+      }),
+    ])
+    : input.execution.runtimeState.trace.logs;
+
+  return Object.freeze({
+    ...input.execution,
+    runtimeState: Object.freeze({
+      ...input.execution.runtimeState,
+      trace: Object.freeze({
+        events: Object.freeze([...input.execution.runtimeState.trace.events, event]),
+        logs,
+        lastEventAt: event.at,
+      }),
+    }),
+    updatedAt: event.at,
+  });
+}
+
+export function createExecutionTraceSnapshot(execution: SystemExecution): ExecutionTrace {
+  return Object.freeze({
+    events: Object.freeze([...execution.runtimeState.trace.events]),
+    logs: Object.freeze([...execution.runtimeState.trace.logs]),
+    lastEventAt: execution.runtimeState.trace.lastEventAt,
+  });
+}
+
+export function appendRuntimeExecutionError(input: {
+  readonly execution: SystemExecution;
+  readonly error: RuntimeExecutionError;
+}): SystemExecution {
+  const normalizedError = Object.freeze({
+    ...input.error,
+    errorId: normalizeRequired(input.error.errorId, "Runtime execution error id"),
+    code: normalizeRequired(input.error.code, "Runtime execution error code"),
+    message: normalizeRequired(input.error.message, "Runtime execution error message"),
+    at: normalizeRequired(input.error.at, "Runtime execution error timestamp"),
+    executionId: normalizeRequired(input.error.executionId, "Runtime execution error execution id"),
+    nodeId: normalizeOptional(input.error.nodeId),
+    parentNodeId: normalizeOptional(input.error.parentNodeId),
+    diagnostics: normalizeStringList(input.error.diagnostics),
+  });
+
+  return appendExecutionTraceEvent({
+    execution: Object.freeze({
+      ...input.execution,
+      runtimeState: Object.freeze({
+        ...input.execution.runtimeState,
+        errors: Object.freeze([...input.execution.runtimeState.errors, normalizedError]),
+      }),
+    }),
+    event: {
+      eventId: `${input.execution.executionId}:trace:event:error:${input.execution.runtimeState.errors.length}`,
+      kind: ExecutionTraceEventKinds.errorRecorded,
+      at: normalizedError.at,
+      executionId: input.execution.executionId,
+      nodeId: normalizedError.nodeId,
+      parentNodeId: normalizedError.parentNodeId,
+      summary: normalizedError.message,
+      diagnostics: normalizedError.diagnostics,
+      errorCode: normalizedError.code,
+    },
+    logEntry: {
+      entryId: `${input.execution.executionId}:trace:log:error:${input.execution.runtimeState.errors.length}`,
+      level: ExecutionLogLevels.error,
+      message: normalizedError.message,
+      emittedAt: normalizedError.at,
+      nodeId: normalizedError.nodeId,
+      diagnostics: normalizedError.diagnostics,
+    },
+  });
+}
+
+export function decideRecoveryAction(input: {
+  readonly error: RuntimeExecutionError;
+  readonly retryCount: number;
+  readonly maxRetries: number;
+}): RecoveryDecision {
+  const retryCount = Math.max(0, Math.floor(input.retryCount));
+  const maxRetries = Math.max(0, Math.floor(input.maxRetries));
+  const canRetry = input.error.retriable && retryCount < maxRetries;
+  const action = canRetry
+    ? (input.error.kind === RuntimeExecutionErrorKinds.iterativeProgressionFailure
+      ? RecoveryActionKinds.retryLoopPass
+      : RecoveryActionKinds.retryStep)
+    : RecoveryActionKinds.failExecution;
+
+  return Object.freeze({
+    action,
+    reason: canRetry
+      ? `bounded-retry-${retryCount + 1}-of-${maxRetries}`
+      : "unrecoverable-or-retry-budget-exhausted",
+    decidedAt: input.error.at,
+    retryCount,
+    maxRetries,
+  });
+}
+
+export function propagateExecutionFailure(input: {
+  readonly execution: SystemExecution;
+  readonly error: RuntimeExecutionError;
+  readonly decision: RecoveryDecision;
+  readonly updatedAt: string;
+  readonly completedAt?: string;
+}): SystemExecution {
+  const withError = appendRuntimeExecutionError({
+    execution: input.execution,
+    error: input.error,
+  });
+  const withDecision = appendExecutionTraceEvent({
+    execution: withError,
+    event: {
+      eventId: `${input.execution.executionId}:trace:event:recovery:${withError.runtimeState.trace.events.length}`,
+      kind: ExecutionTraceEventKinds.recoveryDecided,
+      at: input.updatedAt,
+      executionId: input.execution.executionId,
+      nodeId: input.error.nodeId,
+      summary: `Recovery action '${input.decision.action}' selected.`,
+      diagnostics: Object.freeze([input.decision.reason]),
+      errorCode: input.error.code,
+    },
+    logEntry: {
+      entryId: `${input.execution.executionId}:trace:log:recovery:${withError.runtimeState.trace.logs.length}`,
+      level: input.decision.action === RecoveryActionKinds.failExecution ? ExecutionLogLevels.error : ExecutionLogLevels.warning,
+      message: `Recovery decision '${input.decision.action}' for error '${input.error.code}'.`,
+      emittedAt: input.updatedAt,
+      nodeId: input.error.nodeId,
+      diagnostics: Object.freeze([input.decision.reason]),
+    },
+  });
+
+  if (input.decision.action !== RecoveryActionKinds.failExecution) {
+    return withDecision;
+  }
+
+  return transitionSystemExecutionStatus({
+    execution: withDecision,
+    nextStatus: ExecutionStatusKinds.failed,
+    updatedAt: input.updatedAt,
+    completedAt: input.completedAt ?? input.updatedAt,
+    output: Object.freeze({
+      producedAt: input.updatedAt,
+      error: Object.freeze({
+        code: input.error.code,
+        message: input.error.message,
+      }),
+    }),
   });
 }

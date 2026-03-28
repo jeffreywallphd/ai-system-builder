@@ -266,4 +266,28 @@ describe("StepExecutionEngine", () => {
     expect(first.progressionDecision?.kind).toBe("replan");
     expect(second.progressionDecision?.kind).toBe("complete");
   });
+
+  it("classifies adapter exceptions as transient step failures", async () => {
+    const environment = createEnvironment();
+    const plan = createExecutionPlan(environment);
+    const execution = createExecution();
+    const engine = new StepExecutionEngine([{
+      adapterId: "throwing",
+      canExecute: () => true,
+      execute: () => {
+        throw new Error("temporary adapter failure");
+      },
+    }]);
+
+    const result = await engine.executeStep({
+      plan,
+      node: plan.nodes[0]!,
+      environment,
+      execution,
+    });
+
+    expect(result.status).toBe("failed");
+    expect(result.error?.code).toBe("step-transient-failure");
+    expect(result.error?.retriable).toBe(true);
+  });
 });

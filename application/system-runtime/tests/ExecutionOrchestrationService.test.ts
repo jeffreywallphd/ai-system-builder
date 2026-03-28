@@ -71,6 +71,21 @@ class RecordingStepEngine implements IStepExecutionEngine {
   }
 }
 
+class FailingStepEngine implements IStepExecutionEngine {
+  public async executeStep(request: StepExecutionRequest): Promise<StepExecutionResult> {
+    return Object.freeze({
+      nodeId: request.node.nodeId,
+      status: "failed",
+      startedAt: "2026-03-28T00:00:00.000Z",
+      completedAt: "2026-03-28T00:00:01.000Z",
+      error: {
+        code: "nested-systems-unsupported",
+        message: "Nested systems are unavailable in the selected runtime.",
+      },
+    });
+  }
+}
+
 describe("ExecutionOrchestrationService", () => {
   it("initializes runtime execution and deterministically sequences plan nodes", async () => {
     const root = createSystem({
@@ -233,5 +248,101 @@ describe("ExecutionOrchestrationService", () => {
 
     expect(result.status).toBe("completed");
     expect(result.progression.filter((entry) => entry.nodeId.startsWith("system:")).length).toBe(1);
+  });
+
+  it("records execution and node trace events for orchestration progress", async () => {
+    const root = createSystem({
+      assetId: "system:trace",
+      versionId: "system:trace:v1",
+      components: [
+        {
+          componentKind: "system",
+          alias: "child",
+          assetId: "system:child",
+          versionId: "system:child:v1",
+          taxonomy: { structuralKind: "system", semanticRole: "system", behaviorKind: "deterministic" },
+        },
+      ],
+      nestedSystems: [{ assetId: "system:child", versionId: "system:child:v1", alias: "child" }],
+    });
+    const child = createSystem({ assetId: "system:child", versionId: "system:child:v1" });
+    const systems = new Map<string, SystemAsset>([["system:child::system:child:v1", child]]);
+    const runtime = await createRuntimeBundle(root, async (reference) => systems.get(`${reference.assetId}::${reference.versionId ?? ""}`));
+
+    const result = await new ExecutionOrchestrationService(new StepExecutionEngine()).orchestrate({
+      root,
+      ...runtime,
+      inputPayload: { run: "trace" },
+    });
+
+    expect(result.status).toBe("completed");
+    const traceEvents = result.execution?.runtimeState.trace.events ?? [];
+    expect(traceEvents.some((entry) => entry.kind === "execution-status-changed" && entry.status === "running")).toBe(true);
+    expect(traceEvents.some((entry) => entry.kind === "nested-system-entered")).toBe(true);
+    expect(traceEvents.some((entry) => entry.kind === "nested-system-completed")).toBe(true);
+  });
+
+  it("applies bounded retry for transient step failures and records recovery traces", async () => {
+    const root = createSystem({ assetId: "system:retry", versionId: "system:retry:v1" });
+    const runtime = await createRuntimeBundle(root, async () => undefined);
+    const attemptsByNode = new Map<string, number>();
+    const stepEngine = new StepExecutionEngine([{
+      adapterId: "flaky-adapter",
+      canExecute: () => true,
+      execute: (request) => {
+        const attempts = attemptsByNode.get(request.node.nodeId) ?? 0;
+        attemptsByNode.set(request.node.nodeId, attempts + 1);
+        if (attempts === 0) {
+          throw new Error("temporary failure");
+        }
+        return Object.freeze({
+          nodeId: request.node.nodeId,
+          status: "succeeded",
+          startedAt: "2026-03-28T00:00:00.000Z",
+          completedAt: "2026-03-28T00:00:01.000Z",
+          output: Object.freeze({ recovered: true }),
+        });
+      },
+    }]);
+    const service = new ExecutionOrchestrationService(stepEngine);
+
+    const result = await service.orchestrate({
+      root,
+      ...runtime,
+      inputPayload: { retry: true },
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.execution?.runtimeState.trace.events.some((event) =>
+      event.kind === "recovery-decided" && event.summary?.includes("Retrying")
+    )).toBe(true);
+  });
+
+  it("propagates unrecoverable failures into runtime errors and terminal execution status", async () => {
+    const root = createSystem({
+      assetId: "system:fail",
+      versionId: "system:fail:v1",
+      components: [
+        {
+          componentKind: "system",
+          alias: "child",
+          assetId: "system:child",
+          versionId: "system:child:v1",
+          taxonomy: { structuralKind: "system", semanticRole: "system", behaviorKind: "deterministic" },
+        },
+      ],
+      nestedSystems: [{ assetId: "system:child", versionId: "system:child:v1", alias: "child" }],
+    });
+    const runtime = await createRuntimeBundle(root, async () => undefined);
+    const result = await new ExecutionOrchestrationService(new FailingStepEngine()).orchestrate({
+      root,
+      ...runtime,
+      inputPayload: { fail: true },
+    });
+
+    expect(result.status).toBe("failed");
+    expect(result.execution?.status).toBe("failed");
+    expect(result.execution?.runtimeState.errors.length).toBeGreaterThan(0);
+    expect(result.execution?.runtimeState.errors[0]?.kind).toBe("environment-mismatch");
   });
 });
