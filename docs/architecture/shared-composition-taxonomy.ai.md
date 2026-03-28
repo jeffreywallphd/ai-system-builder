@@ -43,7 +43,7 @@ Current Direction 5 target shape remains:
 ## Implementation status snapshot (story 3.19)
 - Fully implemented now: shared taxonomy model + combination validation, shared studio registration taxonomy defaults, and active composite studio roles (`workflow`, `context-bundle`, `dataset-pipeline`, `training-recipe`, `tool-chain`).
 - Partially implemented / bounded: specialized composite semantics are currently taxonomy/authoring semantics (workflow orchestrator, agent decision unit, context-bundle input preparer); only workflow/context-bundle have specialized composite Studio Shell surfaces in this slice.
-- System-level UI authoring surfaces (`app-template`, `system`) are still not implemented, but the bounded inner domain foundation now includes explicit recursive composition references, typed system input/output/parameter bindings, and dependency traversal/cycle semantics (`domain/system-studio/SystemAssetDomain.ts`).
+- System-level taxonomy authoring is now integrated through shared Studio Shell routing/registration (`/studio-shell/system`) with bounded System Studio application orchestration; richer composition-canvas UX is still intentionally out of scope while recursive composition semantics remain in the inner system domain foundation (`domain/system-studio/SystemAssetDomain.ts`).
 
 
 ## Specialized composite role interpretation

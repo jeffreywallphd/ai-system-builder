@@ -38,4 +38,4 @@
 ## Implementation status snapshot (story 3.19)
 - Fully implemented now: shared taxonomy-driven contract projection for implemented atomic/composite studios, shared composite publish-consistency enforcement, and composite-to-atomic interop validation through shared dependency + taxonomy/contract seams.
 - Partially implemented / bounded: projections are baseline authoring/publish-gating contracts, not a full runtime behavior-contract system.
-- Not implemented in this slice: dedicated system-asset Studio Shell contract authoring surfaces (Full AI System, App Template / Deployment Unit).
+- Implemented in this slice: bounded System Studio authoring/publish orchestration now uses recursive system contract projection through shared Studio Shell seams. Still not implemented: full dedicated system composition canvas/editor surfaces.
