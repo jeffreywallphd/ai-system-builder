@@ -38,7 +38,9 @@ Electron is the desktop host boundary; the renderer accesses desktop capabilitie
 - Resolutions now carry an operational state model (`disabled`, `unavailable`, `provisioning`, `starting`, `healthy`, `degraded`, `failed`, `stopped`, `unknown`), fallback information, timestamps, metadata, and remediation hints.
 - The orchestrator also supports explicit `refresh`, single-dependency invalidation, and global invalidation so runtime-backed capabilities can recompute status after managed-runtime changes; the runtime console and managed-services store now use those hooks.
 - Python runtime provisioning in desktop development treats the managed environment as disposable: supervisor provisioning verifies venv/pip integrity before pip operations (including invalid-distribution detection), performs bounded safe `ensurepip --upgrade` repair only when trustworthy, and otherwise provisions/validates a fresh staged environment (`.venv.managed/*`) before promoting it active.
-- Provisioning/runtime diagnostics must stay truthful across these flows and distinguish at least unprovisioned, provisioning, provision-failed, corrupted environment, and needs-reprovision states.
+- Runtime launchability is a separate truth from provisioning: after install/integrity checks, provisioning now runs an import preflight (`import app.main`) and persists launchability diagnostics.
+- Provisioning/runtime diagnostics must stay truthful across these flows and distinguish at least unprovisioned, provisioning, provisioned, provisioned-unlaunchable, provision-failed, corrupted environment, and needs-reprovision states.
+- Browser/desktop startup now checks supervisor state after `ensure-running` so known startup-fatal failures are surfaced directly instead of being masked by generic port-wait timeouts.
 
 ## Caveat
 The preload bridge uses synchronous IPC and exposes storage/workflow/model-file capabilities.

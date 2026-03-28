@@ -639,4 +639,104 @@ describe("ManagedServicesService", () => {
     expect(mapped.lastErrorDetail).toBeUndefined();
     expect(mapped.healthSummary).toBe("Trying to restart Python runtime (2 of 3).");
   });
+
+  it("maps provisioned-unlaunchable provisioning state with repair actions", async () => {
+    const pythonDefinition = createPythonRuntimeServiceDefinition(new PythonRuntimeConfig({
+      mode: "managed-local",
+      baseUrl: "http://127.0.0.1:8000",
+    }));
+    const repository = createRepository([pythonDefinition]);
+    const unlaunchableService = {
+      serviceId: "python-runtime",
+      name: "Python runtime",
+      args: ["-m", "uvicorn"],
+      dependencies: [],
+      dependents: [],
+      pid: null,
+      startedAt: null,
+      lastHealthCheckAt: "2026-03-20T10:16:00.000Z",
+      state: "failed",
+      ownership: "none",
+      detail: "Python runtime environment is provisioned but not launchable on this host.",
+      readiness: { isReady: false, detail: "Runtime failed.", blockedBy: [] },
+      recentLogs: [],
+      processHistory: [],
+      metadata: { version: "1.0.0", compatibility: {} },
+      diagnostics: {
+        lastError: null,
+        lastExit: null,
+        lastStart: null,
+        lastHealthProbe: null,
+        provisioning: {
+          state: "provisioned-unlaunchable",
+          required: true,
+          requestedVersion: "3.12",
+          resolvedVersion: "3.12.7",
+          resolvedInterpreter: "/usr/bin/python3.12",
+          environmentPath: "python-runtime/.venv",
+          versionMismatch: false,
+          needsReprovision: false,
+          lastUpdatedAt: "2026-03-20T10:16:00.000Z",
+          lastError: {
+            at: "2026-03-20T10:16:00.000Z",
+            message: "RuntimeError: NumPy was built with baseline optimizations: (X86_V2) but your machine doesn't support: (X86_V2).",
+            code: "PYTHON_RUNTIME_HOST_INCOMPATIBLE_DEPENDENCY",
+            details: {},
+          },
+        },
+        circuitBreaker: {
+          state: "closed",
+          openedAt: null,
+          retryAfter: null,
+          recentFailures: 0,
+          maxFailures: 3,
+          failureWindowMs: 60_000,
+          cooldownMs: 30_000,
+        },
+      },
+    } as const;
+
+    const service = new ManagedServicesService({
+      serviceManager: {
+        listServices: () => ([]),
+        getServiceStatus: () => undefined,
+        subscribeToStatus: () => () => undefined,
+        subscribeToLogs: () => () => undefined,
+      } as any,
+      serviceSupervisor: {
+        start: async () => ({}) as any,
+        stop: async () => ({}) as any,
+        restart: async () => ({}) as any,
+        ensureRunning: async () => ({}) as any,
+        provision: async () => ({}) as any,
+        repair: async () => ({}) as any,
+        recreateEnvironment: async () => ({}) as any,
+      },
+      supervisorClient: {
+        health: async () => ({ ok: true, mode: "service-supervisor", host: "127.0.0.1", port: 8790, serviceCount: 1, services: [unlaunchableService] }),
+        listServices: async () => ({ ok: true, services: [unlaunchableService] }),
+        getService: async () => ({ ok: true, service: unlaunchableService }),
+        listDefinitions: async () => ({ ok: true, definitions: [pythonDefinition] }),
+        getDefinition: async () => ({ ok: true, definition: pythonDefinition }),
+        saveDefinition: async (definition) => ({ ok: true, definition }),
+        deleteDefinition: async () => undefined,
+        start: async () => ({ ok: true, service: unlaunchableService }),
+        stop: async () => ({ ok: true, service: unlaunchableService }),
+        restart: async () => ({ ok: true, service: unlaunchableService }),
+        ensureRunning: async () => ({ ok: true, service: unlaunchableService }),
+        provision: async () => ({ ok: true, service: unlaunchableService }),
+        repair: async () => ({ ok: true, service: unlaunchableService }),
+        recreateEnvironment: async () => ({ ok: true, service: unlaunchableService }),
+      },
+      runtimeEventStore: new RuntimeEventBuffer({ capacity: 5 }),
+      builtinDefinitions: [pythonDefinition],
+      definitionRepository: repository as any,
+      fetchImplementation: mock(async () => ({ ok: true, status: 200 })) as any,
+    });
+
+    const mapped = await service.getService("python-runtime");
+    expect(mapped.provisioning.state).toBe("provisioned-unlaunchable");
+    expect(mapped.provisioning.availableActions).toEqual(["repair", "recreate-environment"]);
+    expect(mapped.provisioning.detail).toContain("NumPy");
+  });
 });

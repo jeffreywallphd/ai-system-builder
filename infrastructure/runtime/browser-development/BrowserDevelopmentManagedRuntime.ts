@@ -33,6 +33,8 @@ interface ManagedServiceLogEntry {
 }
 
 interface ManagedServiceSnapshot {
+  readonly serviceId?: string;
+  readonly name?: string;
   readonly state?: string;
   readonly detail?: string;
   readonly diagnostics?: {
@@ -156,7 +158,8 @@ export class BrowserDevelopmentManagedRuntime {
       logger.info("[ai-loom] provisioning browser dev Python runtime environment.");
       await this.requestSupervisorAction("provision");
       logger.info("[ai-loom] ensuring browser dev Python runtime is running.");
-      await this.requestSupervisorAction("ensure-running");
+      const ensureRunning = await this.requestSupervisorAction("ensure-running");
+      this.assertManagedRuntimeStarted(ensureRunning);
       await this.waitForPort(this.options.pythonRuntimePort, this.options.supervisorHost, PYTHON_READY_TIMEOUT_MS);
       logger.info(
         `[ai-loom] python runtime ready on http://${this.options.supervisorHost}:${this.options.pythonRuntimePort} with MCP runtime auto-connect enabled.`,
@@ -167,7 +170,7 @@ export class BrowserDevelopmentManagedRuntime {
     }
   }
 
-  private async requestSupervisorAction(action: "provision" | "ensure-running"): Promise<void> {
+  private async requestSupervisorAction(action: "provision" | "ensure-running"): Promise<ManagedServiceSnapshot | undefined> {
     const supervisorBaseUrl = `http://${this.options.supervisorHost}:${this.options.supervisorPort}`;
     const response = await fetch(`${supervisorBaseUrl}/services/python-runtime/${action}`, {
       method: "POST",
@@ -177,12 +180,33 @@ export class BrowserDevelopmentManagedRuntime {
       body: JSON.stringify({}),
     });
 
+    const payload = await response.json().catch(() => ({})) as { service?: ManagedServiceSnapshot };
     if (!response.ok) {
-      const body = await response.text().catch(() => "");
+      const body = JSON.stringify(payload);
       throw new Error(
         `Managed service supervisor could not ${action} the python-runtime service (${response.status})${body ? `: ${body}` : "."}`,
       );
     }
+
+    return payload.service;
+  }
+
+  private assertManagedRuntimeStarted(snapshot: ManagedServiceSnapshot | undefined): void {
+    if (!snapshot) {
+      return;
+    }
+
+    if (snapshot.state === "healthy" || snapshot.state === "starting") {
+      return;
+    }
+
+    const provisioningState = snapshot.diagnostics?.provisioning?.state;
+    const provisioningError = snapshot.diagnostics?.provisioning?.lastError;
+    const rootCause = provisioningError?.message ?? snapshot.detail ?? "Runtime startup failed before health endpoint became available.";
+    const detail = provisioningState
+      ? `supervisorState=${snapshot.state ?? "unknown"}, provisioningState=${provisioningState}`
+      : `supervisorState=${snapshot.state ?? "unknown"}`;
+    throw new Error(`Python runtime did not enter a startable state (${detail}): ${rootCause}`);
   }
 
   private async fetchPythonRuntimeSnapshot(): Promise<ManagedServiceSnapshot | undefined> {

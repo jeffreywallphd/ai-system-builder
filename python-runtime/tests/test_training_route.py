@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from app.api.dependencies import get_dataset_generation_service, get_model_training_service
 from app.main import app
 from app.services.dataset_generation_service import DatasetGenerationService
+from app.services import model_training_service
 from app.services.model_training_service import ModelTrainingService, _now_iso
 
 
@@ -113,6 +114,36 @@ def test_training_failure_persists_diagnostic_artifact(tmp_path) -> None:
         time.sleep(0.05)
     else:
         raise AssertionError("training job did not reach failed state")
+
+    app.dependency_overrides.clear()
+
+
+def test_local_training_reports_numpy_import_incompatibility_without_crashing_runtime(tmp_path, monkeypatch) -> None:
+    service = ModelTrainingService(workspace_root=tmp_path)
+    app.dependency_overrides[get_model_training_service] = lambda: service
+
+    def fail_numpy_import():
+        raise ValueError("Local gradient training is unavailable because NumPy could not be initialized on this host.")
+
+    monkeypatch.setattr(model_training_service, "_require_numpy", fail_numpy_import)
+
+    response = client.post("/training/jobs", json=create_training_payload())
+    assert response.status_code == 200
+
+    terminal = None
+    for _ in range(60):
+        polled = client.post("/training/jobs/job-1/refresh")
+        payload = polled.json()
+        if payload["status"] in {"failed", "partially-completed"}:
+            terminal = payload
+            break
+        time.sleep(0.05)
+
+    assert terminal is not None
+    assert any(diagnostic["code"] == "local_training_failed" for diagnostic in terminal["diagnostics"])
+    assert any("NumPy" in (diagnostic.get("detail") or "") for diagnostic in terminal["diagnostics"])
+    health = client.get("/health")
+    assert health.status_code == 200
 
     app.dependency_overrides.clear()
 

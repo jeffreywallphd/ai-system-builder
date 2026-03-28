@@ -102,6 +102,7 @@ export const ProvisioningStates = Object.freeze({
   unprovisioned: "unprovisioned",
   provisioning: "provisioning",
   provisioned: "provisioned",
+  provisionedUnlaunchable: "provisioned-unlaunchable",
   provisionFailed: "provision-failed",
   corrupted: "corrupted",
 });
@@ -892,6 +893,54 @@ function readProvisioningMetadata(definition, environmentPath = getPythonEnviron
   }
 }
 
+function normalizeLaunchabilityMetadata(metadata) {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return undefined;
+  }
+
+  const state = typeof metadata.state === "string" ? metadata.state.trim() : "";
+  if (!state) {
+    return undefined;
+  }
+
+  const lastError = metadata.lastError && typeof metadata.lastError === "object" && !Array.isArray(metadata.lastError)
+    ? {
+      at: typeof metadata.lastError.at === "string" ? metadata.lastError.at : null,
+      message: typeof metadata.lastError.message === "string" ? metadata.lastError.message : "Runtime launchability preflight failed.",
+      code: typeof metadata.lastError.code === "string" ? metadata.lastError.code : null,
+      category: typeof metadata.lastError.category === "string" ? metadata.lastError.category : "runtime-launchability",
+      details: metadata.lastError.details && typeof metadata.lastError.details === "object" && !Array.isArray(metadata.lastError.details)
+        ? { ...metadata.lastError.details }
+        : {},
+    }
+    : null;
+
+  return {
+    state,
+    checkedAt: typeof metadata.checkedAt === "string" ? metadata.checkedAt : null,
+    lastError,
+  };
+}
+
+function classifyRuntimeLaunchabilityIssue(message) {
+  const normalized = String(message || "").toLowerCase();
+  if (!normalized) {
+    return { category: "runtime-launchability", code: "PYTHON_RUNTIME_IMPORT_PREFLIGHT_FAILED" };
+  }
+  if (
+    normalized.includes("x86_v2")
+    || normalized.includes("doesn't support")
+    || normalized.includes("cpu")
+    || normalized.includes("illegal instruction")
+  ) {
+    return { category: "host-incompatible", code: "PYTHON_RUNTIME_HOST_INCOMPATIBLE_DEPENDENCY" };
+  }
+  if (normalized.includes("cannot import") || normalized.includes("importerror") || normalized.includes("module not found")) {
+    return { category: "dependency-import", code: "PYTHON_RUNTIME_IMPORT_PREFLIGHT_FAILED" };
+  }
+  return { category: "runtime-launchability", code: "PYTHON_RUNTIME_IMPORT_PREFLIGHT_FAILED" };
+}
+
 function hashFileContents(filePath) {
   if (!existsSync(filePath)) {
     return null;
@@ -948,10 +997,14 @@ function buildInitialProvisioningState(clock, definition) {
   const fingerprintMismatch = Boolean(hasEnvironment
     && isFingerprintMismatch(buildProvisioningFingerprint(definition), metadata?.fingerprint));
   const needsReprovision = isInvalidEnvironment || versionMismatch || fingerprintMismatch;
+  const launchability = normalizeLaunchabilityMetadata(metadata?.launchability);
+  const hasRecordedLaunchabilityFailure = launchability?.state === "unlaunchable";
   const state = !hasEnvironment
     ? ProvisioningStates.unprovisioned
     : isInvalidEnvironment
       ? ProvisioningStates.corrupted
+      : hasRecordedLaunchabilityFailure
+        ? ProvisioningStates.provisionedUnlaunchable
       : ProvisioningStates.provisioned;
 
   return {
@@ -964,13 +1017,24 @@ function buildInitialProvisioningState(clock, definition) {
     versionMismatch,
     fingerprintMismatch,
     needsReprovision,
-    lastUpdatedAt: metadata?.provisionedAt ?? null,
+    lastUpdatedAt: launchability?.checkedAt ?? metadata?.provisionedAt ?? null,
     lastError: isInvalidEnvironment
       ? createDiagnosticError(clock, "provisioning", "Managed Python environment is marked invalid and must be recreated.", {
         code: "PYTHON_RUNTIME_ENV_INVALIDATED",
         category: "corrupted-environment",
         environmentPath,
       })
+      : launchability?.lastError
+        ? createDiagnosticError(
+          clock,
+          "runtime-launchability",
+          launchability.lastError.message,
+          {
+            code: launchability.lastError.code ?? "PYTHON_RUNTIME_IMPORT_PREFLIGHT_FAILED",
+            category: launchability.lastError.category ?? "runtime-launchability",
+            ...launchability.lastError.details,
+          },
+        )
       : null,
   };
 }
@@ -1683,6 +1747,42 @@ export class InMemoryServiceSupervisor {
     return { healthy: true, issues, error: null };
   }
 
+  async validateRuntimeLaunchabilityPreflight(serviceId, definition, pythonExecutable) {
+    const result = await this.runCommand(
+      pythonExecutable,
+      ["-c", "import app.main"],
+      { cwd: definition.cwd },
+    );
+    this.appendCommandOutput(serviceId, result);
+
+    if (result.code === 0) {
+      return {
+        launchable: true,
+        checkedAt: createClockTimestamp(this.clock),
+        lastError: null,
+      };
+    }
+
+    const failureMessage = result.stderr || result.stdout || "Python runtime import preflight failed.";
+    const issue = classifyRuntimeLaunchabilityIssue(failureMessage);
+    return {
+      launchable: false,
+      checkedAt: createClockTimestamp(this.clock),
+      lastError: {
+        at: createClockTimestamp(this.clock),
+        message: failureMessage,
+        code: issue.code,
+        category: issue.category,
+        details: {
+          command: pythonExecutable,
+          check: "import app.main",
+          exitCode: result.code,
+          signal: result.signal ?? null,
+        },
+      },
+    };
+  }
+
   async provisionInternal(serviceId, action) {
     const definition = this.requireDefinition(serviceId);
     const state = this.requireState(serviceId);
@@ -1829,6 +1929,8 @@ export class InMemoryServiceSupervisor {
         throw postInstallError;
       }
 
+      const launchability = await this.validateRuntimeLaunchabilityPreflight(serviceId, definition, venvPython);
+
       this.ensureDirectory(activeEnvironmentPath);
       const provisioningFingerprint = buildProvisioningFingerprint(definition);
       const metadataPath = getProvisioningMetadataPath(definition, activeEnvironmentPath);
@@ -1840,19 +1942,30 @@ export class InMemoryServiceSupervisor {
         environmentPath: activeEnvironmentPath,
         fingerprint: provisioningFingerprint,
         provisionedAt: createClockTimestamp(this.clock),
+        launchability,
       }, null, 2)}\n`, "utf8");
       this.promoteActiveEnvironment(definition, activeEnvironmentPath, environmentPath);
       clearInvalidEnvironment(definition, activeEnvironmentPath, this.clock);
       this.flushPendingEnvironmentCleanup(serviceId, definition);
 
-      this.appendLog(serviceId, "success", `${definition.name} provisioning completed successfully.`);
+      if (!launchability.launchable) {
+        this.appendLog(
+          serviceId,
+          "warning",
+          `${definition.name} environment provisioned but runtime import preflight failed: ${launchability.lastError?.message ?? "unknown error"}`,
+        );
+      } else {
+        this.appendLog(serviceId, "success", `${definition.name} provisioning completed successfully.`);
+      }
       return this.updateState(serviceId, {
-        detail: `${definition.name} is provisioned and ready to start.`,
+        detail: launchability.launchable
+          ? `${definition.name} is provisioned and ready to start.`
+          : `${definition.name} environment is provisioned but not launchable on this host.`,
         diagnostics: {
           ...this.requireState(serviceId).diagnostics,
           provisioning: {
             ...this.requireState(serviceId).diagnostics.provisioning,
-            state: ProvisioningStates.provisioned,
+            state: launchability.launchable ? ProvisioningStates.provisioned : ProvisioningStates.provisionedUnlaunchable,
             required: true,
             requestedVersion,
             resolvedVersion: interpreter.version,
@@ -1861,8 +1974,8 @@ export class InMemoryServiceSupervisor {
             versionMismatch: false,
             fingerprintMismatch: false,
             needsReprovision: false,
-            lastUpdatedAt: createClockTimestamp(this.clock),
-            lastError: null,
+            lastUpdatedAt: launchability.checkedAt,
+            lastError: launchability.lastError,
           },
         },
       });
@@ -2217,6 +2330,8 @@ export class InMemoryServiceSupervisor {
           : `${definition.name} environment inputs changed and reprovisioning is required before starting.`
         : provisioning.state === ProvisioningStates.corrupted
         ? `${definition.name} environment is corrupted. Repair or recreate the environment before starting.`
+        : provisioning.state === ProvisioningStates.provisionedUnlaunchable
+        ? `${definition.name} environment is provisioned but not launchable on this host. ${provisioning.lastError?.message ?? "Runtime import preflight failed."}`
         : provisioning.state === ProvisioningStates.provisionFailed
         ? `${definition.name} provisioning failed. Repair or recreate the environment before starting.`
         : `${definition.name} must be provisioned before it can start.`;
@@ -2379,10 +2494,14 @@ export class InMemoryServiceSupervisor {
       const current = this.requireState(serviceId);
       const exitInfo = getExitInfo?.();
       if (exitInfo) {
+        const startupFailure = this.detectKnownStartupFailure(serviceId);
+        const knownFailureSuffix = startupFailure
+          ? ` Known cause: ${startupFailure.message}`
+          : "";
         return this.failService(serviceId, definition, {
           category: "start",
-          detail: `${definition.name} exited unexpectedly during startup (code=${exitInfo?.code ?? "null"}, signal=${exitInfo?.signal ?? "null"}).`,
-          error: new Error(`${definition.name} exited unexpectedly during startup.`),
+          detail: `${definition.name} exited unexpectedly during startup (code=${exitInfo?.code ?? "null"}, signal=${exitInfo?.signal ?? "null"}).${knownFailureSuffix}`,
+          error: new Error(`${definition.name} exited unexpectedly during startup.${knownFailureSuffix}`),
           outcome: "failed-start",
           ownership: ServiceOwnership.none,
           exitInfo,
@@ -2467,6 +2586,35 @@ export class InMemoryServiceSupervisor {
       pid: null,
       ownership: ServiceOwnership.none,
     });
+  }
+
+  detectKnownStartupFailure(serviceId) {
+    const state = this.states.get(serviceId);
+    if (!state) {
+      return undefined;
+    }
+
+    const stderrTail = [...state.recentLogs]
+      .reverse()
+      .filter((entry) => entry.level === "stderr")
+      .slice(0, 20)
+      .map((entry) => entry.message)
+      .join("\n");
+    if (!stderrTail) {
+      return undefined;
+    }
+
+    const issue = classifyRuntimeLaunchabilityIssue(stderrTail);
+    if (issue.code === "PYTHON_RUNTIME_IMPORT_PREFLIGHT_FAILED" && issue.category === "runtime-launchability") {
+      return undefined;
+    }
+
+    const conciseMessage = stderrTail.split("\n").find((line) => line.trim()) ?? "Runtime startup dependency failure detected.";
+    return {
+      code: issue.code,
+      category: issue.category,
+      message: conciseMessage,
+    };
   }
 
   async detectExternalService(serviceId, definition, state) {

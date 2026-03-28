@@ -10,14 +10,23 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
 
-import numpy as np
-
 from app.models.requests import FineTuningJobRequest
 from app.models.responses import FineTuningJobResponse
 
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _require_numpy():
+    try:
+        import numpy as np  # type: ignore[import-not-found]
+    except Exception as error:
+        raise ValueError(
+            "Local gradient training is unavailable because NumPy could not be initialized on this host. "
+            f"Underlying error: {error}"
+        ) from error
+    return np
 
 
 class ModelTrainingService:
@@ -316,6 +325,7 @@ class ModelTrainingService:
         )
 
         try:
+            np = _require_numpy()
             examples = request.examples
             vocab = self._build_vocabulary(examples)
             x_matrix = np.vstack([self._vectorize(example.input_text, vocab) for example in examples])
@@ -580,6 +590,7 @@ class ModelTrainingService:
         return ordered or ["<empty>"]
 
     def _vectorize(self, text: str, vocab: List[str]) -> np.ndarray:
+        np = _require_numpy()
         tokens = self._tokenize(text)
         vector = np.zeros((len(vocab),), dtype=np.float64)
         index = {token: position for position, token in enumerate(vocab)}

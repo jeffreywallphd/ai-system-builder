@@ -886,7 +886,11 @@ function mapProvisioning(
   const actions: ManagedServiceProvisioningAction[] = [];
   if (provisioning.state === "unprovisioned") {
     actions.push(ManagedServiceProvisioningActions.provision);
-  } else if (provisioning.state === "provision-failed") {
+  } else if (
+    provisioning.state === "provision-failed"
+    || provisioning.state === "provisioned-unlaunchable"
+    || provisioning.state === "corrupted"
+  ) {
     actions.push(
       ManagedServiceProvisioningActions.repair,
       ManagedServiceProvisioningActions.recreateEnvironment,
