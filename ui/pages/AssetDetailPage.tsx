@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import ContextualRecommendationsPanel from "../components/navigation/ContextualRecommendationsPanel";
+import { ContextualRecommendationService, ContextualRecommendationSurfaces } from "../routes/ContextualRecommendations";
+import { RecentAndFavoritesService } from "../routes/RecentAndFavorites";
 import { Link, useLocation, useParams } from "react-router-dom";
 import type {
   RegistryDependencyGraph,
@@ -31,11 +34,14 @@ export default function AssetDetailPage(): JSX.Element {
   const { assetId } = useParams<{ assetId: string }>();
   const location = useLocation();
   const service = useMemo(() => new RegistryService(), []);
+  const recommendationService = useMemo(() => new ContextualRecommendationService(), []);
+  const recentAndFavoritesService = useMemo(() => new RecentAndFavoritesService(), []);
   const [asset, setAsset] = useState<RegistryAsset>();
   const [upstream, setUpstream] = useState<RegistryDependencyGraph>();
   const [downstream, setDownstream] = useState<RegistryDependencyGraph>();
   const [error, setError] = useState<string>();
   const [loading, setLoading] = useState(true);
+  const [favoriteRevision, setFavoriteRevision] = useState(0);
   const registryContextQuery = useMemo(() => new URLSearchParams(location.search).get("registryContext")?.trim(), [location.search]);
   const registryBackPath = registryContextQuery
     ? `${ROUTE_PATHS.registry}?${registryContextQuery}`
@@ -66,6 +72,11 @@ export default function AssetDetailPage(): JSX.Element {
 
       const detail = detailResponse.data;
       setAsset(detail);
+      recentAndFavoritesService.recordRecentAsset({
+        assetId: detail.assetId,
+        title: detail.displayName || detail.assetId,
+        launchPath: `/studio-shell/registry/assets/${encodeURIComponent(detail.assetId)}?assetId=${encodeURIComponent(detail.assetId)}`,
+      });
       setError(undefined);
 
       if (!detail.versionId) {
@@ -100,7 +111,7 @@ export default function AssetDetailPage(): JSX.Element {
     return () => {
       active = false;
     };
-  }, [assetId, service]);
+  }, [assetId, recentAndFavoritesService, service]);
 
   if (loading) {
     return <section className="ui-page"><p className="ui-text-secondary">Loading registry asset detail…</p></section>;
@@ -130,10 +141,39 @@ export default function AssetDetailPage(): JSX.Element {
     buildIntent: new URLSearchParams(location.search).get("buildIntent")?.trim() || undefined,
     buildIntentSelectedAt: new URLSearchParams(location.search).get("buildIntentSelectedAt")?.trim() || undefined,
   };
+  const relatedAssetIds = [
+    ...(upstream?.nodes.map((node) => node.assetId) ?? []),
+    ...(downstream?.nodes.map((node) => node.assetId) ?? []),
+  ].filter((entry) => entry !== asset.assetId);
+  const recommendations = recommendationService.resolve({
+    surface: ContextualRecommendationSurfaces.assetDetail,
+    assetActionContext: actionContext,
+    relatedAssetIds,
+  });
+  const favoriteItemId = `asset:${asset.assetId}`;
+  const isFavorite = useMemo(() => recentAndFavoritesService.isFavorite(favoriteItemId), [favoriteItemId, favoriteRevision, recentAndFavoritesService]);
 
   return (
     <section className="ui-page ui-stack ui-stack--md" data-testid="registry-asset-detail-page">
       <StandardAssetDetailView asset={asset} actionContext={actionContext} backPath={registryBackPath} />
+
+      <div className="ui-row ui-row--wrap" style={{ justifyContent: "space-between", gap: "0.75rem" }}>
+        <ContextualRecommendationsPanel recommendations={recommendations} />
+        <button
+          type="button"
+          className="ui-button ui-button--ghost ui-button--small"
+          onClick={() => {
+            recentAndFavoritesService.toggleFavorite({
+              itemId: favoriteItemId,
+              title: asset.displayName || asset.assetId,
+              launchPath: `/studio-shell/registry/assets/${encodeURIComponent(asset.assetId)}?assetId=${encodeURIComponent(asset.assetId)}` ,
+            });
+            setFavoriteRevision((value) => value + 1);
+          }}
+        >
+          {isFavorite ? "Remove favorite" : "Add to favorites"}
+        </button>
+      </div>
 
       <div className="ui-grid" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "1rem" }}>
         <AssetSummaryPanel asset={asset} />

@@ -1,4 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
+import ContextualRecommendationsPanel from "../components/navigation/ContextualRecommendationsPanel";
+import RecentAndFavoritesPanel from "../components/navigation/RecentAndFavoritesPanel";
+import { ContextualRecommendationService, ContextualRecommendationSurfaces } from "../routes/ContextualRecommendations";
+import { RecentAndFavoritesService } from "../routes/RecentAndFavorites";
 import { Link, useLocation } from "react-router-dom";
 import type { ExecutionRunProjection } from "../../application/execution/ExecutionRunProjectionService";
 import ExecutionHistoryPanel from "../components/execution/ExecutionHistoryPanel";
@@ -10,10 +14,30 @@ export default function RunPage(): JSX.Element {
   const location = useLocation();
   const { executionHistoryService } = useUiDependencies();
   const service = useMemo(() => new RunInterfaceService(), []);
+  const recommendationService = useMemo(() => new ContextualRecommendationService(), []);
+  const recentAndFavoritesService = useMemo(() => new RecentAndFavoritesService(), []);
   const presentation = useMemo(() => service.resolvePresentation(location.search), [location.search, service]);
+  const recommendations = recommendationService.resolve({
+    surface: ContextualRecommendationSurfaces.run,
+    runContextKind: presentation.request.contextKind,
+    runOriginPath: presentation.request.originPath,
+    assetActionContext: presentation.request.assetId
+      ? {
+          source: "detail",
+          asset: {
+            assetId: presentation.request.assetId,
+            versionId: presentation.request.versionId,
+            taxonomy: undefined,
+          },
+        }
+      : undefined,
+  });
+  const recents = recentAndFavoritesService.listRecents(4);
+  const favorites = recentAndFavoritesService.listFavorites();
   const [history, setHistory] = useState<ReadonlyArray<ExecutionRunProjection>>([]);
 
   useEffect(() => {
+    recentAndFavoritesService.recordRecentRunContext({ request: presentation.request, launchPath: presentation.launchPath });
     let active = true;
     void executionHistoryService
       .listHistory({ limit: 10 })
@@ -30,7 +54,7 @@ export default function RunPage(): JSX.Element {
     return () => {
       active = false;
     };
-  }, [executionHistoryService]);
+  }, [executionHistoryService, presentation.launchPath, presentation.request, recentAndFavoritesService]);
 
   return (
     <section className="ui-page ui-stack ui-stack--md" data-testid="run-page">
@@ -40,6 +64,9 @@ export default function RunPage(): JSX.Element {
           <p className="ui-page__subtitle">{presentation.shellSubtitle}</p>
         </div>
       </div>
+
+      <ContextualRecommendationsPanel recommendations={recommendations} />
+      <RecentAndFavoritesPanel service={recentAndFavoritesService} recents={recents} favorites={favorites} />
 
       <div className="ui-card">
         <div className="ui-card__body ui-stack ui-stack--sm">
