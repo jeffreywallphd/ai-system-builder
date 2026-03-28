@@ -1,6 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AssetDraftLifecycleStatuses } from "../../../domain/studio-shell/StudioShellDomain";
 import type { StudioShellExtensionContext } from "../../studio-shell/StudioShellExtensions";
+import { ExecutionMonitorPanel } from "./runtime/ExecutionMonitorPanel";
+import { ExecutionResultPanel } from "./runtime/ExecutionResultPanel";
 
 interface SystemRuntimeRunPanelProps {
   readonly context: StudioShellExtensionContext;
@@ -9,8 +11,12 @@ interface SystemRuntimeRunPanelProps {
 export function SystemRuntimeRunPanel({ context }: SystemRuntimeRunPanelProps): JSX.Element {
   const [message, setMessage] = useState<string | undefined>();
   const [latestExecutionId, setLatestExecutionId] = useState<string | undefined>();
-  const [latestStatus, setLatestStatus] = useState<string | undefined>();
+  const [status, setStatus] = useState<Awaited<ReturnType<NonNullable<StudioShellExtensionContext["operations"]["getSystemExecutionStatus"]>>>["data"]>();
+  const [trace, setTrace] = useState<Awaited<ReturnType<NonNullable<StudioShellExtensionContext["operations"]["getSystemExecutionTrace"]>>>["data"]>();
+  const [result, setResult] = useState<Awaited<ReturnType<NonNullable<StudioShellExtensionContext["operations"]["getSystemExecutionResult"]>>>["data"]>();
   const [isRunning, setIsRunning] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
 
   const draft = context.snapshot?.draft;
   const canRun = useMemo(() => {
@@ -21,10 +27,54 @@ export function SystemRuntimeRunPanel({ context }: SystemRuntimeRunPanelProps): 
       || draft.lifecycleStatus === AssetDraftLifecycleStatuses.published;
   }, [draft]);
 
+  const isTerminal = status?.status === "succeeded" || status?.status === "failed" || status?.status === "cancelled";
+
+  const refreshExecutionDetails = async (executionId: string): Promise<void> => {
+    if (!context.operations.getSystemExecutionStatus) {
+      return;
+    }
+
+    setIsRefreshing(true);
+    try {
+      const [statusResponse, traceResponse, resultResponse] = await Promise.all([
+        context.operations.getSystemExecutionStatus(executionId),
+        context.operations.getSystemExecutionTrace?.({ executionId, eventLimit: 20, logLimit: 20 }),
+        context.operations.getSystemExecutionResult?.(executionId),
+      ]);
+
+      if (!statusResponse.ok || !statusResponse.data) {
+        setMessage(statusResponse.error?.message ?? "Unable to refresh execution status.");
+        return;
+      }
+
+      setStatus(statusResponse.data);
+      if (traceResponse?.ok) {
+        setTrace(traceResponse.data);
+      }
+      if (resultResponse?.ok) {
+        setResult(resultResponse.data);
+      }
+      setMessage(undefined);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!latestExecutionId || !autoRefreshEnabled || !status || isTerminal) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      void refreshExecutionDetails(latestExecutionId);
+    }, 2000);
+    return () => window.clearInterval(timer);
+  }, [autoRefreshEnabled, isTerminal, latestExecutionId, status]);
+
   return (
     <div className="ui-stack ui-stack--sm" data-testid="system-runtime-run-panel">
       <p className="ui-text-muted">
-        Trigger bounded runtime execution for the current System Studio draft. This uses the real desktop backend runtime API path.
+        Trigger bounded runtime execution for the current System Studio draft and monitor runtime progression/results through the real backend API path.
       </p>
       <div className="ui-stack ui-stack--xs" style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap" }}>
         <button
@@ -50,15 +100,11 @@ export function SystemRuntimeRunPanel({ context }: SystemRuntimeRunPanelProps): 
               }
 
               setLatestExecutionId(response.data.executionId);
-              setLatestStatus(response.data.status);
+              setStatus(undefined);
+              setTrace(undefined);
+              setResult(undefined);
               setMessage(`Started execution '${response.data.executionId}' with status '${response.data.status}'.`);
-
-              if (context.operations.getSystemExecutionStatus) {
-                const status = await context.operations.getSystemExecutionStatus(response.data.executionId);
-                if (status.ok && status.data) {
-                  setLatestStatus(status.data.status);
-                }
-              }
+              await refreshExecutionDetails(response.data.executionId);
             }).finally(() => {
               setIsRunning(false);
             });
@@ -72,13 +118,37 @@ export function SystemRuntimeRunPanel({ context }: SystemRuntimeRunPanelProps): 
             : "Validate or publish the draft before running."}
         </span>
       </div>
+      <div className="ui-stack ui-stack--xs" style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap" }}>
+        <button
+          className="ui-button"
+          disabled={!latestExecutionId || isRefreshing}
+          onClick={() => {
+            if (!latestExecutionId) {
+              return;
+            }
+            void refreshExecutionDetails(latestExecutionId);
+          }}
+        >
+          {isRefreshing ? "Refreshing..." : "Refresh Monitoring"}
+        </button>
+        <label className="ui-text-small ui-text-secondary" style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
+          <input
+            type="checkbox"
+            checked={autoRefreshEnabled}
+            onChange={(event) => setAutoRefreshEnabled(event.currentTarget.checked)}
+          />
+          Auto-refresh every 2s (while running)
+        </label>
+      </div>
       {latestExecutionId ? (
         <div className="ui-stack ui-stack--2xs">
           <div><strong>Execution:</strong> {latestExecutionId}</div>
-          <div><strong>Status:</strong> {latestStatus ?? "unknown"}</div>
+          <div><strong>Status:</strong> {status?.status ?? "unknown"}</div>
         </div>
       ) : null}
       {message ? <div role="status">{message}</div> : null}
+      <ExecutionMonitorPanel status={status} trace={trace} />
+      <ExecutionResultPanel result={result} />
     </div>
   );
 }

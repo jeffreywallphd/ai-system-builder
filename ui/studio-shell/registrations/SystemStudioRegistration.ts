@@ -92,7 +92,7 @@ export const systemStudioRegistration: SystemStudioRegistration = Object.freeze(
       id: "system-studio-runtime-run-trigger",
       slot: "lifecycle",
       title: "System runtime run trigger",
-      subtitle: "Bounded run trigger wired through StudioShell service bridge and backend runtime API.",
+      subtitle: "Bounded run trigger, execution monitoring, and result visualization through StudioShell runtime API contracts.",
       order: 12,
       render: (context) => createElement(SystemRuntimeRunPanel, { context }),
     },

@@ -71,6 +71,8 @@ describe("SystemRuntimeBackendApi", () => {
     expect(status.ok).toBeTrue();
     expect(status.data?.executionId).toBe(started.data?.executionId);
     expect(status.data?.progress.totalNodeCount).toBeGreaterThan(0);
+    expect((status.data?.nodeStatuses.length ?? 0) > 0).toBeTrue();
+    expect(status.data?.recovery.decisionCount).toBeGreaterThanOrEqual(0);
 
     const trace = await runtimeApi.getExecutionTrace({ executionId: started.data!.executionId, eventLimit: 5, logLimit: 3 });
     expect(trace.ok).toBeTrue();
@@ -81,6 +83,9 @@ describe("SystemRuntimeBackendApi", () => {
     expect(result.ok).toBeTrue();
     expect(result.data?.executionId).toBe(started.data?.executionId);
     expect(result.data?.output).toBeDefined();
+    expect(result.data?.outputSummary.hasOutput).toBeTrue();
+    expect((result.data?.nodeResults.length ?? 0) > 0).toBeTrue();
+    expect(result.data?.diagnostics.length).toBeGreaterThanOrEqual(0);
   });
 
   it("returns coherent not-found and invalid-request errors", async () => {

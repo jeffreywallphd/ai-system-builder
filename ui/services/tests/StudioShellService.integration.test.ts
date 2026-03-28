@@ -1797,6 +1797,8 @@ describe("StudioShellService integration", () => {
     expect(status.ok).toBeTrue();
     expect(status.data?.executionId).toBe(started.data?.executionId);
     expect(status.data?.progress.totalNodeCount).toBeGreaterThan(0);
+    expect((status.data?.nodeStatuses.length ?? 0) > 0).toBeTrue();
+    expect(status.data?.recovery.decisionCount).toBeGreaterThanOrEqual(0);
 
     const trace = await service.getSystemExecutionTrace({
       executionId: started.data!.executionId,
@@ -1811,6 +1813,9 @@ describe("StudioShellService integration", () => {
     expect(result.ok).toBeTrue();
     expect(result.data?.executionId).toBe(started.data?.executionId);
     expect(result.data?.output).toBeDefined();
+    expect(result.data?.outputSummary.hasOutput).toBeTrue();
+    expect((result.data?.nodeResults.length ?? 0) > 0).toBeTrue();
+    expect(result.data?.diagnostics.length).toBeGreaterThanOrEqual(0);
 
     repository.dispose();
   });
