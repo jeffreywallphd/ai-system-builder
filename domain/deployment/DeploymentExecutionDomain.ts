@@ -2,6 +2,7 @@ import type { DeploymentBundle } from "./DeploymentBundleDomain";
 import type { DeploymentConfigurationContract } from "./DeploymentConfigurationDomain";
 import type { DeploymentTarget } from "./DeploymentTargetDomain";
 import type { ProvisionedDeploymentEnvironment } from "./EnvironmentProvisioningDomain";
+import type { DeploymentState, DeploymentStateSnapshot, DeploymentStateTransition } from "./DeploymentStateDomain";
 
 export const DeploymentStatuses = Object.freeze({
   pending: "pending",
@@ -24,6 +25,9 @@ export interface DeploymentRecord {
   readonly deploymentId: string;
   readonly requestId: string;
   readonly status: DeploymentStatus;
+  readonly state: DeploymentState;
+  readonly stateSnapshot: DeploymentStateSnapshot;
+  readonly stateTransitions: ReadonlyArray<DeploymentStateTransition>;
   readonly bundleId: string;
   readonly bundleVersionKey: string;
   readonly packageId: string;
@@ -32,7 +36,7 @@ export interface DeploymentRecord {
   readonly deploymentConfigurationId: string;
   readonly targetId: string;
   readonly targetType: DeploymentTarget["type"];
-  readonly provisionedEnvironmentId: string;
+  readonly provisionedEnvironmentId?: string;
   readonly nestedSystemCount: number;
   readonly deployedAt: string;
   readonly metadata: {
@@ -45,6 +49,14 @@ export interface DeploymentExecutionResult {
   readonly status: DeploymentStatus;
   readonly deployment?: DeploymentRecord;
   readonly issues: ReadonlyArray<{ readonly code: string; readonly message: string }>;
+}
+
+export interface DeploymentLifecycleRequest {
+  readonly requestId: string;
+  readonly bundle: DeploymentBundle;
+  readonly deploymentConfiguration: DeploymentConfigurationContract;
+  readonly target: DeploymentTarget;
+  readonly requestedAt: string;
 }
 
 export function createDeploymentExecutionRequest(input: DeploymentExecutionRequest): DeploymentExecutionRequest {
@@ -63,6 +75,25 @@ export function createDeploymentExecutionRequest(input: DeploymentExecutionReque
     deploymentConfiguration: input.deploymentConfiguration,
     target: input.target,
     provisionedEnvironment: input.provisionedEnvironment,
+    requestedAt,
+  });
+}
+
+export function createDeploymentLifecycleRequest(input: DeploymentLifecycleRequest): DeploymentLifecycleRequest {
+  const requestId = input.requestId.trim();
+  if (!requestId) {
+    throw new Error("Deployment lifecycle request id is required.");
+  }
+  const requestedAt = input.requestedAt.trim();
+  if (!requestedAt) {
+    throw new Error("Deployment lifecycle requestedAt is required.");
+  }
+
+  return Object.freeze({
+    requestId,
+    bundle: input.bundle,
+    deploymentConfiguration: input.deploymentConfiguration,
+    target: input.target,
     requestedAt,
   });
 }
