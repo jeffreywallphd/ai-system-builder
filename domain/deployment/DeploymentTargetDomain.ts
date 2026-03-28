@@ -28,6 +28,8 @@ export interface DeploymentTargetCapabilities {
   readonly supportedRuntimeEnvironments: ReadonlyArray<string>;
   readonly providedRuntimeRequirements: ReadonlyArray<string>;
   readonly supportedExportTargets: ReadonlyArray<string>;
+  readonly supportedDeploymentSettings: ReadonlyArray<string>;
+  readonly supportedRuntimeSettings: ReadonlyArray<string>;
 }
 
 export interface DeploymentTarget {
@@ -62,6 +64,8 @@ export function createDeploymentTarget(input: {
       supportedRuntimeEnvironments: normalizeStringList(input.capabilities.supportedRuntimeEnvironments),
       providedRuntimeRequirements: normalizeStringList(input.capabilities.providedRuntimeRequirements),
       supportedExportTargets: normalizeStringList(input.capabilities.supportedExportTargets),
+      supportedDeploymentSettings: normalizeStringList(input.capabilities.supportedDeploymentSettings),
+      supportedRuntimeSettings: normalizeStringList(input.capabilities.supportedRuntimeSettings),
     }),
   });
 }
