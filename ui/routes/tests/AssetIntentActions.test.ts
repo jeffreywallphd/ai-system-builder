@@ -59,6 +59,7 @@ describe("AssetActionExecutionService", () => {
     const service = new AssetActionExecutionService();
     const open = service.execute(AssetIntentActionTypes.openAndModify, makeContext());
     const build = service.execute(AssetIntentActionTypes.buildFromThis, makeContext());
+    const run = service.execute(AssetIntentActionTypes.runOrTest, makeContext());
 
     expect(open?.launchPath).toContain("assetId=asset%3Aworkflow%3A1");
     expect(open?.launchPath).toContain("entryMode=asset");
@@ -66,6 +67,9 @@ describe("AssetActionExecutionService", () => {
     expect(build?.launchPath).toContain("buildIntent=automate-task");
     expect(build?.launchPath).toContain("buildIntentSelectedAt=");
     expect(build?.studioEntry?.initializationPayload.initialization.context.intent?.key).toBe("automate-task");
+    expect(run?.launchPath).toContain("/run?");
+    expect(run?.launchPath).toContain("context=asset");
+    expect(run?.launchPath).toContain("intent=Run+%2F+test");
   });
 
   it("uses inline creation flow for extend/connect on system assets", () => {

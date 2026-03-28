@@ -1,5 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { IntentNavigationFeatureFlag } from "../../features/IntentNavigationFeatureFlag";
+import { LegacyNavigationFeatureFlag } from "../../features/LegacyNavigationFeatureFlag";
+import { NavigationMigrationService } from "../LegacyNavigationSunset";
 import { IntentNavigationShell, ShellRouteResolver } from "../IntentNavigationShell";
 import { ROUTE_PATHS } from "../RouteConfig";
 
@@ -22,6 +24,20 @@ describe("Intent navigation shell", () => {
     expect(model.isIntentNavigationEnabled).toBeFalse();
     expect(model.items.some((item) => item.key === "workflows")).toBeTrue();
     expect(model.items.some((item) => item.key === "build")).toBeFalse();
+  });
+
+
+  it("uses migration controls to hide legacy routes during sunset rollout", () => {
+    const featureFlag = new IntentNavigationFeatureFlag({ env: { VITE_FEATURE_INTENT_NAVIGATION: "false" } });
+    const migration = new NavigationMigrationService({
+      intentNavigationFlag: featureFlag,
+      legacyNavigationFlag: new LegacyNavigationFeatureFlag({ env: { VITE_FEATURE_LEGACY_NAVIGATION: "sunset" } }),
+    });
+    const shell = new IntentNavigationShell(featureFlag, migration);
+
+    const model = shell.resolvePrimaryNavigation({ pathname: ROUTE_PATHS.workflows });
+
+    expect(model.items.some((item) => item.key === "workflows")).toBeFalse();
   });
 
   it("resolves shell-level routes into Build / Explore / Run sections", () => {
