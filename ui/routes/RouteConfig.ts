@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { BuildEntryFeatureFlag } from "../features/BuildEntryFeatureFlag";
 import { UxStudioEntryLabelResolver } from "../taxonomy/UxTaxonomySuppression";
 
 export interface AppRouteDefinition {
@@ -12,6 +13,7 @@ export interface AppRouteDefinition {
 
 export const ROUTE_PATHS = Object.freeze({
   home: "/",
+  build: "/build",
   workflows: "/workflows",
   workflowEditor: "/workflows/:workflowId",
   workflowContextWorkbench: "/workflows/:workflowId/context-workbench",
@@ -47,6 +49,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteDefinition> = Object.freeze([
     key: "home",
     path: ROUTE_PATHS.home,
     title: "Home",
+    showInNavigation: true,
+  }),
+  Object.freeze({
+    key: "build",
+    path: ROUTE_PATHS.build,
+    title: "Build",
     showInNavigation: true,
   }),
   Object.freeze({
@@ -215,8 +223,20 @@ export const APP_ROUTES: ReadonlyArray<AppRouteDefinition> = Object.freeze([
 
 export function getNavigationRoutes(): ReadonlyArray<AppRouteDefinition> {
   const labelResolver = new UxStudioEntryLabelResolver();
+  const buildFlag = new BuildEntryFeatureFlag();
   return APP_ROUTES
-    .filter((route) => route.showInNavigation)
+    .filter((route) => {
+      if (!route.showInNavigation) {
+        return false;
+      }
+      if (route.key === "build") {
+        return buildFlag.isEnabled();
+      }
+      if (route.key === "workflows" && buildFlag.isEnabled()) {
+        return false;
+      }
+      return true;
+    })
     .map((route) => Object.freeze({
       ...route,
       title: labelResolver.resolveNavigationTitle(route.key, route.title),
