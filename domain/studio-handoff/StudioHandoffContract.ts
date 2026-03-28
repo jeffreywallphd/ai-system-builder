@@ -87,6 +87,7 @@ export interface StudioHandoffPayload {
   readonly taxonomy: CompositionTaxonomyDescriptor;
   readonly contract?: AssetContractDescriptor;
   readonly targetInputContract: TargetStudioInputContract;
+  readonly systemOfSystems?: SystemOfSystemsHandoffContext;
 }
 
 export const StudioHandoffAssetRoles = Object.freeze({
@@ -120,6 +121,19 @@ export interface PinnedStudioHandoffAssetVersion {
 export interface VersionAwareStudioHandoffReference extends PinnedStudioHandoffAssetVersion {
   readonly role?: StudioHandoffAssetRole;
   readonly relation?: string;
+}
+
+export interface SystemHandoffReference extends VersionAwareStudioHandoffReference {
+  readonly structuralKind: "system";
+  readonly semanticRole: "system";
+  readonly behaviorKind: CompositionTaxonomyDescriptor["behaviorKind"];
+  readonly structureRole: "root-system" | "nested-system" | "peer-system";
+  readonly nestedSystemReferences: ReadonlyArray<VersionAwareStudioHandoffReference>;
+}
+
+export interface SystemOfSystemsHandoffContext {
+  readonly rootSystem: SystemHandoffReference;
+  readonly nestedSystems: ReadonlyArray<SystemHandoffReference>;
 }
 
 export interface MultiAssetStudioHandoffContract {
@@ -259,6 +273,46 @@ export function createStudioHandoffContract(input: {
     throw new Error("Studio handoff payload pinned version must match payload assetId/versionId.");
   }
 
+  const systemOfSystems = input.payload.taxonomy.structuralKind === "system" && input.payload.taxonomy.semanticRole === "system"
+    ? Object.freeze({
+      rootSystem: Object.freeze({
+        assetId: payloadAssetId,
+        versionId: payloadVersionId,
+        role: StudioHandoffAssetRoles.primary,
+        relation: "system-of-systems",
+        structuralKind: "system" as const,
+        semanticRole: "system" as const,
+        behaviorKind: input.payload.taxonomy.behaviorKind,
+        structureRole: "root-system" as const,
+        nestedSystemReferences: Object.freeze(
+          (input.context?.sourceReferences ?? [])
+            .filter((entry) => (entry.relation?.includes("system") ?? false) && entry.assetId !== payloadAssetId)
+            .map((entry) => Object.freeze({
+              assetId: entry.assetId,
+              versionId: entry.versionId,
+              role: StudioHandoffAssetRoles.systemComponent,
+              relation: entry.relation ?? "nested-system",
+            })),
+        ),
+      }),
+      nestedSystems: Object.freeze(
+        (input.multiAsset?.assets ?? [])
+          .filter((entry) => entry.taxonomy.structuralKind === "system" && entry.assetId !== payloadAssetId)
+          .map((entry) => Object.freeze({
+            assetId: entry.assetId,
+            versionId: entry.versionId,
+            role: entry.role,
+            relation: "grouped-system-asset",
+            structuralKind: "system" as const,
+            semanticRole: "system" as const,
+            behaviorKind: entry.taxonomy.behaviorKind,
+            structureRole: "nested-system" as const,
+            nestedSystemReferences: Object.freeze([]),
+          })),
+      ),
+    })
+    : undefined;
+
   const normalizedPayload = Object.freeze({
     assetId: payloadAssetId,
     versionId: payloadVersionId,
@@ -284,6 +338,7 @@ export function createStudioHandoffContract(input: {
         ? Object.freeze([...targetInputContract.allowedContextKeys.map((entry) => entry.trim()).filter(Boolean)])
         : undefined,
     }),
+    systemOfSystems,
   });
 
   const context = input.context

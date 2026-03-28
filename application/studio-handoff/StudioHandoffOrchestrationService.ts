@@ -17,6 +17,10 @@ import type { StudioHandoffAuditTrailService } from "./StudioHandoffAuditTrailSe
 import type { AdaptedStudioInput, StudioInputAdapterLayer } from "./StudioInputAdapter";
 import type { AdaptedStudioOutput, StudioOutputAdapterLayer, StudioProducedOutput } from "./StudioOutputAdapter";
 import type { StudioHandoffLineageRecord, StudioHandoffLineageTracker } from "./StudioHandoffLineageTracker";
+import {
+  StudioHandoffFailureHandler,
+  type StudioHandoffFailure,
+} from "./StudioHandoffFailure";
 
 export interface StudioHandoffRequest {
   readonly handoff?: StudioHandoffContract;
@@ -37,23 +41,6 @@ export interface StudioHandoffPreparation {
   readonly compatibility: StudioHandoffCompatibilityDecision;
   readonly targetInput: AdaptedStudioInput;
   readonly lineage?: StudioHandoffLineageRecord;
-}
-
-export interface StudioHandoffFailure {
-  readonly stage: "output-adaptation" | "contract" | "input-adaptation";
-  readonly code:
-    | "output-adaptation-failed"
-    | "request-invalid"
-    | "contract-source-mismatch"
-    | "contract-payload-mismatch"
-    | "input-adaptation-failed";
-  readonly message: string;
-  readonly issues: ReadonlyArray<{
-    readonly code: string;
-    readonly message: string;
-    readonly path?: string;
-  }>;
-  readonly compatibility?: StudioHandoffCompatibilityDecision;
 }
 
 export interface StudioHandoffResult {
@@ -113,10 +100,22 @@ export interface UpdatedStudioHandoffResult extends StudioHandoffResult {
   readonly changes?: StudioHandoffChangeSet;
 }
 
+interface StudioHandoffFailureSeed {
+  readonly stage: "output-adaptation" | "contract" | "input-adaptation";
+  readonly code: "output-adaptation-failed" | "request-invalid" | "contract-source-mismatch" | "contract-payload-mismatch" | "input-adaptation-failed";
+  readonly message: string;
+  readonly issues: ReadonlyArray<{
+    readonly code: string;
+    readonly message: string;
+    readonly path?: string;
+  }>;
+  readonly compatibility?: StudioHandoffCompatibilityDecision;
+}
+
 function resolveContract(input: {
   readonly request: StudioHandoffRequest;
   readonly adaptedOutput: AdaptedStudioOutput;
-}): StudioHandoffContract | StudioHandoffFailure {
+}): StudioHandoffContract | StudioHandoffFailureSeed {
   const existing = input.request.handoff;
   if (existing) {
     if (
@@ -380,6 +379,8 @@ function toAuditedAssets(handoff: StudioHandoffContract): ReadonlyArray<{
 }
 
 export class StudioHandoffOrchestrationService {
+  private readonly failureHandler: StudioHandoffFailureHandler;
+
   public constructor(
     private readonly outputAdapterLayer: Pick<StudioOutputAdapterLayer, "adapt">,
     private readonly inputAdapterLayer: Pick<StudioInputAdapterLayer, "adapt">,
@@ -387,8 +388,11 @@ export class StudioHandoffOrchestrationService {
       readonly versionPolicy?: StudioHandoffVersionResolutionPolicy;
       readonly lineageTracker?: Pick<StudioHandoffLineageTracker, "track">;
       readonly auditTrail?: Pick<StudioHandoffAuditTrailService, "record">;
+      readonly failureHandler?: StudioHandoffFailureHandler;
     } = {},
-  ) {}
+  ) {
+    this.failureHandler = this.options.failureHandler ?? new StudioHandoffFailureHandler();
+  }
 
   public orchestrate(request: StudioHandoffRequest): StudioHandoffResult {
     const versionPolicy = this.options.versionPolicy ?? StudioHandoffVersionResolutionPolicyKinds.strictPinned;
@@ -400,11 +404,23 @@ export class StudioHandoffOrchestrationService {
     if (!outputAdaptation.ok || !outputAdaptation.adapted) {
       return Object.freeze({
         ok: false,
-        failure: Object.freeze({
+        failure: this.failureHandler.createFailure({
           stage: "output-adaptation",
           code: "output-adaptation-failed",
           message: "Source studio output adaptation failed before handoff orchestration.",
           issues: Object.freeze(outputAdaptation.issues),
+          context: Object.freeze({
+            handoffId: request.handoff?.id.value ?? request.handoffId,
+            sourceStudioId: request.sourceOutput.sourceStudioId,
+            sourceStudioType: request.sourceOutput.sourceStudioType,
+            targetStudioId: request.target?.studioId ?? request.handoff?.target.studioId,
+            targetStudioType: request.target?.studioType ?? request.handoff?.target.studioType,
+            impactedAssets: Object.freeze([{
+              assetId: request.sourceOutput.authoritativeAsset.assetId,
+              versionId: request.sourceOutput.authoritativeAsset.versionId,
+              role: "primary",
+            }]),
+          }),
         }),
       });
     }
@@ -417,7 +433,21 @@ export class StudioHandoffOrchestrationService {
     if ("stage" in contract) {
       return Object.freeze({
         ok: false,
-        failure: contract,
+        failure: this.failureHandler.createFailure({
+          ...contract,
+          context: Object.freeze({
+            handoffId: request.handoff?.id.value ?? request.handoffId,
+            sourceStudioId: request.source?.studioId ?? outputAdaptation.adapted.sourceStudioId,
+            sourceStudioType: request.source?.studioType ?? outputAdaptation.adapted.sourceStudioType,
+            targetStudioId: request.target?.studioId ?? request.handoff?.target.studioId,
+            targetStudioType: request.target?.studioType ?? request.handoff?.target.studioType,
+            impactedAssets: Object.freeze([{
+              assetId: outputAdaptation.adapted.authoritativeAsset.assetId,
+              versionId: outputAdaptation.adapted.authoritativeAsset.versionId,
+              role: "primary",
+            }]),
+          }),
+        }),
       });
     }
 
@@ -479,12 +509,24 @@ export class StudioHandoffOrchestrationService {
       });
       return Object.freeze({
         ok: false,
-        failure: Object.freeze({
+        failure: this.failureHandler.createFailure({
           stage: "input-adaptation",
           code: "input-adaptation-failed",
           message: "Target studio input adaptation failed during handoff orchestration.",
           compatibility: inputAdaptation.compatibility,
           issues: Object.freeze(inputAdaptation.issues),
+          context: Object.freeze({
+            handoffId: contract.id.value,
+            sourceStudioId: contract.source.studioId,
+            sourceStudioType: contract.source.studioType,
+            targetStudioId: contract.target.studioId,
+            targetStudioType: contract.target.studioType,
+            impactedAssets: Object.freeze(toAuditedAssets(contract).map((entry) => Object.freeze({
+              assetId: entry.assetId,
+              versionId: entry.versionId,
+              role: entry.role,
+            }))),
+          }),
         }),
       });
     }

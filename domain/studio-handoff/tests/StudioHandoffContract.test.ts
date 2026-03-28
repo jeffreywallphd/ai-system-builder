@@ -113,6 +113,8 @@ describe("createStudioHandoffContract", () => {
     expect(systemOfSystems.payload.taxonomy.semanticRole).toBe("system");
     expect(systemOfSystems.payload.versionId).toBe("handoff-system-of-systems:v1");
     expect(systemOfSystems.payload.pinnedVersion?.versionId).toBe("handoff-system-of-systems:v1");
+    expect(systemOfSystems.payload.systemOfSystems?.rootSystem.assetId).toBe("asset:handoff-system-of-systems");
+    expect(systemOfSystems.payload.systemOfSystems?.rootSystem.structureRole).toBe("root-system");
   });
 
   it("preserves source/target identities and remains scoped to studio-handoff contracts", () => {
@@ -226,5 +228,65 @@ describe("createStudioHandoffContract", () => {
     expect(handoff.multiAsset?.assets[1]?.roleLabel).toBe("model");
     expect(handoff.multiAsset?.assets[1]?.versionId).toBe("asset:model:v3");
     expect(handoff.multiAsset?.assets[1]?.pinnedVersion?.versionId).toBe("asset:model:v3");
+  });
+
+  it("captures explicit system-of-systems context for system handoffs with nested references", () => {
+    const systemTaxonomy = createCompositionTaxonomyDescriptor({
+      structuralKind: TaxonomyStructuralKinds.system,
+      semanticRole: TaxonomySemanticRoles.system,
+      behaviorKind: TaxonomyBehaviorKinds.iterative,
+    });
+
+    const handoff = createStudioHandoffContract({
+      id: "handoff-system-context",
+      source: {
+        studioId: "system-studio-source",
+        studioType: "system-studio",
+      },
+      target: {
+        studioId: "system-studio-target",
+        studioType: "system-studio",
+      },
+      payload: {
+        assetId: "system:root",
+        versionId: "system:root:v2",
+        taxonomy: systemTaxonomy,
+        contract: resolver.resolveContractForTaxonomy(systemTaxonomy),
+        targetInputContract: {
+          contractId: "system-default-input",
+        },
+      },
+      multiAsset: {
+        grouped: true,
+        requireAllAssets: true,
+        assets: [
+          {
+            role: StudioHandoffAssetRoles.primary,
+            assetId: "system:root",
+            versionId: "system:root:v2",
+            taxonomy: systemTaxonomy,
+          },
+          {
+            role: StudioHandoffAssetRoles.systemComponent,
+            assetId: "system:nested",
+            versionId: "system:nested:v9",
+            taxonomy: systemTaxonomy,
+          },
+        ],
+      },
+      context: {
+        sourceReferences: [
+          { assetId: "system:root", versionId: "system:root:v2", relation: "system-root" },
+          { assetId: "system:nested", versionId: "system:nested:v9", relation: "system-of-systems-child" },
+        ],
+      },
+      intent: {
+        kind: StudioHandoffIntentKinds.systemIntegration,
+      },
+    });
+
+    expect(handoff.payload.systemOfSystems?.rootSystem.assetId).toBe("system:root");
+    expect(handoff.payload.systemOfSystems?.rootSystem.nestedSystemReferences[0]?.assetId).toBe("system:nested");
+    expect(handoff.payload.systemOfSystems?.nestedSystems[0]?.assetId).toBe("system:nested");
   });
 });

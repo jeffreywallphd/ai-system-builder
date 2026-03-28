@@ -4,6 +4,7 @@ import {
   StudioHandoffIntentKinds,
   StudioHandoffAssetRoles,
   type MultiAssetStudioHandoffContract,
+  type SystemOfSystemsHandoffContext,
 } from "../../domain/studio-handoff/StudioHandoffContract";
 import type { StudioHandoffRoutingService, StudioHandoffRouteDecision } from "./StudioHandoffRoutingService";
 import type { StudioHandoffOrchestrationService, StudioHandoffRequest, UpdatedStudioHandoffResult } from "./StudioHandoffOrchestrationService";
@@ -66,6 +67,11 @@ export interface SystemStudioHandoffIntegrationResult {
     readonly sessionId: string;
   };
   readonly draftId: string;
+  readonly systemOfSystems?: SystemOfSystemsHandoffContext;
+}
+
+export interface SystemOfSystemsHandoffResult extends SystemStudioHandoffIntegrationResult {
+  readonly systemOfSystems: SystemOfSystemsHandoffContext;
 }
 
 function toSystemComponentKind(structuralKind: string): SystemComponentKind {
@@ -341,6 +347,7 @@ export class SystemStudioHandoffIntegrationService {
         sessionId: ensured.session.id,
       }),
       draftId: created.draft.id,
+      systemOfSystems: orchestration.preparation.handoff.payload.systemOfSystems,
     });
   }
 }
