@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { UxStudioEntryLabelResolver } from "../taxonomy/UxTaxonomySuppression";
 
 export interface AppRouteDefinition {
   readonly key: string;
@@ -213,5 +214,11 @@ export const APP_ROUTES: ReadonlyArray<AppRouteDefinition> = Object.freeze([
 ]);
 
 export function getNavigationRoutes(): ReadonlyArray<AppRouteDefinition> {
-  return APP_ROUTES.filter((route) => route.showInNavigation);
+  const labelResolver = new UxStudioEntryLabelResolver();
+  return APP_ROUTES
+    .filter((route) => route.showInNavigation)
+    .map((route) => Object.freeze({
+      ...route,
+      title: labelResolver.resolveNavigationTitle(route.key, route.title),
+    }));
 }

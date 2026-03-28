@@ -20,7 +20,7 @@ describe("registry UI components", () => {
     expect(listSource).toContain("No registry assets match the current filters");
     expect(itemSource).toContain("data-testid=\"registry-asset-item\"");
     expect(itemSource).toContain("View details");
-    expect(itemSource).toContain("Open in studio");
+    expect(itemSource).toContain("resolveOpenLabel");
     expect(itemSource).toContain("asset.taxonomy?.structuralKind");
     expect(itemSource).toContain("asset.taxonomy?.semanticRole");
     expect(itemSource).toContain("asset.taxonomy?.behaviorKind");
