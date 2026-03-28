@@ -163,6 +163,7 @@ describe("SystemStudioApplicationService", () => {
 
     expect(published.draft.metadata.taxonomy?.semanticRole).toBe("system");
     expect(published.version.versionId).toBe("asset:system-root:v2");
+    expect([...published.version.upstreamVersionIds].sort()).toEqual(["asset:model:v1", "system:child:v1"]);
   });
 
   it("exercises recursive publish enforcement and blocks unresolved nested system dependencies", async () => {

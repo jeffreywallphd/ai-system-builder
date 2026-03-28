@@ -299,6 +299,61 @@ describe("SystemAssetDomain", () => {
     ]);
   });
 
+  it("includes binding-implied component references in direct dependencies", () => {
+    const system = createSystemAsset({
+      assetId: "system:bindings-dependencies",
+      components: [
+        {
+          componentKind: SystemComponentKinds.atomic,
+          assetId: "asset:model",
+          versionId: "asset:model:v1",
+          alias: "model-a",
+        },
+        {
+          componentKind: SystemComponentKinds.composite,
+          assetId: "asset:workflow",
+          versionId: "asset:workflow:v2",
+          alias: "flow-a",
+        },
+      ],
+      inputs: [{ inputId: "prompt", valueType: "string", required: true }],
+      outputs: [{ outputId: "answer", valueType: "string" }],
+      bindings: [
+        {
+          bindingId: "system-to-model",
+          source: {
+            scope: SystemBindingEndpointScopes.systemInput,
+            endpointId: "prompt",
+          },
+          target: {
+            scope: SystemBindingEndpointScopes.componentInput,
+            componentAlias: "model-a",
+            endpointId: "prompt",
+          },
+        },
+        {
+          bindingId: "flow-to-system",
+          source: {
+            scope: SystemBindingEndpointScopes.componentOutput,
+            componentAlias: "flow-a",
+            endpointId: "answer",
+          },
+          target: {
+            scope: SystemBindingEndpointScopes.systemOutput,
+            endpointId: "answer",
+          },
+        },
+      ],
+      dependencies: [],
+    });
+
+    const directDependencies = collectSystemDirectDependencies(system);
+    expect(directDependencies.map((entry) => `${entry.assetId}::${entry.versionId ?? ""}`).sort()).toEqual([
+      "asset:model::asset:model:v1",
+      "asset:workflow::asset:workflow:v2",
+    ]);
+  });
+
   it("rejects indirect cycles in aggregated system dependency traversal", async () => {
     const root = createSystemAsset({
       assetId: "system:root",

@@ -79,6 +79,42 @@ export function AssetDependencySummaryPanel({ asset }: { readonly asset: Registr
       <div className="ui-text-small ui-text-secondary">
         Sources: {[...new Set(asset.dependencies.map((entry) => entry.source))].join(", ") || "none"}
       </div>
+      {asset.systemDetails ? (
+        <div className="ui-text-small ui-text-secondary">
+          Aggregated (system): direct {asset.systemDetails.aggregatedDependencies.directCount}
+          {" · "}transitive {asset.systemDetails.aggregatedDependencies.transitiveCount}
+          {" · "}total {asset.systemDetails.aggregatedDependencies.totalCount}
+          {" · "}status {asset.systemDetails.aggregatedDependencies.traversalStatus}
+        </div>
+      ) : null}
+    </DetailPanel>
+  );
+}
+
+export function SystemAssetDetailsPanel({ asset }: { readonly asset: RegistryAsset }): JSX.Element | null {
+  if (!asset.systemDetails) {
+    return null;
+  }
+
+  return (
+    <DetailPanel title="System Details" testId="registry-system-details-panel">
+      <div className="ui-text-small">
+        Selected children: {asset.systemDetails.selectedChildren.length}
+        {" · "}Bindings: {asset.systemDetails.bindings.count}
+      </div>
+      <div className="ui-text-small ui-text-secondary">
+        Inputs: {asset.systemDetails.interfaces.inputs.length}
+        {" · "}Outputs: {asset.systemDetails.interfaces.outputs.length}
+        {" · "}Parameters: {asset.systemDetails.interfaces.parameters.length}
+      </div>
+      <div className="ui-text-small ui-text-secondary">
+        Child summary: {asset.systemDetails.selectedChildren
+          .map((child) => `${child.alias ?? child.assetId} (${child.componentKind})`)
+          .join(", ") || "none"}
+      </div>
+      <div className="ui-text-small ui-text-secondary">
+        Binding ids: {asset.systemDetails.bindings.bindingIds.join(", ") || "none"}
+      </div>
     </DetailPanel>
   );
 }

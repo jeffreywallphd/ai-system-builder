@@ -42,6 +42,7 @@ const semanticRoleOptions: ReadonlyArray<FilterOption<TaxonomySemanticRole>> = O
   { value: TaxonomySemanticRoles.trainingRecipe, label: "Training Recipe" },
   { value: TaxonomySemanticRoles.toolChain, label: "Tool Chain" },
   { value: TaxonomySemanticRoles.system, label: "System" },
+  { value: TaxonomySemanticRoles.appTemplate, label: "App Template" },
 ]);
 
 const behaviorKindOptions: ReadonlyArray<FilterOption<TaxonomyBehaviorKind>> = Object.freeze([

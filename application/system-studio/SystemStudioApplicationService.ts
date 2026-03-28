@@ -3,6 +3,7 @@ import {
   type AssetContractDescriptor,
 } from "../../domain/contracts/AssetContract";
 import {
+  aggregateSystemDependencies,
   buildNestedSystemReferences,
   collectSystemDirectDependencies,
   createSystemAsset,
@@ -460,6 +461,7 @@ export class SystemStudioApplicationService {
       versionId: command.versionId,
       versionLabel: command.versionLabel,
       createdBy: command.createdBy,
+      upstreamVersionIds: await this.resolveAggregatedUpstreamVersionIds(systemAsset, command.maxDepth),
     });
   }
 
@@ -709,5 +711,24 @@ export class SystemStudioApplicationService {
     return component.taxonomy
       ? this.contractResolver.resolveContractForTaxonomy(component.taxonomy)
       : undefined;
+  }
+
+  private async resolveAggregatedUpstreamVersionIds(
+    system: SystemAsset,
+    maxDepth?: number,
+  ): Promise<ReadonlyArray<string>> {
+    const summary = await aggregateSystemDependencies({
+      root: system,
+      resolveSystem: (reference) => this.resolveSystemFromReference(reference),
+      maxDepth,
+    }).catch(() => undefined);
+    if (!summary) {
+      return Object.freeze([]);
+    }
+
+    const pinned = [...new Set(summary.allDependencies
+      .map((dependency) => dependency.versionId?.trim())
+      .filter((versionId): versionId is string => Boolean(versionId)))];
+    return Object.freeze(pinned);
   }
 }
