@@ -26,6 +26,30 @@ export interface BrowserDevelopmentManagedRuntimeLogger {
   warn(message: string): void;
 }
 
+interface ManagedServiceLogEntry {
+  readonly timestamp?: string;
+  readonly level?: string;
+  readonly message?: string;
+}
+
+interface ManagedServiceSnapshot {
+  readonly state?: string;
+  readonly detail?: string;
+  readonly diagnostics?: {
+    readonly provisioning?: {
+      readonly state?: string;
+      readonly environmentPath?: string | null;
+      readonly requestedVersion?: string | null;
+      readonly resolvedVersion?: string | null;
+      readonly lastError?: {
+        readonly message?: string;
+        readonly code?: string | null;
+      } | null;
+    };
+  };
+  readonly recentLogs?: ReadonlyArray<ManagedServiceLogEntry>;
+}
+
 export class BrowserDevelopmentManagedRuntime {
   private supervisorProcess: ChildProcess | undefined;
 
@@ -90,6 +114,10 @@ export class BrowserDevelopmentManagedRuntime {
           path.join(PYTHON_RUNTIME_WORKDIR, "venv", "bin", "python"),
         ];
 
+    if (process.platform === "win32") {
+      return candidates.find((candidate) => existsSync(candidate)) ?? "py";
+    }
+
     return candidates.find((candidate) => existsSync(candidate)) ?? "python";
   }
 
@@ -123,15 +151,20 @@ export class BrowserDevelopmentManagedRuntime {
   }
 
   private async ensureManagedPythonRuntime(logger: BrowserDevelopmentManagedRuntimeLogger): Promise<void> {
-    await this.waitForPort(this.options.supervisorPort, this.options.supervisorHost, SUPERVISOR_READY_TIMEOUT_MS);
-    logger.info("[ai-loom] provisioning browser dev Python runtime environment.");
-    await this.requestSupervisorAction("provision");
-    logger.info("[ai-loom] ensuring browser dev Python runtime is running.");
-    await this.requestSupervisorAction("ensure-running");
-    await this.waitForPort(this.options.pythonRuntimePort, this.options.supervisorHost, PYTHON_READY_TIMEOUT_MS);
-    logger.info(
-      `[ai-loom] python runtime ready on http://${this.options.supervisorHost}:${this.options.pythonRuntimePort} with MCP runtime auto-connect enabled.`,
-    );
+    try {
+      await this.waitForPort(this.options.supervisorPort, this.options.supervisorHost, SUPERVISOR_READY_TIMEOUT_MS);
+      logger.info("[ai-loom] provisioning browser dev Python runtime environment.");
+      await this.requestSupervisorAction("provision");
+      logger.info("[ai-loom] ensuring browser dev Python runtime is running.");
+      await this.requestSupervisorAction("ensure-running");
+      await this.waitForPort(this.options.pythonRuntimePort, this.options.supervisorHost, PYTHON_READY_TIMEOUT_MS);
+      logger.info(
+        `[ai-loom] python runtime ready on http://${this.options.supervisorHost}:${this.options.pythonRuntimePort} with MCP runtime auto-connect enabled.`,
+      );
+    } catch (error) {
+      await this.logPythonRuntimeDiagnostics(logger, error);
+      throw error;
+    }
   }
 
   private async requestSupervisorAction(action: "provision" | "ensure-running"): Promise<void> {
@@ -148,6 +181,72 @@ export class BrowserDevelopmentManagedRuntime {
       const body = await response.text().catch(() => "");
       throw new Error(
         `Managed service supervisor could not ${action} the python-runtime service (${response.status})${body ? `: ${body}` : "."}`,
+      );
+    }
+  }
+
+  private async fetchPythonRuntimeSnapshot(): Promise<ManagedServiceSnapshot | undefined> {
+    const supervisorBaseUrl = `http://${this.options.supervisorHost}:${this.options.supervisorPort}`;
+    const response = await fetch(`${supervisorBaseUrl}/services/python-runtime`, {
+      method: "GET",
+      headers: {
+        "content-type": "application/json",
+      },
+    });
+    if (!response.ok) {
+      return undefined;
+    }
+    const payload = await response.json() as { service?: ManagedServiceSnapshot };
+    return payload.service;
+  }
+
+  private async logPythonRuntimeDiagnostics(logger: BrowserDevelopmentManagedRuntimeLogger, cause: unknown): Promise<void> {
+    logger.warn(
+      `[ai-loom] python runtime bootstrap failed: ${cause instanceof Error ? cause.message : String(cause)}`,
+    );
+
+    try {
+      const snapshot = await this.fetchPythonRuntimeSnapshot();
+      if (!snapshot) {
+        logger.warn("[ai-loom] python runtime diagnostics unavailable: supervisor returned no service snapshot.");
+        return;
+      }
+
+      const provisioning = snapshot.diagnostics?.provisioning;
+      const provisioningStatus = [
+        `state=${provisioning?.state ?? "unknown"}`,
+        `requested=${provisioning?.requestedVersion ?? "unknown"}`,
+        `resolved=${provisioning?.resolvedVersion ?? "unknown"}`,
+      ].join(", ");
+      logger.warn(`[ai-loom] python runtime status: state=${snapshot.state ?? "unknown"}; detail=${snapshot.detail ?? "n/a"}.`);
+      logger.warn(`[ai-loom] python runtime provisioning: ${provisioningStatus}.`);
+
+      if (provisioning?.environmentPath) {
+        logger.warn(`[ai-loom] python runtime environment path: ${provisioning.environmentPath}`);
+      }
+
+      const provisioningError = provisioning?.lastError;
+      if (provisioningError?.message) {
+        logger.warn(
+          `[ai-loom] python runtime provisioning error${provisioningError.code ? ` (${provisioningError.code})` : ""}: ${provisioningError.message}`,
+        );
+      }
+
+      const logTail = snapshot.recentLogs?.slice(-12) ?? [];
+      if (logTail.length > 0) {
+        logger.warn("[ai-loom] python runtime recent logs (tail):");
+        for (const entry of logTail) {
+          const timestamp = entry.timestamp ?? "unknown-time";
+          const level = entry.level ?? "info";
+          const message = entry.message ?? "(empty)";
+          logger.warn(`[ai-loom] [python-runtime:${level}] ${timestamp} ${message}`);
+        }
+      } else {
+        logger.warn("[ai-loom] python runtime recent logs are empty.");
+      }
+    } catch (diagnosticError) {
+      logger.warn(
+        `[ai-loom] python runtime diagnostics collection failed: ${diagnosticError instanceof Error ? diagnosticError.message : String(diagnosticError)}`,
       );
     }
   }
