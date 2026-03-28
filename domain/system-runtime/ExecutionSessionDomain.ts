@@ -1,3 +1,9 @@
+import {
+  createExecutionCallbackRegistration,
+  type ExecutionCallbackDeliveryResult,
+  type ExecutionCallbackRegistration,
+} from "./ExecutionCallbackDomain";
+
 export const ExecutionSessionStatuses = Object.freeze({
   accepted: "accepted",
   running: "running",
@@ -29,6 +35,8 @@ export interface ExecutionSession {
     readonly code: string;
     readonly message: string;
   };
+  readonly callbacks?: ReadonlyArray<ExecutionCallbackRegistration>;
+  readonly callbackDeliveries?: ReadonlyArray<ExecutionCallbackDeliveryResult>;
 }
 
 function normalizeOptional(value?: string): string | undefined {
@@ -88,6 +96,8 @@ export function createExecutionSession(input: {
     createdAt: now,
     updatedAt: now,
     lastExecutionId: normalizeOptional(input.executionId),
+    callbacks: Object.freeze([]),
+    callbackDeliveries: Object.freeze([]),
   });
 }
 
@@ -115,5 +125,51 @@ export function transitionExecutionSession(input: {
         message: input.error.message.trim(),
       })
       : input.session.lastError,
+  });
+}
+
+export function registerExecutionSessionCallback(input: {
+  readonly session: ExecutionSession;
+  readonly callback: {
+    readonly callbackId?: string;
+    readonly targetUrl: string;
+    readonly eventKinds?: ReadonlyArray<ExecutionCallbackRegistration["eventKinds"][number]>;
+    readonly secretToken?: string;
+    readonly includeResultSummary?: boolean;
+    readonly headers?: Readonly<Record<string, string>>;
+    readonly maxAttempts?: number;
+  };
+  readonly now?: string;
+}): ExecutionSession {
+  const callback = createExecutionCallbackRegistration({
+    ...input.callback,
+    now: input.now,
+  });
+  const existing = input.session.callbacks ?? [];
+  const filtered = existing.filter((entry) => entry.callbackId !== callback.callbackId && entry.targetUrl !== callback.targetUrl);
+  return Object.freeze({
+    ...input.session,
+    callbacks: Object.freeze([...filtered, callback]),
+    updatedAt: input.now?.trim() || new Date().toISOString(),
+  });
+}
+
+export function appendExecutionSessionCallbackDelivery(input: {
+  readonly session: ExecutionSession;
+  readonly delivery: ExecutionCallbackDeliveryResult;
+  readonly maxEntries?: number;
+  readonly now?: string;
+}): ExecutionSession {
+  const maxEntries = Number.isFinite(input.maxEntries) && (input.maxEntries as number) > 0
+    ? Math.floor(input.maxEntries as number)
+    : 50;
+  const deliveries = [...(input.session.callbackDeliveries ?? []), Object.freeze({ ...input.delivery })];
+  const bounded = deliveries.length > maxEntries
+    ? deliveries.slice(deliveries.length - maxEntries)
+    : deliveries;
+  return Object.freeze({
+    ...input.session,
+    callbackDeliveries: Object.freeze(bounded),
+    updatedAt: input.now?.trim() || new Date().toISOString(),
   });
 }

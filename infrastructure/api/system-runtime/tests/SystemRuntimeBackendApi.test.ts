@@ -12,6 +12,30 @@ import { AssetDraftLifecycleStatuses } from "../../../../domain/studio-shell/Stu
 import { SystemRuntimeBackendApi } from "../SystemRuntimeBackendApi";
 import { SqliteStudioShellRepository } from "../../../filesystem/studio-shell/SqliteStudioShellRepository";
 import { SqliteSystemRuntimeExecutionStore } from "../../../filesystem/system-runtime/SqliteSystemRuntimeExecutionStore";
+import type { ExecutionCallbackDispatcher, ExecutionCallbackPayload } from "../ExecutionCallbackDispatcher";
+import { ExecutionUpdateEventKinds } from "../ExecutionUpdateStream";
+
+class RecordingCallbackDispatcher implements ExecutionCallbackDispatcher {
+  public readonly deliveries: Array<{ payload: ExecutionCallbackPayload; targetUrl: string }> = [];
+  public constructor(private readonly shouldFail = false) {}
+
+  public async dispatch(
+    registration: Parameters<ExecutionCallbackDispatcher["dispatch"]>[0],
+    payload: ExecutionCallbackPayload,
+  ): Promise<Awaited<ReturnType<ExecutionCallbackDispatcher["dispatch"]>>> {
+    this.deliveries.push({ payload, targetUrl: registration.targetUrl });
+    return Object.freeze({
+      callbackId: registration.callbackId,
+      eventKind: payload.eventKind,
+      executionId: payload.executionId,
+      deliveredAt: new Date().toISOString(),
+      attemptCount: 1,
+      succeeded: !this.shouldFail,
+      message: this.shouldFail ? "failed" : "ok",
+      statusCode: this.shouldFail ? 500 : 200,
+    });
+  }
+}
 
 class InMemoryStudioShellRepository implements IStudioShellRepository {
   private readonly studios = new Map<string, Studio>();
@@ -180,6 +204,197 @@ describe("SystemRuntimeBackendApi", () => {
     const result = await runtimeApi.getExecutionResult(started.data!.executionId);
     expect(result.ok).toBeTrue();
     expect(result.data?.executionId).toBe(started.data?.executionId);
+  });
+
+  it("registers callbacks on async start and dispatches accepted/completed events with bounded payload summaries", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    await repository.saveAssetVersion(new AssetVersion({
+      assetId: "system:callback",
+      versionId: "system:callback:v1",
+      metadata: {
+        metadata: {
+          taxonomy: createSystemStudioTaxonomy("system", "deterministic"),
+        },
+        content: JSON.stringify({
+          systemSpec: {
+            components: [],
+            inputs: [{ inputId: "request", valueType: "string", required: false }],
+            outputs: [{ outputId: "response", valueType: "string" }],
+          },
+        }),
+        dependencies: [],
+      },
+    }));
+    const callbackDispatcher = new RecordingCallbackDispatcher(false);
+    const runtimeApi = new SystemRuntimeBackendApi(repository, undefined, undefined, undefined, undefined, undefined, callbackDispatcher);
+
+    const started = await runtimeApi.startExecutionAsync({
+      versionId: "system:callback:v1",
+      callback: {
+        targetUrl: "https://callbacks.example.test/hook",
+        includeResultSummary: true,
+      },
+      requestContext: {
+        trustedInternal: true,
+        accessContext: { callerKind: "user", callerId: "callback-user" },
+      },
+    });
+    expect(started.ok).toBeTrue();
+    expect(started.data?.sessionId).toBeDefined();
+
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      const session = await runtimeApi.getExecutionSession(started.data!.sessionId!, {
+        trustedInternal: true,
+        accessContext: { callerKind: "user", callerId: "callback-user" },
+      });
+      if (session.ok && (session.data?.status === "completed" || session.data?.status === "failed")) {
+        break;
+      }
+      await Bun.sleep(5);
+    }
+
+    expect(callbackDispatcher.deliveries.some((entry) => entry.payload.eventKind === "execution-accepted")).toBeTrue();
+    expect(callbackDispatcher.deliveries.some((entry) => entry.payload.eventKind === "execution-completed")).toBeTrue();
+    const completed = callbackDispatcher.deliveries.find((entry) => entry.payload.eventKind === "execution-completed");
+    expect(completed?.payload.summary?.outputSummary).toBeDefined();
+
+    const session = await runtimeApi.getExecutionSession(started.data!.sessionId!, {
+      trustedInternal: true,
+      accessContext: { callerKind: "user", callerId: "callback-user" },
+    });
+    expect(session.ok).toBeTrue();
+    expect((session.data?.callbacks?.length ?? 0) > 0).toBeTrue();
+    expect((session.data?.callbackDeliveries?.length ?? 0) >= 2).toBeTrue();
+  });
+
+  it("surfaces callback delivery failures predictably without breaking async polling fallback", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    await repository.saveAssetVersion(new AssetVersion({
+      assetId: "system:callback-fail",
+      versionId: "system:callback-fail:v1",
+      metadata: {
+        metadata: {
+          taxonomy: createSystemStudioTaxonomy("system", "deterministic"),
+        },
+        content: JSON.stringify({
+          systemSpec: {
+            components: [],
+            inputs: [{ inputId: "request", valueType: "string", required: false }],
+            outputs: [{ outputId: "response", valueType: "string" }],
+          },
+        }),
+        dependencies: [],
+      },
+    }));
+    const runtimeApi = new SystemRuntimeBackendApi(
+      repository,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      new RecordingCallbackDispatcher(true),
+    );
+
+    const started = await runtimeApi.startExecutionAsync({
+      versionId: "system:callback-fail:v1",
+      callback: {
+        targetUrl: "https://callbacks.example.test/hook",
+        includeResultSummary: false,
+      },
+      requestContext: {
+        trustedInternal: true,
+        accessContext: { callerKind: "user", callerId: "callback-user-2" },
+      },
+    });
+    expect(started.ok).toBeTrue();
+
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      const poll = await runtimeApi.pollExecution({
+        executionId: started.data!.executionId,
+        requestContext: {
+          trustedInternal: true,
+          accessContext: { callerKind: "user", callerId: "callback-user-2" },
+        },
+      });
+      if (poll.ok && (poll.data?.acceptedState === "completed" || poll.data?.acceptedState === "failed")) {
+        break;
+      }
+      await Bun.sleep(5);
+    }
+
+    const session = await runtimeApi.getExecutionSession(started.data!.sessionId!, {
+      trustedInternal: true,
+      accessContext: { callerKind: "user", callerId: "callback-user-2" },
+    });
+    expect(session.ok).toBeTrue();
+    expect(session.data?.callbackDeliveries?.some((entry) => entry.succeeded === false)).toBeTrue();
+
+    const result = await runtimeApi.getExecutionResult(started.data!.executionId);
+    expect(result.ok).toBeTrue();
+  });
+
+  it("streams bounded execution updates derived from runtime status/trace while preserving polling", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    await repository.saveAssetVersion(new AssetVersion({
+      assetId: "system:stream",
+      versionId: "system:stream:v1",
+      metadata: {
+        metadata: {
+          taxonomy: createSystemStudioTaxonomy("system", "deterministic"),
+        },
+        content: JSON.stringify({
+          systemSpec: {
+            components: [],
+            inputs: [{ inputId: "request", valueType: "string", required: false }],
+            outputs: [{ outputId: "response", valueType: "string" }],
+          },
+        }),
+        dependencies: [],
+      },
+    }));
+    const runtimeApi = new SystemRuntimeBackendApi(repository);
+    const events: Array<{ kind: string; executionId: string }> = [];
+
+    const started = await runtimeApi.startExecutionAsync({
+      versionId: "system:stream:v1",
+      requestContext: {
+        trustedInternal: true,
+        accessContext: { callerKind: "user", callerId: "stream-user" },
+      },
+    });
+    expect(started.ok).toBeTrue();
+
+    const subscription = runtimeApi.subscribeToExecutionUpdates({
+      executionId: started.data!.executionId,
+      requestContext: {
+        trustedInternal: true,
+        accessContext: { callerKind: "user", callerId: "stream-user" },
+      },
+      listener: (event) => {
+        events.push({ kind: event.kind, executionId: event.executionId });
+      },
+    });
+    expect(subscription.ok).toBeTrue();
+
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      const poll = await runtimeApi.pollExecution({
+        executionId: started.data!.executionId,
+        requestContext: {
+          trustedInternal: true,
+          accessContext: { callerKind: "user", callerId: "stream-user" },
+        },
+      });
+      if (poll.ok && (poll.data?.acceptedState === "completed" || poll.data?.acceptedState === "failed")) {
+        break;
+      }
+      await Bun.sleep(5);
+    }
+
+    subscription.data?.unsubscribe();
+    expect(events.some((event) => event.kind === ExecutionUpdateEventKinds.executionStatus)).toBeTrue();
+    expect(events.some((event) => event.kind === ExecutionUpdateEventKinds.executionTrace)).toBeTrue();
+    expect(events.some((event) => event.kind === ExecutionUpdateEventKinds.executionCompleted || event.kind === ExecutionUpdateEventKinds.executionFailed)).toBeTrue();
   });
 
   it("returns structured runtime input validation errors before orchestration", async () => {

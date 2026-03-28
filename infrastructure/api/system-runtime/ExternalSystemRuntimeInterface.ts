@@ -2,16 +2,20 @@ import type { ExecutionContext } from "../../../domain/system-runtime/SystemRunt
 import type { ExecutionAccessContext } from "../../../application/system-runtime/RuntimeAccessControlService";
 import {
   type AsyncExecutionStartResponse,
+  type ExecutionCallbackRegistrationRequest,
   type ExecutionPollResponse,
   type GetSystemRuntimeExecutionResultRequest,
   type GetSystemRuntimeExecutionTraceRequest,
   type RuntimeExecutionResultApiModel,
+  type RuntimeApiRequestContext,
   type RuntimeExecutionStatusReadModel,
   type RuntimeExecutionTraceReadModel,
   SystemRuntimeBackendApi,
   type SystemRuntimeApiResponse,
 } from "./SystemRuntimeBackendApi";
 import type { RuntimeApiAuthenticationRequest } from "./RuntimeApiAuthentication";
+import type { ExecutionCallbackRegistration } from "../../../domain/system-runtime/ExecutionCallbackDomain";
+import type { ExecutionUpdateEvent, ExecutionUpdateEventKind, ExecutionUpdateSubscription } from "./ExecutionUpdateStream";
 
 export interface ExternalExecutionRequest {
   readonly systemId: string;
@@ -24,6 +28,7 @@ export interface ExternalExecutionRequest {
   readonly authentication?: RuntimeApiAuthenticationRequest;
   readonly executionId?: string;
   readonly async?: boolean;
+  readonly callback?: ExecutionCallbackRegistrationRequest;
 }
 
 export interface ExternalExecutionResponse {
@@ -119,6 +124,7 @@ export class ExternalSystemRuntimeInterface {
             authentication: request.authentication,
             accessContext: request.callerContext,
           },
+          callback: request.callback,
         })
         : await this.runtimeApi.startExecution({
         versionId,
@@ -134,6 +140,7 @@ export class ExternalSystemRuntimeInterface {
           authentication: request.authentication,
           accessContext: request.callerContext,
         },
+        callback: request.callback,
       });
 
       if (!started.ok || !started.data) {
@@ -246,11 +253,54 @@ export class ExternalSystemRuntimeInterface {
     });
   }
 
+  public async registerExecutionCallback(request: {
+    readonly sessionId?: string;
+    readonly executionId?: string;
+    readonly callback: ExecutionCallbackRegistrationRequest;
+    readonly callerContext?: ExecutionAccessContext;
+    readonly authentication?: RuntimeApiAuthenticationRequest;
+  }): Promise<SystemRuntimeApiResponse<ExecutionCallbackRegistration>> {
+    return this.runtimeApi.registerExecutionCallback({
+      sessionId: request.sessionId,
+      executionId: request.executionId,
+      callback: request.callback,
+      requestContext: this.toRequestContext(request.callerContext, request.authentication),
+    });
+  }
+
+  public subscribeToExecutionUpdates(request: {
+    readonly executionId?: string;
+    readonly sessionId?: string;
+    readonly eventKinds?: ReadonlyArray<ExecutionUpdateEventKind>;
+    readonly callerContext?: ExecutionAccessContext;
+    readonly authentication?: RuntimeApiAuthenticationRequest;
+    readonly listener: (event: ExecutionUpdateEvent) => void;
+  }): SystemRuntimeApiResponse<ExecutionUpdateSubscription> {
+    return this.runtimeApi.subscribeToExecutionUpdates({
+      executionId: request.executionId,
+      sessionId: request.sessionId,
+      eventKinds: request.eventKinds,
+      requestContext: this.toRequestContext(request.callerContext, request.authentication),
+      listener: request.listener,
+    });
+  }
+
   private toApiError(error: unknown): { readonly code: "invalid-request" | "internal"; readonly message: string } {
     const message = error instanceof Error ? error.message : "Unexpected external runtime interface error.";
     if (message.startsWith("invalid-request:")) {
       return Object.freeze({ code: "invalid-request", message: message.slice("invalid-request:".length) });
     }
     return Object.freeze({ code: "internal", message });
+  }
+
+  private toRequestContext(
+    callerContext?: ExecutionAccessContext,
+    authentication?: RuntimeApiAuthenticationRequest,
+  ): RuntimeApiRequestContext {
+    return Object.freeze({
+      requireAuthentication: true,
+      authentication,
+      accessContext: callerContext,
+    });
   }
 }
