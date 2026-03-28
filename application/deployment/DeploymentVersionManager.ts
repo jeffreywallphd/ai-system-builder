@@ -17,6 +17,8 @@ import {
 } from "./DeploymentQuotaEvaluator";
 import { DeploymentIsolationEvaluator } from "./DeploymentIsolationEvaluator";
 import type { DeploymentEnvironmentContext } from "../../domain/deployment/DeploymentIsolationDomain";
+import { DeploymentAuditEventKinds, DeploymentAuditOutcomes } from "../../domain/deployment/DeploymentAuditTrailDomain";
+import type { DeploymentAuditTrailService } from "./DeploymentAuditTrailService";
 
 export class DeploymentVersionManager {
   public constructor(
@@ -25,6 +27,7 @@ export class DeploymentVersionManager {
     private readonly accessEvaluator: DeploymentAccessEvaluator = new DeploymentAccessEvaluator(),
     private readonly quotaEvaluator: DeploymentQuotaEvaluator = new DeploymentQuotaEvaluator(),
     private readonly isolationEvaluator: DeploymentIsolationEvaluator = new DeploymentIsolationEvaluator(),
+    private readonly auditTrailService?: DeploymentAuditTrailService,
   ) {}
 
   public listDeploymentsForSystemVersion(input: {
@@ -212,6 +215,36 @@ export class DeploymentVersionManager {
       reason,
       actionKind,
     });
+    this.auditTrailService?.record({
+      eventKind: DeploymentAuditEventKinds.activationChanged,
+      outcome: DeploymentAuditOutcomes.succeeded,
+      requestSource: this.normalizeRequestSource(input.requestSource),
+      caller: this.normalizeCaller(input.accessContext),
+      tenant: Object.freeze({
+        tenantId: input.resourceTenantId ?? input.accessContext?.tenantId ?? selected.isolation.boundary.tenantId,
+        source: input.requestSource,
+      }),
+      deployment: Object.freeze({
+        deploymentId: activeRecord.deploymentId,
+        requestId: activeRecord.requestId,
+        rootSystemAssetId: activeRecord.rootSystemAssetId,
+        rootSystemVersionId: activeRecord.rootSystemVersionId,
+        bundleId: activeRecord.bundleId,
+        bundleVersionKey: activeRecord.bundleVersionKey,
+        deploymentConfigurationId: activeRecord.deploymentConfigurationId,
+        targetId: activeRecord.targetId,
+        targetType: activeRecord.targetType,
+        deploymentEnvironmentId: activeRecord.provisionedEnvironmentId,
+      }),
+      detail: Object.freeze({
+        message: "Deployment activation changed.",
+      }),
+      metadata: Object.freeze({
+        reason,
+        actionKind,
+        supersededCount: superseded.length.toString(10),
+      }),
+    });
 
     return Object.freeze({
       active: toManagedDeploymentVersion(activeRecord),
@@ -264,5 +297,22 @@ export class DeploymentVersionManager {
       callerId: input.accessContext?.caller?.callerId?.trim() || undefined,
       sessionId: input.accessContext?.caller?.sessionId?.trim() || undefined,
     });
+  }
+
+  private normalizeCaller(accessContext?: DeploymentAccessContext) {
+    return Object.freeze({
+      callerKind: accessContext?.caller?.callerKind,
+      callerId: accessContext?.caller?.callerId,
+      sessionId: accessContext?.caller?.sessionId,
+      roles: accessContext?.caller?.roles,
+      authenticatedPrincipalId: accessContext?.caller?.authenticatedPrincipalId,
+    });
+  }
+
+  private normalizeRequestSource(source?: string): "deployment-api" | "external-api" | "studio-shell-internal" | "internal-trusted" | "unknown" {
+    if (source === "deployment-api" || source === "external-api" || source === "studio-shell-internal" || source === "internal-trusted") {
+      return source;
+    }
+    return "unknown";
   }
 }

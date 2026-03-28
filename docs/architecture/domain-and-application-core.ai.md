@@ -795,3 +795,25 @@ Explicitly later than this scope:
   - no full endpoint routing fabric in this slice,
   - no deployment health monitoring/autoscaling,
   - no alternate invocation architecture outside existing runtime external invocation seams.
+
+## Direction 5 update: Bounded autoscaling interface + deployment audit trail (stories 8.17–8.18)
+
+- Deployment autoscaling is now an explicit bounded deployment-management seam (not provider infrastructure):
+  - domain contracts in `domain/deployment/DeploymentAutoscalingDomain.ts` (`DeploymentScalingPolicy`, `DeploymentScalingConfiguration`, `DeploymentScaleStatus`, `ScaleDecision`, `ScaleActionRequest`),
+  - application orchestration in `application/deployment/DeploymentAutoscalingService.ts` exposing a typed `AutoscalingInterface`.
+- Autoscaling remains deployment-linked and provider-agnostic:
+  - only active deployments are eligible for scaling configuration and scale-action requests,
+  - scaling records preserve linkage across deployment id, system asset/version, bundle/build key, deployment configuration, target/environment, tenant boundary, and nested-system counts,
+  - bounded policy inputs (utilization/health metadata) can drive explicit `ScaleDecision` outputs without introducing automatic scaling loops or provider adapters.
+- Deployment governance now includes a deployment-specific audit trail separate from runtime execution audit and deployment diagnostics:
+  - domain audit contracts in `domain/deployment/DeploymentAuditTrailDomain.ts`,
+  - queryable persistence seam in `application/deployment/DeploymentAuditTrailService.ts`,
+  - authoritative deployment boundaries now emit deployment audit records:
+    - deployment lifecycle request/outcomes (`DeploymentExecutionService`),
+    - activation changes (`DeploymentVersionManager`),
+    - rollback request/outcomes (`DeploymentRollbackService`),
+    - autoscaling configuration/action management events (`DeploymentAutoscalingService`).
+- Scope remains intentionally bounded:
+  - no provider-specific autoscaling infrastructure integration,
+  - no health-remediation/autoscaling control loop,
+  - no merging deployment audit records into runtime invocation audit or deployment diagnostics streams.
