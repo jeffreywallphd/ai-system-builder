@@ -42,7 +42,7 @@ export function AssetListItem({ asset, registryContextQuery }: AssetListItemProp
           </Link>
           {studioRoute ? (
             <Link
-              to={`${studioRoute}?${buildStudioHandoffQuery(asset)}`}
+              to={`${studioRoute}?${buildStudioHandoffQuery(asset, { registryContext: registryContextQuery, handoff: "registry" })}`}
               className="ui-button ui-button--ghost ui-button--small"
             >
               Open in studio

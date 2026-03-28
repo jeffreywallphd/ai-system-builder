@@ -20,11 +20,14 @@ describe("SystemStudioPage contracts", () => {
     expect(registrationSource).toContain("SystemCompositionEditor");
     expect(registrationSource).toContain("SystemInterfaceEditor");
     expect(registrationSource).toContain("SystemParameterConfigEditor");
+    expect(registrationSource).toContain("SystemCompatibilityInsightsPanel");
     expect(registrationSource).toContain("system-studio-structure-editor");
     expect(registrationSource).toContain("system-studio-interface-editor");
     expect(registrationSource).toContain("system-studio-parameter-editor");
+    expect(registrationSource).toContain("system-studio-compatibility-insights");
     expect(registrationSource).toContain('slot: "dependencies"');
     expect(registrationSource).toContain('slot: "metadata"');
+    expect(registrationSource).toContain('slot: "validation"');
   });
 
   it("keeps System Studio wired into shared route and navigation configuration", () => {
@@ -47,6 +50,10 @@ describe("SystemStudioPage contracts", () => {
     expect(source).toContain("Selected components");
     expect(source).toContain("Nested system summary");
     expect(source).toContain("componentKind === \"system\"");
+    expect(source).toContain("Open detail");
+    expect(source).toContain("Open child in studio");
+    expect(source).toContain("Open nested system");
+    expect(source).toContain("buildStudioHandoffQuery");
     expect(source).toContain("saveSystemChildComponent");
     expect(source).toContain("removeSystemChildComponent");
     expect(source).toContain("reorderSystemChildComponent");
@@ -61,5 +68,14 @@ describe("SystemStudioPage contracts", () => {
     expect(parameterSource).toContain("data-testid=\"system-parameter-config-editor\"");
     expect(parameterSource).toContain("System parameters and defaults");
     expect(parameterSource).toContain("updateSystemParameters");
+  });
+
+  it("renders bounded recursive compatibility insights from system validation outputs", () => {
+    const compatibilitySource = readSource("ui/components/studio-shell/SystemCompatibilityInsightsPanel.tsx");
+    expect(compatibilitySource).toContain("data-testid=\"system-compatibility-insights-panel\"");
+    expect(compatibilitySource).toContain("Recursive compatibility summary");
+    expect(compatibilitySource).toContain("bindingIncompatibilityCount");
+    expect(compatibilitySource).toContain("unresolvedNestedSystemCount");
+    expect(compatibilitySource).toContain("configurationMismatchCount");
   });
 });

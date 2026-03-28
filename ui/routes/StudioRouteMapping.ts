@@ -24,12 +24,35 @@ export function resolveStudioRouteFromAsset(asset: Pick<RegistryAsset, "taxonomy
   return semanticRole ? semanticRoleToStudioRoute[semanticRole] : undefined;
 }
 
-export function buildStudioHandoffQuery(asset: Pick<RegistryAsset, "assetId" | "versionId">): string {
+export interface StudioHandoffContext {
+  readonly handoff?: "registry" | "system-studio";
+  readonly registryContext?: string;
+  readonly parentAssetId?: string;
+  readonly parentVersionId?: string;
+  readonly selectedComponent?: string;
+}
+
+export function buildStudioHandoffQuery(
+  asset: Pick<RegistryAsset, "assetId" | "versionId">,
+  context?: StudioHandoffContext,
+): string {
   const params = new URLSearchParams();
   params.set("assetId", asset.assetId);
   if (asset.versionId) {
     params.set("versionId", asset.versionId);
   }
-  params.set("handoff", "registry");
+  params.set("handoff", context?.handoff ?? "registry");
+  if (context?.registryContext) {
+    params.set("registryContext", context.registryContext);
+  }
+  if (context?.parentAssetId) {
+    params.set("parentAssetId", context.parentAssetId);
+  }
+  if (context?.parentVersionId) {
+    params.set("parentVersionId", context.parentVersionId);
+  }
+  if (context?.selectedComponent) {
+    params.set("selectedComponent", context.selectedComponent);
+  }
   return params.toString();
 }

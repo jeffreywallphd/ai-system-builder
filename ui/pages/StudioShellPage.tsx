@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { AssetDraftLifecycleStatuses, type AssetMetadataPatch } from "../../domain/studio-shell/StudioShellDomain";
 import type { StudioShellSnapshotReadModel, StudioShellValidationIssue } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
 import { StudioShellService } from "../services/StudioShellService";
@@ -85,6 +86,7 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
       ? `Shared ${studioRegistration.kind}-studio shell for ${studioRegistration.role} assets: session/draft context, metadata/dependencies, lifecycle/version, and validation.`
       : "Reusable bounded shell for studio/session context, authoring, taxonomy/contract/provenance/dependencies, lifecycle/version state, and validation.");
   const service = useMemo(() => new StudioShellService(), []);
+  const location = useLocation();
   const extensionRegistry = useMemo(() => {
     const registry = new StudioShellExtensionRegistry();
     registry.registerMany([...(studioRegistration?.extensions ?? []), ...extensions]);
@@ -93,6 +95,7 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
   const [snapshot, setSnapshot] = useState<StudioShellSnapshotReadModel | undefined>();
   const [error, setError] = useState<string | undefined>();
   const [validationIssues, setValidationIssues] = useState<ReadonlyArray<StudioShellValidationIssue>>([]);
+  const [systemCompatibility, setSystemCompatibility] = useState<StudioShellExtensionContext["systemCompatibility"]>();
   const [isBusy, setIsBusy] = useState(false);
   const [content, setContent] = useState(defaultContent);
   const [metadataPatchJson, setMetadataPatchJson] = useState(
@@ -122,6 +125,15 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
       }
       setSnapshot(response.data);
       setValidationIssues(response.data.validationIssues);
+      if (studioRegistration?.kind === "system" && response.data.draft?.draftId) {
+        const compatibilityResponse = await service.getSystemCompatibilityInsights({
+          studioId,
+          draftId: response.data.draft.draftId,
+        });
+        setSystemCompatibility(compatibilityResponse.ok ? compatibilityResponse.data : undefined);
+      } else {
+        setSystemCompatibility(undefined);
+      }
       setError(undefined);
       if (response.data.draft) {
         setContent(response.data.draft.content);
@@ -157,6 +169,14 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
     studioId,
     snapshot,
     validationIssues,
+    systemCompatibility,
+    handoffContext: {
+      assetId: new URLSearchParams(location.search).get("assetId")?.trim() || undefined,
+      versionId: new URLSearchParams(location.search).get("versionId")?.trim() || undefined,
+      handoff: new URLSearchParams(location.search).get("handoff")?.trim() || undefined,
+      registryContext: new URLSearchParams(location.search).get("registryContext")?.trim() || undefined,
+      selectedComponent: new URLSearchParams(location.search).get("selectedComponent")?.trim() || undefined,
+    },
     operationError: error,
     isBusy,
     operations: {

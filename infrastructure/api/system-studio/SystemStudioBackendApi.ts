@@ -67,6 +67,26 @@ export interface UpdateSystemParametersRequest extends MutateSystemChildComponen
   }>;
 }
 
+export interface SystemCompatibilitySummaryReadModel {
+  readonly status: "clean" | "warning" | "incompatible";
+  readonly totalIssueCount: number;
+  readonly incompatibleChildAssetCount: number;
+  readonly unresolvedNestedSystemCount: number;
+  readonly bindingIncompatibilityCount: number;
+  readonly interfaceMismatchCount: number;
+  readonly configurationMismatchCount: number;
+}
+
+export interface SystemCompatibilityInsightsReadModel {
+  readonly summary: SystemCompatibilitySummaryReadModel;
+  readonly incompatibleChildAssets: ReadonlyArray<{ readonly assetId: string; readonly message: string }>;
+  readonly unresolvedNestedSystems: ReadonlyArray<{ readonly assetId?: string; readonly message: string }>;
+  readonly bindingIncompatibilities: ReadonlyArray<{ readonly bindingId?: string; readonly message: string }>;
+  readonly interfaceMismatches: ReadonlyArray<{ readonly message: string }>;
+  readonly configurationMismatches: ReadonlyArray<{ readonly message: string }>;
+  readonly issues: ReadonlyArray<{ readonly code: string; readonly message: string }>;
+}
+
 export class SystemStudioBackendApi {
   private readonly service: SystemStudioApplicationService;
 
@@ -126,6 +146,68 @@ export class SystemStudioBackendApi {
     });
   }
 
+  public async getCompatibilityInsights(request: ListSystemChildComponentsRequest): Promise<SystemStudioApiResponse<SystemCompatibilityInsightsReadModel>> {
+    return this.wrap(async () => {
+      const validation = await this.service.validateSystemDraft({
+        studioId: request.studioId ?? SystemStudioIdentity.defaultStudioId,
+        draftId: request.draftId,
+      });
+
+      const incompatibleChildAssets = validation.issues
+        .filter((issue) => issue.code === "system-child-reference-missing" || issue.code === "dependency-version-not-found")
+        .map((issue) => Object.freeze({
+          assetId: extractFirstAssetId(issue.message) ?? "unknown",
+          message: issue.message,
+        }));
+      const unresolvedNestedSystems = validation.issues
+        .filter((issue) => issue.code === "system-child-reference-missing" || issue.code === "system-recursion-cycle-detected" || issue.code === "system-recursion-depth-exceeded")
+        .map((issue) => Object.freeze({
+          assetId: extractFirstAssetId(issue.message),
+          message: issue.message,
+        }));
+      const bindingIncompatibilities = validation.issues
+        .filter((issue) => issue.code === "system-binding-type-mismatch")
+        .map((issue) => Object.freeze({
+          bindingId: extractFirstQuotedToken(issue.message),
+          message: issue.message,
+        }));
+      const interfaceMismatches = validation.issues
+        .filter((issue) => issue.code === "system-binding-endpoint-not-found" || issue.code === "contract-mismatch")
+        .map((issue) => Object.freeze({ message: issue.message }));
+      const configurationMismatches = validation.issues
+        .filter((issue) => issue.code === "dependency-version-unpinned" || issue.code === "system-child-version-unpinned")
+        .map((issue) => Object.freeze({ message: issue.message }));
+
+      const errorCount = validation.issues.length;
+      const summary: SystemCompatibilitySummaryReadModel = Object.freeze({
+        status: errorCount === 0
+          ? "clean"
+          : incompatibleChildAssets.length > 0 || bindingIncompatibilities.length > 0 || unresolvedNestedSystems.length > 0
+            ? "incompatible"
+            : "warning",
+        totalIssueCount: errorCount,
+        incompatibleChildAssetCount: incompatibleChildAssets.length,
+        unresolvedNestedSystemCount: unresolvedNestedSystems.length,
+        bindingIncompatibilityCount: bindingIncompatibilities.length,
+        interfaceMismatchCount: interfaceMismatches.length,
+        configurationMismatchCount: configurationMismatches.length,
+      });
+
+      return Object.freeze({
+        summary,
+        incompatibleChildAssets: Object.freeze(incompatibleChildAssets),
+        unresolvedNestedSystems: Object.freeze(unresolvedNestedSystems),
+        bindingIncompatibilities: Object.freeze(bindingIncompatibilities),
+        interfaceMismatches: Object.freeze(interfaceMismatches),
+        configurationMismatches: Object.freeze(configurationMismatches),
+        issues: Object.freeze(validation.issues.map((issue) => Object.freeze({
+          code: issue.code,
+          message: issue.message,
+        }))),
+      });
+    });
+  }
+
   private async wrap<T>(action: () => Promise<T>): Promise<SystemStudioApiResponse<T>> {
     try {
       return Object.freeze({ ok: true, data: await action() });
@@ -147,4 +229,14 @@ export class SystemStudioBackendApi {
     const message = error instanceof Error ? error.message : "Unexpected backend error.";
     return Object.freeze({ code: "internal", message });
   }
+}
+
+function extractFirstQuotedToken(message: string): string | undefined {
+  const match = /'([^']+)'/.exec(message);
+  return match?.[1];
+}
+
+function extractFirstAssetId(message: string): string | undefined {
+  const match = /(asset|system):[a-zA-Z0-9:_-]+/.exec(message);
+  return match?.[0];
 }

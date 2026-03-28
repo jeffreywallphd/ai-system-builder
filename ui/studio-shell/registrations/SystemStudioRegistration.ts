@@ -6,6 +6,7 @@ import { createElement } from "react";
 import { SystemCompositionEditor } from "../../components/studio-shell/SystemCompositionEditor";
 import { SystemInterfaceEditor } from "../../components/studio-shell/SystemInterfaceEditor";
 import { SystemParameterConfigEditor } from "../../components/studio-shell/SystemParameterConfigEditor";
+import { SystemCompatibilityInsightsPanel } from "../../components/studio-shell/SystemCompatibilityInsightsPanel";
 import type { SystemStudioRegistration } from "../StudioShellExtensions";
 import { createSystemStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
 
@@ -76,6 +77,14 @@ export const systemStudioRegistration: SystemStudioRegistration = Object.freeze(
       subtitle: "First-class authoring for system parameters and bounded default configuration values.",
       order: 10,
       render: (context) => createElement(SystemParameterConfigEditor, { context }),
+    },
+    {
+      id: "system-studio-compatibility-insights",
+      slot: "validation",
+      title: "System compatibility insights (recursive)",
+      subtitle: "Summarized recursive system compatibility signals from shared validation/enforcement outputs.",
+      order: 11,
+      render: (context) => createElement(SystemCompatibilityInsightsPanel, { context }),
     },
     {
       id: "system-studio-composition-capabilities",

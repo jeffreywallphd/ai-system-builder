@@ -15,6 +15,13 @@ describe("StudioShellService", () => {
     expect(source).toContain("transitionLifecycle(");
     expect(source).toContain("publishVersion(");
     expect(source).toContain("validateDraft(");
+    expect(source).toContain("listSystemChildComponents(");
+    expect(source).toContain("addSystemChildComponent(");
+    expect(source).toContain("removeSystemChildComponent(");
+    expect(source).toContain("reorderSystemChildComponent(");
+    expect(source).toContain("updateSystemInterfaces(");
+    expect(source).toContain("updateSystemParameters(");
+    expect(source).toContain("getSystemCompatibilityInsights(");
     expect(source).not.toContain("fetch(");
   });
 });

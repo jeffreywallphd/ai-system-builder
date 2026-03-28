@@ -167,6 +167,9 @@ contextBridge.exposeInMainWorld("aiLoomDesktop", {
     updateSystemParameters(requestJson: string) {
       return ipcRenderer.invoke("ai-loom-desktop-studio-shell:system-parameters:update", requestJson) as Promise<string>;
     },
+    getSystemCompatibilityInsights(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:system-compatibility:insights", requestJson) as Promise<string>;
+    },
   },
   registry: {
     listAssets(limit?: number) {
