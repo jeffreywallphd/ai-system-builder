@@ -14,6 +14,12 @@ import WorkflowStudioDraftAuthoringBoundary from "../../../components/studio-she
 import { resolveWorkflowStudioModeRoute } from "../WorkflowStudioModeRouting";
 import { WorkflowStudioModeStateStore } from "../WorkflowStudioModeStateStore";
 import { WorkflowStudioModeIds } from "../WorkflowStudioModes";
+import {
+  addWorkflowStep,
+  moveWorkflowStepUp,
+  removeWorkflowStep,
+  setWorkflowStepAgentAssetSelection,
+} from "../WorkflowWizardSteps";
 
 interface ButtonElementProps {
   readonly children?: ReactNode;
@@ -393,6 +399,35 @@ describe("WorkflowStudioModeSystem integration seams", () => {
     expect(createLink.props.href).toContain("entryMode=new");
     expect(createLink.props.href).toContain("inlineCreate=1");
     expect(createLink.props.href).toContain("returnTo=%2Fstudio-shell%2Fworkflow%2Fwizard");
+  });
+
+  it("preserves wizard step ordering and step-level asset selection across mode switching", () => {
+    const store = new WorkflowStudioModeStateStore();
+    store.setSelectedMode(WorkflowStudioModeIds.wizard);
+
+    store.updateSharedDraft((draft) => addWorkflowStep(draft).draft);
+    store.updateSharedDraft((draft) => addWorkflowStep(draft).draft);
+    store.updateSharedDraft((draft) => addWorkflowStep(draft).draft);
+    const thirdStepId = store.getState().sharedDraft.steps[2]?.id as string;
+    const secondStepId = store.getState().sharedDraft.steps[1]?.id as string;
+
+    store.updateSharedDraft((draft) => moveWorkflowStepUp(draft, thirdStepId).draft);
+    store.updateSharedDraft((draft) => setWorkflowStepAgentAssetSelection(draft, secondStepId, {
+      assetId: "asset:agent-selected",
+      versionId: "asset:agent-selected:v1",
+      name: "Selected Agent",
+    }).draft);
+
+    expect(store.getState().sharedDraft.steps.map((step) => step.order)).toEqual([1, 2, 3]);
+    expect(store.getState().sharedDraft.steps.find((step) => step.id === secondStepId)?.assetRef?.asset.assetId).toBe("asset:agent-selected");
+
+    store.setSelectedMode(WorkflowStudioModeIds.canvas);
+    store.setSelectedMode(WorkflowStudioModeIds.wizard);
+    expect(store.getState().sharedDraft.steps.map((step) => step.order)).toEqual([1, 2, 3]);
+    expect(store.getState().sharedDraft.steps.find((step) => step.id === secondStepId)?.assetRef?.asset.assetId).toBe("asset:agent-selected");
+
+    store.updateSharedDraft((draft) => removeWorkflowStep(draft, secondStepId).draft);
+    expect(store.getState().sharedDraft.steps.map((step) => step.order)).toEqual([1, 2]);
   });
 });
 

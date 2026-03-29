@@ -4,6 +4,7 @@ import SectionHeader from "./SectionHeader";
 import WizardSection from "./WizardSection";
 import WorkflowStudioTriggerSectionEditor from "./WorkflowStudioTriggerSectionEditor";
 import WorkflowStudioInputSectionEditor from "./WorkflowStudioInputSectionEditor";
+import WorkflowStudioStepSectionEditor from "./WorkflowStudioStepSectionEditor";
 
 export interface WorkflowStudioWizardModeSurfaceProps {
   readonly sharedDraft: WorkflowDraft;
@@ -56,24 +57,13 @@ export default function WorkflowStudioWizardModeSurface({
         onReplaceRouteSearch={onReplaceRouteSearch}
       />
 
-      <WizardSection sectionId="workflow-wizard-steps">
-        <SectionHeader
-          title="Steps Section"
-          description="Describe workflow execution steps in order. This section is backed by the shared workflow draft steps array."
-        />
-        <SectionBody>
-          <div className="ui-text-small">{buildSectionSummary(sharedDraft.steps.length, "step", "steps")}</div>
-          {sharedDraft.steps.length === 0
-            ? renderEmptyState("No steps configured yet.")
-            : (
-              <ol className="ui-stack ui-stack--2xs">
-                {sharedDraft.steps.map((step) => (
-                  <li key={step.id}>{step.title || step.id}</li>
-                ))}
-              </ol>
-            )}
-        </SectionBody>
-      </WizardSection>
+      <WorkflowStudioStepSectionEditor
+        sharedDraft={sharedDraft}
+        draftValidationIssues={draftValidationIssues}
+        onUpdateSharedDraft={onUpdateSharedDraft}
+        studioId={studioId}
+        routeSearch={routeSearch}
+      />
 
       <WizardSection sectionId="workflow-wizard-outputs">
         <SectionHeader
