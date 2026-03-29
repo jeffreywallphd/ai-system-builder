@@ -104,6 +104,7 @@ describe("WorkflowStudioModeStateStore", () => {
         {
           id: "output-1",
           type: "result",
+          title: "Preview output",
           outputType: "document",
           format: "json",
           destination: {
@@ -132,6 +133,7 @@ describe("WorkflowStudioModeStateStore", () => {
         {
           id: "out-1",
           type: "result",
+          title: "Preview output",
           outputType: "document",
           format: "json",
           destination: {
@@ -203,6 +205,7 @@ describe("WorkflowStudioModeStateStore", () => {
         {
           id: "local-output",
           type: "result",
+          title: "Preview output",
           outputType: "document",
           format: "json",
           destination: {

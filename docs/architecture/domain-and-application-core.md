@@ -195,6 +195,7 @@ The studio shell now has a bounded inner-layer model and application orchestrati
 ## Direction 5 update: Workflow Studio canonical validation + lifecycle foundation (stories 1.9-1.10)
 
 - Workflow Studio now exposes a canonical workflow-definition validation engine in `domain/workflow-studio/WorkflowStudioDomain.ts` via `validateWorkflowDraft(...)` and `validateWorkflowEntity(...)`, with structured deterministic issues (`code`, `section`, `severity`, `path`, `message`) for triggers, inputs, steps, outputs, and cross-section dependency rules.
+- Output validation now includes destination-specific readiness rules in that same canonical path (for example file-export format constraints, web-viewer title requirements, and system-entry entity-name requirements) so Wizard output configuration gates stay domain-authoritative.
 - Validation remains inner-layer and reusable across authoring surfaces, persistence gates, and runtime-preparation readiness checks (no UI-local source of truth path).
 - Workflow entity lifecycle is now explicit and transition-guarded (`draft` -> `saved` -> `executable`) through `WorkflowLifecycleStates`, `isWorkflowLifecycleTransitionAllowed(...)`, and `transitionWorkflowEntityLifecycle(...)`.
 - `executable` state is now domain-gated by canonical draft readiness (lifecycle transition/create validation uses workflow-definition validation, not presentation flags).

@@ -108,6 +108,9 @@ describe("WorkflowStudioDomain schema validation coverage", () => {
             destination: {
               type: WorkflowDraftOutputDestinationTypes.systemEntry,
               target: "ops/review-queue",
+              options: {
+                entityName: "review-queue-record",
+              },
             },
           },
         ],
@@ -196,6 +199,9 @@ describe("WorkflowStudioDomain schema validation coverage", () => {
           destination: {
             type: WorkflowDraftOutputDestinationTypes.systemEntry,
             target: "records/out",
+            options: {
+              entityName: "records-out",
+            },
           },
         },
       ],

@@ -167,6 +167,7 @@ export const WorkflowDraftOutputTypes = Object.freeze({
 export type WorkflowDraftOutputType = typeof WorkflowDraftOutputTypes[keyof typeof WorkflowDraftOutputTypes] | (string & {});
 
 export const WorkflowDraftOutputFormats = Object.freeze({
+  pdf: "pdf",
   json: "json",
   jsonl: "jsonl",
   csv: "csv",
@@ -379,6 +380,9 @@ export const WorkflowValidationIssueCodes = Object.freeze({
   loopCollectionInputMissing: "loop-collection-input-missing",
   outputMalformed: "output-malformed",
   outputSourceStepMissing: "output-source-step-missing",
+  outputFileFormatInvalid: "output-file-format-invalid",
+  outputViewerTitleMissing: "output-viewer-title-missing",
+  outputSystemEntityMissing: "output-system-entity-missing",
 });
 
 export type WorkflowValidationIssueCode = typeof WorkflowValidationIssueCodes[keyof typeof WorkflowValidationIssueCodes];
@@ -1233,6 +1237,18 @@ function validateStepDependencyCycles(stepDependencies: ReadonlyMap<string, Read
   return false;
 }
 
+function readDestinationOptionString(
+  output: WorkflowDraftOutput,
+  optionKey: string,
+): string | undefined {
+  const candidate = output.destination.options?.[optionKey];
+  if (typeof candidate !== "string") {
+    return undefined;
+  }
+  const normalized = candidate.trim();
+  return normalized ? normalized : undefined;
+}
+
 export function classifyWorkflowDraftAssetReferences(
   draft: WorkflowDraft,
 ): ReadonlyArray<WorkflowDraftAssetReferenceClassification> {
@@ -1568,6 +1584,51 @@ export function validateWorkflowDraft(draft: WorkflowDraft | undefined): Workflo
           message: `Workflow output '${normalized.id}' references unknown sourceStepId '${normalized.sourceStepId}'.`,
           path: `draft.outputs[${index}].sourceStepId`,
         });
+      }
+
+      if (normalized.destination.type === WorkflowDraftOutputDestinationTypes.fileExport) {
+        const validFormats = new Set<string>([
+          WorkflowDraftOutputFormats.pdf,
+          WorkflowDraftOutputFormats.json,
+          WorkflowDraftOutputFormats.jsonl,
+          WorkflowDraftOutputFormats.csv,
+          WorkflowDraftOutputFormats.markdown,
+          WorkflowDraftOutputFormats.html,
+        ]);
+        if (!validFormats.has(normalized.format)) {
+          issues.push({
+            code: WorkflowValidationIssueCodes.outputFileFormatInvalid,
+            section: WorkflowValidationSections.outputs,
+            severity: "error",
+            message: `File export output '${normalized.id}' format '${normalized.format}' is not supported.`,
+            path: `draft.outputs[${index}].format`,
+          });
+        }
+      }
+
+      if (normalized.destination.type === WorkflowDraftOutputDestinationTypes.webViewer) {
+        if (!normalized.title?.trim()) {
+          issues.push({
+            code: WorkflowValidationIssueCodes.outputViewerTitleMissing,
+            section: WorkflowValidationSections.outputs,
+            severity: "error",
+            message: `Web viewer output '${normalized.id}' requires a title.`,
+            path: `draft.outputs[${index}].title`,
+          });
+        }
+      }
+
+      if (normalized.destination.type === WorkflowDraftOutputDestinationTypes.systemEntry) {
+        const entityName = readDestinationOptionString(normalized, "entityName");
+        if (!entityName) {
+          issues.push({
+            code: WorkflowValidationIssueCodes.outputSystemEntityMissing,
+            section: WorkflowValidationSections.outputs,
+            severity: "error",
+            message: `System record output '${normalized.id}' requires destination options.entityName.`,
+            path: `draft.outputs[${index}].destination.options.entityName`,
+          });
+        }
       }
     } catch (error) {
       issues.push({

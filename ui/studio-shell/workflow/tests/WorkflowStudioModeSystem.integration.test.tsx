@@ -243,6 +243,7 @@ describe("WorkflowStudioModeSystem integration seams", () => {
         {
           id: "output-1",
           type: "result",
+          title: "Canvas output",
           outputType: WorkflowDraftOutputTypes.document,
           format: WorkflowDraftOutputFormats.json,
           destination: {
@@ -460,6 +461,80 @@ describe("WorkflowStudioModeSystem integration seams", () => {
 
     store.updateSharedDraft((draft) => removeWorkflowStep(draft, secondStepId).draft);
     expect(store.getState().sharedDraft.steps.map((step) => step.order)).toEqual([1, 2]);
+  });
+
+  it("supports wizard output add/remove/type/configuration with clean type switching and shared mode persistence", () => {
+    const store = new WorkflowStudioModeStateStore();
+    store.setSelectedMode(WorkflowStudioModeIds.wizard);
+
+    const renderBoundary = () => WorkflowStudioDraftAuthoringBoundary({
+      isWorkflowStudio: true,
+      content: store.getState().sharedDraftSerialized,
+      onChangeContent: (nextContent) => store.hydrateFromSerializedDraft(nextContent),
+      workflowModeContext: {
+        selectedModeId: store.getState().selectedModeId,
+        sharedDraft: store.getState().sharedDraft,
+        sharedDraftSerialized: store.getState().sharedDraftSerialized,
+        draftEditorContent: store.getState().draftEditorContent,
+        modeValidationIssues: store.getState().modeValidationIssues,
+        draftValidationIssues: store.getState().draftValidationIssues,
+        updateSharedDraft: (updater) => store.updateSharedDraft(updater),
+      },
+    });
+
+    let boundary = renderBoundary();
+    const addFile = getElementByTestId(boundary, "workflow-output-add-file-export") as ReactElement<ButtonElementProps>;
+    const addViewer = getElementByTestId(boundary, "workflow-output-add-web-viewer") as ReactElement<ButtonElementProps>;
+    const addSystem = getElementByTestId(boundary, "workflow-output-add-system-entry") as ReactElement<ButtonElementProps>;
+    addFile.props.onClick?.();
+    addViewer.props.onClick?.();
+    addSystem.props.onClick?.();
+
+    expect(store.getState().sharedDraft.outputs).toHaveLength(3);
+    expect(store.getState().sharedDraft.outputs.map((output) => output.destination.type)).toEqual([
+      WorkflowDraftOutputDestinationTypes.fileExport,
+      WorkflowDraftOutputDestinationTypes.webViewer,
+      WorkflowDraftOutputDestinationTypes.systemEntry,
+    ]);
+    expect(store.getState().isSharedDraftValid).toBe(false);
+
+    boundary = renderBoundary();
+    const viewerTitle = getElementByTestId(boundary, "workflow-output-viewer-title-1") as ReactElement<InputElementProps>;
+    viewerTitle.props.onChange?.({ target: { value: "Results Viewer" } });
+    expect(store.getState().isSharedDraftValid).toBe(false);
+
+    boundary = renderBoundary();
+    const systemEntity = getElementByTestId(boundary, "workflow-output-system-entity-2") as ReactElement<InputElementProps>;
+    systemEntity.props.onChange?.({ target: { value: "customer-record" } });
+    const systemConfig = getElementByTestId(boundary, "workflow-output-system-config-value-2") as ReactElement<InputElementProps>;
+    systemConfig.props.onChange?.({ target: { value: "connection:warehouse" } });
+    expect(store.getState().isSharedDraftValid).toBe(true);
+
+    boundary = renderBoundary();
+    const firstTypeSelect = getElementByTestId(boundary, "workflow-output-type-select-0") as ReactElement<SelectElementProps>;
+    firstTypeSelect.props.onChange?.({ target: { value: WorkflowDraftOutputDestinationTypes.systemEntry } });
+    expect(store.getState().sharedDraft.outputs[0]?.destination.type).toBe(WorkflowDraftOutputDestinationTypes.systemEntry);
+    expect(store.getState().sharedDraft.outputs[0]?.destination.options).toEqual(expect.objectContaining({
+      entityName: "",
+      destinationConfig: "",
+    }));
+    expect(store.getState().isSharedDraftValid).toBe(false);
+
+    boundary = renderBoundary();
+    const firstEntity = getElementByTestId(boundary, "workflow-output-system-entity-0") as ReactElement<InputElementProps>;
+    firstEntity.props.onChange?.({ target: { value: "file-output-record" } });
+    expect(store.getState().isSharedDraftValid).toBe(true);
+
+    boundary = renderBoundary();
+    const removeSecond = getElementByTestId(boundary, "workflow-output-remove-1") as ReactElement<ButtonElementProps>;
+    removeSecond.props.onClick?.();
+    expect(store.getState().sharedDraft.outputs).toHaveLength(2);
+
+    const baselineSerialized = store.getState().sharedDraftSerialized;
+    store.setSelectedMode(WorkflowStudioModeIds.canvas);
+    store.setSelectedMode(WorkflowStudioModeIds.wizard);
+    expect(store.getState().sharedDraftSerialized).toBe(baselineSerialized);
+    expect(store.getState().sharedDraft.outputs).toHaveLength(2);
   });
 });
 
