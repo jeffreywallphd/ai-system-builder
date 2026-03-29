@@ -24,6 +24,7 @@ describe("ui/routes interactions", () => {
     expect(appRouterSource).toContain("element: <RegistryPage />");
     expect(appRouterSource).toContain("element: <AssetDetailPage />");
     expect(appRouterSource).toContain("element: <WorkflowStudioPage />");
+    expect(appRouterSource).toContain("path: ROUTE_PATHS.workflowStudioMode");
     expect(appRouterSource).toContain("element: <ContextBundleStudioPage />");
     expect(appRouterSource).toContain("element: <DatasetPipelineStudioPage />");
     expect(appRouterSource).toContain("element: <TrainingRecipeStudioPage />");
