@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { AssetDraftLifecycleStatuses, type AssetMetadataPatch } from "../../domain/studio-shell/StudioShellDomain";
 import type { StudioShellSnapshotReadModel, StudioShellValidationIssue } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
@@ -17,22 +17,66 @@ import { StudioEntryService } from "../routes/StudioRouteMapping";
 import { readAutomationIntentFromSearch } from "../routes/BuildAutomationIntent";
 import { BuildIntents } from "../routes/BuildIntentModels";
 
-function safeParseJson<T>(value: string, fallback: T): T {
+interface JsonParseResult<T> {
+  readonly ok: boolean;
+  readonly data?: T;
+}
+
+interface DraftDependencyInput {
+  readonly assetId: string;
+  readonly versionId: string;
+}
+
+function parseJson<T>(value: string): JsonParseResult<T> {
   try {
     if (!value.trim()) {
-      return fallback;
+      return Object.freeze({ ok: true, data: undefined as T | undefined });
     }
-    return JSON.parse(value) as T;
+    return Object.freeze({ ok: true, data: JSON.parse(value) as T });
   } catch {
-    return fallback;
+    return Object.freeze({ ok: false });
   }
+}
+
+function toDependencyInputs(
+  dependencies: ReadonlyArray<{ readonly assetId: string; readonly versionId?: string }>,
+): ReadonlyArray<DraftDependencyInput> {
+  if (dependencies.length === 0) {
+    return Object.freeze([{ assetId: "", versionId: "" }]);
+  }
+  return Object.freeze(dependencies.map((entry) => ({ assetId: entry.assetId, versionId: entry.versionId ?? "" })));
+}
+
+function toDependencyReferences(
+  dependencies: ReadonlyArray<DraftDependencyInput>,
+): ReadonlyArray<{ readonly assetId: string; readonly versionId?: string }> {
+  return Object.freeze(
+    dependencies
+      .map((entry) => ({
+        assetId: entry.assetId.trim(),
+        versionId: entry.versionId.trim(),
+      }))
+      .filter((entry) => entry.assetId.length > 0)
+      .map((entry) => ({
+        assetId: entry.assetId,
+        versionId: entry.versionId.length > 0 ? entry.versionId : undefined,
+      })),
+  );
+}
+
+function parseTagsInput(value: string): ReadonlyArray<string> {
+  return Object.freeze([...new Set(value.split(",").map((entry) => entry.trim()).filter(Boolean))]);
+}
+
+function formatTags(tags?: ReadonlyArray<string>): string {
+  return (tags ?? []).join(", ");
 }
 
 
 function buildCreateMetadata(
   defaultDraftTitle: string,
   defaultDraftTags: ReadonlyArray<string>,
-  metadataPatchJson: string,
+  metadataPatch: AssetMetadataPatch,
 ): {
   readonly title: string;
   readonly summary?: string;
@@ -41,14 +85,13 @@ function buildCreateMetadata(
   readonly contract?: AssetMetadataPatch["contract"];
   readonly provenance?: AssetMetadataPatch["provenance"];
 } {
-  const metadataPatch = safeParseJson<AssetMetadataPatch>(metadataPatchJson, {});
   return {
     title: metadataPatch.title ?? defaultDraftTitle,
-    summary: metadataPatch.summary,
+    summary: metadataPatch.summary === null ? undefined : metadataPatch.summary,
     tags: metadataPatch.tags ?? defaultDraftTags,
-    taxonomy: metadataPatch.taxonomy,
-    contract: metadataPatch.contract,
-    provenance: metadataPatch.provenance,
+    taxonomy: metadataPatch.taxonomy === null ? undefined : metadataPatch.taxonomy,
+    contract: metadataPatch.contract === null ? undefined : metadataPatch.contract,
+    provenance: metadataPatch.provenance === null ? undefined : metadataPatch.provenance,
   };
 }
 
@@ -112,12 +155,22 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
   const [systemCompatibility, setSystemCompatibility] = useState<StudioShellExtensionContext["systemCompatibility"]>();
   const [isBusy, setIsBusy] = useState(false);
   const [content, setContent] = useState(defaultContent);
-  const [metadataPatchJson, setMetadataPatchJson] = useState(
-    JSON.stringify(studioRegistration?.defaults.metadataPatch ?? { title: defaultDraftTitle, tags: defaultDraftTags }),
+  const initialMetadataPatch = useMemo<AssetMetadataPatch>(
+    () => studioRegistration?.defaults.metadataPatch ?? { title: defaultDraftTitle, tags: defaultDraftTags },
+    [defaultDraftTags, defaultDraftTitle, studioRegistration?.defaults.metadataPatch],
   );
-  const [dependenciesJson, setDependenciesJson] = useState(
-    JSON.stringify(studioRegistration?.defaults.dependencies ?? []),
+  const initialDependencies = useMemo(
+    () => toDependencyInputs(studioRegistration?.defaults.dependencies ?? []),
+    [studioRegistration?.defaults.dependencies],
   );
+  const [metadataPatch, setMetadataPatch] = useState<AssetMetadataPatch>(initialMetadataPatch);
+  const [metadataPatchJson, setMetadataPatchJson] = useState(() => JSON.stringify(initialMetadataPatch, null, 2));
+  const [isMetadataJsonMode, setIsMetadataJsonMode] = useState(false);
+  const [metadataJsonError, setMetadataJsonError] = useState<string | undefined>();
+  const [dependencies, setDependencies] = useState<ReadonlyArray<DraftDependencyInput>>(initialDependencies);
+  const [dependenciesJson, setDependenciesJson] = useState(() => JSON.stringify(toDependencyReferences(initialDependencies), null, 2));
+  const [isDependenciesJsonMode, setIsDependenciesJsonMode] = useState(false);
+  const [dependenciesJsonError, setDependenciesJsonError] = useState<string | undefined>();
   const automationPrefillAppliedRef = useRef(false);
 
   const refreshSnapshot = async () => {
@@ -159,6 +212,18 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
   };
 
   useEffect(() => {
+    setMetadataPatch(initialMetadataPatch);
+    setMetadataPatchJson(JSON.stringify(initialMetadataPatch, null, 2));
+    setIsMetadataJsonMode(false);
+    setMetadataJsonError(undefined);
+
+    setDependencies(initialDependencies);
+    setDependenciesJson(JSON.stringify(toDependencyReferences(initialDependencies), null, 2));
+    setIsDependenciesJsonMode(false);
+    setDependenciesJsonError(undefined);
+  }, [initialDependencies, initialMetadataPatch]);
+
+  useEffect(() => {
     void refreshSnapshot();
   }, [studioId]);
 
@@ -172,14 +237,14 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
     }
 
     setContent((current) => (current === defaultContent ? automationIntent : current));
-    setMetadataPatchJson((current) => {
-      const metadataPatch = safeParseJson<AssetMetadataPatch>(current, {});
+    setMetadataPatch((current) => {
       const nextPatch: AssetMetadataPatch = {
-        ...metadataPatch,
-        title: metadataPatch.title ?? "Automation draft",
-        summary: metadataPatch.summary ?? automationIntent,
+        ...current,
+        title: current.title ?? "Automation draft",
+        summary: current.summary ?? automationIntent,
       };
-      return JSON.stringify(nextPatch);
+      setMetadataPatchJson(JSON.stringify(nextPatch, null, 2));
+      return nextPatch;
     });
     automationPrefillAppliedRef.current = true;
   }, [automationIntent, defaultContent, shouldSeedAutomationIntent, snapshot?.draft]);
@@ -197,6 +262,49 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
     } finally {
       setIsBusy(false);
     }
+  };
+
+  const updateMetadataPatch = (updater: (current: AssetMetadataPatch) => AssetMetadataPatch): void => {
+    setMetadataPatch((current) => {
+      const next = updater(current);
+      setMetadataPatchJson(JSON.stringify(next, null, 2));
+      return next;
+    });
+  };
+
+  const updateDependenciesForm = (nextDependencies: ReadonlyArray<DraftDependencyInput>): void => {
+    setDependencies(nextDependencies);
+    setDependenciesJson(JSON.stringify(toDependencyReferences(nextDependencies), null, 2));
+  };
+
+  const resolveMetadataPatchForSave = (): AssetMetadataPatch | undefined => {
+    if (!isMetadataJsonMode) {
+      return metadataPatch;
+    }
+
+    const parsed = parseJson<AssetMetadataPatch>(metadataPatchJson);
+    if (!parsed.ok) {
+      setMetadataJsonError("Metadata patch JSON is invalid. Fix JSON or switch back to form mode.");
+      return undefined;
+    }
+    setMetadataJsonError(undefined);
+    return parsed.data ?? {};
+  };
+
+  const resolveDependenciesForSave = (): ReadonlyArray<{ readonly assetId: string; readonly versionId?: string }> | undefined => {
+    if (!isDependenciesJsonMode) {
+      return toDependencyReferences(dependencies);
+    }
+
+    const parsed = parseJson<Array<{ assetId: string; versionId?: string }>>(dependenciesJson);
+    if (!parsed.ok) {
+      setDependenciesJsonError("Dependencies JSON is invalid. Fix JSON or switch back to form mode.");
+      return undefined;
+    }
+    setDependenciesJsonError(undefined);
+    return (parsed.data ?? [])
+      .map((entry) => ({ assetId: entry.assetId.trim(), versionId: entry.versionId?.trim() }))
+      .filter((entry) => entry.assetId.length > 0);
   };
 
   const sessionId = snapshot?.activeSessionId;
@@ -317,11 +425,15 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
               className="ui-button ui-button--primary"
               disabled={isBusy || !sessionId}
               onClick={() => {
-                    if (!sessionId) {
+                if (!sessionId) {
+                  return;
+                }
+                const resolvedMetadataPatch = resolveMetadataPatchForSave();
+                if (!resolvedMetadataPatch) {
                   return;
                 }
                 if (!draftId) {
-                  const metadata = buildCreateMetadata(defaultDraftTitle, defaultDraftTags, metadataPatchJson);
+                  const metadata = buildCreateMetadata(defaultDraftTitle, defaultDraftTags, resolvedMetadataPatch);
                   void runAndRefresh(() => service.createDraft({
                     studioId,
                     sessionId,
@@ -330,13 +442,12 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
                   }));
                   return;
                 }
-                const metadataPatch = safeParseJson<AssetMetadataPatch>(metadataPatchJson, {});
                 void runAndRefresh(() => service.updateDraft({
                   studioId,
                   sessionId,
                   draftId,
                   content,
-                  metadataPatch,
+                  metadataPatch: resolvedMetadataPatch,
                 }));
               }}
             >
@@ -346,14 +457,352 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
         </StudioShellPanel>
         {renderExtensions(extensionRegistry, StudioShellExtensionSlots.draftAuthoring, extensionContext)}
 
-        <StudioShellPanel title="Taxonomy / contract / provenance" subtitle="JSON metadata patch surface (backend/application remains authoritative).">
-          <textarea className="ui-textarea" rows={8} value={metadataPatchJson} onChange={(event) => setMetadataPatchJson(event.target.value)} />
-          <p className="ui-text-muted">Use keys like taxonomy, contract, provenance, title, summary, and tags in metadataPatch JSON.</p>
+        <StudioShellPanel title="Taxonomy / contract / provenance" subtitle="Form-first metadata editing with optional advanced JSON.">
+          <div className="ui-form-json-toggle">
+            <button
+              type="button"
+              className="ui-button ui-button--ghost ui-button--sm"
+              onClick={() => {
+                if (!isMetadataJsonMode) {
+                  setMetadataPatchJson(JSON.stringify(metadataPatch, null, 2));
+                  setIsMetadataJsonMode(true);
+                  setMetadataJsonError(undefined);
+                  return;
+                }
+                const parsed = parseJson<AssetMetadataPatch>(metadataPatchJson);
+                if (!parsed.ok) {
+                  setMetadataJsonError("Metadata patch JSON is invalid. Fix JSON before leaving advanced mode.");
+                  return;
+                }
+                setMetadataPatch(parsed.data ?? {});
+                setMetadataPatchJson(JSON.stringify(parsed.data ?? {}, null, 2));
+                setMetadataJsonError(undefined);
+                setIsMetadataJsonMode(false);
+              }}
+            >
+              {isMetadataJsonMode ? "Use Form Editor" : "Edit JSON"}
+            </button>
+          </div>
+
+          {isMetadataJsonMode ? (
+            <label className="ui-stack ui-stack--2xs">
+              <span className="ui-text-small">Metadata patch JSON</span>
+              <textarea className="ui-textarea" rows={12} value={metadataPatchJson} onChange={(event) => setMetadataPatchJson(event.target.value)} />
+            </label>
+          ) : (
+            <div className="ui-stack ui-stack--sm">
+              <div className="ui-form-grid">
+                <label className="ui-field">
+                  <span className="ui-field__label">Title</span>
+                  <input
+                    className="ui-input"
+                    value={metadataPatch.title ?? ""}
+                    onChange={(event) => updateMetadataPatch((current) => ({ ...current, title: event.target.value || undefined }))}
+                  />
+                </label>
+                <label className="ui-field">
+                  <span className="ui-field__label">Tags</span>
+                  <input
+                    className="ui-input"
+                    value={formatTags(metadataPatch.tags)}
+                    onChange={(event) => updateMetadataPatch((current) => ({ ...current, tags: parseTagsInput(event.target.value) }))}
+                    placeholder="studio-shell, workflow"
+                  />
+                </label>
+              </div>
+
+              <label className="ui-field">
+                <span className="ui-field__label">Summary</span>
+                <textarea
+                  className="ui-textarea"
+                  rows={4}
+                  value={metadataPatch.summary === null ? "" : (metadataPatch.summary ?? "")}
+                  onChange={(event) => updateMetadataPatch((current) => ({ ...current, summary: event.target.value || undefined }))}
+                />
+              </label>
+
+              <div className="ui-card ui-card--padded ui-stack ui-stack--sm">
+                <strong>Taxonomy</strong>
+                <div className="ui-form-grid">
+                  <label className="ui-field">
+                    <span className="ui-field__label">Structural kind</span>
+                    <input
+                      className="ui-input"
+                      value={metadataPatch.taxonomy?.structuralKind ?? ""}
+                      onChange={(event) => updateMetadataPatch((current) => ({
+                        ...current,
+                        taxonomy: {
+                          structuralKind: event.target.value as never,
+                          semanticRole: (current.taxonomy?.semanticRole ?? "") as never,
+                          behaviorKind: (current.taxonomy?.behaviorKind ?? "") as never,
+                        },
+                      }))}
+                    />
+                  </label>
+                  <label className="ui-field">
+                    <span className="ui-field__label">Semantic role</span>
+                    <input
+                      className="ui-input"
+                      value={metadataPatch.taxonomy?.semanticRole ?? ""}
+                      onChange={(event) => updateMetadataPatch((current) => ({
+                        ...current,
+                        taxonomy: {
+                          structuralKind: (current.taxonomy?.structuralKind ?? "") as never,
+                          semanticRole: event.target.value as never,
+                          behaviorKind: (current.taxonomy?.behaviorKind ?? "") as never,
+                        },
+                      }))}
+                    />
+                  </label>
+                  <label className="ui-field">
+                    <span className="ui-field__label">Behavior kind</span>
+                    <input
+                      className="ui-input"
+                      value={metadataPatch.taxonomy?.behaviorKind ?? ""}
+                      onChange={(event) => updateMetadataPatch((current) => ({
+                        ...current,
+                        taxonomy: {
+                          structuralKind: (current.taxonomy?.structuralKind ?? "") as never,
+                          semanticRole: (current.taxonomy?.semanticRole ?? "") as never,
+                          behaviorKind: event.target.value as never,
+                        },
+                      }))}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="ui-card ui-card--padded ui-stack ui-stack--sm">
+                <strong>Contract</strong>
+                <div className="ui-form-grid">
+                  <label className="ui-field">
+                    <span className="ui-field__label">Version</span>
+                    <input
+                      className="ui-input"
+                      value={metadataPatch.contract?.version ?? ""}
+                      onChange={(event) => updateMetadataPatch((current) => ({
+                        ...current,
+                        contract: {
+                          ...(current.contract ?? { version: "", parameters: [] }),
+                          version: event.target.value,
+                          parameters: current.contract?.parameters ?? [],
+                        },
+                      }))}
+                    />
+                  </label>
+                  <label className="ui-field">
+                    <span className="ui-field__label">Execution mode</span>
+                    <input
+                      className="ui-input"
+                      value={metadataPatch.contract?.execution?.invocationMode ?? ""}
+                      onChange={(event) => updateMetadataPatch((current) => ({
+                        ...current,
+                        contract: {
+                          ...(current.contract ?? { version: "", parameters: [] }),
+                          version: current.contract?.version ?? "1.0.0",
+                          parameters: current.contract?.parameters ?? [],
+                          execution: {
+                            ...(current.contract?.execution ?? {}),
+                            invocationMode: event.target.value as never,
+                          },
+                        },
+                      }))}
+                    />
+                  </label>
+                  <label className="ui-field">
+                    <span className="ui-field__label">Input shape</span>
+                    <input
+                      className="ui-input"
+                      value={metadataPatch.contract?.input?.kind ?? ""}
+                      onChange={(event) => updateMetadataPatch((current) => ({
+                        ...current,
+                        contract: {
+                          ...(current.contract ?? { version: "", parameters: [] }),
+                          version: current.contract?.version ?? "1.0.0",
+                          parameters: current.contract?.parameters ?? [],
+                          input: {
+                            ...(current.contract?.input ?? {}),
+                            kind: event.target.value as never,
+                          },
+                        },
+                      }))}
+                    />
+                  </label>
+                  <label className="ui-field">
+                    <span className="ui-field__label">Output shape</span>
+                    <input
+                      className="ui-input"
+                      value={metadataPatch.contract?.output?.kind ?? ""}
+                      onChange={(event) => updateMetadataPatch((current) => ({
+                        ...current,
+                        contract: {
+                          ...(current.contract ?? { version: "", parameters: [] }),
+                          version: current.contract?.version ?? "1.0.0",
+                          parameters: current.contract?.parameters ?? [],
+                          output: {
+                            ...(current.contract?.output ?? {}),
+                            kind: event.target.value as never,
+                          },
+                        },
+                      }))}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="ui-card ui-card--padded ui-stack ui-stack--sm">
+                <strong>Provenance</strong>
+                <div className="ui-form-grid">
+                  <label className="ui-field">
+                    <span className="ui-field__label">Creator ID</span>
+                    <input
+                      className="ui-input"
+                      value={metadataPatch.provenance?.creatorId ?? ""}
+                      onChange={(event) => updateMetadataPatch((current) => ({
+                        ...current,
+                        provenance: {
+                          ...(current.provenance ?? {}),
+                          creatorId: event.target.value || undefined,
+                        },
+                      }))}
+                    />
+                  </label>
+                  <label className="ui-field">
+                    <span className="ui-field__label">Source type</span>
+                    <input
+                      className="ui-input"
+                      value={metadataPatch.provenance?.sourceType ?? ""}
+                      onChange={(event) => updateMetadataPatch((current) => ({
+                        ...current,
+                        provenance: {
+                          ...(current.provenance ?? {}),
+                          sourceType: event.target.value as never,
+                        },
+                      }))}
+                    />
+                  </label>
+                  <label className="ui-field">
+                    <span className="ui-field__label">Source label</span>
+                    <input
+                      className="ui-input"
+                      value={metadataPatch.provenance?.sourceLabel ?? ""}
+                      onChange={(event) => updateMetadataPatch((current) => ({
+                        ...current,
+                        provenance: {
+                          ...(current.provenance ?? {}),
+                          sourceLabel: event.target.value || undefined,
+                        },
+                      }))}
+                    />
+                  </label>
+                  <label className="ui-field">
+                    <span className="ui-field__label">Derivation context</span>
+                    <input
+                      className="ui-input"
+                      value={metadataPatch.provenance?.derivationContext ?? ""}
+                      onChange={(event) => updateMetadataPatch((current) => ({
+                        ...current,
+                        provenance: {
+                          ...(current.provenance ?? {}),
+                          derivationContext: event.target.value || undefined,
+                        },
+                      }))}
+                    />
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
+          {metadataJsonError ? <p className="ui-text-muted">{metadataJsonError}</p> : null}
         </StudioShellPanel>
         {renderExtensions(extensionRegistry, StudioShellExtensionSlots.metadata, extensionContext)}
 
         <StudioShellPanel title="Dependencies" subtitle="Draft dependency references and version pinning.">
-          <textarea className="ui-textarea" rows={8} value={dependenciesJson} onChange={(event) => setDependenciesJson(event.target.value)} />
+          <div className="ui-form-json-toggle">
+            <button
+              type="button"
+              className="ui-button ui-button--ghost ui-button--sm"
+              onClick={() => {
+                if (!isDependenciesJsonMode) {
+                  setDependenciesJson(JSON.stringify(toDependencyReferences(dependencies), null, 2));
+                  setIsDependenciesJsonMode(true);
+                  setDependenciesJsonError(undefined);
+                  return;
+                }
+                const parsed = parseJson<Array<{ assetId: string; versionId?: string }>>(dependenciesJson);
+                if (!parsed.ok) {
+                  setDependenciesJsonError("Dependencies JSON is invalid. Fix JSON before leaving advanced mode.");
+                  return;
+                }
+                const nextDependencies = toDependencyInputs(parsed.data ?? []);
+                setDependencies(nextDependencies);
+                setDependenciesJson(JSON.stringify(toDependencyReferences(nextDependencies), null, 2));
+                setDependenciesJsonError(undefined);
+                setIsDependenciesJsonMode(false);
+              }}
+            >
+              {isDependenciesJsonMode ? "Use Form Editor" : "Edit JSON"}
+            </button>
+          </div>
+          {isDependenciesJsonMode ? (
+            <textarea className="ui-textarea" rows={8} value={dependenciesJson} onChange={(event) => setDependenciesJson(event.target.value)} />
+          ) : (
+            <div className="ui-form-array">
+              <div className="ui-form-array__header">
+                <strong>Dependency references</strong>
+                <button
+                  type="button"
+                  className="ui-button ui-button--ghost ui-button--sm"
+                  onClick={() => updateDependenciesForm([...dependencies, { assetId: "", versionId: "" }])}
+                >
+                  Add dependency
+                </button>
+              </div>
+              {dependencies.map((dependency, index) => (
+                <div key={`dependency-row-${index}`} className="ui-form-array__row">
+                  <div className="ui-form-grid">
+                    <label className="ui-field">
+                      <span className="ui-field__label">Asset ID</span>
+                      <input
+                        className="ui-input"
+                        value={dependency.assetId}
+                        onChange={(event) => {
+                          const next = [...dependencies];
+                          next[index] = { ...dependency, assetId: event.target.value };
+                          updateDependenciesForm(next);
+                        }}
+                      />
+                    </label>
+                    <label className="ui-field">
+                      <span className="ui-field__label">Version ID (optional)</span>
+                      <input
+                        className="ui-input"
+                        value={dependency.versionId}
+                        onChange={(event) => {
+                          const next = [...dependencies];
+                          next[index] = { ...dependency, versionId: event.target.value };
+                          updateDependenciesForm(next);
+                        }}
+                      />
+                    </label>
+                  </div>
+                  <div className="ui-row ui-row--end">
+                    <button
+                      type="button"
+                      className="ui-button ui-button--ghost ui-button--sm"
+                      onClick={() => {
+                        const next = dependencies.filter((_, entryIndex) => entryIndex !== index);
+                        updateDependenciesForm(next.length > 0 ? next : [{ assetId: "", versionId: "" }]);
+                      }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {dependenciesJsonError ? <p className="ui-text-muted">{dependenciesJsonError}</p> : null}
           <button
             className="ui-button"
             disabled={isBusy || !sessionId || !draftId}
@@ -361,12 +810,15 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
               if (!sessionId || !draftId) {
                 return;
               }
-              const dependencies = safeParseJson<Array<{ assetId: string; versionId?: string }>>(dependenciesJson, []);
+              const dependenciesToSave = resolveDependenciesForSave();
+              if (!dependenciesToSave) {
+                return;
+              }
               void runAndRefresh(() => service.updateDependencies({
                 studioId,
                 sessionId,
                 draftId,
-                dependencies,
+                dependencies: dependenciesToSave,
               }));
             }}
           >
@@ -445,7 +897,7 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
           </div>
           <ul className="ui-stack ui-stack--2xs">
             {(snapshot?.versions ?? []).map((version) => (
-              <li key={version.versionId}>{version.versionLabel ?? version.versionId} · {version.createdAt}</li>
+              <li key={version.versionId}>{version.versionLabel ?? version.versionId} - {version.createdAt}</li>
             ))}
           </ul>
         </StudioShellPanel>
