@@ -56,7 +56,7 @@ export default function ContextFragmentEditor({
   onDelete,
 }: ContextFragmentEditorProps): JSX.Element {
   return (
-    <article className="ui-card ui-context-fragment-editor">
+    <article className="ui-card ui-card--padded ui-context-fragment-editor">
       <div className="ui-context-fragment-editor__toolbar">
         <h4 className="ui-context-fragment-editor__title">{fragment.title || fragment.id}</h4>
         {onDelete ? (
