@@ -169,6 +169,10 @@ export default function StudioShellPage({
     () => inlineAssetCreationService.parseInlineReturnFromSearch(location.search),
     [inlineAssetCreationService, location.search],
   );
+  const selectorLaunchContext = useMemo(
+    () => inlineAssetCreationService.parseSelectorLaunchFromSearch(location.search),
+    [inlineAssetCreationService, location.search],
+  );
   const workflowModeStore = useMemo(
     () => (isWorkflowStudio ? getWorkflowStudioModeStateStore(studioId) : undefined),
     [isWorkflowStudio, studioId],
@@ -411,6 +415,8 @@ export default function StudioShellPage({
             status: InlineAssetReturnStatuses.created,
             assetId: snapshot.draft.assetId,
             versionId: returnVersionId,
+            assetType: studioRegistration?.role,
+            displayName: snapshot.draft.metadata.title,
             sourceStudioType: studioRegistration?.studioType,
             sourceStudioId: studioId,
             returnContextId: inlineCreationReturnTarget.contextId,
@@ -419,11 +425,12 @@ export default function StudioShellPage({
         : undefined,
       cancelled: inlineAssetCreationService.buildReturnPath({
         returnTarget: inlineCreationReturnTarget,
-        payload: {
-          status: InlineAssetReturnStatuses.cancelled,
-          sourceStudioType: studioRegistration?.studioType,
-          sourceStudioId: studioId,
-          returnContextId: inlineCreationReturnTarget.contextId,
+      payload: {
+        status: InlineAssetReturnStatuses.cancelled,
+        assetType: studioRegistration?.role,
+        sourceStudioType: studioRegistration?.studioType,
+        sourceStudioId: studioId,
+        returnContextId: inlineCreationReturnTarget.contextId,
         },
       }),
     });
@@ -435,7 +442,24 @@ export default function StudioShellPage({
     snapshot?.draft?.assetId,
     studioId,
     studioRegistration?.studioType,
+    studioRegistration?.role,
   ]);
+  const autoReturnedFromSelectorRef = useRef(false);
+
+  useEffect(() => {
+    autoReturnedFromSelectorRef.current = false;
+  }, [selectorLaunchContext?.selectorSessionId, studioId]);
+
+  useEffect(() => {
+    if (!selectorLaunchContext || !inlineReturnPaths?.withAsset || autoReturnedFromSelectorRef.current) {
+      return;
+    }
+    if (!snapshot?.draft?.assetId) {
+      return;
+    }
+    autoReturnedFromSelectorRef.current = true;
+    void navigate(inlineReturnPaths.withAsset, { replace: true });
+  }, [inlineReturnPaths?.withAsset, navigate, selectorLaunchContext, snapshot?.draft?.assetId]);
   const workflowDraftContent = workflowModeState?.sharedDraftSerialized ?? content;
   const hasWorkflowDraftParseError = isWorkflowStudio && Boolean(workflowModeState?.draftParseError);
   const extensionContext: StudioShellExtensionContext = {
@@ -550,7 +574,9 @@ export default function StudioShellPage({
             <div className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="studio-shell-inline-return-panel">
               <strong>Inline creation handoff</strong>
               <span className="ui-text-small ui-text-secondary">
-                This studio was opened from another workspace. Return when done, optionally attaching this asset.
+                {selectorLaunchContext
+                  ? `This studio was launched from selector session ${selectorLaunchContext.selectorSessionId}. Return when creation completes.`
+                  : "This studio was opened from another workspace. Return when done, optionally attaching this asset."}
               </span>
               <div className="ui-stack ui-stack--xs" style={{ flexDirection: "row", flexWrap: "wrap" }}>
                 {inlineReturnPaths?.withAsset ? (

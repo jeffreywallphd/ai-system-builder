@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import type { AgentMemoryConfiguration } from "../../domain/agents/AgentMemory";
 import { AssetId } from "../../domain/assets/AssetId";
 import type { AgentPlanningStrategy } from "../../domain/agents/Agent";
@@ -20,6 +21,10 @@ import { AgentLaunchPanel } from "../components/agents/AgentLaunchPanel";
 import { SessionListPanel } from "../components/agents/SessionListPanel";
 import { SessionDetailPanel } from "../components/agents/SessionDetailPanel";
 import { useUiDependencies } from "../composition/AppProviders";
+import {
+  InlineAssetCreationService,
+  InlineAssetReturnStatuses,
+} from "../routes/InlineAssetCreation";
 
 function buildCreateRequest(id: string) {
   return {
@@ -50,8 +55,19 @@ function toIssueList(value: unknown): ReadonlyArray<unknown> {
 }
 
 export default function AgentStudioPage(): JSX.Element {
+  const location = useLocation();
+  const navigate = useNavigate();
   const { canonicalAssetManagementService } = useUiDependencies();
   const service = useMemo(() => new AgentStudioService(), []);
+  const inlineAssetCreationService = useMemo(() => new InlineAssetCreationService(), []);
+  const inlineCreationReturnTarget = useMemo(
+    () => inlineAssetCreationService.parseReturnTargetFromSearch(location.search),
+    [inlineAssetCreationService, location.search],
+  );
+  const selectorLaunchContext = useMemo(
+    () => inlineAssetCreationService.parseSelectorLaunchFromSearch(location.search),
+    [inlineAssetCreationService, location.search],
+  );
   const [agents, setAgents] = useState<ReadonlyArray<AgentAuthoringApiReadModel>>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<string>("");
   const [snapshot, setSnapshot] = useState<AgentStudioSnapshotReadModel | undefined>();
@@ -146,6 +162,21 @@ export default function AgentStudioPage(): JSX.Element {
       setSelectedAgentId(response.data.agent.id);
       await refreshAgents();
       await refreshSnapshot(response.data.agent.id);
+      if (inlineCreationReturnTarget && selectorLaunchContext) {
+        const returnPath = inlineAssetCreationService.buildReturnPath({
+          returnTarget: inlineCreationReturnTarget,
+          payload: {
+            status: InlineAssetReturnStatuses.created,
+            assetId: response.data.agent.id,
+            assetType: "agent",
+            displayName: response.data.agent.name,
+            sourceStudioType: "agent-studio",
+            sourceStudioId: "agent-studio",
+            returnContextId: inlineCreationReturnTarget.contextId,
+          },
+        });
+        void navigate(returnPath, { replace: true });
+      }
     } finally {
       setIsBusy(false);
     }
@@ -257,6 +288,21 @@ export default function AgentStudioPage(): JSX.Element {
     setSelectedSession(undefined);
   }, [selectedAgentId]);
 
+  const inlineCancelReturnPath = useMemo(() => {
+    if (!inlineCreationReturnTarget) {
+      return undefined;
+    }
+    return inlineAssetCreationService.buildReturnPath({
+      returnTarget: inlineCreationReturnTarget,
+      payload: {
+        status: InlineAssetReturnStatuses.cancelled,
+        sourceStudioType: "agent-studio",
+        sourceStudioId: "agent-studio",
+        returnContextId: inlineCreationReturnTarget.contextId,
+      },
+    });
+  }, [inlineAssetCreationService, inlineCreationReturnTarget]);
+
   return (
     <section className="ui-page ui-stack ui-stack--md" data-testid="agent-studio-shell">
       <div className="ui-page__hero">
@@ -265,6 +311,31 @@ export default function AgentStudioPage(): JSX.Element {
           <p className="ui-page__subtitle">Thin shell over backend contracts for authoring, launch, sessions, and run control.</p>
         </div>
       </div>
+
+      {inlineCreationReturnTarget ? (
+        <div className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="agent-studio-inline-return-panel">
+          <strong>Inline creation handoff</strong>
+          <span className="ui-text-small ui-text-secondary">
+            {selectorLaunchContext
+              ? `Opened from selector session ${selectorLaunchContext.selectorSessionId}.`
+              : "Opened from another workspace context."}
+          </span>
+          <div className="ui-row ui-row--wrap" style={{ gap: "0.5rem" }}>
+            <button
+              type="button"
+              className="ui-button ui-button--ghost ui-button--sm"
+              onClick={() => {
+                if (!inlineCancelReturnPath) {
+                  return;
+                }
+                void navigate(inlineCancelReturnPath, { replace: true });
+              }}
+            >
+              Cancel and return
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <div className="ui-grid" style={{ gridTemplateColumns: "minmax(260px, 320px) 1fr", gap: "1rem" }}>
         <AgentListPanel

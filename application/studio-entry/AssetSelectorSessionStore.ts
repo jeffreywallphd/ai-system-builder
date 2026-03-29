@@ -3,9 +3,11 @@ import {
   AssetSelectorSelectionModes,
   AssetSelectorSelectionTypes,
   type AssetSelectorAssetReference,
+  type AssetSelectorContext,
   type AssetSelectorRequest,
   type AssetSelectorResult,
 } from "../../domain/studio-shell/AssetSelectorContract";
+import type { TaxonomySemanticRole } from "../../domain/taxonomy/CompositionTaxonomy";
 import {
   AssetSelectorApplicationValidationService,
   createDefaultAssetSelectorCapabilityRegistry,
@@ -40,6 +42,13 @@ export interface AssetSelectorSessionError {
   readonly path?: string;
 }
 
+export interface AssetSelectorCreatingNewContext {
+  readonly originatingContext: AssetSelectorContext;
+  readonly requestedAssetType: TaxonomySemanticRole;
+  readonly returnTargetSessionKey: string;
+  readonly returnRoutePath?: string;
+}
+
 export interface AssetSelectorSessionState {
   readonly sessionKey: string;
   readonly request: AssetSelectorRequest;
@@ -48,6 +57,7 @@ export interface AssetSelectorSessionState {
   readonly pendingSelections: ReadonlyArray<AssetSelectorAssetReference>;
   readonly validationErrors: ReadonlyArray<AssetSelectorSessionError>;
   readonly lastResult?: AssetSelectorResult;
+  readonly creatingNewContext?: AssetSelectorCreatingNewContext;
   readonly lifecycleHistory: ReadonlyArray<AssetSelectorSessionLifecycleState>;
 }
 
@@ -58,6 +68,7 @@ export interface AssetSelectorSessionSnapshot {
   readonly selectedAssets: ReadonlyArray<AssetSelectorAssetReference>;
   readonly pendingSelections: ReadonlyArray<AssetSelectorAssetReference>;
   readonly lastResult?: AssetSelectorResult;
+  readonly creatingNewContext?: AssetSelectorCreatingNewContext;
 }
 
 export type AssetSelectorSessionListener = (state: AssetSelectorSessionState) => void;
@@ -144,6 +155,7 @@ export class AssetSelectorSessionStore {
       pendingSelections: selectedAssets,
       validationErrors: Object.freeze([]),
       lastResult: undefined,
+      creatingNewContext: undefined,
       lifecycleHistory: Object.freeze([AssetSelectorSessionLifecycleStates.idle]),
     });
     this.sessionStates.set(state.sessionKey, state);
@@ -158,10 +170,27 @@ export class AssetSelectorSessionStore {
     });
   }
 
-  public transitionToCreatingNew(sessionKey: string): AssetSelectorSessionState {
+  public transitionToCreatingNew(
+    sessionKey: string,
+    creatingNewContext?: AssetSelectorCreatingNewContext,
+  ): AssetSelectorSessionState {
     return this.patch(sessionKey, {
       lifecycleState: AssetSelectorSessionLifecycleStates.creatingNew,
       validationErrors: Object.freeze([]),
+      creatingNewContext: creatingNewContext ?? this.requireSession(sessionKey).creatingNewContext,
+    });
+  }
+
+  public resumeAfterCreationCancellation(sessionKey: string, reason = "creation-cancelled"): AssetSelectorSessionState {
+    const state = this.requireSession(sessionKey);
+    return this.patch(sessionKey, {
+      lifecycleState: AssetSelectorSessionLifecycleStates.active,
+      pendingSelections: state.selectedAssets,
+      validationErrors: Object.freeze([]),
+      lastResult: Object.freeze({
+        kind: AssetSelectorResultKinds.cancelled,
+        reason,
+      }),
     });
   }
 
@@ -262,6 +291,21 @@ export class AssetSelectorSessionStore {
     });
   }
 
+  public reportReturnPayloadError(
+    sessionKey: string,
+    message: string,
+    path?: string,
+  ): AssetSelectorSessionState {
+    return this.patch(sessionKey, {
+      lifecycleState: AssetSelectorSessionLifecycleStates.active,
+      validationErrors: buildValidationErrors(
+        message,
+        AssetSelectorSessionErrorCodes.returnPayloadInvalid,
+        path,
+      ),
+    });
+  }
+
   public getSession(sessionKey: string): AssetSelectorSessionState | undefined {
     return this.sessionStates.get(sessionKey.trim());
   }
@@ -279,6 +323,7 @@ export class AssetSelectorSessionStore {
       selectedAssets: state.selectedAssets,
       pendingSelections: state.pendingSelections,
       lastResult: state.lastResult,
+      creatingNewContext: state.creatingNewContext,
     });
   }
 
@@ -299,6 +344,7 @@ export class AssetSelectorSessionStore {
         pendingSelections,
         validationErrors: Object.freeze([]),
         lastResult: snapshot.lastResult,
+        creatingNewContext: snapshot.creatingNewContext,
         lifecycleHistory: Object.freeze([AssetSelectorSessionLifecycleStates.idle, snapshot.lifecycleState]),
       });
       this.sessionStates.set(state.sessionKey, state);

@@ -70,6 +70,7 @@ Responsibilities:
   - pending selections
   - lifecycle state
   - validation/error state
+  - creation launch context (`creatingNewContext`: origin context, requested asset type, return target session/route)
 - Lifecycle support:
   - `idle`
   - `active`
@@ -138,7 +139,7 @@ Responsibilities:
 - Handles empty/error states and excludes unavailable/deleted rows from selectable results.
 
 Create-new behavior:
-- The shell create-new affordance is explicitly stubbed in this slice (no studio launch/handoff yet).
+- Create-new launches Dataset Studio via shared selector launch contract and preserves selector session state during navigation.
 
 ## Story 4.6: Agent/assistant asset selector integration
 Agent/assistant-specific selector integration is now implemented through:
@@ -155,7 +156,49 @@ Responsibilities:
 - Handles empty/error states and excludes unavailable/deleted or invalid-role rows.
 
 Create-new behavior:
-- The shell create-new affordance is explicitly stubbed in this slice (no studio launch/handoff yet).
+- Create-new launches Agent Studio via shared selector launch contract and preserves selector session state during navigation.
+
+## Story 4.7: Inline studio launch for missing assets
+Implemented seams:
+- `ui/studio-shell/asset-selector/AssetSelectorStudioLaunchService.ts`
+- `ui/routes/InlineAssetCreation.ts`
+- Workflow selector integrations:
+  - `ui/components/studio-shell/workflow/WorkflowStudioInputSectionEditor.tsx`
+  - `ui/components/studio-shell/workflow/WorkflowStudioStepSectionEditor.tsx`
+
+Launch contract now carries:
+- selector session id (`selectorSessionId` / `returnContextId`)
+- asset type being created (`selectorAssetType`)
+- return route/context (`returnTo` + selector route metadata)
+
+Lifecycle/navigation semantics:
+- selector transitions `active -> creating-new` before route handoff
+- selector selected/pending state remains in shared session store during navigation
+- cancelled creation returns safely with selector session restored to `active` and no selection corruption
+
+## Story 4.8: Return-to-selector handoff contract
+Implemented seams:
+- `ui/studio-shell/asset-selector/AssetSelectorReturnHandoffService.ts`
+- Return contract extensions in `ui/routes/InlineAssetCreation.ts`
+
+Return payload contract now includes:
+- `assetId`
+- `assetType`
+- optional `versionId`
+- optional `displayName`
+- selector-targeting context (`returnContextId`) for multi-session routing
+
+Studio integration:
+- Dataset Studio and Agent Studio detect selector-launch context from route params.
+- Successful creation emits created-return payload and navigates back to the originating selector route.
+- Cancel emits cancelled-return payload and routes back safely.
+
+Selector return handling:
+- session transitions include `creating-new -> returning -> active` for creation handoffs
+- returned assets are validated through existing Story 4.1 + 4.2 seams (contract + capability matrix)
+- invalid payloads, stale sessions, and mismatched asset types are rejected safely
+- valid returned assets are merged into selector options and selected assets for immediate confirm/modify flows
+- multiple concurrent selectors remain isolated by session key/return-context targeting
 
 ## Adding future asset types
 To add a new selector type without modifying shared shell/session layers:

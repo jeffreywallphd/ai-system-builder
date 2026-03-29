@@ -32,12 +32,14 @@ export interface InlineAssetCreationRequest {
   readonly mode?: InlineAssetCreationMode;
   readonly context: InlineAssetCreationContext;
   readonly returnTarget?: InlineAssetCreationReturnTarget;
+  readonly selectorLaunch?: InlineAssetSelectorLaunchContext;
 }
 
 export interface InlineAssetCreationResult {
   readonly mode: InlineAssetCreationMode;
   readonly launchPath: string;
   readonly returnTarget?: InlineAssetCreationReturnTarget;
+  readonly selectorLaunch?: InlineAssetSelectorLaunchContext;
   readonly studioEntry: StudioEntryResolution;
 }
 
@@ -52,9 +54,17 @@ export interface InlineAssetReturnPayload {
   readonly status: InlineAssetReturnStatus;
   readonly assetId?: string;
   readonly versionId?: string;
+  readonly assetType?: TaxonomySemanticRole;
+  readonly displayName?: string;
   readonly sourceStudioType?: string;
   readonly sourceStudioId?: string;
   readonly returnContextId?: string;
+}
+
+export interface InlineAssetSelectorLaunchContext {
+  readonly selectorSessionId: string;
+  readonly assetType: TaxonomySemanticRole;
+  readonly returnRoutePath?: string;
 }
 
 function toEntryContextSource(source: InlineAssetCreationContext["source"]): "navigation" | "registry" | "system-studio" | "intent" | "unknown" {
@@ -91,6 +101,15 @@ function appendReturnTarget(path: string, request: InlineAssetCreationRequest): 
     }
     if (request.returnTarget.selectedComponent) {
       params.set("selectedComponent", request.returnTarget.selectedComponent);
+    }
+  }
+
+  if (request.selectorLaunch) {
+    params.set("selectorLaunch", "1");
+    params.set("selectorSessionId", request.selectorLaunch.selectorSessionId);
+    params.set("selectorAssetType", request.selectorLaunch.assetType);
+    if (request.selectorLaunch.returnRoutePath?.trim()) {
+      params.set("selectorReturnTo", request.selectorLaunch.returnRoutePath.trim());
     }
   }
 
@@ -140,6 +159,7 @@ export class InlineAssetCreationService {
       mode: request.mode ?? InlineAssetCreationModes.inlineContext,
       launchPath,
       returnTarget: request.returnTarget,
+      selectorLaunch: request.selectorLaunch,
       studioEntry,
     });
   }
@@ -178,6 +198,16 @@ export class InlineAssetCreationService {
       params.set("inlineVersionId", input.payload.versionId.trim());
     } else {
       params.delete("inlineVersionId");
+    }
+    if (input.payload.assetType?.trim()) {
+      params.set("inlineAssetType", input.payload.assetType.trim());
+    } else {
+      params.delete("inlineAssetType");
+    }
+    if (input.payload.displayName?.trim()) {
+      params.set("inlineDisplayName", input.payload.displayName.trim());
+    } else {
+      params.delete("inlineDisplayName");
     }
     if (input.payload.sourceStudioType?.trim()) {
       params.set("inlineSourceStudioType", input.payload.sourceStudioType.trim());
@@ -223,9 +253,30 @@ export class InlineAssetCreationService {
       status,
       assetId: params.get("inlineAssetId")?.trim() || undefined,
       versionId: params.get("inlineVersionId")?.trim() || undefined,
+      assetType: (params.get("inlineAssetType")?.trim() || undefined) as TaxonomySemanticRole | undefined,
+      displayName: params.get("inlineDisplayName")?.trim() || undefined,
       sourceStudioType: params.get("inlineSourceStudioType")?.trim() || undefined,
       sourceStudioId: params.get("inlineSourceStudioId")?.trim() || undefined,
       returnContextId: params.get("returnContextId")?.trim() || undefined,
+    });
+  }
+
+  public parseSelectorLaunchFromSearch(search: string): InlineAssetSelectorLaunchContext | undefined {
+    const params = new URLSearchParams(search);
+    if (params.get("selectorLaunch")?.trim() !== "1") {
+      return undefined;
+    }
+
+    const selectorSessionId = params.get("selectorSessionId")?.trim();
+    const assetType = params.get("selectorAssetType")?.trim();
+    if (!selectorSessionId || !assetType) {
+      return undefined;
+    }
+
+    return Object.freeze({
+      selectorSessionId,
+      assetType: assetType as TaxonomySemanticRole,
+      returnRoutePath: params.get("selectorReturnTo")?.trim() || undefined,
     });
   }
 
@@ -235,6 +286,8 @@ export class InlineAssetCreationService {
     params.delete("inlineStatus");
     params.delete("inlineAssetId");
     params.delete("inlineVersionId");
+    params.delete("inlineAssetType");
+    params.delete("inlineDisplayName");
     params.delete("inlineSourceStudioType");
     params.delete("inlineSourceStudioId");
     const next = params.toString();

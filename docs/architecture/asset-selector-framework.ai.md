@@ -53,6 +53,7 @@ The matrix is centralized in `AssetSelectorCapabilityRegistry` (no scattered `if
   - pending selections
   - lifecycle state
   - validation errors
+  - `creatingNewContext` (origin context, requested creation asset type, return target session/route)
 - Lifecycle states implemented:
   - `idle`
   - `active`
@@ -102,7 +103,7 @@ Implemented behavior:
 - Shared shell + shared session store multi-select handling for workflow inputs.
 - Selection propagation into canonical workflow draft dataset inputs through existing workflow draft helpers.
 - Empty/error handling plus filtering of unavailable/deleted rows.
-- Create-new action remains intentionally stubbed in this slice (no studio launch/handoff yet).
+- Create-new action launches Dataset Studio through shared selector launch service and keeps selector session state in `creating-new` until return/cancel.
 
 ## Story 4.6 implemented agent/assistant selector
 - Agent adapter: `ui/studio-shell/asset-selector/AgentAssistantAssetSelectorAdapter.ts`
@@ -116,7 +117,45 @@ Implemented behavior:
 - Confirmed selections map to step-compatible payload semantics (asset reference + config placeholder) before draft updates.
 - Ordered step insertion/editing compatibility remains intact.
 - Empty/error handling plus filtering of unavailable/deleted or invalid-role rows.
-- Create-new action remains intentionally stubbed in this slice (no studio launch/handoff yet).
+- Create-new action launches Agent Studio through shared selector launch service and keeps selector session state in `creating-new` until return/cancel.
+
+## Story 4.7 implemented inline studio launch for missing assets
+- Central launcher: `ui/studio-shell/asset-selector/AssetSelectorStudioLaunchService.ts`
+- Shared route handoff seam: `ui/routes/InlineAssetCreation.ts`
+- Selector UI wiring:
+  - `WorkflowStudioInputSectionEditor.tsx` (dataset selector -> Dataset Studio)
+  - `WorkflowStudioStepSectionEditor.tsx` (agent selector -> Agent Studio)
+
+Launch contract now carries:
+- selector session key (`selectorSessionId` / `returnContextId`)
+- asset type being created (`selectorAssetType`)
+- return route context (`returnTo` + selector route metadata)
+
+Navigation/lifecycle behavior:
+- selector transitions `active -> creating-new` before navigation
+- selected/pending selector state remains preserved in the session store during route transition
+- cancel/exit-from-creation uses safe return semantics (`resumeAfterCreationCancellation`) so selector state is restored to `active` without corruption
+
+## Story 4.8 implemented return-to-selector handoff contract
+- Return handler seam: `ui/studio-shell/asset-selector/AssetSelectorReturnHandoffService.ts`
+- Return payload contract (query-backed) now includes:
+  - `assetId`
+  - `assetType`
+  - optional `versionId`
+  - optional `displayName`
+  - selector return context id (`returnContextId`) for multi-session targeting
+
+Studio integration:
+- Dataset Studio (shared shell path) and Agent Studio detect selector launch context via `InlineAssetCreationService.parseSelectorLaunchFromSearch`.
+- Successful creation emits created-return payload and routes back to selector return target.
+- Cancel path emits cancelled-return payload and routes back safely.
+
+Selector rehydration + validation behavior:
+- On return: selector session transitions through `returning` and resumes to `active` after successful return handling.
+- Returned assets flow through existing Story 4.1/4.2 validation (`AssetSelectorSessionStore.handleReturnPayload` + capability matrix checks).
+- Malformed payloads, stale sessions, and mismatched asset types are safely rejected with session validation issues.
+- Returned assets are merged into selector options and selected assets for immediate user confirmation/modification.
+- Multiple selector sessions are isolated by `sessionKey`/`returnContextId` targeting.
 
 ## Future asset-type integration pattern
 For new selector types, keep shared shell/session unchanged and add:
