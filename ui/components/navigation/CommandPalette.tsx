@@ -28,16 +28,16 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
 
   return (
     <div className="ui-overlay-panel ui-overlay-panel--right ui-overlay-panel--open ui-command-palette" aria-hidden={false}>
-      <button type="button" className="ui-overlay-panel__scrim" onClick={onClose} aria-label="Close command palette" />
-      <aside className="ui-overlay-panel__surface" role="dialog" aria-modal="true" aria-label="Command palette">
-        <div className="ui-overlay-panel__header">
-          <div className="ui-stack ui-stack--2xs">
-            <strong>Command palette</strong>
-            <span className="ui-text-small ui-text-secondary">Build, Explore, Run, or Manage.</span>
-          </div>
-        </div>
+      <button type="button" className="ui-overlay-panel__scrim" onClick={onClose} aria-label="Close navigation menu" />
+      <aside
+        id="global-navigation-menu"
+        className="ui-overlay-panel__surface"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Navigation menu"
+      >
         <div className="ui-overlay-panel__body ui-stack ui-stack--sm">
-          <div className="ui-stack ui-stack--2xs">
+          <div className="ui-command-palette__entries">
             {model.entries.map((entry) => (
               <button
                 key={entry.id}

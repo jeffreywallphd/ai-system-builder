@@ -7,7 +7,6 @@ import {
   useLocation,
 } from "react-router-dom";
 import { ContextNavigationService } from "../routes/ContextNavigation";
-import DevSyncButton from "../dev/DevSyncButton";
 import { useUiDependencies } from "../composition/AppProviders";
 import type { RuntimeConsoleState } from "../state/RuntimeConsoleStore";
 import RuntimeConsoleDrawer from "../components/execution/RuntimeConsoleDrawer";
@@ -51,7 +50,7 @@ function getWorkflowEditorExitPrompt(workflowName?: string): string {
 }
 
 export default function AppLayout(): JSX.Element {
-  const { config, runtimeConsoleStore, workflowStore } = useUiDependencies();
+  const { runtimeConsoleStore, workflowStore } = useUiDependencies();
   const location = useLocation();
   const contextNavigationService = useMemo(() => new ContextNavigationService(), []);
   const contextNavigation = contextNavigationService.resolve({ pathname: location.pathname, search: location.search });
@@ -168,15 +167,20 @@ export default function AppLayout(): JSX.Element {
             />
           </Link>
 
-          <div className="ui-app__header-actions ui-row ui-row--wrap">
-            {!config.isProductionMode ? <DevSyncButton /> : null}
+          <div className="ui-app__header-actions ui-row ui-row--end">
             <button
               type="button"
-              className="ui-button ui-button--ghost ui-button--sm"
+              className="ui-button ui-button--ghost ui-button--sm ui-app__menu-trigger"
               onClick={() => setCommandPaletteOpen(true)}
-              aria-label="Open command palette"
+              aria-label="Open navigation menu"
+              aria-expanded={isCommandPaletteOpen}
+              aria-controls="global-navigation-menu"
             >
-              Command palette
+              <span className="ui-app__menu-trigger-icon" aria-hidden="true">
+                <span className="ui-app__menu-trigger-bar" />
+                <span className="ui-app__menu-trigger-bar" />
+                <span className="ui-app__menu-trigger-bar" />
+              </span>
             </button>
           </div>
         </div>
