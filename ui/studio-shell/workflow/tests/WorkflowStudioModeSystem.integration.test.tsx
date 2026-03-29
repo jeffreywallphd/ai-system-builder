@@ -26,6 +26,8 @@ import {
   setWorkflowStepType,
   workflowStepTypeDefinitions,
 } from "../WorkflowWizardSteps";
+import { upsertDatasetInputSelection } from "../WorkflowWizardDatasetInputs";
+import { addWorkflowOutput, setWorkflowOutputViewerTitle } from "../WorkflowWizardOutputs";
 
 interface ButtonElementProps {
   readonly children?: ReactNode;
@@ -535,6 +537,51 @@ describe("WorkflowStudioModeSystem integration seams", () => {
     store.setSelectedMode(WorkflowStudioModeIds.wizard);
     expect(store.getState().sharedDraftSerialized).toBe(baselineSerialized);
     expect(store.getState().sharedDraft.outputs).toHaveLength(2);
+  });
+
+  it("renders wizard progression controls and terminal readiness actions from shared draft completeness", () => {
+    const store = new WorkflowStudioModeStateStore();
+    store.setSelectedMode(WorkflowStudioModeIds.wizard);
+
+    store.updateSharedDraft((draft) => ({
+      ...draft,
+      triggers: [
+        ...draft.triggers,
+        {
+          id: "trigger-1",
+          kind: "user",
+          type: "manual",
+          config: {},
+        },
+      ],
+    }));
+    store.updateSharedDraft((draft) => upsertDatasetInputSelection(draft, { assetId: "asset:dataset-1" }).draft);
+    store.updateSharedDraft((draft) => addWorkflowStep(draft).draft);
+    store.updateSharedDraft((draft) => addWorkflowOutput(draft, WorkflowDraftOutputDestinationTypes.webViewer).draft);
+    const outputId = store.getState().sharedDraft.outputs[0]?.id as string;
+    store.updateSharedDraft((draft) => setWorkflowOutputViewerTitle(draft, outputId, "Result viewer").draft);
+
+    const wizardBoundary = WorkflowStudioDraftAuthoringBoundary({
+      isWorkflowStudio: true,
+      content: store.getState().sharedDraftSerialized,
+      onChangeContent: (nextContent) => store.hydrateFromSerializedDraft(nextContent),
+      workflowModeContext: {
+        selectedModeId: store.getState().selectedModeId,
+        sharedDraft: store.getState().sharedDraft,
+        sharedDraftSerialized: store.getState().sharedDraftSerialized,
+        draftEditorContent: store.getState().draftEditorContent,
+        modeValidationIssues: store.getState().modeValidationIssues,
+        draftValidationIssues: store.getState().draftValidationIssues,
+      },
+    });
+
+    const markup = renderToStaticMarkup(wizardBoundary);
+    expect(markup).toContain('data-testid="workflow-wizard-progression-controls"');
+    expect(markup).toContain('data-testid="workflow-wizard-prev-section"');
+    expect(markup).toContain('data-testid="workflow-wizard-next-section"');
+    expect(markup).toContain('aria-current="step"');
+    expect(markup).toContain('data-testid="workflow-wizard-terminal-actions"');
+    expect(markup).toContain("Ready to Save / Ready to Run: all sections are complete and validation-ready for this draft slice.");
   });
 });
 
