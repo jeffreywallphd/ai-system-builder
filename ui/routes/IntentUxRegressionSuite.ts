@@ -78,7 +78,7 @@ export class IntentUxRegressionSuite {
     const paletteText = palette.entries.map((entry) => `${entry.label} ${entry.description}`).join(" ").toLowerCase();
     scenarios.push(Object.freeze({
       key: "command-palette-language",
-      passed: !paletteText.includes("taxonomy") && !paletteText.includes("studio shell") && palette.entries.some((entry) => entry.label === "Go to Explore"),
+      passed: !paletteText.includes("taxonomy") && !paletteText.includes("studio shell") && palette.entries.some((entry) => entry.label === "Explore"),
       details: `entryCount=${palette.entries.length}`,
     }));
 
