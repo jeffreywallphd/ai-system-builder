@@ -170,8 +170,6 @@ export default function WorkflowStudioWizardModeSurface({
         draftValidationIssues={draftValidationIssues}
         onUpdateSharedDraft={onUpdateSharedDraft}
         studioId={studioId}
-        routeSearch={routeSearch}
-        onReplaceRouteSearch={onReplaceRouteSearch}
       />
 
       <WorkflowStudioStepSectionEditor
@@ -179,7 +177,6 @@ export default function WorkflowStudioWizardModeSurface({
         draftValidationIssues={draftValidationIssues}
         onUpdateSharedDraft={onUpdateSharedDraft}
         studioId={studioId}
-        routeSearch={routeSearch}
       />
 
       <WorkflowStudioOutputSectionEditor

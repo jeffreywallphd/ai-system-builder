@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   WorkflowDraftBuiltInStepTypes,
   WorkflowDraftStepTypes,
@@ -8,22 +8,27 @@ import {
   type WorkflowDraftLoopIterationStepConfig,
   type WorkflowValidationIssue,
 } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
-import { RegistryService } from "../../../services/RegistryService";
-import { ROUTE_PATHS } from "../../../routes/RouteConfig";
 import {
-  InlineAssetCreationModes,
-  InlineAssetCreationService,
-} from "../../../routes/InlineAssetCreation";
+  AssetSelectorSessionLifecycleStates,
+  type AssetSelectorSessionState,
+} from "../../../../application/studio-entry/AssetSelectorSessionStore";
 import SectionBody from "./SectionBody";
 import SectionHeader from "./SectionHeader";
 import WizardSection from "./WizardSection";
+import { RegistryService } from "../../../services/RegistryService";
+import AssetSelectorShell from "../asset-selector/AssetSelectorShell";
+import { getAssetSelectorSessionStore } from "../../../studio-shell/asset-selector/AssetSelectorSessionRegistry";
+import type { AssetSelectorResultItem } from "../../../studio-shell/asset-selector/AssetSelectorDataProvider";
+import {
+  AgentAssistantAssetSelectorAdapter,
+  createAgentAssistantAssetSelectorRequest,
+} from "../../../studio-shell/asset-selector/AgentAssistantAssetSelectorAdapter";
 import {
   addWorkflowStep,
   buildWorkflowStepAssetOptionKey,
   buildWorkflowStepTypeDefinitionKey,
   clearWorkflowStepAgentAssetSelection,
   getWorkflowStepTypeDefinitionByKey,
-  loadAgentAssistantAssetCandidates,
   moveWorkflowStepDown,
   moveWorkflowStepUp,
   removeWorkflowStep,
@@ -37,7 +42,6 @@ import {
   workflowStepTypeDefinitions,
   WorkflowWizardStepSelectionKinds,
   type WorkflowStepAgentAssetCandidate,
-  type WorkflowStepAssetCatalogService,
 } from "../../../studio-shell/workflow/WorkflowWizardSteps";
 
 interface WorkflowStudioStepSectionEditorProps {
@@ -45,13 +49,6 @@ interface WorkflowStudioStepSectionEditorProps {
   readonly draftValidationIssues: ReadonlyArray<WorkflowValidationIssue>;
   readonly onUpdateSharedDraft?: (updater: (draft: WorkflowDraft) => WorkflowDraft) => void;
   readonly studioId?: string;
-  readonly routeSearch?: string;
-}
-
-interface StepAssetCatalogState {
-  readonly loading: boolean;
-  readonly assets: ReadonlyArray<WorkflowStepAgentAssetCandidate>;
-  readonly error?: string;
 }
 
 function buildSectionSummary(count: number, singular: string, plural: string): string {
@@ -63,42 +60,56 @@ function buildAgentAssetLabel(asset: WorkflowStepAgentAssetCandidate): string {
   return asset.versionId ? `${base} (${asset.versionId})` : base;
 }
 
-function sanitizeSearchForReturn(search: string): string {
-  const params = new URLSearchParams(search);
-  params.delete("inlineCreate");
-  params.delete("inlineMode");
-  params.delete("inlineOrigin");
-  params.delete("returnTo");
-  params.delete("returnContextId");
-  params.delete("inlineReturn");
-  params.delete("inlineStatus");
-  params.delete("inlineAssetId");
-  params.delete("inlineVersionId");
-  params.delete("inlineSourceStudioType");
-  params.delete("inlineSourceStudioId");
-  params.set("mode", "wizard");
-  const query = params.toString();
-  return query.length > 0 ? `?${query}` : "";
-}
-
 function buildStepTypeBadgeLabel(selectionKind: string): string {
   return selectionKind === WorkflowWizardStepSelectionKinds.assetBacked ? "Asset-backed" : "Built-in";
 }
+
+function countCompletedStates(state: AssetSelectorSessionState): number {
+  return state.lifecycleHistory.filter((entry) => entry === AssetSelectorSessionLifecycleStates.completed).length;
+}
+
+const defaultAgentAssistantStepDefinition = workflowStepTypeDefinitions.find(
+  (definition) => definition.type === WorkflowDraftStepTypes.agentAssistant,
+) ?? workflowStepTypeDefinitions[0];
 
 export default function WorkflowStudioStepSectionEditor({
   sharedDraft,
   draftValidationIssues,
   onUpdateSharedDraft,
   studioId,
-  routeSearch = "",
 }: WorkflowStudioStepSectionEditorProps): JSX.Element {
-  const assetCatalogService = useMemo<WorkflowStepAssetCatalogService>(() => new RegistryService(), []);
-  const inlineAssetCreationService = useMemo(() => new InlineAssetCreationService(), []);
-  const [query, setQuery] = useState("");
-  const [catalog, setCatalog] = useState<StepAssetCatalogState>({
-    loading: true,
-    assets: Object.freeze([]),
-  });
+  const selectorSessionStore = useMemo(() => getAssetSelectorSessionStore(), []);
+  const registryService = useMemo(() => new RegistryService(), []);
+  const selectorDataProvider = useMemo(() => new AgentAssistantAssetSelectorAdapter({
+    registryService,
+    limit: 50,
+  }), [registryService]);
+
+  const selectorSessionKey = useMemo(
+    () => `workflow-studio:${studioId?.trim() || "default"}:steps:agent-assistant`,
+    [studioId],
+  );
+  const selectorRequest = useMemo(() => createAgentAssistantAssetSelectorRequest({
+    requestId: `selector:${selectorSessionKey}`,
+    originatingStudio: "workflow-studio",
+    originatingField: "steps.agent-assistant",
+    launchSource: "wizard",
+    selectionMode: "single-select",
+    minSelections: 0,
+    maxSelections: 1,
+    required: false,
+  }), [selectorSessionKey]);
+
+  const [searchTerm, setSearchTerm] = useState("");
+  const [items, setItems] = useState<ReadonlyArray<AssetSelectorResultItem>>([]);
+  const [loading, setLoading] = useState(true);
+  const [queryError, setQueryError] = useState<string | undefined>(undefined);
+  const [queryRevision, setQueryRevision] = useState(0);
+  const [createAgentStubNotice, setCreateAgentStubNotice] = useState<string | undefined>(undefined);
+  const [selectorState, setSelectorState] = useState<AssetSelectorSessionState | undefined>(
+    () => selectorSessionStore.getSession(selectorSessionKey),
+  );
+  const lastAppliedCompletedCount = useRef<number | undefined>(undefined);
 
   const stepValidationIssues = useMemo(
     () => draftValidationIssues.filter((issue) => issue.section === "steps" || issue.path?.startsWith("draft.steps")),
@@ -106,34 +117,22 @@ export default function WorkflowStudioStepSectionEditor({
   );
   const sectionHasErrors = stepValidationIssues.some((issue) => issue.severity === "error");
 
-  const createAgentLaunchPath = useMemo(() => {
-    const returnTargetPath = `${ROUTE_PATHS.workflowStudioMode.replace(":modeId", "wizard")}${sanitizeSearchForReturn(routeSearch)}#workflow-wizard-steps`;
-    return inlineAssetCreationService.launch({
-      requestedRole: "agent",
-      mode: InlineAssetCreationModes.inlineContext,
-      context: {
-        source: "studio-shell",
-        sourceIntentKey: "create-workflow-step-agent",
-        sourceIntentLabel: "Create workflow step agent",
-        sourceMetadata: {
-          sourceStudio: "workflow-studio",
-          sourceSection: "steps",
-        },
-      },
-      returnTarget: {
-        routePath: returnTargetPath,
-        contextId: studioId,
-      },
-    })?.launchPath;
-  }, [inlineAssetCreationService, routeSearch, studioId]);
+  const stepCatalogAssets = useMemo<ReadonlyArray<WorkflowStepAgentAssetCandidate>>(
+    () => Object.freeze(items.map((item) => Object.freeze({
+      assetId: item.asset.assetId,
+      versionId: item.asset.versionId,
+      name: item.asset.displayName ?? item.title,
+    }))),
+    [items],
+  );
 
   const stepAssetOptionByKey = useMemo(() => {
     const map = new Map<string, WorkflowStepAgentAssetCandidate>();
-    for (const asset of catalog.assets) {
+    for (const asset of stepCatalogAssets) {
       map.set(buildWorkflowStepAssetOptionKey(asset), asset);
     }
     return map;
-  }, [catalog.assets]);
+  }, [stepCatalogAssets]);
 
   const addableDefinitions = useMemo(
     () => workflowStepTypeDefinitions.filter((definition) => definition.interactive),
@@ -141,31 +140,82 @@ export default function WorkflowStudioStepSectionEditor({
   );
 
   useEffect(() => {
+    const existing = selectorSessionStore.getSession(selectorSessionKey);
+    if (!existing) {
+      selectorSessionStore.prepareSession({
+        sessionKey: selectorSessionKey,
+        request: selectorRequest,
+      });
+    }
+
+    if (selectorSessionStore.getSession(selectorSessionKey)?.lifecycleState === AssetSelectorSessionLifecycleStates.idle) {
+      selectorSessionStore.activateSession(selectorSessionKey);
+    }
+
+    const unsubscribe = selectorSessionStore.subscribe(selectorSessionKey, setSelectorState);
+    return unsubscribe;
+  }, [selectorRequest, selectorSessionKey, selectorSessionStore]);
+
+  useEffect(() => {
     let active = true;
     const load = async (): Promise<void> => {
-      setCatalog((current) => ({ ...current, loading: true, error: undefined }));
-      const result = await loadAgentAssistantAssetCandidates(assetCatalogService, query);
+      setLoading(true);
+      setQueryError(undefined);
+      const response = await selectorDataProvider.query({
+        request: selectorRequest,
+        searchTerm,
+      });
       if (!active) {
         return;
       }
-      setCatalog({
-        loading: false,
-        assets: result.assets,
-        error: result.error,
-      });
+      setItems(response.items);
+      setQueryError(response.error);
+      setLoading(false);
     };
 
     void load();
     return () => {
       active = false;
     };
-  }, [assetCatalogService, query]);
+  }, [queryRevision, searchTerm, selectorDataProvider, selectorRequest]);
+
+  useEffect(() => {
+    if (!selectorState || !onUpdateSharedDraft || !defaultAgentAssistantStepDefinition) {
+      return;
+    }
+
+    const completedCount = countCompletedStates(selectorState);
+    if (lastAppliedCompletedCount.current === undefined) {
+      lastAppliedCompletedCount.current = completedCount;
+      return;
+    }
+    if (completedCount <= lastAppliedCompletedCount.current) {
+      return;
+    }
+    lastAppliedCompletedCount.current = completedCount;
+
+    const selectedAsset = selectorState.selectedAssets[0];
+    if (!selectedAsset?.assetId?.trim()) {
+      return;
+    }
+
+    onUpdateSharedDraft((draft) => {
+      const added = addWorkflowStep(draft, defaultAgentAssistantStepDefinition);
+      return setWorkflowStepAgentAssetSelection(added.draft, added.stepId, {
+        assetId: selectedAsset.assetId,
+        versionId: selectedAsset.versionId,
+        name: selectedAsset.displayName,
+      }).draft;
+    });
+  }, [onUpdateSharedDraft, selectorState]);
+
+  const stateForShell = selectorState ?? selectorSessionStore.getSession(selectorSessionKey);
 
   return (
     <WizardSection sectionId="workflow-wizard-steps" validationState={sectionHasErrors ? "error" : "none"}>
       <SectionHeader
         title="Steps Section"
-        description="Configure ordered workflow steps and choose either asset-backed actions or built-in workflow logic. All edits write directly to canonical workflow draft steps."
+        description="Configure ordered workflow steps and choose either asset-backed actions or built-in workflow logic. Agent and assistant discovery now uses the shared asset selector shell."
       />
       <SectionBody>
         <div className="ui-text-small">{buildSectionSummary(sharedDraft.steps.length, "step", "steps")}</div>
@@ -193,38 +243,39 @@ export default function WorkflowStudioStepSectionEditor({
           </div>
         </div>
 
-        <div className="ui-stack ui-stack--2xs">
-          <div className="ui-row ui-row--between ui-row--wrap" style={{ gap: "0.5rem" }}>
-            <strong>Agent/assistant asset catalog</strong>
-            {createAgentLaunchPath ? (
-              <a
-                className="ui-button ui-button--ghost ui-button--sm"
-                href={createAgentLaunchPath}
-                data-testid="workflow-step-create-agent-link"
-              >
-                Create new agent/assistant
-              </a>
-            ) : (
-              <button type="button" className="ui-button ui-button--ghost ui-button--sm" disabled>
-                Create new agent/assistant
-              </button>
-            )}
+        {stateForShell ? (
+          <AssetSelectorShell
+            title="Agent/assistant selector"
+            state={stateForShell}
+            searchTerm={searchTerm}
+            items={items}
+            loading={loading}
+            error={queryError}
+            onSearchTermChange={setSearchTerm}
+            onToggleSelection={(item) => {
+              selectorSessionStore.togglePendingSelection(selectorSessionKey, item.asset);
+            }}
+            onConfirm={() => {
+              selectorSessionStore.confirmPendingSelections(selectorSessionKey);
+            }}
+            onCancel={() => {
+              selectorSessionStore.cancelSession(selectorSessionKey, "user-cancelled-selector");
+            }}
+            onCreateNew={() => {
+              selectorSessionStore.transitionToCreatingNew(selectorSessionKey);
+              setCreateAgentStubNotice("Create new agent/assistant is stubbed in Story 4.6. Studio handoff is implemented in a later story.");
+            }}
+            onRetry={() => {
+              setQueryRevision((current) => current + 1);
+            }}
+          />
+        ) : null}
+
+        {createAgentStubNotice ? (
+          <div className="ui-text-small ui-text-secondary" data-testid="workflow-step-create-agent-stub-notice">
+            {createAgentStubNotice}
           </div>
-
-          <label className="ui-stack ui-stack--2xs">
-            <span className="ui-text-small">Search agent/assistant assets</span>
-            <input
-              className="ui-input"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search agent/assistant assets"
-              data-testid="workflow-step-agent-search"
-            />
-          </label>
-
-          {catalog.loading ? <span className="ui-text-small ui-text-secondary">Loading agent/assistant assets...</span> : null}
-          {catalog.error ? <span className="ui-text-small ui-text-danger">{catalog.error}</span> : null}
-        </div>
+        ) : null}
 
         {sharedDraft.steps.length === 0 ? (
           <div className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="workflow-step-empty-state">
@@ -320,7 +371,7 @@ export default function WorkflowStudioStepSectionEditor({
                           className="ui-select"
                           data-testid={`workflow-step-asset-select-${index}`}
                           value={selectedAssetKey}
-                          disabled={!onUpdateSharedDraft || catalog.assets.length === 0}
+                          disabled={!onUpdateSharedDraft || stepCatalogAssets.length === 0}
                           onChange={(event) => {
                             if (!onUpdateSharedDraft) {
                               return;
@@ -334,7 +385,7 @@ export default function WorkflowStudioStepSectionEditor({
                           }}
                         >
                           <option value="">None selected</option>
-                          {catalog.assets.map((asset) => (
+                          {stepCatalogAssets.map((asset) => (
                             <option key={buildWorkflowStepAssetOptionKey(asset)} value={buildWorkflowStepAssetOptionKey(asset)}>
                               {buildAgentAssetLabel(asset)}
                             </option>

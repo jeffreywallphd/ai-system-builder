@@ -124,6 +124,50 @@ Current integration slice:
 - Workflow Wizard dataset input section now renders through the shared selector shell and shared session store.
 - Dataset/agent specific selector behavior remains out of scope; this slice only provides reusable shell + state/session foundation.
 
+## Story 4.5: Dataset asset selector integration
+Dataset-specific selector integration is now implemented through:
+- Adapter/data provider: `ui/studio-shell/asset-selector/DatasetAssetSelectorAdapter.ts`
+- Workflow wizard inputs integration: `ui/components/studio-shell/workflow/WorkflowStudioInputSectionEditor.tsx`
+
+Responsibilities:
+- Builds canonical dataset selector requests for workflow input usage (`usageContext=workflow-input`).
+- Loads dataset assets from registry sources with dataset taxonomy filters (`atomic/dataset/none`).
+- Maps registry entities into shell result items with canonical asset references.
+- Enforces multi-select workflow input semantics via shared session state.
+- Persists and propagates confirmed selections back into canonical workflow draft inputs through existing workflow draft utilities.
+- Handles empty/error states and excludes unavailable/deleted rows from selectable results.
+
+Create-new behavior:
+- The shell create-new affordance is explicitly stubbed in this slice (no studio launch/handoff yet).
+
+## Story 4.6: Agent/assistant asset selector integration
+Agent/assistant-specific selector integration is now implemented through:
+- Adapter/data provider: `ui/studio-shell/asset-selector/AgentAssistantAssetSelectorAdapter.ts`
+- Workflow wizard steps integration: `ui/components/studio-shell/workflow/WorkflowStudioStepSectionEditor.tsx`
+- Step payload seam: `ui/studio-shell/workflow/WorkflowWizardSteps.ts`
+
+Responsibilities:
+- Builds canonical agent selector requests for workflow step usage (`usageContext=workflow-step`).
+- Defaults to single-select for step insertion, with multi-select available through request options.
+- Loads agent/assistant assets with taxonomy filters (`composite/agent/autonomous`).
+- Maps confirmed selector choices into step-compatible payload semantics (asset reference + config placeholder) before applying to workflow steps.
+- Preserves compatibility with ordered step insertion and existing step editing/reordering behavior.
+- Handles empty/error states and excludes unavailable/deleted or invalid-role rows.
+
+Create-new behavior:
+- The shell create-new affordance is explicitly stubbed in this slice (no studio launch/handoff yet).
+
+## Adding future asset types
+To add a new selector type without modifying shared shell/session layers:
+1. Add a typed adapter in `ui/studio-shell/asset-selector/` that:
+   - builds canonical `AssetSelectorRequest` for the target asset type and usage context
+   - queries/mapping from the asset source into `AssetSelectorResultItem`
+2. Register/validate capability matrix support in `application/studio-entry/AssetSelectorCapabilityRegistry.ts`.
+3. Integrate the adapter into the target workflow/studio surface using:
+   - shared session store (`AssetSelectorSessionStore`)
+   - shared shell UI (`AssetSelectorShell`)
+4. Keep asset-type-specific behavior in adapter/feature seams; avoid branching inside shared shell/session classes.
+
 ## Extensibility model
 - New usage contexts can be registered without changing validator logic.
 - New asset-type allowances are configuration-driven via registry descriptors.

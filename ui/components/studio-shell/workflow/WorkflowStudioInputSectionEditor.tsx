@@ -2,13 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { WorkflowDraft, WorkflowValidationIssue } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
 import { WorkflowDraftInputSourceTypes } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
 import {
-  AssetSelectorResultKinds,
-  AssetSelectorSelectionModes,
-  AssetSelectorSelectionTypes,
-  createAssetSelectorRequest,
-} from "../../../../domain/studio-shell/AssetSelectorContract";
-import { AssetSelectorUsageContexts } from "../../../../application/studio-entry/AssetSelectorCapabilityRegistry";
-import {
   AssetSelectorSessionLifecycleStates,
   type AssetSelectorSessionState,
 } from "../../../../application/studio-entry/AssetSelectorSessionStore";
@@ -16,15 +9,13 @@ import SectionBody from "./SectionBody";
 import SectionHeader from "./SectionHeader";
 import WizardSection from "./WizardSection";
 import { RegistryService } from "../../../services/RegistryService";
-import { ROUTE_PATHS } from "../../../routes/RouteConfig";
-import {
-  InlineAssetCreationModes,
-  InlineAssetCreationService,
-} from "../../../routes/InlineAssetCreation";
 import AssetSelectorShell from "../asset-selector/AssetSelectorShell";
 import { getAssetSelectorSessionStore } from "../../../studio-shell/asset-selector/AssetSelectorSessionRegistry";
-import { RegistryAssetSelectorDataProvider } from "../../../studio-shell/asset-selector/RegistryAssetSelectorDataProvider";
 import type { AssetSelectorResultItem } from "../../../studio-shell/asset-selector/AssetSelectorDataProvider";
+import {
+  createDatasetAssetSelectorRequest,
+  DatasetAssetSelectorAdapter,
+} from "../../../studio-shell/asset-selector/DatasetAssetSelectorAdapter";
 import {
   listDatasetInputs,
   replaceDatasetInputSelections,
@@ -35,8 +26,6 @@ interface WorkflowStudioInputSectionEditorProps {
   readonly draftValidationIssues: ReadonlyArray<WorkflowValidationIssue>;
   readonly onUpdateSharedDraft?: (updater: (draft: WorkflowDraft) => WorkflowDraft) => void;
   readonly studioId?: string;
-  readonly routeSearch?: string;
-  readonly onReplaceRouteSearch?: (nextSearch: string) => void;
 }
 
 const inputTypeDefinitions = Object.freeze([
@@ -64,64 +53,31 @@ function buildSectionSummary(count: number, singular: string, plural: string): s
   return count === 1 ? `1 ${singular}` : `${count} ${plural}`;
 }
 
-function sanitizeSearchForReturn(search: string): string {
-  const params = new URLSearchParams(search);
-  params.delete("inlineCreate");
-  params.delete("inlineMode");
-  params.delete("inlineOrigin");
-  params.delete("returnTo");
-  params.delete("returnContextId");
-  params.delete("inlineReturn");
-  params.delete("inlineStatus");
-  params.delete("inlineAssetId");
-  params.delete("inlineVersionId");
-  params.delete("inlineSourceStudioType");
-  params.delete("inlineSourceStudioId");
-  params.set("mode", "wizard");
-  const query = params.toString();
-  return query.length > 0 ? `?${query}` : "";
-}
-
 export default function WorkflowStudioInputSectionEditor({
   sharedDraft,
   draftValidationIssues,
   onUpdateSharedDraft,
   studioId,
-  routeSearch = "",
-  onReplaceRouteSearch,
 }: WorkflowStudioInputSectionEditorProps): JSX.Element {
   const selectorSessionStore = useMemo(() => getAssetSelectorSessionStore(), []);
   const registryService = useMemo(() => new RegistryService(), []);
-  const inlineAssetCreationService = useMemo(() => new InlineAssetCreationService(), []);
-  const selectorDataProvider = useMemo(
-    () => new RegistryAssetSelectorDataProvider({
+  const selectorDataProvider = useMemo(() => new DatasetAssetSelectorAdapter({
       registryService,
-      structuralKinds: ["atomic"],
-      behaviorKinds: ["none"],
       limit: 50,
-    }),
-    [registryService],
-  );
+    }), [registryService]);
   const selectorSessionKey = useMemo(
     () => `workflow-studio:${studioId?.trim() || "default"}:inputs:dataset`,
     [studioId],
   );
   const selectorRequest = useMemo(
-    () => createAssetSelectorRequest({
+    () => createDatasetAssetSelectorRequest({
       requestId: `selector:${selectorSessionKey}`,
-      assetType: "dataset",
-      selectionMode: AssetSelectorSelectionModes.multiSelect,
-      allowedSelectionTypes: [AssetSelectorSelectionTypes.existingAsset, AssetSelectorSelectionTypes.createNewAsset],
-      constraints: {
-        required: false,
-        minSelections: 0,
-      },
-      context: {
-        originatingStudio: "workflow-studio",
-        originatingField: "inputs.dataset",
-        usageContext: AssetSelectorUsageContexts.workflowInput,
-        launchSource: "wizard",
-      },
+      selectionMode: "multi-select",
+      minSelections: 0,
+      required: false,
+      originatingStudio: "workflow-studio",
+      originatingField: "inputs.dataset",
+      launchSource: "wizard",
     }),
     [selectorSessionKey],
   );
@@ -131,6 +87,7 @@ export default function WorkflowStudioInputSectionEditor({
   const [loading, setLoading] = useState(true);
   const [queryError, setQueryError] = useState<string | undefined>(undefined);
   const [queryRevision, setQueryRevision] = useState(0);
+  const [createDatasetStubNotice, setCreateDatasetStubNotice] = useState<string | undefined>(undefined);
   const [selectorState, setSelectorState] = useState<AssetSelectorSessionState | undefined>(
     () => selectorSessionStore.getSession(selectorSessionKey),
   );
@@ -146,33 +103,6 @@ export default function WorkflowStudioInputSectionEditor({
     [draftValidationIssues],
   );
   const sectionHasErrors = datasetValidationIssues.length > 0;
-
-  const inlineReturn = useMemo(
-    () => inlineAssetCreationService.parseInlineReturnFromSearch(routeSearch),
-    [inlineAssetCreationService, routeSearch],
-  );
-
-  const createDatasetLaunchPath = useMemo(() => {
-    const returnTargetPath = `${ROUTE_PATHS.workflowStudioMode.replace(":modeId", "wizard")}${sanitizeSearchForReturn(routeSearch)}#workflow-wizard-inputs`;
-    return inlineAssetCreationService.launch({
-      requestedStudioType: "dataset-studio",
-      requestedRole: "dataset",
-      mode: InlineAssetCreationModes.inlineContext,
-      context: {
-        source: "studio-shell",
-        sourceIntentKey: "create-workflow-input-dataset",
-        sourceIntentLabel: "Create dataset input",
-        sourceMetadata: {
-          sourceStudio: "workflow-studio",
-          sourceSection: "inputs",
-        },
-      },
-      returnTarget: {
-        routePath: returnTargetPath,
-        contextId: studioId,
-      },
-    })?.launchPath;
-  }, [inlineAssetCreationService, routeSearch, studioId]);
 
   useEffect(() => {
     const existing = selectorSessionStore.getSession(selectorSessionKey);
@@ -219,43 +149,6 @@ export default function WorkflowStudioInputSectionEditor({
       active = false;
     };
   }, [queryRevision, searchTerm, selectorDataProvider, selectorRequest]);
-
-  useEffect(() => {
-    if (!inlineReturn) {
-      return;
-    }
-
-    const result = inlineReturn.status === "created" && inlineReturn.assetId
-      ? {
-        kind: AssetSelectorResultKinds.selected as const,
-        selectionType: AssetSelectorSelectionTypes.createNewAsset,
-        assets: [{
-          assetId: inlineReturn.assetId,
-          versionId: inlineReturn.versionId,
-          assetType: "dataset" as const,
-        }],
-      }
-      : {
-        kind: AssetSelectorResultKinds.cancelled as const,
-        reason: "inline-create-cancelled",
-      };
-    selectorSessionStore.handleReturnPayload({
-      sessionKey: selectorSessionKey,
-      result,
-    });
-
-    const nextSearch = inlineAssetCreationService.stripInlineReturnFromSearch(routeSearch);
-    if (nextSearch !== routeSearch) {
-      onReplaceRouteSearch?.(nextSearch);
-    }
-  }, [
-    inlineAssetCreationService,
-    inlineReturn,
-    onReplaceRouteSearch,
-    routeSearch,
-    selectorSessionKey,
-    selectorSessionStore,
-  ]);
 
   useEffect(() => {
     if (!selectorState || !onUpdateSharedDraft) {
@@ -326,14 +219,18 @@ export default function WorkflowStudioInputSectionEditor({
             }}
             onCreateNew={() => {
               selectorSessionStore.transitionToCreatingNew(selectorSessionKey);
-              if (createDatasetLaunchPath && typeof window !== "undefined") {
-                window.location.href = createDatasetLaunchPath;
-              }
+              setCreateDatasetStubNotice("Create new dataset is stubbed in Story 4.5. Studio handoff is implemented in a later story.");
             }}
             onRetry={() => {
               setQueryRevision((current) => current + 1);
             }}
           />
+        ) : null}
+
+        {createDatasetStubNotice ? (
+          <div className="ui-text-small ui-text-secondary" data-testid="workflow-input-dataset-create-stub-notice">
+            {createDatasetStubNotice}
+          </div>
         ) : null}
 
         {otherInputs.length > 0 ? (

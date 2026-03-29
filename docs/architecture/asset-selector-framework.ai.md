@@ -92,6 +92,39 @@ Separation reminder:
 - shell stays presentation-only and asset-type-agnostic
 - fetching goes through provider adapter seam (no hardcoded dataset/agent logic in shell)
 
+## Story 4.5 implemented dataset selector
+- Dataset adapter: `ui/studio-shell/asset-selector/DatasetAssetSelectorAdapter.ts`
+- Workflow integration: `ui/components/studio-shell/workflow/WorkflowStudioInputSectionEditor.tsx`
+
+Implemented behavior:
+- Canonical dataset selector request creation for `usageContext=workflow-input`.
+- Registry query/mapping constrained to dataset taxonomy (`atomic/dataset/none`).
+- Shared shell + shared session store multi-select handling for workflow inputs.
+- Selection propagation into canonical workflow draft dataset inputs through existing workflow draft helpers.
+- Empty/error handling plus filtering of unavailable/deleted rows.
+- Create-new action remains intentionally stubbed in this slice (no studio launch/handoff yet).
+
+## Story 4.6 implemented agent/assistant selector
+- Agent adapter: `ui/studio-shell/asset-selector/AgentAssistantAssetSelectorAdapter.ts`
+- Workflow integration: `ui/components/studio-shell/workflow/WorkflowStudioStepSectionEditor.tsx`
+- Step payload mapping seam: `ui/studio-shell/workflow/WorkflowWizardSteps.ts`
+
+Implemented behavior:
+- Canonical agent selector request creation for `usageContext=workflow-step`.
+- Single-select default for step insertion with multi-select request flexibility retained.
+- Registry query/mapping constrained to agent taxonomy (`composite/agent/autonomous`).
+- Confirmed selections map to step-compatible payload semantics (asset reference + config placeholder) before draft updates.
+- Ordered step insertion/editing compatibility remains intact.
+- Empty/error handling plus filtering of unavailable/deleted or invalid-role rows.
+- Create-new action remains intentionally stubbed in this slice (no studio launch/handoff yet).
+
+## Future asset-type integration pattern
+For new selector types, keep shared shell/session unchanged and add:
+1. A typed adapter in `ui/studio-shell/asset-selector/` (request builder + source mapping).
+2. Capability matrix support in `AssetSelectorCapabilityRegistry`.
+3. Feature-surface integration via shared store + shared shell.
+4. Asset-type logic only in adapters/feature seams, not in shared shell/state infrastructure.
+
 ## Extensibility
 - New usage contexts can be added by registry registration.
 - New allowed asset-type mappings per context are configuration-driven.
