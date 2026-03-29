@@ -7,6 +7,9 @@ import {
   deserializeWorkflowDraft,
   normalizeWorkflowDraft,
   serializeWorkflowDraft,
+  WorkflowDraftInputSourceTypes,
+  WorkflowDraftTriggerKinds,
+  WorkflowDraftTriggerTypes,
   WorkflowStudioIdentity,
 } from "../WorkflowStudioDomain";
 
@@ -21,8 +24,18 @@ describe("WorkflowStudioDomain", () => {
         tags: ["core", "core", "workflow"],
       },
       draft: {
-        triggers: [{ id: "trigger-1", type: "manual" }],
-        inputs: [{ id: "input-1", type: "text" }],
+        triggers: [{
+          id: "trigger-1",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        }],
+        inputs: [{
+          id: "input-1",
+          type: "dataset",
+          sourceType: WorkflowDraftInputSourceTypes.datasetAsset,
+          asset: { assetId: "asset:dataset-1", versionId: "asset:dataset-1:v1" },
+        }],
         steps: [{ id: "step-1", type: "action", order: 1 }],
         outputs: [{ id: "output-1", type: "json" }],
       },
@@ -83,8 +96,22 @@ describe("WorkflowStudioDomain", () => {
 
   it("round-trips canonical workflow draft serialization and deserialization", () => {
     const draft = normalizeWorkflowDraft({
-      triggers: [{ id: "trigger-manual", type: "manual", title: "Manual Start" }],
-      inputs: [{ id: "input-query", type: "text", title: "Query" }],
+      triggers: [{
+        id: "trigger-manual",
+        kind: WorkflowDraftTriggerKinds.user,
+        type: WorkflowDraftTriggerTypes.userManual,
+        title: "Manual Start",
+        config: {
+          requiresConfirmation: true,
+        },
+      }],
+      inputs: [{
+        id: "input-query",
+        type: "dataset",
+        sourceType: WorkflowDraftInputSourceTypes.datasetAsset,
+        title: "Query Dataset",
+        asset: { assetId: "asset:dataset-query", versionId: "asset:dataset-query:v2" },
+      }],
       steps: [{ id: "step-run", type: "run-tool", order: 1, dependsOnStepIds: [] }],
       outputs: [{ id: "output-result", type: "text" }],
     });
@@ -93,6 +120,193 @@ describe("WorkflowStudioDomain", () => {
     const rehydrated = deserializeWorkflowDraft(serialized);
 
     expect(rehydrated).toEqual(draft);
+  });
+
+  it("accepts canonical trigger entries for user, temporal, and state trigger kinds", () => {
+    const normalized = normalizeWorkflowDraft({
+      triggers: [
+        {
+          id: "trigger-user",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userButtonClick,
+          config: {
+            buttonId: "run-now",
+            requiresConfirmation: true,
+            allowedRoles: ["editor", "editor", "owner"],
+          },
+        },
+        {
+          id: "trigger-temporal",
+          kind: WorkflowDraftTriggerKinds.temporal,
+          type: WorkflowDraftTriggerTypes.temporalRecurring,
+          config: {
+            every: 6,
+            unit: "hours",
+            timezone: "America/New_York",
+          },
+        },
+        {
+          id: "trigger-state",
+          kind: WorkflowDraftTriggerKinds.state,
+          type: WorkflowDraftTriggerTypes.stateAssetStateChanged,
+          config: {
+            asset: { assetId: "asset:dataset-training", versionId: "asset:dataset-training:v3" },
+            stateKey: "status",
+            stateValue: "ready",
+          },
+        },
+      ],
+      inputs: [],
+      steps: [],
+      outputs: [],
+    });
+
+    expect(normalized.triggers).toHaveLength(3);
+    expect(normalized.triggers[0]).toMatchObject({
+      kind: "user",
+      type: "button-click",
+      config: {
+        buttonId: "run-now",
+        requiresConfirmation: true,
+        allowedRoles: ["editor", "owner"],
+      },
+    });
+    expect(normalized.triggers[1]).toMatchObject({
+      kind: "temporal",
+      type: "recurring",
+      config: { every: 6, unit: "hours", timezone: "America/New_York" },
+    });
+    expect(normalized.triggers[2]).toMatchObject({
+      kind: "state",
+      type: "asset-state-changed",
+      config: {
+        asset: { assetId: "asset:dataset-training", versionId: "asset:dataset-training:v3" },
+        stateKey: "status",
+        stateValue: "ready",
+      },
+    });
+  });
+
+  it("rejects invalid trigger kind/type/config combinations", () => {
+    expect(() => normalizeWorkflowDraft({
+      triggers: [{
+        id: "trigger-invalid-kind",
+        kind: "temporal" as "temporal",
+        type: WorkflowDraftTriggerTypes.userManual,
+        config: {},
+      }],
+      inputs: [],
+      steps: [],
+      outputs: [],
+    })).toThrow("not valid for kind 'temporal'");
+
+    expect(() => normalizeWorkflowDraft({
+      triggers: [{
+        id: "trigger-invalid-temporal-config",
+        kind: WorkflowDraftTriggerKinds.temporal,
+        type: WorkflowDraftTriggerTypes.temporalSchedule,
+        config: {},
+      }],
+      inputs: [],
+      steps: [],
+      outputs: [],
+    })).toThrow("requires config.cronExpression");
+
+    expect(() => normalizeWorkflowDraft({
+      triggers: [{
+        id: "trigger-invalid-state-config",
+        kind: WorkflowDraftTriggerKinds.state,
+        type: WorkflowDraftTriggerTypes.stateSystemEvent,
+        config: { eventName: " " },
+      }],
+      inputs: [],
+      steps: [],
+      outputs: [],
+    })).toThrow("requires config.eventName");
+  });
+
+  it("accepts one or more canonical workflow inputs with dataset-backed asset references", () => {
+    const normalized = normalizeWorkflowDraft({
+      triggers: [],
+      inputs: [
+        {
+          id: "input-dataset",
+          type: "dataset",
+          sourceType: WorkflowDraftInputSourceTypes.datasetAsset,
+          required: true,
+          valueType: "object",
+          asset: { assetId: "asset:dataset-customers", versionId: "asset:dataset-customers:v4" },
+          format: "jsonl",
+          selection: {
+            split: "train",
+            query: "region = 'east'",
+            fields: ["name", "email", "name"],
+            limit: 500,
+          },
+        },
+        {
+          id: "input-runtime",
+          type: "parameter",
+          sourceType: WorkflowDraftInputSourceTypes.runtimeParameter,
+          parameterKey: "customerSegment",
+          valueType: "string",
+          defaultValue: "enterprise",
+        },
+      ],
+      steps: [],
+      outputs: [],
+    });
+
+    expect(normalized.inputs).toHaveLength(2);
+    expect(normalized.inputs[0]).toMatchObject({
+      sourceType: "dataset-asset",
+      asset: { assetId: "asset:dataset-customers", versionId: "asset:dataset-customers:v4" },
+      selection: { split: "train", query: "region = 'east'", fields: ["name", "email"], limit: 500 },
+    });
+    expect(normalized.inputs[1]).toMatchObject({
+      sourceType: "runtime-parameter",
+      parameterKey: "customerSegment",
+      defaultValue: "enterprise",
+    });
+  });
+
+  it("rejects malformed workflow input structures", () => {
+    expect(() => normalizeWorkflowDraft({
+      triggers: [],
+      inputs: [{
+        id: "input-invalid-source",
+        type: "dataset",
+        sourceType: "file-upload" as "dataset-asset",
+        asset: { assetId: "asset:dataset-1" },
+      }],
+      steps: [],
+      outputs: [],
+    })).toThrow("source type 'file-upload' is not supported");
+
+    expect(() => normalizeWorkflowDraft({
+      triggers: [],
+      inputs: [{
+        id: "input-invalid-dataset-format",
+        type: "dataset",
+        sourceType: WorkflowDraftInputSourceTypes.datasetAsset,
+        asset: { assetId: "asset:dataset-1" },
+        format: "yaml" as "json",
+      }],
+      steps: [],
+      outputs: [],
+    })).toThrow("format 'yaml' is not supported");
+
+    expect(() => normalizeWorkflowDraft({
+      triggers: [],
+      inputs: [{
+        id: "input-invalid-runtime-parameter",
+        type: "parameter",
+        sourceType: WorkflowDraftInputSourceTypes.runtimeParameter,
+        parameterKey: " ",
+      }],
+      steps: [],
+      outputs: [],
+    })).toThrow("parameterKey is required");
   });
 
   it("creates composite workflow taxonomy with deterministic default behavior", () => {
