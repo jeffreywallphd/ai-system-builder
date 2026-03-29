@@ -55,6 +55,7 @@ export const InlineAssetReturnStatuses = Object.freeze({
   created: "created",
   cancelled: "cancelled",
   noSelection: "no-selection",
+  abandoned: "abandoned",
 });
 
 export type InlineAssetReturnStatus = typeof InlineAssetReturnStatuses[keyof typeof InlineAssetReturnStatuses];
@@ -68,6 +69,7 @@ export interface InlineAssetReturnPayload {
   readonly sourceStudioType?: string;
   readonly sourceStudioId?: string;
   readonly returnContextId?: string;
+  readonly handoffId?: string;
 }
 
 export interface InlineAssetSelectorLaunchContext {
@@ -136,6 +138,7 @@ function parseInlineReturnStatus(value?: string | null): InlineAssetReturnStatus
     value === InlineAssetReturnStatuses.created
     || value === InlineAssetReturnStatuses.cancelled
     || value === InlineAssetReturnStatuses.noSelection
+    || value === InlineAssetReturnStatuses.abandoned
   ) {
     return value;
   }
@@ -248,6 +251,11 @@ export class InlineAssetCreationService {
     if (returnContextId) {
       params.set("returnContextId", returnContextId);
     }
+    if (input.payload.handoffId?.trim()) {
+      params.set("inlineHandoffId", input.payload.handoffId.trim());
+    } else {
+      params.delete("inlineHandoffId");
+    }
     if (input.returnTarget.parentAssetId?.trim()) {
       params.set("parentAssetId", input.returnTarget.parentAssetId.trim());
     }
@@ -283,6 +291,7 @@ export class InlineAssetCreationService {
       sourceStudioType: params.get("inlineSourceStudioType")?.trim() || undefined,
       sourceStudioId: params.get("inlineSourceStudioId")?.trim() || undefined,
       returnContextId: params.get("returnContextId")?.trim() || undefined,
+      handoffId: params.get("inlineHandoffId")?.trim() || undefined,
     });
   }
 
@@ -333,6 +342,7 @@ export class InlineAssetCreationService {
     params.delete("inlineDisplayName");
     params.delete("inlineSourceStudioType");
     params.delete("inlineSourceStudioId");
+    params.delete("inlineHandoffId");
     const next = params.toString();
     return next ? `?${next}` : "";
   }

@@ -94,6 +94,7 @@ describe("InlineAssetCreationService", () => {
         displayName: "New dataset",
         sourceStudioType: "dataset-studio",
         sourceStudioId: "studio-datasets",
+        handoffId: "handoff:inline-return:1",
       },
     });
     const parsedWithAsset = service.parseInlineReturnFromSearch(withAsset.split("?")[1] ? `?${withAsset.split("?")[1]?.split("#")[0]}` : "");
@@ -106,6 +107,7 @@ describe("InlineAssetCreationService", () => {
       sourceStudioType: "dataset-studio",
       sourceStudioId: "studio-datasets",
       returnContextId: "workflow-studio",
+      handoffId: "handoff:inline-return:1",
     });
 
     const cancelled = service.buildReturnPath({
@@ -126,17 +128,32 @@ describe("InlineAssetCreationService", () => {
       },
       payload: {
         status: InlineAssetReturnStatuses.noSelection,
+        handoffId: "handoff:inline-return:2",
       },
     });
     const parsedNoSelection = service.parseInlineReturnFromSearch(`?${noSelection.split("?")[1]}`);
     expect(parsedNoSelection?.status).toBe("no-selection");
     expect(parsedNoSelection?.assetId).toBeUndefined();
+    expect(parsedNoSelection?.handoffId).toBe("handoff:inline-return:2");
+
+    const abandoned = service.buildReturnPath({
+      returnTarget: {
+        routePath: "/studio-shell/workflow/wizard?mode=wizard",
+      },
+      payload: {
+        status: InlineAssetReturnStatuses.abandoned,
+        handoffId: "handoff:inline-return:3",
+      },
+    });
+    const parsedAbandoned = service.parseInlineReturnFromSearch(`?${abandoned.split("?")[1]}`);
+    expect(parsedAbandoned?.status).toBe("abandoned");
+    expect(parsedAbandoned?.handoffId).toBe("handoff:inline-return:3");
   });
 
   it("strips one-time inline return params while preserving other query values", () => {
     const service = new InlineAssetCreationService();
     const stripped = service.stripInlineReturnFromSearch(
-      "?mode=wizard&inlineReturn=1&inlineStatus=created&inlineAssetId=asset:dataset&inlineVersionId=v1&assetId=asset:workflow",
+      "?mode=wizard&inlineReturn=1&inlineStatus=created&inlineAssetId=asset:dataset&inlineVersionId=v1&inlineHandoffId=handoff:1&assetId=asset:workflow",
     );
     expect(stripped).toBe("?mode=wizard&assetId=asset%3Aworkflow");
   });

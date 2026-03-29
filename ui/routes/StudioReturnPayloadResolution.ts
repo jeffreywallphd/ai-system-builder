@@ -11,6 +11,7 @@ export const StudioReturnPayloadResolutionKinds = Object.freeze({
   created: "created",
   cancelled: "cancelled",
   noSelection: "no-selection",
+  abandoned: "abandoned",
   invalid: "invalid",
 });
 
@@ -31,6 +32,7 @@ export interface StudioReturnPayloadResolution {
   readonly selectorTargetId?: string;
   readonly originatingField?: string;
   readonly usageContext?: string;
+  readonly handoffId?: string;
   readonly returnedAsset?: AssetSelectorAssetReference;
   readonly issues: ReadonlyArray<StudioReturnPayloadResolutionIssue>;
 }
@@ -51,6 +53,13 @@ function resolveSelectorSessionId(
     || handoff?.target.selector.selectorSessionId?.trim()
     || handoff?.returnContract.target.contextId?.trim()
     || undefined;
+}
+
+function resolveHandoffId(
+  payload: InlineAssetReturnPayload,
+  handoff?: StudioLaunchHandoffContract,
+): string | undefined {
+  return payload.handoffId?.trim() || handoff?.launch.handoffId?.trim() || undefined;
 }
 
 export class StudioReturnPayloadResolver {
@@ -78,6 +87,25 @@ export class StudioReturnPayloadResolver {
     const selectorTargetId = handoff?.target.selector.selectorTargetId;
     const originatingField = handoff?.target.selector.originatingField;
     const usageContext = handoff?.target.selector.usageContext;
+    const handoffId = resolveHandoffId(payload, handoff);
+
+    if (payload.handoffId?.trim() && handoff?.launch.handoffId?.trim() && payload.handoffId.trim() !== handoff.launch.handoffId.trim()) {
+      return Object.freeze({
+        handled: true,
+        kind: StudioReturnPayloadResolutionKinds.invalid,
+        payload,
+        handoff,
+        selectorSessionId,
+        selectorTargetId,
+        originatingField,
+        usageContext,
+        handoffId,
+        issues: Object.freeze([Object.freeze({
+          message: "Returned selector payload handoff id does not match the canonical studio handoff id.",
+          path: "inlineHandoffId",
+        })]),
+      });
+    }
 
     if (payload.status === InlineAssetReturnStatuses.cancelled) {
       return Object.freeze({
@@ -89,6 +117,7 @@ export class StudioReturnPayloadResolver {
         selectorTargetId,
         originatingField,
         usageContext,
+        handoffId,
         issues: Object.freeze([]),
       });
     }
@@ -103,6 +132,22 @@ export class StudioReturnPayloadResolver {
         selectorTargetId,
         originatingField,
         usageContext,
+        handoffId,
+        issues: Object.freeze([]),
+      });
+    }
+
+    if (payload.status === InlineAssetReturnStatuses.abandoned) {
+      return Object.freeze({
+        handled: true,
+        kind: StudioReturnPayloadResolutionKinds.abandoned,
+        payload,
+        handoff,
+        selectorSessionId,
+        selectorTargetId,
+        originatingField,
+        usageContext,
+        handoffId,
         issues: Object.freeze([]),
       });
     }
@@ -137,6 +182,7 @@ export class StudioReturnPayloadResolver {
         selectorTargetId,
         originatingField,
         usageContext,
+        handoffId,
         issues: Object.freeze(issues),
       });
     }
@@ -150,6 +196,7 @@ export class StudioReturnPayloadResolver {
       selectorTargetId,
       originatingField,
       usageContext,
+      handoffId,
       returnedAsset: Object.freeze({
         assetId: payload.assetId as string,
         versionId: payload.versionId,

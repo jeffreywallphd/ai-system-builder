@@ -30,5 +30,6 @@ describe("WorkflowStudioInputSectionEditor", () => {
     expect(source).toContain("expectedSelectorTargetId: datasetSelectorTargetId");
     expect(source).toContain('expectedOriginatingField: datasetSelectorOriginatingField');
     expect(source).toContain('expectedUsageContext: "workflow-input"');
+    expect(source).toContain("launchHandoffId: launch.studioHandoff?.launch.handoffId");
   });
 });

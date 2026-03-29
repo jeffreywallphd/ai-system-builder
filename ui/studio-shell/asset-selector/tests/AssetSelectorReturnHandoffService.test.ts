@@ -45,11 +45,12 @@ describe("AssetSelectorReturnHandoffService", () => {
       originatingContext: request.context,
       requestedAssetType: "dataset",
       returnTargetSessionKey: "selector:inputs",
+      launchHandoffId: "handoff:return:created",
     });
 
     const service = new AssetSelectorReturnHandoffService();
     const outcome = service.handle({
-      search: "?inlineReturn=1&inlineStatus=created&inlineAssetId=asset:dataset:new&inlineAssetType=dataset&inlineDisplayName=New%20dataset&returnContextId=selector:inputs",
+      search: "?inlineReturn=1&inlineStatus=created&inlineAssetId=asset:dataset:new&inlineAssetType=dataset&inlineDisplayName=New%20dataset&returnContextId=selector:inputs&inlineHandoffId=handoff:return:created",
       sessionKey: "selector:inputs",
       request,
       sessionStore: store,
@@ -75,11 +76,12 @@ describe("AssetSelectorReturnHandoffService", () => {
       originatingContext: request.context,
       requestedAssetType: "dataset",
       returnTargetSessionKey: "selector:inputs",
+      launchHandoffId: "handoff:return:malformed",
     });
 
     const service = new AssetSelectorReturnHandoffService();
     service.handle({
-      search: "?inlineReturn=1&inlineStatus=created&inlineAssetId=asset:dataset:new&returnContextId=selector:inputs",
+      search: "?inlineReturn=1&inlineStatus=created&inlineAssetId=asset:dataset:new&returnContextId=selector:inputs&inlineHandoffId=handoff:return:malformed",
       sessionKey: "selector:inputs",
       request,
       sessionStore: store,
@@ -102,11 +104,12 @@ describe("AssetSelectorReturnHandoffService", () => {
       originatingContext: request.context,
       requestedAssetType: "dataset",
       returnTargetSessionKey: "selector:inputs",
+      launchHandoffId: "handoff:return:mismatched-type",
     });
 
     const service = new AssetSelectorReturnHandoffService();
     service.handle({
-      search: "?inlineReturn=1&inlineStatus=created&inlineAssetId=asset:agent:new&inlineAssetType=agent&returnContextId=selector:inputs",
+      search: "?inlineReturn=1&inlineStatus=created&inlineAssetId=asset:agent:new&inlineAssetType=agent&returnContextId=selector:inputs&inlineHandoffId=handoff:return:mismatched-type",
       sessionKey: "selector:inputs",
       request,
       sessionStore: store,
@@ -182,11 +185,12 @@ describe("AssetSelectorReturnHandoffService", () => {
       originatingContext: request.context,
       requestedAssetType: "dataset",
       returnTargetSessionKey: "selector:inputs",
+      launchHandoffId: "handoff:return:no-selection",
     });
 
     const service = new AssetSelectorReturnHandoffService();
     const outcome = service.handle({
-      search: "?inlineReturn=1&inlineStatus=no-selection&returnContextId=selector:inputs",
+      search: "?inlineReturn=1&inlineStatus=no-selection&returnContextId=selector:inputs&inlineHandoffId=handoff:return:no-selection",
       sessionKey: "selector:inputs",
       request,
       sessionStore: store,
@@ -214,6 +218,7 @@ describe("AssetSelectorReturnHandoffService", () => {
       originatingContext: request.context,
       requestedAssetType: "dataset",
       returnTargetSessionKey: "selector:inputs",
+      launchHandoffId: "handoff:return:wrong-target",
     });
 
     const inlineCreationService = new InlineAssetCreationService();
@@ -266,5 +271,72 @@ describe("AssetSelectorReturnHandoffService", () => {
     expect(outcome.nextSearch).toBe("");
     expect(store.getSession("selector:inputs")?.selectedAssets.map((entry) => entry.assetId)).toEqual(["asset:dataset:existing"]);
     expect(store.getSession("selector:inputs")?.validationErrors.length).toBeGreaterThan(0);
+  });
+
+  it("ignores created returns with stale handoff ids so repeated launches do not collide", () => {
+    const store = new AssetSelectorSessionStore();
+    const request = createRequest("dataset", AssetSelectorUsageContexts.workflowInput);
+    store.prepareSession({
+      sessionKey: "selector:inputs",
+      request,
+      initialSelectedAssets: [{
+        assetId: "asset:dataset:existing",
+        assetType: "dataset",
+      }],
+    });
+    store.activateSession("selector:inputs");
+    store.transitionToCreatingNew("selector:inputs", {
+      originatingContext: request.context,
+      requestedAssetType: "dataset",
+      returnTargetSessionKey: "selector:inputs",
+      launchHandoffId: "handoff:return:latest",
+    });
+
+    const service = new AssetSelectorReturnHandoffService();
+    const outcome = service.handle({
+      search: "?inlineReturn=1&inlineStatus=created&inlineAssetId=asset:dataset:stale&inlineAssetType=dataset&returnContextId=selector:inputs&inlineHandoffId=handoff:return:stale",
+      sessionKey: "selector:inputs",
+      request,
+      sessionStore: store,
+    });
+
+    expect(outcome.handled).toBeTrue();
+    expect(outcome.returnedAsset).toBeUndefined();
+    expect(store.getSession("selector:inputs")?.selectedAssets.map((entry) => entry.assetId)).toEqual(["asset:dataset:existing"]);
+    expect(store.getSession("selector:inputs")?.validationErrors[0]?.code).toBe("return-payload-invalid");
+  });
+
+  it("treats abandoned returns as non-destructive no-op outcomes", () => {
+    const store = new AssetSelectorSessionStore();
+    const request = createRequest("agent", AssetSelectorUsageContexts.workflowStep);
+    store.prepareSession({
+      sessionKey: "selector:steps",
+      request,
+      initialSelectedAssets: [{
+        assetId: "asset:agent:existing",
+        assetType: "agent",
+      }],
+    });
+    store.activateSession("selector:steps");
+    store.transitionToCreatingNew("selector:steps", {
+      originatingContext: request.context,
+      requestedAssetType: "agent",
+      returnTargetSessionKey: "selector:steps",
+      launchHandoffId: "handoff:return:abandoned",
+    });
+
+    const service = new AssetSelectorReturnHandoffService();
+    const outcome = service.handle({
+      search: "?inlineReturn=1&inlineStatus=abandoned&returnContextId=selector:steps&inlineHandoffId=handoff:return:abandoned",
+      sessionKey: "selector:steps",
+      request,
+      sessionStore: store,
+    });
+
+    expect(outcome.handled).toBeTrue();
+    expect(outcome.outcomeKind).toBe("abandoned");
+    expect(outcome.returnedAsset).toBeUndefined();
+    expect(store.getSession("selector:steps")?.selectedAssets.map((entry) => entry.assetId)).toEqual(["asset:agent:existing"]);
+    expect(store.getSession("selector:steps")?.lifecycleState).toBe("active");
   });
 });

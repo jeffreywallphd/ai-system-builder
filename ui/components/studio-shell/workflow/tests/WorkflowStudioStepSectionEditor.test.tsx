@@ -31,6 +31,7 @@ describe("WorkflowStudioStepSectionEditor", () => {
     expect(source).toContain("expectedOriginatingField: stepSelectorOriginatingField");
     expect(source).toContain("expectedUsageContext: stepSelectorUsageContext");
     expect(source).toContain("expectedSelectorTargetId: expectedOperation ? buildStepSelectorTargetId(expectedOperation) : undefined");
+    expect(source).toContain("launchHandoffId: launch.studioHandoff?.launch.handoffId");
   });
 });
 

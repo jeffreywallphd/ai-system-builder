@@ -27,6 +27,7 @@ export const StudioLaunchHandoffOutcomeKinds = Object.freeze({
   created: "created",
   cancelled: "cancelled",
   noSelection: "no-selection",
+  abandoned: "abandoned",
 });
 
 export type StudioLaunchHandoffOutcomeKind =
@@ -141,6 +142,7 @@ function normalizeOutcomes(
     normalized.add(StudioLaunchHandoffOutcomeKinds.created);
     normalized.add(StudioLaunchHandoffOutcomeKinds.cancelled);
     normalized.add(StudioLaunchHandoffOutcomeKinds.noSelection);
+    normalized.add(StudioLaunchHandoffOutcomeKinds.abandoned);
   }
   return Object.freeze([...normalized.values()]);
 }

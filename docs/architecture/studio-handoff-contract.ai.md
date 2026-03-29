@@ -52,6 +52,7 @@ Primary call path:
   - `created`
   - `cancelled`
   - `no-selection`
+  - `abandoned`
 - Resume destination is explicit:
   - `resume.destinationRoutePath`
 - Legacy inline return/search semantics are preserved; contract support is additive and backward-compatible.
@@ -59,7 +60,7 @@ Primary call path:
 ## Story 5.3 return payload resolution layer
 - Return payload handling now flows through `StudioReturnPayloadResolver`:
   - parse + validate inline return payload shape
-  - discriminate typed outcome (`created`/`cancelled`/`no-selection`/`invalid`)
+  - discriminate typed outcome (`created`/`cancelled`/`no-selection`/`abandoned`/`invalid`)
   - project selector target context (`selectorSessionId`, `originatingField`, `selectorTargetId`) from canonical handoff when present
 - `AssetSelectorReturnHandoffService` now consumes that resolver so feature surfaces no longer implement hand-written query validation logic.
 
@@ -90,6 +91,17 @@ Primary call path:
 - Workflow session resume remains aligned with Story 5.4:
   - mode/draft restoration via `WorkflowStudioReturnRestorationService`,
   - in-progress draft persistence via `WorkflowStudioModeStateStore`.
+
+## Stories 5.9 / 5.10 cancel/back/abandon + multi-session safety hardening
+- The canonical return lifecycle now includes an explicit `abandoned` outcome in both handoff outcomes and inline return payload status parsing.
+- Inline returns now carry `inlineHandoffId` correlation metadata, and resolver validation rejects payloads where inline handoff id conflicts with canonical `studioHandoff.launch.handoffId`.
+- Selector sessions now track the active launch handoff id (`creatingNewContext.launchHandoffId`) and enforce correlation on return:
+  - stale or mismatched handoff returns are consumed and ignored safely (no workflow draft mutation),
+  - cancellation-like outcomes (`cancelled`, `no-selection`, `abandoned`) resume selector sessions without mutating selected assets,
+  - created returns only apply when lifecycle + handoff correlation are valid for the active launch.
+- Workflow origin restoration now guards against stale reentry:
+  - if handoff draft reference conflicts with current workflow draft sync context, restoration is ignored (`draft-context-mismatch`) instead of overwriting active authoring state.
+- Workflow dataset and step selectors pass launch handoff id into session launch context so concurrent/repeated launches from the same selector session remain distinguishable and collision-safe.
 
 ## Backward compatibility
 - Legacy selector launch params still parse as before.
