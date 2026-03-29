@@ -19,15 +19,17 @@ describe("WorkflowStudioDraftAuthoringBoundary", () => {
           draftEditorContent: serializeWorkflowDraft(draft),
           modeValidationIssues: [],
           draftValidationIssues: [],
-          updateSharedDraft: () => undefined,
         }}
       />,
     );
 
     expect(html).toContain('data-testid="workflow-studio-wizard-mode-layout"');
     expect(html).toContain('data-testid="workflow-studio-wizard-mode-surface"');
-    expect(html).toContain("Wizard layout container");
-    expect(html).toContain("Add trigger");
+    expect(html).toContain("Workflow wizard layout");
+    expect(html).toContain("Trigger Section");
+    expect(html).toContain("Inputs Section");
+    expect(html).toContain("Steps Section");
+    expect(html).toContain("Outputs Section");
     expect(html).not.toContain('data-testid="workflow-studio-canvas-mode-layout"');
     expect(html).not.toContain('data-testid="workflow-studio-canvas-mode-surface"');
   });
@@ -46,7 +48,6 @@ describe("WorkflowStudioDraftAuthoringBoundary", () => {
           draftEditorContent: serializeWorkflowDraft(draft),
           modeValidationIssues: [],
           draftValidationIssues: [],
-          updateSharedDraft: () => undefined,
         }}
       />,
     );
@@ -73,7 +74,6 @@ describe("WorkflowStudioDraftAuthoringBoundary", () => {
           draftEditorContent: serializeWorkflowDraft(draft),
           modeValidationIssues: [],
           draftValidationIssues: [],
-          updateSharedDraft: () => undefined,
         }}
       />,
     );
@@ -107,7 +107,6 @@ describe("WorkflowStudioDraftAuthoringBoundary", () => {
             severity: "error",
             message: "step order mismatch",
           }],
-          updateSharedDraft: () => undefined,
         }}
       />,
     );

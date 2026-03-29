@@ -17,7 +17,7 @@ function renderModeSurface(modeId: WorkflowStudioModeId): JSX.Element {
   if (modeId === "wizard") {
     return (
       <p className="ui-text-muted">
-        Wizard mode is registered and uses the shared canonical workflow draft; follow-up stories can layer guided step UX on top of this state.
+        Wizard mode uses the structured Trigger, Inputs, Steps, and Outputs layout over the shared canonical workflow draft.
       </p>
     );
   }
