@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   createDefaultWorkflowStudioModeRegistry,
+  DEFAULT_WORKFLOW_STUDIO_MODE_ID,
   defaultWorkflowStudioModes,
   WorkflowStudioModeIds,
   WorkflowStudioModeRegistry,
@@ -16,6 +17,7 @@ describe("WorkflowStudioModes", () => {
     ]);
     expect(registry.get(WorkflowStudioModeIds.canvas)?.intent).toBe("graph-authoring");
     expect(registry.get(WorkflowStudioModeIds.wizard)?.intent).toBe("guided-authoring");
+    expect(DEFAULT_WORKFLOW_STUDIO_MODE_ID).toBe(WorkflowStudioModeIds.canvas);
   });
 
   it("supports explicit registry extension while preventing duplicate mode ids", () => {

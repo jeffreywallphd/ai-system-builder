@@ -4,6 +4,7 @@ export const WorkflowStudioModeIds = Object.freeze({
 });
 
 export type WorkflowStudioModeId = typeof WorkflowStudioModeIds[keyof typeof WorkflowStudioModeIds];
+export const DEFAULT_WORKFLOW_STUDIO_MODE_ID: WorkflowStudioModeId = WorkflowStudioModeIds.canvas;
 
 export interface WorkflowStudioModeDefinition {
   readonly id: WorkflowStudioModeId;

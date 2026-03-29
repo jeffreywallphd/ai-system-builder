@@ -16,7 +16,7 @@ describe("StudioShellPage contracts", () => {
     expect(source).toContain("Lifecycle / publish / version status");
     expect(source).toContain("StudioShellValidationIssuesPanel");
     expect(source).toContain("StudioShellExtensionRegistry");
-    expect(source).toContain("WorkflowStudioModeStateStore");
+    expect(source).toContain("getWorkflowStudioModeStateStore");
     expect(source).toContain("WorkflowStudioDraftAuthoringBoundary");
     expect(source).toContain("workflowModeRoute");
     expect(source).toContain("workflowModeState");

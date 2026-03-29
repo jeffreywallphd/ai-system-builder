@@ -6,10 +6,17 @@ import {
 } from "../../../domain/workflow-studio/WorkflowStudioDomain";
 import {
   createDefaultWorkflowStudioModeRegistry,
-  WorkflowStudioModeIds,
+  DEFAULT_WORKFLOW_STUDIO_MODE_ID,
   type WorkflowStudioModeDefinition,
   type WorkflowStudioModeId,
 } from "./WorkflowStudioModes";
+
+export interface WorkflowStudioDraftSyncContext {
+  readonly studioId: string;
+  readonly sessionId?: string;
+  readonly draftId?: string;
+  readonly revision?: number;
+}
 
 export interface WorkflowStudioModeState {
   readonly availableModes: ReadonlyArray<WorkflowStudioModeDefinition>;
@@ -19,6 +26,8 @@ export interface WorkflowStudioModeState {
   readonly sharedDraftSerialized: string;
   readonly draftEditorContent: string;
   readonly draftParseError?: string;
+  readonly draftSyncContext?: WorkflowStudioDraftSyncContext;
+  readonly hasLocalDraftEdits: boolean;
 }
 
 export type WorkflowStudioModeStateListener = (state: WorkflowStudioModeState) => void;
@@ -28,7 +37,8 @@ const defaultModeRegistry = createDefaultWorkflowStudioModeRegistry();
 function buildInitialState(): WorkflowStudioModeState {
   const availableModes = defaultModeRegistry.list();
   const defaultDraft = createEmptyWorkflowDraft();
-  const selectedMode = defaultModeRegistry.get(WorkflowStudioModeIds.canvas) ?? availableModes[0];
+  const selectedMode = defaultModeRegistry.get(DEFAULT_WORKFLOW_STUDIO_MODE_ID) ?? availableModes[0];
+  const serializedDefaultDraft = serializeWorkflowDraft(defaultDraft);
 
   if (!selectedMode) {
     throw new Error("Workflow studio mode registry must include at least one mode.");
@@ -39,9 +49,11 @@ function buildInitialState(): WorkflowStudioModeState {
     selectedModeId: selectedMode.id,
     selectedMode,
     sharedDraft: defaultDraft,
-    sharedDraftSerialized: serializeWorkflowDraft(defaultDraft),
-    draftEditorContent: serializeWorkflowDraft(defaultDraft),
+    sharedDraftSerialized: serializedDefaultDraft,
+    draftEditorContent: serializedDefaultDraft,
     draftParseError: undefined,
+    draftSyncContext: undefined,
+    hasLocalDraftEdits: false,
   });
 }
 
@@ -92,12 +104,35 @@ export class WorkflowStudioModeStateStore {
   }
 
   public replaceSharedDraft(sharedDraft: WorkflowDraft): void {
-    const serialized = serializeWorkflowDraft(sharedDraft);
+    this.replaceSharedDraftWithSerialized(sharedDraft, undefined, true);
+  }
+
+  public synchronizeSharedDraftFromSnapshot(input: {
+    readonly serializedDraft: string;
+    readonly context: WorkflowStudioDraftSyncContext;
+  }): void {
+    const snapshotSerializedDraft = input.serializedDraft;
+    const contextChanged = !this.isSameDraftSyncContext(input.context, this.state.draftSyncContext);
+    const snapshotMatchesLocal = snapshotSerializedDraft === this.state.draftEditorContent
+      || snapshotSerializedDraft === this.state.sharedDraftSerialized;
+
+    if (contextChanged || snapshotMatchesLocal || !this.state.hasLocalDraftEdits) {
+      try {
+        const sharedDraft = deserializeWorkflowDraft(snapshotSerializedDraft);
+        this.replaceSharedDraftWithSerialized(sharedDraft, snapshotSerializedDraft, false, input.context);
+      } catch (error) {
+        this.patch({
+          draftEditorContent: snapshotSerializedDraft,
+          draftParseError: error instanceof Error ? error.message : "Workflow draft is malformed.",
+          hasLocalDraftEdits: true,
+          draftSyncContext: input.context,
+        });
+      }
+      return;
+    }
+
     this.patch({
-      sharedDraft: deserializeWorkflowDraft(serialized),
-      sharedDraftSerialized: serialized,
-      draftEditorContent: serialized,
-      draftParseError: undefined,
+      draftSyncContext: input.context,
     });
   }
 
@@ -108,19 +143,41 @@ export class WorkflowStudioModeStateStore {
   public hydrateFromSerializedDraft(serializedDraft: string): void {
     try {
       const sharedDraft = deserializeWorkflowDraft(serializedDraft);
-      this.patch({
-        sharedDraft,
-        sharedDraftSerialized: serializeWorkflowDraft(sharedDraft),
-        draftEditorContent: serializedDraft,
-        draftParseError: undefined,
-      });
+      this.replaceSharedDraftWithSerialized(sharedDraft, serializedDraft, true);
       return;
     } catch (error) {
       this.patch({
         draftEditorContent: serializedDraft,
         draftParseError: error instanceof Error ? error.message : "Workflow draft is malformed.",
+        hasLocalDraftEdits: true,
       });
     }
+  }
+
+  private replaceSharedDraftWithSerialized(
+    sharedDraft: WorkflowDraft,
+    serializedDraft?: string,
+    hasLocalDraftEdits = true,
+    draftSyncContext?: WorkflowStudioDraftSyncContext,
+  ): void {
+    const serialized = serializeWorkflowDraft(sharedDraft);
+    this.patch({
+      sharedDraft: deserializeWorkflowDraft(serialized),
+      sharedDraftSerialized: serialized,
+      draftEditorContent: serializedDraft ?? serialized,
+      draftParseError: undefined,
+      hasLocalDraftEdits,
+      draftSyncContext: draftSyncContext ?? this.state.draftSyncContext,
+    });
+  }
+
+  private isSameDraftSyncContext(
+    left: WorkflowStudioDraftSyncContext,
+    right?: WorkflowStudioDraftSyncContext,
+  ): boolean {
+    return left.studioId === right?.studioId
+      && left.sessionId === right.sessionId
+      && left.draftId === right.draftId;
   }
 
   private patch(patch: Partial<WorkflowStudioModeState>): void {
@@ -133,4 +190,21 @@ export class WorkflowStudioModeStateStore {
       listener(this.state);
     }
   }
+}
+
+const workflowModeStoresByStudioId = new Map<string, WorkflowStudioModeStateStore>();
+
+export function getWorkflowStudioModeStateStore(studioId: string): WorkflowStudioModeStateStore {
+  const existing = workflowModeStoresByStudioId.get(studioId);
+  if (existing) {
+    return existing;
+  }
+
+  const created = new WorkflowStudioModeStateStore();
+  workflowModeStoresByStudioId.set(studioId, created);
+  return created;
+}
+
+export function clearWorkflowStudioModeStateStoresForTests(): void {
+  workflowModeStoresByStudioId.clear();
 }
