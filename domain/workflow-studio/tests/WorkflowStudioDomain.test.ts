@@ -5,8 +5,12 @@ import {
   createWorkflowAssetMetadata,
   createWorkflowStudioTaxonomy,
   deserializeWorkflowDraft,
+  isWorkflowLifecycleTransitionAllowed,
   normalizeWorkflowDraft,
   serializeWorkflowDraft,
+  transitionWorkflowEntityLifecycle,
+  validateWorkflowDraft,
+  validateWorkflowEntity,
   WorkflowDraftBuiltInStepTypes,
   WorkflowDraftInputSourceTypes,
   WorkflowDraftOutputDestinationTypes,
@@ -17,6 +21,8 @@ import {
   WorkflowDraftStepTypes,
   WorkflowDraftTriggerKinds,
   WorkflowDraftTriggerTypes,
+  WorkflowLifecycleStates,
+  WorkflowValidationIssueCodes,
   WorkflowStudioIdentity,
 } from "../WorkflowStudioDomain";
 
@@ -62,6 +68,7 @@ describe("WorkflowStudioDomain", () => {
     expect(entity.name).toBe("Automation Workflow");
     expect(entity.metadata.summary).toBe("Canonical workflow draft holder");
     expect(entity.metadata.tags).toEqual(["core", "workflow"]);
+    expect(entity.lifecycleState).toBe(WorkflowLifecycleStates.draft);
     expect(entity.draftRevision).toBe(1);
     expect(entity.createdAt).toBe("2026-03-29T13:00:00.000Z");
     expect(entity.updatedAt).toBe("2026-03-29T13:00:00.000Z");
@@ -657,6 +664,189 @@ describe("WorkflowStudioDomain", () => {
         },
       }],
     })).toThrow("destination target is required");
+  });
+
+  it("validates a canonical workflow draft successfully", () => {
+    const result = validateWorkflowDraft({
+      triggers: [{
+        id: "trigger-manual",
+        kind: WorkflowDraftTriggerKinds.user,
+        type: WorkflowDraftTriggerTypes.userManual,
+        config: {},
+      }],
+      inputs: [{
+        id: "input-dataset",
+        type: "dataset",
+        sourceType: WorkflowDraftInputSourceTypes.datasetAsset,
+        asset: { assetId: "asset:dataset-customers", versionId: "asset:dataset-customers:v1" },
+      }],
+      steps: [
+        { id: "step-load", type: "load", kind: WorkflowDraftStepKinds.action, order: 1 },
+        {
+          id: "step-loop",
+          type: WorkflowDraftBuiltInStepTypes.loopIteration,
+          kind: WorkflowDraftStepKinds.controlFlow,
+          order: 2,
+          dependsOnStepIds: ["step-load"],
+          config: {
+            iterationMode: "collection",
+            collectionInputKey: "input-dataset",
+            bodyStepIds: ["step-load"],
+          },
+        },
+      ],
+      outputs: [{
+        id: "output-1",
+        type: "workflow-output",
+        outputType: WorkflowDraftOutputTypes.record,
+        format: WorkflowDraftOutputFormats.json,
+        sourceStepId: "step-loop",
+        destination: {
+          type: WorkflowDraftOutputDestinationTypes.systemEntry,
+          target: "records/customers",
+        },
+      }],
+    });
+
+    expect(result.valid).toBeTrue();
+    expect(result.issues).toEqual([]);
+  });
+
+  it("returns structured validation issues for malformed trigger/input/step/output and cross-section references", () => {
+    const result = validateWorkflowDraft({
+      triggers: [{
+        id: "trigger-invalid",
+        kind: WorkflowDraftTriggerKinds.temporal,
+        type: WorkflowDraftTriggerTypes.temporalSchedule,
+        config: {},
+      }],
+      inputs: [{
+        id: "input-dataset",
+        type: "dataset",
+        sourceType: WorkflowDraftInputSourceTypes.datasetAsset,
+        asset: { assetId: "dataset-without-canonical-prefix" },
+      }],
+      steps: [
+        { id: "step-1", type: "action", kind: WorkflowDraftStepKinds.action, order: 1, dependsOnStepIds: ["step-2"] },
+        { id: "step-2", type: "action", kind: WorkflowDraftStepKinds.action, order: 3, dependsOnStepIds: ["step-1"] },
+      ],
+      outputs: [{
+        id: "output-1",
+        type: "workflow-output",
+        outputType: WorkflowDraftOutputTypes.record,
+        format: WorkflowDraftOutputFormats.json,
+        sourceStepId: "step-unknown",
+        destination: {
+          type: WorkflowDraftOutputDestinationTypes.fileExport,
+          target: "/tmp/export.json",
+        },
+      }],
+    });
+
+    expect(result.valid).toBeFalse();
+    expect(result.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.triggerMalformed)).toBeTrue();
+    expect(result.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.inputDatasetAssetMalformed)).toBeTrue();
+    expect(result.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.stepOrderNonContiguous)).toBeTrue();
+    expect(result.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.stepDependencyCycle)).toBeTrue();
+    expect(result.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.outputSourceStepMissing)).toBeTrue();
+    expect(result.issues.every((issue) => typeof issue.code === "string" && typeof issue.section === "string")).toBeTrue();
+  });
+
+  it("validates lifecycle states and executable readiness on canonical workflow entities", () => {
+    const readyEntity = createWorkflowEntity({
+      id: "workflow-ready",
+      name: "Workflow Ready",
+      lifecycleState: WorkflowLifecycleStates.executable,
+      draft: {
+        triggers: [],
+        inputs: [],
+        steps: [{ id: "step-1", type: "action", kind: WorkflowDraftStepKinds.action, order: 1 }],
+        outputs: [],
+      },
+    });
+
+    expect(validateWorkflowEntity(readyEntity).valid).toBeTrue();
+
+    const notReady = createWorkflowEntity({
+      id: "workflow-not-ready",
+      name: "Workflow Not Ready",
+      lifecycleState: WorkflowLifecycleStates.saved,
+      draft: {
+        triggers: [],
+        inputs: [],
+        steps: [{
+          id: "step-loop",
+          type: WorkflowDraftBuiltInStepTypes.loopIteration,
+          kind: WorkflowDraftStepKinds.controlFlow,
+          order: 1,
+          config: {
+            iterationMode: "collection",
+            collectionInputKey: "input-missing",
+            bodyStepIds: ["step-loop-body"],
+          },
+        }],
+        outputs: [],
+      },
+    });
+
+    const executableCandidate = Object.freeze({
+      ...notReady,
+      lifecycleState: WorkflowLifecycleStates.executable,
+    });
+    const validation = validateWorkflowEntity(executableCandidate);
+    expect(validation.valid).toBeFalse();
+    expect(validation.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.loopCollectionInputMissing)).toBeTrue();
+    expect(validation.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.lifecycleExecutableNotReady)).toBeTrue();
+  });
+
+  it("enforces canonical workflow lifecycle transitions", () => {
+    const base = createWorkflowEntity({
+      id: "workflow-lifecycle",
+      name: "Workflow Lifecycle",
+      lifecycleState: WorkflowLifecycleStates.draft,
+      draft: {
+        triggers: [],
+        inputs: [],
+        steps: [{ id: "step-1", type: "action", kind: WorkflowDraftStepKinds.action, order: 1 }],
+        outputs: [],
+      },
+    });
+
+    expect(isWorkflowLifecycleTransitionAllowed(WorkflowLifecycleStates.draft, WorkflowLifecycleStates.saved)).toBeTrue();
+    expect(isWorkflowLifecycleTransitionAllowed(WorkflowLifecycleStates.draft, WorkflowLifecycleStates.executable)).toBeFalse();
+    expect(isWorkflowLifecycleTransitionAllowed(WorkflowLifecycleStates.executable, WorkflowLifecycleStates.draft)).toBeFalse();
+
+    const saved = transitionWorkflowEntityLifecycle(base, WorkflowLifecycleStates.saved, new Date("2026-03-29T15:00:00.000Z"));
+    expect(saved.lifecycleState).toBe(WorkflowLifecycleStates.saved);
+
+    const executable = transitionWorkflowEntityLifecycle(saved, WorkflowLifecycleStates.executable, new Date("2026-03-29T15:01:00.000Z"));
+    expect(executable.lifecycleState).toBe(WorkflowLifecycleStates.executable);
+
+    expect(() => transitionWorkflowEntityLifecycle(base, WorkflowLifecycleStates.executable)).toThrow("cannot transition");
+    expect(() => transitionWorkflowEntityLifecycle(executable, WorkflowLifecycleStates.draft)).toThrow("cannot transition");
+  });
+
+  it("rejects executable lifecycle creation when workflow readiness validation fails", () => {
+    expect(() => createWorkflowEntity({
+      id: "workflow-executable-invalid",
+      name: "Workflow Executable Invalid",
+      lifecycleState: WorkflowLifecycleStates.executable,
+      draft: {
+        triggers: [],
+        inputs: [],
+        steps: [{
+          id: "step-loop",
+          type: WorkflowDraftBuiltInStepTypes.loopIteration,
+          kind: WorkflowDraftStepKinds.controlFlow,
+          order: 1,
+          config: {
+            iterationMode: "collection",
+            bodyStepIds: ["step-body"],
+          },
+        }],
+        outputs: [],
+      },
+    })).toThrow("requires a valid canonical workflow draft");
   });
 
   it("creates composite workflow taxonomy with deterministic default behavior", () => {

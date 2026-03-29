@@ -275,9 +275,80 @@ export interface WorkflowEntity {
   readonly name: string;
   readonly metadata: WorkflowEntityMetadata;
   readonly draft: WorkflowDraft;
+  readonly lifecycleState: WorkflowLifecycleState;
   readonly draftRevision: number;
   readonly createdAt: string;
   readonly updatedAt: string;
+}
+
+export const WorkflowLifecycleStates = Object.freeze({
+  draft: "draft",
+  saved: "saved",
+  executable: "executable",
+});
+
+export type WorkflowLifecycleState = typeof WorkflowLifecycleStates[keyof typeof WorkflowLifecycleStates];
+
+export class WorkflowLifecycleTransitionError extends Error {
+  constructor(fromState: WorkflowLifecycleState, toState: WorkflowLifecycleState, detail?: string) {
+    super(detail
+      ? `Workflow lifecycle cannot transition from '${fromState}' to '${toState}': ${detail}.`
+      : `Workflow lifecycle cannot transition from '${fromState}' to '${toState}'.`);
+    this.name = "WorkflowLifecycleTransitionError";
+  }
+}
+
+export const WorkflowValidationSections = Object.freeze({
+  entity: "entity",
+  draft: "draft",
+  triggers: "triggers",
+  inputs: "inputs",
+  steps: "steps",
+  outputs: "outputs",
+  crossSection: "cross-section",
+  lifecycle: "lifecycle",
+});
+
+export type WorkflowValidationSection = typeof WorkflowValidationSections[keyof typeof WorkflowValidationSections];
+
+export const WorkflowValidationIssueCodes = Object.freeze({
+  entityIdMissing: "entity-id-missing",
+  entityNameMissing: "entity-name-missing",
+  entityDraftRevisionInvalid: "entity-draft-revision-invalid",
+  entityCreatedAtInvalid: "entity-created-at-invalid",
+  entityUpdatedAtInvalid: "entity-updated-at-invalid",
+  lifecycleStateInvalid: "lifecycle-state-invalid",
+  lifecycleExecutableNotReady: "lifecycle-executable-not-ready",
+  draftMalformed: "draft-malformed",
+  draftSectionMissing: "draft-section-missing",
+  triggerMalformed: "trigger-malformed",
+  inputMalformed: "input-malformed",
+  inputDatasetAssetMalformed: "input-dataset-asset-malformed",
+  stepMalformed: "step-malformed",
+  stepOrderNonContiguous: "step-order-non-contiguous",
+  stepDependencyMissing: "step-dependency-missing",
+  stepDependencySelf: "step-dependency-self",
+  stepDependencyCycle: "step-dependency-cycle",
+  builtInStepReferenceMissing: "built-in-step-reference-missing",
+  builtInStepReferenceSelf: "built-in-step-reference-self",
+  loopCollectionInputMissing: "loop-collection-input-missing",
+  outputMalformed: "output-malformed",
+  outputSourceStepMissing: "output-source-step-missing",
+});
+
+export type WorkflowValidationIssueCode = typeof WorkflowValidationIssueCodes[keyof typeof WorkflowValidationIssueCodes];
+
+export interface WorkflowValidationIssue {
+  readonly code: WorkflowValidationIssueCode;
+  readonly section: WorkflowValidationSection;
+  readonly severity: "error" | "warning";
+  readonly message: string;
+  readonly path?: string;
+}
+
+export interface WorkflowValidationResult {
+  readonly valid: boolean;
+  readonly issues: ReadonlyArray<WorkflowValidationIssue>;
 }
 
 function normalizeRequired(value: unknown, label: string): string {
@@ -922,6 +993,447 @@ export function normalizeWorkflowDraft(draft?: WorkflowDraft): WorkflowDraft {
   });
 }
 
+function isWorkflowLifecycleState(value: string): value is WorkflowLifecycleState {
+  return value === WorkflowLifecycleStates.draft
+    || value === WorkflowLifecycleStates.saved
+    || value === WorkflowLifecycleStates.executable;
+}
+
+function normalizeWorkflowLifecycleState(value: string): WorkflowLifecycleState {
+  if (!isWorkflowLifecycleState(value)) {
+    throw new Error(`Workflow lifecycle state '${value}' is not supported.`);
+  }
+  return value;
+}
+
+function isValidTimestamp(value: unknown): boolean {
+  if (typeof value !== "string") {
+    return false;
+  }
+  const millis = Date.parse(value);
+  return Number.isFinite(millis);
+}
+
+function buildWorkflowValidationResult(issues: ReadonlyArray<WorkflowValidationIssue>): WorkflowValidationResult {
+  const frozenIssues = Object.freeze(issues.map((issue) => Object.freeze(issue)));
+  return Object.freeze({
+    valid: frozenIssues.every((issue) => issue.severity !== "error"),
+    issues: frozenIssues,
+  });
+}
+
+function validateStepDependencyCycles(stepDependencies: ReadonlyMap<string, ReadonlyArray<string>>): boolean {
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+
+  function visit(stepId: string): boolean {
+    if (visited.has(stepId)) {
+      return false;
+    }
+    if (visiting.has(stepId)) {
+      return true;
+    }
+    visiting.add(stepId);
+    const dependencies = stepDependencies.get(stepId) ?? [];
+    for (const dependency of dependencies) {
+      if (visit(dependency)) {
+        return true;
+      }
+    }
+    visiting.delete(stepId);
+    visited.add(stepId);
+    return false;
+  }
+
+  for (const stepId of stepDependencies.keys()) {
+    if (visit(stepId)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+export function validateWorkflowDraft(draft: WorkflowDraft | undefined): WorkflowValidationResult {
+  const issues: WorkflowValidationIssue[] = [];
+  if (!draft || typeof draft !== "object") {
+    issues.push({
+      code: WorkflowValidationIssueCodes.draftMalformed,
+      section: WorkflowValidationSections.draft,
+      severity: "error",
+      message: "Workflow draft must be an object.",
+      path: "draft",
+    });
+    return buildWorkflowValidationResult(issues);
+  }
+
+  const raw = draft as {
+    readonly triggers?: unknown;
+    readonly inputs?: unknown;
+    readonly steps?: unknown;
+    readonly outputs?: unknown;
+  };
+
+  if (!Array.isArray(raw.triggers)) {
+    issues.push({
+      code: WorkflowValidationIssueCodes.draftSectionMissing,
+      section: WorkflowValidationSections.draft,
+      severity: "error",
+      message: "Workflow draft requires a triggers array.",
+      path: "draft.triggers",
+    });
+  }
+  if (!Array.isArray(raw.inputs)) {
+    issues.push({
+      code: WorkflowValidationIssueCodes.draftSectionMissing,
+      section: WorkflowValidationSections.draft,
+      severity: "error",
+      message: "Workflow draft requires an inputs array.",
+      path: "draft.inputs",
+    });
+  }
+  if (!Array.isArray(raw.steps)) {
+    issues.push({
+      code: WorkflowValidationIssueCodes.draftSectionMissing,
+      section: WorkflowValidationSections.draft,
+      severity: "error",
+      message: "Workflow draft requires a steps array.",
+      path: "draft.steps",
+    });
+  }
+  if (!Array.isArray(raw.outputs)) {
+    issues.push({
+      code: WorkflowValidationIssueCodes.draftSectionMissing,
+      section: WorkflowValidationSections.draft,
+      severity: "error",
+      message: "Workflow draft requires an outputs array.",
+      path: "draft.outputs",
+    });
+  }
+
+  const triggers = Array.isArray(raw.triggers) ? raw.triggers : [];
+  for (let index = 0; index < triggers.length; index += 1) {
+    try {
+      normalizeTrigger(triggers[index] as WorkflowDraftTrigger);
+    } catch (error) {
+      issues.push({
+        code: WorkflowValidationIssueCodes.triggerMalformed,
+        section: WorkflowValidationSections.triggers,
+        severity: "error",
+        message: error instanceof Error ? error.message : "Workflow trigger is malformed.",
+        path: `draft.triggers[${index}]`,
+      });
+    }
+  }
+
+  const normalizedInputs: WorkflowDraftInput[] = [];
+  const inputs = Array.isArray(raw.inputs) ? raw.inputs : [];
+  for (let index = 0; index < inputs.length; index += 1) {
+    try {
+      const normalized = normalizeInput(inputs[index] as WorkflowDraftInput);
+      normalizedInputs.push(normalized);
+      if (
+        normalized.sourceType === WorkflowDraftInputSourceTypes.datasetAsset
+        && !normalized.asset.assetId.startsWith("asset:")
+      ) {
+        issues.push({
+          code: WorkflowValidationIssueCodes.inputDatasetAssetMalformed,
+          section: WorkflowValidationSections.inputs,
+          severity: "error",
+          message: `Dataset input asset '${normalized.asset.assetId}' must use canonical 'asset:' identity.`,
+          path: `draft.inputs[${index}].asset.assetId`,
+        });
+      }
+    } catch (error) {
+      issues.push({
+        code: WorkflowValidationIssueCodes.inputMalformed,
+        section: WorkflowValidationSections.inputs,
+        severity: "error",
+        message: error instanceof Error ? error.message : "Workflow input is malformed.",
+        path: `draft.inputs[${index}]`,
+      });
+    }
+  }
+
+  const normalizedSteps: WorkflowDraftStep[] = [];
+  const steps = Array.isArray(raw.steps) ? raw.steps : [];
+  for (let index = 0; index < steps.length; index += 1) {
+    try {
+      normalizedSteps.push(normalizeStep(steps[index] as WorkflowDraftStep));
+    } catch (error) {
+      issues.push({
+        code: WorkflowValidationIssueCodes.stepMalformed,
+        section: WorkflowValidationSections.steps,
+        severity: "error",
+        message: error instanceof Error ? error.message : "Workflow step is malformed.",
+        path: `draft.steps[${index}]`,
+      });
+    }
+  }
+
+  const stepIds = new Set<string>(normalizedSteps.map((step) => step.id));
+  const sortedOrders = [...normalizedSteps].map((step) => step.order).sort((left, right) => left - right);
+  if (sortedOrders.some((order, index) => order !== index + 1)) {
+    issues.push({
+      code: WorkflowValidationIssueCodes.stepOrderNonContiguous,
+      section: WorkflowValidationSections.steps,
+      severity: "error",
+      message: "Workflow step order values must be contiguous and start at 1.",
+      path: "draft.steps",
+    });
+  }
+
+  const inputIds = new Set<string>(normalizedInputs.map((input) => input.id));
+  const stepDependencies = new Map<string, ReadonlyArray<string>>();
+  for (const step of normalizedSteps) {
+    const dependencies = step.dependsOnStepIds ?? [];
+    stepDependencies.set(step.id, dependencies);
+    for (const dependency of dependencies) {
+      if (dependency === step.id) {
+        issues.push({
+          code: WorkflowValidationIssueCodes.stepDependencySelf,
+          section: WorkflowValidationSections.crossSection,
+          severity: "error",
+          message: `Step '${step.id}' cannot depend on itself.`,
+          path: `draft.steps.${step.id}.dependsOnStepIds`,
+        });
+        continue;
+      }
+      if (!stepIds.has(dependency)) {
+        issues.push({
+          code: WorkflowValidationIssueCodes.stepDependencyMissing,
+          section: WorkflowValidationSections.crossSection,
+          severity: "error",
+          message: `Step '${step.id}' depends on unknown step '${dependency}'.`,
+          path: `draft.steps.${step.id}.dependsOnStepIds`,
+        });
+      }
+    }
+
+    if (!isBuiltInControlFlowStepType(step.type) || step.kind !== WorkflowDraftStepKinds.controlFlow || !step.config) {
+      continue;
+    }
+
+    if (step.type === WorkflowDraftBuiltInStepTypes.ifThen) {
+      const config = step.config as WorkflowDraftIfThenStepConfig;
+      for (const referenced of [...config.thenStepIds, ...(config.elseStepIds ?? [])]) {
+        if (referenced === step.id) {
+          issues.push({
+            code: WorkflowValidationIssueCodes.builtInStepReferenceSelf,
+            section: WorkflowValidationSections.crossSection,
+            severity: "error",
+            message: `Built-in if-then step '${step.id}' cannot reference itself.`,
+            path: `draft.steps.${step.id}.config`,
+          });
+          continue;
+        }
+        if (!stepIds.has(referenced)) {
+          issues.push({
+            code: WorkflowValidationIssueCodes.builtInStepReferenceMissing,
+            section: WorkflowValidationSections.crossSection,
+            severity: "error",
+            message: `Built-in if-then step '${step.id}' references unknown step '${referenced}'.`,
+            path: `draft.steps.${step.id}.config`,
+          });
+        }
+      }
+    }
+
+    if (step.type === WorkflowDraftBuiltInStepTypes.loopIteration) {
+      const config = step.config as WorkflowDraftLoopIterationStepConfig;
+      for (const referenced of config.bodyStepIds) {
+        if (referenced === step.id) {
+          issues.push({
+            code: WorkflowValidationIssueCodes.builtInStepReferenceSelf,
+            section: WorkflowValidationSections.crossSection,
+            severity: "error",
+            message: `Built-in loop step '${step.id}' cannot include itself in bodyStepIds.`,
+            path: `draft.steps.${step.id}.config`,
+          });
+          continue;
+        }
+        if (!stepIds.has(referenced)) {
+          issues.push({
+            code: WorkflowValidationIssueCodes.builtInStepReferenceMissing,
+            section: WorkflowValidationSections.crossSection,
+            severity: "error",
+            message: `Built-in loop step '${step.id}' references unknown body step '${referenced}'.`,
+            path: `draft.steps.${step.id}.config`,
+          });
+        }
+      }
+
+      if (
+        config.iterationMode === WorkflowDraftLoopIterationModes.collection
+        && config.collectionInputKey
+        && !inputIds.has(config.collectionInputKey)
+      ) {
+        issues.push({
+          code: WorkflowValidationIssueCodes.loopCollectionInputMissing,
+          section: WorkflowValidationSections.crossSection,
+          severity: "error",
+          message: `Built-in loop step '${step.id}' collectionInputKey '${config.collectionInputKey}' does not match any workflow input id.`,
+          path: `draft.steps.${step.id}.config.collectionInputKey`,
+        });
+      }
+    }
+  }
+
+  if (validateStepDependencyCycles(stepDependencies)) {
+    issues.push({
+      code: WorkflowValidationIssueCodes.stepDependencyCycle,
+      section: WorkflowValidationSections.crossSection,
+      severity: "error",
+      message: "Workflow step dependencies cannot contain cycles.",
+      path: "draft.steps",
+    });
+  }
+
+  const outputs = Array.isArray(raw.outputs) ? raw.outputs : [];
+  for (let index = 0; index < outputs.length; index += 1) {
+    try {
+      const normalized = normalizeOutput(outputs[index] as WorkflowDraftOutput);
+      if (normalized.sourceStepId && !stepIds.has(normalized.sourceStepId)) {
+        issues.push({
+          code: WorkflowValidationIssueCodes.outputSourceStepMissing,
+          section: WorkflowValidationSections.crossSection,
+          severity: "error",
+          message: `Workflow output '${normalized.id}' references unknown sourceStepId '${normalized.sourceStepId}'.`,
+          path: `draft.outputs[${index}].sourceStepId`,
+        });
+      }
+    } catch (error) {
+      issues.push({
+        code: WorkflowValidationIssueCodes.outputMalformed,
+        section: WorkflowValidationSections.outputs,
+        severity: "error",
+        message: error instanceof Error ? error.message : "Workflow output is malformed.",
+        path: `draft.outputs[${index}]`,
+      });
+    }
+  }
+
+  return buildWorkflowValidationResult(issues);
+}
+
+export function validateWorkflowEntity(entity: WorkflowEntity): WorkflowValidationResult {
+  const issues: WorkflowValidationIssue[] = [];
+  if (!entity.id.trim()) {
+    issues.push({
+      code: WorkflowValidationIssueCodes.entityIdMissing,
+      section: WorkflowValidationSections.entity,
+      severity: "error",
+      message: "Workflow entity id is required.",
+      path: "id",
+    });
+  }
+  if (!entity.name.trim()) {
+    issues.push({
+      code: WorkflowValidationIssueCodes.entityNameMissing,
+      section: WorkflowValidationSections.entity,
+      severity: "error",
+      message: "Workflow entity name is required.",
+      path: "name",
+    });
+  }
+  if (!Number.isInteger(entity.draftRevision) || entity.draftRevision < 1) {
+    issues.push({
+      code: WorkflowValidationIssueCodes.entityDraftRevisionInvalid,
+      section: WorkflowValidationSections.entity,
+      severity: "error",
+      message: "Workflow entity draftRevision must be a positive integer.",
+      path: "draftRevision",
+    });
+  }
+  if (!isValidTimestamp(entity.createdAt)) {
+    issues.push({
+      code: WorkflowValidationIssueCodes.entityCreatedAtInvalid,
+      section: WorkflowValidationSections.entity,
+      severity: "error",
+      message: "Workflow entity createdAt must be a valid timestamp.",
+      path: "createdAt",
+    });
+  }
+  if (!isValidTimestamp(entity.updatedAt)) {
+    issues.push({
+      code: WorkflowValidationIssueCodes.entityUpdatedAtInvalid,
+      section: WorkflowValidationSections.entity,
+      severity: "error",
+      message: "Workflow entity updatedAt must be a valid timestamp.",
+      path: "updatedAt",
+    });
+  }
+  if (!isWorkflowLifecycleState(entity.lifecycleState)) {
+    issues.push({
+      code: WorkflowValidationIssueCodes.lifecycleStateInvalid,
+      section: WorkflowValidationSections.lifecycle,
+      severity: "error",
+      message: `Workflow lifecycle state '${entity.lifecycleState}' is not supported.`,
+      path: "lifecycleState",
+    });
+  }
+
+  const draftValidation = validateWorkflowDraft(entity.draft);
+  issues.push(...draftValidation.issues);
+  if (entity.lifecycleState === WorkflowLifecycleStates.executable && !draftValidation.valid) {
+    issues.push({
+      code: WorkflowValidationIssueCodes.lifecycleExecutableNotReady,
+      section: WorkflowValidationSections.lifecycle,
+      severity: "error",
+      message: "Workflow lifecycle state 'executable' requires a valid canonical workflow draft.",
+      path: "lifecycleState",
+    });
+  }
+
+  return buildWorkflowValidationResult(issues);
+}
+
+export function isWorkflowLifecycleTransitionAllowed(fromState: WorkflowLifecycleState, toState: WorkflowLifecycleState): boolean {
+  if (fromState === toState) {
+    return true;
+  }
+
+  if (fromState === WorkflowLifecycleStates.draft) {
+    return toState === WorkflowLifecycleStates.saved;
+  }
+  if (fromState === WorkflowLifecycleStates.saved) {
+    return toState === WorkflowLifecycleStates.draft || toState === WorkflowLifecycleStates.executable;
+  }
+
+  return fromState === WorkflowLifecycleStates.executable && toState === WorkflowLifecycleStates.saved;
+}
+
+export function transitionWorkflowEntityLifecycle(
+  entity: WorkflowEntity,
+  targetState: WorkflowLifecycleState,
+  now: Date = new Date(),
+): WorkflowEntity {
+  if (!isWorkflowLifecycleTransitionAllowed(entity.lifecycleState, targetState)) {
+    throw new WorkflowLifecycleTransitionError(entity.lifecycleState, targetState);
+  }
+
+  if (targetState === WorkflowLifecycleStates.executable) {
+    const draftValidation = validateWorkflowDraft(entity.draft);
+    if (!draftValidation.valid) {
+      throw new WorkflowLifecycleTransitionError(
+        entity.lifecycleState,
+        targetState,
+        "canonical workflow draft is not executable-ready",
+      );
+    }
+  }
+
+  if (targetState === entity.lifecycleState) {
+    return entity;
+  }
+
+  return Object.freeze({
+    ...entity,
+    lifecycleState: targetState,
+    updatedAt: now.toISOString(),
+  });
+}
+
 export function serializeWorkflowDraft(draft: WorkflowDraft): string {
   return JSON.stringify(normalizeWorkflowDraft(draft), null, 2);
 }
@@ -944,6 +1456,7 @@ export function createWorkflowEntity(input: {
   readonly name: string;
   readonly metadata?: WorkflowEntityMetadata;
   readonly draft?: WorkflowDraft;
+  readonly lifecycleState?: WorkflowLifecycleState;
   readonly draftRevision?: number;
   readonly now?: Date;
 }): WorkflowEntity {
@@ -959,12 +1472,18 @@ export function createWorkflowEntity(input: {
   if (!Number.isInteger(draftRevision) || draftRevision < 1) {
     throw new Error("Workflow entity draftRevision must be a positive integer.");
   }
+  const draft = normalizeWorkflowDraft(input.draft);
+  const lifecycleState = normalizeWorkflowLifecycleState(input.lifecycleState ?? WorkflowLifecycleStates.draft);
+  if (lifecycleState === WorkflowLifecycleStates.executable && !validateWorkflowDraft(draft).valid) {
+    throw new Error("Workflow lifecycle state 'executable' requires a valid canonical workflow draft.");
+  }
 
   return Object.freeze({
     id,
     name,
     metadata,
-    draft: normalizeWorkflowDraft(input.draft),
+    draft,
+    lifecycleState,
     draftRevision,
     createdAt: now,
     updatedAt: now,
