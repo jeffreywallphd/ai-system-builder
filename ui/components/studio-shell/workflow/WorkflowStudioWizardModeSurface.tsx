@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import type { WorkflowDraft, WorkflowValidationIssue } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
 import WorkflowStudioTriggerSectionEditor from "./WorkflowStudioTriggerSectionEditor";
 import WorkflowStudioInputSectionEditor from "./WorkflowStudioInputSectionEditor";
@@ -27,7 +28,14 @@ export default function WorkflowStudioWizardModeSurface({
   routeSearch,
   onReplaceRouteSearch,
 }: WorkflowStudioWizardModeSurfaceProps): JSX.Element {
+  const [readyActionAttempted, setReadyActionAttempted] = useState(false);
+  const [readyActionConfirmed, setReadyActionConfirmed] = useState(false);
   const progress = deriveWorkflowWizardProgress(sharedDraft, draftValidationIssues);
+  useEffect(() => {
+    if (!progress.isWorkflowReady) {
+      setReadyActionConfirmed(false);
+    }
+  }, [progress.isWorkflowReady]);
   const sectionById = new Map(progress.sections.map((section) => [section.id, section]));
   const currentSection = sectionById.get(progress.currentSectionId) ?? progress.sections[0];
   const previousSection = progress.previousSectionId
@@ -66,6 +74,15 @@ export default function WorkflowStudioWizardModeSurface({
     return "Needs input";
   };
 
+  const handleReadyAction = () => {
+    setReadyActionAttempted(true);
+    if (!progress.isWorkflowReady) {
+      setReadyActionConfirmed(false);
+      return;
+    }
+    setReadyActionConfirmed(true);
+  };
+
   return (
     <div className="ui-stack ui-stack--sm" data-testid="workflow-studio-wizard-mode-surface">
       <nav className="ui-stack ui-stack--2xs" aria-label="Wizard sections">
@@ -89,6 +106,30 @@ export default function WorkflowStudioWizardModeSurface({
           ))}
         </div>
       </nav>
+
+      <div className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="workflow-wizard-readiness-summary">
+        <strong>Workflow readiness summary</strong>
+        <p className="ui-text-muted">
+          {progress.isWorkflowReady
+            ? "Workflow draft is ready for handoff."
+            : `Workflow draft is not ready yet. ${progress.blockingIssueCount} blocking item(s) remain.`}
+          {" "}
+          Inputs policy: {progress.readinessPolicy.inputs === "required" ? "required for this wizard pass" : "optional"}.
+        </p>
+        {progress.blockingIssues.length > 0 ? (
+          <ul className="ui-stack ui-stack--2xs">
+            {progress.blockingIssues.map((issue) => (
+              <li key={issue.id}>
+                <a className="ui-text-danger" href={`#${issue.sectionAnchorId}`}>
+                  {issue.sectionTitle}: {issue.message}
+                </a>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="ui-text-muted">No blocking issues detected.</p>
+        )}
+      </div>
 
       <div className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="workflow-wizard-progression-controls">
         <strong>Guided progression</strong>
@@ -129,8 +170,6 @@ export default function WorkflowStudioWizardModeSurface({
         draftValidationIssues={draftValidationIssues}
         onUpdateSharedDraft={onUpdateSharedDraft}
         studioId={studioId}
-        routeSearch={routeSearch}
-        onReplaceRouteSearch={onReplaceRouteSearch}
       />
 
       <WorkflowStudioStepSectionEditor
@@ -138,7 +177,6 @@ export default function WorkflowStudioWizardModeSurface({
         draftValidationIssues={draftValidationIssues}
         onUpdateSharedDraft={onUpdateSharedDraft}
         studioId={studioId}
-        routeSearch={routeSearch}
       />
 
       <WorkflowStudioOutputSectionEditor
@@ -152,16 +190,26 @@ export default function WorkflowStudioWizardModeSurface({
         className="ui-card ui-card--padded ui-stack ui-stack--2xs"
         data-testid="workflow-wizard-terminal-actions"
       >
-        <strong>Finish and continue</strong>
+        <strong>Prepare for run handoff</strong>
         {progress.isWorkflowReady ? (
           <p className="ui-text-muted">
-            Ready to Save / Ready to Run: all sections are complete and validation-ready for this draft slice.
+            Ready for next-stage handoff. Save the draft and continue to lifecycle/publish controls.
           </p>
         ) : (
           <p className="ui-text-muted">
-            Continue refining required sections before save/run. Completed: {progress.completedSectionCount}/{progress.sections.length}.
+            Resolve readiness blockers before handoff. Completed: {progress.completedSectionCount}/{progress.sections.length}.
           </p>
         )}
+        {readyActionAttempted && !progress.isWorkflowReady ? (
+          <p className="ui-text-danger" data-testid="workflow-wizard-ready-blocked">
+            Cannot prepare for run yet. Resolve the blocking sections listed above.
+          </p>
+        ) : null}
+        {readyActionConfirmed ? (
+          <p className="ui-text-muted" data-testid="workflow-wizard-ready-confirmed">
+            Wizard handoff marked ready. Continue to <a href="#studio-shell-lifecycle-panel">Lifecycle / publish / version status</a>.
+          </p>
+        ) : null}
         <div className="ui-row ui-row--wrap" style={{ gap: "0.5rem" }}>
           {firstIncompleteSection ? (
             <a
@@ -182,10 +230,10 @@ export default function WorkflowStudioWizardModeSurface({
           <button
             type="button"
             className="ui-button ui-button--primary ui-button--sm"
-            disabled={!progress.isWorkflowReady}
+            onClick={handleReadyAction}
             data-testid="workflow-wizard-ready-action"
           >
-            Ready to Save / Run
+            Prepare for Run
           </button>
         </div>
       </section>

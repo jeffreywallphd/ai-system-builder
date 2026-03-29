@@ -13,11 +13,14 @@ import {
   type StudioShellExtensionContext,
   type StudioShellExtensionContribution,
   type StudioShellExtensionSlot,
+  type StudioShellToolbarAction,
+  StudioShellToolbarActionKinds,
 } from "../studio-shell/StudioShellExtensions";
 import {
   getWorkflowStudioModeStateStore,
   type WorkflowStudioModeState,
 } from "../studio-shell/workflow/WorkflowStudioModeStateStore";
+import type { WorkflowStudioModeId } from "../studio-shell/workflow/WorkflowStudioModes";
 import type { WorkflowStudioModeRouteResolution } from "../studio-shell/workflow/WorkflowStudioModeRouting";
 import { StudioEntryService } from "../routes/StudioRouteMapping";
 import { readAutomationIntentFromSearch } from "../routes/BuildAutomationIntent";
@@ -81,6 +84,16 @@ function parseTagsInput(value: string): ReadonlyArray<string> {
 
 function formatTags(tags?: ReadonlyArray<string>): string {
   return (tags ?? []).join(", ");
+}
+
+function getToolbarButtonClassName(action: StudioShellToolbarAction): string {
+  if (action.tone === "primary") {
+    return "ui-button ui-button--primary";
+  }
+  if (action.tone === "ghost") {
+    return "ui-button ui-button--ghost";
+  }
+  return "ui-button";
 }
 
 function buildCreateMetadata(
@@ -167,6 +180,10 @@ export default function StudioShellPage({
   );
   const inlineCreationReturnPayload = useMemo(
     () => inlineAssetCreationService.parseInlineReturnFromSearch(location.search),
+    [inlineAssetCreationService, location.search],
+  );
+  const selectorLaunchContext = useMemo(
+    () => inlineAssetCreationService.parseSelectorLaunchFromSearch(location.search),
     [inlineAssetCreationService, location.search],
   );
   const workflowModeStore = useMemo(
@@ -411,6 +428,8 @@ export default function StudioShellPage({
             status: InlineAssetReturnStatuses.created,
             assetId: snapshot.draft.assetId,
             versionId: returnVersionId,
+            assetType: studioRegistration?.role,
+            displayName: snapshot.draft.metadata.title,
             sourceStudioType: studioRegistration?.studioType,
             sourceStudioId: studioId,
             returnContextId: inlineCreationReturnTarget.contextId,
@@ -419,11 +438,12 @@ export default function StudioShellPage({
         : undefined,
       cancelled: inlineAssetCreationService.buildReturnPath({
         returnTarget: inlineCreationReturnTarget,
-        payload: {
-          status: InlineAssetReturnStatuses.cancelled,
-          sourceStudioType: studioRegistration?.studioType,
-          sourceStudioId: studioId,
-          returnContextId: inlineCreationReturnTarget.contextId,
+      payload: {
+        status: InlineAssetReturnStatuses.cancelled,
+        assetType: studioRegistration?.role,
+        sourceStudioType: studioRegistration?.studioType,
+        sourceStudioId: studioId,
+        returnContextId: inlineCreationReturnTarget.contextId,
         },
       }),
     });
@@ -435,9 +455,125 @@ export default function StudioShellPage({
     snapshot?.draft?.assetId,
     studioId,
     studioRegistration?.studioType,
+    studioRegistration?.role,
   ]);
+  const autoReturnedFromSelectorRef = useRef(false);
+
+  useEffect(() => {
+    autoReturnedFromSelectorRef.current = false;
+  }, [selectorLaunchContext?.selectorSessionId, studioId]);
+
+  useEffect(() => {
+    if (!selectorLaunchContext || !inlineReturnPaths?.withAsset || autoReturnedFromSelectorRef.current) {
+      return;
+    }
+    if (!snapshot?.draft?.assetId) {
+      return;
+    }
+    autoReturnedFromSelectorRef.current = true;
+    void navigate(inlineReturnPaths.withAsset, { replace: true });
+  }, [inlineReturnPaths?.withAsset, navigate, selectorLaunchContext, snapshot?.draft?.assetId]);
   const workflowDraftContent = workflowModeState?.sharedDraftSerialized ?? content;
   const hasWorkflowDraftParseError = isWorkflowStudio && Boolean(workflowModeState?.draftParseError);
+  const toolbarActions = studioRegistration?.shell?.toolbar?.actions ?? [];
+
+  const saveDraftFromAuthoring = (): void => {
+    if (!sessionId) {
+      return;
+    }
+
+    const resolvedMetadataPatch = resolveMetadataPatchForSave();
+    if (!resolvedMetadataPatch) {
+      return;
+    }
+
+    if (!draftId) {
+      const metadata = buildCreateMetadata(defaultDraftTitle, defaultDraftTags, resolvedMetadataPatch);
+      void runAndRefresh(() => service.createDraft({
+        studioId,
+        sessionId,
+        content: workflowDraftContent,
+        metadata,
+      }));
+      return;
+    }
+
+    void runAndRefresh(() => service.updateDraft({
+      studioId,
+      sessionId,
+      draftId,
+      content: workflowDraftContent,
+      metadataPatch: resolvedMetadataPatch,
+    }));
+  };
+
+  const runValidationFromAuthoring = (): void => {
+    if (!draftId) {
+      return;
+    }
+
+    void runAndRefresh(async () => {
+      const response = await service.validateDraft(studioId, draftId);
+      if (response.ok && response.data) {
+        setValidationIssues(response.data);
+      }
+      return response;
+    });
+  };
+
+  const setWorkflowModeFromToolbar = (modeId: WorkflowStudioModeId): void => {
+    if (!isWorkflowStudio || !workflowModeStore) {
+      return;
+    }
+
+    workflowModeStore.setSelectedMode(modeId);
+    const nextSearchParams = new URLSearchParams(location.search);
+    nextSearchParams.set("mode", modeId);
+    void navigate(
+      {
+        pathname: location.pathname,
+        search: nextSearchParams.toString().length > 0 ? `?${nextSearchParams.toString()}` : "",
+        hash: location.hash,
+      },
+      { replace: true },
+    );
+  };
+
+  const runToolbarAction = (action: StudioShellToolbarAction): void => {
+    if (action.kind === StudioShellToolbarActionKinds.refreshSnapshot) {
+      void refreshSnapshot();
+      return;
+    }
+
+    if (action.kind === StudioShellToolbarActionKinds.saveDraft) {
+      saveDraftFromAuthoring();
+      return;
+    }
+
+    if (action.kind === StudioShellToolbarActionKinds.runValidation) {
+      runValidationFromAuthoring();
+      return;
+    }
+
+    setWorkflowModeFromToolbar(action.modeId);
+  };
+
+  const isToolbarActionDisabled = (action: StudioShellToolbarAction): boolean => {
+    if (action.kind === StudioShellToolbarActionKinds.refreshSnapshot) {
+      return isBusy;
+    }
+    if (action.kind === StudioShellToolbarActionKinds.saveDraft) {
+      return isBusy || !sessionId || hasWorkflowDraftParseError;
+    }
+    if (action.kind === StudioShellToolbarActionKinds.runValidation) {
+      return isBusy || !draftId;
+    }
+    if (!isWorkflowStudio || !workflowModeState) {
+      return true;
+    }
+    return workflowModeState.selectedModeId === action.modeId;
+  };
+
   const extensionContext: StudioShellExtensionContext = {
     studioId,
     snapshot,
@@ -538,7 +674,70 @@ export default function StudioShellPage({
         </div>
       </div>
 
-      <div className="ui-grid" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "1rem" }}>
+      <div className="ui-studio-shell__authoring">
+        {toolbarActions.length > 0 ? (
+          <div className="ui-toolbar ui-toolbar--panel ui-studio-shell__authoring-toolbar" data-testid="studio-shell-authoring-toolbar">
+            <div className="ui-toolbar__group">
+              {toolbarActions.map((action) => (
+                <button
+                  key={action.id}
+                  type="button"
+                  className={getToolbarButtonClassName(action)}
+                  disabled={isToolbarActionDisabled(action)}
+                  onClick={() => runToolbarAction(action)}
+                >
+                  {action.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        <StudioShellPanel title="Asset draft authoring" subtitle="Thin authoring surface over studio-shell draft contracts.">
+          <WorkflowStudioDraftAuthoringBoundary
+            isWorkflowStudio={isWorkflowStudio}
+            content={content}
+            onChangeContent={updateContent}
+            invalidModeRouteId={isWorkflowStudio ? workflowModeRoute?.invalidModeId : undefined}
+            workflowModeContext={workflowModeStore && workflowModeState
+              ? {
+                studioId,
+                routeSearch: location.search,
+                replaceRouteSearch: (nextSearch: string) => {
+                  void navigate(
+                    {
+                      pathname: location.pathname,
+                      search: nextSearch,
+                      hash: location.hash,
+                    },
+                    { replace: true },
+                  );
+                },
+                selectedModeId: workflowModeState.selectedModeId,
+                sharedDraft: workflowModeState.sharedDraft,
+                sharedDraftSerialized: workflowModeState.sharedDraftSerialized,
+                draftEditorContent: workflowModeState.draftEditorContent,
+                draftParseError: workflowModeState.draftParseError,
+                modeValidationIssues: workflowModeState.modeValidationIssues,
+                draftValidationIssues: workflowModeState.draftValidationIssues,
+                updateSharedDraft: (updater) => workflowModeStore.updateSharedDraft(updater),
+              }
+              : undefined}
+          />
+          <div className="ui-stack ui-stack--xs" style={{ flexDirection: "row" }}>
+            <button
+              className="ui-button ui-button--primary"
+              disabled={isBusy || !sessionId || hasWorkflowDraftParseError}
+              onClick={saveDraftFromAuthoring}
+            >
+              {draftId ? "Save Draft" : "Create Draft"}
+            </button>
+          </div>
+        </StudioShellPanel>
+        {renderExtensions(extensionRegistry, StudioShellExtensionSlots.draftAuthoring, extensionContext)}
+      </div>
+
+      <div className="ui-grid ui-grid--2 ui-studio-shell__grid">
         <StudioShellPanel title="Studio/session context" subtitle="Current studio, active session, and draft context.">
           <div className="ui-stack ui-stack--2xs">
             <div><strong>Studio:</strong> {snapshot?.studioName ?? "-"} ({snapshot?.studioId ?? studioId})</div>
@@ -550,7 +749,9 @@ export default function StudioShellPage({
             <div className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="studio-shell-inline-return-panel">
               <strong>Inline creation handoff</strong>
               <span className="ui-text-small ui-text-secondary">
-                This studio was opened from another workspace. Return when done, optionally attaching this asset.
+                {selectorLaunchContext
+                  ? `This studio was launched from selector session ${selectorLaunchContext.selectorSessionId}. Return when creation completes.`
+                  : "This studio was opened from another workspace. Return when done, optionally attaching this asset."}
               </span>
               <div className="ui-stack ui-stack--xs" style={{ flexDirection: "row", flexWrap: "wrap" }}>
                 {inlineReturnPaths?.withAsset ? (
@@ -592,74 +793,6 @@ export default function StudioShellPage({
           </div>
         </StudioShellPanel>
         {renderExtensions(extensionRegistry, StudioShellExtensionSlots.sessionContext, extensionContext)}
-
-        <StudioShellPanel title="Asset draft authoring" subtitle="Thin authoring surface over studio-shell draft contracts.">
-          <WorkflowStudioDraftAuthoringBoundary
-            isWorkflowStudio={isWorkflowStudio}
-            content={content}
-            onChangeContent={updateContent}
-            invalidModeRouteId={isWorkflowStudio ? workflowModeRoute?.invalidModeId : undefined}
-            workflowModeContext={workflowModeStore && workflowModeState
-              ? {
-                studioId,
-                routeSearch: location.search,
-                replaceRouteSearch: (nextSearch: string) => {
-                  void navigate(
-                    {
-                      pathname: location.pathname,
-                      search: nextSearch,
-                      hash: location.hash,
-                    },
-                    { replace: true },
-                  );
-                },
-                selectedModeId: workflowModeState.selectedModeId,
-                sharedDraft: workflowModeState.sharedDraft,
-                sharedDraftSerialized: workflowModeState.sharedDraftSerialized,
-                draftEditorContent: workflowModeState.draftEditorContent,
-                draftParseError: workflowModeState.draftParseError,
-                modeValidationIssues: workflowModeState.modeValidationIssues,
-                draftValidationIssues: workflowModeState.draftValidationIssues,
-                updateSharedDraft: (updater) => workflowModeStore.updateSharedDraft(updater),
-              }
-              : undefined}
-          />
-          <div className="ui-stack ui-stack--xs" style={{ flexDirection: "row" }}>
-            <button
-              className="ui-button ui-button--primary"
-              disabled={isBusy || !sessionId || hasWorkflowDraftParseError}
-              onClick={() => {
-                if (!sessionId) {
-                  return;
-                }
-                const resolvedMetadataPatch = resolveMetadataPatchForSave();
-                if (!resolvedMetadataPatch) {
-                  return;
-                }
-                if (!draftId) {
-                  const metadata = buildCreateMetadata(defaultDraftTitle, defaultDraftTags, resolvedMetadataPatch);
-                  void runAndRefresh(() => service.createDraft({
-                    studioId,
-                    sessionId,
-                    content: workflowDraftContent,
-                    metadata,
-                  }));
-                  return;
-                }
-                void runAndRefresh(() => service.updateDraft({
-                  studioId,
-                  sessionId,
-                  draftId,
-                  content: workflowDraftContent,
-                  metadataPatch: resolvedMetadataPatch,
-                }));
-              }}
-            >
-              {draftId ? "Save Draft" : "Create Draft"}
-            </button>
-          </div>
-        </StudioShellPanel>
-        {renderExtensions(extensionRegistry, StudioShellExtensionSlots.draftAuthoring, extensionContext)}
 
         <StudioShellPanel title="Taxonomy / contract / provenance" subtitle="Form-first metadata editing with optional advanced JSON.">
           <div className="ui-form-json-toggle">
@@ -1031,7 +1164,11 @@ export default function StudioShellPage({
         </StudioShellPanel>
         {renderExtensions(extensionRegistry, StudioShellExtensionSlots.dependencies, extensionContext)}
 
-        <StudioShellPanel title="Lifecycle / publish / version status" subtitle="Explicit draft lifecycle transitions and publish/version operations.">
+        <StudioShellPanel
+          sectionId="studio-shell-lifecycle-panel"
+          title="Lifecycle / publish / version status"
+          subtitle="Explicit draft lifecycle transitions and publish/version operations."
+        >
           <div className="ui-stack ui-stack--2xs">
             <div><strong>Lifecycle:</strong> {snapshot?.draft?.lifecycleStatus ?? "n/a"}</div>
             <div><strong>Published versions:</strong> {snapshot?.versions.length ?? 0}</div>
@@ -1085,18 +1222,7 @@ export default function StudioShellPage({
             <button
               className="ui-button"
               disabled={isBusy || !draftId}
-              onClick={() => {
-                if (!draftId) {
-                  return;
-                }
-                void runAndRefresh(async () => {
-                  const response = await service.validateDraft(studioId, draftId);
-                  if (response.ok && response.data) {
-                    setValidationIssues(response.data);
-                  }
-                  return response;
-                });
-              }}
+              onClick={runValidationFromAuthoring}
             >Run Validation</button>
           </div>
           <ul className="ui-stack ui-stack--2xs">

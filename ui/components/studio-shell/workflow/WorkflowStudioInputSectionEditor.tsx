@@ -1,21 +1,28 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import type { WorkflowDraft, WorkflowValidationIssue } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
 import { WorkflowDraftInputSourceTypes } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+import {
+  AssetSelectorSessionLifecycleStates,
+  type AssetSelectorSessionState,
+} from "../../../../application/studio-entry/AssetSelectorSessionStore";
 import SectionBody from "./SectionBody";
 import SectionHeader from "./SectionHeader";
 import WizardSection from "./WizardSection";
 import { RegistryService } from "../../../services/RegistryService";
-import { ROUTE_PATHS } from "../../../routes/RouteConfig";
+import AssetSelectorShell from "../asset-selector/AssetSelectorShell";
+import { getAssetSelectorSessionStore } from "../../../studio-shell/asset-selector/AssetSelectorSessionRegistry";
+import type { AssetSelectorResultItem } from "../../../studio-shell/asset-selector/AssetSelectorDataProvider";
 import {
-  InlineAssetCreationModes,
-  InlineAssetCreationService,
-} from "../../../routes/InlineAssetCreation";
+  createDatasetAssetSelectorRequest,
+  DatasetAssetSelectorAdapter,
+} from "../../../studio-shell/asset-selector/DatasetAssetSelectorAdapter";
+import { AssetSelectorStudioLaunchService } from "../../../studio-shell/asset-selector/AssetSelectorStudioLaunchService";
+import { AssetSelectorReturnHandoffService } from "../../../studio-shell/asset-selector/AssetSelectorReturnHandoffService";
 import {
-  applyInlineDatasetReturnToDraft,
   listDatasetInputs,
   removeDatasetInputSelection,
-  toggleDatasetInputSelection,
-  type WorkflowDatasetAssetCandidate,
+  replaceDatasetInputSelections,
 } from "../../../studio-shell/workflow/WorkflowWizardDatasetInputs";
 
 interface WorkflowStudioInputSectionEditorProps {
@@ -23,21 +30,13 @@ interface WorkflowStudioInputSectionEditorProps {
   readonly draftValidationIssues: ReadonlyArray<WorkflowValidationIssue>;
   readonly onUpdateSharedDraft?: (updater: (draft: WorkflowDraft) => WorkflowDraft) => void;
   readonly studioId?: string;
-  readonly routeSearch?: string;
-  readonly onReplaceRouteSearch?: (nextSearch: string) => void;
-}
-
-interface DatasetCatalogState {
-  readonly loading: boolean;
-  readonly assets: ReadonlyArray<WorkflowDatasetAssetCandidate>;
-  readonly error?: string;
 }
 
 const inputTypeDefinitions = Object.freeze([
   Object.freeze({
     sourceType: WorkflowDraftInputSourceTypes.datasetAsset,
     label: "Dataset asset",
-    summary: "Selectable registry-backed dataset assets.",
+    summary: "Selectable registry-backed dataset assets through the shared selector shell.",
     interactive: true,
   }),
   Object.freeze({
@@ -58,39 +57,19 @@ function buildSectionSummary(count: number, singular: string, plural: string): s
   return count === 1 ? `1 ${singular}` : `${count} ${plural}`;
 }
 
-function buildDatasetLabel(asset: WorkflowDatasetAssetCandidate): string {
-  const base = asset.name?.trim() || asset.assetId;
-  return asset.versionId ? `${base} (${asset.versionId})` : base;
-}
-
-function toDatasetCandidate(asset: {
+function buildDatasetLabel(input: {
+  readonly title?: string;
   readonly assetId: string;
   readonly versionId?: string;
-  readonly name: string;
-}): WorkflowDatasetAssetCandidate {
-  return Object.freeze({
-    assetId: asset.assetId,
-    versionId: asset.versionId,
-    name: asset.name,
-  });
-}
-
-function sanitizeSearchForReturn(search: string): string {
-  const params = new URLSearchParams(search);
-  params.delete("inlineCreate");
-  params.delete("inlineMode");
-  params.delete("inlineOrigin");
-  params.delete("returnTo");
-  params.delete("returnContextId");
-  params.delete("inlineReturn");
-  params.delete("inlineStatus");
-  params.delete("inlineAssetId");
-  params.delete("inlineVersionId");
-  params.delete("inlineSourceStudioType");
-  params.delete("inlineSourceStudioId");
-  params.set("mode", "wizard");
-  const query = params.toString();
-  return query.length > 0 ? `?${query}` : "";
+}): string {
+  const title = input.title?.trim();
+  if (title && input.versionId) {
+    return `${title} (${input.versionId})`;
+  }
+  if (title) {
+    return title;
+  }
+  return input.versionId ? `${input.assetId} (${input.versionId})` : input.assetId;
 }
 
 export default function WorkflowStudioInputSectionEditor({
@@ -98,20 +77,56 @@ export default function WorkflowStudioInputSectionEditor({
   draftValidationIssues,
   onUpdateSharedDraft,
   studioId,
-  routeSearch = "",
-  onReplaceRouteSearch,
 }: WorkflowStudioInputSectionEditorProps): JSX.Element {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const selectorSessionStore = useMemo(() => getAssetSelectorSessionStore(), []);
   const registryService = useMemo(() => new RegistryService(), []);
-  const inlineAssetCreationService = useMemo(() => new InlineAssetCreationService(), []);
-  const [query, setQuery] = useState("");
-  const [catalog, setCatalog] = useState<DatasetCatalogState>({
-    loading: true,
-    assets: Object.freeze([]),
-  });
+  const studioLaunchService = useMemo(() => new AssetSelectorStudioLaunchService(), []);
+  const returnHandoffService = useMemo(() => new AssetSelectorReturnHandoffService(), []);
+  const selectorDataProvider = useMemo(() => new DatasetAssetSelectorAdapter({
+    registryService,
+    limit: 50,
+  }), [registryService]);
+  const selectorSessionKey = useMemo(
+    () => `workflow-studio:${studioId?.trim() || "default"}:inputs:dataset`,
+    [studioId],
+  );
+  const selectorRequest = useMemo(
+    () => createDatasetAssetSelectorRequest({
+      requestId: `selector:${selectorSessionKey}`,
+      selectionMode: "multi-select",
+      minSelections: 0,
+      required: false,
+      originatingStudio: "workflow-studio",
+      originatingField: "inputs.dataset",
+      launchSource: "wizard",
+    }),
+    [selectorSessionKey],
+  );
+
+  const [searchTerm, setSearchTerm] = useState("");
+  const [items, setItems] = useState<ReadonlyArray<AssetSelectorResultItem>>([]);
+  const [loading, setLoading] = useState(true);
+  const [queryError, setQueryError] = useState<string | undefined>(undefined);
+  const [queryRevision, setQueryRevision] = useState(0);
+  const [selectorNotice, setSelectorNotice] = useState<string | undefined>(undefined);
+  const [returnedItems, setReturnedItems] = useState<ReadonlyArray<AssetSelectorResultItem>>([]);
+  const [selectorState, setSelectorState] = useState<AssetSelectorSessionState | undefined>(
+    () => selectorSessionStore.getSession(selectorSessionKey),
+  );
+  const [selectorOpen, setSelectorOpen] = useState(false);
+  const lastAppliedCompletedCount = useRef<number | undefined>(undefined);
 
   const datasetInputs = useMemo(() => listDatasetInputs(sharedDraft), [sharedDraft]);
-  const datasetSelectionByAssetId = useMemo(
-    () => new Map(datasetInputs.map((entry) => [entry.asset.assetId, entry])),
+  const selectedDatasetAssets = useMemo(
+    () => datasetInputs.map((entry) => Object.freeze({
+      assetId: entry.asset.assetId,
+      versionId: entry.asset.versionId,
+      assetType: "dataset" as const,
+      displayName: entry.title,
+      taxonomy: entry.asset.taxonomy,
+    })),
     [datasetInputs],
   );
   const otherInputs = useMemo(
@@ -124,107 +139,299 @@ export default function WorkflowStudioInputSectionEditor({
   );
   const sectionHasErrors = datasetValidationIssues.length > 0;
 
-  const inlineReturn = useMemo(
-    () => inlineAssetCreationService.parseInlineReturnFromSearch(routeSearch),
-    [inlineAssetCreationService, routeSearch],
-  );
+  useEffect(() => {
+    const existing = selectorSessionStore.getSession(selectorSessionKey);
+    if (!existing) {
+      selectorSessionStore.prepareSession({
+        sessionKey: selectorSessionKey,
+        request: selectorRequest,
+        initialSelectedAssets: selectedDatasetAssets,
+      });
+    }
 
-  const createDatasetLaunchPath = useMemo(() => {
-    const returnTargetPath = `${ROUTE_PATHS.workflowStudioMode.replace(":modeId", "wizard")}${sanitizeSearchForReturn(routeSearch)}#workflow-wizard-inputs`;
-    return inlineAssetCreationService.launch({
-      requestedStudioType: "dataset-studio",
-      requestedRole: "dataset",
-      mode: InlineAssetCreationModes.inlineContext,
-      context: {
-        source: "studio-shell",
-        sourceIntentKey: "create-workflow-input-dataset",
-        sourceIntentLabel: "Create dataset input",
-        sourceMetadata: {
-          sourceStudio: "workflow-studio",
-          sourceSection: "inputs",
-        },
-      },
-      returnTarget: {
-        routePath: returnTargetPath,
-        contextId: studioId,
-      },
-    })?.launchPath;
-  }, [inlineAssetCreationService, routeSearch, studioId]);
+    if (selectorSessionStore.getSession(selectorSessionKey)?.lifecycleState === AssetSelectorSessionLifecycleStates.idle) {
+      selectorSessionStore.activateSession(selectorSessionKey);
+    }
+
+    const unsubscribe = selectorSessionStore.subscribe(selectorSessionKey, setSelectorState);
+    return unsubscribe;
+  }, [selectedDatasetAssets, selectorRequest, selectorSessionKey, selectorSessionStore]);
+
+  useEffect(() => {
+    const existing = selectorSessionStore.getSession(selectorSessionKey);
+    if (!existing) {
+      return;
+    }
+    selectorSessionStore.replaceSelections(selectorSessionKey, selectedDatasetAssets);
+  }, [selectedDatasetAssets, selectorSessionKey, selectorSessionStore]);
 
   useEffect(() => {
     let active = true;
     const load = async (): Promise<void> => {
-      setCatalog((current) => ({ ...current, loading: true, error: undefined }));
-      const keyword = query.trim();
-      const response = keyword.length > 0
-        ? await registryService.searchAssets({
-          keyword,
-          structuralKinds: ["atomic"],
-          semanticRoles: ["dataset"],
-          behaviorKinds: ["none"],
-          limit: 50,
-        })
-        : await registryService.filterAssets({
-          structuralKinds: ["atomic"],
-          semanticRoles: ["dataset"],
-          behaviorKinds: ["none"],
-          limit: 50,
-        });
-
+      setLoading(true);
+      setQueryError(undefined);
+      const response = await selectorDataProvider.query({
+        request: selectorRequest,
+        searchTerm,
+      });
       if (!active) {
         return;
       }
-
-      if (!response.ok || !response.data) {
-        setCatalog({
-          loading: false,
-          assets: Object.freeze([]),
-          error: response.error?.message ?? "Unable to load dataset assets.",
-        });
-        return;
-      }
-
-      setCatalog({
-        loading: false,
-        assets: Object.freeze(response.data.map((asset) => toDatasetCandidate(asset))),
-      });
+      setItems(response.items);
+      setQueryError(response.error);
+      setLoading(false);
     };
-
     void load();
     return () => {
       active = false;
     };
-  }, [query, registryService]);
+  }, [queryRevision, searchTerm, selectorDataProvider, selectorRequest]);
 
   useEffect(() => {
-    if (!inlineReturn) {
+    const outcome = returnHandoffService.handle({
+      search: location.search,
+      sessionKey: selectorSessionKey,
+      request: selectorRequest,
+      sessionStore: selectorSessionStore,
+    });
+
+    if (!outcome.handled) {
       return;
     }
 
-    if (onUpdateSharedDraft) {
-      onUpdateSharedDraft((draft) => applyInlineDatasetReturnToDraft(draft, {
-        status: inlineReturn.status,
-        assetId: inlineReturn.assetId,
-        versionId: inlineReturn.versionId,
-      }).draft);
+    if (outcome.returnedAsset) {
+      setReturnedItems((current) => {
+        const key = `${outcome.returnedAsset?.assetId}:${outcome.returnedAsset?.versionId ?? ""}`;
+        const existing = new Set(current.map((entry) => `${entry.asset.assetId}:${entry.asset.versionId ?? ""}`));
+        if (existing.has(key)) {
+          return current;
+        }
+        const nextItem: AssetSelectorResultItem = Object.freeze({
+          id: key,
+          title: outcome.returnedAsset?.displayName ?? outcome.returnedAsset?.assetId,
+          subtitle: outcome.returnedAsset?.versionId,
+          description: "Created in Dataset Studio",
+          badges: Object.freeze(["dataset", "new"]),
+          asset: outcome.returnedAsset,
+        });
+        return Object.freeze([nextItem, ...current]);
+      });
+      setQueryRevision((current) => current + 1);
+      setSelectorNotice(undefined);
+      setSelectorOpen(true);
     }
 
-    const nextSearch = inlineAssetCreationService.stripInlineReturnFromSearch(routeSearch);
-    if (nextSearch === routeSearch) {
+    if (outcome.consumed && outcome.nextSearch !== undefined) {
+      void navigate({
+        pathname: location.pathname,
+        search: outcome.nextSearch,
+        hash: location.hash,
+      }, { replace: true });
+    }
+  }, [
+    location.hash,
+    location.pathname,
+    location.search,
+    navigate,
+    returnHandoffService,
+    selectorRequest,
+    selectorSessionKey,
+    selectorSessionStore,
+  ]);
+
+  useEffect(() => {
+    if (!selectorState || !onUpdateSharedDraft) {
       return;
     }
 
-    onReplaceRouteSearch?.(nextSearch);
-  }, [inlineAssetCreationService, inlineReturn, onReplaceRouteSearch, onUpdateSharedDraft, routeSearch]);
+    const completedCount = selectorState.lifecycleHistory.filter(
+      (entry) => entry === AssetSelectorSessionLifecycleStates.completed,
+    ).length;
+    if (lastAppliedCompletedCount.current === undefined) {
+      lastAppliedCompletedCount.current = completedCount;
+      return;
+    }
+    if (completedCount <= lastAppliedCompletedCount.current) {
+      return;
+    }
+    lastAppliedCompletedCount.current = completedCount;
+
+    onUpdateSharedDraft((draft) => replaceDatasetInputSelections(
+      draft,
+      selectorState.selectedAssets.map((entry) => Object.freeze({
+        assetId: entry.assetId,
+        versionId: entry.versionId,
+        name: entry.displayName,
+      })),
+    ).draft);
+    setSelectorOpen(false);
+  }, [onUpdateSharedDraft, selectorState]);
+
+  const stateForShell = selectorState ?? selectorSessionStore.getSession(selectorSessionKey);
+  const shellItems = useMemo(() => {
+    const byId = new Map<string, AssetSelectorResultItem>();
+    for (const item of returnedItems) {
+      byId.set(item.id, item);
+    }
+    for (const item of items) {
+      byId.set(item.id, item);
+    }
+    return Object.freeze([...byId.values()]);
+  }, [items, returnedItems]);
+  const unavailableDatasetInputs = useMemo(() => {
+    if (searchTerm.trim().length > 0 || loading || Boolean(queryError)) {
+      return Object.freeze([] as typeof datasetInputs);
+    }
+    const availableAssetIds = new Set(shellItems.map((item) => item.asset.assetId));
+    return Object.freeze(datasetInputs.filter((entry) => !availableAssetIds.has(entry.asset.assetId)));
+  }, [datasetInputs, loading, queryError, searchTerm, shellItems]);
 
   return (
     <WizardSection sectionId="workflow-wizard-inputs" validationState={sectionHasErrors ? "error" : "none"}>
       <SectionHeader
         title="Inputs Section"
-        description="Configure workflow inputs from canonical asset-backed sources. Dataset selection is interactive in this slice and writes directly to the shared workflow draft inputs array."
+        description="Configure workflow inputs from canonical asset-backed sources. Dataset selection now uses the shared selector shell and shared selector session state."
       />
       <SectionBody>
         <div className="ui-text-small">{buildSectionSummary(sharedDraft.inputs.length, "input", "inputs")}</div>
+
+        <div className="ui-card ui-card--padded ui-stack ui-stack--2xs">
+          <strong>Dataset inputs</strong>
+          {datasetInputs.length === 0 ? (
+            <span className="ui-text-small ui-text-secondary">No datasets attached yet.</span>
+          ) : (
+            <div className="ui-stack ui-stack--2xs" data-testid="workflow-input-dataset-list">
+              {datasetInputs.map((input) => (
+                <div key={input.id} className="ui-row ui-row--between ui-row--wrap" style={{ gap: "0.5rem" }}>
+                  <div className="ui-stack ui-stack--2xs">
+                    <span className="ui-text-small"><strong>{buildDatasetLabel({
+                      title: input.title,
+                      assetId: input.asset.assetId,
+                      versionId: input.asset.versionId,
+                    })}</strong></span>
+                    <span className="ui-text-small ui-text-secondary">{input.asset.assetId}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="ui-button ui-button--ghost ui-button--sm"
+                    disabled={!onUpdateSharedDraft}
+                    data-testid={`workflow-input-remove-dataset-${input.id}`}
+                    onClick={() => {
+                      if (!onUpdateSharedDraft) {
+                        return;
+                      }
+                      onUpdateSharedDraft((draft) => removeDatasetInputSelection(draft, input.asset.assetId).draft);
+                    }}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="ui-row ui-row--wrap" style={{ gap: "0.5rem" }}>
+            <button
+              type="button"
+              className="ui-button ui-button--sm"
+              data-testid="workflow-input-open-selector"
+              onClick={() => {
+                selectorSessionStore.activateSession(selectorSessionKey);
+                selectorSessionStore.setPendingSelections(selectorSessionKey, selectedDatasetAssets);
+                setSelectorOpen((current) => !current || datasetInputs.length === 0);
+              }}
+            >
+              {selectorOpen ? "Selector open" : "Add or modify datasets"}
+            </button>
+            {selectorOpen ? (
+              <button
+                type="button"
+                className="ui-button ui-button--ghost ui-button--sm"
+                data-testid="workflow-input-close-selector"
+                onClick={() => {
+                  selectorSessionStore.activateSession(selectorSessionKey);
+                  selectorSessionStore.setPendingSelections(selectorSessionKey, selectedDatasetAssets);
+                  setSelectorOpen(false);
+                }}
+              >
+                Close selector
+              </button>
+            ) : null}
+          </div>
+        </div>
+
+        {selectorOpen && stateForShell ? (
+          <AssetSelectorShell
+            title="Dataset inputs"
+            state={stateForShell}
+            searchTerm={searchTerm}
+            items={shellItems}
+            loading={loading}
+            error={queryError}
+            onSearchTermChange={setSearchTerm}
+            onToggleSelection={(item) => {
+              selectorSessionStore.togglePendingSelection(selectorSessionKey, item.asset);
+            }}
+            onConfirm={() => {
+              selectorSessionStore.confirmPendingSelections(selectorSessionKey);
+            }}
+            onCancel={() => {
+              selectorSessionStore.cancelSession(selectorSessionKey, "user-cancelled-selector");
+              selectorSessionStore.activateSession(selectorSessionKey);
+              selectorSessionStore.setPendingSelections(selectorSessionKey, selectedDatasetAssets);
+              setSelectorOpen(false);
+            }}
+            onCreateNew={() => {
+              const launch = studioLaunchService.launch({
+                sessionKey: selectorSessionKey,
+                selectorRequest,
+                routePath: location.pathname,
+                routeSearch: location.search,
+                routeHash: location.hash || "#workflow-wizard-inputs",
+              });
+              if (!launch) {
+                setSelectorNotice("Unable to open Dataset Studio from this selector request.");
+                return;
+              }
+              selectorSessionStore.transitionToCreatingNew(selectorSessionKey, {
+                originatingContext: selectorRequest.context,
+                requestedAssetType: selectorRequest.assetType,
+                returnTargetSessionKey: selectorSessionKey,
+                returnRoutePath: launch.returnTarget?.routePath,
+              });
+              setSelectorNotice(undefined);
+              void navigate(launch.launchPath);
+            }}
+            onRetry={() => {
+              setQueryRevision((current) => current + 1);
+            }}
+          />
+        ) : null}
+
+        {selectorNotice ? (
+          <div className="ui-text-small ui-text-secondary" data-testid="workflow-input-dataset-create-stub-notice">
+            {selectorNotice}
+          </div>
+        ) : null}
+
+        {unavailableDatasetInputs.length > 0 ? (
+          <div className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="workflow-input-unavailable-datasets">
+            <strong>Unavailable datasets</strong>
+            <span className="ui-text-small ui-text-secondary">
+              Some attached datasets are no longer available in the registry. Remove or replace them before run preparation.
+            </span>
+            <ul className="ui-stack ui-stack--2xs" style={{ margin: 0, paddingLeft: "1rem" }}>
+              {unavailableDatasetInputs.map((entry) => (
+                <li key={`missing-${entry.id}`} className="ui-text-small ui-text-danger">
+                  {buildDatasetLabel({
+                    title: entry.title,
+                    assetId: entry.asset.assetId,
+                    versionId: entry.asset.versionId,
+                  })}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
 
         <div className="ui-card ui-card--padded ui-stack ui-stack--2xs">
           <strong>Input types</strong>
@@ -235,104 +442,6 @@ export default function WorkflowStudioInputSectionEditor({
               </li>
             ))}
           </ul>
-        </div>
-
-        <div className="ui-stack ui-stack--2xs">
-          <div className="ui-row ui-row--between ui-row--wrap" style={{ gap: "0.5rem" }}>
-            <strong>Dataset asset inputs ({datasetInputs.length})</strong>
-            {createDatasetLaunchPath ? (
-              <a
-                className="ui-button ui-button--ghost ui-button--sm"
-                href={createDatasetLaunchPath}
-                data-testid="workflow-input-create-dataset-link"
-              >
-                Create new dataset
-              </a>
-            ) : (
-              <button type="button" className="ui-button ui-button--ghost ui-button--sm" disabled>
-                Create new dataset
-              </button>
-            )}
-          </div>
-
-          <label className="ui-stack ui-stack--2xs">
-            <span className="ui-text-small">Search datasets</span>
-            <input
-              className="ui-input"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search dataset assets"
-              data-testid="workflow-input-dataset-search"
-            />
-          </label>
-
-          {catalog.loading ? <span className="ui-text-small ui-text-secondary">Loading dataset assets...</span> : null}
-          {catalog.error ? <span className="ui-text-small ui-text-danger">{catalog.error}</span> : null}
-
-          {!catalog.loading && !catalog.error && catalog.assets.length === 0 ? (
-            <div className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="workflow-input-dataset-empty-state">
-              <strong>No dataset assets available.</strong>
-              <span className="ui-text-small ui-text-secondary">
-                Create a dataset in Dataset Studio, then return here to continue configuring workflow inputs.
-              </span>
-            </div>
-          ) : null}
-
-          {datasetInputs.length > 0 ? (
-            <div className="ui-stack ui-stack--2xs" data-testid="workflow-input-selected-datasets">
-              <span className="ui-text-small ui-text-secondary">Selected datasets</span>
-              <div className="ui-row ui-row--wrap" style={{ gap: "0.5rem" }}>
-                {datasetInputs.map((input, index) => (
-                  <button
-                    key={`${input.asset.assetId}:${input.asset.versionId ?? ""}:${index}`}
-                    type="button"
-                    className="ui-badge"
-                    data-testid={`workflow-input-selected-dataset-${index}`}
-                    disabled={!onUpdateSharedDraft}
-                    onClick={() => {
-                      if (!onUpdateSharedDraft) {
-                        return;
-                      }
-                      onUpdateSharedDraft((draft) => removeDatasetInputSelection(draft, input.asset.assetId).draft);
-                    }}
-                  >
-                    {buildDatasetLabel({ assetId: input.asset.assetId, versionId: input.asset.versionId, name: input.title })} x
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <p className="ui-text-muted">No dataset inputs selected yet.</p>
-          )}
-
-          {catalog.assets.length > 0 ? (
-            <ul className="ui-stack ui-stack--2xs" style={{ margin: 0, paddingLeft: "1rem" }}>
-              {catalog.assets.map((asset, index) => {
-                const selected = datasetSelectionByAssetId.has(asset.assetId);
-                return (
-                  <li key={`${asset.assetId}:${asset.versionId ?? ""}`}>
-                    <div className="ui-row ui-row--between ui-row--wrap" style={{ gap: "0.5rem" }}>
-                      <span className="ui-text-small">{buildDatasetLabel(asset)}</span>
-                      <button
-                        type="button"
-                        className={`ui-button ui-button--sm ${selected ? "ui-button--ghost" : ""}`}
-                        data-testid={`workflow-input-dataset-toggle-${index}`}
-                        disabled={!onUpdateSharedDraft}
-                        onClick={() => {
-                          if (!onUpdateSharedDraft) {
-                            return;
-                          }
-                          onUpdateSharedDraft((draft) => toggleDatasetInputSelection(draft, asset).draft);
-                        }}
-                      >
-                        {selected ? "Remove" : "Add"}
-                      </button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : null}
         </div>
 
         {otherInputs.length > 0 ? (

@@ -35,6 +35,14 @@ function normalizeOptional(value?: string): string | undefined {
   return normalized ? normalized : undefined;
 }
 
+function isCanonicalAssetIdentity(value: string | undefined): boolean {
+  if (!value) {
+    return true;
+  }
+  const normalized = value.trim();
+  return normalized.length > 0 && normalized.startsWith("asset:");
+}
+
 function toDatasetInput(input: WorkflowDraftInput): WorkflowDraftDatasetInput | undefined {
   return input.sourceType === WorkflowDraftInputSourceTypes.datasetAsset
     ? input as WorkflowDraftDatasetInput
@@ -90,6 +98,13 @@ export function buildDatasetInputFromAsset(
   if (!assetId) {
     throw new Error("Dataset asset id is required.");
   }
+  if (!isCanonicalAssetIdentity(assetId)) {
+    throw new Error("Dataset asset id must use canonical 'asset:' identity.");
+  }
+  const versionId = normalizeOptional(candidate.versionId);
+  if (!isCanonicalAssetIdentity(versionId)) {
+    throw new Error("Dataset asset version id must use canonical 'asset:' identity when provided.");
+  }
 
   const title = normalizeOptional(candidate.name);
   const suffix = assetId.split(":").at(-1) ?? assetId;
@@ -103,7 +118,7 @@ export function buildDatasetInputFromAsset(
     required: true,
     asset: Object.freeze({
       assetId,
-      versionId: normalizeOptional(candidate.versionId),
+      versionId,
       taxonomy: datasetInputTaxonomy,
     }),
   });
@@ -115,6 +130,9 @@ export function upsertDatasetInputSelection(
 ): { readonly draft: WorkflowDraft; readonly changed: boolean } {
   const assetId = candidate.assetId.trim();
   if (!assetId) {
+    return Object.freeze({ draft, changed: false });
+  }
+  if (!isCanonicalAssetIdentity(assetId)) {
     return Object.freeze({ draft, changed: false });
   }
 
@@ -131,6 +149,9 @@ export function upsertDatasetInputSelection(
   }
 
   const normalizedVersionId = normalizeOptional(candidate.versionId);
+  if (!isCanonicalAssetIdentity(normalizedVersionId)) {
+    return Object.freeze({ draft, changed: false });
+  }
   const normalizedTitle = normalizeOptional(candidate.name);
   const existingInput = existing.input;
   if (existingInput.asset.versionId === normalizedVersionId && (!normalizedTitle || normalizedTitle === existingInput.title)) {
@@ -209,4 +230,59 @@ export function applyInlineDatasetReturnToDraft(
     assetId: payload.assetId,
     versionId: payload.versionId,
   });
+}
+
+export function replaceDatasetInputSelections(
+  draft: WorkflowDraft,
+  selections: ReadonlyArray<WorkflowDatasetAssetCandidate>,
+): { readonly draft: WorkflowDraft; readonly changed: boolean } {
+  const normalizedSelections = dedupeAssetReferences(selections);
+  const existingDatasetInputs = listDatasetInputs(draft);
+
+  if (
+    existingDatasetInputs.length === normalizedSelections.length
+    && existingDatasetInputs.every((entry) => normalizedSelections.some((candidate) => (
+      candidate.assetId === entry.asset.assetId
+      && (candidate.versionId ?? undefined) === (entry.asset.versionId ?? undefined)
+      && (candidate.name ?? entry.title) === entry.title
+    )))
+  ) {
+    return Object.freeze({
+      draft,
+      changed: false,
+    });
+  }
+
+  let nextDraft: WorkflowDraft = Object.freeze({
+    ...draft,
+    inputs: Object.freeze(draft.inputs.filter((entry) => entry.sourceType !== WorkflowDraftInputSourceTypes.datasetAsset)),
+  });
+
+  for (const selection of normalizedSelections) {
+    nextDraft = upsertDatasetInputSelection(nextDraft, selection).draft;
+  }
+
+  return Object.freeze({
+    draft: nextDraft,
+    changed: true,
+  });
+}
+
+function dedupeAssetReferences(
+  selections: ReadonlyArray<WorkflowDatasetAssetCandidate>,
+): ReadonlyArray<WorkflowDatasetAssetCandidate> {
+  const entries = new Map<string, WorkflowDatasetAssetCandidate>();
+  for (const selection of selections) {
+    const assetId = selection.assetId.trim();
+    const versionId = normalizeOptional(selection.versionId);
+    if (!assetId || !isCanonicalAssetIdentity(assetId) || !isCanonicalAssetIdentity(versionId)) {
+      continue;
+    }
+    entries.set(assetId, Object.freeze({
+      assetId,
+      versionId,
+      name: normalizeOptional(selection.name),
+    }));
+  }
+  return Object.freeze([...entries.values()]);
 }

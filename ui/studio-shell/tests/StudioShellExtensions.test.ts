@@ -93,6 +93,13 @@ describe("StudioRegistrationRegistry", () => {
     expect(registry.get("workflow-studio")?.kind).toBe("composite");
     expect(registry.get("workflow-studio")?.role).toBe("workflow");
     expect(registry.get("workflow-studio")?.allowedBehaviorKinds).toEqual(["deterministic", "conditional", "iterative"]);
+    expect(registry.get("workflow-studio")?.shell?.toolbar?.actions.map((entry) => entry.id)).toEqual([
+      "workflow-studio-toolbar-mode-wizard",
+      "workflow-studio-toolbar-mode-canvas",
+      "workflow-studio-toolbar-save",
+      "workflow-studio-toolbar-validate",
+      "workflow-studio-toolbar-refresh",
+    ]);
     expect(registry.listExtensionsBySlot("workflow-studio", StudioShellExtensionSlots.draftAuthoring).map((entry) => entry.id)).toContain(
       "workflow-studio-mode-abstraction",
     );
@@ -126,6 +133,52 @@ describe("StudioRegistrationRegistry", () => {
       studioType: "bad-composite-role",
       role: "agent",
     })).toThrow("not supported");
+  });
+
+  it("rejects invalid or duplicate toolbar action configuration", () => {
+    const registry = new StudioRegistrationRegistry();
+
+    expect(() => registry.register({
+      ...workflowStudioRegistration,
+      studioType: "workflow-studio-invalid-toolbar-mode",
+      studioId: "studio-workflow-invalid-toolbar-mode",
+      shell: {
+        ...(workflowStudioRegistration.shell ?? {}),
+        toolbar: {
+          actions: [
+            {
+              id: "invalid-mode",
+              kind: "set-workflow-mode",
+              modeId: "unknown" as "wizard",
+              label: "Invalid",
+            },
+          ],
+        },
+      },
+    })).toThrow("unsupported workflow mode");
+
+    expect(() => registry.register({
+      ...workflowStudioRegistration,
+      studioType: "workflow-studio-duplicate-toolbar-actions",
+      studioId: "studio-workflow-duplicate-toolbar-actions",
+      shell: {
+        ...(workflowStudioRegistration.shell ?? {}),
+        toolbar: {
+          actions: [
+            {
+              id: "duplicate-action",
+              kind: "refresh-snapshot",
+              label: "Refresh",
+            },
+            {
+              id: "duplicate-action",
+              kind: "save-draft",
+              label: "Save",
+            },
+          ],
+        },
+      },
+    })).toThrow("is duplicated");
   });
 });
 

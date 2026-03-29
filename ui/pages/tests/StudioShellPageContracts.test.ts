@@ -22,6 +22,10 @@ describe("StudioShellPage contracts", () => {
     expect(source).toContain("workflowModeState");
     expect(source).toContain("studioRegistration");
     expect(source).toContain("shellTitle");
+    expect(source).toContain("toolbarActions");
+    expect(source).toContain('data-testid="studio-shell-authoring-toolbar"');
+    expect(source).toContain("runToolbarAction(");
+    expect(source).toContain("setWorkflowModeFromToolbar(");
     expect(source).toContain("buildCreateMetadata(");
     expect(source).toContain("renderExtensions(");
     expect(source).toContain("StudioShellExtensionSlots");
@@ -32,5 +36,6 @@ describe("StudioShellPage contracts", () => {
     expect(source).toContain("service.transitionLifecycle");
     expect(source).toContain("service.publishVersion");
     expect(source).toContain("service.validateDraft");
+    expect(source.indexOf("Asset draft authoring")).toBeLessThan(source.indexOf("ui-studio-shell__grid"));
   });
 });

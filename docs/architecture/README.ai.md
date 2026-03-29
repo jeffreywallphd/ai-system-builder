@@ -88,6 +88,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Canonical asset summary/detail reads include taxonomy via identity metadata with bounded fallback mapping.
 - See `docs/architecture/shared-composition-taxonomy.md` for the practical architecture note and current-scope boundaries.
 - Shared asset contracts now complement taxonomy (`domain/contracts/AssetContract.ts`, `application/contracts/CompositionAssetContractResolver.ts`) and are surfaced through canonical operational reads when available; see `docs/architecture/shared-asset-contracts.md`.
+- Asset selector foundation now lives in `domain/studio-shell/AssetSelectorContract.ts` and `application/studio-entry/AssetSelectorCapabilityRegistry.ts`; see `docs/architecture/asset-selector-framework.md`.
 
 ## Direction 5 update: Exchange (Epic 10) status snapshot
 

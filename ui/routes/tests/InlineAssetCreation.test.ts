@@ -24,6 +24,11 @@ describe("InlineAssetCreationService", () => {
         parentVersionId: "asset:system-root:v1",
         selectedComponent: "new-component",
       },
+      selectorLaunch: {
+        selectorSessionId: "selector:workflow:inputs",
+        assetType: "dataset",
+        returnRoutePath: "/studio-shell/workflow/wizard?mode=wizard",
+      },
     });
 
     expect(result).toBeDefined();
@@ -34,6 +39,9 @@ describe("InlineAssetCreationService", () => {
     expect(query.get("returnTo")).toBe("/studio-shell/system");
     expect(query.get("parentAssetId")).toBe("asset:system-root");
     expect(query.get("selectedComponent")).toBe("new-component");
+    expect(query.get("selectorLaunch")).toBe("1");
+    expect(query.get("selectorSessionId")).toBe("selector:workflow:inputs");
+    expect(query.get("selectorAssetType")).toBe("dataset");
   });
 
   it("parses explicit inline return target semantics", () => {
@@ -60,6 +68,8 @@ describe("InlineAssetCreationService", () => {
         status: InlineAssetReturnStatuses.created,
         assetId: "asset:dataset-created",
         versionId: "asset:dataset-created:v1",
+        assetType: "dataset",
+        displayName: "New dataset",
         sourceStudioType: "dataset-studio",
         sourceStudioId: "studio-datasets",
       },
@@ -69,6 +79,8 @@ describe("InlineAssetCreationService", () => {
       status: "created",
       assetId: "asset:dataset-created",
       versionId: "asset:dataset-created:v1",
+      assetType: "dataset",
+      displayName: "New dataset",
       sourceStudioType: "dataset-studio",
       sourceStudioId: "studio-datasets",
       returnContextId: "workflow-studio",
@@ -93,5 +105,18 @@ describe("InlineAssetCreationService", () => {
       "?mode=wizard&inlineReturn=1&inlineStatus=created&inlineAssetId=asset:dataset&inlineVersionId=v1&assetId=asset:workflow",
     );
     expect(stripped).toBe("?mode=wizard&assetId=asset%3Aworkflow");
+  });
+
+  it("parses selector launch context from search params", () => {
+    const service = new InlineAssetCreationService();
+    const parsed = service.parseSelectorLaunchFromSearch(
+      "?selectorLaunch=1&selectorSessionId=selector%3Aworkflow%3Asteps&selectorAssetType=agent&selectorReturnTo=%2Fstudio-shell%2Fworkflow",
+    );
+
+    expect(parsed).toEqual({
+      selectorSessionId: "selector:workflow:steps",
+      assetType: "agent",
+      returnRoutePath: "/studio-shell/workflow",
+    });
   });
 });
