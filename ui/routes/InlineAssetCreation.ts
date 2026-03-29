@@ -54,6 +54,7 @@ export interface InlineAssetCreationResult {
 export const InlineAssetReturnStatuses = Object.freeze({
   created: "created",
   cancelled: "cancelled",
+  noSelection: "no-selection",
 });
 
 export type InlineAssetReturnStatus = typeof InlineAssetReturnStatuses[keyof typeof InlineAssetReturnStatuses];
@@ -131,7 +132,11 @@ function appendReturnTarget(path: string, request: InlineAssetCreationRequest): 
 }
 
 function parseInlineReturnStatus(value?: string | null): InlineAssetReturnStatus | undefined {
-  if (value === InlineAssetReturnStatuses.created || value === InlineAssetReturnStatuses.cancelled) {
+  if (
+    value === InlineAssetReturnStatuses.created
+    || value === InlineAssetReturnStatuses.cancelled
+    || value === InlineAssetReturnStatuses.noSelection
+  ) {
     return value;
   }
   return undefined;

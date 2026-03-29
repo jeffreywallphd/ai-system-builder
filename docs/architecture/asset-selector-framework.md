@@ -310,6 +310,14 @@ Future selector-backed asset-type adoption guidance:
 - Workflow Studio origin launches build this contract through `ui/studio-shell/workflow/WorkflowStudioLaunchContext.ts`, including origin route, workflow draft reference/state, selector target context, and return/resume destination.
 - `InlineAssetCreationService` remains backward-compatible with existing selector query params and now falls back to parsing the canonical contract when those params are absent.
 
+## Direction 5 stories 5.3-5.4: Shared return resolution + workflow session persistence
+- Return payload resolution is now centralized in `ui/routes/StudioReturnPayloadResolution.ts`:
+  - typed resolution (`created`, `cancelled`, `no-selection`, `invalid`)
+  - canonical payload validation and selector-target extraction from handoff context
+- `AssetSelectorReturnHandoffService` now uses that shared resolver and explicitly supports `no-selection` without mutating selected assets.
+- Workflow return restoration now uses canonical handoff origin context via `ui/studio-shell/workflow/WorkflowStudioReturnRestorationService.ts` (mode + draft snapshot + draft/session reference restore).
+- Workflow authoring state persistence now lives in `WorkflowStudioModeStateStore` local-storage snapshots keyed by studio id, preserving in-progress draft sections (`triggers`, `inputs`, `steps`, `outputs`) through launch/return and refresh flows.
+
 ## Story 4.14: Workflow wizard focus and layout hardening
 - Wizard mode now prioritizes page authoring flow by rendering the active wizard page directly under page buttons in the primary wizard card (`WorkflowStudioWizardModeSurface`).
 - The per-section readiness label row was removed from the default surface to reduce redundant readiness copy in the main authoring path.

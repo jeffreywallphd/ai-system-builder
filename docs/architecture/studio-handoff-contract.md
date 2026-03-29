@@ -6,8 +6,12 @@ Defines the canonical launch-and-return contract for cross-studio create/select 
 ## Canonical location
 - Contract model + validation + query serialization:
   - `ui/routes/StudioHandoffContract.ts`
+- Shared return payload resolution:
+  - `ui/routes/StudioReturnPayloadResolution.ts`
 - Workflow-origin launch-context adapter:
   - `ui/studio-shell/workflow/WorkflowStudioLaunchContext.ts`
+- Workflow return restoration adapter:
+  - `ui/studio-shell/workflow/WorkflowStudioReturnRestorationService.ts`
 - Route-level launch/parse integration:
   - `ui/routes/InlineAssetCreation.ts`
 
@@ -63,6 +67,18 @@ Included Workflow-origin context:
   - `no-selection`
 - Resume destination is explicit in `resume.destinationRoutePath`.
 - Existing inline return payload (`inlineReturn` query semantics) remains backward-compatible and unchanged for active callers.
+
+### Story 5.3 return payload resolution
+- Return payload parsing/validation/discrimination now goes through `StudioReturnPayloadResolver` rather than ad hoc query parsing in feature pages.
+- Resolution returns typed outcomes (`created`, `cancelled`, `no-selection`, `invalid`) plus selector-target metadata (`selectorSessionId`, `originatingField`, `selectorTargetId`) when available from canonical handoff context.
+- `AssetSelectorReturnHandoffService` now consumes that typed resolver and applies cancel/no-selection outcomes without mutating selected assets.
+
+### Story 5.4 workflow return restoration + persistence
+- Workflow Studio now restores launch-origin context from canonical handoff return payloads via `WorkflowStudioReturnRestorationService`:
+  - restores mode (`origin.workflowAuthoring.modeId`) when valid
+  - restores workflow draft snapshot (`origin.workflowAuthoring.draftState`) when present
+  - restores draft/session identity (`origin.workflowAuthoring.draftReference`) into mode-store sync context
+- Workflow mode/draft state now persists across refresh/reload through `WorkflowStudioModeStateStore` local-storage snapshots keyed per studio id (`ai-loom.workflow-studio.mode-state.v1`), preserving in-progress triggers/inputs/steps/outputs through cross-studio launch/return flows.
 
 ## Compatibility note
 `InlineAssetCreation` still supports legacy selector query params (`selectorLaunch`, `selectorSessionId`, etc.).  

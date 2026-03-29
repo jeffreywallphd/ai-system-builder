@@ -79,7 +79,7 @@ describe("InlineAssetCreationService", () => {
     });
   });
 
-  it("builds and parses inline return payloads for created and cancelled flows", () => {
+  it("builds and parses inline return payloads for created/cancelled/no-selection flows", () => {
     const service = new InlineAssetCreationService();
     const withAsset = service.buildReturnPath({
       returnTarget: {
@@ -119,6 +119,18 @@ describe("InlineAssetCreationService", () => {
     const parsedCancelled = service.parseInlineReturnFromSearch(`?${cancelled.split("?")[1]}`);
     expect(parsedCancelled?.status).toBe("cancelled");
     expect(parsedCancelled?.assetId).toBeUndefined();
+
+    const noSelection = service.buildReturnPath({
+      returnTarget: {
+        routePath: "/studio-shell/workflow/wizard?mode=wizard",
+      },
+      payload: {
+        status: InlineAssetReturnStatuses.noSelection,
+      },
+    });
+    const parsedNoSelection = service.parseInlineReturnFromSearch(`?${noSelection.split("?")[1]}`);
+    expect(parsedNoSelection?.status).toBe("no-selection");
+    expect(parsedNoSelection?.assetId).toBeUndefined();
   });
 
   it("strips one-time inline return params while preserving other query values", () => {

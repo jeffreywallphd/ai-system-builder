@@ -8,7 +8,11 @@ import {
   AssetSelectorSessionLifecycleStates,
   type AssetSelectorSessionStore,
 } from "../../../application/studio-entry/AssetSelectorSessionStore";
-import { InlineAssetReturnStatuses, InlineAssetCreationService } from "../../routes/InlineAssetCreation";
+import { InlineAssetCreationService } from "../../routes/InlineAssetCreation";
+import {
+  StudioReturnPayloadResolutionKinds,
+  StudioReturnPayloadResolver,
+} from "../../routes/StudioReturnPayloadResolution";
 
 export interface AssetSelectorReturnHandoffResult {
   readonly handled: boolean;
@@ -28,28 +32,29 @@ export interface HandleSelectorReturnInput {
 }
 
 export class AssetSelectorReturnHandoffService {
-  private readonly inlineCreationService: Pick<
-    InlineAssetCreationService,
-    "parseInlineReturnFromSearch" | "stripInlineReturnFromSearch"
-  >;
+  private readonly inlineCreationService: Pick<InlineAssetCreationService, "stripInlineReturnFromSearch">;
+  private readonly returnPayloadResolver: Pick<StudioReturnPayloadResolver, "resolveFromSearch">;
 
   public constructor(
-    inlineCreationService: Pick<InlineAssetCreationService, "parseInlineReturnFromSearch" | "stripInlineReturnFromSearch">
+    inlineCreationService: Pick<InlineAssetCreationService, "stripInlineReturnFromSearch">
     = new InlineAssetCreationService(),
+    returnPayloadResolver: Pick<StudioReturnPayloadResolver, "resolveFromSearch">
+    = new StudioReturnPayloadResolver(),
   ) {
     this.inlineCreationService = inlineCreationService;
+    this.returnPayloadResolver = returnPayloadResolver;
   }
 
   public handle(input: HandleSelectorReturnInput): AssetSelectorReturnHandoffResult {
-    const payload = this.inlineCreationService.parseInlineReturnFromSearch(input.search);
-    if (!payload) {
+    const resolution = this.returnPayloadResolver.resolveFromSearch(input.search);
+    if (!resolution.handled) {
       return Object.freeze({
         handled: false,
         consumed: false,
       });
     }
 
-    if (payload.returnContextId && payload.returnContextId !== input.sessionKey) {
+    if (resolution.selectorSessionId && resolution.selectorSessionId !== input.sessionKey) {
       return Object.freeze({
         handled: false,
         consumed: false,
@@ -66,7 +71,7 @@ export class AssetSelectorReturnHandoffService {
     }
 
     if (
-      payload.status === InlineAssetReturnStatuses.created
+      resolution.kind === StudioReturnPayloadResolutionKinds.created
       && session.lifecycleState !== AssetSelectorSessionLifecycleStates.creatingNew
       && session.lifecycleState !== AssetSelectorSessionLifecycleStates.returning
     ) {
@@ -82,7 +87,7 @@ export class AssetSelectorReturnHandoffService {
       });
     }
 
-    if (payload.status === InlineAssetReturnStatuses.cancelled) {
+    if (resolution.kind === StudioReturnPayloadResolutionKinds.cancelled) {
       input.sessionStore.resumeAfterCreationCancellation(input.sessionKey, "creation-cancelled");
       return Object.freeze({
         handled: true,
@@ -91,11 +96,21 @@ export class AssetSelectorReturnHandoffService {
       });
     }
 
-    if (!payload.assetId?.trim()) {
+    if (resolution.kind === StudioReturnPayloadResolutionKinds.noSelection) {
+      input.sessionStore.resumeAfterCreationCancellation(input.sessionKey, "creation-no-selection");
+      return Object.freeze({
+        handled: true,
+        consumed: true,
+        nextSearch: this.inlineCreationService.stripInlineReturnFromSearch(input.search),
+      });
+    }
+
+    if (resolution.kind === StudioReturnPayloadResolutionKinds.invalid) {
+      const issue = resolution.issues[0];
       input.sessionStore.reportReturnPayloadError(
         input.sessionKey,
-        "Returned selector payload is missing required assetId.",
-        "result.assets[0].assetId",
+        issue?.message ?? "Returned selector payload is malformed.",
+        issue?.path,
       );
       return Object.freeze({
         handled: true,
@@ -104,12 +119,7 @@ export class AssetSelectorReturnHandoffService {
       });
     }
 
-    if (!payload.assetType?.trim()) {
-      input.sessionStore.reportReturnPayloadError(
-        input.sessionKey,
-        "Returned selector payload is missing required assetType.",
-        "result.assets[0].assetType",
-      );
+    if (resolution.kind !== StudioReturnPayloadResolutionKinds.created || !resolution.returnedAsset) {
       return Object.freeze({
         handled: true,
         consumed: true,
@@ -117,12 +127,7 @@ export class AssetSelectorReturnHandoffService {
       });
     }
 
-    const returnedAsset: AssetSelectorAssetReference = Object.freeze({
-      assetId: payload.assetId,
-      versionId: payload.versionId,
-      assetType: payload.assetType,
-      displayName: payload.displayName,
-    });
+    const returnedAsset: AssetSelectorAssetReference = resolution.returnedAsset;
 
     const stateAfterReturn = input.sessionStore.handleReturnPayload({
       sessionKey: input.sessionKey,

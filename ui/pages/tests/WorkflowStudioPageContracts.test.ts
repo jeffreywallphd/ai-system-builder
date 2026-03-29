@@ -33,5 +33,7 @@ describe("WorkflowStudioPage contracts", () => {
     expect(shellSource).toContain("workflowModeStore.setSelectedMode(resolvedWorkflowModeId)");
     expect(shellSource).toContain("getWorkflowStudioModeStateStore(studioId)");
     expect(shellSource).toContain("synchronizeSharedDraftFromSnapshot");
+    expect(shellSource).toContain("WorkflowStudioReturnRestorationService");
+    expect(shellSource).toContain("restoreFromReturnSearch");
   });
 });

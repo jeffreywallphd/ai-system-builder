@@ -27,6 +27,7 @@ import {
   type WorkflowStudioWizardPageId,
   type WorkflowStudioWizardPageRouteResolution,
 } from "../studio-shell/workflow/WorkflowStudioWizardRouting";
+import { WorkflowStudioReturnRestorationService } from "../studio-shell/workflow/WorkflowStudioReturnRestorationService";
 import { StudioEntryService } from "../routes/StudioRouteMapping";
 import { readAutomationIntentFromSearch } from "../routes/BuildAutomationIntent";
 import { BuildIntents } from "../routes/BuildIntentModels";
@@ -170,6 +171,7 @@ export default function StudioShellPage({
       : "Reusable bounded shell for studio/session context, authoring, taxonomy/contract/provenance/dependencies, lifecycle/version state, and validation.");
   const service = useMemo(() => new StudioShellService(), []);
   const inlineAssetCreationService = useMemo(() => new InlineAssetCreationService(), []);
+  const workflowReturnRestorationService = useMemo(() => new WorkflowStudioReturnRestorationService(), []);
   const location = useLocation();
   const navigate = useNavigate();
   const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
@@ -232,6 +234,7 @@ export default function StudioShellPage({
     () => workflowModeStore?.getState(),
   );
   const automationPrefillAppliedRef = useRef(false);
+  const lastRestoredWorkflowReturnSearchRef = useRef<string | undefined>(undefined);
 
   const updateContent = (nextContent: string): void => {
     setContent(nextContent);
@@ -267,6 +270,24 @@ export default function StudioShellPage({
 
     workflowModeStore.setSelectedMode(resolvedWorkflowModeId);
   }, [resolvedWorkflowModeId, workflowModeStore]);
+
+  useEffect(() => {
+    if (!isWorkflowStudio || !workflowModeStore || !location.search.trim()) {
+      return;
+    }
+    if (lastRestoredWorkflowReturnSearchRef.current === location.search) {
+      return;
+    }
+
+    const restoration = workflowReturnRestorationService.restoreFromReturnSearch({
+      search: location.search,
+      workflowModeStore,
+    });
+    if (!restoration.handled || !restoration.restored || !restoration.handoffId) {
+      return;
+    }
+    lastRestoredWorkflowReturnSearchRef.current = location.search;
+  }, [isWorkflowStudio, location.search, workflowModeStore, workflowReturnRestorationService]);
 
   const refreshSnapshot = async () => {
     setIsBusy(true);
