@@ -19,12 +19,14 @@ describe("Build entry and intent landing seams", () => {
 
   it("captures intent selections in structured launch context through shared studio-entry initialization", () => {
     const service = new BuildEntryService(new BuildEntryFeatureFlag({ env: { VITE_FEATURE_BUILD_ENTRY: "true" } }));
+    const automationIntent = "Summarize support tickets and post actions.";
     const launch = service.resolveIntentLaunchContext({
       selection: {
         intent: BuildIntents.automateTask,
         selectedAtIso: "2026-03-28T00:00:00.000Z",
       },
       entryContext: { source: "intent" },
+      prefill: { automationIntent },
     });
 
     const query = new URLSearchParams(launch.launchPath.split("?")[1] ?? "");
@@ -35,6 +37,8 @@ describe("Build entry and intent landing seams", () => {
     expect(query.get("buildIntentSelectedAt")).toBe("2026-03-28T00:00:00.000Z");
     expect(query.get("buildFlowSessionId")).toContain("build-flow-automate-task");
     expect(query.get("buildFlowProgress")).toBe("active");
+    expect(launch.routeDecision.studioEntryRequest.prefill?.values).toEqual({ automationIntent });
+    expect(launch.flowSession.current.launchContext.prefill?.values).toEqual({ automationIntent });
   });
 
   it("exposes intent-first landing options and keeps taxonomy suppression in intent-primary mode", () => {
