@@ -168,10 +168,7 @@ export default function AppLayout(): JSX.Element {
             />
           </Link>
 
-          <div
-            className="ui-row ui-row--wrap"
-            style={{ justifyContent: "flex-end", flex: 1 }}
-          >
+          <div className="ui-app__header-actions ui-row ui-row--wrap">
             {!config.isProductionMode ? <DevSyncButton /> : null}
             <button
               type="button"

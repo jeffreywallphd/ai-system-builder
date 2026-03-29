@@ -29,8 +29,12 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
     void navigate(entry.action.launchPath);
   };
 
+  if (!isOpen) {
+    return null;
+  }
+
   return (
-    <div className={`ui-overlay-panel ui-overlay-panel--bottom${isOpen ? " ui-overlay-panel--open" : ""}`} aria-hidden={!isOpen}>
+    <div className="ui-overlay-panel ui-overlay-panel--right ui-overlay-panel--open ui-command-palette" aria-hidden={false}>
       <button type="button" className="ui-overlay-panel__scrim" onClick={onClose} aria-label="Close command palette" />
       <aside className="ui-overlay-panel__surface" role="dialog" aria-modal="true" aria-label="Command palette">
         <div className="ui-overlay-panel__header">
@@ -55,15 +59,14 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
               <button
                 key={entry.id}
                 type="button"
-                className="ui-button ui-button--ghost"
-                style={{ justifyContent: "space-between" }}
+                className="ui-button ui-button--ghost ui-command-palette__entry"
                 onClick={() => onExecute(entry)}
               >
                 <span>{entry.label}</span>
                 <span className="ui-text-small ui-text-secondary">{entry.category}</span>
               </button>
             )) : (
-              <p className="ui-text-secondary" style={{ margin: 0 }}>
+              <p className="ui-text-secondary ui-command-palette__empty">
                 No commands matched your search. Try “build”, “explore”, or “run”.
               </p>
             )}

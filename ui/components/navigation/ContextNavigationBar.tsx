@@ -7,13 +7,13 @@ export interface ContextNavigationBarProps {
 
 export default function ContextNavigationBar({ model }: ContextNavigationBarProps): JSX.Element {
   return (
-    <nav aria-label="Context" className="ui-card" data-testid="context-navigation-bar">
-      <div className="ui-card__body ui-row ui-row--wrap" style={{ justifyContent: "space-between", alignItems: "center", gap: "0.75rem" }}>
-        <ol className="ui-row ui-row--wrap" style={{ listStyle: "none", margin: 0, padding: 0, gap: "0.5rem" }}>
+    <nav aria-label="Context" className="ui-context-nav" data-testid="context-navigation-bar">
+      <div className="ui-context-nav__content">
+        <ol className="ui-context-nav__breadcrumbs">
           {model.breadcrumbs.map((crumb, index) => {
             const isLast = index === model.breadcrumbs.length - 1;
             return (
-              <li key={crumb.key} className="ui-row ui-row--wrap" style={{ alignItems: "center", gap: "0.5rem" }}>
+              <li key={crumb.key} className="ui-context-nav__crumb">
                 {crumb.path && !isLast ? <Link to={crumb.path}>{crumb.label}</Link> : <span className={isLast ? "ui-text-secondary" : undefined}>{crumb.label}</span>}
                 {!isLast ? <span className="ui-text-small ui-text-secondary">/</span> : null}
               </li>
@@ -21,7 +21,7 @@ export default function ContextNavigationBar({ model }: ContextNavigationBarProp
           })}
         </ol>
         {model.returnPath ? (
-          <Link className="ui-button ui-button--ghost ui-button--small" to={model.returnPath}>Return to context</Link>
+          <Link className="ui-button ui-button--ghost ui-button--sm" to={model.returnPath}>Return to context</Link>
         ) : null}
       </div>
     </nav>
