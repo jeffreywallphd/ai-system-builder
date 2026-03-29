@@ -7,7 +7,11 @@ import {
   deserializeWorkflowDraft,
   normalizeWorkflowDraft,
   serializeWorkflowDraft,
+  WorkflowDraftBuiltInStepTypes,
   WorkflowDraftInputSourceTypes,
+  WorkflowDraftOutputDestinationTypes,
+  WorkflowDraftOutputFormats,
+  WorkflowDraftOutputTypes,
   WorkflowDraftStepAssetKinds,
   WorkflowDraftStepKinds,
   WorkflowDraftStepTypes,
@@ -40,7 +44,16 @@ describe("WorkflowStudioDomain", () => {
           asset: { assetId: "asset:dataset-1", versionId: "asset:dataset-1:v1" },
         }],
         steps: [{ id: "step-1", type: "action", kind: WorkflowDraftStepKinds.action, order: 1 }],
-        outputs: [{ id: "output-1", type: "json" }],
+        outputs: [{
+          id: "output-1",
+          type: "workflow-output",
+          outputType: WorkflowDraftOutputTypes.document,
+          format: WorkflowDraftOutputFormats.json,
+          destination: {
+            type: WorkflowDraftOutputDestinationTypes.fileExport,
+            target: "/exports/workflow-output.json",
+          },
+        }],
       },
       now: createdAt,
     });
@@ -120,7 +133,16 @@ describe("WorkflowStudioDomain", () => {
         asset: { assetId: "asset:dataset-query", versionId: "asset:dataset-query:v2" },
       }],
       steps: [{ id: "step-run", type: "run-tool", kind: WorkflowDraftStepKinds.action, order: 1, dependsOnStepIds: [] }],
-      outputs: [{ id: "output-result", type: "text" }],
+      outputs: [{
+        id: "output-result",
+        type: "workflow-output",
+        outputType: WorkflowDraftOutputTypes.record,
+        format: WorkflowDraftOutputFormats.json,
+        destination: {
+          type: WorkflowDraftOutputDestinationTypes.systemEntry,
+          target: "crm/customers",
+        },
+      }],
     });
 
     const serialized = serializeWorkflowDraft(draft);
@@ -349,6 +371,63 @@ describe("WorkflowStudioDomain", () => {
     });
   });
 
+  it("accepts built-in control-flow step variants for if/then branching and loop iteration", () => {
+    const normalized = normalizeWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [
+        {
+          id: "step-branch",
+          type: WorkflowDraftBuiltInStepTypes.ifThen,
+          kind: WorkflowDraftStepKinds.controlFlow,
+          order: 1,
+          config: {
+            conditionExpression: "qualityScore >= 0.9",
+            thenStepIds: ["step-publish", "step-notify"],
+            elseStepIds: ["step-review"],
+          },
+        },
+        {
+          id: "step-loop",
+          type: WorkflowDraftBuiltInStepTypes.loopIteration,
+          kind: WorkflowDraftStepKinds.controlFlow,
+          order: 2,
+          config: {
+            iterationMode: "collection",
+            collectionInputKey: "documents",
+            itemAlias: "document",
+            bodyStepIds: ["step-summarize"],
+            maxIterations: 100,
+          },
+        },
+      ],
+      outputs: [],
+    });
+
+    expect(normalized.steps[0]).toMatchObject({
+      id: "step-branch",
+      kind: WorkflowDraftStepKinds.controlFlow,
+      type: WorkflowDraftBuiltInStepTypes.ifThen,
+      config: {
+        conditionExpression: "qualityScore >= 0.9",
+        thenStepIds: ["step-publish", "step-notify"],
+        elseStepIds: ["step-review"],
+      },
+    });
+    expect(normalized.steps[1]).toMatchObject({
+      id: "step-loop",
+      kind: WorkflowDraftStepKinds.controlFlow,
+      type: WorkflowDraftBuiltInStepTypes.loopIteration,
+      config: {
+        iterationMode: "collection",
+        collectionInputKey: "documents",
+        itemAlias: "document",
+        bodyStepIds: ["step-summarize"],
+        maxIterations: 100,
+      },
+    });
+  });
+
   it("supports agent-assistant asset-backed workflow steps with canonical asset references", () => {
     const normalized = normalizeWorkflowDraft({
       triggers: [],
@@ -433,6 +512,151 @@ describe("WorkflowStudioDomain", () => {
       }],
       outputs: [],
     })).toThrow("requires type 'agent-assistant'");
+  });
+
+  it("rejects malformed built-in control-flow step structures", () => {
+    expect(() => normalizeWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [{
+        id: "step-invalid-if-then",
+        type: WorkflowDraftBuiltInStepTypes.ifThen,
+        kind: WorkflowDraftStepKinds.controlFlow,
+        order: 1,
+      }],
+      outputs: [],
+    })).toThrow("requires config");
+
+    expect(() => normalizeWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [{
+        id: "step-invalid-loop",
+        type: WorkflowDraftBuiltInStepTypes.loopIteration,
+        kind: WorkflowDraftStepKinds.controlFlow,
+        order: 1,
+        config: {
+          iterationMode: "range",
+          bodyStepIds: ["step-body"],
+        },
+      }],
+      outputs: [],
+    })).toThrow("range mode requires config.range");
+
+    expect(() => normalizeWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [{
+        id: "step-invalid-kind-for-built-in",
+        type: WorkflowDraftBuiltInStepTypes.ifThen,
+        kind: WorkflowDraftStepKinds.action,
+        order: 1,
+        config: {
+          conditionExpression: "x > 0",
+          thenStepIds: ["step-next"],
+        },
+      }],
+      outputs: [],
+    })).toThrow("requires kind 'control-flow'");
+  });
+
+  it("accepts canonical output entries with type, format, and destination", () => {
+    const normalized = normalizeWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [{ id: "step-run", type: "run-tool", kind: WorkflowDraftStepKinds.action, order: 1 }],
+      outputs: [{
+        id: "output-primary",
+        type: "workflow-output",
+        outputType: WorkflowDraftOutputTypes.document,
+        format: WorkflowDraftOutputFormats.markdown,
+        sourceStepId: "step-run",
+        destination: {
+          type: WorkflowDraftOutputDestinationTypes.webViewer,
+          target: "session-panel",
+          options: { tab: "preview" },
+        },
+      }],
+    });
+
+    expect(normalized.outputs[0]).toMatchObject({
+      id: "output-primary",
+      outputType: WorkflowDraftOutputTypes.document,
+      format: WorkflowDraftOutputFormats.markdown,
+      sourceStepId: "step-run",
+      destination: {
+        type: WorkflowDraftOutputDestinationTypes.webViewer,
+        target: "session-panel",
+        options: { tab: "preview" },
+      },
+    });
+  });
+
+  it("supports multiple outputs in the canonical workflow draft", () => {
+    const normalized = normalizeWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [],
+      outputs: [
+        {
+          id: "output-file",
+          type: "workflow-output",
+          outputType: WorkflowDraftOutputTypes.document,
+          format: WorkflowDraftOutputFormats.html,
+          destination: {
+            type: WorkflowDraftOutputDestinationTypes.fileExport,
+            target: "/exports/report.html",
+          },
+        },
+        {
+          id: "output-system",
+          type: "workflow-output",
+          outputType: WorkflowDraftOutputTypes.record,
+          format: WorkflowDraftOutputFormats.json,
+          destination: {
+            type: WorkflowDraftOutputDestinationTypes.systemEntry,
+            target: "warehouse/reports",
+          },
+        },
+      ],
+    });
+
+    expect(normalized.outputs).toHaveLength(2);
+    expect(normalized.outputs.map((output) => output.id)).toEqual(["output-file", "output-system"]);
+  });
+
+  it("rejects malformed workflow output structures", () => {
+    expect(() => normalizeWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [],
+      outputs: [{
+        id: "output-invalid-type",
+        type: "workflow-output",
+        outputType: " ",
+        format: WorkflowDraftOutputFormats.json,
+        destination: {
+          type: WorkflowDraftOutputDestinationTypes.fileExport,
+          target: "/exports/result.json",
+        },
+      }],
+    })).toThrow("output outputType is required");
+
+    expect(() => normalizeWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [],
+      outputs: [{
+        id: "output-missing-destination-target",
+        type: "workflow-output",
+        outputType: WorkflowDraftOutputTypes.document,
+        format: WorkflowDraftOutputFormats.json,
+        destination: {
+          type: WorkflowDraftOutputDestinationTypes.fileExport,
+          target: " ",
+        },
+      }],
+    })).toThrow("destination target is required");
   });
 
   it("creates composite workflow taxonomy with deterministic default behavior", () => {
