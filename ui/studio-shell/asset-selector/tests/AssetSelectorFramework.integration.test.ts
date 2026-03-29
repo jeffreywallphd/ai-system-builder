@@ -1,5 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import { createEmptyWorkflowDraft, deserializeWorkflowDraft, serializeWorkflowDraft } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+import {
+  WorkflowDraftBuiltInStepTypes,
+  createEmptyWorkflowDraft,
+  deserializeWorkflowDraft,
+  serializeWorkflowDraft,
+} from "../../../../domain/workflow-studio/WorkflowStudioDomain";
 import { createAssetSelectorRequest, AssetSelectorSelectionModes, AssetSelectorSelectionTypes } from "../../../../domain/studio-shell/AssetSelectorContract";
 import { AssetSelectorSessionStore } from "../../../../application/studio-entry/AssetSelectorSessionStore";
 import { AssetSelectorUsageContexts } from "../../../../application/studio-entry/AssetSelectorCapabilityRegistry";
@@ -13,7 +18,13 @@ import { AssetSelectorStudioLaunchService } from "../AssetSelectorStudioLaunchSe
 import { AssetSelectorReturnHandoffService } from "../AssetSelectorReturnHandoffService";
 import { InlineAssetCreationService } from "../../../routes/InlineAssetCreation";
 import { listDatasetInputs, replaceDatasetInputSelections } from "../../workflow/WorkflowWizardDatasetInputs";
-import { addWorkflowStep, setWorkflowStepAgentAssetSelection } from "../../workflow/WorkflowWizardSteps";
+import {
+  addWorkflowStep,
+  buildWorkflowStepTypeDefinitionKey,
+  setWorkflowStepAgentAssetSelection,
+  setWorkflowStepType,
+  workflowStepTypeDefinitions,
+} from "../../workflow/WorkflowWizardSteps";
 
 function readSearchFromPath(path: string): string {
   const query = path.split("?")[1];
@@ -184,6 +195,161 @@ describe("AssetSelectorFramework integration", () => {
       "asset:dataset:existing",
       "asset:dataset:newly-created",
     ]);
+  });
+
+  it("applies returned agent assets to the intended workflow step target and keeps prior draft state", () => {
+    const sessionKey = "workflow-studio:demo:steps:agent-assistant";
+    const request = createAgentAssistantAssetSelectorRequest({
+      requestId: "selector:workflow:steps:return",
+      originatingStudio: "workflow-studio",
+      originatingField: "steps.agent-assistant",
+    });
+    const store = new AssetSelectorSessionStore();
+    const launchService = new AssetSelectorStudioLaunchService();
+    const returnService = new AssetSelectorReturnHandoffService();
+    const inlineService = new InlineAssetCreationService();
+
+    store.prepareSession({
+      sessionKey,
+      request,
+    });
+    store.activateSession(sessionKey);
+
+    let draft = Object.freeze({
+      ...createEmptyWorkflowDraft(),
+      triggers: Object.freeze([Object.freeze({
+        id: "trigger-1",
+        kind: "user" as const,
+        type: "manual" as const,
+        config: Object.freeze({}),
+      })]),
+      inputs: Object.freeze([Object.freeze({
+        id: "input-1",
+        type: "dataset-input",
+        title: "Dataset",
+        sourceType: "dataset-asset" as const,
+        asset: Object.freeze({ assetId: "asset:dataset:customers" }),
+      })]),
+      outputs: Object.freeze([Object.freeze({
+        id: "output-1",
+        type: "result",
+        outputType: "document" as const,
+        format: "json" as const,
+        destination: Object.freeze({
+          type: "web-viewer" as const,
+          target: "preview",
+        }),
+        title: "Result",
+      })]),
+    });
+    draft = addWorkflowStep(draft).draft;
+    draft = addWorkflowStep(draft).draft;
+    const replaceStepId = draft.steps[1]?.id as string;
+    draft = setWorkflowStepAgentAssetSelection(draft, replaceStepId, {
+      assetId: "asset:agent:existing",
+      versionId: "asset:agent:existing:v1",
+      name: "Existing Agent",
+    }).draft;
+    const delayDefinition = workflowStepTypeDefinitions.find(
+      (entry) => entry.type === WorkflowDraftBuiltInStepTypes.delayWait,
+    );
+    if (!delayDefinition) {
+      throw new Error("Missing delay step definition.");
+    }
+    draft = setWorkflowStepType(
+      draft,
+      draft.steps[0]?.id as string,
+      buildWorkflowStepTypeDefinitionKey(delayDefinition),
+    ).draft;
+
+    const launch = launchService.launch({
+      sessionKey,
+      selectorRequest: request,
+      routePath: "/studio-shell/workflow/wizard/steps",
+      routeSearch: `?workflowStepSelectorTarget=${replaceStepId}`,
+      routeHash: "#workflow-wizard-steps",
+      selectorTargetId: `workflow-step:${replaceStepId}`,
+      workflowOrigin: {
+        studioId: "studio-workflows",
+        modeId: "wizard",
+        wizardPageId: "steps",
+        draftState: serializeWorkflowDraft(draft),
+      },
+    });
+    expect(launch).toBeDefined();
+
+    store.transitionToCreatingNew(sessionKey, {
+      originatingContext: request.context,
+      requestedAssetType: "agent",
+      returnTargetSessionKey: sessionKey,
+      returnRoutePath: launch?.returnTarget?.routePath,
+    });
+
+    const createdReturnPath = inlineService.buildReturnPath({
+      returnTarget: {
+        routePath: launch?.returnTarget?.routePath ?? "/studio-shell/workflow/wizard/steps",
+        contextId: sessionKey,
+      },
+      payload: {
+        status: "created",
+        assetId: "asset:agent:new",
+        versionId: "asset:agent:new:v1",
+        assetType: "agent",
+        displayName: "New Agent",
+      },
+    });
+
+    const createdOutcome = returnService.handle({
+      search: readSearchFromPath(createdReturnPath),
+      sessionKey,
+      request,
+      expectedSelectorTargetId: `workflow-step:${replaceStepId}`,
+      expectedOriginatingField: "steps.agent-assistant",
+      expectedUsageContext: "workflow-step",
+      sessionStore: store,
+    });
+    expect(createdOutcome.handled).toBeTrue();
+    expect(createdOutcome.returnedAsset?.assetId).toBe("asset:agent:new");
+    expect(createdOutcome.selectorTargetId).toBe(`workflow-step:${replaceStepId}`);
+
+    const updated = setWorkflowStepAgentAssetSelection(draft, replaceStepId, {
+      assetId: createdOutcome.returnedAsset?.assetId ?? "",
+      versionId: createdOutcome.returnedAsset?.versionId,
+      name: createdOutcome.returnedAsset?.displayName,
+    }).draft;
+    expect(updated.steps.find((step) => step.id === replaceStepId)?.assetRef?.asset.assetId).toBe("asset:agent:new");
+    expect(updated.triggers).toEqual(draft.triggers);
+    expect(updated.inputs).toEqual(draft.inputs);
+    expect(updated.outputs).toEqual(draft.outputs);
+    expect(updated.steps[0]?.type).toBe(WorkflowDraftBuiltInStepTypes.delayWait);
+
+    store.transitionToCreatingNew(sessionKey, {
+      originatingContext: request.context,
+      requestedAssetType: "agent",
+      returnTargetSessionKey: sessionKey,
+      returnRoutePath: launch?.returnTarget?.routePath,
+    });
+    const noSelectionReturnPath = inlineService.buildReturnPath({
+      returnTarget: {
+        routePath: launch?.returnTarget?.routePath ?? "/studio-shell/workflow/wizard/steps",
+        contextId: sessionKey,
+      },
+      payload: {
+        status: "no-selection",
+      },
+    });
+    const noSelectionOutcome = returnService.handle({
+      search: readSearchFromPath(noSelectionReturnPath),
+      sessionKey,
+      request,
+      expectedSelectorTargetId: `workflow-step:${replaceStepId}`,
+      expectedOriginatingField: "steps.agent-assistant",
+      expectedUsageContext: "workflow-step",
+      sessionStore: store,
+    });
+    expect(noSelectionOutcome.handled).toBeTrue();
+    expect(noSelectionOutcome.returnedAsset).toBeUndefined();
+    expect(updated.steps.find((step) => step.id === replaceStepId)?.assetRef?.asset.assetId).toBe("asset:agent:new");
   });
 
   it("fails stale or malformed return payloads safely", () => {
