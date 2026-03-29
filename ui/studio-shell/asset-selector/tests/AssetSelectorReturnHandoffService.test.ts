@@ -163,4 +163,36 @@ describe("AssetSelectorReturnHandoffService", () => {
     expect(store.getSession("selector:inputs")?.selectedAssets).toHaveLength(0);
     expect(store.getSession("selector:steps")?.selectedAssets).toHaveLength(0);
   });
+
+  it("handles no-selection returns without mutating selected assets", () => {
+    const store = new AssetSelectorSessionStore();
+    const request = createRequest("dataset", AssetSelectorUsageContexts.workflowInput);
+    store.prepareSession({
+      sessionKey: "selector:inputs",
+      request,
+      initialSelectedAssets: [{
+        assetId: "asset:dataset:existing",
+        assetType: "dataset",
+      }],
+    });
+    store.activateSession("selector:inputs");
+    store.transitionToCreatingNew("selector:inputs", {
+      originatingContext: request.context,
+      requestedAssetType: "dataset",
+      returnTargetSessionKey: "selector:inputs",
+    });
+
+    const service = new AssetSelectorReturnHandoffService();
+    const outcome = service.handle({
+      search: "?inlineReturn=1&inlineStatus=no-selection&returnContextId=selector:inputs",
+      sessionKey: "selector:inputs",
+      request,
+      sessionStore: store,
+    });
+
+    expect(outcome.handled).toBeTrue();
+    expect(outcome.returnedAsset).toBeUndefined();
+    expect(store.getSession("selector:inputs")?.selectedAssets.map((entry) => entry.assetId)).toEqual(["asset:dataset:existing"]);
+    expect(store.getSession("selector:inputs")?.lifecycleState).toBe("active");
+  });
 });

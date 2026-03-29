@@ -12,6 +12,19 @@ import {
 } from "../WorkflowStudioModeStateStore";
 import { DEFAULT_WORKFLOW_STUDIO_MODE_ID, WorkflowStudioModeIds } from "../WorkflowStudioModes";
 
+function createMemoryStorage(): Pick<Storage, "getItem" | "setItem" | "removeItem"> {
+  const values = new Map<string, string>();
+  return Object.freeze({
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      values.set(key, value);
+    },
+    removeItem: (key: string) => {
+      values.delete(key);
+    },
+  });
+}
+
 describe("WorkflowStudioModeStateStore", () => {
   beforeEach(() => {
     clearWorkflowStudioModeStateStoresForTests();
@@ -264,6 +277,45 @@ describe("WorkflowStudioModeStateStore", () => {
     expect(second).toBe(first);
     expect(second.getState().selectedModeId).toBe(WorkflowStudioModeIds.wizard);
     expect(second.getState().sharedDraft.triggers.map((trigger) => trigger.id)).toEqual(["trigger-persisted"]);
+  });
+
+  it("persists workflow mode/draft state across store re-instantiation", () => {
+    const storage = createMemoryStorage();
+    const key = "workflow-store-persistence";
+    const first = new WorkflowStudioModeStateStore({
+      storage,
+      storageKey: key,
+    });
+    first.setSelectedMode(WorkflowStudioModeIds.canvas);
+    first.updateSharedDraft((draft) => ({
+      ...draft,
+      triggers: [
+        {
+          id: "trigger-persisted",
+          kind: "user",
+          type: "manual",
+          config: {},
+        },
+      ],
+    }));
+    first.setDraftSyncContext({
+      studioId: "studio-workflows",
+      sessionId: "session-1",
+      draftId: "draft-1",
+    });
+
+    const second = new WorkflowStudioModeStateStore({
+      storage,
+      storageKey: key,
+    });
+    expect(second.getState().selectedModeId).toBe(WorkflowStudioModeIds.canvas);
+    expect(second.getState().sharedDraft.triggers.map((entry) => entry.id)).toEqual(["trigger-persisted"]);
+    expect(second.getState().draftSyncContext).toEqual({
+      studioId: "studio-workflows",
+      sessionId: "session-1",
+      draftId: "draft-1",
+      revision: undefined,
+    });
   });
 
   it("runs shared draft validation hooks and keeps results consistent across mode switches", () => {

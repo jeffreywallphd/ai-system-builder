@@ -6,8 +6,12 @@ Canonical launch/return contract for one studio launching another and returning 
 ## Where it lives
 - Canonical contract + validation + query serializer/parser:
   - `ui/routes/StudioHandoffContract.ts`
+- Shared return payload resolver:
+  - `ui/routes/StudioReturnPayloadResolution.ts`
 - Workflow-origin adapter (origin context generation):
   - `ui/studio-shell/workflow/WorkflowStudioLaunchContext.ts`
+- Workflow return restoration adapter:
+  - `ui/studio-shell/workflow/WorkflowStudioReturnRestorationService.ts`
 - Integration seam that transports it in route params:
   - `ui/routes/InlineAssetCreation.ts`
 
@@ -51,6 +55,20 @@ Primary call path:
 - Resume destination is explicit:
   - `resume.destinationRoutePath`
 - Legacy inline return/search semantics are preserved; contract support is additive and backward-compatible.
+
+## Story 5.3 return payload resolution layer
+- Return payload handling now flows through `StudioReturnPayloadResolver`:
+  - parse + validate inline return payload shape
+  - discriminate typed outcome (`created`/`cancelled`/`no-selection`/`invalid`)
+  - project selector target context (`selectorSessionId`, `originatingField`, `selectorTargetId`) from canonical handoff when present
+- `AssetSelectorReturnHandoffService` now consumes that resolver so feature surfaces no longer implement hand-written query validation logic.
+
+## Story 5.4 workflow session restoration and persistence
+- Workflow Studio now restores handoff-origin authoring context from return payloads through `WorkflowStudioReturnRestorationService`:
+  - restores valid origin mode
+  - rehydrates origin draft-state snapshot
+  - restores draft/session identity into shared draft sync context
+- `WorkflowStudioModeStateStore` now persists mode + canonical shared draft state per studio id in local storage (`ai-loom.workflow-studio.mode-state.v1`), so in-progress triggers/inputs/steps/outputs survive handoff navigation and reload.
 
 ## Backward compatibility
 - Legacy selector launch params still parse as before.

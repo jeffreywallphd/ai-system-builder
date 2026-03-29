@@ -15,6 +15,7 @@ import {
   type WorkflowStudioModeValidationIssue,
 } from "./WorkflowStudioModeValidation";
 import type { WorkflowValidationIssue } from "../../../domain/workflow-studio/WorkflowStudioDomain";
+import { isWorkflowStudioModeId } from "./WorkflowStudioModes";
 
 export interface WorkflowStudioDraftSyncContext {
   readonly studioId: string;
@@ -42,6 +43,49 @@ export interface WorkflowStudioModeState {
 export type WorkflowStudioModeStateListener = (state: WorkflowStudioModeState) => void;
 
 const defaultModeRegistry = createDefaultWorkflowStudioModeRegistry();
+const workflowModeStateStorageSchemaVersion = "ai-loom.workflow-studio.mode-state.v1";
+const workflowModeStateStoragePrefix = "ai-loom.workflow-studio.mode-state";
+
+interface WorkflowStudioModeStateStorageRecord {
+  readonly schemaVersion: string;
+  readonly selectedModeId: string;
+  readonly sharedDraftSerialized: string;
+  readonly draftEditorContent: string;
+  readonly draftParseError?: string;
+  readonly hasLocalDraftEdits: boolean;
+  readonly draftSyncContext?: WorkflowStudioDraftSyncContext;
+}
+
+interface WorkflowStudioModeStateStoreOptions {
+  readonly storageKey?: string;
+  readonly storage?: Pick<Storage, "getItem" | "setItem" | "removeItem">;
+}
+
+function resolveDefaultStorage(): Pick<Storage, "getItem" | "setItem" | "removeItem"> | undefined {
+  if (typeof window === "undefined") {
+    return undefined;
+  }
+  return window.localStorage;
+}
+
+function normalizeSyncContext(
+  input?: WorkflowStudioDraftSyncContext,
+): WorkflowStudioDraftSyncContext | undefined {
+  if (!input?.studioId?.trim()) {
+    return undefined;
+  }
+
+  return Object.freeze({
+    studioId: input.studioId.trim(),
+    sessionId: input.sessionId?.trim() || undefined,
+    draftId: input.draftId?.trim() || undefined,
+    revision: Number.isFinite(input.revision) ? input.revision : undefined,
+  });
+}
+
+function buildStorageKey(studioId: string): string {
+  return `${workflowModeStateStoragePrefix}:${studioId.trim() || "default"}`;
+}
 
 function buildInitialState(): WorkflowStudioModeState {
   const availableModes = defaultModeRegistry.list();
@@ -98,10 +142,15 @@ function freezeState(state: WorkflowStudioModeState): WorkflowStudioModeState {
 
 export class WorkflowStudioModeStateStore {
   private readonly listeners = new Set<WorkflowStudioModeStateListener>();
+  private readonly storageKey?: string;
+  private readonly storage?: Pick<Storage, "getItem" | "setItem" | "removeItem">;
   private state: WorkflowStudioModeState;
 
-  constructor() {
+  constructor(options?: WorkflowStudioModeStateStoreOptions) {
+    this.storageKey = options?.storageKey?.trim() || undefined;
+    this.storage = options?.storage ?? resolveDefaultStorage();
     this.state = freezeState(buildInitialState());
+    this.restorePersistedState();
   }
 
   public getState(): WorkflowStudioModeState {
@@ -165,6 +214,12 @@ export class WorkflowStudioModeStateStore {
     this.replaceSharedDraft(updater(this.state.sharedDraft));
   }
 
+  public setDraftSyncContext(context?: WorkflowStudioDraftSyncContext): void {
+    this.patch({
+      draftSyncContext: normalizeSyncContext(context),
+    });
+  }
+
   public hydrateFromSerializedDraft(serializedDraft: string): void {
     try {
       const sharedDraft = deserializeWorkflowDraft(serializedDraft);
@@ -210,9 +265,88 @@ export class WorkflowStudioModeStateStore {
       ...this.state,
       ...patch,
     });
+    this.persistState();
 
     for (const listener of this.listeners) {
       listener(this.state);
+    }
+  }
+
+  private restorePersistedState(): void {
+    if (!this.storage || !this.storageKey) {
+      return;
+    }
+
+    const serialized = this.storage.getItem(this.storageKey);
+    if (!serialized?.trim()) {
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(serialized) as Partial<WorkflowStudioModeStateStorageRecord>;
+      if (parsed.schemaVersion !== workflowModeStateStorageSchemaVersion) {
+        return;
+      }
+
+      const patch: Partial<WorkflowStudioModeState> = {};
+      if (typeof parsed.selectedModeId === "string" && isWorkflowStudioModeId(parsed.selectedModeId)) {
+        const selectedMode = this.state.availableModes.find((mode) => mode.id === parsed.selectedModeId);
+        if (selectedMode) {
+          patch.selectedModeId = selectedMode.id;
+          patch.selectedMode = selectedMode;
+        }
+      }
+
+      if (typeof parsed.sharedDraftSerialized === "string" && parsed.sharedDraftSerialized.trim()) {
+        try {
+          const sharedDraft = deserializeWorkflowDraft(parsed.sharedDraftSerialized);
+          const normalizedSerialized = serializeWorkflowDraft(sharedDraft);
+          patch.sharedDraft = sharedDraft;
+          patch.sharedDraftSerialized = normalizedSerialized;
+          patch.draftEditorContent = typeof parsed.draftEditorContent === "string"
+            ? parsed.draftEditorContent
+            : normalizedSerialized;
+          patch.draftParseError = typeof parsed.draftParseError === "string"
+            ? parsed.draftParseError
+            : undefined;
+          patch.hasLocalDraftEdits = parsed.hasLocalDraftEdits === true;
+        } catch {
+          patch.draftEditorContent = typeof parsed.draftEditorContent === "string"
+            ? parsed.draftEditorContent
+            : this.state.draftEditorContent;
+          patch.draftParseError = "Workflow draft is malformed.";
+          patch.hasLocalDraftEdits = true;
+        }
+      }
+
+      patch.draftSyncContext = normalizeSyncContext(parsed.draftSyncContext);
+      this.state = freezeState({
+        ...this.state,
+        ...patch,
+      });
+    } catch {
+      this.storage.removeItem(this.storageKey);
+    }
+  }
+
+  private persistState(): void {
+    if (!this.storage || !this.storageKey) {
+      return;
+    }
+
+    try {
+      const record: WorkflowStudioModeStateStorageRecord = Object.freeze({
+        schemaVersion: workflowModeStateStorageSchemaVersion,
+        selectedModeId: this.state.selectedModeId,
+        sharedDraftSerialized: this.state.sharedDraftSerialized,
+        draftEditorContent: this.state.draftEditorContent,
+        draftParseError: this.state.draftParseError,
+        hasLocalDraftEdits: this.state.hasLocalDraftEdits,
+        draftSyncContext: normalizeSyncContext(this.state.draftSyncContext),
+      });
+      this.storage.setItem(this.storageKey, JSON.stringify(record));
+    } catch {
+      // ignore persistence failures (storage unavailable/quota)
     }
   }
 }
@@ -225,7 +359,9 @@ export function getWorkflowStudioModeStateStore(studioId: string): WorkflowStudi
     return existing;
   }
 
-  const created = new WorkflowStudioModeStateStore();
+  const created = new WorkflowStudioModeStateStore({
+    storageKey: buildStorageKey(studioId),
+  });
   workflowModeStoresByStudioId.set(studioId, created);
   return created;
 }
