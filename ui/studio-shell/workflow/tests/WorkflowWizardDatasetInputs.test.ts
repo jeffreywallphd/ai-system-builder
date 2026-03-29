@@ -3,6 +3,7 @@ import { createEmptyWorkflowDraft } from "../../../../domain/workflow-studio/Wor
 import {
   applyInlineDatasetReturnToDraft,
   listDatasetInputs,
+  replaceDatasetInputSelections,
   removeDatasetInputSelection,
   toggleDatasetInputSelection,
   upsertDatasetInputSelection,
@@ -144,5 +145,40 @@ describe("WorkflowWizardDatasetInputs", () => {
     expect(result.draft.triggers).toEqual(baseDraft.triggers);
     expect(result.draft.steps).toEqual(baseDraft.steps);
     expect(result.draft.outputs).toEqual(baseDraft.outputs);
+  });
+
+  it("replaces dataset selections from selector session state while preserving non-dataset inputs", () => {
+    const baseDraft = createEmptyWorkflowDraft();
+    const seeded = upsertDatasetInputSelection(baseDraft, {
+      assetId: "asset:dataset-old",
+      versionId: "asset:dataset-old:v1",
+    }).draft;
+    const withRuntimeInput = Object.freeze({
+      ...seeded,
+      inputs: Object.freeze([
+        ...seeded.inputs,
+        Object.freeze({
+          id: "input-runtime",
+          type: "runtime-input",
+          sourceType: "runtime-parameter" as const,
+          parameterKey: "runtime-key",
+        }),
+      ]),
+    });
+
+    const replaced = replaceDatasetInputSelections(withRuntimeInput, [{
+      assetId: "asset:dataset-new-a",
+      versionId: "asset:dataset-new-a:v1",
+    }, {
+      assetId: "asset:dataset-new-b",
+      versionId: "asset:dataset-new-b:v1",
+    }]);
+
+    expect(replaced.changed).toBe(true);
+    expect(listDatasetInputs(replaced.draft).map((entry) => entry.asset.assetId)).toEqual([
+      "asset:dataset-new-a",
+      "asset:dataset-new-b",
+    ]);
+    expect(replaced.draft.inputs.some((entry) => entry.id === "input-runtime")).toBe(true);
   });
 });

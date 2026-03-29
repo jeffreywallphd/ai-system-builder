@@ -210,3 +210,53 @@ export function applyInlineDatasetReturnToDraft(
     versionId: payload.versionId,
   });
 }
+
+export function replaceDatasetInputSelections(
+  draft: WorkflowDraft,
+  selections: ReadonlyArray<WorkflowDatasetAssetCandidate>,
+): { readonly draft: WorkflowDraft; readonly changed: boolean } {
+  const normalizedSelections = dedupeAssetReferences(selections);
+  const existingDatasetInputs = listDatasetInputs(draft);
+
+  if (
+    existingDatasetInputs.length === normalizedSelections.length
+    && existingDatasetInputs.every((entry) => normalizedSelections.some((candidate) => candidate.assetId === entry.asset.assetId))
+  ) {
+    return Object.freeze({
+      draft,
+      changed: false,
+    });
+  }
+
+  let nextDraft: WorkflowDraft = Object.freeze({
+    ...draft,
+    inputs: Object.freeze(draft.inputs.filter((entry) => entry.sourceType !== WorkflowDraftInputSourceTypes.datasetAsset)),
+  });
+
+  for (const selection of normalizedSelections) {
+    nextDraft = upsertDatasetInputSelection(nextDraft, selection).draft;
+  }
+
+  return Object.freeze({
+    draft: nextDraft,
+    changed: true,
+  });
+}
+
+function dedupeAssetReferences(
+  selections: ReadonlyArray<WorkflowDatasetAssetCandidate>,
+): ReadonlyArray<WorkflowDatasetAssetCandidate> {
+  const entries = new Map<string, WorkflowDatasetAssetCandidate>();
+  for (const selection of selections) {
+    const assetId = selection.assetId.trim();
+    if (!assetId) {
+      continue;
+    }
+    entries.set(assetId, Object.freeze({
+      assetId,
+      versionId: normalizeOptional(selection.versionId),
+      name: normalizeOptional(selection.name),
+    }));
+  }
+  return Object.freeze([...entries.values()]);
+}

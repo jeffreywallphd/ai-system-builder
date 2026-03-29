@@ -45,6 +45,53 @@ The matrix is centralized in `AssetSelectorCapabilityRegistry` (no scattered `if
 - Application-level matrix validation in `AssetSelectorApplicationValidationService`
 - Defensive fail-fast via `assertValidRequest` and `assertValidResult`
 
+## Story 4.3 implemented state/session foundation
+- Application session store: `application/studio-entry/AssetSelectorSessionStore.ts`
+- Session model now includes:
+  - request/context
+  - selected assets
+  - pending selections
+  - lifecycle state
+  - validation errors
+- Lifecycle states implemented:
+  - `idle`
+  - `active`
+  - `creating-new`
+  - `returning`
+  - `cancelled`
+  - `completed`
+- Return handling:
+  - accepts canonical `AssetSelectorResult`
+  - validates through Story 4.1 + 4.2 seams
+  - merges selected/new assets into session state
+- Navigation/session continuity:
+  - sessions are keyed and isolated by `sessionKey`
+  - snapshot create/restore supports route-transition preservation workflows
+- Error handling includes:
+  - invalid return payloads
+  - asset-type mismatches
+  - snapshot restoration failures
+
+## Story 4.4 implemented reusable shell
+- Shell UI: `ui/components/studio-shell/asset-selector/AssetSelectorShell.tsx`
+- Data provider contract: `ui/studio-shell/asset-selector/AssetSelectorDataProvider.ts`
+- Registry-backed adapter: `ui/studio-shell/asset-selector/RegistryAssetSelectorDataProvider.ts`
+- Session accessor seam: `ui/studio-shell/asset-selector/AssetSelectorSessionRegistry.ts`
+
+Shell behavior:
+- search input
+- loading/empty/error/populated result states
+- selected indicators and summary
+- single/multi-select support
+- confirm/cancel actions
+- create-new action entry point
+- baseline keyboard controls (arrow navigation, enter/space select, escape cancel, ctrl/cmd+enter confirm)
+
+Separation reminder:
+- session/lifecycle/capability rules stay in application layer
+- shell stays presentation-only and asset-type-agnostic
+- fetching goes through provider adapter seam (no hardcoded dataset/agent logic in shell)
+
 ## Extensibility
 - New usage contexts can be added by registry registration.
 - New allowed asset-type mappings per context are configuration-driven.
