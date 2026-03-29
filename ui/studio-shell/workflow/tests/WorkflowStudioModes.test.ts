@@ -17,7 +17,7 @@ describe("WorkflowStudioModes", () => {
     ]);
     expect(registry.get(WorkflowStudioModeIds.canvas)?.intent).toBe("graph-authoring");
     expect(registry.get(WorkflowStudioModeIds.wizard)?.intent).toBe("guided-authoring");
-    expect(DEFAULT_WORKFLOW_STUDIO_MODE_ID).toBe(WorkflowStudioModeIds.canvas);
+    expect(DEFAULT_WORKFLOW_STUDIO_MODE_ID).toBe(WorkflowStudioModeIds.wizard);
   });
 
   it("supports explicit registry extension while preventing duplicate mode ids", () => {

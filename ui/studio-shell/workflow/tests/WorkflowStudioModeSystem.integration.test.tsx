@@ -81,6 +81,18 @@ function getButtonByText(root: ReactElement, label: string): ReactElement<Button
   return button as ReactElement<ButtonElementProps>;
 }
 
+function getAnchorByText(root: ReactElement, label: string): ReactElement<{ readonly href?: string }> {
+  const anchor = collectElements(root).find((entry) => (
+    typeof entry.type === "string"
+    && entry.type === "a"
+    && toText((entry.props as { children?: ReactNode }).children).trim() === label
+  ));
+  if (!anchor) {
+    throw new Error(`Expected anchor '${label}' to be present.`);
+  }
+  return anchor as ReactElement<{ readonly href?: string }>;
+}
+
 function getTextarea(root: ReactElement): ReactElement<TextareaElementProps> {
   const textarea = collectElements(root).find((entry) => (
     typeof entry.type === "string" && entry.type === "textarea"
@@ -94,7 +106,7 @@ function getTextarea(root: ReactElement): ReactElement<TextareaElementProps> {
 describe("WorkflowStudioModeSystem integration seams", () => {
   it("keeps routing resolution and centralized mode state aligned for default, direct, and invalid mode inputs", () => {
     const store = new WorkflowStudioModeStateStore();
-    expect(store.getState().selectedModeId).toBe(WorkflowStudioModeIds.canvas);
+    expect(store.getState().selectedModeId).toBe(WorkflowStudioModeIds.wizard);
 
     const wizardResolution = resolveWorkflowStudioModeRoute({ routeModeId: "wizard" });
     store.setSelectedMode(wizardResolution.resolvedModeId);
@@ -106,7 +118,7 @@ describe("WorkflowStudioModeSystem integration seams", () => {
 
     const invalidResolution = resolveWorkflowStudioModeRoute({ routeModeId: "unsupported" });
     store.setSelectedMode(invalidResolution.resolvedModeId);
-    expect(store.getState().selectedModeId).toBe(WorkflowStudioModeIds.canvas);
+    expect(store.getState().selectedModeId).toBe(WorkflowStudioModeIds.wizard);
     expect(invalidResolution.invalidModeId).toBe("unsupported");
   });
 
@@ -155,6 +167,20 @@ describe("WorkflowStudioModeSystem integration seams", () => {
     const store = new WorkflowStudioModeStateStore();
     store.setSelectedMode(WorkflowStudioModeIds.wizard);
 
+    store.updateSharedDraft((draft) => ({
+      ...draft,
+      steps: [
+        ...draft.steps,
+        {
+          id: "step-1",
+          type: "action",
+          kind: WorkflowDraftStepKinds.action,
+          order: 1,
+          title: "Step 1",
+        },
+      ],
+    }));
+
     const wizardBoundary = WorkflowStudioDraftAuthoringBoundary({
       isWorkflowStudio: true,
       content: store.getState().sharedDraftSerialized,
@@ -166,16 +192,18 @@ describe("WorkflowStudioModeSystem integration seams", () => {
         draftEditorContent: store.getState().draftEditorContent,
         modeValidationIssues: store.getState().modeValidationIssues,
         draftValidationIssues: store.getState().draftValidationIssues,
-        updateSharedDraft: (updater) => store.updateSharedDraft(updater),
       },
     });
-    const addStepButton = getButtonByText(wizardBoundary, "Add step");
-    addStepButton.props.onClick?.();
     expect(store.getState().sharedDraft.steps.map((entry) => entry.id)).toEqual(["step-1"]);
+    expect(getAnchorByText(wizardBoundary, "Trigger").props.href).toBe("#workflow-wizard-trigger");
 
     const wizardMarkup = renderToStaticMarkup(wizardBoundary);
     expect(wizardMarkup).toContain('data-testid="workflow-studio-wizard-mode-layout"');
     expect(wizardMarkup).toContain('data-testid="workflow-studio-wizard-mode-surface"');
+    expect(wizardMarkup).toContain("Trigger Section");
+    expect(wizardMarkup).toContain("Inputs Section");
+    expect(wizardMarkup).toContain("Steps Section");
+    expect(wizardMarkup).toContain("Outputs Section");
 
     store.setSelectedMode(WorkflowStudioModeIds.canvas);
     const canvasSerialized = serializeWorkflowDraft({
@@ -206,7 +234,6 @@ describe("WorkflowStudioModeSystem integration seams", () => {
         draftEditorContent: store.getState().draftEditorContent,
         modeValidationIssues: store.getState().modeValidationIssues,
         draftValidationIssues: store.getState().draftValidationIssues,
-        updateSharedDraft: (updater) => store.updateSharedDraft(updater),
       },
     });
 

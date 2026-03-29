@@ -19,7 +19,6 @@ export interface WorkflowStudioDraftAuthoringBoundaryProps {
     readonly draftParseError?: string;
     readonly modeValidationIssues: ReadonlyArray<WorkflowStudioModeValidationIssue>;
     readonly draftValidationIssues: ReadonlyArray<WorkflowValidationIssue>;
-    readonly updateSharedDraft: (updater: (draft: WorkflowDraft) => WorkflowDraft) => void;
   };
   readonly invalidModeRouteId?: string;
 }
@@ -42,7 +41,6 @@ export default function WorkflowStudioDraftAuthoringBoundary({
           <WorkflowStudioWizardModeSurface
             sharedDraft={workflowModeContext.sharedDraft}
             sharedDraftSerialized={workflowModeContext.sharedDraftSerialized}
-            onUpdateSharedDraft={workflowModeContext.updateSharedDraft}
           />
         </WorkflowStudioWizardModeLayout>
       ) : (
