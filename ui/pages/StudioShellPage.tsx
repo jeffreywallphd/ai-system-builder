@@ -1,18 +1,8 @@
 ﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { AssetDraftLifecycleStatuses, type AssetMetadataPatch } from "../../domain/studio-shell/StudioShellDomain";
-import {
-  WorkflowDraftInputSourceTypes,
-  WorkflowDraftInputValueTypes,
-  WorkflowDraftOutputDestinationTypes,
-  WorkflowDraftOutputFormats,
-  WorkflowDraftOutputTypes,
-  WorkflowDraftStepKinds,
-  WorkflowDraftTriggerKinds,
-  WorkflowDraftTriggerTypes,
-  type WorkflowDraft,
-} from "../../domain/workflow-studio/WorkflowStudioDomain";
 import type { StudioShellSnapshotReadModel, StudioShellValidationIssue } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
+import WorkflowStudioDraftAuthoringBoundary from "../components/studio-shell/workflow/WorkflowStudioDraftAuthoringBoundary";
 import { StudioShellService } from "../services/StudioShellService";
 import { StudioShellPanel } from "../components/studio-shell/StudioShellPanel";
 import { StudioShellValidationIssuesPanel } from "../components/studio-shell/StudioShellValidationIssuesPanel";
@@ -25,6 +15,7 @@ import {
   type StudioShellExtensionSlot,
 } from "../studio-shell/StudioShellExtensions";
 import { WorkflowStudioModeStateStore, type WorkflowStudioModeState } from "../studio-shell/workflow/WorkflowStudioModeStateStore";
+import type { WorkflowStudioModeRouteResolution } from "../studio-shell/workflow/WorkflowStudioModeRouting";
 import { StudioEntryService } from "../routes/StudioRouteMapping";
 import { readAutomationIntentFromSearch } from "../routes/BuildAutomationIntent";
 import { BuildIntents } from "../routes/BuildIntentModels";
@@ -84,18 +75,6 @@ function formatTags(tags?: ReadonlyArray<string>): string {
   return (tags ?? []).join(", ");
 }
 
-function createNextWorkflowDraftId(prefix: string, currentIds: ReadonlyArray<string>): string {
-  const knownIds = new Set(currentIds);
-  let counter = currentIds.length + 1;
-  let candidate = `${prefix}-${counter}`;
-  while (knownIds.has(candidate)) {
-    counter += 1;
-    candidate = `${prefix}-${counter}`;
-  }
-  return candidate;
-}
-
-
 function buildCreateMetadata(
   defaultDraftTitle: string,
   defaultDraftTags: ReadonlyArray<string>,
@@ -121,6 +100,7 @@ function buildCreateMetadata(
 interface StudioShellPageProps {
   readonly studioRegistration?: StudioRegistration;
   readonly extensions?: ReadonlyArray<StudioShellExtensionContribution>;
+  readonly workflowModeRoute?: WorkflowStudioModeRouteResolution;
 }
 
 function renderExtensions(
@@ -144,7 +124,11 @@ function renderExtensions(
   );
 }
 
-export default function StudioShellPage({ studioRegistration, extensions = [] }: StudioShellPageProps): JSX.Element {
+export default function StudioShellPage({
+  studioRegistration,
+  extensions = [],
+  workflowModeRoute,
+}: StudioShellPageProps): JSX.Element {
   const studioId = studioRegistration?.studioId ?? "studio-shell-main";
   const isWorkflowStudio = studioRegistration?.role === "workflow";
   const defaultDraftTitle = studioRegistration?.defaults.title ?? "Studio Shell Draft";
@@ -171,6 +155,7 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
     () => (isWorkflowStudio ? new WorkflowStudioModeStateStore() : undefined),
     [isWorkflowStudio],
   );
+  const requestedWorkflowModeId = workflowModeRoute?.requestedModeId;
   const shouldSeedAutomationIntent = searchParams.get("buildIntent")?.trim() === BuildIntents.automateTask && Boolean(automationIntent);
   const extensionRegistry = useMemo(() => {
     const registry = new StudioShellExtensionRegistry();
@@ -209,14 +194,6 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
     workflowModeStore?.hydrateFromSerializedDraft(nextContent);
   };
 
-  const updateSharedWorkflowDraft = (updater: (draft: WorkflowDraft) => WorkflowDraft): void => {
-    if (!workflowModeStore) {
-      return;
-    }
-
-    workflowModeStore.updateSharedDraft(updater);
-  };
-
   useEffect(() => {
     if (!workflowModeStore) {
       setWorkflowModeState(undefined);
@@ -234,6 +211,18 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
 
     setContent(workflowModeState.draftEditorContent);
   }, [isWorkflowStudio, workflowModeState]);
+
+  useEffect(() => {
+    if (!workflowModeStore || !requestedWorkflowModeId) {
+      return;
+    }
+
+    if (workflowModeStore.getState().selectedModeId === requestedWorkflowModeId) {
+      return;
+    }
+
+    workflowModeStore.setSelectedMode(requestedWorkflowModeId);
+  }, [requestedWorkflowModeId, workflowModeStore]);
 
   const refreshSnapshot = async () => {
     setIsBusy(true);
@@ -373,10 +362,8 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
 
   const sessionId = snapshot?.activeSessionId;
   const draftId = snapshot?.draft?.draftId;
-  const workflowDraftEditorContent = workflowModeState?.draftEditorContent ?? content;
   const workflowDraftContent = workflowModeState?.sharedDraftSerialized ?? content;
   const hasWorkflowDraftParseError = isWorkflowStudio && Boolean(workflowModeState?.draftParseError);
-  const isWorkflowWizardMode = isWorkflowStudio && workflowModeState?.selectedModeId === "wizard";
   const extensionContext: StudioShellExtensionContext = {
     studioId,
     snapshot,
@@ -493,155 +480,22 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
         {renderExtensions(extensionRegistry, StudioShellExtensionSlots.sessionContext, extensionContext)}
 
         <StudioShellPanel title="Asset draft authoring" subtitle="Thin authoring surface over studio-shell draft contracts.">
-          {isWorkflowStudio ? (
-            isWorkflowWizardMode ? (
-              <div className="ui-stack ui-stack--xs" data-testid="workflow-studio-wizard-mode-surface">
-                <div className="ui-card ui-card--padded ui-stack ui-stack--2xs">
-                  <strong>Wizard mode shell</strong>
-                  <p className="ui-text-muted">
-                    Guided workflow authoring operates on the same canonical workflow draft used by canvas mode.
-                  </p>
-                </div>
-                <div className="ui-grid" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "0.75rem" }}>
-                  <div className="ui-card ui-card--padded ui-stack ui-stack--2xs">
-                    <strong>Triggers ({workflowModeState?.sharedDraft.triggers.length ?? 0})</strong>
-                    <button
-                      type="button"
-                      className="ui-button ui-button--sm ui-button--ghost"
-                      onClick={() => {
-                        const currentDraft = workflowModeState?.sharedDraft;
-                        if (!currentDraft) {
-                          return;
-                        }
-                        const nextId = createNextWorkflowDraftId("trigger", currentDraft.triggers.map((entry) => entry.id));
-                        updateSharedWorkflowDraft((draft) => ({
-                          ...draft,
-                          triggers: [
-                            ...draft.triggers,
-                            {
-                              id: nextId,
-                              type: WorkflowDraftTriggerTypes.userManual,
-                              kind: WorkflowDraftTriggerKinds.user,
-                              config: {},
-                            },
-                          ],
-                        }));
-                      }}
-                    >
-                      Add trigger
-                    </button>
-                  </div>
-                  <div className="ui-card ui-card--padded ui-stack ui-stack--2xs">
-                    <strong>Inputs ({workflowModeState?.sharedDraft.inputs.length ?? 0})</strong>
-                    <button
-                      type="button"
-                      className="ui-button ui-button--sm ui-button--ghost"
-                      onClick={() => {
-                        const currentDraft = workflowModeState?.sharedDraft;
-                        if (!currentDraft) {
-                          return;
-                        }
-                        const nextId = createNextWorkflowDraftId("input", currentDraft.inputs.map((entry) => entry.id));
-                        updateSharedWorkflowDraft((draft) => ({
-                          ...draft,
-                          inputs: [
-                            ...draft.inputs,
-                            {
-                              id: nextId,
-                              type: WorkflowDraftInputSourceTypes.runtimeParameter,
-                              sourceType: WorkflowDraftInputSourceTypes.runtimeParameter,
-                              parameterKey: nextId,
-                              valueType: WorkflowDraftInputValueTypes.string,
-                            },
-                          ],
-                        }));
-                      }}
-                    >
-                      Add input
-                    </button>
-                  </div>
-                  <div className="ui-card ui-card--padded ui-stack ui-stack--2xs">
-                    <strong>Steps ({workflowModeState?.sharedDraft.steps.length ?? 0})</strong>
-                    <button
-                      type="button"
-                      className="ui-button ui-button--sm ui-button--ghost"
-                      onClick={() => {
-                        const currentDraft = workflowModeState?.sharedDraft;
-                        if (!currentDraft) {
-                          return;
-                        }
-                        const nextId = createNextWorkflowDraftId("step", currentDraft.steps.map((entry) => entry.id));
-                        const nextOrder = currentDraft.steps.reduce((max, step) => Math.max(max, step.order), 0) + 1;
-                        updateSharedWorkflowDraft((draft) => ({
-                          ...draft,
-                          steps: [
-                            ...draft.steps,
-                            {
-                              id: nextId,
-                              type: "action",
-                              kind: WorkflowDraftStepKinds.action,
-                              order: nextOrder,
-                              title: `Step ${nextOrder}`,
-                            },
-                          ],
-                        }));
-                      }}
-                    >
-                      Add step
-                    </button>
-                  </div>
-                  <div className="ui-card ui-card--padded ui-stack ui-stack--2xs">
-                    <strong>Outputs ({workflowModeState?.sharedDraft.outputs.length ?? 0})</strong>
-                    <button
-                      type="button"
-                      className="ui-button ui-button--sm ui-button--ghost"
-                      onClick={() => {
-                        const currentDraft = workflowModeState?.sharedDraft;
-                        if (!currentDraft) {
-                          return;
-                        }
-                        const nextId = createNextWorkflowDraftId("output", currentDraft.outputs.map((entry) => entry.id));
-                        updateSharedWorkflowDraft((draft) => ({
-                          ...draft,
-                          outputs: [
-                            ...draft.outputs,
-                            {
-                              id: nextId,
-                              type: "result",
-                              outputType: WorkflowDraftOutputTypes.document,
-                              format: WorkflowDraftOutputFormats.json,
-                              destination: {
-                                type: WorkflowDraftOutputDestinationTypes.webViewer,
-                                target: "preview",
-                              },
-                            },
-                          ],
-                        }));
-                      }}
-                    >
-                      Add output
-                    </button>
-                  </div>
-                </div>
-                <label className="ui-stack ui-stack--2xs">
-                  <span className="ui-text-small">Shared canonical workflow draft JSON preview</span>
-                  <textarea className="ui-textarea" rows={8} value={workflowDraftContent} readOnly />
-                </label>
-              </div>
-            ) : (
-              <div className="ui-stack ui-stack--xs" data-testid="workflow-studio-canvas-mode-surface">
-                <div className="ui-text-small">Canvas mode (current Workflow Studio draft authoring)</div>
-                <textarea className="ui-textarea" rows={8} value={workflowDraftEditorContent} onChange={(event) => updateContent(event.target.value)} />
-              </div>
-            )
-          ) : (
-            <textarea className="ui-textarea" rows={8} value={content} onChange={(event) => updateContent(event.target.value)} />
-          )}
-          {hasWorkflowDraftParseError ? (
-            <p className="ui-text-muted">
-              Workflow draft content must be valid canonical workflow JSON before saving.
-            </p>
-          ) : null}
+          <WorkflowStudioDraftAuthoringBoundary
+            isWorkflowStudio={isWorkflowStudio}
+            content={content}
+            onChangeContent={updateContent}
+            invalidModeRouteId={isWorkflowStudio ? workflowModeRoute?.invalidModeId : undefined}
+            workflowModeContext={workflowModeStore && workflowModeState
+              ? {
+                selectedModeId: workflowModeState.selectedModeId,
+                sharedDraft: workflowModeState.sharedDraft,
+                sharedDraftSerialized: workflowModeState.sharedDraftSerialized,
+                draftEditorContent: workflowModeState.draftEditorContent,
+                draftParseError: workflowModeState.draftParseError,
+                updateSharedDraft: (updater) => workflowModeStore.updateSharedDraft(updater),
+              }
+              : undefined}
+          />
           <div className="ui-stack ui-stack--xs" style={{ flexDirection: "row" }}>
             <button
               className="ui-button ui-button--primary"

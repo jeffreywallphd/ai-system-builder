@@ -9,6 +9,10 @@ describe("WorkflowStudioPage contracts", () => {
 
     expect(pageSource).toContain("StudioShellPage");
     expect(pageSource).toContain("workflowStudioRegistration");
+    expect(pageSource).toContain("resolveWorkflowStudioModeRoute");
+    expect(pageSource).toContain("useParams");
+    expect(pageSource).toContain("useLocation");
+    expect(pageSource).toContain("workflowModeRoute={workflowModeRoute}");
     expect(pageSource).toContain("studioRegistration={workflowStudioRegistration}");
 
     expect(registrationSource).toContain("studioType: WorkflowStudioIdentity.studioType");
@@ -19,17 +23,9 @@ describe("WorkflowStudioPage contracts", () => {
     expect(registrationSource).toContain('slot: "metadata"');
     expect(registrationSource).toContain('createWorkflowStudioTaxonomy("deterministic")');
 
-    expect(shellSource).toContain("isWorkflowWizardMode");
-    expect(shellSource).toContain('workflowModeState?.selectedModeId === "wizard"');
-    expect(shellSource).toContain("workflow-studio-canvas-mode-surface");
-    expect(shellSource).toContain("workflow-studio-wizard-mode-surface");
-    expect(shellSource).toContain("Canvas mode (current Workflow Studio draft authoring)");
-    expect(shellSource).toContain("Wizard mode shell");
-    expect(shellSource).toContain("updateSharedWorkflowDraft");
-    expect(shellSource).toContain("Add trigger");
-    expect(shellSource).toContain("Add input");
-    expect(shellSource).toContain("Add step");
-    expect(shellSource).toContain("Add output");
-    expect(shellSource).toContain("workflowDraftEditorContent");
+    expect(shellSource).toContain("WorkflowStudioDraftAuthoringBoundary");
+    expect(shellSource).toContain("workflowModeRoute");
+    expect(shellSource).toContain("requestedWorkflowModeId");
+    expect(shellSource).toContain("workflowModeStore.setSelectedMode(requestedWorkflowModeId)");
   });
 });
