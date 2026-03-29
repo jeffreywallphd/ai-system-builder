@@ -131,4 +131,37 @@ describe("WorkflowStudioApplicationService", () => {
       versionId: "workflow-version-unpinned",
     })).rejects.toThrow("dependency-version-unpinned");
   });
+
+  it("blocks publish when canonical workflow draft content fails domain validation", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const ids = ["session-1", "draft-1"];
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => ids.shift() ?? "generated");
+    const service = new WorkflowStudioApplicationService(studioShell);
+
+    const ensure = await service.ensureStudioInitialized();
+    const created = await service.createWorkflowDraft({
+      sessionId: ensure.session.id,
+      title: "Workflow",
+      content: JSON.stringify({
+        triggers: [
+          {
+            id: "trigger-temporal",
+            kind: "temporal",
+            type: "schedule",
+            config: {},
+          },
+        ],
+        inputs: [],
+        steps: [],
+        outputs: [],
+      }),
+      dependencies: [{ assetId: "asset:model", versionId: "asset:model:v1" }],
+    });
+
+    await expect(service.publishWorkflowDraft({
+      sessionId: ensure.session.id,
+      draftId: created.draft.id,
+      versionId: "workflow-version-invalid-content",
+    })).rejects.toThrow("Workflow draft content is malformed");
+  });
 });
