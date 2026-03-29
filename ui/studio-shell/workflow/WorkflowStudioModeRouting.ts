@@ -1,6 +1,11 @@
-import { isWorkflowStudioModeId, type WorkflowStudioModeId } from "./WorkflowStudioModes";
+import {
+  DEFAULT_WORKFLOW_STUDIO_MODE_ID,
+  isWorkflowStudioModeId,
+  type WorkflowStudioModeId,
+} from "./WorkflowStudioModes";
 
 export interface WorkflowStudioModeRouteResolution {
+  readonly resolvedModeId: WorkflowStudioModeId;
   readonly requestedModeId?: WorkflowStudioModeId;
   readonly invalidModeId?: string;
   readonly source: "route-param" | "query-param" | "none";
@@ -19,12 +24,14 @@ export function resolveWorkflowStudioModeRoute(input: {
   if (routeModeId) {
     if (isWorkflowStudioModeId(routeModeId)) {
       return Object.freeze({
+        resolvedModeId: routeModeId,
         requestedModeId: routeModeId,
         source: "route-param",
       });
     }
 
     return Object.freeze({
+      resolvedModeId: DEFAULT_WORKFLOW_STUDIO_MODE_ID,
       invalidModeId: routeModeId,
       source: "route-param",
     });
@@ -33,18 +40,21 @@ export function resolveWorkflowStudioModeRoute(input: {
   const queryModeId = normalizeModeInput(new URLSearchParams(input.search).get("mode"));
   if (!queryModeId) {
     return Object.freeze({
+      resolvedModeId: DEFAULT_WORKFLOW_STUDIO_MODE_ID,
       source: "none",
     });
   }
 
   if (isWorkflowStudioModeId(queryModeId)) {
     return Object.freeze({
+      resolvedModeId: queryModeId,
       requestedModeId: queryModeId,
       source: "query-param",
     });
   }
 
   return Object.freeze({
+    resolvedModeId: DEFAULT_WORKFLOW_STUDIO_MODE_ID,
     invalidModeId: queryModeId,
     source: "query-param",
   });

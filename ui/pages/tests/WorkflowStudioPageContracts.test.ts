@@ -25,7 +25,9 @@ describe("WorkflowStudioPage contracts", () => {
 
     expect(shellSource).toContain("WorkflowStudioDraftAuthoringBoundary");
     expect(shellSource).toContain("workflowModeRoute");
-    expect(shellSource).toContain("requestedWorkflowModeId");
-    expect(shellSource).toContain("workflowModeStore.setSelectedMode(requestedWorkflowModeId)");
+    expect(shellSource).toContain("resolvedWorkflowModeId");
+    expect(shellSource).toContain("workflowModeStore.setSelectedMode(resolvedWorkflowModeId)");
+    expect(shellSource).toContain("getWorkflowStudioModeStateStore(studioId)");
+    expect(shellSource).toContain("synchronizeSharedDraftFromSnapshot");
   });
 });

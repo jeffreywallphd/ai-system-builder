@@ -8,6 +8,7 @@ import {
 import WorkflowStudioModePanel from "../../components/studio-shell/workflow/WorkflowStudioModePanel";
 import type { CompositeStudioRegistration } from "../StudioShellExtensions";
 import { createCompositeStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
+import { DEFAULT_WORKFLOW_STUDIO_MODE_ID } from "../workflow/WorkflowStudioModes";
 
 export const workflowStudioRegistration: CompositeStudioRegistration = Object.freeze({
   studioType: WorkflowStudioIdentity.studioType,
@@ -54,7 +55,7 @@ export const workflowStudioRegistration: CompositeStudioRegistration = Object.fr
         "Workflow assets are specialized composite orchestrators: structure/version in assets, execution patterns in behavior metadata.",
         "Canonical draft sections: triggers, inputs, steps, outputs.",
         "Allowed behavior kinds: deterministic, conditional, iterative.",
-        `Selected mode: ${workflowModeState?.state.selectedModeId ?? "canvas"}`,
+        `Selected mode: ${workflowModeState?.state.selectedModeId ?? DEFAULT_WORKFLOW_STUDIO_MODE_ID}`,
         `Draft asset id: ${snapshot?.draft?.assetId ?? "-"}`,
       ]),
     },

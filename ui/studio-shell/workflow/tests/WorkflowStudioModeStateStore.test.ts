@@ -1,16 +1,24 @@
-import { describe, expect, it } from "bun:test";
+import { beforeEach, describe, expect, it } from "bun:test";
 import {
   createEmptyWorkflowDraft,
   deserializeWorkflowDraft,
   serializeWorkflowDraft,
 } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
-import { WorkflowStudioModeStateStore } from "../WorkflowStudioModeStateStore";
-import { WorkflowStudioModeIds } from "../WorkflowStudioModes";
+import {
+  clearWorkflowStudioModeStateStoresForTests,
+  getWorkflowStudioModeStateStore,
+  WorkflowStudioModeStateStore,
+} from "../WorkflowStudioModeStateStore";
+import { DEFAULT_WORKFLOW_STUDIO_MODE_ID, WorkflowStudioModeIds } from "../WorkflowStudioModes";
 
 describe("WorkflowStudioModeStateStore", () => {
+  beforeEach(() => {
+    clearWorkflowStudioModeStateStoresForTests();
+  });
+
   it("tracks selected mode centrally and allows deterministic mode switching", () => {
     const store = new WorkflowStudioModeStateStore();
-    expect(store.getState().selectedModeId).toBe(WorkflowStudioModeIds.canvas);
+    expect(store.getState().selectedModeId).toBe(DEFAULT_WORKFLOW_STUDIO_MODE_ID);
 
     store.setSelectedMode(WorkflowStudioModeIds.wizard);
 
@@ -143,5 +151,114 @@ describe("WorkflowStudioModeStateStore", () => {
     expect(store.getState().draftEditorContent).toBe("not-json");
     expect(store.getState().sharedDraftSerialized).not.toBe(baselineSerialized);
     expect(store.getState().sharedDraft.outputs.map((entry) => entry.id)).toEqual(["out-1"]);
+  });
+
+  it("preserves local draft edits across same-session mode-route snapshot refreshes", () => {
+    const store = new WorkflowStudioModeStateStore();
+    const serverDraft = serializeWorkflowDraft(createEmptyWorkflowDraft());
+
+    store.synchronizeSharedDraftFromSnapshot({
+      serializedDraft: serverDraft,
+      context: {
+        studioId: "workflow-studio",
+        sessionId: "session-1",
+        draftId: "draft-1",
+        revision: 1,
+      },
+    });
+
+    store.hydrateFromSerializedDraft(serializeWorkflowDraft({
+      ...createEmptyWorkflowDraft(),
+      steps: [
+        {
+          id: "local-step",
+          type: "action",
+          kind: "action",
+          order: 1,
+          title: "Unsaved local step",
+        },
+      ],
+    }));
+
+    store.synchronizeSharedDraftFromSnapshot({
+      serializedDraft: serverDraft,
+      context: {
+        studioId: "workflow-studio",
+        sessionId: "session-1",
+        draftId: "draft-1",
+        revision: 1,
+      },
+    });
+
+    expect(store.getState().sharedDraft.steps.map((step) => step.id)).toEqual(["local-step"]);
+  });
+
+  it("re-hydrates from backend draft when draft session identity changes", () => {
+    const store = new WorkflowStudioModeStateStore();
+
+    store.hydrateFromSerializedDraft(serializeWorkflowDraft({
+      ...createEmptyWorkflowDraft(),
+      outputs: [
+        {
+          id: "local-output",
+          type: "result",
+          outputType: "document",
+          format: "json",
+          destination: {
+            type: "web-viewer",
+            target: "preview",
+          },
+        },
+      ],
+    }));
+
+    const serverDraft = serializeWorkflowDraft({
+      ...createEmptyWorkflowDraft(),
+      steps: [
+        {
+          id: "server-step",
+          type: "action",
+          kind: "action",
+          order: 1,
+          title: "Server step",
+        },
+      ],
+    });
+
+    store.synchronizeSharedDraftFromSnapshot({
+      serializedDraft: serverDraft,
+      context: {
+        studioId: "workflow-studio",
+        sessionId: "session-2",
+        draftId: "draft-2",
+        revision: 1,
+      },
+    });
+
+    expect(store.getState().sharedDraft.steps.map((step) => step.id)).toEqual(["server-step"]);
+    expect(store.getState().sharedDraft.outputs).toHaveLength(0);
+    expect(store.getState().hasLocalDraftEdits).toBe(false);
+  });
+
+  it("reuses one workflow mode store instance per studio id across route transitions", () => {
+    const first = getWorkflowStudioModeStateStore("workflow-studio");
+    first.setSelectedMode(WorkflowStudioModeIds.wizard);
+    first.hydrateFromSerializedDraft(serializeWorkflowDraft({
+      ...createEmptyWorkflowDraft(),
+      triggers: [
+        {
+          id: "trigger-persisted",
+          kind: "user",
+          type: "manual",
+          config: {},
+        },
+      ],
+    }));
+
+    const second = getWorkflowStudioModeStateStore("workflow-studio");
+
+    expect(second).toBe(first);
+    expect(second.getState().selectedModeId).toBe(WorkflowStudioModeIds.wizard);
+    expect(second.getState().sharedDraft.triggers.map((trigger) => trigger.id)).toEqual(["trigger-persisted"]);
   });
 });

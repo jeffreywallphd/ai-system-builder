@@ -14,7 +14,10 @@ import {
   type StudioShellExtensionContribution,
   type StudioShellExtensionSlot,
 } from "../studio-shell/StudioShellExtensions";
-import { WorkflowStudioModeStateStore, type WorkflowStudioModeState } from "../studio-shell/workflow/WorkflowStudioModeStateStore";
+import {
+  getWorkflowStudioModeStateStore,
+  type WorkflowStudioModeState,
+} from "../studio-shell/workflow/WorkflowStudioModeStateStore";
 import type { WorkflowStudioModeRouteResolution } from "../studio-shell/workflow/WorkflowStudioModeRouting";
 import { StudioEntryService } from "../routes/StudioRouteMapping";
 import { readAutomationIntentFromSearch } from "../routes/BuildAutomationIntent";
@@ -152,10 +155,10 @@ export default function StudioShellPage({
     [location.search],
   );
   const workflowModeStore = useMemo(
-    () => (isWorkflowStudio ? new WorkflowStudioModeStateStore() : undefined),
-    [isWorkflowStudio],
+    () => (isWorkflowStudio ? getWorkflowStudioModeStateStore(studioId) : undefined),
+    [isWorkflowStudio, studioId],
   );
-  const requestedWorkflowModeId = workflowModeRoute?.requestedModeId;
+  const resolvedWorkflowModeId = workflowModeRoute?.resolvedModeId;
   const shouldSeedAutomationIntent = searchParams.get("buildIntent")?.trim() === BuildIntents.automateTask && Boolean(automationIntent);
   const extensionRegistry = useMemo(() => {
     const registry = new StudioShellExtensionRegistry();
@@ -213,16 +216,16 @@ export default function StudioShellPage({
   }, [isWorkflowStudio, workflowModeState]);
 
   useEffect(() => {
-    if (!workflowModeStore || !requestedWorkflowModeId) {
+    if (!workflowModeStore || !resolvedWorkflowModeId) {
       return;
     }
 
-    if (workflowModeStore.getState().selectedModeId === requestedWorkflowModeId) {
+    if (workflowModeStore.getState().selectedModeId === resolvedWorkflowModeId) {
       return;
     }
 
-    workflowModeStore.setSelectedMode(requestedWorkflowModeId);
-  }, [requestedWorkflowModeId, workflowModeStore]);
+    workflowModeStore.setSelectedMode(resolvedWorkflowModeId);
+  }, [resolvedWorkflowModeId, workflowModeStore]);
 
   const refreshSnapshot = async () => {
     setIsBusy(true);
@@ -255,7 +258,19 @@ export default function StudioShellPage({
       }
       setError(undefined);
       if (response.data.draft) {
-        updateContent(response.data.draft.content);
+        if (workflowModeStore && isWorkflowStudio) {
+          workflowModeStore.synchronizeSharedDraftFromSnapshot({
+            serializedDraft: response.data.draft.content,
+            context: {
+              studioId,
+              sessionId: response.data.activeSessionId,
+              draftId: response.data.draft.draftId,
+              revision: response.data.draft.revision,
+            },
+          });
+        } else {
+          updateContent(response.data.draft.content);
+        }
       }
     } finally {
       setIsBusy(false);
