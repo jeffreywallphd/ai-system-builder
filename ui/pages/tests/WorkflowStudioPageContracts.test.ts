@@ -25,5 +25,11 @@ describe("WorkflowStudioPage contracts", () => {
     expect(shellSource).toContain("workflow-studio-wizard-mode-surface");
     expect(shellSource).toContain("Canvas mode (current Workflow Studio draft authoring)");
     expect(shellSource).toContain("Wizard mode shell");
+    expect(shellSource).toContain("updateSharedWorkflowDraft");
+    expect(shellSource).toContain("Add trigger");
+    expect(shellSource).toContain("Add input");
+    expect(shellSource).toContain("Add step");
+    expect(shellSource).toContain("Add output");
+    expect(shellSource).toContain("workflowDraftEditorContent");
   });
 });
