@@ -551,6 +551,8 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
 ## Direction 5 update: Workflow studio domain + application slice (story 3.5)
 
 - Workflow Studio now has a thin bounded inner-layer domain helper (`domain/workflow-studio/WorkflowStudioDomain.ts`) for specialized composite orchestrator authoring with taxonomy `composite/workflow/{deterministic|conditional|iterative}` and generated provenance defaults.
+- Workflow Studio domain now includes a canonical workflow authoring entity contract (`WorkflowEntity`) with stable identity, human-readable name, descriptive metadata, lifecycle timestamps, and explicit relation to canonical draft state.
+- Workflow Studio domain now includes canonical workflow draft schema contracts (`WorkflowDraft`) with typed top-level sections (`triggers`, `inputs`, `steps`, `outputs`), explicit step ordering semantics, and deterministic serialize/deserialize normalization helpers.
 - A bounded application orchestrator (`application/workflow-studio/WorkflowStudioApplicationService.ts`) reuses `StudioShellApplicationService` for initialize/create/publish lifecycle instead of introducing workflow-specific create/update/publish infrastructure.
 - Publish gating now reuses shared composite enforcement (`assertCompositeStudioDraftPublishConsistency`) so workflow semantic-role and behavior invariants plus taxonomy-driven contract derivability remain backend/application-authoritative.
 

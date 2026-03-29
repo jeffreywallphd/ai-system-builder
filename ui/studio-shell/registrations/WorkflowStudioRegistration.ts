@@ -1,4 +1,9 @@
-import { createWorkflowStudioTaxonomy, WorkflowStudioIdentity } from "../../../domain/workflow-studio/WorkflowStudioDomain";
+import {
+  createEmptyWorkflowDraft,
+  createWorkflowStudioTaxonomy,
+  serializeWorkflowDraft,
+  WorkflowStudioIdentity,
+} from "../../../domain/workflow-studio/WorkflowStudioDomain";
 import type { CompositeStudioRegistration } from "../StudioShellExtensions";
 import { createCompositeStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
 
@@ -16,21 +21,7 @@ export const workflowStudioRegistration: CompositeStudioRegistration = Object.fr
   defaults: {
     title: "Workflow Asset Draft",
     tags: Object.freeze(["workflow", "studio-shell", "composite", "orchestrator"]),
-    contentTemplate: JSON.stringify(
-      {
-        workflowSpec: {
-          metadata: {
-            name: "",
-            description: "",
-          },
-          executionPolicy: "acyclic-only",
-          nodes: [],
-          connections: [],
-        },
-      },
-      null,
-      2,
-    ),
+    contentTemplate: serializeWorkflowDraft(createEmptyWorkflowDraft()),
     metadataPatch: createCompositeStudioMetadataPatch({
       title: "Workflow Asset Draft",
       tags: ["workflow", "studio-shell", "composite", "orchestrator"],
@@ -49,6 +40,7 @@ export const workflowStudioRegistration: CompositeStudioRegistration = Object.fr
       order: 10,
       render: ({ snapshot }) => Object.freeze([
         "Workflow assets are specialized composite orchestrators: structure/version in assets, execution patterns in behavior metadata.",
+        "Canonical draft sections: triggers, inputs, steps, outputs.",
         "Allowed behavior kinds: deterministic, conditional, iterative.",
         `Draft asset id: ${snapshot?.draft?.assetId ?? "-"}`,
       ]),
