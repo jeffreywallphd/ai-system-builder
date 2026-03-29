@@ -14,6 +14,7 @@ import {
   TaxonomySemanticRoles,
   TaxonomyStructuralKinds,
   createCompositionTaxonomyDescriptor,
+  type CompositionTaxonomyDescriptor,
 } from "../../../domain/taxonomy/CompositionTaxonomy";
 
 export const WorkflowWizardStepSelectionKinds = Object.freeze({
@@ -37,6 +38,18 @@ export interface WorkflowStepAgentAssetCandidate {
   readonly assetId: string;
   readonly versionId?: string;
   readonly name?: string;
+}
+
+export interface WorkflowStepAgentAssistantSelectionPayload {
+  readonly assetRef: {
+    readonly assetKind: typeof WorkflowDraftStepAssetKinds.agentAssistant;
+    readonly asset: {
+      readonly assetId: string;
+      readonly versionId?: string;
+      readonly taxonomy: CompositionTaxonomyDescriptor;
+    };
+  };
+  readonly config: Readonly<Record<string, unknown>>;
 }
 
 export interface WorkflowStepAssetCatalogLoadResult {
@@ -494,21 +507,38 @@ export function setWorkflowStepAgentAssetSelection(
       return currentStep;
     }
 
+    const payload = buildWorkflowStepAgentAssistantSelectionPayload(candidate);
+
     return Object.freeze({
       ...currentStep,
       type: WorkflowDraftStepTypes.agentAssistant,
       kind: WorkflowDraftStepKinds.assetBacked,
       title: normalizedName ?? currentStep.title,
-      config: undefined,
-      assetRef: Object.freeze({
-        assetKind: WorkflowDraftStepAssetKinds.agentAssistant,
-        asset: Object.freeze({
-          assetId,
-          versionId,
-          taxonomy: stepAgentAssistantTaxonomy,
-        }),
-      }),
+      config: payload.config,
+      assetRef: payload.assetRef,
     });
+  });
+}
+
+export function buildWorkflowStepAgentAssistantSelectionPayload(
+  candidate: WorkflowStepAgentAssetCandidate,
+): WorkflowStepAgentAssistantSelectionPayload {
+  const assetId = candidate.assetId.trim();
+  if (!assetId) {
+    throw new Error("Agent or assistant asset id is required.");
+  }
+
+  return Object.freeze({
+    assetRef: Object.freeze({
+      assetKind: WorkflowDraftStepAssetKinds.agentAssistant,
+      asset: Object.freeze({
+        assetId,
+        versionId: normalizeOptional(candidate.versionId),
+        taxonomy: stepAgentAssistantTaxonomy,
+      }),
+    }),
+    // Keep a bounded placeholder so future step configuration can be layered without changing payload shape.
+    config: Object.freeze({}),
   });
 }
 
