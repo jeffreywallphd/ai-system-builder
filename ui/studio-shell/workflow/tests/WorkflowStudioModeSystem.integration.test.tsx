@@ -576,12 +576,14 @@ describe("WorkflowStudioModeSystem integration seams", () => {
     });
 
     const markup = renderToStaticMarkup(wizardBoundary);
+    expect(markup).toContain('data-testid="workflow-wizard-readiness-summary"');
     expect(markup).toContain('data-testid="workflow-wizard-progression-controls"');
     expect(markup).toContain('data-testid="workflow-wizard-prev-section"');
     expect(markup).toContain('data-testid="workflow-wizard-next-section"');
     expect(markup).toContain('aria-current="step"');
     expect(markup).toContain('data-testid="workflow-wizard-terminal-actions"');
-    expect(markup).toContain("Ready to Save / Ready to Run: all sections are complete and validation-ready for this draft slice.");
+    expect(markup).toContain("Ready for next-stage handoff. Save the draft and continue to lifecycle/publish controls.");
+    expect(markup).toContain("Prepare for Run");
   });
 });
 

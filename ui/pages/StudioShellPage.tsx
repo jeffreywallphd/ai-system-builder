@@ -1031,7 +1031,11 @@ export default function StudioShellPage({
         </StudioShellPanel>
         {renderExtensions(extensionRegistry, StudioShellExtensionSlots.dependencies, extensionContext)}
 
-        <StudioShellPanel title="Lifecycle / publish / version status" subtitle="Explicit draft lifecycle transitions and publish/version operations.">
+        <StudioShellPanel
+          sectionId="studio-shell-lifecycle-panel"
+          title="Lifecycle / publish / version status"
+          subtitle="Explicit draft lifecycle transitions and publish/version operations."
+        >
           <div className="ui-stack ui-stack--2xs">
             <div><strong>Lifecycle:</strong> {snapshot?.draft?.lifecycleStatus ?? "n/a"}</div>
             <div><strong>Published versions:</strong> {snapshot?.versions.length ?? 0}</div>
