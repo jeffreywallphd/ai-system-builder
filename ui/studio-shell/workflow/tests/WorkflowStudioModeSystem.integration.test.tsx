@@ -366,5 +366,33 @@ describe("WorkflowStudioModeSystem integration seams", () => {
     removeButton.props.onClick?.();
     expect(store.getState().sharedDraft.triggers).toHaveLength(0);
   });
+
+  it("exposes dataset inline creation handoff launch from wizard inputs", () => {
+    const store = new WorkflowStudioModeStateStore();
+    store.setSelectedMode(WorkflowStudioModeIds.wizard);
+
+    const boundary = WorkflowStudioDraftAuthoringBoundary({
+      isWorkflowStudio: true,
+      content: store.getState().sharedDraftSerialized,
+      onChangeContent: (nextContent) => store.hydrateFromSerializedDraft(nextContent),
+      workflowModeContext: {
+        studioId: "studio-workflows",
+        routeSearch: "?mode=wizard&assetId=asset:workflow-root",
+        selectedModeId: store.getState().selectedModeId,
+        sharedDraft: store.getState().sharedDraft,
+        sharedDraftSerialized: store.getState().sharedDraftSerialized,
+        draftEditorContent: store.getState().draftEditorContent,
+        modeValidationIssues: store.getState().modeValidationIssues,
+        draftValidationIssues: store.getState().draftValidationIssues,
+        updateSharedDraft: (updater) => store.updateSharedDraft(updater),
+      },
+    });
+
+    const createLink = getElementByTestId(boundary, "workflow-input-create-dataset-link") as ReactElement<{ readonly href?: string }>;
+    expect(createLink.props.href).toContain("/studio-shell/dataset?");
+    expect(createLink.props.href).toContain("entryMode=new");
+    expect(createLink.props.href).toContain("inlineCreate=1");
+    expect(createLink.props.href).toContain("returnTo=%2Fstudio-shell%2Fworkflow%2Fwizard");
+  });
 });
 

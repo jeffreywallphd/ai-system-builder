@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AssetDraftLifecycleStatuses, type AssetMetadataPatch } from "../../domain/studio-shell/StudioShellDomain";
 import type { StudioShellSnapshotReadModel, StudioShellValidationIssue } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
 import WorkflowStudioDraftAuthoringBoundary from "../components/studio-shell/workflow/WorkflowStudioDraftAuthoringBoundary";
@@ -22,6 +22,11 @@ import type { WorkflowStudioModeRouteResolution } from "../studio-shell/workflow
 import { StudioEntryService } from "../routes/StudioRouteMapping";
 import { readAutomationIntentFromSearch } from "../routes/BuildAutomationIntent";
 import { BuildIntents } from "../routes/BuildIntentModels";
+import {
+  InlineAssetCreationService,
+  InlineAssetReturnStatuses,
+  type InlineAssetCreationReturnTarget,
+} from "../routes/InlineAssetCreation";
 
 interface JsonParseResult<T> {
   readonly ok: boolean;
@@ -143,7 +148,9 @@ export default function StudioShellPage({
       ? `Shared ${studioRegistration.kind}-studio shell for ${studioRegistration.role} assets: session/draft context, metadata/dependencies, lifecycle/version, and validation.`
       : "Reusable bounded shell for studio/session context, authoring, taxonomy/contract/provenance/dependencies, lifecycle/version state, and validation.");
   const service = useMemo(() => new StudioShellService(), []);
+  const inlineAssetCreationService = useMemo(() => new InlineAssetCreationService(), []);
   const location = useLocation();
+  const navigate = useNavigate();
   const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
   const studioEntryService = useMemo(() => new StudioEntryService(), []);
   const contextualInitialization = useMemo(
@@ -153,6 +160,14 @@ export default function StudioShellPage({
   const automationIntent = useMemo(
     () => readAutomationIntentFromSearch(location.search),
     [location.search],
+  );
+  const inlineCreationReturnTarget = useMemo<InlineAssetCreationReturnTarget | undefined>(
+    () => inlineAssetCreationService.parseReturnTargetFromSearch(location.search),
+    [inlineAssetCreationService, location.search],
+  );
+  const inlineCreationReturnPayload = useMemo(
+    () => inlineAssetCreationService.parseInlineReturnFromSearch(location.search),
+    [inlineAssetCreationService, location.search],
   );
   const workflowModeStore = useMemo(
     () => (isWorkflowStudio ? getWorkflowStudioModeStateStore(studioId) : undefined),
@@ -377,6 +392,50 @@ export default function StudioShellPage({
 
   const sessionId = snapshot?.activeSessionId;
   const draftId = snapshot?.draft?.draftId;
+  const latestVersionId = snapshot && snapshot.versions.length > 0
+    ? snapshot.versions[snapshot.versions.length - 1]?.versionId
+    : undefined;
+  const returnVersionId = snapshot?.draft?.lastPublishedVersionId
+    ?? latestVersionId
+    ?? undefined;
+  const inlineReturnPaths = useMemo(() => {
+    if (!inlineCreationReturnTarget) {
+      return undefined;
+    }
+
+    return Object.freeze({
+      withAsset: snapshot?.draft?.assetId
+        ? inlineAssetCreationService.buildReturnPath({
+          returnTarget: inlineCreationReturnTarget,
+          payload: {
+            status: InlineAssetReturnStatuses.created,
+            assetId: snapshot.draft.assetId,
+            versionId: returnVersionId,
+            sourceStudioType: studioRegistration?.studioType,
+            sourceStudioId: studioId,
+            returnContextId: inlineCreationReturnTarget.contextId,
+          },
+        })
+        : undefined,
+      cancelled: inlineAssetCreationService.buildReturnPath({
+        returnTarget: inlineCreationReturnTarget,
+        payload: {
+          status: InlineAssetReturnStatuses.cancelled,
+          sourceStudioType: studioRegistration?.studioType,
+          sourceStudioId: studioId,
+          returnContextId: inlineCreationReturnTarget.contextId,
+        },
+      }),
+    });
+  }, [
+    inlineAssetCreationService,
+    inlineCreationReturnTarget,
+    latestVersionId,
+    returnVersionId,
+    snapshot?.draft?.assetId,
+    studioId,
+    studioRegistration?.studioType,
+  ]);
   const workflowDraftContent = workflowModeState?.sharedDraftSerialized ?? content;
   const hasWorkflowDraftParseError = isWorkflowStudio && Boolean(workflowModeState?.draftParseError);
   const extensionContext: StudioShellExtensionContext = {
@@ -487,6 +546,46 @@ export default function StudioShellPage({
             <div><strong>Draft:</strong> {snapshot?.draft?.draftId ?? "-"}</div>
             <div><strong>Revision:</strong> {snapshot?.draft?.revision ?? 0}</div>
           </div>
+          {inlineCreationReturnTarget ? (
+            <div className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="studio-shell-inline-return-panel">
+              <strong>Inline creation handoff</strong>
+              <span className="ui-text-small ui-text-secondary">
+                This studio was opened from another workspace. Return when done, optionally attaching this asset.
+              </span>
+              <div className="ui-stack ui-stack--xs" style={{ flexDirection: "row", flexWrap: "wrap" }}>
+                {inlineReturnPaths?.withAsset ? (
+                  <Link
+                    className="ui-button ui-button--sm ui-button--primary"
+                    to={inlineReturnPaths.withAsset}
+                    data-testid="studio-shell-inline-return-with-asset"
+                  >
+                    Return with asset
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    className="ui-button ui-button--sm ui-button--primary"
+                    disabled
+                    data-testid="studio-shell-inline-return-with-asset-disabled"
+                  >
+                    Return with asset
+                  </button>
+                )}
+                <Link
+                  className="ui-button ui-button--sm ui-button--ghost"
+                  to={inlineReturnPaths?.cancelled ?? inlineCreationReturnTarget.routePath}
+                  data-testid="studio-shell-inline-return-cancel"
+                >
+                  Cancel and return
+                </Link>
+              </div>
+              {inlineCreationReturnPayload ? (
+                <span className="ui-text-small ui-text-secondary">
+                  Last return status: {inlineCreationReturnPayload.status}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
           <div className="ui-stack ui-stack--xs" style={{ flexDirection: "row" }}>
             <button className="ui-button" disabled={isBusy} onClick={() => { void refreshSnapshot(); }}>Refresh</button>
             <button className="ui-button" disabled={isBusy} onClick={() => { void runAndRefresh(() => service.startSession(studioId)); }}>Start Session</button>
@@ -502,6 +601,18 @@ export default function StudioShellPage({
             invalidModeRouteId={isWorkflowStudio ? workflowModeRoute?.invalidModeId : undefined}
             workflowModeContext={workflowModeStore && workflowModeState
               ? {
+                studioId,
+                routeSearch: location.search,
+                replaceRouteSearch: (nextSearch: string) => {
+                  void navigate(
+                    {
+                      pathname: location.pathname,
+                      search: nextSearch,
+                      hash: location.hash,
+                    },
+                    { replace: true },
+                  );
+                },
                 selectedModeId: workflowModeState.selectedModeId,
                 sharedDraft: workflowModeState.sharedDraft,
                 sharedDraftSerialized: workflowModeState.sharedDraftSerialized,

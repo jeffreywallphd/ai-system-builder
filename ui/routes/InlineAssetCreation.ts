@@ -41,6 +41,22 @@ export interface InlineAssetCreationResult {
   readonly studioEntry: StudioEntryResolution;
 }
 
+export const InlineAssetReturnStatuses = Object.freeze({
+  created: "created",
+  cancelled: "cancelled",
+});
+
+export type InlineAssetReturnStatus = typeof InlineAssetReturnStatuses[keyof typeof InlineAssetReturnStatuses];
+
+export interface InlineAssetReturnPayload {
+  readonly status: InlineAssetReturnStatus;
+  readonly assetId?: string;
+  readonly versionId?: string;
+  readonly sourceStudioType?: string;
+  readonly sourceStudioId?: string;
+  readonly returnContextId?: string;
+}
+
 function toEntryContextSource(source: InlineAssetCreationContext["source"]): "navigation" | "registry" | "system-studio" | "intent" | "unknown" {
   if (source === "registry") {
     return "registry";
@@ -55,7 +71,8 @@ function toEntryContextSource(source: InlineAssetCreationContext["source"]): "na
 }
 
 function appendReturnTarget(path: string, request: InlineAssetCreationRequest): string {
-  const [routePath, search] = path.split("?");
+  const [routeAndSearch, hash] = path.split("#");
+  const [routePath, search] = routeAndSearch.split("?");
   const params = new URLSearchParams(search ?? "");
   params.set("inlineCreate", "1");
   params.set("inlineMode", request.mode ?? InlineAssetCreationModes.inlineContext);
@@ -77,7 +94,16 @@ function appendReturnTarget(path: string, request: InlineAssetCreationRequest): 
     }
   }
 
-  return `${routePath}?${params.toString()}`;
+  const query = params.toString();
+  const encodedHash = hash ? `#${hash}` : "";
+  return query.length > 0 ? `${routePath}?${query}${encodedHash}` : `${routePath}${encodedHash}`;
+}
+
+function parseInlineReturnStatus(value?: string | null): InlineAssetReturnStatus | undefined {
+  if (value === InlineAssetReturnStatuses.created || value === InlineAssetReturnStatuses.cancelled) {
+    return value;
+  }
+  return undefined;
 }
 
 export class InlineAssetCreationService {
@@ -132,5 +158,86 @@ export class InlineAssetCreationService {
       parentVersionId: params.get("parentVersionId")?.trim() || undefined,
       selectedComponent: params.get("selectedComponent")?.trim() || undefined,
     });
+  }
+
+  public buildReturnPath(input: {
+    readonly returnTarget: InlineAssetCreationReturnTarget;
+    readonly payload: InlineAssetReturnPayload;
+  }): string {
+    const [routeAndSearch, hash] = input.returnTarget.routePath.split("#");
+    const [routePath, existingSearch] = routeAndSearch.split("?");
+    const params = new URLSearchParams(existingSearch ?? "");
+    params.set("inlineReturn", "1");
+    params.set("inlineStatus", input.payload.status);
+    if (input.payload.assetId?.trim()) {
+      params.set("inlineAssetId", input.payload.assetId.trim());
+    } else {
+      params.delete("inlineAssetId");
+    }
+    if (input.payload.versionId?.trim()) {
+      params.set("inlineVersionId", input.payload.versionId.trim());
+    } else {
+      params.delete("inlineVersionId");
+    }
+    if (input.payload.sourceStudioType?.trim()) {
+      params.set("inlineSourceStudioType", input.payload.sourceStudioType.trim());
+    } else {
+      params.delete("inlineSourceStudioType");
+    }
+    if (input.payload.sourceStudioId?.trim()) {
+      params.set("inlineSourceStudioId", input.payload.sourceStudioId.trim());
+    } else {
+      params.delete("inlineSourceStudioId");
+    }
+    const returnContextId = input.payload.returnContextId?.trim() || input.returnTarget.contextId?.trim();
+    if (returnContextId) {
+      params.set("returnContextId", returnContextId);
+    }
+    if (input.returnTarget.parentAssetId?.trim()) {
+      params.set("parentAssetId", input.returnTarget.parentAssetId.trim());
+    }
+    if (input.returnTarget.parentVersionId?.trim()) {
+      params.set("parentVersionId", input.returnTarget.parentVersionId.trim());
+    }
+    if (input.returnTarget.selectedComponent?.trim()) {
+      params.set("selectedComponent", input.returnTarget.selectedComponent.trim());
+    }
+
+    const query = params.toString();
+    const encodedHash = hash ? `#${hash}` : "";
+    return query.length > 0 ? `${routePath}?${query}${encodedHash}` : `${routePath}${encodedHash}`;
+  }
+
+  public parseInlineReturnFromSearch(search: string): InlineAssetReturnPayload | undefined {
+    const params = new URLSearchParams(search);
+    if (params.get("inlineReturn")?.trim() !== "1") {
+      return undefined;
+    }
+
+    const status = parseInlineReturnStatus(params.get("inlineStatus"));
+    if (!status) {
+      return undefined;
+    }
+
+    return Object.freeze({
+      status,
+      assetId: params.get("inlineAssetId")?.trim() || undefined,
+      versionId: params.get("inlineVersionId")?.trim() || undefined,
+      sourceStudioType: params.get("inlineSourceStudioType")?.trim() || undefined,
+      sourceStudioId: params.get("inlineSourceStudioId")?.trim() || undefined,
+      returnContextId: params.get("returnContextId")?.trim() || undefined,
+    });
+  }
+
+  public stripInlineReturnFromSearch(search: string): string {
+    const params = new URLSearchParams(search);
+    params.delete("inlineReturn");
+    params.delete("inlineStatus");
+    params.delete("inlineAssetId");
+    params.delete("inlineVersionId");
+    params.delete("inlineSourceStudioType");
+    params.delete("inlineSourceStudioId");
+    const next = params.toString();
+    return next ? `?${next}` : "";
   }
 }
