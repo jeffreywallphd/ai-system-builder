@@ -80,8 +80,8 @@ describe("WorkflowStudioDomain schema validation coverage", () => {
             dependsOnStepIds: ["step-agent"],
             config: {
               conditionExpression: "score > 0.7",
-              thenStepIds: ["step-publish"],
-              elseStepIds: ["step-rework"],
+              thenLabel: "publish",
+              elseLabel: "rework",
             },
           },
           { id: "step-publish", type: "publish", kind: WorkflowDraftStepKinds.action, order: 4 },
@@ -172,6 +172,7 @@ describe("WorkflowStudioDomain schema validation coverage", () => {
             iterationMode: "collection",
             collectionInputKey: "input-missing",
             bodyStepIds: ["step-loop", "step-not-found"],
+            repeatCount: 2,
           },
         },
         {

@@ -1,8 +1,12 @@
 import {
+  WorkflowDraftBuiltInStepTypes,
   WorkflowDraftStepAssetKinds,
   WorkflowDraftStepKinds,
   WorkflowDraftStepTypes,
   type WorkflowDraft,
+  type WorkflowDraftDelayWaitStepConfig,
+  type WorkflowDraftIfThenStepConfig,
+  type WorkflowDraftLoopIterationStepConfig,
   type WorkflowDraftStep,
 } from "../../../domain/workflow-studio/WorkflowStudioDomain";
 import {
@@ -12,9 +16,18 @@ import {
   createCompositionTaxonomyDescriptor,
 } from "../../../domain/taxonomy/CompositionTaxonomy";
 
+export const WorkflowWizardStepSelectionKinds = Object.freeze({
+  assetBacked: "asset-backed",
+  builtIn: "built-in",
+});
+
+export type WorkflowWizardStepSelectionKind =
+  typeof WorkflowWizardStepSelectionKinds[keyof typeof WorkflowWizardStepSelectionKinds];
+
 export interface WorkflowStepTypeDefinition {
   readonly kind: WorkflowDraftStep["kind"];
   readonly type: string;
+  readonly selectionKind: WorkflowWizardStepSelectionKind;
   readonly label: string;
   readonly summary: string;
   readonly interactive: boolean;
@@ -67,25 +80,36 @@ const stepAgentAssistantTaxonomy = createCompositionTaxonomyDescriptor({
 
 export const workflowStepTypeDefinitions: ReadonlyArray<WorkflowStepTypeDefinition> = Object.freeze([
   Object.freeze({
-    kind: WorkflowDraftStepKinds.action,
+    kind: WorkflowDraftStepKinds.assetBacked,
     type: WorkflowDraftStepTypes.agentAssistant,
+    selectionKind: WorkflowWizardStepSelectionKinds.assetBacked,
     label: "Agent/assistant action",
-    summary: "Select an agent/assistant asset to execute this step.",
+    summary: "Select an agent/assistant asset for this step.",
     interactive: true,
   }),
   Object.freeze({
     kind: WorkflowDraftStepKinds.controlFlow,
-    type: "if-then",
-    label: "If/then branch",
-    summary: "Planned built-in control flow step type.",
-    interactive: false,
+    type: WorkflowDraftBuiltInStepTypes.ifThen,
+    selectionKind: WorkflowWizardStepSelectionKinds.builtIn,
+    label: "If / Then branching",
+    summary: "Evaluate a condition and branch.",
+    interactive: true,
   }),
   Object.freeze({
     kind: WorkflowDraftStepKinds.controlFlow,
-    type: "loop-iteration",
-    label: "Loop iteration",
-    summary: "Planned built-in loop step type.",
-    interactive: false,
+    type: WorkflowDraftBuiltInStepTypes.loopIteration,
+    selectionKind: WorkflowWizardStepSelectionKinds.builtIn,
+    label: "Loop / Repeat",
+    summary: "Repeat work by count or condition.",
+    interactive: true,
+  }),
+  Object.freeze({
+    kind: WorkflowDraftStepKinds.controlFlow,
+    type: WorkflowDraftBuiltInStepTypes.delayWait,
+    selectionKind: WorkflowWizardStepSelectionKinds.builtIn,
+    label: "Delay / Wait",
+    summary: "Pause workflow execution for a duration.",
+    interactive: true,
   }),
 ]);
 
@@ -159,6 +183,95 @@ function moveStep(
   });
 }
 
+function resolveStepDefinitionByType(kind: WorkflowDraftStep["kind"], type: string): WorkflowStepTypeDefinition {
+  return (workflowStepTypeDefinitions.find((definition) => definition.kind === kind && definition.type === type)
+    ?? defaultStepTypeDefinition) as WorkflowStepTypeDefinition;
+}
+
+function defaultBuiltInConfig(stepType: string): Readonly<Record<string, unknown>> | undefined {
+  switch (stepType) {
+    case WorkflowDraftBuiltInStepTypes.ifThen:
+      return Object.freeze<WorkflowDraftIfThenStepConfig>({
+        conditionExpression: "true",
+      });
+    case WorkflowDraftBuiltInStepTypes.loopIteration:
+      return Object.freeze<WorkflowDraftLoopIterationStepConfig>({
+        repeatCount: 1,
+      });
+    case WorkflowDraftBuiltInStepTypes.delayWait:
+      return Object.freeze<WorkflowDraftDelayWaitStepConfig>({
+        durationSeconds: 60,
+      });
+    default:
+      return undefined;
+  }
+}
+
+function applyStepType(
+  currentStep: WorkflowDraftStep,
+  definition: WorkflowStepTypeDefinition,
+): WorkflowDraftStep {
+  if (definition.selectionKind === WorkflowWizardStepSelectionKinds.assetBacked) {
+    return Object.freeze({
+      ...currentStep,
+      kind: WorkflowDraftStepKinds.assetBacked,
+      type: WorkflowDraftStepTypes.agentAssistant,
+      config: undefined,
+      assetRef: currentStep.assetRef?.assetKind === WorkflowDraftStepAssetKinds.agentAssistant
+        ? currentStep.assetRef
+        : undefined,
+    });
+  }
+
+  return Object.freeze({
+    ...currentStep,
+    kind: WorkflowDraftStepKinds.controlFlow,
+    type: definition.type,
+    assetRef: undefined,
+    config: defaultBuiltInConfig(definition.type),
+  });
+}
+
+function updateStep(
+  draft: WorkflowDraft,
+  stepId: string,
+  updater: (step: WorkflowDraftStep) => WorkflowDraftStep,
+): { readonly draft: WorkflowDraft; readonly changed: boolean } {
+  const index = draft.steps.findIndex((step) => step.id === stepId);
+  if (index < 0) {
+    return Object.freeze({ draft, changed: false });
+  }
+
+  const currentStep = draft.steps[index] as WorkflowDraftStep;
+  const nextStep = updater(currentStep);
+  if (nextStep === currentStep) {
+    return Object.freeze({ draft, changed: false });
+  }
+
+  const nextSteps = [...draft.steps];
+  nextSteps[index] = nextStep;
+  return Object.freeze({
+    draft: Object.freeze({
+      ...draft,
+      steps: normalizeStepOrdering(nextSteps),
+    }),
+    changed: true,
+  });
+}
+
+export function buildWorkflowStepTypeDefinitionKey(definition: WorkflowStepTypeDefinition): string {
+  return `${definition.selectionKind}:${definition.kind ?? "none"}:${definition.type}`;
+}
+
+export function getWorkflowStepTypeDefinitionByKey(key: string): WorkflowStepTypeDefinition | undefined {
+  return workflowStepTypeDefinitions.find((definition) => buildWorkflowStepTypeDefinitionKey(definition) === key);
+}
+
+export function resolveWorkflowStepTypeDefinition(step: WorkflowDraftStep): WorkflowStepTypeDefinition {
+  const kind = step.kind ?? (step.assetRef ? WorkflowDraftStepKinds.assetBacked : WorkflowDraftStepKinds.action);
+  return resolveStepDefinitionByType(kind, step.type);
+}
+
 export function listAgentAssistantStepSelections(
   draft: WorkflowDraft,
 ): ReadonlyMap<string, WorkflowStepAgentAssetCandidate> {
@@ -186,13 +299,15 @@ export function addWorkflowStep(
   const stepId = buildNextStepId(draft);
   const nextOrder = draft.steps.length + 1;
 
-  const nextStep: WorkflowDraftStep = Object.freeze({
+  const baseStep: WorkflowDraftStep = Object.freeze({
     id: stepId,
     type: definition.type,
     kind: definition.kind ?? WorkflowDraftStepKinds.action,
     order: nextOrder,
     title: buildStepTitle(definition, nextOrder),
   });
+
+  const nextStep = applyStepType(baseStep, definition);
 
   return Object.freeze({
     stepId,
@@ -237,6 +352,126 @@ export function moveWorkflowStepDown(
   return moveStep(draft, stepId, 1);
 }
 
+export function setWorkflowStepType(
+  draft: WorkflowDraft,
+  stepId: string,
+  definitionKey: string,
+): { readonly draft: WorkflowDraft; readonly changed: boolean } {
+  const nextDefinition = getWorkflowStepTypeDefinitionByKey(definitionKey);
+  if (!nextDefinition) {
+    return Object.freeze({ draft, changed: false });
+  }
+
+  return updateStep(draft, stepId, (currentStep) => {
+    const currentDefinition = resolveWorkflowStepTypeDefinition(currentStep);
+    if (buildWorkflowStepTypeDefinitionKey(currentDefinition) === definitionKey) {
+      return currentStep;
+    }
+    return applyStepType(currentStep, nextDefinition);
+  });
+}
+
+export function setWorkflowStepTitle(
+  draft: WorkflowDraft,
+  stepId: string,
+  title: string,
+): { readonly draft: WorkflowDraft; readonly changed: boolean } {
+  const normalizedTitle = normalizeOptional(title);
+  return updateStep(draft, stepId, (currentStep) => {
+    if (normalizedTitle === currentStep.title) {
+      return currentStep;
+    }
+    return Object.freeze({
+      ...currentStep,
+      title: normalizedTitle,
+    });
+  });
+}
+
+export function setWorkflowStepIfThenConfig(
+  draft: WorkflowDraft,
+  stepId: string,
+  patch: {
+    readonly conditionExpression?: string;
+    readonly thenLabel?: string;
+    readonly elseLabel?: string;
+  },
+): { readonly draft: WorkflowDraft; readonly changed: boolean } {
+  return updateStep(draft, stepId, (currentStep) => {
+    if (currentStep.type !== WorkflowDraftBuiltInStepTypes.ifThen) {
+      return currentStep;
+    }
+
+    const existing = (currentStep.config ?? {}) as WorkflowDraftIfThenStepConfig;
+    const nextConfig: WorkflowDraftIfThenStepConfig = Object.freeze({
+      conditionExpression: patch.conditionExpression ?? existing.conditionExpression ?? "",
+      thenLabel: patch.thenLabel !== undefined ? normalizeOptional(patch.thenLabel) : existing.thenLabel,
+      elseLabel: patch.elseLabel !== undefined ? normalizeOptional(patch.elseLabel) : existing.elseLabel,
+    });
+
+    return Object.freeze({
+      ...currentStep,
+      config: nextConfig,
+    });
+  });
+}
+
+export function setWorkflowStepLoopConfig(
+  draft: WorkflowDraft,
+  stepId: string,
+  patch: {
+    readonly repeatCount?: number;
+    readonly loopConditionExpression?: string;
+    readonly loopLabel?: string;
+  },
+): { readonly draft: WorkflowDraft; readonly changed: boolean } {
+  return updateStep(draft, stepId, (currentStep) => {
+    if (currentStep.type !== WorkflowDraftBuiltInStepTypes.loopIteration) {
+      return currentStep;
+    }
+
+    const existing = (currentStep.config ?? {}) as WorkflowDraftLoopIterationStepConfig;
+    const nextConfig: WorkflowDraftLoopIterationStepConfig = Object.freeze({
+      repeatCount: patch.repeatCount ?? existing.repeatCount,
+      loopConditionExpression: patch.loopConditionExpression !== undefined
+        ? normalizeOptional(patch.loopConditionExpression)
+        : existing.loopConditionExpression,
+      loopLabel: patch.loopLabel !== undefined ? normalizeOptional(patch.loopLabel) : existing.loopLabel,
+    });
+
+    return Object.freeze({
+      ...currentStep,
+      config: nextConfig,
+    });
+  });
+}
+
+export function setWorkflowStepDelayConfig(
+  draft: WorkflowDraft,
+  stepId: string,
+  patch: {
+    readonly durationSeconds?: number;
+    readonly note?: string;
+  },
+): { readonly draft: WorkflowDraft; readonly changed: boolean } {
+  return updateStep(draft, stepId, (currentStep) => {
+    if (currentStep.type !== WorkflowDraftBuiltInStepTypes.delayWait) {
+      return currentStep;
+    }
+
+    const existing = (currentStep.config ?? {}) as WorkflowDraftDelayWaitStepConfig;
+    const nextConfig: WorkflowDraftDelayWaitStepConfig = Object.freeze({
+      durationSeconds: patch.durationSeconds ?? existing.durationSeconds ?? 60,
+      note: patch.note !== undefined ? normalizeOptional(patch.note) : existing.note,
+    });
+
+    return Object.freeze({
+      ...currentStep,
+      config: nextConfig,
+    });
+  });
+}
+
 export function setWorkflowStepAgentAssetSelection(
   draft: WorkflowDraft,
   stepId: string,
@@ -247,45 +482,33 @@ export function setWorkflowStepAgentAssetSelection(
     return Object.freeze({ draft, changed: false });
   }
 
-  const stepIndex = draft.steps.findIndex((entry) => entry.id === stepId);
-  if (stepIndex < 0) {
-    return Object.freeze({ draft, changed: false });
-  }
+  return updateStep(draft, stepId, (currentStep) => {
+    const versionId = normalizeOptional(candidate.versionId);
+    const normalizedName = normalizeOptional(candidate.name);
+    const currentAsset = currentStep.assetRef?.asset;
+    const assetAlreadySelected = currentStep.kind === WorkflowDraftStepKinds.assetBacked
+      && currentStep.assetRef?.assetKind === WorkflowDraftStepAssetKinds.agentAssistant
+      && currentAsset?.assetId === assetId
+      && currentAsset.versionId === versionId;
+    if (assetAlreadySelected && (!normalizedName || normalizedName === currentStep.title)) {
+      return currentStep;
+    }
 
-  const currentStep = draft.steps[stepIndex] as WorkflowDraftStep;
-  const versionId = normalizeOptional(candidate.versionId);
-  const normalizedName = normalizeOptional(candidate.name);
-  const currentAsset = currentStep.assetRef?.asset;
-  const assetAlreadySelected = currentStep.kind === WorkflowDraftStepKinds.assetBacked
-    && currentStep.assetRef?.assetKind === WorkflowDraftStepAssetKinds.agentAssistant
-    && currentAsset?.assetId === assetId
-    && currentAsset.versionId === versionId;
-  if (assetAlreadySelected && (!normalizedName || normalizedName === currentStep.title)) {
-    return Object.freeze({ draft, changed: false });
-  }
-
-  const nextSteps = [...draft.steps];
-  nextSteps[stepIndex] = Object.freeze({
-    ...currentStep,
-    type: WorkflowDraftStepTypes.agentAssistant,
-    kind: WorkflowDraftStepKinds.assetBacked,
-    title: normalizedName ?? currentStep.title,
-    assetRef: Object.freeze({
-      assetKind: WorkflowDraftStepAssetKinds.agentAssistant,
-      asset: Object.freeze({
-        assetId,
-        versionId,
-        taxonomy: stepAgentAssistantTaxonomy,
+    return Object.freeze({
+      ...currentStep,
+      type: WorkflowDraftStepTypes.agentAssistant,
+      kind: WorkflowDraftStepKinds.assetBacked,
+      title: normalizedName ?? currentStep.title,
+      config: undefined,
+      assetRef: Object.freeze({
+        assetKind: WorkflowDraftStepAssetKinds.agentAssistant,
+        asset: Object.freeze({
+          assetId,
+          versionId,
+          taxonomy: stepAgentAssistantTaxonomy,
+        }),
       }),
-    }),
-  });
-
-  return Object.freeze({
-    draft: Object.freeze({
-      ...draft,
-      steps: normalizeStepOrdering(nextSteps),
-    }),
-    changed: true,
+    });
   });
 }
 
@@ -293,30 +516,18 @@ export function clearWorkflowStepAgentAssetSelection(
   draft: WorkflowDraft,
   stepId: string,
 ): { readonly draft: WorkflowDraft; readonly changed: boolean } {
-  const stepIndex = draft.steps.findIndex((entry) => entry.id === stepId);
-  if (stepIndex < 0) {
-    return Object.freeze({ draft, changed: false });
-  }
+  return updateStep(draft, stepId, (currentStep) => {
+    if (!currentStep.assetRef) {
+      return currentStep;
+    }
 
-  const currentStep = draft.steps[stepIndex] as WorkflowDraftStep;
-  if (!currentStep.assetRef) {
-    return Object.freeze({ draft, changed: false });
-  }
-
-  const nextSteps = [...draft.steps];
-  nextSteps[stepIndex] = Object.freeze({
-    ...currentStep,
-    type: WorkflowDraftStepTypes.agentAssistant,
-    kind: WorkflowDraftStepKinds.action,
-    assetRef: undefined,
-  });
-
-  return Object.freeze({
-    draft: Object.freeze({
-      ...draft,
-      steps: normalizeStepOrdering(nextSteps),
-    }),
-    changed: true,
+    return Object.freeze({
+      ...currentStep,
+      type: WorkflowDraftStepTypes.agentAssistant,
+      kind: WorkflowDraftStepKinds.assetBacked,
+      assetRef: undefined,
+      config: undefined,
+    });
   });
 }
 
