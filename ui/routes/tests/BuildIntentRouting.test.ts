@@ -44,4 +44,16 @@ describe("BuildIntentRoutingService", () => {
     expect(decision.studioEntry.entryPoint.routePath).toBe(ROUTE_PATHS.systemStudio);
     expect(decision.target).toBe(BuildIntentFlowTargets.compositionBlankCanvas);
   });
+
+  it("carries provided prefill values through intent routing context", () => {
+    const decision = routingService.decideRoute({
+      selection: { intent: BuildIntents.automateTask, selectedAtIso },
+      prefill: { automationIntent: "Draft weekly KPI summary workflow." },
+    });
+
+    expect(decision.studioEntryRequest.prefill?.values).toEqual({ automationIntent: "Draft weekly KPI summary workflow." });
+    expect(decision.studioEntry.initializationPayload.initialization.context.prefill?.values).toEqual({
+      automationIntent: "Draft weekly KPI summary workflow.",
+    });
+  });
 });

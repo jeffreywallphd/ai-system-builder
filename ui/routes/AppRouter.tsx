@@ -34,6 +34,7 @@ import PromptTemplateStudioPage from "../pages/PromptTemplateStudioPage";
 import EmbeddingIndexStudioPage from "../pages/EmbeddingIndexStudioPage";
 import ConfigProfileStudioPage from "../pages/ConfigProfileStudioPage";
 import BuildPage from "../pages/BuildPage";
+import BuildAutomatePage from "../pages/BuildAutomatePage";
 import RegistryPage from "../pages/RegistryPage";
 import AssetDetailPage from "../pages/AssetDetailPage";
 import RunPage from "../pages/RunPage";
@@ -71,6 +72,7 @@ export default function AppRouter({
         children: [
           { path: ROUTE_PATHS.home, element: <HomePage /> },
           { path: ROUTE_PATHS.build, element: <BuildPage /> },
+          { path: ROUTE_PATHS.buildAutomate, element: <BuildAutomatePage /> },
           { path: ROUTE_PATHS.create, element: resolveLegacyRouteElement(ROUTE_PATHS.create, <Navigate to={ROUTE_PATHS.build} replace />, migrationService) },
           { path: ROUTE_PATHS.compose, element: resolveLegacyRouteElement(ROUTE_PATHS.compose, <Navigate to={ROUTE_PATHS.build} replace />, migrationService) },
           { path: ROUTE_PATHS.explore, element: <RegistryPage /> },

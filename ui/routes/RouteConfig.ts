@@ -14,6 +14,7 @@ export interface AppRouteDefinition {
 export const ROUTE_PATHS = Object.freeze({
   home: "/",
   build: "/build",
+  buildAutomate: "/build/automate",
   explore: "/explore",
   run: "/run",
   create: "/create",
@@ -60,6 +61,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteDefinition> = Object.freeze([
     path: ROUTE_PATHS.build,
     title: "Build",
     showInNavigation: true,
+  }),
+  Object.freeze({
+    key: "build-automate",
+    path: ROUTE_PATHS.buildAutomate,
+    title: "Automate a task",
+    showInNavigation: false,
   }),
   Object.freeze({
     key: "explore",

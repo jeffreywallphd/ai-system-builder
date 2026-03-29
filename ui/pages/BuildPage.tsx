@@ -1,7 +1,7 @@
-export interface BuildLandingAction {
-  readonly id: string;
-  readonly label: string;
-}
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { BuildEntryService, BuildIntents, type BuildIntent } from "../routes/BuildEntry";
+import { ROUTE_PATHS } from "../routes/RouteConfig";
 
 export interface BuildTemplateCard {
   readonly id: string;
@@ -9,15 +9,6 @@ export interface BuildTemplateCard {
   readonly description: string;
   readonly difficulty: "Beginner" | "Intermediate" | "Advanced";
 }
-
-const buildLandingActions: ReadonlyArray<BuildLandingAction> = Object.freeze([
-  Object.freeze({ id: "automate-task", label: "Automate a Task" }),
-  Object.freeze({ id: "create-ai-assistant", label: "Create an AI Assistant" }),
-  Object.freeze({ id: "build-automation-system", label: "Build an Automation System" }),
-  Object.freeze({ id: "work-with-data", label: "Work with Data" }),
-  Object.freeze({ id: "customize-ai-model", label: "Customize an AI Model" }),
-  Object.freeze({ id: "build-from-scratch", label: "Build Something from Scratch" }),
-]);
 
 const buildTemplateCards: ReadonlyArray<BuildTemplateCard> = Object.freeze([
   Object.freeze({
@@ -59,25 +50,58 @@ const buildTemplateCards: ReadonlyArray<BuildTemplateCard> = Object.freeze([
 ]);
 
 export default function BuildPage(): JSX.Element {
+  const navigate = useNavigate();
+  const buildEntryService = useMemo(() => new BuildEntryService(), []);
+  const model = useMemo(() => buildEntryService.getLandingModel(), [buildEntryService]);
+  const [launchError, setLaunchError] = useState<string | undefined>();
+
+  const onIntentSelected = (intent: BuildIntent) => {
+    setLaunchError(undefined);
+    if (intent === BuildIntents.automateTask) {
+      navigate(ROUTE_PATHS.buildAutomate);
+      return;
+    }
+
+    try {
+      const launch = buildEntryService.resolveIntentLaunchContext({
+        selection: {
+          intent,
+          selectedAtIso: new Date().toISOString(),
+        },
+        entryContext: { source: "intent" },
+      });
+      navigate(launch.launchPath);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to open build flow.";
+      setLaunchError(message);
+    }
+  };
+
   return (
     <section className="ui-page ui-stack ui-stack--lg ui-build-landing" data-testid="build-landing-page">
       <div className="ui-page__hero">
         <div className="ui-page__hero-copy">
-          <h1 className="ui-page__title">Build</h1>
-          <p className="ui-page__subtitle">Start with a goal and shape your next AI workflow from one landing surface.</p>
+          <h1 className="ui-page__title">{model.title}</h1>
+          <p className="ui-page__subtitle">{model.subtitle}</p>
         </div>
       </div>
 
       <div className="ui-card">
         <div className="ui-card__body ui-stack ui-stack--md">
-          <h2 className="ui-build-landing__question">What do you want to do?</h2>
+          <h2 className="ui-build-landing__question">{model.prompt}</h2>
           <div className="ui-grid ui-build-landing__actions" role="group" aria-label="Build actions">
-            {buildLandingActions.map((action) => (
-              <button key={action.id} type="button" className="ui-button ui-button--secondary ui-button--md ui-build-landing__action">
-                {action.label}
+            {model.options.map((option) => (
+              <button
+                key={option.intent}
+                type="button"
+                className="ui-button ui-button--secondary ui-button--md ui-build-landing__action"
+                onClick={() => onIntentSelected(option.intent)}
+              >
+                {option.label}
               </button>
             ))}
           </div>
+          {launchError ? <p role="alert">{launchError}</p> : null}
         </div>
       </div>
 

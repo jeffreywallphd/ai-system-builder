@@ -479,6 +479,12 @@ body {
   margin: 0;
 }
 
+.ui-build-automate__example {
+  justify-content: flex-start;
+  text-align: left;
+  white-space: normal;
+}
+
 .ui-command-palette__empty {
   margin: 0;
 }

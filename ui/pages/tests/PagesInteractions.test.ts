@@ -13,6 +13,7 @@ describe("ui/pages interactions", () => {
     const studioShell = readSource("ui/pages/StudioShellPage.tsx");
     const registry = readSource("ui/pages/RegistryPage.tsx");
     const build = readSource("ui/pages/BuildPage.tsx");
+    const buildAutomate = readSource("ui/pages/BuildAutomatePage.tsx");
     const notFound = readSource("ui/pages/NotFoundPage.tsx");
 
     expect(home).toContain('import { ROUTE_PATHS } from "../routes/RouteConfig"');
@@ -33,14 +34,21 @@ describe("ui/pages interactions", () => {
     expect(agentStudio).toContain("<AgentDetailPanel");
     expect(studioShell).toContain('data-testid="studio-shell-page"');
     expect(studioShell).toContain("StudioShellService");
+    expect(studioShell).toContain("readAutomationIntentFromSearch");
+    expect(studioShell).toContain("BuildIntents.automateTask");
     expect(registry).toContain('data-testid="registry-page"');
     expect(registry).toContain("RegistryService");
     expect(registry).toContain("AssetFilterPanel");
     expect(registry).toContain("AssetList");
-    expect(build).toContain("What do you want to do?");
+    expect(build).toContain("buildEntryService.getLandingModel()");
     expect(build).toContain("Build from a Template");
-    expect(build).toContain("Automate a Task");
-    expect(build).toContain("Build Something from Scratch");
+    expect(build).toContain("BuildIntents.automateTask");
+    expect(build).toContain("ROUTE_PATHS.buildAutomate");
+    expect(buildAutomate).toContain("What do you want to automate?");
+    expect(buildAutomate).toContain("Continue");
+    expect(buildAutomate).toContain("Back to Build");
+    expect(buildAutomate).toContain("appendAutomationIntentToPath");
+    expect(buildAutomate).toContain("BuildIntents.automateTask");
     expect(settings).toContain("Advanced runtime settings");
     expect(notFound).toContain("to={ROUTE_PATHS.home}");
   });

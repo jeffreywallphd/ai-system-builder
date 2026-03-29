@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { AssetDraftLifecycleStatuses, type AssetMetadataPatch } from "../../domain/studio-shell/StudioShellDomain";
 import type { StudioShellSnapshotReadModel, StudioShellValidationIssue } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
@@ -14,6 +14,8 @@ import {
   type StudioShellExtensionSlot,
 } from "../studio-shell/StudioShellExtensions";
 import { StudioEntryService } from "../routes/StudioRouteMapping";
+import { readAutomationIntentFromSearch } from "../routes/BuildAutomationIntent";
+import { BuildIntents } from "../routes/BuildIntentModels";
 
 function safeParseJson<T>(value: string, fallback: T): T {
   try {
@@ -88,11 +90,17 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
       : "Reusable bounded shell for studio/session context, authoring, taxonomy/contract/provenance/dependencies, lifecycle/version state, and validation.");
   const service = useMemo(() => new StudioShellService(), []);
   const location = useLocation();
+  const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
   const studioEntryService = useMemo(() => new StudioEntryService(), []);
   const contextualInitialization = useMemo(
     () => studioEntryService.parseInitializationFromSearch(location.search),
     [location.search, studioEntryService],
   );
+  const automationIntent = useMemo(
+    () => readAutomationIntentFromSearch(location.search),
+    [location.search],
+  );
+  const shouldSeedAutomationIntent = searchParams.get("buildIntent")?.trim() === BuildIntents.automateTask && Boolean(automationIntent);
   const extensionRegistry = useMemo(() => {
     const registry = new StudioShellExtensionRegistry();
     registry.registerMany([...(studioRegistration?.extensions ?? []), ...extensions]);
@@ -110,6 +118,7 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
   const [dependenciesJson, setDependenciesJson] = useState(
     JSON.stringify(studioRegistration?.defaults.dependencies ?? []),
   );
+  const automationPrefillAppliedRef = useRef(false);
 
   const refreshSnapshot = async () => {
     setIsBusy(true);
@@ -153,6 +162,28 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
     void refreshSnapshot();
   }, [studioId]);
 
+  useEffect(() => {
+    automationPrefillAppliedRef.current = false;
+  }, [studioId, location.search]);
+
+  useEffect(() => {
+    if (!shouldSeedAutomationIntent || !automationIntent || snapshot?.draft || automationPrefillAppliedRef.current) {
+      return;
+    }
+
+    setContent((current) => (current === defaultContent ? automationIntent : current));
+    setMetadataPatchJson((current) => {
+      const metadataPatch = safeParseJson<AssetMetadataPatch>(current, {});
+      const nextPatch: AssetMetadataPatch = {
+        ...metadataPatch,
+        title: metadataPatch.title ?? "Automation draft",
+        summary: metadataPatch.summary ?? automationIntent,
+      };
+      return JSON.stringify(nextPatch);
+    });
+    automationPrefillAppliedRef.current = true;
+  }, [automationIntent, defaultContent, shouldSeedAutomationIntent, snapshot?.draft]);
+
   const runAndRefresh = async (action: () => Promise<{ ok: boolean; error?: { message: string } }>) => {
     setIsBusy(true);
     try {
@@ -170,8 +201,6 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
 
   const sessionId = snapshot?.activeSessionId;
   const draftId = snapshot?.draft?.draftId;
-  const searchParams = new URLSearchParams(location.search);
-
   const extensionContext: StudioShellExtensionContext = {
     studioId,
     snapshot,
