@@ -197,6 +197,13 @@ The studio shell now has a bounded inner-layer model and application orchestrati
 - `executable` state is now domain-gated by canonical draft readiness (lifecycle transition/create validation uses workflow-definition validation, not presentation flags).
 - Workflow Studio publish flow now enforces canonical workflow-content validation before lifecycle publish/version operations (`application/workflow-studio/WorkflowStudioApplicationService.ts`).
 
+## Direction 5 update: Workflow Studio persistence + taxonomy alignment (stories 1.11-1.12)
+
+- Workflow Studio canonical draft and entity models now expose explicit persistence mappings and versioned serialized-document shapes (`mapWorkflowDraftToPersistenceRecord`, `mapWorkflowEntityToPersistenceRecord`, `serializeWorkflowDraftDocument`, `serializeWorkflowEntity`) in `domain/workflow-studio/WorkflowStudioDomain.ts`.
+- Draft/entity rehydration now goes through canonical normalization (`mapWorkflowDraftFromPersistenceRecord`, `mapWorkflowEntityFromPersistenceRecord`, `deserializeWorkflowDraftDocument`, `deserializeWorkflowEntity`) so identity/metadata/lifecycle/triggers/inputs/steps/outputs survive round-trip without UI-local shaping.
+- Workflow asset-backed references now carry taxonomy metadata on canonical asset refs (`WorkflowDraftAssetReference.taxonomy`) and are validated against shared taxonomy expectations for dataset-backed inputs and agent-assistant steps.
+- Workflow draft validation now emits deterministic taxonomy/asset-reference issues for mismatched dataset taxonomy and malformed asset-backed step identities, while keeping canonical validation in the domain layer and publish enforcement in `application/workflow-studio/WorkflowStudioApplicationService.ts`.
+
 ## Direction 5 update: Studio shell persistence integration (story 1.11)
 
 - Studio shell now has a real SQLite-backed infrastructure adapter (`infrastructure/filesystem/studio-shell/SqliteStudioShellRepository.ts`) implementing `IStudioShellRepository` with migration-managed schema, indexed studio/session/draft/version storage, and full aggregate snapshot persistence.
