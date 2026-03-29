@@ -50,6 +50,68 @@ describe("WorkflowStudioModeStateStore", () => {
     expect(store.getState().sharedDraft.steps.map((step) => step.id)).toEqual(["step-1"]);
   });
 
+  it("supports shared canonical draft updates from either mode without shadow copies", () => {
+    const store = new WorkflowStudioModeStateStore();
+
+    store.setSelectedMode(WorkflowStudioModeIds.wizard);
+    store.updateSharedDraft((draft) => ({
+      ...draft,
+      triggers: [
+        ...draft.triggers,
+        {
+          id: "trigger-1",
+          kind: "user",
+          type: "manual",
+          config: {},
+        },
+      ],
+      inputs: [
+        ...draft.inputs,
+        {
+          id: "input-1",
+          type: "runtime-parameter",
+          sourceType: "runtime-parameter",
+          parameterKey: "input-1",
+          valueType: "string",
+        },
+      ],
+    }));
+
+    store.setSelectedMode(WorkflowStudioModeIds.canvas);
+    const wizardEditedDraft = store.getState().sharedDraft;
+
+    store.hydrateFromSerializedDraft(serializeWorkflowDraft({
+      ...wizardEditedDraft,
+      steps: [
+        {
+          id: "step-1",
+          type: "action",
+          kind: "action",
+          order: 1,
+          title: "Step 1",
+        },
+      ],
+      outputs: [
+        {
+          id: "output-1",
+          type: "result",
+          outputType: "document",
+          format: "json",
+          destination: {
+            type: "web-viewer",
+            target: "preview",
+          },
+        },
+      ],
+    }));
+
+    store.setSelectedMode(WorkflowStudioModeIds.wizard);
+    expect(store.getState().sharedDraft.triggers.map((entry) => entry.id)).toEqual(["trigger-1"]);
+    expect(store.getState().sharedDraft.inputs.map((entry) => entry.id)).toEqual(["input-1"]);
+    expect(store.getState().sharedDraft.steps.map((entry) => entry.id)).toEqual(["step-1"]);
+    expect(store.getState().sharedDraft.outputs.map((entry) => entry.id)).toEqual(["output-1"]);
+  });
+
   it("hydrates shared draft from canonical serialized content and preserves previous draft on parse failures", () => {
     const store = new WorkflowStudioModeStateStore();
     const baselineSerialized = store.getState().sharedDraftSerialized;
@@ -78,6 +140,7 @@ describe("WorkflowStudioModeStateStore", () => {
     store.hydrateFromSerializedDraft("not-json");
 
     expect(store.getState().draftParseError).toBeDefined();
+    expect(store.getState().draftEditorContent).toBe("not-json");
     expect(store.getState().sharedDraftSerialized).not.toBe(baselineSerialized);
     expect(store.getState().sharedDraft.outputs.map((entry) => entry.id)).toEqual(["out-1"]);
   });

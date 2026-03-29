@@ -1,6 +1,17 @@
 ﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { AssetDraftLifecycleStatuses, type AssetMetadataPatch } from "../../domain/studio-shell/StudioShellDomain";
+import {
+  WorkflowDraftInputSourceTypes,
+  WorkflowDraftInputValueTypes,
+  WorkflowDraftOutputDestinationTypes,
+  WorkflowDraftOutputFormats,
+  WorkflowDraftOutputTypes,
+  WorkflowDraftStepKinds,
+  WorkflowDraftTriggerKinds,
+  WorkflowDraftTriggerTypes,
+  type WorkflowDraft,
+} from "../../domain/workflow-studio/WorkflowStudioDomain";
 import type { StudioShellSnapshotReadModel, StudioShellValidationIssue } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
 import { StudioShellService } from "../services/StudioShellService";
 import { StudioShellPanel } from "../components/studio-shell/StudioShellPanel";
@@ -71,6 +82,17 @@ function parseTagsInput(value: string): ReadonlyArray<string> {
 
 function formatTags(tags?: ReadonlyArray<string>): string {
   return (tags ?? []).join(", ");
+}
+
+function createNextWorkflowDraftId(prefix: string, currentIds: ReadonlyArray<string>): string {
+  const knownIds = new Set(currentIds);
+  let counter = currentIds.length + 1;
+  let candidate = `${prefix}-${counter}`;
+  while (knownIds.has(candidate)) {
+    counter += 1;
+    candidate = `${prefix}-${counter}`;
+  }
+  return candidate;
 }
 
 
@@ -187,6 +209,14 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
     workflowModeStore?.hydrateFromSerializedDraft(nextContent);
   };
 
+  const updateSharedWorkflowDraft = (updater: (draft: WorkflowDraft) => WorkflowDraft): void => {
+    if (!workflowModeStore) {
+      return;
+    }
+
+    workflowModeStore.updateSharedDraft(updater);
+  };
+
   useEffect(() => {
     if (!workflowModeStore) {
       setWorkflowModeState(undefined);
@@ -196,6 +226,14 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
     setWorkflowModeState(workflowModeStore.getState());
     return workflowModeStore.subscribe((state) => setWorkflowModeState(state));
   }, [workflowModeStore]);
+
+  useEffect(() => {
+    if (!isWorkflowStudio || !workflowModeState) {
+      return;
+    }
+
+    setContent(workflowModeState.draftEditorContent);
+  }, [isWorkflowStudio, workflowModeState]);
 
   const refreshSnapshot = async () => {
     setIsBusy(true);
@@ -335,6 +373,7 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
 
   const sessionId = snapshot?.activeSessionId;
   const draftId = snapshot?.draft?.draftId;
+  const workflowDraftEditorContent = workflowModeState?.draftEditorContent ?? content;
   const workflowDraftContent = workflowModeState?.sharedDraftSerialized ?? content;
   const hasWorkflowDraftParseError = isWorkflowStudio && Boolean(workflowModeState?.draftParseError);
   const isWorkflowWizardMode = isWorkflowStudio && workflowModeState?.selectedModeId === "wizard";
@@ -460,18 +499,139 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
                 <div className="ui-card ui-card--padded ui-stack ui-stack--2xs">
                   <strong>Wizard mode shell</strong>
                   <p className="ui-text-muted">
-                    Guided workflow authoring is scaffolded here over the shared canonical draft state; upcoming stories can layer the step-by-step wizard UX without changing draft ownership.
+                    Guided workflow authoring operates on the same canonical workflow draft used by canvas mode.
                   </p>
                 </div>
+                <div className="ui-grid" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "0.75rem" }}>
+                  <div className="ui-card ui-card--padded ui-stack ui-stack--2xs">
+                    <strong>Triggers ({workflowModeState?.sharedDraft.triggers.length ?? 0})</strong>
+                    <button
+                      type="button"
+                      className="ui-button ui-button--sm ui-button--ghost"
+                      onClick={() => {
+                        const currentDraft = workflowModeState?.sharedDraft;
+                        if (!currentDraft) {
+                          return;
+                        }
+                        const nextId = createNextWorkflowDraftId("trigger", currentDraft.triggers.map((entry) => entry.id));
+                        updateSharedWorkflowDraft((draft) => ({
+                          ...draft,
+                          triggers: [
+                            ...draft.triggers,
+                            {
+                              id: nextId,
+                              type: WorkflowDraftTriggerTypes.userManual,
+                              kind: WorkflowDraftTriggerKinds.user,
+                              config: {},
+                            },
+                          ],
+                        }));
+                      }}
+                    >
+                      Add trigger
+                    </button>
+                  </div>
+                  <div className="ui-card ui-card--padded ui-stack ui-stack--2xs">
+                    <strong>Inputs ({workflowModeState?.sharedDraft.inputs.length ?? 0})</strong>
+                    <button
+                      type="button"
+                      className="ui-button ui-button--sm ui-button--ghost"
+                      onClick={() => {
+                        const currentDraft = workflowModeState?.sharedDraft;
+                        if (!currentDraft) {
+                          return;
+                        }
+                        const nextId = createNextWorkflowDraftId("input", currentDraft.inputs.map((entry) => entry.id));
+                        updateSharedWorkflowDraft((draft) => ({
+                          ...draft,
+                          inputs: [
+                            ...draft.inputs,
+                            {
+                              id: nextId,
+                              type: WorkflowDraftInputSourceTypes.runtimeParameter,
+                              sourceType: WorkflowDraftInputSourceTypes.runtimeParameter,
+                              parameterKey: nextId,
+                              valueType: WorkflowDraftInputValueTypes.string,
+                            },
+                          ],
+                        }));
+                      }}
+                    >
+                      Add input
+                    </button>
+                  </div>
+                  <div className="ui-card ui-card--padded ui-stack ui-stack--2xs">
+                    <strong>Steps ({workflowModeState?.sharedDraft.steps.length ?? 0})</strong>
+                    <button
+                      type="button"
+                      className="ui-button ui-button--sm ui-button--ghost"
+                      onClick={() => {
+                        const currentDraft = workflowModeState?.sharedDraft;
+                        if (!currentDraft) {
+                          return;
+                        }
+                        const nextId = createNextWorkflowDraftId("step", currentDraft.steps.map((entry) => entry.id));
+                        const nextOrder = currentDraft.steps.reduce((max, step) => Math.max(max, step.order), 0) + 1;
+                        updateSharedWorkflowDraft((draft) => ({
+                          ...draft,
+                          steps: [
+                            ...draft.steps,
+                            {
+                              id: nextId,
+                              type: "action",
+                              kind: WorkflowDraftStepKinds.action,
+                              order: nextOrder,
+                              title: `Step ${nextOrder}`,
+                            },
+                          ],
+                        }));
+                      }}
+                    >
+                      Add step
+                    </button>
+                  </div>
+                  <div className="ui-card ui-card--padded ui-stack ui-stack--2xs">
+                    <strong>Outputs ({workflowModeState?.sharedDraft.outputs.length ?? 0})</strong>
+                    <button
+                      type="button"
+                      className="ui-button ui-button--sm ui-button--ghost"
+                      onClick={() => {
+                        const currentDraft = workflowModeState?.sharedDraft;
+                        if (!currentDraft) {
+                          return;
+                        }
+                        const nextId = createNextWorkflowDraftId("output", currentDraft.outputs.map((entry) => entry.id));
+                        updateSharedWorkflowDraft((draft) => ({
+                          ...draft,
+                          outputs: [
+                            ...draft.outputs,
+                            {
+                              id: nextId,
+                              type: "result",
+                              outputType: WorkflowDraftOutputTypes.document,
+                              format: WorkflowDraftOutputFormats.json,
+                              destination: {
+                                type: WorkflowDraftOutputDestinationTypes.webViewer,
+                                target: "preview",
+                              },
+                            },
+                          ],
+                        }));
+                      }}
+                    >
+                      Add output
+                    </button>
+                  </div>
+                </div>
                 <label className="ui-stack ui-stack--2xs">
-                  <span className="ui-text-small">Shared workflow draft JSON preview</span>
+                  <span className="ui-text-small">Shared canonical workflow draft JSON preview</span>
                   <textarea className="ui-textarea" rows={8} value={workflowDraftContent} readOnly />
                 </label>
               </div>
             ) : (
               <div className="ui-stack ui-stack--xs" data-testid="workflow-studio-canvas-mode-surface">
                 <div className="ui-text-small">Canvas mode (current Workflow Studio draft authoring)</div>
-                <textarea className="ui-textarea" rows={8} value={content} onChange={(event) => updateContent(event.target.value)} />
+                <textarea className="ui-textarea" rows={8} value={workflowDraftEditorContent} onChange={(event) => updateContent(event.target.value)} />
               </div>
             )
           ) : (

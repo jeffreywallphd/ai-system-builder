@@ -17,6 +17,7 @@ export interface WorkflowStudioModeState {
   readonly selectedMode: WorkflowStudioModeDefinition;
   readonly sharedDraft: WorkflowDraft;
   readonly sharedDraftSerialized: string;
+  readonly draftEditorContent: string;
   readonly draftParseError?: string;
 }
 
@@ -39,6 +40,7 @@ function buildInitialState(): WorkflowStudioModeState {
     selectedMode,
     sharedDraft: defaultDraft,
     sharedDraftSerialized: serializeWorkflowDraft(defaultDraft),
+    draftEditorContent: serializeWorkflowDraft(defaultDraft),
     draftParseError: undefined,
   });
 }
@@ -94,8 +96,13 @@ export class WorkflowStudioModeStateStore {
     this.patch({
       sharedDraft: deserializeWorkflowDraft(serialized),
       sharedDraftSerialized: serialized,
+      draftEditorContent: serialized,
       draftParseError: undefined,
     });
+  }
+
+  public updateSharedDraft(updater: (draft: WorkflowDraft) => WorkflowDraft): void {
+    this.replaceSharedDraft(updater(this.state.sharedDraft));
   }
 
   public hydrateFromSerializedDraft(serializedDraft: string): void {
@@ -104,11 +111,13 @@ export class WorkflowStudioModeStateStore {
       this.patch({
         sharedDraft,
         sharedDraftSerialized: serializeWorkflowDraft(sharedDraft),
+        draftEditorContent: serializedDraft,
         draftParseError: undefined,
       });
       return;
     } catch (error) {
       this.patch({
+        draftEditorContent: serializedDraft,
         draftParseError: error instanceof Error ? error.message : "Workflow draft is malformed.",
       });
     }
