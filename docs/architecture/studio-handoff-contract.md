@@ -80,6 +80,15 @@ Included Workflow-origin context:
   - restores draft/session identity (`origin.workflowAuthoring.draftReference`) into mode-store sync context
 - Workflow mode/draft state now persists across refresh/reload through `WorkflowStudioModeStateStore` local-storage snapshots keyed per studio id (`ai-loom.workflow-studio.mode-state.v1`), preserving in-progress triggers/inputs/steps/outputs through cross-studio launch/return flows.
 
+### Stories 5.5 / 5.6 dataset selector launch + return slice
+- Workflow Wizard Inputs now exposes a direct dataset creation launch affordance from the dataset input selector surface (`WorkflowStudioInputSectionEditor`), in addition to existing dataset selection.
+- Dataset launch continues to use the canonical handoff/origin contract through `AssetSelectorStudioLaunchService`, now with explicit selector target identity for inputs (`selectorTargetId=workflow-inputs:dataset`).
+- Dataset return application remains centralized in `AssetSelectorReturnHandoffService` + `StudioReturnPayloadResolver` and now supports optional selector-target guard checks (`selectorTargetId`, `originatingField`, `usageContext`) before mutating selector session state.
+- Successful created returns are applied to the active dataset selector session and persisted back into canonical workflow draft inputs via existing draft update seams (`replaceDatasetInputSelections`), preserving in-progress wizard authoring state.
+- No-op flows are explicit:
+  - `cancelled` keeps dataset selections unchanged and resumes selector session.
+  - `no-selection` is now surfaced in shared inline return UI (`StudioShellPage`) for selector-launched studios and resumes Workflow authoring without mutating attached dataset inputs.
+
 ## Compatibility note
 `InlineAssetCreation` still supports legacy selector query params (`selectorLaunch`, `selectorSessionId`, etc.).  
 When those are absent, it now falls back to the canonical `studioHandoff` contract.

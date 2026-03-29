@@ -466,6 +466,16 @@ export default function StudioShellPage({
           },
         })
         : undefined,
+      noSelection: inlineAssetCreationService.buildReturnPath({
+        returnTarget: inlineCreationReturnTarget,
+        payload: {
+          status: InlineAssetReturnStatuses.noSelection,
+          assetType: studioRegistration?.role,
+          sourceStudioType: studioRegistration?.studioType,
+          sourceStudioId: studioId,
+          returnContextId: inlineCreationReturnTarget.contextId,
+        },
+      }),
       cancelled: inlineAssetCreationService.buildReturnPath({
         returnTarget: inlineCreationReturnTarget,
       payload: {
@@ -811,11 +821,24 @@ export default function StudioShellPage({
                 )}
                 <Link
                   className="ui-button ui-button--sm ui-button--ghost"
-                  to={inlineReturnPaths?.cancelled ?? inlineCreationReturnTarget.routePath}
-                  data-testid="studio-shell-inline-return-cancel"
+                  to={selectorLaunchContext
+                    ? (inlineReturnPaths?.noSelection ?? inlineCreationReturnTarget.routePath)
+                    : (inlineReturnPaths?.cancelled ?? inlineCreationReturnTarget.routePath)}
+                  data-testid={selectorLaunchContext
+                    ? "studio-shell-inline-return-no-selection"
+                    : "studio-shell-inline-return-cancel"}
                 >
-                  Cancel and return
+                  {selectorLaunchContext ? "Return without selection" : "Cancel and return"}
                 </Link>
+                {selectorLaunchContext ? (
+                  <Link
+                    className="ui-button ui-button--sm ui-button--ghost"
+                    to={inlineReturnPaths?.cancelled ?? inlineCreationReturnTarget.routePath}
+                    data-testid="studio-shell-inline-return-cancel"
+                  >
+                    Cancel and return
+                  </Link>
+                ) : null}
               </div>
               {inlineCreationReturnPayload ? (
                 <span className="ui-text-small ui-text-secondary">
