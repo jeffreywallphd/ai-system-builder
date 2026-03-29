@@ -196,6 +196,10 @@ export default function StudioShellPage({
     () => inlineAssetCreationService.parseSelectorLaunchFromSearch(location.search),
     [inlineAssetCreationService, location.search],
   );
+  const studioLaunchHandoff = useMemo(
+    () => inlineAssetCreationService.parseStudioHandoffFromSearch(location.search),
+    [inlineAssetCreationService, location.search],
+  );
   const workflowModeStore = useMemo(
     () => (isWorkflowStudio ? getWorkflowStudioModeStateStore(studioId) : undefined),
     [isWorkflowStudio, studioId],
@@ -463,6 +467,7 @@ export default function StudioShellPage({
             sourceStudioType: studioRegistration?.studioType,
             sourceStudioId: studioId,
             returnContextId: inlineCreationReturnTarget.contextId,
+            handoffId: studioLaunchHandoff?.launch.handoffId,
           },
         })
         : undefined,
@@ -474,16 +479,29 @@ export default function StudioShellPage({
           sourceStudioType: studioRegistration?.studioType,
           sourceStudioId: studioId,
           returnContextId: inlineCreationReturnTarget.contextId,
+          handoffId: studioLaunchHandoff?.launch.handoffId,
         },
       }),
       cancelled: inlineAssetCreationService.buildReturnPath({
         returnTarget: inlineCreationReturnTarget,
-      payload: {
-        status: InlineAssetReturnStatuses.cancelled,
-        assetType: studioRegistration?.role,
-        sourceStudioType: studioRegistration?.studioType,
-        sourceStudioId: studioId,
-        returnContextId: inlineCreationReturnTarget.contextId,
+        payload: {
+          status: InlineAssetReturnStatuses.cancelled,
+          assetType: studioRegistration?.role,
+          sourceStudioType: studioRegistration?.studioType,
+          sourceStudioId: studioId,
+          returnContextId: inlineCreationReturnTarget.contextId,
+          handoffId: studioLaunchHandoff?.launch.handoffId,
+        },
+      }),
+      abandoned: inlineAssetCreationService.buildReturnPath({
+        returnTarget: inlineCreationReturnTarget,
+        payload: {
+          status: InlineAssetReturnStatuses.abandoned,
+          assetType: studioRegistration?.role,
+          sourceStudioType: studioRegistration?.studioType,
+          sourceStudioId: studioId,
+          returnContextId: inlineCreationReturnTarget.contextId,
+          handoffId: studioLaunchHandoff?.launch.handoffId,
         },
       }),
     });
@@ -493,6 +511,7 @@ export default function StudioShellPage({
     latestVersionId,
     returnVersionId,
     snapshot?.draft?.assetId,
+    studioLaunchHandoff?.launch.handoffId,
     studioId,
     studioRegistration?.studioType,
     studioRegistration?.role,
@@ -837,6 +856,15 @@ export default function StudioShellPage({
                     data-testid="studio-shell-inline-return-cancel"
                   >
                     Cancel and return
+                  </Link>
+                ) : null}
+                {selectorLaunchContext ? (
+                  <Link
+                    className="ui-button ui-button--sm ui-button--ghost"
+                    to={inlineReturnPaths?.abandoned ?? inlineCreationReturnTarget.routePath}
+                    data-testid="studio-shell-inline-return-abandon"
+                  >
+                    Abandon and return
                   </Link>
                 ) : null}
               </div>

@@ -45,6 +45,7 @@ describe("StudioHandoffContract", () => {
         StudioLaunchHandoffOutcomeKinds.created,
         StudioLaunchHandoffOutcomeKinds.cancelled,
         StudioLaunchHandoffOutcomeKinds.noSelection,
+        StudioLaunchHandoffOutcomeKinds.abandoned,
       ],
     });
 
@@ -54,6 +55,7 @@ describe("StudioHandoffContract", () => {
     expect(contract.returnContract.target.routePath).toBe("/studio-shell/workflow/wizard/inputs?mode=wizard#workflow-wizard-inputs");
     expect(contract.resume.destinationRoutePath).toBe("/studio-shell/workflow/wizard/inputs?mode=wizard#workflow-wizard-inputs");
     expect(contract.returnContract.outcomes).toContain("no-selection");
+    expect(contract.returnContract.outcomes).toContain("abandoned");
   });
 
   it("round-trips through query-safe serialization", () => {

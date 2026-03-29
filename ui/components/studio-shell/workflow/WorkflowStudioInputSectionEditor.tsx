@@ -179,6 +179,7 @@ export default function WorkflowStudioInputSectionEditor({
       requestedAssetType: selectorRequest.assetType,
       returnTargetSessionKey: selectorSessionKey,
       returnRoutePath: launch.returnTarget?.routePath,
+      launchHandoffId: launch.studioHandoff?.launch.handoffId,
     });
     setSelectorNotice(undefined);
     void navigate(launch.launchPath);
@@ -267,6 +268,15 @@ export default function WorkflowStudioInputSectionEditor({
       setQueryRevision((current) => current + 1);
       setSelectorNotice(undefined);
       setSelectorOpen(true);
+    }
+
+    if (
+      outcome.outcomeKind === "cancelled"
+      || outcome.outcomeKind === "no-selection"
+      || outcome.outcomeKind === "abandoned"
+    ) {
+      setSelectorNotice("Dataset handoff ended without a returned asset. Existing workflow inputs were preserved.");
+      setSelectorOpen(false);
     }
 
     if (outcome.consumed && outcome.nextSearch !== undefined) {

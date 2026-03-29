@@ -99,12 +99,14 @@ describe("AssetSelectorSessionStore", () => {
       requestedAssetType: "dataset",
       returnTargetSessionKey: "workflow:inputs",
       returnRoutePath: "/studio-shell/workflow/wizard?mode=wizard#workflow-wizard-inputs",
+      launchHandoffId: "handoff:workflow:inputs:1",
     });
     store.resumeAfterCreationCancellation("workflow:inputs");
 
     const state = store.getSession("workflow:inputs");
     expect(state?.lifecycleState).toBe(AssetSelectorSessionLifecycleStates.active);
     expect(state?.creatingNewContext?.requestedAssetType).toBe("dataset");
+    expect(state?.creatingNewContext?.launchHandoffId).toBe("handoff:workflow:inputs:1");
     expect(state?.pendingSelections.map((entry) => entry.assetId)).toEqual(["asset:dataset:existing"]);
   });
 

@@ -80,5 +80,32 @@ describe("AssetSelectorStudioLaunchService", () => {
     expect(query.get("selectorSessionId")).toBe("selector:workflow:steps");
     expect(query.get("selectorAssetType")).toBe("agent");
   });
+
+  it("creates unique handoff ids across repeated launches for the same selector session", () => {
+    const service = new AssetSelectorStudioLaunchService();
+    const inlineCreationService = new InlineAssetCreationService();
+
+    const first = service.launch({
+      sessionKey: "selector:workflow:inputs",
+      selectorRequest: createSelectorRequest("dataset"),
+      routePath: "/studio-shell/workflow/wizard",
+      routeSearch: "?mode=wizard",
+    });
+    const second = service.launch({
+      sessionKey: "selector:workflow:inputs",
+      selectorRequest: createSelectorRequest("dataset"),
+      routePath: "/studio-shell/workflow/wizard",
+      routeSearch: "?mode=wizard",
+    });
+
+    const firstQuery = new URLSearchParams(first?.launchPath.split("?")[1]?.split("#")[0] ?? "");
+    const secondQuery = new URLSearchParams(second?.launchPath.split("?")[1]?.split("#")[0] ?? "");
+    const firstHandoff = inlineCreationService.parseStudioHandoffFromSearch(`?${firstQuery.toString()}`);
+    const secondHandoff = inlineCreationService.parseStudioHandoffFromSearch(`?${secondQuery.toString()}`);
+
+    expect(firstHandoff?.launch.handoffId).toBeDefined();
+    expect(secondHandoff?.launch.handoffId).toBeDefined();
+    expect(firstHandoff?.launch.handoffId).not.toBe(secondHandoff?.launch.handoffId);
+  });
 });
 

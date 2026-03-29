@@ -65,12 +65,13 @@ Included Workflow-origin context:
   - `created`
   - `cancelled`
   - `no-selection`
+  - `abandoned`
 - Resume destination is explicit in `resume.destinationRoutePath`.
 - Existing inline return payload (`inlineReturn` query semantics) remains backward-compatible and unchanged for active callers.
 
 ### Story 5.3 return payload resolution
 - Return payload parsing/validation/discrimination now goes through `StudioReturnPayloadResolver` rather than ad hoc query parsing in feature pages.
-- Resolution returns typed outcomes (`created`, `cancelled`, `no-selection`, `invalid`) plus selector-target metadata (`selectorSessionId`, `originatingField`, `selectorTargetId`) when available from canonical handoff context.
+- Resolution returns typed outcomes (`created`, `cancelled`, `no-selection`, `abandoned`, `invalid`) plus selector-target metadata (`selectorSessionId`, `originatingField`, `selectorTargetId`) when available from canonical handoff context.
 - `AssetSelectorReturnHandoffService` now consumes that typed resolver and applies cancel/no-selection outcomes without mutating selected assets.
 
 ### Story 5.4 workflow return restoration + persistence
@@ -103,6 +104,18 @@ Included Workflow-origin context:
 - Workflow authoring resume behavior remains shared with Story 5.4:
   - mode/draft snapshot restoration continues through `WorkflowStudioReturnRestorationService`,
   - in-progress workflow draft state remains preserved via `WorkflowStudioModeStateStore` persistence.
+
+### Stories 5.9 / 5.10 resilience hardening (cancel/back/abandon + multi-session safety)
+- The handoff lifecycle now explicitly models `abandoned` alongside `created`, `cancelled`, and `no-selection`.
+- Inline return payloads now include optional handoff correlation (`inlineHandoffId`), and `StudioReturnPayloadResolver` rejects returns where inline correlation disagrees with canonical handoff id (`studioHandoff.launch.handoffId`).
+- Selector return application is now launch-correlated:
+  - selector sessions persist active launch handoff id (`creatingNewContext.launchHandoffId`),
+  - stale/mismatched returns are consumed safely and ignored for draft mutation,
+  - created returns only apply when lifecycle and handoff correlation match the active in-flight launch.
+- Cancellation-style outcomes are non-destructive by contract:
+  - `cancelled`, `no-selection`, and `abandoned` resume selector sessions and preserve prior selected assets/draft state.
+- Workflow return restoration now guards against stale reentry:
+  - restoration is ignored when handoff draft reference does not match current draft/session sync context (`draft-context-mismatch`), preventing wrong-draft overwrite during repeated launches/reentries.
 
 ## Compatibility note
 `InlineAssetCreation` still supports legacy selector query params (`selectorLaunch`, `selectorSessionId`, etc.).  

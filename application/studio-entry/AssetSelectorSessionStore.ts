@@ -49,6 +49,7 @@ export interface AssetSelectorCreatingNewContext {
   readonly requestedAssetType: TaxonomySemanticRole;
   readonly returnTargetSessionKey: string;
   readonly returnRoutePath?: string;
+  readonly launchHandoffId?: string;
 }
 
 export interface AssetSelectorSessionState {

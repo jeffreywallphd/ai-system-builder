@@ -91,14 +91,14 @@ export class AssetSelectorStudioLaunchService {
 
     const returnSearch = input.routeSearch?.trim();
     const returnHash = input.routeHash?.trim();
-    const handoffIdSeed = `${input.sessionKey}:${input.selectorRequest.assetType}:${Date.now()}`;
+    const handoffId = this.createHandoffId(input);
     const boundedDraftState = workflowOrigin.draftState
       && workflowOrigin.draftState.length <= AssetSelectorStudioLaunchService.maxDraftStateLength
       ? workflowOrigin.draftState
       : undefined;
 
     return createWorkflowStudioOriginLaunchContext({
-      handoffId: `handoff:${handoffIdSeed}`,
+      handoffId,
       routePath: input.routePath,
       routeSearch: returnSearch,
       routeHash: returnHash,
@@ -118,6 +118,11 @@ export class AssetSelectorStudioLaunchService {
         draftState: boundedDraftState,
       },
     });
+  }
+
+  private createHandoffId(input: AssetSelectorStudioLaunchRequest): string {
+    const randomSuffix = Math.random().toString(36).slice(2, 10);
+    return `handoff:${input.sessionKey}:${input.selectorRequest.assetType}:${Date.now()}:${randomSuffix}`;
   }
 }
 

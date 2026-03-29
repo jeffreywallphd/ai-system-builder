@@ -367,6 +367,15 @@ export default function WorkflowStudioStepSectionEditor({
       setSelectorOpen(true);
     }
 
+    if (
+      outcome.outcomeKind === "cancelled"
+      || outcome.outcomeKind === "no-selection"
+      || outcome.outcomeKind === "abandoned"
+    ) {
+      setSelectorNotice("Step handoff ended without a returned asset. Existing workflow steps were preserved.");
+      closeSelector();
+    }
+
     if (outcome.consumed && outcome.nextSearch !== undefined) {
       void navigate({
         pathname: location.pathname,
@@ -536,6 +545,7 @@ export default function WorkflowStudioStepSectionEditor({
                 requestedAssetType: selectorRequest.assetType,
                 returnTargetSessionKey: selectorSessionKey,
                 returnRoutePath: launch.returnTarget?.routePath,
+                launchHandoffId: launch.studioHandoff?.launch.handoffId,
               });
               setSelectorNotice(undefined);
               void navigate(launch.launchPath);

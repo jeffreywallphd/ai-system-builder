@@ -69,4 +69,56 @@ describe("StudioReturnPayloadResolver", () => {
     expect(resolution.kind).toBe(StudioReturnPayloadResolutionKinds.noSelection);
     expect(resolution.selectorSessionId).toBe("selector:workflow:steps");
   });
+
+  it("resolves abandoned payloads explicitly", () => {
+    const resolver = new StudioReturnPayloadResolver();
+    const resolution = resolver.resolveFromSearch(
+      "?inlineReturn=1&inlineStatus=abandoned&returnContextId=selector%3Aworkflow%3Asteps&inlineHandoffId=handoff%3Aworkflow%3Asteps%3A1",
+    );
+
+    expect(resolution.handled).toBeTrue();
+    expect(resolution.kind).toBe(StudioReturnPayloadResolutionKinds.abandoned);
+    expect(resolution.handoffId).toBe("handoff:workflow:steps:1");
+  });
+
+  it("rejects payloads whose inline handoff id disagrees with canonical studio handoff", () => {
+    const inlineService = new InlineAssetCreationService();
+    const resolver = new StudioReturnPayloadResolver(inlineService);
+    const handoff = createStudioLaunchHandoffContract({
+      handoffId: "handoff:return:canonical",
+      launchSource: "workflow-studio",
+      origin: {
+        studioType: "workflow-studio",
+        route: {
+          path: "/studio-shell/workflow/wizard/steps",
+        },
+      },
+      target: {
+        selectorSessionId: "selector:workflow:steps",
+        assetType: "agent",
+      },
+      returnTarget: {
+        routePath: "/studio-shell/workflow/wizard/steps",
+        contextId: "selector:workflow:steps",
+      },
+    });
+    const returnPath = inlineService.buildReturnPath({
+      returnTarget: {
+        routePath: `/studio-shell/workflow/wizard/steps?studioHandoff=${serializeStudioLaunchHandoffContract(handoff)}`,
+        contextId: "selector:workflow:steps",
+      },
+      payload: {
+        status: InlineAssetReturnStatuses.created,
+        assetId: "asset:agent:new",
+        assetType: "agent",
+        handoffId: "handoff:return:other",
+      },
+    });
+
+    const query = returnPath.split("?")[1] ?? "";
+    const resolution = resolver.resolveFromSearch(`?${query}`);
+    expect(resolution.handled).toBeTrue();
+    expect(resolution.kind).toBe(StudioReturnPayloadResolutionKinds.invalid);
+    expect(resolution.issues[0]?.path).toBe("inlineHandoffId");
+  });
 });
