@@ -1326,12 +1326,17 @@ export function validateWorkflowDraft(draft: WorkflowDraft | undefined): Workflo
         }
       }
     } catch (error) {
+      const message = error instanceof Error ? error.message : "Workflow input is malformed.";
+      const taxonomyMismatch = message.includes("Workflow draft dataset input asset taxonomy")
+        && message.includes("must match expected taxonomy");
       issues.push({
-        code: WorkflowValidationIssueCodes.inputMalformed,
+        code: taxonomyMismatch
+          ? WorkflowValidationIssueCodes.inputDatasetAssetTaxonomyMismatch
+          : WorkflowValidationIssueCodes.inputMalformed,
         section: WorkflowValidationSections.inputs,
         severity: "error",
-        message: error instanceof Error ? error.message : "Workflow input is malformed.",
-        path: `draft.inputs[${index}]`,
+        message,
+        path: taxonomyMismatch ? `draft.inputs[${index}].asset.taxonomy` : `draft.inputs[${index}]`,
       });
     }
   }
@@ -1342,12 +1347,17 @@ export function validateWorkflowDraft(draft: WorkflowDraft | undefined): Workflo
     try {
       normalizedSteps.push(normalizeStep(steps[index] as WorkflowDraftStep));
     } catch (error) {
+      const message = error instanceof Error ? error.message : "Workflow step is malformed.";
+      const taxonomyMismatch = message.includes("Workflow draft step assetRef asset taxonomy")
+        && message.includes("must match expected taxonomy");
       issues.push({
-        code: WorkflowValidationIssueCodes.stepMalformed,
+        code: taxonomyMismatch
+          ? WorkflowValidationIssueCodes.stepAssetTaxonomyMismatch
+          : WorkflowValidationIssueCodes.stepMalformed,
         section: WorkflowValidationSections.steps,
         severity: "error",
-        message: error instanceof Error ? error.message : "Workflow step is malformed.",
-        path: `draft.steps[${index}]`,
+        message,
+        path: taxonomyMismatch ? `draft.steps[${index}].assetRef.asset.taxonomy` : `draft.steps[${index}]`,
       });
     }
   }
