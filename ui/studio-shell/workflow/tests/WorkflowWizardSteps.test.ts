@@ -214,4 +214,21 @@ describe("WorkflowWizardSteps", () => {
     expect(payload.assetRef.asset.versionId).toBe("asset:agent-step-payload:v1");
     expect(payload.config).toEqual({});
   });
+
+  it("rejects non-canonical agent identities to prevent invalid step asset references", () => {
+    const baseDraft = addWorkflowStep(createEmptyWorkflowDraft()).draft;
+    const stepId = baseDraft.steps[0]?.id as string;
+
+    const invalidSet = setWorkflowStepAgentAssetSelection(baseDraft, stepId, {
+      assetId: "agent-non-canonical",
+      versionId: "version-non-canonical",
+    });
+    expect(invalidSet.changed).toBe(false);
+    expect(invalidSet.draft.steps[0]?.assetRef).toBeUndefined();
+
+    expect(() => buildWorkflowStepAgentAssistantSelectionPayload({
+      assetId: "agent-invalid",
+      versionId: "version-invalid",
+    })).toThrow("canonical 'asset:' identity");
+  });
 });

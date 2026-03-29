@@ -74,6 +74,7 @@ export const AssetSelectorValidationIssueCodes = Object.freeze({
   missingLaunchContext: "missing-launch-context",
   invalidSelectionConstraint: "invalid-selection-constraint",
   selectionLimitViolation: "selection-limit-violation",
+  duplicateSelection: "duplicate-selection",
   malformedReturnPayload: "malformed-return-payload",
   unsupportedSelectionType: "unsupported-selection-type",
   returnAssetTypeMismatch: "return-asset-type-mismatch",
@@ -191,8 +192,14 @@ function normalizeAllowedSelectionTypes(
 
 function normalizeAssetReference(reference: AssetSelectorAssetReference): AssetSelectorAssetReference {
   const assetId = AssetId.from(reference.assetId).value;
+  if (!assetId.startsWith("asset:")) {
+    throw new Error("Asset selector result assetId must use canonical 'asset:' identity.");
+  }
   const assetType = assertSupportedAssetType(reference.assetType, "Asset selector result assetType");
   const versionId = normalizeOptional(reference.versionId);
+  if (versionId && !versionId.startsWith("asset:")) {
+    throw new Error("Asset selector result versionId must use canonical 'asset:' identity when provided.");
+  }
   const displayName = normalizeOptional(reference.displayName);
   if (
     reference.taxonomy
@@ -314,10 +321,21 @@ export function validateAssetSelectorResult(input: {
     });
   }
 
+  const seenSelectionKeys = new Set<string>();
   for (let index = 0; index < resultAssets.length; index += 1) {
     const reference = resultAssets[index];
     try {
       const normalized = normalizeAssetReference(reference);
+      const dedupeKey = `${normalized.assetId}::${normalized.versionId ?? ""}`;
+      if (seenSelectionKeys.has(dedupeKey)) {
+        issues.push({
+          code: AssetSelectorValidationIssueCodes.duplicateSelection,
+          message: `Result includes duplicate asset reference '${normalized.assetId}'.`,
+          path: `result.assets[${index}]`,
+        });
+      } else {
+        seenSelectionKeys.add(dedupeKey);
+      }
       if (normalized.assetType !== request.assetType) {
         issues.push({
           code: AssetSelectorValidationIssueCodes.returnAssetTypeMismatch,

@@ -69,6 +69,11 @@ describe("AssetSelectorReturnHandoffService", () => {
       request,
     });
     store.activateSession("selector:inputs");
+    store.transitionToCreatingNew("selector:inputs", {
+      originatingContext: request.context,
+      requestedAssetType: "dataset",
+      returnTargetSessionKey: "selector:inputs",
+    });
 
     const service = new AssetSelectorReturnHandoffService();
     service.handle({
@@ -91,6 +96,11 @@ describe("AssetSelectorReturnHandoffService", () => {
       request,
     });
     store.activateSession("selector:inputs");
+    store.transitionToCreatingNew("selector:inputs", {
+      originatingContext: request.context,
+      requestedAssetType: "dataset",
+      returnTargetSessionKey: "selector:inputs",
+    });
 
     const service = new AssetSelectorReturnHandoffService();
     service.handle({
@@ -103,6 +113,28 @@ describe("AssetSelectorReturnHandoffService", () => {
     const state = store.getSession("selector:inputs");
     expect(state?.validationErrors.length).toBeGreaterThan(0);
     expect(state?.lifecycleState).toBe("active");
+  });
+
+  it("rejects stale created-return payloads when session is not in creating-new lifecycle", () => {
+    const store = new AssetSelectorSessionStore();
+    const request = createRequest("dataset", AssetSelectorUsageContexts.workflowInput);
+    store.prepareSession({
+      sessionKey: "selector:inputs",
+      request,
+    });
+    store.activateSession("selector:inputs");
+
+    const service = new AssetSelectorReturnHandoffService();
+    const outcome = service.handle({
+      search: "?inlineReturn=1&inlineStatus=created&inlineAssetId=asset:dataset:new&inlineAssetType=dataset&returnContextId=selector:inputs",
+      sessionKey: "selector:inputs",
+      request,
+      sessionStore: store,
+    });
+
+    expect(outcome.handled).toBeTrue();
+    expect(outcome.returnedAsset).toBeUndefined();
+    expect(store.getSession("selector:inputs")?.validationErrors.length).toBeGreaterThan(0);
   });
 
   it("does not consume returns for other selector sessions", () => {

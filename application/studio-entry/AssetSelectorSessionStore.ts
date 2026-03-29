@@ -30,6 +30,8 @@ export const AssetSelectorSessionErrorCodes = Object.freeze({
   returnPayloadInvalid: "return-payload-invalid",
   restorationFailed: "restoration-failed",
   sessionNotFound: "session-not-found",
+  invalidSessionState: "invalid-session-state",
+  selectionConstraintViolation: "selection-constraint-violation",
   assetTypeMismatch: "asset-type-mismatch",
 });
 
@@ -126,6 +128,14 @@ function mergeSelectedAssets(
   return dedupeAssetReferences([...existing, ...incoming]);
 }
 
+function isCanonicalAssetIdentity(value: string | undefined): boolean {
+  if (!value) {
+    return true;
+  }
+  const normalized = value.trim();
+  return normalized.length > 0 && normalized.startsWith("asset:");
+}
+
 export class AssetSelectorSessionStore {
   private readonly sessionStates = new Map<string, AssetSelectorSessionState>();
   private readonly listenersBySessionKey = new Map<string, Set<AssetSelectorSessionListener>>();
@@ -142,18 +152,32 @@ export class AssetSelectorSessionStore {
     readonly request: AssetSelectorRequest;
     readonly initialSelectedAssets?: ReadonlyArray<AssetSelectorAssetReference>;
   }): AssetSelectorSessionState {
+    const sessionKey = input.sessionKey.trim();
+    if (!sessionKey) {
+      throw new Error("Asset selector session key is required.");
+    }
     const request = this.validator.assertValidRequest(input.request);
-    const selectedAssets = normalizeSelectionsForMode(
+    const normalizedInitialSelections = normalizeSelectionsForMode(
       request,
       input.initialSelectedAssets?.filter((entry) => entry.assetType === request.assetType) ?? [],
     );
+    const initialSelectionValidation = this.validateSelectionSet(
+      request,
+      normalizedInitialSelections,
+      { enforceMinimumSelections: false },
+    );
+    const selectedAssets = initialSelectionValidation.valid
+      ? normalizedInitialSelections
+      : Object.freeze([]);
     const state: AssetSelectorSessionState = Object.freeze({
-      sessionKey: input.sessionKey.trim(),
+      sessionKey,
       request,
       lifecycleState: AssetSelectorSessionLifecycleStates.idle,
       selectedAssets,
       pendingSelections: selectedAssets,
-      validationErrors: Object.freeze([]),
+      validationErrors: initialSelectionValidation.valid
+        ? Object.freeze([])
+        : initialSelectionValidation.errors,
       lastResult: undefined,
       creatingNewContext: undefined,
       lifecycleHistory: Object.freeze([AssetSelectorSessionLifecycleStates.idle]),
@@ -208,21 +232,22 @@ export class AssetSelectorSessionStore {
 
   public togglePendingSelection(sessionKey: string, selection: AssetSelectorAssetReference): AssetSelectorSessionState {
     const state = this.requireSession(sessionKey);
-    if (selection.assetType !== state.request.assetType) {
-      return this.patch(sessionKey, {
-        validationErrors: buildValidationErrors(
-          `Selected asset type '${selection.assetType}' does not match request asset type '${state.request.assetType}'.`,
-          AssetSelectorSessionErrorCodes.assetTypeMismatch,
-        ),
-      });
-    }
-
     const existing = state.pendingSelections.find((entry) => entry.assetId === selection.assetId);
     const nextPending = existing
       ? state.pendingSelections.filter((entry) => entry.assetId !== selection.assetId)
       : [...state.pendingSelections, selection];
+    const normalizedPending = normalizeSelectionsForMode(state.request, nextPending);
+    const validation = this.validateSelectionSet(state.request, normalizedPending, {
+      enforceMinimumSelections: false,
+    });
+    if (!validation.valid) {
+      return this.patch(sessionKey, {
+        validationErrors: validation.errors,
+      });
+    }
+
     return this.patch(sessionKey, {
-      pendingSelections: normalizeSelectionsForMode(state.request, nextPending),
+      pendingSelections: normalizedPending,
       validationErrors: Object.freeze([]),
     });
   }
@@ -239,17 +264,17 @@ export class AssetSelectorSessionStore {
     selections: ReadonlyArray<AssetSelectorAssetReference>,
   ): AssetSelectorSessionState {
     const state = this.requireSession(sessionKey);
-    const mismatchedSelection = selections.find((entry) => entry.assetType !== state.request.assetType);
-    if (mismatchedSelection) {
+    const normalizedSelections = normalizeSelectionsForMode(state.request, selections);
+    const validation = this.validateSelectionSet(state.request, normalizedSelections, {
+      enforceMinimumSelections: false,
+    });
+    if (!validation.valid) {
       return this.patch(sessionKey, {
-        validationErrors: buildValidationErrors(
-          `Selected asset type '${mismatchedSelection.assetType}' does not match request asset type '${state.request.assetType}'.`,
-          AssetSelectorSessionErrorCodes.assetTypeMismatch,
-        ),
+        validationErrors: validation.errors,
       });
     }
     return this.patch(sessionKey, {
-      pendingSelections: normalizeSelectionsForMode(state.request, selections),
+      pendingSelections: normalizedSelections,
       validationErrors: Object.freeze([]),
     });
   }
@@ -259,16 +284,15 @@ export class AssetSelectorSessionStore {
     selections: ReadonlyArray<AssetSelectorAssetReference>,
   ): AssetSelectorSessionState {
     const state = this.requireSession(sessionKey);
-    const mismatchedSelection = selections.find((entry) => entry.assetType !== state.request.assetType);
-    if (mismatchedSelection) {
+    const normalizedSelections = normalizeSelectionsForMode(state.request, selections);
+    const validation = this.validateSelectionSet(state.request, normalizedSelections, {
+      enforceMinimumSelections: false,
+    });
+    if (!validation.valid) {
       return this.patch(sessionKey, {
-        validationErrors: buildValidationErrors(
-          `Selected asset type '${mismatchedSelection.assetType}' does not match request asset type '${state.request.assetType}'.`,
-          AssetSelectorSessionErrorCodes.assetTypeMismatch,
-        ),
+        validationErrors: validation.errors,
       });
     }
-    const normalizedSelections = normalizeSelectionsForMode(state.request, selections);
     return this.patch(sessionKey, {
       selectedAssets: normalizedSelections,
       pendingSelections: normalizedSelections,
@@ -278,6 +302,14 @@ export class AssetSelectorSessionStore {
 
   public confirmPendingSelections(sessionKey: string): AssetSelectorSessionState {
     const state = this.requireSession(sessionKey);
+    const pendingSelectionValidation = this.validateSelectionSet(state.request, state.pendingSelections, {
+      enforceMinimumSelections: true,
+    });
+    if (!pendingSelectionValidation.valid) {
+      return this.patch(sessionKey, {
+        validationErrors: pendingSelectionValidation.errors,
+      });
+    }
     return this.handleReturnPayload({
       sessionKey,
       result: Object.freeze({
@@ -375,11 +407,36 @@ export class AssetSelectorSessionStore {
     readonly state?: AssetSelectorSessionState;
   } {
     try {
+      const sessionKey = snapshot.sessionKey.trim();
+      if (!sessionKey) {
+        throw new Error("Asset selector session key is required.");
+      }
       const request = this.validator.assertValidRequest(snapshot.request);
       const selectedAssets = normalizeSelectionsForMode(request, snapshot.selectedAssets ?? []);
       const pendingSelections = normalizeSelectionsForMode(request, snapshot.pendingSelections ?? selectedAssets);
+      if (!Object.values(AssetSelectorSessionLifecycleStates).includes(snapshot.lifecycleState)) {
+        throw new Error(`Asset selector session lifecycle state '${snapshot.lifecycleState}' is not supported.`);
+      }
+      if (
+        snapshot.creatingNewContext
+        && snapshot.creatingNewContext.requestedAssetType !== request.assetType
+      ) {
+        throw new Error("Asset selector creating-new context asset type must match request assetType.");
+      }
+      const selectedValidation = this.validateSelectionSet(request, selectedAssets, {
+        enforceMinimumSelections: false,
+      });
+      if (!selectedValidation.valid) {
+        throw new Error(selectedValidation.errors[0]?.message ?? "Asset selector selected assets are invalid.");
+      }
+      const pendingValidation = this.validateSelectionSet(request, pendingSelections, {
+        enforceMinimumSelections: false,
+      });
+      if (!pendingValidation.valid) {
+        throw new Error(pendingValidation.errors[0]?.message ?? "Asset selector pending selections are invalid.");
+      }
       const state: AssetSelectorSessionState = Object.freeze({
-        sessionKey: snapshot.sessionKey.trim(),
+        sessionKey,
         request,
         lifecycleState: snapshot.lifecycleState,
         selectedAssets,
@@ -429,11 +486,94 @@ export class AssetSelectorSessionStore {
   }
 
   private requireSession(sessionKey: string): AssetSelectorSessionState {
-    const state = this.sessionStates.get(sessionKey.trim());
+    const normalizedSessionKey = sessionKey.trim();
+    if (!normalizedSessionKey) {
+      throw new Error("Asset selector session key is required.");
+    }
+    const state = this.sessionStates.get(normalizedSessionKey);
     if (!state) {
       throw new Error(`Asset selector session '${sessionKey}' was not found.`);
     }
     return state;
+  }
+
+  private validateSelectionSet(
+    request: AssetSelectorRequest,
+    selections: ReadonlyArray<AssetSelectorAssetReference>,
+    options: {
+      readonly enforceMinimumSelections: boolean;
+    },
+  ): {
+    readonly valid: boolean;
+    readonly errors: ReadonlyArray<AssetSelectorSessionError>;
+  } {
+    const errors: AssetSelectorSessionError[] = [];
+    const maxSelections = request.constraints.maxSelections
+      ?? (request.selectionMode === AssetSelectorSelectionModes.singleSelect ? 1 : Number.POSITIVE_INFINITY);
+    const minSelections = request.constraints.minSelections ?? (request.constraints.required ? 1 : 0);
+
+    if (selections.length > maxSelections) {
+      errors.push(Object.freeze({
+        code: AssetSelectorSessionErrorCodes.selectionConstraintViolation,
+        message: `Selection count '${selections.length}' exceeds maximum '${maxSelections}'.`,
+        path: "pendingSelections",
+      }));
+    }
+    if (options.enforceMinimumSelections && selections.length < minSelections) {
+      errors.push(Object.freeze({
+        code: AssetSelectorSessionErrorCodes.selectionConstraintViolation,
+        message: `Selection count '${selections.length}' is below required minimum '${minSelections}'.`,
+        path: "pendingSelections",
+      }));
+    }
+
+    const seenKeys = new Set<string>();
+    for (let index = 0; index < selections.length; index += 1) {
+      const selection = selections[index];
+      if (selection.assetType !== request.assetType) {
+        errors.push(Object.freeze({
+          code: AssetSelectorSessionErrorCodes.assetTypeMismatch,
+          message: `Selected asset type '${selection.assetType}' does not match request asset type '${request.assetType}'.`,
+          path: `pendingSelections[${index}].assetType`,
+        }));
+      }
+      if (!isCanonicalAssetIdentity(selection.assetId)) {
+        errors.push(Object.freeze({
+          code: AssetSelectorSessionErrorCodes.validationFailed,
+          message: "Selected asset id must use canonical 'asset:' identity.",
+          path: `pendingSelections[${index}].assetId`,
+        }));
+      }
+      if (!isCanonicalAssetIdentity(selection.versionId)) {
+        errors.push(Object.freeze({
+          code: AssetSelectorSessionErrorCodes.validationFailed,
+          message: "Selected version id must use canonical 'asset:' identity when provided.",
+          path: `pendingSelections[${index}].versionId`,
+        }));
+      }
+      if (selection.taxonomy && selection.taxonomy.semanticRole !== request.assetType) {
+        errors.push(Object.freeze({
+          code: AssetSelectorSessionErrorCodes.assetTypeMismatch,
+          message: `Selected asset taxonomy role '${selection.taxonomy.semanticRole}' does not match '${request.assetType}'.`,
+          path: `pendingSelections[${index}].taxonomy.semanticRole`,
+        }));
+      }
+      const key = `${selection.assetId}::${selection.versionId ?? ""}`;
+      if (seenKeys.has(key)) {
+        errors.push(Object.freeze({
+          code: AssetSelectorSessionErrorCodes.selectionConstraintViolation,
+          message: `Duplicate selection '${selection.assetId}' is not allowed.`,
+          path: `pendingSelections[${index}]`,
+        }));
+      } else {
+        seenKeys.add(key);
+      }
+    }
+
+    return Object.freeze({
+      valid: errors.length === 0,
+      errors: Object.freeze(errors),
+    });
   }
 
   private patch(sessionKey: string, patch: Partial<AssetSelectorSessionState>): AssetSelectorSessionState {

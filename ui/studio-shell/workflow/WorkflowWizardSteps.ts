@@ -133,6 +133,14 @@ function normalizeOptional(value?: string): string | undefined {
   return normalized ? normalized : undefined;
 }
 
+function isCanonicalAssetIdentity(value: string | undefined): boolean {
+  if (!value) {
+    return true;
+  }
+  const normalized = value.trim();
+  return normalized.length > 0 && normalized.startsWith("asset:");
+}
+
 function normalizeStepOrdering(steps: ReadonlyArray<WorkflowDraftStep>): ReadonlyArray<WorkflowDraftStep> {
   return Object.freeze(
     steps.map((step, index) => Object.freeze({
@@ -491,12 +499,12 @@ export function setWorkflowStepAgentAssetSelection(
   candidate: WorkflowStepAgentAssetCandidate,
 ): { readonly draft: WorkflowDraft; readonly changed: boolean } {
   const assetId = candidate.assetId.trim();
-  if (!assetId) {
+  const versionId = normalizeOptional(candidate.versionId);
+  if (!assetId || !isCanonicalAssetIdentity(assetId) || !isCanonicalAssetIdentity(versionId)) {
     return Object.freeze({ draft, changed: false });
   }
 
   return updateStep(draft, stepId, (currentStep) => {
-    const versionId = normalizeOptional(candidate.versionId);
     const normalizedName = normalizeOptional(candidate.name);
     const currentAsset = currentStep.assetRef?.asset;
     const assetAlreadySelected = currentStep.kind === WorkflowDraftStepKinds.assetBacked
@@ -527,13 +535,20 @@ export function buildWorkflowStepAgentAssistantSelectionPayload(
   if (!assetId) {
     throw new Error("Agent or assistant asset id is required.");
   }
+  if (!isCanonicalAssetIdentity(assetId)) {
+    throw new Error("Agent or assistant asset id must use canonical 'asset:' identity.");
+  }
+  const versionId = normalizeOptional(candidate.versionId);
+  if (!isCanonicalAssetIdentity(versionId)) {
+    throw new Error("Agent or assistant version id must use canonical 'asset:' identity when provided.");
+  }
 
   return Object.freeze({
     assetRef: Object.freeze({
       assetKind: WorkflowDraftStepAssetKinds.agentAssistant,
       asset: Object.freeze({
         assetId,
-        versionId: normalizeOptional(candidate.versionId),
+        versionId,
         taxonomy: stepAgentAssistantTaxonomy,
       }),
     }),

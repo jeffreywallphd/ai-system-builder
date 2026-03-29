@@ -278,6 +278,13 @@ export default function WorkflowStudioInputSectionEditor({
     }
     return Object.freeze([...byId.values()]);
   }, [items, returnedItems]);
+  const unavailableDatasetInputs = useMemo(() => {
+    if (searchTerm.trim().length > 0 || loading || Boolean(queryError)) {
+      return Object.freeze([] as typeof datasetInputs);
+    }
+    const availableAssetIds = new Set(shellItems.map((item) => item.asset.assetId));
+    return Object.freeze(datasetInputs.filter((entry) => !availableAssetIds.has(entry.asset.assetId)));
+  }, [datasetInputs, loading, queryError, searchTerm, shellItems]);
 
   return (
     <WizardSection sectionId="workflow-wizard-inputs" validationState={sectionHasErrors ? "error" : "none"}>
@@ -403,6 +410,26 @@ export default function WorkflowStudioInputSectionEditor({
         {selectorNotice ? (
           <div className="ui-text-small ui-text-secondary" data-testid="workflow-input-dataset-create-stub-notice">
             {selectorNotice}
+          </div>
+        ) : null}
+
+        {unavailableDatasetInputs.length > 0 ? (
+          <div className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="workflow-input-unavailable-datasets">
+            <strong>Unavailable datasets</strong>
+            <span className="ui-text-small ui-text-secondary">
+              Some attached datasets are no longer available in the registry. Remove or replace them before run preparation.
+            </span>
+            <ul className="ui-stack ui-stack--2xs" style={{ margin: 0, paddingLeft: "1rem" }}>
+              {unavailableDatasetInputs.map((entry) => (
+                <li key={`missing-${entry.id}`} className="ui-text-small ui-text-danger">
+                  {buildDatasetLabel({
+                    title: entry.title,
+                    assetId: entry.asset.assetId,
+                    versionId: entry.asset.versionId,
+                  })}
+                </li>
+              ))}
+            </ul>
           </div>
         ) : null}
 

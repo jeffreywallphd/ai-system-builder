@@ -181,4 +181,36 @@ describe("WorkflowWizardDatasetInputs", () => {
     ]);
     expect(replaced.draft.inputs.some((entry) => entry.id === "input-runtime")).toBe(true);
   });
+
+  it("updates dataset selection versions during replacement when asset ids are unchanged", () => {
+    const baseDraft = createEmptyWorkflowDraft();
+    const seeded = upsertDatasetInputSelection(baseDraft, {
+      assetId: "asset:dataset-versioned",
+      versionId: "asset:dataset-versioned:v1",
+      name: "Dataset Versioned",
+    }).draft;
+
+    const replaced = replaceDatasetInputSelections(seeded, [{
+      assetId: "asset:dataset-versioned",
+      versionId: "asset:dataset-versioned:v2",
+      name: "Dataset Versioned v2",
+    }]);
+
+    expect(replaced.changed).toBe(true);
+    const selected = listDatasetInputs(replaced.draft)[0];
+    expect(selected?.asset.versionId).toBe("asset:dataset-versioned:v2");
+    expect(selected?.title).toBe("Dataset Versioned v2");
+  });
+
+  it("ignores non-canonical dataset identities to prevent invalid draft references", () => {
+    const baseDraft = createEmptyWorkflowDraft();
+    const result = upsertDatasetInputSelection(baseDraft, {
+      assetId: "dataset-non-canonical-id",
+      versionId: "dataset-version-non-canonical",
+      name: "Invalid Dataset",
+    });
+
+    expect(result.changed).toBe(false);
+    expect(listDatasetInputs(result.draft)).toHaveLength(0);
+  });
 });
