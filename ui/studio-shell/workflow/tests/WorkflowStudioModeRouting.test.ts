@@ -12,6 +12,27 @@ describe("WorkflowStudioModeRouting", () => {
     expect(resolution.invalidModeId).toBeUndefined();
   });
 
+  it("resolves canvas when explicitly deep-linked through the route parameter", () => {
+    const resolution = resolveWorkflowStudioModeRoute({ routeModeId: "canvas" });
+
+    expect(resolution.resolvedModeId).toBe("canvas");
+    expect(resolution.requestedModeId).toBe("canvas");
+    expect(resolution.source).toBe("route-param");
+    expect(resolution.invalidModeId).toBeUndefined();
+  });
+
+  it("prioritizes explicit route mode over query mode when both are present", () => {
+    const resolution = resolveWorkflowStudioModeRoute({
+      routeModeId: "wizard",
+      search: "?mode=canvas",
+    });
+
+    expect(resolution.resolvedModeId).toBe("wizard");
+    expect(resolution.requestedModeId).toBe("wizard");
+    expect(resolution.source).toBe("route-param");
+    expect(resolution.invalidModeId).toBeUndefined();
+  });
+
   it("resolves query mode parameters when route mode parameter is absent", () => {
     const resolution = resolveWorkflowStudioModeRoute({ search: "?mode=canvas" });
 
