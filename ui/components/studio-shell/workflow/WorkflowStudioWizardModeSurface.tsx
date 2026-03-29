@@ -3,12 +3,16 @@ import SectionBody from "./SectionBody";
 import SectionHeader from "./SectionHeader";
 import WizardSection from "./WizardSection";
 import WorkflowStudioTriggerSectionEditor from "./WorkflowStudioTriggerSectionEditor";
+import WorkflowStudioInputSectionEditor from "./WorkflowStudioInputSectionEditor";
 
 export interface WorkflowStudioWizardModeSurfaceProps {
   readonly sharedDraft: WorkflowDraft;
   readonly sharedDraftSerialized: string;
   readonly draftValidationIssues?: ReadonlyArray<WorkflowValidationIssue>;
   readonly onUpdateSharedDraft?: (updater: (draft: WorkflowDraft) => WorkflowDraft) => void;
+  readonly studioId?: string;
+  readonly routeSearch?: string;
+  readonly onReplaceRouteSearch?: (nextSearch: string) => void;
 }
 
 function buildSectionSummary(count: number, singular: string, plural: string): string {
@@ -24,6 +28,9 @@ export default function WorkflowStudioWizardModeSurface({
   sharedDraftSerialized,
   draftValidationIssues = [],
   onUpdateSharedDraft,
+  studioId,
+  routeSearch,
+  onReplaceRouteSearch,
 }: WorkflowStudioWizardModeSurfaceProps): JSX.Element {
   return (
     <div className="ui-stack ui-stack--sm" data-testid="workflow-studio-wizard-mode-surface">
@@ -40,24 +47,14 @@ export default function WorkflowStudioWizardModeSurface({
         onUpdateSharedDraft={onUpdateSharedDraft}
       />
 
-      <WizardSection sectionId="workflow-wizard-inputs">
-        <SectionHeader
-          title="Inputs Section"
-          description="Capture runtime inputs consumed by the workflow. This section reads from the shared workflow draft inputs array."
-        />
-        <SectionBody>
-          <div className="ui-text-small">{buildSectionSummary(sharedDraft.inputs.length, "input", "inputs")}</div>
-          {sharedDraft.inputs.length === 0
-            ? renderEmptyState("No inputs configured yet.")
-            : (
-              <ul className="ui-stack ui-stack--2xs">
-                {sharedDraft.inputs.map((input) => (
-                  <li key={input.id}>{input.id}: {input.sourceType}</li>
-                ))}
-              </ul>
-            )}
-        </SectionBody>
-      </WizardSection>
+      <WorkflowStudioInputSectionEditor
+        sharedDraft={sharedDraft}
+        draftValidationIssues={draftValidationIssues}
+        onUpdateSharedDraft={onUpdateSharedDraft}
+        studioId={studioId}
+        routeSearch={routeSearch}
+        onReplaceRouteSearch={onReplaceRouteSearch}
+      />
 
       <WizardSection sectionId="workflow-wizard-steps">
         <SectionHeader

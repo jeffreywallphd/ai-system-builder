@@ -12,6 +12,9 @@ export interface WorkflowStudioDraftAuthoringBoundaryProps {
   readonly content: string;
   readonly onChangeContent: (nextContent: string) => void;
   readonly workflowModeContext?: {
+    readonly studioId?: string;
+    readonly routeSearch?: string;
+    readonly replaceRouteSearch?: (nextSearch: string) => void;
     readonly selectedModeId: WorkflowStudioModeId;
     readonly sharedDraft: WorkflowDraft;
     readonly sharedDraftSerialized: string;
@@ -40,6 +43,9 @@ export default function WorkflowStudioDraftAuthoringBoundary({
       {workflowModeContext.selectedModeId === "wizard" ? (
         <WorkflowStudioWizardModeLayout>
           <WorkflowStudioWizardModeSurface
+            studioId={workflowModeContext.studioId}
+            routeSearch={workflowModeContext.routeSearch}
+            onReplaceRouteSearch={workflowModeContext.replaceRouteSearch}
             sharedDraft={workflowModeContext.sharedDraft}
             sharedDraftSerialized={workflowModeContext.sharedDraftSerialized}
             draftValidationIssues={workflowModeContext.draftValidationIssues}
