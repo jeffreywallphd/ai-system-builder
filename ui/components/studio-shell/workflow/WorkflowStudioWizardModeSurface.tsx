@@ -21,16 +21,6 @@ export interface WorkflowStudioWizardModeSurfaceProps {
   readonly onSelectWizardPage?: (pageId: WorkflowStudioWizardPageId) => void;
 }
 
-function toStatusLabel(statusLabel: "ready" | "needs-input" | "has-issues"): string {
-  if (statusLabel === "ready") {
-    return "Ready";
-  }
-  if (statusLabel === "has-issues") {
-    return "Needs review";
-  }
-  return "Needs input";
-}
-
 function isWorkflowWizardSectionId(value: string): value is WorkflowWizardSectionId {
   return (
     value === WorkflowWizardSectionIds.trigger
@@ -98,64 +88,65 @@ export default function WorkflowStudioWizardModeSurface({
 
   return (
     <div className="ui-stack ui-stack--sm" data-testid="workflow-studio-wizard-mode-surface">
-      <nav className="ui-stack ui-stack--2xs" aria-label="Workflow wizard pages">
-        <div className="ui-row ui-row--wrap" style={{ gap: "0.5rem" }}>
-          {progress.sections.map((section) => (
-            <button
-              key={section.id}
-              type="button"
-              className={`ui-button ui-button--sm ${section.id === activePageId ? "ui-button--primary" : "ui-button--ghost"}`}
-              data-testid={`workflow-wizard-page-button-${section.id}`}
-              aria-current={section.id === activePageId ? "page" : undefined}
-              onClick={() => selectPage(section.id)}
-            >
-              {section.title}
-            </button>
-          ))}
-        </div>
-        <div className="ui-row ui-row--wrap ui-text-small ui-text-secondary" style={{ gap: "0.75rem" }}>
-          {progress.sections.map((section) => (
-            <span key={`${section.id}-status`}>
-              {section.title}: {toStatusLabel(section.statusLabel)}
-            </span>
-          ))}
-        </div>
-      </nav>
-
-      <div className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="workflow-wizard-readiness-summary">
-        <strong>Workflow readiness summary</strong>
-        <p className="ui-text-muted">
-          {progress.isWorkflowReady
-            ? "Workflow draft is ready for handoff."
-            : `Workflow draft is not ready yet. ${progress.blockingIssueCount} blocking item(s) remain.`}
-          {" "}
-          Inputs policy: {progress.readinessPolicy.inputs === "required" ? "required for this wizard pass" : "optional"}.
-        </p>
-        {progress.blockingIssues.length > 0 ? (
-          <ul className="ui-stack ui-stack--2xs">
-            {progress.blockingIssues.map((issue) => (
-              <li key={issue.id}>
-                <button
-                  type="button"
-                  className="ui-button ui-button--ghost ui-button--sm"
-                  onClick={() => selectPage(issue.sectionId)}
-                >
-                  {issue.sectionTitle}: {issue.message}
-                </button>
-              </li>
+      <section className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="workflow-wizard-pages-card">
+        <nav className="ui-stack ui-stack--2xs" aria-label="Workflow wizard pages">
+          <div className="ui-workflow-wizard__page-buttons">
+            {progress.sections.map((section) => (
+              <button
+                key={section.id}
+                type="button"
+                className={`ui-button ui-button--sm ${section.id === activePageId ? "ui-button--primary" : "ui-button--ghost"}`}
+                data-testid={`workflow-wizard-page-button-${section.id}`}
+                aria-current={section.id === activePageId ? "page" : undefined}
+                onClick={() => selectPage(section.id)}
+              >
+                {section.title}
+              </button>
             ))}
-          </ul>
-        ) : (
-          <p className="ui-text-muted">No blocking issues detected.</p>
-        )}
-      </div>
+          </div>
+        </nav>
+        <div data-testid={`workflow-wizard-page-${activePageId}`}>
+          {activePageId === WorkflowWizardSectionIds.trigger ? (
+            <WorkflowStudioTriggerSectionEditor
+              sharedDraft={sharedDraft}
+              draftValidationIssues={draftValidationIssues}
+              onUpdateSharedDraft={onUpdateSharedDraft}
+            />
+          ) : null}
+
+          {activePageId === WorkflowWizardSectionIds.inputs ? (
+            <WorkflowStudioInputSectionEditor
+              sharedDraft={sharedDraft}
+              draftValidationIssues={draftValidationIssues}
+              onUpdateSharedDraft={onUpdateSharedDraft}
+              studioId={studioId}
+            />
+          ) : null}
+
+          {activePageId === WorkflowWizardSectionIds.steps ? (
+            <WorkflowStudioStepSectionEditor
+              sharedDraft={sharedDraft}
+              draftValidationIssues={draftValidationIssues}
+              onUpdateSharedDraft={onUpdateSharedDraft}
+              studioId={studioId}
+            />
+          ) : null}
+
+          {activePageId === WorkflowWizardSectionIds.outputs ? (
+            <WorkflowStudioOutputSectionEditor
+              sharedDraft={sharedDraft}
+              draftValidationIssues={draftValidationIssues}
+              onUpdateSharedDraft={onUpdateSharedDraft}
+            />
+          ) : null}
+        </div>
+      </section>
 
       <div className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="workflow-wizard-progression-controls">
-        <strong>Guided progression</strong>
-        <div className="ui-row ui-row--wrap" style={{ gap: "0.5rem" }}>
+        <div className="ui-workflow-wizard__navigation-actions">
           <button
             type="button"
-            className="ui-button ui-button--ghost ui-button--sm"
+            className="ui-button ui-button--primary ui-button--sm"
             data-testid="workflow-wizard-back-page"
             disabled={!previousPageId}
             onClick={() => {
@@ -168,7 +159,7 @@ export default function WorkflowStudioWizardModeSurface({
           </button>
           <button
             type="button"
-            className="ui-button ui-button--sm"
+            className="ui-button ui-button--primary ui-button--sm"
             data-testid="workflow-wizard-next-page"
             disabled={!nextPageId}
             onClick={() => {
@@ -185,42 +176,6 @@ export default function WorkflowStudioWizardModeSurface({
         </p>
       </div>
 
-      <div data-testid={`workflow-wizard-page-${activePageId}`}>
-        {activePageId === WorkflowWizardSectionIds.trigger ? (
-          <WorkflowStudioTriggerSectionEditor
-            sharedDraft={sharedDraft}
-            draftValidationIssues={draftValidationIssues}
-            onUpdateSharedDraft={onUpdateSharedDraft}
-          />
-        ) : null}
-
-        {activePageId === WorkflowWizardSectionIds.inputs ? (
-          <WorkflowStudioInputSectionEditor
-            sharedDraft={sharedDraft}
-            draftValidationIssues={draftValidationIssues}
-            onUpdateSharedDraft={onUpdateSharedDraft}
-            studioId={studioId}
-          />
-        ) : null}
-
-        {activePageId === WorkflowWizardSectionIds.steps ? (
-          <WorkflowStudioStepSectionEditor
-            sharedDraft={sharedDraft}
-            draftValidationIssues={draftValidationIssues}
-            onUpdateSharedDraft={onUpdateSharedDraft}
-            studioId={studioId}
-          />
-        ) : null}
-
-        {activePageId === WorkflowWizardSectionIds.outputs ? (
-          <WorkflowStudioOutputSectionEditor
-            sharedDraft={sharedDraft}
-            draftValidationIssues={draftValidationIssues}
-            onUpdateSharedDraft={onUpdateSharedDraft}
-          />
-        ) : null}
-      </div>
-
       {activePageId === WorkflowWizardSectionIds.outputs ? (
         <>
           <section
@@ -235,7 +190,7 @@ export default function WorkflowStudioWizardModeSurface({
               </p>
             ) : (
               <p className="ui-text-muted">
-                Resolve readiness blockers before handoff. Completed: {progress.completedSectionCount}/{progress.sections.length}.
+                Resolve remaining blockers before handoff. Completed: {progress.completedSectionCount}/{progress.sections.length}.
               </p>
             )}
             {readyActionAttempted && !progress.isWorkflowReady ? (
@@ -283,6 +238,38 @@ export default function WorkflowStudioWizardModeSurface({
           </label>
         </>
       ) : null}
+
+      <details className="ui-card ui-card--padded ui-workflow-wizard__readiness" data-testid="workflow-wizard-readiness-summary">
+        <summary className="ui-workflow-wizard__readiness-summary">
+          <strong>Workflow readiness summary</strong>
+        </summary>
+        <div className="ui-stack ui-stack--2xs ui-workflow-wizard__readiness-content">
+          <p className="ui-text-muted">
+            {progress.isWorkflowReady
+              ? "Workflow draft is ready for handoff."
+              : `Workflow draft is not ready yet. ${progress.blockingIssueCount} blocking item(s) remain.`}
+            {" "}
+            Inputs policy: {progress.readinessPolicy.inputs === "required" ? "required for this wizard pass" : "optional"}.
+          </p>
+          {progress.blockingIssues.length > 0 ? (
+            <ul className="ui-stack ui-stack--2xs">
+              {progress.blockingIssues.map((issue) => (
+                <li key={issue.id}>
+                  <button
+                    type="button"
+                    className="ui-button ui-button--ghost ui-button--sm"
+                    onClick={() => selectPage(issue.sectionId)}
+                  >
+                    {issue.sectionTitle}: {issue.message}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="ui-text-muted">No blocking issues detected.</p>
+          )}
+        </div>
+      </details>
     </div>
   );
 }

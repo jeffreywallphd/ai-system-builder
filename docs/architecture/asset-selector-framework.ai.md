@@ -228,6 +228,13 @@ Selector session vs workflow draft model:
 - Workflow Studio now demonstrates shell-specific toolbar configuration through registration metadata (`ui/studio-shell/registrations/WorkflowStudioRegistration.ts`) with wizard/canvas mode actions and draft/validation controls.
 - Toolbar actions interact through existing shell orchestration seams (shared mode state store + existing draft/validation operations) without bypassing selector/session infrastructure or duplicating validation logic.
 
+## Story 4.14: workflow wizard focus/layout hardening
+- Wizard mode now prioritizes page authoring flow by rendering the active wizard page directly under page buttons in the primary wizard card (`WorkflowStudioWizardModeSurface`).
+- Per-section readiness label rows were removed from the default surface to reduce redundant readiness copy in the main authoring path.
+- Guided progression controls remain available directly below the pages card with prominent primary Back/Next actions and increased button spacing to reduce accidental navigation clicks.
+- Workflow readiness details remain available but moved to the bottom of the wizard stack as a collapsed disclosure (`details/summary`) so readiness diagnostics are opt-in instead of always expanded.
+- These UX changes are renderer-only and preserve existing selector/session/capability integration seams for workflow inputs and steps.
+
 ## Future asset-type integration pattern
 For new selector types, keep shared shell/session unchanged and add:
 1. A typed adapter in `ui/studio-shell/asset-selector/` (request builder + source mapping).

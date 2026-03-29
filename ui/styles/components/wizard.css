@@ -2,6 +2,30 @@
   overflow: hidden;
 }
 
+.ui-workflow-wizard__page-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.ui-workflow-wizard__navigation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xl);
+}
+
+.ui-workflow-wizard__readiness {
+  display: block;
+}
+
+.ui-workflow-wizard__readiness-summary {
+  cursor: pointer;
+}
+
+.ui-workflow-wizard__readiness-content {
+  margin-top: var(--space-sm);
+}
+
 .ui-linear-wizard__shell {
   display: flex;
   flex-direction: column;

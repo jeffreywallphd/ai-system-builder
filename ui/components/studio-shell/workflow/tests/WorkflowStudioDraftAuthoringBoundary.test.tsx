@@ -26,15 +26,15 @@ describe("WorkflowStudioDraftAuthoringBoundary", () => {
 
     expect(html).toContain('data-testid="workflow-studio-wizard-mode-layout"');
     expect(html).toContain('data-testid="workflow-studio-wizard-mode-surface"');
-    expect(html).toContain("Workflow wizard layout");
+    expect(html).toContain('data-testid="workflow-wizard-pages-card"');
     expect(html).toContain("Trigger Section");
     expect(html).not.toContain("Inputs Section");
     expect(html).not.toContain("Steps Section");
     expect(html).not.toContain("Outputs Section");
-    expect(html).toContain("Guided progression");
     expect(html).toContain("Back");
     expect(html).toContain("Next");
     expect(html).toContain("Workflow readiness summary");
+    expect(html).not.toContain("Trigger: Needs input");
     expect(html).not.toContain("Prepare for run handoff");
     expect(html).not.toContain("Prepare for Run");
     expect(html).not.toContain('data-testid="workflow-studio-canvas-mode-layout"');
