@@ -39,7 +39,6 @@ import AssetDetailPage from "../pages/AssetDetailPage";
 import RunPage from "../pages/RunPage";
 import ProtectedRoute from "./ProtectedRoute";
 import { ROUTE_PATHS } from "./RouteConfig";
-import { BuildEntryFeatureFlag } from "../features/BuildEntryFeatureFlag";
 import { NavigationMigrationService } from "./LegacyNavigationSunset";
 
 export interface AppRouterProps {
@@ -57,7 +56,6 @@ function resolveLegacyRouteElement(path: string, fallback: JSX.Element, migratio
 export default function AppRouter({
   isAuthenticated = true,
 }: AppRouterProps): JSX.Element {
-  const buildEntryEnabled = useMemo(() => new BuildEntryFeatureFlag().isEnabled(), []);
   const migrationService = useMemo(() => new NavigationMigrationService(), []);
   const routes = useMemo<ReadonlyArray<RouteObject>>(
     () => [
@@ -72,12 +70,7 @@ export default function AppRouter({
         ),
         children: [
           { path: ROUTE_PATHS.home, element: <HomePage /> },
-          {
-            path: ROUTE_PATHS.build,
-            element: buildEntryEnabled
-              ? <BuildPage />
-              : <Navigate to={ROUTE_PATHS.workflows} replace />,
-          },
+          { path: ROUTE_PATHS.build, element: <BuildPage /> },
           { path: ROUTE_PATHS.create, element: resolveLegacyRouteElement(ROUTE_PATHS.create, <Navigate to={ROUTE_PATHS.build} replace />, migrationService) },
           { path: ROUTE_PATHS.compose, element: resolveLegacyRouteElement(ROUTE_PATHS.compose, <Navigate to={ROUTE_PATHS.build} replace />, migrationService) },
           { path: ROUTE_PATHS.explore, element: <RegistryPage /> },
@@ -120,7 +113,7 @@ export default function AppRouter({
       },
       { path: ROUTE_PATHS.notFound, element: <NotFoundPage /> },
     ],
-    [buildEntryEnabled, isAuthenticated, migrationService]
+    [isAuthenticated, migrationService]
   );
   const router = useMemo(() => createBrowserRouter([...routes]), [routes]);
 

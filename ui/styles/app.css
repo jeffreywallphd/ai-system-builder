@@ -96,7 +96,8 @@ body {
 }
 
 .ui-app__header-actions {
-  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
   justify-content: flex-end;
   margin-left: auto;
 }
@@ -411,8 +412,8 @@ body {
 .ui-command-palette .ui-overlay-panel__surface {
   top: calc(4rem + var(--space-sm));
   bottom: auto;
-  width: min(28rem, calc(100vw - 2rem));
-  max-height: min(34rem, calc(100vh - 7rem));
+  width: min(16rem, calc(100vw - 2rem));
+  max-height: min(24rem, calc(100vh - 7rem));
   border-radius: var(--radius-lg);
   border-right: 1px solid var(--color-border);
   border-left: 1px solid var(--color-border);
@@ -420,9 +421,43 @@ body {
   overflow: hidden;
 }
 
+.ui-command-palette .ui-overlay-panel__body {
+  padding: var(--space-sm);
+}
+
+.ui-command-palette__entries {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+}
+
 .ui-command-palette__entry {
   width: 100%;
   justify-content: flex-start;
+}
+
+.ui-app__menu-trigger {
+  min-width: var(--control-height-sm);
+  padding-inline: 0.45rem;
+}
+
+.ui-app__menu-trigger[aria-expanded="true"] {
+  background: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+}
+
+.ui-app__menu-trigger-icon {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.ui-app__menu-trigger-bar {
+  display: block;
+  width: 1rem;
+  height: 2px;
+  border-radius: var(--radius-pill);
+  background: currentColor;
 }
 
 .ui-build-landing__question,
@@ -484,15 +519,15 @@ body {
   }
 
   .ui-app__header-inner {
-    align-items: flex-start;
-    flex-direction: column;
+    align-items: center;
+    flex-direction: row;
     padding: var(--space-sm) 0;
   }
 
   .ui-app__header-actions {
-    width: 100%;
-    margin-left: 0;
-    justify-content: flex-start;
+    width: auto;
+    margin-left: auto;
+    justify-content: flex-end;
   }
 
   .ui-app__footer-inner {
@@ -522,9 +557,20 @@ body {
   }
 
   .ui-command-palette .ui-overlay-panel__surface {
-    top: calc(5rem + var(--space-sm));
-    width: calc(100vw - 1rem);
-    max-height: min(34rem, calc(100vh - 6rem));
+    top: calc(4rem + var(--space-xs));
+    width: min(16rem, calc(100vw - 1rem));
+    max-height: min(24rem, calc(100vh - 5rem));
+  }
+
+  .ui-command-palette.ui-overlay-panel--right .ui-overlay-panel__surface {
+    inset: auto 0 auto auto;
+    top: calc(4rem + var(--space-xs));
+    bottom: auto;
+    transform: translateY(-0.5rem);
+  }
+
+  .ui-overlay-panel--open.ui-command-palette.ui-overlay-panel--right .ui-overlay-panel__surface {
+    transform: translateY(0);
   }
 
 }
@@ -829,7 +875,6 @@ body {
 }
 
 @media (max-width: 800px) {
-  .ui-app__header-inner,
   .ui-app__footer-inner {
     flex-direction: column;
     align-items: flex-start;
