@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import type { AssetDraftDependencyReference, AssetMetadataPatch } from "../../domain/studio-shell/StudioShellDomain";
 import { TaxonomySemanticRoles, type TaxonomyBehaviorKind, type TaxonomySemanticRole } from "../../domain/taxonomy/CompositionTaxonomy";
 import type { StudioShellSnapshotReadModel, StudioShellValidationIssue } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
+import type { WorkflowStudioModeState } from "./workflow/WorkflowStudioModeStateStore";
+import type { WorkflowStudioModeId } from "./workflow/WorkflowStudioModes";
 import type {
   RuntimeExecutionResultReadModel,
   RuntimeExecutionStatusReadModel,
@@ -49,6 +51,10 @@ export interface StudioShellExtensionContext {
   readonly studioId: string;
   readonly snapshot: StudioShellSnapshotReadModel | undefined;
   readonly validationIssues: ReadonlyArray<StudioShellValidationIssue>;
+  readonly workflowModeState?: {
+    readonly state: WorkflowStudioModeState;
+    readonly setSelectedMode: (modeId: WorkflowStudioModeId) => void;
+  };
   readonly systemCompatibility?: SystemCompatibilityInsightsReadModel;
   readonly handoffContext: {
     readonly assetId?: string;
