@@ -155,7 +155,45 @@ export interface WorkflowDraftSectionItemBase {
   readonly metadata?: Readonly<Record<string, unknown>>;
 }
 
-export interface WorkflowDraftOutput extends WorkflowDraftSectionItemBase {}
+export const WorkflowDraftOutputTypes = Object.freeze({
+  document: "document",
+  record: "record",
+  media: "media",
+});
+
+export type WorkflowDraftOutputType = typeof WorkflowDraftOutputTypes[keyof typeof WorkflowDraftOutputTypes] | (string & {});
+
+export const WorkflowDraftOutputFormats = Object.freeze({
+  json: "json",
+  jsonl: "jsonl",
+  csv: "csv",
+  markdown: "markdown",
+  html: "html",
+});
+
+export type WorkflowDraftOutputFormat = typeof WorkflowDraftOutputFormats[keyof typeof WorkflowDraftOutputFormats] | (string & {});
+
+export const WorkflowDraftOutputDestinationTypes = Object.freeze({
+  fileExport: "file-export",
+  webViewer: "web-viewer",
+  systemEntry: "system-entry",
+});
+
+export type WorkflowDraftOutputDestinationType = typeof WorkflowDraftOutputDestinationTypes[keyof typeof WorkflowDraftOutputDestinationTypes]
+  | (string & {});
+
+export interface WorkflowDraftOutputDestination {
+  readonly type: WorkflowDraftOutputDestinationType;
+  readonly target: string;
+  readonly options?: Readonly<Record<string, unknown>>;
+}
+
+export interface WorkflowDraftOutput extends WorkflowDraftSectionItemBase {
+  readonly outputType: WorkflowDraftOutputType;
+  readonly format: WorkflowDraftOutputFormat;
+  readonly destination: WorkflowDraftOutputDestination;
+  readonly sourceStepId?: string;
+}
 
 export const WorkflowDraftStepKinds = Object.freeze({
   action: "action",
@@ -170,6 +208,41 @@ export const WorkflowDraftStepTypes = Object.freeze({
 });
 
 export type WorkflowDraftStepType = typeof WorkflowDraftStepTypes[keyof typeof WorkflowDraftStepTypes] | (string & {});
+
+export const WorkflowDraftBuiltInStepTypes = Object.freeze({
+  ifThen: "if-then",
+  loopIteration: "loop-iteration",
+});
+
+export type WorkflowDraftBuiltInStepType = typeof WorkflowDraftBuiltInStepTypes[keyof typeof WorkflowDraftBuiltInStepTypes];
+
+export const WorkflowDraftLoopIterationModes = Object.freeze({
+  collection: "collection",
+  range: "range",
+});
+
+export type WorkflowDraftLoopIterationMode = typeof WorkflowDraftLoopIterationModes[keyof typeof WorkflowDraftLoopIterationModes];
+
+export interface WorkflowDraftIfThenStepConfig {
+  readonly conditionExpression: string;
+  readonly thenStepIds: ReadonlyArray<string>;
+  readonly elseStepIds?: ReadonlyArray<string>;
+}
+
+export interface WorkflowDraftLoopRangeConfig {
+  readonly start: number;
+  readonly end: number;
+  readonly step?: number;
+}
+
+export interface WorkflowDraftLoopIterationStepConfig {
+  readonly iterationMode: WorkflowDraftLoopIterationMode;
+  readonly bodyStepIds: ReadonlyArray<string>;
+  readonly itemAlias?: string;
+  readonly collectionInputKey?: string;
+  readonly range?: WorkflowDraftLoopRangeConfig;
+  readonly maxIterations?: number;
+}
 
 export const WorkflowDraftStepAssetKinds = Object.freeze({
   agentAssistant: "agent-assistant",
@@ -290,6 +363,15 @@ function normalizeStringArray(values: unknown, label: string): ReadonlyArray<str
   }
 
   return deduped.size > 0 ? Object.freeze([...deduped.values()]) : undefined;
+}
+
+function normalizeRequiredStringArray(values: unknown, label: string): ReadonlyArray<string> {
+  const normalized = normalizeStringArray(values, label);
+  if (!normalized || normalized.length === 0) {
+    throw new Error(`${label} must include at least one value.`);
+  }
+
+  return normalized;
 }
 
 function normalizeTriggerKind(value: string): WorkflowDraftTriggerKind {
@@ -568,9 +650,7 @@ function normalizeStep(step: WorkflowDraftStep): WorkflowDraftStep {
     }
   }
 
-  const config = step.config
-    ? Object.freeze({ ...assertRecord(step.config, "Workflow draft step config") })
-    : undefined;
+  const config = normalizeStepConfig(normalizedStep, kind);
   const assetRef = step.assetRef
     ? normalizeWorkflowDraftStepAssetReference(step.assetRef)
     : undefined;
@@ -585,6 +665,11 @@ function normalizeStep(step: WorkflowDraftStep): WorkflowDraftStep {
       "Workflow draft asset-backed agent-assistant step requires type 'agent-assistant'.",
     );
   }
+  if (kind !== WorkflowDraftStepKinds.controlFlow && isBuiltInControlFlowStepType(normalizedStep.type)) {
+    throw new Error(
+      `Workflow draft built-in step type '${normalizedStep.type}' requires kind '${WorkflowDraftStepKinds.controlFlow}'.`,
+    );
+  }
 
   return Object.freeze({
     ...normalizedStep,
@@ -595,6 +680,115 @@ function normalizeStep(step: WorkflowDraftStep): WorkflowDraftStep {
     config,
     assetRef,
   });
+}
+
+function normalizeStepConfig(
+  step: WorkflowDraftStep,
+  kind: WorkflowDraftStepKind,
+): Readonly<Record<string, unknown>> | undefined {
+  const configRecord = step.config
+    ? assertRecord(step.config, "Workflow draft step config")
+    : undefined;
+
+  if (kind !== WorkflowDraftStepKinds.controlFlow) {
+    return configRecord ? Object.freeze({ ...configRecord }) : undefined;
+  }
+
+  if (!isBuiltInControlFlowStepType(step.type)) {
+    return configRecord ? Object.freeze({ ...configRecord }) : undefined;
+  }
+
+  if (!configRecord) {
+    throw new Error(`Workflow draft built-in control-flow step '${step.type}' requires config.`);
+  }
+
+  switch (step.type) {
+    case WorkflowDraftBuiltInStepTypes.ifThen:
+      return normalizeIfThenStepConfig(configRecord);
+    case WorkflowDraftBuiltInStepTypes.loopIteration:
+      return normalizeLoopIterationStepConfig(configRecord);
+    default:
+      return Object.freeze({ ...configRecord });
+  }
+}
+
+function isBuiltInControlFlowStepType(value: string): value is WorkflowDraftBuiltInStepType {
+  return value === WorkflowDraftBuiltInStepTypes.ifThen || value === WorkflowDraftBuiltInStepTypes.loopIteration;
+}
+
+function normalizeIfThenStepConfig(configRecord: Readonly<Record<string, unknown>>): Readonly<WorkflowDraftIfThenStepConfig> {
+  const conditionExpression = normalizeRequired(
+    typeof configRecord.conditionExpression === "string" ? configRecord.conditionExpression : "",
+    "Workflow draft if-then step config.conditionExpression",
+  );
+  const thenStepIds = normalizeRequiredStringArray(configRecord.thenStepIds, "Workflow draft if-then step config.thenStepIds");
+  const elseStepIds = normalizeStringArray(configRecord.elseStepIds, "Workflow draft if-then step config.elseStepIds");
+  if (elseStepIds && elseStepIds.some((stepId) => thenStepIds.includes(stepId))) {
+    throw new Error("Workflow draft if-then step config elseStepIds cannot overlap thenStepIds.");
+  }
+
+  return Object.freeze({
+    conditionExpression,
+    thenStepIds,
+    elseStepIds,
+  });
+}
+
+function normalizeLoopIterationStepConfig(
+  configRecord: Readonly<Record<string, unknown>>,
+): Readonly<WorkflowDraftLoopIterationStepConfig> {
+  const iterationModeRaw = normalizeRequired(
+    typeof configRecord.iterationMode === "string" ? configRecord.iterationMode : "",
+    "Workflow draft loop-iteration step config.iterationMode",
+  );
+  if (iterationModeRaw !== WorkflowDraftLoopIterationModes.collection && iterationModeRaw !== WorkflowDraftLoopIterationModes.range) {
+    throw new Error(`Workflow draft loop-iteration step config.iterationMode '${iterationModeRaw}' is not supported.`);
+  }
+  const bodyStepIds = normalizeRequiredStringArray(configRecord.bodyStepIds, "Workflow draft loop-iteration step config.bodyStepIds");
+  const itemAlias = normalizeOptional(typeof configRecord.itemAlias === "string" ? configRecord.itemAlias : undefined);
+  const maxIterations = normalizePositiveInteger(configRecord.maxIterations, "Workflow draft loop-iteration step config.maxIterations");
+  const iterationMode = iterationModeRaw as WorkflowDraftLoopIterationMode;
+  const collectionInputKey = normalizeOptional(
+    typeof configRecord.collectionInputKey === "string" ? configRecord.collectionInputKey : undefined,
+  );
+
+  if (iterationMode === WorkflowDraftLoopIterationModes.collection && !collectionInputKey) {
+    throw new Error("Workflow draft loop-iteration collection mode requires config.collectionInputKey.");
+  }
+
+  const rangeRecord = configRecord.range
+    ? assertRecord(configRecord.range, "Workflow draft loop-iteration step config.range")
+    : undefined;
+  const range = rangeRecord
+    ? Object.freeze({
+      start: normalizeLoopRangeBoundary(rangeRecord.start, "Workflow draft loop-iteration step config.range.start"),
+      end: normalizeLoopRangeBoundary(rangeRecord.end, "Workflow draft loop-iteration step config.range.end"),
+      step: normalizePositiveInteger(rangeRecord.step, "Workflow draft loop-iteration step config.range.step"),
+    })
+    : undefined;
+
+  if (iterationMode === WorkflowDraftLoopIterationModes.range && !range) {
+    throw new Error("Workflow draft loop-iteration range mode requires config.range.");
+  }
+  if (iterationMode === WorkflowDraftLoopIterationModes.range && range && range.start > range.end) {
+    throw new Error("Workflow draft loop-iteration step config.range.start must be less than or equal to range.end.");
+  }
+
+  return Object.freeze({
+    iterationMode,
+    bodyStepIds,
+    itemAlias,
+    collectionInputKey,
+    range,
+    maxIterations,
+  });
+}
+
+function normalizeLoopRangeBoundary(value: unknown, label: string): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new Error(`${label} must be a finite number.`);
+  }
+  return value;
 }
 
 function normalizeStepKind(step: WorkflowDraftStep): WorkflowDraftStepKind {
@@ -628,6 +822,37 @@ function normalizeWorkflowDraftStepAssetReference(reference: WorkflowDraftStepAs
       assetRecord as WorkflowDraftAssetReference,
       "Workflow draft step assetRef asset",
     ),
+  });
+}
+
+function normalizeOutput(output: WorkflowDraftOutput): WorkflowDraftOutput {
+  const item = normalizeSectionItem(output, "Workflow draft output");
+  const outputType = normalizeRequired(output.outputType, "Workflow draft output outputType");
+  const format = normalizeRequired(output.format, "Workflow draft output format");
+  const destinationRecord = assertRecord(output.destination, "Workflow draft output destination");
+  const destinationType = normalizeRequired(
+    typeof destinationRecord.type === "string" ? destinationRecord.type : "",
+    "Workflow draft output destination type",
+  );
+  const destinationTarget = normalizeRequired(
+    typeof destinationRecord.target === "string" ? destinationRecord.target : "",
+    "Workflow draft output destination target",
+  );
+  const destinationOptions = destinationRecord.options
+    ? Object.freeze({ ...assertRecord(destinationRecord.options, "Workflow draft output destination options") })
+    : undefined;
+  const sourceStepId = normalizeOptional(output.sourceStepId);
+
+  return Object.freeze({
+    ...item,
+    outputType,
+    format,
+    destination: Object.freeze({
+      type: destinationType,
+      target: destinationTarget,
+      options: destinationOptions,
+    }),
+    sourceStepId,
   });
 }
 
@@ -693,7 +918,7 @@ export function normalizeWorkflowDraft(draft?: WorkflowDraft): WorkflowDraft {
     triggers: normalizeSectionItems("Workflow draft trigger", draft.triggers ?? [], (item) => normalizeTrigger(item as WorkflowDraftTrigger)),
     inputs: normalizeSectionItems("Workflow draft input", draft.inputs ?? [], (item) => normalizeInput(item as WorkflowDraftInput)),
     steps: normalizeStepOrdering((draft.steps ?? []).map((step) => normalizeStep(step))),
-    outputs: normalizeSectionItems("Workflow draft output", draft.outputs ?? []),
+    outputs: normalizeSectionItems("Workflow draft output", draft.outputs ?? [], (item) => normalizeOutput(item as WorkflowDraftOutput)),
   });
 }
 
