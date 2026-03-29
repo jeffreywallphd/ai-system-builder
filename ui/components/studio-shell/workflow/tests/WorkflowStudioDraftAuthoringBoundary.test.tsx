@@ -30,6 +30,11 @@ describe("WorkflowStudioDraftAuthoringBoundary", () => {
     expect(html).toContain("Inputs Section");
     expect(html).toContain("Steps Section");
     expect(html).toContain("Outputs Section");
+    expect(html).toContain("Guided progression");
+    expect(html).toContain("Previous section");
+    expect(html).toContain("Next section");
+    expect(html).toContain("Finish and continue");
+    expect(html).toContain("Ready to Save / Run");
     expect(html).not.toContain('data-testid="workflow-studio-canvas-mode-layout"');
     expect(html).not.toContain('data-testid="workflow-studio-canvas-mode-surface"');
   });

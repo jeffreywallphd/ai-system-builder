@@ -308,4 +308,68 @@ describe("WorkflowStudioModeStateStore", () => {
     expect(state.hasModeValidationErrors).toBe(true);
     expect(state.modeValidationIssues.some((issue) => issue.code === "draft-parse-error")).toBe(true);
   });
+
+  it("keeps section updates isolated so editing one section does not wipe the others", () => {
+    const store = new WorkflowStudioModeStateStore();
+    store.updateSharedDraft((draft) => ({
+      ...draft,
+      triggers: [
+        {
+          id: "trigger-1",
+          kind: "user",
+          type: "manual",
+          config: {},
+        },
+      ],
+      inputs: [
+        {
+          id: "input-1",
+          type: "runtime-input",
+          sourceType: "runtime-parameter",
+          parameterKey: "payload",
+          valueType: "object",
+        },
+      ],
+      steps: [
+        {
+          id: "step-1",
+          type: "action",
+          kind: "action",
+          order: 1,
+          title: "Step one",
+        },
+      ],
+      outputs: [
+        {
+          id: "output-1",
+          type: "result",
+          outputType: "document",
+          format: "json",
+          destination: {
+            type: "web-viewer",
+            target: "preview",
+          },
+          title: "Preview",
+        },
+      ],
+    }));
+
+    store.updateSharedDraft((draft) => ({
+      ...draft,
+      steps: draft.steps.map((entry) => (
+        entry.id === "step-1"
+          ? {
+            ...entry,
+            title: "Step one updated",
+          }
+          : entry
+      )),
+    }));
+
+    const state = store.getState();
+    expect(state.sharedDraft.triggers.map((entry) => entry.id)).toEqual(["trigger-1"]);
+    expect(state.sharedDraft.inputs.map((entry) => entry.id)).toEqual(["input-1"]);
+    expect(state.sharedDraft.steps[0]?.title).toBe("Step one updated");
+    expect(state.sharedDraft.outputs.map((entry) => entry.id)).toEqual(["output-1"]);
+  });
 });

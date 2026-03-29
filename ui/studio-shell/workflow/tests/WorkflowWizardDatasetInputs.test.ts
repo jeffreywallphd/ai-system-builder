@@ -97,4 +97,52 @@ describe("WorkflowWizardDatasetInputs", () => {
     expect(result.draft).toBe(seeded);
     expect(listDatasetInputs(result.draft).map((entry) => entry.asset.assetId)).toEqual(["asset:dataset-seeded"]);
   });
+
+  it("applies created inline return payloads without mutating trigger/step/output sections", () => {
+    const baseDraft = Object.freeze({
+      ...createEmptyWorkflowDraft(),
+      triggers: Object.freeze([
+        Object.freeze({
+          id: "trigger-1",
+          kind: "user" as const,
+          type: "manual" as const,
+          config: Object.freeze({}),
+        }),
+      ]),
+      steps: Object.freeze([
+        Object.freeze({
+          id: "step-1",
+          type: "action",
+          kind: "action" as const,
+          order: 1,
+          title: "Step one",
+        }),
+      ]),
+      outputs: Object.freeze([
+        Object.freeze({
+          id: "output-1",
+          type: "result",
+          title: "Preview",
+          outputType: "document",
+          format: "json",
+          destination: Object.freeze({
+            type: "web-viewer",
+            target: "preview",
+          }),
+        }),
+      ]),
+    });
+
+    const result = applyInlineDatasetReturnToDraft(baseDraft, {
+      status: "created",
+      assetId: "asset:dataset-new",
+      versionId: "asset:dataset-new:v1",
+    });
+
+    expect(result.changed).toBe(true);
+    expect(listDatasetInputs(result.draft).map((entry) => entry.asset.assetId)).toEqual(["asset:dataset-new"]);
+    expect(result.draft.triggers).toEqual(baseDraft.triggers);
+    expect(result.draft.steps).toEqual(baseDraft.steps);
+    expect(result.draft.outputs).toEqual(baseDraft.outputs);
+  });
 });
