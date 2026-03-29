@@ -20,6 +20,47 @@ export const workflowStudioRegistration: CompositeStudioRegistration = Object.fr
   shell: Object.freeze({
     title: WorkflowStudioIdentity.defaultStudioName,
     subtitle: "Shared composite shell for workflow orchestrator authoring with backend-authoritative lifecycle, validation, and publish/version flows.",
+    toolbar: Object.freeze({
+      actions: Object.freeze([
+        {
+          id: "workflow-studio-toolbar-mode-wizard",
+          kind: "set-workflow-mode",
+          modeId: "wizard",
+          label: "Wizard Mode",
+          tone: "ghost",
+          order: 10,
+        },
+        {
+          id: "workflow-studio-toolbar-mode-canvas",
+          kind: "set-workflow-mode",
+          modeId: "canvas",
+          label: "Canvas Mode",
+          tone: "ghost",
+          order: 20,
+        },
+        {
+          id: "workflow-studio-toolbar-save",
+          kind: "save-draft",
+          label: "Save Draft",
+          tone: "primary",
+          order: 30,
+        },
+        {
+          id: "workflow-studio-toolbar-validate",
+          kind: "run-validation",
+          label: "Run Validation",
+          tone: "default",
+          order: 40,
+        },
+        {
+          id: "workflow-studio-toolbar-refresh",
+          kind: "refresh-snapshot",
+          label: "Refresh Snapshot",
+          tone: "ghost",
+          order: 50,
+        },
+      ]),
+    }),
   }),
   defaults: {
     title: "Workflow Asset Draft",

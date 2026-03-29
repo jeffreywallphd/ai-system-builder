@@ -3,7 +3,7 @@ import type { AssetDraftDependencyReference, AssetMetadataPatch } from "../../do
 import { TaxonomySemanticRoles, type TaxonomyBehaviorKind, type TaxonomySemanticRole } from "../../domain/taxonomy/CompositionTaxonomy";
 import type { StudioShellSnapshotReadModel, StudioShellValidationIssue } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
 import type { WorkflowStudioModeState } from "./workflow/WorkflowStudioModeStateStore";
-import type { WorkflowStudioModeId } from "./workflow/WorkflowStudioModes";
+import { isWorkflowStudioModeId, type WorkflowStudioModeId } from "./workflow/WorkflowStudioModes";
 import type {
   RuntimeExecutionResultReadModel,
   RuntimeExecutionStatusReadModel,
@@ -125,9 +125,43 @@ export interface StudioDraftDefaults {
   readonly dependencies?: ReadonlyArray<AssetDraftDependencyReference>;
 }
 
+export const StudioShellToolbarActionKinds = Object.freeze({
+  refreshSnapshot: "refresh-snapshot",
+  saveDraft: "save-draft",
+  runValidation: "run-validation",
+  setWorkflowMode: "set-workflow-mode",
+});
+
+export type StudioShellToolbarActionKind = typeof StudioShellToolbarActionKinds[keyof typeof StudioShellToolbarActionKinds];
+export type StudioShellToolbarActionTone = "default" | "primary" | "ghost";
+
+interface BaseStudioShellToolbarAction {
+  readonly id: string;
+  readonly kind: StudioShellToolbarActionKind;
+  readonly label: string;
+  readonly order?: number;
+  readonly tone?: StudioShellToolbarActionTone;
+}
+
+export interface SetWorkflowModeStudioShellToolbarAction extends BaseStudioShellToolbarAction {
+  readonly kind: "set-workflow-mode";
+  readonly modeId: WorkflowStudioModeId;
+}
+
+export type StudioShellToolbarAction =
+  | SetWorkflowModeStudioShellToolbarAction
+  | (BaseStudioShellToolbarAction & {
+    readonly kind: "refresh-snapshot" | "save-draft" | "run-validation";
+  });
+
+export interface StudioShellToolbarConfiguration {
+  readonly actions: ReadonlyArray<StudioShellToolbarAction>;
+}
+
 export interface StudioShellPresentationHints {
   readonly title?: string;
   readonly subtitle?: string;
+  readonly toolbar?: StudioShellToolbarConfiguration;
 }
 
 interface BaseStudioRegistration {
@@ -200,6 +234,60 @@ function assertSystemRole(role: TaxonomySemanticRole): SystemStudioRole {
   return role as SystemStudioRole;
 }
 
+function normalizeToolbarAction(studioType: string, action: StudioShellToolbarAction): StudioShellToolbarAction {
+  const id = action.id.trim();
+  if (!id) {
+    throw new Error(`Studio '${studioType}' toolbar action id is required.`);
+  }
+
+  const label = action.label.trim();
+  if (!label) {
+    throw new Error(`Studio '${studioType}' toolbar action '${id}' label is required.`);
+  }
+
+  if (action.kind === StudioShellToolbarActionKinds.setWorkflowMode && !isWorkflowStudioModeId(action.modeId)) {
+    throw new Error(`Studio '${studioType}' toolbar action '${id}' has unsupported workflow mode '${String(action.modeId)}'.`);
+  }
+
+  return Object.freeze({
+    ...action,
+    id,
+    label,
+  });
+}
+
+function normalizeToolbar(
+  studioType: string,
+  toolbar: StudioShellToolbarConfiguration,
+): StudioShellToolbarConfiguration {
+  if (toolbar.actions.length === 0) {
+    throw new Error(`Studio '${studioType}' toolbar must declare at least one action.`);
+  }
+
+  const normalizedActions = toolbar.actions
+    .map((entry) => normalizeToolbarAction(studioType, entry))
+    .sort((left, right) => {
+      const leftOrder = left.order ?? Number.MAX_SAFE_INTEGER;
+      const rightOrder = right.order ?? Number.MAX_SAFE_INTEGER;
+      if (leftOrder !== rightOrder) {
+        return leftOrder - rightOrder;
+      }
+      return left.id.localeCompare(right.id);
+    });
+
+  const seenActionIds = new Set<string>();
+  for (const action of normalizedActions) {
+    if (seenActionIds.has(action.id)) {
+      throw new Error(`Studio '${studioType}' toolbar action '${action.id}' is duplicated.`);
+    }
+    seenActionIds.add(action.id);
+  }
+
+  return Object.freeze({
+    actions: Object.freeze(normalizedActions),
+  });
+}
+
 function normalizeRegistration(registration: StudioRegistration): StudioRegistration {
   const studioType = registration.studioType.trim();
   if (!studioType) {
@@ -235,7 +323,14 @@ function normalizeRegistration(registration: StudioRegistration): StudioRegistra
         dependencies: registration.defaults.dependencies,
       }),
       extensions: Object.freeze([...(registration.extensions ?? [])]),
-      shell: registration.shell ? Object.freeze({ ...registration.shell }) : undefined,
+      shell: registration.shell
+        ? Object.freeze({
+          ...registration.shell,
+          toolbar: registration.shell.toolbar
+            ? normalizeToolbar(studioType, registration.shell.toolbar)
+            : undefined,
+        })
+        : undefined,
     });
   }
 
@@ -258,7 +353,14 @@ function normalizeRegistration(registration: StudioRegistration): StudioRegistra
         dependencies: registration.defaults.dependencies,
       }),
       extensions: Object.freeze([...(registration.extensions ?? [])]),
-      shell: registration.shell ? Object.freeze({ ...registration.shell }) : undefined,
+      shell: registration.shell
+        ? Object.freeze({
+          ...registration.shell,
+          toolbar: registration.shell.toolbar
+            ? normalizeToolbar(studioType, registration.shell.toolbar)
+            : undefined,
+        })
+        : undefined,
     });
   }
 
@@ -277,7 +379,14 @@ function normalizeRegistration(registration: StudioRegistration): StudioRegistra
       dependencies: registration.defaults.dependencies,
     }),
     extensions: Object.freeze([...(registration.extensions ?? [])]),
-    shell: registration.shell ? Object.freeze({ ...registration.shell }) : undefined,
+    shell: registration.shell
+      ? Object.freeze({
+        ...registration.shell,
+        toolbar: registration.shell.toolbar
+          ? normalizeToolbar(studioType, registration.shell.toolbar)
+          : undefined,
+      })
+      : undefined,
   });
 }
 
