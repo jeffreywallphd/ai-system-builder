@@ -24,6 +24,14 @@ interface TextareaElementProps {
   readonly onChange?: (event: { target: { value: string } }) => void;
 }
 
+interface InputElementProps {
+  readonly onChange?: (event: { target: { value: string } }) => void;
+}
+
+interface SelectElementProps {
+  readonly onChange?: (event: { target: { value: string } }) => void;
+}
+
 function collectElements(node: ReactNode): ReadonlyArray<ReactElement> {
   const elements: ReactElement[] = [];
   const stack = [node];
@@ -54,6 +62,16 @@ function collectElements(node: ReactNode): ReadonlyArray<ReactElement> {
   }
 
   return elements;
+}
+
+function getElementByTestId(root: ReactElement, testId: string): ReactElement {
+  const element = collectElements(root).find((entry) => (
+    (entry.props as { readonly ["data-testid"]?: string })["data-testid"] === testId
+  ));
+  if (!element) {
+    throw new Error(`Expected element with test id '${testId}' to be present.`);
+  }
+  return element;
 }
 
 function toText(value: ReactNode): string {
@@ -275,6 +293,78 @@ describe("WorkflowStudioModeSystem integration seams", () => {
     store.hydrateFromSerializedDraft("{ malformed");
     expect(store.getState().hasModeValidationErrors).toBe(true);
     expect(store.getState().modeValidationIssues.some((issue) => issue.code === "draft-parse-error")).toBe(true);
+  });
+
+  it("supports wizard trigger add/remove/configuration while persisting through shared draft state", () => {
+    const store = new WorkflowStudioModeStateStore();
+    store.setSelectedMode(WorkflowStudioModeIds.wizard);
+
+    const renderBoundary = () => WorkflowStudioDraftAuthoringBoundary({
+      isWorkflowStudio: true,
+      content: store.getState().sharedDraftSerialized,
+      onChangeContent: (nextContent) => store.hydrateFromSerializedDraft(nextContent),
+      workflowModeContext: {
+        selectedModeId: store.getState().selectedModeId,
+        sharedDraft: store.getState().sharedDraft,
+        sharedDraftSerialized: store.getState().sharedDraftSerialized,
+        draftEditorContent: store.getState().draftEditorContent,
+        modeValidationIssues: store.getState().modeValidationIssues,
+        draftValidationIssues: store.getState().draftValidationIssues,
+        updateSharedDraft: (updater) => store.updateSharedDraft(updater),
+      },
+    });
+
+    let boundary = renderBoundary();
+    const addManualButton = getElementByTestId(boundary, "workflow-trigger-add-manual") as ReactElement<ButtonElementProps>;
+    addManualButton.props.onClick?.();
+    expect(store.getState().sharedDraft.triggers).toHaveLength(1);
+    expect(store.getState().sharedDraft.triggers[0]?.kind).toBe("user");
+    expect(store.getState().sharedDraft.triggers[0]?.type).toBe("manual");
+
+    boundary = renderBoundary();
+    const triggerTypeSelect = getElementByTestId(boundary, "workflow-trigger-type-0") as ReactElement<SelectElementProps>;
+    triggerTypeSelect.props.onChange?.({ target: { value: "temporal" } });
+    expect(store.getState().sharedDraft.triggers[0]?.kind).toBe("temporal");
+
+    boundary = renderBoundary();
+    const temporalTimeInput = getElementByTestId(boundary, "workflow-trigger-temporal-time-0") as ReactElement<InputElementProps>;
+    temporalTimeInput.props.onChange?.({ target: { value: "" } });
+    expect(store.getState().isSharedDraftValid).toBe(false);
+
+    boundary = renderBoundary();
+    expect(renderToStaticMarkup(boundary)).toContain("Temporal trigger requires a valid time of day.");
+    temporalTimeInput.props.onChange?.({ target: { value: "14:30" } });
+    expect(store.getState().isSharedDraftValid).toBe(true);
+
+    boundary = renderBoundary();
+    const stateTypeSelect = getElementByTestId(boundary, "workflow-trigger-type-0") as ReactElement<SelectElementProps>;
+    stateTypeSelect.props.onChange?.({ target: { value: "state" } });
+    expect(store.getState().sharedDraft.triggers[0]?.kind).toBe("state");
+
+    boundary = renderBoundary();
+    const stateEventNameInput = getElementByTestId(boundary, "workflow-trigger-state-event-name-0") as ReactElement<InputElementProps>;
+    stateEventNameInput.props.onChange?.({ target: { value: "" } });
+    expect(store.getState().isSharedDraftValid).toBe(false);
+
+    boundary = renderBoundary();
+    stateEventNameInput.props.onChange?.({ target: { value: "new-data" } });
+    const stateSourceInput = getElementByTestId(boundary, "workflow-trigger-state-source-0") as ReactElement<InputElementProps>;
+    stateSourceInput.props.onChange?.({ target: { value: "source-alpha" } });
+    expect(store.getState().isSharedDraftValid).toBe(true);
+    expect(store.getState().sharedDraft.triggers[0]?.config).toEqual(expect.objectContaining({
+      eventName: "new-data",
+      stateKey: "source-alpha",
+    }));
+
+    const baselineSerialized = store.getState().sharedDraftSerialized;
+    store.setSelectedMode(WorkflowStudioModeIds.canvas);
+    store.setSelectedMode(WorkflowStudioModeIds.wizard);
+    expect(store.getState().sharedDraftSerialized).toBe(baselineSerialized);
+
+    boundary = renderBoundary();
+    const removeButton = getElementByTestId(boundary, "workflow-trigger-remove-0") as ReactElement<ButtonElementProps>;
+    removeButton.props.onClick?.();
+    expect(store.getState().sharedDraft.triggers).toHaveLength(0);
   });
 });
 

@@ -1,11 +1,14 @@
-import type { WorkflowDraft } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+import type { WorkflowDraft, WorkflowValidationIssue } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
 import SectionBody from "./SectionBody";
 import SectionHeader from "./SectionHeader";
 import WizardSection from "./WizardSection";
+import WorkflowStudioTriggerSectionEditor from "./WorkflowStudioTriggerSectionEditor";
 
 export interface WorkflowStudioWizardModeSurfaceProps {
   readonly sharedDraft: WorkflowDraft;
   readonly sharedDraftSerialized: string;
+  readonly draftValidationIssues?: ReadonlyArray<WorkflowValidationIssue>;
+  readonly onUpdateSharedDraft?: (updater: (draft: WorkflowDraft) => WorkflowDraft) => void;
 }
 
 function buildSectionSummary(count: number, singular: string, plural: string): string {
@@ -19,6 +22,8 @@ function renderEmptyState(message: string): JSX.Element {
 export default function WorkflowStudioWizardModeSurface({
   sharedDraft,
   sharedDraftSerialized,
+  draftValidationIssues = [],
+  onUpdateSharedDraft,
 }: WorkflowStudioWizardModeSurfaceProps): JSX.Element {
   return (
     <div className="ui-stack ui-stack--sm" data-testid="workflow-studio-wizard-mode-surface">
@@ -29,24 +34,11 @@ export default function WorkflowStudioWizardModeSurface({
         <a className="ui-button ui-button--ghost ui-button--sm" href="#workflow-wizard-outputs">Outputs</a>
       </nav>
 
-      <WizardSection sectionId="workflow-wizard-trigger">
-        <SectionHeader
-          title="Trigger Section"
-          description="Define what starts workflow execution. This section is bound to the shared workflow draft triggers array."
-        />
-        <SectionBody>
-          <div className="ui-text-small">{buildSectionSummary(sharedDraft.triggers.length, "trigger", "triggers")}</div>
-          {sharedDraft.triggers.length === 0
-            ? renderEmptyState("No triggers configured yet.")
-            : (
-              <ul className="ui-stack ui-stack--2xs">
-                {sharedDraft.triggers.map((trigger) => (
-                  <li key={trigger.id}>{trigger.id}: {trigger.type}</li>
-                ))}
-              </ul>
-            )}
-        </SectionBody>
-      </WizardSection>
+      <WorkflowStudioTriggerSectionEditor
+        sharedDraft={sharedDraft}
+        draftValidationIssues={draftValidationIssues}
+        onUpdateSharedDraft={onUpdateSharedDraft}
+      />
 
       <WizardSection sectionId="workflow-wizard-inputs">
         <SectionHeader
