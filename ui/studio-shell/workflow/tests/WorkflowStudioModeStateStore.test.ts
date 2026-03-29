@@ -3,6 +3,7 @@ import {
   createEmptyWorkflowDraft,
   deserializeWorkflowDraft,
   serializeWorkflowDraft,
+  WorkflowValidationIssueCodes,
 } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
 import {
   clearWorkflowStudioModeStateStoresForTests,
@@ -260,5 +261,48 @@ describe("WorkflowStudioModeStateStore", () => {
     expect(second).toBe(first);
     expect(second.getState().selectedModeId).toBe(WorkflowStudioModeIds.wizard);
     expect(second.getState().sharedDraft.triggers.map((trigger) => trigger.id)).toEqual(["trigger-persisted"]);
+  });
+
+  it("runs shared draft validation hooks and keeps results consistent across mode switches", () => {
+    const store = new WorkflowStudioModeStateStore();
+    const invalidDraft = deserializeWorkflowDraft(serializeWorkflowDraft({
+      ...createEmptyWorkflowDraft(),
+      steps: [
+        {
+          id: "step-2",
+          type: "action",
+          kind: "action",
+          order: 2,
+          title: "Non contiguous step order",
+        },
+      ],
+    }));
+
+    store.replaceSharedDraft(invalidDraft);
+    const wizardState = store.getState();
+
+    expect(wizardState.isSharedDraftValid).toBe(false);
+    expect(wizardState.modeValidationIssues.some((entry) => entry.code === "draft-validation-error")).toBe(true);
+    expect(wizardState.draftValidationIssues).toContainEqual(expect.objectContaining({
+      code: WorkflowValidationIssueCodes.stepOrderNonContiguous,
+    }));
+
+    store.setSelectedMode(WorkflowStudioModeIds.wizard);
+    store.setSelectedMode(WorkflowStudioModeIds.canvas);
+    const canvasState = store.getState();
+    expect(canvasState.isSharedDraftValid).toBe(false);
+    expect(canvasState.draftValidationIssues).toContainEqual(expect.objectContaining({
+      code: WorkflowValidationIssueCodes.stepOrderNonContiguous,
+    }));
+  });
+
+  it("reports parse-level validation issues safely when editor content is malformed", () => {
+    const store = new WorkflowStudioModeStateStore();
+    store.hydrateFromSerializedDraft("{ malformed");
+
+    const state = store.getState();
+    expect(state.draftParseError).toBeDefined();
+    expect(state.hasModeValidationErrors).toBe(true);
+    expect(state.modeValidationIssues.some((issue) => issue.code === "draft-parse-error")).toBe(true);
   });
 });

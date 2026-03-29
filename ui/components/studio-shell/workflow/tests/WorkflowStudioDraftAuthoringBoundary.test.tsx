@@ -17,14 +17,18 @@ describe("WorkflowStudioDraftAuthoringBoundary", () => {
           sharedDraft: draft,
           sharedDraftSerialized: serializeWorkflowDraft(draft),
           draftEditorContent: serializeWorkflowDraft(draft),
+          modeValidationIssues: [],
+          draftValidationIssues: [],
           updateSharedDraft: () => undefined,
         }}
       />,
     );
 
+    expect(html).toContain('data-testid="workflow-studio-wizard-mode-layout"');
     expect(html).toContain('data-testid="workflow-studio-wizard-mode-surface"');
-    expect(html).toContain("Wizard mode shell");
+    expect(html).toContain("Wizard layout container");
     expect(html).toContain("Add trigger");
+    expect(html).not.toContain('data-testid="workflow-studio-canvas-mode-layout"');
     expect(html).not.toContain('data-testid="workflow-studio-canvas-mode-surface"');
   });
 
@@ -40,13 +44,17 @@ describe("WorkflowStudioDraftAuthoringBoundary", () => {
           sharedDraft: draft,
           sharedDraftSerialized: serializeWorkflowDraft(draft),
           draftEditorContent: serializeWorkflowDraft(draft),
+          modeValidationIssues: [],
+          draftValidationIssues: [],
           updateSharedDraft: () => undefined,
         }}
       />,
     );
 
+    expect(html).toContain('data-testid="workflow-studio-canvas-mode-layout"');
     expect(html).toContain('data-testid="workflow-studio-canvas-mode-surface"');
-    expect(html).toContain("Canvas mode (current Workflow Studio draft authoring)");
+    expect(html).toContain("Canvas layout container");
+    expect(html).not.toContain('data-testid="workflow-studio-wizard-mode-layout"');
     expect(html).not.toContain('data-testid="workflow-studio-wizard-mode-surface"');
   });
 
@@ -63,6 +71,8 @@ describe("WorkflowStudioDraftAuthoringBoundary", () => {
           sharedDraft: draft,
           sharedDraftSerialized: serializeWorkflowDraft(draft),
           draftEditorContent: serializeWorkflowDraft(draft),
+          modeValidationIssues: [],
+          draftValidationIssues: [],
           updateSharedDraft: () => undefined,
         }}
       />,
@@ -71,5 +81,38 @@ describe("WorkflowStudioDraftAuthoringBoundary", () => {
     expect(html).toContain("Unsupported workflow mode route");
     expect(html).toContain("unsupported-mode");
     expect(html).toContain("using canvas mode");
+    expect(html.match(/Unsupported workflow mode route/g)?.length).toBe(1);
+  });
+
+  it("surfaces shared validation hook feedback without throwing", () => {
+    const draft = createEmptyWorkflowDraft();
+    const html = renderToStaticMarkup(
+      <WorkflowStudioDraftAuthoringBoundary
+        isWorkflowStudio
+        content={serializeWorkflowDraft(draft)}
+        onChangeContent={() => undefined}
+        workflowModeContext={{
+          selectedModeId: "canvas",
+          sharedDraft: draft,
+          sharedDraftSerialized: serializeWorkflowDraft(draft),
+          draftEditorContent: serializeWorkflowDraft(draft),
+          modeValidationIssues: [{
+            code: "draft-validation-error",
+            severity: "error",
+            message: "invalid draft",
+          }],
+          draftValidationIssues: [{
+            code: "step-order-non-contiguous",
+            section: "steps",
+            severity: "error",
+            message: "step order mismatch",
+          }],
+          updateSharedDraft: () => undefined,
+        }}
+      />,
+    );
+
+    expect(html).toContain("Workflow mode validation: 1 issue(s) detected.");
+    expect(html).toContain("Shared workflow draft validation: 1 canonical issue(s) detected.");
   });
 });
