@@ -57,12 +57,21 @@ export default function WorkflowStudioModePanel({ workflowModeState }: WorkflowS
         <div><strong>Active mode:</strong> {state.selectedMode.title}</div>
         <div><strong>Intent:</strong> {state.selectedMode.intent}</div>
         <div><strong>Shared draft:</strong> {buildModeSummary(state)}</div>
+        <div><strong>Shared draft valid:</strong> {state.isSharedDraftValid ? "yes" : "no"}</div>
+        <div><strong>Mode validation issues:</strong> {state.modeValidationIssues.length}</div>
+        <div><strong>Draft validation issues:</strong> {state.draftValidationIssues.length}</div>
         {renderModeSurface(state.selectedModeId)}
       </div>
 
       {state.draftParseError ? (
         <p className="ui-text-muted">
           Workflow draft parse issue: {state.draftParseError}
+        </p>
+      ) : null}
+
+      {state.modeValidationIssues.length > 0 ? (
+        <p className="ui-text-muted">
+          Validation hook status: {state.modeValidationIssues.length} mode-level issue(s) detected.
         </p>
       ) : null}
     </section>

@@ -20,6 +20,9 @@ describe("WorkflowStudioModePanel", () => {
     expect(html).toContain("Canvas");
     expect(html).toContain("Wizard");
     expect(html).toContain("Shared draft");
+    expect(html).toContain("Shared draft valid");
+    expect(html).toContain("Mode validation issues");
+    expect(html).toContain("Draft validation issues");
     expect(html).toContain('aria-pressed="true"');
   });
 });

@@ -507,6 +507,8 @@ export default function StudioShellPage({
                 sharedDraftSerialized: workflowModeState.sharedDraftSerialized,
                 draftEditorContent: workflowModeState.draftEditorContent,
                 draftParseError: workflowModeState.draftParseError,
+                modeValidationIssues: workflowModeState.modeValidationIssues,
+                draftValidationIssues: workflowModeState.draftValidationIssues,
                 updateSharedDraft: (updater) => workflowModeStore.updateSharedDraft(updater),
               }
               : undefined}

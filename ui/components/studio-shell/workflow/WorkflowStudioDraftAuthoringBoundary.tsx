@@ -2,6 +2,10 @@ import type { WorkflowDraft } from "../../../../domain/workflow-studio/WorkflowS
 import type { WorkflowStudioModeId } from "../../../studio-shell/workflow/WorkflowStudioModes";
 import WorkflowStudioCanvasModeSurface from "./WorkflowStudioCanvasModeSurface";
 import WorkflowStudioWizardModeSurface from "./WorkflowStudioWizardModeSurface";
+import WorkflowStudioWizardModeLayout from "./WorkflowStudioWizardModeLayout";
+import WorkflowStudioCanvasModeLayout from "./WorkflowStudioCanvasModeLayout";
+import type { WorkflowStudioModeValidationIssue } from "../../../studio-shell/workflow/WorkflowStudioModeValidation";
+import type { WorkflowValidationIssue } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
 
 export interface WorkflowStudioDraftAuthoringBoundaryProps {
   readonly isWorkflowStudio: boolean;
@@ -13,6 +17,8 @@ export interface WorkflowStudioDraftAuthoringBoundaryProps {
     readonly sharedDraftSerialized: string;
     readonly draftEditorContent: string;
     readonly draftParseError?: string;
+    readonly modeValidationIssues: ReadonlyArray<WorkflowStudioModeValidationIssue>;
+    readonly draftValidationIssues: ReadonlyArray<WorkflowValidationIssue>;
     readonly updateSharedDraft: (updater: (draft: WorkflowDraft) => WorkflowDraft) => void;
   };
   readonly invalidModeRouteId?: string;
@@ -32,16 +38,20 @@ export default function WorkflowStudioDraftAuthoringBoundary({
   return (
     <>
       {workflowModeContext.selectedModeId === "wizard" ? (
-        <WorkflowStudioWizardModeSurface
-          sharedDraft={workflowModeContext.sharedDraft}
-          sharedDraftSerialized={workflowModeContext.sharedDraftSerialized}
-          onUpdateSharedDraft={workflowModeContext.updateSharedDraft}
-        />
+        <WorkflowStudioWizardModeLayout>
+          <WorkflowStudioWizardModeSurface
+            sharedDraft={workflowModeContext.sharedDraft}
+            sharedDraftSerialized={workflowModeContext.sharedDraftSerialized}
+            onUpdateSharedDraft={workflowModeContext.updateSharedDraft}
+          />
+        </WorkflowStudioWizardModeLayout>
       ) : (
-        <WorkflowStudioCanvasModeSurface
-          draftEditorContent={workflowModeContext.draftEditorContent}
-          onChangeDraftEditorContent={onChangeContent}
-        />
+        <WorkflowStudioCanvasModeLayout>
+          <WorkflowStudioCanvasModeSurface
+            draftEditorContent={workflowModeContext.draftEditorContent}
+            onChangeDraftEditorContent={onChangeContent}
+          />
+        </WorkflowStudioCanvasModeLayout>
       )}
 
       {invalidModeRouteId ? (
@@ -53,6 +63,18 @@ export default function WorkflowStudioDraftAuthoringBoundary({
       {workflowModeContext.draftParseError ? (
         <p className="ui-text-muted">
           Workflow draft content must be valid canonical workflow JSON before saving.
+        </p>
+      ) : null}
+
+      {workflowModeContext.modeValidationIssues.length > 0 ? (
+        <p className="ui-text-muted">
+          Workflow mode validation: {workflowModeContext.modeValidationIssues.length} issue(s) detected.
+        </p>
+      ) : null}
+
+      {workflowModeContext.draftValidationIssues.length > 0 ? (
+        <p className="ui-text-muted">
+          Shared workflow draft validation: {workflowModeContext.draftValidationIssues.length} canonical issue(s) detected.
         </p>
       ) : null}
     </>

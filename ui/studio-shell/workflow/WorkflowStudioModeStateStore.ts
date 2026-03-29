@@ -10,6 +10,11 @@ import {
   type WorkflowStudioModeDefinition,
   type WorkflowStudioModeId,
 } from "./WorkflowStudioModes";
+import {
+  validateWorkflowStudioModeState,
+  type WorkflowStudioModeValidationIssue,
+} from "./WorkflowStudioModeValidation";
+import type { WorkflowValidationIssue } from "../../../domain/workflow-studio/WorkflowStudioDomain";
 
 export interface WorkflowStudioDraftSyncContext {
   readonly studioId: string;
@@ -26,6 +31,10 @@ export interface WorkflowStudioModeState {
   readonly sharedDraftSerialized: string;
   readonly draftEditorContent: string;
   readonly draftParseError?: string;
+  readonly modeValidationIssues: ReadonlyArray<WorkflowStudioModeValidationIssue>;
+  readonly draftValidationIssues: ReadonlyArray<WorkflowValidationIssue>;
+  readonly hasModeValidationErrors: boolean;
+  readonly isSharedDraftValid: boolean;
   readonly draftSyncContext?: WorkflowStudioDraftSyncContext;
   readonly hasLocalDraftEdits: boolean;
 }
@@ -52,12 +61,24 @@ function buildInitialState(): WorkflowStudioModeState {
     sharedDraftSerialized: serializedDefaultDraft,
     draftEditorContent: serializedDefaultDraft,
     draftParseError: undefined,
+    modeValidationIssues: Object.freeze([]),
+    draftValidationIssues: Object.freeze([]),
+    hasModeValidationErrors: false,
+    isSharedDraftValid: true,
     draftSyncContext: undefined,
     hasLocalDraftEdits: false,
   });
 }
 
 function freezeState(state: WorkflowStudioModeState): WorkflowStudioModeState {
+  const modeValidation = validateWorkflowStudioModeState({
+    selectedModeId: state.selectedModeId,
+    selectedModeDefinitionId: state.selectedMode.id,
+    availableModeIds: state.availableModes.map((mode) => mode.id),
+    sharedDraft: state.sharedDraft,
+    draftParseError: state.draftParseError,
+  });
+
   return Object.freeze({
     ...state,
     availableModes: Object.freeze([...(state.availableModes ?? [])]),
@@ -68,6 +89,10 @@ function freezeState(state: WorkflowStudioModeState): WorkflowStudioModeState {
       steps: Object.freeze([...(state.sharedDraft.steps ?? [])]),
       outputs: Object.freeze([...(state.sharedDraft.outputs ?? [])]),
     }),
+    modeValidationIssues: Object.freeze([...(modeValidation.issues ?? [])]),
+    draftValidationIssues: Object.freeze([...(modeValidation.draftIssues ?? [])]),
+    hasModeValidationErrors: modeValidation.hasErrors,
+    isSharedDraftValid: modeValidation.draftIsValid,
   });
 }
 
@@ -76,7 +101,7 @@ export class WorkflowStudioModeStateStore {
   private state: WorkflowStudioModeState;
 
   constructor() {
-    this.state = buildInitialState();
+    this.state = freezeState(buildInitialState());
   }
 
   public getState(): WorkflowStudioModeState {
