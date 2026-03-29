@@ -83,6 +83,31 @@ describe("AssetSelectorSessionStore", () => {
     ]);
   });
 
+  it("stores creating-new launch context and supports safe creation cancellation return", () => {
+    const store = new AssetSelectorSessionStore();
+    store.prepareSession({
+      sessionKey: "workflow:inputs",
+      request: createWorkflowInputRequest(),
+      initialSelectedAssets: [{
+        assetId: "asset:dataset:existing",
+        assetType: "dataset",
+      }],
+    });
+    store.activateSession("workflow:inputs");
+    store.transitionToCreatingNew("workflow:inputs", {
+      originatingContext: createWorkflowInputRequest().context,
+      requestedAssetType: "dataset",
+      returnTargetSessionKey: "workflow:inputs",
+      returnRoutePath: "/studio-shell/workflow/wizard?mode=wizard#workflow-wizard-inputs",
+    });
+    store.resumeAfterCreationCancellation("workflow:inputs");
+
+    const state = store.getSession("workflow:inputs");
+    expect(state?.lifecycleState).toBe(AssetSelectorSessionLifecycleStates.active);
+    expect(state?.creatingNewContext?.requestedAssetType).toBe("dataset");
+    expect(state?.pendingSelections.map((entry) => entry.assetId)).toEqual(["asset:dataset:existing"]);
+  });
+
   it("preserves state across navigation snapshots and restoration", () => {
     const store = new AssetSelectorSessionStore();
     store.prepareSession({
@@ -206,6 +231,20 @@ describe("AssetSelectorSessionStore", () => {
     const state = store.getSession("workflow:inputs");
     expect(state?.lifecycleState).toBe(AssetSelectorSessionLifecycleStates.active);
     expect(state?.validationErrors.length).toBeGreaterThan(0);
+  });
+
+  it("records return payload errors and keeps session active", () => {
+    const store = new AssetSelectorSessionStore();
+    store.prepareSession({
+      sessionKey: "workflow:inputs",
+      request: createWorkflowInputRequest(),
+    });
+    store.activateSession("workflow:inputs");
+
+    store.reportReturnPayloadError("workflow:inputs", "malformed payload", "result.assets[0]");
+    const state = store.getSession("workflow:inputs");
+    expect(state?.lifecycleState).toBe(AssetSelectorSessionLifecycleStates.active);
+    expect(state?.validationErrors[0]?.code).toBe("return-payload-invalid");
   });
 
   it("reports restoration failures for malformed snapshots", () => {

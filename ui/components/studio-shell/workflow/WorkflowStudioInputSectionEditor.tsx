@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import type { WorkflowDraft, WorkflowValidationIssue } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
 import { WorkflowDraftInputSourceTypes } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
 import {
@@ -16,6 +17,8 @@ import {
   createDatasetAssetSelectorRequest,
   DatasetAssetSelectorAdapter,
 } from "../../../studio-shell/asset-selector/DatasetAssetSelectorAdapter";
+import { AssetSelectorStudioLaunchService } from "../../../studio-shell/asset-selector/AssetSelectorStudioLaunchService";
+import { AssetSelectorReturnHandoffService } from "../../../studio-shell/asset-selector/AssetSelectorReturnHandoffService";
 import {
   listDatasetInputs,
   replaceDatasetInputSelections,
@@ -59,8 +62,12 @@ export default function WorkflowStudioInputSectionEditor({
   onUpdateSharedDraft,
   studioId,
 }: WorkflowStudioInputSectionEditorProps): JSX.Element {
+  const location = useLocation();
+  const navigate = useNavigate();
   const selectorSessionStore = useMemo(() => getAssetSelectorSessionStore(), []);
   const registryService = useMemo(() => new RegistryService(), []);
+  const studioLaunchService = useMemo(() => new AssetSelectorStudioLaunchService(), []);
+  const returnHandoffService = useMemo(() => new AssetSelectorReturnHandoffService(), []);
   const selectorDataProvider = useMemo(() => new DatasetAssetSelectorAdapter({
       registryService,
       limit: 50,
@@ -87,11 +94,12 @@ export default function WorkflowStudioInputSectionEditor({
   const [loading, setLoading] = useState(true);
   const [queryError, setQueryError] = useState<string | undefined>(undefined);
   const [queryRevision, setQueryRevision] = useState(0);
-  const [createDatasetStubNotice, setCreateDatasetStubNotice] = useState<string | undefined>(undefined);
+  const [selectorNotice, setSelectorNotice] = useState<string | undefined>(undefined);
+  const [returnedItems, setReturnedItems] = useState<ReadonlyArray<AssetSelectorResultItem>>([]);
   const [selectorState, setSelectorState] = useState<AssetSelectorSessionState | undefined>(
     () => selectorSessionStore.getSession(selectorSessionKey),
   );
-  const lastSyncedSelectionSignature = useRef<string>("");
+  const lastAppliedCompletedCount = useRef<number | undefined>(undefined);
 
   const datasetInputs = useMemo(() => listDatasetInputs(sharedDraft), [sharedDraft]);
   const otherInputs = useMemo(
@@ -151,22 +159,73 @@ export default function WorkflowStudioInputSectionEditor({
   }, [queryRevision, searchTerm, selectorDataProvider, selectorRequest]);
 
   useEffect(() => {
+    const outcome = returnHandoffService.handle({
+      search: location.search,
+      sessionKey: selectorSessionKey,
+      request: selectorRequest,
+      sessionStore: selectorSessionStore,
+    });
+
+    if (!outcome.handled) {
+      return;
+    }
+
+    if (outcome.returnedAsset) {
+      setReturnedItems((current) => {
+        const key = `${outcome.returnedAsset?.assetId}:${outcome.returnedAsset?.versionId ?? ""}`;
+        const existing = new Set(current.map((entry) => `${entry.asset.assetId}:${entry.asset.versionId ?? ""}`));
+        if (existing.has(key)) {
+          return current;
+        }
+        const nextItem: AssetSelectorResultItem = Object.freeze({
+          id: key,
+          title: outcome.returnedAsset?.displayName ?? outcome.returnedAsset?.assetId,
+          subtitle: outcome.returnedAsset?.versionId,
+          description: "Created in Dataset Studio",
+          badges: Object.freeze(["dataset", "new"]),
+          asset: outcome.returnedAsset,
+        });
+        return Object.freeze([nextItem, ...current]);
+      });
+      setQueryRevision((current) => current + 1);
+      setSelectorNotice(undefined);
+    }
+
+    if (outcome.consumed && outcome.nextSearch !== undefined) {
+      void navigate({
+        pathname: location.pathname,
+        search: outcome.nextSearch,
+        hash: location.hash,
+      }, { replace: true });
+    }
+  }, [
+    location.hash,
+    location.pathname,
+    location.search,
+    navigate,
+    returnHandoffService,
+    selectorRequest,
+    selectorSessionKey,
+    selectorSessionStore,
+  ]);
+
+  useEffect(() => {
     if (!selectorState || !onUpdateSharedDraft) {
       return;
     }
-    if (selectorState.lifecycleState !== AssetSelectorSessionLifecycleStates.completed) {
+
+    const completedCount = selectorState.lifecycleHistory.filter(
+      (entry) => entry === AssetSelectorSessionLifecycleStates.completed,
+    ).length;
+    if (lastAppliedCompletedCount.current === undefined) {
+      lastAppliedCompletedCount.current = completedCount;
       return;
     }
-
-    const selectionSignature = selectorState.selectedAssets
-      .map((entry) => `${entry.assetId}:${entry.versionId ?? ""}`)
-      .sort()
-      .join("|");
-    if (selectionSignature === lastSyncedSelectionSignature.current) {
+    if (completedCount <= lastAppliedCompletedCount.current) {
       return;
     }
+    lastAppliedCompletedCount.current = completedCount;
 
-    lastSyncedSelectionSignature.current = selectionSignature;
     onUpdateSharedDraft((draft) => replaceDatasetInputSelections(
       draft,
       selectorState.selectedAssets.map((entry) => Object.freeze({
@@ -178,6 +237,16 @@ export default function WorkflowStudioInputSectionEditor({
   }, [onUpdateSharedDraft, selectorState]);
 
   const stateForShell = selectorState ?? selectorSessionStore.getSession(selectorSessionKey);
+  const shellItems = useMemo(() => {
+    const byId = new Map<string, AssetSelectorResultItem>();
+    for (const item of returnedItems) {
+      byId.set(item.id, item);
+    }
+    for (const item of items) {
+      byId.set(item.id, item);
+    }
+    return Object.freeze([...byId.values()]);
+  }, [items, returnedItems]);
 
   return (
     <WizardSection sectionId="workflow-wizard-inputs" validationState={sectionHasErrors ? "error" : "none"}>
@@ -204,7 +273,7 @@ export default function WorkflowStudioInputSectionEditor({
             title="Dataset inputs"
             state={stateForShell}
             searchTerm={searchTerm}
-            items={items}
+            items={shellItems}
             loading={loading}
             error={queryError}
             onSearchTermChange={setSearchTerm}
@@ -218,8 +287,25 @@ export default function WorkflowStudioInputSectionEditor({
               selectorSessionStore.cancelSession(selectorSessionKey, "user-cancelled-selector");
             }}
             onCreateNew={() => {
-              selectorSessionStore.transitionToCreatingNew(selectorSessionKey);
-              setCreateDatasetStubNotice("Create new dataset is stubbed in Story 4.5. Studio handoff is implemented in a later story.");
+              const launch = studioLaunchService.launch({
+                sessionKey: selectorSessionKey,
+                selectorRequest,
+                routePath: location.pathname,
+                routeSearch: location.search,
+                routeHash: location.hash || "#workflow-wizard-inputs",
+              });
+              if (!launch) {
+                setSelectorNotice("Unable to open Dataset Studio from this selector request.");
+                return;
+              }
+              selectorSessionStore.transitionToCreatingNew(selectorSessionKey, {
+                originatingContext: selectorRequest.context,
+                requestedAssetType: selectorRequest.assetType,
+                returnTargetSessionKey: selectorSessionKey,
+                returnRoutePath: launch.returnTarget?.routePath,
+              });
+              setSelectorNotice(undefined);
+              void navigate(launch.launchPath);
             }}
             onRetry={() => {
               setQueryRevision((current) => current + 1);
@@ -227,9 +313,9 @@ export default function WorkflowStudioInputSectionEditor({
           />
         ) : null}
 
-        {createDatasetStubNotice ? (
+        {selectorNotice ? (
           <div className="ui-text-small ui-text-secondary" data-testid="workflow-input-dataset-create-stub-notice">
-            {createDatasetStubNotice}
+            {selectorNotice}
           </div>
         ) : null}
 

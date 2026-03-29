@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   WorkflowDraftBuiltInStepTypes,
   WorkflowDraftStepTypes,
@@ -23,6 +24,8 @@ import {
   AgentAssistantAssetSelectorAdapter,
   createAgentAssistantAssetSelectorRequest,
 } from "../../../studio-shell/asset-selector/AgentAssistantAssetSelectorAdapter";
+import { AssetSelectorStudioLaunchService } from "../../../studio-shell/asset-selector/AssetSelectorStudioLaunchService";
+import { AssetSelectorReturnHandoffService } from "../../../studio-shell/asset-selector/AssetSelectorReturnHandoffService";
 import {
   addWorkflowStep,
   buildWorkflowStepAssetOptionKey,
@@ -78,8 +81,12 @@ export default function WorkflowStudioStepSectionEditor({
   onUpdateSharedDraft,
   studioId,
 }: WorkflowStudioStepSectionEditorProps): JSX.Element {
+  const location = useLocation();
+  const navigate = useNavigate();
   const selectorSessionStore = useMemo(() => getAssetSelectorSessionStore(), []);
   const registryService = useMemo(() => new RegistryService(), []);
+  const studioLaunchService = useMemo(() => new AssetSelectorStudioLaunchService(), []);
+  const returnHandoffService = useMemo(() => new AssetSelectorReturnHandoffService(), []);
   const selectorDataProvider = useMemo(() => new AgentAssistantAssetSelectorAdapter({
     registryService,
     limit: 50,
@@ -105,7 +112,8 @@ export default function WorkflowStudioStepSectionEditor({
   const [loading, setLoading] = useState(true);
   const [queryError, setQueryError] = useState<string | undefined>(undefined);
   const [queryRevision, setQueryRevision] = useState(0);
-  const [createAgentStubNotice, setCreateAgentStubNotice] = useState<string | undefined>(undefined);
+  const [selectorNotice, setSelectorNotice] = useState<string | undefined>(undefined);
+  const [returnedItems, setReturnedItems] = useState<ReadonlyArray<AssetSelectorResultItem>>([]);
   const [selectorState, setSelectorState] = useState<AssetSelectorSessionState | undefined>(
     () => selectorSessionStore.getSession(selectorSessionKey),
   );
@@ -116,14 +124,24 @@ export default function WorkflowStudioStepSectionEditor({
     [draftValidationIssues],
   );
   const sectionHasErrors = stepValidationIssues.some((issue) => issue.severity === "error");
+  const selectorItems = useMemo(() => {
+    const byId = new Map<string, AssetSelectorResultItem>();
+    for (const item of returnedItems) {
+      byId.set(item.id, item);
+    }
+    for (const item of items) {
+      byId.set(item.id, item);
+    }
+    return Object.freeze([...byId.values()]);
+  }, [items, returnedItems]);
 
   const stepCatalogAssets = useMemo<ReadonlyArray<WorkflowStepAgentAssetCandidate>>(
-    () => Object.freeze(items.map((item) => Object.freeze({
+    () => Object.freeze(selectorItems.map((item) => Object.freeze({
       assetId: item.asset.assetId,
       versionId: item.asset.versionId,
       name: item.asset.displayName ?? item.title,
     }))),
-    [items],
+    [selectorItems],
   );
 
   const stepAssetOptionByKey = useMemo(() => {
@@ -178,6 +196,57 @@ export default function WorkflowStudioStepSectionEditor({
       active = false;
     };
   }, [queryRevision, searchTerm, selectorDataProvider, selectorRequest]);
+
+  useEffect(() => {
+    const outcome = returnHandoffService.handle({
+      search: location.search,
+      sessionKey: selectorSessionKey,
+      request: selectorRequest,
+      sessionStore: selectorSessionStore,
+    });
+
+    if (!outcome.handled) {
+      return;
+    }
+
+    if (outcome.returnedAsset) {
+      setReturnedItems((current) => {
+        const key = `${outcome.returnedAsset?.assetId}:${outcome.returnedAsset?.versionId ?? ""}`;
+        const existing = new Set(current.map((entry) => `${entry.asset.assetId}:${entry.asset.versionId ?? ""}`));
+        if (existing.has(key)) {
+          return current;
+        }
+        const nextItem: AssetSelectorResultItem = Object.freeze({
+          id: key,
+          title: outcome.returnedAsset?.displayName ?? outcome.returnedAsset?.assetId,
+          subtitle: outcome.returnedAsset?.versionId,
+          description: "Created in Agent Studio",
+          badges: Object.freeze(["agent", "new"]),
+          asset: outcome.returnedAsset,
+        });
+        return Object.freeze([nextItem, ...current]);
+      });
+      setQueryRevision((current) => current + 1);
+      setSelectorNotice(undefined);
+    }
+
+    if (outcome.consumed && outcome.nextSearch !== undefined) {
+      void navigate({
+        pathname: location.pathname,
+        search: outcome.nextSearch,
+        hash: location.hash,
+      }, { replace: true });
+    }
+  }, [
+    location.hash,
+    location.pathname,
+    location.search,
+    navigate,
+    returnHandoffService,
+    selectorRequest,
+    selectorSessionKey,
+    selectorSessionStore,
+  ]);
 
   useEffect(() => {
     if (!selectorState || !onUpdateSharedDraft || !defaultAgentAssistantStepDefinition) {
@@ -248,7 +317,7 @@ export default function WorkflowStudioStepSectionEditor({
             title="Agent/assistant selector"
             state={stateForShell}
             searchTerm={searchTerm}
-            items={items}
+            items={selectorItems}
             loading={loading}
             error={queryError}
             onSearchTermChange={setSearchTerm}
@@ -262,8 +331,25 @@ export default function WorkflowStudioStepSectionEditor({
               selectorSessionStore.cancelSession(selectorSessionKey, "user-cancelled-selector");
             }}
             onCreateNew={() => {
-              selectorSessionStore.transitionToCreatingNew(selectorSessionKey);
-              setCreateAgentStubNotice("Create new agent/assistant is stubbed in Story 4.6. Studio handoff is implemented in a later story.");
+              const launch = studioLaunchService.launch({
+                sessionKey: selectorSessionKey,
+                selectorRequest,
+                routePath: location.pathname,
+                routeSearch: location.search,
+                routeHash: location.hash || "#workflow-wizard-steps",
+              });
+              if (!launch) {
+                setSelectorNotice("Unable to open Agent Studio from this selector request.");
+                return;
+              }
+              selectorSessionStore.transitionToCreatingNew(selectorSessionKey, {
+                originatingContext: selectorRequest.context,
+                requestedAssetType: selectorRequest.assetType,
+                returnTargetSessionKey: selectorSessionKey,
+                returnRoutePath: launch.returnTarget?.routePath,
+              });
+              setSelectorNotice(undefined);
+              void navigate(launch.launchPath);
             }}
             onRetry={() => {
               setQueryRevision((current) => current + 1);
@@ -271,9 +357,9 @@ export default function WorkflowStudioStepSectionEditor({
           />
         ) : null}
 
-        {createAgentStubNotice ? (
+        {selectorNotice ? (
           <div className="ui-text-small ui-text-secondary" data-testid="workflow-step-create-agent-stub-notice">
-            {createAgentStubNotice}
+            {selectorNotice}
           </div>
         ) : null}
 
