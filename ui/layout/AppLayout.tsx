@@ -1,25 +1,21 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Link,
-  NavLink,
   Outlet,
   useBlocker,
   useBeforeUnload,
   useLocation,
 } from "react-router-dom";
-import { getNavigationRoutes } from "../routes/RouteConfig";
-import DevSyncButton from "../dev/DevSyncButton";
+import { ContextNavigationService } from "../routes/ContextNavigation";
 import { useUiDependencies } from "../composition/AppProviders";
 import type { RuntimeConsoleState } from "../state/RuntimeConsoleStore";
 import RuntimeConsoleDrawer from "../components/execution/RuntimeConsoleDrawer";
 import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
 import logo from "../images/ai-loom-studio-logo.svg";
-
-function navLinkClassName(isActive: boolean): string {
-  return isActive
-    ? "ui-app__nav-link ui-app__nav-link--active"
-    : "ui-app__nav-link";
-}
+import ContextNavigationBar from "../components/navigation/ContextNavigationBar";
+import CommandPalette from "../components/navigation/CommandPalette";
+import { GlobalCommandTrigger } from "../routes/CommandPalette";
+import GuidedOnboardingFlowSurface from "../components/navigation/GuidedOnboardingFlow";
 
 const fallbackConsoleState: RuntimeConsoleState = Object.freeze({
   isExpanded: false,
@@ -54,10 +50,13 @@ function getWorkflowEditorExitPrompt(workflowName?: string): string {
 }
 
 export default function AppLayout(): JSX.Element {
-  const routes = getNavigationRoutes();
-  const { config, runtimeConsoleStore, workflowStore } = useUiDependencies();
+  const { runtimeConsoleStore, workflowStore } = useUiDependencies();
   const location = useLocation();
+  const contextNavigationService = useMemo(() => new ContextNavigationService(), []);
+  const contextNavigation = contextNavigationService.resolve({ pathname: location.pathname, search: location.search });
   const [runtimeConsoleState, setRuntimeConsoleState] = useState<RuntimeConsoleState>(fallbackConsoleState);
+  const [isCommandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const globalCommandTrigger = useMemo(() => new GlobalCommandTrigger(), []);
   const previousPathnameRef = useRef(location.pathname);
 
   useEffect(() => {
@@ -138,6 +137,20 @@ export default function AppLayout(): JSX.Element {
     }
   }, [location.pathname, workflowStore]);
 
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (!globalCommandTrigger.isOpenCommand(event)) {
+        return;
+      }
+      event.preventDefault();
+      setCommandPaletteOpen((value) => !value);
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [globalCommandTrigger]);
+
   const isWideWorkspace =
     location.pathname.startsWith("/workflows/") ||
     location.pathname === "/workflows";
@@ -154,24 +167,21 @@ export default function AppLayout(): JSX.Element {
             />
           </Link>
 
-          <div
-            className="ui-row ui-row--wrap"
-            style={{ justifyContent: "flex-end", flex: 1 }}
-          >
-            {!config.isProductionMode ? <DevSyncButton /> : null}
-
-            <nav className="ui-app__nav" aria-label="Primary">
-              {routes.map((route) => (
-                <NavLink
-                  key={route.key}
-                  to={route.path}
-                  className={({ isActive }) => navLinkClassName(isActive)}
-                  end={route.path === "/"}
-                >
-                  {route.title}
-                </NavLink>
-              ))}
-            </nav>
+          <div className="ui-app__header-actions ui-row ui-row--end">
+            <button
+              type="button"
+              className="ui-button ui-button--ghost ui-button--sm ui-app__menu-trigger"
+              onClick={() => setCommandPaletteOpen(true)}
+              aria-label="Open navigation menu"
+              aria-expanded={isCommandPaletteOpen}
+              aria-controls="global-navigation-menu"
+            >
+              <span className="ui-app__menu-trigger-icon" aria-hidden="true">
+                <span className="ui-app__menu-trigger-bar" />
+                <span className="ui-app__menu-trigger-bar" />
+                <span className="ui-app__menu-trigger-bar" />
+              </span>
+            </button>
           </div>
         </div>
       </header>
@@ -182,6 +192,8 @@ export default function AppLayout(): JSX.Element {
             isWideWorkspace ? " ui-app__main-inner--wide" : ""
           }`}
         >
+          <GuidedOnboardingFlowSurface pathname={location.pathname} />
+          <ContextNavigationBar model={contextNavigation} />
           <Outlet />
         </div>
       </main>
@@ -203,6 +215,8 @@ export default function AppLayout(): JSX.Element {
         canRestartRuntime={runtimeConsoleState.canRestartRuntime}
         isRestartingRuntime={runtimeConsoleState.isRestartingRuntime}
       />
+
+      <CommandPalette isOpen={isCommandPaletteOpen} onClose={() => setCommandPaletteOpen(false)} />
 
       <footer className="ui-app__footer">
         <div className="ui-app__footer-inner">

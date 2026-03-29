@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
 import type { RegistryAsset } from "../../../domain/asset-registry/RegistryAsset";
 import { ROUTE_PATHS } from "../../routes/RouteConfig";
-import { buildStudioHandoffQuery, resolveStudioRouteFromAsset } from "../../routes/StudioRouteMapping";
+import { StudioEntryService } from "../../routes/StudioRouteMapping";
+import { UxStudioEntryLabelResolver } from "../../taxonomy/UxTaxonomySuppression";
 
 export interface AssetListItemProps {
   readonly asset: RegistryAsset;
@@ -18,7 +19,14 @@ function toAssetDetailPath(assetId: string, registryContextQuery?: string): stri
 }
 
 export function AssetListItem({ asset, registryContextQuery }: AssetListItemProps): JSX.Element {
-  const studioRoute = resolveStudioRouteFromAsset(asset);
+  const studioEntryService = new StudioEntryService();
+  const labelResolver = new UxStudioEntryLabelResolver();
+  const studioRoute = studioEntryService.buildStudioRoute({
+    requestedRole: asset.taxonomy?.semanticRole,
+    mode: "asset",
+    asset: { assetId: asset.assetId, versionId: asset.versionId, taxonomy: asset.taxonomy },
+    entryContext: { source: "registry", registryContext: registryContextQuery },
+  });
 
   return (
     <article className="ui-card" data-testid="registry-asset-item">
@@ -42,10 +50,10 @@ export function AssetListItem({ asset, registryContextQuery }: AssetListItemProp
           </Link>
           {studioRoute ? (
             <Link
-              to={`${studioRoute}?${buildStudioHandoffQuery(asset, { registryContext: registryContextQuery, handoff: "registry" })}`}
+              to={studioRoute}
               className="ui-button ui-button--ghost ui-button--small"
             >
-              Open in studio
+              {labelResolver.resolveOpenLabel(asset.taxonomy)}
             </Link>
           ) : null}
         </div>

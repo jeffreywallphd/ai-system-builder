@@ -6,9 +6,15 @@ describe("ui/routes unit coverage", () => {
     const source = readSource("ui/routes/RouteConfig.ts");
 
     expect(source).toContain('export const ROUTE_PATHS = Object.freeze({');
+    expect(source).toContain('build: "/build"');
+    expect(source).toContain('explore: "/explore"');
+    expect(source).toContain('run: "/run"');
     expect(source).toContain('workflowEditor: "/workflows/:workflowId"');
     expect(source).toContain('workflowContextWorkbench: "/workflows/:workflowId/context-workbench"');
     expect(source).toContain("export const APP_ROUTES");
+    expect(source).toContain('key: "build"');
+    expect(source).toContain('key: "explore"');
+    expect(source).toContain('key: "run"');
     expect(source).toContain('key: "workflow-editor"');
     expect(source).toContain('key: "settings"');
     expect(source).toContain('key: "mcp"');
@@ -18,6 +24,7 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain('registry: "/studio-shell/registry"');
     expect(source).toContain('registryAssetDetail: "/studio-shell/registry/assets/:assetId"');
     expect(source).toContain('workflowStudio: "/studio-shell/workflow"');
+    expect(source).toContain('workflowStudioMode: "/studio-shell/workflow/:modeId"');
     expect(source).toContain('contextBundleStudio: "/studio-shell/context-bundle"');
     expect(source).toContain('datasetPipelineStudio: "/studio-shell/dataset-pipeline"');
     expect(source).toContain('toolChainStudio: "/studio-shell/tool-chain"');
@@ -32,6 +39,7 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain('key: "registry"');
     expect(source).toContain('key: "registry-asset-detail"');
     expect(source).toContain('key: "workflow-studio"');
+    expect(source).toContain('key: "workflow-studio-mode"');
     expect(source).toContain('key: "context-bundle-studio"');
     expect(source).toContain('key: "dataset-pipeline-studio"');
     expect(source).toContain('key: "tool-chain-studio"');
@@ -59,6 +67,9 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain("createBrowserRouter");
     expect(source).toContain("<RouterProvider router={router} />");
     expect(source).toContain("<ProtectedRoute");
+    expect(source).toContain("path: ROUTE_PATHS.build");
+    expect(source).toContain("path: ROUTE_PATHS.explore");
+    expect(source).toContain("path: ROUTE_PATHS.run");
     expect(source).toContain("path: ROUTE_PATHS.notFound");
     expect(source).toContain('path: "/index.html"');
     expect(source).toContain("path: ROUTE_PATHS.settings");
@@ -69,6 +80,7 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain("path: ROUTE_PATHS.registry");
     expect(source).toContain("path: ROUTE_PATHS.registryAssetDetail");
     expect(source).toContain("path: ROUTE_PATHS.workflowStudio");
+    expect(source).toContain("path: ROUTE_PATHS.workflowStudioMode");
     expect(source).toContain("path: ROUTE_PATHS.contextBundleStudio");
     expect(source).toContain("path: ROUTE_PATHS.datasetPipelineStudio");
     expect(source).toContain("path: ROUTE_PATHS.trainingRecipeStudio");

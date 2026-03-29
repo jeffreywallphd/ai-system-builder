@@ -173,9 +173,33 @@ vite.config.ts.timestamp-*
 !/user/workflow-data/inputs/.gitkeep
 /user/workflow-data/outputs/*
 !/user/workflow-data/outputs/.gitkeep
+/user/workflow-data/mcp/
 /user/*/workflow-data/workflows/*
 !/user/*/workflow-data/workflows/.gitkeep
 /user/*/workflow-data/inputs/*
 !/user/*/workflow-data/inputs/.gitkeep
 /user/*/workflow-data/outputs/*
 !/user/*/workflow-data/outputs/.gitkeep
+/user/*/workflow-data/mcp/
+
+# Managed Python runtime artifacts (local machine only)
+/python-runtime/.venv.managed/
+/python-runtime/.ai-loom-runtime/
+/python-runtime/.ai-loom-python-runtime-state.json
+/python-runtime/**/__pycache__/
+
+# Local workflow runtime indexes and sqlite sidecars
+/dev/workflow-data/workflows/*.sqlite
+/dev/workflow-data/workflows/*.sqlite-shm
+/dev/workflow-data/workflows/*.sqlite-wal
+/dev/workflow-data/workflows/*.sqlite-journal
+
+# Local model payloads (keep placeholders/docs)
+/dev/model-files/*
+!/dev/model-files/.gitkeep
+!/dev/model-files/README.md
+
+# Private packaged Python runtimes (keep templates/docs)
+/runtime-assets/python/*/
+!/runtime-assets/python/README.md
+!/runtime-assets/python/manifest.template.json

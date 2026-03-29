@@ -19,6 +19,9 @@ describe("RegistryService", () => {
       ...(previousBridge ?? {}),
       registry: {
         listAssets: async () => JSON.stringify({ ok: true, data: [] }),
+        searchAssets: async () => JSON.stringify({ ok: true, data: [] }),
+        listExploreAssets: async () => JSON.stringify({ ok: true, data: { assets: [], totalCount: 0, availableKinds: [] } }),
+        searchExploreAssets: async () => JSON.stringify({ ok: true, data: { assets: [], totalCount: 0, facets: [], query: {} } }),
         filterAssets: async (filtersJson: string) => {
           const parsed = JSON.parse(filtersJson) as { structuralKinds?: ReadonlyArray<string> };
           return JSON.stringify({

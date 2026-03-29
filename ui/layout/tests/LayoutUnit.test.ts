@@ -2,14 +2,13 @@ import { describe, expect, it } from "bun:test";
 import { readSource } from "../../tests/testUtils";
 
 describe("ui/layout unit coverage", () => {
-  it("implements AppLayout with navigation, outlet, and dev sync controls", () => {
+  it("implements AppLayout with a hamburger navigation trigger, outlet, and runtime controls", () => {
     const source = readSource("ui/layout/AppLayout.tsx");
 
-    expect(source).toContain("getNavigationRoutes");
-    expect(source).toContain("<NavLink");
+    expect(source).toContain("AI Loom Studio home");
+    expect(source).toContain("ui-app__menu-trigger");
     expect(source).toContain("<Outlet />");
-    expect(source).toContain("DevSyncButton");
-    expect(source).toContain("config.isProductionMode");
+    expect(source).not.toContain("DevSyncButton");
     expect(source).toContain("RuntimeConsoleDrawer");
     expect(source).toContain("shouldPromptForWorkflowSave");
     expect(source).toContain("hasWorkflowCanvasContent");
@@ -21,7 +20,6 @@ describe("ui/layout unit coverage", () => {
 
     expect(source).toContain(".ui-app__header");
     expect(source).toContain(".ui-app__footer");
-    expect(source).toContain(".ui-app__nav-link");
     expect(source).toContain("runtime-console.css");
   });
 });

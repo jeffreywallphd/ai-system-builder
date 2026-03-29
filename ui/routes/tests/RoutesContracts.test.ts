@@ -16,6 +16,10 @@ describe("ui/routes contract adherence", () => {
     const source = readSource("ui/routes/RouteConfig.ts");
 
     expect(source).toContain('home: "/"');
+    expect(source).toContain('build: "/build"');
+    expect(source).toContain('buildAutomate: "/build/automate"');
+    expect(source).toContain('explore: "/explore"');
+    expect(source).toContain('run: "/run"');
     expect(source).toContain('workflows: "/workflows"');
     expect(source).toContain('models: "/models"');
     expect(source).toContain('mcp: "/mcp"');
@@ -23,6 +27,7 @@ describe("ui/routes contract adherence", () => {
     expect(source).toContain('assets: "/assets"');
     expect(source).toContain('registry: "/studio-shell/registry"');
     expect(source).toContain('registryAssetDetail: "/studio-shell/registry/assets/:assetId"');
+    expect(source).toContain('workflowStudioMode: "/studio-shell/workflow/:modeId"');
     expect(source).toContain('systemStudio: "/studio-shell/system"');
     expect(source).toContain('settings: "/settings"');
     expect(source).toContain('notFound: "*"');

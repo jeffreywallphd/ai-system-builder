@@ -621,6 +621,13 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     const query = JSON.parse(queryJson) as Parameters<RegistryBackendApi["searchAssets"]>[0];
     return JSON.stringify(await registryBackendApi.searchAssets(query));
   });
+  ipcMain.handle("ai-loom-desktop-registry:explore-assets", async (_event, limit?: number) => {
+    return JSON.stringify(await registryBackendApi.listExploreAssets(limit));
+  });
+  ipcMain.handle("ai-loom-desktop-registry:explore-search", async (_event, queryJson: string) => {
+    const query = JSON.parse(queryJson) as Parameters<RegistryBackendApi["searchExploreAssets"]>[0];
+    return JSON.stringify(await registryBackendApi.searchExploreAssets(query));
+  });
   ipcMain.handle("ai-loom-desktop-registry:asset-detail", async (_event, queryJson: string) => {
     const query = JSON.parse(queryJson) as Parameters<RegistryBackendApi["getAssetDetail"]>[0];
     return JSON.stringify(await registryBackendApi.getAssetDetail(query));

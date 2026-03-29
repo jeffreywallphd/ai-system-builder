@@ -5,6 +5,10 @@
   box-shadow: var(--shadow-panel);
 }
 
+.ui-card--padded {
+  padding: var(--space-md);
+}
+
 .ui-card--interactive {
   transition:
     border-color var(--transition-fast),

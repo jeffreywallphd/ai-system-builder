@@ -5,6 +5,8 @@ import { RegistryService } from "../../services/RegistryService";
 import type { StudioShellExtensionContext } from "../../studio-shell/StudioShellExtensions";
 import { ROUTE_PATHS } from "../../routes/RouteConfig";
 import { buildStudioHandoffQuery } from "../../routes/StudioRouteMapping";
+import { InlineAssetCreationModes, InlineAssetCreationService } from "../../routes/InlineAssetCreation";
+import { UxStudioEntryLabelResolver } from "../../taxonomy/UxTaxonomySuppression";
 
 function parseSystemComponents(content: string): ReadonlyArray<{
   readonly componentKind: "atomic" | "composite" | "system";
@@ -40,6 +42,8 @@ function studioRouteFromComponentKind(kind: "atomic" | "composite" | "system"): 
 export function SystemCompositionEditor({ context }: { readonly context: StudioShellExtensionContext }): JSX.Element {
   const service = useMemo(() => new RegistryService(), []);
   const [query, setQuery] = useState("");
+  const inlineCreationService = useMemo(() => new InlineAssetCreationService(), []);
+  const labelResolver = useMemo(() => new UxStudioEntryLabelResolver(), []);
   const [candidates, setCandidates] = useState<ReadonlyArray<RegistryAsset>>([]);
   const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
   const [candidateError, setCandidateError] = useState<string>();
@@ -50,6 +54,59 @@ export function SystemCompositionEditor({ context }: { readonly context: StudioS
   const parentAssetId = context.handoffContext.assetId ?? draft?.assetId;
   const parentVersionId = context.handoffContext.versionId;
   const registryContext = context.handoffContext.registryContext;
+
+
+  const inlineCreationLinks = useMemo(() => {
+    const returnTarget = {
+      routePath: ROUTE_PATHS.systemStudio,
+      contextId: context.studioId,
+      parentAssetId,
+      parentVersionId,
+      selectedComponent: "new-component",
+    };
+
+    return Object.freeze({
+      atomic: inlineCreationService.launch({
+        requestedStudioType: "model-studio",
+        requestedRole: "model",
+        mode: InlineAssetCreationModes.systemIntake,
+        context: {
+          source: "system-studio",
+          sourceIntentKey: "create-system-component",
+          sourceIntentLabel: "Create a component for this system",
+          sourceMetadata: { parentStudioId: context.studioId, componentKind: "atomic" },
+          prefill: parentAssetId ? { parentAssetId } : undefined,
+        },
+        returnTarget,
+      })?.launchPath,
+      composite: inlineCreationService.launch({
+        requestedStudioType: "workflow-studio",
+        requestedRole: "workflow",
+        mode: InlineAssetCreationModes.systemIntake,
+        context: {
+          source: "system-studio",
+          sourceIntentKey: "create-system-component",
+          sourceIntentLabel: "Create a component for this system",
+          sourceMetadata: { parentStudioId: context.studioId, componentKind: "composite" },
+          prefill: parentAssetId ? { parentAssetId } : undefined,
+        },
+        returnTarget,
+      })?.launchPath,
+      system: inlineCreationService.launch({
+        requestedStudioType: "system-studio",
+        requestedRole: "system",
+        mode: InlineAssetCreationModes.systemIntake,
+        context: {
+          source: "system-studio",
+          sourceIntentKey: "create-nested-system",
+          sourceIntentLabel: "Create a nested system",
+          sourceMetadata: { parentStudioId: context.studioId, componentKind: "system" },
+          prefill: parentAssetId ? { parentAssetId } : undefined,
+        },
+        returnTarget,
+      })?.launchPath,
+    });
+  }, [context.studioId, inlineCreationService, parentAssetId, parentVersionId]);
 
   useEffect(() => {
     let active = true;
@@ -187,6 +244,23 @@ export function SystemCompositionEditor({ context }: { readonly context: StudioS
       </div>
 
       <div className="ui-stack ui-stack--2xs">
+        <div className="ui-row ui-row--wrap" style={{ gap: "0.5rem" }}>
+          {inlineCreationLinks.atomic ? (
+            <Link className="ui-button ui-button--ghost ui-button--small" to={inlineCreationLinks.atomic}>
+              {labelResolver.resolveCreateInlineLabel({ structuralKind: "atomic", semanticRole: "model", behaviorKind: "none" })}
+            </Link>
+          ) : null}
+          {inlineCreationLinks.composite ? (
+            <Link className="ui-button ui-button--ghost ui-button--small" to={inlineCreationLinks.composite}>
+              {labelResolver.resolveCreateInlineLabel({ structuralKind: "composite", semanticRole: "workflow", behaviorKind: "deterministic" })}
+            </Link>
+          ) : null}
+          {inlineCreationLinks.system ? (
+            <Link className="ui-button ui-button--ghost ui-button--small" to={inlineCreationLinks.system}>
+              {labelResolver.resolveCreateInlineLabel({ structuralKind: "system", semanticRole: "system", behaviorKind: "deterministic" })}
+            </Link>
+          ) : null}
+        </div>
         <label className="ui-stack ui-stack--2xs">
           <span className="ui-text-small">Browse candidate assets</span>
           <input className="ui-input" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search registry assets" />
@@ -196,7 +270,7 @@ export function SystemCompositionEditor({ context }: { readonly context: StudioS
         <div className="ui-stack ui-stack--2xs">
           {candidates.slice(0, 12).map((asset) => (
             <div key={`${asset.assetId}:${asset.versionId}`} className="ui-row ui-row--wrap" style={{ justifyContent: "space-between", gap: "0.5rem" }}>
-              <span className="ui-text-small">{asset.name} · {asset.taxonomy?.structuralKind ?? "unknown"}/{asset.taxonomy?.semanticRole ?? "unknown"}</span>
+              <span className="ui-text-small">{asset.name} · {labelResolver.resolveCreateInlineLabel(asset.taxonomy)}</span>
               <button
                 className="ui-button"
                 disabled={!sessionId || !draft || !asset.versionId}

@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import { BuildEntryFeatureFlag } from "../features/BuildEntryFeatureFlag";
+import { UxStudioEntryLabelResolver } from "../taxonomy/UxTaxonomySuppression";
 
 export interface AppRouteDefinition {
   readonly key: string;
@@ -11,6 +13,12 @@ export interface AppRouteDefinition {
 
 export const ROUTE_PATHS = Object.freeze({
   home: "/",
+  build: "/build",
+  buildAutomate: "/build/automate",
+  explore: "/explore",
+  run: "/run",
+  create: "/create",
+  compose: "/compose",
   workflows: "/workflows",
   workflowEditor: "/workflows/:workflowId",
   workflowContextWorkbench: "/workflows/:workflowId/context-workbench",
@@ -26,6 +34,7 @@ export const ROUTE_PATHS = Object.freeze({
   registry: "/studio-shell/registry",
   registryAssetDetail: "/studio-shell/registry/assets/:assetId",
   workflowStudio: "/studio-shell/workflow",
+  workflowStudioMode: "/studio-shell/workflow/:modeId",
   contextBundleStudio: "/studio-shell/context-bundle",
   datasetPipelineStudio: "/studio-shell/dataset-pipeline",
   trainingRecipeStudio: "/studio-shell/training-recipe",
@@ -47,6 +56,42 @@ export const APP_ROUTES: ReadonlyArray<AppRouteDefinition> = Object.freeze([
     path: ROUTE_PATHS.home,
     title: "Home",
     showInNavigation: true,
+  }),
+  Object.freeze({
+    key: "build",
+    path: ROUTE_PATHS.build,
+    title: "Build",
+    showInNavigation: true,
+  }),
+  Object.freeze({
+    key: "build-automate",
+    path: ROUTE_PATHS.buildAutomate,
+    title: "Automate a task",
+    showInNavigation: false,
+  }),
+  Object.freeze({
+    key: "explore",
+    path: ROUTE_PATHS.explore,
+    title: "Explore",
+    showInNavigation: false,
+  }),
+  Object.freeze({
+    key: "run",
+    path: ROUTE_PATHS.run,
+    title: "Run",
+    showInNavigation: false,
+  }),
+  Object.freeze({
+    key: "create",
+    path: ROUTE_PATHS.create,
+    title: "Create",
+    showInNavigation: false,
+  }),
+  Object.freeze({
+    key: "compose",
+    path: ROUTE_PATHS.compose,
+    title: "Compose",
+    showInNavigation: false,
   }),
   Object.freeze({
     key: "workflows",
@@ -139,6 +184,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteDefinition> = Object.freeze([
     showInNavigation: false,
   }),
   Object.freeze({
+    key: "workflow-studio-mode",
+    path: ROUTE_PATHS.workflowStudioMode,
+    title: "Workflow Studio Mode",
+    showInNavigation: false,
+  }),
+  Object.freeze({
     key: "context-bundle-studio",
     path: ROUTE_PATHS.contextBundleStudio,
     title: "Context Bundle Studio",
@@ -213,5 +264,23 @@ export const APP_ROUTES: ReadonlyArray<AppRouteDefinition> = Object.freeze([
 ]);
 
 export function getNavigationRoutes(): ReadonlyArray<AppRouteDefinition> {
-  return APP_ROUTES.filter((route) => route.showInNavigation);
+  const labelResolver = new UxStudioEntryLabelResolver();
+  const buildFlag = new BuildEntryFeatureFlag();
+  return APP_ROUTES
+    .filter((route) => {
+      if (!route.showInNavigation) {
+        return false;
+      }
+      if (route.key === "build") {
+        return buildFlag.isEnabled();
+      }
+      if (route.key === "workflows" && buildFlag.isEnabled()) {
+        return false;
+      }
+      return true;
+    })
+    .map((route) => Object.freeze({
+      ...route,
+      title: labelResolver.resolveNavigationTitle(route.key, route.title),
+    }));
 }

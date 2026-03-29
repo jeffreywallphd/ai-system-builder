@@ -8,7 +8,7 @@ export interface StudioShellPanelProps {
 
 export function StudioShellPanel({ title, subtitle, children }: StudioShellPanelProps): JSX.Element {
   return (
-    <section className="ui-card ui-stack ui-stack--sm">
+    <section className="ui-card ui-card--padded ui-stack ui-stack--sm">
       <header className="ui-stack ui-stack--2xs">
         <h3 className="ui-heading-3">{title}</h3>
         {subtitle ? <p className="ui-text-muted">{subtitle}</p> : null}

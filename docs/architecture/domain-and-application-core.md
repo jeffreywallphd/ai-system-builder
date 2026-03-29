@@ -192,6 +192,22 @@ The studio shell now has a bounded inner-layer model and application orchestrati
 - studio-shell now has a bounded backend/UI boundary through `infrastructure/api/studio-shell/StudioShellBackendApi.ts`, reusing `DefaultStudioShellApplicationService` and `IStudioShellRepository` while projecting a reusable shell snapshot (studio/session/draft/version/readiness state).
 - validation/error handling for studio-shell is now structured across that boundary: typed operation codes (`not-found`/`conflict`/`invalid-request`/`invalid-lifecycle-transition`) plus deterministic `validationIssues` sections for taxonomy, contract, provenance, dependencies, lifecycle readiness, and publish/version status.
 
+## Direction 5 update: Workflow Studio canonical validation + lifecycle foundation (stories 1.9-1.10)
+
+- Workflow Studio now exposes a canonical workflow-definition validation engine in `domain/workflow-studio/WorkflowStudioDomain.ts` via `validateWorkflowDraft(...)` and `validateWorkflowEntity(...)`, with structured deterministic issues (`code`, `section`, `severity`, `path`, `message`) for triggers, inputs, steps, outputs, and cross-section dependency rules.
+- Output validation now includes destination-specific readiness rules in that same canonical path (for example file-export format constraints, web-viewer title requirements, and system-entry entity-name requirements) so Wizard output configuration gates stay domain-authoritative.
+- Validation remains inner-layer and reusable across authoring surfaces, persistence gates, and runtime-preparation readiness checks (no UI-local source of truth path).
+- Workflow entity lifecycle is now explicit and transition-guarded (`draft` -> `saved` -> `executable`) through `WorkflowLifecycleStates`, `isWorkflowLifecycleTransitionAllowed(...)`, and `transitionWorkflowEntityLifecycle(...)`.
+- `executable` state is now domain-gated by canonical draft readiness (lifecycle transition/create validation uses workflow-definition validation, not presentation flags).
+- Workflow Studio publish flow now enforces canonical workflow-content validation before lifecycle publish/version operations (`application/workflow-studio/WorkflowStudioApplicationService.ts`).
+
+## Direction 5 update: Workflow Studio persistence + taxonomy alignment (stories 1.11-1.12)
+
+- Workflow Studio canonical draft and entity models now expose explicit persistence mappings and versioned serialized-document shapes (`mapWorkflowDraftToPersistenceRecord`, `mapWorkflowEntityToPersistenceRecord`, `serializeWorkflowDraftDocument`, `serializeWorkflowEntity`) in `domain/workflow-studio/WorkflowStudioDomain.ts`.
+- Draft/entity rehydration now goes through canonical normalization (`mapWorkflowDraftFromPersistenceRecord`, `mapWorkflowEntityFromPersistenceRecord`, `deserializeWorkflowDraftDocument`, `deserializeWorkflowEntity`) so identity/metadata/lifecycle/triggers/inputs/steps/outputs survive round-trip without UI-local shaping.
+- Workflow asset-backed references now carry taxonomy metadata on canonical asset refs (`WorkflowDraftAssetReference.taxonomy`) and are validated against shared taxonomy expectations for dataset-backed inputs and agent-assistant steps.
+- Workflow draft validation now emits deterministic taxonomy/asset-reference issues for mismatched dataset taxonomy and malformed asset-backed step identities, while keeping canonical validation in the domain layer and publish enforcement in `application/workflow-studio/WorkflowStudioApplicationService.ts`.
+
 ## Direction 5 update: Studio shell persistence integration (story 1.11)
 
 - Studio shell now has a real SQLite-backed infrastructure adapter (`infrastructure/filesystem/studio-shell/SqliteStudioShellRepository.ts`) implementing `IStudioShellRepository` with migration-managed schema, indexed studio/session/draft/version storage, and full aggregate snapshot persistence.
@@ -548,6 +564,14 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
 ## Direction 5 update: Workflow studio domain + application slice (story 3.5)
 
 - Workflow Studio now has a thin bounded inner-layer domain helper (`domain/workflow-studio/WorkflowStudioDomain.ts`) for specialized composite orchestrator authoring with taxonomy `composite/workflow/{deterministic|conditional|iterative}` and generated provenance defaults.
+- Workflow Studio domain now includes a canonical workflow authoring entity contract (`WorkflowEntity`) with stable identity, human-readable name, descriptive metadata, lifecycle timestamps, and explicit relation to canonical draft state.
+- Workflow Studio domain now includes canonical workflow draft schema contracts (`WorkflowDraft`) with typed top-level sections (`triggers`, `inputs`, `steps`, `outputs`), explicit step ordering semantics, and deterministic serialize/deserialize normalization helpers.
+- Workflow draft trigger contracts now use a canonical discriminated trigger model (`kind` + `type` + typed `config`) covering user (`manual` / `button-click` / `user-initiated-run`), temporal (`schedule` / `recurring`), and state (`data-available` / `asset-state-changed` / `system-event`) trigger categories with kind/type compatibility validation.
+- Workflow draft input contracts now use canonical source typing (`sourceType`) with dataset-asset references (`assetId` + optional `versionId`) plus bounded runtime/static source variants, enabling multiple input entries per draft without UI-local schema forks.
+- Workflow draft step contracts now use an explicit canonical base step model with stable step identity (`id`), explicit ordering (`order`), and clear step classification (`kind` + `type`) while preserving deterministic ordering/uniqueness validation.
+- Workflow draft step contracts now include an explicit asset-backed step substructure (`assetRef`) with canonical asset references (`assetId` + optional `versionId`) and implemented agent/assistant-backed step support (`assetKind=agent-assistant`) without introducing a parallel step model.
+- Workflow draft step contracts now include canonical built-in control-flow step variants (`if-then`, `loop-iteration`) under the same base step model (`kind=control-flow`) with typed configuration payloads and deterministic structural validation.
+- Workflow draft output contracts now include a canonical structured output model (`outputType`, `format`, `destination`) supporting one-or-more outputs per draft without introducing output-specific parallel schemas.
 - A bounded application orchestrator (`application/workflow-studio/WorkflowStudioApplicationService.ts`) reuses `StudioShellApplicationService` for initialize/create/publish lifecycle instead of introducing workflow-specific create/update/publish infrastructure.
 - Publish gating now reuses shared composite enforcement (`assertCompositeStudioDraftPublishConsistency`) so workflow semantic-role and behavior invariants plus taxonomy-driven contract derivability remain backend/application-authoritative.
 

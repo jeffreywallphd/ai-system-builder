@@ -14,6 +14,8 @@ import { assertCompositeStudioDraftPublishConsistency } from "../studio-shell/At
 import {
   createWorkflowAssetMetadata,
   createWorkflowStudioTaxonomy,
+  deserializeWorkflowDraft,
+  validateWorkflowDraft,
   WorkflowStudioIdentity,
 } from "../../domain/workflow-studio/WorkflowStudioDomain";
 
@@ -120,6 +122,26 @@ export class WorkflowStudioApplicationService {
       },
       contractResolver: this.contractResolver,
     });
+
+    let canonicalDraft;
+    try {
+      canonicalDraft = deserializeWorkflowDraft(snapshot.draft.content);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "Workflow draft content is not valid JSON.";
+      throw new StudioShellInvalidRequestError(`Workflow draft content is malformed: ${detail}`);
+    }
+
+    const workflowValidation = validateWorkflowDraft(canonicalDraft);
+    if (!workflowValidation.valid) {
+      const issueSummary = workflowValidation.issues
+        .filter((issue) => issue.severity === "error")
+        .map((issue) => issue.code)
+        .slice(0, 5)
+        .join(", ");
+      throw new StudioShellInvalidRequestError(
+        `Workflow draft is not publish-ready: ${issueSummary || "validation-failed"}.`,
+      );
+    }
   }
 
   public async publishWorkflowDraft(command: PublishWorkflowDraftCommand): Promise<AssetVersionResult> {

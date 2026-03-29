@@ -58,6 +58,8 @@ describe("SystemStudioPage contracts", () => {
     expect(source).toContain("Open child in studio");
     expect(source).toContain("Open nested system");
     expect(source).toContain("buildStudioHandoffQuery");
+    expect(source).toContain("InlineAssetCreationService");
+    expect(source).toContain("inlineCreationLinks");
     expect(source).toContain("saveSystemChildComponent");
     expect(source).toContain("removeSystemChildComponent");
     expect(source).toContain("reorderSystemChildComponent");
@@ -82,7 +84,8 @@ describe("SystemStudioPage contracts", () => {
     const runtimePanelSource = readSource("ui/components/studio-shell/SystemRuntimeRunPanel.tsx");
     expect(runtimePanelSource).toContain("data-testid=\"system-runtime-run-panel\"");
     expect(runtimePanelSource).toContain("Run System");
-    expect(runtimePanelSource).toContain("startSystemExecution");
+    expect(runtimePanelSource).toContain("UxRuntimeService");
+    expect(runtimePanelSource).toContain("launchSystemRun");
     expect(runtimePanelSource).toContain("getSystemExecutionStatus");
     expect(runtimePanelSource).toContain("getSystemExecutionTrace");
     expect(runtimePanelSource).toContain("getSystemExecutionResult");

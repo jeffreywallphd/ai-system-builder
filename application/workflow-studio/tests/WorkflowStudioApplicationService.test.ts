@@ -4,7 +4,7 @@ import type { AssetDraft, AssetSession, Studio } from "../../../domain/studio-sh
 import type { AssetVersion } from "../../../domain/assets/AssetVersion";
 import { DefaultStudioShellApplicationService } from "../../studio-shell/DefaultStudioShellApplicationService";
 import { WorkflowStudioApplicationService } from "../WorkflowStudioApplicationService";
-import { WorkflowStudioIdentity } from "../../../domain/workflow-studio/WorkflowStudioDomain";
+import { createEmptyWorkflowDraft, serializeWorkflowDraft, WorkflowStudioIdentity } from "../../../domain/workflow-studio/WorkflowStudioDomain";
 
 class InMemoryStudioShellRepository implements IStudioShellRepository {
   private readonly studios = new Map<string, Studio>();
@@ -36,7 +36,7 @@ describe("WorkflowStudioApplicationService", () => {
     const created = await service.createWorkflowDraft({
       sessionId: ensure.session.id,
       title: "Workflow Orchestrator Draft",
-      content: '{"workflowSpec":{"nodes":[],"connections":[],"executionPolicy":"acyclic-only"}}',
+      content: serializeWorkflowDraft(createEmptyWorkflowDraft()),
       creatorId: "author-1",
       tags: ["orchestrator"],
       behaviorKind: "iterative",
@@ -130,5 +130,76 @@ describe("WorkflowStudioApplicationService", () => {
       draftId: created.draft.id,
       versionId: "workflow-version-unpinned",
     })).rejects.toThrow("dependency-version-unpinned");
+  });
+
+  it("blocks publish when canonical workflow draft content fails domain validation", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const ids = ["session-1", "draft-1"];
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => ids.shift() ?? "generated");
+    const service = new WorkflowStudioApplicationService(studioShell);
+
+    const ensure = await service.ensureStudioInitialized();
+    const created = await service.createWorkflowDraft({
+      sessionId: ensure.session.id,
+      title: "Workflow",
+      content: JSON.stringify({
+        triggers: [
+          {
+            id: "trigger-temporal",
+            kind: "temporal",
+            type: "schedule",
+            config: {},
+          },
+        ],
+        inputs: [],
+        steps: [],
+        outputs: [],
+      }),
+      dependencies: [{ assetId: "asset:model", versionId: "asset:model:v1" }],
+    });
+
+    await expect(service.publishWorkflowDraft({
+      sessionId: ensure.session.id,
+      draftId: created.draft.id,
+      versionId: "workflow-version-invalid-content",
+    })).rejects.toThrow("Workflow draft content is malformed");
+  });
+
+  it("blocks publish when workflow asset references violate canonical taxonomy expectations", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const ids = ["session-1", "draft-1"];
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => ids.shift() ?? "generated");
+    const service = new WorkflowStudioApplicationService(studioShell);
+
+    const ensure = await service.ensureStudioInitialized();
+    const created = await service.createWorkflowDraft({
+      sessionId: ensure.session.id,
+      title: "Workflow taxonomy mismatch",
+      content: JSON.stringify({
+        triggers: [],
+        inputs: [{
+          id: "input-dataset",
+          type: "dataset",
+          sourceType: "dataset-asset",
+          asset: {
+            assetId: "asset:dataset-customers",
+            taxonomy: {
+              structuralKind: "atomic",
+              semanticRole: "tool",
+              behaviorKind: "deterministic",
+            },
+          },
+        }],
+        steps: [],
+        outputs: [],
+      }),
+      dependencies: [{ assetId: "asset:model", versionId: "asset:model:v1" }],
+    });
+
+    await expect(service.publishWorkflowDraft({
+      sessionId: ensure.session.id,
+      draftId: created.draft.id,
+      versionId: "workflow-version-taxonomy-mismatch",
+    })).rejects.toThrow("input-malformed");
   });
 });

@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
-import { useLocation } from "react-router-dom";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AssetDraftLifecycleStatuses, type AssetMetadataPatch } from "../../domain/studio-shell/StudioShellDomain";
 import type { StudioShellSnapshotReadModel, StudioShellValidationIssue } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
+import WorkflowStudioDraftAuthoringBoundary from "../components/studio-shell/workflow/WorkflowStudioDraftAuthoringBoundary";
 import { StudioShellService } from "../services/StudioShellService";
 import { StudioShellPanel } from "../components/studio-shell/StudioShellPanel";
 import { StudioShellValidationIssuesPanel } from "../components/studio-shell/StudioShellValidationIssuesPanel";
@@ -13,23 +14,79 @@ import {
   type StudioShellExtensionContribution,
   type StudioShellExtensionSlot,
 } from "../studio-shell/StudioShellExtensions";
+import {
+  getWorkflowStudioModeStateStore,
+  type WorkflowStudioModeState,
+} from "../studio-shell/workflow/WorkflowStudioModeStateStore";
+import type { WorkflowStudioModeRouteResolution } from "../studio-shell/workflow/WorkflowStudioModeRouting";
+import { StudioEntryService } from "../routes/StudioRouteMapping";
+import { readAutomationIntentFromSearch } from "../routes/BuildAutomationIntent";
+import { BuildIntents } from "../routes/BuildIntentModels";
+import {
+  InlineAssetCreationService,
+  InlineAssetReturnStatuses,
+  type InlineAssetCreationReturnTarget,
+} from "../routes/InlineAssetCreation";
 
-function safeParseJson<T>(value: string, fallback: T): T {
+interface JsonParseResult<T> {
+  readonly ok: boolean;
+  readonly data?: T;
+}
+
+interface DraftDependencyInput {
+  readonly assetId: string;
+  readonly versionId: string;
+}
+
+function parseJson<T>(value: string): JsonParseResult<T> {
   try {
     if (!value.trim()) {
-      return fallback;
+      return Object.freeze({ ok: true, data: undefined as T | undefined });
     }
-    return JSON.parse(value) as T;
+    return Object.freeze({ ok: true, data: JSON.parse(value) as T });
   } catch {
-    return fallback;
+    return Object.freeze({ ok: false });
   }
 }
 
+function toDependencyInputs(
+  dependencies: ReadonlyArray<{ readonly assetId: string; readonly versionId?: string }>,
+): ReadonlyArray<DraftDependencyInput> {
+  if (dependencies.length === 0) {
+    return Object.freeze([{ assetId: "", versionId: "" }]);
+  }
+  return Object.freeze(dependencies.map((entry) => ({ assetId: entry.assetId, versionId: entry.versionId ?? "" })));
+}
+
+function toDependencyReferences(
+  dependencies: ReadonlyArray<DraftDependencyInput>,
+): ReadonlyArray<{ readonly assetId: string; readonly versionId?: string }> {
+  return Object.freeze(
+    dependencies
+      .map((entry) => ({
+        assetId: entry.assetId.trim(),
+        versionId: entry.versionId.trim(),
+      }))
+      .filter((entry) => entry.assetId.length > 0)
+      .map((entry) => ({
+        assetId: entry.assetId,
+        versionId: entry.versionId.length > 0 ? entry.versionId : undefined,
+      })),
+  );
+}
+
+function parseTagsInput(value: string): ReadonlyArray<string> {
+  return Object.freeze([...new Set(value.split(",").map((entry) => entry.trim()).filter(Boolean))]);
+}
+
+function formatTags(tags?: ReadonlyArray<string>): string {
+  return (tags ?? []).join(", ");
+}
 
 function buildCreateMetadata(
   defaultDraftTitle: string,
   defaultDraftTags: ReadonlyArray<string>,
-  metadataPatchJson: string,
+  metadataPatch: AssetMetadataPatch,
 ): {
   readonly title: string;
   readonly summary?: string;
@@ -38,20 +95,20 @@ function buildCreateMetadata(
   readonly contract?: AssetMetadataPatch["contract"];
   readonly provenance?: AssetMetadataPatch["provenance"];
 } {
-  const metadataPatch = safeParseJson<AssetMetadataPatch>(metadataPatchJson, {});
   return {
     title: metadataPatch.title ?? defaultDraftTitle,
-    summary: metadataPatch.summary,
+    summary: metadataPatch.summary === null ? undefined : metadataPatch.summary,
     tags: metadataPatch.tags ?? defaultDraftTags,
-    taxonomy: metadataPatch.taxonomy,
-    contract: metadataPatch.contract,
-    provenance: metadataPatch.provenance,
+    taxonomy: metadataPatch.taxonomy === null ? undefined : metadataPatch.taxonomy,
+    contract: metadataPatch.contract === null ? undefined : metadataPatch.contract,
+    provenance: metadataPatch.provenance === null ? undefined : metadataPatch.provenance,
   };
 }
 
 interface StudioShellPageProps {
   readonly studioRegistration?: StudioRegistration;
   readonly extensions?: ReadonlyArray<StudioShellExtensionContribution>;
+  readonly workflowModeRoute?: WorkflowStudioModeRouteResolution;
 }
 
 function renderExtensions(
@@ -75,8 +132,13 @@ function renderExtensions(
   );
 }
 
-export default function StudioShellPage({ studioRegistration, extensions = [] }: StudioShellPageProps): JSX.Element {
+export default function StudioShellPage({
+  studioRegistration,
+  extensions = [],
+  workflowModeRoute,
+}: StudioShellPageProps): JSX.Element {
   const studioId = studioRegistration?.studioId ?? "studio-shell-main";
+  const isWorkflowStudio = studioRegistration?.role === "workflow";
   const defaultDraftTitle = studioRegistration?.defaults.title ?? "Studio Shell Draft";
   const defaultDraftTags = studioRegistration?.defaults.tags ?? ["studio-shell"];
   const defaultContent = studioRegistration?.defaults.contentTemplate ?? "{}";
@@ -86,7 +148,33 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
       ? `Shared ${studioRegistration.kind}-studio shell for ${studioRegistration.role} assets: session/draft context, metadata/dependencies, lifecycle/version, and validation.`
       : "Reusable bounded shell for studio/session context, authoring, taxonomy/contract/provenance/dependencies, lifecycle/version state, and validation.");
   const service = useMemo(() => new StudioShellService(), []);
+  const inlineAssetCreationService = useMemo(() => new InlineAssetCreationService(), []);
   const location = useLocation();
+  const navigate = useNavigate();
+  const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const studioEntryService = useMemo(() => new StudioEntryService(), []);
+  const contextualInitialization = useMemo(
+    () => studioEntryService.parseInitializationFromSearch(location.search),
+    [location.search, studioEntryService],
+  );
+  const automationIntent = useMemo(
+    () => readAutomationIntentFromSearch(location.search),
+    [location.search],
+  );
+  const inlineCreationReturnTarget = useMemo<InlineAssetCreationReturnTarget | undefined>(
+    () => inlineAssetCreationService.parseReturnTargetFromSearch(location.search),
+    [inlineAssetCreationService, location.search],
+  );
+  const inlineCreationReturnPayload = useMemo(
+    () => inlineAssetCreationService.parseInlineReturnFromSearch(location.search),
+    [inlineAssetCreationService, location.search],
+  );
+  const workflowModeStore = useMemo(
+    () => (isWorkflowStudio ? getWorkflowStudioModeStateStore(studioId) : undefined),
+    [isWorkflowStudio, studioId],
+  );
+  const resolvedWorkflowModeId = workflowModeRoute?.resolvedModeId;
+  const shouldSeedAutomationIntent = searchParams.get("buildIntent")?.trim() === BuildIntents.automateTask && Boolean(automationIntent);
   const extensionRegistry = useMemo(() => {
     const registry = new StudioShellExtensionRegistry();
     registry.registerMany([...(studioRegistration?.extensions ?? []), ...extensions]);
@@ -98,12 +186,61 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
   const [systemCompatibility, setSystemCompatibility] = useState<StudioShellExtensionContext["systemCompatibility"]>();
   const [isBusy, setIsBusy] = useState(false);
   const [content, setContent] = useState(defaultContent);
-  const [metadataPatchJson, setMetadataPatchJson] = useState(
-    JSON.stringify(studioRegistration?.defaults.metadataPatch ?? { title: defaultDraftTitle, tags: defaultDraftTags }),
+  const initialMetadataPatch = useMemo<AssetMetadataPatch>(
+    () => studioRegistration?.defaults.metadataPatch ?? { title: defaultDraftTitle, tags: defaultDraftTags },
+    [defaultDraftTags, defaultDraftTitle, studioRegistration?.defaults.metadataPatch],
   );
-  const [dependenciesJson, setDependenciesJson] = useState(
-    JSON.stringify(studioRegistration?.defaults.dependencies ?? []),
+  const initialDependencies = useMemo(
+    () => toDependencyInputs(studioRegistration?.defaults.dependencies ?? []),
+    [studioRegistration?.defaults.dependencies],
   );
+  const [metadataPatch, setMetadataPatch] = useState<AssetMetadataPatch>(initialMetadataPatch);
+  const [metadataPatchJson, setMetadataPatchJson] = useState(() => JSON.stringify(initialMetadataPatch, null, 2));
+  const [isMetadataJsonMode, setIsMetadataJsonMode] = useState(false);
+  const [metadataJsonError, setMetadataJsonError] = useState<string | undefined>();
+  const [dependencies, setDependencies] = useState<ReadonlyArray<DraftDependencyInput>>(initialDependencies);
+  const [dependenciesJson, setDependenciesJson] = useState(() => JSON.stringify(toDependencyReferences(initialDependencies), null, 2));
+  const [isDependenciesJsonMode, setIsDependenciesJsonMode] = useState(false);
+  const [dependenciesJsonError, setDependenciesJsonError] = useState<string | undefined>();
+  const [workflowModeState, setWorkflowModeState] = useState<WorkflowStudioModeState | undefined>(
+    () => workflowModeStore?.getState(),
+  );
+  const automationPrefillAppliedRef = useRef(false);
+
+  const updateContent = (nextContent: string): void => {
+    setContent(nextContent);
+    workflowModeStore?.hydrateFromSerializedDraft(nextContent);
+  };
+
+  useEffect(() => {
+    if (!workflowModeStore) {
+      setWorkflowModeState(undefined);
+      return;
+    }
+
+    setWorkflowModeState(workflowModeStore.getState());
+    return workflowModeStore.subscribe((state) => setWorkflowModeState(state));
+  }, [workflowModeStore]);
+
+  useEffect(() => {
+    if (!isWorkflowStudio || !workflowModeState) {
+      return;
+    }
+
+    setContent(workflowModeState.draftEditorContent);
+  }, [isWorkflowStudio, workflowModeState]);
+
+  useEffect(() => {
+    if (!workflowModeStore || !resolvedWorkflowModeId) {
+      return;
+    }
+
+    if (workflowModeStore.getState().selectedModeId === resolvedWorkflowModeId) {
+      return;
+    }
+
+    workflowModeStore.setSelectedMode(resolvedWorkflowModeId);
+  }, [resolvedWorkflowModeId, workflowModeStore]);
 
   const refreshSnapshot = async () => {
     setIsBusy(true);
@@ -136,7 +273,19 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
       }
       setError(undefined);
       if (response.data.draft) {
-        setContent(response.data.draft.content);
+        if (workflowModeStore && isWorkflowStudio) {
+          workflowModeStore.synchronizeSharedDraftFromSnapshot({
+            serializedDraft: response.data.draft.content,
+            context: {
+              studioId,
+              sessionId: response.data.activeSessionId,
+              draftId: response.data.draft.draftId,
+              revision: response.data.draft.revision,
+            },
+          });
+        } else {
+          updateContent(response.data.draft.content);
+        }
       }
     } finally {
       setIsBusy(false);
@@ -144,8 +293,44 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
   };
 
   useEffect(() => {
+    setMetadataPatch(initialMetadataPatch);
+    setMetadataPatchJson(JSON.stringify(initialMetadataPatch, null, 2));
+    setIsMetadataJsonMode(false);
+    setMetadataJsonError(undefined);
+
+    setDependencies(initialDependencies);
+    setDependenciesJson(JSON.stringify(toDependencyReferences(initialDependencies), null, 2));
+    setIsDependenciesJsonMode(false);
+    setDependenciesJsonError(undefined);
+  }, [initialDependencies, initialMetadataPatch]);
+
+  useEffect(() => {
     void refreshSnapshot();
   }, [studioId]);
+
+  useEffect(() => {
+    automationPrefillAppliedRef.current = false;
+  }, [studioId, location.search]);
+
+  useEffect(() => {
+    if (!shouldSeedAutomationIntent || !automationIntent || snapshot?.draft || automationPrefillAppliedRef.current) {
+      return;
+    }
+
+    if (!isWorkflowStudio) {
+      updateContent(content === defaultContent ? automationIntent : content);
+    }
+    setMetadataPatch((current) => {
+      const nextPatch: AssetMetadataPatch = {
+        ...current,
+        title: current.title ?? "Automation draft",
+        summary: current.summary ?? automationIntent,
+      };
+      setMetadataPatchJson(JSON.stringify(nextPatch, null, 2));
+      return nextPatch;
+    });
+    automationPrefillAppliedRef.current = true;
+  }, [automationIntent, content, defaultContent, isWorkflowStudio, shouldSeedAutomationIntent, snapshot?.draft]);
 
   const runAndRefresh = async (action: () => Promise<{ ok: boolean; error?: { message: string } }>) => {
     setIsBusy(true);
@@ -162,20 +347,116 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
     }
   };
 
+  const updateMetadataPatch = (updater: (current: AssetMetadataPatch) => AssetMetadataPatch): void => {
+    setMetadataPatch((current) => {
+      const next = updater(current);
+      setMetadataPatchJson(JSON.stringify(next, null, 2));
+      return next;
+    });
+  };
+
+  const updateDependenciesForm = (nextDependencies: ReadonlyArray<DraftDependencyInput>): void => {
+    setDependencies(nextDependencies);
+    setDependenciesJson(JSON.stringify(toDependencyReferences(nextDependencies), null, 2));
+  };
+
+  const resolveMetadataPatchForSave = (): AssetMetadataPatch | undefined => {
+    if (!isMetadataJsonMode) {
+      return metadataPatch;
+    }
+
+    const parsed = parseJson<AssetMetadataPatch>(metadataPatchJson);
+    if (!parsed.ok) {
+      setMetadataJsonError("Metadata patch JSON is invalid. Fix JSON or switch back to form mode.");
+      return undefined;
+    }
+    setMetadataJsonError(undefined);
+    return parsed.data ?? {};
+  };
+
+  const resolveDependenciesForSave = (): ReadonlyArray<{ readonly assetId: string; readonly versionId?: string }> | undefined => {
+    if (!isDependenciesJsonMode) {
+      return toDependencyReferences(dependencies);
+    }
+
+    const parsed = parseJson<Array<{ assetId: string; versionId?: string }>>(dependenciesJson);
+    if (!parsed.ok) {
+      setDependenciesJsonError("Dependencies JSON is invalid. Fix JSON or switch back to form mode.");
+      return undefined;
+    }
+    setDependenciesJsonError(undefined);
+    return (parsed.data ?? [])
+      .map((entry) => ({ assetId: entry.assetId.trim(), versionId: entry.versionId?.trim() }))
+      .filter((entry) => entry.assetId.length > 0);
+  };
+
   const sessionId = snapshot?.activeSessionId;
   const draftId = snapshot?.draft?.draftId;
+  const latestVersionId = snapshot && snapshot.versions.length > 0
+    ? snapshot.versions[snapshot.versions.length - 1]?.versionId
+    : undefined;
+  const returnVersionId = snapshot?.draft?.lastPublishedVersionId
+    ?? latestVersionId
+    ?? undefined;
+  const inlineReturnPaths = useMemo(() => {
+    if (!inlineCreationReturnTarget) {
+      return undefined;
+    }
 
+    return Object.freeze({
+      withAsset: snapshot?.draft?.assetId
+        ? inlineAssetCreationService.buildReturnPath({
+          returnTarget: inlineCreationReturnTarget,
+          payload: {
+            status: InlineAssetReturnStatuses.created,
+            assetId: snapshot.draft.assetId,
+            versionId: returnVersionId,
+            sourceStudioType: studioRegistration?.studioType,
+            sourceStudioId: studioId,
+            returnContextId: inlineCreationReturnTarget.contextId,
+          },
+        })
+        : undefined,
+      cancelled: inlineAssetCreationService.buildReturnPath({
+        returnTarget: inlineCreationReturnTarget,
+        payload: {
+          status: InlineAssetReturnStatuses.cancelled,
+          sourceStudioType: studioRegistration?.studioType,
+          sourceStudioId: studioId,
+          returnContextId: inlineCreationReturnTarget.contextId,
+        },
+      }),
+    });
+  }, [
+    inlineAssetCreationService,
+    inlineCreationReturnTarget,
+    latestVersionId,
+    returnVersionId,
+    snapshot?.draft?.assetId,
+    studioId,
+    studioRegistration?.studioType,
+  ]);
+  const workflowDraftContent = workflowModeState?.sharedDraftSerialized ?? content;
+  const hasWorkflowDraftParseError = isWorkflowStudio && Boolean(workflowModeState?.draftParseError);
   const extensionContext: StudioShellExtensionContext = {
     studioId,
     snapshot,
     validationIssues,
+    workflowModeState: workflowModeStore && workflowModeState
+      ? {
+        state: workflowModeState,
+        setSelectedMode: (modeId) => workflowModeStore.setSelectedMode(modeId),
+      }
+      : undefined,
     systemCompatibility,
     handoffContext: {
-      assetId: new URLSearchParams(location.search).get("assetId")?.trim() || undefined,
-      versionId: new URLSearchParams(location.search).get("versionId")?.trim() || undefined,
-      handoff: new URLSearchParams(location.search).get("handoff")?.trim() || undefined,
-      registryContext: new URLSearchParams(location.search).get("registryContext")?.trim() || undefined,
-      selectedComponent: new URLSearchParams(location.search).get("selectedComponent")?.trim() || undefined,
+      assetId: contextualInitialization.context.authoritativeAsset?.assetId
+        ?? (searchParams.get("assetId")?.trim() || undefined),
+      versionId: contextualInitialization.context.authoritativeAsset?.versionId
+        ?? (searchParams.get("versionId")?.trim() || undefined),
+      handoff: searchParams.get("handoff")?.trim() || undefined,
+      registryContext: searchParams.get("registryContext")?.trim() || undefined,
+      selectedComponent: searchParams.get("selectedComponent")?.trim() || undefined,
     },
     operationError: error,
     isBusy,
@@ -265,6 +546,46 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
             <div><strong>Draft:</strong> {snapshot?.draft?.draftId ?? "-"}</div>
             <div><strong>Revision:</strong> {snapshot?.draft?.revision ?? 0}</div>
           </div>
+          {inlineCreationReturnTarget ? (
+            <div className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="studio-shell-inline-return-panel">
+              <strong>Inline creation handoff</strong>
+              <span className="ui-text-small ui-text-secondary">
+                This studio was opened from another workspace. Return when done, optionally attaching this asset.
+              </span>
+              <div className="ui-stack ui-stack--xs" style={{ flexDirection: "row", flexWrap: "wrap" }}>
+                {inlineReturnPaths?.withAsset ? (
+                  <Link
+                    className="ui-button ui-button--sm ui-button--primary"
+                    to={inlineReturnPaths.withAsset}
+                    data-testid="studio-shell-inline-return-with-asset"
+                  >
+                    Return with asset
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    className="ui-button ui-button--sm ui-button--primary"
+                    disabled
+                    data-testid="studio-shell-inline-return-with-asset-disabled"
+                  >
+                    Return with asset
+                  </button>
+                )}
+                <Link
+                  className="ui-button ui-button--sm ui-button--ghost"
+                  to={inlineReturnPaths?.cancelled ?? inlineCreationReturnTarget.routePath}
+                  data-testid="studio-shell-inline-return-cancel"
+                >
+                  Cancel and return
+                </Link>
+              </div>
+              {inlineCreationReturnPayload ? (
+                <span className="ui-text-small ui-text-secondary">
+                  Last return status: {inlineCreationReturnPayload.status}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
           <div className="ui-stack ui-stack--xs" style={{ flexDirection: "row" }}>
             <button className="ui-button" disabled={isBusy} onClick={() => { void refreshSnapshot(); }}>Refresh</button>
             <button className="ui-button" disabled={isBusy} onClick={() => { void runAndRefresh(() => service.startSession(studioId)); }}>Start Session</button>
@@ -273,32 +594,64 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
         {renderExtensions(extensionRegistry, StudioShellExtensionSlots.sessionContext, extensionContext)}
 
         <StudioShellPanel title="Asset draft authoring" subtitle="Thin authoring surface over studio-shell draft contracts.">
-          <textarea className="ui-textarea" rows={8} value={content} onChange={(event) => setContent(event.target.value)} />
+          <WorkflowStudioDraftAuthoringBoundary
+            isWorkflowStudio={isWorkflowStudio}
+            content={content}
+            onChangeContent={updateContent}
+            invalidModeRouteId={isWorkflowStudio ? workflowModeRoute?.invalidModeId : undefined}
+            workflowModeContext={workflowModeStore && workflowModeState
+              ? {
+                studioId,
+                routeSearch: location.search,
+                replaceRouteSearch: (nextSearch: string) => {
+                  void navigate(
+                    {
+                      pathname: location.pathname,
+                      search: nextSearch,
+                      hash: location.hash,
+                    },
+                    { replace: true },
+                  );
+                },
+                selectedModeId: workflowModeState.selectedModeId,
+                sharedDraft: workflowModeState.sharedDraft,
+                sharedDraftSerialized: workflowModeState.sharedDraftSerialized,
+                draftEditorContent: workflowModeState.draftEditorContent,
+                draftParseError: workflowModeState.draftParseError,
+                modeValidationIssues: workflowModeState.modeValidationIssues,
+                draftValidationIssues: workflowModeState.draftValidationIssues,
+                updateSharedDraft: (updater) => workflowModeStore.updateSharedDraft(updater),
+              }
+              : undefined}
+          />
           <div className="ui-stack ui-stack--xs" style={{ flexDirection: "row" }}>
             <button
               className="ui-button ui-button--primary"
-              disabled={isBusy || !sessionId}
+              disabled={isBusy || !sessionId || hasWorkflowDraftParseError}
               onClick={() => {
-                    if (!sessionId) {
+                if (!sessionId) {
+                  return;
+                }
+                const resolvedMetadataPatch = resolveMetadataPatchForSave();
+                if (!resolvedMetadataPatch) {
                   return;
                 }
                 if (!draftId) {
-                  const metadata = buildCreateMetadata(defaultDraftTitle, defaultDraftTags, metadataPatchJson);
+                  const metadata = buildCreateMetadata(defaultDraftTitle, defaultDraftTags, resolvedMetadataPatch);
                   void runAndRefresh(() => service.createDraft({
                     studioId,
                     sessionId,
-                    content,
+                    content: workflowDraftContent,
                     metadata,
                   }));
                   return;
                 }
-                const metadataPatch = safeParseJson<AssetMetadataPatch>(metadataPatchJson, {});
                 void runAndRefresh(() => service.updateDraft({
                   studioId,
                   sessionId,
                   draftId,
-                  content,
-                  metadataPatch,
+                  content: workflowDraftContent,
+                  metadataPatch: resolvedMetadataPatch,
                 }));
               }}
             >
@@ -308,14 +661,352 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
         </StudioShellPanel>
         {renderExtensions(extensionRegistry, StudioShellExtensionSlots.draftAuthoring, extensionContext)}
 
-        <StudioShellPanel title="Taxonomy / contract / provenance" subtitle="JSON metadata patch surface (backend/application remains authoritative).">
-          <textarea className="ui-textarea" rows={8} value={metadataPatchJson} onChange={(event) => setMetadataPatchJson(event.target.value)} />
-          <p className="ui-text-muted">Use keys like taxonomy, contract, provenance, title, summary, and tags in metadataPatch JSON.</p>
+        <StudioShellPanel title="Taxonomy / contract / provenance" subtitle="Form-first metadata editing with optional advanced JSON.">
+          <div className="ui-form-json-toggle">
+            <button
+              type="button"
+              className="ui-button ui-button--ghost ui-button--sm"
+              onClick={() => {
+                if (!isMetadataJsonMode) {
+                  setMetadataPatchJson(JSON.stringify(metadataPatch, null, 2));
+                  setIsMetadataJsonMode(true);
+                  setMetadataJsonError(undefined);
+                  return;
+                }
+                const parsed = parseJson<AssetMetadataPatch>(metadataPatchJson);
+                if (!parsed.ok) {
+                  setMetadataJsonError("Metadata patch JSON is invalid. Fix JSON before leaving advanced mode.");
+                  return;
+                }
+                setMetadataPatch(parsed.data ?? {});
+                setMetadataPatchJson(JSON.stringify(parsed.data ?? {}, null, 2));
+                setMetadataJsonError(undefined);
+                setIsMetadataJsonMode(false);
+              }}
+            >
+              {isMetadataJsonMode ? "Use Form Editor" : "Edit JSON"}
+            </button>
+          </div>
+
+          {isMetadataJsonMode ? (
+            <label className="ui-stack ui-stack--2xs">
+              <span className="ui-text-small">Metadata patch JSON</span>
+              <textarea className="ui-textarea" rows={12} value={metadataPatchJson} onChange={(event) => setMetadataPatchJson(event.target.value)} />
+            </label>
+          ) : (
+            <div className="ui-stack ui-stack--sm">
+              <div className="ui-form-grid">
+                <label className="ui-field">
+                  <span className="ui-field__label">Title</span>
+                  <input
+                    className="ui-input"
+                    value={metadataPatch.title ?? ""}
+                    onChange={(event) => updateMetadataPatch((current) => ({ ...current, title: event.target.value || undefined }))}
+                  />
+                </label>
+                <label className="ui-field">
+                  <span className="ui-field__label">Tags</span>
+                  <input
+                    className="ui-input"
+                    value={formatTags(metadataPatch.tags)}
+                    onChange={(event) => updateMetadataPatch((current) => ({ ...current, tags: parseTagsInput(event.target.value) }))}
+                    placeholder="studio-shell, workflow"
+                  />
+                </label>
+              </div>
+
+              <label className="ui-field">
+                <span className="ui-field__label">Summary</span>
+                <textarea
+                  className="ui-textarea"
+                  rows={4}
+                  value={metadataPatch.summary === null ? "" : (metadataPatch.summary ?? "")}
+                  onChange={(event) => updateMetadataPatch((current) => ({ ...current, summary: event.target.value || undefined }))}
+                />
+              </label>
+
+              <div className="ui-card ui-card--padded ui-stack ui-stack--sm">
+                <strong>Taxonomy</strong>
+                <div className="ui-form-grid">
+                  <label className="ui-field">
+                    <span className="ui-field__label">Structural kind</span>
+                    <input
+                      className="ui-input"
+                      value={metadataPatch.taxonomy?.structuralKind ?? ""}
+                      onChange={(event) => updateMetadataPatch((current) => ({
+                        ...current,
+                        taxonomy: {
+                          structuralKind: event.target.value as never,
+                          semanticRole: (current.taxonomy?.semanticRole ?? "") as never,
+                          behaviorKind: (current.taxonomy?.behaviorKind ?? "") as never,
+                        },
+                      }))}
+                    />
+                  </label>
+                  <label className="ui-field">
+                    <span className="ui-field__label">Semantic role</span>
+                    <input
+                      className="ui-input"
+                      value={metadataPatch.taxonomy?.semanticRole ?? ""}
+                      onChange={(event) => updateMetadataPatch((current) => ({
+                        ...current,
+                        taxonomy: {
+                          structuralKind: (current.taxonomy?.structuralKind ?? "") as never,
+                          semanticRole: event.target.value as never,
+                          behaviorKind: (current.taxonomy?.behaviorKind ?? "") as never,
+                        },
+                      }))}
+                    />
+                  </label>
+                  <label className="ui-field">
+                    <span className="ui-field__label">Behavior kind</span>
+                    <input
+                      className="ui-input"
+                      value={metadataPatch.taxonomy?.behaviorKind ?? ""}
+                      onChange={(event) => updateMetadataPatch((current) => ({
+                        ...current,
+                        taxonomy: {
+                          structuralKind: (current.taxonomy?.structuralKind ?? "") as never,
+                          semanticRole: (current.taxonomy?.semanticRole ?? "") as never,
+                          behaviorKind: event.target.value as never,
+                        },
+                      }))}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="ui-card ui-card--padded ui-stack ui-stack--sm">
+                <strong>Contract</strong>
+                <div className="ui-form-grid">
+                  <label className="ui-field">
+                    <span className="ui-field__label">Version</span>
+                    <input
+                      className="ui-input"
+                      value={metadataPatch.contract?.version ?? ""}
+                      onChange={(event) => updateMetadataPatch((current) => ({
+                        ...current,
+                        contract: {
+                          ...(current.contract ?? { version: "", parameters: [] }),
+                          version: event.target.value,
+                          parameters: current.contract?.parameters ?? [],
+                        },
+                      }))}
+                    />
+                  </label>
+                  <label className="ui-field">
+                    <span className="ui-field__label">Execution mode</span>
+                    <input
+                      className="ui-input"
+                      value={metadataPatch.contract?.execution?.invocationMode ?? ""}
+                      onChange={(event) => updateMetadataPatch((current) => ({
+                        ...current,
+                        contract: {
+                          ...(current.contract ?? { version: "", parameters: [] }),
+                          version: current.contract?.version ?? "1.0.0",
+                          parameters: current.contract?.parameters ?? [],
+                          execution: {
+                            ...(current.contract?.execution ?? {}),
+                            invocationMode: event.target.value as never,
+                          },
+                        },
+                      }))}
+                    />
+                  </label>
+                  <label className="ui-field">
+                    <span className="ui-field__label">Input shape</span>
+                    <input
+                      className="ui-input"
+                      value={metadataPatch.contract?.input?.kind ?? ""}
+                      onChange={(event) => updateMetadataPatch((current) => ({
+                        ...current,
+                        contract: {
+                          ...(current.contract ?? { version: "", parameters: [] }),
+                          version: current.contract?.version ?? "1.0.0",
+                          parameters: current.contract?.parameters ?? [],
+                          input: {
+                            ...(current.contract?.input ?? {}),
+                            kind: event.target.value as never,
+                          },
+                        },
+                      }))}
+                    />
+                  </label>
+                  <label className="ui-field">
+                    <span className="ui-field__label">Output shape</span>
+                    <input
+                      className="ui-input"
+                      value={metadataPatch.contract?.output?.kind ?? ""}
+                      onChange={(event) => updateMetadataPatch((current) => ({
+                        ...current,
+                        contract: {
+                          ...(current.contract ?? { version: "", parameters: [] }),
+                          version: current.contract?.version ?? "1.0.0",
+                          parameters: current.contract?.parameters ?? [],
+                          output: {
+                            ...(current.contract?.output ?? {}),
+                            kind: event.target.value as never,
+                          },
+                        },
+                      }))}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="ui-card ui-card--padded ui-stack ui-stack--sm">
+                <strong>Provenance</strong>
+                <div className="ui-form-grid">
+                  <label className="ui-field">
+                    <span className="ui-field__label">Creator ID</span>
+                    <input
+                      className="ui-input"
+                      value={metadataPatch.provenance?.creatorId ?? ""}
+                      onChange={(event) => updateMetadataPatch((current) => ({
+                        ...current,
+                        provenance: {
+                          ...(current.provenance ?? {}),
+                          creatorId: event.target.value || undefined,
+                        },
+                      }))}
+                    />
+                  </label>
+                  <label className="ui-field">
+                    <span className="ui-field__label">Source type</span>
+                    <input
+                      className="ui-input"
+                      value={metadataPatch.provenance?.sourceType ?? ""}
+                      onChange={(event) => updateMetadataPatch((current) => ({
+                        ...current,
+                        provenance: {
+                          ...(current.provenance ?? {}),
+                          sourceType: event.target.value as never,
+                        },
+                      }))}
+                    />
+                  </label>
+                  <label className="ui-field">
+                    <span className="ui-field__label">Source label</span>
+                    <input
+                      className="ui-input"
+                      value={metadataPatch.provenance?.sourceLabel ?? ""}
+                      onChange={(event) => updateMetadataPatch((current) => ({
+                        ...current,
+                        provenance: {
+                          ...(current.provenance ?? {}),
+                          sourceLabel: event.target.value || undefined,
+                        },
+                      }))}
+                    />
+                  </label>
+                  <label className="ui-field">
+                    <span className="ui-field__label">Derivation context</span>
+                    <input
+                      className="ui-input"
+                      value={metadataPatch.provenance?.derivationContext ?? ""}
+                      onChange={(event) => updateMetadataPatch((current) => ({
+                        ...current,
+                        provenance: {
+                          ...(current.provenance ?? {}),
+                          derivationContext: event.target.value || undefined,
+                        },
+                      }))}
+                    />
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
+          {metadataJsonError ? <p className="ui-text-muted">{metadataJsonError}</p> : null}
         </StudioShellPanel>
         {renderExtensions(extensionRegistry, StudioShellExtensionSlots.metadata, extensionContext)}
 
         <StudioShellPanel title="Dependencies" subtitle="Draft dependency references and version pinning.">
-          <textarea className="ui-textarea" rows={8} value={dependenciesJson} onChange={(event) => setDependenciesJson(event.target.value)} />
+          <div className="ui-form-json-toggle">
+            <button
+              type="button"
+              className="ui-button ui-button--ghost ui-button--sm"
+              onClick={() => {
+                if (!isDependenciesJsonMode) {
+                  setDependenciesJson(JSON.stringify(toDependencyReferences(dependencies), null, 2));
+                  setIsDependenciesJsonMode(true);
+                  setDependenciesJsonError(undefined);
+                  return;
+                }
+                const parsed = parseJson<Array<{ assetId: string; versionId?: string }>>(dependenciesJson);
+                if (!parsed.ok) {
+                  setDependenciesJsonError("Dependencies JSON is invalid. Fix JSON before leaving advanced mode.");
+                  return;
+                }
+                const nextDependencies = toDependencyInputs(parsed.data ?? []);
+                setDependencies(nextDependencies);
+                setDependenciesJson(JSON.stringify(toDependencyReferences(nextDependencies), null, 2));
+                setDependenciesJsonError(undefined);
+                setIsDependenciesJsonMode(false);
+              }}
+            >
+              {isDependenciesJsonMode ? "Use Form Editor" : "Edit JSON"}
+            </button>
+          </div>
+          {isDependenciesJsonMode ? (
+            <textarea className="ui-textarea" rows={8} value={dependenciesJson} onChange={(event) => setDependenciesJson(event.target.value)} />
+          ) : (
+            <div className="ui-form-array">
+              <div className="ui-form-array__header">
+                <strong>Dependency references</strong>
+                <button
+                  type="button"
+                  className="ui-button ui-button--ghost ui-button--sm"
+                  onClick={() => updateDependenciesForm([...dependencies, { assetId: "", versionId: "" }])}
+                >
+                  Add dependency
+                </button>
+              </div>
+              {dependencies.map((dependency, index) => (
+                <div key={`dependency-row-${index}`} className="ui-form-array__row">
+                  <div className="ui-form-grid">
+                    <label className="ui-field">
+                      <span className="ui-field__label">Asset ID</span>
+                      <input
+                        className="ui-input"
+                        value={dependency.assetId}
+                        onChange={(event) => {
+                          const next = [...dependencies];
+                          next[index] = { ...dependency, assetId: event.target.value };
+                          updateDependenciesForm(next);
+                        }}
+                      />
+                    </label>
+                    <label className="ui-field">
+                      <span className="ui-field__label">Version ID (optional)</span>
+                      <input
+                        className="ui-input"
+                        value={dependency.versionId}
+                        onChange={(event) => {
+                          const next = [...dependencies];
+                          next[index] = { ...dependency, versionId: event.target.value };
+                          updateDependenciesForm(next);
+                        }}
+                      />
+                    </label>
+                  </div>
+                  <div className="ui-row ui-row--end">
+                    <button
+                      type="button"
+                      className="ui-button ui-button--ghost ui-button--sm"
+                      onClick={() => {
+                        const next = dependencies.filter((_, entryIndex) => entryIndex !== index);
+                        updateDependenciesForm(next.length > 0 ? next : [{ assetId: "", versionId: "" }]);
+                      }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {dependenciesJsonError ? <p className="ui-text-muted">{dependenciesJsonError}</p> : null}
           <button
             className="ui-button"
             disabled={isBusy || !sessionId || !draftId}
@@ -323,12 +1014,15 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
               if (!sessionId || !draftId) {
                 return;
               }
-              const dependencies = safeParseJson<Array<{ assetId: string; versionId?: string }>>(dependenciesJson, []);
+              const dependenciesToSave = resolveDependenciesForSave();
+              if (!dependenciesToSave) {
+                return;
+              }
               void runAndRefresh(() => service.updateDependencies({
                 studioId,
                 sessionId,
                 draftId,
-                dependencies,
+                dependencies: dependenciesToSave,
               }));
             }}
           >
@@ -407,7 +1101,7 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
           </div>
           <ul className="ui-stack ui-stack--2xs">
             {(snapshot?.versions ?? []).map((version) => (
-              <li key={version.versionId}>{version.versionLabel ?? version.versionId} · {version.createdAt}</li>
+              <li key={version.versionId}>{version.versionLabel ?? version.versionId} - {version.createdAt}</li>
             ))}
           </ul>
         </StudioShellPanel>
