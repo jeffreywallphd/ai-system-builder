@@ -1,14 +1,34 @@
 import { describe, expect, it } from "bun:test";
-import { createEmptyWorkflowDraft } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+import {
+  WorkflowDraftBuiltInStepTypes,
+  WorkflowDraftStepTypes,
+  createEmptyWorkflowDraft,
+  validateWorkflowDraft,
+} from "../../../../domain/workflow-studio/WorkflowStudioDomain";
 import {
   addWorkflowStep,
+  buildWorkflowStepTypeDefinitionKey,
   clearWorkflowStepAgentAssetSelection,
   loadAgentAssistantAssetCandidates,
   moveWorkflowStepDown,
   moveWorkflowStepUp,
   removeWorkflowStep,
+  resolveWorkflowStepTypeDefinition,
   setWorkflowStepAgentAssetSelection,
+  setWorkflowStepDelayConfig,
+  setWorkflowStepIfThenConfig,
+  setWorkflowStepLoopConfig,
+  setWorkflowStepType,
+  workflowStepTypeDefinitions,
 } from "../WorkflowWizardSteps";
+
+function findDefinition(type: string): string {
+  const definition = workflowStepTypeDefinitions.find((entry) => entry.type === type);
+  if (!definition) {
+    throw new Error(`Missing step definition for '${type}'.`);
+  }
+  return buildWorkflowStepTypeDefinitionKey(definition);
+}
 
 describe("WorkflowWizardSteps", () => {
   it("adds, removes, and reorders steps while preserving stable step ids", () => {
@@ -33,6 +53,33 @@ describe("WorkflowWizardSteps", () => {
     expect(removed.changed).toBe(true);
     expect(removed.draft.steps.map((step) => step.id)).toEqual([third.stepId, second.stepId]);
     expect(removed.draft.steps.map((step) => step.order)).toEqual([1, 2]);
+  });
+
+  it("supports selecting built-in step types and updating type-specific configs", () => {
+    const withStep = addWorkflowStep(createEmptyWorkflowDraft()).draft;
+    const stepId = withStep.steps[0]?.id as string;
+
+    const ifThen = setWorkflowStepType(withStep, stepId, findDefinition(WorkflowDraftBuiltInStepTypes.ifThen));
+    expect(ifThen.changed).toBeTrue();
+    expect(ifThen.draft.steps[0]?.type).toBe(WorkflowDraftBuiltInStepTypes.ifThen);
+    expect(resolveWorkflowStepTypeDefinition(ifThen.draft.steps[0]!).selectionKind).toBe("built-in");
+
+    const configuredIf = setWorkflowStepIfThenConfig(ifThen.draft, stepId, {
+      conditionExpression: "score > 0.8",
+      thenLabel: "approve",
+      elseLabel: "review",
+    });
+    expect((configuredIf.draft.steps[0]?.config as { conditionExpression?: string }).conditionExpression).toBe("score > 0.8");
+
+    const loop = setWorkflowStepType(configuredIf.draft, stepId, findDefinition(WorkflowDraftBuiltInStepTypes.loopIteration));
+    const configuredLoop = setWorkflowStepLoopConfig(loop.draft, stepId, { repeatCount: 3 });
+    expect((configuredLoop.draft.steps[0]?.config as { repeatCount?: number }).repeatCount).toBe(3);
+
+    const delay = setWorkflowStepType(configuredLoop.draft, stepId, findDefinition(WorkflowDraftBuiltInStepTypes.delayWait));
+    const configuredDelay = setWorkflowStepDelayConfig(delay.draft, stepId, { durationSeconds: 45 });
+    expect((configuredDelay.draft.steps[0]?.config as { durationSeconds?: number }).durationSeconds).toBe(45);
+
+    expect(validateWorkflowDraft(configuredDelay.draft).valid).toBeTrue();
   });
 
   it("supports selecting, replacing, and clearing agent/assistant assets per step", () => {
@@ -68,8 +115,27 @@ describe("WorkflowWizardSteps", () => {
     const cleared = clearWorkflowStepAgentAssetSelection(secondAssigned.draft, firstStepId);
     expect(cleared.changed).toBe(true);
     expect(cleared.draft.steps[0]?.assetRef).toBeUndefined();
-    expect(cleared.draft.steps[0]?.kind).toBe("action");
+    expect(cleared.draft.steps[0]?.kind).toBe("asset-backed");
     expect(cleared.draft.steps[1]?.assetRef?.asset.assetId).toBe("asset:agent-alpha");
+  });
+
+  it("cleans stale config and asset references when switching step types", () => {
+    const added = addWorkflowStep(createEmptyWorkflowDraft()).draft;
+    const stepId = added.steps[0]?.id as string;
+
+    const withAsset = setWorkflowStepAgentAssetSelection(added, stepId, {
+      assetId: "asset:agent-a",
+      versionId: "asset:agent-a:v1",
+    }).draft;
+    expect(withAsset.steps[0]?.type).toBe(WorkflowDraftStepTypes.agentAssistant);
+
+    const asIf = setWorkflowStepType(withAsset, stepId, findDefinition(WorkflowDraftBuiltInStepTypes.ifThen)).draft;
+    expect(asIf.steps[0]?.assetRef).toBeUndefined();
+    expect(asIf.steps[0]?.type).toBe(WorkflowDraftBuiltInStepTypes.ifThen);
+
+    const backToAsset = setWorkflowStepType(asIf, stepId, findDefinition(WorkflowDraftStepTypes.agentAssistant)).draft;
+    expect(backToAsset.steps[0]?.type).toBe(WorkflowDraftStepTypes.agentAssistant);
+    expect(backToAsset.steps[0]?.config).toBeUndefined();
   });
 
   it("queries the registry with canonical agent/assistant taxonomy filters", async () => {

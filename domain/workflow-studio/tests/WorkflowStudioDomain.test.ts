@@ -520,8 +520,8 @@ describe("WorkflowStudioDomain", () => {
           order: 1,
           config: {
             conditionExpression: "qualityScore >= 0.9",
-            thenStepIds: ["step-publish", "step-notify"],
-            elseStepIds: ["step-review"],
+            thenLabel: "high confidence",
+            elseLabel: "needs review",
           },
         },
         {
@@ -530,11 +530,16 @@ describe("WorkflowStudioDomain", () => {
           kind: WorkflowDraftStepKinds.controlFlow,
           order: 2,
           config: {
-            iterationMode: "collection",
-            collectionInputKey: "documents",
-            itemAlias: "document",
-            bodyStepIds: ["step-summarize"],
-            maxIterations: 100,
+            repeatCount: 3,
+          },
+        },
+        {
+          id: "step-delay",
+          type: WorkflowDraftBuiltInStepTypes.delayWait,
+          kind: WorkflowDraftStepKinds.controlFlow,
+          order: 3,
+          config: {
+            durationSeconds: 30,
           },
         },
       ],
@@ -547,8 +552,8 @@ describe("WorkflowStudioDomain", () => {
       type: WorkflowDraftBuiltInStepTypes.ifThen,
       config: {
         conditionExpression: "qualityScore >= 0.9",
-        thenStepIds: ["step-publish", "step-notify"],
-        elseStepIds: ["step-review"],
+        thenLabel: "high confidence",
+        elseLabel: "needs review",
       },
     });
     expect(normalized.steps[1]).toMatchObject({
@@ -556,11 +561,15 @@ describe("WorkflowStudioDomain", () => {
       kind: WorkflowDraftStepKinds.controlFlow,
       type: WorkflowDraftBuiltInStepTypes.loopIteration,
       config: {
-        iterationMode: "collection",
-        collectionInputKey: "documents",
-        itemAlias: "document",
-        bodyStepIds: ["step-summarize"],
-        maxIterations: 100,
+        repeatCount: 3,
+      },
+    });
+    expect(normalized.steps[2]).toMatchObject({
+      id: "step-delay",
+      kind: WorkflowDraftStepKinds.controlFlow,
+      type: WorkflowDraftBuiltInStepTypes.delayWait,
+      config: {
+        durationSeconds: 30,
       },
     });
   });
@@ -735,12 +744,11 @@ describe("WorkflowStudioDomain", () => {
         kind: WorkflowDraftStepKinds.controlFlow,
         order: 1,
         config: {
-          iterationMode: "range",
-          bodyStepIds: ["step-body"],
+          loopLabel: "no conditions",
         },
       }],
       outputs: [],
-    })).toThrow("range mode requires config.range");
+    })).toThrow("requires config.repeatCount or config.loopConditionExpression");
 
     expect(() => normalizeWorkflowDraft({
       triggers: [],
@@ -752,11 +760,25 @@ describe("WorkflowStudioDomain", () => {
         order: 1,
         config: {
           conditionExpression: "x > 0",
-          thenStepIds: ["step-next"],
         },
       }],
       outputs: [],
     })).toThrow("requires kind 'control-flow'");
+
+    expect(() => normalizeWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [{
+        id: "step-invalid-delay",
+        type: WorkflowDraftBuiltInStepTypes.delayWait,
+        kind: WorkflowDraftStepKinds.controlFlow,
+        order: 1,
+        config: {
+          durationSeconds: 0,
+        },
+      }],
+      outputs: [],
+    })).toThrow("durationSeconds");
   });
 
   it("accepts canonical output entries with type, format, and destination", () => {
@@ -881,9 +903,7 @@ describe("WorkflowStudioDomain", () => {
           order: 2,
           dependsOnStepIds: ["step-load"],
           config: {
-            iterationMode: "collection",
-            collectionInputKey: "input-dataset",
-            bodyStepIds: ["step-load"],
+            repeatCount: 2,
           },
         },
       ],
@@ -985,7 +1005,7 @@ describe("WorkflowStudioDomain", () => {
           config: {
             iterationMode: "collection",
             collectionInputKey: "input-missing",
-            bodyStepIds: ["step-loop-body"],
+            repeatCount: 2,
           },
         }],
         outputs: [],
@@ -1043,8 +1063,7 @@ describe("WorkflowStudioDomain", () => {
           kind: WorkflowDraftStepKinds.controlFlow,
           order: 1,
           config: {
-            iterationMode: "collection",
-            bodyStepIds: ["step-body"],
+            loopLabel: "missing count",
           },
         }],
         outputs: [],

@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import React, { type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
+  WorkflowDraftBuiltInStepTypes,
   WorkflowDraftOutputDestinationTypes,
   WorkflowDraftOutputFormats,
   WorkflowDraftOutputTypes,
@@ -16,9 +17,14 @@ import { WorkflowStudioModeStateStore } from "../WorkflowStudioModeStateStore";
 import { WorkflowStudioModeIds } from "../WorkflowStudioModes";
 import {
   addWorkflowStep,
+  buildWorkflowStepTypeDefinitionKey,
   moveWorkflowStepUp,
   removeWorkflowStep,
+  setWorkflowStepDelayConfig,
+  setWorkflowStepIfThenConfig,
   setWorkflowStepAgentAssetSelection,
+  setWorkflowStepType,
+  workflowStepTypeDefinitions,
 } from "../WorkflowWizardSteps";
 
 interface ButtonElementProps {
@@ -417,14 +423,40 @@ describe("WorkflowStudioModeSystem integration seams", () => {
       versionId: "asset:agent-selected:v1",
       name: "Selected Agent",
     }).draft);
+    const firstStepId = store.getState().sharedDraft.steps[0]?.id as string;
+    const ifThenDefinition = workflowStepTypeDefinitions.find((definition) => definition.type === WorkflowDraftBuiltInStepTypes.ifThen);
+    const delayDefinition = workflowStepTypeDefinitions.find((definition) => definition.type === WorkflowDraftBuiltInStepTypes.delayWait);
+    if (!ifThenDefinition || !delayDefinition) {
+      throw new Error("Expected built-in workflow step type definitions to be present.");
+    }
+    store.updateSharedDraft((draft) => setWorkflowStepType(
+      draft,
+      firstStepId,
+      buildWorkflowStepTypeDefinitionKey(ifThenDefinition),
+    ).draft);
+    store.updateSharedDraft((draft) => setWorkflowStepIfThenConfig(draft, firstStepId, {
+      conditionExpression: "score > 0.5",
+      thenLabel: "approve",
+    }).draft);
+    store.updateSharedDraft((draft) => setWorkflowStepType(
+      draft,
+      firstStepId,
+      buildWorkflowStepTypeDefinitionKey(delayDefinition),
+    ).draft);
+    store.updateSharedDraft((draft) => setWorkflowStepDelayConfig(draft, firstStepId, {
+      durationSeconds: 20,
+    }).draft);
 
     expect(store.getState().sharedDraft.steps.map((step) => step.order)).toEqual([1, 2, 3]);
     expect(store.getState().sharedDraft.steps.find((step) => step.id === secondStepId)?.assetRef?.asset.assetId).toBe("asset:agent-selected");
+    expect(store.getState().sharedDraft.steps.find((step) => step.id === firstStepId)?.type).toBe(WorkflowDraftBuiltInStepTypes.delayWait);
 
     store.setSelectedMode(WorkflowStudioModeIds.canvas);
     store.setSelectedMode(WorkflowStudioModeIds.wizard);
     expect(store.getState().sharedDraft.steps.map((step) => step.order)).toEqual([1, 2, 3]);
     expect(store.getState().sharedDraft.steps.find((step) => step.id === secondStepId)?.assetRef?.asset.assetId).toBe("asset:agent-selected");
+    expect(store.getState().sharedDraft.steps.find((step) => step.id === firstStepId)?.type).toBe(WorkflowDraftBuiltInStepTypes.delayWait);
+    expect((store.getState().sharedDraft.steps.find((step) => step.id === firstStepId)?.config as { durationSeconds?: number })?.durationSeconds).toBe(20);
 
     store.updateSharedDraft((draft) => removeWorkflowStep(draft, secondStepId).draft);
     expect(store.getState().sharedDraft.steps.map((step) => step.order)).toEqual([1, 2]);

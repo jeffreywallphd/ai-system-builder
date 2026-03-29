@@ -215,6 +215,7 @@ export type WorkflowDraftStepType = typeof WorkflowDraftStepTypes[keyof typeof W
 export const WorkflowDraftBuiltInStepTypes = Object.freeze({
   ifThen: "if-then",
   loopIteration: "loop-iteration",
+  delayWait: "delay-wait",
 });
 
 export type WorkflowDraftBuiltInStepType = typeof WorkflowDraftBuiltInStepTypes[keyof typeof WorkflowDraftBuiltInStepTypes];
@@ -228,7 +229,9 @@ export type WorkflowDraftLoopIterationMode = typeof WorkflowDraftLoopIterationMo
 
 export interface WorkflowDraftIfThenStepConfig {
   readonly conditionExpression: string;
-  readonly thenStepIds: ReadonlyArray<string>;
+  readonly thenLabel?: string;
+  readonly elseLabel?: string;
+  readonly thenStepIds?: ReadonlyArray<string>;
   readonly elseStepIds?: ReadonlyArray<string>;
 }
 
@@ -239,12 +242,20 @@ export interface WorkflowDraftLoopRangeConfig {
 }
 
 export interface WorkflowDraftLoopIterationStepConfig {
-  readonly iterationMode: WorkflowDraftLoopIterationMode;
-  readonly bodyStepIds: ReadonlyArray<string>;
+  readonly repeatCount?: number;
+  readonly loopConditionExpression?: string;
+  readonly loopLabel?: string;
+  readonly iterationMode?: WorkflowDraftLoopIterationMode;
+  readonly bodyStepIds?: ReadonlyArray<string>;
   readonly itemAlias?: string;
   readonly collectionInputKey?: string;
   readonly range?: WorkflowDraftLoopRangeConfig;
   readonly maxIterations?: number;
+}
+
+export interface WorkflowDraftDelayWaitStepConfig {
+  readonly durationSeconds: number;
+  readonly note?: string;
 }
 
 export const WorkflowDraftStepAssetKinds = Object.freeze({
@@ -902,13 +913,17 @@ function normalizeStepConfig(
       return normalizeIfThenStepConfig(configRecord);
     case WorkflowDraftBuiltInStepTypes.loopIteration:
       return normalizeLoopIterationStepConfig(configRecord);
+    case WorkflowDraftBuiltInStepTypes.delayWait:
+      return normalizeDelayWaitStepConfig(configRecord);
     default:
       return Object.freeze({ ...configRecord });
   }
 }
 
 function isBuiltInControlFlowStepType(value: string): value is WorkflowDraftBuiltInStepType {
-  return value === WorkflowDraftBuiltInStepTypes.ifThen || value === WorkflowDraftBuiltInStepTypes.loopIteration;
+  return value === WorkflowDraftBuiltInStepTypes.ifThen
+    || value === WorkflowDraftBuiltInStepTypes.loopIteration
+    || value === WorkflowDraftBuiltInStepTypes.delayWait;
 }
 
 function normalizeIfThenStepConfig(configRecord: Readonly<Record<string, unknown>>): Readonly<WorkflowDraftIfThenStepConfig> {
@@ -916,14 +931,18 @@ function normalizeIfThenStepConfig(configRecord: Readonly<Record<string, unknown
     typeof configRecord.conditionExpression === "string" ? configRecord.conditionExpression : "",
     "Workflow draft if-then step config.conditionExpression",
   );
-  const thenStepIds = normalizeRequiredStringArray(configRecord.thenStepIds, "Workflow draft if-then step config.thenStepIds");
+  const thenLabel = normalizeOptional(typeof configRecord.thenLabel === "string" ? configRecord.thenLabel : undefined);
+  const elseLabel = normalizeOptional(typeof configRecord.elseLabel === "string" ? configRecord.elseLabel : undefined);
+  const thenStepIds = normalizeStringArray(configRecord.thenStepIds, "Workflow draft if-then step config.thenStepIds");
   const elseStepIds = normalizeStringArray(configRecord.elseStepIds, "Workflow draft if-then step config.elseStepIds");
-  if (elseStepIds && elseStepIds.some((stepId) => thenStepIds.includes(stepId))) {
+  if (thenStepIds && elseStepIds && elseStepIds.some((stepId) => thenStepIds.includes(stepId))) {
     throw new Error("Workflow draft if-then step config elseStepIds cannot overlap thenStepIds.");
   }
 
   return Object.freeze({
     conditionExpression,
+    thenLabel,
+    elseLabel,
     thenStepIds,
     elseStepIds,
   });
@@ -932,17 +951,26 @@ function normalizeIfThenStepConfig(configRecord: Readonly<Record<string, unknown
 function normalizeLoopIterationStepConfig(
   configRecord: Readonly<Record<string, unknown>>,
 ): Readonly<WorkflowDraftLoopIterationStepConfig> {
-  const iterationModeRaw = normalizeRequired(
-    typeof configRecord.iterationMode === "string" ? configRecord.iterationMode : "",
-    "Workflow draft loop-iteration step config.iterationMode",
+  const repeatCount = normalizePositiveInteger(configRecord.repeatCount, "Workflow draft loop-iteration step config.repeatCount");
+  const loopConditionExpression = normalizeOptional(
+    typeof configRecord.loopConditionExpression === "string" ? configRecord.loopConditionExpression : undefined,
   );
-  if (iterationModeRaw !== WorkflowDraftLoopIterationModes.collection && iterationModeRaw !== WorkflowDraftLoopIterationModes.range) {
+  const loopLabel = normalizeOptional(typeof configRecord.loopLabel === "string" ? configRecord.loopLabel : undefined);
+
+  const iterationModeRaw = normalizeOptional(
+    typeof configRecord.iterationMode === "string" ? configRecord.iterationMode : undefined,
+  );
+  if (
+    iterationModeRaw
+    && iterationModeRaw !== WorkflowDraftLoopIterationModes.collection
+    && iterationModeRaw !== WorkflowDraftLoopIterationModes.range
+  ) {
     throw new Error(`Workflow draft loop-iteration step config.iterationMode '${iterationModeRaw}' is not supported.`);
   }
-  const bodyStepIds = normalizeRequiredStringArray(configRecord.bodyStepIds, "Workflow draft loop-iteration step config.bodyStepIds");
+  const iterationMode = iterationModeRaw as WorkflowDraftLoopIterationMode | undefined;
+  const bodyStepIds = normalizeStringArray(configRecord.bodyStepIds, "Workflow draft loop-iteration step config.bodyStepIds");
   const itemAlias = normalizeOptional(typeof configRecord.itemAlias === "string" ? configRecord.itemAlias : undefined);
   const maxIterations = normalizePositiveInteger(configRecord.maxIterations, "Workflow draft loop-iteration step config.maxIterations");
-  const iterationMode = iterationModeRaw as WorkflowDraftLoopIterationMode;
   const collectionInputKey = normalizeOptional(
     typeof configRecord.collectionInputKey === "string" ? configRecord.collectionInputKey : undefined,
   );
@@ -968,14 +996,37 @@ function normalizeLoopIterationStepConfig(
   if (iterationMode === WorkflowDraftLoopIterationModes.range && range && range.start > range.end) {
     throw new Error("Workflow draft loop-iteration step config.range.start must be less than or equal to range.end.");
   }
+  if (!repeatCount && !loopConditionExpression && !iterationMode) {
+    throw new Error("Workflow draft loop-iteration step requires config.repeatCount or config.loopConditionExpression.");
+  }
 
   return Object.freeze({
+    repeatCount,
+    loopConditionExpression,
+    loopLabel,
     iterationMode,
     bodyStepIds,
     itemAlias,
     collectionInputKey,
     range,
     maxIterations,
+  });
+}
+
+function normalizeDelayWaitStepConfig(
+  configRecord: Readonly<Record<string, unknown>>,
+): Readonly<WorkflowDraftDelayWaitStepConfig> {
+  const durationSeconds = normalizePositiveInteger(
+    configRecord.durationSeconds,
+    "Workflow draft delay-wait step config.durationSeconds",
+  );
+  if (!durationSeconds) {
+    throw new Error("Workflow draft delay-wait step requires config.durationSeconds.");
+  }
+  const note = normalizeOptional(typeof configRecord.note === "string" ? configRecord.note : undefined);
+  return Object.freeze({
+    durationSeconds,
+    note,
   });
 }
 
@@ -1432,7 +1483,7 @@ export function validateWorkflowDraft(draft: WorkflowDraft | undefined): Workflo
 
     if (step.type === WorkflowDraftBuiltInStepTypes.ifThen) {
       const config = step.config as WorkflowDraftIfThenStepConfig;
-      for (const referenced of [...config.thenStepIds, ...(config.elseStepIds ?? [])]) {
+      for (const referenced of [...(config.thenStepIds ?? []), ...(config.elseStepIds ?? [])]) {
         if (referenced === step.id) {
           issues.push({
             code: WorkflowValidationIssueCodes.builtInStepReferenceSelf,
@@ -1457,7 +1508,7 @@ export function validateWorkflowDraft(draft: WorkflowDraft | undefined): Workflo
 
     if (step.type === WorkflowDraftBuiltInStepTypes.loopIteration) {
       const config = step.config as WorkflowDraftLoopIterationStepConfig;
-      for (const referenced of config.bodyStepIds) {
+      for (const referenced of config.bodyStepIds ?? []) {
         if (referenced === step.id) {
           issues.push({
             code: WorkflowValidationIssueCodes.builtInStepReferenceSelf,
