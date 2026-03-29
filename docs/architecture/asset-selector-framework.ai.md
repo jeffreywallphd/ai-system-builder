@@ -217,6 +217,38 @@ Selector session vs workflow draft model:
 - selector sessions remain ephemeral interaction state (pending/lifecycle/validation),
 - rehydration synchronizes selector interaction state from canonical draft without persisting UI-only session artifacts.
 
+## Story 4.13 (Epic 4 closeout): cross-story tests + docs hardening
+Epic 4 closeout now adds integration-level selector regression coverage in:
+- `ui/studio-shell/asset-selector/tests/AssetSelectorFramework.integration.test.ts`
+
+What the closeout suite verifies:
+- Domain contract + capability matrix enforcement at shared session-store boundaries.
+- Dataset and agent selectors both using the same session/lifecycle infra with isolation between sessions.
+- Create-new launch + return handoff restoring the targeted selector session while preserving existing selections.
+- Workflow draft synchronization across selector-confirm flows for dataset inputs and agent-backed steps.
+- Stale/malformed return payloads failing safely without mutating selected-state truth.
+- Draft persistence round-trip (`serializeWorkflowDraft`/`deserializeWorkflowDraft`) preserving canonical selector-linked refs.
+- Duplicate/non-canonical dataset refs filtered during replacement so save/load flows do not introduce duplicate or orphaned selector refs.
+
+Shared vs asset-specific boundaries (keep this split):
+- Shared framework:
+  - Contract/validation: `domain/studio-shell/AssetSelectorContract.ts`
+  - Capability matrix: `application/studio-entry/AssetSelectorCapabilityRegistry.ts`
+  - Session/lifecycle state model: `application/studio-entry/AssetSelectorSessionStore.ts`
+  - Shared shell UI: `ui/components/studio-shell/asset-selector/AssetSelectorShell.tsx`
+  - Shared launch/return seams: `AssetSelectorStudioLaunchService` + `AssetSelectorReturnHandoffService`
+- Asset-specific seams:
+  - Adapter request defaults + taxonomy filtering + mapping (`DatasetAssetSelectorAdapter`, `AgentAssistantAssetSelectorAdapter`)
+  - Canonical draft mutation helpers (`WorkflowWizardDatasetInputs`, `WorkflowWizardSteps`)
+  - Feature/editor wiring (workflow section editors)
+
+Future selector-backed type adoption checklist:
+1. Add usage-context -> asset-type mapping in `AssetSelectorCapabilityRegistry`.
+2. Add an adapter with only asset-specific request/taxonomy/mapping logic.
+3. Reuse shared session store + shell + launch/return services (no duplicate lifecycle logic in UI).
+4. Persist only canonical refs in workflow draft; keep selector session as ephemeral interaction state.
+5. Add one lifecycle integration test covering validation, create-new return, and persistence round-trip for the new type.
+
 ## Story 4.13: studio-shell authoring promotion + configurable toolbar contract
 - Studio Shell registration contracts now support an optional shell toolbar configuration (`ui/studio-shell/StudioShellExtensions.ts`) with typed toolbar actions:
   - `refresh-snapshot`
