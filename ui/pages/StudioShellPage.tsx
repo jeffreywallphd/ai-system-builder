@@ -13,6 +13,7 @@ import {
   type StudioShellExtensionContribution,
   type StudioShellExtensionSlot,
 } from "../studio-shell/StudioShellExtensions";
+import { WorkflowStudioModeStateStore, type WorkflowStudioModeState } from "../studio-shell/workflow/WorkflowStudioModeStateStore";
 import { StudioEntryService } from "../routes/StudioRouteMapping";
 import { readAutomationIntentFromSearch } from "../routes/BuildAutomationIntent";
 import { BuildIntents } from "../routes/BuildIntentModels";
@@ -123,6 +124,7 @@ function renderExtensions(
 
 export default function StudioShellPage({ studioRegistration, extensions = [] }: StudioShellPageProps): JSX.Element {
   const studioId = studioRegistration?.studioId ?? "studio-shell-main";
+  const isWorkflowStudio = studioRegistration?.role === "workflow";
   const defaultDraftTitle = studioRegistration?.defaults.title ?? "Studio Shell Draft";
   const defaultDraftTags = studioRegistration?.defaults.tags ?? ["studio-shell"];
   const defaultContent = studioRegistration?.defaults.contentTemplate ?? "{}";
@@ -142,6 +144,10 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
   const automationIntent = useMemo(
     () => readAutomationIntentFromSearch(location.search),
     [location.search],
+  );
+  const workflowModeStore = useMemo(
+    () => (isWorkflowStudio ? new WorkflowStudioModeStateStore() : undefined),
+    [isWorkflowStudio],
   );
   const shouldSeedAutomationIntent = searchParams.get("buildIntent")?.trim() === BuildIntents.automateTask && Boolean(automationIntent);
   const extensionRegistry = useMemo(() => {
@@ -171,7 +177,25 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
   const [dependenciesJson, setDependenciesJson] = useState(() => JSON.stringify(toDependencyReferences(initialDependencies), null, 2));
   const [isDependenciesJsonMode, setIsDependenciesJsonMode] = useState(false);
   const [dependenciesJsonError, setDependenciesJsonError] = useState<string | undefined>();
+  const [workflowModeState, setWorkflowModeState] = useState<WorkflowStudioModeState | undefined>(
+    () => workflowModeStore?.getState(),
+  );
   const automationPrefillAppliedRef = useRef(false);
+
+  const updateContent = (nextContent: string): void => {
+    setContent(nextContent);
+    workflowModeStore?.hydrateFromSerializedDraft(nextContent);
+  };
+
+  useEffect(() => {
+    if (!workflowModeStore) {
+      setWorkflowModeState(undefined);
+      return;
+    }
+
+    setWorkflowModeState(workflowModeStore.getState());
+    return workflowModeStore.subscribe((state) => setWorkflowModeState(state));
+  }, [workflowModeStore]);
 
   const refreshSnapshot = async () => {
     setIsBusy(true);
@@ -204,7 +228,7 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
       }
       setError(undefined);
       if (response.data.draft) {
-        setContent(response.data.draft.content);
+        updateContent(response.data.draft.content);
       }
     } finally {
       setIsBusy(false);
@@ -236,7 +260,9 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
       return;
     }
 
-    setContent((current) => (current === defaultContent ? automationIntent : current));
+    if (!isWorkflowStudio) {
+      updateContent(content === defaultContent ? automationIntent : content);
+    }
     setMetadataPatch((current) => {
       const nextPatch: AssetMetadataPatch = {
         ...current,
@@ -247,7 +273,7 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
       return nextPatch;
     });
     automationPrefillAppliedRef.current = true;
-  }, [automationIntent, defaultContent, shouldSeedAutomationIntent, snapshot?.draft]);
+  }, [automationIntent, content, defaultContent, isWorkflowStudio, shouldSeedAutomationIntent, snapshot?.draft]);
 
   const runAndRefresh = async (action: () => Promise<{ ok: boolean; error?: { message: string } }>) => {
     setIsBusy(true);
@@ -309,10 +335,18 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
 
   const sessionId = snapshot?.activeSessionId;
   const draftId = snapshot?.draft?.draftId;
+  const workflowDraftContent = workflowModeState?.sharedDraftSerialized ?? content;
+  const hasWorkflowDraftParseError = isWorkflowStudio && Boolean(workflowModeState?.draftParseError);
   const extensionContext: StudioShellExtensionContext = {
     studioId,
     snapshot,
     validationIssues,
+    workflowModeState: workflowModeStore && workflowModeState
+      ? {
+        state: workflowModeState,
+        setSelectedMode: (modeId) => workflowModeStore.setSelectedMode(modeId),
+      }
+      : undefined,
     systemCompatibility,
     handoffContext: {
       assetId: contextualInitialization.context.authoritativeAsset?.assetId
@@ -419,11 +453,16 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
         {renderExtensions(extensionRegistry, StudioShellExtensionSlots.sessionContext, extensionContext)}
 
         <StudioShellPanel title="Asset draft authoring" subtitle="Thin authoring surface over studio-shell draft contracts.">
-          <textarea className="ui-textarea" rows={8} value={content} onChange={(event) => setContent(event.target.value)} />
+          <textarea className="ui-textarea" rows={8} value={content} onChange={(event) => updateContent(event.target.value)} />
+          {hasWorkflowDraftParseError ? (
+            <p className="ui-text-muted">
+              Workflow draft content must be valid canonical workflow JSON before saving.
+            </p>
+          ) : null}
           <div className="ui-stack ui-stack--xs" style={{ flexDirection: "row" }}>
             <button
               className="ui-button ui-button--primary"
-              disabled={isBusy || !sessionId}
+              disabled={isBusy || !sessionId || hasWorkflowDraftParseError}
               onClick={() => {
                 if (!sessionId) {
                   return;
@@ -437,7 +476,7 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
                   void runAndRefresh(() => service.createDraft({
                     studioId,
                     sessionId,
-                    content,
+                    content: workflowDraftContent,
                     metadata,
                   }));
                   return;
@@ -446,7 +485,7 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
                   studioId,
                   sessionId,
                   draftId,
-                  content,
+                  content: workflowDraftContent,
                   metadataPatch: resolvedMetadataPatch,
                 }));
               }}

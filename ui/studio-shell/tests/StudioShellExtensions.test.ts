@@ -93,6 +93,9 @@ describe("StudioRegistrationRegistry", () => {
     expect(registry.get("workflow-studio")?.kind).toBe("composite");
     expect(registry.get("workflow-studio")?.role).toBe("workflow");
     expect(registry.get("workflow-studio")?.allowedBehaviorKinds).toEqual(["deterministic", "conditional", "iterative"]);
+    expect(registry.listExtensionsBySlot("workflow-studio", StudioShellExtensionSlots.draftAuthoring).map((entry) => entry.id)).toContain(
+      "workflow-studio-mode-abstraction",
+    );
     expect(registry.listByKind(StudioRegistrationKinds.atomic).map((entry) => entry.studioType)).toEqual([
       "dataset-studio",
       "model-studio",
