@@ -126,6 +126,7 @@ The runtime is not a single path. The system currently supports multiple executi
 - For host/runtime composition and desktop delivery, read [`desktop-runtime-and-hosts.md`](./desktop-runtime-and-hosts.md).
 - For UI composition and state flow, read [`presentation-and-state.md`](./presentation-and-state.md).
 - For cross-studio asset selection contracts and capability rules, read [`asset-selector-framework.md`](./asset-selector-framework.md).
+- For canonical studio launch/return handoff contracts, read [`studio-handoff-contract.md`](./studio-handoff-contract.md).
 
 ## Direction 4 (Phase 1) foundation
 - Agent concepts are now first-class inner-layer artifacts (`domain/agents/*`) with validated goal, policy, memory, and execution-session models (including lifecycle and invariant enforcement).

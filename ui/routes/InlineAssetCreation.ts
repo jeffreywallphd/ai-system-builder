@@ -1,6 +1,12 @@
 import type { TaxonomySemanticRole } from "../../domain/taxonomy/CompositionTaxonomy";
 import { StudioEntryModes, type StudioEntryRequest, type StudioEntryResolution } from "../../application/studio-entry/StudioEntryContracts";
 import { StudioEntryResolver } from "./StudioRouteMapping";
+import {
+  parseStudioLaunchHandoffContract,
+  serializeStudioLaunchHandoffContract,
+  StudioLaunchHandoffQueryParam,
+  type StudioLaunchHandoffContract,
+} from "./StudioHandoffContract";
 
 export const InlineAssetCreationModes = Object.freeze({
   inlineContext: "inline-context",
@@ -33,6 +39,7 @@ export interface InlineAssetCreationRequest {
   readonly context: InlineAssetCreationContext;
   readonly returnTarget?: InlineAssetCreationReturnTarget;
   readonly selectorLaunch?: InlineAssetSelectorLaunchContext;
+  readonly studioHandoff?: StudioLaunchHandoffContract;
 }
 
 export interface InlineAssetCreationResult {
@@ -40,6 +47,7 @@ export interface InlineAssetCreationResult {
   readonly launchPath: string;
   readonly returnTarget?: InlineAssetCreationReturnTarget;
   readonly selectorLaunch?: InlineAssetSelectorLaunchContext;
+  readonly studioHandoff?: StudioLaunchHandoffContract;
   readonly studioEntry: StudioEntryResolution;
 }
 
@@ -113,6 +121,10 @@ function appendReturnTarget(path: string, request: InlineAssetCreationRequest): 
     }
   }
 
+  if (request.studioHandoff) {
+    params.set(StudioLaunchHandoffQueryParam, serializeStudioLaunchHandoffContract(request.studioHandoff));
+  }
+
   const query = params.toString();
   const encodedHash = hash ? `#${hash}` : "";
   return query.length > 0 ? `${routePath}?${query}${encodedHash}` : `${routePath}${encodedHash}`;
@@ -160,6 +172,7 @@ export class InlineAssetCreationService {
       launchPath,
       returnTarget: request.returnTarget,
       selectorLaunch: request.selectorLaunch,
+      studioHandoff: request.studioHandoff,
       studioEntry,
     });
   }
@@ -168,7 +181,14 @@ export class InlineAssetCreationService {
     const params = new URLSearchParams(search);
     const returnTo = params.get("returnTo")?.trim();
     if (!returnTo) {
-      return undefined;
+      const handoff = this.parseStudioHandoffFromSearch(search);
+      if (!handoff) {
+        return undefined;
+      }
+      return Object.freeze({
+        routePath: handoff.returnContract.target.routePath,
+        contextId: handoff.returnContract.target.contextId,
+      });
     }
 
     return Object.freeze({
@@ -270,7 +290,15 @@ export class InlineAssetCreationService {
     const selectorSessionId = params.get("selectorSessionId")?.trim();
     const assetType = params.get("selectorAssetType")?.trim();
     if (!selectorSessionId || !assetType) {
-      return undefined;
+      const handoff = this.parseStudioHandoffFromSearch(search);
+      if (!handoff) {
+        return undefined;
+      }
+      return Object.freeze({
+        selectorSessionId: handoff.target.selector.selectorSessionId,
+        assetType: handoff.target.selector.assetType,
+        returnRoutePath: handoff.returnContract.target.routePath,
+      });
     }
 
     return Object.freeze({
@@ -278,6 +306,16 @@ export class InlineAssetCreationService {
       assetType: assetType as TaxonomySemanticRole,
       returnRoutePath: params.get("selectorReturnTo")?.trim() || undefined,
     });
+  }
+
+  public parseStudioHandoffFromSearch(search: string): StudioLaunchHandoffContract | undefined {
+    const params = new URLSearchParams(search);
+    const encoded = params.get(StudioLaunchHandoffQueryParam)?.trim();
+    if (!encoded) {
+      return undefined;
+    }
+
+    return parseStudioLaunchHandoffContract(encoded);
   }
 
   public stripInlineReturnFromSearch(search: string): string {

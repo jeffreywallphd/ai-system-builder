@@ -145,6 +145,7 @@ describe("AssetSelectorFramework integration", () => {
     expect(launch).toBeDefined();
     expect(launch?.launchPath).toContain("selectorLaunch=1");
     expect(launch?.launchPath).toContain(`selectorSessionId=${encodeURIComponent(sessionKey)}`);
+    expect(launch?.launchPath).toContain("studioHandoff=");
 
     store.transitionToCreatingNew(sessionKey, {
       originatingContext: request.context,

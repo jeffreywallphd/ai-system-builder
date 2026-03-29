@@ -9,6 +9,7 @@ import {
   type WorkflowDraftLoopIterationStepConfig,
   type WorkflowValidationIssue,
 } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+import { serializeWorkflowDraft } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
 import {
   AssetSelectorSessionLifecycleStates,
   type AssetSelectorSessionState,
@@ -139,6 +140,17 @@ export default function WorkflowStudioStepSectionEditor({
     maxSelections: 1,
     required: false,
   }), [selectorSessionKey]);
+  const workflowDraftReference = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return Object.freeze({
+      studioId: studioId?.trim() || "studio-workflows",
+      draftId: params.get("draftId")?.trim() || undefined,
+      sessionId: params.get("sessionId")?.trim() || undefined,
+      assetId: params.get("assetId")?.trim() || undefined,
+      versionId: params.get("versionId")?.trim() || undefined,
+    });
+  }, [location.search, studioId]);
+  const serializedSharedDraft = useMemo(() => serializeWorkflowDraft(sharedDraft), [sharedDraft]);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [items, setItems] = useState<ReadonlyArray<AssetSelectorResultItem>>([]);
@@ -461,6 +473,16 @@ export default function WorkflowStudioStepSectionEditor({
                 routePath: location.pathname,
                 routeSearch: writeStepSelectorOperationToSearch(location.search, selectorOperation ?? Object.freeze({ kind: "add" } as const)),
                 routeHash: location.hash || "#workflow-wizard-steps",
+                selectorTargetId: selectorOperation?.kind === "replace"
+                  ? `workflow-step:${selectorOperation.stepId}`
+                  : "workflow-step:new",
+                workflowOrigin: {
+                  studioId: workflowDraftReference.studioId,
+                  modeId: "wizard",
+                  wizardPageId: "steps",
+                  draftReference: workflowDraftReference,
+                  draftState: serializedSharedDraft,
+                },
               });
               if (!launch) {
                 setSelectorNotice("Unable to open Agent Studio from this selector request.");

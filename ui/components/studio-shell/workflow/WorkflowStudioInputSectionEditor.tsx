@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { WorkflowDraft, WorkflowValidationIssue } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
 import { WorkflowDraftInputSourceTypes } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+import { serializeWorkflowDraft } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
 import {
   AssetSelectorSessionLifecycleStates,
   type AssetSelectorSessionState,
@@ -104,6 +105,17 @@ export default function WorkflowStudioInputSectionEditor({
     }),
     [selectorSessionKey],
   );
+  const workflowDraftReference = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return Object.freeze({
+      studioId: studioId?.trim() || "studio-workflows",
+      draftId: params.get("draftId")?.trim() || undefined,
+      sessionId: params.get("sessionId")?.trim() || undefined,
+      assetId: params.get("assetId")?.trim() || undefined,
+      versionId: params.get("versionId")?.trim() || undefined,
+    });
+  }, [location.search, studioId]);
+  const serializedSharedDraft = useMemo(() => serializeWorkflowDraft(sharedDraft), [sharedDraft]);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [items, setItems] = useState<ReadonlyArray<AssetSelectorResultItem>>([]);
@@ -387,6 +399,14 @@ export default function WorkflowStudioInputSectionEditor({
                 routePath: location.pathname,
                 routeSearch: location.search,
                 routeHash: location.hash || "#workflow-wizard-inputs",
+                selectorTargetId: "workflow-inputs:dataset",
+                workflowOrigin: {
+                  studioId: workflowDraftReference.studioId,
+                  modeId: "wizard",
+                  wizardPageId: "inputs",
+                  draftReference: workflowDraftReference,
+                  draftState: serializedSharedDraft,
+                },
               });
               if (!launch) {
                 setSelectorNotice("Unable to open Dataset Studio from this selector request.");

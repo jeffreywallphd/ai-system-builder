@@ -305,6 +305,11 @@ Future selector-backed asset-type adoption guidance:
 - Workflow Studio now demonstrates per-studio toolbar configuration through registration metadata (`ui/studio-shell/registrations/WorkflowStudioRegistration.ts`) with wizard/canvas mode actions plus save/validate/refresh controls.
 - Toolbar execution reuses existing shell orchestration seams (shared workflow mode state store and existing draft/validation operations) without bypassing selector/session infrastructure or duplicating validation logic.
 
+## Direction 5 stories 5.1-5.2: Canonical studio launch/return contract
+- Cross-studio selector create-new launches now also carry a canonical studio handoff contract (`ui/routes/StudioHandoffContract.ts`) in addition to legacy query params.
+- Workflow Studio origin launches build this contract through `ui/studio-shell/workflow/WorkflowStudioLaunchContext.ts`, including origin route, workflow draft reference/state, selector target context, and return/resume destination.
+- `InlineAssetCreationService` remains backward-compatible with existing selector query params and now falls back to parsing the canonical contract when those params are absent.
+
 ## Story 4.14: Workflow wizard focus and layout hardening
 - Wizard mode now prioritizes page authoring flow by rendering the active wizard page directly under page buttons in the primary wizard card (`WorkflowStudioWizardModeSurface`).
 - The per-section readiness label row was removed from the default surface to reduce redundant readiness copy in the main authoring path.
