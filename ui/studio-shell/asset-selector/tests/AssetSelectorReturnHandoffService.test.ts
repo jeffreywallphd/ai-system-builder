@@ -8,6 +8,8 @@ import { AssetSelectorSessionStore } from "../../../../application/studio-entry/
 import {
   AssetSelectorUsageContexts,
 } from "../../../../application/studio-entry/AssetSelectorCapabilityRegistry";
+import { InlineAssetCreationService, InlineAssetReturnStatuses } from "../../../routes/InlineAssetCreation";
+import { createStudioLaunchHandoffContract, serializeStudioLaunchHandoffContract } from "../../../routes/StudioHandoffContract";
 import { AssetSelectorReturnHandoffService } from "../AssetSelectorReturnHandoffService";
 
 function createRequest(assetType: "dataset" | "agent", usageContext: string) {
@@ -194,5 +196,75 @@ describe("AssetSelectorReturnHandoffService", () => {
     expect(outcome.returnedAsset).toBeUndefined();
     expect(store.getSession("selector:inputs")?.selectedAssets.map((entry) => entry.assetId)).toEqual(["asset:dataset:existing"]);
     expect(store.getSession("selector:inputs")?.lifecycleState).toBe("active");
+  });
+
+  it("rejects returns that do not match expected selector-target metadata", () => {
+    const store = new AssetSelectorSessionStore();
+    const request = createRequest("dataset", AssetSelectorUsageContexts.workflowInput);
+    store.prepareSession({
+      sessionKey: "selector:inputs",
+      request,
+      initialSelectedAssets: [{
+        assetId: "asset:dataset:existing",
+        assetType: "dataset",
+      }],
+    });
+    store.activateSession("selector:inputs");
+    store.transitionToCreatingNew("selector:inputs", {
+      originatingContext: request.context,
+      requestedAssetType: "dataset",
+      returnTargetSessionKey: "selector:inputs",
+    });
+
+    const inlineCreationService = new InlineAssetCreationService();
+    const handoff = createStudioLaunchHandoffContract({
+      handoffId: "handoff:return:wrong-target",
+      launchSource: "workflow-studio",
+      origin: {
+        studioType: "workflow-studio",
+        route: {
+          path: "/studio-shell/workflow/wizard/inputs",
+        },
+      },
+      target: {
+        selectorSessionId: "selector:inputs",
+        assetType: "dataset",
+        originatingField: "inputs.dataset",
+        usageContext: "workflow-input",
+        selectorTargetId: "workflow-inputs:other",
+      },
+      returnTarget: {
+        routePath: "/studio-shell/workflow/wizard/inputs",
+        contextId: "selector:inputs",
+      },
+    });
+    const returnPath = inlineCreationService.buildReturnPath({
+      returnTarget: {
+        routePath: `/studio-shell/workflow/wizard/inputs?studioHandoff=${serializeStudioLaunchHandoffContract(handoff)}`,
+        contextId: "selector:inputs",
+      },
+      payload: {
+        status: InlineAssetReturnStatuses.created,
+        assetId: "asset:dataset:new",
+        assetType: "dataset",
+      },
+    });
+
+    const service = new AssetSelectorReturnHandoffService();
+    const outcome = service.handle({
+      search: `?${returnPath.split("?")[1]?.split("#")[0] ?? ""}`,
+      sessionKey: "selector:inputs",
+      request,
+      expectedSelectorTargetId: "workflow-inputs:dataset",
+      expectedOriginatingField: "inputs.dataset",
+      expectedUsageContext: "workflow-input",
+      sessionStore: store,
+    });
+
+    expect(outcome.handled).toBeTrue();
+    expect(outcome.returnedAsset).toBeUndefined();
+    expect(outcome.nextSearch).toBe("");
+    expect(store.getSession("selector:inputs")?.selectedAssets.map((entry) => entry.assetId)).toEqual(["asset:dataset:existing"]);
+    expect(store.getSession("selector:inputs")?.validationErrors.length).toBeGreaterThan(0);
   });
 });

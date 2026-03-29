@@ -18,6 +18,8 @@ describe("StudioShellPage contracts", () => {
     expect(source).toContain("StudioShellExtensionRegistry");
     expect(source).toContain("getWorkflowStudioModeStateStore");
     expect(source).toContain("WorkflowStudioDraftAuthoringBoundary");
+    expect(source).toContain("InlineAssetReturnStatuses.noSelection");
+    expect(source).toContain('data-testid="studio-shell-inline-return-no-selection"');
     expect(source).toContain("workflowModeRoute");
     expect(source).toContain("workflowModeState");
     expect(source).toContain("studioRegistration");

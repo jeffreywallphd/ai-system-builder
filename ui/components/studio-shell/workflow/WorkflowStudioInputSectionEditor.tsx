@@ -73,6 +73,9 @@ function buildDatasetLabel(input: {
   return input.versionId ? `${input.assetId} (${input.versionId})` : input.assetId;
 }
 
+const datasetSelectorTargetId = "workflow-inputs:dataset";
+const datasetSelectorOriginatingField = "inputs.dataset";
+
 export default function WorkflowStudioInputSectionEditor({
   sharedDraft,
   draftValidationIssues,
@@ -151,6 +154,36 @@ export default function WorkflowStudioInputSectionEditor({
   );
   const sectionHasErrors = datasetValidationIssues.length > 0;
 
+  const launchDatasetStudioFromSelector = (): void => {
+    const launch = studioLaunchService.launch({
+      sessionKey: selectorSessionKey,
+      selectorRequest,
+      routePath: location.pathname,
+      routeSearch: location.search,
+      routeHash: location.hash || "#workflow-wizard-inputs",
+      selectorTargetId: datasetSelectorTargetId,
+      workflowOrigin: {
+        studioId: workflowDraftReference.studioId,
+        modeId: "wizard",
+        wizardPageId: "inputs",
+        draftReference: workflowDraftReference,
+        draftState: serializedSharedDraft,
+      },
+    });
+    if (!launch) {
+      setSelectorNotice("Unable to open Dataset Studio from this selector request.");
+      return;
+    }
+    selectorSessionStore.transitionToCreatingNew(selectorSessionKey, {
+      originatingContext: selectorRequest.context,
+      requestedAssetType: selectorRequest.assetType,
+      returnTargetSessionKey: selectorSessionKey,
+      returnRoutePath: launch.returnTarget?.routePath,
+    });
+    setSelectorNotice(undefined);
+    void navigate(launch.launchPath);
+  };
+
   useEffect(() => {
     const existing = selectorSessionStore.getSession(selectorSessionKey);
     if (!existing) {
@@ -204,6 +237,9 @@ export default function WorkflowStudioInputSectionEditor({
       search: location.search,
       sessionKey: selectorSessionKey,
       request: selectorRequest,
+      expectedSelectorTargetId: datasetSelectorTargetId,
+      expectedOriginatingField: datasetSelectorOriginatingField,
+      expectedUsageContext: "workflow-input",
       sessionStore: selectorSessionStore,
     });
 
@@ -368,6 +404,18 @@ export default function WorkflowStudioInputSectionEditor({
                 Close selector
               </button>
             ) : null}
+            <button
+              type="button"
+              className="ui-button ui-button--ghost ui-button--sm"
+              data-testid="workflow-input-launch-dataset-studio"
+              onClick={() => {
+                selectorSessionStore.activateSession(selectorSessionKey);
+                selectorSessionStore.setPendingSelections(selectorSessionKey, selectedDatasetAssets);
+                launchDatasetStudioFromSelector();
+              }}
+            >
+              Create dataset in Dataset Studio
+            </button>
           </div>
         </div>
 
@@ -393,33 +441,7 @@ export default function WorkflowStudioInputSectionEditor({
               setSelectorOpen(false);
             }}
             onCreateNew={() => {
-              const launch = studioLaunchService.launch({
-                sessionKey: selectorSessionKey,
-                selectorRequest,
-                routePath: location.pathname,
-                routeSearch: location.search,
-                routeHash: location.hash || "#workflow-wizard-inputs",
-                selectorTargetId: "workflow-inputs:dataset",
-                workflowOrigin: {
-                  studioId: workflowDraftReference.studioId,
-                  modeId: "wizard",
-                  wizardPageId: "inputs",
-                  draftReference: workflowDraftReference,
-                  draftState: serializedSharedDraft,
-                },
-              });
-              if (!launch) {
-                setSelectorNotice("Unable to open Dataset Studio from this selector request.");
-                return;
-              }
-              selectorSessionStore.transitionToCreatingNew(selectorSessionKey, {
-                originatingContext: selectorRequest.context,
-                requestedAssetType: selectorRequest.assetType,
-                returnTargetSessionKey: selectorSessionKey,
-                returnRoutePath: launch.returnTarget?.routePath,
-              });
-              setSelectorNotice(undefined);
-              void navigate(launch.launchPath);
+              launchDatasetStudioFromSelector();
             }}
             onRetry={() => {
               setQueryRevision((current) => current + 1);

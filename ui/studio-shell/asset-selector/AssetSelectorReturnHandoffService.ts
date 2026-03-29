@@ -25,6 +25,9 @@ export interface HandleSelectorReturnInput {
   readonly search: string;
   readonly sessionKey: string;
   readonly request: AssetSelectorRequest;
+  readonly expectedSelectorTargetId?: string;
+  readonly expectedOriginatingField?: string;
+  readonly expectedUsageContext?: string;
   readonly sessionStore: Pick<
     AssetSelectorSessionStore,
     "getSession" | "handleReturnPayload" | "resumeAfterCreationCancellation" | "activateSession" | "reportReturnPayloadError"
@@ -63,6 +66,19 @@ export class AssetSelectorReturnHandoffService {
 
     const session = input.sessionStore.getSession(input.sessionKey);
     if (!session) {
+      return Object.freeze({
+        handled: true,
+        consumed: true,
+        nextSearch: this.inlineCreationService.stripInlineReturnFromSearch(input.search),
+      });
+    }
+
+    if (this.hasMismatchedSelectorTarget(input, resolution)) {
+      input.sessionStore.reportReturnPayloadError(
+        input.sessionKey,
+        "Returned selector payload target does not match the active selector target.",
+        "target.selector",
+      );
       return Object.freeze({
         handled: true,
         consumed: true,
@@ -160,6 +176,31 @@ export class AssetSelectorReturnHandoffService {
       message,
       path,
     );
+  }
+
+  private hasMismatchedSelectorTarget(
+    input: HandleSelectorReturnInput,
+    resolution: ReturnType<StudioReturnPayloadResolver["resolveFromSearch"]>,
+  ): boolean {
+    const expectedSelectorTargetId = input.expectedSelectorTargetId?.trim();
+    const resolvedSelectorTargetId = resolution.selectorTargetId?.trim();
+    if (expectedSelectorTargetId && resolvedSelectorTargetId && resolvedSelectorTargetId !== expectedSelectorTargetId) {
+      return true;
+    }
+
+    const expectedOriginatingField = input.expectedOriginatingField?.trim();
+    const resolvedOriginatingField = resolution.originatingField?.trim();
+    if (expectedOriginatingField && resolvedOriginatingField && resolvedOriginatingField !== expectedOriginatingField) {
+      return true;
+    }
+
+    const expectedUsageContext = input.expectedUsageContext?.trim();
+    const resolvedUsageContext = resolution.usageContext?.trim();
+    if (expectedUsageContext && resolvedUsageContext && resolvedUsageContext !== expectedUsageContext) {
+      return true;
+    }
+
+    return false;
   }
 }
 
