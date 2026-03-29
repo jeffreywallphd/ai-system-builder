@@ -21,6 +21,7 @@ import { AssetSelectorStudioLaunchService } from "../../../studio-shell/asset-se
 import { AssetSelectorReturnHandoffService } from "../../../studio-shell/asset-selector/AssetSelectorReturnHandoffService";
 import {
   listDatasetInputs,
+  removeDatasetInputSelection,
   replaceDatasetInputSelections,
 } from "../../../studio-shell/workflow/WorkflowWizardDatasetInputs";
 
@@ -56,6 +57,21 @@ function buildSectionSummary(count: number, singular: string, plural: string): s
   return count === 1 ? `1 ${singular}` : `${count} ${plural}`;
 }
 
+function buildDatasetLabel(input: {
+  readonly title?: string;
+  readonly assetId: string;
+  readonly versionId?: string;
+}): string {
+  const title = input.title?.trim();
+  if (title && input.versionId) {
+    return `${title} (${input.versionId})`;
+  }
+  if (title) {
+    return title;
+  }
+  return input.versionId ? `${input.assetId} (${input.versionId})` : input.assetId;
+}
+
 export default function WorkflowStudioInputSectionEditor({
   sharedDraft,
   draftValidationIssues,
@@ -69,9 +85,9 @@ export default function WorkflowStudioInputSectionEditor({
   const studioLaunchService = useMemo(() => new AssetSelectorStudioLaunchService(), []);
   const returnHandoffService = useMemo(() => new AssetSelectorReturnHandoffService(), []);
   const selectorDataProvider = useMemo(() => new DatasetAssetSelectorAdapter({
-      registryService,
-      limit: 50,
-    }), [registryService]);
+    registryService,
+    limit: 50,
+  }), [registryService]);
   const selectorSessionKey = useMemo(
     () => `workflow-studio:${studioId?.trim() || "default"}:inputs:dataset`,
     [studioId],
@@ -99,9 +115,20 @@ export default function WorkflowStudioInputSectionEditor({
   const [selectorState, setSelectorState] = useState<AssetSelectorSessionState | undefined>(
     () => selectorSessionStore.getSession(selectorSessionKey),
   );
+  const [selectorOpen, setSelectorOpen] = useState(false);
   const lastAppliedCompletedCount = useRef<number | undefined>(undefined);
 
   const datasetInputs = useMemo(() => listDatasetInputs(sharedDraft), [sharedDraft]);
+  const selectedDatasetAssets = useMemo(
+    () => datasetInputs.map((entry) => Object.freeze({
+      assetId: entry.asset.assetId,
+      versionId: entry.asset.versionId,
+      assetType: "dataset" as const,
+      displayName: entry.title,
+      taxonomy: entry.asset.taxonomy,
+    })),
+    [datasetInputs],
+  );
   const otherInputs = useMemo(
     () => sharedDraft.inputs.filter((entry) => entry.sourceType !== WorkflowDraftInputSourceTypes.datasetAsset),
     [sharedDraft.inputs],
@@ -118,13 +145,7 @@ export default function WorkflowStudioInputSectionEditor({
       selectorSessionStore.prepareSession({
         sessionKey: selectorSessionKey,
         request: selectorRequest,
-        initialSelectedAssets: datasetInputs.map((entry) => Object.freeze({
-          assetId: entry.asset.assetId,
-          versionId: entry.asset.versionId,
-          assetType: "dataset" as const,
-          displayName: entry.title,
-          taxonomy: entry.asset.taxonomy,
-        })),
+        initialSelectedAssets: selectedDatasetAssets,
       });
     }
 
@@ -134,7 +155,15 @@ export default function WorkflowStudioInputSectionEditor({
 
     const unsubscribe = selectorSessionStore.subscribe(selectorSessionKey, setSelectorState);
     return unsubscribe;
-  }, [datasetInputs, selectorRequest, selectorSessionKey, selectorSessionStore]);
+  }, [selectedDatasetAssets, selectorRequest, selectorSessionKey, selectorSessionStore]);
+
+  useEffect(() => {
+    const existing = selectorSessionStore.getSession(selectorSessionKey);
+    if (!existing) {
+      return;
+    }
+    selectorSessionStore.replaceSelections(selectorSessionKey, selectedDatasetAssets);
+  }, [selectedDatasetAssets, selectorSessionKey, selectorSessionStore]);
 
   useEffect(() => {
     let active = true;
@@ -189,6 +218,7 @@ export default function WorkflowStudioInputSectionEditor({
       });
       setQueryRevision((current) => current + 1);
       setSelectorNotice(undefined);
+      setSelectorOpen(true);
     }
 
     if (outcome.consumed && outcome.nextSearch !== undefined) {
@@ -234,6 +264,7 @@ export default function WorkflowStudioInputSectionEditor({
         name: entry.displayName,
       })),
     ).draft);
+    setSelectorOpen(false);
   }, [onUpdateSharedDraft, selectorState]);
 
   const stateForShell = selectorState ?? selectorSessionStore.getSession(selectorSessionKey);
@@ -258,17 +289,70 @@ export default function WorkflowStudioInputSectionEditor({
         <div className="ui-text-small">{buildSectionSummary(sharedDraft.inputs.length, "input", "inputs")}</div>
 
         <div className="ui-card ui-card--padded ui-stack ui-stack--2xs">
-          <strong>Input types</strong>
-          <ul className="ui-stack ui-stack--2xs" style={{ margin: 0, paddingLeft: "1rem" }}>
-            {inputTypeDefinitions.map((entry) => (
-              <li key={entry.sourceType} className="ui-text-small">
-                <strong>{entry.label}</strong>: {entry.summary}{entry.interactive ? " (active editor)" : " (future editor surface)"}
-              </li>
-            ))}
-          </ul>
+          <strong>Dataset inputs</strong>
+          {datasetInputs.length === 0 ? (
+            <span className="ui-text-small ui-text-secondary">No datasets attached yet.</span>
+          ) : (
+            <div className="ui-stack ui-stack--2xs" data-testid="workflow-input-dataset-list">
+              {datasetInputs.map((input) => (
+                <div key={input.id} className="ui-row ui-row--between ui-row--wrap" style={{ gap: "0.5rem" }}>
+                  <div className="ui-stack ui-stack--2xs">
+                    <span className="ui-text-small"><strong>{buildDatasetLabel({
+                      title: input.title,
+                      assetId: input.asset.assetId,
+                      versionId: input.asset.versionId,
+                    })}</strong></span>
+                    <span className="ui-text-small ui-text-secondary">{input.asset.assetId}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="ui-button ui-button--ghost ui-button--sm"
+                    disabled={!onUpdateSharedDraft}
+                    data-testid={`workflow-input-remove-dataset-${input.id}`}
+                    onClick={() => {
+                      if (!onUpdateSharedDraft) {
+                        return;
+                      }
+                      onUpdateSharedDraft((draft) => removeDatasetInputSelection(draft, input.asset.assetId).draft);
+                    }}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="ui-row ui-row--wrap" style={{ gap: "0.5rem" }}>
+            <button
+              type="button"
+              className="ui-button ui-button--sm"
+              data-testid="workflow-input-open-selector"
+              onClick={() => {
+                selectorSessionStore.activateSession(selectorSessionKey);
+                selectorSessionStore.setPendingSelections(selectorSessionKey, selectedDatasetAssets);
+                setSelectorOpen((current) => !current || datasetInputs.length === 0);
+              }}
+            >
+              {selectorOpen ? "Selector open" : "Add or modify datasets"}
+            </button>
+            {selectorOpen ? (
+              <button
+                type="button"
+                className="ui-button ui-button--ghost ui-button--sm"
+                data-testid="workflow-input-close-selector"
+                onClick={() => {
+                  selectorSessionStore.activateSession(selectorSessionKey);
+                  selectorSessionStore.setPendingSelections(selectorSessionKey, selectedDatasetAssets);
+                  setSelectorOpen(false);
+                }}
+              >
+                Close selector
+              </button>
+            ) : null}
+          </div>
         </div>
 
-        {stateForShell ? (
+        {selectorOpen && stateForShell ? (
           <AssetSelectorShell
             title="Dataset inputs"
             state={stateForShell}
@@ -285,6 +369,9 @@ export default function WorkflowStudioInputSectionEditor({
             }}
             onCancel={() => {
               selectorSessionStore.cancelSession(selectorSessionKey, "user-cancelled-selector");
+              selectorSessionStore.activateSession(selectorSessionKey);
+              selectorSessionStore.setPendingSelections(selectorSessionKey, selectedDatasetAssets);
+              setSelectorOpen(false);
             }}
             onCreateNew={() => {
               const launch = studioLaunchService.launch({
@@ -318,6 +405,17 @@ export default function WorkflowStudioInputSectionEditor({
             {selectorNotice}
           </div>
         ) : null}
+
+        <div className="ui-card ui-card--padded ui-stack ui-stack--2xs">
+          <strong>Input types</strong>
+          <ul className="ui-stack ui-stack--2xs" style={{ margin: 0, paddingLeft: "1rem" }}>
+            {inputTypeDefinitions.map((entry) => (
+              <li key={entry.sourceType} className="ui-text-small">
+                <strong>{entry.label}</strong>: {entry.summary}{entry.interactive ? " (active editor)" : " (future editor surface)"}
+              </li>
+            ))}
+          </ul>
+        </div>
 
         {otherInputs.length > 0 ? (
           <div className="ui-stack ui-stack--2xs">

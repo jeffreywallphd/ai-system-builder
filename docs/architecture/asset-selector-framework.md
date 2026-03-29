@@ -200,6 +200,30 @@ Selector return handling:
 - valid returned assets are merged into selector options and selected assets for immediate confirm/modify flows
 - multiple concurrent selectors remain isolated by session key/return-context targeting
 
+## Story 4.9: Workflow wizard inputs selector integration
+Workflow Wizard Inputs now use selector-first dataset attachment flow in:
+- `ui/components/studio-shell/workflow/WorkflowStudioInputSectionEditor.tsx`
+
+Implemented behavior:
+- Dataset inputs are rendered as canonical selected dataset rows (title + asset id + optional version) with explicit remove actions.
+- Dataset add/modify uses the shared selector shell (open/close + confirm/cancel) instead of ad hoc input-picking logic.
+- Selector session state is synchronized with canonical workflow draft dataset inputs through shared session-store APIs so route transitions/reopen flows do not drift.
+- Confirmed selector selections persist back into canonical workflow draft inputs via `replaceDatasetInputSelections`.
+- Create-new dataset launch/return keeps wizard draft state intact and reopens selector with returned assets available for immediate confirm.
+- Capability enforcement remains matrix-driven (`workflow-input` -> `dataset`) through shared request/result validation, not UI-only checks.
+
+## Story 4.10: Workflow wizard steps selector integration
+Workflow Wizard Steps now use selector-first agent/assistant attachment flow in:
+- `ui/components/studio-shell/workflow/WorkflowStudioStepSectionEditor.tsx`
+
+Implemented behavior:
+- Adding an agent/assistant step routes through the shared agent selector shell (single-select) before step insertion.
+- Existing agent/assistant-backed steps support selector-driven replace/edit actions; per-step ad hoc dropdown asset-picking was retired.
+- Selector targeting context for add vs replace is preserved across inline create-new route transitions via route-state query metadata.
+- Confirmed selections map into canonical step payload semantics (`assetRef` + placeholder config) through existing `WorkflowWizardSteps` helpers.
+- Step ordering/reorder/remove flows continue to operate on canonical step ids and remain isolated from selector session state.
+- Capability enforcement remains matrix-driven (`workflow-step` -> `agent`) through shared request/result validation, not UI-only checks.
+
 ## Adding future asset types
 To add a new selector type without modifying shared shell/session layers:
 1. Add a typed adapter in `ui/studio-shell/asset-selector/` that:
@@ -217,9 +241,7 @@ To add a new selector type without modifying shared shell/session layers:
 - Existing flows remain stable because checks run through the same registry/service seam.
 
 ## Integration readiness
-The contract is ready for:
-- Workflow wizard input selectors (future Story 4.9)
-- Workflow step selectors (future Story 4.10)
-- Studio handoff integration boundaries (future Epic 5)
-
-No selector UI is introduced in this slice.
+Epic 4 selector integration is now active in Workflow Wizard inputs and steps:
+- Inputs: selector-backed dataset multi-select with inline create-new return.
+- Steps: selector-backed agent/assistant add + replace flows with ordered-step compatibility.
+- Shared shell/session/capability/return seams are reused without parallel selector pathways.

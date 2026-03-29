@@ -234,6 +234,48 @@ export class AssetSelectorSessionStore {
     });
   }
 
+  public setPendingSelections(
+    sessionKey: string,
+    selections: ReadonlyArray<AssetSelectorAssetReference>,
+  ): AssetSelectorSessionState {
+    const state = this.requireSession(sessionKey);
+    const mismatchedSelection = selections.find((entry) => entry.assetType !== state.request.assetType);
+    if (mismatchedSelection) {
+      return this.patch(sessionKey, {
+        validationErrors: buildValidationErrors(
+          `Selected asset type '${mismatchedSelection.assetType}' does not match request asset type '${state.request.assetType}'.`,
+          AssetSelectorSessionErrorCodes.assetTypeMismatch,
+        ),
+      });
+    }
+    return this.patch(sessionKey, {
+      pendingSelections: normalizeSelectionsForMode(state.request, selections),
+      validationErrors: Object.freeze([]),
+    });
+  }
+
+  public replaceSelections(
+    sessionKey: string,
+    selections: ReadonlyArray<AssetSelectorAssetReference>,
+  ): AssetSelectorSessionState {
+    const state = this.requireSession(sessionKey);
+    const mismatchedSelection = selections.find((entry) => entry.assetType !== state.request.assetType);
+    if (mismatchedSelection) {
+      return this.patch(sessionKey, {
+        validationErrors: buildValidationErrors(
+          `Selected asset type '${mismatchedSelection.assetType}' does not match request asset type '${state.request.assetType}'.`,
+          AssetSelectorSessionErrorCodes.assetTypeMismatch,
+        ),
+      });
+    }
+    const normalizedSelections = normalizeSelectionsForMode(state.request, selections);
+    return this.patch(sessionKey, {
+      selectedAssets: normalizedSelections,
+      pendingSelections: normalizedSelections,
+      validationErrors: Object.freeze([]),
+    });
+  }
+
   public confirmPendingSelections(sessionKey: string): AssetSelectorSessionState {
     const state = this.requireSession(sessionKey);
     return this.handleReturnPayload({
