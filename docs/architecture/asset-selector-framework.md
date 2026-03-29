@@ -59,6 +59,71 @@ Enforcement path:
 
 This prevents invalid combinations (for example dataset selection in workflow step context) without scattered conditionals.
 
+## Story 4.3: Shared selector state and session infrastructure
+Session/state infrastructure is now implemented in:
+- `application/studio-entry/AssetSelectorSessionStore.ts`
+
+Responsibilities:
+- Canonical session state model per selector session key:
+  - active request/context
+  - selected assets
+  - pending selections
+  - lifecycle state
+  - validation/error state
+- Lifecycle support:
+  - `idle`
+  - `active`
+  - `creating-new`
+  - `returning`
+  - `cancelled`
+  - `completed`
+- Session-scoped state isolation:
+  - multiple selector sessions can co-exist without collisions (`sessionKey` map)
+- Route-transition resilience:
+  - in-memory session registry can be reused across route changes
+  - snapshot create/restore hooks support explicit navigation preservation workflows
+- Return payload integration:
+  - accepts canonical `AssetSelectorResult`
+  - validates through domain + capability matrix enforcement
+  - merges valid returned assets into selected/pending session state
+- Error handling:
+  - invalid return payloads
+  - mismatched asset types
+  - snapshot restore failures
+
+Boundary note:
+- Session business rules remain in application layer.
+- UI consumes session state through thin adapters and does not own lifecycle/capability validation logic.
+
+## Story 4.4: Reusable selector shell UI
+Shared selector shell is now implemented in:
+- Presentation shell: `ui/components/studio-shell/asset-selector/AssetSelectorShell.tsx`
+- Data-provider seam: `ui/studio-shell/asset-selector/AssetSelectorDataProvider.ts`
+- Registry adapter: `ui/studio-shell/asset-selector/RegistryAssetSelectorDataProvider.ts`
+- Session bridge accessor: `ui/studio-shell/asset-selector/AssetSelectorSessionRegistry.ts`
+
+Shell responsibilities:
+- Search input
+- Loading/empty/error states
+- Result list with selected indicators
+- Selection summary
+- Confirm/cancel actions
+- Create-new entry point
+- Keyboard accessibility baseline:
+  - up/down focus movement
+  - enter/space selection
+  - escape cancel
+  - ctrl/cmd+enter confirm
+
+Separation model:
+- Application session store owns lifecycle + selection truth.
+- Data provider adapter owns asset fetching shape.
+- Shell component is presentation-only and asset-type-agnostic.
+
+Current integration slice:
+- Workflow Wizard dataset input section now renders through the shared selector shell and shared session store.
+- Dataset/agent specific selector behavior remains out of scope; this slice only provides reusable shell + state/session foundation.
+
 ## Extensibility model
 - New usage contexts can be registered without changing validator logic.
 - New asset-type allowances are configuration-driven via registry descriptors.
