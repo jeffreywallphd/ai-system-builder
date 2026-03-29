@@ -4,7 +4,7 @@ import type { AssetDraft, AssetSession, Studio } from "../../../domain/studio-sh
 import type { AssetVersion } from "../../../domain/assets/AssetVersion";
 import { DefaultStudioShellApplicationService } from "../../studio-shell/DefaultStudioShellApplicationService";
 import { WorkflowStudioApplicationService } from "../WorkflowStudioApplicationService";
-import { WorkflowStudioIdentity } from "../../../domain/workflow-studio/WorkflowStudioDomain";
+import { createEmptyWorkflowDraft, serializeWorkflowDraft, WorkflowStudioIdentity } from "../../../domain/workflow-studio/WorkflowStudioDomain";
 
 class InMemoryStudioShellRepository implements IStudioShellRepository {
   private readonly studios = new Map<string, Studio>();
@@ -36,7 +36,7 @@ describe("WorkflowStudioApplicationService", () => {
     const created = await service.createWorkflowDraft({
       sessionId: ensure.session.id,
       title: "Workflow Orchestrator Draft",
-      content: '{"workflowSpec":{"nodes":[],"connections":[],"executionPolicy":"acyclic-only"}}',
+      content: serializeWorkflowDraft(createEmptyWorkflowDraft()),
       creatorId: "author-1",
       tags: ["orchestrator"],
       behaviorKind: "iterative",
