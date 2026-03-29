@@ -509,6 +509,7 @@ export default function StudioShellPage({
                 draftParseError: workflowModeState.draftParseError,
                 modeValidationIssues: workflowModeState.modeValidationIssues,
                 draftValidationIssues: workflowModeState.draftValidationIssues,
+                updateSharedDraft: (updater) => workflowModeStore.updateSharedDraft(updater),
               }
               : undefined}
           />
