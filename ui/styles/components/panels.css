@@ -49,3 +49,17 @@
     var(--shadow-panel),
     0 0 0 1px rgba(79, 156, 249, 0.08);
 }
+
+.ui-studio-shell__authoring {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.ui-studio-shell__authoring-toolbar {
+  justify-content: flex-start;
+}
+
+.ui-studio-shell__grid {
+  align-items: flex-start;
+}

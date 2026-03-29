@@ -217,6 +217,17 @@ Selector session vs workflow draft model:
 - selector sessions remain ephemeral interaction state (pending/lifecycle/validation),
 - rehydration synchronizes selector interaction state from canonical draft without persisting UI-only session artifacts.
 
+## Story 4.13: studio-shell authoring promotion + configurable toolbar contract
+- Studio Shell registration contracts now support an optional shell toolbar configuration (`ui/studio-shell/StudioShellExtensions.ts`) with typed toolbar actions:
+  - `refresh-snapshot`
+  - `save-draft`
+  - `run-validation`
+  - `set-workflow-mode`
+- Toolbar configuration is registration-owned (not user-authored) and validated/normalized at registration boundaries (required ids/labels, duplicate detection, workflow-mode validity checks).
+- `StudioShellPage` now renders draft authoring as a primary top-level section outside and above the two-column shell grid, preserving existing session/metadata/dependencies/lifecycle/validation cards and extension slots.
+- Workflow Studio now demonstrates shell-specific toolbar configuration through registration metadata (`ui/studio-shell/registrations/WorkflowStudioRegistration.ts`) with wizard/canvas mode actions and draft/validation controls.
+- Toolbar actions interact through existing shell orchestration seams (shared mode state store + existing draft/validation operations) without bypassing selector/session infrastructure or duplicating validation logic.
+
 ## Future asset-type integration pattern
 For new selector types, keep shared shell/session unchanged and add:
 1. A typed adapter in `ui/studio-shell/asset-selector/` (request builder + source mapping).
