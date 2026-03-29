@@ -157,9 +157,37 @@ export interface WorkflowDraftSectionItemBase {
 
 export interface WorkflowDraftOutput extends WorkflowDraftSectionItemBase {}
 
+export const WorkflowDraftStepKinds = Object.freeze({
+  action: "action",
+  controlFlow: "control-flow",
+  assetBacked: "asset-backed",
+});
+
+export type WorkflowDraftStepKind = typeof WorkflowDraftStepKinds[keyof typeof WorkflowDraftStepKinds];
+
+export const WorkflowDraftStepTypes = Object.freeze({
+  agentAssistant: "agent-assistant",
+});
+
+export type WorkflowDraftStepType = typeof WorkflowDraftStepTypes[keyof typeof WorkflowDraftStepTypes] | (string & {});
+
+export const WorkflowDraftStepAssetKinds = Object.freeze({
+  agentAssistant: "agent-assistant",
+});
+
+export type WorkflowDraftStepAssetKind = typeof WorkflowDraftStepAssetKinds[keyof typeof WorkflowDraftStepAssetKinds] | (string & {});
+
+export interface WorkflowDraftStepAssetReference {
+  readonly assetKind: WorkflowDraftStepAssetKind;
+  readonly asset: WorkflowDraftAssetReference;
+}
+
 export interface WorkflowDraftStep extends WorkflowDraftSectionItemBase {
   readonly order: number;
+  readonly kind?: WorkflowDraftStepKind;
   readonly dependsOnStepIds?: ReadonlyArray<string>;
+  readonly config?: Readonly<Record<string, unknown>>;
+  readonly assetRef?: WorkflowDraftStepAssetReference;
 }
 
 export interface WorkflowDraft {
@@ -526,6 +554,7 @@ function normalizeSectionItem<T extends WorkflowDraftSectionItemBase>(
 
 function normalizeStep(step: WorkflowDraftStep): WorkflowDraftStep {
   const normalizedStep = normalizeSectionItem(step, "Workflow draft step");
+  const kind = normalizeStepKind(step);
 
   if (!Number.isInteger(normalizedStep.order) || normalizedStep.order < 1) {
     throw new Error("Workflow draft step order must be a positive integer.");
@@ -539,11 +568,66 @@ function normalizeStep(step: WorkflowDraftStep): WorkflowDraftStep {
     }
   }
 
+  const config = step.config
+    ? Object.freeze({ ...assertRecord(step.config, "Workflow draft step config") })
+    : undefined;
+  const assetRef = step.assetRef
+    ? normalizeWorkflowDraftStepAssetReference(step.assetRef)
+    : undefined;
+  if (kind === WorkflowDraftStepKinds.assetBacked && !assetRef) {
+    throw new Error("Workflow draft asset-backed step requires assetRef.");
+  }
+  if (kind !== WorkflowDraftStepKinds.assetBacked && assetRef) {
+    throw new Error("Workflow draft step assetRef is only supported for kind 'asset-backed'.");
+  }
+  if (assetRef?.assetKind === WorkflowDraftStepAssetKinds.agentAssistant && normalizedStep.type !== WorkflowDraftStepTypes.agentAssistant) {
+    throw new Error(
+      "Workflow draft asset-backed agent-assistant step requires type 'agent-assistant'.",
+    );
+  }
+
   return Object.freeze({
     ...normalizedStep,
+    kind,
     dependsOnStepIds: dedupedDependencies.size > 0
       ? Object.freeze([...dedupedDependencies.values()])
       : undefined,
+    config,
+    assetRef,
+  });
+}
+
+function normalizeStepKind(step: WorkflowDraftStep): WorkflowDraftStepKind {
+  const kind = normalizeOptional(step.kind);
+  if (!kind) {
+    return step.assetRef ? WorkflowDraftStepKinds.assetBacked : WorkflowDraftStepKinds.action;
+  }
+
+  if (
+    kind === WorkflowDraftStepKinds.action
+    || kind === WorkflowDraftStepKinds.controlFlow
+    || kind === WorkflowDraftStepKinds.assetBacked
+  ) {
+    return kind;
+  }
+
+  throw new Error(`Workflow draft step kind '${kind}' is not supported.`);
+}
+
+function normalizeWorkflowDraftStepAssetReference(reference: WorkflowDraftStepAssetReference): WorkflowDraftStepAssetReference {
+  const record = assertRecord(reference, "Workflow draft step assetRef");
+  const assetKind = normalizeRequired(
+    typeof record.assetKind === "string" ? record.assetKind : "",
+    "Workflow draft step assetRef assetKind",
+  );
+  const assetRecord = assertRecord(record.asset, "Workflow draft step assetRef asset");
+
+  return Object.freeze({
+    assetKind,
+    asset: normalizeWorkflowDraftAssetReference(
+      assetRecord as WorkflowDraftAssetReference,
+      "Workflow draft step assetRef asset",
+    ),
   });
 }
 

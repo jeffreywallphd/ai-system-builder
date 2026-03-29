@@ -8,6 +8,9 @@ import {
   normalizeWorkflowDraft,
   serializeWorkflowDraft,
   WorkflowDraftInputSourceTypes,
+  WorkflowDraftStepAssetKinds,
+  WorkflowDraftStepKinds,
+  WorkflowDraftStepTypes,
   WorkflowDraftTriggerKinds,
   WorkflowDraftTriggerTypes,
   WorkflowStudioIdentity,
@@ -36,7 +39,7 @@ describe("WorkflowStudioDomain", () => {
           sourceType: WorkflowDraftInputSourceTypes.datasetAsset,
           asset: { assetId: "asset:dataset-1", versionId: "asset:dataset-1:v1" },
         }],
-        steps: [{ id: "step-1", type: "action", order: 1 }],
+        steps: [{ id: "step-1", type: "action", kind: WorkflowDraftStepKinds.action, order: 1 }],
         outputs: [{ id: "output-1", type: "json" }],
       },
       now: createdAt,
@@ -72,8 +75,8 @@ describe("WorkflowStudioDomain", () => {
       triggers: [],
       inputs: [],
       steps: [
-        { id: "step-b", type: "transform", order: 2 },
-        { id: "step-a", type: "load", order: 1 },
+        { id: "step-b", type: "transform", kind: WorkflowDraftStepKinds.action, order: 2 },
+        { id: "step-a", type: "load", kind: WorkflowDraftStepKinds.action, order: 1 },
       ],
       outputs: [],
     });
@@ -82,13 +85,17 @@ describe("WorkflowStudioDomain", () => {
       "step-a:1",
       "step-b:2",
     ]);
+    expect(normalized.steps.map((step) => step.kind)).toEqual([
+      WorkflowDraftStepKinds.action,
+      WorkflowDraftStepKinds.action,
+    ]);
 
     expect(() => normalizeWorkflowDraft({
       triggers: [],
       inputs: [],
       steps: [
-        { id: "step-a", type: "load", order: 1 },
-        { id: "step-b", type: "transform", order: 1 },
+        { id: "step-a", type: "load", kind: WorkflowDraftStepKinds.action, order: 1 },
+        { id: "step-b", type: "transform", kind: WorkflowDraftStepKinds.action, order: 1 },
       ],
       outputs: [],
     })).toThrow("Workflow draft step order '1' is duplicated.");
@@ -112,7 +119,7 @@ describe("WorkflowStudioDomain", () => {
         title: "Query Dataset",
         asset: { assetId: "asset:dataset-query", versionId: "asset:dataset-query:v2" },
       }],
-      steps: [{ id: "step-run", type: "run-tool", order: 1, dependsOnStepIds: [] }],
+      steps: [{ id: "step-run", type: "run-tool", kind: WorkflowDraftStepKinds.action, order: 1, dependsOnStepIds: [] }],
       outputs: [{ id: "output-result", type: "text" }],
     });
 
@@ -307,6 +314,125 @@ describe("WorkflowStudioDomain", () => {
       steps: [],
       outputs: [],
     })).toThrow("parameterKey is required");
+  });
+
+  it("supports canonical base step model with identity, ordering, type classification, and config payload", () => {
+    const normalized = normalizeWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [{
+        id: "step-control-1",
+        type: "branch",
+        kind: WorkflowDraftStepKinds.controlFlow,
+        title: "Branch on quality score",
+        description: "Routes to review or publish",
+        order: 1,
+        config: {
+          predicate: "qualityScore >= 0.9",
+          truePath: "publish",
+          falsePath: "review",
+        },
+      }],
+      outputs: [],
+    });
+
+    expect(normalized.steps[0]).toMatchObject({
+      id: "step-control-1",
+      type: "branch",
+      kind: WorkflowDraftStepKinds.controlFlow,
+      order: 1,
+      config: {
+        predicate: "qualityScore >= 0.9",
+        truePath: "publish",
+        falsePath: "review",
+      },
+    });
+  });
+
+  it("supports agent-assistant asset-backed workflow steps with canonical asset references", () => {
+    const normalized = normalizeWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [
+        {
+          id: "step-agent-1",
+          type: WorkflowDraftStepTypes.agentAssistant,
+          kind: WorkflowDraftStepKinds.assetBacked,
+          order: 1,
+          assetRef: {
+            assetKind: WorkflowDraftStepAssetKinds.agentAssistant,
+            asset: { assetId: "asset:assistant-summarizer", versionId: "asset:assistant-summarizer:v3" },
+          },
+        },
+        {
+          id: "step-control-2",
+          type: "guard",
+          kind: WorkflowDraftStepKinds.controlFlow,
+          order: 2,
+          dependsOnStepIds: ["step-agent-1"],
+        },
+      ],
+      outputs: [],
+    });
+
+    expect(normalized.steps).toHaveLength(2);
+    expect(normalized.steps[0]).toMatchObject({
+      id: "step-agent-1",
+      kind: WorkflowDraftStepKinds.assetBacked,
+      type: WorkflowDraftStepTypes.agentAssistant,
+      assetRef: {
+        assetKind: WorkflowDraftStepAssetKinds.agentAssistant,
+        asset: { assetId: "asset:assistant-summarizer", versionId: "asset:assistant-summarizer:v3" },
+      },
+    });
+    expect(normalized.steps[1]).toMatchObject({
+      id: "step-control-2",
+      kind: WorkflowDraftStepKinds.controlFlow,
+      order: 2,
+      dependsOnStepIds: ["step-agent-1"],
+    });
+  });
+
+  it("rejects malformed base and asset-backed step structures", () => {
+    expect(() => normalizeWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [{
+        id: "step-invalid-kind",
+        type: "noop",
+        kind: "asset-link" as "action",
+        order: 1,
+      }],
+      outputs: [],
+    })).toThrow("step kind 'asset-link' is not supported");
+
+    expect(() => normalizeWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [{
+        id: "step-missing-asset-ref",
+        type: WorkflowDraftStepTypes.agentAssistant,
+        kind: WorkflowDraftStepKinds.assetBacked,
+        order: 1,
+      }],
+      outputs: [],
+    })).toThrow("asset-backed step requires assetRef");
+
+    expect(() => normalizeWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [{
+        id: "step-invalid-agent-type",
+        type: "agent",
+        kind: WorkflowDraftStepKinds.assetBacked,
+        order: 1,
+        assetRef: {
+          assetKind: WorkflowDraftStepAssetKinds.agentAssistant,
+          asset: { assetId: "asset:assistant-1" },
+        },
+      }],
+      outputs: [],
+    })).toThrow("requires type 'agent-assistant'");
   });
 
   it("creates composite workflow taxonomy with deterministic default behavior", () => {
