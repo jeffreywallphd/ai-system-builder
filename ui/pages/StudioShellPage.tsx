@@ -337,6 +337,7 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
   const draftId = snapshot?.draft?.draftId;
   const workflowDraftContent = workflowModeState?.sharedDraftSerialized ?? content;
   const hasWorkflowDraftParseError = isWorkflowStudio && Boolean(workflowModeState?.draftParseError);
+  const isWorkflowWizardMode = isWorkflowStudio && workflowModeState?.selectedModeId === "wizard";
   const extensionContext: StudioShellExtensionContext = {
     studioId,
     snapshot,
@@ -453,7 +454,29 @@ export default function StudioShellPage({ studioRegistration, extensions = [] }:
         {renderExtensions(extensionRegistry, StudioShellExtensionSlots.sessionContext, extensionContext)}
 
         <StudioShellPanel title="Asset draft authoring" subtitle="Thin authoring surface over studio-shell draft contracts.">
-          <textarea className="ui-textarea" rows={8} value={content} onChange={(event) => updateContent(event.target.value)} />
+          {isWorkflowStudio ? (
+            isWorkflowWizardMode ? (
+              <div className="ui-stack ui-stack--xs" data-testid="workflow-studio-wizard-mode-surface">
+                <div className="ui-card ui-card--padded ui-stack ui-stack--2xs">
+                  <strong>Wizard mode shell</strong>
+                  <p className="ui-text-muted">
+                    Guided workflow authoring is scaffolded here over the shared canonical draft state; upcoming stories can layer the step-by-step wizard UX without changing draft ownership.
+                  </p>
+                </div>
+                <label className="ui-stack ui-stack--2xs">
+                  <span className="ui-text-small">Shared workflow draft JSON preview</span>
+                  <textarea className="ui-textarea" rows={8} value={workflowDraftContent} readOnly />
+                </label>
+              </div>
+            ) : (
+              <div className="ui-stack ui-stack--xs" data-testid="workflow-studio-canvas-mode-surface">
+                <div className="ui-text-small">Canvas mode (current Workflow Studio draft authoring)</div>
+                <textarea className="ui-textarea" rows={8} value={content} onChange={(event) => updateContent(event.target.value)} />
+              </div>
+            )
+          ) : (
+            <textarea className="ui-textarea" rows={8} value={content} onChange={(event) => updateContent(event.target.value)} />
+          )}
           {hasWorkflowDraftParseError ? (
             <p className="ui-text-muted">
               Workflow draft content must be valid canonical workflow JSON before saving.
