@@ -1,10 +1,12 @@
 import type { AssetContractDescriptor } from "../contracts/AssetContract";
 import type { AssetMetadata } from "../studio-shell/StudioShellDomain";
 import {
+  assertAllowedCompositionTaxonomyCombination,
   createCompositionTaxonomyDescriptor,
   TaxonomyBehaviorKinds,
   TaxonomySemanticRoles,
   TaxonomyStructuralKinds,
+  type CompositionTaxonomyDescriptor,
   type TaxonomyBehaviorKind,
 } from "../taxonomy/CompositionTaxonomy";
 
@@ -37,6 +39,7 @@ export type WorkflowDraftTriggerType = typeof WorkflowDraftTriggerTypes[keyof ty
 export interface WorkflowDraftAssetReference {
   readonly assetId: string;
   readonly versionId?: string;
+  readonly taxonomy?: CompositionTaxonomyDescriptor;
 }
 
 export interface WorkflowDraftTriggerBase extends WorkflowDraftSectionItemBase {
@@ -281,6 +284,34 @@ export interface WorkflowEntity {
   readonly updatedAt: string;
 }
 
+export interface WorkflowDraftPersistenceRecord {
+  readonly triggers: ReadonlyArray<WorkflowDraftTrigger>;
+  readonly inputs: ReadonlyArray<WorkflowDraftInput>;
+  readonly steps: ReadonlyArray<WorkflowDraftStep>;
+  readonly outputs: ReadonlyArray<WorkflowDraftOutput>;
+}
+
+export interface WorkflowEntityPersistenceRecord {
+  readonly id: string;
+  readonly name: string;
+  readonly metadata: WorkflowEntityMetadata;
+  readonly draft: WorkflowDraftPersistenceRecord;
+  readonly lifecycleState: WorkflowLifecycleState;
+  readonly draftRevision: number;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+export interface WorkflowDraftSerializedDocument {
+  readonly schemaVersion: "ai-loom.workflow-draft.v1";
+  readonly draft: WorkflowDraftPersistenceRecord;
+}
+
+export interface WorkflowEntitySerializedDocument {
+  readonly schemaVersion: "ai-loom.workflow-entity.v1";
+  readonly entity: WorkflowEntityPersistenceRecord;
+}
+
 export const WorkflowLifecycleStates = Object.freeze({
   draft: "draft",
   saved: "saved",
@@ -324,7 +355,10 @@ export const WorkflowValidationIssueCodes = Object.freeze({
   triggerMalformed: "trigger-malformed",
   inputMalformed: "input-malformed",
   inputDatasetAssetMalformed: "input-dataset-asset-malformed",
+  inputDatasetAssetTaxonomyMismatch: "input-dataset-asset-taxonomy-mismatch",
   stepMalformed: "step-malformed",
+  stepAssetReferenceMalformed: "step-asset-reference-malformed",
+  stepAssetTaxonomyMismatch: "step-asset-taxonomy-mismatch",
   stepOrderNonContiguous: "step-order-non-contiguous",
   stepDependencyMissing: "step-dependency-missing",
   stepDependencySelf: "step-dependency-self",
@@ -350,6 +384,38 @@ export interface WorkflowValidationResult {
   readonly valid: boolean;
   readonly issues: ReadonlyArray<WorkflowValidationIssue>;
 }
+
+export const WorkflowDraftAssetReferenceKinds = Object.freeze({
+  datasetInput: "dataset-input",
+  agentAssistantStep: "agent-assistant-step",
+});
+
+export type WorkflowDraftAssetReferenceKind =
+  typeof WorkflowDraftAssetReferenceKinds[keyof typeof WorkflowDraftAssetReferenceKinds];
+
+export interface WorkflowDraftAssetReferenceClassification {
+  readonly kind: WorkflowDraftAssetReferenceKind;
+  readonly path: string;
+  readonly asset: WorkflowDraftAssetReference;
+  readonly expectedTaxonomy: CompositionTaxonomyDescriptor;
+  readonly taxonomyMatched: boolean;
+}
+
+const WorkflowDraftAssetReferenceTaxonomyExpectations = Object.freeze({
+  [WorkflowDraftAssetReferenceKinds.datasetInput]: createCompositionTaxonomyDescriptor({
+    structuralKind: TaxonomyStructuralKinds.atomic,
+    semanticRole: TaxonomySemanticRoles.dataset,
+    behaviorKind: TaxonomyBehaviorKinds.none,
+  }),
+  [WorkflowDraftAssetReferenceKinds.agentAssistantStep]: createCompositionTaxonomyDescriptor({
+    structuralKind: TaxonomyStructuralKinds.composite,
+    semanticRole: TaxonomySemanticRoles.agent,
+    behaviorKind: TaxonomyBehaviorKinds.autonomous,
+  }),
+});
+
+const WorkflowDraftDocumentSchemaVersion = "ai-loom.workflow-draft.v1";
+const WorkflowEntityDocumentSchemaVersion = "ai-loom.workflow-entity.v1";
 
 function normalizeRequired(value: unknown, label: string): string {
   if (typeof value !== "string") {
@@ -406,6 +472,43 @@ function normalizeTags(tags?: ReadonlyArray<string>): ReadonlyArray<string> {
   return Object.freeze([...deduped.values()]);
 }
 
+function cloneRecord<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function stableStringify(value: unknown): string {
+  const normalize = (entry: unknown): unknown => {
+    if (Array.isArray(entry)) {
+      return entry.map((item) => normalize(item));
+    }
+    if (entry && typeof entry === "object") {
+      const record = entry as Record<string, unknown>;
+      const normalized: Record<string, unknown> = {};
+      for (const key of Object.keys(record).sort((left, right) => left.localeCompare(right))) {
+        normalized[key] = normalize(record[key]);
+      }
+      return normalized;
+    }
+    return entry;
+  };
+
+  return JSON.stringify(normalize(value), null, 2);
+}
+
+function taxonomyToLabel(taxonomy: CompositionTaxonomyDescriptor): string {
+  return `${taxonomy.structuralKind}/${taxonomy.semanticRole}/${taxonomy.behaviorKind}`;
+}
+
+function taxonomyEquals(
+  left: CompositionTaxonomyDescriptor | undefined,
+  right: CompositionTaxonomyDescriptor,
+): boolean {
+  return Boolean(left)
+    && left.structuralKind === right.structuralKind
+    && left.semanticRole === right.semanticRole
+    && left.behaviorKind === right.behaviorKind;
+}
+
 function assertRecord(value: unknown, label: string): Readonly<Record<string, unknown>> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error(`${label} must be an object.`);
@@ -452,10 +555,27 @@ function normalizeTriggerKind(value: string): WorkflowDraftTriggerKind {
   throw new Error(`Workflow draft trigger kind '${value}' is not supported.`);
 }
 
-function normalizeWorkflowDraftAssetReference(reference: WorkflowDraftAssetReference, label: string): WorkflowDraftAssetReference {
+function normalizeWorkflowDraftAssetReference(
+  reference: WorkflowDraftAssetReference,
+  label: string,
+  expectedTaxonomy?: CompositionTaxonomyDescriptor,
+): WorkflowDraftAssetReference {
   const assetId = normalizeRequired(reference.assetId, `${label} asset id`);
   const versionId = normalizeOptional(reference.versionId);
-  return Object.freeze({ assetId, versionId });
+  const taxonomy = reference.taxonomy
+    ? createCompositionTaxonomyDescriptor(reference.taxonomy)
+    : expectedTaxonomy;
+  if (taxonomy) {
+    assertAllowedCompositionTaxonomyCombination(taxonomy, `${label} taxonomy`);
+  }
+  if (expectedTaxonomy && taxonomy && !taxonomyEquals(taxonomy, expectedTaxonomy)) {
+    throw new Error(
+      `${label} taxonomy '${taxonomyToLabel(taxonomy)}' must match expected taxonomy ` +
+      `'${taxonomyToLabel(expectedTaxonomy)}'.`,
+    );
+  }
+
+  return Object.freeze({ assetId, versionId, taxonomy });
 }
 
 function normalizeUserTrigger(
@@ -632,7 +752,11 @@ function normalizeInput(input: WorkflowDraftInput): WorkflowDraftInput {
     if (!datasetInput.asset) {
       throw new Error("Workflow draft dataset input requires asset.");
     }
-    const asset = normalizeWorkflowDraftAssetReference(datasetInput.asset, "Workflow draft dataset input asset");
+    const asset = normalizeWorkflowDraftAssetReference(
+      datasetInput.asset,
+      "Workflow draft dataset input asset",
+      WorkflowDraftAssetReferenceTaxonomyExpectations[WorkflowDraftAssetReferenceKinds.datasetInput],
+    );
     const selectionRecord = datasetInput.selection
       ? assertRecord(datasetInput.selection, "Workflow draft dataset input selection")
       : undefined;
@@ -886,12 +1010,16 @@ function normalizeWorkflowDraftStepAssetReference(reference: WorkflowDraftStepAs
     "Workflow draft step assetRef assetKind",
   );
   const assetRecord = assertRecord(record.asset, "Workflow draft step assetRef asset");
+  const expectedTaxonomy = assetKind === WorkflowDraftStepAssetKinds.agentAssistant
+    ? WorkflowDraftAssetReferenceTaxonomyExpectations[WorkflowDraftAssetReferenceKinds.agentAssistantStep]
+    : undefined;
 
   return Object.freeze({
     assetKind,
     asset: normalizeWorkflowDraftAssetReference(
       assetRecord as WorkflowDraftAssetReference,
       "Workflow draft step assetRef asset",
+      expectedTaxonomy,
     ),
   });
 }
@@ -1054,6 +1182,47 @@ function validateStepDependencyCycles(stepDependencies: ReadonlyMap<string, Read
   return false;
 }
 
+export function classifyWorkflowDraftAssetReferences(
+  draft: WorkflowDraft,
+): ReadonlyArray<WorkflowDraftAssetReferenceClassification> {
+  const normalizedDraft = normalizeWorkflowDraft(draft);
+  const classifications: WorkflowDraftAssetReferenceClassification[] = [];
+
+  normalizedDraft.inputs.forEach((input, index) => {
+    if (input.sourceType !== WorkflowDraftInputSourceTypes.datasetAsset) {
+      return;
+    }
+    const expectedTaxonomy = WorkflowDraftAssetReferenceTaxonomyExpectations[WorkflowDraftAssetReferenceKinds.datasetInput];
+    classifications.push(Object.freeze({
+      kind: WorkflowDraftAssetReferenceKinds.datasetInput,
+      path: `draft.inputs[${index}].asset`,
+      asset: input.asset,
+      expectedTaxonomy,
+      taxonomyMatched: taxonomyEquals(input.asset.taxonomy, expectedTaxonomy),
+    }));
+  });
+
+  normalizedDraft.steps.forEach((step, index) => {
+    if (
+      step.kind !== WorkflowDraftStepKinds.assetBacked
+      || !step.assetRef
+      || step.assetRef.assetKind !== WorkflowDraftStepAssetKinds.agentAssistant
+    ) {
+      return;
+    }
+    const expectedTaxonomy = WorkflowDraftAssetReferenceTaxonomyExpectations[WorkflowDraftAssetReferenceKinds.agentAssistantStep];
+    classifications.push(Object.freeze({
+      kind: WorkflowDraftAssetReferenceKinds.agentAssistantStep,
+      path: `draft.steps[${index}].assetRef.asset`,
+      asset: step.assetRef.asset,
+      expectedTaxonomy,
+      taxonomyMatched: taxonomyEquals(step.assetRef.asset.taxonomy, expectedTaxonomy),
+    }));
+  });
+
+  return Object.freeze(classifications);
+}
+
 export function validateWorkflowDraft(draft: WorkflowDraft | undefined): WorkflowValidationResult {
   const issues: WorkflowValidationIssue[] = [];
   if (!draft || typeof draft !== "object") {
@@ -1144,6 +1313,18 @@ export function validateWorkflowDraft(draft: WorkflowDraft | undefined): Workflo
           path: `draft.inputs[${index}].asset.assetId`,
         });
       }
+      if (normalized.sourceType === WorkflowDraftInputSourceTypes.datasetAsset) {
+        const expectedTaxonomy = WorkflowDraftAssetReferenceTaxonomyExpectations[WorkflowDraftAssetReferenceKinds.datasetInput];
+        if (!taxonomyEquals(normalized.asset.taxonomy, expectedTaxonomy)) {
+          issues.push({
+            code: WorkflowValidationIssueCodes.inputDatasetAssetTaxonomyMismatch,
+            section: WorkflowValidationSections.inputs,
+            severity: "error",
+            message: `Dataset input asset '${normalized.asset.assetId}' must align with taxonomy '${taxonomyToLabel(expectedTaxonomy)}'.`,
+            path: `draft.inputs[${index}].asset.taxonomy`,
+          });
+        }
+      }
     } catch (error) {
       issues.push({
         code: WorkflowValidationIssueCodes.inputMalformed,
@@ -1207,6 +1388,31 @@ export function validateWorkflowDraft(draft: WorkflowDraft | undefined): Workflo
           message: `Step '${step.id}' depends on unknown step '${dependency}'.`,
           path: `draft.steps.${step.id}.dependsOnStepIds`,
         });
+      }
+    }
+
+    if (step.kind === WorkflowDraftStepKinds.assetBacked && step.assetRef) {
+      if (!step.assetRef.asset.assetId.startsWith("asset:")) {
+        issues.push({
+          code: WorkflowValidationIssueCodes.stepAssetReferenceMalformed,
+          section: WorkflowValidationSections.steps,
+          severity: "error",
+          message: `Asset-backed step '${step.id}' asset '${step.assetRef.asset.assetId}' must use canonical 'asset:' identity.`,
+          path: `draft.steps.${step.id}.assetRef.asset.assetId`,
+        });
+      }
+
+      if (step.assetRef.assetKind === WorkflowDraftStepAssetKinds.agentAssistant) {
+        const expectedTaxonomy = WorkflowDraftAssetReferenceTaxonomyExpectations[WorkflowDraftAssetReferenceKinds.agentAssistantStep];
+        if (!taxonomyEquals(step.assetRef.asset.taxonomy, expectedTaxonomy)) {
+          issues.push({
+            code: WorkflowValidationIssueCodes.stepAssetTaxonomyMismatch,
+            section: WorkflowValidationSections.steps,
+            severity: "error",
+            message: `Agent-assistant step '${step.id}' must align with taxonomy '${taxonomyToLabel(expectedTaxonomy)}'.`,
+            path: `draft.steps.${step.id}.assetRef.asset.taxonomy`,
+          });
+        }
       }
     }
 
@@ -1434,21 +1640,138 @@ export function transitionWorkflowEntityLifecycle(
   });
 }
 
-export function serializeWorkflowDraft(draft: WorkflowDraft): string {
-  return JSON.stringify(normalizeWorkflowDraft(draft), null, 2);
+export function mapWorkflowDraftToPersistenceRecord(draft: WorkflowDraft): WorkflowDraftPersistenceRecord {
+  return cloneRecord(normalizeWorkflowDraft(draft));
 }
 
-export function deserializeWorkflowDraft(serializedDraft: string): WorkflowDraft {
-  const normalizedPayload = normalizeRequired(serializedDraft, "Workflow draft payload");
-  const parsed = JSON.parse(normalizedPayload);
-  const record = assertRecord(parsed, "Workflow draft payload");
-
+export function mapWorkflowDraftFromPersistenceRecord(record: WorkflowDraftPersistenceRecord): WorkflowDraft {
   return normalizeWorkflowDraft({
     triggers: Array.isArray(record.triggers) ? record.triggers as ReadonlyArray<WorkflowDraftTrigger> : [],
     inputs: Array.isArray(record.inputs) ? record.inputs as ReadonlyArray<WorkflowDraftInput> : [],
     steps: Array.isArray(record.steps) ? record.steps as ReadonlyArray<WorkflowDraftStep> : [],
     outputs: Array.isArray(record.outputs) ? record.outputs as ReadonlyArray<WorkflowDraftOutput> : [],
   });
+}
+
+export function mapWorkflowEntityToPersistenceRecord(entity: WorkflowEntity): WorkflowEntityPersistenceRecord {
+  const normalizedEntityId = normalizeRequired(entity.id, "Workflow entity id");
+  const normalizedName = normalizeRequired(entity.name, "Workflow entity name");
+  const metadata = Object.freeze({
+    summary: normalizeOptional(entity.metadata?.summary),
+    tags: normalizeTags(entity.metadata?.tags),
+  });
+  const lifecycleState = normalizeWorkflowLifecycleState(entity.lifecycleState);
+  if (!Number.isInteger(entity.draftRevision) || entity.draftRevision < 1) {
+    throw new Error("Workflow entity draftRevision must be a positive integer.");
+  }
+  if (!isValidTimestamp(entity.createdAt)) {
+    throw new Error("Workflow entity createdAt must be a valid timestamp.");
+  }
+  if (!isValidTimestamp(entity.updatedAt)) {
+    throw new Error("Workflow entity updatedAt must be a valid timestamp.");
+  }
+
+  return Object.freeze({
+    id: normalizedEntityId,
+    name: normalizedName,
+    metadata,
+    draft: mapWorkflowDraftToPersistenceRecord(entity.draft),
+    lifecycleState,
+    draftRevision: entity.draftRevision,
+    createdAt: entity.createdAt,
+    updatedAt: entity.updatedAt,
+  });
+}
+
+export function mapWorkflowEntityFromPersistenceRecord(record: WorkflowEntityPersistenceRecord): WorkflowEntity {
+  const normalizedRecord = assertRecord(record, "Workflow entity persistence record") as WorkflowEntityPersistenceRecord;
+  const lifecycleState = normalizeWorkflowLifecycleState(
+    normalizeRequired(normalizedRecord.lifecycleState, "Workflow entity lifecycle state"),
+  );
+  const draft = mapWorkflowDraftFromPersistenceRecord(normalizedRecord.draft);
+  if (lifecycleState === WorkflowLifecycleStates.executable && !validateWorkflowDraft(draft).valid) {
+    throw new Error("Workflow lifecycle state 'executable' requires a valid canonical workflow draft.");
+  }
+
+  const entity: WorkflowEntity = Object.freeze({
+    id: normalizeRequired(normalizedRecord.id, "Workflow entity id"),
+    name: normalizeRequired(normalizedRecord.name, "Workflow entity name"),
+    metadata: Object.freeze({
+      summary: normalizeOptional(normalizedRecord.metadata?.summary),
+      tags: normalizeTags(normalizedRecord.metadata?.tags),
+    }),
+    draft,
+    lifecycleState,
+    draftRevision: normalizedRecord.draftRevision,
+    createdAt: normalizeRequired(normalizedRecord.createdAt, "Workflow entity createdAt"),
+    updatedAt: normalizeRequired(normalizedRecord.updatedAt, "Workflow entity updatedAt"),
+  });
+
+  if (!isValidTimestamp(entity.createdAt)) {
+    throw new Error("Workflow entity createdAt must be a valid timestamp.");
+  }
+  if (!isValidTimestamp(entity.updatedAt)) {
+    throw new Error("Workflow entity updatedAt must be a valid timestamp.");
+  }
+  if (!Number.isInteger(entity.draftRevision) || entity.draftRevision < 1) {
+    throw new Error("Workflow entity draftRevision must be a positive integer.");
+  }
+  return entity;
+}
+
+export function serializeWorkflowDraft(draft: WorkflowDraft): string {
+  return stableStringify(mapWorkflowDraftToPersistenceRecord(draft));
+}
+
+export function deserializeWorkflowDraft(serializedDraft: string): WorkflowDraft {
+  const normalizedPayload = normalizeRequired(serializedDraft, "Workflow draft payload");
+  const parsed = JSON.parse(normalizedPayload);
+  const record = assertRecord(parsed, "Workflow draft payload") as Record<string, unknown>;
+  if (record.schemaVersion === WorkflowDraftDocumentSchemaVersion) {
+    const draftRecord = assertRecord(record.draft, "Workflow draft payload draft");
+    return mapWorkflowDraftFromPersistenceRecord(draftRecord as WorkflowDraftPersistenceRecord);
+  }
+
+  return mapWorkflowDraftFromPersistenceRecord(record as WorkflowDraftPersistenceRecord);
+}
+
+export function serializeWorkflowDraftDocument(draft: WorkflowDraft): string {
+  const document: WorkflowDraftSerializedDocument = Object.freeze({
+    schemaVersion: WorkflowDraftDocumentSchemaVersion,
+    draft: mapWorkflowDraftToPersistenceRecord(draft),
+  });
+  return stableStringify(document);
+}
+
+export function deserializeWorkflowDraftDocument(serializedDraft: string): WorkflowDraft {
+  const normalizedPayload = normalizeRequired(serializedDraft, "Workflow draft payload");
+  const parsed = assertRecord(JSON.parse(normalizedPayload), "Workflow draft payload");
+  if (parsed.schemaVersion !== WorkflowDraftDocumentSchemaVersion) {
+    throw new Error(
+      `Workflow draft schema version '${String(parsed.schemaVersion)}' is not supported. Expected '${WorkflowDraftDocumentSchemaVersion}'.`,
+    );
+  }
+  const draftRecord = assertRecord(parsed.draft, "Workflow draft payload draft");
+  return mapWorkflowDraftFromPersistenceRecord(draftRecord as WorkflowDraftPersistenceRecord);
+}
+
+export function serializeWorkflowEntity(entity: WorkflowEntity): string {
+  const document: WorkflowEntitySerializedDocument = Object.freeze({
+    schemaVersion: WorkflowEntityDocumentSchemaVersion,
+    entity: mapWorkflowEntityToPersistenceRecord(entity),
+  });
+  return stableStringify(document);
+}
+
+export function deserializeWorkflowEntity(serializedEntity: string): WorkflowEntity {
+  const normalizedPayload = normalizeRequired(serializedEntity, "Workflow entity payload");
+  const parsed = assertRecord(JSON.parse(normalizedPayload), "Workflow entity payload");
+  if (parsed.schemaVersion === WorkflowEntityDocumentSchemaVersion) {
+    const entityRecord = assertRecord(parsed.entity, "Workflow entity payload entity");
+    return mapWorkflowEntityFromPersistenceRecord(entityRecord as WorkflowEntityPersistenceRecord);
+  }
+
+  return mapWorkflowEntityFromPersistenceRecord(parsed as WorkflowEntityPersistenceRecord);
 }
 
 export function createWorkflowEntity(input: {

@@ -164,4 +164,42 @@ describe("WorkflowStudioApplicationService", () => {
       versionId: "workflow-version-invalid-content",
     })).rejects.toThrow("Workflow draft content is malformed");
   });
+
+  it("blocks publish when workflow asset references violate canonical taxonomy expectations", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const ids = ["session-1", "draft-1"];
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => ids.shift() ?? "generated");
+    const service = new WorkflowStudioApplicationService(studioShell);
+
+    const ensure = await service.ensureStudioInitialized();
+    const created = await service.createWorkflowDraft({
+      sessionId: ensure.session.id,
+      title: "Workflow taxonomy mismatch",
+      content: JSON.stringify({
+        triggers: [],
+        inputs: [{
+          id: "input-dataset",
+          type: "dataset",
+          sourceType: "dataset-asset",
+          asset: {
+            assetId: "asset:dataset-customers",
+            taxonomy: {
+              structuralKind: "atomic",
+              semanticRole: "tool",
+              behaviorKind: "deterministic",
+            },
+          },
+        }],
+        steps: [],
+        outputs: [],
+      }),
+      dependencies: [{ assetId: "asset:model", versionId: "asset:model:v1" }],
+    });
+
+    await expect(service.publishWorkflowDraft({
+      sessionId: ensure.session.id,
+      draftId: created.draft.id,
+      versionId: "workflow-version-taxonomy-mismatch",
+    })).rejects.toThrow("input-malformed");
+  });
 });
