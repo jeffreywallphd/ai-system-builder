@@ -19,6 +19,9 @@ export interface AssetSelectorReturnHandoffResult {
   readonly consumed: boolean;
   readonly nextSearch?: string;
   readonly returnedAsset?: AssetSelectorAssetReference;
+  readonly selectorTargetId?: string;
+  readonly originatingField?: string;
+  readonly usageContext?: string;
 }
 
 export interface HandleSelectorReturnInput {
@@ -70,6 +73,9 @@ export class AssetSelectorReturnHandoffService {
         handled: true,
         consumed: true,
         nextSearch: this.inlineCreationService.stripInlineReturnFromSearch(input.search),
+        selectorTargetId: resolution.selectorTargetId,
+        originatingField: resolution.originatingField,
+        usageContext: resolution.usageContext,
       });
     }
 
@@ -83,6 +89,9 @@ export class AssetSelectorReturnHandoffService {
         handled: true,
         consumed: true,
         nextSearch: this.inlineCreationService.stripInlineReturnFromSearch(input.search),
+        selectorTargetId: resolution.selectorTargetId,
+        originatingField: resolution.originatingField,
+        usageContext: resolution.usageContext,
       });
     }
 
@@ -100,6 +109,9 @@ export class AssetSelectorReturnHandoffService {
         handled: true,
         consumed: true,
         nextSearch: this.inlineCreationService.stripInlineReturnFromSearch(input.search),
+        selectorTargetId: resolution.selectorTargetId,
+        originatingField: resolution.originatingField,
+        usageContext: resolution.usageContext,
       });
     }
 
@@ -109,6 +121,9 @@ export class AssetSelectorReturnHandoffService {
         handled: true,
         consumed: true,
         nextSearch: this.inlineCreationService.stripInlineReturnFromSearch(input.search),
+        selectorTargetId: resolution.selectorTargetId,
+        originatingField: resolution.originatingField,
+        usageContext: resolution.usageContext,
       });
     }
 
@@ -118,6 +133,9 @@ export class AssetSelectorReturnHandoffService {
         handled: true,
         consumed: true,
         nextSearch: this.inlineCreationService.stripInlineReturnFromSearch(input.search),
+        selectorTargetId: resolution.selectorTargetId,
+        originatingField: resolution.originatingField,
+        usageContext: resolution.usageContext,
       });
     }
 
@@ -163,6 +181,9 @@ export class AssetSelectorReturnHandoffService {
       consumed: true,
       nextSearch: this.inlineCreationService.stripInlineReturnFromSearch(input.search),
       returnedAsset: stateAfterReturn.validationErrors.length === 0 ? returnedAsset : undefined,
+      selectorTargetId: resolution.selectorTargetId,
+      originatingField: resolution.originatingField,
+      usageContext: resolution.usageContext,
     });
   }
 

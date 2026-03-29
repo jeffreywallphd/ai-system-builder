@@ -54,6 +54,10 @@ interface WorkflowStudioStepSectionEditorProps {
 }
 
 const stepSelectorTargetQueryParam = "workflowStepSelectorTarget";
+const stepSelectorTargetPrefix = "workflow-step:";
+const newStepSelectorTargetId = "workflow-step:new";
+const stepSelectorOriginatingField = "steps.agent-assistant";
+const stepSelectorUsageContext = "workflow-step";
 
 type StepSelectorOperation =
   | Readonly<{ readonly kind: "add" }>
@@ -90,6 +94,31 @@ function parseStepSelectorOperationFromSearch(search: string, draft: WorkflowDra
     return undefined;
   }
   return Object.freeze({ kind: "replace", stepId: target });
+}
+
+function parseStepSelectorOperationFromTargetId(selectorTargetId?: string): StepSelectorOperation | undefined {
+  const targetId = selectorTargetId?.trim();
+  if (!targetId) {
+    return undefined;
+  }
+  if (targetId === newStepSelectorTargetId) {
+    return Object.freeze({ kind: "add" } as const);
+  }
+  if (!targetId.startsWith(stepSelectorTargetPrefix)) {
+    return undefined;
+  }
+  const stepId = targetId.slice(stepSelectorTargetPrefix.length).trim();
+  if (!stepId || stepId === "new") {
+    return undefined;
+  }
+  return Object.freeze({ kind: "replace", stepId });
+}
+
+function buildStepSelectorTargetId(operation: StepSelectorOperation): string {
+  if (operation.kind === "add") {
+    return newStepSelectorTargetId;
+  }
+  return `${stepSelectorTargetPrefix}${operation.stepId}`;
 }
 
 function writeStepSelectorOperationToSearch(search: string, operation?: StepSelectorOperation): string {
@@ -164,6 +193,7 @@ export default function WorkflowStudioStepSectionEditor({
   );
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [selectorOperation, setSelectorOperation] = useState<StepSelectorOperation | undefined>(undefined);
+  const [selectorReturnTargetId, setSelectorReturnTargetId] = useState<string | undefined>(undefined);
   const lastAppliedCompletedCount = useRef<number | undefined>(undefined);
 
   const stepValidationIssues = useMemo(
@@ -237,6 +267,7 @@ export default function WorkflowStudioStepSectionEditor({
     selectorSessionStore.clearPendingSelections(selectorSessionKey);
     setSelectorOpen(false);
     setSelectorOperation(undefined);
+    setSelectorReturnTargetId(undefined);
     const nextSearch = writeStepSelectorOperationToSearch(location.search, undefined);
     void navigate({
       pathname: location.pathname,
@@ -298,10 +329,14 @@ export default function WorkflowStudioStepSectionEditor({
   }, [queryRevision, searchTerm, selectorDataProvider, selectorRequest]);
 
   useEffect(() => {
+    const expectedOperation = selectorOperation ?? parseStepSelectorOperationFromSearch(location.search, sharedDraft);
     const outcome = returnHandoffService.handle({
       search: location.search,
       sessionKey: selectorSessionKey,
       request: selectorRequest,
+      expectedSelectorTargetId: expectedOperation ? buildStepSelectorTargetId(expectedOperation) : undefined,
+      expectedOriginatingField: stepSelectorOriginatingField,
+      expectedUsageContext: stepSelectorUsageContext,
       sessionStore: selectorSessionStore,
     });
 
@@ -310,6 +345,7 @@ export default function WorkflowStudioStepSectionEditor({
     }
 
     if (outcome.returnedAsset) {
+      setSelectorReturnTargetId(outcome.selectorTargetId);
       setReturnedItems((current) => {
         const key = `${outcome.returnedAsset?.assetId}:${outcome.returnedAsset?.versionId ?? ""}`;
         const existing = new Set(current.map((entry) => `${entry.asset.assetId}:${entry.asset.versionId ?? ""}`));
@@ -343,10 +379,12 @@ export default function WorkflowStudioStepSectionEditor({
     location.pathname,
     location.search,
     navigate,
+    selectorOperation,
     returnHandoffService,
     selectorRequest,
     selectorSessionKey,
     selectorSessionStore,
+    sharedDraft,
   ]);
 
   useEffect(() => {
@@ -371,7 +409,10 @@ export default function WorkflowStudioStepSectionEditor({
 
     const operation = selectorOperation
       ?? parseStepSelectorOperationFromSearch(location.search, sharedDraft)
-      ?? Object.freeze({ kind: "add" } as const);
+      ?? parseStepSelectorOperationFromTargetId(selectorReturnTargetId);
+    if (!operation) {
+      return;
+    }
 
     onUpdateSharedDraft((draft) => {
       if (operation.kind === "replace") {
@@ -395,7 +436,8 @@ export default function WorkflowStudioStepSectionEditor({
     });
 
     closeSelector();
-  }, [location.search, onUpdateSharedDraft, selectorOperation, selectorState, sharedDraft]);
+    setSelectorReturnTargetId(undefined);
+  }, [location.search, onUpdateSharedDraft, selectorOperation, selectorReturnTargetId, selectorState, sharedDraft]);
 
   const stateForShell = selectorState ?? selectorSessionStore.getSession(selectorSessionKey);
 
@@ -467,15 +509,16 @@ export default function WorkflowStudioStepSectionEditor({
               closeSelector();
             }}
             onCreateNew={() => {
+              const operation = selectorOperation
+                ?? parseStepSelectorOperationFromSearch(location.search, sharedDraft)
+                ?? Object.freeze({ kind: "add" } as const);
               const launch = studioLaunchService.launch({
                 sessionKey: selectorSessionKey,
                 selectorRequest,
                 routePath: location.pathname,
-                routeSearch: writeStepSelectorOperationToSearch(location.search, selectorOperation ?? Object.freeze({ kind: "add" } as const)),
+                routeSearch: writeStepSelectorOperationToSearch(location.search, operation),
                 routeHash: location.hash || "#workflow-wizard-steps",
-                selectorTargetId: selectorOperation?.kind === "replace"
-                  ? `workflow-step:${selectorOperation.stepId}`
-                  : "workflow-step:new",
+                selectorTargetId: buildStepSelectorTargetId(operation),
                 workflowOrigin: {
                   studioId: workflowDraftReference.studioId,
                   modeId: "wizard",

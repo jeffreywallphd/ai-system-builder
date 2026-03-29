@@ -77,6 +77,20 @@ Primary call path:
 - On valid created returns, selector session state is updated and canonical workflow draft dataset inputs are synchronized through existing draft seams (`replaceDatasetInputSelections`), preserving in-progress wizard state.
 - Shared inline return UI now exposes an explicit `no-selection` return action for selector-origin launches so Workflow authoring can resume without mutating selected datasets; `cancelled` behavior remains unchanged.
 
+## Stories 5.7 / 5.8 agent step selector handoff slice
+- Workflow Wizard Steps now uses the same handoff shape as dataset inputs for agent/assistant step authoring (`WorkflowStudioStepSectionEditor`):
+  - selector flow supports existing agent/assistant selection for step slots,
+  - create-new launches Agent Studio through `AssetSelectorStudioLaunchService`.
+- Step-target metadata is now explicit and validated on return:
+  - `selectorTargetId` is canonical per step target (`workflow-step:new` or `workflow-step:<stepId>`),
+  - return handling validates `originatingField` and `usageContext` (`steps.agent-assistant` / `workflow-step`) before mutating selector state.
+- Created-return handling remains centralized in `AssetSelectorReturnHandoffService` + `StudioReturnPayloadResolver`:
+  - matching returns are routed to the intended step selector target,
+  - `cancelled` and `no-selection` remain no-op for workflow draft mutation.
+- Workflow session resume remains aligned with Story 5.4:
+  - mode/draft restoration via `WorkflowStudioReturnRestorationService`,
+  - in-progress draft persistence via `WorkflowStudioModeStateStore`.
+
 ## Backward compatibility
 - Legacy selector launch params still parse as before.
 - If those params are absent, `InlineAssetCreationService.parseSelectorLaunchFromSearch(...)` now falls back to parsing `studioHandoff`.
