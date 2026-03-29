@@ -281,4 +281,45 @@ describe("AssetSelectorSessionStore", () => {
     store.cancelSession("workflow:inputs:actions", "user-cancelled");
     expect(store.getSession("workflow:inputs:actions")?.lifecycleState).toBe(AssetSelectorSessionLifecycleStates.cancelled);
   });
+
+  it("supports replacing selected and pending selections from canonical draft state", () => {
+    const store = new AssetSelectorSessionStore();
+    store.prepareSession({
+      sessionKey: "workflow:inputs:sync",
+      request: createWorkflowInputRequest(),
+    });
+    store.activateSession("workflow:inputs:sync");
+
+    store.replaceSelections("workflow:inputs:sync", [{
+      assetId: "asset:dataset:from-draft",
+      assetType: "dataset",
+      versionId: "asset:dataset:from-draft:v2",
+    }]);
+
+    const state = store.getSession("workflow:inputs:sync");
+    expect(state?.selectedAssets.map((entry) => entry.assetId)).toEqual(["asset:dataset:from-draft"]);
+    expect(state?.pendingSelections.map((entry) => entry.assetId)).toEqual(["asset:dataset:from-draft"]);
+  });
+
+  it("supports setting pending selections for one selector interaction without mutating selected state", () => {
+    const store = new AssetSelectorSessionStore();
+    store.prepareSession({
+      sessionKey: "workflow:inputs:pending-only",
+      request: createWorkflowInputRequest(),
+      initialSelectedAssets: [{
+        assetId: "asset:dataset:selected",
+        assetType: "dataset",
+      }],
+    });
+    store.activateSession("workflow:inputs:pending-only");
+
+    store.setPendingSelections("workflow:inputs:pending-only", [{
+      assetId: "asset:dataset:pending",
+      assetType: "dataset",
+    }]);
+
+    const state = store.getSession("workflow:inputs:pending-only");
+    expect(state?.selectedAssets.map((entry) => entry.assetId)).toEqual(["asset:dataset:selected"]);
+    expect(state?.pendingSelections.map((entry) => entry.assetId)).toEqual(["asset:dataset:pending"]);
+  });
 });

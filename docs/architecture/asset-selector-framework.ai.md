@@ -157,6 +157,28 @@ Selector rehydration + validation behavior:
 - Returned assets are merged into selector options and selected assets for immediate user confirmation/modification.
 - Multiple selector sessions are isolated by `sessionKey`/`returnContextId` targeting.
 
+## Story 4.9 implemented workflow wizard inputs integration
+- Workflow surface: `ui/components/studio-shell/workflow/WorkflowStudioInputSectionEditor.tsx`
+- Dataset input attachments are now selector-first:
+  - selected datasets are shown as explicit rows (title + asset id + optional version),
+  - remove actions mutate canonical workflow draft inputs directly,
+  - add/modify opens shared selector shell instead of ad hoc input picker behavior.
+- Selector session state now synchronizes with canonical draft dataset inputs via shared session-store selection replacement APIs, preventing selector/draft drift across reopen and route transitions.
+- Confirmed selector selections persist through `replaceDatasetInputSelections` into canonical `WorkflowDraft.inputs`.
+- Inline create-new dataset handoff returns into the active selector/session and preserves wizard draft state.
+- Capability enforcement remains shared-validator/matrix-based (`workflow-input` -> `dataset`), not UI-only filtering.
+
+## Story 4.10 implemented workflow wizard steps integration
+- Workflow surface: `ui/components/studio-shell/workflow/WorkflowStudioStepSectionEditor.tsx`
+- Agent/assistant step attachments are now selector-first:
+  - add-step (agent/assistant) opens shared selector and inserts step on confirm,
+  - existing asset-backed steps use selector-driven replace/edit actions,
+  - ad hoc per-step asset dropdown selection path was removed.
+- Add-vs-replace selector intent survives inline create-new route transitions via selector-target query metadata, so returned assets apply to the correct step operation.
+- Confirmed selections still map through canonical step helper seams (`setWorkflowStepAgentAssetSelection`) preserving step payload compatibility (`assetRef` + placeholder config).
+- Step ordering/reorder/remove behavior remains canonical-step-id based and isolated from selector session state.
+- Capability enforcement remains shared-validator/matrix-based (`workflow-step` -> `agent`), not UI-only filtering.
+
 ## Future asset-type integration pattern
 For new selector types, keep shared shell/session unchanged and add:
 1. A typed adapter in `ui/studio-shell/asset-selector/` (request builder + source mapping).
@@ -170,6 +192,6 @@ For new selector types, keep shared shell/session unchanged and add:
 - Existing validator code does not require refactor for new context/type combinations.
 
 ## Scope boundaries
-- No selector UI implementation in this slice.
-- No workflow canvas/wizard wiring in this slice.
-- This is the reusable contract + capability truth foundation for later stories.
+- Shared selector shell/session/capability infrastructure remains reusable and UI-agnostic.
+- Workflow wizard wiring for inputs + steps is now implemented through those shared seams.
+- No parallel selector architecture or selector-bypass paths should be introduced for future workflow sections.
