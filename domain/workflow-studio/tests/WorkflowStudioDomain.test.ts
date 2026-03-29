@@ -156,6 +156,9 @@ describe("WorkflowStudioDomain", () => {
         destination: {
           type: WorkflowDraftOutputDestinationTypes.systemEntry,
           target: "crm/customers",
+          options: {
+            entityName: "customer-record",
+          },
         },
       }],
     });
@@ -225,7 +228,13 @@ describe("WorkflowStudioDomain", () => {
           outputType: WorkflowDraftOutputTypes.record,
           format: WorkflowDraftOutputFormats.json,
           sourceStepId: "step-agent",
-          destination: { type: WorkflowDraftOutputDestinationTypes.systemEntry, target: "records/outbound" },
+          destination: {
+            type: WorkflowDraftOutputDestinationTypes.systemEntry,
+            target: "records/outbound",
+            options: {
+              entityName: "outbound-record",
+            },
+          },
         }],
       },
       now: new Date("2026-03-29T18:00:00.000Z"),
@@ -789,6 +798,7 @@ describe("WorkflowStudioDomain", () => {
       outputs: [{
         id: "output-primary",
         type: "workflow-output",
+        title: "Session Panel Output",
         outputType: WorkflowDraftOutputTypes.document,
         format: WorkflowDraftOutputFormats.markdown,
         sourceStepId: "step-run",
@@ -802,6 +812,7 @@ describe("WorkflowStudioDomain", () => {
 
     expect(normalized.outputs[0]).toMatchObject({
       id: "output-primary",
+      title: "Session Panel Output",
       outputType: WorkflowDraftOutputTypes.document,
       format: WorkflowDraftOutputFormats.markdown,
       sourceStepId: "step-run",
@@ -837,6 +848,9 @@ describe("WorkflowStudioDomain", () => {
           destination: {
             type: WorkflowDraftOutputDestinationTypes.systemEntry,
             target: "warehouse/reports",
+            options: {
+              entityName: "report-record",
+            },
           },
         },
       ],
@@ -880,6 +894,62 @@ describe("WorkflowStudioDomain", () => {
     })).toThrow("destination target is required");
   });
 
+  it("returns output validation issues for required destination-specific output configuration", () => {
+    const webViewerMissingTitle = validateWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [],
+      outputs: [{
+        id: "output-web-view",
+        type: "workflow-output",
+        outputType: WorkflowDraftOutputTypes.document,
+        format: WorkflowDraftOutputFormats.markdown,
+        destination: {
+          type: WorkflowDraftOutputDestinationTypes.webViewer,
+          target: "session-panel",
+        },
+      }],
+    });
+    expect(webViewerMissingTitle.valid).toBeFalse();
+    expect(webViewerMissingTitle.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.outputViewerTitleMissing)).toBeTrue();
+
+    const systemEntryMissingEntity = validateWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [],
+      outputs: [{
+        id: "output-system-entry",
+        type: "workflow-output",
+        outputType: WorkflowDraftOutputTypes.record,
+        format: WorkflowDraftOutputFormats.json,
+        destination: {
+          type: WorkflowDraftOutputDestinationTypes.systemEntry,
+          target: "records/customers",
+        },
+      }],
+    });
+    expect(systemEntryMissingEntity.valid).toBeFalse();
+    expect(systemEntryMissingEntity.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.outputSystemEntityMissing)).toBeTrue();
+
+    const fileExportInvalidFormat = validateWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [],
+      outputs: [{
+        id: "output-file-export",
+        type: "workflow-output",
+        outputType: WorkflowDraftOutputTypes.document,
+        format: "xml",
+        destination: {
+          type: WorkflowDraftOutputDestinationTypes.fileExport,
+          target: "/tmp/export.xml",
+        },
+      }],
+    });
+    expect(fileExportInvalidFormat.valid).toBeFalse();
+    expect(fileExportInvalidFormat.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.outputFileFormatInvalid)).toBeTrue();
+  });
+
   it("validates a canonical workflow draft successfully", () => {
     const result = validateWorkflowDraft({
       triggers: [{
@@ -916,6 +986,9 @@ describe("WorkflowStudioDomain", () => {
         destination: {
           type: WorkflowDraftOutputDestinationTypes.systemEntry,
           target: "records/customers",
+          options: {
+            entityName: "customer-record",
+          },
         },
       }],
     });

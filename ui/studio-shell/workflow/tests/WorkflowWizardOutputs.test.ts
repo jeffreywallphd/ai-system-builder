@@ -1,0 +1,119 @@
+import { describe, expect, it } from "bun:test";
+import {
+  WorkflowDraftOutputDestinationTypes,
+  createEmptyWorkflowDraft,
+} from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+import {
+  addWorkflowOutput,
+  getWorkflowOutputValidationMessages,
+  removeWorkflowOutput,
+  setWorkflowOutputDestinationType,
+  setWorkflowOutputFileName,
+  setWorkflowOutputFormat,
+  setWorkflowOutputRecordEntityName,
+  setWorkflowOutputViewerPresentationMode,
+  setWorkflowOutputViewerTitle,
+  WorkflowOutputPresentationModes,
+} from "../WorkflowWizardOutputs";
+
+describe("WorkflowWizardOutputs", () => {
+  it("adds and removes outputs with stable identifiers", () => {
+    const baseDraft = createEmptyWorkflowDraft();
+    const first = addWorkflowOutput(baseDraft, WorkflowDraftOutputDestinationTypes.fileExport);
+    const second = addWorkflowOutput(first.draft, WorkflowDraftOutputDestinationTypes.webViewer);
+    const third = addWorkflowOutput(second.draft, WorkflowDraftOutputDestinationTypes.systemEntry);
+
+    expect(third.draft.outputs.map((output) => output.id)).toEqual([
+      first.outputId,
+      second.outputId,
+      third.outputId,
+    ]);
+
+    const removed = removeWorkflowOutput(third.draft, second.outputId);
+    expect(removed.changed).toBe(true);
+    expect(removed.draft.outputs.map((output) => output.id)).toEqual([first.outputId, third.outputId]);
+  });
+
+  it("switches output destination type and resets stale destination-specific configuration", () => {
+    const added = addWorkflowOutput(createEmptyWorkflowDraft(), WorkflowDraftOutputDestinationTypes.fileExport);
+    const outputId = added.outputId;
+
+    const configuredFile = setWorkflowOutputFileName(added.draft, outputId, "report-name").draft;
+    expect(configuredFile.outputs[0]?.destination.options).toEqual(expect.objectContaining({
+      fileName: "report-name",
+    }));
+
+    const switched = setWorkflowOutputDestinationType(
+      configuredFile,
+      outputId,
+      WorkflowDraftOutputDestinationTypes.systemEntry,
+    ).draft;
+
+    expect(switched.outputs[0]?.destination.type).toBe(WorkflowDraftOutputDestinationTypes.systemEntry);
+    expect(switched.outputs[0]?.destination.options).toEqual(expect.objectContaining({
+      entityName: "",
+      destinationConfig: "",
+    }));
+    expect(switched.outputs[0]?.destination.options).not.toEqual(expect.objectContaining({
+      fileName: "report-name",
+    }));
+  });
+
+  it("updates type-specific configuration fields independently", () => {
+    const added = addWorkflowOutput(
+      createEmptyWorkflowDraft(),
+      WorkflowDraftOutputDestinationTypes.webViewer,
+    );
+    let draft = added.draft;
+    draft = setWorkflowOutputViewerTitle(draft, added.outputId, "Viewer A").draft;
+    draft = setWorkflowOutputViewerPresentationMode(draft, added.outputId, WorkflowOutputPresentationModes.fullPage).draft;
+
+    expect(draft.outputs[0]?.title).toBe("Viewer A");
+    expect(draft.outputs[0]?.destination.options).toEqual(expect.objectContaining({
+      presentationMode: WorkflowOutputPresentationModes.fullPage,
+    }));
+  });
+
+  it("returns validation messages for missing required per-type configuration", () => {
+    const fileOutput = addWorkflowOutput(
+      createEmptyWorkflowDraft(),
+      WorkflowDraftOutputDestinationTypes.fileExport,
+    ).draft.outputs[0]!;
+    const invalidFile = {
+      ...fileOutput,
+      format: "invalid-format",
+    };
+    expect(getWorkflowOutputValidationMessages(invalidFile)).toContain("File Export output requires a valid file format.");
+
+    const webViewerOutput = addWorkflowOutput(
+      createEmptyWorkflowDraft(),
+      WorkflowDraftOutputDestinationTypes.webViewer,
+    ).draft.outputs[0]!;
+    expect(getWorkflowOutputValidationMessages(webViewerOutput)).toContain("Web Viewer output requires a viewer title.");
+
+    const systemOutput = addWorkflowOutput(
+      createEmptyWorkflowDraft(),
+      WorkflowDraftOutputDestinationTypes.systemEntry,
+    ).draft.outputs[0]!;
+    expect(getWorkflowOutputValidationMessages(systemOutput)).toContain(
+      "Database/System Record output requires an entity name.",
+    );
+
+    const configuredSystem = setWorkflowOutputRecordEntityName(
+      { ...createEmptyWorkflowDraft(), outputs: [systemOutput] },
+      systemOutput.id,
+      "customer-record",
+    ).draft.outputs[0]!;
+    expect(getWorkflowOutputValidationMessages(configuredSystem)).toEqual([]);
+  });
+
+  it("applies explicit output format updates for file-export outputs", () => {
+    const added = addWorkflowOutput(createEmptyWorkflowDraft(), WorkflowDraftOutputDestinationTypes.fileExport);
+    const updated = setWorkflowOutputFormat(added.draft, added.outputId, "pdf");
+    expect(updated.changed).toBe(false);
+
+    const switched = setWorkflowOutputFormat(added.draft, added.outputId, "json");
+    expect(switched.changed).toBe(true);
+    expect(switched.draft.outputs[0]?.format).toBe("json");
+  });
+});

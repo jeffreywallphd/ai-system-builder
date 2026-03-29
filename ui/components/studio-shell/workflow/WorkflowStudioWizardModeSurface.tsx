@@ -1,10 +1,8 @@
 import type { WorkflowDraft, WorkflowValidationIssue } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
-import SectionBody from "./SectionBody";
-import SectionHeader from "./SectionHeader";
-import WizardSection from "./WizardSection";
 import WorkflowStudioTriggerSectionEditor from "./WorkflowStudioTriggerSectionEditor";
 import WorkflowStudioInputSectionEditor from "./WorkflowStudioInputSectionEditor";
 import WorkflowStudioStepSectionEditor from "./WorkflowStudioStepSectionEditor";
+import WorkflowStudioOutputSectionEditor from "./WorkflowStudioOutputSectionEditor";
 
 export interface WorkflowStudioWizardModeSurfaceProps {
   readonly sharedDraft: WorkflowDraft;
@@ -14,14 +12,6 @@ export interface WorkflowStudioWizardModeSurfaceProps {
   readonly studioId?: string;
   readonly routeSearch?: string;
   readonly onReplaceRouteSearch?: (nextSearch: string) => void;
-}
-
-function buildSectionSummary(count: number, singular: string, plural: string): string {
-  return count === 1 ? `1 ${singular}` : `${count} ${plural}`;
-}
-
-function renderEmptyState(message: string): JSX.Element {
-  return <p className="ui-text-muted">{message}</p>;
 }
 
 export default function WorkflowStudioWizardModeSurface({
@@ -65,24 +55,11 @@ export default function WorkflowStudioWizardModeSurface({
         routeSearch={routeSearch}
       />
 
-      <WizardSection sectionId="workflow-wizard-outputs">
-        <SectionHeader
-          title="Outputs Section"
-          description="Define workflow outputs and destinations. This section reflects the shared workflow draft outputs array."
-        />
-        <SectionBody>
-          <div className="ui-text-small">{buildSectionSummary(sharedDraft.outputs.length, "output", "outputs")}</div>
-          {sharedDraft.outputs.length === 0
-            ? renderEmptyState("No outputs configured yet.")
-            : (
-              <ul className="ui-stack ui-stack--2xs">
-                {sharedDraft.outputs.map((output) => (
-                  <li key={output.id}>{output.id}: {output.outputType}</li>
-                ))}
-              </ul>
-            )}
-        </SectionBody>
-      </WizardSection>
+      <WorkflowStudioOutputSectionEditor
+        sharedDraft={sharedDraft}
+        draftValidationIssues={draftValidationIssues}
+        onUpdateSharedDraft={onUpdateSharedDraft}
+      />
 
       <label className="ui-stack ui-stack--2xs">
         <span className="ui-text-small">Shared canonical workflow draft JSON preview</span>
