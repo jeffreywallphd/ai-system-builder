@@ -179,4 +179,58 @@ describe("DatasetAssetSelectorAdapter", () => {
     expect(result.items).toEqual([]);
     expect(result.error).toContain("registry unavailable");
   });
+
+  it("reuses short-lived query cache entries to avoid duplicate fetches during rehydration", async () => {
+    let filterCallCount = 0;
+    const provider = new DatasetAssetSelectorAdapter({
+      registryService: {
+        async filterAssets() {
+          filterCallCount += 1;
+          return {
+            ok: true,
+            data: [{
+              assetId: "asset:dataset:cached",
+              versionId: "asset:dataset:cached:v1",
+              name: "Cached Dataset",
+              kind: "dataset",
+              status: "published",
+              taxonomy: {
+                structuralKind: "atomic",
+                semanticRole: "dataset",
+                behaviorKind: "none",
+              },
+              provenance: {
+                upstreamAssets: [],
+                directUpstreamVersionIds: [],
+                directDownstreamVersionIds: [],
+              },
+              dependencies: [],
+              versionHistory: [],
+              lineage: {
+                upstream: [],
+                downstream: [],
+              },
+            }],
+          } as const;
+        },
+        async searchAssets() {
+          throw new Error("not used");
+        },
+      },
+      cacheTtlMs: 1000,
+    });
+
+    const request = createDatasetAssetSelectorRequest({
+      requestId: "selector:dataset:cache",
+      originatingStudio: "workflow-studio",
+      originatingField: "inputs.dataset",
+    });
+
+    const first = await provider.query({ request, searchTerm: "" });
+    const second = await provider.query({ request, searchTerm: "" });
+
+    expect(first.items).toHaveLength(1);
+    expect(second.items).toHaveLength(1);
+    expect(filterCallCount).toBe(1);
+  });
 });

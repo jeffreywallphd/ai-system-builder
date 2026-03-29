@@ -4,7 +4,10 @@ import {
   type AssetSelectorAssetReference,
   type AssetSelectorRequest,
 } from "../../../domain/studio-shell/AssetSelectorContract";
-import type { AssetSelectorSessionStore } from "../../../application/studio-entry/AssetSelectorSessionStore";
+import {
+  AssetSelectorSessionLifecycleStates,
+  type AssetSelectorSessionStore,
+} from "../../../application/studio-entry/AssetSelectorSessionStore";
 import { InlineAssetReturnStatuses, InlineAssetCreationService } from "../../routes/InlineAssetCreation";
 
 export interface AssetSelectorReturnHandoffResult {
@@ -53,7 +56,25 @@ export class AssetSelectorReturnHandoffService {
       });
     }
 
-    if (!input.sessionStore.getSession(input.sessionKey)) {
+    const session = input.sessionStore.getSession(input.sessionKey);
+    if (!session) {
+      return Object.freeze({
+        handled: true,
+        consumed: true,
+        nextSearch: this.inlineCreationService.stripInlineReturnFromSearch(input.search),
+      });
+    }
+
+    if (
+      payload.status === InlineAssetReturnStatuses.created
+      && session.lifecycleState !== AssetSelectorSessionLifecycleStates.creatingNew
+      && session.lifecycleState !== AssetSelectorSessionLifecycleStates.returning
+    ) {
+      this.reportInvalidReturn(
+        input,
+        "Returned selector payload is stale for the current session state.",
+        "session.lifecycleState",
+      );
       return Object.freeze({
         handled: true,
         consumed: true,
@@ -122,6 +143,18 @@ export class AssetSelectorReturnHandoffService {
       nextSearch: this.inlineCreationService.stripInlineReturnFromSearch(input.search),
       returnedAsset: stateAfterReturn.validationErrors.length === 0 ? returnedAsset : undefined,
     });
+  }
+
+  private reportInvalidReturn(
+    input: HandleSelectorReturnInput,
+    message: string,
+    path?: string,
+  ): void {
+    input.sessionStore.reportReturnPayloadError(
+      input.sessionKey,
+      message,
+      path,
+    );
   }
 }
 

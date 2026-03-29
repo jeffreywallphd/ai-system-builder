@@ -169,6 +169,23 @@ export default function WorkflowStudioStepSectionEditor({
     }
     return Object.freeze([...byId.values()]);
   }, [items, returnedItems]);
+  const unavailableStepAssetIds = useMemo(() => {
+    if (searchTerm.trim().length > 0 || loading || Boolean(queryError)) {
+      return new Set<string>();
+    }
+    const available = new Set(selectorItems.map((item) => item.asset.assetId));
+    const unavailable = new Set<string>();
+    for (const step of sharedDraft.steps) {
+      const assetId = step.assetRef?.asset.assetId;
+      if (!assetId) {
+        continue;
+      }
+      if (!available.has(assetId)) {
+        unavailable.add(assetId);
+      }
+    }
+    return unavailable;
+  }, [loading, queryError, searchTerm, selectorItems, sharedDraft.steps]);
 
   const addableDefinitions = useMemo(
     () => workflowStepTypeDefinitions.filter((definition) => definition.interactive),
@@ -470,6 +487,15 @@ export default function WorkflowStudioStepSectionEditor({
           </div>
         ) : null}
 
+        {unavailableStepAssetIds.size > 0 ? (
+          <div className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="workflow-step-unavailable-assets">
+            <strong>Unavailable step assets</strong>
+            <span className="ui-text-small ui-text-secondary">
+              One or more selected step assets are no longer available in the registry. Replace them before run preparation.
+            </span>
+          </div>
+        ) : null}
+
         {sharedDraft.steps.length === 0 ? (
           <div className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="workflow-step-empty-state">
             <strong>No workflow steps configured yet.</strong>
@@ -555,6 +581,9 @@ export default function WorkflowStudioStepSectionEditor({
                         </span>
                         {selectedAsset ? (
                           <span className="ui-text-small ui-text-secondary">{selectedAsset.assetId}</span>
+                        ) : null}
+                        {selectedAsset && unavailableStepAssetIds.has(selectedAsset.assetId) ? (
+                          <span className="ui-text-small ui-text-danger">Selected asset is unavailable or deleted.</span>
                         ) : null}
                       </div>
 

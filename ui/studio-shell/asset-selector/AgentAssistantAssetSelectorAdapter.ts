@@ -19,6 +19,8 @@ import type { AssetSelectorDataProvider, AssetSelectorQueryResponse } from "./As
 export interface AgentAssistantAssetSelectorAdapterOptions {
   readonly registryService: Pick<RegistryService, "filterAssets" | "searchAssets">;
   readonly limit?: number;
+  readonly cacheTtlMs?: number;
+  readonly cacheMaxEntries?: number;
 }
 
 export interface AgentAssistantAssetSelectorRequestInput {
@@ -85,9 +87,17 @@ export function createAgentAssistantAssetSelectorRequest(input: AgentAssistantAs
 
 export class AgentAssistantAssetSelectorAdapter implements AssetSelectorDataProvider {
   private readonly limit: number;
+  private readonly cacheTtlMs: number;
+  private readonly cacheMaxEntries: number;
+  private readonly queryCache = new Map<string, {
+    readonly createdAt: number;
+    readonly response: AssetSelectorQueryResponse;
+  }>();
 
   public constructor(private readonly options: AgentAssistantAssetSelectorAdapterOptions) {
     this.limit = options.limit ?? 75;
+    this.cacheTtlMs = options.cacheTtlMs ?? 15000;
+    this.cacheMaxEntries = options.cacheMaxEntries ?? 40;
   }
 
   public async query(input: {
@@ -95,6 +105,18 @@ export class AgentAssistantAssetSelectorAdapter implements AssetSelectorDataProv
     readonly searchTerm: string;
   }): Promise<AssetSelectorQueryResponse> {
     const keyword = input.searchTerm.trim();
+    const cacheKey = [
+      input.request.requestId,
+      input.request.assetType,
+      input.request.context.usageContext ?? "",
+      keyword.toLowerCase(),
+    ].join("::");
+    const now = Date.now();
+    const cached = this.queryCache.get(cacheKey);
+    if (cached && (now - cached.createdAt) <= this.cacheTtlMs) {
+      return cached.response;
+    }
+
     const response = keyword.length > 0
       ? await this.options.registryService.searchAssets({
         keyword,
@@ -111,10 +133,12 @@ export class AgentAssistantAssetSelectorAdapter implements AssetSelectorDataProv
       });
 
     if (!response.ok || !response.data) {
-      return Object.freeze({
+      const failedResponse: AssetSelectorQueryResponse = Object.freeze({
         items: Object.freeze([]),
         error: response.error?.message ?? "Unable to load agent or assistant assets.",
       });
+      this.cache(cacheKey, failedResponse, now);
+      return failedResponse;
     }
 
     const items = response.data
@@ -143,8 +167,21 @@ export class AgentAssistantAssetSelectorAdapter implements AssetSelectorDataProv
         });
       });
 
-    return Object.freeze({
+    const successResponse: AssetSelectorQueryResponse = Object.freeze({
       items: Object.freeze(items),
     });
+    this.cache(cacheKey, successResponse, now);
+    return successResponse;
+  }
+
+  private cache(key: string, response: AssetSelectorQueryResponse, createdAt: number): void {
+    this.queryCache.set(key, Object.freeze({ createdAt, response }));
+    if (this.queryCache.size <= this.cacheMaxEntries) {
+      return;
+    }
+    const oldest = this.queryCache.keys().next().value;
+    if (oldest) {
+      this.queryCache.delete(oldest);
+    }
   }
 }

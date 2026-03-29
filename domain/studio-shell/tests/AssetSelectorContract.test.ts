@@ -160,4 +160,49 @@ describe("AssetSelectorContract", () => {
     expect(malformed.valid).toBeFalse();
     expect(malformed.issues.some((issue) => issue.code === AssetSelectorValidationIssueCodes.malformedReturnPayload)).toBeTrue();
   });
+
+  it("rejects non-canonical asset identities and duplicate result entries", () => {
+    const request = createAssetSelectorRequest({
+      requestId: "selector:canonical-check",
+      assetType: "dataset",
+      selectionMode: AssetSelectorSelectionModes.multiSelect,
+      allowedSelectionTypes: [AssetSelectorSelectionTypes.existingAsset],
+      constraints: { minSelections: 0, maxSelections: 3 },
+      context: {
+        originatingStudio: "workflow-studio",
+        originatingField: "inputs.dataset",
+      },
+    });
+
+    const malformedIdentity = validateAssetSelectorResult({
+      request,
+      result: {
+        kind: AssetSelectorResultKinds.selected,
+        selectionType: AssetSelectorSelectionTypes.existingAsset,
+        assets: [{
+          assetId: "dataset-customers",
+          assetType: "dataset",
+        }],
+      },
+    });
+    expect(malformedIdentity.valid).toBeFalse();
+    expect(malformedIdentity.issues.some((issue) => issue.code === AssetSelectorValidationIssueCodes.malformedReturnPayload)).toBeTrue();
+
+    const duplicated = validateAssetSelectorResult({
+      request,
+      result: {
+        kind: AssetSelectorResultKinds.selected,
+        selectionType: AssetSelectorSelectionTypes.existingAsset,
+        assets: [{
+          assetId: "asset:dataset:customers",
+          assetType: "dataset",
+        }, {
+          assetId: "asset:dataset:customers",
+          assetType: "dataset",
+        }],
+      },
+    });
+    expect(duplicated.valid).toBeFalse();
+    expect(duplicated.issues.some((issue) => issue.code === AssetSelectorValidationIssueCodes.duplicateSelection)).toBeTrue();
+  });
 });

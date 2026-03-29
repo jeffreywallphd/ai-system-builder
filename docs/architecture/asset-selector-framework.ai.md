@@ -179,6 +179,44 @@ Selector rehydration + validation behavior:
 - Step ordering/reorder/remove behavior remains canonical-step-id based and isolated from selector session state.
 - Capability enforcement remains shared-validator/matrix-based (`workflow-step` -> `agent`), not UI-only filtering.
 
+## Story 4.11 hardening: validation, constraints, and error handling
+Validation/constraint logic is now stricter at source-of-truth seams:
+- Domain contract (`domain/studio-shell/AssetSelectorContract.ts`):
+  - canonical return identity enforcement (`assetId`/`versionId` require `asset:` shape),
+  - duplicate selected-asset entries are rejected,
+  - existing type/taxonomy/min-max checks remain canonical.
+- Application selector session (`application/studio-entry/AssetSelectorSessionStore.ts`):
+  - centralized selection-set validation for toggle/set/replace paths,
+  - over-selection is blocked before confirm,
+  - required/min constraints are enforced at confirm,
+  - snapshot restore now validates session key, lifecycle state, creating-new context alignment, and restored selections.
+- Return handoff (`ui/studio-shell/asset-selector/AssetSelectorReturnHandoffService.ts`):
+  - stale created-return payloads are rejected when lifecycle is not creation-return aligned,
+  - malformed return payloads still route to safe session validation issues.
+
+Error strategy remains bounded:
+- selector/session errors are user-facing but non-internal,
+- invalid states fail safe and do not crash wizard/selector surfaces,
+- invalid selector states are rejected before workflow draft mutation.
+
+## Story 4.12 hardening: persistence and rehydration support
+Persistence/rehydration seams are now more defensive and consistent:
+- Dataset draft sync (`ui/studio-shell/workflow/WorkflowWizardDatasetInputs.ts`):
+  - replacement equality includes version/title, not only asset id,
+  - canonical dataset id/version guards prevent malformed references,
+  - dataset replacement preserves non-dataset input isolation.
+- Step draft sync (`ui/studio-shell/workflow/WorkflowWizardSteps.ts`):
+  - canonical agent/assistant id/version guards prevent malformed step references.
+- Wizard rehydration UX:
+  - inputs/steps now surface unavailable/deleted attached-asset warnings when selected references are absent from selector catalog reads.
+- Rehydration performance:
+  - dataset/agent selector adapters now use bounded short-lived in-memory query caching to reduce redundant refetching during route transitions/reopen flows.
+
+Selector session vs workflow draft model:
+- canonical persisted truth is workflow draft (`inputs` + `steps.assetRef`),
+- selector sessions remain ephemeral interaction state (pending/lifecycle/validation),
+- rehydration synchronizes selector interaction state from canonical draft without persisting UI-only session artifacts.
+
 ## Future asset-type integration pattern
 For new selector types, keep shared shell/session unchanged and add:
 1. A typed adapter in `ui/studio-shell/asset-selector/` (request builder + source mapping).

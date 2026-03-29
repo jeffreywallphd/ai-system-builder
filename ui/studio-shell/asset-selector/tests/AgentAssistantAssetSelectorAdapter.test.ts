@@ -174,4 +174,58 @@ describe("AgentAssistantAssetSelectorAdapter", () => {
     expect(result.items).toEqual([]);
     expect(result.error).toContain("bridge unavailable");
   });
+
+  it("reuses short-lived query cache entries to avoid duplicate fetches during rehydration", async () => {
+    let filterCallCount = 0;
+    const provider = new AgentAssistantAssetSelectorAdapter({
+      registryService: {
+        async filterAssets() {
+          filterCallCount += 1;
+          return {
+            ok: true,
+            data: [{
+              assetId: "asset:agent:cached",
+              versionId: "asset:agent:cached:v1",
+              name: "Cached Agent",
+              kind: "agent",
+              status: "published",
+              taxonomy: {
+                structuralKind: "composite",
+                semanticRole: "agent",
+                behaviorKind: "autonomous",
+              },
+              provenance: {
+                upstreamAssets: [],
+                directUpstreamVersionIds: [],
+                directDownstreamVersionIds: [],
+              },
+              dependencies: [],
+              versionHistory: [],
+              lineage: {
+                upstream: [],
+                downstream: [],
+              },
+            }],
+          } as const;
+        },
+        async searchAssets() {
+          throw new Error("not used");
+        },
+      },
+      cacheTtlMs: 1000,
+    });
+
+    const request = createAgentAssistantAssetSelectorRequest({
+      requestId: "selector:workflow-step:cache",
+      originatingStudio: "workflow-studio",
+      originatingField: "steps.agent-assistant",
+    });
+
+    const first = await provider.query({ request, searchTerm: "" });
+    const second = await provider.query({ request, searchTerm: "" });
+
+    expect(first.items).toHaveLength(1);
+    expect(second.items).toHaveLength(1);
+    expect(filterCallCount).toBe(1);
+  });
 });

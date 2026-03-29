@@ -322,4 +322,59 @@ describe("AssetSelectorSessionStore", () => {
     expect(state?.selectedAssets.map((entry) => entry.assetId)).toEqual(["asset:dataset:selected"]);
     expect(state?.pendingSelections.map((entry) => entry.assetId)).toEqual(["asset:dataset:pending"]);
   });
+
+  it("prevents over-selection before confirm when max constraints are exceeded", () => {
+    const store = new AssetSelectorSessionStore();
+    store.prepareSession({
+      sessionKey: "workflow:inputs:max",
+      request: createAssetSelectorRequest({
+        requestId: "selector:workflow-input:max-1",
+        assetType: "dataset",
+        selectionMode: AssetSelectorSelectionModes.multiSelect,
+        allowedSelectionTypes: [AssetSelectorSelectionTypes.existingAsset],
+        constraints: {
+          minSelections: 0,
+          maxSelections: 1,
+        },
+        context: {
+          originatingStudio: "workflow-studio",
+          originatingField: "inputs",
+          usageContext: AssetSelectorUsageContexts.workflowInput,
+          launchSource: "wizard",
+        },
+      }),
+    });
+    store.activateSession("workflow:inputs:max");
+
+    store.togglePendingSelection("workflow:inputs:max", {
+      assetId: "asset:dataset:one",
+      assetType: "dataset",
+    });
+    store.togglePendingSelection("workflow:inputs:max", {
+      assetId: "asset:dataset:two",
+      assetType: "dataset",
+    });
+
+    const state = store.getSession("workflow:inputs:max");
+    expect(state?.pendingSelections.map((entry) => entry.assetId)).toEqual(["asset:dataset:one"]);
+    expect(state?.validationErrors[0]?.code).toBe("selection-constraint-violation");
+  });
+
+  it("rejects malformed canonical identities during selection replacement", () => {
+    const store = new AssetSelectorSessionStore();
+    store.prepareSession({
+      sessionKey: "workflow:inputs:canonical",
+      request: createWorkflowInputRequest(),
+    });
+    store.activateSession("workflow:inputs:canonical");
+
+    store.replaceSelections("workflow:inputs:canonical", [{
+      assetId: "dataset-without-canonical-prefix",
+      assetType: "dataset",
+    }]);
+
+    const state = store.getSession("workflow:inputs:canonical");
+    expect(state?.selectedAssets).toHaveLength(0);
+    expect(state?.validationErrors[0]?.code).toBe("validation-failed");
+  });
 });
