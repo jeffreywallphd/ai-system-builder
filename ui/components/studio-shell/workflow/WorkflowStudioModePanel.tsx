@@ -45,6 +45,7 @@ export default function WorkflowStudioModePanel({ workflowModeState }: WorkflowS
             key={mode.id}
             type="button"
             className={`ui-button ui-button--sm ${state.selectedModeId === mode.id ? "ui-button--primary" : "ui-button--ghost"}`}
+            aria-pressed={state.selectedModeId === mode.id}
             onClick={() => workflowModeState.setSelectedMode(mode.id)}
           >
             {mode.title}
