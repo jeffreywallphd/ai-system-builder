@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { CommandPaletteService, type CommandPaletteEntry } from "../../routes/CommandPalette";
 
@@ -11,17 +11,10 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
   const location = useLocation();
   const navigate = useNavigate();
   const service = useMemo(() => new CommandPaletteService(), []);
-  const [searchText, setSearchText] = useState("");
-
-  useEffect(() => {
-    if (isOpen) {
-      setSearchText("");
-    }
-  }, [isOpen]);
 
   const model = useMemo(
-    () => service.resolveModel({ pathname: location.pathname, search: location.search }, { searchText }),
-    [location.pathname, location.search, searchText, service],
+    () => service.resolveDefaultModel({ pathname: location.pathname, search: location.search }),
+    [location.pathname, location.search, service],
   );
 
   const onExecute = (entry: CommandPaletteEntry): void => {
@@ -40,36 +33,21 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
         <div className="ui-overlay-panel__header">
           <div className="ui-stack ui-stack--2xs">
             <strong>Command palette</strong>
-            <span className="ui-text-small ui-text-secondary">Jump to Build, Explore, Run, and common intent actions.</span>
+            <span className="ui-text-small ui-text-secondary">Build, Explore, Run, or Manage.</span>
           </div>
-          <button type="button" className="ui-button ui-button--ghost ui-button--sm" onClick={onClose}>Close</button>
         </div>
         <div className="ui-overlay-panel__body ui-stack ui-stack--sm">
-          <input
-            autoFocus={isOpen}
-            className="ui-input"
-            placeholder={model.placeholder}
-            value={searchText}
-            onChange={(event) => setSearchText(event.currentTarget.value)}
-            aria-label="Search commands"
-          />
-
           <div className="ui-stack ui-stack--2xs">
-            {model.entries.length > 0 ? model.entries.slice(0, 12).map((entry) => (
+            {model.entries.map((entry) => (
               <button
                 key={entry.id}
                 type="button"
-                className="ui-button ui-button--ghost ui-command-palette__entry"
+                className="ui-button ui-button--secondary ui-button--md ui-command-palette__entry"
                 onClick={() => onExecute(entry)}
               >
-                <span>{entry.label}</span>
-                <span className="ui-text-small ui-text-secondary">{entry.category}</span>
+                {entry.label}
               </button>
-            )) : (
-              <p className="ui-text-secondary ui-command-palette__empty">
-                No commands matched your search. Try “build”, “explore”, or “run”.
-              </p>
-            )}
+            ))}
           </div>
         </div>
       </aside>

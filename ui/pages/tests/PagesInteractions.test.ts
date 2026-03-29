@@ -12,6 +12,7 @@ describe("ui/pages interactions", () => {
     const agentStudio = readSource("ui/pages/AgentStudioPage.tsx");
     const studioShell = readSource("ui/pages/StudioShellPage.tsx");
     const registry = readSource("ui/pages/RegistryPage.tsx");
+    const build = readSource("ui/pages/BuildPage.tsx");
     const notFound = readSource("ui/pages/NotFoundPage.tsx");
 
     expect(home).toContain('import { ROUTE_PATHS } from "../routes/RouteConfig"');
@@ -36,6 +37,10 @@ describe("ui/pages interactions", () => {
     expect(registry).toContain("RegistryService");
     expect(registry).toContain("AssetFilterPanel");
     expect(registry).toContain("AssetList");
+    expect(build).toContain("What do you want to do?");
+    expect(build).toContain("Build from a Template");
+    expect(build).toContain("Automate a Task");
+    expect(build).toContain("Build Something from Scratch");
     expect(settings).toContain("Advanced runtime settings");
     expect(notFound).toContain("to={ROUTE_PATHS.home}");
   });
