@@ -113,18 +113,6 @@ function getButtonByText(root: ReactElement, label: string): ReactElement<Button
   return button as ReactElement<ButtonElementProps>;
 }
 
-function getAnchorByText(root: ReactElement, label: string): ReactElement<{ readonly href?: string }> {
-  const anchor = collectElements(root).find((entry) => (
-    typeof entry.type === "string"
-    && entry.type === "a"
-    && toText((entry.props as { children?: ReactNode }).children).trim() === label
-  ));
-  if (!anchor) {
-    throw new Error(`Expected anchor '${label}' to be present.`);
-  }
-  return anchor as ReactElement<{ readonly href?: string }>;
-}
-
 function getTextarea(root: ReactElement): ReactElement<TextareaElementProps> {
   const textarea = collectElements(root).find((entry) => (
     typeof entry.type === "string" && entry.type === "textarea"
@@ -195,6 +183,51 @@ describe("WorkflowStudioModeSystem integration seams", () => {
     expect(store.getState().sharedDraft.steps.map((step) => step.id)).toEqual(["step-1"]);
   });
 
+  it("supports wizard page menu and Back/Next controls for linear page routing", () => {
+    const store = new WorkflowStudioModeStateStore();
+    store.setSelectedMode(WorkflowStudioModeIds.wizard);
+    let selectedWizardPageId: "trigger" | "inputs" | "steps" | "outputs" = "trigger";
+
+    const renderBoundary = () => WorkflowStudioDraftAuthoringBoundary({
+      isWorkflowStudio: true,
+      content: store.getState().sharedDraftSerialized,
+      onChangeContent: (nextContent) => store.hydrateFromSerializedDraft(nextContent),
+      workflowModeContext: {
+        selectedModeId: store.getState().selectedModeId,
+        selectedWizardPageId,
+        onSelectWizardPage: (pageId) => {
+          selectedWizardPageId = pageId;
+        },
+        sharedDraft: store.getState().sharedDraft,
+        sharedDraftSerialized: store.getState().sharedDraftSerialized,
+        draftEditorContent: store.getState().draftEditorContent,
+        modeValidationIssues: store.getState().modeValidationIssues,
+        draftValidationIssues: store.getState().draftValidationIssues,
+      },
+    });
+
+    let boundary = renderBoundary();
+    expect(renderToStaticMarkup(boundary)).toContain("Trigger Section");
+
+    const nextButton = getElementByTestId(boundary, "workflow-wizard-next-page") as ReactElement<ButtonElementProps>;
+    nextButton.props.onClick?.();
+    expect(selectedWizardPageId).toBe("inputs");
+
+    boundary = renderBoundary();
+    expect(renderToStaticMarkup(boundary)).toContain("Inputs Section");
+
+    const stepsButton = getElementByTestId(boundary, "workflow-wizard-page-button-steps") as ReactElement<ButtonElementProps>;
+    stepsButton.props.onClick?.();
+    expect(selectedWizardPageId).toBe("steps");
+
+    boundary = renderBoundary();
+    expect(renderToStaticMarkup(boundary)).toContain("Steps Section");
+
+    const backButton = getElementByTestId(boundary, "workflow-wizard-back-page") as ReactElement<ButtonElementProps>;
+    backButton.props.onClick?.();
+    expect(selectedWizardPageId).toBe("inputs");
+  });
+
   it("synchronizes wizard and canvas draft edits through one shared mode state and renders mode-specific layouts", () => {
     const store = new WorkflowStudioModeStateStore();
     store.setSelectedMode(WorkflowStudioModeIds.wizard);
@@ -219,6 +252,7 @@ describe("WorkflowStudioModeSystem integration seams", () => {
       onChangeContent: (nextContent) => store.hydrateFromSerializedDraft(nextContent),
       workflowModeContext: {
         selectedModeId: store.getState().selectedModeId,
+        selectedWizardPageId: "trigger",
         sharedDraft: store.getState().sharedDraft,
         sharedDraftSerialized: store.getState().sharedDraftSerialized,
         draftEditorContent: store.getState().draftEditorContent,
@@ -227,15 +261,15 @@ describe("WorkflowStudioModeSystem integration seams", () => {
       },
     });
     expect(store.getState().sharedDraft.steps.map((entry) => entry.id)).toEqual(["step-1"]);
-    expect(getAnchorByText(wizardBoundary, "Trigger").props.href).toBe("#workflow-wizard-trigger");
+    expect(getElementByTestId(wizardBoundary, "workflow-wizard-page-button-trigger")).toBeDefined();
 
     const wizardMarkup = renderToStaticMarkup(wizardBoundary);
     expect(wizardMarkup).toContain('data-testid="workflow-studio-wizard-mode-layout"');
     expect(wizardMarkup).toContain('data-testid="workflow-studio-wizard-mode-surface"');
     expect(wizardMarkup).toContain("Trigger Section");
-    expect(wizardMarkup).toContain("Inputs Section");
-    expect(wizardMarkup).toContain("Steps Section");
-    expect(wizardMarkup).toContain("Outputs Section");
+    expect(wizardMarkup).not.toContain("Inputs Section");
+    expect(wizardMarkup).not.toContain("Steps Section");
+    expect(wizardMarkup).not.toContain("Outputs Section");
 
     store.setSelectedMode(WorkflowStudioModeIds.canvas);
     const canvasSerialized = serializeWorkflowDraft({
@@ -262,6 +296,7 @@ describe("WorkflowStudioModeSystem integration seams", () => {
       onChangeContent: (nextContent) => store.hydrateFromSerializedDraft(nextContent),
       workflowModeContext: {
         selectedModeId: store.getState().selectedModeId,
+        selectedWizardPageId: "trigger",
         sharedDraft: store.getState().sharedDraft,
         sharedDraftSerialized: store.getState().sharedDraftSerialized,
         draftEditorContent: store.getState().draftEditorContent,
@@ -320,6 +355,7 @@ describe("WorkflowStudioModeSystem integration seams", () => {
       onChangeContent: (nextContent) => store.hydrateFromSerializedDraft(nextContent),
       workflowModeContext: {
         selectedModeId: store.getState().selectedModeId,
+        selectedWizardPageId: "trigger",
         sharedDraft: store.getState().sharedDraft,
         sharedDraftSerialized: store.getState().sharedDraftSerialized,
         draftEditorContent: store.getState().draftEditorContent,
@@ -392,8 +428,8 @@ describe("WorkflowStudioModeSystem integration seams", () => {
       onChangeContent: (nextContent) => store.hydrateFromSerializedDraft(nextContent),
       workflowModeContext: {
         studioId: "studio-workflows",
-        routeSearch: "?mode=wizard&assetId=asset:workflow-root",
         selectedModeId: store.getState().selectedModeId,
+        selectedWizardPageId: "inputs",
         sharedDraft: store.getState().sharedDraft,
         sharedDraftSerialized: store.getState().sharedDraftSerialized,
         draftEditorContent: store.getState().draftEditorContent,
@@ -475,6 +511,7 @@ describe("WorkflowStudioModeSystem integration seams", () => {
       onChangeContent: (nextContent) => store.hydrateFromSerializedDraft(nextContent),
       workflowModeContext: {
         selectedModeId: store.getState().selectedModeId,
+        selectedWizardPageId: "outputs",
         sharedDraft: store.getState().sharedDraft,
         sharedDraftSerialized: store.getState().sharedDraftSerialized,
         draftEditorContent: store.getState().draftEditorContent,
@@ -567,6 +604,7 @@ describe("WorkflowStudioModeSystem integration seams", () => {
       onChangeContent: (nextContent) => store.hydrateFromSerializedDraft(nextContent),
       workflowModeContext: {
         selectedModeId: store.getState().selectedModeId,
+        selectedWizardPageId: "outputs",
         sharedDraft: store.getState().sharedDraft,
         sharedDraftSerialized: store.getState().sharedDraftSerialized,
         draftEditorContent: store.getState().draftEditorContent,
@@ -578,9 +616,9 @@ describe("WorkflowStudioModeSystem integration seams", () => {
     const markup = renderToStaticMarkup(wizardBoundary);
     expect(markup).toContain('data-testid="workflow-wizard-readiness-summary"');
     expect(markup).toContain('data-testid="workflow-wizard-progression-controls"');
-    expect(markup).toContain('data-testid="workflow-wizard-prev-section"');
-    expect(markup).toContain('data-testid="workflow-wizard-next-section"');
-    expect(markup).toContain('aria-current="step"');
+    expect(markup).toContain('data-testid="workflow-wizard-back-page"');
+    expect(markup).toContain('data-testid="workflow-wizard-next-page"');
+    expect(markup).toContain('aria-current="page"');
     expect(markup).toContain('data-testid="workflow-wizard-terminal-actions"');
     expect(markup).toContain("Ready for next-stage handoff. Save the draft and continue to lifecycle/publish controls.");
     expect(markup).toContain("Prepare for Run");

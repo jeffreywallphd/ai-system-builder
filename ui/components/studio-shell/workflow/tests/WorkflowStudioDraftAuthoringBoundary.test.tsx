@@ -14,6 +14,7 @@ describe("WorkflowStudioDraftAuthoringBoundary", () => {
         onChangeContent={() => undefined}
         workflowModeContext={{
           selectedModeId: "wizard",
+          selectedWizardPageId: "trigger",
           sharedDraft: draft,
           sharedDraftSerialized: serializeWorkflowDraft(draft),
           draftEditorContent: serializeWorkflowDraft(draft),
@@ -27,15 +28,15 @@ describe("WorkflowStudioDraftAuthoringBoundary", () => {
     expect(html).toContain('data-testid="workflow-studio-wizard-mode-surface"');
     expect(html).toContain("Workflow wizard layout");
     expect(html).toContain("Trigger Section");
-    expect(html).toContain("Inputs Section");
-    expect(html).toContain("Steps Section");
-    expect(html).toContain("Outputs Section");
+    expect(html).not.toContain("Inputs Section");
+    expect(html).not.toContain("Steps Section");
+    expect(html).not.toContain("Outputs Section");
     expect(html).toContain("Guided progression");
-    expect(html).toContain("Previous section");
-    expect(html).toContain("Next section");
+    expect(html).toContain("Back");
+    expect(html).toContain("Next");
     expect(html).toContain("Workflow readiness summary");
-    expect(html).toContain("Prepare for run handoff");
-    expect(html).toContain("Prepare for Run");
+    expect(html).not.toContain("Prepare for run handoff");
+    expect(html).not.toContain("Prepare for Run");
     expect(html).not.toContain('data-testid="workflow-studio-canvas-mode-layout"');
     expect(html).not.toContain('data-testid="workflow-studio-canvas-mode-surface"');
   });
@@ -49,6 +50,7 @@ describe("WorkflowStudioDraftAuthoringBoundary", () => {
         onChangeContent={() => undefined}
         workflowModeContext={{
           selectedModeId: "canvas",
+          selectedWizardPageId: "trigger",
           sharedDraft: draft,
           sharedDraftSerialized: serializeWorkflowDraft(draft),
           draftEditorContent: serializeWorkflowDraft(draft),
@@ -75,6 +77,7 @@ describe("WorkflowStudioDraftAuthoringBoundary", () => {
         invalidModeRouteId="unsupported-mode"
         workflowModeContext={{
           selectedModeId: "canvas",
+          selectedWizardPageId: "trigger",
           sharedDraft: draft,
           sharedDraftSerialized: serializeWorkflowDraft(draft),
           draftEditorContent: serializeWorkflowDraft(draft),
@@ -99,6 +102,7 @@ describe("WorkflowStudioDraftAuthoringBoundary", () => {
         onChangeContent={() => undefined}
         workflowModeContext={{
           selectedModeId: "canvas",
+          selectedWizardPageId: "trigger",
           sharedDraft: draft,
           sharedDraftSerialized: serializeWorkflowDraft(draft),
           draftEditorContent: serializeWorkflowDraft(draft),
