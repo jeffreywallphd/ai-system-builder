@@ -22,9 +22,15 @@ import {
 } from "../studio-shell/workflow/WorkflowStudioModeStateStore";
 import type { WorkflowStudioModeId } from "../studio-shell/workflow/WorkflowStudioModes";
 import type { WorkflowStudioModeRouteResolution } from "../studio-shell/workflow/WorkflowStudioModeRouting";
+import {
+  buildWorkflowStudioWizardPagePath,
+  type WorkflowStudioWizardPageId,
+  type WorkflowStudioWizardPageRouteResolution,
+} from "../studio-shell/workflow/WorkflowStudioWizardRouting";
 import { StudioEntryService } from "../routes/StudioRouteMapping";
 import { readAutomationIntentFromSearch } from "../routes/BuildAutomationIntent";
 import { BuildIntents } from "../routes/BuildIntentModels";
+import { ROUTE_PATHS } from "../routes/RouteConfig";
 import {
   InlineAssetCreationService,
   InlineAssetReturnStatuses,
@@ -122,6 +128,7 @@ interface StudioShellPageProps {
   readonly studioRegistration?: StudioRegistration;
   readonly extensions?: ReadonlyArray<StudioShellExtensionContribution>;
   readonly workflowModeRoute?: WorkflowStudioModeRouteResolution;
+  readonly workflowWizardPageRoute?: WorkflowStudioWizardPageRouteResolution;
 }
 
 function renderExtensions(
@@ -149,6 +156,7 @@ export default function StudioShellPage({
   studioRegistration,
   extensions = [],
   workflowModeRoute,
+  workflowWizardPageRoute,
 }: StudioShellPageProps): JSX.Element {
   const studioId = studioRegistration?.studioId ?? "studio-shell-main";
   const isWorkflowStudio = studioRegistration?.role === "workflow";
@@ -191,6 +199,7 @@ export default function StudioShellPage({
     [isWorkflowStudio, studioId],
   );
   const resolvedWorkflowModeId = workflowModeRoute?.resolvedModeId;
+  const resolvedWorkflowWizardPageId = workflowWizardPageRoute?.resolvedPageId;
   const shouldSeedAutomationIntent = searchParams.get("buildIntent")?.trim() === BuildIntents.automateTask && Boolean(automationIntent);
   const extensionRegistry = useMemo(() => {
     const registry = new StudioShellExtensionRegistry();
@@ -527,11 +536,17 @@ export default function StudioShellPage({
     }
 
     workflowModeStore.setSelectedMode(modeId);
+    const nextPathname = modeId === "wizard"
+      ? buildWorkflowStudioWizardPagePath(
+        resolvedWorkflowWizardPageId ?? "trigger",
+      )
+      : ROUTE_PATHS.workflowStudioMode.replace(":modeId", modeId);
     const nextSearchParams = new URLSearchParams(location.search);
-    nextSearchParams.set("mode", modeId);
+    nextSearchParams.delete("mode");
+    nextSearchParams.delete("wizardPage");
     void navigate(
       {
-        pathname: location.pathname,
+        pathname: nextPathname,
         search: nextSearchParams.toString().length > 0 ? `?${nextSearchParams.toString()}` : "",
         hash: location.hash,
       },
@@ -699,21 +714,22 @@ export default function StudioShellPage({
             content={content}
             onChangeContent={updateContent}
             invalidModeRouteId={isWorkflowStudio ? workflowModeRoute?.invalidModeId : undefined}
+            invalidWizardPageRouteId={isWorkflowStudio ? workflowWizardPageRoute?.invalidPageId : undefined}
             workflowModeContext={workflowModeStore && workflowModeState
               ? {
                 studioId,
-                routeSearch: location.search,
-                replaceRouteSearch: (nextSearch: string) => {
+                selectedModeId: workflowModeState.selectedModeId,
+                selectedWizardPageId: resolvedWorkflowWizardPageId ?? "trigger",
+                onSelectWizardPage: (pageId: WorkflowStudioWizardPageId) => {
                   void navigate(
                     {
-                      pathname: location.pathname,
-                      search: nextSearch,
-                      hash: location.hash,
+                      pathname: buildWorkflowStudioWizardPagePath(pageId),
+                      search: "",
+                      hash: "",
                     },
                     { replace: true },
                   );
                 },
-                selectedModeId: workflowModeState.selectedModeId,
                 sharedDraft: workflowModeState.sharedDraft,
                 sharedDraftSerialized: workflowModeState.sharedDraftSerialized,
                 draftEditorContent: workflowModeState.draftEditorContent,

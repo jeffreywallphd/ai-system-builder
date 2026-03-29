@@ -96,6 +96,7 @@ export default function AppRouter({
           { path: ROUTE_PATHS.registryAssetDetail, element: <AssetDetailPage /> },
           { path: ROUTE_PATHS.workflowStudio, element: <WorkflowStudioPage /> },
           { path: ROUTE_PATHS.workflowStudioMode, element: <WorkflowStudioPage /> },
+          { path: ROUTE_PATHS.workflowStudioWizardPage, element: <WorkflowStudioPage /> },
           { path: ROUTE_PATHS.contextBundleStudio, element: <ContextBundleStudioPage /> },
           { path: ROUTE_PATHS.datasetPipelineStudio, element: <DatasetPipelineStudioPage /> },
           { path: ROUTE_PATHS.trainingRecipeStudio, element: <TrainingRecipeStudioPage /> },

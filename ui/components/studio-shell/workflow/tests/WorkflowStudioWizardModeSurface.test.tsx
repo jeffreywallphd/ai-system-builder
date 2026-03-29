@@ -16,13 +16,14 @@ describe("WorkflowStudioWizardModeSurface", () => {
         sharedDraft={draft}
         sharedDraftSerialized={serializeWorkflowDraft(draft)}
         draftValidationIssues={[]}
+        selectedWizardPageId="trigger"
       />,
     );
 
     expect(html).toContain('data-testid="workflow-wizard-readiness-summary"');
     expect(html).toContain("Workflow draft is not ready yet.");
     expect(html).toContain("Trigger needs at least 1 item.");
-    expect(html).toContain("Prepare for Run");
+    expect(html).not.toContain("Prepare for Run");
   });
 
   it("renders ready summary for valid drafts", () => {
@@ -75,11 +76,13 @@ describe("WorkflowStudioWizardModeSurface", () => {
         sharedDraft={draft}
         sharedDraftSerialized={serializeWorkflowDraft(draft)}
         draftValidationIssues={[]}
+        selectedWizardPageId="outputs"
       />,
     );
 
     expect(html).toContain("Workflow draft is ready for handoff.");
     expect(html).toContain("No blocking issues detected.");
     expect(html).toContain("Ready for next-stage handoff.");
+    expect(html).toContain("Prepare for Run");
   });
 });
