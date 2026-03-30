@@ -127,6 +127,18 @@ describe("WorkflowStudioCanvasViewModel", () => {
     expect(stepNodes[0]?.kind).toBe(WorkflowCanvasGraphNodeKinds.section);
     expect(stepNodes[1]?.kind).toBe(WorkflowCanvasGraphNodeKinds.item);
     expect(stepNodes[2]?.kind).toBe(WorkflowCanvasGraphNodeKinds.item);
+    const sectionNodeHeight = viewModel.graph.layout.sectionNodeHeight;
+    const itemNodeHeight = viewModel.graph.layout.itemNodeHeight;
+    const gap = viewModel.graph.layout.nodeVerticalGap;
+    const nodeHeights = stepNodes.map((node) => (
+      node.kind === WorkflowCanvasGraphNodeKinds.section ? sectionNodeHeight : itemNodeHeight
+    ));
+    for (let index = 1; index < stepNodes.length; index += 1) {
+      const previous = stepNodes[index - 1];
+      const current = stepNodes[index];
+      const previousHeight = nodeHeights[index - 1] as number;
+      expect(current?.position.y).toBeGreaterThanOrEqual((previous?.position.y ?? 0) + previousHeight + gap);
+    }
     expect(viewModel.graph.edges.some((edge) => edge.kind === WorkflowCanvasGraphEdgeKinds.itemSequence)).toBe(true);
     expect(viewModel.graph.edges.some((edge) => (
       edge.kind === WorkflowCanvasGraphEdgeKinds.sectionFlow
