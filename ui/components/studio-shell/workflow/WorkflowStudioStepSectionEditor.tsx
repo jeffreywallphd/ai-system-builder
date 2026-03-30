@@ -9,6 +9,7 @@ import {
   type WorkflowDraftLoopIterationStepConfig,
   type WorkflowValidationIssue,
 } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+import { serializeWorkflowDraft } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
 import {
   AssetSelectorSessionLifecycleStates,
   type AssetSelectorSessionState,
@@ -44,15 +45,25 @@ import {
   workflowStepTypeDefinitions,
   WorkflowWizardStepSelectionKinds,
 } from "../../../studio-shell/workflow/WorkflowWizardSteps";
+import {
+  WorkflowStudioHandoffFlowKinds,
+  WorkflowStudioHandoffStatusKinds,
+  type WorkflowStudioHandoffStatus,
+} from "../../../studio-shell/workflow/WorkflowStudioHandoffStatus";
 
 interface WorkflowStudioStepSectionEditorProps {
   readonly sharedDraft: WorkflowDraft;
   readonly draftValidationIssues: ReadonlyArray<WorkflowValidationIssue>;
   readonly onUpdateSharedDraft?: (updater: (draft: WorkflowDraft) => WorkflowDraft) => void;
   readonly studioId?: string;
+  readonly onSetHandoffStatus?: (status: WorkflowStudioHandoffStatus) => void;
 }
 
 const stepSelectorTargetQueryParam = "workflowStepSelectorTarget";
+const stepSelectorTargetPrefix = "workflow-step:";
+const newStepSelectorTargetId = "workflow-step:new";
+const stepSelectorOriginatingField = "steps.agent-assistant";
+const stepSelectorUsageContext = "workflow-step";
 
 type StepSelectorOperation =
   | Readonly<{ readonly kind: "add" }>
@@ -91,6 +102,31 @@ function parseStepSelectorOperationFromSearch(search: string, draft: WorkflowDra
   return Object.freeze({ kind: "replace", stepId: target });
 }
 
+function parseStepSelectorOperationFromTargetId(selectorTargetId?: string): StepSelectorOperation | undefined {
+  const targetId = selectorTargetId?.trim();
+  if (!targetId) {
+    return undefined;
+  }
+  if (targetId === newStepSelectorTargetId) {
+    return Object.freeze({ kind: "add" } as const);
+  }
+  if (!targetId.startsWith(stepSelectorTargetPrefix)) {
+    return undefined;
+  }
+  const stepId = targetId.slice(stepSelectorTargetPrefix.length).trim();
+  if (!stepId || stepId === "new") {
+    return undefined;
+  }
+  return Object.freeze({ kind: "replace", stepId });
+}
+
+function buildStepSelectorTargetId(operation: StepSelectorOperation): string {
+  if (operation.kind === "add") {
+    return newStepSelectorTargetId;
+  }
+  return `${stepSelectorTargetPrefix}${operation.stepId}`;
+}
+
 function writeStepSelectorOperationToSearch(search: string, operation?: StepSelectorOperation): string {
   const params = new URLSearchParams(search);
   if (!operation) {
@@ -113,6 +149,7 @@ export default function WorkflowStudioStepSectionEditor({
   draftValidationIssues,
   onUpdateSharedDraft,
   studioId,
+  onSetHandoffStatus,
 }: WorkflowStudioStepSectionEditorProps): JSX.Element {
   const location = useLocation();
   const navigate = useNavigate();
@@ -139,6 +176,17 @@ export default function WorkflowStudioStepSectionEditor({
     maxSelections: 1,
     required: false,
   }), [selectorSessionKey]);
+  const workflowDraftReference = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return Object.freeze({
+      studioId: studioId?.trim() || "studio-workflows",
+      draftId: params.get("draftId")?.trim() || undefined,
+      sessionId: params.get("sessionId")?.trim() || undefined,
+      assetId: params.get("assetId")?.trim() || undefined,
+      versionId: params.get("versionId")?.trim() || undefined,
+    });
+  }, [location.search, studioId]);
+  const serializedSharedDraft = useMemo(() => serializeWorkflowDraft(sharedDraft), [sharedDraft]);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [items, setItems] = useState<ReadonlyArray<AssetSelectorResultItem>>([]);
@@ -152,6 +200,7 @@ export default function WorkflowStudioStepSectionEditor({
   );
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [selectorOperation, setSelectorOperation] = useState<StepSelectorOperation | undefined>(undefined);
+  const [selectorReturnTargetId, setSelectorReturnTargetId] = useState<string | undefined>(undefined);
   const lastAppliedCompletedCount = useRef<number | undefined>(undefined);
 
   const stepValidationIssues = useMemo(
@@ -225,6 +274,7 @@ export default function WorkflowStudioStepSectionEditor({
     selectorSessionStore.clearPendingSelections(selectorSessionKey);
     setSelectorOpen(false);
     setSelectorOperation(undefined);
+    setSelectorReturnTargetId(undefined);
     const nextSearch = writeStepSelectorOperationToSearch(location.search, undefined);
     void navigate({
       pathname: location.pathname,
@@ -286,10 +336,14 @@ export default function WorkflowStudioStepSectionEditor({
   }, [queryRevision, searchTerm, selectorDataProvider, selectorRequest]);
 
   useEffect(() => {
+    const expectedOperation = selectorOperation ?? parseStepSelectorOperationFromSearch(location.search, sharedDraft);
     const outcome = returnHandoffService.handle({
       search: location.search,
       sessionKey: selectorSessionKey,
       request: selectorRequest,
+      expectedSelectorTargetId: expectedOperation ? buildStepSelectorTargetId(expectedOperation) : undefined,
+      expectedOriginatingField: stepSelectorOriginatingField,
+      expectedUsageContext: stepSelectorUsageContext,
       sessionStore: selectorSessionStore,
     });
 
@@ -298,6 +352,7 @@ export default function WorkflowStudioStepSectionEditor({
     }
 
     if (outcome.returnedAsset) {
+      setSelectorReturnTargetId(outcome.selectorTargetId);
       setReturnedItems((current) => {
         const key = `${outcome.returnedAsset?.assetId}:${outcome.returnedAsset?.versionId ?? ""}`;
         const existing = new Set(current.map((entry) => `${entry.asset.assetId}:${entry.asset.versionId ?? ""}`));
@@ -317,6 +372,47 @@ export default function WorkflowStudioStepSectionEditor({
       setQueryRevision((current) => current + 1);
       setSelectorNotice(undefined);
       setSelectorOpen(true);
+      onSetHandoffStatus?.({
+        kind: WorkflowStudioHandoffStatusKinds.completed,
+        flow: WorkflowStudioHandoffFlowKinds.agentStep,
+        updatedAt: Date.now(),
+        handoffId: selectorState?.creatingNewContext?.launchHandoffId,
+        selectorSessionKey,
+        selectorTargetId: outcome.selectorTargetId,
+        outcomeKind: "created",
+        assetId: outcome.returnedAsset.assetId,
+        assetDisplayName: outcome.returnedAsset.displayName,
+      });
+    }
+
+    if (
+      outcome.outcomeKind === "cancelled"
+      || outcome.outcomeKind === "no-selection"
+      || outcome.outcomeKind === "abandoned"
+    ) {
+      setSelectorNotice("Step handoff ended without a returned asset. Existing workflow steps were preserved.");
+      closeSelector();
+      onSetHandoffStatus?.({
+        kind: WorkflowStudioHandoffStatusKinds.cancelled,
+        flow: WorkflowStudioHandoffFlowKinds.agentStep,
+        updatedAt: Date.now(),
+        handoffId: selectorState?.creatingNewContext?.launchHandoffId,
+        selectorSessionKey,
+        selectorTargetId: outcome.selectorTargetId,
+        outcomeKind: outcome.outcomeKind,
+      });
+    }
+
+    if (outcome.outcomeKind === "created" && !outcome.returnedAsset) {
+      onSetHandoffStatus?.({
+        kind: WorkflowStudioHandoffStatusKinds.recovered,
+        flow: WorkflowStudioHandoffFlowKinds.agentStep,
+        updatedAt: Date.now(),
+        handoffId: selectorState?.creatingNewContext?.launchHandoffId,
+        selectorSessionKey,
+        selectorTargetId: outcome.selectorTargetId,
+        outcomeKind: "created",
+      });
     }
 
     if (outcome.consumed && outcome.nextSearch !== undefined) {
@@ -331,10 +427,14 @@ export default function WorkflowStudioStepSectionEditor({
     location.pathname,
     location.search,
     navigate,
+    selectorOperation,
     returnHandoffService,
     selectorRequest,
     selectorSessionKey,
     selectorSessionStore,
+    sharedDraft,
+    selectorState?.creatingNewContext?.launchHandoffId,
+    onSetHandoffStatus,
   ]);
 
   useEffect(() => {
@@ -359,7 +459,10 @@ export default function WorkflowStudioStepSectionEditor({
 
     const operation = selectorOperation
       ?? parseStepSelectorOperationFromSearch(location.search, sharedDraft)
-      ?? Object.freeze({ kind: "add" } as const);
+      ?? parseStepSelectorOperationFromTargetId(selectorReturnTargetId);
+    if (!operation) {
+      return;
+    }
 
     onUpdateSharedDraft((draft) => {
       if (operation.kind === "replace") {
@@ -383,7 +486,8 @@ export default function WorkflowStudioStepSectionEditor({
     });
 
     closeSelector();
-  }, [location.search, onUpdateSharedDraft, selectorOperation, selectorState, sharedDraft]);
+    setSelectorReturnTargetId(undefined);
+  }, [location.search, onUpdateSharedDraft, selectorOperation, selectorReturnTargetId, selectorState, sharedDraft]);
 
   const stateForShell = selectorState ?? selectorSessionStore.getSession(selectorSessionKey);
 
@@ -455,12 +559,23 @@ export default function WorkflowStudioStepSectionEditor({
               closeSelector();
             }}
             onCreateNew={() => {
+              const operation = selectorOperation
+                ?? parseStepSelectorOperationFromSearch(location.search, sharedDraft)
+                ?? Object.freeze({ kind: "add" } as const);
               const launch = studioLaunchService.launch({
                 sessionKey: selectorSessionKey,
                 selectorRequest,
                 routePath: location.pathname,
-                routeSearch: writeStepSelectorOperationToSearch(location.search, selectorOperation ?? Object.freeze({ kind: "add" } as const)),
+                routeSearch: writeStepSelectorOperationToSearch(location.search, operation),
                 routeHash: location.hash || "#workflow-wizard-steps",
+                selectorTargetId: buildStepSelectorTargetId(operation),
+                workflowOrigin: {
+                  studioId: workflowDraftReference.studioId,
+                  modeId: "wizard",
+                  wizardPageId: "steps",
+                  draftReference: workflowDraftReference,
+                  draftState: serializedSharedDraft,
+                },
               });
               if (!launch) {
                 setSelectorNotice("Unable to open Agent Studio from this selector request.");
@@ -471,6 +586,25 @@ export default function WorkflowStudioStepSectionEditor({
                 requestedAssetType: selectorRequest.assetType,
                 returnTargetSessionKey: selectorSessionKey,
                 returnRoutePath: launch.returnTarget?.routePath,
+                launchHandoffId: launch.studioHandoff?.launch.handoffId,
+              });
+              onSetHandoffStatus?.({
+                kind: WorkflowStudioHandoffStatusKinds.launching,
+                flow: WorkflowStudioHandoffFlowKinds.agentStep,
+                updatedAt: Date.now(),
+                handoffId: launch.studioHandoff?.launch.handoffId,
+                selectorSessionKey,
+                selectorTargetId: buildStepSelectorTargetId(operation),
+                detail: "Launching Agent Studio for workflow steps.",
+              });
+              onSetHandoffStatus?.({
+                kind: WorkflowStudioHandoffStatusKinds.pending,
+                flow: WorkflowStudioHandoffFlowKinds.agentStep,
+                updatedAt: Date.now(),
+                handoffId: launch.studioHandoff?.launch.handoffId,
+                selectorSessionKey,
+                selectorTargetId: buildStepSelectorTargetId(operation),
+                detail: "Waiting for Agent Studio handoff return.",
               });
               setSelectorNotice(undefined);
               void navigate(launch.launchPath);

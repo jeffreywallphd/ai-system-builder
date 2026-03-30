@@ -10,9 +10,11 @@ describe("WorkflowStudioPage contracts", () => {
     expect(pageSource).toContain("StudioShellPage");
     expect(pageSource).toContain("workflowStudioRegistration");
     expect(pageSource).toContain("resolveWorkflowStudioModeRoute");
+    expect(pageSource).toContain("resolveWorkflowStudioWizardPageRoute");
     expect(pageSource).toContain("useParams");
     expect(pageSource).toContain("useLocation");
     expect(pageSource).toContain("workflowModeRoute={workflowModeRoute}");
+    expect(pageSource).toContain("workflowWizardPageRoute={workflowWizardPageRoute}");
     expect(pageSource).toContain("studioRegistration={workflowStudioRegistration}");
 
     expect(registrationSource).toContain("studioType: WorkflowStudioIdentity.studioType");
@@ -25,9 +27,15 @@ describe("WorkflowStudioPage contracts", () => {
 
     expect(shellSource).toContain("WorkflowStudioDraftAuthoringBoundary");
     expect(shellSource).toContain("workflowModeRoute");
+    expect(shellSource).toContain("workflowWizardPageRoute");
     expect(shellSource).toContain("resolvedWorkflowModeId");
+    expect(shellSource).toContain("resolvedWorkflowWizardPageId");
     expect(shellSource).toContain("workflowModeStore.setSelectedMode(resolvedWorkflowModeId)");
     expect(shellSource).toContain("getWorkflowStudioModeStateStore(studioId)");
     expect(shellSource).toContain("synchronizeSharedDraftFromSnapshot");
+    expect(shellSource).toContain("WorkflowStudioReturnRestorationService");
+    expect(shellSource).toContain("restoreFromReturnSearch");
+    expect(shellSource).toContain("setHandoffStatus");
+    expect(shellSource).toContain("clearHandoffStatus");
   });
 });

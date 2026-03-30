@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { WorkflowDraft, WorkflowValidationIssue } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
 import { WorkflowDraftInputSourceTypes } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+import { serializeWorkflowDraft } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
 import {
   AssetSelectorSessionLifecycleStates,
   type AssetSelectorSessionState,
@@ -24,12 +25,18 @@ import {
   removeDatasetInputSelection,
   replaceDatasetInputSelections,
 } from "../../../studio-shell/workflow/WorkflowWizardDatasetInputs";
+import {
+  WorkflowStudioHandoffFlowKinds,
+  WorkflowStudioHandoffStatusKinds,
+  type WorkflowStudioHandoffStatus,
+} from "../../../studio-shell/workflow/WorkflowStudioHandoffStatus";
 
 interface WorkflowStudioInputSectionEditorProps {
   readonly sharedDraft: WorkflowDraft;
   readonly draftValidationIssues: ReadonlyArray<WorkflowValidationIssue>;
   readonly onUpdateSharedDraft?: (updater: (draft: WorkflowDraft) => WorkflowDraft) => void;
   readonly studioId?: string;
+  readonly onSetHandoffStatus?: (status: WorkflowStudioHandoffStatus) => void;
 }
 
 const inputTypeDefinitions = Object.freeze([
@@ -72,11 +79,15 @@ function buildDatasetLabel(input: {
   return input.versionId ? `${input.assetId} (${input.versionId})` : input.assetId;
 }
 
+const datasetSelectorTargetId = "workflow-inputs:dataset";
+const datasetSelectorOriginatingField = "inputs.dataset";
+
 export default function WorkflowStudioInputSectionEditor({
   sharedDraft,
   draftValidationIssues,
   onUpdateSharedDraft,
   studioId,
+  onSetHandoffStatus,
 }: WorkflowStudioInputSectionEditorProps): JSX.Element {
   const location = useLocation();
   const navigate = useNavigate();
@@ -104,6 +115,17 @@ export default function WorkflowStudioInputSectionEditor({
     }),
     [selectorSessionKey],
   );
+  const workflowDraftReference = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return Object.freeze({
+      studioId: studioId?.trim() || "studio-workflows",
+      draftId: params.get("draftId")?.trim() || undefined,
+      sessionId: params.get("sessionId")?.trim() || undefined,
+      assetId: params.get("assetId")?.trim() || undefined,
+      versionId: params.get("versionId")?.trim() || undefined,
+    });
+  }, [location.search, studioId]);
+  const serializedSharedDraft = useMemo(() => serializeWorkflowDraft(sharedDraft), [sharedDraft]);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [items, setItems] = useState<ReadonlyArray<AssetSelectorResultItem>>([]);
@@ -138,6 +160,55 @@ export default function WorkflowStudioInputSectionEditor({
     [draftValidationIssues],
   );
   const sectionHasErrors = datasetValidationIssues.length > 0;
+
+  const launchDatasetStudioFromSelector = (): void => {
+    const launch = studioLaunchService.launch({
+      sessionKey: selectorSessionKey,
+      selectorRequest,
+      routePath: location.pathname,
+      routeSearch: location.search,
+      routeHash: location.hash || "#workflow-wizard-inputs",
+      selectorTargetId: datasetSelectorTargetId,
+      workflowOrigin: {
+        studioId: workflowDraftReference.studioId,
+        modeId: "wizard",
+        wizardPageId: "inputs",
+        draftReference: workflowDraftReference,
+        draftState: serializedSharedDraft,
+      },
+    });
+    if (!launch) {
+      setSelectorNotice("Unable to open Dataset Studio from this selector request.");
+      return;
+    }
+    onSetHandoffStatus?.({
+      kind: WorkflowStudioHandoffStatusKinds.launching,
+      flow: WorkflowStudioHandoffFlowKinds.datasetInput,
+      updatedAt: Date.now(),
+      handoffId: launch.studioHandoff?.launch.handoffId,
+      selectorSessionKey,
+      selectorTargetId: datasetSelectorTargetId,
+      detail: "Launching Dataset Studio for workflow inputs.",
+    });
+    selectorSessionStore.transitionToCreatingNew(selectorSessionKey, {
+      originatingContext: selectorRequest.context,
+      requestedAssetType: selectorRequest.assetType,
+      returnTargetSessionKey: selectorSessionKey,
+      returnRoutePath: launch.returnTarget?.routePath,
+      launchHandoffId: launch.studioHandoff?.launch.handoffId,
+    });
+    onSetHandoffStatus?.({
+      kind: WorkflowStudioHandoffStatusKinds.pending,
+      flow: WorkflowStudioHandoffFlowKinds.datasetInput,
+      updatedAt: Date.now(),
+      handoffId: launch.studioHandoff?.launch.handoffId,
+      selectorSessionKey,
+      selectorTargetId: datasetSelectorTargetId,
+      detail: "Waiting for Dataset Studio handoff return.",
+    });
+    setSelectorNotice(undefined);
+    void navigate(launch.launchPath);
+  };
 
   useEffect(() => {
     const existing = selectorSessionStore.getSession(selectorSessionKey);
@@ -192,6 +263,9 @@ export default function WorkflowStudioInputSectionEditor({
       search: location.search,
       sessionKey: selectorSessionKey,
       request: selectorRequest,
+      expectedSelectorTargetId: datasetSelectorTargetId,
+      expectedOriginatingField: datasetSelectorOriginatingField,
+      expectedUsageContext: "workflow-input",
       sessionStore: selectorSessionStore,
     });
 
@@ -219,6 +293,47 @@ export default function WorkflowStudioInputSectionEditor({
       setQueryRevision((current) => current + 1);
       setSelectorNotice(undefined);
       setSelectorOpen(true);
+      onSetHandoffStatus?.({
+        kind: WorkflowStudioHandoffStatusKinds.completed,
+        flow: WorkflowStudioHandoffFlowKinds.datasetInput,
+        updatedAt: Date.now(),
+        handoffId: selectorState?.creatingNewContext?.launchHandoffId,
+        selectorSessionKey,
+        selectorTargetId: datasetSelectorTargetId,
+        outcomeKind: "created",
+        assetId: outcome.returnedAsset.assetId,
+        assetDisplayName: outcome.returnedAsset.displayName,
+      });
+    }
+
+    if (
+      outcome.outcomeKind === "cancelled"
+      || outcome.outcomeKind === "no-selection"
+      || outcome.outcomeKind === "abandoned"
+    ) {
+      setSelectorNotice("Dataset handoff ended without a returned asset. Existing workflow inputs were preserved.");
+      setSelectorOpen(false);
+      onSetHandoffStatus?.({
+        kind: WorkflowStudioHandoffStatusKinds.cancelled,
+        flow: WorkflowStudioHandoffFlowKinds.datasetInput,
+        updatedAt: Date.now(),
+        handoffId: selectorState?.creatingNewContext?.launchHandoffId,
+        selectorSessionKey,
+        selectorTargetId: datasetSelectorTargetId,
+        outcomeKind: outcome.outcomeKind,
+      });
+    }
+
+    if (outcome.outcomeKind === "created" && !outcome.returnedAsset) {
+      onSetHandoffStatus?.({
+        kind: WorkflowStudioHandoffStatusKinds.recovered,
+        flow: WorkflowStudioHandoffFlowKinds.datasetInput,
+        updatedAt: Date.now(),
+        handoffId: selectorState?.creatingNewContext?.launchHandoffId,
+        selectorSessionKey,
+        selectorTargetId: datasetSelectorTargetId,
+        outcomeKind: "created",
+      });
     }
 
     if (outcome.consumed && outcome.nextSearch !== undefined) {
@@ -237,6 +352,8 @@ export default function WorkflowStudioInputSectionEditor({
     selectorRequest,
     selectorSessionKey,
     selectorSessionStore,
+    selectorState?.creatingNewContext?.launchHandoffId,
+    onSetHandoffStatus,
   ]);
 
   useEffect(() => {
@@ -356,6 +473,18 @@ export default function WorkflowStudioInputSectionEditor({
                 Close selector
               </button>
             ) : null}
+            <button
+              type="button"
+              className="ui-button ui-button--ghost ui-button--sm"
+              data-testid="workflow-input-launch-dataset-studio"
+              onClick={() => {
+                selectorSessionStore.activateSession(selectorSessionKey);
+                selectorSessionStore.setPendingSelections(selectorSessionKey, selectedDatasetAssets);
+                launchDatasetStudioFromSelector();
+              }}
+            >
+              Create dataset in Dataset Studio
+            </button>
           </div>
         </div>
 
@@ -381,25 +510,7 @@ export default function WorkflowStudioInputSectionEditor({
               setSelectorOpen(false);
             }}
             onCreateNew={() => {
-              const launch = studioLaunchService.launch({
-                sessionKey: selectorSessionKey,
-                selectorRequest,
-                routePath: location.pathname,
-                routeSearch: location.search,
-                routeHash: location.hash || "#workflow-wizard-inputs",
-              });
-              if (!launch) {
-                setSelectorNotice("Unable to open Dataset Studio from this selector request.");
-                return;
-              }
-              selectorSessionStore.transitionToCreatingNew(selectorSessionKey, {
-                originatingContext: selectorRequest.context,
-                requestedAssetType: selectorRequest.assetType,
-                returnTargetSessionKey: selectorSessionKey,
-                returnRoutePath: launch.returnTarget?.routePath,
-              });
-              setSelectorNotice(undefined);
-              void navigate(launch.launchPath);
+              launchDatasetStudioFromSelector();
             }}
             onRetry={() => {
               setQueryRevision((current) => current + 1);

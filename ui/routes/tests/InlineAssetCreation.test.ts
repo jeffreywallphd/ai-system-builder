@@ -4,10 +4,28 @@ import {
   InlineAssetCreationService,
   InlineAssetReturnStatuses,
 } from "../InlineAssetCreation";
+import { createStudioLaunchHandoffContract } from "../StudioHandoffContract";
 
 describe("InlineAssetCreationService", () => {
   it("launches inline creation through studio entry seams and preserves return target context", () => {
     const service = new InlineAssetCreationService();
+    const studioHandoff = createStudioLaunchHandoffContract({
+      handoffId: "handoff:inline-test",
+      launchSource: "workflow-studio",
+      origin: {
+        studioType: "workflow-studio",
+        route: {
+          path: "/studio-shell/workflow/wizard/inputs",
+        },
+      },
+      target: {
+        selectorSessionId: "selector:workflow:inputs",
+        assetType: "dataset",
+      },
+      returnTarget: {
+        routePath: "/studio-shell/workflow/wizard/inputs?mode=wizard#workflow-wizard-inputs",
+      },
+    });
     const result = service.launch({
       requestedRole: "workflow",
       mode: InlineAssetCreationModes.systemIntake,
@@ -29,6 +47,7 @@ describe("InlineAssetCreationService", () => {
         assetType: "dataset",
         returnRoutePath: "/studio-shell/workflow/wizard?mode=wizard",
       },
+      studioHandoff,
     });
 
     expect(result).toBeDefined();
@@ -42,6 +61,9 @@ describe("InlineAssetCreationService", () => {
     expect(query.get("selectorLaunch")).toBe("1");
     expect(query.get("selectorSessionId")).toBe("selector:workflow:inputs");
     expect(query.get("selectorAssetType")).toBe("dataset");
+    expect(query.get("studioHandoff")).toBeDefined();
+    const parsedHandoff = service.parseStudioHandoffFromSearch(`?${query.toString()}`);
+    expect(parsedHandoff?.launch.handoffId).toBe("handoff:inline-test");
   });
 
   it("parses explicit inline return target semantics", () => {
@@ -57,7 +79,7 @@ describe("InlineAssetCreationService", () => {
     });
   });
 
-  it("builds and parses inline return payloads for created and cancelled flows", () => {
+  it("builds and parses inline return payloads for created/cancelled/no-selection flows", () => {
     const service = new InlineAssetCreationService();
     const withAsset = service.buildReturnPath({
       returnTarget: {
@@ -72,6 +94,7 @@ describe("InlineAssetCreationService", () => {
         displayName: "New dataset",
         sourceStudioType: "dataset-studio",
         sourceStudioId: "studio-datasets",
+        handoffId: "handoff:inline-return:1",
       },
     });
     const parsedWithAsset = service.parseInlineReturnFromSearch(withAsset.split("?")[1] ? `?${withAsset.split("?")[1]?.split("#")[0]}` : "");
@@ -84,6 +107,7 @@ describe("InlineAssetCreationService", () => {
       sourceStudioType: "dataset-studio",
       sourceStudioId: "studio-datasets",
       returnContextId: "workflow-studio",
+      handoffId: "handoff:inline-return:1",
     });
 
     const cancelled = service.buildReturnPath({
@@ -97,12 +121,39 @@ describe("InlineAssetCreationService", () => {
     const parsedCancelled = service.parseInlineReturnFromSearch(`?${cancelled.split("?")[1]}`);
     expect(parsedCancelled?.status).toBe("cancelled");
     expect(parsedCancelled?.assetId).toBeUndefined();
+
+    const noSelection = service.buildReturnPath({
+      returnTarget: {
+        routePath: "/studio-shell/workflow/wizard?mode=wizard",
+      },
+      payload: {
+        status: InlineAssetReturnStatuses.noSelection,
+        handoffId: "handoff:inline-return:2",
+      },
+    });
+    const parsedNoSelection = service.parseInlineReturnFromSearch(`?${noSelection.split("?")[1]}`);
+    expect(parsedNoSelection?.status).toBe("no-selection");
+    expect(parsedNoSelection?.assetId).toBeUndefined();
+    expect(parsedNoSelection?.handoffId).toBe("handoff:inline-return:2");
+
+    const abandoned = service.buildReturnPath({
+      returnTarget: {
+        routePath: "/studio-shell/workflow/wizard?mode=wizard",
+      },
+      payload: {
+        status: InlineAssetReturnStatuses.abandoned,
+        handoffId: "handoff:inline-return:3",
+      },
+    });
+    const parsedAbandoned = service.parseInlineReturnFromSearch(`?${abandoned.split("?")[1]}`);
+    expect(parsedAbandoned?.status).toBe("abandoned");
+    expect(parsedAbandoned?.handoffId).toBe("handoff:inline-return:3");
   });
 
   it("strips one-time inline return params while preserving other query values", () => {
     const service = new InlineAssetCreationService();
     const stripped = service.stripInlineReturnFromSearch(
-      "?mode=wizard&inlineReturn=1&inlineStatus=created&inlineAssetId=asset:dataset&inlineVersionId=v1&assetId=asset:workflow",
+      "?mode=wizard&inlineReturn=1&inlineStatus=created&inlineAssetId=asset:dataset&inlineVersionId=v1&inlineHandoffId=handoff:1&assetId=asset:workflow",
     );
     expect(stripped).toBe("?mode=wizard&assetId=asset%3Aworkflow");
   });
@@ -118,5 +169,43 @@ describe("InlineAssetCreationService", () => {
       assetType: "agent",
       returnRoutePath: "/studio-shell/workflow",
     });
+  });
+
+  it("falls back to canonical studio handoff contract for selector launch parsing", () => {
+    const service = new InlineAssetCreationService();
+    const studioHandoff = createStudioLaunchHandoffContract({
+      handoffId: "handoff:inline-fallback",
+      launchSource: "workflow-studio",
+      origin: {
+        studioType: "workflow-studio",
+        route: {
+          path: "/studio-shell/workflow/wizard/steps",
+        },
+      },
+      target: {
+        selectorSessionId: "selector:workflow:steps",
+        assetType: "agent",
+      },
+      returnTarget: {
+        routePath: "/studio-shell/workflow/wizard/steps",
+      },
+    });
+    const launch = service.launch({
+      requestedRole: "agent",
+      context: {
+        source: "studio-shell",
+      },
+      studioHandoff,
+    });
+
+    const query = launch?.launchPath.split("?")[1] ?? "";
+    const params = new URLSearchParams(query);
+    params.delete("selectorLaunch");
+    params.delete("selectorSessionId");
+    params.delete("selectorAssetType");
+    params.delete("selectorReturnTo");
+    const parsed = service.parseSelectorLaunchFromSearch(`?${params.toString()}`);
+    expect(parsed?.selectorSessionId).toBe("selector:workflow:steps");
+    expect(parsed?.assetType).toBe("agent");
   });
 });

@@ -8,19 +8,31 @@ import {
   AssetSelectorSessionLifecycleStates,
   type AssetSelectorSessionStore,
 } from "../../../application/studio-entry/AssetSelectorSessionStore";
-import { InlineAssetReturnStatuses, InlineAssetCreationService } from "../../routes/InlineAssetCreation";
+import { InlineAssetCreationService } from "../../routes/InlineAssetCreation";
+import {
+  type StudioReturnPayloadResolutionKind,
+  StudioReturnPayloadResolutionKinds,
+  StudioReturnPayloadResolver,
+} from "../../routes/StudioReturnPayloadResolution";
 
 export interface AssetSelectorReturnHandoffResult {
   readonly handled: boolean;
   readonly consumed: boolean;
   readonly nextSearch?: string;
+  readonly outcomeKind?: StudioReturnPayloadResolutionKind;
   readonly returnedAsset?: AssetSelectorAssetReference;
+  readonly selectorTargetId?: string;
+  readonly originatingField?: string;
+  readonly usageContext?: string;
 }
 
 export interface HandleSelectorReturnInput {
   readonly search: string;
   readonly sessionKey: string;
   readonly request: AssetSelectorRequest;
+  readonly expectedSelectorTargetId?: string;
+  readonly expectedOriginatingField?: string;
+  readonly expectedUsageContext?: string;
   readonly sessionStore: Pick<
     AssetSelectorSessionStore,
     "getSession" | "handleReturnPayload" | "resumeAfterCreationCancellation" | "activateSession" | "reportReturnPayloadError"
@@ -28,28 +40,30 @@ export interface HandleSelectorReturnInput {
 }
 
 export class AssetSelectorReturnHandoffService {
-  private readonly inlineCreationService: Pick<
-    InlineAssetCreationService,
-    "parseInlineReturnFromSearch" | "stripInlineReturnFromSearch"
-  >;
+  private readonly inlineCreationService: Pick<InlineAssetCreationService, "stripInlineReturnFromSearch">;
+  private readonly returnPayloadResolver: Pick<StudioReturnPayloadResolver, "resolveFromSearch">;
 
   public constructor(
-    inlineCreationService: Pick<InlineAssetCreationService, "parseInlineReturnFromSearch" | "stripInlineReturnFromSearch">
+    inlineCreationService: Pick<InlineAssetCreationService, "stripInlineReturnFromSearch">
     = new InlineAssetCreationService(),
+    returnPayloadResolver: Pick<StudioReturnPayloadResolver, "resolveFromSearch">
+    = new StudioReturnPayloadResolver(),
   ) {
     this.inlineCreationService = inlineCreationService;
+    this.returnPayloadResolver = returnPayloadResolver;
   }
 
   public handle(input: HandleSelectorReturnInput): AssetSelectorReturnHandoffResult {
-    const payload = this.inlineCreationService.parseInlineReturnFromSearch(input.search);
-    if (!payload) {
+    const resolution = this.returnPayloadResolver.resolveFromSearch(input.search);
+    if (!resolution.handled) {
       return Object.freeze({
         handled: false,
         consumed: false,
+        outcomeKind: resolution.kind,
       });
     }
 
-    if (payload.returnContextId && payload.returnContextId !== input.sessionKey) {
+    if (resolution.selectorSessionId && resolution.selectorSessionId !== input.sessionKey) {
       return Object.freeze({
         handled: false,
         consumed: false,
@@ -61,14 +75,19 @@ export class AssetSelectorReturnHandoffService {
       return Object.freeze({
         handled: true,
         consumed: true,
+        outcomeKind: resolution.kind,
         nextSearch: this.inlineCreationService.stripInlineReturnFromSearch(input.search),
+        selectorTargetId: resolution.selectorTargetId,
+        originatingField: resolution.originatingField,
+        usageContext: resolution.usageContext,
       });
     }
 
+    const isAwaitingReturn = session.lifecycleState === AssetSelectorSessionLifecycleStates.creatingNew
+      || session.lifecycleState === AssetSelectorSessionLifecycleStates.returning;
     if (
-      payload.status === InlineAssetReturnStatuses.created
-      && session.lifecycleState !== AssetSelectorSessionLifecycleStates.creatingNew
-      && session.lifecycleState !== AssetSelectorSessionLifecycleStates.returning
+      !isAwaitingReturn
+      && this.isCompletionLikeOutcome(resolution.kind)
     ) {
       this.reportInvalidReturn(
         input,
@@ -78,51 +97,114 @@ export class AssetSelectorReturnHandoffService {
       return Object.freeze({
         handled: true,
         consumed: true,
+        outcomeKind: resolution.kind,
         nextSearch: this.inlineCreationService.stripInlineReturnFromSearch(input.search),
+        selectorTargetId: resolution.selectorTargetId,
+        originatingField: resolution.originatingField,
+        usageContext: resolution.usageContext,
       });
     }
 
-    if (payload.status === InlineAssetReturnStatuses.cancelled) {
+    const expectedLaunchHandoffId = session.creatingNewContext?.launchHandoffId?.trim();
+    const returnedHandoffId = resolution.handoffId?.trim();
+    if (expectedLaunchHandoffId && returnedHandoffId && expectedLaunchHandoffId !== returnedHandoffId) {
+      this.reportInvalidReturn(
+        input,
+        "Returned selector payload handoff id does not match the active selector launch.",
+        "launch.handoffId",
+      );
+      return Object.freeze({
+        handled: true,
+        consumed: true,
+        outcomeKind: resolution.kind,
+        nextSearch: this.inlineCreationService.stripInlineReturnFromSearch(input.search),
+        selectorTargetId: resolution.selectorTargetId,
+        originatingField: resolution.originatingField,
+        usageContext: resolution.usageContext,
+      });
+    }
+
+    if (this.hasMismatchedSelectorTarget(input, resolution)) {
+      input.sessionStore.reportReturnPayloadError(
+        input.sessionKey,
+        "Returned selector payload target does not match the active selector target.",
+        "target.selector",
+      );
+      return Object.freeze({
+        handled: true,
+        consumed: true,
+        outcomeKind: resolution.kind,
+        nextSearch: this.inlineCreationService.stripInlineReturnFromSearch(input.search),
+        selectorTargetId: resolution.selectorTargetId,
+        originatingField: resolution.originatingField,
+        usageContext: resolution.usageContext,
+      });
+    }
+
+    if (resolution.kind === StudioReturnPayloadResolutionKinds.cancelled) {
       input.sessionStore.resumeAfterCreationCancellation(input.sessionKey, "creation-cancelled");
       return Object.freeze({
         handled: true,
         consumed: true,
+        outcomeKind: resolution.kind,
         nextSearch: this.inlineCreationService.stripInlineReturnFromSearch(input.search),
+        selectorTargetId: resolution.selectorTargetId,
+        originatingField: resolution.originatingField,
+        usageContext: resolution.usageContext,
       });
     }
 
-    if (!payload.assetId?.trim()) {
+    if (resolution.kind === StudioReturnPayloadResolutionKinds.noSelection) {
+      input.sessionStore.resumeAfterCreationCancellation(input.sessionKey, "creation-no-selection");
+      return Object.freeze({
+        handled: true,
+        consumed: true,
+        outcomeKind: resolution.kind,
+        nextSearch: this.inlineCreationService.stripInlineReturnFromSearch(input.search),
+        selectorTargetId: resolution.selectorTargetId,
+        originatingField: resolution.originatingField,
+        usageContext: resolution.usageContext,
+      });
+    }
+
+    if (resolution.kind === StudioReturnPayloadResolutionKinds.abandoned) {
+      input.sessionStore.resumeAfterCreationCancellation(input.sessionKey, "creation-abandoned");
+      return Object.freeze({
+        handled: true,
+        consumed: true,
+        outcomeKind: resolution.kind,
+        nextSearch: this.inlineCreationService.stripInlineReturnFromSearch(input.search),
+        selectorTargetId: resolution.selectorTargetId,
+        originatingField: resolution.originatingField,
+        usageContext: resolution.usageContext,
+      });
+    }
+
+    if (resolution.kind === StudioReturnPayloadResolutionKinds.invalid) {
+      const issue = resolution.issues[0];
       input.sessionStore.reportReturnPayloadError(
         input.sessionKey,
-        "Returned selector payload is missing required assetId.",
-        "result.assets[0].assetId",
+        issue?.message ?? "Returned selector payload is malformed.",
+        issue?.path,
       );
       return Object.freeze({
         handled: true,
         consumed: true,
+        outcomeKind: resolution.kind,
         nextSearch: this.inlineCreationService.stripInlineReturnFromSearch(input.search),
       });
     }
 
-    if (!payload.assetType?.trim()) {
-      input.sessionStore.reportReturnPayloadError(
-        input.sessionKey,
-        "Returned selector payload is missing required assetType.",
-        "result.assets[0].assetType",
-      );
+    if (resolution.kind !== StudioReturnPayloadResolutionKinds.created || !resolution.returnedAsset) {
       return Object.freeze({
         handled: true,
         consumed: true,
+        outcomeKind: resolution.kind,
         nextSearch: this.inlineCreationService.stripInlineReturnFromSearch(input.search),
       });
     }
 
-    const returnedAsset: AssetSelectorAssetReference = Object.freeze({
-      assetId: payload.assetId,
-      versionId: payload.versionId,
-      assetType: payload.assetType,
-      displayName: payload.displayName,
-    });
+    const returnedAsset: AssetSelectorAssetReference = resolution.returnedAsset;
 
     const stateAfterReturn = input.sessionStore.handleReturnPayload({
       sessionKey: input.sessionKey,
@@ -140,9 +222,20 @@ export class AssetSelectorReturnHandoffService {
     return Object.freeze({
       handled: true,
       consumed: true,
+      outcomeKind: resolution.kind,
       nextSearch: this.inlineCreationService.stripInlineReturnFromSearch(input.search),
       returnedAsset: stateAfterReturn.validationErrors.length === 0 ? returnedAsset : undefined,
+      selectorTargetId: resolution.selectorTargetId,
+      originatingField: resolution.originatingField,
+      usageContext: resolution.usageContext,
     });
+  }
+
+  private isCompletionLikeOutcome(kind: StudioReturnPayloadResolutionKind): boolean {
+    return kind === StudioReturnPayloadResolutionKinds.created
+      || kind === StudioReturnPayloadResolutionKinds.cancelled
+      || kind === StudioReturnPayloadResolutionKinds.noSelection
+      || kind === StudioReturnPayloadResolutionKinds.abandoned;
   }
 
   private reportInvalidReturn(
@@ -155,6 +248,31 @@ export class AssetSelectorReturnHandoffService {
       message,
       path,
     );
+  }
+
+  private hasMismatchedSelectorTarget(
+    input: HandleSelectorReturnInput,
+    resolution: ReturnType<StudioReturnPayloadResolver["resolveFromSearch"]>,
+  ): boolean {
+    const expectedSelectorTargetId = input.expectedSelectorTargetId?.trim();
+    const resolvedSelectorTargetId = resolution.selectorTargetId?.trim();
+    if (expectedSelectorTargetId && resolvedSelectorTargetId && resolvedSelectorTargetId !== expectedSelectorTargetId) {
+      return true;
+    }
+
+    const expectedOriginatingField = input.expectedOriginatingField?.trim();
+    const resolvedOriginatingField = resolution.originatingField?.trim();
+    if (expectedOriginatingField && resolvedOriginatingField && resolvedOriginatingField !== expectedOriginatingField) {
+      return true;
+    }
+
+    const expectedUsageContext = input.expectedUsageContext?.trim();
+    const resolvedUsageContext = resolution.usageContext?.trim();
+    if (expectedUsageContext && resolvedUsageContext && resolvedUsageContext !== expectedUsageContext) {
+      return true;
+    }
+
+    return false;
   }
 }
 

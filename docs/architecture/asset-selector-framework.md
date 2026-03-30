@@ -262,6 +262,38 @@ Selector session <-> workflow draft model:
 - Selector session store remains interaction-scoped state (pending, lifecycle, validation), synchronized from canonical draft references.
 - Rehydration restores selector-aligned state from canonical draft without introducing UI-only persistence artifacts.
 
+## Story 4.13 (Epic 4 closeout): Cross-story tests and documentation hardening
+Epic 4 closeout adds integration-level regression coverage across the full selector lifecycle in:
+- `ui/studio-shell/asset-selector/tests/AssetSelectorFramework.integration.test.ts`
+
+Closeout coverage now validates:
+- Domain contract and application capability matrix enforcement at shared session boundaries.
+- Dataset and agent selectors reusing the same session/lifecycle infrastructure without cross-session conflicts.
+- Create-new launch and return handoff restoring the targeted selector session and preserving existing selections.
+- Workflow draft synchronization for both dataset inputs and agent-backed steps during selector confirm flows.
+- Stale and malformed return payloads failing safely without corrupting selected state.
+- Workflow draft persistence round-trip (`serializeWorkflowDraft`/`deserializeWorkflowDraft`) preserving canonical selector-linked references.
+- Duplicate/non-canonical dataset references being filtered during replacement so save/load flows do not introduce duplicate/orphaned selector references.
+
+System responsibility split (must remain stable):
+- Shared framework responsibilities:
+  - Contract and validation: `domain/studio-shell/AssetSelectorContract.ts`
+  - Capability matrix: `application/studio-entry/AssetSelectorCapabilityRegistry.ts`
+  - Selector lifecycle/session model: `application/studio-entry/AssetSelectorSessionStore.ts`
+  - Shared selector shell UI: `ui/components/studio-shell/asset-selector/AssetSelectorShell.tsx`
+  - Shared create-new launch/return seams: `AssetSelectorStudioLaunchService` + `AssetSelectorReturnHandoffService`
+- Asset-specific responsibilities:
+  - Request construction and registry mapping in selector adapters (`DatasetAssetSelectorAdapter`, `AgentAssistantAssetSelectorAdapter`)
+  - Draft mutation semantics in workflow helpers (`WorkflowWizardDatasetInputs`, `WorkflowWizardSteps`)
+  - Feature-surface wiring in workflow section editors
+
+Future selector-backed asset-type adoption guidance:
+1. Add/extend capability mapping for the new usage context/asset type in `AssetSelectorCapabilityRegistry`.
+2. Implement an asset-specific adapter that only handles request defaults, taxonomy filters, and result mapping.
+3. Reuse shared session store + shared shell + shared launch/return services; do not fork lifecycle logic in feature UI.
+4. Persist only canonical references in workflow draft seams; treat selector session state as interaction-scoped.
+5. Add one cross-story integration test that exercises request validation, create-new return handling, and persistence round-trip for the new type.
+
 ## Story 4.13: Studio Shell authoring promotion and configurable toolbar contract
 - Studio Shell registration contracts now include an optional shell toolbar configuration (`ui/studio-shell/StudioShellExtensions.ts`) with typed actions:
   - `refresh-snapshot`
@@ -272,6 +304,26 @@ Selector session <-> workflow draft model:
 - `StudioShellPage` now renders draft authoring as a primary top-level section outside and above the shell card grid, while keeping existing session/metadata/dependencies/lifecycle/validation cards and extension slots intact.
 - Workflow Studio now demonstrates per-studio toolbar configuration through registration metadata (`ui/studio-shell/registrations/WorkflowStudioRegistration.ts`) with wizard/canvas mode actions plus save/validate/refresh controls.
 - Toolbar execution reuses existing shell orchestration seams (shared workflow mode state store and existing draft/validation operations) without bypassing selector/session infrastructure or duplicating validation logic.
+
+## Direction 5 stories 5.1-5.2: Canonical studio launch/return contract
+- Cross-studio selector create-new launches now also carry a canonical studio handoff contract (`ui/routes/StudioHandoffContract.ts`) in addition to legacy query params.
+- Workflow Studio origin launches build this contract through `ui/studio-shell/workflow/WorkflowStudioLaunchContext.ts`, including origin route, workflow draft reference/state, selector target context, and return/resume destination.
+- `InlineAssetCreationService` remains backward-compatible with existing selector query params and now falls back to parsing the canonical contract when those params are absent.
+
+## Direction 5 stories 5.3-5.4: Shared return resolution + workflow session persistence
+- Return payload resolution is now centralized in `ui/routes/StudioReturnPayloadResolution.ts`:
+  - typed resolution (`created`, `cancelled`, `no-selection`, `invalid`)
+  - canonical payload validation and selector-target extraction from handoff context
+- `AssetSelectorReturnHandoffService` now uses that shared resolver and explicitly supports `no-selection` without mutating selected assets.
+- Workflow return restoration now uses canonical handoff origin context via `ui/studio-shell/workflow/WorkflowStudioReturnRestorationService.ts` (mode + draft snapshot + draft/session reference restore).
+- Workflow authoring state persistence now lives in `WorkflowStudioModeStateStore` local-storage snapshots keyed by studio id, preserving in-progress draft sections (`triggers`, `inputs`, `steps`, `outputs`) through launch/return and refresh flows.
+
+## Story 4.14: Workflow wizard focus and layout hardening
+- Wizard mode now prioritizes page authoring flow by rendering the active wizard page directly under page buttons in the primary wizard card (`WorkflowStudioWizardModeSurface`).
+- The per-section readiness label row was removed from the default surface to reduce redundant readiness copy in the main authoring path.
+- Guided progression controls remain immediately below the pages card with prominent primary Back/Next actions and increased button spacing to reduce accidental navigation clicks.
+- Workflow readiness details remain available but now sit at the bottom of the wizard stack as a collapsed disclosure (`details/summary`), so diagnostics are opt-in rather than always expanded.
+- These changes stay in renderer presentation seams and preserve existing selector/session/capability integration paths for workflow inputs and steps.
 
 ## Adding future asset types
 To add a new selector type without modifying shared shell/session layers:

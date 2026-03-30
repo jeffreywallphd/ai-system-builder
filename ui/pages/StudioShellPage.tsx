@@ -22,9 +22,20 @@ import {
 } from "../studio-shell/workflow/WorkflowStudioModeStateStore";
 import type { WorkflowStudioModeId } from "../studio-shell/workflow/WorkflowStudioModes";
 import type { WorkflowStudioModeRouteResolution } from "../studio-shell/workflow/WorkflowStudioModeRouting";
+import {
+  buildWorkflowStudioWizardPagePath,
+  type WorkflowStudioWizardPageId,
+  type WorkflowStudioWizardPageRouteResolution,
+} from "../studio-shell/workflow/WorkflowStudioWizardRouting";
+import { WorkflowStudioReturnRestorationService } from "../studio-shell/workflow/WorkflowStudioReturnRestorationService";
+import {
+  WorkflowStudioHandoffFlowKinds,
+  WorkflowStudioHandoffStatusKinds,
+} from "../studio-shell/workflow/WorkflowStudioHandoffStatus";
 import { StudioEntryService } from "../routes/StudioRouteMapping";
 import { readAutomationIntentFromSearch } from "../routes/BuildAutomationIntent";
 import { BuildIntents } from "../routes/BuildIntentModels";
+import { ROUTE_PATHS } from "../routes/RouteConfig";
 import {
   InlineAssetCreationService,
   InlineAssetReturnStatuses,
@@ -122,6 +133,7 @@ interface StudioShellPageProps {
   readonly studioRegistration?: StudioRegistration;
   readonly extensions?: ReadonlyArray<StudioShellExtensionContribution>;
   readonly workflowModeRoute?: WorkflowStudioModeRouteResolution;
+  readonly workflowWizardPageRoute?: WorkflowStudioWizardPageRouteResolution;
 }
 
 function renderExtensions(
@@ -149,6 +161,7 @@ export default function StudioShellPage({
   studioRegistration,
   extensions = [],
   workflowModeRoute,
+  workflowWizardPageRoute,
 }: StudioShellPageProps): JSX.Element {
   const studioId = studioRegistration?.studioId ?? "studio-shell-main";
   const isWorkflowStudio = studioRegistration?.role === "workflow";
@@ -162,6 +175,7 @@ export default function StudioShellPage({
       : "Reusable bounded shell for studio/session context, authoring, taxonomy/contract/provenance/dependencies, lifecycle/version state, and validation.");
   const service = useMemo(() => new StudioShellService(), []);
   const inlineAssetCreationService = useMemo(() => new InlineAssetCreationService(), []);
+  const workflowReturnRestorationService = useMemo(() => new WorkflowStudioReturnRestorationService(), []);
   const location = useLocation();
   const navigate = useNavigate();
   const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
@@ -186,11 +200,16 @@ export default function StudioShellPage({
     () => inlineAssetCreationService.parseSelectorLaunchFromSearch(location.search),
     [inlineAssetCreationService, location.search],
   );
+  const studioLaunchHandoff = useMemo(
+    () => inlineAssetCreationService.parseStudioHandoffFromSearch(location.search),
+    [inlineAssetCreationService, location.search],
+  );
   const workflowModeStore = useMemo(
     () => (isWorkflowStudio ? getWorkflowStudioModeStateStore(studioId) : undefined),
     [isWorkflowStudio, studioId],
   );
   const resolvedWorkflowModeId = workflowModeRoute?.resolvedModeId;
+  const resolvedWorkflowWizardPageId = workflowWizardPageRoute?.resolvedPageId;
   const shouldSeedAutomationIntent = searchParams.get("buildIntent")?.trim() === BuildIntents.automateTask && Boolean(automationIntent);
   const extensionRegistry = useMemo(() => {
     const registry = new StudioShellExtensionRegistry();
@@ -223,6 +242,7 @@ export default function StudioShellPage({
     () => workflowModeStore?.getState(),
   );
   const automationPrefillAppliedRef = useRef(false);
+  const lastRestoredWorkflowReturnSearchRef = useRef<string | undefined>(undefined);
 
   const updateContent = (nextContent: string): void => {
     setContent(nextContent);
@@ -258,6 +278,48 @@ export default function StudioShellPage({
 
     workflowModeStore.setSelectedMode(resolvedWorkflowModeId);
   }, [resolvedWorkflowModeId, workflowModeStore]);
+
+  useEffect(() => {
+    if (!isWorkflowStudio || !workflowModeStore || !location.search.trim()) {
+      return;
+    }
+    if (lastRestoredWorkflowReturnSearchRef.current === location.search) {
+      return;
+    }
+
+    const restoration = workflowReturnRestorationService.restoreFromReturnSearch({
+      search: location.search,
+      workflowModeStore,
+    });
+    if (!restoration.handled || !restoration.handoffId) {
+      return;
+    }
+
+    const flow = restoration.assetType === "agent"
+      ? WorkflowStudioHandoffFlowKinds.agentStep
+      : WorkflowStudioHandoffFlowKinds.datasetInput;
+    if (restoration.restored) {
+      workflowModeStore.setHandoffStatus({
+        kind: WorkflowStudioHandoffStatusKinds.resumed,
+        flow,
+        updatedAt: Date.now(),
+        handoffId: restoration.handoffId,
+        selectorSessionKey: restoration.selectorSessionId,
+        selectorTargetId: restoration.selectorTargetId,
+      });
+    } else if (restoration.ignoredReason === "draft-context-mismatch") {
+      workflowModeStore.setHandoffStatus({
+        kind: WorkflowStudioHandoffStatusKinds.recovered,
+        flow,
+        updatedAt: Date.now(),
+        handoffId: restoration.handoffId,
+        selectorSessionKey: restoration.selectorSessionId,
+        selectorTargetId: restoration.selectorTargetId,
+        detail: "Ignored stale handoff restoration for a different draft session.",
+      });
+    }
+    lastRestoredWorkflowReturnSearchRef.current = location.search;
+  }, [isWorkflowStudio, location.search, workflowModeStore, workflowReturnRestorationService]);
 
   const refreshSnapshot = async () => {
     setIsBusy(true);
@@ -433,17 +495,41 @@ export default function StudioShellPage({
             sourceStudioType: studioRegistration?.studioType,
             sourceStudioId: studioId,
             returnContextId: inlineCreationReturnTarget.contextId,
+            handoffId: studioLaunchHandoff?.launch.handoffId,
           },
         })
         : undefined,
+      noSelection: inlineAssetCreationService.buildReturnPath({
+        returnTarget: inlineCreationReturnTarget,
+        payload: {
+          status: InlineAssetReturnStatuses.noSelection,
+          assetType: studioRegistration?.role,
+          sourceStudioType: studioRegistration?.studioType,
+          sourceStudioId: studioId,
+          returnContextId: inlineCreationReturnTarget.contextId,
+          handoffId: studioLaunchHandoff?.launch.handoffId,
+        },
+      }),
       cancelled: inlineAssetCreationService.buildReturnPath({
         returnTarget: inlineCreationReturnTarget,
-      payload: {
-        status: InlineAssetReturnStatuses.cancelled,
-        assetType: studioRegistration?.role,
-        sourceStudioType: studioRegistration?.studioType,
-        sourceStudioId: studioId,
-        returnContextId: inlineCreationReturnTarget.contextId,
+        payload: {
+          status: InlineAssetReturnStatuses.cancelled,
+          assetType: studioRegistration?.role,
+          sourceStudioType: studioRegistration?.studioType,
+          sourceStudioId: studioId,
+          returnContextId: inlineCreationReturnTarget.contextId,
+          handoffId: studioLaunchHandoff?.launch.handoffId,
+        },
+      }),
+      abandoned: inlineAssetCreationService.buildReturnPath({
+        returnTarget: inlineCreationReturnTarget,
+        payload: {
+          status: InlineAssetReturnStatuses.abandoned,
+          assetType: studioRegistration?.role,
+          sourceStudioType: studioRegistration?.studioType,
+          sourceStudioId: studioId,
+          returnContextId: inlineCreationReturnTarget.contextId,
+          handoffId: studioLaunchHandoff?.launch.handoffId,
         },
       }),
     });
@@ -453,6 +539,7 @@ export default function StudioShellPage({
     latestVersionId,
     returnVersionId,
     snapshot?.draft?.assetId,
+    studioLaunchHandoff?.launch.handoffId,
     studioId,
     studioRegistration?.studioType,
     studioRegistration?.role,
@@ -527,11 +614,17 @@ export default function StudioShellPage({
     }
 
     workflowModeStore.setSelectedMode(modeId);
+    const nextPathname = modeId === "wizard"
+      ? buildWorkflowStudioWizardPagePath(
+        resolvedWorkflowWizardPageId ?? "trigger",
+      )
+      : ROUTE_PATHS.workflowStudioMode.replace(":modeId", modeId);
     const nextSearchParams = new URLSearchParams(location.search);
-    nextSearchParams.set("mode", modeId);
+    nextSearchParams.delete("mode");
+    nextSearchParams.delete("wizardPage");
     void navigate(
       {
-        pathname: location.pathname,
+        pathname: nextPathname,
         search: nextSearchParams.toString().length > 0 ? `?${nextSearchParams.toString()}` : "",
         hash: location.hash,
       },
@@ -699,21 +792,22 @@ export default function StudioShellPage({
             content={content}
             onChangeContent={updateContent}
             invalidModeRouteId={isWorkflowStudio ? workflowModeRoute?.invalidModeId : undefined}
+            invalidWizardPageRouteId={isWorkflowStudio ? workflowWizardPageRoute?.invalidPageId : undefined}
             workflowModeContext={workflowModeStore && workflowModeState
               ? {
                 studioId,
-                routeSearch: location.search,
-                replaceRouteSearch: (nextSearch: string) => {
+                selectedModeId: workflowModeState.selectedModeId,
+                selectedWizardPageId: resolvedWorkflowWizardPageId ?? "trigger",
+                onSelectWizardPage: (pageId: WorkflowStudioWizardPageId) => {
                   void navigate(
                     {
-                      pathname: location.pathname,
-                      search: nextSearch,
-                      hash: location.hash,
+                      pathname: buildWorkflowStudioWizardPagePath(pageId),
+                      search: "",
+                      hash: "",
                     },
                     { replace: true },
                   );
                 },
-                selectedModeId: workflowModeState.selectedModeId,
                 sharedDraft: workflowModeState.sharedDraft,
                 sharedDraftSerialized: workflowModeState.sharedDraftSerialized,
                 draftEditorContent: workflowModeState.draftEditorContent,
@@ -721,6 +815,9 @@ export default function StudioShellPage({
                 modeValidationIssues: workflowModeState.modeValidationIssues,
                 draftValidationIssues: workflowModeState.draftValidationIssues,
                 updateSharedDraft: (updater) => workflowModeStore.updateSharedDraft(updater),
+                handoffStatus: workflowModeState.handoffStatus,
+                setHandoffStatus: (status) => workflowModeStore.setHandoffStatus(status),
+                clearHandoffStatus: () => workflowModeStore.clearHandoffStatus(),
               }
               : undefined}
           />
@@ -774,11 +871,33 @@ export default function StudioShellPage({
                 )}
                 <Link
                   className="ui-button ui-button--sm ui-button--ghost"
-                  to={inlineReturnPaths?.cancelled ?? inlineCreationReturnTarget.routePath}
-                  data-testid="studio-shell-inline-return-cancel"
+                  to={selectorLaunchContext
+                    ? (inlineReturnPaths?.noSelection ?? inlineCreationReturnTarget.routePath)
+                    : (inlineReturnPaths?.cancelled ?? inlineCreationReturnTarget.routePath)}
+                  data-testid={selectorLaunchContext
+                    ? "studio-shell-inline-return-no-selection"
+                    : "studio-shell-inline-return-cancel"}
                 >
-                  Cancel and return
+                  {selectorLaunchContext ? "Return without selection" : "Cancel and return"}
                 </Link>
+                {selectorLaunchContext ? (
+                  <Link
+                    className="ui-button ui-button--sm ui-button--ghost"
+                    to={inlineReturnPaths?.cancelled ?? inlineCreationReturnTarget.routePath}
+                    data-testid="studio-shell-inline-return-cancel"
+                  >
+                    Cancel and return
+                  </Link>
+                ) : null}
+                {selectorLaunchContext ? (
+                  <Link
+                    className="ui-button ui-button--sm ui-button--ghost"
+                    to={inlineReturnPaths?.abandoned ?? inlineCreationReturnTarget.routePath}
+                    data-testid="studio-shell-inline-return-abandon"
+                  >
+                    Abandon and return
+                  </Link>
+                ) : null}
               </div>
               {inlineCreationReturnPayload ? (
                 <span className="ui-text-small ui-text-secondary">

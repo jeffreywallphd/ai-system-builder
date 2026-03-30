@@ -6,6 +6,10 @@ import {
   serializeWorkflowDraft,
 } from "../../../../../domain/workflow-studio/WorkflowStudioDomain";
 import WorkflowStudioWizardModeSurface from "../WorkflowStudioWizardModeSurface";
+import {
+  WorkflowStudioHandoffFlowKinds,
+  WorkflowStudioHandoffStatusKinds,
+} from "../../../../studio-shell/workflow/WorkflowStudioHandoffStatus";
 
 describe("WorkflowStudioWizardModeSurface", () => {
   it("renders blocking readiness summary and enabled handoff action for invalid drafts", () => {
@@ -16,13 +20,16 @@ describe("WorkflowStudioWizardModeSurface", () => {
         sharedDraft={draft}
         sharedDraftSerialized={serializeWorkflowDraft(draft)}
         draftValidationIssues={[]}
+        selectedWizardPageId="trigger"
       />,
     );
 
     expect(html).toContain('data-testid="workflow-wizard-readiness-summary"');
+    expect(html).toContain('data-testid="workflow-wizard-pages-card"');
     expect(html).toContain("Workflow draft is not ready yet.");
     expect(html).toContain("Trigger needs at least 1 item.");
-    expect(html).toContain("Prepare for Run");
+    expect(html).not.toContain("Trigger: Needs input");
+    expect(html).not.toContain("Prepare for Run");
   });
 
   it("renders ready summary for valid drafts", () => {
@@ -75,11 +82,35 @@ describe("WorkflowStudioWizardModeSurface", () => {
         sharedDraft={draft}
         sharedDraftSerialized={serializeWorkflowDraft(draft)}
         draftValidationIssues={[]}
+        selectedWizardPageId="outputs"
       />,
     );
 
     expect(html).toContain("Workflow draft is ready for handoff.");
     expect(html).toContain("No blocking issues detected.");
     expect(html).toContain("Ready for next-stage handoff.");
+    expect(html).toContain("Prepare for Run");
+  });
+
+  it("renders shared handoff status banner when lifecycle status is present", () => {
+    const draft = createEmptyWorkflowDraft();
+    const html = renderToStaticMarkup(
+      <WorkflowStudioWizardModeSurface
+        sharedDraft={draft}
+        sharedDraftSerialized={serializeWorkflowDraft(draft)}
+        draftValidationIssues={[]}
+        selectedWizardPageId="inputs"
+        handoffStatus={{
+          kind: WorkflowStudioHandoffStatusKinds.pending,
+          flow: WorkflowStudioHandoffFlowKinds.datasetInput,
+          updatedAt: Date.now(),
+          detail: "Waiting for Dataset Studio handoff return.",
+        }}
+      />,
+    );
+
+    expect(html).toContain('data-testid="workflow-handoff-status-banner"');
+    expect(html).toContain("Cross-studio handoff status");
+    expect(html).toContain("Waiting for Dataset Studio handoff return.");
   });
 });
