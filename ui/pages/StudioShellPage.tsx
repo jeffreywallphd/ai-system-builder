@@ -614,6 +614,15 @@ export default function StudioShellPage({
       }),
     )
     : toolbarActions;
+  const saveToolbarAction = toolbarActionsToRender.find(
+    (action) => action.kind === StudioShellToolbarActionKinds.saveDraft,
+  );
+  const toolbarActionsWithoutSave = saveToolbarAction
+    ? toolbarActionsToRender.filter((action) => action.id !== saveToolbarAction.id)
+    : toolbarActionsToRender;
+  const toolbarActionsBeforeSave = workflowModeToggleAction
+    ? toolbarActionsWithoutSave.filter((action) => action.id !== workflowModeToggleAction.id)
+    : toolbarActionsWithoutSave;
   const shouldShowLeftDrawerToggle = Boolean(leftDrawerConfiguration)
     && (!isWorkflowStudio || workflowModeState?.selectedModeId === "canvas");
   const hasToolbar = toolbarActionsToRender.length > 0 || shouldShowLeftDrawerToggle || Boolean(rightDrawerConfiguration);
@@ -829,7 +838,7 @@ export default function StudioShellPage({
         {hasToolbar ? (
           <div className="ui-toolbar ui-toolbar--panel ui-studio-shell__authoring-toolbar" data-testid="studio-shell-authoring-toolbar">
             <div className="ui-toolbar__group">
-              {shouldShowLeftDrawerToggle && leftDrawerConfiguration ? (
+              {!workflowModeToggleAction && shouldShowLeftDrawerToggle && leftDrawerConfiguration ? (
                 <button
                   type="button"
                   className={getDrawerToggleButtonClassName(isLeftDrawerOpen)}
@@ -839,7 +848,28 @@ export default function StudioShellPage({
                   {leftDrawerConfiguration.label}
                 </button>
               ) : null}
-              {toolbarActionsToRender.map((action) => (
+              {workflowModeToggleAction ? (
+                <button
+                  key={workflowModeToggleAction.id}
+                  type="button"
+                  className={getToolbarButtonClassName(workflowModeToggleAction)}
+                  disabled={isToolbarActionDisabled(workflowModeToggleAction)}
+                  onClick={() => runToolbarAction(workflowModeToggleAction)}
+                >
+                  {workflowModeToggleAction.label}
+                </button>
+              ) : null}
+              {workflowModeToggleAction && shouldShowLeftDrawerToggle && leftDrawerConfiguration ? (
+                <button
+                  type="button"
+                  className={getDrawerToggleButtonClassName(isLeftDrawerOpen)}
+                  data-testid="studio-shell-left-drawer-toggle"
+                  onClick={() => setIsLeftDrawerOpen((current) => !current)}
+                >
+                  {leftDrawerConfiguration.label}
+                </button>
+              ) : null}
+              {toolbarActionsBeforeSave.map((action) => (
                 <button
                   key={action.id}
                   type="button"
@@ -858,6 +888,17 @@ export default function StudioShellPage({
                   onClick={() => setIsRightDrawerOpen((current) => !current)}
                 >
                   {rightDrawerConfiguration.label}
+                </button>
+              ) : null}
+              {saveToolbarAction ? (
+                <button
+                  key={saveToolbarAction.id}
+                  type="button"
+                  className={getToolbarButtonClassName(saveToolbarAction)}
+                  disabled={isToolbarActionDisabled(saveToolbarAction)}
+                  onClick={() => runToolbarAction(saveToolbarAction)}
+                >
+                  {saveToolbarAction.label}
                 </button>
               ) : null}
             </div>
@@ -920,7 +961,7 @@ export default function StudioShellPage({
               disabled={isBusy || !sessionId || hasWorkflowDraftParseError}
               onClick={saveDraftFromAuthoring}
             >
-              {draftId ? "Save Draft" : "Create Draft"}
+              {draftId ? "Save" : "Create Draft"}
             </button>
           </div>
         </StudioShellPanel>

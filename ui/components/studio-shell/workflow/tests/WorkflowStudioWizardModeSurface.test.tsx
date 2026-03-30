@@ -26,6 +26,9 @@ describe("WorkflowStudioWizardModeSurface", () => {
 
     expect(html).toContain('data-testid="workflow-wizard-readiness-summary"');
     expect(html).toContain('data-testid="workflow-wizard-pages-card"');
+    expect(html).toContain('data-testid="workflow-wizard-page-progress"');
+    expect(html).toContain('data-testid="workflow-wizard-back-page-trigger"');
+    expect(html).toContain('data-testid="workflow-wizard-next-page-trigger"');
     expect(html).toContain("Workflow draft is not ready yet.");
     expect(html).toContain("Trigger needs at least 1 item.");
     expect(html).not.toContain("Trigger: Needs input");
