@@ -103,7 +103,7 @@ describe("StudioRegistrationRegistry", () => {
     expect(registry.get("workflow-studio")?.shell?.drawers).toEqual({
       left: {
         label: "Nodes",
-        defaultOpen: true,
+        defaultOpen: false,
       },
       right: {
         label: "Inspector",
