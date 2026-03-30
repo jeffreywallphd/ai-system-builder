@@ -12,10 +12,14 @@ import {
   mapWorkflowEntityFromPersistenceRecord,
   mapWorkflowEntityToPersistenceRecord,
   normalizeWorkflowDraft,
+  normalizeWorkflowDraftTriggerConfig,
   listWorkflowDraftBuiltInStepDefinitions,
+  listWorkflowDraftTriggerDefinitions,
   getWorkflowDraftBuiltInStepDefinition,
+  getWorkflowDraftTriggerDefinition,
   isWorkflowDraftBuiltInStep,
   isWorkflowDraftBuiltInStepType,
+  isWorkflowDraftTriggerType,
   serializeWorkflowEntity,
   serializeWorkflowDraft,
   serializeWorkflowDraftDocument,
@@ -464,6 +468,73 @@ describe("WorkflowStudioDomain", () => {
       steps: [],
       outputs: [],
     })).toThrow("requires config.eventName");
+  });
+
+  it("exposes canonical trigger contracts with stable discovery metadata", () => {
+    const definitions = listWorkflowDraftTriggerDefinitions();
+    expect(definitions.map((entry) => entry.type)).toEqual([
+      WorkflowDraftTriggerTypes.userManual,
+      WorkflowDraftTriggerTypes.userButtonClick,
+      WorkflowDraftTriggerTypes.userInitiatedRun,
+      WorkflowDraftTriggerTypes.temporalSchedule,
+      WorkflowDraftTriggerTypes.temporalRecurring,
+      WorkflowDraftTriggerTypes.stateDataAvailable,
+      WorkflowDraftTriggerTypes.stateAssetStateChanged,
+      WorkflowDraftTriggerTypes.stateSystemEvent,
+    ]);
+    expect(definitions.map((entry) => entry.kind)).toEqual([
+      WorkflowDraftTriggerKinds.user,
+      WorkflowDraftTriggerKinds.user,
+      WorkflowDraftTriggerKinds.user,
+      WorkflowDraftTriggerKinds.temporal,
+      WorkflowDraftTriggerKinds.temporal,
+      WorkflowDraftTriggerKinds.state,
+      WorkflowDraftTriggerKinds.state,
+      WorkflowDraftTriggerKinds.state,
+    ]);
+    expect(definitions.every((entry) => entry.configSchemaId.startsWith("workflow.trigger."))).toBeTrue();
+    expect(getWorkflowDraftTriggerDefinition(WorkflowDraftTriggerTypes.temporalRecurring)?.label).toBe("Recurring interval");
+    expect(getWorkflowDraftTriggerDefinition("unknown-trigger")).toBeUndefined();
+    expect(isWorkflowDraftTriggerType(WorkflowDraftTriggerTypes.stateSystemEvent)).toBeTrue();
+    expect(isWorkflowDraftTriggerType("unknown-trigger")).toBeFalse();
+  });
+
+  it("validates trigger config payloads through canonical trigger contract entry points", () => {
+    expect(normalizeWorkflowDraftTriggerConfig(WorkflowDraftTriggerTypes.userButtonClick, {
+      buttonId: "run-now",
+      allowedRoles: ["operator", "operator", "owner"],
+    })).toMatchObject({
+      buttonId: "run-now",
+      allowedRoles: ["operator", "owner"],
+    });
+
+    expect(normalizeWorkflowDraftTriggerConfig(WorkflowDraftTriggerTypes.temporalRecurring, {
+      every: 3,
+      unit: "hours",
+      timezone: "UTC",
+    })).toMatchObject({
+      every: 3,
+      unit: "hours",
+      timezone: "UTC",
+    });
+
+    expect(normalizeWorkflowDraftTriggerConfig(WorkflowDraftTriggerTypes.stateAssetStateChanged, {
+      asset: {
+        assetId: "asset:dataset-1",
+      },
+      stateKey: "status",
+      stateValue: "ready",
+    })).toMatchObject({
+      asset: {
+        assetId: "asset:dataset-1",
+      },
+      stateKey: "status",
+      stateValue: "ready",
+    });
+
+    expect(() => normalizeWorkflowDraftTriggerConfig(WorkflowDraftTriggerTypes.userButtonClick, {})).toThrow("config.buttonId");
+    expect(() => normalizeWorkflowDraftTriggerConfig(WorkflowDraftTriggerTypes.temporalSchedule, {})).toThrow("config.cronExpression");
+    expect(() => normalizeWorkflowDraftTriggerConfig(WorkflowDraftTriggerTypes.stateSystemEvent, {})).toThrow("config.eventName");
   });
 
   it("accepts one or more canonical workflow inputs with dataset-backed asset references", () => {
