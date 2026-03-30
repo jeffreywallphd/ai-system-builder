@@ -1,12 +1,18 @@
 import {
+  WorkflowDraftTriggerTypes,
+  type WorkflowDraftStateTriggerConfig,
   WorkflowDraftTriggerKinds,
   type WorkflowDraft,
+  type WorkflowDraftTemporalTriggerConfig,
   type WorkflowDraftTrigger,
   type WorkflowDraftTriggerConfig,
   type WorkflowDraftTriggerKind,
   type WorkflowDraftTriggerType,
+  type WorkflowDraftUserTriggerConfig,
+  type WorkflowValidationIssue,
 } from "../../../domain/workflow-studio/WorkflowStudioDomain";
 import { createDefaultWorkflowTriggerTypeRegistry } from "../../../application/workflow-studio/WorkflowTriggerTypeRegistry";
+import { validateSingleWorkflowTriggerDefinition } from "../../../application/workflow-studio/WorkflowTriggerValidationPipeline";
 
 export interface WorkflowWizardTriggerTypeDefinition {
   readonly kind: WorkflowDraftTriggerKind;
@@ -90,6 +96,39 @@ function updateTriggerById(
   });
 }
 
+function moveTrigger(
+  draft: WorkflowDraft,
+  triggerId: string,
+  direction: -1 | 1,
+): { readonly draft: WorkflowDraft; readonly changed: boolean } {
+  const index = draft.triggers.findIndex((trigger) => trigger.id === triggerId);
+  if (index < 0) {
+    return Object.freeze({ draft, changed: false });
+  }
+
+  const targetIndex = index + direction;
+  if (targetIndex < 0 || targetIndex >= draft.triggers.length) {
+    return Object.freeze({ draft, changed: false });
+  }
+
+  const updated = [...draft.triggers];
+  const current = updated[index];
+  const target = updated[targetIndex];
+  if (!current || !target) {
+    return Object.freeze({ draft, changed: false });
+  }
+
+  updated[index] = target;
+  updated[targetIndex] = current;
+  return Object.freeze({
+    draft: Object.freeze({
+      ...draft,
+      triggers: Object.freeze(updated),
+    }),
+    changed: true,
+  });
+}
+
 export function addWorkflowTrigger(
   draft: WorkflowDraft,
   options?: {
@@ -135,6 +174,35 @@ export function removeWorkflowTrigger(
     }),
     changed: true,
   });
+}
+
+export function moveWorkflowTriggerUp(
+  draft: WorkflowDraft,
+  triggerId: string,
+): { readonly draft: WorkflowDraft; readonly changed: boolean } {
+  return moveTrigger(draft, triggerId, -1);
+}
+
+export function moveWorkflowTriggerDown(
+  draft: WorkflowDraft,
+  triggerId: string,
+): { readonly draft: WorkflowDraft; readonly changed: boolean } {
+  return moveTrigger(draft, triggerId, 1);
+}
+
+export function canMoveWorkflowTrigger(
+  draft: WorkflowDraft,
+  triggerId: string,
+  direction: "up" | "down",
+): boolean {
+  const index = draft.triggers.findIndex((trigger) => trigger.id === triggerId);
+  if (index < 0) {
+    return false;
+  }
+  if (direction === "up") {
+    return index > 0;
+  }
+  return index < draft.triggers.length - 1;
 }
 
 export function setWorkflowTriggerType(
@@ -189,6 +257,95 @@ export function patchWorkflowTriggerConfig(
       ...configPatch,
     }) as WorkflowDraftTriggerConfig,
   }));
+}
+
+export function setWorkflowTriggerUserConfig(
+  draft: WorkflowDraft,
+  triggerId: string,
+  configPatch: Readonly<Partial<WorkflowDraftUserTriggerConfig>>,
+): { readonly draft: WorkflowDraft; readonly changed: boolean } {
+  return patchWorkflowTriggerConfig(draft, triggerId, configPatch as Readonly<Record<string, unknown>>);
+}
+
+export function setWorkflowTriggerTemporalConfig(
+  draft: WorkflowDraft,
+  triggerId: string,
+  configPatch: Readonly<Partial<WorkflowDraftTemporalTriggerConfig>>,
+): { readonly draft: WorkflowDraft; readonly changed: boolean } {
+  return patchWorkflowTriggerConfig(draft, triggerId, configPatch as Readonly<Record<string, unknown>>);
+}
+
+export function setWorkflowTriggerStateConfig(
+  draft: WorkflowDraft,
+  triggerId: string,
+  configPatch: Readonly<Partial<WorkflowDraftStateTriggerConfig>>,
+): { readonly draft: WorkflowDraft; readonly changed: boolean } {
+  return patchWorkflowTriggerConfig(draft, triggerId, configPatch as Readonly<Record<string, unknown>>);
+}
+
+export function getWorkflowTriggerValidationMessages(input: {
+  readonly trigger: WorkflowDraftTrigger;
+  readonly draftIssueMessages?: ReadonlyArray<string>;
+  readonly stepIds?: ReadonlyArray<string>;
+}): ReadonlyArray<string> {
+  const stepIds = input.stepIds?.filter((entry) => entry.trim().length > 0);
+  const localValidation = validateSingleWorkflowTriggerDefinition({
+    trigger: input.trigger,
+    stepIds: stepIds && stepIds.length > 0 ? Object.freeze([...stepIds]) : undefined,
+  });
+  const messages = new Set<string>();
+  for (const message of input.draftIssueMessages ?? []) {
+    if (message.trim().length > 0) {
+      messages.add(message);
+    }
+  }
+  for (const issue of localValidation.issues) {
+    if (issue.message.trim().length > 0) {
+      messages.add(issue.message);
+    }
+  }
+  return Object.freeze([...messages]);
+}
+
+export function resolveWorkflowTriggerSelectionId(
+  draft: WorkflowDraft,
+  preferredTriggerId?: string,
+): string | undefined {
+  const normalizedPreferred = preferredTriggerId?.trim();
+  if (normalizedPreferred && draft.triggers.some((trigger) => trigger.id === normalizedPreferred)) {
+    return normalizedPreferred;
+  }
+  return draft.triggers[0]?.id;
+}
+
+export function getWorkflowTriggerSummary(trigger: WorkflowDraftTrigger): string {
+  if (trigger.kind === WorkflowDraftTriggerKinds.user) {
+    if (trigger.type === WorkflowDraftTriggerTypes.userButtonClick) {
+      return `Button: ${trigger.config.buttonId ?? "not set"}`;
+    }
+    return `Scope: ${trigger.config.invocationScope ?? "workflow-start"}`;
+  }
+  if (trigger.kind === WorkflowDraftTriggerKinds.temporal) {
+    if (trigger.type === WorkflowDraftTriggerTypes.temporalRecurring) {
+      return `Every ${trigger.config.every ?? "?"} ${trigger.config.unit ?? "days"}`;
+    }
+    return trigger.config.runAt ? `Run at ${trigger.config.runAt}` : `Cron: ${trigger.config.cronExpression ?? "not set"}`;
+  }
+  if (trigger.type === WorkflowDraftTriggerTypes.stateAssetStateChanged) {
+    return `Asset: ${trigger.config.asset?.assetId ?? "not set"}`;
+  }
+  return `Event: ${trigger.config.eventName ?? "not set"}`;
+}
+
+export function getWorkflowTriggerIssuesForIndex(
+  draftValidationIssues: ReadonlyArray<WorkflowValidationIssue>,
+  index: number,
+): ReadonlyArray<string> {
+  return Object.freeze(
+    draftValidationIssues
+      .filter((issue) => issue.path?.startsWith(`draft.triggers[${index}]`))
+      .map((issue) => issue.message),
+  );
 }
 
 export function getWorkflowTriggerTypeDefinition(
