@@ -62,6 +62,8 @@ describe("WorkflowStudioDraftAuthoringBoundary", () => {
 
     expect(html).toContain('data-testid="workflow-studio-canvas-mode-layout"');
     expect(html).toContain('data-testid="workflow-studio-canvas-mode-surface"');
+    expect(html).toContain('data-testid="workflow-studio-canvas-reactflow"');
+    expect(html).toContain('data-testid="workflow-studio-canvas-graph-details"');
     expect(html).toContain("Canvas layout container");
     expect(html).not.toContain('data-testid="workflow-studio-wizard-mode-layout"');
     expect(html).not.toContain('data-testid="workflow-studio-wizard-mode-surface"');

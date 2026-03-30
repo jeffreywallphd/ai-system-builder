@@ -7,6 +7,8 @@ import {
 import {
   applyWorkflowCanvasAction,
   deriveWorkflowCanvasViewModel,
+  WorkflowCanvasGraphEdgeKinds,
+  WorkflowCanvasGraphNodeKinds,
   WorkflowCanvasSectionIds,
 } from "../WorkflowStudioCanvasViewModel";
 
@@ -71,6 +73,65 @@ describe("WorkflowStudioCanvasViewModel", () => {
     expect(viewModel.sections[1]?.nodes[0]?.title).toBe("Prompt");
     expect(viewModel.sections[2]?.nodes[0]?.title).toBe("Plan");
     expect(viewModel.sections[3]?.nodes[0]?.title).toBe("Result");
+
+    const graphSectionNode = viewModel.graph.nodes.find((node) => (
+      node.kind === WorkflowCanvasGraphNodeKinds.section
+      && node.sectionId === WorkflowCanvasSectionIds.triggers
+    ));
+    const graphItemNode = viewModel.graph.nodes.find((node) => (
+      node.kind === WorkflowCanvasGraphNodeKinds.item
+      && node.sectionId === WorkflowCanvasSectionIds.steps
+      && node.title === "Plan"
+    ));
+
+    expect(graphSectionNode).toBeDefined();
+    expect(graphItemNode).toBeDefined();
+    expect(viewModel.graph.edges.some((edge) => edge.kind === WorkflowCanvasGraphEdgeKinds.sectionFlow)).toBe(true);
+    expect(viewModel.graph.edges.some((edge) => edge.kind === WorkflowCanvasGraphEdgeKinds.itemSequence)).toBe(false);
+  });
+
+  it("derives deterministic canvas placement and explicit section-flow edges", () => {
+    const draft = Object.freeze({
+      ...createEmptyWorkflowDraft(),
+      triggers: Object.freeze([
+        Object.freeze({
+          id: "trigger-1",
+          kind: "user" as const,
+          type: "manual" as const,
+          title: "Start",
+          config: Object.freeze({}),
+        }),
+      ]),
+      steps: Object.freeze([
+        Object.freeze({
+          id: "step-1",
+          type: "action",
+          kind: WorkflowDraftStepKinds.action,
+          order: 1,
+          title: "First",
+        }),
+        Object.freeze({
+          id: "step-2",
+          type: "action",
+          kind: WorkflowDraftStepKinds.action,
+          order: 2,
+          title: "Second",
+        }),
+      ]),
+    });
+
+    const viewModel = deriveWorkflowCanvasViewModel(draft, []);
+    const stepNodes = viewModel.graph.nodes.filter((node) => node.sectionId === WorkflowCanvasSectionIds.steps);
+    expect(stepNodes.map((node) => node.position.y)).toEqual([0, 156, 332]);
+    expect(stepNodes[0]?.kind).toBe(WorkflowCanvasGraphNodeKinds.section);
+    expect(stepNodes[1]?.kind).toBe(WorkflowCanvasGraphNodeKinds.item);
+    expect(stepNodes[2]?.kind).toBe(WorkflowCanvasGraphNodeKinds.item);
+    expect(viewModel.graph.edges.some((edge) => edge.kind === WorkflowCanvasGraphEdgeKinds.itemSequence)).toBe(true);
+    expect(viewModel.graph.edges.some((edge) => (
+      edge.kind === WorkflowCanvasGraphEdgeKinds.sectionFlow
+      && edge.id.includes("triggers")
+      && edge.id.includes("inputs")
+    ))).toBe(true);
   });
 
   it("applies canvas actions against one shared canonical draft model", () => {

@@ -317,6 +317,8 @@ describe("WorkflowStudioModeSystem integration seams", () => {
     const canvasMarkup = renderToStaticMarkup(canvasBoundary);
     expect(canvasMarkup).toContain('data-testid="workflow-studio-canvas-mode-layout"');
     expect(canvasMarkup).toContain('data-testid="workflow-studio-canvas-mode-surface"');
+    expect(canvasMarkup).toContain('data-testid="workflow-studio-canvas-reactflow"');
+    expect(canvasMarkup).toContain("Rendered as React Flow section and item nodes");
     expect(canvasMarkup).toContain('data-testid="workflow-canvas-section-triggers"');
     expect(canvasMarkup).toContain('data-testid="workflow-canvas-section-inputs"');
     expect(canvasMarkup).toContain('data-testid="workflow-canvas-section-steps"');

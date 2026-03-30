@@ -7,6 +7,7 @@ import {
   type WorkflowCanvasAction,
   type WorkflowCanvasSectionViewModel,
 } from "../../../studio-shell/workflow/WorkflowStudioCanvasViewModel";
+import WorkflowStudioCanvasReactFlow from "./WorkflowStudioCanvasReactFlow";
 
 export interface WorkflowStudioCanvasModeSurfaceProps {
   readonly sharedDraft: WorkflowDraft;
@@ -63,26 +64,30 @@ export default function WorkflowStudioCanvasModeSurface({
   };
 
   return (
-    <div className="ui-stack ui-stack--sm" data-testid="workflow-studio-canvas-mode-surface">
+    <div className="ui-stack ui-stack--sm ui-workflow-studio-canvas" data-testid="workflow-studio-canvas-mode-surface">
       <section className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="workflow-studio-canvas-summary">
         <strong>Workflow Canvas</strong>
         <p className="ui-text-muted">
-          Section-backed canvas projection over the canonical workflow draft. Canvas and wizard write through the same shared draft state.
+          React Flow canvas projection over the canonical workflow draft. Canvas and wizard write through the same shared draft state.
         </p>
         <p className="ui-text-small ui-text-secondary">
           Nodes: {viewModel.totalNodeCount} | Validation issues: {viewModel.totalIssueCount}
         </p>
       </section>
 
-      <div className="ui-stack ui-stack--sm" data-testid="workflow-studio-canvas-sections">
-        {viewModel.sections.map((section) => (
-          <section key={section.id} className="ui-card ui-card--padded ui-stack ui-stack--sm" data-testid={`workflow-canvas-section-${section.id}`}>
-            <header className="ui-row ui-row--between ui-row--wrap">
-              <div className="ui-stack ui-stack--2xs">
+      <section className="ui-card ui-card--padded ui-stack ui-stack--sm" data-testid="workflow-studio-canvas-sections">
+        <header className="ui-row ui-row--between ui-row--wrap">
+          <strong>Core workflow sections</strong>
+          <span className="ui-text-small ui-text-secondary">Rendered as React Flow section and item nodes</span>
+        </header>
+        <div className="ui-workflow-studio-canvas__section-grid">
+          {viewModel.sections.map((section) => (
+            <section key={section.id} className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid={`workflow-canvas-section-${section.id}`}>
+              <div className="ui-row ui-row--between ui-row--wrap">
                 <strong>{section.title}</strong>
-                <p className="ui-text-muted">{section.summary}</p>
-                <p className="ui-text-small ui-text-secondary">{section.nodes.length} node(s)</p>
+                <span className="ui-text-small ui-text-secondary">{section.nodes.length} node(s)</span>
               </div>
+              <p className="ui-text-muted">{section.summary}</p>
               <button
                 type="button"
                 className="ui-button ui-button--ghost ui-button--sm"
@@ -91,85 +96,19 @@ export default function WorkflowStudioCanvasModeSurface({
               >
                 {getSectionAddLabel(section)}
               </button>
-            </header>
+            </section>
+          ))}
+        </div>
+      </section>
 
-            {section.nodes.length === 0 ? (
-              <p className="ui-text-muted">No nodes in this section yet.</p>
-            ) : (
-              <ul className="ui-stack ui-stack--xs">
-                {section.nodes.map((node) => (
-                  <li key={node.id} className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid={`workflow-canvas-node-${section.id}-${node.id}`}>
-                    <div className="ui-row ui-row--between ui-row--wrap">
-                      <strong>{node.subtitle}</strong>
-                      <button
-                        type="button"
-                        className="ui-button ui-button--ghost ui-button--sm"
-                        data-testid={`workflow-canvas-remove-${section.id}-${node.id}`}
-                        onClick={() => {
-                          if (section.id === WorkflowCanvasSectionIds.triggers) {
-                            applyAction({ kind: "remove-trigger", triggerId: node.id });
-                            return;
-                          }
-                          if (section.id === WorkflowCanvasSectionIds.inputs) {
-                            applyAction({ kind: "remove-input", inputId: node.id });
-                            return;
-                          }
-                          if (section.id === WorkflowCanvasSectionIds.steps) {
-                            applyAction({ kind: "remove-step", stepId: node.id });
-                            return;
-                          }
-                          applyAction({ kind: "remove-output", outputId: node.id });
-                        }}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                    <label className="ui-field">
-                      <span className="ui-field__label">Title</span>
-                      <input
-                        className="ui-input"
-                        value={node.title}
-                        data-testid={`workflow-canvas-title-${section.id}-${node.id}`}
-                        onChange={(event) => {
-                          if (section.id === WorkflowCanvasSectionIds.triggers) {
-                            applyAction({ kind: "set-trigger-title", triggerId: node.id, title: event.target.value });
-                            return;
-                          }
-                          if (section.id === WorkflowCanvasSectionIds.inputs) {
-                            applyAction({ kind: "set-input-title", inputId: node.id, title: event.target.value });
-                            return;
-                          }
-                          if (section.id === WorkflowCanvasSectionIds.steps) {
-                            applyAction({ kind: "set-step-title", stepId: node.id, title: event.target.value });
-                            return;
-                          }
-                          applyAction({ kind: "set-output-title", outputId: node.id, title: event.target.value });
-                        }}
-                      />
-                    </label>
+      <WorkflowStudioCanvasReactFlow graph={viewModel.graph} />
 
-                    {node.detailLines.length > 0 ? (
-                      <ul className="ui-stack ui-stack--2xs">
-                        {node.detailLines.map((line, index) => (
-                          <li key={`${node.id}-detail-${index}`} className="ui-text-small ui-text-secondary">{line}</li>
-                        ))}
-                      </ul>
-                    ) : null}
-
-                    {node.issueMessages.length > 0 ? (
-                      <ul className="ui-stack ui-stack--2xs">
-                        {node.issueMessages.map((message, index) => (
-                          <li key={`${node.id}-issue-${index}`} className="ui-text-small ui-text-danger">{message}</li>
-                        ))}
-                      </ul>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        ))}
-      </div>
+      <details className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="workflow-studio-canvas-graph-details">
+        <summary className="ui-text-small">Canvas graph projection</summary>
+        <p className="ui-text-small ui-text-secondary">
+          Graph nodes: {viewModel.graph.nodes.length} | Graph edges: {viewModel.graph.edges.length}
+        </p>
+      </details>
 
       <details className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="workflow-studio-canvas-json-details">
         <summary className="ui-text-small">Canonical workflow draft JSON</summary>
