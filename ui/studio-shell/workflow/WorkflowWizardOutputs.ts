@@ -504,6 +504,23 @@ export function setWorkflowOutputTitle(
   });
 }
 
+export function setWorkflowOutputSourceStep(
+  draft: WorkflowDraft,
+  outputId: string,
+  sourceStepId?: string,
+): { readonly draft: WorkflowDraft; readonly changed: boolean } {
+  const normalizedSourceStepId = normalizeOptional(sourceStepId);
+  return updateOutput(draft, outputId, (current) => {
+    if (current.sourceStepId === normalizedSourceStepId) {
+      return current;
+    }
+    return Object.freeze({
+      ...current,
+      sourceStepId: normalizedSourceStepId,
+    });
+  });
+}
+
 export function setWorkflowOutputFileName(
   draft: WorkflowDraft,
   outputId: string,

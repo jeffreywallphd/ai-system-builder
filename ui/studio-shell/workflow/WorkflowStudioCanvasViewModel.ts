@@ -18,8 +18,11 @@ import {
   setWorkflowTriggerTitle,
 } from "./WorkflowWizardTriggers";
 import {
+  addWorkflowStepDependency,
   addWorkflowStep,
   getWorkflowStepTypeDefinitionByKey,
+  removeWorkflowStepDependency,
+  reorderWorkflowSteps,
   removeWorkflowStep,
   resolveWorkflowStepTypeDefinition,
   setWorkflowStepTitle,
@@ -29,6 +32,7 @@ import {
   getWorkflowOutputDestinationDefinitionByType,
   listWorkflowOutputSummaries,
   removeWorkflowOutput,
+  setWorkflowOutputSourceStep,
   setWorkflowOutputViewerTitle,
 } from "./WorkflowWizardOutputs";
 import { buildDatasetInputFromAsset } from "./WorkflowWizardDatasetInputs";
@@ -78,6 +82,8 @@ export const WorkflowCanvasGraphEdgeKinds = Object.freeze({
   sectionFlow: "section-flow",
   sectionEntry: "section-entry",
   itemSequence: "item-sequence",
+  stepDependency: "step-dependency",
+  outputSource: "output-source",
 });
 
 export type WorkflowCanvasGraphEdgeKind =
@@ -106,6 +112,9 @@ export interface WorkflowCanvasGraphEdgeViewModel {
   readonly kind: WorkflowCanvasGraphEdgeKind;
   readonly sourceNodeId: string;
   readonly targetNodeId: string;
+  readonly sourceEntityId?: string;
+  readonly targetEntityId?: string;
+  readonly editable: boolean;
 }
 
 export interface WorkflowCanvasGraphLayoutViewModel {
@@ -140,6 +149,14 @@ function buildItemGraphNodeId(node: WorkflowCanvasNodeViewModel): string {
 
 function buildGraphEdgeId(sourceNodeId: string, targetNodeId: string): string {
   return `edge:${sourceNodeId}->${targetNodeId}`;
+}
+
+function buildStepDependencyEdgeId(dependsOnStepId: string, stepId: string): string {
+  return `edge:step-dependency:${dependsOnStepId}->${stepId}`;
+}
+
+function buildOutputSourceEdgeId(sourceStepId: string, outputId: string): string {
+  return `edge:output-source:${sourceStepId}->${outputId}`;
 }
 
 function estimateTextLineCount(
@@ -232,6 +249,7 @@ function placeSectionGraphNodes(
 }
 
 function deriveWorkflowCanvasGraphViewModel(
+  draft: WorkflowDraft,
   sections: ReadonlyArray<WorkflowCanvasSectionViewModel>,
 ): WorkflowCanvasGraphViewModel {
   const graphNodes: WorkflowCanvasGraphNodeViewModel[] = [];
@@ -303,6 +321,9 @@ function deriveWorkflowCanvasGraphViewModel(
           kind: WorkflowCanvasGraphEdgeKinds.sectionEntry,
           sourceNodeId: sectionNodeId,
           targetNodeId: itemNodeId,
+          sourceEntityId: undefined,
+          targetEntityId: node.id,
+          editable: false,
         }));
         sectionEntryNodeIds.set(section.id, itemNodeId);
       }
@@ -313,6 +334,9 @@ function deriveWorkflowCanvasGraphViewModel(
           kind: WorkflowCanvasGraphEdgeKinds.itemSequence,
           sourceNodeId: previousItemNodeId,
           targetNodeId: itemNodeId,
+          sourceEntityId: section.nodes[nodeIndex - 1]?.id,
+          targetEntityId: node.id,
+          editable: false,
         }));
       }
 
@@ -338,6 +362,64 @@ function deriveWorkflowCanvasGraphViewModel(
       kind: WorkflowCanvasGraphEdgeKinds.sectionFlow,
       sourceNodeId,
       targetNodeId,
+      sourceEntityId: undefined,
+      targetEntityId: undefined,
+      editable: false,
+    }));
+  }
+
+  const stepNodeIdByStepId = new Map(
+    graphNodes
+      .filter((node) => node.sectionId === WorkflowCanvasSectionIds.steps && node.kind === WorkflowCanvasGraphNodeKinds.item)
+      .map((node) => [node.entityId as string, node.id]),
+  );
+  const outputNodeIdByOutputId = new Map(
+    graphNodes
+      .filter((node) => node.sectionId === WorkflowCanvasSectionIds.outputs && node.kind === WorkflowCanvasGraphNodeKinds.item)
+      .map((node) => [node.entityId as string, node.id]),
+  );
+
+  for (const step of draft.steps) {
+    const targetNodeId = stepNodeIdByStepId.get(step.id);
+    if (!targetNodeId) {
+      continue;
+    }
+
+    for (const dependsOnStepId of step.dependsOnStepIds ?? []) {
+      const sourceNodeId = stepNodeIdByStepId.get(dependsOnStepId);
+      if (!sourceNodeId) {
+        continue;
+      }
+      graphEdges.push(Object.freeze({
+        id: buildStepDependencyEdgeId(dependsOnStepId, step.id),
+        kind: WorkflowCanvasGraphEdgeKinds.stepDependency,
+        sourceNodeId,
+        targetNodeId,
+        sourceEntityId: dependsOnStepId,
+        targetEntityId: step.id,
+        editable: true,
+      }));
+    }
+  }
+
+  for (const output of draft.outputs) {
+    const sourceStepId = output.sourceStepId?.trim();
+    if (!sourceStepId) {
+      continue;
+    }
+    const sourceNodeId = stepNodeIdByStepId.get(sourceStepId);
+    const targetNodeId = outputNodeIdByOutputId.get(output.id);
+    if (!sourceNodeId || !targetNodeId) {
+      continue;
+    }
+    graphEdges.push(Object.freeze({
+      id: buildOutputSourceEdgeId(sourceStepId, output.id),
+      kind: WorkflowCanvasGraphEdgeKinds.outputSource,
+      sourceNodeId,
+      targetNodeId,
+      sourceEntityId: sourceStepId,
+      targetEntityId: output.id,
+      editable: true,
     }));
   }
 
@@ -358,15 +440,34 @@ export type WorkflowCanvasAction =
   | { readonly kind: "set-input-title"; readonly inputId: string; readonly title: string }
   | { readonly kind: "remove-input"; readonly inputId: string }
   | { readonly kind: "add-step"; readonly definitionKey?: string }
+  | { readonly kind: "reorder-steps"; readonly orderedStepIds: ReadonlyArray<string> }
   | { readonly kind: "set-step-title"; readonly stepId: string; readonly title: string }
+  | { readonly kind: "add-step-dependency"; readonly stepId: string; readonly dependsOnStepId: string }
+  | { readonly kind: "remove-step-dependency"; readonly stepId: string; readonly dependsOnStepId: string }
   | { readonly kind: "remove-step"; readonly stepId: string }
   | { readonly kind: "add-output"; readonly destinationType?: WorkflowDraftOutputDestinationType }
   | { readonly kind: "set-output-title"; readonly outputId: string; readonly title: string }
+  | { readonly kind: "set-output-source-step"; readonly outputId: string; readonly sourceStepId?: string }
   | { readonly kind: "remove-output"; readonly outputId: string };
 
 export interface WorkflowCanvasActionResult {
   readonly draft: WorkflowDraft;
   readonly changed: boolean;
+}
+
+export interface WorkflowCanvasConnectionRequest {
+  readonly sourceNodeId: string;
+  readonly targetNodeId: string;
+}
+
+export interface WorkflowCanvasConnectionResolution {
+  readonly valid: boolean;
+  readonly action?: WorkflowCanvasAction;
+}
+
+export interface WorkflowCanvasEdgeUpdateRequest {
+  readonly edge: WorkflowCanvasGraphEdgeViewModel;
+  readonly nextConnection: WorkflowCanvasConnectionRequest;
 }
 
 function normalizeOptional(value?: string): string | undefined {
@@ -605,7 +706,7 @@ export function deriveWorkflowCanvasViewModel(
       nodes: outputNodes,
     }),
   ]);
-  const graph = deriveWorkflowCanvasGraphViewModel(sections);
+  const graph = deriveWorkflowCanvasGraphViewModel(draft, sections);
 
   return Object.freeze({
     sections,
@@ -614,6 +715,135 @@ export function deriveWorkflowCanvasViewModel(
     totalIssueCount: sections.reduce((sum, section) => (
       sum + section.nodes.reduce((sectionSum, node) => sectionSum + node.issueMessages.length, 0)
     ), 0),
+  });
+}
+
+function getGraphNodeById(
+  graph: WorkflowCanvasGraphViewModel,
+  nodeId: string,
+): WorkflowCanvasGraphNodeViewModel | undefined {
+  return graph.nodes.find((node) => node.id === nodeId);
+}
+
+export function resolveWorkflowCanvasConnectionAction(
+  graph: WorkflowCanvasGraphViewModel,
+  request: WorkflowCanvasConnectionRequest,
+): WorkflowCanvasConnectionResolution {
+  const sourceNode = getGraphNodeById(graph, request.sourceNodeId);
+  const targetNode = getGraphNodeById(graph, request.targetNodeId);
+  if (!sourceNode || !targetNode) {
+    return Object.freeze({ valid: false });
+  }
+
+  if (sourceNode.kind !== WorkflowCanvasGraphNodeKinds.item || targetNode.kind !== WorkflowCanvasGraphNodeKinds.item) {
+    return Object.freeze({ valid: false });
+  }
+  if (!sourceNode.entityId || !targetNode.entityId) {
+    return Object.freeze({ valid: false });
+  }
+
+  if (
+    sourceNode.sectionId === WorkflowCanvasSectionIds.steps
+    && targetNode.sectionId === WorkflowCanvasSectionIds.steps
+    && sourceNode.entityId !== targetNode.entityId
+  ) {
+    return Object.freeze({
+      valid: true,
+      action: Object.freeze({
+        kind: "add-step-dependency",
+        stepId: targetNode.entityId,
+        dependsOnStepId: sourceNode.entityId,
+      }),
+    });
+  }
+
+  if (
+    sourceNode.sectionId === WorkflowCanvasSectionIds.steps
+    && targetNode.sectionId === WorkflowCanvasSectionIds.outputs
+  ) {
+    return Object.freeze({
+      valid: true,
+      action: Object.freeze({
+        kind: "set-output-source-step",
+        outputId: targetNode.entityId,
+        sourceStepId: sourceNode.entityId,
+      }),
+    });
+  }
+
+  return Object.freeze({ valid: false });
+}
+
+export function resolveWorkflowCanvasEdgeRemovalAction(
+  edge: WorkflowCanvasGraphEdgeViewModel,
+): WorkflowCanvasAction | undefined {
+  if (
+    edge.kind === WorkflowCanvasGraphEdgeKinds.stepDependency
+    && edge.sourceEntityId
+    && edge.targetEntityId
+  ) {
+    return Object.freeze({
+      kind: "remove-step-dependency",
+      stepId: edge.targetEntityId,
+      dependsOnStepId: edge.sourceEntityId,
+    });
+  }
+  if (edge.kind === WorkflowCanvasGraphEdgeKinds.outputSource && edge.targetEntityId) {
+    return Object.freeze({
+      kind: "set-output-source-step",
+      outputId: edge.targetEntityId,
+      sourceStepId: undefined,
+    });
+  }
+  return undefined;
+}
+
+export function applyWorkflowCanvasConnection(
+  draft: WorkflowDraft,
+  graph: WorkflowCanvasGraphViewModel,
+  request: WorkflowCanvasConnectionRequest,
+): WorkflowCanvasActionResult {
+  const resolution = resolveWorkflowCanvasConnectionAction(graph, request);
+  if (!resolution.valid || !resolution.action) {
+    return Object.freeze({ draft, changed: false });
+  }
+  return applyWorkflowCanvasAction(draft, resolution.action);
+}
+
+export function applyWorkflowCanvasEdgeReconnect(
+  draft: WorkflowDraft,
+  graph: WorkflowCanvasGraphViewModel,
+  request: WorkflowCanvasEdgeUpdateRequest,
+): WorkflowCanvasActionResult {
+  const removeAction = resolveWorkflowCanvasEdgeRemovalAction(request.edge);
+  if (!removeAction) {
+    return Object.freeze({ draft, changed: false });
+  }
+  const addResolution = resolveWorkflowCanvasConnectionAction(graph, request.nextConnection);
+  if (!addResolution.valid || !addResolution.action) {
+    return Object.freeze({ draft, changed: false });
+  }
+  if (
+    request.edge.kind === WorkflowCanvasGraphEdgeKinds.stepDependency
+    && addResolution.action.kind !== "add-step-dependency"
+  ) {
+    return Object.freeze({ draft, changed: false });
+  }
+  if (
+    request.edge.kind === WorkflowCanvasGraphEdgeKinds.outputSource
+    && addResolution.action.kind !== "set-output-source-step"
+  ) {
+    return Object.freeze({ draft, changed: false });
+  }
+
+  const removed = applyWorkflowCanvasAction(draft, removeAction);
+  const added = applyWorkflowCanvasAction(removed.draft, addResolution.action);
+  if (!added.changed) {
+    return Object.freeze({ draft, changed: false });
+  }
+  return Object.freeze({
+    draft: added.draft,
+    changed: true,
   });
 }
 
@@ -732,8 +962,23 @@ export function applyWorkflowCanvasAction(
     return Object.freeze({ draft: result.draft, changed: true });
   }
 
+  if (action.kind === "reorder-steps") {
+    const result = reorderWorkflowSteps(draft, action.orderedStepIds);
+    return Object.freeze({ draft: result.draft, changed: result.changed });
+  }
+
   if (action.kind === "set-step-title") {
     const result = setWorkflowStepTitle(draft, action.stepId, action.title);
+    return Object.freeze({ draft: result.draft, changed: result.changed });
+  }
+
+  if (action.kind === "add-step-dependency") {
+    const result = addWorkflowStepDependency(draft, action.stepId, action.dependsOnStepId);
+    return Object.freeze({ draft: result.draft, changed: result.changed });
+  }
+
+  if (action.kind === "remove-step-dependency") {
+    const result = removeWorkflowStepDependency(draft, action.stepId, action.dependsOnStepId);
     return Object.freeze({ draft: result.draft, changed: result.changed });
   }
 
@@ -755,6 +1000,11 @@ export function applyWorkflowCanvasAction(
 
   if (action.kind === "set-output-title") {
     const result = setWorkflowOutputViewerTitle(draft, action.outputId, action.title);
+    return Object.freeze({ draft: result.draft, changed: result.changed });
+  }
+
+  if (action.kind === "set-output-source-step") {
+    const result = setWorkflowOutputSourceStep(draft, action.outputId, action.sourceStepId);
     return Object.freeze({ draft: result.draft, changed: result.changed });
   }
 

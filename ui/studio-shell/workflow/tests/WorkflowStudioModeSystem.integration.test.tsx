@@ -17,6 +17,7 @@ import { WorkflowStudioModeStateStore } from "../WorkflowStudioModeStateStore";
 import { WorkflowStudioModeIds } from "../WorkflowStudioModes";
 import {
   addWorkflowStep,
+  addWorkflowStepDependency,
   buildWorkflowStepTypeDefinitionKey,
   moveWorkflowStepUp,
   removeWorkflowStep,
@@ -603,6 +604,75 @@ describe("WorkflowStudioModeSystem integration seams", () => {
 
     store.updateSharedDraft((draft) => removeWorkflowStep(draft, secondStepId).draft);
     expect(store.getState().sharedDraft.steps.map((step) => step.order)).toEqual([1, 2]);
+  });
+
+  it("applies canvas step reorder and connection edits back into shared draft for wizard mode", () => {
+    const store = new WorkflowStudioModeStateStore();
+    store.setSelectedMode(WorkflowStudioModeIds.canvas);
+
+    store.updateSharedDraft((draft) => addWorkflowStep(draft).draft);
+    store.updateSharedDraft((draft) => addWorkflowStep(draft).draft);
+    store.updateSharedDraft((draft) => addWorkflowStep(draft).draft);
+
+    const firstStepId = store.getState().sharedDraft.steps[0]?.id as string;
+    const secondStepId = store.getState().sharedDraft.steps[1]?.id as string;
+    const thirdStepId = store.getState().sharedDraft.steps[2]?.id as string;
+
+    const renderCanvasBoundary = () => WorkflowStudioDraftAuthoringBoundary({
+      isWorkflowStudio: true,
+      content: store.getState().sharedDraftSerialized,
+      onChangeContent: (nextContent) => store.hydrateFromSerializedDraft(nextContent),
+      workflowModeContext: {
+        selectedModeId: store.getState().selectedModeId,
+        selectedWizardPageId: "steps",
+        sharedDraft: store.getState().sharedDraft,
+        sharedDraftSerialized: store.getState().sharedDraftSerialized,
+        draftEditorContent: store.getState().draftEditorContent,
+        modeValidationIssues: store.getState().modeValidationIssues,
+        draftValidationIssues: store.getState().draftValidationIssues,
+        updateSharedDraft: (updater) => store.updateSharedDraft(updater),
+      },
+    });
+
+    let canvasBoundary = renderCanvasBoundary();
+    const moveThirdUp = getElementByTestId(
+      canvasBoundary,
+      `workflow-canvas-step-move-up-${thirdStepId}`,
+    ) as ReactElement<ButtonElementProps>;
+    moveThirdUp.props.onClick?.();
+
+    canvasBoundary = renderCanvasBoundary();
+    const moveThirdUpAgain = getElementByTestId(
+      canvasBoundary,
+      `workflow-canvas-step-move-up-${thirdStepId}`,
+    ) as ReactElement<ButtonElementProps>;
+    moveThirdUpAgain.props.onClick?.();
+
+    expect(store.getState().sharedDraft.steps.map((step) => step.id)).toEqual([thirdStepId, firstStepId, secondStepId]);
+    expect(store.getState().sharedDraft.steps.map((step) => step.order)).toEqual([1, 2, 3]);
+
+    store.updateSharedDraft((draft) => addWorkflowStepDependency(draft, secondStepId, firstStepId).draft);
+    expect(store.getState().sharedDraft.steps.find((step) => step.id === secondStepId)?.dependsOnStepIds).toContain(firstStepId);
+
+    store.setSelectedMode(WorkflowStudioModeIds.wizard);
+    const wizardBoundary = WorkflowStudioDraftAuthoringBoundary({
+      isWorkflowStudio: true,
+      content: store.getState().sharedDraftSerialized,
+      onChangeContent: (nextContent) => store.hydrateFromSerializedDraft(nextContent),
+      workflowModeContext: {
+        selectedModeId: store.getState().selectedModeId,
+        selectedWizardPageId: "steps",
+        sharedDraft: store.getState().sharedDraft,
+        sharedDraftSerialized: store.getState().sharedDraftSerialized,
+        draftEditorContent: store.getState().draftEditorContent,
+        modeValidationIssues: store.getState().modeValidationIssues,
+        draftValidationIssues: store.getState().draftValidationIssues,
+      },
+    });
+
+    renderToStaticMarkup(wizardBoundary);
+    expect(store.getState().sharedDraft.steps.map((step) => step.id)).toEqual([thirdStepId, firstStepId, secondStepId]);
+    expect(store.getState().sharedDraft.steps.find((step) => step.id === secondStepId)?.dependsOnStepIds).toContain(firstStepId);
   });
 
   it("renders mixed asset-backed and built-in step choices and surfaces built-in validation feedback", () => {

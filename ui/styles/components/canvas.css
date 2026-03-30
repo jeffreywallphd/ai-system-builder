@@ -563,6 +563,14 @@ body.ui-canvas-locked .ui-page--editor-canvas-locked .ui-canvas-shell {
   margin: 0 auto;
 }
 
+.ui-workflow-canvas-node__handle {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--color-text-inverse);
+  background: var(--color-accent);
+  box-shadow: 0 0 0 2px rgba(79, 156, 249, 0.2);
+}
+
 @media (max-width: 767px) {
   .ui-workflow-studio-canvas__drawer-layout {
     grid-template-columns: 1fr;
