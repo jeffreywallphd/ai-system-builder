@@ -10,6 +10,9 @@ import {
   WorkflowDraftTriggerTypes,
   WorkflowDraftTriggerKinds,
   WorkflowDraftBuiltInStepTypes,
+  WorkflowDraftOutputDestinationTypes,
+  WorkflowDraftOutputFormats,
+  WorkflowDraftOutputTypes,
   WorkflowDraftStepKinds,
   createEmptyWorkflowDraft,
   deserializeWorkflowDraft,
@@ -309,6 +312,189 @@ describe("SqliteStudioShellRepository", () => {
       stateKey: "status",
       stateValue: "ready",
     }));
+    reopenedRepository.dispose();
+  });
+
+  it("preserves workflow outputs and output ordering across save/edit/reload cycles", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-workflow-outputs-"));
+    createdRoots.push(root);
+    const databasePath = path.join(root, "workflow-outputs.sqlite");
+
+    const initialDraftContent = serializeWorkflowDraft({
+      ...createEmptyWorkflowDraft(),
+      inputs: [
+        {
+          id: "input-prompt",
+          type: "runtime-parameter",
+          sourceType: "runtime-parameter",
+          parameterKey: "prompt",
+          valueType: "string",
+        },
+      ],
+      steps: [
+        {
+          id: "step-prepare",
+          type: "action",
+          kind: WorkflowDraftStepKinds.action,
+          order: 1,
+        },
+      ],
+      outputs: [
+        {
+          id: "output-file",
+          type: "workflow-output",
+          order: 1,
+          outputType: WorkflowDraftOutputTypes.document,
+          format: WorkflowDraftOutputFormats.json,
+          sourceStepId: "step-prepare",
+          destination: {
+            type: WorkflowDraftOutputDestinationTypes.fileExport,
+            target: "file-download",
+            options: {
+              deliveryMode: "workspace-file",
+              destinationPath: "exports/result.json",
+              fileName: "Result JSON",
+            },
+          },
+        },
+        {
+          id: "output-chat",
+          type: "workflow-output",
+          order: 2,
+          outputType: WorkflowDraftOutputTypes.document,
+          format: WorkflowDraftOutputFormats.json,
+          sourceStepId: "step-prepare",
+          destination: {
+            type: WorkflowDraftOutputDestinationTypes.promptResponseChat,
+            target: "chat-session",
+            options: {
+              title: "Workflow Chat",
+              promptInputId: "input-prompt",
+              responseField: "assistant-response",
+              conversationScope: "continue-session",
+            },
+          },
+        },
+      ],
+    });
+
+    let draftId = "";
+    {
+      const repository = new SqliteStudioShellRepository(databasePath);
+      const service = new DefaultStudioShellApplicationService(repository, () => "generated");
+      await service.initializeStudio({ studioId: "studio-workflows", name: "Workflow Studio" });
+      const created = await service.createAssetDraft({
+        studioId: "studio-workflows",
+        sessionId: "generated",
+        content: initialDraftContent,
+        metadata: {
+          title: "Workflow outputs draft",
+          taxonomy: {
+            structuralKind: "composite",
+            semanticRole: "workflow",
+            behaviorKind: "deterministic",
+          },
+        },
+      });
+      draftId = created.draft.id;
+
+      const editedDraftContent = serializeWorkflowDraft({
+        ...deserializeWorkflowDraft(created.draft.content),
+        outputs: [
+          {
+            id: "output-chat",
+            type: "workflow-output",
+            order: 1,
+            outputType: WorkflowDraftOutputTypes.document,
+            format: WorkflowDraftOutputFormats.json,
+            sourceStepId: "step-prepare",
+            destination: {
+              type: WorkflowDraftOutputDestinationTypes.promptResponseChat,
+              target: "chat-session",
+              options: {
+                title: "Workflow Chat v2",
+                promptInputId: "input-prompt",
+                responseField: "assistant-response",
+                conversationScope: "new-session",
+              },
+            },
+          },
+          {
+            id: "output-system",
+            type: "workflow-output",
+            order: 2,
+            outputType: WorkflowDraftOutputTypes.record,
+            format: WorkflowDraftOutputFormats.json,
+            sourceStepId: "step-prepare",
+            destination: {
+              type: WorkflowDraftOutputDestinationTypes.systemEntry,
+              target: "system-record",
+              options: {
+                entityName: "customer.record",
+                recordCollection: "records/customers",
+                writeMode: "upsert",
+                recordShape: "single-record",
+                includeExecutionMetadata: "true",
+              },
+            },
+          },
+          {
+            id: "output-file",
+            type: "workflow-output",
+            order: 3,
+            outputType: WorkflowDraftOutputTypes.document,
+            format: WorkflowDraftOutputFormats.markdown,
+            sourceStepId: "step-prepare",
+            destination: {
+              type: WorkflowDraftOutputDestinationTypes.webViewer,
+              target: "in-app-view",
+              options: {
+                title: "Workflow Preview",
+                presentationMode: "embedded",
+              },
+            },
+          },
+        ],
+      });
+
+      await service.updateAssetDraft({
+        studioId: "studio-workflows",
+        sessionId: "generated",
+        draftId,
+        content: editedDraftContent,
+      });
+      repository.dispose();
+    }
+
+    const reopenedRepository = new SqliteStudioShellRepository(databasePath);
+    const reopened = await reopenedRepository.getDraft(draftId);
+    const canonical = deserializeWorkflowDraft(reopened?.content ?? "{}");
+    expect(canonical.outputs.map((output) => output.id)).toEqual(["output-chat", "output-system", "output-file"]);
+    expect(canonical.outputs.map((output) => output.order)).toEqual([1, 2, 3]);
+    expect(canonical.outputs[0]).toMatchObject({
+      destination: {
+        type: WorkflowDraftOutputDestinationTypes.promptResponseChat,
+        options: {
+          title: "Workflow Chat v2",
+          conversationScope: "new-session",
+        },
+      },
+    });
+    expect(canonical.outputs[1]).toMatchObject({
+      outputType: WorkflowDraftOutputTypes.record,
+      destination: {
+        type: WorkflowDraftOutputDestinationTypes.systemEntry,
+        options: {
+          entityName: "customer.record",
+        },
+      },
+    });
+    expect(canonical.outputs[2]).toMatchObject({
+      format: WorkflowDraftOutputFormats.markdown,
+      destination: {
+        type: WorkflowDraftOutputDestinationTypes.webViewer,
+      },
+    });
     reopenedRepository.dispose();
   });
 });
