@@ -28,8 +28,16 @@ describe("StudioShellPage contracts", () => {
     expect(source).toContain("toolbarActionsToRender");
     expect(source).toContain("workflowModeToggleAction");
     expect(source).toContain("shouldShowLeftDrawerToggle");
+    expect(source).toContain("useBlocker");
+    expect(source).toContain("useBeforeUnload");
+    expect(source).toContain("hasWorkflowUnsavedChanges");
+    expect(source).toContain("saveDraftFromAuthoringAsync");
+    expect(source).toContain("workflowUnsavedNavigationBlocker");
+    expect(source).toContain("getWorkflowStudioUnsavedPrompt");
     expect(source).toContain('label: workflowModeState.selectedModeId === "canvas" ? "Wizard" : "Canvas"');
     expect(source).toContain('data-testid="studio-shell-authoring-toolbar"');
+    expect(source).toContain('data-testid="studio-shell-workflow-draft-status"');
+    expect(source).toContain('data-testid="studio-shell-workflow-draft-status-badge"');
     expect(source).toContain('data-testid="studio-shell-left-drawer-toggle"');
     expect(source).toContain('data-testid="studio-shell-right-drawer-toggle"');
     expect(source).toContain("runToolbarAction(");
