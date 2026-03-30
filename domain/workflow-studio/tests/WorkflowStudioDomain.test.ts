@@ -544,17 +544,32 @@ describe("WorkflowStudioDomain", () => {
     });
 
     expect(normalizeWorkflowDraftTriggerConfig(WorkflowDraftTriggerTypes.stateAssetStateChanged, {
+      sourceType: "asset",
+      eventCategory: "asset-updated",
+      subject: "dataset",
       asset: {
         assetId: "asset:dataset-1",
       },
       stateKey: "status",
       stateValue: "ready",
+      criteria: {
+        tenant: "alpha",
+      },
     })).toMatchObject({
+      sourceType: "asset",
+      eventCategory: "asset-updated",
+      subject: "dataset",
       asset: {
         assetId: "asset:dataset-1",
       },
       stateKey: "status",
       stateValue: "ready",
+      criteria: {
+        tenant: "alpha",
+      },
+      filter: {
+        tenant: "alpha",
+      },
     });
 
     expect(() => normalizeWorkflowDraftTriggerConfig(WorkflowDraftTriggerTypes.userButtonClick, {})).toThrow("config.buttonId");
@@ -580,6 +595,48 @@ describe("WorkflowStudioDomain", () => {
       endAt: "2026-04-01T00:00:00.000Z",
     })).toThrow("config.startAt");
     expect(() => normalizeWorkflowDraftTriggerConfig(WorkflowDraftTriggerTypes.stateSystemEvent, {})).toThrow("config.eventName");
+    expect(() => normalizeWorkflowDraftTriggerConfig(WorkflowDraftTriggerTypes.stateDataAvailable, {}))
+      .toThrow("config.eventName, config.subject, or config.stateKey");
+    expect(() => normalizeWorkflowDraftTriggerConfig(WorkflowDraftTriggerTypes.stateAssetStateChanged, {
+      sourceType: "asset",
+      stateKey: "status",
+    })).toThrow("config.asset");
+  });
+
+  it("runs workflow-level trigger validation for duplicate definitions and continuation references", () => {
+    const result = validateWorkflowDraft({
+      triggers: [
+        {
+          id: "trigger-1",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        },
+        {
+          id: "trigger-1",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        },
+        {
+          id: "trigger-continuation",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {
+            invocationScope: WorkflowDraftUserTriggerScopes.workflowContinuation,
+            continuationStepId: "step-missing",
+          },
+        },
+      ],
+      inputs: [],
+      steps: [{ id: "step-existing", type: "action", kind: WorkflowDraftStepKinds.action, order: 1 }],
+      outputs: [],
+    });
+
+    expect(result.valid).toBeFalse();
+    expect(result.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.triggerDuplicateId)).toBeTrue();
+    expect(result.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.triggerDuplicateDefinition)).toBeTrue();
+    expect(result.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.triggerContinuationStepMissing)).toBeTrue();
   });
 
   it("accepts one or more canonical workflow inputs with dataset-backed asset references", () => {

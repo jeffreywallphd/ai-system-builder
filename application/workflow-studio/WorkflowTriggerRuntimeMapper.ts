@@ -44,11 +44,15 @@ export interface WorkflowRuntimeTemporalTriggerDescriptor extends WorkflowRuntim
 
 export interface WorkflowRuntimeStateTriggerDescriptor extends WorkflowRuntimeTriggerDescriptorBase {
   readonly runtimeKind: "state";
+  readonly sourceType?: WorkflowDraftStateTriggerConfig["sourceType"];
+  readonly eventCategory?: WorkflowDraftStateTriggerConfig["eventCategory"];
+  readonly subject?: WorkflowDraftStateTriggerConfig["subject"];
   readonly eventName?: string;
   readonly stateKey?: string;
   readonly stateValue?: string;
   readonly assetId?: string;
   readonly assetVersionId?: string;
+  readonly criteria?: Readonly<Record<string, unknown>>;
   readonly filter?: Readonly<Record<string, unknown>>;
 }
 
@@ -130,11 +134,15 @@ function mapStateTriggerConfig(
     description: trigger.description,
     triggerKind: trigger.kind,
     triggerType: trigger.type,
+    sourceType: config.sourceType,
+    eventCategory: config.eventCategory,
+    subject: config.subject,
     eventName: config.eventName,
     stateKey: config.stateKey,
     stateValue: config.stateValue,
     assetId: config.asset?.assetId,
     assetVersionId: config.asset?.versionId,
+    criteria: config.criteria ?? config.filter,
     filter: config.filter,
   });
 }
