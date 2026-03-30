@@ -96,6 +96,45 @@ export default function WorkflowStudioWizardModeSurface({
     setReadyActionConfirmed(true);
   };
 
+  const renderPageNavigationActions = ({
+    backTestId,
+    nextTestId,
+    className,
+  }: {
+    readonly backTestId: string;
+    readonly nextTestId: string;
+    readonly className?: string;
+  }): JSX.Element => (
+    <div className={`ui-workflow-wizard__navigation-actions ${className ?? ""}`.trim()}>
+      <button
+        type="button"
+        className="ui-button ui-button--primary ui-button--sm"
+        data-testid={backTestId}
+        disabled={!previousPageId}
+        onClick={() => {
+          if (previousPageId) {
+            selectPage(previousPageId);
+          }
+        }}
+      >
+        Back
+      </button>
+      <button
+        type="button"
+        className="ui-button ui-button--primary ui-button--sm"
+        data-testid={nextTestId}
+        disabled={!nextPageId}
+        onClick={() => {
+          if (nextPageId) {
+            selectPage(nextPageId);
+          }
+        }}
+      >
+        Next
+      </button>
+    </div>
+  );
+
   return (
     <div className="ui-stack ui-stack--sm" data-testid="workflow-studio-wizard-mode-surface">
       <WorkflowStudioHandoffStatusBanner
@@ -104,29 +143,46 @@ export default function WorkflowStudioWizardModeSurface({
       />
 
       <section className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="workflow-wizard-pages-card">
-        <nav className="ui-stack ui-stack--2xs" aria-label="Workflow wizard pages">
-          <div className="ui-workflow-wizard__page-buttons">
-            {progress.sections.map((section) => (
-              <button
-                key={section.id}
-                type="button"
-                className={`ui-button ui-button--sm ${section.id === activePageId ? "ui-button--primary" : "ui-button--ghost"}`}
-                data-testid={`workflow-wizard-page-button-${section.id}`}
-                aria-current={section.id === activePageId ? "page" : undefined}
-                onClick={() => selectPage(section.id)}
-              >
-                {section.title}
-              </button>
-            ))}
+        <nav className="ui-workflow-wizard__page-nav" aria-label="Workflow wizard pages">
+          <div className="ui-workflow-wizard__page-nav-main">
+            <div className="ui-workflow-wizard__page-buttons">
+              {progress.sections.map((section) => (
+                <button
+                  key={section.id}
+                  type="button"
+                  className={`ui-button ui-button--sm ${section.id === activePageId ? "ui-button--primary" : "ui-button--ghost"}`}
+                  data-testid={`workflow-wizard-page-button-${section.id}`}
+                  aria-current={section.id === activePageId ? "page" : undefined}
+                  onClick={() => selectPage(section.id)}
+                >
+                  {section.title}
+                </button>
+              ))}
+            </div>
+            <p className="ui-text-muted ui-workflow-wizard__page-progress" data-testid="workflow-wizard-page-progress">
+              Current focus: <strong>{activeSection?.title ?? "Trigger"}</strong>. Progress: {progress.readySectionCount}/{progress.sections.length} sections ready.
+            </p>
           </div>
+          {renderPageNavigationActions({
+            backTestId: "workflow-wizard-back-page",
+            nextTestId: "workflow-wizard-next-page",
+            className: "ui-workflow-wizard__navigation-actions--rail",
+          })}
         </nav>
         <div data-testid={`workflow-wizard-page-${activePageId}`}>
           {activePageId === WorkflowWizardSectionIds.trigger ? (
-            <WorkflowStudioTriggerSectionEditor
-              sharedDraft={sharedDraft}
-              draftValidationIssues={draftValidationIssues}
-              onUpdateSharedDraft={onUpdateSharedDraft}
-            />
+            <div className="ui-stack ui-stack--2xs">
+              <WorkflowStudioTriggerSectionEditor
+                sharedDraft={sharedDraft}
+                draftValidationIssues={draftValidationIssues}
+                onUpdateSharedDraft={onUpdateSharedDraft}
+              />
+              {renderPageNavigationActions({
+                backTestId: "workflow-wizard-back-page-trigger",
+                nextTestId: "workflow-wizard-next-page-trigger",
+                className: "ui-workflow-wizard__navigation-actions--inline",
+              })}
+            </div>
           ) : null}
 
           {activePageId === WorkflowWizardSectionIds.inputs ? (
@@ -159,40 +215,6 @@ export default function WorkflowStudioWizardModeSurface({
         </div>
       </section>
 
-      <div className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="workflow-wizard-progression-controls">
-        <div className="ui-workflow-wizard__navigation-actions">
-          <button
-            type="button"
-            className="ui-button ui-button--primary ui-button--sm"
-            data-testid="workflow-wizard-back-page"
-            disabled={!previousPageId}
-            onClick={() => {
-              if (previousPageId) {
-                selectPage(previousPageId);
-              }
-            }}
-          >
-            Back
-          </button>
-          <button
-            type="button"
-            className="ui-button ui-button--primary ui-button--sm"
-            data-testid="workflow-wizard-next-page"
-            disabled={!nextPageId}
-            onClick={() => {
-              if (nextPageId) {
-                selectPage(nextPageId);
-              }
-            }}
-          >
-            Next
-          </button>
-        </div>
-        <p className="ui-text-muted">
-          Current focus: <strong>{activeSection?.title ?? "Trigger"}</strong>. Progress: {progress.readySectionCount}/{progress.sections.length} sections ready.
-        </p>
-      </div>
-
       {activePageId === WorkflowWizardSectionIds.outputs ? (
         <>
           <section
@@ -203,7 +225,7 @@ export default function WorkflowStudioWizardModeSurface({
             <strong>Prepare for run handoff</strong>
             {progress.isWorkflowReady ? (
               <p className="ui-text-muted">
-                Ready for next-stage handoff. Save the draft and continue to lifecycle/publish controls.
+                Ready for next-stage handoff. Save and continue to lifecycle/publish controls.
               </p>
             ) : (
               <p className="ui-text-muted">

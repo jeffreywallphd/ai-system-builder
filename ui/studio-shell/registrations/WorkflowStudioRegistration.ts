@@ -8,7 +8,6 @@ import {
 import WorkflowStudioModePanel from "../../components/studio-shell/workflow/WorkflowStudioModePanel";
 import type { CompositeStudioRegistration } from "../StudioShellExtensions";
 import { createCompositeStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
-import { DEFAULT_WORKFLOW_STUDIO_MODE_ID } from "../workflow/WorkflowStudioModes";
 
 export const workflowStudioRegistration: CompositeStudioRegistration = Object.freeze({
   studioType: WorkflowStudioIdentity.studioType,
@@ -51,7 +50,7 @@ export const workflowStudioRegistration: CompositeStudioRegistration = Object.fr
         {
           id: "workflow-studio-toolbar-save",
           kind: "save-draft",
-          label: "Save Draft",
+          label: "Save",
           tone: "primary",
           order: 30,
         },
@@ -95,20 +94,6 @@ export const workflowStudioRegistration: CompositeStudioRegistration = Object.fr
       render: ({ workflowModeState }) => (workflowModeState
         ? createElement(WorkflowStudioModePanel, { workflowModeState })
         : "Workflow mode state is unavailable for this studio session."),
-    },
-    {
-      id: "workflow-studio-draft-guidance",
-      slot: "draft-authoring",
-      title: "Workflow draft guidance",
-      subtitle: "Author orchestrator structure as a composite asset while keeping execution behavior in taxonomy metadata.",
-      order: 10,
-      render: ({ snapshot, workflowModeState }) => Object.freeze([
-        "Workflow assets are specialized composite orchestrators: structure/version in assets, execution patterns in behavior metadata.",
-        "Canonical draft sections: triggers, inputs, steps, outputs.",
-        "Allowed behavior kinds: deterministic, conditional, iterative.",
-        `Selected mode: ${workflowModeState?.state.selectedModeId ?? DEFAULT_WORKFLOW_STUDIO_MODE_ID}`,
-        `Draft asset id: ${snapshot?.draft?.assetId ?? "-"}`,
-      ]),
     },
     {
       id: "workflow-studio-metadata-summary",

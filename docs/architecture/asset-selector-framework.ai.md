@@ -263,7 +263,7 @@ Future selector-backed type adoption checklist:
 ## Story 4.14: workflow wizard focus/layout hardening
 - Wizard mode now prioritizes page authoring flow by rendering the active wizard page directly under page buttons in the primary wizard card (`WorkflowStudioWizardModeSurface`).
 - Per-section readiness label rows were removed from the default surface to reduce redundant readiness copy in the main authoring path.
-- Guided progression controls remain available directly below the pages card with prominent primary Back/Next actions and increased button spacing to reduce accidental navigation clicks.
+- Wizard focus/progress details now render directly under the page buttons, while primary Back/Next actions sit on the page-nav rail and are also duplicated inline under the Trigger page content.
 - Workflow readiness details remain available but moved to the bottom of the wizard stack as a collapsed disclosure (`details/summary`) so readiness diagnostics are opt-in instead of always expanded.
 - These UX changes are renderer-only and preserve existing selector/session/capability integration seams for workflow inputs and steps.
 
