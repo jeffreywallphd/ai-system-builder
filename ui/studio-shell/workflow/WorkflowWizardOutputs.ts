@@ -60,8 +60,6 @@ export const workflowOutputTypeRegistry = createDefaultWorkflowOutputTypeRegistr
 export const workflowOutputTypeDefinitions: ReadonlyArray<WorkflowOutputTypeRegistryEntry> =
   workflowOutputTypeRegistry.list();
 
-const defaultOutputTypeDefinition = workflowOutputTypeDefinitions[0] as WorkflowOutputTypeRegistryEntry;
-
 export const workflowOutputDestinationDefinitions = workflowOutputTypeDefinitions;
 export const workflowFileOutputFormats = Object.freeze([
   ...(workflowOutputTypeRegistry.get(WorkflowDraftOutputDestinationTypes.fileExport)?.supportedFormats ?? []),
@@ -208,8 +206,34 @@ function setWorkflowOutputConfigurationValue(
 export function getWorkflowOutputDestinationDefinitionByType(
   destinationType: string,
 ): WorkflowOutputTypeRegistryEntry {
-  return getDestinationDefinition(destinationType)
-    ?? defaultOutputTypeDefinition;
+  const resolved = getDestinationDefinition(destinationType);
+  if (resolved) {
+    return resolved;
+  }
+
+  return Object.freeze({
+    destinationType: destinationType as WorkflowOutputTypeRegistryEntry["destinationType"],
+    outputType: "document",
+    label: `Unknown output (${destinationType})`,
+    description: "Persisted workflow output type is not currently registered.",
+    configSchemaId: "workflow.output.destination.unknown.v1",
+    supportedFormats: Object.freeze([]),
+    defaultFormat: "json",
+    defaultTarget: "unknown",
+    defaultConfiguration: undefined,
+    capabilities: Object.freeze({
+      supportsAssetDelivery: false,
+      supportsInteractiveViewer: false,
+      supportsSystemRecordPersistence: false,
+      supportsExecutionReview: false,
+      supportsConversationalOutput: false,
+    }),
+    conversational: undefined,
+    multiplicity: Object.freeze({
+      policy: "allow-multiple",
+    }),
+    configurationFields: Object.freeze([]),
+  });
 }
 
 export function addWorkflowOutput(

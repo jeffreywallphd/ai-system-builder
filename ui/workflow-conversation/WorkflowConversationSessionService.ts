@@ -61,7 +61,7 @@ export interface WorkflowConversationCreateFromExecutionInput {
   readonly workflow: IWorkflow;
   readonly request?: Omit<IExecuteWorkflowRequest, "workflow">;
   readonly result: IExecuteWorkflowResult;
-  readonly nodeOutputs?: Readonly<Record<string, Readonly<Record<string, unknown>>>;
+  readonly nodeOutputs?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 }
 
 export interface WorkflowConversationContinueRequest {
@@ -408,14 +408,23 @@ export class WorkflowConversationSessionService {
       return Object.freeze([]);
     }
 
-    return Object.freeze(payload.sessions.map((session) => Object.freeze({
-      ...session,
-      messages: Object.freeze([...(session.messages ?? [])]),
-      metadata: Object.freeze({
-        ...session.metadata,
-        executionIds: Object.freeze([...(session.metadata?.executionIds ?? [])]),
-      }),
-    })));
+    const sessions: WorkflowConversationSession[] = [];
+    for (const rawSession of payload.sessions) {
+      if (!isWorkflowConversationSession(rawSession)) {
+        continue;
+      }
+
+      sessions.push(Object.freeze({
+        ...rawSession,
+        messages: Object.freeze([...(rawSession.messages ?? [])]),
+        metadata: Object.freeze({
+          ...rawSession.metadata,
+          executionIds: Object.freeze([...(rawSession.metadata.executionIds ?? [])]),
+        }),
+      }));
+    }
+
+    return Object.freeze(sessions);
   }
 
   private persistSession(session: WorkflowConversationSession): WorkflowConversationSession {
@@ -441,6 +450,51 @@ function extractNodeOutputs(event: IWorkflowExecutionEvent): Readonly<Record<str
   }
 
   return event.payload.nodeOutputs as Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+}
+
+function isWorkflowConversationMessage(value: unknown): value is WorkflowConversationMessage {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const record = value as Record<string, unknown>;
+  return typeof record.id === "string"
+    && typeof record.role === "string"
+    && typeof record.content === "string"
+    && typeof record.timestamp === "string";
+}
+
+function isWorkflowConversationSession(value: unknown): value is WorkflowConversationSession {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const record = value as Record<string, unknown>;
+  if (typeof record.id !== "string" || typeof record.createdAt !== "string" || typeof record.updatedAt !== "string") {
+    return false;
+  }
+  if (!Array.isArray(record.messages) || !record.messages.every((message) => isWorkflowConversationMessage(message))) {
+    return false;
+  }
+
+  const metadata = record.metadata;
+  if (!metadata || typeof metadata !== "object") {
+    return false;
+  }
+
+  const metadataRecord = metadata as Record<string, unknown>;
+  if (
+    typeof metadataRecord.workflowId !== "string"
+    || typeof metadataRecord.workflowName !== "string"
+    || typeof metadataRecord.title !== "string"
+  ) {
+    return false;
+  }
+  if (!Array.isArray(metadataRecord.executionIds) || !metadataRecord.executionIds.every((entry) => typeof entry === "string")) {
+    return false;
+  }
+
+  return true;
 }
 
 function normalizeOptionalContent(value: unknown): string | undefined {

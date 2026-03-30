@@ -364,6 +364,45 @@ describe("WorkflowStudioModeStateStore", () => {
     });
   });
 
+  it("falls back safely when persisted draft contains malformed output payload", () => {
+    const storage = createMemoryStorage();
+    const key = "workflow-store-malformed-output";
+    const malformedDraft = JSON.stringify({
+      triggers: [],
+      inputs: [],
+      steps: [],
+      outputs: [
+        {
+          id: "out-1",
+          type: "workflow-output",
+          outputType: "document",
+          format: "json",
+          destination: {
+            type: "web-viewer",
+            target: "preview",
+            options: "invalid-options-record",
+          },
+        },
+      ],
+    });
+
+    storage.setItem(key, JSON.stringify({
+      schemaVersion: "ai-loom.workflow-studio.mode-state.v1",
+      selectedModeId: WorkflowStudioModeIds.wizard,
+      sharedDraftSerialized: malformedDraft,
+      draftEditorContent: malformedDraft,
+      hasLocalDraftEdits: false,
+    }));
+
+    const restored = new WorkflowStudioModeStateStore({
+      storage,
+      storageKey: key,
+    });
+
+    expect(restored.getState().draftParseError).toBe("Workflow draft is malformed.");
+    expect(restored.getState().sharedDraft.outputs).toEqual([]);
+  });
+
   it("runs shared draft validation hooks and keeps results consistent across mode switches", () => {
     const store = new WorkflowStudioModeStateStore();
     const invalidDraft = deserializeWorkflowDraft(serializeWorkflowDraft({

@@ -25,6 +25,24 @@ class InMemoryConversationStorage implements WorkflowConversationSessionStorage 
   }
 }
 
+class MalformedConversationStorage implements WorkflowConversationSessionStorage {
+  load() {
+    return {
+      schemaVersion: "workflow-conversation.v1",
+      sessions: [
+        {
+          id: "malformed-session",
+          metadata: {
+            workflowId: "wf-chat",
+          },
+        },
+      ],
+    } as any;
+  }
+
+  save(): void {}
+}
+
 function createWorkflow(): any {
   return {
     id: "wf-chat",
@@ -147,5 +165,19 @@ describe("WorkflowConversationSessionService", () => {
 
     expect(continued.session.messages.some((message) => message.role === "user" && message.content.includes("implementation steps"))).toBeTrue();
     expect(continued.session.messages.some((message) => message.role === "assistant" && message.content.includes("Follow-up answer"))).toBeTrue();
+  });
+
+  it("ignores malformed persisted session payloads safely", () => {
+    const workflow = createWorkflow();
+    const service = new WorkflowConversationSessionService({
+      workflowService: {
+        loadWorkflow: async () => workflow,
+        executeWorkflow: async () => ({ effectiveWorkflow: workflow, result: { executionId: "exec", status: "completed", outputAssets: [] } }),
+      } as any,
+      storage: new MalformedConversationStorage(),
+    });
+
+    expect(service.listByWorkflowId("wf-chat")).toEqual([]);
+    expect(service.getById("malformed-session")).toBeUndefined();
   });
 });
