@@ -23,6 +23,8 @@ describe("WorkflowStudioModePanel", () => {
     expect(html).toContain("Shared draft valid");
     expect(html).toContain("Mode validation issues");
     expect(html).toContain("Draft validation issues");
+    expect(html).toContain('data-testid="workflow-studio-mode-output-overview"');
+    expect(html).toContain("Configured outputs");
     expect(html).toContain('aria-pressed="true"');
   });
 });

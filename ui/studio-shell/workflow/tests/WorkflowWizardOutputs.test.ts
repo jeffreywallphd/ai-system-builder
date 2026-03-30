@@ -12,6 +12,7 @@ import {
   moveWorkflowOutputUp,
   removeWorkflowOutput,
   resolveWorkflowOutputSelectionId,
+  listWorkflowOutputSummaries,
   setWorkflowOutputFieldValue,
   setWorkflowOutputDestinationType,
   setWorkflowOutputFileName,
@@ -127,7 +128,10 @@ describe("WorkflowWizardOutputs", () => {
     expect(switched.outputs[0]?.destination.type).toBe(WorkflowDraftOutputDestinationTypes.systemEntry);
     expect(switched.outputs[0]?.destination.options).toEqual(expect.objectContaining({
       entityName: "",
-      destinationConfig: "",
+      recordCollection: "",
+      writeMode: "upsert",
+      recordShape: "single-record",
+      includeExecutionMetadata: "true",
     }));
     expect(switched.outputs[0]?.destination.options).not.toEqual(expect.objectContaining({
       fileName: "report-name",
@@ -196,11 +200,14 @@ describe("WorkflowWizardOutputs", () => {
     expect(getWorkflowOutputValidationMessages(systemOutput)).toContain(
       "Database/System Record output requires an entity name.",
     );
+    expect(getWorkflowOutputValidationMessages(systemOutput)).not.toContain(
+      "Database/System Record output requires a valid write mode.",
+    );
 
     const configuredSystem = setWorkflowOutputRecordEntityName(
       { ...createEmptyWorkflowDraft(), outputs: [systemOutput] },
       systemOutput.id,
-      "customer-record",
+      "customer.record",
     ).draft.outputs[0]!;
     expect(getWorkflowOutputValidationMessages(configuredSystem)).toEqual([]);
 
@@ -270,5 +277,35 @@ describe("WorkflowWizardOutputs", () => {
     expect(draft.outputs[2]?.destination.options).toEqual(expect.objectContaining({
       promptInputId: "input-user-prompt",
     }));
+  });
+
+  it("builds output summaries from canonical draft state and reflects add/edit/remove/reorder changes", () => {
+    const added = addWorkflowOutputs(createEmptyWorkflowDraft(), [
+      WorkflowDraftOutputDestinationTypes.fileExport,
+      WorkflowDraftOutputDestinationTypes.webViewer,
+      WorkflowDraftOutputDestinationTypes.systemEntry,
+    ]).draft;
+
+    const webViewerId = added.outputs[1]?.id as string;
+    const systemId = added.outputs[2]?.id as string;
+    let next = setWorkflowOutputViewerTitle(added, webViewerId, "Results Panel").draft;
+    next = setWorkflowOutputRecordEntityName(next, systemId, "customer.record").draft;
+
+    const beforeReorder = listWorkflowOutputSummaries(next);
+    expect(beforeReorder).toHaveLength(3);
+    expect(beforeReorder[1]?.displayLabel).toBe("Results Panel");
+    expect(beforeReorder[1]?.typeLabel).toBe("Web viewer");
+    expect(beforeReorder[2]?.typeLabel).toBe("System record");
+    expect(beforeReorder[2]?.detailLines.join(" ")).toContain("Record entity: customer.record");
+
+    const reordered = moveWorkflowOutputUp(next, systemId).draft;
+    const reorderedSummaries = listWorkflowOutputSummaries(reordered);
+    expect(reorderedSummaries.map((entry) => entry.order)).toEqual([1, 2, 3]);
+    expect(reorderedSummaries[1]?.typeLabel).toBe("System record");
+
+    const removed = removeWorkflowOutput(reordered, webViewerId).draft;
+    const removedSummaries = listWorkflowOutputSummaries(removed);
+    expect(removedSummaries).toHaveLength(2);
+    expect(removedSummaries.some((entry) => entry.displayLabel === "Results Panel")).toBeFalse();
   });
 });

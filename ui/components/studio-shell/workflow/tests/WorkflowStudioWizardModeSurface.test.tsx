@@ -29,6 +29,8 @@ describe("WorkflowStudioWizardModeSurface", () => {
     expect(html).toContain("Workflow draft is not ready yet.");
     expect(html).toContain("Trigger needs at least 1 item.");
     expect(html).not.toContain("Trigger: Needs input");
+    expect(html).toContain("Output review");
+    expect(html).toContain("No outputs configured yet.");
     expect(html).not.toContain("Prepare for Run");
   });
 
@@ -89,6 +91,9 @@ describe("WorkflowStudioWizardModeSurface", () => {
     expect(html).toContain("Workflow draft is ready for handoff.");
     expect(html).toContain("No blocking issues detected.");
     expect(html).toContain("Ready for next-stage handoff.");
+    expect(html).toContain("Configured outputs");
+    expect(html).toContain("Output review");
+    expect(html).toContain("Viewer title: Viewer");
     expect(html).toContain("Prepare for Run");
   });
 

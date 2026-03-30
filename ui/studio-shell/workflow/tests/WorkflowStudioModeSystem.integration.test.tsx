@@ -640,9 +640,13 @@ describe("WorkflowStudioModeSystem integration seams", () => {
     selectSystemOutput.props.onClick?.();
     boundary = renderBoundary();
     const systemEntity = getElementByTestId(boundary, "workflow-output-system-entity-2") as ReactElement<InputElementProps>;
-    systemEntity.props.onChange?.({ target: { value: "customer-record" } });
-    const systemConfig = getElementByTestId(boundary, "workflow-output-system-config-value-2") as ReactElement<InputElementProps>;
-    systemConfig.props.onChange?.({ target: { value: "connection:warehouse" } });
+    systemEntity.props.onChange?.({ target: { value: "customer.record" } });
+    const systemCollection = getElementByTestId(boundary, "workflow-output-system-record-collection-2") as ReactElement<InputElementProps>;
+    systemCollection.props.onChange?.({ target: { value: "records/customers" } });
+    const systemWriteMode = getElementByTestId(boundary, "workflow-output-system-write-mode-2") as ReactElement<SelectElementProps>;
+    systemWriteMode.props.onChange?.({ target: { value: "append" } });
+    const systemRecordShape = getElementByTestId(boundary, "workflow-output-system-record-shape-2") as ReactElement<SelectElementProps>;
+    systemRecordShape.props.onChange?.({ target: { value: "record-collection" } });
     expect(store.getState().isSharedDraftValid).toBe(false);
 
     boundary = renderBoundary();
@@ -680,7 +684,9 @@ describe("WorkflowStudioModeSystem integration seams", () => {
     expect(store.getState().sharedDraft.outputs[0]?.destination.type).toBe(WorkflowDraftOutputDestinationTypes.systemEntry);
     expect(store.getState().sharedDraft.outputs[0]?.destination.options).toEqual(expect.objectContaining({
       entityName: "",
-      destinationConfig: "",
+      recordCollection: "",
+      writeMode: "upsert",
+      recordShape: "single-record",
     }));
     expect(store.getState().isSharedDraftValid).toBe(false);
 
@@ -750,6 +756,10 @@ describe("WorkflowStudioModeSystem integration seams", () => {
     expect(markup).toContain('data-testid="workflow-wizard-next-page"');
     expect(markup).toContain('aria-current="page"');
     expect(markup).toContain('data-testid="workflow-wizard-terminal-actions"');
+    expect(markup).toContain('data-testid="workflow-wizard-output-overview"');
+    expect(markup).toContain('data-testid="workflow-wizard-readiness-output-summary"');
+    expect(markup).toContain("Result viewer");
+    expect(markup).toContain("Web viewer");
     expect(markup).toContain("Ready for next-stage handoff. Save the draft and continue to lifecycle/publish controls.");
     expect(markup).toContain("Prepare for Run");
   });

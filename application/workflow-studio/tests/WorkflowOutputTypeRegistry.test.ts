@@ -56,6 +56,17 @@ describe("WorkflowOutputTypeRegistry", () => {
         }),
       }),
     );
+    expect(registry.get(WorkflowDraftOutputDestinationTypes.systemEntry)).toEqual(
+      expect.objectContaining({
+        label: "System record",
+        configurationFields: expect.arrayContaining([
+          expect.objectContaining({ key: "entityName", required: true }),
+          expect.objectContaining({ key: "recordCollection", required: false }),
+          expect.objectContaining({ key: "writeMode", required: true }),
+          expect.objectContaining({ key: "recordShape", required: true }),
+        ]),
+      }),
+    );
   });
 
   it("evaluates add constraints and rejects unsupported add requests", () => {

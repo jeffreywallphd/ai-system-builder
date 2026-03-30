@@ -35,6 +35,8 @@ import {
   WorkflowDraftOutputDestinationTypes,
   WorkflowDraftOutputFormats,
   WorkflowDraftOutputTypes,
+  WorkflowDraftSystemOutputRecordShapes,
+  WorkflowDraftSystemOutputWriteModes,
   WorkflowDraftStepAssetKinds,
   WorkflowDraftStepKinds,
   WorkflowDraftStepTypes,
@@ -168,9 +170,12 @@ describe("WorkflowStudioDomain", () => {
         format: WorkflowDraftOutputFormats.json,
         destination: {
           type: WorkflowDraftOutputDestinationTypes.systemEntry,
-          target: "crm/customers",
+          target: "system-record",
           options: {
-            entityName: "customer-record",
+            entityName: "customer.record",
+            recordCollection: "crm/customers",
+            writeMode: WorkflowDraftSystemOutputWriteModes.upsert,
+            recordShape: WorkflowDraftSystemOutputRecordShapes.singleRecord,
           },
         },
       }],
@@ -331,9 +336,12 @@ describe("WorkflowStudioDomain", () => {
           sourceStepId: "step-agent",
           destination: {
             type: WorkflowDraftOutputDestinationTypes.systemEntry,
-            target: "records/outbound",
+            target: "system-record",
             options: {
-              entityName: "outbound-record",
+              entityName: "outbound.record",
+              recordCollection: "records/outbound",
+              writeMode: WorkflowDraftSystemOutputWriteModes.upsert,
+              recordShape: WorkflowDraftSystemOutputRecordShapes.singleRecord,
             },
           },
         }],
@@ -1384,9 +1392,12 @@ describe("WorkflowStudioDomain", () => {
           format: WorkflowDraftOutputFormats.json,
           destination: {
             type: WorkflowDraftOutputDestinationTypes.systemEntry,
-            target: "warehouse/reports",
+            target: "system-record",
             options: {
-              entityName: "report-record",
+              entityName: "report.record",
+              recordCollection: "warehouse/reports",
+              writeMode: WorkflowDraftSystemOutputWriteModes.upsert,
+              recordShape: WorkflowDraftSystemOutputRecordShapes.singleRecord,
             },
           },
         },
@@ -1514,12 +1525,63 @@ describe("WorkflowStudioDomain", () => {
         format: WorkflowDraftOutputFormats.json,
         destination: {
           type: WorkflowDraftOutputDestinationTypes.systemEntry,
-          target: "records/customers",
+          target: "system-record",
         },
       }],
     });
     expect(systemEntryMissingEntity.valid).toBeFalse();
     expect(systemEntryMissingEntity.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.outputSystemEntityMissing)).toBeTrue();
+
+    const systemEntryInvalidConfiguration = validateWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [],
+      outputs: [{
+        id: "output-system-entry-invalid",
+        type: "workflow-output",
+        outputType: WorkflowDraftOutputTypes.record,
+        format: WorkflowDraftOutputFormats.jsonl,
+        destination: {
+          type: WorkflowDraftOutputDestinationTypes.systemEntry,
+          target: "records/customers",
+          options: {
+            entityName: "Customer Record",
+            recordCollection: "Records/Customers",
+            writeMode: "replace",
+            recordShape: "unknown-shape",
+          },
+        },
+      }],
+    });
+    expect(systemEntryInvalidConfiguration.valid).toBeFalse();
+    expect(systemEntryInvalidConfiguration.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.outputSystemTargetInvalid)).toBeTrue();
+    expect(systemEntryInvalidConfiguration.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.outputSystemEntityMalformed)).toBeTrue();
+    expect(systemEntryInvalidConfiguration.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.outputSystemRecordCollectionMalformed)).toBeTrue();
+    expect(systemEntryInvalidConfiguration.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.outputSystemWriteModeInvalid)).toBeTrue();
+    expect(systemEntryInvalidConfiguration.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.outputSystemRecordShapeInvalid)).toBeTrue();
+
+    const systemEntryFormatIncompatible = validateWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [],
+      outputs: [{
+        id: "output-system-entry-format",
+        type: "workflow-output",
+        outputType: WorkflowDraftOutputTypes.record,
+        format: WorkflowDraftOutputFormats.jsonl,
+        destination: {
+          type: WorkflowDraftOutputDestinationTypes.systemEntry,
+          target: "system-record",
+          options: {
+            entityName: "customer.record",
+            writeMode: "upsert",
+            recordShape: "single-record",
+          },
+        },
+      }],
+    });
+    expect(systemEntryFormatIncompatible.valid).toBeFalse();
+    expect(systemEntryFormatIncompatible.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.outputSystemFormatIncompatible)).toBeTrue();
 
     const fileExportInvalidFormat = validateWorkflowDraft({
       triggers: [],
@@ -1734,9 +1796,12 @@ describe("WorkflowStudioDomain", () => {
         sourceStepId: "step-loop",
         destination: {
           type: WorkflowDraftOutputDestinationTypes.systemEntry,
-          target: "records/customers",
+          target: "system-record",
           options: {
-            entityName: "customer-record",
+            entityName: "customer.record",
+            recordCollection: "records/customers",
+            writeMode: WorkflowDraftSystemOutputWriteModes.upsert,
+            recordShape: WorkflowDraftSystemOutputRecordShapes.singleRecord,
           },
         },
       }],

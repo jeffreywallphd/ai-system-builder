@@ -1,5 +1,6 @@
 import type { WorkflowStudioModeState } from "../../../studio-shell/workflow/WorkflowStudioModeStateStore";
 import type { WorkflowStudioModeId } from "../../../studio-shell/workflow/WorkflowStudioModes";
+import { listWorkflowOutputSummaries } from "../../../studio-shell/workflow/WorkflowWizardOutputs";
 
 export interface WorkflowStudioModePanelProps {
   readonly workflowModeState: {
@@ -31,6 +32,7 @@ function renderModeSurface(modeId: WorkflowStudioModeId): JSX.Element {
 
 export default function WorkflowStudioModePanel({ workflowModeState }: WorkflowStudioModePanelProps): JSX.Element {
   const state = workflowModeState.state;
+  const outputSummaries = listWorkflowOutputSummaries(state.sharedDraft);
 
   return (
     <section className="ui-stack ui-stack--sm" data-testid="workflow-studio-mode-panel">
@@ -61,6 +63,26 @@ export default function WorkflowStudioModePanel({ workflowModeState }: WorkflowS
         <div><strong>Mode validation issues:</strong> {state.modeValidationIssues.length}</div>
         <div><strong>Draft validation issues:</strong> {state.draftValidationIssues.length}</div>
         {renderModeSurface(state.selectedModeId)}
+      </div>
+
+      <div className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="workflow-studio-mode-output-overview">
+        <strong>Configured outputs</strong>
+        {outputSummaries.length > 0 ? (
+          <ul className="ui-stack ui-stack--2xs ui-workflow-wizard__output-summary-list">
+            {outputSummaries.map((summary) => (
+              <li key={summary.outputId} className="ui-workflow-wizard__output-summary-item">
+                <div><strong>{summary.order}. {summary.displayLabel}</strong> <span className="ui-text-secondary">({summary.typeLabel})</span></div>
+                {summary.detailLines.length > 0 ? (
+                  <div className="ui-text-small ui-text-secondary">{summary.detailLines.join(" · ")}</div>
+                ) : (
+                  <div className="ui-text-small ui-text-secondary">No additional output details configured.</div>
+                )}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="ui-text-muted">No outputs configured yet.</p>
+        )}
       </div>
 
       {state.draftParseError ? (
