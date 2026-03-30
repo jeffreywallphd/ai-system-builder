@@ -16,6 +16,7 @@ import {
 } from "./WorkflowStudioModeValidation";
 import type { WorkflowValidationIssue } from "../../../domain/workflow-studio/WorkflowStudioDomain";
 import { isWorkflowStudioModeId } from "./WorkflowStudioModes";
+import type { WorkflowStudioHandoffStatus } from "./WorkflowStudioHandoffStatus";
 
 export interface WorkflowStudioDraftSyncContext {
   readonly studioId: string;
@@ -38,6 +39,7 @@ export interface WorkflowStudioModeState {
   readonly isSharedDraftValid: boolean;
   readonly draftSyncContext?: WorkflowStudioDraftSyncContext;
   readonly hasLocalDraftEdits: boolean;
+  readonly handoffStatus?: WorkflowStudioHandoffStatus;
 }
 
 export type WorkflowStudioModeStateListener = (state: WorkflowStudioModeState) => void;
@@ -111,6 +113,7 @@ function buildInitialState(): WorkflowStudioModeState {
     isSharedDraftValid: true,
     draftSyncContext: undefined,
     hasLocalDraftEdits: false,
+    handoffStatus: undefined,
   });
 }
 
@@ -194,12 +197,16 @@ export class WorkflowStudioModeStateStore {
       try {
         const sharedDraft = deserializeWorkflowDraft(snapshotSerializedDraft);
         this.replaceSharedDraftWithSerialized(sharedDraft, snapshotSerializedDraft, false, input.context);
+        if (contextChanged) {
+          this.clearHandoffStatus();
+        }
       } catch (error) {
         this.patch({
           draftEditorContent: snapshotSerializedDraft,
           draftParseError: error instanceof Error ? error.message : "Workflow draft is malformed.",
           hasLocalDraftEdits: true,
           draftSyncContext: input.context,
+          handoffStatus: contextChanged ? undefined : this.state.handoffStatus,
         });
       }
       return;
@@ -217,6 +224,25 @@ export class WorkflowStudioModeStateStore {
   public setDraftSyncContext(context?: WorkflowStudioDraftSyncContext): void {
     this.patch({
       draftSyncContext: normalizeSyncContext(context),
+    });
+  }
+
+  public setHandoffStatus(status?: WorkflowStudioHandoffStatus): void {
+    if (!status) {
+      this.clearHandoffStatus();
+      return;
+    }
+    this.patch({
+      handoffStatus: Object.freeze({
+        ...status,
+        updatedAt: Number.isFinite(status.updatedAt) ? status.updatedAt : Date.now(),
+      }),
+    });
+  }
+
+  public clearHandoffStatus(): void {
+    this.patch({
+      handoffStatus: undefined,
     });
   }
 

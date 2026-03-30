@@ -7,6 +7,10 @@ export interface WorkflowStudioReturnRestorationResult {
   readonly handled: boolean;
   readonly restored: boolean;
   readonly handoffId?: string;
+  readonly selectorSessionId?: string;
+  readonly selectorTargetId?: string;
+  readonly originatingField?: string;
+  readonly assetType?: string;
   readonly ignoredReason?: "draft-context-mismatch";
 }
 
@@ -40,6 +44,10 @@ export class WorkflowStudioReturnRestorationService {
         handled: true,
         restored: false,
         handoffId: handoff?.launch.handoffId,
+        selectorSessionId: handoff?.target.selector.selectorSessionId,
+        selectorTargetId: handoff?.target.selector.selectorTargetId,
+        originatingField: handoff?.target.selector.originatingField,
+        assetType: handoff?.target.selector.assetType,
       });
     }
 
@@ -55,6 +63,10 @@ export class WorkflowStudioReturnRestorationService {
         handled: true,
         restored: false,
         handoffId: handoff.launch.handoffId,
+        selectorSessionId: handoff.target.selector.selectorSessionId,
+        selectorTargetId: handoff.target.selector.selectorTargetId,
+        originatingField: handoff.target.selector.originatingField,
+        assetType: handoff.target.selector.assetType,
         ignoredReason: "draft-context-mismatch",
       });
     }
@@ -82,6 +94,10 @@ export class WorkflowStudioReturnRestorationService {
       handled: true,
       restored: true,
       handoffId: handoff.launch.handoffId,
+      selectorSessionId: handoff.target.selector.selectorSessionId,
+      selectorTargetId: handoff.target.selector.selectorTargetId,
+      originatingField: handoff.target.selector.originatingField,
+      assetType: handoff.target.selector.assetType,
     });
   }
 

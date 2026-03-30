@@ -11,6 +11,10 @@ import {
   WorkflowStudioModeStateStore,
 } from "../WorkflowStudioModeStateStore";
 import { DEFAULT_WORKFLOW_STUDIO_MODE_ID, WorkflowStudioModeIds } from "../WorkflowStudioModes";
+import {
+  WorkflowStudioHandoffFlowKinds,
+  WorkflowStudioHandoffStatusKinds,
+} from "../WorkflowStudioHandoffStatus";
 
 function createMemoryStorage(): Pick<Storage, "getItem" | "setItem" | "removeItem"> {
   const values = new Map<string, string>();
@@ -423,5 +427,59 @@ describe("WorkflowStudioModeStateStore", () => {
     expect(state.sharedDraft.inputs.map((entry) => entry.id)).toEqual(["input-1"]);
     expect(state.sharedDraft.steps[0]?.title).toBe("Step one updated");
     expect(state.sharedDraft.outputs.map((entry) => entry.id)).toEqual(["output-1"]);
+  });
+
+  it("stores and clears handoff status in centralized workflow mode state", () => {
+    const store = new WorkflowStudioModeStateStore();
+    store.setHandoffStatus({
+      kind: WorkflowStudioHandoffStatusKinds.pending,
+      flow: WorkflowStudioHandoffFlowKinds.datasetInput,
+      updatedAt: Date.now(),
+      handoffId: "handoff:pending:1",
+      selectorSessionKey: "workflow-studio:test:inputs",
+    });
+
+    expect(store.getState().handoffStatus).toEqual(expect.objectContaining({
+      kind: WorkflowStudioHandoffStatusKinds.pending,
+      flow: WorkflowStudioHandoffFlowKinds.datasetInput,
+      handoffId: "handoff:pending:1",
+    }));
+
+    store.clearHandoffStatus();
+    expect(store.getState().handoffStatus).toBeUndefined();
+  });
+
+  it("clears stale handoff status when workflow draft context changes across sessions", () => {
+    const store = new WorkflowStudioModeStateStore();
+    const draft = serializeWorkflowDraft(createEmptyWorkflowDraft());
+
+    store.synchronizeSharedDraftFromSnapshot({
+      serializedDraft: draft,
+      context: {
+        studioId: "studio-workflows",
+        sessionId: "session-1",
+        draftId: "draft-1",
+        revision: 1,
+      },
+    });
+    store.setHandoffStatus({
+      kind: WorkflowStudioHandoffStatusKinds.completed,
+      flow: WorkflowStudioHandoffFlowKinds.agentStep,
+      updatedAt: Date.now(),
+      handoffId: "handoff:session-1",
+      selectorSessionKey: "workflow-studio:test:steps",
+    });
+
+    store.synchronizeSharedDraftFromSnapshot({
+      serializedDraft: draft,
+      context: {
+        studioId: "studio-workflows",
+        sessionId: "session-2",
+        draftId: "draft-2",
+        revision: 1,
+      },
+    });
+
+    expect(store.getState().handoffStatus).toBeUndefined();
   });
 });

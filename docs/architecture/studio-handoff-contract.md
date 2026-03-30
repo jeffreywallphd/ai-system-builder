@@ -117,6 +117,18 @@ Included Workflow-origin context:
 - Workflow return restoration now guards against stale reentry:
   - restoration is ignored when handoff draft reference does not match current draft/session sync context (`draft-context-mismatch`), preventing wrong-draft overwrite during repeated launches/reentries.
 
+### Stories 5.11 / 5.12 handoff status UX + cross-studio regression coverage
+- Workflow Studio wizard now surfaces cross-studio lifecycle state through one shared status surface (`WorkflowStudioHandoffStatusBanner`) instead of editor-local message flags.
+- Status is centralized in typed workflow mode state (`WorkflowStudioModeStateStore.handoffStatus`) and updated from typed handoff/session seams:
+  - `launching` when a create-new handoff is initiated.
+  - `pending` while waiting for return.
+  - `resumed` when Workflow authoring reentry is restored from canonical handoff context.
+  - `completed` when created assets are applied to the intended dataset input or step selector target.
+  - `cancelled` for `cancelled`/`no-selection`/`abandoned` outcomes (non-destructive by contract).
+  - `recovered` when stale/invalid returns are safely ignored.
+- Dataset and agent launch/return status updates remain correlated through existing handoff identifiers (`launchHandoffId`, selector target metadata, selector session id) to respect multi-session safety rules.
+- Cross-studio regression coverage now explicitly validates dataset and agent launch -> return -> apply -> resume behavior (including cancel/no-selection and stale-correlation safety) in `ui/studio-shell/asset-selector/tests/AssetSelectorFramework.integration.test.ts`.
+
 ## Compatibility note
 `InlineAssetCreation` still supports legacy selector query params (`selectorLaunch`, `selectorSessionId`, etc.).  
 When those are absent, it now falls back to the canonical `studioHandoff` contract.

@@ -28,6 +28,10 @@ import {
   type WorkflowStudioWizardPageRouteResolution,
 } from "../studio-shell/workflow/WorkflowStudioWizardRouting";
 import { WorkflowStudioReturnRestorationService } from "../studio-shell/workflow/WorkflowStudioReturnRestorationService";
+import {
+  WorkflowStudioHandoffFlowKinds,
+  WorkflowStudioHandoffStatusKinds,
+} from "../studio-shell/workflow/WorkflowStudioHandoffStatus";
 import { StudioEntryService } from "../routes/StudioRouteMapping";
 import { readAutomationIntentFromSearch } from "../routes/BuildAutomationIntent";
 import { BuildIntents } from "../routes/BuildIntentModels";
@@ -287,8 +291,32 @@ export default function StudioShellPage({
       search: location.search,
       workflowModeStore,
     });
-    if (!restoration.handled || !restoration.restored || !restoration.handoffId) {
+    if (!restoration.handled || !restoration.handoffId) {
       return;
+    }
+
+    const flow = restoration.assetType === "agent"
+      ? WorkflowStudioHandoffFlowKinds.agentStep
+      : WorkflowStudioHandoffFlowKinds.datasetInput;
+    if (restoration.restored) {
+      workflowModeStore.setHandoffStatus({
+        kind: WorkflowStudioHandoffStatusKinds.resumed,
+        flow,
+        updatedAt: Date.now(),
+        handoffId: restoration.handoffId,
+        selectorSessionKey: restoration.selectorSessionId,
+        selectorTargetId: restoration.selectorTargetId,
+      });
+    } else if (restoration.ignoredReason === "draft-context-mismatch") {
+      workflowModeStore.setHandoffStatus({
+        kind: WorkflowStudioHandoffStatusKinds.recovered,
+        flow,
+        updatedAt: Date.now(),
+        handoffId: restoration.handoffId,
+        selectorSessionKey: restoration.selectorSessionId,
+        selectorTargetId: restoration.selectorTargetId,
+        detail: "Ignored stale handoff restoration for a different draft session.",
+      });
     }
     lastRestoredWorkflowReturnSearchRef.current = location.search;
   }, [isWorkflowStudio, location.search, workflowModeStore, workflowReturnRestorationService]);
@@ -787,6 +815,9 @@ export default function StudioShellPage({
                 modeValidationIssues: workflowModeState.modeValidationIssues,
                 draftValidationIssues: workflowModeState.draftValidationIssues,
                 updateSharedDraft: (updater) => workflowModeStore.updateSharedDraft(updater),
+                handoffStatus: workflowModeState.handoffStatus,
+                setHandoffStatus: (status) => workflowModeStore.setHandoffStatus(status),
+                clearHandoffStatus: () => workflowModeStore.clearHandoffStatus(),
               }
               : undefined}
           />

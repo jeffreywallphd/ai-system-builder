@@ -32,6 +32,11 @@ describe("WorkflowStudioStepSectionEditor", () => {
     expect(source).toContain("expectedUsageContext: stepSelectorUsageContext");
     expect(source).toContain("expectedSelectorTargetId: expectedOperation ? buildStepSelectorTargetId(expectedOperation) : undefined");
     expect(source).toContain("launchHandoffId: launch.studioHandoff?.launch.handoffId");
+    expect(source).toContain("WorkflowStudioHandoffStatusKinds.launching");
+    expect(source).toContain("WorkflowStudioHandoffStatusKinds.pending");
+    expect(source).toContain("WorkflowStudioHandoffStatusKinds.completed");
+    expect(source).toContain("WorkflowStudioHandoffStatusKinds.cancelled");
+    expect(source).toContain("WorkflowStudioHandoffStatusKinds.recovered");
   });
 });
 

@@ -45,12 +45,18 @@ import {
   workflowStepTypeDefinitions,
   WorkflowWizardStepSelectionKinds,
 } from "../../../studio-shell/workflow/WorkflowWizardSteps";
+import {
+  WorkflowStudioHandoffFlowKinds,
+  WorkflowStudioHandoffStatusKinds,
+  type WorkflowStudioHandoffStatus,
+} from "../../../studio-shell/workflow/WorkflowStudioHandoffStatus";
 
 interface WorkflowStudioStepSectionEditorProps {
   readonly sharedDraft: WorkflowDraft;
   readonly draftValidationIssues: ReadonlyArray<WorkflowValidationIssue>;
   readonly onUpdateSharedDraft?: (updater: (draft: WorkflowDraft) => WorkflowDraft) => void;
   readonly studioId?: string;
+  readonly onSetHandoffStatus?: (status: WorkflowStudioHandoffStatus) => void;
 }
 
 const stepSelectorTargetQueryParam = "workflowStepSelectorTarget";
@@ -143,6 +149,7 @@ export default function WorkflowStudioStepSectionEditor({
   draftValidationIssues,
   onUpdateSharedDraft,
   studioId,
+  onSetHandoffStatus,
 }: WorkflowStudioStepSectionEditorProps): JSX.Element {
   const location = useLocation();
   const navigate = useNavigate();
@@ -365,6 +372,17 @@ export default function WorkflowStudioStepSectionEditor({
       setQueryRevision((current) => current + 1);
       setSelectorNotice(undefined);
       setSelectorOpen(true);
+      onSetHandoffStatus?.({
+        kind: WorkflowStudioHandoffStatusKinds.completed,
+        flow: WorkflowStudioHandoffFlowKinds.agentStep,
+        updatedAt: Date.now(),
+        handoffId: selectorState?.creatingNewContext?.launchHandoffId,
+        selectorSessionKey,
+        selectorTargetId: outcome.selectorTargetId,
+        outcomeKind: "created",
+        assetId: outcome.returnedAsset.assetId,
+        assetDisplayName: outcome.returnedAsset.displayName,
+      });
     }
 
     if (
@@ -374,6 +392,27 @@ export default function WorkflowStudioStepSectionEditor({
     ) {
       setSelectorNotice("Step handoff ended without a returned asset. Existing workflow steps were preserved.");
       closeSelector();
+      onSetHandoffStatus?.({
+        kind: WorkflowStudioHandoffStatusKinds.cancelled,
+        flow: WorkflowStudioHandoffFlowKinds.agentStep,
+        updatedAt: Date.now(),
+        handoffId: selectorState?.creatingNewContext?.launchHandoffId,
+        selectorSessionKey,
+        selectorTargetId: outcome.selectorTargetId,
+        outcomeKind: outcome.outcomeKind,
+      });
+    }
+
+    if (outcome.outcomeKind === "created" && !outcome.returnedAsset) {
+      onSetHandoffStatus?.({
+        kind: WorkflowStudioHandoffStatusKinds.recovered,
+        flow: WorkflowStudioHandoffFlowKinds.agentStep,
+        updatedAt: Date.now(),
+        handoffId: selectorState?.creatingNewContext?.launchHandoffId,
+        selectorSessionKey,
+        selectorTargetId: outcome.selectorTargetId,
+        outcomeKind: "created",
+      });
     }
 
     if (outcome.consumed && outcome.nextSearch !== undefined) {
@@ -394,6 +433,8 @@ export default function WorkflowStudioStepSectionEditor({
     selectorSessionKey,
     selectorSessionStore,
     sharedDraft,
+    selectorState?.creatingNewContext?.launchHandoffId,
+    onSetHandoffStatus,
   ]);
 
   useEffect(() => {
@@ -546,6 +587,24 @@ export default function WorkflowStudioStepSectionEditor({
                 returnTargetSessionKey: selectorSessionKey,
                 returnRoutePath: launch.returnTarget?.routePath,
                 launchHandoffId: launch.studioHandoff?.launch.handoffId,
+              });
+              onSetHandoffStatus?.({
+                kind: WorkflowStudioHandoffStatusKinds.launching,
+                flow: WorkflowStudioHandoffFlowKinds.agentStep,
+                updatedAt: Date.now(),
+                handoffId: launch.studioHandoff?.launch.handoffId,
+                selectorSessionKey,
+                selectorTargetId: buildStepSelectorTargetId(operation),
+                detail: "Launching Agent Studio for workflow steps.",
+              });
+              onSetHandoffStatus?.({
+                kind: WorkflowStudioHandoffStatusKinds.pending,
+                flow: WorkflowStudioHandoffFlowKinds.agentStep,
+                updatedAt: Date.now(),
+                handoffId: launch.studioHandoff?.launch.handoffId,
+                selectorSessionKey,
+                selectorTargetId: buildStepSelectorTargetId(operation),
+                detail: "Waiting for Agent Studio handoff return.",
               });
               setSelectorNotice(undefined);
               void navigate(launch.launchPath);

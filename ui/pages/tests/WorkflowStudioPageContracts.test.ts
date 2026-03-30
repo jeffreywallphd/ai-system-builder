@@ -35,5 +35,7 @@ describe("WorkflowStudioPage contracts", () => {
     expect(shellSource).toContain("synchronizeSharedDraftFromSnapshot");
     expect(shellSource).toContain("WorkflowStudioReturnRestorationService");
     expect(shellSource).toContain("restoreFromReturnSearch");
+    expect(shellSource).toContain("setHandoffStatus");
+    expect(shellSource).toContain("clearHandoffStatus");
   });
 });
