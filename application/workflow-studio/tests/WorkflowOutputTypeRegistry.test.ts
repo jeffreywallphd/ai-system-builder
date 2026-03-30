@@ -67,6 +67,11 @@ describe("WorkflowOutputTypeRegistry", () => {
         ]),
       }),
     );
+    expect(registry.get(` ${WorkflowDraftOutputDestinationTypes.systemEntry} `)).toEqual(
+      expect.objectContaining({
+        destinationType: WorkflowDraftOutputDestinationTypes.systemEntry,
+      }),
+    );
   });
 
   it("evaluates add constraints and rejects unsupported add requests", () => {
@@ -104,5 +109,25 @@ describe("WorkflowOutputTypeRegistry", () => {
         defaultTarget: "files",
       },
     ])).toThrow("already registered");
+  });
+
+  it("supports constructor-supplied destination definitions for lookup", () => {
+    const registry = new WorkflowOutputTypeRegistry([
+      {
+        destinationType: "custom-output",
+        outputType: WorkflowDraftOutputTypes.document,
+        label: "Custom output",
+        description: "Custom output",
+        configSchemaId: "workflow.output.destination.custom.v1",
+        supportedFormats: [WorkflowDraftOutputFormats.json],
+        defaultFormat: WorkflowDraftOutputFormats.json,
+        defaultTarget: "custom-target",
+      },
+    ] as any);
+
+    expect(registry.get("custom-output")).toEqual(expect.objectContaining({
+      destinationType: "custom-output",
+      configSchemaId: "workflow.output.destination.custom.v1",
+    }));
   });
 });

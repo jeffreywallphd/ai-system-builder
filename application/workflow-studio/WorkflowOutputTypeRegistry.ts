@@ -1,5 +1,4 @@
 import {
-  getWorkflowDraftOutputDestinationDefinition,
   listWorkflowDraftOutputDestinationDefinitions,
   WorkflowDraftOutputDestinationTypes,
   WorkflowDraftSystemOutputRecordShapes,
@@ -402,11 +401,12 @@ export class WorkflowOutputTypeRegistry {
   }
 
   public get(destinationType: string): WorkflowOutputTypeRegistryEntry | undefined {
-    const resolved = getWorkflowDraftOutputDestinationDefinition(destinationType);
-    if (!resolved || !this.byDestinationType.has(resolved.destinationType)) {
+    const normalizedDestinationType = destinationType.trim();
+    if (!normalizedDestinationType) {
       return undefined;
     }
-    return toRegistryEntry(resolved);
+
+    return this.byDestinationType.get(normalizedDestinationType);
   }
 
   public isSupported(destinationType: string): boolean {

@@ -308,4 +308,29 @@ describe("WorkflowWizardOutputs", () => {
     expect(removedSummaries).toHaveLength(2);
     expect(removedSummaries.some((entry) => entry.displayLabel === "Results Panel")).toBeFalse();
   });
+
+  it("surfaces unknown persisted output types without silently coercing to a default type", () => {
+    const draft = {
+      ...createEmptyWorkflowDraft(),
+      outputs: [
+        {
+          id: "output-stale",
+          type: "workflow-output",
+          order: 1,
+          outputType: "document",
+          format: "json",
+          destination: {
+            type: "stale-output-type",
+            target: "stale",
+          },
+        },
+      ],
+    };
+
+    const summaries = listWorkflowOutputSummaries(draft);
+    expect(summaries[0]?.typeLabel).toBe("Unknown output (stale-output-type)");
+    expect(getWorkflowOutputValidationMessages(draft.outputs[0] as any)).toContain(
+      "Workflow output type 'stale-output-type' is not registered.",
+    );
+  });
 });

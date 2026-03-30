@@ -347,4 +347,43 @@ describe("WorkflowDraftExecutionPlanMapper", () => {
       ],
     })).toThrow("output-plan-output-type-mismatch");
   });
+
+  it("fails planning for conversational outputs with missing required configuration", () => {
+    expect(() => mapWorkflowDraftToExecutionPlan({
+      ...createEmptyWorkflowDraft(),
+      inputs: [
+        {
+          id: "input-prompt",
+          type: "runtime-input",
+          sourceType: "runtime-parameter",
+          parameterKey: "prompt",
+          valueType: "string",
+        },
+      ],
+      steps: [
+        {
+          id: "step-1",
+          type: "action",
+          kind: WorkflowDraftStepKinds.action,
+          order: 1,
+        },
+      ],
+      outputs: [
+        {
+          id: "output-chat",
+          type: "workflow-output",
+          outputType: WorkflowDraftOutputTypes.document,
+          format: WorkflowDraftOutputFormats.json,
+          destination: {
+            type: WorkflowDraftOutputDestinationTypes.promptResponseChat,
+            target: "chat",
+            options: {
+              title: "Chat",
+              promptInputId: "input-prompt",
+            },
+          },
+        },
+      ],
+    })).toThrow("output-prompt-response-field-missing");
+  });
 });
