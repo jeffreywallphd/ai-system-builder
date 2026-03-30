@@ -26,6 +26,8 @@ describe("StudioShellPage contracts", () => {
     expect(source).toContain("shellTitle");
     expect(source).toContain("toolbarActions");
     expect(source).toContain('data-testid="studio-shell-authoring-toolbar"');
+    expect(source).toContain('data-testid="studio-shell-left-drawer-toggle"');
+    expect(source).toContain('data-testid="studio-shell-right-drawer-toggle"');
     expect(source).toContain("runToolbarAction(");
     expect(source).toContain("setWorkflowModeFromToolbar(");
     expect(source).toContain("buildCreateMetadata(");

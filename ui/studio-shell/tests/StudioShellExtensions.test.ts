@@ -100,6 +100,16 @@ describe("StudioRegistrationRegistry", () => {
       "workflow-studio-toolbar-validate",
       "workflow-studio-toolbar-refresh",
     ]);
+    expect(registry.get("workflow-studio")?.shell?.drawers).toEqual({
+      left: {
+        label: "Nodes",
+        defaultOpen: true,
+      },
+      right: {
+        label: "Inspector",
+        defaultOpen: true,
+      },
+    });
     expect(registry.listExtensionsBySlot("workflow-studio", StudioShellExtensionSlots.draftAuthoring).map((entry) => entry.id)).toContain(
       "workflow-studio-mode-abstraction",
     );
@@ -179,6 +189,34 @@ describe("StudioRegistrationRegistry", () => {
         },
       },
     })).toThrow("is duplicated");
+  });
+
+  it("rejects invalid drawer toggle configuration", () => {
+    const registry = new StudioRegistrationRegistry();
+
+    expect(() => registry.register({
+      ...workflowStudioRegistration,
+      studioType: "workflow-studio-invalid-drawers",
+      studioId: "studio-workflow-invalid-drawers",
+      shell: {
+        ...(workflowStudioRegistration.shell ?? {}),
+        drawers: {
+          left: {
+            label: "   ",
+          },
+        },
+      },
+    })).toThrow("drawer label is required");
+
+    expect(() => registry.register({
+      ...workflowStudioRegistration,
+      studioType: "workflow-studio-empty-drawers",
+      studioId: "studio-workflow-empty-drawers",
+      shell: {
+        ...(workflowStudioRegistration.shell ?? {}),
+        drawers: {},
+      },
+    })).toThrow("must declare at least one side");
   });
 });
 

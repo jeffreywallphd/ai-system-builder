@@ -158,10 +158,21 @@ export interface StudioShellToolbarConfiguration {
   readonly actions: ReadonlyArray<StudioShellToolbarAction>;
 }
 
+export interface StudioShellDrawerToggleConfiguration {
+  readonly label: string;
+  readonly defaultOpen?: boolean;
+}
+
+export interface StudioShellDrawerConfiguration {
+  readonly left?: StudioShellDrawerToggleConfiguration;
+  readonly right?: StudioShellDrawerToggleConfiguration;
+}
+
 export interface StudioShellPresentationHints {
   readonly title?: string;
   readonly subtitle?: string;
   readonly toolbar?: StudioShellToolbarConfiguration;
+  readonly drawers?: StudioShellDrawerConfiguration;
 }
 
 interface BaseStudioRegistration {
@@ -288,6 +299,43 @@ function normalizeToolbar(
   });
 }
 
+function normalizeDrawerToggle(
+  studioType: string,
+  side: "left" | "right",
+  toggle: StudioShellDrawerToggleConfiguration,
+): StudioShellDrawerToggleConfiguration {
+  const label = toggle.label.trim();
+  if (!label) {
+    throw new Error(`Studio '${studioType}' ${side} drawer label is required.`);
+  }
+
+  return Object.freeze({
+    label,
+    defaultOpen: toggle.defaultOpen ?? true,
+  });
+}
+
+function normalizeDrawers(
+  studioType: string,
+  drawers: StudioShellDrawerConfiguration,
+): StudioShellDrawerConfiguration {
+  const normalizedLeft = drawers.left
+    ? normalizeDrawerToggle(studioType, "left", drawers.left)
+    : undefined;
+  const normalizedRight = drawers.right
+    ? normalizeDrawerToggle(studioType, "right", drawers.right)
+    : undefined;
+
+  if (!normalizedLeft && !normalizedRight) {
+    throw new Error(`Studio '${studioType}' drawers must declare at least one side.`);
+  }
+
+  return Object.freeze({
+    left: normalizedLeft,
+    right: normalizedRight,
+  });
+}
+
 function normalizeRegistration(registration: StudioRegistration): StudioRegistration {
   const studioType = registration.studioType.trim();
   if (!studioType) {
@@ -329,6 +377,9 @@ function normalizeRegistration(registration: StudioRegistration): StudioRegistra
           toolbar: registration.shell.toolbar
             ? normalizeToolbar(studioType, registration.shell.toolbar)
             : undefined,
+          drawers: registration.shell.drawers
+            ? normalizeDrawers(studioType, registration.shell.drawers)
+            : undefined,
         })
         : undefined,
     });
@@ -359,6 +410,9 @@ function normalizeRegistration(registration: StudioRegistration): StudioRegistra
           toolbar: registration.shell.toolbar
             ? normalizeToolbar(studioType, registration.shell.toolbar)
             : undefined,
+          drawers: registration.shell.drawers
+            ? normalizeDrawers(studioType, registration.shell.drawers)
+            : undefined,
         })
         : undefined,
     });
@@ -384,6 +438,9 @@ function normalizeRegistration(registration: StudioRegistration): StudioRegistra
         ...registration.shell,
         toolbar: registration.shell.toolbar
           ? normalizeToolbar(studioType, registration.shell.toolbar)
+          : undefined,
+        drawers: registration.shell.drawers
+          ? normalizeDrawers(studioType, registration.shell.drawers)
           : undefined,
       })
       : undefined,
