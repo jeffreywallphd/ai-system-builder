@@ -19,6 +19,7 @@ import {
 } from "./WorkflowWizardTriggers";
 import {
   addWorkflowStep,
+  getWorkflowStepTypeDefinitionByKey,
   removeWorkflowStep,
   resolveWorkflowStepTypeDefinition,
   setWorkflowStepTitle,
@@ -30,6 +31,7 @@ import {
   removeWorkflowOutput,
   setWorkflowOutputViewerTitle,
 } from "./WorkflowWizardOutputs";
+import { buildDatasetInputFromAsset } from "./WorkflowWizardDatasetInputs";
 
 export const WorkflowCanvasSectionIds = Object.freeze({
   triggers: "triggers",
@@ -90,6 +92,7 @@ export interface WorkflowCanvasGraphNodeViewModel {
   readonly id: string;
   readonly kind: WorkflowCanvasGraphNodeKind;
   readonly sectionId: WorkflowCanvasSectionId;
+  readonly entityId?: string;
   readonly title: string;
   readonly subtitle: string;
   readonly detailLines: ReadonlyArray<string>;
@@ -150,6 +153,7 @@ function deriveWorkflowCanvasGraphViewModel(
       id: sectionNodeId,
       kind: WorkflowCanvasGraphNodeKinds.section,
       sectionId: section.id,
+      entityId: undefined,
       title: section.title,
       subtitle: section.summary,
       detailLines: Object.freeze([`${section.nodes.length} node(s)`]),
@@ -174,6 +178,7 @@ function deriveWorkflowCanvasGraphViewModel(
         id: itemNodeId,
         kind: WorkflowCanvasGraphNodeKinds.item,
         sectionId: section.id,
+        entityId: node.id,
         title: node.title,
         subtitle: node.subtitle,
         detailLines: node.detailLines,
@@ -237,9 +242,11 @@ export type WorkflowCanvasAction =
   | { readonly kind: "set-trigger-title"; readonly triggerId: string; readonly title: string }
   | { readonly kind: "remove-trigger"; readonly triggerId: string }
   | { readonly kind: "add-input-runtime-parameter" }
+  | { readonly kind: "add-input-dataset-asset" }
+  | { readonly kind: "add-input-static-value" }
   | { readonly kind: "set-input-title"; readonly inputId: string; readonly title: string }
   | { readonly kind: "remove-input"; readonly inputId: string }
-  | { readonly kind: "add-step" }
+  | { readonly kind: "add-step"; readonly definitionKey?: string }
   | { readonly kind: "set-step-title"; readonly stepId: string; readonly title: string }
   | { readonly kind: "remove-step"; readonly stepId: string }
   | { readonly kind: "add-output"; readonly destinationType?: WorkflowDraftOutputDestinationType }
@@ -274,6 +281,32 @@ function buildNextRuntimeInputId(draft: WorkflowDraft): string {
   while (existing.has(candidate)) {
     index += 1;
     candidate = `input-runtime-${index}`;
+  }
+  return candidate;
+}
+
+function buildNextStaticInputId(draft: WorkflowDraft): string {
+  const existing = new Set(draft.inputs.map((input) => input.id));
+  let index = draft.inputs.length + 1;
+  let candidate = `input-static-${index}`;
+  while (existing.has(candidate)) {
+    index += 1;
+    candidate = `input-static-${index}`;
+  }
+  return candidate;
+}
+
+function buildNextDatasetAssetId(draft: WorkflowDraft): string {
+  let index = draft.inputs.length + 1;
+  let candidate = `asset:dataset-${index}`;
+  const existingIds = new Set(
+    draft.inputs
+      .filter((input) => input.sourceType === WorkflowDraftInputSourceTypes.datasetAsset)
+      .map((input) => input.sourceType === WorkflowDraftInputSourceTypes.datasetAsset ? input.asset.assetId : ""),
+  );
+  while (existingIds.has(candidate)) {
+    index += 1;
+    candidate = `asset:dataset-${index}`;
   }
   return candidate;
 }
@@ -528,6 +561,44 @@ export function applyWorkflowCanvasAction(
     });
   }
 
+  if (action.kind === "add-input-dataset-asset") {
+    const nextAssetId = buildNextDatasetAssetId(draft);
+    const nextInput = buildDatasetInputFromAsset(draft, {
+      assetId: nextAssetId,
+      name: `Dataset input ${draft.inputs.length + 1}`,
+    });
+    return Object.freeze({
+      changed: true,
+      draft: Object.freeze({
+        ...draft,
+        inputs: Object.freeze([...draft.inputs, nextInput]),
+      }),
+    });
+  }
+
+  if (action.kind === "add-input-static-value") {
+    const nextId = buildNextStaticInputId(draft);
+    const inputs = Object.freeze([
+      ...draft.inputs,
+      Object.freeze({
+        id: nextId,
+        type: "static-value-input",
+        title: `Static input ${draft.inputs.length + 1}`,
+        sourceType: WorkflowDraftInputSourceTypes.staticValue,
+        valueType: WorkflowDraftInputValueTypes.string,
+        value: "",
+        required: false,
+      }),
+    ]);
+    return Object.freeze({
+      changed: true,
+      draft: Object.freeze({
+        ...draft,
+        inputs,
+      }),
+    });
+  }
+
   if (action.kind === "remove-input") {
     const nextInputs = draft.inputs.filter((input) => input.id !== action.inputId);
     if (nextInputs.length === draft.inputs.length) {
@@ -543,7 +614,10 @@ export function applyWorkflowCanvasAction(
   }
 
   if (action.kind === "add-step") {
-    const result = addWorkflowStep(draft);
+    const definition = action.definitionKey
+      ? getWorkflowStepTypeDefinitionByKey(action.definitionKey)
+      : undefined;
+    const result = definition ? addWorkflowStep(draft, definition) : addWorkflowStep(draft);
     return Object.freeze({ draft: result.draft, changed: true });
   }
 

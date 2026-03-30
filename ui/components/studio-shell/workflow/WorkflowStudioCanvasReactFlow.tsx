@@ -4,9 +4,11 @@ import {
   Controls,
   MarkerType,
   ReactFlow,
+  type EdgeMouseHandler,
   type Edge,
   type Node,
   type NodeProps,
+  type NodeMouseHandler,
 } from "@xyflow/react";
 import {
   WorkflowCanvasGraphEdgeKinds,
@@ -18,10 +20,19 @@ import {
 
 interface WorkflowStudioCanvasReactFlowProps {
   readonly graph: WorkflowCanvasGraphViewModel;
+  readonly selectedNodeId?: string;
+  readonly onSelectNode?: (nodeId: string) => void;
+  readonly onClearSelection?: () => void;
+  readonly renderNodeEditor?: (node: WorkflowCanvasGraphNodeViewModel) => JSX.Element | null;
+  readonly onRemoveNode?: (node: WorkflowCanvasGraphNodeViewModel) => void;
 }
 
 interface WorkflowStudioCanvasGraphNodeData {
   readonly graphNode: WorkflowCanvasGraphNodeViewModel;
+  readonly selectedNodeId?: string;
+  readonly onSelectNode?: (nodeId: string) => void;
+  readonly renderNodeEditor?: (node: WorkflowCanvasGraphNodeViewModel) => JSX.Element | null;
+  readonly onRemoveNode?: (node: WorkflowCanvasGraphNodeViewModel) => void;
 }
 
 function WorkflowSectionGraphNode({
@@ -49,10 +60,44 @@ function WorkflowItemGraphNode({
   data,
 }: NodeProps<Node<WorkflowStudioCanvasGraphNodeData>>): JSX.Element {
   const issueCount = data.graphNode.issueCount;
+  const selected = data.selectedNodeId === data.graphNode.id;
   return (
-    <article className="ui-workflow-canvas-node ui-workflow-canvas-node--item ui-card ui-card--padded ui-stack ui-stack--2xs">
-      <strong className="ui-workflow-canvas-node__title">{data.graphNode.title}</strong>
+    <article
+      className={`ui-workflow-canvas-node ui-workflow-canvas-node--item ui-card ui-card--padded ui-stack ui-stack--2xs ${selected ? "ui-workflow-canvas-node--selected" : ""}`}
+      data-testid={`workflow-canvas-node-${data.graphNode.sectionId}-${data.graphNode.entityId ?? data.graphNode.id}`}
+    >
+      <div className="ui-row ui-row--between ui-row--wrap">
+        <button
+          type="button"
+          className={`ui-button ui-button--sm ${selected ? "ui-button--primary" : "ui-button--ghost"}`}
+          data-testid={`workflow-canvas-node-select-${data.graphNode.sectionId}-${data.graphNode.entityId ?? data.graphNode.id}`}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            data.onSelectNode?.(data.graphNode.id);
+          }}
+        >
+          {data.graphNode.title}
+        </button>
+        <button
+          type="button"
+          className="ui-button ui-button--ghost ui-button--sm"
+          data-testid={`workflow-canvas-node-remove-${data.graphNode.sectionId}-${data.graphNode.entityId ?? data.graphNode.id}`}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            data.onRemoveNode?.(data.graphNode);
+          }}
+        >
+          Remove
+        </button>
+      </div>
       <p className="ui-text-small ui-text-secondary">{data.graphNode.subtitle}</p>
+      {data.renderNodeEditor ? (
+        <div className="ui-workflow-canvas-node__editor ui-stack ui-stack--2xs">
+          {data.renderNodeEditor(data.graphNode)}
+        </div>
+      ) : null}
       {data.graphNode.detailLines.length > 0 ? (
         <ul className="ui-stack ui-stack--2xs">
           {data.graphNode.detailLines.slice(0, 2).map((line, index) => (
@@ -60,9 +105,7 @@ function WorkflowItemGraphNode({
           ))}
         </ul>
       ) : null}
-      {issueCount > 0 ? (
-        <p className="ui-text-small ui-text-danger">{issueCount} issue(s)</p>
-      ) : null}
+      {issueCount > 0 ? <p className="ui-text-small ui-text-danger">{issueCount} issue(s)</p> : null}
     </article>
   );
 }
@@ -84,6 +127,10 @@ function mapGraphNodeToReactFlowNode(
     connectable: false,
     data: {
       graphNode: node,
+      selectedNodeId: undefined,
+      onSelectNode: undefined,
+      renderNodeEditor: undefined,
+      onRemoveNode: undefined,
     },
   };
 }
@@ -123,15 +170,46 @@ const nodeTypes = {
 
 export default function WorkflowStudioCanvasReactFlow({
   graph,
+  selectedNodeId,
+  onSelectNode,
+  onClearSelection,
+  renderNodeEditor,
+  onRemoveNode,
 }: WorkflowStudioCanvasReactFlowProps): JSX.Element {
   const nodes = useMemo(
-    () => graph.nodes.map((node) => mapGraphNodeToReactFlowNode(node)),
-    [graph.nodes],
+    () => graph.nodes.map((node) => {
+      const mapped = mapGraphNodeToReactFlowNode(node);
+      return {
+        ...mapped,
+        data: {
+          ...mapped.data,
+          selectedNodeId,
+          onSelectNode,
+          renderNodeEditor,
+          onRemoveNode,
+        },
+      };
+    }),
+    [graph.nodes, onRemoveNode, onSelectNode, renderNodeEditor, selectedNodeId],
   );
 
   const edges = useMemo(
     () => graph.edges.map((edge) => mapGraphEdgeToReactFlowEdge(edge)),
     [graph.edges],
+  );
+
+  const handleNodeClick = useMemo<NodeMouseHandler<Node<WorkflowStudioCanvasGraphNodeData>>>(
+    () => (_event, node) => {
+      onSelectNode?.(node.id);
+    },
+    [onSelectNode],
+  );
+
+  const handleEdgeClick = useMemo<EdgeMouseHandler<Edge>>(
+    () => () => {
+      onClearSelection?.();
+    },
+    [onClearSelection],
   );
 
   return (
@@ -148,6 +226,9 @@ export default function WorkflowStudioCanvasReactFlow({
         zoomOnPinch
         zoomOnScroll
         className="ui-rf-canvas ui-workflow-studio-canvas__reactflow"
+        onNodeClick={handleNodeClick}
+        onPaneClick={onClearSelection}
+        onEdgeClick={handleEdgeClick}
       >
         <Background gap={24} size={1} />
         <Controls showInteractive={false} />

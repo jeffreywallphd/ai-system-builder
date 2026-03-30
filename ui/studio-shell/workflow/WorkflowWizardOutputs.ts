@@ -487,6 +487,23 @@ export function setWorkflowOutputViewerTitle(
   });
 }
 
+export function setWorkflowOutputTitle(
+  draft: WorkflowDraft,
+  outputId: string,
+  title: string,
+): { readonly draft: WorkflowDraft; readonly changed: boolean } {
+  return updateOutput(draft, outputId, (current) => {
+    const normalized = normalizeOptional(title);
+    if (current.title === normalized) {
+      return current;
+    }
+    return Object.freeze({
+      ...current,
+      title: normalized,
+    });
+  });
+}
+
 export function setWorkflowOutputFileName(
   draft: WorkflowDraft,
   outputId: string,
