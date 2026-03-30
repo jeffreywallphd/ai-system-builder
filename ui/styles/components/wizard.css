@@ -50,6 +50,14 @@
   gap: var(--space-xs);
 }
 
+.workflow-output-selector-option {
+  align-items: flex-start;
+}
+
+.workflow-output-selector-actions {
+  gap: var(--space-xs);
+}
+
 .ui-linear-wizard__shell {
   display: flex;
   flex-direction: column;

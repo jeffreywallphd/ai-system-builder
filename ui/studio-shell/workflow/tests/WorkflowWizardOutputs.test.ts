@@ -5,8 +5,10 @@ import {
 } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
 import {
   addWorkflowOutput,
+  addWorkflowOutputs,
   getWorkflowOutputValidationMessages,
   removeWorkflowOutput,
+  setWorkflowOutputFieldValue,
   setWorkflowOutputDestinationType,
   setWorkflowOutputFileName,
   setWorkflowOutputFormat,
@@ -14,6 +16,7 @@ import {
   setWorkflowOutputViewerPresentationMode,
   setWorkflowOutputViewerTitle,
   WorkflowOutputPresentationModes,
+  workflowOutputTypeDefinitions,
 } from "../WorkflowWizardOutputs";
 
 describe("WorkflowWizardOutputs", () => {
@@ -22,6 +25,10 @@ describe("WorkflowWizardOutputs", () => {
     const first = addWorkflowOutput(baseDraft, WorkflowDraftOutputDestinationTypes.fileExport);
     const second = addWorkflowOutput(first.draft, WorkflowDraftOutputDestinationTypes.webViewer);
     const third = addWorkflowOutput(second.draft, WorkflowDraftOutputDestinationTypes.systemEntry);
+
+    expect(first.added).toBeTrue();
+    expect(second.added).toBeTrue();
+    expect(third.added).toBeTrue();
 
     expect(third.draft.outputs.map((output) => output.id)).toEqual([
       first.outputId,
@@ -34,6 +41,27 @@ describe("WorkflowWizardOutputs", () => {
     expect(removed.changed).toBe(true);
     expect(removed.draft.outputs.map((output) => output.id)).toEqual([first.outputId, third.outputId]);
     expect(removed.draft.outputs.map((output) => output.order)).toEqual([1, 2]);
+  });
+
+  it("supports multi-output addition and rejects malformed output add requests", () => {
+    const added = addWorkflowOutputs(createEmptyWorkflowDraft(), [
+      WorkflowDraftOutputDestinationTypes.fileExport,
+      WorkflowDraftOutputDestinationTypes.webViewer,
+      "",
+      "future-output",
+    ]);
+
+    expect(added.addedOutputIds).toHaveLength(2);
+    expect(added.draft.outputs.map((output) => output.destination.type)).toEqual([
+      WorkflowDraftOutputDestinationTypes.fileExport,
+      WorkflowDraftOutputDestinationTypes.webViewer,
+    ]);
+    expect(added.rejectedRequests.map((entry) => entry.destinationType)).toEqual([
+      "",
+      "future-output",
+    ]);
+    expect(added.rejectedRequests[0]?.error).toContain("requires a destination type");
+    expect(added.rejectedRequests[1]?.error).toContain("not supported");
   });
 
   it("switches output destination type and resets stale destination-specific configuration", () => {
@@ -120,5 +148,44 @@ describe("WorkflowWizardOutputs", () => {
     const switched = setWorkflowOutputFormat(added.draft, added.outputId, "json");
     expect(switched.changed).toBe(true);
     expect(switched.draft.outputs[0]?.format).toBe("json");
+  });
+
+  it("ignores unsupported destination-type switches", () => {
+    const added = addWorkflowOutput(createEmptyWorkflowDraft(), WorkflowDraftOutputDestinationTypes.fileExport);
+    const unchanged = setWorkflowOutputDestinationType(added.draft, added.outputId as string, "future-output");
+    expect(unchanged.changed).toBe(false);
+    expect(unchanged.draft.outputs[0]?.destination.type).toBe(WorkflowDraftOutputDestinationTypes.fileExport);
+  });
+
+  it("applies registry-driven field updates for format and destination configuration keys", () => {
+    const fileDefinition = workflowOutputTypeDefinitions.find(
+      (entry) => entry.destinationType === WorkflowDraftOutputDestinationTypes.fileExport,
+    );
+    const systemDefinition = workflowOutputTypeDefinitions.find(
+      (entry) => entry.destinationType === WorkflowDraftOutputDestinationTypes.systemEntry,
+    );
+    if (!fileDefinition || !systemDefinition) {
+      throw new Error("Expected workflow output type definitions to be available.");
+    }
+
+    const added = addWorkflowOutputs(createEmptyWorkflowDraft(), [
+      WorkflowDraftOutputDestinationTypes.fileExport,
+      WorkflowDraftOutputDestinationTypes.systemEntry,
+    ]);
+    const fileOutputId = added.draft.outputs[0]?.id as string;
+    const systemOutputId = added.draft.outputs[1]?.id as string;
+    const formatField = fileDefinition.configurationFields.find((field) => field.key === "format");
+    const entityField = systemDefinition.configurationFields.find((field) => field.key === "entityName");
+    if (!formatField || !entityField) {
+      throw new Error("Expected output config fields to be available.");
+    }
+
+    let draft = setWorkflowOutputFieldValue(added.draft, fileOutputId, formatField, "jsonl").draft;
+    draft = setWorkflowOutputFieldValue(draft, systemOutputId, entityField, "customer-record").draft;
+
+    expect(draft.outputs[0]?.format).toBe("jsonl");
+    expect(draft.outputs[1]?.destination.options).toEqual(expect.objectContaining({
+      entityName: "customer-record",
+    }));
   });
 });
