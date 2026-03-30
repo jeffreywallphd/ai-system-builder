@@ -37,7 +37,9 @@ import {
   WorkflowDraftStepKinds,
   WorkflowDraftStepTypes,
   WorkflowDraftTriggerKinds,
+  WorkflowDraftTemporalScheduleModes,
   WorkflowDraftTriggerTypes,
+  WorkflowDraftUserTriggerScopes,
   WorkflowLifecycleStates,
   WorkflowValidationIssueCodes,
   WorkflowStudioIdentity,
@@ -455,7 +457,7 @@ describe("WorkflowStudioDomain", () => {
       inputs: [],
       steps: [],
       outputs: [],
-    })).toThrow("requires config.cronExpression");
+    })).toThrow("requires config.cronExpression or config.runAt");
 
     expect(() => normalizeWorkflowDraft({
       triggers: [{
@@ -504,17 +506,40 @@ describe("WorkflowStudioDomain", () => {
       buttonId: "run-now",
       allowedRoles: ["operator", "operator", "owner"],
     })).toMatchObject({
+      invocationScope: WorkflowDraftUserTriggerScopes.workflowStart,
       buttonId: "run-now",
       allowedRoles: ["operator", "owner"],
     });
 
+    expect(normalizeWorkflowDraftTriggerConfig(WorkflowDraftTriggerTypes.userManual, {
+      invocationScope: WorkflowDraftUserTriggerScopes.workflowContinuation,
+      continuationStepId: "step-approval",
+      continuationTokenRef: "token.approval",
+    })).toMatchObject({
+      invocationScope: WorkflowDraftUserTriggerScopes.workflowContinuation,
+      continuationStepId: "step-approval",
+      continuationTokenRef: "token.approval",
+    });
+
     expect(normalizeWorkflowDraftTriggerConfig(WorkflowDraftTriggerTypes.temporalRecurring, {
+      scheduleMode: WorkflowDraftTemporalScheduleModes.interval,
       every: 3,
       unit: "hours",
       timezone: "UTC",
     })).toMatchObject({
+      scheduleMode: WorkflowDraftTemporalScheduleModes.interval,
       every: 3,
       unit: "hours",
+      timezone: "UTC",
+    });
+
+    expect(normalizeWorkflowDraftTriggerConfig(WorkflowDraftTriggerTypes.temporalSchedule, {
+      scheduleMode: WorkflowDraftTemporalScheduleModes.oneTime,
+      runAt: "2026-04-01T09:00:00.000Z",
+      timezone: "UTC",
+    })).toMatchObject({
+      scheduleMode: WorkflowDraftTemporalScheduleModes.oneTime,
+      runAt: "2026-04-01T09:00:00.000Z",
       timezone: "UTC",
     });
 
@@ -533,7 +558,27 @@ describe("WorkflowStudioDomain", () => {
     });
 
     expect(() => normalizeWorkflowDraftTriggerConfig(WorkflowDraftTriggerTypes.userButtonClick, {})).toThrow("config.buttonId");
-    expect(() => normalizeWorkflowDraftTriggerConfig(WorkflowDraftTriggerTypes.temporalSchedule, {})).toThrow("config.cronExpression");
+    expect(() => normalizeWorkflowDraftTriggerConfig(WorkflowDraftTriggerTypes.userManual, {
+      continuationStepId: "step-only",
+    })).toThrow("config.invocationScope");
+    expect(() => normalizeWorkflowDraftTriggerConfig(WorkflowDraftTriggerTypes.temporalSchedule, {})).toThrow("config.cronExpression or config.runAt");
+    expect(() => normalizeWorkflowDraftTriggerConfig(WorkflowDraftTriggerTypes.temporalSchedule, {
+      cronExpression: "* *",
+    })).toThrow("five-field cron expression");
+    expect(() => normalizeWorkflowDraftTriggerConfig(WorkflowDraftTriggerTypes.temporalSchedule, {
+      runAt: "not-a-time",
+    })).toThrow("config.runAt");
+    expect(() => normalizeWorkflowDraftTriggerConfig(WorkflowDraftTriggerTypes.temporalRecurring, {
+      every: 2,
+      unit: "hours",
+      runAt: "2026-04-01T09:00:00.000Z",
+    })).toThrow("config.every and config.unit");
+    expect(() => normalizeWorkflowDraftTriggerConfig(WorkflowDraftTriggerTypes.temporalRecurring, {
+      every: 1,
+      unit: "days",
+      startAt: "2026-04-02T00:00:00.000Z",
+      endAt: "2026-04-01T00:00:00.000Z",
+    })).toThrow("config.startAt");
     expect(() => normalizeWorkflowDraftTriggerConfig(WorkflowDraftTriggerTypes.stateSystemEvent, {})).toThrow("config.eventName");
   });
 

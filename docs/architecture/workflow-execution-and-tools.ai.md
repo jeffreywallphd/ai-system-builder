@@ -68,6 +68,7 @@ Workflow -> `ExecuteWorkflowUseCase` -> one-unit `ExecutionPlan` -> `UnifiedExec
   - `application/workflow-studio/WorkflowDraftExecutionRuntime.ts` executes mapped built-in plan elements deterministically (branch, loop, delay, manual-approval) and records explicit completed/skipped/failed/paused step traces.
   - `WorkflowStudioApplicationService.executeWorkflowDraft(...)` now routes canonical draft content through `deserialize -> plan mapper -> runtime executor` on the same workflow-studio contracts.
   - Built-in workflow drafts continue to persist as canonical serialized draft content and now have explicit persistence/rehydration coverage for built-in type/config/order round-trip in SQLite-backed studio-shell flows.
+- Trigger execution readiness mapping is now explicit but bounded through `application/workflow-studio/WorkflowTriggerRuntimeMapper.ts`, which projects canonical trigger definitions/config (manual/user, temporal, state) into runtime-facing descriptors without introducing a scheduler engine or trigger-side execution path.
 
 ## Runtime orchestration update
 - Delegated workflow execution selection can now consult the shared runtime dependency orchestrator before choosing a delegated strategy.

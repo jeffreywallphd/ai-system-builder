@@ -36,6 +36,23 @@ export const WorkflowDraftTriggerTypes = Object.freeze({
 
 export type WorkflowDraftTriggerType = typeof WorkflowDraftTriggerTypes[keyof typeof WorkflowDraftTriggerTypes];
 
+export const WorkflowDraftUserTriggerScopes = Object.freeze({
+  workflowStart: "workflow-start",
+  workflowContinuation: "workflow-continuation",
+});
+
+export type WorkflowDraftUserTriggerScope =
+  typeof WorkflowDraftUserTriggerScopes[keyof typeof WorkflowDraftUserTriggerScopes];
+
+export const WorkflowDraftTemporalScheduleModes = Object.freeze({
+  oneTime: "one-time",
+  cron: "cron",
+  interval: "interval",
+});
+
+export type WorkflowDraftTemporalScheduleMode =
+  typeof WorkflowDraftTemporalScheduleModes[keyof typeof WorkflowDraftTemporalScheduleModes];
+
 export interface WorkflowDraftAssetReference {
   readonly assetId: string;
   readonly versionId?: string;
@@ -48,12 +65,17 @@ export interface WorkflowDraftTriggerBase extends WorkflowDraftSectionItemBase {
 }
 
 export interface WorkflowDraftUserTriggerConfig {
+  readonly invocationScope?: WorkflowDraftUserTriggerScope;
   readonly buttonId?: string;
   readonly requiresConfirmation?: boolean;
   readonly allowedRoles?: ReadonlyArray<string>;
+  readonly continuationStepId?: string;
+  readonly continuationTokenRef?: string;
 }
 
 export interface WorkflowDraftTemporalTriggerConfig {
+  readonly scheduleMode?: WorkflowDraftTemporalScheduleMode;
+  readonly runAt?: string;
   readonly cronExpression?: string;
   readonly every?: number;
   readonly unit?: "minutes" | "hours" | "days" | "weeks";
@@ -107,6 +129,7 @@ export interface WorkflowDraftTriggerCapabilityMetadata {
   readonly supportsManualInvocation: boolean;
   readonly supportsTemporalScheduling: boolean;
   readonly supportsStateSubscription: boolean;
+  readonly supportsIntermediateContinuation: boolean;
 }
 
 export interface WorkflowDraftTriggerDefinition<TConfig extends WorkflowDraftTriggerConfig = WorkflowDraftTriggerConfig> {
@@ -749,6 +772,43 @@ function normalizeTriggerKind(value: string): WorkflowDraftTriggerKind {
   throw new Error(`Workflow draft trigger kind '${value}' is not supported.`);
 }
 
+function normalizeUserTriggerScope(value: unknown): WorkflowDraftUserTriggerScope {
+  const normalized = normalizeOptional(typeof value === "string" ? value : undefined);
+  if (!normalized) {
+    return WorkflowDraftUserTriggerScopes.workflowStart;
+  }
+  if (
+    normalized === WorkflowDraftUserTriggerScopes.workflowStart
+    || normalized === WorkflowDraftUserTriggerScopes.workflowContinuation
+  ) {
+    return normalized;
+  }
+  throw new Error(`Workflow draft user trigger config.invocationScope '${normalized}' is not supported.`);
+}
+
+function normalizeTemporalScheduleMode(value: unknown): WorkflowDraftTemporalScheduleMode | undefined {
+  const normalized = normalizeOptional(typeof value === "string" ? value : undefined);
+  if (!normalized) {
+    return undefined;
+  }
+  if (
+    normalized === WorkflowDraftTemporalScheduleModes.oneTime
+    || normalized === WorkflowDraftTemporalScheduleModes.cron
+    || normalized === WorkflowDraftTemporalScheduleModes.interval
+  ) {
+    return normalized;
+  }
+  throw new Error(`Workflow draft temporal trigger config.scheduleMode '${normalized}' is not supported.`);
+}
+
+function isLikelyCronExpression(value: string): boolean {
+  const fields = value.trim().split(/\s+/);
+  if (fields.length !== 5) {
+    return false;
+  }
+  return fields.every((field) => field.length > 0 && !field.includes(" "));
+}
+
 function normalizeWorkflowDraftAssetReference(
   reference: WorkflowDraftAssetReference,
   label: string,
@@ -789,10 +849,26 @@ function normalizeUserTriggerConfig(
     throw new Error("Workflow draft user button-click trigger requires config.buttonId.");
   }
 
+  const invocationScope = normalizeUserTriggerScope(configRecord.invocationScope);
+  const continuationStepId = normalizeOptional(
+    typeof configRecord.continuationStepId === "string" ? configRecord.continuationStepId : undefined,
+  );
+  const continuationTokenRef = normalizeOptional(
+    typeof configRecord.continuationTokenRef === "string" ? configRecord.continuationTokenRef : undefined,
+  );
+  if (invocationScope !== WorkflowDraftUserTriggerScopes.workflowContinuation && (continuationStepId || continuationTokenRef)) {
+    throw new Error(
+      "Workflow draft user trigger continuation fields require config.invocationScope to be 'workflow-continuation'.",
+    );
+  }
+
   return Object.freeze({
+    invocationScope,
     buttonId,
     requiresConfirmation: normalizeOptionalBoolean(configRecord.requiresConfirmation, "Workflow draft user trigger config.requiresConfirmation"),
     allowedRoles: normalizeStringArray(configRecord.allowedRoles, "Workflow draft user trigger config.allowedRoles"),
+    continuationStepId,
+    continuationTokenRef,
   });
 }
 
@@ -807,7 +883,16 @@ function normalizeTemporalTriggerConfig(
     throw new Error(`Workflow draft trigger type '${triggerType}' is not valid for kind '${WorkflowDraftTriggerKinds.temporal}'.`);
   }
 
+  const scheduleMode = normalizeTemporalScheduleMode(configRecord.scheduleMode);
+  const runAt = normalizeOptional(typeof configRecord.runAt === "string" ? configRecord.runAt : undefined);
+  if (runAt && !isValidTimestamp(runAt)) {
+    throw new Error("Workflow draft temporal trigger config.runAt must be a valid timestamp when provided.");
+  }
+
   const cronExpression = normalizeOptional(typeof configRecord.cronExpression === "string" ? configRecord.cronExpression : undefined);
+  if (cronExpression && !isLikelyCronExpression(cronExpression)) {
+    throw new Error("Workflow draft temporal trigger config.cronExpression must be a valid five-field cron expression.");
+  }
   const every = normalizePositiveInteger(configRecord.every, "Workflow draft temporal trigger config.every");
   const unit = normalizeOptional(typeof configRecord.unit === "string" ? configRecord.unit : undefined);
   const normalizedUnit = unit && ["minutes", "hours", "days", "weeks"].includes(unit)
@@ -817,20 +902,37 @@ function normalizeTemporalTriggerConfig(
     throw new Error(`Workflow draft temporal trigger config.unit '${unit}' is not supported.`);
   }
 
-  if (triggerType === WorkflowDraftTriggerTypes.temporalSchedule && !cronExpression) {
-    throw new Error("Workflow draft temporal schedule trigger requires config.cronExpression.");
+  const startAt = normalizeOptional(typeof configRecord.startAt === "string" ? configRecord.startAt : undefined);
+  const endAt = normalizeOptional(typeof configRecord.endAt === "string" ? configRecord.endAt : undefined);
+  if (startAt && !isValidTimestamp(startAt)) {
+    throw new Error("Workflow draft temporal trigger config.startAt must be a valid timestamp when provided.");
   }
-  if (triggerType === WorkflowDraftTriggerTypes.temporalRecurring && (!every || !normalizedUnit)) {
+  if (endAt && !isValidTimestamp(endAt)) {
+    throw new Error("Workflow draft temporal trigger config.endAt must be a valid timestamp when provided.");
+  }
+  if (startAt && endAt && Date.parse(startAt) > Date.parse(endAt)) {
+    throw new Error("Workflow draft temporal trigger config.startAt must be before config.endAt when both are provided.");
+  }
+
+  if (triggerType === WorkflowDraftTriggerTypes.temporalSchedule && !cronExpression && !runAt) {
+    throw new Error("Workflow draft temporal schedule trigger requires config.cronExpression or config.runAt.");
+  }
+  if (triggerType === WorkflowDraftTriggerTypes.temporalSchedule && cronExpression && runAt) {
+    throw new Error("Workflow draft temporal schedule trigger cannot define both config.cronExpression and config.runAt.");
+  }
+  if (triggerType === WorkflowDraftTriggerTypes.temporalRecurring && (!every || !normalizedUnit || runAt)) {
     throw new Error("Workflow draft temporal recurring trigger requires config.every and config.unit.");
   }
 
   return Object.freeze({
+    scheduleMode,
+    runAt,
     cronExpression,
     every,
     unit: normalizedUnit,
     timezone: normalizeOptional(typeof configRecord.timezone === "string" ? configRecord.timezone : undefined),
-    startAt: normalizeOptional(typeof configRecord.startAt === "string" ? configRecord.startAt : undefined),
-    endAt: normalizeOptional(typeof configRecord.endAt === "string" ? configRecord.endAt : undefined),
+    startAt,
+    endAt,
   });
 }
 
@@ -1626,8 +1728,11 @@ const workflowDraftTriggerDefinitions: ReadonlyArray<WorkflowDraftTriggerDefinit
       supportsManualInvocation: true,
       supportsTemporalScheduling: false,
       supportsStateSubscription: false,
+      supportsIntermediateContinuation: true,
     }),
-    defaultConfig: Object.freeze<WorkflowDraftUserTriggerConfig>({}),
+    defaultConfig: Object.freeze<WorkflowDraftUserTriggerConfig>({
+      invocationScope: WorkflowDraftUserTriggerScopes.workflowStart,
+    }),
     validateConfig: (configRecord) => normalizeUserTriggerConfig(WorkflowDraftTriggerTypes.userManual, configRecord),
   }),
   Object.freeze({
@@ -1640,8 +1745,10 @@ const workflowDraftTriggerDefinitions: ReadonlyArray<WorkflowDraftTriggerDefinit
       supportsManualInvocation: true,
       supportsTemporalScheduling: false,
       supportsStateSubscription: false,
+      supportsIntermediateContinuation: false,
     }),
     defaultConfig: Object.freeze<WorkflowDraftUserTriggerConfig>({
+      invocationScope: WorkflowDraftUserTriggerScopes.workflowStart,
       buttonId: "run-workflow",
     }),
     validateConfig: (configRecord) => normalizeUserTriggerConfig(WorkflowDraftTriggerTypes.userButtonClick, configRecord),
@@ -1656,8 +1763,11 @@ const workflowDraftTriggerDefinitions: ReadonlyArray<WorkflowDraftTriggerDefinit
       supportsManualInvocation: true,
       supportsTemporalScheduling: false,
       supportsStateSubscription: false,
+      supportsIntermediateContinuation: true,
     }),
-    defaultConfig: Object.freeze<WorkflowDraftUserTriggerConfig>({}),
+    defaultConfig: Object.freeze<WorkflowDraftUserTriggerConfig>({
+      invocationScope: WorkflowDraftUserTriggerScopes.workflowStart,
+    }),
     validateConfig: (configRecord) => normalizeUserTriggerConfig(WorkflowDraftTriggerTypes.userInitiatedRun, configRecord),
   }),
   Object.freeze({
@@ -1670,8 +1780,10 @@ const workflowDraftTriggerDefinitions: ReadonlyArray<WorkflowDraftTriggerDefinit
       supportsManualInvocation: false,
       supportsTemporalScheduling: true,
       supportsStateSubscription: false,
+      supportsIntermediateContinuation: false,
     }),
     defaultConfig: Object.freeze<WorkflowDraftTemporalTriggerConfig>({
+      scheduleMode: WorkflowDraftTemporalScheduleModes.cron,
       cronExpression: "0 9 * * *",
       timezone: "UTC",
     }),
@@ -1687,8 +1799,10 @@ const workflowDraftTriggerDefinitions: ReadonlyArray<WorkflowDraftTriggerDefinit
       supportsManualInvocation: false,
       supportsTemporalScheduling: true,
       supportsStateSubscription: false,
+      supportsIntermediateContinuation: false,
     }),
     defaultConfig: Object.freeze<WorkflowDraftTemporalTriggerConfig>({
+      scheduleMode: WorkflowDraftTemporalScheduleModes.interval,
       every: 1,
       unit: "days",
       timezone: "UTC",
@@ -1705,6 +1819,7 @@ const workflowDraftTriggerDefinitions: ReadonlyArray<WorkflowDraftTriggerDefinit
       supportsManualInvocation: false,
       supportsTemporalScheduling: false,
       supportsStateSubscription: true,
+      supportsIntermediateContinuation: false,
     }),
     defaultConfig: Object.freeze<WorkflowDraftStateTriggerConfig>({
       eventName: "data-available",
@@ -1721,6 +1836,7 @@ const workflowDraftTriggerDefinitions: ReadonlyArray<WorkflowDraftTriggerDefinit
       supportsManualInvocation: false,
       supportsTemporalScheduling: false,
       supportsStateSubscription: true,
+      supportsIntermediateContinuation: false,
     }),
     defaultConfig: Object.freeze<WorkflowDraftStateTriggerConfig>({
       asset: Object.freeze({
@@ -1741,6 +1857,7 @@ const workflowDraftTriggerDefinitions: ReadonlyArray<WorkflowDraftTriggerDefinit
       supportsManualInvocation: false,
       supportsTemporalScheduling: false,
       supportsStateSubscription: true,
+      supportsIntermediateContinuation: false,
     }),
     defaultConfig: Object.freeze<WorkflowDraftStateTriggerConfig>({
       eventName: "system-event",

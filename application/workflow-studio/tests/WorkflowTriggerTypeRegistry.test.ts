@@ -1,7 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import {
+  WorkflowDraftTemporalScheduleModes,
   WorkflowDraftTriggerKinds,
   WorkflowDraftTriggerTypes,
+  WorkflowDraftUserTriggerScopes,
   createEmptyWorkflowDraft,
   validateWorkflowDraft,
 } from "../../../domain/workflow-studio/WorkflowStudioDomain";
@@ -39,6 +41,7 @@ describe("WorkflowTriggerTypeRegistry", () => {
     expect(entries.every((entry) => entry.description.trim().length > 0)).toBeTrue();
     expect(entries.every((entry) => entry.configSchemaId.startsWith("workflow.trigger."))).toBeTrue();
     expect(entries.every((entry) => entry.validationEntryPoint === "normalizeWorkflowDraftTriggerConfig")).toBeTrue();
+    expect(entries.every((entry) => typeof entry.defaultConfig === "object")).toBeTrue();
   });
 
   it("supports trigger lookup, support checks, and kind filtering", () => {
@@ -56,6 +59,13 @@ describe("WorkflowTriggerTypeRegistry", () => {
 
   it("creates default trigger configs and validates them through domain entry points", () => {
     const registry = createDefaultWorkflowTriggerTypeRegistry();
+    expect(registry.createDefaultConfig(WorkflowDraftTriggerTypes.userManual)).toMatchObject({
+      invocationScope: WorkflowDraftUserTriggerScopes.workflowStart,
+    });
+    expect(registry.createDefaultConfig(WorkflowDraftTriggerTypes.temporalSchedule)).toMatchObject({
+      scheduleMode: WorkflowDraftTemporalScheduleModes.cron,
+      cronExpression: "0 9 * * *",
+    });
 
     const triggers = registry.list().map((entry, index) => Object.freeze({
       id: `trigger-${index + 1}`,
@@ -75,7 +85,7 @@ describe("WorkflowTriggerTypeRegistry", () => {
   it("rejects malformed trigger configs and duplicate registrations", () => {
     const registry = createDefaultWorkflowTriggerTypeRegistry();
     expect(() => registry.validateConfig(WorkflowDraftTriggerTypes.userButtonClick, {})).toThrow("config.buttonId");
-    expect(() => registry.validateConfig(WorkflowDraftTriggerTypes.temporalSchedule, {})).toThrow("config.cronExpression");
+    expect(() => registry.validateConfig(WorkflowDraftTriggerTypes.temporalSchedule, {})).toThrow("config.cronExpression or config.runAt");
     expect(() => registry.validateConfig(WorkflowDraftTriggerTypes.temporalRecurring, {
       every: 1,
     })).toThrow("config.every and config.unit");
@@ -97,6 +107,7 @@ describe("WorkflowTriggerTypeRegistry", () => {
           supportsManualInvocation: true,
           supportsTemporalScheduling: false,
           supportsStateSubscription: false,
+          supportsIntermediateContinuation: true,
         },
         defaultConfig: {},
         validateConfig: () => ({}),
@@ -111,6 +122,7 @@ describe("WorkflowTriggerTypeRegistry", () => {
           supportsManualInvocation: true,
           supportsTemporalScheduling: false,
           supportsStateSubscription: false,
+          supportsIntermediateContinuation: true,
         },
         defaultConfig: {},
         validateConfig: () => ({}),
