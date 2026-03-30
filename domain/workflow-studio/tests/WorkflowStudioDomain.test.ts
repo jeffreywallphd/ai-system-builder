@@ -206,18 +206,52 @@ describe("WorkflowStudioDomain", () => {
     const draft = normalizeWorkflowDraft({
       triggers: [],
       inputs: [],
-      steps: [{
-        id: "step-approval",
-        type: WorkflowDraftBuiltInStepTypes.manualApproval,
-        kind: WorkflowDraftStepKinds.controlFlow,
-        order: 1,
-        config: {
-          approvalMessage: "Manager sign-off required",
-          requiredApproverRoles: ["manager"],
-          timeoutSeconds: 900,
-          onTimeout: "escalate",
+      steps: [
+        {
+          id: "step-branch",
+          type: WorkflowDraftBuiltInStepTypes.ifThen,
+          kind: WorkflowDraftStepKinds.controlFlow,
+          order: 1,
+          config: {
+            condition: {
+              kind: "expression",
+              expression: "inputs.score >= 0.8",
+            },
+            branches: {
+              then: {
+                label: "approve",
+              },
+              else: {
+                label: "review",
+              },
+            },
+          },
         },
-      }],
+        {
+          id: "step-loop",
+          type: WorkflowDraftBuiltInStepTypes.loopIteration,
+          kind: WorkflowDraftStepKinds.controlFlow,
+          order: 2,
+          config: {
+            mode: "fixed-count",
+            fixedCount: {
+              count: 2,
+            },
+          },
+        },
+        {
+          id: "step-approval",
+          type: WorkflowDraftBuiltInStepTypes.manualApproval,
+          kind: WorkflowDraftStepKinds.controlFlow,
+          order: 3,
+          config: {
+            approvalMessage: "Manager sign-off required",
+            requiredApproverRoles: ["manager"],
+            timeoutSeconds: 900,
+            onTimeout: "escalate",
+          },
+        },
+      ],
       outputs: [],
     });
 
@@ -225,7 +259,11 @@ describe("WorkflowStudioDomain", () => {
     const parsed = deserializeWorkflowDraftDocument(serialized);
 
     expect(parsed).toEqual(draft);
-    expect(parsed.steps[0]?.type).toBe(WorkflowDraftBuiltInStepTypes.manualApproval);
+    expect(parsed.steps.map((step) => step.type)).toEqual([
+      WorkflowDraftBuiltInStepTypes.ifThen,
+      WorkflowDraftBuiltInStepTypes.loopIteration,
+      WorkflowDraftBuiltInStepTypes.manualApproval,
+    ]);
   });
 
   it("maps workflow entities to/from persistence records and preserves canonical fields", () => {
@@ -559,9 +597,20 @@ describe("WorkflowStudioDomain", () => {
           kind: WorkflowDraftStepKinds.controlFlow,
           order: 1,
           config: {
-            conditionExpression: "qualityScore >= 0.9",
-            thenLabel: "high confidence",
-            elseLabel: "needs review",
+            condition: {
+              kind: "comparison",
+              leftOperand: "inputs.qualityScore",
+              operator: "greater-than-or-equal",
+              rightOperand: 0.9,
+            },
+            branches: {
+              then: {
+                label: "high confidence",
+              },
+              else: {
+                label: "needs review",
+              },
+            },
           },
         },
         {
@@ -570,7 +619,11 @@ describe("WorkflowStudioDomain", () => {
           kind: WorkflowDraftStepKinds.controlFlow,
           order: 2,
           config: {
-            repeatCount: 3,
+            mode: "fixed-count",
+            fixedCount: {
+              count: 3,
+            },
+            loopLabel: "retry",
           },
         },
         {
@@ -602,9 +655,20 @@ describe("WorkflowStudioDomain", () => {
       kind: WorkflowDraftStepKinds.controlFlow,
       type: WorkflowDraftBuiltInStepTypes.ifThen,
       config: {
-        conditionExpression: "qualityScore >= 0.9",
-        thenLabel: "high confidence",
-        elseLabel: "needs review",
+        condition: {
+          kind: "comparison",
+          leftOperand: "inputs.qualityScore",
+          operator: "greater-than-or-equal",
+          rightOperand: 0.9,
+        },
+        branches: {
+          then: {
+            label: "high confidence",
+          },
+          else: {
+            label: "needs review",
+          },
+        },
       },
     });
     expect(normalized.steps[1]).toMatchObject({
@@ -612,7 +676,12 @@ describe("WorkflowStudioDomain", () => {
       kind: WorkflowDraftStepKinds.controlFlow,
       type: WorkflowDraftBuiltInStepTypes.loopIteration,
       config: {
+        mode: "fixed-count",
+        fixedCount: {
+          count: 3,
+        },
         repeatCount: 3,
+        iterationMode: "fixed-count",
       },
     });
     expect(normalized.steps[2]).toMatchObject({
@@ -852,7 +921,43 @@ describe("WorkflowStudioDomain", () => {
         },
       }],
       outputs: [],
-    })).toThrow("requires config.repeatCount or config.loopConditionExpression");
+    })).toThrow("requires config.mode/fixedCount/collection/range or legacy repeatCount");
+
+    expect(() => normalizeWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [{
+        id: "step-invalid-if-branches",
+        type: WorkflowDraftBuiltInStepTypes.ifThen,
+        kind: WorkflowDraftStepKinds.controlFlow,
+        order: 1,
+        config: {
+          condition: {
+            kind: "expression",
+            expression: "score > 0",
+          },
+          branches: {
+            then: {},
+          },
+        },
+      }],
+      outputs: [],
+    })).toThrow("branches.then requires label or stepIds");
+
+    expect(() => normalizeWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [{
+        id: "step-invalid-loop-mode-source",
+        type: WorkflowDraftBuiltInStepTypes.loopIteration,
+        kind: WorkflowDraftStepKinds.controlFlow,
+        order: 1,
+        config: {
+          mode: "collection",
+        },
+      }],
+      outputs: [],
+    })).toThrow("collection mode requires config.collection");
 
     expect(() => normalizeWorkflowDraft({
       triggers: [],

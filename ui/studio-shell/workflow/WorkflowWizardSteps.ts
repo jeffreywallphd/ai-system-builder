@@ -408,10 +408,46 @@ export function setWorkflowStepIfThenConfig(
     }
 
     const existing = (currentStep.config ?? {}) as WorkflowDraftIfThenStepConfig;
+    const previousThen = existing.branches?.then ?? Object.freeze({
+      label: existing.thenLabel,
+      stepIds: existing.thenStepIds,
+    });
+    const previousElse = existing.branches?.else ?? (
+      existing.elseLabel || existing.elseStepIds
+        ? Object.freeze({
+          label: existing.elseLabel,
+          stepIds: existing.elseStepIds,
+        })
+        : undefined
+    );
+    const nextThenLabel = patch.thenLabel !== undefined ? normalizeOptional(patch.thenLabel) : previousThen.label;
+    const nextElseLabel = patch.elseLabel !== undefined ? normalizeOptional(patch.elseLabel) : previousElse?.label;
+    const conditionExpression = patch.conditionExpression
+      ?? existing.conditionExpression
+      ?? (existing.condition?.kind === "expression" ? existing.condition.expression : "")
+      ?? "";
     const nextConfig: WorkflowDraftIfThenStepConfig = Object.freeze({
-      conditionExpression: patch.conditionExpression ?? existing.conditionExpression ?? "",
-      thenLabel: patch.thenLabel !== undefined ? normalizeOptional(patch.thenLabel) : existing.thenLabel,
-      elseLabel: patch.elseLabel !== undefined ? normalizeOptional(patch.elseLabel) : existing.elseLabel,
+      condition: Object.freeze({
+        kind: "expression",
+        expression: conditionExpression,
+      }),
+      branches: Object.freeze({
+        then: Object.freeze({
+          label: nextThenLabel,
+          stepIds: previousThen.stepIds,
+        }),
+        else: (nextElseLabel || previousElse?.stepIds)
+          ? Object.freeze({
+            label: nextElseLabel,
+            stepIds: previousElse?.stepIds,
+          })
+          : undefined,
+      }),
+      conditionExpression,
+      thenLabel: nextThenLabel,
+      elseLabel: nextElseLabel,
+      thenStepIds: previousThen.stepIds,
+      elseStepIds: previousElse?.stepIds,
     });
 
     return Object.freeze({
@@ -436,12 +472,45 @@ export function setWorkflowStepLoopConfig(
     }
 
     const existing = (currentStep.config ?? {}) as WorkflowDraftLoopIterationStepConfig;
+    const nextRepeatCount = patch.repeatCount ?? existing.repeatCount;
+    const nextLoopConditionExpression = patch.loopConditionExpression !== undefined
+      ? normalizeOptional(patch.loopConditionExpression)
+      : existing.loopConditionExpression;
+    const nextLoopLabel = patch.loopLabel !== undefined ? normalizeOptional(patch.loopLabel) : existing.loopLabel;
+    const resolvedCollection = existing.collection ?? (
+      existing.collectionInputKey
+        ? Object.freeze({
+          inputKey: existing.collectionInputKey,
+          itemAlias: existing.itemAlias,
+        })
+        : undefined
+    );
+    const resolvedMode = patch.repeatCount !== undefined
+      ? "fixed-count"
+      : (existing.mode ?? existing.iterationMode ?? (resolvedCollection ? "collection" : (existing.range ? "range" : "fixed-count")));
     const nextConfig: WorkflowDraftLoopIterationStepConfig = Object.freeze({
-      repeatCount: patch.repeatCount ?? existing.repeatCount,
-      loopConditionExpression: patch.loopConditionExpression !== undefined
-        ? normalizeOptional(patch.loopConditionExpression)
-        : existing.loopConditionExpression,
-      loopLabel: patch.loopLabel !== undefined ? normalizeOptional(patch.loopLabel) : existing.loopLabel,
+      mode: resolvedMode,
+      fixedCount: nextRepeatCount
+        ? Object.freeze({
+          count: nextRepeatCount,
+        })
+        : existing.fixedCount,
+      collection: resolvedCollection,
+      range: existing.range,
+      exitCondition: nextLoopConditionExpression
+        ? Object.freeze({
+          kind: "expression",
+          expression: nextLoopConditionExpression,
+        })
+        : existing.exitCondition,
+      loopLabel: nextLoopLabel,
+      bodyStepIds: existing.bodyStepIds,
+      maxIterations: existing.maxIterations,
+      repeatCount: nextRepeatCount,
+      loopConditionExpression: nextLoopConditionExpression,
+      iterationMode: resolvedMode,
+      itemAlias: resolvedCollection?.itemAlias,
+      collectionInputKey: resolvedCollection?.inputKey,
     });
 
     return Object.freeze({

@@ -69,6 +69,13 @@ describe("BuiltInWorkflowStepRegistry", () => {
   it("rejects malformed built-in configs and duplicate registrations", () => {
     const registry = createDefaultBuiltInWorkflowStepRegistry();
     expect(() => registry.validateConfig(WorkflowDraftBuiltInStepTypes.delayWait, { durationSeconds: 0 })).toThrow("durationSeconds");
+    expect(() => registry.validateConfig(WorkflowDraftBuiltInStepTypes.ifThen, {
+      condition: { kind: "expression", expression: "x > 0" },
+      branches: { then: {} },
+    })).toThrow("branches.then");
+    expect(() => registry.validateConfig(WorkflowDraftBuiltInStepTypes.loopIteration, {
+      mode: "collection",
+    })).toThrow("config.collection");
 
     expect(() => new BuiltInWorkflowStepRegistry([
       {
@@ -76,18 +83,24 @@ describe("BuiltInWorkflowStepRegistry", () => {
         category: WorkflowDraftBuiltInStepCategories.controlFlow,
         label: "If / Then",
         description: "Branch",
-        configSchemaId: "workflow.builtin.if-then.v1",
-        defaultConfig: { conditionExpression: "true" },
-        validateConfig: (config) => config as { conditionExpression: string },
+        configSchemaId: "workflow.builtin.if-then.v2",
+        defaultConfig: {
+          condition: { kind: "expression", expression: "true" },
+          branches: { then: { label: "then" } },
+        },
+        validateConfig: (config) => config as never,
       },
       {
         type: WorkflowDraftBuiltInStepTypes.ifThen,
         category: WorkflowDraftBuiltInStepCategories.controlFlow,
         label: "If / Then duplicate",
         description: "Branch duplicate",
-        configSchemaId: "workflow.builtin.if-then.v1",
-        defaultConfig: { conditionExpression: "true" },
-        validateConfig: (config) => config as { conditionExpression: string },
+        configSchemaId: "workflow.builtin.if-then.v2",
+        defaultConfig: {
+          condition: { kind: "expression", expression: "true" },
+          branches: { then: { label: "then" } },
+        },
+        validateConfig: (config) => config as never,
       },
     ])).toThrow("already registered");
   });
