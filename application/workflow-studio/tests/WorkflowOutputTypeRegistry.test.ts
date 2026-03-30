@@ -20,13 +20,14 @@ describe("WorkflowOutputTypeRegistry", () => {
       WorkflowDraftOutputDestinationTypes.fileExport,
       WorkflowDraftOutputDestinationTypes.webViewer,
       WorkflowDraftOutputDestinationTypes.systemEntry,
+      WorkflowDraftOutputDestinationTypes.promptResponseChat,
     ]);
     expect(entries.every((entry) => entry.label.trim().length > 0)).toBeTrue();
     expect(entries.every((entry) => entry.description.trim().length > 0)).toBeTrue();
     expect(entries.every((entry) => entry.configSchemaId.startsWith("workflow.output.destination."))).toBeTrue();
     expect(entries.every((entry) => entry.supportedFormats.length > 0)).toBeTrue();
     expect(entries.every((entry) => entry.configurationFields.length > 0)).toBeTrue();
-    expect(entries.some((entry) => entry.capabilities.supportsConversationalOutput)).toBeFalse();
+    expect(entries.some((entry) => entry.capabilities.supportsConversationalOutput)).toBeTrue();
   });
 
   it("supports lookup and unknown-type handling", () => {
@@ -42,6 +43,18 @@ describe("WorkflowOutputTypeRegistry", () => {
           target: WorkflowOutputRegistryFieldTargets.format,
         }),
       ]),
+    );
+    expect(registry.get(WorkflowDraftOutputDestinationTypes.promptResponseChat)).toEqual(
+      expect.objectContaining({
+        capabilities: expect.objectContaining({
+          supportsConversationalOutput: true,
+        }),
+        conversational: expect.objectContaining({
+          mode: "prompt-response",
+          supportsContinuation: true,
+          promptInputLinkKey: "promptInputId",
+        }),
+      }),
     );
   });
 

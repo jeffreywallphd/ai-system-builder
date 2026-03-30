@@ -58,6 +58,14 @@ export interface WorkflowOutputRegistryCapabilities {
   readonly supportsConversationalOutput: boolean;
 }
 
+export interface WorkflowOutputRegistryConversationalMetadata {
+  readonly mode: "prompt-response";
+  readonly supportsContinuation: boolean;
+  readonly promptInputLinkKey: string;
+  readonly responseFieldKey: string;
+  readonly scopeFieldKey: string;
+}
+
 export interface WorkflowOutputRegistryMultiplicity {
   readonly policy: WorkflowOutputRegistryMultiplicityPolicy;
   readonly maxInstances?: number;
@@ -74,6 +82,7 @@ export interface WorkflowOutputTypeRegistryEntry {
   readonly defaultTarget: string;
   readonly defaultConfiguration?: Readonly<Record<string, unknown>>;
   readonly capabilities: WorkflowOutputRegistryCapabilities;
+  readonly conversational?: WorkflowOutputRegistryConversationalMetadata;
   readonly multiplicity: WorkflowOutputRegistryMultiplicity;
   readonly configurationFields: ReadonlyArray<WorkflowOutputRegistryFieldMetadata>;
 }
@@ -114,6 +123,7 @@ function toRegistryEntry(definition: WorkflowDraftOutputDestinationDefinition): 
       supportsExecutionReview: true,
       supportsConversationalOutput: false,
     }),
+    conversational: undefined,
     configurationFields: Object.freeze([] as WorkflowOutputRegistryFieldMetadata[]),
   });
 
@@ -137,6 +147,32 @@ function toRegistryEntry(definition: WorkflowDraftOutputDestinationDefinition): 
               label: String(format).toUpperCase(),
             })),
           ),
+        }),
+        Object.freeze({
+          key: "deliveryMode",
+          label: "Delivery mode",
+          target: WorkflowOutputRegistryFieldTargets.configuration,
+          kind: WorkflowOutputRegistryFieldKinds.select,
+          required: true,
+          options: Object.freeze([
+            Object.freeze({
+              value: "download",
+              label: "Download file",
+            }),
+            Object.freeze({
+              value: "workspace-file",
+              label: "Workspace file",
+            }),
+          ]),
+        }),
+        Object.freeze({
+          key: "destinationPath",
+          label: "Destination path",
+          target: WorkflowOutputRegistryFieldTargets.configuration,
+          kind: WorkflowOutputRegistryFieldKinds.text,
+          required: false,
+          placeholder: "exports/report.json",
+          description: "Required when delivery mode is 'Workspace file'.",
         }),
         Object.freeze({
           key: "fileName",
@@ -211,6 +247,77 @@ function toRegistryEntry(definition: WorkflowDraftOutputDestinationDefinition): 
           kind: WorkflowOutputRegistryFieldKinds.text,
           required: false,
           placeholder: "connection:primary-db",
+        }),
+      ]),
+    });
+  }
+
+  if (definition.destinationType === WorkflowDraftOutputDestinationTypes.promptResponseChat) {
+    return Object.freeze({
+      ...base,
+      capabilities: Object.freeze({
+        ...base.capabilities,
+        supportsInteractiveViewer: true,
+        supportsConversationalOutput: true,
+      }),
+      conversational: Object.freeze({
+        mode: "prompt-response",
+        supportsContinuation: true,
+        promptInputLinkKey: "promptInputId",
+        responseFieldKey: "responseField",
+        scopeFieldKey: "conversationScope",
+      }),
+      configurationFields: Object.freeze([
+        Object.freeze({
+          key: "title",
+          label: "Chat title",
+          target: WorkflowOutputRegistryFieldTargets.title,
+          kind: WorkflowOutputRegistryFieldKinds.text,
+          required: true,
+          placeholder: "Workflow chat response",
+        }),
+        Object.freeze({
+          key: "promptInputId",
+          label: "Prompt input id",
+          target: WorkflowOutputRegistryFieldTargets.configuration,
+          kind: WorkflowOutputRegistryFieldKinds.text,
+          required: true,
+          placeholder: "input-user-prompt",
+          description: "Links the conversational output to a prompt-oriented workflow input id.",
+        }),
+        Object.freeze({
+          key: "responseField",
+          label: "Initial response field",
+          target: WorkflowOutputRegistryFieldTargets.configuration,
+          kind: WorkflowOutputRegistryFieldKinds.text,
+          required: true,
+          placeholder: "assistant-response",
+          description: "Field key that stores the initial assistant response payload.",
+        }),
+        Object.freeze({
+          key: "conversationScope",
+          label: "Conversation scope",
+          target: WorkflowOutputRegistryFieldTargets.configuration,
+          kind: WorkflowOutputRegistryFieldKinds.select,
+          required: true,
+          options: Object.freeze([
+            Object.freeze({
+              value: "continue-session",
+              label: "Continue session",
+            }),
+            Object.freeze({
+              value: "new-session",
+              label: "New session",
+            }),
+          ]),
+        }),
+        Object.freeze({
+          key: "initialSystemPrompt",
+          label: "Initial system prompt (optional)",
+          target: WorkflowOutputRegistryFieldTargets.configuration,
+          kind: WorkflowOutputRegistryFieldKinds.text,
+          required: false,
+          placeholder: "You are a concise assistant.",
         }),
       ]),
     });

@@ -1442,6 +1442,7 @@ describe("WorkflowStudioDomain", () => {
       WorkflowDraftOutputDestinationTypes.fileExport,
       WorkflowDraftOutputDestinationTypes.webViewer,
       WorkflowDraftOutputDestinationTypes.systemEntry,
+      WorkflowDraftOutputDestinationTypes.promptResponseChat,
     ]);
     expect(definitions.every((entry) => entry.configSchemaId.startsWith("workflow.output.destination."))).toBeTrue();
     expect(getWorkflowDraftOutputDestinationDefinition(WorkflowDraftOutputDestinationTypes.systemEntry)?.defaultFormat).toBe(
@@ -1537,6 +1538,112 @@ describe("WorkflowStudioDomain", () => {
     });
     expect(fileExportInvalidFormat.valid).toBeFalse();
     expect(fileExportInvalidFormat.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.outputFileFormatInvalid)).toBeTrue();
+
+    const fileExportWorkspacePathMissing = validateWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [],
+      outputs: [{
+        id: "output-file-export-path",
+        type: "workflow-output",
+        outputType: WorkflowDraftOutputTypes.document,
+        format: WorkflowDraftOutputFormats.json,
+        destination: {
+          type: WorkflowDraftOutputDestinationTypes.fileExport,
+          target: "/tmp/export.json",
+          options: {
+            deliveryMode: "workspace-file",
+            destinationPath: "",
+          },
+        },
+      }],
+    });
+    expect(fileExportWorkspacePathMissing.valid).toBeFalse();
+    expect(fileExportWorkspacePathMissing.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.outputFileDestinationPathMissing)).toBeTrue();
+
+    const promptChatMissingLinkage = validateWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [],
+      outputs: [{
+        id: "output-chat",
+        type: "workflow-output",
+        outputType: WorkflowDraftOutputTypes.document,
+        format: WorkflowDraftOutputFormats.json,
+        destination: {
+          type: WorkflowDraftOutputDestinationTypes.promptResponseChat,
+          target: "chat-session",
+          options: {
+            title: "Conversation",
+            promptInputId: "",
+            responseField: "",
+            conversationScope: "invalid-scope",
+          },
+        },
+      }],
+    });
+    expect(promptChatMissingLinkage.valid).toBeFalse();
+    expect(promptChatMissingLinkage.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.outputPromptInputIdMissing)).toBeTrue();
+    expect(promptChatMissingLinkage.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.outputPromptResponseFieldMissing)).toBeTrue();
+    expect(promptChatMissingLinkage.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.outputPromptConversationScopeInvalid)).toBeTrue();
+
+    const promptChatUnknownInput = validateWorkflowDraft({
+      triggers: [],
+      inputs: [{
+        id: "input-dataset",
+        type: "dataset",
+        sourceType: WorkflowDraftInputSourceTypes.datasetAsset,
+        asset: { assetId: "asset:dataset-chat" },
+      }],
+      steps: [],
+      outputs: [{
+        id: "output-chat-missing-input",
+        type: "workflow-output",
+        outputType: WorkflowDraftOutputTypes.document,
+        format: WorkflowDraftOutputFormats.markdown,
+        destination: {
+          type: WorkflowDraftOutputDestinationTypes.promptResponseChat,
+          target: "chat-session",
+          options: {
+            title: "Conversation",
+            promptInputId: "input-missing",
+            responseField: "assistant-response",
+            conversationScope: "continue-session",
+          },
+        },
+      }],
+    });
+    expect(promptChatUnknownInput.valid).toBeFalse();
+    expect(promptChatUnknownInput.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.outputPromptInputNotFound)).toBeTrue();
+
+    const promptChatIncompatibleInput = validateWorkflowDraft({
+      triggers: [],
+      inputs: [{
+        id: "input-dataset",
+        type: "dataset",
+        sourceType: WorkflowDraftInputSourceTypes.datasetAsset,
+        asset: { assetId: "asset:dataset-chat" },
+      }],
+      steps: [],
+      outputs: [{
+        id: "output-chat-incompatible",
+        type: "workflow-output",
+        outputType: WorkflowDraftOutputTypes.document,
+        format: WorkflowDraftOutputFormats.json,
+        destination: {
+          type: WorkflowDraftOutputDestinationTypes.promptResponseChat,
+          target: "chat-session",
+          options: {
+            title: "Conversation",
+            promptInputId: "input-dataset",
+            responseField: "assistant-response",
+            conversationScope: "continue-session",
+          },
+        },
+      }],
+    });
+    expect(promptChatIncompatibleInput.valid).toBeFalse();
+    expect(promptChatIncompatibleInput.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.outputPromptInputIncompatible)).toBeTrue();
   });
 
   it("returns output validation issues for duplicate/non-contiguous output ordering", () => {

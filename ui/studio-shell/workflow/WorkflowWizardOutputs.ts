@@ -17,6 +17,14 @@ export const WorkflowOutputPresentationModes = Object.freeze({
 export type WorkflowOutputPresentationMode =
   typeof WorkflowOutputPresentationModes[keyof typeof WorkflowOutputPresentationModes];
 
+export const WorkflowOutputConversationScopes = Object.freeze({
+  continueSession: "continue-session",
+  newSession: "new-session",
+});
+
+export type WorkflowOutputConversationScope =
+  typeof WorkflowOutputConversationScopes[keyof typeof WorkflowOutputConversationScopes];
+
 export interface WorkflowOutputAddRequest {
   readonly destinationType: string;
 }
@@ -101,6 +109,7 @@ function applyDestinationDefinition(
     format: definition.defaultFormat,
     configuration,
     title: definition.destinationType === WorkflowDraftOutputDestinationTypes.webViewer
+      || definition.destinationType === WorkflowDraftOutputDestinationTypes.promptResponseChat
       ? (typeof configuration?.title === "string" ? configuration.title : undefined)
       : undefined,
     destination: Object.freeze({
@@ -162,6 +171,24 @@ function readDestinationOptionString(output: WorkflowDraftOutput, key: string): 
     return undefined;
   }
   return normalizeOptional(candidate);
+}
+
+function setWorkflowOutputConfigurationValue(
+  draft: WorkflowDraft,
+  outputId: string,
+  key: string,
+  value: string,
+): { readonly draft: WorkflowDraft; readonly changed: boolean } {
+  return updateOutput(draft, outputId, (current) => {
+    const normalized = normalizeOptional(value) ?? "";
+    const existing = readDestinationOptionString(current, key) ?? "";
+    if (existing === normalized) {
+      return current;
+    }
+    return updateDestinationOptions(current, {
+      [key]: normalized,
+    });
+  });
 }
 
 export function getWorkflowOutputDestinationDefinitionByType(
@@ -427,16 +454,7 @@ export function setWorkflowOutputFileName(
   outputId: string,
   fileName: string,
 ): { readonly draft: WorkflowDraft; readonly changed: boolean } {
-  return updateOutput(draft, outputId, (current) => {
-    const normalized = normalizeOptional(fileName) ?? "";
-    const existing = readDestinationOptionString(current, "fileName") ?? "";
-    if (existing === normalized) {
-      return current;
-    }
-    return updateDestinationOptions(current, {
-      fileName: normalized,
-    });
-  });
+  return setWorkflowOutputConfigurationValue(draft, outputId, "fileName", fileName);
 }
 
 export function setWorkflowOutputViewerPresentationMode(
@@ -460,16 +478,7 @@ export function setWorkflowOutputRecordEntityName(
   outputId: string,
   entityName: string,
 ): { readonly draft: WorkflowDraft; readonly changed: boolean } {
-  return updateOutput(draft, outputId, (current) => {
-    const normalized = normalizeOptional(entityName) ?? "";
-    const existing = readDestinationOptionString(current, "entityName") ?? "";
-    if (existing === normalized) {
-      return current;
-    }
-    return updateDestinationOptions(current, {
-      entityName: normalized,
-    });
-  });
+  return setWorkflowOutputConfigurationValue(draft, outputId, "entityName", entityName);
 }
 
 export function setWorkflowOutputRecordDestinationConfig(
@@ -477,16 +486,7 @@ export function setWorkflowOutputRecordDestinationConfig(
   outputId: string,
   destinationConfig: string,
 ): { readonly draft: WorkflowDraft; readonly changed: boolean } {
-  return updateOutput(draft, outputId, (current) => {
-    const normalized = normalizeOptional(destinationConfig) ?? "";
-    const existing = readDestinationOptionString(current, "destinationConfig") ?? "";
-    if (existing === normalized) {
-      return current;
-    }
-    return updateDestinationOptions(current, {
-      destinationConfig: normalized,
-    });
-  });
+  return setWorkflowOutputConfigurationValue(draft, outputId, "destinationConfig", destinationConfig);
 }
 
 export function getWorkflowOutputValidationMessages(
@@ -512,10 +512,34 @@ export function getWorkflowOutputValidationMessages(
       messages.push("Web Viewer output requires a viewer title.");
     }
   }
+  if (destinationDefinition.destinationType === WorkflowDraftOutputDestinationTypes.fileExport) {
+    const deliveryMode = readDestinationOptionString(output, "deliveryMode") ?? "download";
+    if (deliveryMode === "workspace-file" && !readDestinationOptionString(output, "destinationPath")) {
+      messages.push("File Export workspace-file delivery requires a destination path.");
+    }
+  }
   if (destinationDefinition.destinationType === WorkflowDraftOutputDestinationTypes.systemEntry) {
     const entityName = readDestinationOptionString(output, "entityName");
     if (!entityName) {
       messages.push("Database/System Record output requires an entity name.");
+    }
+  }
+  if (destinationDefinition.destinationType === WorkflowDraftOutputDestinationTypes.promptResponseChat) {
+    if (!normalizeOptional(output.title)) {
+      messages.push("Prompt Response Chat output requires a chat title.");
+    }
+    if (!readDestinationOptionString(output, "promptInputId")) {
+      messages.push("Prompt Response Chat output requires a prompt input id link.");
+    }
+    if (!readDestinationOptionString(output, "responseField")) {
+      messages.push("Prompt Response Chat output requires an initial response field.");
+    }
+    const conversationScope = readDestinationOptionString(output, "conversationScope");
+    if (
+      conversationScope !== WorkflowOutputConversationScopes.continueSession
+      && conversationScope !== WorkflowOutputConversationScopes.newSession
+    ) {
+      messages.push("Prompt Response Chat output requires a valid conversation scope.");
     }
   }
 
@@ -558,6 +582,9 @@ export function setWorkflowOutputFieldValue(
   }
   if (field.key === "destinationConfig") {
     return setWorkflowOutputRecordDestinationConfig(draft, outputId, value);
+  }
+  if (field.target === "configuration") {
+    return setWorkflowOutputConfigurationValue(draft, outputId, field.key, value);
   }
   return Object.freeze({ draft, changed: false });
 }
