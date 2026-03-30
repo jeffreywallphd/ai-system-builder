@@ -248,6 +248,7 @@ export const WorkflowDraftOutputDestinationTypes = Object.freeze({
   fileExport: "file-export",
   webViewer: "web-viewer",
   systemEntry: "system-entry",
+  promptResponseChat: "prompt-response-chat",
 });
 
 export type WorkflowDraftOutputDestinationType = typeof WorkflowDraftOutputDestinationTypes[keyof typeof WorkflowDraftOutputDestinationTypes]
@@ -289,6 +290,8 @@ const WorkflowDraftOutputDestinationDefinitions: ReadonlyArray<WorkflowDraftOutp
     defaultFormat: WorkflowDraftOutputFormats.pdf,
     defaultTarget: "file-download",
     defaultConfiguration: Object.freeze({
+      deliveryMode: "download",
+      destinationPath: "",
       fileName: "",
     }),
   }),
@@ -326,6 +329,26 @@ const WorkflowDraftOutputDestinationDefinitions: ReadonlyArray<WorkflowDraftOutp
     defaultConfiguration: Object.freeze({
       entityName: "",
       destinationConfig: "",
+    }),
+  }),
+  Object.freeze({
+    destinationType: WorkflowDraftOutputDestinationTypes.promptResponseChat,
+    outputType: WorkflowDraftOutputTypes.document,
+    label: "Prompt response chat",
+    description: "Start a conversational prompt-response output that can continue in chat mode.",
+    configSchemaId: "workflow.output.destination.prompt-response-chat.v1",
+    supportedFormats: Object.freeze([
+      WorkflowDraftOutputFormats.json,
+      WorkflowDraftOutputFormats.markdown,
+    ]),
+    defaultFormat: WorkflowDraftOutputFormats.json,
+    defaultTarget: "chat-session",
+    defaultConfiguration: Object.freeze({
+      title: "",
+      promptInputId: "",
+      responseField: "assistant-response",
+      conversationScope: "continue-session",
+      initialSystemPrompt: "",
     }),
   }),
 ]);
@@ -698,8 +721,16 @@ export const WorkflowValidationIssueCodes = Object.freeze({
   outputOrderNonContiguous: "output-order-non-contiguous",
   outputSourceStepMissing: "output-source-step-missing",
   outputFileFormatInvalid: "output-file-format-invalid",
+  outputFileDeliveryModeInvalid: "output-file-delivery-mode-invalid",
+  outputFileDestinationPathMissing: "output-file-destination-path-missing",
   outputViewerTitleMissing: "output-viewer-title-missing",
   outputSystemEntityMissing: "output-system-entity-missing",
+  outputPromptInputIdMissing: "output-prompt-input-id-missing",
+  outputPromptInputNotFound: "output-prompt-input-not-found",
+  outputPromptInputIncompatible: "output-prompt-input-incompatible",
+  outputPromptResponseFieldMissing: "output-prompt-response-field-missing",
+  outputPromptConversationScopeInvalid: "output-prompt-conversation-scope-invalid",
+  outputPromptFormatInvalid: "output-prompt-format-invalid",
 });
 
 export type WorkflowValidationIssueCode = typeof WorkflowValidationIssueCodes[keyof typeof WorkflowValidationIssueCodes];
@@ -2273,6 +2304,7 @@ function normalizeOutput(output: WorkflowDraftOutput, fallbackOrder = 1): Normal
     item.title,
   );
   const title = destinationType === WorkflowDraftOutputDestinationTypes.webViewer
+    || destinationType === WorkflowDraftOutputDestinationTypes.promptResponseChat
     ? readOutputConfigurationString(configuration, "title")
     : item.title;
   const sourceStepId = normalizeOptional(output.sourceStepId);
@@ -2462,6 +2494,24 @@ function readDestinationOptionString(
   return normalized ? normalized : undefined;
 }
 
+function isPromptConversationScopeSupported(value: string): boolean {
+  return value === "continue-session" || value === "new-session";
+}
+
+function isPromptCompatibleInput(input: WorkflowDraftInput): boolean {
+  if (input.sourceType === WorkflowDraftInputSourceTypes.runtimeParameter) {
+    return !input.valueType
+      || input.valueType === WorkflowDraftInputValueTypes.string
+      || input.valueType === WorkflowDraftInputValueTypes.unknown;
+  }
+
+  if (input.sourceType === WorkflowDraftInputSourceTypes.staticValue) {
+    return typeof input.value === "string";
+  }
+
+  return false;
+}
+
 function readOutputConfigurationString(
   configuration: Readonly<Record<string, unknown>> | undefined,
   key: string,
@@ -2496,6 +2546,18 @@ export function normalizeWorkflowDraftOutputConfiguration(
   const titleFromLegacy = normalizeOptional(legacyTitle);
 
   if (destinationType === WorkflowDraftOutputDestinationTypes.fileExport) {
+    const deliveryMode = readOutputConfigurationString(merged, "deliveryMode");
+    if (deliveryMode !== undefined) {
+      normalized.deliveryMode = deliveryMode;
+    } else {
+      delete normalized.deliveryMode;
+    }
+    const destinationPath = readOutputConfigurationString(merged, "destinationPath");
+    if (destinationPath !== undefined) {
+      normalized.destinationPath = destinationPath;
+    } else {
+      delete normalized.destinationPath;
+    }
     const fileName = readOutputConfigurationString(merged, "fileName");
     if (fileName !== undefined) {
       normalized.fileName = fileName;
@@ -2531,6 +2593,43 @@ export function normalizeWorkflowDraftOutputConfiguration(
       normalized.destinationConfig = destinationConfig;
     } else {
       delete normalized.destinationConfig;
+    }
+  }
+
+  if (destinationType === WorkflowDraftOutputDestinationTypes.promptResponseChat) {
+    const title = titleFromLegacy ?? readOutputConfigurationString(merged, "title");
+    if (title !== undefined) {
+      normalized.title = title;
+    } else {
+      delete normalized.title;
+    }
+
+    const promptInputId = readOutputConfigurationString(merged, "promptInputId");
+    if (promptInputId !== undefined) {
+      normalized.promptInputId = promptInputId;
+    } else {
+      delete normalized.promptInputId;
+    }
+
+    const responseField = readOutputConfigurationString(merged, "responseField");
+    if (responseField !== undefined) {
+      normalized.responseField = responseField;
+    } else {
+      delete normalized.responseField;
+    }
+
+    const conversationScope = readOutputConfigurationString(merged, "conversationScope");
+    if (conversationScope !== undefined) {
+      normalized.conversationScope = conversationScope;
+    } else {
+      delete normalized.conversationScope;
+    }
+
+    const initialSystemPrompt = readOutputConfigurationString(merged, "initialSystemPrompt");
+    if (initialSystemPrompt !== undefined) {
+      normalized.initialSystemPrompt = initialSystemPrompt;
+    } else {
+      delete normalized.initialSystemPrompt;
     }
   }
 
@@ -3108,6 +3207,30 @@ export function validateWorkflowDraft(draft: WorkflowDraft | undefined): Workflo
             path: `draft.outputs[${index}].format`,
           });
         }
+
+        const deliveryMode = readDestinationOptionString(normalized, "deliveryMode") ?? "download";
+        if (deliveryMode !== "download" && deliveryMode !== "workspace-file") {
+          issues.push({
+            code: WorkflowValidationIssueCodes.outputFileDeliveryModeInvalid,
+            section: WorkflowValidationSections.outputs,
+            severity: "error",
+            message: `File export output '${normalized.id}' requires destination options.deliveryMode to be 'download' or 'workspace-file'.`,
+            path: `draft.outputs[${index}].destination.options.deliveryMode`,
+          });
+        }
+
+        if (deliveryMode === "workspace-file") {
+          const destinationPath = readDestinationOptionString(normalized, "destinationPath");
+          if (!destinationPath) {
+            issues.push({
+              code: WorkflowValidationIssueCodes.outputFileDestinationPathMissing,
+              section: WorkflowValidationSections.outputs,
+              severity: "error",
+              message: `File export output '${normalized.id}' with workspace-file delivery requires destination options.destinationPath.`,
+              path: `draft.outputs[${index}].destination.options.destinationPath`,
+            });
+          }
+        }
       }
 
       if (normalized.destination.type === WorkflowDraftOutputDestinationTypes.webViewer) {
@@ -3131,6 +3254,74 @@ export function validateWorkflowDraft(draft: WorkflowDraft | undefined): Workflo
             severity: "error",
             message: `System record output '${normalized.id}' requires destination options.entityName.`,
             path: `draft.outputs[${index}].destination.options.entityName`,
+          });
+        }
+      }
+
+      if (normalized.destination.type === WorkflowDraftOutputDestinationTypes.promptResponseChat) {
+        const destinationDefinition = getWorkflowDraftOutputDestinationDefinition(
+          WorkflowDraftOutputDestinationTypes.promptResponseChat,
+        );
+        const validFormats = new Set<string>(destinationDefinition?.supportedFormats ?? []);
+        if (!validFormats.has(normalized.format)) {
+          issues.push({
+            code: WorkflowValidationIssueCodes.outputPromptFormatInvalid,
+            section: WorkflowValidationSections.outputs,
+            severity: "error",
+            message: `Prompt response chat output '${normalized.id}' format '${normalized.format}' is not supported.`,
+            path: `draft.outputs[${index}].format`,
+          });
+        }
+
+        const promptInputId = readDestinationOptionString(normalized, "promptInputId");
+        if (!promptInputId) {
+          issues.push({
+            code: WorkflowValidationIssueCodes.outputPromptInputIdMissing,
+            section: WorkflowValidationSections.outputs,
+            severity: "error",
+            message: `Prompt response chat output '${normalized.id}' requires destination options.promptInputId.`,
+            path: `draft.outputs[${index}].destination.options.promptInputId`,
+          });
+        } else {
+          const linkedInput = normalizedInputs.find((input) => input.id === promptInputId);
+          if (!linkedInput) {
+            issues.push({
+              code: WorkflowValidationIssueCodes.outputPromptInputNotFound,
+              section: WorkflowValidationSections.crossSection,
+              severity: "error",
+              message: `Prompt response chat output '${normalized.id}' references unknown prompt input '${promptInputId}'.`,
+              path: `draft.outputs[${index}].destination.options.promptInputId`,
+            });
+          } else if (!isPromptCompatibleInput(linkedInput)) {
+            issues.push({
+              code: WorkflowValidationIssueCodes.outputPromptInputIncompatible,
+              section: WorkflowValidationSections.crossSection,
+              severity: "error",
+              message: `Prompt response chat output '${normalized.id}' requires prompt-compatible input '${promptInputId}'.`,
+              path: `draft.outputs[${index}].destination.options.promptInputId`,
+            });
+          }
+        }
+
+        const responseField = readDestinationOptionString(normalized, "responseField");
+        if (!responseField) {
+          issues.push({
+            code: WorkflowValidationIssueCodes.outputPromptResponseFieldMissing,
+            section: WorkflowValidationSections.outputs,
+            severity: "error",
+            message: `Prompt response chat output '${normalized.id}' requires destination options.responseField.`,
+            path: `draft.outputs[${index}].destination.options.responseField`,
+          });
+        }
+
+        const conversationScope = readDestinationOptionString(normalized, "conversationScope");
+        if (!conversationScope || !isPromptConversationScopeSupported(conversationScope)) {
+          issues.push({
+            code: WorkflowValidationIssueCodes.outputPromptConversationScopeInvalid,
+            section: WorkflowValidationSections.outputs,
+            severity: "error",
+            message: `Prompt response chat output '${normalized.id}' requires destination options.conversationScope to be 'continue-session' or 'new-session'.`,
+            path: `draft.outputs[${index}].destination.options.conversationScope`,
           });
         }
       }

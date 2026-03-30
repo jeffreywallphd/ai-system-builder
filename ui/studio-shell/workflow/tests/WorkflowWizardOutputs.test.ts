@@ -162,6 +162,22 @@ describe("WorkflowWizardOutputs", () => {
       format: "invalid-format",
     };
     expect(getWorkflowOutputValidationMessages(invalidFile)).toContain("File Export output requires a valid file format.");
+    expect(getWorkflowOutputValidationMessages({
+      ...fileOutput,
+      destination: {
+        ...fileOutput.destination,
+        options: {
+          ...(fileOutput.destination.options ?? {}),
+          deliveryMode: "workspace-file",
+          destinationPath: "",
+        },
+      },
+      configuration: {
+        ...(fileOutput.configuration ?? {}),
+        deliveryMode: "workspace-file",
+        destinationPath: "",
+      },
+    })).toContain("File Export workspace-file delivery requires a destination path.");
 
     const webViewerOutput = addWorkflowOutput(
       createEmptyWorkflowDraft(),
@@ -187,6 +203,14 @@ describe("WorkflowWizardOutputs", () => {
       "customer-record",
     ).draft.outputs[0]!;
     expect(getWorkflowOutputValidationMessages(configuredSystem)).toEqual([]);
+
+    const chatOutput = addWorkflowOutput(
+      createEmptyWorkflowDraft(),
+      WorkflowDraftOutputDestinationTypes.promptResponseChat,
+    ).draft.outputs[0]!;
+    expect(getWorkflowOutputValidationMessages(chatOutput)).toContain("Prompt Response Chat output requires a chat title.");
+    expect(getWorkflowOutputValidationMessages(chatOutput)).toContain("Prompt Response Chat output requires a prompt input id link.");
+    expect(getWorkflowOutputValidationMessages(chatOutput)).toContain("Prompt Response Chat output requires an initial response field.");
   });
 
   it("applies explicit output format updates for file-export outputs", () => {
@@ -213,28 +237,38 @@ describe("WorkflowWizardOutputs", () => {
     const systemDefinition = workflowOutputTypeDefinitions.find(
       (entry) => entry.destinationType === WorkflowDraftOutputDestinationTypes.systemEntry,
     );
-    if (!fileDefinition || !systemDefinition) {
+    const chatDefinition = workflowOutputTypeDefinitions.find(
+      (entry) => entry.destinationType === WorkflowDraftOutputDestinationTypes.promptResponseChat,
+    );
+    if (!fileDefinition || !systemDefinition || !chatDefinition) {
       throw new Error("Expected workflow output type definitions to be available.");
     }
 
     const added = addWorkflowOutputs(createEmptyWorkflowDraft(), [
       WorkflowDraftOutputDestinationTypes.fileExport,
       WorkflowDraftOutputDestinationTypes.systemEntry,
+      WorkflowDraftOutputDestinationTypes.promptResponseChat,
     ]);
     const fileOutputId = added.draft.outputs[0]?.id as string;
     const systemOutputId = added.draft.outputs[1]?.id as string;
+    const chatOutputId = added.draft.outputs[2]?.id as string;
     const formatField = fileDefinition.configurationFields.find((field) => field.key === "format");
     const entityField = systemDefinition.configurationFields.find((field) => field.key === "entityName");
-    if (!formatField || !entityField) {
+    const promptInputField = chatDefinition.configurationFields.find((field) => field.key === "promptInputId");
+    if (!formatField || !entityField || !promptInputField) {
       throw new Error("Expected output config fields to be available.");
     }
 
     let draft = setWorkflowOutputFieldValue(added.draft, fileOutputId, formatField, "jsonl").draft;
     draft = setWorkflowOutputFieldValue(draft, systemOutputId, entityField, "customer-record").draft;
+    draft = setWorkflowOutputFieldValue(draft, chatOutputId, promptInputField, "input-user-prompt").draft;
 
     expect(draft.outputs[0]?.format).toBe("jsonl");
     expect(draft.outputs[1]?.destination.options).toEqual(expect.objectContaining({
       entityName: "customer-record",
+    }));
+    expect(draft.outputs[2]?.destination.options).toEqual(expect.objectContaining({
+      promptInputId: "input-user-prompt",
     }));
   });
 });

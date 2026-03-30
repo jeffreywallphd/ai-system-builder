@@ -64,6 +64,7 @@ describe("WorkflowOutputSelector", () => {
     expect(html).toContain("File export");
     expect(html).toContain("Web viewer");
     expect(html).toContain("System entry");
+    expect(html).toContain("Prompt response chat");
     expect(html).toContain("Add all supported outputs");
   });
 
@@ -90,6 +91,6 @@ describe("WorkflowOutputSelector", () => {
     });
 
     expect(addedRequests[0]).toEqual(["file-export"]);
-    expect(addedRequests[1]).toEqual(["file-export", "web-viewer", "system-entry"]);
+    expect(addedRequests[1]).toEqual(["file-export", "web-viewer", "system-entry", "prompt-response-chat"]);
   });
 });

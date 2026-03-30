@@ -229,11 +229,17 @@ export default function WorkflowStudioOutputSectionEditor({
                 const fieldPathPrefix = `draft.outputs[${selectedOutputIndex}]`;
                 const testIdByFieldKey: Record<string, string> = Object.freeze({
                   format: `workflow-output-file-format-${selectedOutputIndex}`,
+                  deliveryMode: `workflow-output-file-delivery-mode-${selectedOutputIndex}`,
+                  destinationPath: `workflow-output-file-destination-path-${selectedOutputIndex}`,
                   fileName: `workflow-output-file-name-${selectedOutputIndex}`,
                   title: `workflow-output-viewer-title-${selectedOutputIndex}`,
                   presentationMode: `workflow-output-viewer-mode-${selectedOutputIndex}`,
                   entityName: `workflow-output-system-entity-${selectedOutputIndex}`,
                   destinationConfig: `workflow-output-system-config-value-${selectedOutputIndex}`,
+                  promptInputId: `workflow-output-chat-prompt-input-${selectedOutputIndex}`,
+                  responseField: `workflow-output-chat-response-field-${selectedOutputIndex}`,
+                  conversationScope: `workflow-output-chat-scope-${selectedOutputIndex}`,
+                  initialSystemPrompt: `workflow-output-chat-system-prompt-${selectedOutputIndex}`,
                 });
                 const testId = testIdByFieldKey[field.key] ?? `workflow-output-field-${field.key}-${selectedOutputIndex}`;
                 const fieldPath = field.target === "format"
