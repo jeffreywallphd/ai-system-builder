@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
   WorkflowDraftOutputDestinationTypes,
   WorkflowDraftStepKinds,
+  WorkflowDraftStepTypes,
   createEmptyWorkflowDraft,
 } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
 import {
@@ -180,5 +181,22 @@ describe("WorkflowStudioCanvasViewModel", () => {
 
     draft = applyWorkflowCanvasAction(draft, { kind: "remove-step", stepId }).draft;
     expect(draft.steps).toHaveLength(0);
+  });
+
+  it("adds palette-mapped input and step variants through shared canvas actions", () => {
+    let draft = createEmptyWorkflowDraft();
+
+    draft = applyWorkflowCanvasAction(draft, { kind: "add-input-dataset-asset" }).draft;
+    draft = applyWorkflowCanvasAction(draft, { kind: "add-input-static-value" }).draft;
+    draft = applyWorkflowCanvasAction(draft, {
+      kind: "add-step",
+      definitionKey: "built-in:control-flow:if-then",
+    }).draft;
+
+    expect(draft.inputs).toHaveLength(2);
+    expect(draft.inputs[0]?.sourceType).toBe("dataset-asset");
+    expect(draft.inputs[1]?.sourceType).toBe("static-value");
+    expect(draft.steps).toHaveLength(1);
+    expect(draft.steps[0]?.type).not.toBe(WorkflowDraftStepTypes.agentAssistant);
   });
 });
