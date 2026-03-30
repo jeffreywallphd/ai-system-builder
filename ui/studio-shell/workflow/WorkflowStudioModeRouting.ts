@@ -3,6 +3,7 @@ import {
   isWorkflowStudioModeId,
   type WorkflowStudioModeId,
 } from "./WorkflowStudioModes";
+import { ROUTE_PATHS } from "../../routes/RouteConfig";
 
 export interface WorkflowStudioModeRouteResolution {
   readonly resolvedModeId: WorkflowStudioModeId;
@@ -58,4 +59,8 @@ export function resolveWorkflowStudioModeRoute(input: {
     invalidModeId: queryModeId,
     source: "query-param",
   });
+}
+
+export function buildWorkflowStudioModePath(modeId: WorkflowStudioModeId): string {
+  return ROUTE_PATHS.workflowStudioMode.replace(":modeId", modeId);
 }

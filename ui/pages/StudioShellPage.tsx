@@ -21,7 +21,10 @@ import {
   type WorkflowStudioModeState,
 } from "../studio-shell/workflow/WorkflowStudioModeStateStore";
 import type { WorkflowStudioModeId } from "../studio-shell/workflow/WorkflowStudioModes";
-import type { WorkflowStudioModeRouteResolution } from "../studio-shell/workflow/WorkflowStudioModeRouting";
+import {
+  buildWorkflowStudioModePath,
+  type WorkflowStudioModeRouteResolution,
+} from "../studio-shell/workflow/WorkflowStudioModeRouting";
 import {
   buildWorkflowStudioWizardPagePath,
   type WorkflowStudioWizardPageId,
@@ -608,6 +611,13 @@ export default function StudioShellPage({
     });
   };
 
+  const buildWorkflowStudioSearchWithoutModeParams = (): string => {
+    const nextSearchParams = new URLSearchParams(location.search);
+    nextSearchParams.delete("mode");
+    nextSearchParams.delete("wizardPage");
+    return nextSearchParams.toString().length > 0 ? `?${nextSearchParams.toString()}` : "";
+  };
+
   const setWorkflowModeFromToolbar = (modeId: WorkflowStudioModeId): void => {
     if (!isWorkflowStudio || !workflowModeStore) {
       return;
@@ -618,14 +628,11 @@ export default function StudioShellPage({
       ? buildWorkflowStudioWizardPagePath(
         resolvedWorkflowWizardPageId ?? "trigger",
       )
-      : ROUTE_PATHS.workflowStudioMode.replace(":modeId", modeId);
-    const nextSearchParams = new URLSearchParams(location.search);
-    nextSearchParams.delete("mode");
-    nextSearchParams.delete("wizardPage");
+      : buildWorkflowStudioModePath(modeId);
     void navigate(
       {
         pathname: nextPathname,
-        search: nextSearchParams.toString().length > 0 ? `?${nextSearchParams.toString()}` : "",
+        search: buildWorkflowStudioSearchWithoutModeParams(),
         hash: location.hash,
       },
       { replace: true },
@@ -674,7 +681,7 @@ export default function StudioShellPage({
     workflowModeState: workflowModeStore && workflowModeState
       ? {
         state: workflowModeState,
-        setSelectedMode: (modeId) => workflowModeStore.setSelectedMode(modeId),
+        setSelectedMode: (modeId) => setWorkflowModeFromToolbar(modeId),
       }
       : undefined,
     systemCompatibility,
@@ -802,8 +809,8 @@ export default function StudioShellPage({
                   void navigate(
                     {
                       pathname: buildWorkflowStudioWizardPagePath(pageId),
-                      search: "",
-                      hash: "",
+                      search: buildWorkflowStudioSearchWithoutModeParams(),
+                      hash: location.hash,
                     },
                     { replace: true },
                   );

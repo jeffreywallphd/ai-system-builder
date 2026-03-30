@@ -65,6 +65,9 @@ export default function WorkflowStudioDraftAuthoringBoundary({
       ) : (
         <WorkflowStudioCanvasModeLayout>
           <WorkflowStudioCanvasModeSurface
+            sharedDraft={workflowModeContext.sharedDraft}
+            draftValidationIssues={workflowModeContext.draftValidationIssues}
+            onUpdateSharedDraft={workflowModeContext.updateSharedDraft}
             draftEditorContent={workflowModeContext.draftEditorContent}
             onChangeDraftEditorContent={onChangeContent}
           />
