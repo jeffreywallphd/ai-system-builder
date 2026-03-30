@@ -6,8 +6,12 @@ import {
 import {
   addWorkflowOutput,
   addWorkflowOutputs,
+  canMoveWorkflowOutput,
   getWorkflowOutputValidationMessages,
+  moveWorkflowOutputDown,
+  moveWorkflowOutputUp,
   removeWorkflowOutput,
+  resolveWorkflowOutputSelectionId,
   setWorkflowOutputFieldValue,
   setWorkflowOutputDestinationType,
   setWorkflowOutputFileName,
@@ -43,6 +47,34 @@ describe("WorkflowWizardOutputs", () => {
     expect(removed.draft.outputs.map((output) => output.order)).toEqual([1, 2]);
   });
 
+  it("reorders outputs deterministically and preserves contiguous output ordering", () => {
+    const draft = addWorkflowOutputs(createEmptyWorkflowDraft(), [
+      WorkflowDraftOutputDestinationTypes.fileExport,
+      WorkflowDraftOutputDestinationTypes.webViewer,
+      WorkflowDraftOutputDestinationTypes.systemEntry,
+    ]).draft;
+    const secondId = draft.outputs[1]?.id as string;
+    const thirdId = draft.outputs[2]?.id as string;
+
+    expect(canMoveWorkflowOutput(draft, secondId, "up")).toBe(true);
+    expect(canMoveWorkflowOutput(draft, secondId, "down")).toBe(true);
+    expect(canMoveWorkflowOutput(draft, draft.outputs[0]?.id as string, "up")).toBe(false);
+    expect(canMoveWorkflowOutput(draft, thirdId, "down")).toBe(false);
+
+    const movedUp = moveWorkflowOutputUp(draft, thirdId);
+    expect(movedUp.changed).toBe(true);
+    expect(movedUp.draft.outputs.map((output) => output.id)).toEqual([
+      draft.outputs[0]?.id,
+      thirdId,
+      secondId,
+    ]);
+    expect(movedUp.draft.outputs.map((output) => output.order)).toEqual([1, 2, 3]);
+
+    const movedDown = moveWorkflowOutputDown(movedUp.draft, draft.outputs[0]?.id as string);
+    expect(movedDown.changed).toBe(true);
+    expect(movedDown.draft.outputs.map((output) => output.order)).toEqual([1, 2, 3]);
+  });
+
   it("supports multi-output addition and rejects malformed output add requests", () => {
     const added = addWorkflowOutputs(createEmptyWorkflowDraft(), [
       WorkflowDraftOutputDestinationTypes.fileExport,
@@ -62,6 +94,19 @@ describe("WorkflowWizardOutputs", () => {
     ]);
     expect(added.rejectedRequests[0]?.error).toContain("requires a destination type");
     expect(added.rejectedRequests[1]?.error).toContain("not supported");
+  });
+
+  it("resolves output selection id with stable fallback behavior", () => {
+    const added = addWorkflowOutputs(createEmptyWorkflowDraft(), [
+      WorkflowDraftOutputDestinationTypes.fileExport,
+      WorkflowDraftOutputDestinationTypes.webViewer,
+    ]).draft;
+    const first = added.outputs[0]?.id as string;
+    const second = added.outputs[1]?.id as string;
+
+    expect(resolveWorkflowOutputSelectionId(added, second)).toBe(second);
+    expect(resolveWorkflowOutputSelectionId(added, "missing")).toBe(first);
+    expect(resolveWorkflowOutputSelectionId(createEmptyWorkflowDraft())).toBeUndefined();
   });
 
   it("switches output destination type and resets stale destination-specific configuration", () => {
@@ -123,6 +168,10 @@ describe("WorkflowWizardOutputs", () => {
       WorkflowDraftOutputDestinationTypes.webViewer,
     ).draft.outputs[0]!;
     expect(getWorkflowOutputValidationMessages(webViewerOutput)).toContain("Web Viewer output requires a viewer title.");
+    expect(getWorkflowOutputValidationMessages({
+      ...webViewerOutput,
+      format: "pdf",
+    })).toContain("Web viewer output format 'pdf' is not supported.");
 
     const systemOutput = addWorkflowOutput(
       createEmptyWorkflowDraft(),
