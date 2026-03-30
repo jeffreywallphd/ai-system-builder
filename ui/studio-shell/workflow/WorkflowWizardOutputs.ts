@@ -1,9 +1,10 @@
 import {
+  getWorkflowDraftOutputDestinationDefinition,
+  listWorkflowDraftOutputDestinationDefinitions,
   WorkflowDraftOutputDestinationTypes,
-  WorkflowDraftOutputFormats,
-  WorkflowDraftOutputTypes,
   type WorkflowDraft,
   type WorkflowDraftOutput,
+  type WorkflowDraftOutputDestinationDefinition,
   type WorkflowDraftOutputDestinationType,
 } from "../../../domain/workflow-studio/WorkflowStudioDomain";
 
@@ -15,63 +16,14 @@ export const WorkflowOutputPresentationModes = Object.freeze({
 export type WorkflowOutputPresentationMode =
   typeof WorkflowOutputPresentationModes[keyof typeof WorkflowOutputPresentationModes];
 
-export interface WorkflowOutputDestinationDefinition {
-  readonly destinationType: WorkflowDraftOutputDestinationType;
-  readonly label: string;
-  readonly summary: string;
-  readonly outputType: string;
-  readonly defaultFormat: string;
-  readonly defaultTarget: string;
-  readonly defaultOptions?: Readonly<Record<string, unknown>>;
-}
+export const workflowOutputDestinationDefinitions: ReadonlyArray<WorkflowDraftOutputDestinationDefinition> =
+  listWorkflowDraftOutputDestinationDefinitions();
 
-export const workflowOutputDestinationDefinitions: ReadonlyArray<WorkflowOutputDestinationDefinition> = Object.freeze([
-  Object.freeze({
-    destinationType: WorkflowDraftOutputDestinationTypes.fileExport,
-    label: "File Export",
-    summary: "Generate downloadable files such as PDF exports.",
-    outputType: WorkflowDraftOutputTypes.document,
-    defaultFormat: "pdf",
-    defaultTarget: "file-download",
-    defaultOptions: Object.freeze({
-      fileName: "",
-    }),
-  }),
-  Object.freeze({
-    destinationType: WorkflowDraftOutputDestinationTypes.webViewer,
-    label: "Web Viewer / In-App View",
-    summary: "Render output directly inside the studio/web viewer.",
-    outputType: WorkflowDraftOutputTypes.document,
-    defaultFormat: WorkflowDraftOutputFormats.markdown,
-    defaultTarget: "in-app-view",
-    defaultOptions: Object.freeze({
-      presentationMode: WorkflowOutputPresentationModes.embedded,
-    }),
-  }),
-  Object.freeze({
-    destinationType: WorkflowDraftOutputDestinationTypes.systemEntry,
-    label: "Database / System Record",
-    summary: "Persist output as a system entity/record destination.",
-    outputType: WorkflowDraftOutputTypes.record,
-    defaultFormat: WorkflowDraftOutputFormats.json,
-    defaultTarget: "system-record",
-    defaultOptions: Object.freeze({
-      entityName: "",
-      destinationConfig: "",
-    }),
-  }),
-]);
+const defaultOutputDestinationDefinition = workflowOutputDestinationDefinitions[0] as WorkflowDraftOutputDestinationDefinition;
 
-const defaultOutputDestinationDefinition = workflowOutputDestinationDefinitions[0] as WorkflowOutputDestinationDefinition;
-
-export const workflowFileOutputFormats = Object.freeze([
-  "pdf",
-  WorkflowDraftOutputFormats.json,
-  WorkflowDraftOutputFormats.jsonl,
-  WorkflowDraftOutputFormats.csv,
-  WorkflowDraftOutputFormats.markdown,
-  WorkflowDraftOutputFormats.html,
-]);
+export const workflowFileOutputFormats = Object.freeze(
+  (getWorkflowDraftOutputDestinationDefinition(WorkflowDraftOutputDestinationTypes.fileExport)?.supportedFormats ?? []),
+);
 
 function normalizeOptional(value?: string): string | undefined {
   const normalized = value?.trim();
@@ -91,32 +43,41 @@ function buildNextOutputId(draft: WorkflowDraft): string {
 
 function getDestinationDefinition(
   destinationType: WorkflowDraftOutputDestinationType,
-): WorkflowOutputDestinationDefinition {
-  return (workflowOutputDestinationDefinitions.find((entry) => entry.destinationType === destinationType)
-    ?? defaultOutputDestinationDefinition) as WorkflowOutputDestinationDefinition;
+): WorkflowDraftOutputDestinationDefinition {
+  return (getWorkflowDraftOutputDestinationDefinition(destinationType)
+    ?? defaultOutputDestinationDefinition) as WorkflowDraftOutputDestinationDefinition;
 }
 
-function createDefaultDestinationOptions(
-  definition: WorkflowOutputDestinationDefinition,
+function createDefaultOutputConfiguration(
+  definition: WorkflowDraftOutputDestinationDefinition,
 ): Readonly<Record<string, unknown>> | undefined {
-  if (!definition.defaultOptions) {
+  if (!definition.defaultConfiguration) {
     return undefined;
   }
-  return Object.freeze({ ...definition.defaultOptions });
+  const configuration = { ...definition.defaultConfiguration };
+  if (definition.destinationType === WorkflowDraftOutputDestinationTypes.webViewer) {
+    configuration.presentationMode = WorkflowOutputPresentationModes.embedded;
+  }
+  return Object.freeze(configuration);
 }
 
 function applyDestinationDefinition(
   output: WorkflowDraftOutput,
-  definition: WorkflowOutputDestinationDefinition,
+  definition: WorkflowDraftOutputDestinationDefinition,
 ): WorkflowDraftOutput {
+  const configuration = createDefaultOutputConfiguration(definition);
   return Object.freeze({
     ...output,
     outputType: definition.outputType,
     format: definition.defaultFormat,
+    configuration,
+    title: definition.destinationType === WorkflowDraftOutputDestinationTypes.webViewer
+      ? (typeof configuration?.title === "string" ? configuration.title : undefined)
+      : undefined,
     destination: Object.freeze({
       type: definition.destinationType,
       target: definition.defaultTarget,
-      options: createDefaultDestinationOptions(definition),
+      options: configuration,
     }),
   });
 }
@@ -152,20 +113,22 @@ function updateDestinationOptions(
   output: WorkflowDraftOutput,
   patch: Readonly<Record<string, unknown>>,
 ): WorkflowDraftOutput {
+  const nextConfiguration = Object.freeze({
+    ...(output.configuration ?? output.destination.options ?? {}),
+    ...patch,
+  });
   return Object.freeze({
     ...output,
+    configuration: nextConfiguration,
     destination: Object.freeze({
       ...output.destination,
-      options: Object.freeze({
-        ...(output.destination.options ?? {}),
-        ...patch,
-      }),
+      options: nextConfiguration,
     }),
   });
 }
 
 function readDestinationOptionString(output: WorkflowDraftOutput, key: string): string | undefined {
-  const candidate = output.destination.options?.[key];
+  const candidate = output.configuration?.[key] ?? output.destination.options?.[key];
   if (typeof candidate !== "string") {
     return undefined;
   }
@@ -174,7 +137,7 @@ function readDestinationOptionString(output: WorkflowDraftOutput, key: string): 
 
 export function getWorkflowOutputDestinationDefinitionByType(
   destinationType: WorkflowDraftOutputDestinationType,
-): WorkflowOutputDestinationDefinition {
+): WorkflowDraftOutputDestinationDefinition {
   return getDestinationDefinition(destinationType);
 }
 
@@ -184,16 +147,21 @@ export function addWorkflowOutput(
 ): { readonly draft: WorkflowDraft; readonly outputId: string } {
   const outputId = buildNextOutputId(draft);
   const destinationDefinition = getDestinationDefinition(destinationType);
+  const configuration = createDefaultOutputConfiguration(destinationDefinition);
   const baseOutput: WorkflowDraftOutput = Object.freeze({
     id: outputId,
     type: "workflow-output",
-    title: undefined,
+    title: destinationType === WorkflowDraftOutputDestinationTypes.webViewer
+      ? (typeof configuration?.title === "string" ? configuration.title : undefined)
+      : undefined,
+    order: draft.outputs.length + 1,
     outputType: destinationDefinition.outputType,
     format: destinationDefinition.defaultFormat,
+    configuration,
     destination: Object.freeze({
       type: destinationDefinition.destinationType,
       target: destinationDefinition.defaultTarget,
-      options: createDefaultDestinationOptions(destinationDefinition),
+      options: configuration,
     }),
   });
 
@@ -213,7 +181,12 @@ export function removeWorkflowOutput(
   draft: WorkflowDraft,
   outputId: string,
 ): { readonly draft: WorkflowDraft; readonly changed: boolean } {
-  const nextOutputs = draft.outputs.filter((output) => output.id !== outputId);
+  const nextOutputs = draft.outputs
+    .filter((output) => output.id !== outputId)
+    .map((output, index) => Object.freeze({
+      ...output,
+      order: index + 1,
+    }));
   if (nextOutputs.length === draft.outputs.length) {
     return Object.freeze({ draft, changed: false });
   }
@@ -268,12 +241,16 @@ export function setWorkflowOutputViewerTitle(
 ): { readonly draft: WorkflowDraft; readonly changed: boolean } {
   return updateOutput(draft, outputId, (current) => {
     const normalized = normalizeOptional(title);
-    if (current.title === normalized) {
+    const existingTitle = current.title;
+    const existingConfigTitle = readDestinationOptionString(current, "title");
+    if (existingTitle === normalized && existingConfigTitle === normalized) {
       return current;
     }
-    return Object.freeze({
+    return updateDestinationOptions(Object.freeze({
       ...current,
       title: normalized,
+    }), {
+      title: normalized ?? "",
     });
   });
 }

@@ -259,12 +259,97 @@ export interface WorkflowDraftOutputDestination {
   readonly options?: Readonly<Record<string, unknown>>;
 }
 
+export interface WorkflowDraftOutputDestinationDefinition {
+  readonly destinationType: WorkflowDraftOutputDestinationType;
+  readonly outputType: WorkflowDraftOutputType;
+  readonly label: string;
+  readonly description: string;
+  readonly configSchemaId: string;
+  readonly supportedFormats: ReadonlyArray<WorkflowDraftOutputFormat>;
+  readonly defaultFormat: WorkflowDraftOutputFormat;
+  readonly defaultTarget: string;
+  readonly defaultConfiguration?: Readonly<Record<string, unknown>>;
+}
+
+const WorkflowDraftOutputDestinationDefinitions: ReadonlyArray<WorkflowDraftOutputDestinationDefinition> = Object.freeze([
+  Object.freeze({
+    destinationType: WorkflowDraftOutputDestinationTypes.fileExport,
+    outputType: WorkflowDraftOutputTypes.document,
+    label: "File export",
+    description: "Persist workflow output to a file artifact destination.",
+    configSchemaId: "workflow.output.destination.file-export.v1",
+    supportedFormats: Object.freeze([
+      WorkflowDraftOutputFormats.pdf,
+      WorkflowDraftOutputFormats.json,
+      WorkflowDraftOutputFormats.jsonl,
+      WorkflowDraftOutputFormats.csv,
+      WorkflowDraftOutputFormats.markdown,
+      WorkflowDraftOutputFormats.html,
+    ]),
+    defaultFormat: WorkflowDraftOutputFormats.pdf,
+    defaultTarget: "file-download",
+    defaultConfiguration: Object.freeze({
+      fileName: "",
+    }),
+  }),
+  Object.freeze({
+    destinationType: WorkflowDraftOutputDestinationTypes.webViewer,
+    outputType: WorkflowDraftOutputTypes.document,
+    label: "Web viewer",
+    description: "Render workflow output directly inside the Studio viewer.",
+    configSchemaId: "workflow.output.destination.web-viewer.v1",
+    supportedFormats: Object.freeze([
+      WorkflowDraftOutputFormats.markdown,
+      WorkflowDraftOutputFormats.html,
+      WorkflowDraftOutputFormats.json,
+    ]),
+    defaultFormat: WorkflowDraftOutputFormats.markdown,
+    defaultTarget: "in-app-view",
+    defaultConfiguration: Object.freeze({
+      title: "",
+      presentationMode: "embedded",
+    }),
+  }),
+  Object.freeze({
+    destinationType: WorkflowDraftOutputDestinationTypes.systemEntry,
+    outputType: WorkflowDraftOutputTypes.record,
+    label: "System entry",
+    description: "Persist workflow output into a system/entity-backed destination.",
+    configSchemaId: "workflow.output.destination.system-entry.v1",
+    supportedFormats: Object.freeze([
+      WorkflowDraftOutputFormats.json,
+      WorkflowDraftOutputFormats.jsonl,
+      WorkflowDraftOutputFormats.csv,
+    ]),
+    defaultFormat: WorkflowDraftOutputFormats.json,
+    defaultTarget: "system-record",
+    defaultConfiguration: Object.freeze({
+      entityName: "",
+      destinationConfig: "",
+    }),
+  }),
+]);
+
+export function listWorkflowDraftOutputDestinationDefinitions(): ReadonlyArray<WorkflowDraftOutputDestinationDefinition> {
+  return WorkflowDraftOutputDestinationDefinitions;
+}
+
+export function getWorkflowDraftOutputDestinationDefinition(
+  destinationType: WorkflowDraftOutputDestinationType,
+): WorkflowDraftOutputDestinationDefinition | undefined {
+  return WorkflowDraftOutputDestinationDefinitions.find((entry) => entry.destinationType === destinationType);
+}
+
 export interface WorkflowDraftOutput extends WorkflowDraftSectionItemBase {
+  readonly order?: number;
   readonly outputType: WorkflowDraftOutputType;
   readonly format: WorkflowDraftOutputFormat;
   readonly destination: WorkflowDraftOutputDestination;
+  readonly configuration?: Readonly<Record<string, unknown>>;
   readonly sourceStepId?: string;
 }
+
+type NormalizedWorkflowDraftOutput = WorkflowDraftOutput & { readonly order: number };
 
 export const WorkflowDraftStepKinds = Object.freeze({
   action: "action",
@@ -608,6 +693,9 @@ export const WorkflowValidationIssueCodes = Object.freeze({
   builtInStepReferenceOrderInvalid: "built-in-step-reference-order-invalid",
   loopCollectionInputMissing: "loop-collection-input-missing",
   outputMalformed: "output-malformed",
+  outputDuplicateId: "output-duplicate-id",
+  outputOrderDuplicate: "output-order-duplicate",
+  outputOrderNonContiguous: "output-order-non-contiguous",
   outputSourceStepMissing: "output-source-step-missing",
   outputFileFormatInvalid: "output-file-format-invalid",
   outputViewerTitleMissing: "output-viewer-title-missing",
@@ -2158,8 +2246,9 @@ function normalizeWorkflowDraftStepAssetReference(reference: WorkflowDraftStepAs
   });
 }
 
-function normalizeOutput(output: WorkflowDraftOutput): WorkflowDraftOutput {
+function normalizeOutput(output: WorkflowDraftOutput, fallbackOrder = 1): NormalizedWorkflowDraftOutput {
   const item = normalizeSectionItem(output, "Workflow draft output");
+  const order = normalizePositiveInteger(output.order, "Workflow draft output order");
   const outputType = normalizeRequired(output.outputType, "Workflow draft output outputType");
   const format = normalizeRequired(output.format, "Workflow draft output format");
   const destinationRecord = assertRecord(output.destination, "Workflow draft output destination");
@@ -2174,19 +2263,60 @@ function normalizeOutput(output: WorkflowDraftOutput): WorkflowDraftOutput {
   const destinationOptions = destinationRecord.options
     ? Object.freeze({ ...assertRecord(destinationRecord.options, "Workflow draft output destination options") })
     : undefined;
+  const configurationRecord = output.configuration
+    ? assertRecord(output.configuration, "Workflow draft output configuration")
+    : undefined;
+  const configuration = normalizeWorkflowDraftOutputConfiguration(
+    destinationType,
+    configurationRecord,
+    destinationOptions,
+    item.title,
+  );
+  const title = destinationType === WorkflowDraftOutputDestinationTypes.webViewer
+    ? readOutputConfigurationString(configuration, "title")
+    : item.title;
   const sourceStepId = normalizeOptional(output.sourceStepId);
 
   return Object.freeze({
     ...item,
+    title,
+    order: order ?? fallbackOrder,
     outputType,
     format,
     destination: Object.freeze({
       type: destinationType,
       target: destinationTarget,
-      options: destinationOptions,
+      options: configuration,
     }),
+    configuration,
     sourceStepId,
   });
+}
+
+function normalizeOutputOrdering(
+  outputs: ReadonlyArray<NormalizedWorkflowDraftOutput>,
+): ReadonlyArray<NormalizedWorkflowDraftOutput> {
+  const normalized = [...outputs].sort((left, right) => {
+    if (left.order !== right.order) {
+      return left.order - right.order;
+    }
+    return left.id.localeCompare(right.id);
+  });
+
+  const seenOrder = new Set<number>();
+  const seenIds = new Set<string>();
+  for (const output of normalized) {
+    if (seenIds.has(output.id)) {
+      throw new Error(`Workflow draft output id '${output.id}' is duplicated.`);
+    }
+    if (seenOrder.has(output.order)) {
+      throw new Error(`Workflow draft output order '${output.order}' is duplicated.`);
+    }
+    seenIds.add(output.id);
+    seenOrder.add(output.order);
+  }
+
+  return Object.freeze(normalized);
 }
 
 function normalizeStepOrdering(steps: ReadonlyArray<WorkflowDraftStep>): ReadonlyArray<WorkflowDraftStep> {
@@ -2247,11 +2377,15 @@ export function normalizeWorkflowDraft(draft?: WorkflowDraft): WorkflowDraft {
     return createEmptyWorkflowDraft();
   }
 
+  const normalizedOutputs: ReadonlyArray<NormalizedWorkflowDraftOutput> = (draft.outputs ?? []).map(
+    (item, index) => normalizeOutput(item as WorkflowDraftOutput, index + 1),
+  );
+
   return Object.freeze({
     triggers: normalizeSectionItems("Workflow draft trigger", draft.triggers ?? [], (item) => normalizeTrigger(item as WorkflowDraftTrigger)),
     inputs: normalizeSectionItems("Workflow draft input", draft.inputs ?? [], (item) => normalizeInput(item as WorkflowDraftInput)),
     steps: normalizeStepOrdering((draft.steps ?? []).map((step) => normalizeStep(step))),
-    outputs: normalizeSectionItems("Workflow draft output", draft.outputs ?? [], (item) => normalizeOutput(item as WorkflowDraftOutput)),
+    outputs: normalizeOutputOrdering(normalizedOutputs),
   });
 }
 
@@ -2320,12 +2454,97 @@ function readDestinationOptionString(
   output: WorkflowDraftOutput,
   optionKey: string,
 ): string | undefined {
-  const candidate = output.destination.options?.[optionKey];
+  const candidate = output.configuration?.[optionKey] ?? output.destination.options?.[optionKey];
   if (typeof candidate !== "string") {
     return undefined;
   }
   const normalized = candidate.trim();
   return normalized ? normalized : undefined;
+}
+
+function readOutputConfigurationString(
+  configuration: Readonly<Record<string, unknown>> | undefined,
+  key: string,
+): string | undefined {
+  const candidate = configuration?.[key];
+  if (candidate === undefined) {
+    return undefined;
+  }
+  if (typeof candidate !== "string") {
+    throw new Error(`Workflow output configuration '${key}' must be a string when provided.`);
+  }
+  const normalized = candidate.trim();
+  return normalized ? normalized : undefined;
+}
+
+export function normalizeWorkflowDraftOutputConfiguration(
+  destinationType: WorkflowDraftOutputDestinationType,
+  configuration?: Readonly<Record<string, unknown>>,
+  legacyDestinationOptions?: Readonly<Record<string, unknown>>,
+  legacyTitle?: string,
+): Readonly<Record<string, unknown>> | undefined {
+  const merged = Object.freeze({
+    ...(legacyDestinationOptions ?? {}),
+    ...(configuration ?? {}),
+  });
+
+  const normalized: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(merged)) {
+    normalized[key] = value;
+  }
+
+  const titleFromLegacy = normalizeOptional(legacyTitle);
+
+  if (destinationType === WorkflowDraftOutputDestinationTypes.fileExport) {
+    const fileName = readOutputConfigurationString(merged, "fileName");
+    if (fileName !== undefined) {
+      normalized.fileName = fileName;
+    } else {
+      delete normalized.fileName;
+    }
+  }
+
+  if (destinationType === WorkflowDraftOutputDestinationTypes.webViewer) {
+    const title = titleFromLegacy ?? readOutputConfigurationString(merged, "title");
+    if (title !== undefined) {
+      normalized.title = title;
+    } else {
+      delete normalized.title;
+    }
+    const presentationMode = readOutputConfigurationString(merged, "presentationMode");
+    if (presentationMode !== undefined) {
+      normalized.presentationMode = presentationMode;
+    } else {
+      delete normalized.presentationMode;
+    }
+  }
+
+  if (destinationType === WorkflowDraftOutputDestinationTypes.systemEntry) {
+    const entityName = readOutputConfigurationString(merged, "entityName");
+    if (entityName !== undefined) {
+      normalized.entityName = entityName;
+    } else {
+      delete normalized.entityName;
+    }
+    const destinationConfig = readOutputConfigurationString(merged, "destinationConfig");
+    if (destinationConfig !== undefined) {
+      normalized.destinationConfig = destinationConfig;
+    } else {
+      delete normalized.destinationConfig;
+    }
+  }
+
+  const keys = Object.keys(normalized);
+  if (keys.length === 0) {
+    return undefined;
+  }
+
+  keys.sort((left, right) => left.localeCompare(right));
+  const ordered: Record<string, unknown> = {};
+  for (const key of keys) {
+    ordered[key] = normalized[key];
+  }
+  return Object.freeze(ordered);
 }
 
 export function classifyWorkflowDraftAssetReferences(
@@ -2860,9 +3079,11 @@ export function validateWorkflowDraft(draft: WorkflowDraft | undefined): Workflo
   }
 
   const outputs = Array.isArray(raw.outputs) ? raw.outputs : [];
+  const normalizedOutputs: Array<{ readonly output: NormalizedWorkflowDraftOutput; readonly index: number }> = [];
   for (let index = 0; index < outputs.length; index += 1) {
     try {
-      const normalized = normalizeOutput(outputs[index] as WorkflowDraftOutput);
+      const normalized = normalizeOutput(outputs[index] as WorkflowDraftOutput, index + 1);
+      normalizedOutputs.push(Object.freeze({ output: normalized, index }));
       if (normalized.sourceStepId && !stepIds.has(normalized.sourceStepId)) {
         issues.push({
           code: WorkflowValidationIssueCodes.outputSourceStepMissing,
@@ -2874,14 +3095,10 @@ export function validateWorkflowDraft(draft: WorkflowDraft | undefined): Workflo
       }
 
       if (normalized.destination.type === WorkflowDraftOutputDestinationTypes.fileExport) {
-        const validFormats = new Set<string>([
-          WorkflowDraftOutputFormats.pdf,
-          WorkflowDraftOutputFormats.json,
-          WorkflowDraftOutputFormats.jsonl,
-          WorkflowDraftOutputFormats.csv,
-          WorkflowDraftOutputFormats.markdown,
-          WorkflowDraftOutputFormats.html,
-        ]);
+        const destinationDefinition = getWorkflowDraftOutputDestinationDefinition(
+          WorkflowDraftOutputDestinationTypes.fileExport,
+        );
+        const validFormats = new Set<string>(destinationDefinition?.supportedFormats ?? []);
         if (!validFormats.has(normalized.format)) {
           issues.push({
             code: WorkflowValidationIssueCodes.outputFileFormatInvalid,
@@ -2925,6 +3142,64 @@ export function validateWorkflowDraft(draft: WorkflowDraft | undefined): Workflo
         message: error instanceof Error ? error.message : "Workflow output is malformed.",
         path: `draft.outputs[${index}]`,
       });
+    }
+  }
+
+  const outputIdToIndexes = new Map<string, number[]>();
+  const outputOrderToIndexes = new Map<number, number[]>();
+  for (const entry of normalizedOutputs) {
+    const idIndexes = outputIdToIndexes.get(entry.output.id) ?? [];
+    idIndexes.push(entry.index);
+    outputIdToIndexes.set(entry.output.id, idIndexes);
+
+    const orderIndexes = outputOrderToIndexes.get(entry.output.order) ?? [];
+    orderIndexes.push(entry.index);
+    outputOrderToIndexes.set(entry.output.order, orderIndexes);
+  }
+
+  for (const [outputId, indexes] of outputIdToIndexes.entries()) {
+    if (indexes.length < 2) {
+      continue;
+    }
+    for (const index of indexes) {
+      issues.push({
+        code: WorkflowValidationIssueCodes.outputDuplicateId,
+        section: WorkflowValidationSections.outputs,
+        severity: "error",
+        message: `Workflow output id '${outputId}' is duplicated.`,
+        path: `draft.outputs[${index}].id`,
+      });
+    }
+  }
+
+  for (const [order, indexes] of outputOrderToIndexes.entries()) {
+    if (indexes.length < 2) {
+      continue;
+    }
+    for (const index of indexes) {
+      issues.push({
+        code: WorkflowValidationIssueCodes.outputOrderDuplicate,
+        section: WorkflowValidationSections.outputs,
+        severity: "error",
+        message: `Workflow output order '${order}' is duplicated.`,
+        path: `draft.outputs[${index}].order`,
+      });
+    }
+  }
+
+  const normalizedOutputOrders = normalizedOutputs
+    .map((entry) => entry.output.order)
+    .sort((left, right) => left - right);
+  for (let index = 0; index < normalizedOutputOrders.length; index += 1) {
+    if (normalizedOutputOrders[index] !== index + 1) {
+      issues.push({
+        code: WorkflowValidationIssueCodes.outputOrderNonContiguous,
+        section: WorkflowValidationSections.outputs,
+        severity: "error",
+        message: "Workflow output order values must be contiguous starting at 1.",
+        path: "draft.outputs",
+      });
+      break;
     }
   }
 
