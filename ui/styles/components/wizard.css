@@ -58,6 +58,18 @@
   gap: var(--space-xs);
 }
 
+.workflow-output-list-row-header {
+  gap: var(--space-xs);
+}
+
+.workflow-output-list-row-actions {
+  gap: var(--space-xs);
+}
+
+.workflow-output-selected-editor-header {
+  gap: var(--space-xs);
+}
+
 .ui-linear-wizard__shell {
   display: flex;
   flex-direction: column;

@@ -627,10 +627,16 @@ describe("WorkflowStudioModeSystem integration seams", () => {
     expect(store.getState().isSharedDraftValid).toBe(false);
 
     boundary = renderBoundary();
+    const selectViewerOutput = getElementByTestId(boundary, "workflow-output-select-1") as ReactElement<ButtonElementProps>;
+    selectViewerOutput.props.onClick?.();
+    boundary = renderBoundary();
     const viewerTitle = getElementByTestId(boundary, "workflow-output-viewer-title-1") as ReactElement<InputElementProps>;
     viewerTitle.props.onChange?.({ target: { value: "Results Viewer" } });
     expect(store.getState().isSharedDraftValid).toBe(false);
 
+    boundary = renderBoundary();
+    const selectSystemOutput = getElementByTestId(boundary, "workflow-output-select-2") as ReactElement<ButtonElementProps>;
+    selectSystemOutput.props.onClick?.();
     boundary = renderBoundary();
     const systemEntity = getElementByTestId(boundary, "workflow-output-system-entity-2") as ReactElement<InputElementProps>;
     systemEntity.props.onChange?.({ target: { value: "customer-record" } });
@@ -652,6 +658,11 @@ describe("WorkflowStudioModeSystem integration seams", () => {
     const firstEntity = getElementByTestId(boundary, "workflow-output-system-entity-0") as ReactElement<InputElementProps>;
     firstEntity.props.onChange?.({ target: { value: "file-output-record" } });
     expect(store.getState().isSharedDraftValid).toBe(true);
+
+    boundary = renderBoundary();
+    const moveThirdUp = getElementByTestId(boundary, "workflow-output-move-up-2") as ReactElement<ButtonElementProps>;
+    moveThirdUp.props.onClick?.();
+    expect(store.getState().sharedDraft.outputs.map((output) => output.order)).toEqual([1, 2, 3]);
 
     boundary = renderBoundary();
     const removeSecond = getElementByTestId(boundary, "workflow-output-remove-1") as ReactElement<ButtonElementProps>;

@@ -48,6 +48,13 @@ export const workflowFileOutputFormats = Object.freeze([
   ...(workflowOutputTypeRegistry.get(WorkflowDraftOutputDestinationTypes.fileExport)?.supportedFormats ?? []),
 ]);
 
+function normalizeOutputOrdering(outputs: ReadonlyArray<WorkflowDraftOutput>): ReadonlyArray<WorkflowDraftOutput> {
+  return Object.freeze(outputs.map((output, index) => Object.freeze({
+    ...output,
+    order: index + 1,
+  })));
+}
+
 function normalizeOptional(value?: string): string | undefined {
   const normalized = value?.trim();
   return normalized ? normalized : undefined;
@@ -210,7 +217,7 @@ export function addWorkflowOutput(
     outputId,
     draft: Object.freeze({
       ...draft,
-      outputs: Object.freeze([
+      outputs: normalizeOutputOrdering([
         ...draft.outputs,
         baseOutput,
       ]),
@@ -260,12 +267,7 @@ export function removeWorkflowOutput(
   draft: WorkflowDraft,
   outputId: string,
 ): { readonly draft: WorkflowDraft; readonly changed: boolean } {
-  const nextOutputs = draft.outputs
-    .filter((output) => output.id !== outputId)
-    .map((output, index) => Object.freeze({
-      ...output,
-      order: index + 1,
-    }));
+  const nextOutputs = normalizeOutputOrdering(draft.outputs.filter((output) => output.id !== outputId));
   if (nextOutputs.length === draft.outputs.length) {
     return Object.freeze({ draft, changed: false });
   }
@@ -276,6 +278,89 @@ export function removeWorkflowOutput(
     }),
     changed: true,
   });
+}
+
+function moveWorkflowOutput(
+  draft: WorkflowDraft,
+  outputId: string,
+  offset: -1 | 1,
+): { readonly draft: WorkflowDraft; readonly changed: boolean } {
+  const index = draft.outputs.findIndex((output) => output.id === outputId);
+  if (index < 0) {
+    return Object.freeze({ draft, changed: false });
+  }
+  const targetIndex = index + offset;
+  if (targetIndex < 0 || targetIndex >= draft.outputs.length) {
+    return Object.freeze({ draft, changed: false });
+  }
+
+  const nextOutputs = [...draft.outputs];
+  [nextOutputs[index], nextOutputs[targetIndex]] = [
+    nextOutputs[targetIndex] as WorkflowDraftOutput,
+    nextOutputs[index] as WorkflowDraftOutput,
+  ];
+
+  return Object.freeze({
+    changed: true,
+    draft: Object.freeze({
+      ...draft,
+      outputs: normalizeOutputOrdering(nextOutputs),
+    }),
+  });
+}
+
+export function moveWorkflowOutputUp(
+  draft: WorkflowDraft,
+  outputId: string,
+): { readonly draft: WorkflowDraft; readonly changed: boolean } {
+  return moveWorkflowOutput(draft, outputId, -1);
+}
+
+export function moveWorkflowOutputDown(
+  draft: WorkflowDraft,
+  outputId: string,
+): { readonly draft: WorkflowDraft; readonly changed: boolean } {
+  return moveWorkflowOutput(draft, outputId, 1);
+}
+
+export function canMoveWorkflowOutput(
+  draft: WorkflowDraft,
+  outputId: string,
+  direction: "up" | "down",
+): boolean {
+  const index = draft.outputs.findIndex((output) => output.id === outputId);
+  if (index < 0) {
+    return false;
+  }
+  if (direction === "up") {
+    return index > 0;
+  }
+  return index < draft.outputs.length - 1;
+}
+
+export function resolveWorkflowOutputSelectionId(
+  draft: WorkflowDraft,
+  preferredOutputId?: string,
+): string | undefined {
+  const normalizedPreferred = normalizeOptional(preferredOutputId);
+  if (normalizedPreferred && draft.outputs.some((output) => output.id === normalizedPreferred)) {
+    return normalizedPreferred;
+  }
+  return draft.outputs[0]?.id;
+}
+
+export function getWorkflowOutputIssuesForIndex(
+  draftValidationIssues: ReadonlyArray<{ readonly path?: string; readonly message: string }>,
+  index: number,
+): ReadonlyArray<string> {
+  return Object.freeze(draftValidationIssues
+    .filter((issue) => issue.path?.startsWith(`draft.outputs[${index}]`))
+    .map((issue) => issue.message));
+}
+
+function resolveOutputLabel(output: WorkflowDraftOutput): string {
+  const definition = getDestinationDefinition(output.destination.type);
+  return definition?.label ?? output.destination.type;
 }
 
 export function setWorkflowOutputDestinationType(
@@ -408,17 +493,26 @@ export function getWorkflowOutputValidationMessages(
   output: WorkflowDraftOutput,
 ): ReadonlyArray<string> {
   const messages: string[] = [];
-  if (output.destination.type === WorkflowDraftOutputDestinationTypes.fileExport) {
-    if (!workflowFileOutputFormats.includes(output.format)) {
+  const destinationDefinition = getDestinationDefinition(output.destination.type);
+  if (!destinationDefinition) {
+    messages.push(`Workflow output type '${output.destination.type}' is not registered.`);
+    return Object.freeze(messages);
+  }
+
+  if (!destinationDefinition.supportedFormats.includes(output.format)) {
+    if (destinationDefinition.destinationType === WorkflowDraftOutputDestinationTypes.fileExport) {
       messages.push("File Export output requires a valid file format.");
+    } else {
+      messages.push(`${resolveOutputLabel(output)} output format '${output.format}' is not supported.`);
     }
   }
-  if (output.destination.type === WorkflowDraftOutputDestinationTypes.webViewer) {
+
+  if (destinationDefinition.destinationType === WorkflowDraftOutputDestinationTypes.webViewer) {
     if (!normalizeOptional(output.title)) {
       messages.push("Web Viewer output requires a viewer title.");
     }
   }
-  if (output.destination.type === WorkflowDraftOutputDestinationTypes.systemEntry) {
+  if (destinationDefinition.destinationType === WorkflowDraftOutputDestinationTypes.systemEntry) {
     const entityName = readDestinationOptionString(output, "entityName");
     if (!entityName) {
       messages.push("Database/System Record output requires an entity name.");
