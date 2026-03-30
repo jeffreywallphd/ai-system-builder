@@ -24,6 +24,9 @@ describe("WorkflowStudioPage contracts", () => {
     expect(registrationSource).toContain('slot: "draft-authoring"');
     expect(registrationSource).toContain('slot: "metadata"');
     expect(registrationSource).toContain('createWorkflowStudioTaxonomy("deterministic")');
+    expect(registrationSource).toContain("drawers: Object.freeze(");
+    expect(registrationSource).toContain('label: "Nodes"');
+    expect(registrationSource).toContain('label: "Inspector"');
 
     expect(shellSource).toContain("WorkflowStudioDraftAuthoringBoundary");
     expect(shellSource).toContain("workflowModeRoute");
@@ -37,5 +40,7 @@ describe("WorkflowStudioPage contracts", () => {
     expect(shellSource).toContain("restoreFromReturnSearch");
     expect(shellSource).toContain("setHandoffStatus");
     expect(shellSource).toContain("clearHandoffStatus");
+    expect(shellSource).toContain('data-testid="studio-shell-left-drawer-toggle"');
+    expect(shellSource).toContain('data-testid="studio-shell-right-drawer-toggle"');
   });
 });

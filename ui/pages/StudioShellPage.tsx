@@ -110,6 +110,12 @@ function getToolbarButtonClassName(action: StudioShellToolbarAction): string {
   return "ui-button";
 }
 
+function getDrawerToggleButtonClassName(isOpen: boolean): string {
+  return isOpen
+    ? "ui-button ui-button--primary"
+    : "ui-button ui-button--ghost";
+}
+
 function buildCreateMetadata(
   defaultDraftTitle: string,
   defaultDraftTags: ReadonlyArray<string>,
@@ -244,6 +250,10 @@ export default function StudioShellPage({
   const [workflowModeState, setWorkflowModeState] = useState<WorkflowStudioModeState | undefined>(
     () => workflowModeStore?.getState(),
   );
+  const leftDrawerConfiguration = studioRegistration?.shell?.drawers?.left;
+  const rightDrawerConfiguration = studioRegistration?.shell?.drawers?.right;
+  const [isLeftDrawerOpen, setIsLeftDrawerOpen] = useState(leftDrawerConfiguration?.defaultOpen ?? true);
+  const [isRightDrawerOpen, setIsRightDrawerOpen] = useState(rightDrawerConfiguration?.defaultOpen ?? true);
   const automationPrefillAppliedRef = useRef(false);
   const lastRestoredWorkflowReturnSearchRef = useRef<string | undefined>(undefined);
 
@@ -393,6 +403,11 @@ export default function StudioShellPage({
   useEffect(() => {
     automationPrefillAppliedRef.current = false;
   }, [studioId, location.search]);
+
+  useEffect(() => {
+    setIsLeftDrawerOpen(leftDrawerConfiguration?.defaultOpen ?? true);
+    setIsRightDrawerOpen(rightDrawerConfiguration?.defaultOpen ?? true);
+  }, [leftDrawerConfiguration?.defaultOpen, rightDrawerConfiguration?.defaultOpen, studioId]);
 
   useEffect(() => {
     if (!shouldSeedAutomationIntent || !automationIntent || snapshot?.draft || automationPrefillAppliedRef.current) {
@@ -566,6 +581,7 @@ export default function StudioShellPage({
   const workflowDraftContent = workflowModeState?.sharedDraftSerialized ?? content;
   const hasWorkflowDraftParseError = isWorkflowStudio && Boolean(workflowModeState?.draftParseError);
   const toolbarActions = studioRegistration?.shell?.toolbar?.actions ?? [];
+  const hasToolbar = toolbarActions.length > 0 || Boolean(leftDrawerConfiguration) || Boolean(rightDrawerConfiguration);
 
   const saveDraftFromAuthoring = (): void => {
     if (!sessionId) {
@@ -775,9 +791,19 @@ export default function StudioShellPage({
       </div>
 
       <div className="ui-studio-shell__authoring">
-        {toolbarActions.length > 0 ? (
+        {hasToolbar ? (
           <div className="ui-toolbar ui-toolbar--panel ui-studio-shell__authoring-toolbar" data-testid="studio-shell-authoring-toolbar">
             <div className="ui-toolbar__group">
+              {leftDrawerConfiguration ? (
+                <button
+                  type="button"
+                  className={getDrawerToggleButtonClassName(isLeftDrawerOpen)}
+                  data-testid="studio-shell-left-drawer-toggle"
+                  onClick={() => setIsLeftDrawerOpen((current) => !current)}
+                >
+                  {leftDrawerConfiguration.label}
+                </button>
+              ) : null}
               {toolbarActions.map((action) => (
                 <button
                   key={action.id}
@@ -789,6 +815,16 @@ export default function StudioShellPage({
                   {action.label}
                 </button>
               ))}
+              {rightDrawerConfiguration ? (
+                <button
+                  type="button"
+                  className={getDrawerToggleButtonClassName(isRightDrawerOpen)}
+                  data-testid="studio-shell-right-drawer-toggle"
+                  onClick={() => setIsRightDrawerOpen((current) => !current)}
+                >
+                  {rightDrawerConfiguration.label}
+                </button>
+              ) : null}
             </div>
           </div>
         ) : null}
@@ -825,6 +861,20 @@ export default function StudioShellPage({
                 handoffStatus: workflowModeState.handoffStatus,
                 setHandoffStatus: (status) => workflowModeStore.setHandoffStatus(status),
                 clearHandoffStatus: () => workflowModeStore.clearHandoffStatus(),
+                canvasDrawers: {
+                  left: leftDrawerConfiguration
+                    ? {
+                      label: leftDrawerConfiguration.label,
+                      isOpen: isLeftDrawerOpen,
+                    }
+                    : undefined,
+                  right: rightDrawerConfiguration
+                    ? {
+                      label: rightDrawerConfiguration.label,
+                      isOpen: isRightDrawerOpen,
+                    }
+                    : undefined,
+                },
               }
               : undefined}
           />

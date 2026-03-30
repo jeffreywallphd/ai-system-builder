@@ -20,6 +20,16 @@ export const workflowStudioRegistration: CompositeStudioRegistration = Object.fr
   shell: Object.freeze({
     title: WorkflowStudioIdentity.defaultStudioName,
     subtitle: "Shared composite shell for workflow orchestrator authoring with backend-authoritative lifecycle, validation, and publish/version flows.",
+    drawers: Object.freeze({
+      left: Object.freeze({
+        label: "Nodes",
+        defaultOpen: true,
+      }),
+      right: Object.freeze({
+        label: "Inspector",
+        defaultOpen: true,
+      }),
+    }),
     toolbar: Object.freeze({
       actions: Object.freeze([
         {

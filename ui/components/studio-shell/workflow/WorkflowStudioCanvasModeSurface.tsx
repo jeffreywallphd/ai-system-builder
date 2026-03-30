@@ -12,6 +12,7 @@ import {
   WorkflowCanvasSectionIds,
   type WorkflowCanvasAction,
   type WorkflowCanvasGraphNodeViewModel,
+  type WorkflowCanvasSectionId,
 } from "../../../studio-shell/workflow/WorkflowStudioCanvasViewModel";
 import WorkflowStudioCanvasReactFlow from "./WorkflowStudioCanvasReactFlow";
 import {
@@ -39,15 +40,54 @@ export interface WorkflowStudioCanvasModeSurfaceProps {
   readonly onUpdateSharedDraft?: (updater: (draft: WorkflowDraft) => WorkflowDraft) => void;
   readonly draftEditorContent: string;
   readonly onChangeDraftEditorContent: (nextContent: string) => void;
+  readonly drawerState?: {
+    readonly left?: {
+      readonly label: string;
+      readonly isOpen: boolean;
+    };
+    readonly right?: {
+      readonly label: string;
+      readonly isOpen: boolean;
+    };
+  };
 }
 
 interface WorkflowCanvasPaletteOption {
   readonly id: string;
-  readonly sectionId: string;
+  readonly sectionId: WorkflowCanvasSectionId;
   readonly title: string;
   readonly summary: string;
   readonly action: WorkflowCanvasAction;
 }
+
+interface WorkflowCanvasPaletteSection {
+  readonly id: WorkflowCanvasSectionId;
+  readonly title: string;
+  readonly description: string;
+}
+
+const workflowCanvasPaletteSections: ReadonlyArray<WorkflowCanvasPaletteSection> = Object.freeze([
+  Object.freeze({
+    id: WorkflowCanvasSectionIds.triggers,
+    title: "Trigger nodes",
+    description: "Start conditions and incoming events.",
+  }),
+  Object.freeze({
+    id: WorkflowCanvasSectionIds.inputs,
+    title: "Input nodes",
+    description: "Runtime, dataset, and static data inputs.",
+  }),
+  Object.freeze({
+    id: WorkflowCanvasSectionIds.steps,
+    title: "Step nodes",
+    description: "Action and built-in execution steps.",
+  }),
+  Object.freeze({
+    id: WorkflowCanvasSectionIds.outputs,
+    title: "Output nodes",
+    description: "Workflow result destinations.",
+  }),
+]);
 
 function buildPaletteOptions(): ReadonlyArray<WorkflowCanvasPaletteOption> {
   return Object.freeze([
@@ -105,8 +145,10 @@ export default function WorkflowStudioCanvasModeSurface({
   onUpdateSharedDraft,
   draftEditorContent,
   onChangeDraftEditorContent,
+  drawerState,
 }: WorkflowStudioCanvasModeSurfaceProps): JSX.Element {
   const [selectedNodeId, setSelectedNodeId] = useState<string | undefined>(undefined);
+  const [paletteSearchValue, setPaletteSearchValue] = useState("");
   const viewModel = useMemo(
     () => deriveWorkflowCanvasViewModel(sharedDraft, draftValidationIssues),
     [draftValidationIssues, sharedDraft],
@@ -118,6 +160,11 @@ export default function WorkflowStudioCanvasModeSurface({
   );
   const selectedNode = selectedNodeId ? graphNodesById.get(selectedNodeId) : undefined;
   const selectedItemNode = selectedNode?.kind === WorkflowCanvasGraphNodeKinds.item ? selectedNode : undefined;
+  const leftDrawerEnabled = Boolean(drawerState?.left);
+  const rightDrawerEnabled = Boolean(drawerState?.right);
+  const leftDrawerOpen = drawerState?.left?.isOpen ?? true;
+  const rightDrawerOpen = drawerState?.right?.isOpen ?? true;
+  const normalizedPaletteSearch = paletteSearchValue.trim().toLowerCase();
 
   useEffect(() => {
     if (selectedNodeId && !graphNodesById.has(selectedNodeId)) {
@@ -280,54 +327,98 @@ export default function WorkflowStudioCanvasModeSurface({
     );
   };
 
+  const filteredPaletteOptions = useMemo(() => (
+    normalizedPaletteSearch.length === 0
+      ? paletteOptions
+      : paletteOptions.filter((option) => {
+        const section = workflowCanvasPaletteSections.find((entry) => entry.id === option.sectionId);
+        const searchableContent = `${option.title} ${option.summary} ${section?.title ?? ""} ${section?.description ?? ""}`
+          .toLowerCase();
+        return searchableContent.includes(normalizedPaletteSearch);
+      })
+  ), [normalizedPaletteSearch, paletteOptions]);
+
   const paletteBySection = useMemo(() => {
     const grouped = new Map<string, WorkflowCanvasPaletteOption[]>();
-    for (const option of paletteOptions) {
+    for (const option of filteredPaletteOptions) {
       const existing = grouped.get(option.sectionId) ?? [];
       existing.push(option);
       grouped.set(option.sectionId, existing);
     }
     return grouped;
-  }, [paletteOptions]);
+  }, [filteredPaletteOptions]);
+
+  const renderPalette = (): JSX.Element => (
+    <section className="ui-card ui-card--padded ui-stack ui-stack--sm" data-testid="workflow-canvas-palette">
+      <header className="ui-stack ui-stack--2xs">
+        <strong>{drawerState?.left?.label ?? "Nodes"}</strong>
+        <span className="ui-text-small ui-text-secondary">Search and add workflow nodes.</span>
+      </header>
+      <label className="ui-field">
+        <span className="ui-field__label">Search nodes</span>
+        <input
+          type="search"
+          className="ui-input"
+          value={paletteSearchValue}
+          onChange={(event) => setPaletteSearchValue(event.target.value)}
+          placeholder="Search triggers, inputs, steps, outputs"
+          data-testid="workflow-canvas-palette-search"
+        />
+      </label>
+      <div className="ui-workflow-canvas-drawer__sections">
+        {workflowCanvasPaletteSections.map((section) => {
+          const options = paletteBySection.get(section.id) ?? [];
+          return (
+            <section key={section.id} className="ui-stack ui-stack--2xs ui-workflow-canvas-drawer__section">
+              <div className="ui-stack ui-stack--3xs">
+                <strong className="ui-text-small">{section.title}</strong>
+                <span className="ui-text-small ui-text-secondary">{section.description}</span>
+              </div>
+              {options.length === 0 ? (
+                <p className="ui-text-small ui-text-muted">No matching nodes.</p>
+              ) : (
+                <div className="ui-workflow-canvas-drawer__list">
+                  {options.map((option) => (
+                    <article key={option.id} className="ui-workflow-canvas-palette-option ui-stack ui-stack--2xs">
+                      <div className="ui-text-small"><strong>{option.title}</strong></div>
+                      <div className="ui-text-small ui-text-secondary">{option.summary}</div>
+                      <button
+                        type="button"
+                        className="ui-button ui-button--ghost ui-button--sm"
+                        data-testid={`workflow-canvas-palette-add-${option.id.replace(/[^a-zA-Z0-9-]/g, "-")}`}
+                        onClick={() => applyAction(option.action)}
+                      >
+                        Add to Canvas
+                      </button>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+          );
+        })}
+      </div>
+    </section>
+  );
+
+  const renderInspector = (): JSX.Element => (
+    <aside className="ui-card ui-card--padded ui-stack ui-stack--2xs ui-workflow-studio-canvas__inspector" data-testid="workflow-canvas-inspector">
+      <strong>{drawerState?.right?.label ?? "Node inspector"}</strong>
+      {selectedItemNode ? renderNodeEditor(selectedItemNode) : (
+        <p className="ui-text-muted">Select a node to edit it.</p>
+      )}
+    </aside>
+  );
 
   return (
     <div className="ui-stack ui-stack--sm ui-workflow-studio-canvas" data-testid="workflow-studio-canvas-mode-surface">
-      <section className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="workflow-studio-canvas-summary">
-        <strong>Workflow Canvas</strong>
-        <p className="ui-text-small ui-text-secondary">
-          Nodes: {viewModel.totalNodeCount} | Validation issues: {viewModel.totalIssueCount}
-        </p>
-      </section>
-
-      <section className="ui-card ui-card--padded ui-stack ui-stack--sm" data-testid="workflow-canvas-palette">
+      <section className="ui-card ui-card--padded ui-stack ui-stack--2xs ui-workflow-studio-canvas__canvas-card" data-testid="workflow-studio-canvas-summary">
         <header className="ui-row ui-row--between ui-row--wrap">
-          <strong>Canvas palette</strong>
-          <span className="ui-text-small ui-text-secondary">Add to Canvas actions by section.</span>
+          <strong>Workflow Canvas</strong>
+          <span className="ui-text-small ui-text-secondary">
+            Nodes: {viewModel.totalNodeCount} | Validation issues: {viewModel.totalIssueCount}
+          </span>
         </header>
-        <div className="ui-workflow-studio-canvas__palette-grid">
-          {[WorkflowCanvasSectionIds.triggers, WorkflowCanvasSectionIds.inputs, WorkflowCanvasSectionIds.steps, WorkflowCanvasSectionIds.outputs].map((sectionId) => (
-            <section key={sectionId} className="ui-card ui-card--padded ui-stack ui-stack--2xs">
-              <strong className="ui-text-small">{sectionId[0]?.toUpperCase()}{sectionId.slice(1)}</strong>
-              {(paletteBySection.get(sectionId) ?? []).map((option) => (
-                <article key={option.id} className="ui-workflow-canvas-palette-option ui-stack ui-stack--2xs">
-                  <div className="ui-text-small"><strong>{option.title}</strong></div>
-                  <div className="ui-text-small ui-text-secondary">{option.summary}</div>
-                  <button
-                    type="button"
-                    className="ui-button ui-button--ghost ui-button--sm"
-                    data-testid={`workflow-canvas-palette-add-${option.id.replace(/[^a-zA-Z0-9-]/g, "-")}`}
-                    onClick={() => applyAction(option.action)}
-                  >
-                    Add to Canvas
-                  </button>
-                </article>
-              ))}
-            </section>
-          ))}
-        </div>
-      </section>
-
-      <div className="ui-workflow-studio-canvas__authoring-grid">
         <WorkflowStudioCanvasReactFlow
           graph={viewModel.graph}
           selectedNodeId={selectedNodeId}
@@ -336,31 +427,44 @@ export default function WorkflowStudioCanvasModeSurface({
           onRemoveNode={handleRemoveNode}
           renderNodeEditor={renderNodeEditor}
         />
+      </section>
 
-        <aside className="ui-card ui-card--padded ui-stack ui-stack--2xs ui-workflow-studio-canvas__inspector" data-testid="workflow-canvas-inspector">
-          <strong>Node inspector</strong>
-          {selectedItemNode ? renderNodeEditor(selectedItemNode) : (
-            <p className="ui-text-muted">Select a node to edit it.</p>
-          )}
-        </aside>
+      <div className="ui-workflow-studio-canvas__drawer-layout">
+        {leftDrawerEnabled && leftDrawerOpen ? (
+          <aside className="ui-workflow-studio-canvas__drawer ui-workflow-studio-canvas__drawer--left">
+            {renderPalette()}
+          </aside>
+        ) : null}
+
+        <div className="ui-stack ui-stack--sm ui-workflow-studio-canvas__details">
+          {!leftDrawerEnabled ? renderPalette() : null}
+
+          {!rightDrawerEnabled ? renderInspector() : null}
+
+          <details className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="workflow-studio-canvas-graph-details">
+            <summary className="ui-text-small">Canvas graph projection</summary>
+            <p className="ui-text-small ui-text-secondary">
+              Graph nodes: {viewModel.graph.nodes.length} | Graph edges: {viewModel.graph.edges.length}
+            </p>
+          </details>
+
+          <details className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="workflow-studio-canvas-json-details">
+            <summary className="ui-text-small">Canonical workflow draft JSON</summary>
+            <textarea
+              className="ui-textarea"
+              rows={8}
+              value={draftEditorContent}
+              onChange={(event) => onChangeDraftEditorContent(event.target.value)}
+            />
+          </details>
+        </div>
+
+        {rightDrawerEnabled && rightDrawerOpen ? (
+          <aside className="ui-workflow-studio-canvas__drawer ui-workflow-studio-canvas__drawer--right">
+            {renderInspector()}
+          </aside>
+        ) : null}
       </div>
-
-      <details className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="workflow-studio-canvas-graph-details">
-        <summary className="ui-text-small">Canvas graph projection</summary>
-        <p className="ui-text-small ui-text-secondary">
-          Graph nodes: {viewModel.graph.nodes.length} | Graph edges: {viewModel.graph.edges.length}
-        </p>
-      </details>
-
-      <details className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="workflow-studio-canvas-json-details">
-        <summary className="ui-text-small">Canonical workflow draft JSON</summary>
-        <textarea
-          className="ui-textarea"
-          rows={8}
-          value={draftEditorContent}
-          onChange={(event) => onChangeDraftEditorContent(event.target.value)}
-        />
-      </details>
     </div>
   );
 }
