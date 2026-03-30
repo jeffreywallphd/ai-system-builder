@@ -615,12 +615,8 @@ describe("WorkflowStudioModeSystem integration seams", () => {
     });
 
     let boundary = renderBoundary();
-    const addFile = getElementByTestId(boundary, "workflow-output-add-file-export") as ReactElement<ButtonElementProps>;
-    const addViewer = getElementByTestId(boundary, "workflow-output-add-web-viewer") as ReactElement<ButtonElementProps>;
-    const addSystem = getElementByTestId(boundary, "workflow-output-add-system-entry") as ReactElement<ButtonElementProps>;
-    addFile.props.onClick?.();
-    addViewer.props.onClick?.();
-    addSystem.props.onClick?.();
+    const addAllOutputs = getElementByTestId(boundary, "workflow-output-selector-add-all") as ReactElement<ButtonElementProps>;
+    addAllOutputs.props.onClick?.();
 
     expect(store.getState().sharedDraft.outputs).toHaveLength(3);
     expect(store.getState().sharedDraft.outputs.map((output) => output.destination.type)).toEqual([

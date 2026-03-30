@@ -1,12 +1,13 @@
 import {
-  getWorkflowDraftOutputDestinationDefinition,
-  listWorkflowDraftOutputDestinationDefinitions,
   WorkflowDraftOutputDestinationTypes,
   type WorkflowDraft,
   type WorkflowDraftOutput,
-  type WorkflowDraftOutputDestinationDefinition,
-  type WorkflowDraftOutputDestinationType,
 } from "../../../domain/workflow-studio/WorkflowStudioDomain";
+import {
+  createDefaultWorkflowOutputTypeRegistry,
+  type WorkflowOutputRegistryFieldMetadata,
+  type WorkflowOutputTypeRegistryEntry,
+} from "../../../application/workflow-studio/WorkflowOutputTypeRegistry";
 
 export const WorkflowOutputPresentationModes = Object.freeze({
   embedded: "embedded",
@@ -16,14 +17,36 @@ export const WorkflowOutputPresentationModes = Object.freeze({
 export type WorkflowOutputPresentationMode =
   typeof WorkflowOutputPresentationModes[keyof typeof WorkflowOutputPresentationModes];
 
-export const workflowOutputDestinationDefinitions: ReadonlyArray<WorkflowDraftOutputDestinationDefinition> =
-  listWorkflowDraftOutputDestinationDefinitions();
+export interface WorkflowOutputAddRequest {
+  readonly destinationType: string;
+}
 
-const defaultOutputDestinationDefinition = workflowOutputDestinationDefinitions[0] as WorkflowDraftOutputDestinationDefinition;
+export interface WorkflowOutputAddResult {
+  readonly draft: WorkflowDraft;
+  readonly outputId?: string;
+  readonly added: boolean;
+  readonly error?: string;
+}
 
-export const workflowFileOutputFormats = Object.freeze(
-  (getWorkflowDraftOutputDestinationDefinition(WorkflowDraftOutputDestinationTypes.fileExport)?.supportedFormats ?? []),
-);
+export interface WorkflowOutputAddManyResult {
+  readonly draft: WorkflowDraft;
+  readonly addedOutputIds: ReadonlyArray<string>;
+  readonly rejectedRequests: ReadonlyArray<{
+    readonly destinationType: string;
+    readonly error: string;
+  }>;
+}
+
+export const workflowOutputTypeRegistry = createDefaultWorkflowOutputTypeRegistry();
+export const workflowOutputTypeDefinitions: ReadonlyArray<WorkflowOutputTypeRegistryEntry> =
+  workflowOutputTypeRegistry.list();
+
+const defaultOutputTypeDefinition = workflowOutputTypeDefinitions[0] as WorkflowOutputTypeRegistryEntry;
+
+export const workflowOutputDestinationDefinitions = workflowOutputTypeDefinitions;
+export const workflowFileOutputFormats = Object.freeze([
+  ...(workflowOutputTypeRegistry.get(WorkflowDraftOutputDestinationTypes.fileExport)?.supportedFormats ?? []),
+]);
 
 function normalizeOptional(value?: string): string | undefined {
   const normalized = value?.trim();
@@ -42,14 +65,13 @@ function buildNextOutputId(draft: WorkflowDraft): string {
 }
 
 function getDestinationDefinition(
-  destinationType: WorkflowDraftOutputDestinationType,
-): WorkflowDraftOutputDestinationDefinition {
-  return (getWorkflowDraftOutputDestinationDefinition(destinationType)
-    ?? defaultOutputDestinationDefinition) as WorkflowDraftOutputDestinationDefinition;
+  destinationType: string,
+): WorkflowOutputTypeRegistryEntry | undefined {
+  return workflowOutputTypeRegistry.get(destinationType);
 }
 
 function createDefaultOutputConfiguration(
-  definition: WorkflowDraftOutputDestinationDefinition,
+  definition: WorkflowOutputTypeRegistryEntry,
 ): Readonly<Record<string, unknown>> | undefined {
   if (!definition.defaultConfiguration) {
     return undefined;
@@ -63,7 +85,7 @@ function createDefaultOutputConfiguration(
 
 function applyDestinationDefinition(
   output: WorkflowDraftOutput,
-  definition: WorkflowDraftOutputDestinationDefinition,
+  definition: WorkflowOutputTypeRegistryEntry,
 ): WorkflowDraftOutput {
   const configuration = createDefaultOutputConfiguration(definition);
   return Object.freeze({
@@ -136,17 +158,35 @@ function readDestinationOptionString(output: WorkflowDraftOutput, key: string): 
 }
 
 export function getWorkflowOutputDestinationDefinitionByType(
-  destinationType: WorkflowDraftOutputDestinationType,
-): WorkflowDraftOutputDestinationDefinition {
-  return getDestinationDefinition(destinationType);
+  destinationType: string,
+): WorkflowOutputTypeRegistryEntry {
+  return getDestinationDefinition(destinationType)
+    ?? defaultOutputTypeDefinition;
 }
 
 export function addWorkflowOutput(
   draft: WorkflowDraft,
-  destinationType: WorkflowDraftOutputDestinationType = WorkflowDraftOutputDestinationTypes.fileExport,
-): { readonly draft: WorkflowDraft; readonly outputId: string } {
+  destinationType: string = WorkflowDraftOutputDestinationTypes.fileExport,
+): WorkflowOutputAddResult {
+  const addConstraint = workflowOutputTypeRegistry.evaluateAddConstraint(draft, destinationType);
+  if (!addConstraint.allowed) {
+    return Object.freeze({
+      draft,
+      added: false,
+      error: addConstraint.message ?? `Workflow output type '${destinationType}' is not supported.`,
+    });
+  }
+
   const outputId = buildNextOutputId(draft);
   const destinationDefinition = getDestinationDefinition(destinationType);
+  if (!destinationDefinition) {
+    return Object.freeze({
+      draft,
+      added: false,
+      error: `Workflow output type '${destinationType}' is not registered.`,
+    });
+  }
+
   const configuration = createDefaultOutputConfiguration(destinationDefinition);
   const baseOutput: WorkflowDraftOutput = Object.freeze({
     id: outputId,
@@ -166,6 +206,7 @@ export function addWorkflowOutput(
   });
 
   return Object.freeze({
+    added: true,
     outputId,
     draft: Object.freeze({
       ...draft,
@@ -174,6 +215,44 @@ export function addWorkflowOutput(
         baseOutput,
       ]),
     }),
+  });
+}
+
+export function addWorkflowOutputs(
+  draft: WorkflowDraft,
+  destinationTypes: ReadonlyArray<string>,
+): WorkflowOutputAddManyResult {
+  const addedOutputIds: string[] = [];
+  const rejectedRequests: Array<{ readonly destinationType: string; readonly error: string }> = [];
+  let nextDraft = draft;
+
+  for (const rawDestinationType of destinationTypes) {
+    const destinationType = normalizeOptional(rawDestinationType);
+    if (!destinationType) {
+      rejectedRequests.push(Object.freeze({
+        destinationType: String(rawDestinationType ?? ""),
+        error: "Workflow output add request requires a destination type.",
+      }));
+      continue;
+    }
+
+    const result = addWorkflowOutput(nextDraft, destinationType);
+    if (!result.added || !result.outputId) {
+      rejectedRequests.push(Object.freeze({
+        destinationType,
+        error: result.error ?? `Unable to add output '${destinationType}'.`,
+      }));
+      continue;
+    }
+
+    nextDraft = result.draft;
+    addedOutputIds.push(result.outputId);
+  }
+
+  return Object.freeze({
+    draft: nextDraft,
+    addedOutputIds: Object.freeze(addedOutputIds),
+    rejectedRequests: Object.freeze(rejectedRequests),
   });
 }
 
@@ -202,9 +281,12 @@ export function removeWorkflowOutput(
 export function setWorkflowOutputDestinationType(
   draft: WorkflowDraft,
   outputId: string,
-  destinationType: WorkflowDraftOutputDestinationType,
+  destinationType: string,
 ): { readonly draft: WorkflowDraft; readonly changed: boolean } {
   const destinationDefinition = getDestinationDefinition(destinationType);
+  if (!destinationDefinition) {
+    return Object.freeze({ draft, changed: false });
+  }
   return updateOutput(draft, outputId, (current) => {
     if (current.destination.type === destinationType) {
       return current;
@@ -344,5 +426,45 @@ export function getWorkflowOutputValidationMessages(
   }
 
   return Object.freeze(messages);
+}
+
+export function readWorkflowOutputFieldValue(
+  output: WorkflowDraftOutput,
+  field: WorkflowOutputRegistryFieldMetadata,
+): string {
+  if (field.target === "format") {
+    return output.format;
+  }
+  if (field.target === "title") {
+    return output.title ?? "";
+  }
+  return readDestinationOptionString(output, field.key) ?? "";
+}
+
+export function setWorkflowOutputFieldValue(
+  draft: WorkflowDraft,
+  outputId: string,
+  field: WorkflowOutputRegistryFieldMetadata,
+  value: string,
+): { readonly draft: WorkflowDraft; readonly changed: boolean } {
+  if (field.target === "format") {
+    return setWorkflowOutputFormat(draft, outputId, value);
+  }
+  if (field.target === "title") {
+    return setWorkflowOutputViewerTitle(draft, outputId, value);
+  }
+  if (field.key === "fileName") {
+    return setWorkflowOutputFileName(draft, outputId, value);
+  }
+  if (field.key === "presentationMode") {
+    return setWorkflowOutputViewerPresentationMode(draft, outputId, value as WorkflowOutputPresentationMode);
+  }
+  if (field.key === "entityName") {
+    return setWorkflowOutputRecordEntityName(draft, outputId, value);
+  }
+  if (field.key === "destinationConfig") {
+    return setWorkflowOutputRecordDestinationConfig(draft, outputId, value);
+  }
+  return Object.freeze({ draft, changed: false });
 }
 
