@@ -12,6 +12,10 @@ import {
   mapWorkflowEntityFromPersistenceRecord,
   mapWorkflowEntityToPersistenceRecord,
   normalizeWorkflowDraft,
+  listWorkflowDraftBuiltInStepDefinitions,
+  getWorkflowDraftBuiltInStepDefinition,
+  isWorkflowDraftBuiltInStep,
+  isWorkflowDraftBuiltInStepType,
   serializeWorkflowEntity,
   serializeWorkflowDraft,
   serializeWorkflowDraftDocument,
@@ -20,6 +24,7 @@ import {
   validateWorkflowEntity,
   WorkflowDraftAssetReferenceKinds,
   WorkflowDraftBuiltInStepTypes,
+  WorkflowDraftBuiltInStepCategories,
   WorkflowDraftInputSourceTypes,
   WorkflowDraftOutputDestinationTypes,
   WorkflowDraftOutputFormats,
@@ -195,6 +200,32 @@ describe("WorkflowStudioDomain", () => {
     const parsed = deserializeWorkflowDraftDocument(serialized);
 
     expect(parsed).toEqual(draft);
+  });
+
+  it("round-trips built-in workflow-native step persistence shapes", () => {
+    const draft = normalizeWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [{
+        id: "step-approval",
+        type: WorkflowDraftBuiltInStepTypes.manualApproval,
+        kind: WorkflowDraftStepKinds.controlFlow,
+        order: 1,
+        config: {
+          approvalMessage: "Manager sign-off required",
+          requiredApproverRoles: ["manager"],
+          timeoutSeconds: 900,
+          onTimeout: "escalate",
+        },
+      }],
+      outputs: [],
+    });
+
+    const serialized = serializeWorkflowDraftDocument(draft);
+    const parsed = deserializeWorkflowDraftDocument(serialized);
+
+    expect(parsed).toEqual(draft);
+    expect(parsed.steps[0]?.type).toBe(WorkflowDraftBuiltInStepTypes.manualApproval);
   });
 
   it("maps workflow entities to/from persistence records and preserves canonical fields", () => {
@@ -517,7 +548,7 @@ describe("WorkflowStudioDomain", () => {
     });
   });
 
-  it("accepts built-in control-flow step variants for if/then branching and loop iteration", () => {
+  it("accepts built-in workflow-native step variants for control flow, temporal, and human interaction", () => {
     const normalized = normalizeWorkflowDraft({
       triggers: [],
       inputs: [],
@@ -551,6 +582,17 @@ describe("WorkflowStudioDomain", () => {
             durationSeconds: 30,
           },
         },
+        {
+          id: "step-approval",
+          type: WorkflowDraftBuiltInStepTypes.manualApproval,
+          kind: WorkflowDraftStepKinds.controlFlow,
+          order: 4,
+          config: {
+            approvalMessage: "Approve release candidate",
+            requiredApproverRoles: ["qa", "ops"],
+            onTimeout: "escalate",
+          },
+        },
       ],
       outputs: [],
     });
@@ -581,6 +623,59 @@ describe("WorkflowStudioDomain", () => {
         durationSeconds: 30,
       },
     });
+    expect(normalized.steps[3]).toMatchObject({
+      id: "step-approval",
+      kind: WorkflowDraftStepKinds.controlFlow,
+      type: WorkflowDraftBuiltInStepTypes.manualApproval,
+      config: {
+        approvalMessage: "Approve release candidate",
+        requiredApproverRoles: ["qa", "ops"],
+        onTimeout: "escalate",
+      },
+    });
+  });
+
+  it("exposes canonical built-in step taxonomy/contracts with stable discovery metadata", () => {
+    const definitions = listWorkflowDraftBuiltInStepDefinitions();
+    expect(definitions.map((entry) => entry.type)).toEqual([
+      WorkflowDraftBuiltInStepTypes.ifThen,
+      WorkflowDraftBuiltInStepTypes.loopIteration,
+      WorkflowDraftBuiltInStepTypes.delayWait,
+      WorkflowDraftBuiltInStepTypes.manualApproval,
+    ]);
+    expect(definitions.map((entry) => entry.category)).toEqual([
+      WorkflowDraftBuiltInStepCategories.controlFlow,
+      WorkflowDraftBuiltInStepCategories.controlFlow,
+      WorkflowDraftBuiltInStepCategories.temporal,
+      WorkflowDraftBuiltInStepCategories.humanInteraction,
+    ]);
+    expect(definitions.every((entry) => entry.configSchemaId.startsWith("workflow.builtin."))).toBeTrue();
+    expect(getWorkflowDraftBuiltInStepDefinition(WorkflowDraftBuiltInStepTypes.manualApproval)?.label).toBe("Manual / Approval");
+    expect(getWorkflowDraftBuiltInStepDefinition("unknown-built-in")).toBeUndefined();
+    expect(isWorkflowDraftBuiltInStepType(WorkflowDraftBuiltInStepTypes.manualApproval)).toBeTrue();
+    expect(isWorkflowDraftBuiltInStepType("unknown-built-in")).toBeFalse();
+  });
+
+  it("supports built-in step type guards for persistence-safe workflow draft representations", () => {
+    const normalized = normalizeWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [{
+        id: "step-built-in",
+        type: WorkflowDraftBuiltInStepTypes.manualApproval,
+        kind: WorkflowDraftStepKinds.controlFlow,
+        order: 1,
+        config: {
+          approvalMessage: "Approve",
+          onTimeout: "reject",
+        },
+      }],
+      outputs: [],
+    });
+
+    const step = normalized.steps[0];
+    expect(step).toBeDefined();
+    expect(isWorkflowDraftBuiltInStep(step!)).toBeTrue();
   });
 
   it("supports agent-assistant asset-backed workflow steps with canonical asset references", () => {
@@ -788,6 +883,21 @@ describe("WorkflowStudioDomain", () => {
       }],
       outputs: [],
     })).toThrow("durationSeconds");
+
+    expect(() => normalizeWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [{
+        id: "step-invalid-approval",
+        type: WorkflowDraftBuiltInStepTypes.manualApproval,
+        kind: WorkflowDraftStepKinds.controlFlow,
+        order: 1,
+        config: {
+          onTimeout: "skip",
+        },
+      }],
+      outputs: [],
+    })).toThrow("onTimeout");
   });
 
   it("accepts canonical output entries with type, format, and destination", () => {

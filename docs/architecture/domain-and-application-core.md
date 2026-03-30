@@ -208,6 +208,14 @@ The studio shell now has a bounded inner-layer model and application orchestrati
 - Workflow asset-backed references now carry taxonomy metadata on canonical asset refs (`WorkflowDraftAssetReference.taxonomy`) and are validated against shared taxonomy expectations for dataset-backed inputs and agent-assistant steps.
 - Workflow draft validation now emits deterministic taxonomy/asset-reference issues for mismatched dataset taxonomy and malformed asset-backed step identities, while keeping canonical validation in the domain layer and publish enforcement in `application/workflow-studio/WorkflowStudioApplicationService.ts`.
 
+## Direction 5 update: Workflow built-in step taxonomy + registry foundation (stories 6.1-6.2)
+
+- Workflow-native built-in steps are now a first-class inner-layer concept in `domain/workflow-studio/WorkflowStudioDomain.ts` with canonical step taxonomy categories (`control-flow`, `temporal`, `human-interaction`, reserved `transformation`) and stable built-in step identities.
+- Canonical built-in step contracts now include type/category/label/description/config schema id/default config and a domain validation entry point (`normalizeWorkflowDraftBuiltInStepConfig`) so built-in semantics stay out of UI-only code.
+- The initial planned built-ins are now modeled explicitly as canonical contracts: `if-then`, `loop-iteration`, `delay-wait`, and `manual-approval`.
+- Workflow draft normalization/validation now routes built-in config checks through those canonical contracts and remains persistence-safe through existing draft/entity persistence mappings.
+- Application-layer discovery now uses `application/workflow-studio/BuiltInWorkflowStepRegistry.ts`, exposing stable built-in step enumeration and metadata to outer layers (wizard/canvas selectors) without hardcoded page-local built-in lists.
+
 ## Direction 5 update: Studio shell persistence integration (story 1.11)
 
 - Studio shell now has a real SQLite-backed infrastructure adapter (`infrastructure/filesystem/studio-shell/SqliteStudioShellRepository.ts`) implementing `IStudioShellRepository` with migration-managed schema, indexed studio/session/draft/version storage, and full aggregate snapshot persistence.

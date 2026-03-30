@@ -1,4 +1,5 @@
 import {
+  type WorkflowDraftBuiltInStepType,
   WorkflowDraftBuiltInStepTypes,
   WorkflowDraftStepAssetKinds,
   WorkflowDraftStepKinds,
@@ -9,6 +10,7 @@ import {
   type WorkflowDraftLoopIterationStepConfig,
   type WorkflowDraftStep,
 } from "../../../domain/workflow-studio/WorkflowStudioDomain";
+import { createDefaultBuiltInWorkflowStepRegistry } from "../../../application/workflow-studio/BuiltInWorkflowStepRegistry";
 import {
   TaxonomyBehaviorKinds,
   TaxonomySemanticRoles,
@@ -91,6 +93,18 @@ const stepAgentAssistantTaxonomy = createCompositionTaxonomyDescriptor({
   behaviorKind: TaxonomyBehaviorKinds.autonomous,
 });
 
+const builtInStepRegistry = createDefaultBuiltInWorkflowStepRegistry();
+const builtInStepTypeDefinitions: ReadonlyArray<WorkflowStepTypeDefinition> = Object.freeze(
+  builtInStepRegistry.list().map((entry) => Object.freeze({
+    kind: WorkflowDraftStepKinds.controlFlow,
+    type: entry.type,
+    selectionKind: WorkflowWizardStepSelectionKinds.builtIn,
+    label: entry.label,
+    summary: entry.description,
+    interactive: true,
+  })),
+);
+
 export const workflowStepTypeDefinitions: ReadonlyArray<WorkflowStepTypeDefinition> = Object.freeze([
   Object.freeze({
     kind: WorkflowDraftStepKinds.assetBacked,
@@ -100,30 +114,7 @@ export const workflowStepTypeDefinitions: ReadonlyArray<WorkflowStepTypeDefiniti
     summary: "Select an agent/assistant asset for this step.",
     interactive: true,
   }),
-  Object.freeze({
-    kind: WorkflowDraftStepKinds.controlFlow,
-    type: WorkflowDraftBuiltInStepTypes.ifThen,
-    selectionKind: WorkflowWizardStepSelectionKinds.builtIn,
-    label: "If / Then branching",
-    summary: "Evaluate a condition and branch.",
-    interactive: true,
-  }),
-  Object.freeze({
-    kind: WorkflowDraftStepKinds.controlFlow,
-    type: WorkflowDraftBuiltInStepTypes.loopIteration,
-    selectionKind: WorkflowWizardStepSelectionKinds.builtIn,
-    label: "Loop / Repeat",
-    summary: "Repeat work by count or condition.",
-    interactive: true,
-  }),
-  Object.freeze({
-    kind: WorkflowDraftStepKinds.controlFlow,
-    type: WorkflowDraftBuiltInStepTypes.delayWait,
-    selectionKind: WorkflowWizardStepSelectionKinds.builtIn,
-    label: "Delay / Wait",
-    summary: "Pause workflow execution for a duration.",
-    interactive: true,
-  }),
+  ...builtInStepTypeDefinitions,
 ]);
 
 const defaultStepTypeDefinition: WorkflowStepTypeDefinition = workflowStepTypeDefinitions[0] as WorkflowStepTypeDefinition;
@@ -210,22 +201,15 @@ function resolveStepDefinitionByType(kind: WorkflowDraftStep["kind"], type: stri
 }
 
 function defaultBuiltInConfig(stepType: string): Readonly<Record<string, unknown>> | undefined {
-  switch (stepType) {
-    case WorkflowDraftBuiltInStepTypes.ifThen:
-      return Object.freeze<WorkflowDraftIfThenStepConfig>({
-        conditionExpression: "true",
-      });
-    case WorkflowDraftBuiltInStepTypes.loopIteration:
-      return Object.freeze<WorkflowDraftLoopIterationStepConfig>({
-        repeatCount: 1,
-      });
-    case WorkflowDraftBuiltInStepTypes.delayWait:
-      return Object.freeze<WorkflowDraftDelayWaitStepConfig>({
-        durationSeconds: 60,
-      });
-    default:
-      return undefined;
+  if (
+    stepType !== WorkflowDraftBuiltInStepTypes.ifThen
+    && stepType !== WorkflowDraftBuiltInStepTypes.loopIteration
+    && stepType !== WorkflowDraftBuiltInStepTypes.delayWait
+    && stepType !== WorkflowDraftBuiltInStepTypes.manualApproval
+  ) {
+    return undefined;
   }
+  return builtInStepRegistry.createDefaultConfig(stepType as WorkflowDraftBuiltInStepType) as Readonly<Record<string, unknown>>;
 }
 
 function applyStepType(

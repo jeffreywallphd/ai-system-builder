@@ -205,6 +205,13 @@ The studio shell now has a bounded inner-layer model and application orchestrati
 - Workflow asset-backed references now carry taxonomy metadata on canonical asset refs (`WorkflowDraftAssetReference.taxonomy`) and are validated against shared taxonomy expectations for dataset-backed inputs and agent-assistant steps.
 - Workflow draft validation now emits deterministic taxonomy/asset-reference issues for mismatched dataset taxonomy and malformed asset-backed step identities, while keeping canonical validation in the domain layer and publish enforcement in `application/workflow-studio/WorkflowStudioApplicationService.ts`.
 
+## Direction 5 update: Workflow built-in step taxonomy + registry foundation (stories 6.1-6.2)
+
+- Workflow-native built-in steps are now first-class inner-layer contracts in `domain/workflow-studio/WorkflowStudioDomain.ts` with canonical categories (`control-flow`, `temporal`, `human-interaction`, reserved `transformation`) and stable built-in step identities.
+- Built-in step contracts now carry canonical discovery metadata (type/category/label/description/config schema id/default config) plus a shared domain validation entry point (`normalizeWorkflowDraftBuiltInStepConfig`), keeping semantics out of UI-local lists/forms.
+- The initial built-ins are explicitly modeled and discoverable: `if-then`, `loop-iteration`, `delay-wait`, and `manual-approval`.
+- Application discovery is now exposed through `application/workflow-studio/BuiltInWorkflowStepRegistry.ts`, giving wizard/canvas-facing layers a stable built-in step registry without hardcoded page-local definitions.
+
 ## Direction 5 update: Studio shell persistence integration (story 1.11)
 
 - Studio shell now has a real SQLite-backed infrastructure adapter (`infrastructure/filesystem/studio-shell/SqliteStudioShellRepository.ts`) implementing `IStudioShellRepository` with migration-managed schema, indexed studio/session/draft/version storage, and full aggregate snapshot persistence.

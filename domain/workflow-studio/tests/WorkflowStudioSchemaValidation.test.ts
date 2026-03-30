@@ -86,6 +86,17 @@ describe("WorkflowStudioDomain schema validation coverage", () => {
           },
           { id: "step-publish", type: "publish", kind: WorkflowDraftStepKinds.action, order: 4 },
           { id: "step-rework", type: "rework", kind: WorkflowDraftStepKinds.action, order: 5 },
+          {
+            id: "step-approval",
+            type: WorkflowDraftBuiltInStepTypes.manualApproval,
+            kind: WorkflowDraftStepKinds.controlFlow,
+            order: 6,
+            dependsOnStepIds: ["step-branch"],
+            config: {
+              approvalMessage: "Final publication review",
+              onTimeout: "reject",
+            },
+          },
         ],
         outputs: [
           {
