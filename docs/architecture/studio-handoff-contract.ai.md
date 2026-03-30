@@ -103,6 +103,18 @@ Primary call path:
   - if handoff draft reference conflicts with current workflow draft sync context, restoration is ignored (`draft-context-mismatch`) instead of overwriting active authoring state.
 - Workflow dataset and step selectors pass launch handoff id into session launch context so concurrent/repeated launches from the same selector session remain distinguishable and collision-safe.
 
+## Stories 5.11 / 5.12 handoff status UX + cross-studio regression coverage
+- Workflow wizard now has one shared handoff status surface (`WorkflowStudioHandoffStatusBanner`) instead of separate local notices for lifecycle outcomes.
+- Status is centralized in typed workflow mode state (`WorkflowStudioModeStateStore.handoffStatus`) and updated from existing typed seams:
+  - `launching`: create-new handoff initiated.
+  - `pending`: waiting for return.
+  - `resumed`: workflow authoring restored from canonical handoff context.
+  - `completed`: returned asset applied to intended selector target.
+  - `cancelled`: `cancelled`/`no-selection`/`abandoned` outcomes (non-destructive).
+  - `recovered`: stale/invalid return ignored safely.
+- Dataset and agent selectors publish status updates using existing correlation metadata (`launchHandoffId`, selector target metadata, selector session id), preserving 5.9/5.10 multi-session safety behavior.
+- Cross-studio regression coverage now includes explicit dataset + agent launch/return/apply/resume/cancel + stale-correlation scenarios in `ui/studio-shell/asset-selector/tests/AssetSelectorFramework.integration.test.ts`.
+
 ## Backward compatibility
 - Legacy selector launch params still parse as before.
 - If those params are absent, `InlineAssetCreationService.parseSelectorLaunchFromSearch(...)` now falls back to parsing `studioHandoff`.

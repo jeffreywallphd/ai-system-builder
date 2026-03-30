@@ -7,6 +7,7 @@ import WorkflowStudioCanvasModeLayout from "./WorkflowStudioCanvasModeLayout";
 import type { WorkflowStudioModeValidationIssue } from "../../../studio-shell/workflow/WorkflowStudioModeValidation";
 import type { WorkflowValidationIssue } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
 import type { WorkflowStudioWizardPageId } from "../../../studio-shell/workflow/WorkflowStudioWizardRouting";
+import type { WorkflowStudioHandoffStatus } from "../../../studio-shell/workflow/WorkflowStudioHandoffStatus";
 
 export interface WorkflowStudioDraftAuthoringBoundaryProps {
   readonly isWorkflowStudio: boolean;
@@ -24,6 +25,9 @@ export interface WorkflowStudioDraftAuthoringBoundaryProps {
     readonly modeValidationIssues: ReadonlyArray<WorkflowStudioModeValidationIssue>;
     readonly draftValidationIssues: ReadonlyArray<WorkflowValidationIssue>;
     readonly updateSharedDraft?: (updater: (draft: WorkflowDraft) => WorkflowDraft) => void;
+    readonly handoffStatus?: WorkflowStudioHandoffStatus;
+    readonly setHandoffStatus?: (status: WorkflowStudioHandoffStatus) => void;
+    readonly clearHandoffStatus?: () => void;
   };
   readonly invalidModeRouteId?: string;
   readonly invalidWizardPageRouteId?: string;
@@ -53,6 +57,9 @@ export default function WorkflowStudioDraftAuthoringBoundary({
             sharedDraftSerialized={workflowModeContext.sharedDraftSerialized}
             draftValidationIssues={workflowModeContext.draftValidationIssues}
             onUpdateSharedDraft={workflowModeContext.updateSharedDraft}
+            handoffStatus={workflowModeContext.handoffStatus}
+            onSetHandoffStatus={workflowModeContext.setHandoffStatus}
+            onClearHandoffStatus={workflowModeContext.clearHandoffStatus}
           />
         </WorkflowStudioWizardModeLayout>
       ) : (

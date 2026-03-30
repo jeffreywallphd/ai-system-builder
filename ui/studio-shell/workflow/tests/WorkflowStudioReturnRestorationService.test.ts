@@ -53,6 +53,8 @@ describe("WorkflowStudioReturnRestorationService", () => {
 
     expect(outcome.handled).toBeTrue();
     expect(outcome.restored).toBeTrue();
+    expect(outcome.assetType).toBe("agent");
+    expect(outcome.selectorTargetId).toBe("workflow-step:new");
     expect(store.getState().selectedModeId).toBe("wizard");
     expect(store.getState().sharedDraft.triggers.map((entry) => entry.id)).toEqual(["trigger-restored"]);
     expect(store.getState().draftSyncContext).toEqual({
@@ -113,6 +115,7 @@ describe("WorkflowStudioReturnRestorationService", () => {
     expect(outcome.handled).toBeTrue();
     expect(outcome.restored).toBeFalse();
     expect(outcome.ignoredReason).toBe("draft-context-mismatch");
+    expect(outcome.assetType).toBe("agent");
     expect(store.getState().draftSyncContext).toEqual({
       studioId: "studio-workflows",
       sessionId: "session-workflow-current",

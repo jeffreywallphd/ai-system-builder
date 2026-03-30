@@ -10,6 +10,8 @@ import WorkflowStudioInputSectionEditor from "./WorkflowStudioInputSectionEditor
 import WorkflowStudioOutputSectionEditor from "./WorkflowStudioOutputSectionEditor";
 import WorkflowStudioStepSectionEditor from "./WorkflowStudioStepSectionEditor";
 import WorkflowStudioTriggerSectionEditor from "./WorkflowStudioTriggerSectionEditor";
+import type { WorkflowStudioHandoffStatus } from "../../../studio-shell/workflow/WorkflowStudioHandoffStatus";
+import WorkflowStudioHandoffStatusBanner from "./WorkflowStudioHandoffStatusBanner";
 
 export interface WorkflowStudioWizardModeSurfaceProps {
   readonly sharedDraft: WorkflowDraft;
@@ -19,6 +21,9 @@ export interface WorkflowStudioWizardModeSurfaceProps {
   readonly studioId?: string;
   readonly selectedWizardPageId: WorkflowStudioWizardPageId;
   readonly onSelectWizardPage?: (pageId: WorkflowStudioWizardPageId) => void;
+  readonly handoffStatus?: WorkflowStudioHandoffStatus;
+  readonly onSetHandoffStatus?: (status: WorkflowStudioHandoffStatus) => void;
+  readonly onClearHandoffStatus?: () => void;
 }
 
 function isWorkflowWizardSectionId(value: string): value is WorkflowWizardSectionId {
@@ -38,6 +43,9 @@ export default function WorkflowStudioWizardModeSurface({
   studioId,
   selectedWizardPageId,
   onSelectWizardPage,
+  handoffStatus,
+  onSetHandoffStatus,
+  onClearHandoffStatus,
 }: WorkflowStudioWizardModeSurfaceProps): JSX.Element {
   const [readyActionAttempted, setReadyActionAttempted] = useState(false);
   const [readyActionConfirmed, setReadyActionConfirmed] = useState(false);
@@ -88,6 +96,11 @@ export default function WorkflowStudioWizardModeSurface({
 
   return (
     <div className="ui-stack ui-stack--sm" data-testid="workflow-studio-wizard-mode-surface">
+      <WorkflowStudioHandoffStatusBanner
+        status={handoffStatus}
+        onDismiss={onClearHandoffStatus}
+      />
+
       <section className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="workflow-wizard-pages-card">
         <nav className="ui-stack ui-stack--2xs" aria-label="Workflow wizard pages">
           <div className="ui-workflow-wizard__page-buttons">
@@ -120,6 +133,7 @@ export default function WorkflowStudioWizardModeSurface({
               draftValidationIssues={draftValidationIssues}
               onUpdateSharedDraft={onUpdateSharedDraft}
               studioId={studioId}
+              onSetHandoffStatus={onSetHandoffStatus}
             />
           ) : null}
 
@@ -129,6 +143,7 @@ export default function WorkflowStudioWizardModeSurface({
               draftValidationIssues={draftValidationIssues}
               onUpdateSharedDraft={onUpdateSharedDraft}
               studioId={studioId}
+              onSetHandoffStatus={onSetHandoffStatus}
             />
           ) : null}
 

@@ -352,6 +352,171 @@ describe("AssetSelectorFramework integration", () => {
     expect(updated.steps.find((step) => step.id === replaceStepId)?.assetRef?.asset.assetId).toBe("asset:agent:new");
   });
 
+  it("covers dataset launch-return-resume with cancel handling and repeated-handoff safety", () => {
+    const sessionKey = "workflow-studio:demo:inputs:dataset:e2e";
+    const request = createDatasetAssetSelectorRequest({
+      requestId: "selector:workflow:inputs:e2e",
+      originatingStudio: "workflow-studio",
+      originatingField: "inputs.dataset",
+    });
+    const store = new AssetSelectorSessionStore();
+    const launchService = new AssetSelectorStudioLaunchService();
+    const returnService = new AssetSelectorReturnHandoffService();
+    const inlineService = new InlineAssetCreationService();
+
+    let draft = Object.freeze({
+      ...createEmptyWorkflowDraft(),
+      triggers: Object.freeze([Object.freeze({
+        id: "trigger-e2e",
+        kind: "user" as const,
+        type: "manual" as const,
+        config: Object.freeze({}),
+      })]),
+      steps: Object.freeze([Object.freeze({
+        id: "step-e2e",
+        type: "action",
+        kind: "action" as const,
+        order: 1,
+        title: "Existing Step",
+      })]),
+    });
+
+    store.prepareSession({
+      sessionKey,
+      request,
+      initialSelectedAssets: [Object.freeze({
+        assetId: "asset:dataset:baseline",
+        versionId: "asset:dataset:baseline:v1",
+        assetType: "dataset" as const,
+        displayName: "Baseline Dataset",
+      })],
+    });
+    store.activateSession(sessionKey);
+
+    const cancelledLaunch = launchService.launch({
+      sessionKey,
+      selectorRequest: request,
+      routePath: "/studio-shell/workflow/wizard/inputs",
+      routeSearch: "?mode=wizard",
+      routeHash: "#workflow-wizard-inputs",
+      selectorTargetId: "workflow-inputs:dataset",
+    });
+    store.transitionToCreatingNew(sessionKey, {
+      originatingContext: request.context,
+      requestedAssetType: "dataset",
+      returnTargetSessionKey: sessionKey,
+      returnRoutePath: cancelledLaunch?.returnTarget?.routePath,
+      launchHandoffId: cancelledLaunch?.studioHandoff?.launch.handoffId,
+    });
+
+    const cancelledPath = inlineService.buildReturnPath({
+      returnTarget: {
+        routePath: cancelledLaunch?.returnTarget?.routePath ?? "/studio-shell/workflow/wizard/inputs",
+        contextId: sessionKey,
+      },
+      payload: {
+        status: "cancelled",
+        handoffId: cancelledLaunch?.studioHandoff?.launch.handoffId,
+      },
+    });
+    const cancelledOutcome = returnService.handle({
+      search: readSearchFromPath(cancelledPath),
+      sessionKey,
+      request,
+      expectedSelectorTargetId: "workflow-inputs:dataset",
+      expectedOriginatingField: "inputs.dataset",
+      expectedUsageContext: "workflow-input",
+      sessionStore: store,
+    });
+    expect(cancelledOutcome.outcomeKind).toBe("cancelled");
+    expect(store.getSession(sessionKey)?.selectedAssets.map((entry) => entry.assetId)).toEqual(["asset:dataset:baseline"]);
+    draft = replaceDatasetInputSelections(draft, store.getSession(sessionKey)?.selectedAssets.map((entry) => ({
+      assetId: entry.assetId,
+      versionId: entry.versionId,
+      name: entry.displayName,
+    })) ?? []).draft;
+    expect(listDatasetInputs(draft).map((entry) => entry.asset.assetId)).toEqual(["asset:dataset:baseline"]);
+
+    const createdLaunch = launchService.launch({
+      sessionKey,
+      selectorRequest: request,
+      routePath: "/studio-shell/workflow/wizard/inputs",
+      routeSearch: "?mode=wizard",
+      routeHash: "#workflow-wizard-inputs",
+      selectorTargetId: "workflow-inputs:dataset",
+    });
+    store.transitionToCreatingNew(sessionKey, {
+      originatingContext: request.context,
+      requestedAssetType: "dataset",
+      returnTargetSessionKey: sessionKey,
+      returnRoutePath: createdLaunch?.returnTarget?.routePath,
+      launchHandoffId: createdLaunch?.studioHandoff?.launch.handoffId,
+    });
+
+    const staleReturnPath = inlineService.buildReturnPath({
+      returnTarget: {
+        routePath: createdLaunch?.returnTarget?.routePath ?? "/studio-shell/workflow/wizard/inputs",
+        contextId: sessionKey,
+      },
+      payload: {
+        status: "created",
+        assetId: "asset:dataset:stale",
+        versionId: "asset:dataset:stale:v1",
+        assetType: "dataset",
+        handoffId: cancelledLaunch?.studioHandoff?.launch.handoffId,
+      },
+    });
+    const staleOutcome = returnService.handle({
+      search: readSearchFromPath(staleReturnPath),
+      sessionKey,
+      request,
+      expectedSelectorTargetId: "workflow-inputs:dataset",
+      expectedOriginatingField: "inputs.dataset",
+      expectedUsageContext: "workflow-input",
+      sessionStore: store,
+    });
+    expect(staleOutcome.returnedAsset).toBeUndefined();
+    expect(store.getSession(sessionKey)?.selectedAssets.map((entry) => entry.assetId)).toEqual(["asset:dataset:baseline"]);
+
+    const createdPath = inlineService.buildReturnPath({
+      returnTarget: {
+        routePath: createdLaunch?.returnTarget?.routePath ?? "/studio-shell/workflow/wizard/inputs",
+        contextId: sessionKey,
+      },
+      payload: {
+        status: "created",
+        assetId: "asset:dataset:new",
+        versionId: "asset:dataset:new:v3",
+        assetType: "dataset",
+        displayName: "New Dataset",
+        handoffId: createdLaunch?.studioHandoff?.launch.handoffId,
+      },
+    });
+    const createdOutcome = returnService.handle({
+      search: readSearchFromPath(createdPath),
+      sessionKey,
+      request,
+      expectedSelectorTargetId: "workflow-inputs:dataset",
+      expectedOriginatingField: "inputs.dataset",
+      expectedUsageContext: "workflow-input",
+      sessionStore: store,
+    });
+    expect(createdOutcome.returnedAsset?.assetId).toBe("asset:dataset:new");
+
+    draft = replaceDatasetInputSelections(draft, store.getSession(sessionKey)?.selectedAssets.map((entry) => ({
+      assetId: entry.assetId,
+      versionId: entry.versionId,
+      name: entry.displayName,
+    })) ?? []).draft;
+
+    expect(listDatasetInputs(draft).map((entry) => entry.asset.assetId)).toEqual([
+      "asset:dataset:baseline",
+      "asset:dataset:new",
+    ]);
+    expect(draft.triggers).toHaveLength(1);
+    expect(draft.steps).toHaveLength(1);
+  });
+
   it("fails stale or malformed return payloads safely", () => {
     const sessionKey = "workflow-studio:demo:inputs:safe-return";
     const request = createDatasetAssetSelectorRequest({
