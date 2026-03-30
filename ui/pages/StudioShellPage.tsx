@@ -866,6 +866,7 @@ export default function StudioShellPage({
                     ? {
                       label: leftDrawerConfiguration.label,
                       isOpen: isLeftDrawerOpen,
+                      onClose: () => setIsLeftDrawerOpen(false),
                     }
                     : undefined,
                   right: rightDrawerConfiguration

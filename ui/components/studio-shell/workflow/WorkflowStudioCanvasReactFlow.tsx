@@ -222,7 +222,7 @@ export default function WorkflowStudioCanvasReactFlow({
         fitViewOptions={{ padding: 0.22, maxZoom: 1.2 }}
         minZoom={0.35}
         maxZoom={1.8}
-        panOnScroll
+        panOnScroll={false}
         zoomOnPinch
         zoomOnScroll
         className="ui-rf-canvas ui-workflow-studio-canvas__reactflow"

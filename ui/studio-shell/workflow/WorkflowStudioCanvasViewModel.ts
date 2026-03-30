@@ -110,8 +110,10 @@ export interface WorkflowCanvasGraphEdgeViewModel {
 export interface WorkflowCanvasGraphLayoutViewModel {
   readonly sectionColumnWidth: number;
   readonly sectionNodeHeight: number;
+  readonly itemNodeHeight: number;
   readonly itemRowHeight: number;
   readonly itemNodeOffsetY: number;
+  readonly nodeVerticalGap: number;
 }
 
 export interface WorkflowCanvasGraphViewModel {
@@ -123,8 +125,10 @@ export interface WorkflowCanvasGraphViewModel {
 const WorkflowCanvasGraphLayout = Object.freeze({
   sectionColumnWidth: 360,
   sectionNodeHeight: 120,
+  itemNodeHeight: 148,
   itemRowHeight: 176,
   itemNodeOffsetY: 156,
+  nodeVerticalGap: 16,
 });
 
 function buildSectionGraphNodeId(sectionId: WorkflowCanvasSectionId): string {
@@ -137,6 +141,67 @@ function buildItemGraphNodeId(node: WorkflowCanvasNodeViewModel): string {
 
 function buildGraphEdgeId(sourceNodeId: string, targetNodeId: string): string {
   return `edge:${sourceNodeId}->${targetNodeId}`;
+}
+
+function getGraphNodeHeight(
+  node: WorkflowCanvasGraphNodeViewModel,
+  layout: WorkflowCanvasGraphLayoutViewModel,
+): number {
+  return node.kind === WorkflowCanvasGraphNodeKinds.section
+    ? layout.sectionNodeHeight
+    : layout.itemNodeHeight;
+}
+
+function resolveSectionVerticalCollisions(
+  sections: ReadonlyArray<WorkflowCanvasSectionViewModel>,
+  nodes: ReadonlyArray<WorkflowCanvasGraphNodeViewModel>,
+  layout: WorkflowCanvasGraphLayoutViewModel,
+): ReadonlyArray<WorkflowCanvasGraphNodeViewModel> {
+  const nodeIndexById = new Map(nodes.map((node, index) => [node.id, index]));
+  const nextNodes = [...nodes];
+
+  for (const section of sections) {
+    const sectionNodes = nextNodes
+      .filter((node) => node.sectionId === section.id)
+      .sort((left, right) => {
+        if (left.position.y === right.position.y) {
+          if (left.kind === right.kind) {
+            return 0;
+          }
+          return left.kind === WorkflowCanvasGraphNodeKinds.section ? -1 : 1;
+        }
+        return left.position.y - right.position.y;
+      });
+
+    let previousNodeBottom: number | undefined;
+    for (const node of sectionNodes) {
+      const minimumY = previousNodeBottom === undefined
+        ? node.position.y
+        : previousNodeBottom + layout.nodeVerticalGap;
+      const resolvedY = Math.max(node.position.y, minimumY);
+      const nextBottom = resolvedY + getGraphNodeHeight(node, layout);
+      previousNodeBottom = nextBottom;
+
+      if (resolvedY === node.position.y) {
+        continue;
+      }
+
+      const nodeIndex = nodeIndexById.get(node.id);
+      if (nodeIndex === undefined) {
+        continue;
+      }
+
+      nextNodes[nodeIndex] = Object.freeze({
+        ...node,
+        position: Object.freeze({
+          ...node.position,
+          y: resolvedY,
+        }),
+      });
+    }
+  }
+
+  return Object.freeze(nextNodes);
 }
 
 function deriveWorkflowCanvasGraphViewModel(
@@ -230,8 +295,14 @@ function deriveWorkflowCanvasGraphViewModel(
     }));
   }
 
+  const resolvedGraphNodes = resolveSectionVerticalCollisions(
+    sections,
+    graphNodes,
+    WorkflowCanvasGraphLayout,
+  );
+
   return Object.freeze({
-    nodes: Object.freeze(graphNodes),
+    nodes: resolvedGraphNodes,
     edges: Object.freeze(graphEdges),
     layout: WorkflowCanvasGraphLayout,
   });

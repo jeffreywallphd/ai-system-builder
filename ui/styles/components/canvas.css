@@ -280,6 +280,11 @@ body.ui-canvas-locked .ui-page--editor-canvas-locked .ui-canvas-shell {
   border: 0;
   padding: 0;
   width: auto;
+  transition: transform 220ms ease;
+}
+
+.react-flow__node.dragging {
+  transition: none;
 }
 
 .react-flow__edge path,
@@ -380,10 +385,20 @@ body.ui-canvas-locked .ui-page--editor-canvas-locked .ui-canvas-shell {
 
 .ui-workflow-studio-canvas {
   min-height: 0;
+  --ui-workflow-canvas-header-offset: 4rem;
 }
 
-.ui-workflow-studio-canvas__canvas-card {
+.ui-workflow-studio-canvas__canvas-shell {
   min-height: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-panel);
+  box-shadow: var(--shadow-panel);
+  padding: var(--space-sm);
+}
+
+.ui-workflow-studio-canvas__canvas-header {
+  padding: var(--space-2xs) var(--space-2xs) 0;
 }
 
 .ui-workflow-studio-canvas__section-grid {
@@ -438,9 +453,12 @@ body.ui-canvas-locked .ui-page--editor-canvas-locked .ui-canvas-shell {
 }
 
 .ui-workflow-canvas-drawer__sections {
-  display: grid;
-  grid-template-columns: 1fr;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-sm);
+  min-height: 0;
+  overflow: auto;
+  padding-right: var(--space-2xs);
 }
 
 .ui-workflow-canvas-drawer__section {
@@ -463,13 +481,58 @@ body.ui-canvas-locked .ui-page--editor-canvas-locked .ui-canvas-shell {
 
 .ui-workflow-studio-canvas__drawer-layout {
   display: grid;
-  grid-template-columns: minmax(0, 280px) minmax(0, 1fr) minmax(0, 320px);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 320px);
   gap: var(--space-sm);
   align-items: start;
 }
 
 .ui-workflow-studio-canvas__drawer {
   min-height: 0;
+}
+
+.ui-workflow-studio-canvas__drawer--right {
+  position: sticky;
+  top: calc(var(--ui-workflow-canvas-header-offset) + var(--space-sm));
+}
+
+.ui-workflow-studio-canvas__drawer-overlay {
+  position: fixed;
+  top: var(--ui-workflow-canvas-header-offset);
+  bottom: 0;
+  left: 0;
+  width: min(360px, calc(100vw - 1rem));
+  height: calc(100vh - var(--ui-workflow-canvas-header-offset));
+  z-index: var(--z-modal);
+  padding: var(--space-sm) var(--space-sm) var(--space-sm) 0;
+}
+
+.ui-workflow-canvas-drawer-panel {
+  height: 100%;
+  border: 1px solid var(--color-border);
+  border-left: 0;
+  border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+  background: var(--color-bg-panel);
+  box-shadow: var(--shadow-elevated);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: var(--space-sm);
+}
+
+.ui-workflow-canvas-drawer-panel__header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding-bottom: var(--space-xs);
+  border-bottom: 1px solid var(--color-border-soft);
+  background: var(--color-bg-panel);
+}
+
+.ui-workflow-canvas-drawer-panel__body {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  padding-top: var(--space-xs);
 }
 
 .ui-workflow-studio-canvas__details {
@@ -504,12 +567,8 @@ body.ui-canvas-locked .ui-page--editor-canvas-locked .ui-canvas-shell {
     grid-template-columns: 1fr;
   }
 
-  .ui-workflow-studio-canvas__drawer {
-    order: 2;
-  }
-
   .ui-workflow-studio-canvas__details {
-    order: 3;
+    order: 2;
   }
 
   .ui-workflow-studio-canvas__authoring-grid {
@@ -518,5 +577,15 @@ body.ui-canvas-locked .ui-page--editor-canvas-locked .ui-canvas-shell {
 
   .ui-workflow-studio-canvas__inspector {
     min-height: auto;
+  }
+
+  .ui-workflow-studio-canvas__drawer-overlay {
+    width: 100%;
+    padding: 0;
+  }
+
+  .ui-workflow-canvas-drawer-panel {
+    border-left: 1px solid var(--color-border);
+    border-radius: 0;
   }
 }

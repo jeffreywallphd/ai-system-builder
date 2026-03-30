@@ -32,6 +32,7 @@ export interface WorkflowStudioDraftAuthoringBoundaryProps {
       readonly left?: {
         readonly label: string;
         readonly isOpen: boolean;
+        readonly onClose?: () => void;
       };
       readonly right?: {
         readonly label: string;

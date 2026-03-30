@@ -44,6 +44,7 @@ export interface WorkflowStudioCanvasModeSurfaceProps {
     readonly left?: {
       readonly label: string;
       readonly isOpen: boolean;
+      readonly onClose?: () => void;
     };
     readonly right?: {
       readonly label: string;
@@ -349,54 +350,68 @@ export default function WorkflowStudioCanvasModeSurface({
   }, [filteredPaletteOptions]);
 
   const renderPalette = (): JSX.Element => (
-    <section className="ui-card ui-card--padded ui-stack ui-stack--sm" data-testid="workflow-canvas-palette">
-      <header className="ui-stack ui-stack--2xs">
-        <strong>{drawerState?.left?.label ?? "Nodes"}</strong>
-        <span className="ui-text-small ui-text-secondary">Search and add workflow nodes.</span>
+    <section className="ui-workflow-canvas-drawer-panel ui-stack ui-stack--sm" data-testid="workflow-canvas-palette">
+      <header className="ui-workflow-canvas-drawer-panel__header ui-stack ui-stack--2xs">
+        <div className="ui-stack ui-stack--3xs">
+          <strong>{drawerState?.left?.label ?? "Nodes"}</strong>
+          <span className="ui-text-small ui-text-secondary">Search and add workflow nodes.</span>
+        </div>
+        {leftDrawerEnabled ? (
+          <button
+            type="button"
+            className="ui-button ui-button--ghost ui-button--sm"
+            data-testid="workflow-canvas-left-drawer-close"
+            onClick={() => drawerState?.left?.onClose?.()}
+          >
+            Close
+          </button>
+        ) : null}
       </header>
-      <label className="ui-field">
-        <span className="ui-field__label">Search nodes</span>
-        <input
-          type="search"
-          className="ui-input"
-          value={paletteSearchValue}
-          onChange={(event) => setPaletteSearchValue(event.target.value)}
-          placeholder="Search triggers, inputs, steps, outputs"
-          data-testid="workflow-canvas-palette-search"
-        />
-      </label>
-      <div className="ui-workflow-canvas-drawer__sections">
-        {workflowCanvasPaletteSections.map((section) => {
-          const options = paletteBySection.get(section.id) ?? [];
-          return (
-            <section key={section.id} className="ui-stack ui-stack--2xs ui-workflow-canvas-drawer__section">
-              <div className="ui-stack ui-stack--3xs">
-                <strong className="ui-text-small">{section.title}</strong>
-                <span className="ui-text-small ui-text-secondary">{section.description}</span>
-              </div>
-              {options.length === 0 ? (
-                <p className="ui-text-small ui-text-muted">No matching nodes.</p>
-              ) : (
-                <div className="ui-workflow-canvas-drawer__list">
-                  {options.map((option) => (
-                    <article key={option.id} className="ui-workflow-canvas-palette-option ui-stack ui-stack--2xs">
-                      <div className="ui-text-small"><strong>{option.title}</strong></div>
-                      <div className="ui-text-small ui-text-secondary">{option.summary}</div>
-                      <button
-                        type="button"
-                        className="ui-button ui-button--ghost ui-button--sm"
-                        data-testid={`workflow-canvas-palette-add-${option.id.replace(/[^a-zA-Z0-9-]/g, "-")}`}
-                        onClick={() => applyAction(option.action)}
-                      >
-                        Add to Canvas
-                      </button>
-                    </article>
-                  ))}
+      <div className="ui-workflow-canvas-drawer-panel__body ui-stack ui-stack--sm">
+        <label className="ui-field">
+          <span className="ui-field__label">Search nodes</span>
+          <input
+            type="search"
+            className="ui-input"
+            value={paletteSearchValue}
+            onChange={(event) => setPaletteSearchValue(event.target.value)}
+            placeholder="Search triggers, inputs, steps, outputs"
+            data-testid="workflow-canvas-palette-search"
+          />
+        </label>
+        <div className="ui-workflow-canvas-drawer__sections ui-scrollbar">
+          {workflowCanvasPaletteSections.map((section) => {
+            const options = paletteBySection.get(section.id) ?? [];
+            return (
+              <section key={section.id} className="ui-stack ui-stack--2xs ui-workflow-canvas-drawer__section">
+                <div className="ui-stack ui-stack--3xs">
+                  <strong className="ui-text-small">{section.title}</strong>
+                  <span className="ui-text-small ui-text-secondary">{section.description}</span>
                 </div>
-              )}
-            </section>
-          );
-        })}
+                {options.length === 0 ? (
+                  <p className="ui-text-small ui-text-muted">No matching nodes.</p>
+                ) : (
+                  <div className="ui-workflow-canvas-drawer__list">
+                    {options.map((option) => (
+                      <article key={option.id} className="ui-workflow-canvas-palette-option ui-stack ui-stack--2xs">
+                        <div className="ui-text-small"><strong>{option.title}</strong></div>
+                        <div className="ui-text-small ui-text-secondary">{option.summary}</div>
+                        <button
+                          type="button"
+                          className="ui-button ui-button--ghost ui-button--sm"
+                          data-testid={`workflow-canvas-palette-add-${option.id.replace(/[^a-zA-Z0-9-]/g, "-")}`}
+                          onClick={() => applyAction(option.action)}
+                        >
+                          Add to Canvas
+                        </button>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </section>
+            );
+          })}
+        </div>
       </div>
     </section>
   );
@@ -412,8 +427,8 @@ export default function WorkflowStudioCanvasModeSurface({
 
   return (
     <div className="ui-stack ui-stack--sm ui-workflow-studio-canvas" data-testid="workflow-studio-canvas-mode-surface">
-      <section className="ui-card ui-card--padded ui-stack ui-stack--2xs ui-workflow-studio-canvas__canvas-card" data-testid="workflow-studio-canvas-summary">
-        <header className="ui-row ui-row--between ui-row--wrap">
+      <section className="ui-workflow-studio-canvas__canvas-shell ui-stack ui-stack--2xs" data-testid="workflow-studio-canvas-summary">
+        <header className="ui-row ui-row--between ui-row--wrap ui-workflow-studio-canvas__canvas-header">
           <strong>Workflow Canvas</strong>
           <span className="ui-text-small ui-text-secondary">
             Nodes: {viewModel.totalNodeCount} | Validation issues: {viewModel.totalIssueCount}
@@ -430,15 +445,8 @@ export default function WorkflowStudioCanvasModeSurface({
       </section>
 
       <div className="ui-workflow-studio-canvas__drawer-layout">
-        {leftDrawerEnabled && leftDrawerOpen ? (
-          <aside className="ui-workflow-studio-canvas__drawer ui-workflow-studio-canvas__drawer--left">
-            {renderPalette()}
-          </aside>
-        ) : null}
-
         <div className="ui-stack ui-stack--sm ui-workflow-studio-canvas__details">
           {!leftDrawerEnabled ? renderPalette() : null}
-
           {!rightDrawerEnabled ? renderInspector() : null}
 
           <details className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="workflow-studio-canvas-graph-details">
@@ -465,6 +473,15 @@ export default function WorkflowStudioCanvasModeSurface({
           </aside>
         ) : null}
       </div>
+
+      {leftDrawerEnabled && leftDrawerOpen ? (
+        <aside
+          className="ui-workflow-studio-canvas__drawer-overlay ui-workflow-studio-canvas__drawer-overlay--left"
+          data-testid="workflow-canvas-left-drawer"
+        >
+          {renderPalette()}
+        </aside>
+      ) : null}
     </div>
   );
 }
