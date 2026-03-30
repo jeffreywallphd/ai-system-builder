@@ -6,6 +6,13 @@ import { AssetDraftLifecycleStatuses } from "../../../../domain/studio-shell/Stu
 import { DefaultStudioShellApplicationService } from "../../../../application/studio-shell/DefaultStudioShellApplicationService";
 import { StudioShellBackendApi } from "../../../api/studio-shell/StudioShellBackendApi";
 import { SqliteStudioShellRepository } from "../SqliteStudioShellRepository";
+import {
+  WorkflowDraftBuiltInStepTypes,
+  WorkflowDraftStepKinds,
+  createEmptyWorkflowDraft,
+  deserializeWorkflowDraft,
+  serializeWorkflowDraft,
+} from "../../../../domain/workflow-studio/WorkflowStudioDomain";
 
 const createdRoots: string[] = [];
 
@@ -115,5 +122,98 @@ describe("SqliteStudioShellRepository", () => {
     expect(snapshot.data?.validationIssues.some((entry) => entry.code === "taxonomy-missing")).toBeTrue();
 
     repository.dispose();
+  });
+
+  it("persists and rehydrates workflow built-in steps in canonical draft content across reload", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-workflow-builtins-"));
+    createdRoots.push(root);
+    const databasePath = path.join(root, "workflow-builtins.sqlite");
+
+    const builtInDraftContent = serializeWorkflowDraft({
+      ...createEmptyWorkflowDraft(),
+      steps: [
+        {
+          id: "step-if",
+          type: WorkflowDraftBuiltInStepTypes.ifThen,
+          kind: WorkflowDraftStepKinds.controlFlow,
+          order: 1,
+          config: {
+            conditionExpression: "inputs.score > 0.8",
+            thenStepIds: ["step-loop"],
+            elseStepIds: ["step-manual"],
+          },
+        },
+        {
+          id: "step-loop",
+          type: WorkflowDraftBuiltInStepTypes.loopIteration,
+          kind: WorkflowDraftStepKinds.controlFlow,
+          order: 2,
+          config: {
+            repeatCount: 2,
+            bodyStepIds: ["step-delay"],
+          },
+        },
+        {
+          id: "step-delay",
+          type: WorkflowDraftBuiltInStepTypes.delayWait,
+          kind: WorkflowDraftStepKinds.controlFlow,
+          order: 3,
+          config: {
+            durationSeconds: 5,
+          },
+        },
+        {
+          id: "step-manual",
+          type: WorkflowDraftBuiltInStepTypes.manualApproval,
+          kind: WorkflowDraftStepKinds.controlFlow,
+          order: 4,
+          config: {
+            prompt: "Approve release",
+            interactionMode: "approval",
+            outcomes: {
+              approve: {
+                stepIds: ["step-delay"],
+              },
+            },
+          },
+        },
+      ],
+    });
+
+    let draftId = "";
+    {
+      const repository = new SqliteStudioShellRepository(databasePath);
+      const service = new DefaultStudioShellApplicationService(repository, () => "generated");
+      await service.initializeStudio({ studioId: "studio-workflows", name: "Workflow Studio" });
+      const created = await service.createAssetDraft({
+        studioId: "studio-workflows",
+        sessionId: "generated",
+        content: builtInDraftContent,
+        metadata: {
+          title: "Built-in workflow draft",
+          taxonomy: {
+            structuralKind: "composite",
+            semanticRole: "workflow",
+            behaviorKind: "conditional",
+          },
+        },
+      });
+      draftId = created.draft.id;
+      repository.dispose();
+    }
+
+    const reopenedRepository = new SqliteStudioShellRepository(databasePath);
+    const reopened = await reopenedRepository.getDraft(draftId);
+    const canonical = deserializeWorkflowDraft(reopened?.content ?? "{}");
+    expect(canonical.steps.map((step) => step.type)).toEqual([
+      WorkflowDraftBuiltInStepTypes.ifThen,
+      WorkflowDraftBuiltInStepTypes.loopIteration,
+      WorkflowDraftBuiltInStepTypes.delayWait,
+      WorkflowDraftBuiltInStepTypes.manualApproval,
+    ]);
+    expect(canonical.steps.map((step) => step.order)).toEqual([1, 2, 3, 4]);
+    expect((canonical.steps[0]?.config as { conditionExpression?: string }).conditionExpression).toBe("inputs.score > 0.8");
+    expect((canonical.steps[3]?.config as { prompt?: string }).prompt).toBe("Approve release");
+    reopenedRepository.dispose();
   });
 });

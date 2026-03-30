@@ -64,6 +64,10 @@ Workflow -> `ExecuteWorkflowUseCase` -> one-unit `ExecutionPlan` -> `UnifiedExec
 - Workflow Studio now has a canonical draft-to-plan mapper in `application/workflow-studio/WorkflowDraftExecutionPlanMapper.ts`.
 - `mapWorkflowDraftToExecutionPlan(...)` validates canonical draft integrity first (`validateWorkflowDraft`) and then emits deterministic ordered execution-plan elements for action steps and built-ins (`if-then`, `loop-iteration`, `delay-wait`, `manual-approval`).
 - This mapper is planning-only: it creates explicit runtime-ready plan elements without adding a second runtime executor or speculative graph model.
+- Stories 6.11–6.12 now extend that same seam into runtime + persistence behavior without introducing alternate draft models:
+  - `application/workflow-studio/WorkflowDraftExecutionRuntime.ts` executes mapped built-in plan elements deterministically (branch, loop, delay, manual-approval) and records explicit completed/skipped/failed/paused step traces.
+  - `WorkflowStudioApplicationService.executeWorkflowDraft(...)` now routes canonical draft content through `deserialize -> plan mapper -> runtime executor` on the same workflow-studio contracts.
+  - Built-in workflow drafts continue to persist as canonical serialized draft content and now have explicit persistence/rehydration coverage for built-in type/config/order round-trip in SQLite-backed studio-shell flows.
 
 ## Runtime orchestration update
 - Delegated workflow execution selection can now consult the shared runtime dependency orchestrator before choosing a delegated strategy.

@@ -302,4 +302,75 @@ describe("WorkflowStudioApplicationService", () => {
       }),
     })).toThrow("built-in-step-reference-order-invalid");
   });
+
+  it("executes planned built-in workflow steps through runtime with deterministic outputs", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => "generated");
+    const service = new WorkflowStudioApplicationService(studioShell);
+
+    const result = await service.executeWorkflowDraft({
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        steps: [
+          {
+            id: "step-if",
+            type: "if-then",
+            kind: "control-flow",
+            order: 1,
+            config: {
+              conditionExpression: "inputs.score > 0.5",
+              thenStepIds: ["step-approve"],
+              elseStepIds: ["step-reject"],
+            },
+          },
+          {
+            id: "step-approve",
+            type: "manual-approval",
+            kind: "control-flow",
+            order: 2,
+            config: {
+              prompt: "Approve release",
+              interactionMode: "approval",
+              outcomes: {
+                approve: {
+                  stepIds: ["step-delay"],
+                },
+              },
+            },
+          },
+          {
+            id: "step-reject",
+            type: "action",
+            kind: "action",
+            order: 3,
+          },
+          {
+            id: "step-delay",
+            type: "delay-wait",
+            kind: "control-flow",
+            order: 4,
+            config: {
+              durationSeconds: 1,
+            },
+          },
+        ],
+      }),
+      inputs: {
+        score: 0.9,
+      },
+      manualDecisionsByStepId: {
+        "step-approve": {
+          outcome: "approve",
+        },
+      },
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.traces.filter((entry) => entry.status === "completed").map((entry) => entry.stepId)).toEqual([
+      "step-if",
+      "step-approve",
+      "step-delay",
+    ]);
+    expect(result.traces.some((entry) => entry.stepId === "step-reject" && entry.status === "skipped")).toBeTrue();
+  });
 });
