@@ -69,6 +69,12 @@ describe("BuiltInWorkflowStepRegistry", () => {
   it("rejects malformed built-in configs and duplicate registrations", () => {
     const registry = createDefaultBuiltInWorkflowStepRegistry();
     expect(() => registry.validateConfig(WorkflowDraftBuiltInStepTypes.delayWait, { durationSeconds: 0 })).toThrow("durationSeconds");
+    expect(() => registry.validateConfig(WorkflowDraftBuiltInStepTypes.delayWait, {
+      mode: "until-time",
+      until: {
+        timestamp: "not-a-time",
+      },
+    })).toThrow("timestamp");
     expect(() => registry.validateConfig(WorkflowDraftBuiltInStepTypes.ifThen, {
       condition: { kind: "expression", expression: "x > 0" },
       branches: { then: {} },
@@ -76,6 +82,15 @@ describe("BuiltInWorkflowStepRegistry", () => {
     expect(() => registry.validateConfig(WorkflowDraftBuiltInStepTypes.loopIteration, {
       mode: "collection",
     })).toThrow("config.collection");
+    expect(() => registry.validateConfig(WorkflowDraftBuiltInStepTypes.manualApproval, {
+      prompt: "Review this",
+      interactionMode: "review",
+      outcomes: {
+        reject: {
+          label: "stop",
+        },
+      },
+    })).toThrow("review mode only allows");
 
     expect(() => new BuiltInWorkflowStepRegistry([
       {
@@ -103,5 +118,47 @@ describe("BuiltInWorkflowStepRegistry", () => {
         validateConfig: (config) => config as never,
       },
     ])).toThrow("already registered");
+  });
+
+  it("validates canonical delay and manual interaction step modes", () => {
+    const registry = createDefaultBuiltInWorkflowStepRegistry();
+
+    const untilTime = registry.validateConfig(WorkflowDraftBuiltInStepTypes.delayWait, {
+      mode: "until-time",
+      until: {
+        timestamp: "2026-04-02T15:45:00.000Z",
+        timezone: "America/New_York",
+      },
+      note: "Pause until review window",
+    });
+    expect(untilTime).toMatchObject({
+      mode: "until-time",
+      until: {
+        timestamp: "2026-04-02T15:45:00.000Z",
+        timezone: "America/New_York",
+      },
+      waitUntil: "2026-04-02T15:45:00.000Z",
+    });
+
+    const review = registry.validateConfig(WorkflowDraftBuiltInStepTypes.manualApproval, {
+      prompt: "Manual verification required",
+      interactionMode: "review",
+      outcomes: {
+        continue: {
+          label: "continue",
+        },
+      },
+      onTimeout: "continue",
+    });
+    expect(review).toMatchObject({
+      prompt: "Manual verification required",
+      interactionMode: "review",
+      outcomes: {
+        continue: {
+          label: "continue",
+        },
+      },
+      onTimeout: "continue",
+    });
   });
 });
