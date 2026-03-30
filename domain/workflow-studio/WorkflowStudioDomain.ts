@@ -233,14 +233,66 @@ export type WorkflowDraftBuiltInStepCategory =
   typeof WorkflowDraftBuiltInStepCategories[keyof typeof WorkflowDraftBuiltInStepCategories];
 
 export const WorkflowDraftLoopIterationModes = Object.freeze({
+  fixedCount: "fixed-count",
   collection: "collection",
   range: "range",
 });
 
 export type WorkflowDraftLoopIterationMode = typeof WorkflowDraftLoopIterationModes[keyof typeof WorkflowDraftLoopIterationModes];
 
+export const WorkflowDraftConditionKinds = Object.freeze({
+  expression: "expression",
+  comparison: "comparison",
+});
+
+export type WorkflowDraftConditionKind = typeof WorkflowDraftConditionKinds[keyof typeof WorkflowDraftConditionKinds];
+
+export const WorkflowDraftComparisonOperators = Object.freeze({
+  equals: "equals",
+  notEquals: "not-equals",
+  greaterThan: "greater-than",
+  greaterThanOrEqual: "greater-than-or-equal",
+  lessThan: "less-than",
+  lessThanOrEqual: "less-than-or-equal",
+  contains: "contains",
+  startsWith: "starts-with",
+  endsWith: "ends-with",
+  exists: "exists",
+  notExists: "not-exists",
+});
+
+export type WorkflowDraftComparisonOperator =
+  typeof WorkflowDraftComparisonOperators[keyof typeof WorkflowDraftComparisonOperators];
+
+export interface WorkflowDraftComparisonConditionDefinition {
+  readonly kind: typeof WorkflowDraftConditionKinds.comparison;
+  readonly leftOperand: string;
+  readonly operator: WorkflowDraftComparisonOperator;
+  readonly rightOperand?: unknown;
+}
+
+export interface WorkflowDraftExpressionConditionDefinition {
+  readonly kind: typeof WorkflowDraftConditionKinds.expression;
+  readonly expression: string;
+}
+
+export type WorkflowDraftConditionDefinition =
+  | WorkflowDraftExpressionConditionDefinition
+  | WorkflowDraftComparisonConditionDefinition;
+
+export interface WorkflowDraftIfThenBranchTarget {
+  readonly label?: string;
+  readonly stepIds?: ReadonlyArray<string>;
+}
+
 export interface WorkflowDraftIfThenStepConfig {
-  readonly conditionExpression: string;
+  readonly condition: WorkflowDraftConditionDefinition;
+  readonly branches: Readonly<{
+    readonly then: WorkflowDraftIfThenBranchTarget;
+    readonly else?: WorkflowDraftIfThenBranchTarget;
+  }>;
+  // Deprecated compatibility aliases retained for existing authoring flows.
+  readonly conditionExpression?: string;
   readonly thenLabel?: string;
   readonly elseLabel?: string;
   readonly thenStepIds?: ReadonlyArray<string>;
@@ -253,16 +305,30 @@ export interface WorkflowDraftLoopRangeConfig {
   readonly step?: number;
 }
 
+export interface WorkflowDraftLoopFixedCountSource {
+  readonly count: number;
+}
+
+export interface WorkflowDraftLoopCollectionSource {
+  readonly inputKey: string;
+  readonly itemAlias?: string;
+}
+
 export interface WorkflowDraftLoopIterationStepConfig {
+  readonly mode: WorkflowDraftLoopIterationMode;
+  readonly fixedCount?: WorkflowDraftLoopFixedCountSource;
+  readonly collection?: WorkflowDraftLoopCollectionSource;
+  readonly range?: WorkflowDraftLoopRangeConfig;
+  readonly exitCondition?: WorkflowDraftConditionDefinition;
+  readonly loopLabel?: string;
+  readonly bodyStepIds?: ReadonlyArray<string>;
+  readonly maxIterations?: number;
+  // Deprecated compatibility aliases retained for existing authoring flows.
   readonly repeatCount?: number;
   readonly loopConditionExpression?: string;
-  readonly loopLabel?: string;
   readonly iterationMode?: WorkflowDraftLoopIterationMode;
-  readonly bodyStepIds?: ReadonlyArray<string>;
   readonly itemAlias?: string;
   readonly collectionInputKey?: string;
-  readonly range?: WorkflowDraftLoopRangeConfig;
-  readonly maxIterations?: number;
 }
 
 export interface WorkflowDraftDelayWaitStepConfig {
@@ -961,20 +1027,148 @@ function isBuiltInControlFlowStepType(value: string): value is WorkflowDraftBuil
   return isWorkflowDraftBuiltInStepType(value);
 }
 
-function normalizeIfThenStepConfig(configRecord: Readonly<Record<string, unknown>>): Readonly<WorkflowDraftIfThenStepConfig> {
-  const conditionExpression = normalizeRequired(
-    typeof configRecord.conditionExpression === "string" ? configRecord.conditionExpression : "",
-    "Workflow draft if-then step config.conditionExpression",
+function normalizeConditionDefinition(
+  raw: unknown,
+  label: string,
+): Readonly<WorkflowDraftConditionDefinition> {
+  const record = assertRecord(raw, label);
+  const kind = normalizeRequired(
+    typeof record.kind === "string" ? record.kind : "",
+    `${label}.kind`,
   );
-  const thenLabel = normalizeOptional(typeof configRecord.thenLabel === "string" ? configRecord.thenLabel : undefined);
-  const elseLabel = normalizeOptional(typeof configRecord.elseLabel === "string" ? configRecord.elseLabel : undefined);
-  const thenStepIds = normalizeStringArray(configRecord.thenStepIds, "Workflow draft if-then step config.thenStepIds");
-  const elseStepIds = normalizeStringArray(configRecord.elseStepIds, "Workflow draft if-then step config.elseStepIds");
+
+  if (kind === WorkflowDraftConditionKinds.expression) {
+    const expression = normalizeRequired(
+      typeof record.expression === "string" ? record.expression : "",
+      `${label}.expression`,
+    );
+    return Object.freeze({
+      kind: WorkflowDraftConditionKinds.expression,
+      expression,
+    });
+  }
+
+  if (kind === WorkflowDraftConditionKinds.comparison) {
+    const leftOperand = normalizeRequired(
+      typeof record.leftOperand === "string" ? record.leftOperand : "",
+      `${label}.leftOperand`,
+    );
+    const operator = normalizeRequired(
+      typeof record.operator === "string" ? record.operator : "",
+      `${label}.operator`,
+    );
+    if (
+      operator !== WorkflowDraftComparisonOperators.equals
+      && operator !== WorkflowDraftComparisonOperators.notEquals
+      && operator !== WorkflowDraftComparisonOperators.greaterThan
+      && operator !== WorkflowDraftComparisonOperators.greaterThanOrEqual
+      && operator !== WorkflowDraftComparisonOperators.lessThan
+      && operator !== WorkflowDraftComparisonOperators.lessThanOrEqual
+      && operator !== WorkflowDraftComparisonOperators.contains
+      && operator !== WorkflowDraftComparisonOperators.startsWith
+      && operator !== WorkflowDraftComparisonOperators.endsWith
+      && operator !== WorkflowDraftComparisonOperators.exists
+      && operator !== WorkflowDraftComparisonOperators.notExists
+    ) {
+      throw new Error(`${label}.operator '${operator}' is not supported.`);
+    }
+    const rightOperand = record.rightOperand;
+    if (
+      rightOperand === undefined
+      && operator !== WorkflowDraftComparisonOperators.exists
+      && operator !== WorkflowDraftComparisonOperators.notExists
+    ) {
+      throw new Error(`${label}.rightOperand is required for operator '${operator}'.`);
+    }
+    return Object.freeze({
+      kind: WorkflowDraftConditionKinds.comparison,
+      leftOperand,
+      operator: operator as WorkflowDraftComparisonOperator,
+      rightOperand,
+    });
+  }
+
+  throw new Error(`${label}.kind '${kind}' is not supported.`);
+}
+
+function normalizeIfThenBranchTarget(
+  raw: unknown,
+  label: string,
+): Readonly<WorkflowDraftIfThenBranchTarget> {
+  const record = assertRecord(raw, label);
+  const branchLabel = normalizeOptional(typeof record.label === "string" ? record.label : undefined);
+  const stepIds = normalizeStringArray(record.stepIds, `${label}.stepIds`);
+  if (!branchLabel && !stepIds) {
+    throw new Error(`${label} requires label or stepIds.`);
+  }
+  return Object.freeze({
+    label: branchLabel,
+    stepIds,
+  });
+}
+
+function normalizeIfThenStepConfig(configRecord: Readonly<Record<string, unknown>>): Readonly<WorkflowDraftIfThenStepConfig> {
+  const condition = configRecord.condition
+    ? normalizeConditionDefinition(configRecord.condition, "Workflow draft if-then step config.condition")
+    : Object.freeze({
+      kind: WorkflowDraftConditionKinds.expression,
+      expression: normalizeRequired(
+        typeof configRecord.conditionExpression === "string" ? configRecord.conditionExpression : "",
+        "Workflow draft if-then step config.conditionExpression",
+      ),
+    } as WorkflowDraftExpressionConditionDefinition);
+
+  const thenLabelLegacy = normalizeOptional(
+    typeof configRecord.thenLabel === "string" ? configRecord.thenLabel : undefined,
+  );
+  const elseLabelLegacy = normalizeOptional(
+    typeof configRecord.elseLabel === "string" ? configRecord.elseLabel : undefined,
+  );
+  const thenStepIdsLegacy = normalizeStringArray(
+    configRecord.thenStepIds,
+    "Workflow draft if-then step config.thenStepIds",
+  );
+  const elseStepIdsLegacy = normalizeStringArray(
+    configRecord.elseStepIds,
+    "Workflow draft if-then step config.elseStepIds",
+  );
+
+  const branchesRecord = configRecord.branches
+    ? assertRecord(configRecord.branches, "Workflow draft if-then step config.branches")
+    : undefined;
+  const thenBranch = branchesRecord?.then
+    ? normalizeIfThenBranchTarget(branchesRecord.then, "Workflow draft if-then step config.branches.then")
+    : normalizeIfThenBranchTarget(
+      { label: thenLabelLegacy, stepIds: thenStepIdsLegacy },
+      "Workflow draft if-then step config.branches.then",
+    );
+  const elseBranch = branchesRecord?.else
+    ? normalizeIfThenBranchTarget(branchesRecord.else, "Workflow draft if-then step config.branches.else")
+    : (elseLabelLegacy || elseStepIdsLegacy
+      ? normalizeIfThenBranchTarget(
+        { label: elseLabelLegacy, stepIds: elseStepIdsLegacy },
+        "Workflow draft if-then step config.branches.else",
+      )
+      : undefined);
+
+  const thenStepIds = thenBranch.stepIds;
+  const elseStepIds = elseBranch?.stepIds;
   if (thenStepIds && elseStepIds && elseStepIds.some((stepId) => thenStepIds.includes(stepId))) {
     throw new Error("Workflow draft if-then step config elseStepIds cannot overlap thenStepIds.");
   }
 
+  const conditionExpression = condition.kind === WorkflowDraftConditionKinds.expression
+    ? condition.expression
+    : undefined;
+  const thenLabel = thenBranch.label;
+  const elseLabel = elseBranch?.label;
+
   return Object.freeze({
+    condition,
+    branches: Object.freeze({
+      then: thenBranch,
+      else: elseBranch,
+    }),
     conditionExpression,
     thenLabel,
     elseLabel,
@@ -986,33 +1180,31 @@ function normalizeIfThenStepConfig(configRecord: Readonly<Record<string, unknown
 function normalizeLoopIterationStepConfig(
   configRecord: Readonly<Record<string, unknown>>,
 ): Readonly<WorkflowDraftLoopIterationStepConfig> {
-  const repeatCount = normalizePositiveInteger(configRecord.repeatCount, "Workflow draft loop-iteration step config.repeatCount");
+  const repeatCount = normalizePositiveInteger(
+    configRecord.repeatCount,
+    "Workflow draft loop-iteration step config.repeatCount",
+  );
   const loopConditionExpression = normalizeOptional(
     typeof configRecord.loopConditionExpression === "string" ? configRecord.loopConditionExpression : undefined,
   );
   const loopLabel = normalizeOptional(typeof configRecord.loopLabel === "string" ? configRecord.loopLabel : undefined);
 
-  const iterationModeRaw = normalizeOptional(
-    typeof configRecord.iterationMode === "string" ? configRecord.iterationMode : undefined,
+  const modeRaw = normalizeOptional(
+    typeof configRecord.mode === "string"
+      ? configRecord.mode
+      : (typeof configRecord.iterationMode === "string" ? configRecord.iterationMode : undefined),
   );
   if (
-    iterationModeRaw
-    && iterationModeRaw !== WorkflowDraftLoopIterationModes.collection
-    && iterationModeRaw !== WorkflowDraftLoopIterationModes.range
+    modeRaw
+    && modeRaw !== WorkflowDraftLoopIterationModes.fixedCount
+    && modeRaw !== WorkflowDraftLoopIterationModes.collection
+    && modeRaw !== WorkflowDraftLoopIterationModes.range
   ) {
-    throw new Error(`Workflow draft loop-iteration step config.iterationMode '${iterationModeRaw}' is not supported.`);
+    throw new Error(`Workflow draft loop-iteration step config.mode '${modeRaw}' is not supported.`);
   }
-  const iterationMode = iterationModeRaw as WorkflowDraftLoopIterationMode | undefined;
-  const bodyStepIds = normalizeStringArray(configRecord.bodyStepIds, "Workflow draft loop-iteration step config.bodyStepIds");
-  const itemAlias = normalizeOptional(typeof configRecord.itemAlias === "string" ? configRecord.itemAlias : undefined);
-  const maxIterations = normalizePositiveInteger(configRecord.maxIterations, "Workflow draft loop-iteration step config.maxIterations");
-  const collectionInputKey = normalizeOptional(
-    typeof configRecord.collectionInputKey === "string" ? configRecord.collectionInputKey : undefined,
-  );
 
-  if (iterationMode === WorkflowDraftLoopIterationModes.collection && !collectionInputKey) {
-    throw new Error("Workflow draft loop-iteration collection mode requires config.collectionInputKey.");
-  }
+  const bodyStepIds = normalizeStringArray(configRecord.bodyStepIds, "Workflow draft loop-iteration step config.bodyStepIds");
+  const maxIterations = normalizePositiveInteger(configRecord.maxIterations, "Workflow draft loop-iteration step config.maxIterations");
 
   const rangeRecord = configRecord.range
     ? assertRecord(configRecord.range, "Workflow draft loop-iteration step config.range")
@@ -1025,26 +1217,108 @@ function normalizeLoopIterationStepConfig(
     })
     : undefined;
 
-  if (iterationMode === WorkflowDraftLoopIterationModes.range && !range) {
-    throw new Error("Workflow draft loop-iteration range mode requires config.range.");
-  }
-  if (iterationMode === WorkflowDraftLoopIterationModes.range && range && range.start > range.end) {
+  if (range && range.start > range.end) {
     throw new Error("Workflow draft loop-iteration step config.range.start must be less than or equal to range.end.");
   }
-  if (!repeatCount && !loopConditionExpression && !iterationMode) {
-    throw new Error("Workflow draft loop-iteration step requires config.repeatCount or config.loopConditionExpression.");
+
+  const fixedCountRecord = configRecord.fixedCount
+    ? assertRecord(configRecord.fixedCount, "Workflow draft loop-iteration step config.fixedCount")
+    : undefined;
+  const fixedCountValue = fixedCountRecord
+    ? normalizePositiveInteger(
+      fixedCountRecord.count,
+      "Workflow draft loop-iteration step config.fixedCount.count",
+    )
+    : repeatCount;
+  if (fixedCountRecord && !fixedCountValue) {
+    throw new Error("Workflow draft loop-iteration step config.fixedCount.count must be a positive integer.");
+  }
+  const fixedCount = fixedCountValue
+    ? Object.freeze({
+      count: fixedCountValue,
+    })
+    : undefined;
+
+  const collectionRecord = configRecord.collection
+    ? assertRecord(configRecord.collection, "Workflow draft loop-iteration step config.collection")
+    : undefined;
+  const collectionInputKeyLegacy = normalizeOptional(
+    typeof configRecord.collectionInputKey === "string" ? configRecord.collectionInputKey : undefined,
+  );
+  const itemAliasLegacy = normalizeOptional(
+    typeof configRecord.itemAlias === "string" ? configRecord.itemAlias : undefined,
+  );
+  const collection = collectionRecord
+    ? Object.freeze({
+      inputKey: normalizeRequired(
+        typeof collectionRecord.inputKey === "string" ? collectionRecord.inputKey : "",
+        "Workflow draft loop-iteration step config.collection.inputKey",
+      ),
+      itemAlias: normalizeOptional(typeof collectionRecord.itemAlias === "string" ? collectionRecord.itemAlias : undefined),
+    })
+    : (collectionInputKeyLegacy
+      ? Object.freeze({
+        inputKey: collectionInputKeyLegacy,
+        itemAlias: itemAliasLegacy,
+      })
+      : undefined);
+
+  const exitCondition = configRecord.exitCondition
+    ? normalizeConditionDefinition(configRecord.exitCondition, "Workflow draft loop-iteration step config.exitCondition")
+    : (loopConditionExpression
+      ? Object.freeze({
+        kind: WorkflowDraftConditionKinds.expression,
+        expression: loopConditionExpression,
+      } as WorkflowDraftExpressionConditionDefinition)
+      : undefined);
+
+  const mode = (modeRaw as WorkflowDraftLoopIterationMode | undefined)
+    ?? (collection
+      ? WorkflowDraftLoopIterationModes.collection
+      : (range
+        ? WorkflowDraftLoopIterationModes.range
+        : (fixedCount
+          ? WorkflowDraftLoopIterationModes.fixedCount
+          : undefined)));
+
+  if (!mode) {
+    throw new Error(
+      "Workflow draft loop-iteration step requires config.mode/fixedCount/collection/range or legacy repeatCount.",
+    );
+  }
+  if (mode === WorkflowDraftLoopIterationModes.fixedCount && !fixedCount) {
+    throw new Error("Workflow draft loop-iteration fixed-count mode requires config.fixedCount.");
+  }
+  if (mode === WorkflowDraftLoopIterationModes.collection && !collection) {
+    throw new Error("Workflow draft loop-iteration collection mode requires config.collection.");
+  }
+  if (mode === WorkflowDraftLoopIterationModes.range && !range) {
+    throw new Error("Workflow draft loop-iteration range mode requires config.range.");
   }
 
+  const iterationMode = mode;
+  const collectionInputKey = collection?.inputKey;
+  const itemAlias = collection?.itemAlias;
+  const legacyRepeatCount = fixedCount?.count;
+  const legacyLoopConditionExpression = exitCondition?.kind === WorkflowDraftConditionKinds.expression
+    ? exitCondition.expression
+    : undefined;
+
   return Object.freeze({
-    repeatCount,
-    loopConditionExpression,
+    mode,
+    fixedCount,
+    collection,
+    range,
+    exitCondition,
     loopLabel,
-    iterationMode,
     bodyStepIds,
+    maxIterations,
+    // Deprecated aliases retained for compatibility.
+    repeatCount: legacyRepeatCount,
+    loopConditionExpression: legacyLoopConditionExpression,
+    iterationMode,
     itemAlias,
     collectionInputKey,
-    range,
-    maxIterations,
   });
 }
 
@@ -1102,9 +1376,23 @@ const workflowDraftBuiltInStepDefinitions: ReadonlyArray<WorkflowDraftBuiltInSte
     category: WorkflowDraftBuiltInStepCategories.controlFlow,
     label: "If / Then branching",
     description: "Evaluate an expression and route execution to then/else branches.",
-    configSchemaId: "workflow.builtin.if-then.v1",
+    configSchemaId: "workflow.builtin.if-then.v2",
     defaultConfig: Object.freeze<WorkflowDraftIfThenStepConfig>({
+      condition: Object.freeze({
+        kind: WorkflowDraftConditionKinds.expression,
+        expression: "true",
+      }),
+      branches: Object.freeze({
+        then: Object.freeze({
+          label: "Then path",
+        }),
+        else: Object.freeze({
+          label: "Else path",
+        }),
+      }),
       conditionExpression: "true",
+      thenLabel: "Then path",
+      elseLabel: "Else path",
     }),
     validateConfig: normalizeIfThenStepConfig,
   }),
@@ -1113,9 +1401,14 @@ const workflowDraftBuiltInStepDefinitions: ReadonlyArray<WorkflowDraftBuiltInSte
     category: WorkflowDraftBuiltInStepCategories.controlFlow,
     label: "Loop / Repeat",
     description: "Repeat execution by count, condition, collection, or range.",
-    configSchemaId: "workflow.builtin.loop-iteration.v1",
+    configSchemaId: "workflow.builtin.loop-iteration.v2",
     defaultConfig: Object.freeze<WorkflowDraftLoopIterationStepConfig>({
+      mode: WorkflowDraftLoopIterationModes.fixedCount,
+      fixedCount: Object.freeze({
+        count: 1,
+      }),
       repeatCount: 1,
+      iterationMode: WorkflowDraftLoopIterationModes.fixedCount,
     }),
     validateConfig: normalizeLoopIterationStepConfig,
   }),
@@ -1646,7 +1939,9 @@ export function validateWorkflowDraft(draft: WorkflowDraft | undefined): Workflo
 
     if (step.type === WorkflowDraftBuiltInStepTypes.ifThen) {
       const config = step.config as WorkflowDraftIfThenStepConfig;
-      for (const referenced of [...(config.thenStepIds ?? []), ...(config.elseStepIds ?? [])]) {
+      const thenStepIds = config.branches.then.stepIds ?? config.thenStepIds ?? [];
+      const elseStepIds = config.branches.else?.stepIds ?? config.elseStepIds ?? [];
+      for (const referenced of [...thenStepIds, ...elseStepIds]) {
         if (referenced === step.id) {
           issues.push({
             code: WorkflowValidationIssueCodes.builtInStepReferenceSelf,
@@ -1693,17 +1988,18 @@ export function validateWorkflowDraft(draft: WorkflowDraft | undefined): Workflo
         }
       }
 
+      const collectionInputKey = config.collection?.inputKey ?? config.collectionInputKey;
       if (
-        config.iterationMode === WorkflowDraftLoopIterationModes.collection
-        && config.collectionInputKey
-        && !inputIds.has(config.collectionInputKey)
+        config.mode === WorkflowDraftLoopIterationModes.collection
+        && collectionInputKey
+        && !inputIds.has(collectionInputKey)
       ) {
         issues.push({
           code: WorkflowValidationIssueCodes.loopCollectionInputMissing,
           section: WorkflowValidationSections.crossSection,
           severity: "error",
-          message: `Built-in loop step '${step.id}' collectionInputKey '${config.collectionInputKey}' does not match any workflow input id.`,
-          path: `draft.steps.${step.id}.config.collectionInputKey`,
+          message: `Built-in loop step '${step.id}' collection input '${collectionInputKey}' does not match any workflow input id.`,
+          path: `draft.steps.${step.id}.config.collection.inputKey`,
         });
       }
     }

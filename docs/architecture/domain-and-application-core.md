@@ -215,6 +215,8 @@ The studio shell now has a bounded inner-layer model and application orchestrati
 - The initial planned built-ins are now modeled explicitly as canonical contracts: `if-then`, `loop-iteration`, `delay-wait`, and `manual-approval`.
 - Workflow draft normalization/validation now routes built-in config checks through those canonical contracts and remains persistence-safe through existing draft/entity persistence mappings.
 - Application-layer discovery now uses `application/workflow-studio/BuiltInWorkflowStepRegistry.ts`, exposing stable built-in step enumeration and metadata to outer layers (wizard/canvas selectors) without hardcoded page-local built-in lists.
+- Story 6.3 now defines `if-then` as a canonical conditional primitive with explicit condition strategy contracts (`expression` or `comparison`) and explicit branch targets (`then` / optional `else` labels + step references) validated through the same domain normalization path.
+- Story 6.4 now defines `loop-iteration` as a canonical loop primitive with explicit mode/source contracts (`fixed-count`, `collection`, `range`) plus bounded body/max-iteration/exit-condition fields; cross-section checks continue to validate collection input references against canonical workflow inputs.
 
 ## Direction 5 update: Studio shell persistence integration (story 1.11)
 

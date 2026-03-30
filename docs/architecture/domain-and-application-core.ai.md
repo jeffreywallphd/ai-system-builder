@@ -211,6 +211,8 @@ The studio shell now has a bounded inner-layer model and application orchestrati
 - Built-in step contracts now carry canonical discovery metadata (type/category/label/description/config schema id/default config) plus a shared domain validation entry point (`normalizeWorkflowDraftBuiltInStepConfig`), keeping semantics out of UI-local lists/forms.
 - The initial built-ins are explicitly modeled and discoverable: `if-then`, `loop-iteration`, `delay-wait`, and `manual-approval`.
 - Application discovery is now exposed through `application/workflow-studio/BuiltInWorkflowStepRegistry.ts`, giving wizard/canvas-facing layers a stable built-in step registry without hardcoded page-local definitions.
+- Story 6.3 now defines `if-then` as a canonical conditional primitive with explicit condition strategy contracts (`expression` or `comparison`) and explicit branch targets (`then` / optional `else` labels + step references) validated in the same domain normalization path.
+- Story 6.4 now defines `loop-iteration` as a canonical loop primitive with explicit mode/source contracts (`fixed-count`, `collection`, `range`) plus bounded body/max-iteration/exit-condition fields; cross-section checks still validate collection input references against canonical workflow inputs.
 
 ## Direction 5 update: Studio shell persistence integration (story 1.11)
 
