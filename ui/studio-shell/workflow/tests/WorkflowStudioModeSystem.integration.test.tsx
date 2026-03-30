@@ -22,6 +22,7 @@ import {
   removeWorkflowStep,
   setWorkflowStepDelayConfig,
   setWorkflowStepIfThenConfig,
+  setWorkflowStepManualApprovalConfig,
   setWorkflowStepAgentAssetSelection,
   setWorkflowStepType,
   workflowStepTypeDefinitions,
@@ -499,6 +500,51 @@ describe("WorkflowStudioModeSystem integration seams", () => {
 
     store.updateSharedDraft((draft) => removeWorkflowStep(draft, secondStepId).draft);
     expect(store.getState().sharedDraft.steps.map((step) => step.order)).toEqual([1, 2]);
+  });
+
+  it("renders mixed asset-backed and built-in step choices and surfaces built-in validation feedback", () => {
+    const store = new WorkflowStudioModeStateStore();
+    store.setSelectedMode(WorkflowStudioModeIds.wizard);
+
+    const renderBoundary = () => WorkflowStudioDraftAuthoringBoundary({
+      isWorkflowStudio: true,
+      content: store.getState().sharedDraftSerialized,
+      onChangeContent: (nextContent) => store.hydrateFromSerializedDraft(nextContent),
+      workflowModeContext: {
+        selectedModeId: store.getState().selectedModeId,
+        selectedWizardPageId: "steps",
+        sharedDraft: store.getState().sharedDraft,
+        sharedDraftSerialized: store.getState().sharedDraftSerialized,
+        draftEditorContent: store.getState().draftEditorContent,
+        modeValidationIssues: store.getState().modeValidationIssues,
+        draftValidationIssues: store.getState().draftValidationIssues,
+        updateSharedDraft: (updater) => store.updateSharedDraft(updater),
+      },
+    });
+
+    let boundary = renderBoundary();
+    const initialMarkup = renderToStaticMarkup(boundary);
+    expect(initialMarkup).toContain("Agent/assistant action");
+    expect(initialMarkup).toContain("Manual / Approval");
+
+    const addManual = getElementByTestId(
+      boundary,
+      "workflow-step-add-built-in:control-flow:manual-approval",
+    ) as ReactElement<ButtonElementProps>;
+    addManual.props.onClick?.();
+    expect(store.getState().sharedDraft.steps[0]?.type).toBe(WorkflowDraftBuiltInStepTypes.manualApproval);
+
+    store.updateSharedDraft((draft) => setWorkflowStepManualApprovalConfig(
+      draft,
+      store.getState().sharedDraft.steps[0]?.id as string,
+      { prompt: "" },
+    ).draft);
+    expect(store.getState().isSharedDraftValid).toBe(false);
+
+    boundary = renderBoundary();
+    const withManualMarkup = renderToStaticMarkup(boundary);
+    expect(withManualMarkup).toContain('data-testid="workflow-step-manual-config-0"');
+    expect(withManualMarkup).toContain("requires config.prompt or legacy approvalMessage");
   });
 
   it("supports wizard output add/remove/type/configuration with clean type switching and shared mode persistence", () => {

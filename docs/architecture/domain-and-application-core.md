@@ -219,6 +219,7 @@ The studio shell now has a bounded inner-layer model and application orchestrati
 - Story 6.4 now defines `loop-iteration` as a canonical loop primitive with explicit mode/source contracts (`fixed-count`, `collection`, `range`) plus bounded body/max-iteration/exit-condition fields; cross-section checks continue to validate collection input references against canonical workflow inputs.
 - Story 6.5 now defines `delay-wait` as a canonical temporal primitive with explicit timing modes (`duration` with structured value/unit, or `until-time` with timestamp/timezone), compatibility aliases (`durationSeconds`, `waitUntil`), and deterministic malformed-config rejection through the same built-in normalization path.
 - Story 6.6 now defines `manual-approval` as a canonical human-interaction primitive with explicit interaction modes (`review` or `approval`), structured continuation/decision outcomes, required prompt semantics, timeout behavior policy (`reject`/`continue`/`escalate`), and compatibility aliasing for legacy `approvalMessage` flows.
+- Stories 6.7-6.8 keep renderer authoring aligned to this inner model: wizard step selection reads from `BuiltInWorkflowStepRegistry` alongside asset-backed options, and wizard built-in editors only mutate canonical draft config fields that are validated by `normalizeWorkflowDraftBuiltInStepConfig` / `validateWorkflowDraft` rather than UI-local schema forks.
 
 ## Direction 5 update: Studio shell persistence integration (story 1.11)
 
