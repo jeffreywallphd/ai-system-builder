@@ -329,6 +329,110 @@ describe("WorkflowStudioCanvasViewModel", () => {
     expect(draft.steps[1]?.dependsOnStepIds ?? []).not.toContain(draft.steps[0]?.id);
   });
 
+  it("projects if-then branching config as editable branch edges and reconciles branch edits into canonical draft", () => {
+    let draft = createEmptyWorkflowDraft();
+    draft = applyWorkflowCanvasAction(draft, {
+      kind: "add-step",
+      definitionKey: "built-in:control-flow:if-then",
+    }).draft;
+    draft = applyWorkflowCanvasAction(draft, { kind: "add-step" }).draft;
+    draft = applyWorkflowCanvasAction(draft, { kind: "add-step" }).draft;
+
+    const ifThenStepId = draft.steps[0]?.id as string;
+    const thenStepId = draft.steps[1]?.id as string;
+    const elseStepId = draft.steps[2]?.id as string;
+
+    draft = applyWorkflowCanvasAction(draft, {
+      kind: "set-step-if-then-branch-target",
+      stepId: ifThenStepId,
+      branchKey: "then",
+      targetStepId: thenStepId,
+    }).draft;
+    draft = applyWorkflowCanvasAction(draft, {
+      kind: "set-step-if-then-branch-target",
+      stepId: ifThenStepId,
+      branchKey: "else",
+      targetStepId: elseStepId,
+    }).draft;
+
+    const withBranches = deriveWorkflowCanvasViewModel(draft, []);
+    const branchEdges = withBranches.graph.edges.filter((edge) => edge.kind === WorkflowCanvasGraphEdgeKinds.stepBranch);
+    expect(branchEdges).toHaveLength(2);
+    expect(branchEdges.some((edge) => edge.branchKey === "then")).toBe(true);
+    expect(branchEdges.some((edge) => edge.branchKey === "else")).toBe(true);
+
+    const ifThenNode = withBranches.graph.nodes.find((node) => (
+      node.kind === WorkflowCanvasGraphNodeKinds.item
+      && node.sectionId === WorkflowCanvasSectionIds.steps
+      && node.entityId === ifThenStepId
+    ));
+    const replacementElseNode = withBranches.graph.nodes.find((node) => (
+      node.kind === WorkflowCanvasGraphNodeKinds.item
+      && node.sectionId === WorkflowCanvasSectionIds.steps
+      && node.entityId === thenStepId
+    ));
+    const elseBranchEdge = branchEdges.find((edge) => edge.branchKey === "else");
+    if (!ifThenNode || !replacementElseNode || !elseBranchEdge) {
+      throw new Error("Expected if-then node and branch edges.");
+    }
+
+    draft = applyWorkflowCanvasEdgeReconnect(draft, withBranches.graph, {
+      edge: elseBranchEdge,
+      nextConnection: {
+        sourceNodeId: ifThenNode.id,
+        targetNodeId: replacementElseNode.id,
+        sourceHandleId: elseBranchEdge.sourceHandleId,
+      },
+    }).draft;
+
+    const reprojected = deriveWorkflowCanvasViewModel(draft, []);
+    const reprojectedElseEdge = reprojected.graph.edges.find((edge) => (
+      edge.kind === WorkflowCanvasGraphEdgeKinds.stepBranch
+      && edge.branchKey === "else"
+    ));
+    expect(reprojectedElseEdge?.targetEntityId).toBe(thenStepId);
+
+    const removedAction = resolveWorkflowCanvasEdgeRemovalAction(reprojectedElseEdge!);
+    if (!removedAction) {
+      throw new Error("Expected else branch removal action.");
+    }
+    draft = applyWorkflowCanvasAction(draft, removedAction).draft;
+    const finalConfig = draft.steps.find((step) => step.id === ifThenStepId)?.config as {
+      elseStepIds?: ReadonlyArray<string>;
+      branches?: { else?: { stepIds?: ReadonlyArray<string> } };
+    };
+    expect(finalConfig.branches?.else?.stepIds ?? finalConfig.elseStepIds ?? []).toHaveLength(0);
+  });
+
+  it("supports explicit canvas actions for dataset-input and agent-step asset references", () => {
+    let draft = createEmptyWorkflowDraft();
+    draft = applyWorkflowCanvasAction(draft, { kind: "add-input-dataset-asset" }).draft;
+    draft = applyWorkflowCanvasAction(draft, { kind: "add-step" }).draft;
+    const datasetInputId = draft.inputs[0]?.id as string;
+    const stepId = draft.steps[0]?.id as string;
+
+    draft = applyWorkflowCanvasAction(draft, {
+      kind: "set-input-dataset-asset",
+      inputId: datasetInputId,
+      assetId: "asset:dataset-selected",
+      versionId: "asset:dataset-selected:v1",
+      displayName: "Selected Dataset",
+    }).draft;
+
+    draft = applyWorkflowCanvasAction(draft, {
+      kind: "set-step-agent-asset",
+      stepId,
+      assetId: "asset:agent-selected",
+      versionId: "asset:agent-selected:v2",
+      displayName: "Selected Agent",
+    }).draft;
+
+    expect(draft.inputs[0]?.sourceType).toBe("dataset-asset");
+    expect((draft.inputs[0] as { asset?: { assetId?: string; versionId?: string } }).asset?.assetId).toBe("asset:dataset-selected");
+    expect(draft.steps[0]?.type).toBe(WorkflowDraftStepTypes.agentAssistant);
+    expect(draft.steps[0]?.assetRef?.asset.assetId).toBe("asset:agent-selected");
+  });
+
   it("rejects invalid canvas connection attempts and leaves canonical draft unchanged", () => {
     let draft = createEmptyWorkflowDraft();
     draft = applyWorkflowCanvasAction(draft, { kind: "add-trigger" }).draft;

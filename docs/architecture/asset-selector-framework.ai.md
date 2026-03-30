@@ -297,3 +297,4 @@ For new selector types, keep shared shell/session unchanged and add:
 - Shared selector shell/session/capability infrastructure remains reusable and UI-agnostic.
 - Workflow wizard wiring for inputs + steps is now implemented through those shared seams.
 - No parallel selector architecture or selector-bypass paths should be introduced for future workflow sections.
+- Workflow canvas node wiring now also uses the same shared selector seams for dataset inputs and agent steps, persisting canonical refs in workflow draft state (no canvas-only selector/reference model).

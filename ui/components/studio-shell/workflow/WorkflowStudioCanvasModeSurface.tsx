@@ -1,11 +1,19 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Connection } from "@xyflow/react";
 import {
   WorkflowDraftBuiltInStepTypes,
   WorkflowDraftInputSourceTypes,
+  WorkflowDraftStepAssetKinds,
+  WorkflowDraftStepTypes,
+  type WorkflowDraftIfThenStepConfig,
   type WorkflowDraft,
   type WorkflowValidationIssue,
 } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+import {
+  AssetSelectorSessionLifecycleStates,
+  type AssetSelectorSessionState,
+} from "../../../../application/studio-entry/AssetSelectorSessionStore";
+import AssetSelectorShell from "../asset-selector/AssetSelectorShell";
 import {
   applyWorkflowCanvasAction,
   applyWorkflowCanvasConnection,
@@ -18,6 +26,17 @@ import {
   type WorkflowCanvasGraphNodeViewModel,
   type WorkflowCanvasSectionId,
 } from "../../../studio-shell/workflow/WorkflowStudioCanvasViewModel";
+import { RegistryService } from "../../../services/RegistryService";
+import { getAssetSelectorSessionStore } from "../../../studio-shell/asset-selector/AssetSelectorSessionRegistry";
+import type { AssetSelectorResultItem } from "../../../studio-shell/asset-selector/AssetSelectorDataProvider";
+import {
+  createDatasetAssetSelectorRequest,
+  DatasetAssetSelectorAdapter,
+} from "../../../studio-shell/asset-selector/DatasetAssetSelectorAdapter";
+import {
+  AgentAssistantAssetSelectorAdapter,
+  createAgentAssistantAssetSelectorRequest,
+} from "../../../studio-shell/asset-selector/AgentAssistantAssetSelectorAdapter";
 import WorkflowStudioCanvasReactFlow from "./WorkflowStudioCanvasReactFlow";
 import {
   setWorkflowTriggerStateConfig,
@@ -39,6 +58,7 @@ import {
 } from "../../../studio-shell/workflow/WorkflowWizardOutputs";
 
 export interface WorkflowStudioCanvasModeSurfaceProps {
+  readonly studioId?: string;
   readonly sharedDraft: WorkflowDraft;
   readonly draftValidationIssues: ReadonlyArray<WorkflowValidationIssue>;
   readonly onUpdateSharedDraft?: (updater: (draft: WorkflowDraft) => WorkflowDraft) => void;
@@ -94,6 +114,9 @@ const workflowCanvasPaletteSections: ReadonlyArray<WorkflowCanvasPaletteSection>
   }),
 ]);
 
+const canvasDatasetSelectorOriginatingField = "canvas.inputs.dataset";
+const canvasAgentSelectorOriginatingField = "canvas.steps.agent-assistant";
+
 function buildPaletteOptions(): ReadonlyArray<WorkflowCanvasPaletteOption> {
   return Object.freeze([
     ...workflowTriggerTypeDefinitions.map((definition) => Object.freeze({
@@ -144,7 +167,31 @@ function buildPaletteOptions(): ReadonlyArray<WorkflowCanvasPaletteOption> {
   ]);
 }
 
+function countCompletedStates(state?: AssetSelectorSessionState): number {
+  if (!state) {
+    return 0;
+  }
+  return state.lifecycleHistory.filter(
+    (entry) => entry === AssetSelectorSessionLifecycleStates.completed,
+  ).length;
+}
+
+function toDelimitedValues(values?: ReadonlyArray<string>): string {
+  return values?.join(", ") ?? "";
+}
+
+function parseDelimitedValues(raw: string): ReadonlyArray<string> | undefined {
+  const parsed = Array.from(new Set(
+    raw
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0),
+  ));
+  return parsed.length > 0 ? Object.freeze(parsed) : undefined;
+}
+
 export default function WorkflowStudioCanvasModeSurface({
+  studioId,
   sharedDraft,
   draftValidationIssues,
   onUpdateSharedDraft,
@@ -152,9 +199,73 @@ export default function WorkflowStudioCanvasModeSurface({
   onChangeDraftEditorContent,
   drawerState,
 }: WorkflowStudioCanvasModeSurfaceProps): JSX.Element {
+  const selectorSessionStore = useMemo(() => getAssetSelectorSessionStore(), []);
+  const registryService = useMemo(() => new RegistryService(), []);
+  const datasetSelectorAdapter = useMemo(
+    () => new DatasetAssetSelectorAdapter({ registryService, limit: 50 }),
+    [registryService],
+  );
+  const agentSelectorAdapter = useMemo(
+    () => new AgentAssistantAssetSelectorAdapter({ registryService, limit: 50 }),
+    [registryService],
+  );
+  const datasetSelectorSessionKey = useMemo(
+    () => `workflow-studio:${studioId?.trim() || "default"}:canvas:inputs:dataset`,
+    [studioId],
+  );
+  const agentSelectorSessionKey = useMemo(
+    () => `workflow-studio:${studioId?.trim() || "default"}:canvas:steps:agent`,
+    [studioId],
+  );
+  const datasetSelectorRequest = useMemo(
+    () => createDatasetAssetSelectorRequest({
+      requestId: `selector:${datasetSelectorSessionKey}`,
+      selectionMode: "single-select",
+      minSelections: 0,
+      maxSelections: 1,
+      required: false,
+      originatingStudio: "workflow-studio",
+      originatingField: canvasDatasetSelectorOriginatingField,
+      launchSource: "canvas",
+    }),
+    [datasetSelectorSessionKey],
+  );
+  const agentSelectorRequest = useMemo(
+    () => createAgentAssistantAssetSelectorRequest({
+      requestId: `selector:${agentSelectorSessionKey}`,
+      selectionMode: "single-select",
+      minSelections: 0,
+      maxSelections: 1,
+      required: false,
+      originatingStudio: "workflow-studio",
+      originatingField: canvasAgentSelectorOriginatingField,
+      launchSource: "canvas",
+    }),
+    [agentSelectorSessionKey],
+  );
   const [selectedNodeId, setSelectedNodeId] = useState<string | undefined>(undefined);
   const [paletteSearchValue, setPaletteSearchValue] = useState("");
   const [canvasInteractionMessage, setCanvasInteractionMessage] = useState<string | undefined>(undefined);
+  const [datasetSelectorState, setDatasetSelectorState] = useState<AssetSelectorSessionState | undefined>(
+    () => selectorSessionStore.getSession(datasetSelectorSessionKey),
+  );
+  const [datasetSelectorOpenInputId, setDatasetSelectorOpenInputId] = useState<string | undefined>(undefined);
+  const [datasetSelectorSearchTerm, setDatasetSelectorSearchTerm] = useState("");
+  const [datasetSelectorItems, setDatasetSelectorItems] = useState<ReadonlyArray<AssetSelectorResultItem>>([]);
+  const [datasetSelectorLoading, setDatasetSelectorLoading] = useState(false);
+  const [datasetSelectorError, setDatasetSelectorError] = useState<string | undefined>(undefined);
+  const [datasetSelectorQueryRevision, setDatasetSelectorQueryRevision] = useState(0);
+  const [agentSelectorState, setAgentSelectorState] = useState<AssetSelectorSessionState | undefined>(
+    () => selectorSessionStore.getSession(agentSelectorSessionKey),
+  );
+  const [agentSelectorOpenStepId, setAgentSelectorOpenStepId] = useState<string | undefined>(undefined);
+  const [agentSelectorSearchTerm, setAgentSelectorSearchTerm] = useState("");
+  const [agentSelectorItems, setAgentSelectorItems] = useState<ReadonlyArray<AssetSelectorResultItem>>([]);
+  const [agentSelectorLoading, setAgentSelectorLoading] = useState(false);
+  const [agentSelectorError, setAgentSelectorError] = useState<string | undefined>(undefined);
+  const [agentSelectorQueryRevision, setAgentSelectorQueryRevision] = useState(0);
+  const datasetAppliedCompletedCountRef = useRef<number | undefined>(undefined);
+  const agentAppliedCompletedCountRef = useRef<number | undefined>(undefined);
   const viewModel = useMemo(
     () => deriveWorkflowCanvasViewModel(sharedDraft, draftValidationIssues),
     [draftValidationIssues, sharedDraft],
@@ -181,6 +292,152 @@ export default function WorkflowStudioCanvasModeSurface({
       setSelectedNodeId(undefined);
     }
   }, [graphNodesById, selectedNodeId]);
+
+  useEffect(() => {
+    const existing = selectorSessionStore.getSession(datasetSelectorSessionKey);
+    if (!existing) {
+      selectorSessionStore.prepareSession({
+        sessionKey: datasetSelectorSessionKey,
+        request: datasetSelectorRequest,
+      });
+    }
+    selectorSessionStore.activateSession(datasetSelectorSessionKey);
+    const unsubscribe = selectorSessionStore.subscribe(datasetSelectorSessionKey, setDatasetSelectorState);
+    return unsubscribe;
+  }, [datasetSelectorRequest, datasetSelectorSessionKey, selectorSessionStore]);
+
+  useEffect(() => {
+    const existing = selectorSessionStore.getSession(agentSelectorSessionKey);
+    if (!existing) {
+      selectorSessionStore.prepareSession({
+        sessionKey: agentSelectorSessionKey,
+        request: agentSelectorRequest,
+      });
+    }
+    selectorSessionStore.activateSession(agentSelectorSessionKey);
+    const unsubscribe = selectorSessionStore.subscribe(agentSelectorSessionKey, setAgentSelectorState);
+    return unsubscribe;
+  }, [agentSelectorRequest, agentSelectorSessionKey, selectorSessionStore]);
+
+  useEffect(() => {
+    if (!datasetSelectorOpenInputId) {
+      return;
+    }
+    let active = true;
+    const load = async (): Promise<void> => {
+      setDatasetSelectorLoading(true);
+      setDatasetSelectorError(undefined);
+      const response = await datasetSelectorAdapter.query({
+        request: datasetSelectorRequest,
+        searchTerm: datasetSelectorSearchTerm,
+      });
+      if (!active) {
+        return;
+      }
+      setDatasetSelectorItems(response.items);
+      setDatasetSelectorError(response.error);
+      setDatasetSelectorLoading(false);
+    };
+    void load();
+    return () => {
+      active = false;
+    };
+  }, [
+    datasetSelectorAdapter,
+    datasetSelectorOpenInputId,
+    datasetSelectorQueryRevision,
+    datasetSelectorRequest,
+    datasetSelectorSearchTerm,
+  ]);
+
+  useEffect(() => {
+    if (!agentSelectorOpenStepId) {
+      return;
+    }
+    let active = true;
+    const load = async (): Promise<void> => {
+      setAgentSelectorLoading(true);
+      setAgentSelectorError(undefined);
+      const response = await agentSelectorAdapter.query({
+        request: agentSelectorRequest,
+        searchTerm: agentSelectorSearchTerm,
+      });
+      if (!active) {
+        return;
+      }
+      setAgentSelectorItems(response.items);
+      setAgentSelectorError(response.error);
+      setAgentSelectorLoading(false);
+    };
+    void load();
+    return () => {
+      active = false;
+    };
+  }, [
+    agentSelectorAdapter,
+    agentSelectorOpenStepId,
+    agentSelectorQueryRevision,
+    agentSelectorRequest,
+    agentSelectorSearchTerm,
+  ]);
+
+  useEffect(() => {
+    const completedCount = countCompletedStates(datasetSelectorState);
+    if (datasetAppliedCompletedCountRef.current === undefined) {
+      datasetAppliedCompletedCountRef.current = completedCount;
+      return;
+    }
+    if (completedCount <= datasetAppliedCompletedCountRef.current || !datasetSelectorOpenInputId) {
+      return;
+    }
+    datasetAppliedCompletedCountRef.current = completedCount;
+    const selectedAsset = datasetSelectorState?.selectedAssets[0];
+    if (!selectedAsset?.assetId) {
+      return;
+    }
+    const result = applyAction({
+      kind: "set-input-dataset-asset",
+      inputId: datasetSelectorOpenInputId,
+      assetId: selectedAsset.assetId,
+      versionId: selectedAsset.versionId,
+      displayName: selectedAsset.displayName,
+    });
+    if (!result.changed) {
+      setCanvasInteractionMessage("Dataset selection could not be applied to this input node.");
+      return;
+    }
+    setCanvasInteractionMessage(undefined);
+    setDatasetSelectorOpenInputId(undefined);
+  }, [datasetSelectorOpenInputId, datasetSelectorState]);
+
+  useEffect(() => {
+    const completedCount = countCompletedStates(agentSelectorState);
+    if (agentAppliedCompletedCountRef.current === undefined) {
+      agentAppliedCompletedCountRef.current = completedCount;
+      return;
+    }
+    if (completedCount <= agentAppliedCompletedCountRef.current || !agentSelectorOpenStepId) {
+      return;
+    }
+    agentAppliedCompletedCountRef.current = completedCount;
+    const selectedAsset = agentSelectorState?.selectedAssets[0];
+    if (!selectedAsset?.assetId) {
+      return;
+    }
+    const result = applyAction({
+      kind: "set-step-agent-asset",
+      stepId: agentSelectorOpenStepId,
+      assetId: selectedAsset.assetId,
+      versionId: selectedAsset.versionId,
+      displayName: selectedAsset.displayName,
+    });
+    if (!result.changed) {
+      setCanvasInteractionMessage("Agent selection could not be applied to this step node.");
+      return;
+    }
+    setCanvasInteractionMessage(undefined);
+    setAgentSelectorOpenStepId(undefined);
+  }, [agentSelectorOpenStepId, agentSelectorState]);
 
   const updateSharedDraft = (updater: (draft: WorkflowDraft) => WorkflowDraft): void => {
     onUpdateSharedDraft?.(updater);
@@ -264,12 +521,14 @@ export default function WorkflowStudioCanvasModeSurface({
       const result = applyWorkflowCanvasConnection(draft, viewModel.graph, {
         sourceNodeId: connection.source as string,
         targetNodeId: connection.target as string,
+        sourceHandleId: connection.sourceHandle ?? undefined,
+        targetHandleId: connection.targetHandle ?? undefined,
       });
       changed = result.changed;
       return result.draft;
     });
     if (!changed) {
-      setCanvasInteractionMessage("Unsupported connection. Only Step->Step and Step->Output links are allowed.");
+      setCanvasInteractionMessage("Unsupported connection. Use Step->Step, If/Then branch handles, or Step->Output links.");
       return;
     }
     setCanvasInteractionMessage(undefined);
@@ -290,6 +549,8 @@ export default function WorkflowStudioCanvasModeSurface({
         nextConnection: {
           sourceNodeId: connection.source as string,
           targetNodeId: connection.target as string,
+          sourceHandleId: connection.sourceHandle ?? undefined,
+          targetHandleId: connection.targetHandle ?? undefined,
         },
       });
       changed = result.changed;
@@ -317,6 +578,47 @@ export default function WorkflowStudioCanvasModeSurface({
       return;
     }
     setCanvasInteractionMessage(undefined);
+  };
+
+  const openDatasetSelectorForInput = (inputId: string): void => {
+    const input = sharedDraft.inputs.find((entry) => entry.id === inputId);
+    if (!input || input.sourceType !== WorkflowDraftInputSourceTypes.datasetAsset) {
+      return;
+    }
+    selectorSessionStore.activateSession(datasetSelectorSessionKey);
+    selectorSessionStore.setPendingSelections(datasetSelectorSessionKey, Object.freeze([{
+      assetId: input.asset.assetId,
+      versionId: input.asset.versionId,
+      assetType: "dataset",
+      displayName: input.title,
+      taxonomy: input.asset.taxonomy,
+    }]));
+    setDatasetSelectorOpenInputId(inputId);
+    setDatasetSelectorSearchTerm("");
+    setDatasetSelectorQueryRevision((current) => current + 1);
+  };
+
+  const openAgentSelectorForStep = (stepId: string): void => {
+    const step = sharedDraft.steps.find((entry) => entry.id === stepId);
+    if (!step) {
+      return;
+    }
+    const selectedAgent = step.assetRef?.assetKind === WorkflowDraftStepAssetKinds.agentAssistant
+      ? step.assetRef.asset
+      : undefined;
+    selectorSessionStore.activateSession(agentSelectorSessionKey);
+    selectorSessionStore.setPendingSelections(agentSelectorSessionKey, selectedAgent
+      ? Object.freeze([{
+        assetId: selectedAgent.assetId,
+        versionId: selectedAgent.versionId,
+        assetType: "agent",
+        displayName: step.title,
+        taxonomy: selectedAgent.taxonomy,
+      }])
+      : Object.freeze([]));
+    setAgentSelectorOpenStepId(stepId);
+    setAgentSelectorSearchTerm("");
+    setAgentSelectorQueryRevision((current) => current + 1);
   };
 
   const renderNodeEditor = (node: WorkflowCanvasGraphNodeViewModel): JSX.Element | null => {
@@ -365,6 +667,14 @@ export default function WorkflowStudioCanvasModeSurface({
       if (!input) {
         return null;
       }
+      const datasetSelectorStateForShell = datasetSelectorState ?? selectorSessionStore.getSession(datasetSelectorSessionKey);
+      const isDatasetSelectorOpen = datasetSelectorOpenInputId === input.id;
+      const unavailableDatasetSelection = input.sourceType === WorkflowDraftInputSourceTypes.datasetAsset
+        && !datasetSelectorLoading
+        && !datasetSelectorError
+        && datasetSelectorSearchTerm.trim().length === 0
+        && datasetSelectorItems.length > 0
+        && !datasetSelectorItems.some((item) => item.asset.assetId === input.asset.assetId);
       return (
         <div className="ui-stack ui-stack--2xs ui-workflow-canvas-node-form">
           <input
@@ -376,6 +686,71 @@ export default function WorkflowStudioCanvasModeSurface({
           <div className="ui-text-small ui-text-secondary">Type: {input.sourceType}</div>
           {input.sourceType === WorkflowDraftInputSourceTypes.runtimeParameter ? (
             <div className="ui-text-small ui-text-secondary">Parameter: {input.parameterKey}</div>
+          ) : null}
+          {input.sourceType === WorkflowDraftInputSourceTypes.datasetAsset ? (
+            <>
+              <div className="ui-text-small ui-text-secondary">
+                Linked dataset: {input.asset.assetId}{input.asset.versionId ? ` (${input.asset.versionId})` : ""}
+              </div>
+              {unavailableDatasetSelection ? (
+                <div className="ui-text-small ui-text-danger">
+                  Selected dataset is currently unavailable in the dataset catalog.
+                </div>
+              ) : null}
+              <div className="ui-row ui-row--wrap">
+                <button
+                  type="button"
+                  className="ui-button ui-button--ghost ui-button--sm"
+                  data-testid={`workflow-canvas-input-select-dataset-${input.id}`}
+                  onClick={() => openDatasetSelectorForInput(input.id)}
+                >
+                  Select dataset
+                </button>
+                {isDatasetSelectorOpen ? (
+                  <button
+                    type="button"
+                    className="ui-button ui-button--ghost ui-button--sm"
+                    onClick={() => {
+                      selectorSessionStore.activateSession(datasetSelectorSessionKey);
+                      selectorSessionStore.clearPendingSelections(datasetSelectorSessionKey);
+                      setDatasetSelectorOpenInputId(undefined);
+                    }}
+                  >
+                    Close selector
+                  </button>
+                ) : null}
+              </div>
+              {isDatasetSelectorOpen && datasetSelectorStateForShell ? (
+                <AssetSelectorShell
+                  title="Dataset selector"
+                  state={datasetSelectorStateForShell}
+                  searchTerm={datasetSelectorSearchTerm}
+                  items={datasetSelectorItems}
+                  loading={datasetSelectorLoading}
+                  error={datasetSelectorError}
+                  onSearchTermChange={setDatasetSelectorSearchTerm}
+                  onToggleSelection={(item) => {
+                    selectorSessionStore.togglePendingSelection(datasetSelectorSessionKey, item.asset);
+                  }}
+                  onConfirm={() => {
+                    selectorSessionStore.confirmPendingSelections(datasetSelectorSessionKey);
+                  }}
+                  onCancel={() => {
+                    selectorSessionStore.cancelSession(datasetSelectorSessionKey, "user-cancelled-selector");
+                    selectorSessionStore.activateSession(datasetSelectorSessionKey);
+                    setDatasetSelectorOpenInputId(undefined);
+                  }}
+                  onCreateNew={() => {
+                    setCanvasInteractionMessage(
+                      "Create-new dataset handoff is available in Wizard Inputs. Use that flow, then return to Canvas.",
+                    );
+                  }}
+                  onRetry={() => {
+                    setDatasetSelectorQueryRevision((current) => current + 1);
+                  }}
+                />
+              ) : null}
+            </>
           ) : null}
         </div>
       );
@@ -389,6 +764,25 @@ export default function WorkflowStudioCanvasModeSurface({
       const selectedDefinition = workflowStepTypeDefinitions.find((definition) => definition.type === step.type && definition.kind === step.kind)
         ?? workflowStepTypeDefinitions[0];
       const stepIndex = sharedDraft.steps.findIndex((entry) => entry.id === step.id);
+      const agentSelectorStateForShell = agentSelectorState ?? selectorSessionStore.getSession(agentSelectorSessionKey);
+      const isAgentSelectorOpen = agentSelectorOpenStepId === step.id;
+      const ifThenConfig = step.type === WorkflowDraftBuiltInStepTypes.ifThen
+        ? (step.config as WorkflowDraftIfThenStepConfig | undefined)
+        : undefined;
+      const ifThenThenStepIds = ifThenConfig
+        ? (ifThenConfig.branches?.then?.stepIds ?? ifThenConfig.thenStepIds)
+        : undefined;
+      const ifThenElseStepIds = ifThenConfig
+        ? (ifThenConfig.branches?.else?.stepIds ?? ifThenConfig.elseStepIds)
+        : undefined;
+      const unavailableAgentSelection = Boolean(
+        step.assetRef?.asset.assetId
+        && !agentSelectorLoading
+        && !agentSelectorError
+        && agentSelectorSearchTerm.trim().length === 0
+        && agentSelectorItems.length > 0
+        && !agentSelectorItems.some((item) => item.asset.assetId === step.assetRef?.asset.assetId),
+      );
       return (
         <div className="ui-stack ui-stack--2xs ui-workflow-canvas-node-form">
           <input
@@ -410,11 +804,127 @@ export default function WorkflowStudioCanvasModeSurface({
             ))}
           </select>
           {step.type === WorkflowDraftBuiltInStepTypes.ifThen ? (
-            <input
-              className="ui-input"
-              value={String((step.config as { conditionExpression?: string } | undefined)?.conditionExpression ?? "")}
-              onChange={(event) => updateSharedDraft((draft) => setWorkflowStepIfThenConfig(draft, step.id, { conditionExpression: event.target.value }).draft)}
-            />
+            <div className="ui-stack ui-stack--2xs">
+              <label className="ui-stack ui-stack--3xs">
+                <span className="ui-text-small ui-text-secondary">Condition expression</span>
+                <input
+                  className="ui-input"
+                  data-testid={`workflow-canvas-if-then-condition-${step.id}`}
+                  value={String(ifThenConfig?.conditionExpression ?? "")}
+                  onChange={(event) => updateSharedDraft((draft) => setWorkflowStepIfThenConfig(draft, step.id, {
+                    conditionExpression: event.target.value,
+                  }).draft)}
+                />
+              </label>
+              <label className="ui-stack ui-stack--3xs">
+                <span className="ui-text-small ui-text-secondary">Then label</span>
+                <input
+                  className="ui-input"
+                  value={ifThenConfig?.branches?.then?.label ?? ifThenConfig?.thenLabel ?? ""}
+                  onChange={(event) => updateSharedDraft((draft) => setWorkflowStepIfThenConfig(draft, step.id, {
+                    thenLabel: event.target.value,
+                  }).draft)}
+                />
+              </label>
+              <label className="ui-stack ui-stack--3xs">
+                <span className="ui-text-small ui-text-secondary">Else label (optional)</span>
+                <input
+                  className="ui-input"
+                  value={ifThenConfig?.branches.else?.label ?? ifThenConfig?.elseLabel ?? ""}
+                  onChange={(event) => updateSharedDraft((draft) => setWorkflowStepIfThenConfig(draft, step.id, {
+                    elseLabel: event.target.value,
+                  }).draft)}
+                />
+              </label>
+              <label className="ui-stack ui-stack--3xs">
+                <span className="ui-text-small ui-text-secondary">Then branch step IDs</span>
+                <input
+                  className="ui-input"
+                  value={toDelimitedValues(ifThenThenStepIds)}
+                  onChange={(event) => updateSharedDraft((draft) => setWorkflowStepIfThenConfig(draft, step.id, {
+                    thenStepIds: parseDelimitedValues(event.target.value),
+                  }).draft)}
+                />
+              </label>
+              <label className="ui-stack ui-stack--3xs">
+                <span className="ui-text-small ui-text-secondary">Else branch step IDs</span>
+                <input
+                  className="ui-input"
+                  value={toDelimitedValues(ifThenElseStepIds)}
+                  onChange={(event) => updateSharedDraft((draft) => setWorkflowStepIfThenConfig(draft, step.id, {
+                    elseStepIds: parseDelimitedValues(event.target.value),
+                  }).draft)}
+                />
+              </label>
+              <div className="ui-text-small ui-text-secondary">
+                Drag from the Then/Else branch handles on this node to wire branch paths visually.
+              </div>
+            </div>
+          ) : null}
+          {step.type === WorkflowDraftStepTypes.agentAssistant ? (
+            <>
+              <div className="ui-text-small ui-text-secondary">
+                Linked agent: {step.assetRef?.asset.assetId ?? "none selected"}
+              </div>
+              {unavailableAgentSelection ? (
+                <div className="ui-text-small ui-text-danger">
+                  Selected agent is currently unavailable in the agent catalog.
+                </div>
+              ) : null}
+              <div className="ui-row ui-row--wrap">
+                <button
+                  type="button"
+                  className="ui-button ui-button--ghost ui-button--sm"
+                  data-testid={`workflow-canvas-step-select-agent-${step.id}`}
+                  onClick={() => openAgentSelectorForStep(step.id)}
+                >
+                  Select agent
+                </button>
+                {isAgentSelectorOpen ? (
+                  <button
+                    type="button"
+                    className="ui-button ui-button--ghost ui-button--sm"
+                    onClick={() => {
+                      selectorSessionStore.activateSession(agentSelectorSessionKey);
+                      selectorSessionStore.clearPendingSelections(agentSelectorSessionKey);
+                      setAgentSelectorOpenStepId(undefined);
+                    }}
+                  >
+                    Close selector
+                  </button>
+                ) : null}
+              </div>
+              {isAgentSelectorOpen && agentSelectorStateForShell ? (
+                <AssetSelectorShell
+                  title="Agent selector"
+                  state={agentSelectorStateForShell}
+                  searchTerm={agentSelectorSearchTerm}
+                  items={agentSelectorItems}
+                  loading={agentSelectorLoading}
+                  error={agentSelectorError}
+                  onSearchTermChange={setAgentSelectorSearchTerm}
+                  onToggleSelection={(item) => {
+                    selectorSessionStore.togglePendingSelection(agentSelectorSessionKey, item.asset);
+                  }}
+                  onConfirm={() => {
+                    selectorSessionStore.confirmPendingSelections(agentSelectorSessionKey);
+                  }}
+                  onCancel={() => {
+                    selectorSessionStore.cancelSession(agentSelectorSessionKey, "user-cancelled-selector");
+                    selectorSessionStore.activateSession(agentSelectorSessionKey);
+                    setAgentSelectorOpenStepId(undefined);
+                  }}
+                  onCreateNew={() => {
+                    setCanvasInteractionMessage(
+                      "Create-new agent handoff is available in Wizard Steps. Use that flow, then return to Canvas.",
+                    );
+                  }}
+                  onRetry={() => {
+                    setAgentSelectorQueryRevision((current) => current + 1);
+                  }}
+                />
+              ) : null}
+            </>
           ) : null}
           <div className="ui-row ui-row--wrap">
             <button
