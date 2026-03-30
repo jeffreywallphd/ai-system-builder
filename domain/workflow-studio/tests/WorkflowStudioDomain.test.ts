@@ -14,8 +14,10 @@ import {
   normalizeWorkflowDraft,
   normalizeWorkflowDraftTriggerConfig,
   listWorkflowDraftBuiltInStepDefinitions,
+  listWorkflowDraftOutputDestinationDefinitions,
   listWorkflowDraftTriggerDefinitions,
   getWorkflowDraftBuiltInStepDefinition,
+  getWorkflowDraftOutputDestinationDefinition,
   getWorkflowDraftTriggerDefinition,
   isWorkflowDraftBuiltInStep,
   isWorkflowDraftBuiltInStepType,
@@ -1393,6 +1395,58 @@ describe("WorkflowStudioDomain", () => {
 
     expect(normalized.outputs).toHaveLength(2);
     expect(normalized.outputs.map((output) => output.id)).toEqual(["output-file", "output-system"]);
+    expect(normalized.outputs.map((output) => output.order)).toEqual([1, 2]);
+  });
+
+  it("normalizes canonical output configuration and preserves compatibility aliases", () => {
+    const normalized = normalizeWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [],
+      outputs: [{
+        id: "output-view",
+        type: "workflow-output",
+        title: "  Viewer Title  ",
+        outputType: WorkflowDraftOutputTypes.document,
+        format: WorkflowDraftOutputFormats.markdown,
+        destination: {
+          type: WorkflowDraftOutputDestinationTypes.webViewer,
+          target: "session-panel",
+          options: {
+            presentationMode: "full-page",
+          },
+        },
+      }],
+    });
+
+    expect(normalized.outputs[0]).toMatchObject({
+      id: "output-view",
+      order: 1,
+      title: "Viewer Title",
+      configuration: {
+        title: "Viewer Title",
+        presentationMode: "full-page",
+      },
+      destination: {
+        options: {
+          title: "Viewer Title",
+          presentationMode: "full-page",
+        },
+      },
+    });
+  });
+
+  it("exposes canonical output destination definitions for selector/configuration flows", () => {
+    const definitions = listWorkflowDraftOutputDestinationDefinitions();
+    expect(definitions.map((entry) => entry.destinationType)).toEqual([
+      WorkflowDraftOutputDestinationTypes.fileExport,
+      WorkflowDraftOutputDestinationTypes.webViewer,
+      WorkflowDraftOutputDestinationTypes.systemEntry,
+    ]);
+    expect(definitions.every((entry) => entry.configSchemaId.startsWith("workflow.output.destination."))).toBeTrue();
+    expect(getWorkflowDraftOutputDestinationDefinition(WorkflowDraftOutputDestinationTypes.systemEntry)?.defaultFormat).toBe(
+      WorkflowDraftOutputFormats.json,
+    );
   });
 
   it("rejects malformed workflow output structures", () => {
@@ -1483,6 +1537,59 @@ describe("WorkflowStudioDomain", () => {
     });
     expect(fileExportInvalidFormat.valid).toBeFalse();
     expect(fileExportInvalidFormat.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.outputFileFormatInvalid)).toBeTrue();
+  });
+
+  it("returns output validation issues for duplicate/non-contiguous output ordering", () => {
+    const duplicateOrder = validateWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [],
+      outputs: [
+        {
+          id: "output-a",
+          type: "workflow-output",
+          order: 1,
+          outputType: WorkflowDraftOutputTypes.document,
+          format: WorkflowDraftOutputFormats.json,
+          destination: {
+            type: WorkflowDraftOutputDestinationTypes.fileExport,
+            target: "/tmp/a.json",
+          },
+        },
+        {
+          id: "output-b",
+          type: "workflow-output",
+          order: 1,
+          outputType: WorkflowDraftOutputTypes.document,
+          format: WorkflowDraftOutputFormats.json,
+          destination: {
+            type: WorkflowDraftOutputDestinationTypes.fileExport,
+            target: "/tmp/b.json",
+          },
+        },
+      ],
+    });
+    expect(duplicateOrder.valid).toBeFalse();
+    expect(duplicateOrder.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.outputOrderDuplicate)).toBeTrue();
+
+    const nonContiguousOrder = validateWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [],
+      outputs: [{
+        id: "output-c",
+        type: "workflow-output",
+        order: 2,
+        outputType: WorkflowDraftOutputTypes.document,
+        format: WorkflowDraftOutputFormats.json,
+        destination: {
+          type: WorkflowDraftOutputDestinationTypes.fileExport,
+          target: "/tmp/c.json",
+        },
+      }],
+    });
+    expect(nonContiguousOrder.valid).toBeFalse();
+    expect(nonContiguousOrder.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.outputOrderNonContiguous)).toBeTrue();
   });
 
   it("validates a canonical workflow draft successfully", () => {

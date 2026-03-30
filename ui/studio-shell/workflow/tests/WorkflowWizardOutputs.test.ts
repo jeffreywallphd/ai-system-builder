@@ -28,10 +28,12 @@ describe("WorkflowWizardOutputs", () => {
       second.outputId,
       third.outputId,
     ]);
+    expect(third.draft.outputs.map((output) => output.order)).toEqual([1, 2, 3]);
 
     const removed = removeWorkflowOutput(third.draft, second.outputId);
     expect(removed.changed).toBe(true);
     expect(removed.draft.outputs.map((output) => output.id)).toEqual([first.outputId, third.outputId]);
+    expect(removed.draft.outputs.map((output) => output.order)).toEqual([1, 2]);
   });
 
   it("switches output destination type and resets stale destination-specific configuration", () => {
@@ -69,6 +71,9 @@ describe("WorkflowWizardOutputs", () => {
     draft = setWorkflowOutputViewerPresentationMode(draft, added.outputId, WorkflowOutputPresentationModes.fullPage).draft;
 
     expect(draft.outputs[0]?.title).toBe("Viewer A");
+    expect(draft.outputs[0]?.configuration).toEqual(expect.objectContaining({
+      title: "Viewer A",
+    }));
     expect(draft.outputs[0]?.destination.options).toEqual(expect.objectContaining({
       presentationMode: WorkflowOutputPresentationModes.fullPage,
     }));
