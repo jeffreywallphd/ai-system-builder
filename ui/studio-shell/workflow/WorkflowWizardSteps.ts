@@ -80,6 +80,14 @@ interface RegistryAssetCandidateResponse {
   };
 }
 
+export const WorkflowStepMoveDirections = Object.freeze({
+  up: "up",
+  down: "down",
+});
+
+export type WorkflowStepMoveDirection =
+  typeof WorkflowStepMoveDirections[keyof typeof WorkflowStepMoveDirections];
+
 export interface WorkflowStepAssetCatalogService {
   filterAssets(filters: {
     readonly structuralKinds?: ReadonlyArray<string>;
@@ -186,6 +194,162 @@ function toAssetCandidate(asset: {
   });
 }
 
+function normalizeAndFilterStepIds(
+  stepIds: ReadonlyArray<string> | undefined,
+  removedStepId: string,
+): ReadonlyArray<string> | undefined {
+  const normalized = normalizeStepIdReferences(stepIds);
+  if (!normalized) {
+    return undefined;
+  }
+  const filtered = normalized.filter((candidate) => candidate !== removedStepId);
+  return filtered.length > 0 ? Object.freeze(filtered) : undefined;
+}
+
+function listReferencedStepIds(step: WorkflowDraftStep): ReadonlyArray<string> {
+  if (step.kind !== WorkflowDraftStepKinds.controlFlow || !step.config) {
+    return Object.freeze([]);
+  }
+
+  if (step.type === WorkflowDraftBuiltInStepTypes.ifThen) {
+    const config = step.config as WorkflowDraftIfThenStepConfig;
+    return Object.freeze([
+      ...(config.branches.then.stepIds ?? config.thenStepIds ?? []),
+      ...(config.branches.else?.stepIds ?? config.elseStepIds ?? []),
+    ]);
+  }
+
+  if (step.type === WorkflowDraftBuiltInStepTypes.loopIteration) {
+    const config = step.config as WorkflowDraftLoopIterationStepConfig;
+    return Object.freeze([...(config.bodyStepIds ?? [])]);
+  }
+
+  if (step.type === WorkflowDraftBuiltInStepTypes.manualApproval) {
+    const config = step.config as WorkflowDraftManualApprovalStepConfig;
+    return Object.freeze([
+      ...(config.outcomes.continue?.stepIds ?? []),
+      ...(config.outcomes.approve?.stepIds ?? []),
+      ...(config.outcomes.reject?.stepIds ?? []),
+    ]);
+  }
+
+  return Object.freeze([]);
+}
+
+function rewriteStepReferencesForRemoval(
+  step: WorkflowDraftStep,
+  removedStepId: string,
+): WorkflowDraftStep {
+  const nextDependencies = normalizeAndFilterStepIds(step.dependsOnStepIds, removedStepId);
+  if (step.kind !== WorkflowDraftStepKinds.controlFlow || !step.config) {
+    return Object.freeze({
+      ...step,
+      dependsOnStepIds: nextDependencies,
+    });
+  }
+
+  if (step.type === WorkflowDraftBuiltInStepTypes.ifThen) {
+    const config = step.config as WorkflowDraftIfThenStepConfig;
+    const thenStepIds = normalizeAndFilterStepIds(config.branches.then.stepIds ?? config.thenStepIds, removedStepId);
+    const elseStepIds = normalizeAndFilterStepIds(config.branches.else?.stepIds ?? config.elseStepIds, removedStepId);
+    const nextConfig: WorkflowDraftIfThenStepConfig = Object.freeze({
+      ...config,
+      branches: Object.freeze({
+        then: Object.freeze({
+          ...config.branches.then,
+          stepIds: thenStepIds,
+        }),
+        else: config.branches.else
+          ? Object.freeze({
+            ...config.branches.else,
+            stepIds: elseStepIds,
+          })
+          : undefined,
+      }),
+      thenStepIds,
+      elseStepIds,
+    });
+    return Object.freeze({
+      ...step,
+      dependsOnStepIds: nextDependencies,
+      config: nextConfig,
+    });
+  }
+
+  if (step.type === WorkflowDraftBuiltInStepTypes.loopIteration) {
+    const config = step.config as WorkflowDraftLoopIterationStepConfig;
+    const bodyStepIds = normalizeAndFilterStepIds(config.bodyStepIds, removedStepId);
+    const nextConfig: WorkflowDraftLoopIterationStepConfig = Object.freeze({
+      ...config,
+      bodyStepIds,
+    });
+    return Object.freeze({
+      ...step,
+      dependsOnStepIds: nextDependencies,
+      config: nextConfig,
+    });
+  }
+
+  if (step.type === WorkflowDraftBuiltInStepTypes.manualApproval) {
+    const config = step.config as WorkflowDraftManualApprovalStepConfig;
+    const nextConfig: WorkflowDraftManualApprovalStepConfig = Object.freeze({
+      ...config,
+      outcomes: Object.freeze({
+        continue: config.outcomes.continue
+          ? Object.freeze({
+            ...config.outcomes.continue,
+            stepIds: normalizeAndFilterStepIds(config.outcomes.continue.stepIds, removedStepId),
+          })
+          : undefined,
+        approve: config.outcomes.approve
+          ? Object.freeze({
+            ...config.outcomes.approve,
+            stepIds: normalizeAndFilterStepIds(config.outcomes.approve.stepIds, removedStepId),
+          })
+          : undefined,
+        reject: config.outcomes.reject
+          ? Object.freeze({
+            ...config.outcomes.reject,
+            stepIds: normalizeAndFilterStepIds(config.outcomes.reject.stepIds, removedStepId),
+          })
+          : undefined,
+      }),
+    });
+    return Object.freeze({
+      ...step,
+      dependsOnStepIds: nextDependencies,
+      config: nextConfig,
+    });
+  }
+
+  return Object.freeze({
+    ...step,
+    dependsOnStepIds: nextDependencies,
+  });
+}
+
+function areControlFlowReferencesForwardOnly(steps: ReadonlyArray<WorkflowDraftStep>): boolean {
+  const indexByStepId = new Map<string, number>();
+  for (let index = 0; index < steps.length; index += 1) {
+    indexByStepId.set(steps[index]!.id, index);
+  }
+
+  for (let index = 0; index < steps.length; index += 1) {
+    const step = steps[index] as WorkflowDraftStep;
+    for (const referencedStepId of listReferencedStepIds(step)) {
+      const referencedIndex = indexByStepId.get(referencedStepId);
+      if (referencedIndex === undefined) {
+        continue;
+      }
+      if (referencedIndex <= index) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
 function moveStep(
   draft: WorkflowDraft,
   stepId: string,
@@ -202,6 +366,9 @@ function moveStep(
 
   const nextSteps = [...draft.steps];
   [nextSteps[index], nextSteps[targetIndex]] = [nextSteps[targetIndex] as WorkflowDraftStep, nextSteps[index] as WorkflowDraftStep];
+  if (!areControlFlowReferencesForwardOnly(nextSteps)) {
+    return Object.freeze({ draft, changed: false });
+  }
 
   return Object.freeze({
     draft: Object.freeze({
@@ -335,6 +502,9 @@ export function listAgentAssistantStepSelections(
 export function addWorkflowStep(
   draft: WorkflowDraft,
   definition: WorkflowStepTypeDefinition = defaultStepTypeDefinition,
+  options?: {
+    readonly afterStepId?: string;
+  },
 ): { readonly draft: WorkflowDraft; readonly stepId: string } {
   const stepId = buildNextStepId(draft);
   const nextOrder = draft.steps.length + 1;
@@ -348,15 +518,19 @@ export function addWorkflowStep(
   });
 
   const nextStep = applyStepType(baseStep, definition);
+  const afterStepId = normalizeOptional(options?.afterStepId);
+  const afterIndex = afterStepId
+    ? draft.steps.findIndex((step) => step.id === afterStepId)
+    : -1;
+  const insertionIndex = afterIndex >= 0 ? afterIndex + 1 : draft.steps.length;
+  const reorderedSteps = [...draft.steps];
+  reorderedSteps.splice(insertionIndex, 0, nextStep);
 
   return Object.freeze({
     stepId,
     draft: Object.freeze({
       ...draft,
-      steps: Object.freeze([
-        ...draft.steps,
-        nextStep,
-      ]),
+      steps: normalizeStepOrdering(reorderedSteps),
     }),
   });
 }
@@ -365,10 +539,12 @@ export function removeWorkflowStep(
   draft: WorkflowDraft,
   stepId: string,
 ): { readonly draft: WorkflowDraft; readonly changed: boolean } {
-  const nextSteps = draft.steps.filter((step) => step.id !== stepId);
-  if (nextSteps.length === draft.steps.length) {
+  if (!draft.steps.some((step) => step.id === stepId)) {
     return Object.freeze({ draft, changed: false });
   }
+  const nextSteps = draft.steps
+    .filter((step) => step.id !== stepId)
+    .map((step) => rewriteStepReferencesForRemoval(step, stepId));
   return Object.freeze({
     draft: Object.freeze({
       ...draft,
@@ -390,6 +566,15 @@ export function moveWorkflowStepDown(
   stepId: string,
 ): { readonly draft: WorkflowDraft; readonly changed: boolean } {
   return moveStep(draft, stepId, 1);
+}
+
+export function canMoveWorkflowStep(
+  draft: WorkflowDraft,
+  stepId: string,
+  direction: WorkflowStepMoveDirection,
+): boolean {
+  const offset = direction === WorkflowStepMoveDirections.up ? -1 : 1;
+  return moveStep(draft, stepId, offset).changed;
 }
 
 export function setWorkflowStepType(

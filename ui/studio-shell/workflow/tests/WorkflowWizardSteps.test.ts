@@ -12,6 +12,7 @@ import {
   addWorkflowStep,
   buildWorkflowStepAgentAssistantSelectionPayload,
   buildWorkflowStepTypeDefinitionKey,
+  canMoveWorkflowStep,
   clearWorkflowStepAgentAssetSelection,
   loadAgentAssistantAssetCandidates,
   moveWorkflowStepDown,
@@ -25,6 +26,7 @@ import {
   setWorkflowStepManualApprovalConfig,
   setWorkflowStepType,
   workflowStepTypeDefinitions,
+  WorkflowStepMoveDirections,
 } from "../WorkflowWizardSteps";
 
 function findDefinition(type: string): string {
@@ -58,6 +60,15 @@ describe("WorkflowWizardSteps", () => {
     expect(removed.changed).toBe(true);
     expect(removed.draft.steps.map((step) => step.id)).toEqual([third.stepId, second.stepId]);
     expect(removed.draft.steps.map((step) => step.order)).toEqual([1, 2]);
+  });
+
+  it("supports insertion after an existing step when adding new steps", () => {
+    const first = addWorkflowStep(createEmptyWorkflowDraft());
+    const second = addWorkflowStep(first.draft);
+    const inserted = addWorkflowStep(second.draft, workflowStepTypeDefinitions[0]!, { afterStepId: first.stepId });
+
+    expect(inserted.draft.steps.map((step) => step.id)).toEqual([first.stepId, inserted.stepId, second.stepId]);
+    expect(inserted.draft.steps.map((step) => step.order)).toEqual([1, 2, 3]);
   });
 
   it("supports selecting built-in step types and updating type-specific configs", () => {
@@ -181,6 +192,53 @@ describe("WorkflowWizardSteps", () => {
     expect(manualConfig.timeoutSeconds).toBe(120);
     expect(manualConfig.onTimeout).toBe("continue");
     expect(manualConfig.allowSelfApproval).toBeTrue();
+  });
+
+  it("blocks reordering operations that would place control-flow branch/body targets before their parent step", () => {
+    const base = createEmptyWorkflowDraft();
+    const branch = addWorkflowStep(base, workflowStepTypeDefinitions.find((entry) => entry.type === WorkflowDraftBuiltInStepTypes.ifThen)!);
+    const branchStep = addWorkflowStep(branch.draft);
+    const trailing = addWorkflowStep(branchStep.draft);
+    const branchId = branch.stepId;
+    const branchStepId = branchStep.stepId;
+
+    const configured = setWorkflowStepIfThenConfig(trailing.draft, branchId, {
+      thenStepIds: Object.freeze([branchStepId]),
+    }).draft;
+
+    expect(canMoveWorkflowStep(configured, branchStepId, WorkflowStepMoveDirections.up)).toBeFalse();
+    expect(moveWorkflowStepUp(configured, branchStepId).changed).toBeFalse();
+    expect(canMoveWorkflowStep(configured, branchId, WorkflowStepMoveDirections.down)).toBeFalse();
+    expect(moveWorkflowStepDown(configured, branchId).changed).toBeFalse();
+  });
+
+  it("removes deleted step ids from built-in branch/outcome references", () => {
+    const branch = addWorkflowStep(createEmptyWorkflowDraft(), workflowStepTypeDefinitions.find((entry) => entry.type === WorkflowDraftBuiltInStepTypes.ifThen)!);
+    const branchChild = addWorkflowStep(branch.draft);
+    const loop = addWorkflowStep(branchChild.draft, workflowStepTypeDefinitions.find((entry) => entry.type === WorkflowDraftBuiltInStepTypes.loopIteration)!);
+    const loopChild = addWorkflowStep(loop.draft);
+    const manual = addWorkflowStep(loopChild.draft, workflowStepTypeDefinitions.find((entry) => entry.type === WorkflowDraftBuiltInStepTypes.manualApproval)!);
+    const manualChild = addWorkflowStep(manual.draft);
+
+    const withBranch = setWorkflowStepIfThenConfig(manualChild.draft, branch.stepId, {
+      thenStepIds: Object.freeze([branchChild.stepId]),
+    }).draft;
+    const withLoop = setWorkflowStepLoopConfig(withBranch, loop.stepId, {
+      bodyStepIds: Object.freeze([loopChild.stepId]),
+    }).draft;
+    const withManual = setWorkflowStepManualApprovalConfig(withLoop, manual.stepId, {
+      approveStepIds: Object.freeze([manualChild.stepId]),
+      rejectStepIds: Object.freeze([loopChild.stepId]),
+    }).draft;
+
+    const removed = removeWorkflowStep(withManual, loopChild.stepId);
+    expect(removed.changed).toBeTrue();
+    const loopConfig = removed.draft.steps.find((step) => step.id === loop.stepId)?.config as { bodyStepIds?: ReadonlyArray<string> };
+    const manualConfig = removed.draft.steps.find((step) => step.id === manual.stepId)?.config as {
+      outcomes?: { approve?: { stepIds?: ReadonlyArray<string> }; reject?: { stepIds?: ReadonlyArray<string> } };
+    };
+    expect(loopConfig.bodyStepIds).toBeUndefined();
+    expect(manualConfig.outcomes?.reject?.stepIds).toBeUndefined();
   });
 
   it("supports selecting, replacing, and clearing agent/assistant assets per step", () => {

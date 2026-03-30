@@ -533,6 +533,7 @@ export const WorkflowValidationIssueCodes = Object.freeze({
   stepDependencyCycle: "step-dependency-cycle",
   builtInStepReferenceMissing: "built-in-step-reference-missing",
   builtInStepReferenceSelf: "built-in-step-reference-self",
+  builtInStepReferenceOrderInvalid: "built-in-step-reference-order-invalid",
   loopCollectionInputMissing: "loop-collection-input-missing",
   outputMalformed: "output-malformed",
   outputSourceStepMissing: "output-source-step-missing",
@@ -2080,6 +2081,7 @@ export function validateWorkflowDraft(draft: WorkflowDraft | undefined): Workflo
   }
 
   const stepIds = new Set<string>(normalizedSteps.map((step) => step.id));
+  const stepOrderById = new Map<string, number>(normalizedSteps.map((step) => [step.id, step.order]));
   const sortedOrders = [...normalizedSteps].map((step) => step.order).sort((left, right) => left - right);
   if (sortedOrders.some((order, index) => order !== index + 1)) {
     issues.push({
@@ -2170,6 +2172,16 @@ export function validateWorkflowDraft(draft: WorkflowDraft | undefined): Workflo
             message: `Built-in if-then step '${step.id}' references unknown step '${referenced}'.`,
             path: `draft.steps.${step.id}.config`,
           });
+          continue;
+        }
+        if ((stepOrderById.get(referenced) ?? 0) <= step.order) {
+          issues.push({
+            code: WorkflowValidationIssueCodes.builtInStepReferenceOrderInvalid,
+            section: WorkflowValidationSections.crossSection,
+            severity: "error",
+            message: `Built-in if-then step '${step.id}' can only reference downstream steps. Referenced step '${referenced}' must appear after order ${step.order}.`,
+            path: `draft.steps.${step.id}.config`,
+          });
         }
       }
     }
@@ -2195,6 +2207,16 @@ export function validateWorkflowDraft(draft: WorkflowDraft | undefined): Workflo
             message: `Built-in loop step '${step.id}' references unknown body step '${referenced}'.`,
             path: `draft.steps.${step.id}.config`,
           });
+          continue;
+        }
+        if ((stepOrderById.get(referenced) ?? 0) <= step.order) {
+          issues.push({
+            code: WorkflowValidationIssueCodes.builtInStepReferenceOrderInvalid,
+            section: WorkflowValidationSections.crossSection,
+            severity: "error",
+            message: `Built-in loop step '${step.id}' can only reference downstream body steps. Referenced step '${referenced}' must appear after order ${step.order}.`,
+            path: `draft.steps.${step.id}.config`,
+          });
         }
       }
 
@@ -2211,6 +2233,46 @@ export function validateWorkflowDraft(draft: WorkflowDraft | undefined): Workflo
           message: `Built-in loop step '${step.id}' collection input '${collectionInputKey}' does not match any workflow input id.`,
           path: `draft.steps.${step.id}.config.collection.inputKey`,
         });
+      }
+    }
+
+    if (step.type === WorkflowDraftBuiltInStepTypes.manualApproval) {
+      const config = step.config as WorkflowDraftManualApprovalStepConfig;
+      const referencedStepIds = [
+        ...(config.outcomes.continue?.stepIds ?? []),
+        ...(config.outcomes.approve?.stepIds ?? []),
+        ...(config.outcomes.reject?.stepIds ?? []),
+      ];
+      for (const referenced of referencedStepIds) {
+        if (referenced === step.id) {
+          issues.push({
+            code: WorkflowValidationIssueCodes.builtInStepReferenceSelf,
+            section: WorkflowValidationSections.crossSection,
+            severity: "error",
+            message: `Built-in manual step '${step.id}' cannot reference itself in outcomes.`,
+            path: `draft.steps.${step.id}.config`,
+          });
+          continue;
+        }
+        if (!stepIds.has(referenced)) {
+          issues.push({
+            code: WorkflowValidationIssueCodes.builtInStepReferenceMissing,
+            section: WorkflowValidationSections.crossSection,
+            severity: "error",
+            message: `Built-in manual step '${step.id}' references unknown outcome step '${referenced}'.`,
+            path: `draft.steps.${step.id}.config`,
+          });
+          continue;
+        }
+        if ((stepOrderById.get(referenced) ?? 0) <= step.order) {
+          issues.push({
+            code: WorkflowValidationIssueCodes.builtInStepReferenceOrderInvalid,
+            section: WorkflowValidationSections.crossSection,
+            severity: "error",
+            message: `Built-in manual step '${step.id}' can only reference downstream outcome steps. Referenced step '${referenced}' must appear after order ${step.order}.`,
+            path: `draft.steps.${step.id}.config`,
+          });
+        }
       }
     }
   }

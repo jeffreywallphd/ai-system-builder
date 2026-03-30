@@ -1410,6 +1410,65 @@ describe("WorkflowStudioDomain", () => {
     expect(result.issues.every((issue) => typeof issue.code === "string" && typeof issue.section === "string")).toBeTrue();
   });
 
+  it("rejects built-in branch/body/outcome references that point to non-downstream steps", () => {
+    const result = validateWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [
+        {
+          id: "step-if",
+          type: WorkflowDraftBuiltInStepTypes.ifThen,
+          kind: WorkflowDraftStepKinds.controlFlow,
+          order: 1,
+          config: {
+            conditionExpression: "inputs.score > 0",
+            thenStepIds: ["step-target"],
+          },
+        },
+        {
+          id: "step-loop",
+          type: WorkflowDraftBuiltInStepTypes.loopIteration,
+          kind: WorkflowDraftStepKinds.controlFlow,
+          order: 2,
+          config: {
+            repeatCount: 2,
+            bodyStepIds: ["step-if"],
+          },
+        },
+        {
+          id: "step-target",
+          type: "action",
+          kind: WorkflowDraftStepKinds.action,
+          order: 3,
+        },
+        {
+          id: "step-manual",
+          type: WorkflowDraftBuiltInStepTypes.manualApproval,
+          kind: WorkflowDraftStepKinds.controlFlow,
+          order: 4,
+          config: {
+            prompt: "Approve",
+            interactionMode: "approval",
+            outcomes: {
+              approve: {
+                stepIds: ["step-target"],
+              },
+            },
+          },
+        },
+      ],
+      outputs: [],
+    });
+
+    expect(result.valid).toBeFalse();
+    const orderIssues = result.issues.filter(
+      (issue) => issue.code === WorkflowValidationIssueCodes.builtInStepReferenceOrderInvalid,
+    );
+    expect(orderIssues.length).toBe(2);
+    expect(orderIssues.some((issue) => issue.message.includes("step-loop"))).toBeTrue();
+    expect(orderIssues.some((issue) => issue.message.includes("step-manual"))).toBeTrue();
+  });
+
   it("validates lifecycle states and executable readiness on canonical workflow entities", () => {
     const readyEntity = createWorkflowEntity({
       id: "workflow-ready",
