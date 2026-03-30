@@ -434,6 +434,13 @@ body.ui-canvas-locked .ui-page--editor-canvas-locked .ui-canvas-shell {
   background: var(--color-bg-panel);
 }
 
+.ui-workflow-canvas-node--branching {
+  border-color: rgba(83, 214, 158, 0.52);
+  box-shadow:
+    var(--shadow-panel),
+    0 0 0 1px rgba(83, 214, 158, 0.22);
+}
+
 .ui-workflow-canvas-node--selected {
   border-color: rgba(79, 156, 249, 0.5);
   box-shadow:
@@ -569,6 +576,28 @@ body.ui-canvas-locked .ui-page--editor-canvas-locked .ui-canvas-shell {
   border: 2px solid var(--color-text-inverse);
   background: var(--color-accent);
   box-shadow: 0 0 0 2px rgba(79, 156, 249, 0.2);
+}
+
+.ui-workflow-canvas-node__handle--branch-then {
+  background: #2ebd85;
+  box-shadow: 0 0 0 2px rgba(46, 189, 133, 0.24);
+}
+
+.ui-workflow-canvas-node__handle--branch-else {
+  background: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.24);
+}
+
+.ui-workflow-canvas-edge--branch path {
+  stroke-width: 2.5;
+}
+
+.ui-workflow-canvas-edge--branch-then path {
+  stroke: rgba(46, 189, 133, 0.92);
+}
+
+.ui-workflow-canvas-edge--branch-else path {
+  stroke: rgba(245, 158, 11, 0.92);
 }
 
 @media (max-width: 767px) {

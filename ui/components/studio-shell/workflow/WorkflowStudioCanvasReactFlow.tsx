@@ -15,9 +15,11 @@ import {
   type OnConnect,
 } from "@xyflow/react";
 import {
+  WorkflowCanvasBranchKeys,
   WorkflowCanvasGraphEdgeKinds,
   WorkflowCanvasGraphNodeKinds,
   WorkflowCanvasSectionIds,
+  buildWorkflowCanvasBranchSourceHandleId,
   type WorkflowCanvasGraphEdgeKind,
   type WorkflowCanvasGraphEdgeViewModel,
   type WorkflowCanvasGraphNodeViewModel,
@@ -48,6 +50,7 @@ interface WorkflowStudioCanvasGraphNodeData {
 type WorkflowStudioCanvasReactFlowEdge = Edge<{
   readonly editable: boolean;
   readonly kind: WorkflowCanvasGraphEdgeKind;
+  readonly branchKey?: typeof WorkflowCanvasBranchKeys[keyof typeof WorkflowCanvasBranchKeys];
 }>;
 
 function WorkflowSectionGraphNode({
@@ -78,7 +81,16 @@ function WorkflowItemGraphNode({
   const selected = data.selectedNodeId === data.graphNode.id;
   return (
     <article
-      className={`ui-workflow-canvas-node ui-workflow-canvas-node--item ui-card ui-card--padded ui-stack ui-stack--2xs ${selected ? "ui-workflow-canvas-node--selected" : ""}`}
+      className={[
+        "ui-workflow-canvas-node",
+        "ui-workflow-canvas-node--item",
+        "ui-card",
+        "ui-card--padded",
+        "ui-stack",
+        "ui-stack--2xs",
+        selected ? "ui-workflow-canvas-node--selected" : "",
+        data.graphNode.stepType === "if-then" ? "ui-workflow-canvas-node--branching" : "",
+      ].filter(Boolean).join(" ")}
       data-testid={`workflow-canvas-node-${data.graphNode.sectionId}-${data.graphNode.entityId ?? data.graphNode.id}`}
     >
       <div className="ui-row ui-row--between ui-row--wrap">
@@ -135,6 +147,24 @@ function WorkflowItemGraphNode({
             className="ui-workflow-canvas-node__handle"
             id={`source:${data.graphNode.id}`}
           />
+          {data.graphNode.stepType === "if-then" ? (
+            <>
+              <Handle
+                type="source"
+                position={Position.Right}
+                className="ui-workflow-canvas-node__handle ui-workflow-canvas-node__handle--branch-then"
+                id={buildWorkflowCanvasBranchSourceHandleId(data.graphNode.id, WorkflowCanvasBranchKeys.then)}
+                style={{ top: "38%" }}
+              />
+              <Handle
+                type="source"
+                position={Position.Right}
+                className="ui-workflow-canvas-node__handle ui-workflow-canvas-node__handle--branch-else"
+                id={buildWorkflowCanvasBranchSourceHandleId(data.graphNode.id, WorkflowCanvasBranchKeys.else)}
+                style={{ top: "62%" }}
+              />
+            </>
+          ) : null}
         </>
       ) : null}
       {data.graphNode.sectionId === WorkflowCanvasSectionIds.outputs ? (
@@ -193,6 +223,9 @@ function mapEdgeKindLabel(kind: WorkflowCanvasGraphEdgeKind): string {
   if (kind === WorkflowCanvasGraphEdgeKinds.outputSource) {
     return "output-source";
   }
+  if (kind === WorkflowCanvasGraphEdgeKinds.stepBranch) {
+    return "branch";
+  }
   return "sequence";
 }
 
@@ -204,13 +237,17 @@ function mapGraphEdgeToReactFlowEdge(
     id: edge.id,
     source: edge.sourceNodeId,
     target: edge.targetNodeId,
+    sourceHandle: edge.sourceHandleId,
     type: "smoothstep",
     markerEnd: {
       type: MarkerType.ArrowClosed,
       width: 18,
       height: 18,
     },
-    label: mapEdgeKindLabel(edge.kind),
+    label: edge.label ?? mapEdgeKindLabel(edge.kind),
+    className: edge.kind === WorkflowCanvasGraphEdgeKinds.stepBranch
+      ? `ui-workflow-canvas-edge ui-workflow-canvas-edge--branch ui-workflow-canvas-edge--branch-${edge.branchKey ?? "then"}`
+      : "ui-workflow-canvas-edge",
     deletable: isEditableEdge,
     reconnectable: isEditableEdge,
     selectable: isEditableEdge,
@@ -218,11 +255,16 @@ function mapGraphEdgeToReactFlowEdge(
     data: Object.freeze({
       editable: isEditableEdge,
       kind: edge.kind,
+      branchKey: edge.branchKey,
     }),
     style: edge.kind === WorkflowCanvasGraphEdgeKinds.stepDependency
       ? Object.freeze({
         strokeDasharray: "7 5",
       })
+      : edge.kind === WorkflowCanvasGraphEdgeKinds.stepBranch
+        ? Object.freeze({
+          strokeWidth: 2.5,
+        })
       : undefined,
   };
 }

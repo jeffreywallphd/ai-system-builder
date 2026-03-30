@@ -1,12 +1,16 @@
 import {
+  WorkflowDraftBuiltInStepTypes,
   WorkflowDraftInputSourceTypes,
   WorkflowDraftOutputDestinationTypes,
   WorkflowDraftStepKinds,
   WorkflowDraftTriggerTypes,
   WorkflowDraftInputValueTypes,
   type WorkflowDraft,
+  type WorkflowDraftIfThenStepConfig,
   type WorkflowDraftInput,
   type WorkflowDraftOutputDestinationType,
+  type WorkflowDraftStepKind,
+  type WorkflowDraftStepType,
   type WorkflowDraftTriggerType,
   type WorkflowValidationIssue,
 } from "../../../domain/workflow-studio/WorkflowStudioDomain";
@@ -25,6 +29,8 @@ import {
   reorderWorkflowSteps,
   removeWorkflowStep,
   resolveWorkflowStepTypeDefinition,
+  setWorkflowStepAgentAssetSelection,
+  setWorkflowStepIfThenConfig,
   setWorkflowStepTitle,
 } from "./WorkflowWizardSteps";
 import {
@@ -47,6 +53,14 @@ export const WorkflowCanvasSectionIds = Object.freeze({
 export type WorkflowCanvasSectionId =
   typeof WorkflowCanvasSectionIds[keyof typeof WorkflowCanvasSectionIds];
 
+export const WorkflowCanvasBranchKeys = Object.freeze({
+  then: "then",
+  else: "else",
+});
+
+export type WorkflowCanvasBranchKey =
+  typeof WorkflowCanvasBranchKeys[keyof typeof WorkflowCanvasBranchKeys];
+
 export interface WorkflowCanvasNodeViewModel {
   readonly id: string;
   readonly sectionId: WorkflowCanvasSectionId;
@@ -54,6 +68,8 @@ export interface WorkflowCanvasNodeViewModel {
   readonly subtitle: string;
   readonly detailLines: ReadonlyArray<string>;
   readonly issueMessages: ReadonlyArray<string>;
+  readonly stepKind?: WorkflowDraftStepKind;
+  readonly stepType?: WorkflowDraftStepType;
 }
 
 export interface WorkflowCanvasSectionViewModel {
@@ -83,6 +99,7 @@ export const WorkflowCanvasGraphEdgeKinds = Object.freeze({
   sectionEntry: "section-entry",
   itemSequence: "item-sequence",
   stepDependency: "step-dependency",
+  stepBranch: "step-branch",
   outputSource: "output-source",
 });
 
@@ -99,6 +116,8 @@ export interface WorkflowCanvasGraphNodeViewModel {
   readonly kind: WorkflowCanvasGraphNodeKind;
   readonly sectionId: WorkflowCanvasSectionId;
   readonly entityId?: string;
+  readonly stepKind?: WorkflowDraftStepKind;
+  readonly stepType?: WorkflowDraftStepType;
   readonly title: string;
   readonly subtitle: string;
   readonly detailLines: ReadonlyArray<string>;
@@ -112,8 +131,11 @@ export interface WorkflowCanvasGraphEdgeViewModel {
   readonly kind: WorkflowCanvasGraphEdgeKind;
   readonly sourceNodeId: string;
   readonly targetNodeId: string;
+  readonly sourceHandleId?: string;
   readonly sourceEntityId?: string;
   readonly targetEntityId?: string;
+  readonly branchKey?: WorkflowCanvasBranchKey;
+  readonly label?: string;
   readonly editable: boolean;
 }
 
@@ -157,6 +179,55 @@ function buildStepDependencyEdgeId(dependsOnStepId: string, stepId: string): str
 
 function buildOutputSourceEdgeId(sourceStepId: string, outputId: string): string {
   return `edge:output-source:${sourceStepId}->${outputId}`;
+}
+
+function buildStepBranchEdgeId(
+  stepId: string,
+  branchKey: WorkflowCanvasBranchKey,
+  targetStepId: string,
+): string {
+  return `edge:step-branch:${stepId}:${branchKey}->${targetStepId}`;
+}
+
+export function buildWorkflowCanvasBranchSourceHandleId(
+  nodeId: string,
+  branchKey: WorkflowCanvasBranchKey,
+): string {
+  return `branch:${branchKey}:${nodeId}`;
+}
+
+export function parseWorkflowCanvasBranchKeyFromHandleId(handleId?: string): WorkflowCanvasBranchKey | undefined {
+  const normalizedHandleId = handleId?.trim();
+  if (!normalizedHandleId) {
+    return undefined;
+  }
+  if (normalizedHandleId.startsWith("branch:then:")) {
+    return WorkflowCanvasBranchKeys.then;
+  }
+  if (normalizedHandleId.startsWith("branch:else:")) {
+    return WorkflowCanvasBranchKeys.else;
+  }
+  return undefined;
+}
+
+function listIfThenBranchStepIds(
+  config: WorkflowDraftIfThenStepConfig,
+  branchKey: WorkflowCanvasBranchKey,
+): ReadonlyArray<string> {
+  if (branchKey === WorkflowCanvasBranchKeys.then) {
+    return config.branches?.then?.stepIds ?? config.thenStepIds ?? [];
+  }
+  return config.branches?.else?.stepIds ?? config.elseStepIds ?? [];
+}
+
+function getIfThenBranchLabel(
+  config: WorkflowDraftIfThenStepConfig,
+  branchKey: WorkflowCanvasBranchKey,
+): string {
+  if (branchKey === WorkflowCanvasBranchKeys.then) {
+    return config.branches?.then?.label ?? config.thenLabel ?? "Then path";
+  }
+  return config.branches?.else?.label ?? config.elseLabel ?? "Else path";
 }
 
 function estimateTextLineCount(
@@ -298,6 +369,8 @@ function deriveWorkflowCanvasGraphViewModel(
         kind: WorkflowCanvasGraphNodeKinds.item,
         sectionId: section.id,
         entityId: node.id,
+        stepKind: node.stepKind,
+        stepType: node.stepType,
         title: node.title,
         subtitle: node.subtitle,
         detailLines: node.detailLines,
@@ -321,8 +394,11 @@ function deriveWorkflowCanvasGraphViewModel(
           kind: WorkflowCanvasGraphEdgeKinds.sectionEntry,
           sourceNodeId: sectionNodeId,
           targetNodeId: itemNodeId,
+          sourceHandleId: undefined,
           sourceEntityId: undefined,
           targetEntityId: node.id,
+          branchKey: undefined,
+          label: undefined,
           editable: false,
         }));
         sectionEntryNodeIds.set(section.id, itemNodeId);
@@ -334,8 +410,11 @@ function deriveWorkflowCanvasGraphViewModel(
           kind: WorkflowCanvasGraphEdgeKinds.itemSequence,
           sourceNodeId: previousItemNodeId,
           targetNodeId: itemNodeId,
+          sourceHandleId: undefined,
           sourceEntityId: section.nodes[nodeIndex - 1]?.id,
           targetEntityId: node.id,
+          branchKey: undefined,
+          label: undefined,
           editable: false,
         }));
       }
@@ -362,8 +441,11 @@ function deriveWorkflowCanvasGraphViewModel(
       kind: WorkflowCanvasGraphEdgeKinds.sectionFlow,
       sourceNodeId,
       targetNodeId,
+      sourceHandleId: undefined,
       sourceEntityId: undefined,
       targetEntityId: undefined,
+      branchKey: undefined,
+      label: undefined,
       editable: false,
     }));
   }
@@ -395,10 +477,38 @@ function deriveWorkflowCanvasGraphViewModel(
         kind: WorkflowCanvasGraphEdgeKinds.stepDependency,
         sourceNodeId,
         targetNodeId,
+        sourceHandleId: undefined,
         sourceEntityId: dependsOnStepId,
         targetEntityId: step.id,
+        branchKey: undefined,
+        label: "Depends on",
         editable: true,
       }));
+    }
+
+    if (step.type === WorkflowDraftBuiltInStepTypes.ifThen) {
+      const config = (step.config ?? {}) as WorkflowDraftIfThenStepConfig;
+      for (const branchKey of [WorkflowCanvasBranchKeys.then, WorkflowCanvasBranchKeys.else] as const) {
+        const branchStepIds = listIfThenBranchStepIds(config, branchKey);
+        for (const branchStepId of branchStepIds) {
+          const branchTargetNodeId = stepNodeIdByStepId.get(branchStepId);
+          if (!branchTargetNodeId || branchStepId === step.id) {
+            continue;
+          }
+          graphEdges.push(Object.freeze({
+            id: buildStepBranchEdgeId(step.id, branchKey, branchStepId),
+            kind: WorkflowCanvasGraphEdgeKinds.stepBranch,
+            sourceNodeId: targetNodeId,
+            targetNodeId: branchTargetNodeId,
+            sourceHandleId: buildWorkflowCanvasBranchSourceHandleId(targetNodeId, branchKey),
+            sourceEntityId: step.id,
+            targetEntityId: branchStepId,
+            branchKey,
+            label: getIfThenBranchLabel(config, branchKey),
+            editable: true,
+          }));
+        }
+      }
     }
   }
 
@@ -417,8 +527,11 @@ function deriveWorkflowCanvasGraphViewModel(
       kind: WorkflowCanvasGraphEdgeKinds.outputSource,
       sourceNodeId,
       targetNodeId,
+      sourceHandleId: undefined,
       sourceEntityId: sourceStepId,
       targetEntityId: output.id,
+      branchKey: undefined,
+      label: "Output source",
       editable: true,
     }));
   }
@@ -438,12 +551,32 @@ export type WorkflowCanvasAction =
   | { readonly kind: "add-input-dataset-asset" }
   | { readonly kind: "add-input-static-value" }
   | { readonly kind: "set-input-title"; readonly inputId: string; readonly title: string }
+  | {
+    readonly kind: "set-input-dataset-asset";
+    readonly inputId: string;
+    readonly assetId: string;
+    readonly versionId?: string;
+    readonly displayName?: string;
+  }
   | { readonly kind: "remove-input"; readonly inputId: string }
   | { readonly kind: "add-step"; readonly definitionKey?: string }
   | { readonly kind: "reorder-steps"; readonly orderedStepIds: ReadonlyArray<string> }
   | { readonly kind: "set-step-title"; readonly stepId: string; readonly title: string }
+  | {
+    readonly kind: "set-step-agent-asset";
+    readonly stepId: string;
+    readonly assetId: string;
+    readonly versionId?: string;
+    readonly displayName?: string;
+  }
   | { readonly kind: "add-step-dependency"; readonly stepId: string; readonly dependsOnStepId: string }
   | { readonly kind: "remove-step-dependency"; readonly stepId: string; readonly dependsOnStepId: string }
+  | {
+    readonly kind: "set-step-if-then-branch-target";
+    readonly stepId: string;
+    readonly branchKey: WorkflowCanvasBranchKey;
+    readonly targetStepId?: string;
+  }
   | { readonly kind: "remove-step"; readonly stepId: string }
   | { readonly kind: "add-output"; readonly destinationType?: WorkflowDraftOutputDestinationType }
   | { readonly kind: "set-output-title"; readonly outputId: string; readonly title: string }
@@ -458,6 +591,8 @@ export interface WorkflowCanvasActionResult {
 export interface WorkflowCanvasConnectionRequest {
   readonly sourceNodeId: string;
   readonly targetNodeId: string;
+  readonly sourceHandleId?: string;
+  readonly targetHandleId?: string;
 }
 
 export interface WorkflowCanvasConnectionResolution {
@@ -473,6 +608,14 @@ export interface WorkflowCanvasEdgeUpdateRequest {
 function normalizeOptional(value?: string): string | undefined {
   const normalized = value?.trim();
   return normalized && normalized.length > 0 ? normalized : undefined;
+}
+
+function isCanonicalAssetIdentity(value?: string): boolean {
+  if (!value) {
+    return true;
+  }
+  const normalized = value.trim();
+  return normalized.length > 0 && normalized.startsWith("asset:");
 }
 
 function getIssueMessagesForPathPrefix(
@@ -608,6 +751,15 @@ function deriveStepNodes(
       if (step.kind === WorkflowDraftStepKinds.controlFlow) {
         detailLines.push("Built-in control-flow step");
       }
+      if (step.type === WorkflowDraftBuiltInStepTypes.ifThen) {
+        const config = (step.config ?? {}) as WorkflowDraftIfThenStepConfig;
+        const conditionExpression = config.condition?.kind === "expression"
+          ? config.condition.expression
+          : config.conditionExpression;
+        detailLines.push(`Condition: ${conditionExpression || "not set"}`);
+        detailLines.push(`Then targets: ${(config.branches?.then?.stepIds ?? config.thenStepIds ?? []).length}`);
+        detailLines.push(`Else targets: ${(config.branches?.else?.stepIds ?? config.elseStepIds ?? []).length}`);
+      }
       return Object.freeze({
         id: step.id,
         sectionId: WorkflowCanvasSectionIds.steps,
@@ -615,6 +767,8 @@ function deriveStepNodes(
         subtitle: definition.summary,
         detailLines: Object.freeze(detailLines),
         issueMessages,
+        stepKind: step.kind,
+        stepType: step.type,
       });
     }),
   );
@@ -747,6 +901,21 @@ export function resolveWorkflowCanvasConnectionAction(
     && targetNode.sectionId === WorkflowCanvasSectionIds.steps
     && sourceNode.entityId !== targetNode.entityId
   ) {
+    const branchKey = parseWorkflowCanvasBranchKeyFromHandleId(request.sourceHandleId);
+    if (branchKey) {
+      if (sourceNode.stepType !== WorkflowDraftBuiltInStepTypes.ifThen) {
+        return Object.freeze({ valid: false });
+      }
+      return Object.freeze({
+        valid: true,
+        action: Object.freeze({
+          kind: "set-step-if-then-branch-target",
+          stepId: sourceNode.entityId,
+          branchKey,
+          targetStepId: targetNode.entityId,
+        }),
+      });
+    }
     return Object.freeze({
       valid: true,
       action: Object.freeze({
@@ -786,6 +955,18 @@ export function resolveWorkflowCanvasEdgeRemovalAction(
       kind: "remove-step-dependency",
       stepId: edge.targetEntityId,
       dependsOnStepId: edge.sourceEntityId,
+    });
+  }
+  if (
+    edge.kind === WorkflowCanvasGraphEdgeKinds.stepBranch
+    && edge.sourceEntityId
+    && edge.branchKey
+  ) {
+    return Object.freeze({
+      kind: "set-step-if-then-branch-target",
+      stepId: edge.sourceEntityId,
+      branchKey: edge.branchKey,
+      targetStepId: undefined,
     });
   }
   if (edge.kind === WorkflowCanvasGraphEdgeKinds.outputSource && edge.targetEntityId) {
@@ -832,6 +1013,22 @@ export function applyWorkflowCanvasEdgeReconnect(
   if (
     request.edge.kind === WorkflowCanvasGraphEdgeKinds.outputSource
     && addResolution.action.kind !== "set-output-source-step"
+  ) {
+    return Object.freeze({ draft, changed: false });
+  }
+  if (
+    request.edge.kind === WorkflowCanvasGraphEdgeKinds.stepBranch
+    && addResolution.action.kind !== "set-step-if-then-branch-target"
+  ) {
+    return Object.freeze({ draft, changed: false });
+  }
+  if (
+    request.edge.kind === WorkflowCanvasGraphEdgeKinds.stepBranch
+    && addResolution.action.kind === "set-step-if-then-branch-target"
+    && (
+      request.edge.sourceEntityId !== addResolution.action.stepId
+      || request.edge.branchKey !== addResolution.action.branchKey
+    )
   ) {
     return Object.freeze({ draft, changed: false });
   }
@@ -898,6 +1095,36 @@ export function applyWorkflowCanvasAction(
       return Object.freeze({
         ...input,
         title: normalizedTitle,
+      });
+    });
+  }
+
+  if (action.kind === "set-input-dataset-asset") {
+    const normalizedAssetId = action.assetId.trim();
+    const normalizedVersionId = normalizeOptional(action.versionId);
+    const normalizedDisplayName = normalizeOptional(action.displayName);
+    if (!normalizedAssetId || !isCanonicalAssetIdentity(normalizedAssetId) || !isCanonicalAssetIdentity(normalizedVersionId)) {
+      return Object.freeze({ draft, changed: false });
+    }
+    return updateInput(draft, action.inputId, (input) => {
+      if (input.sourceType !== WorkflowDraftInputSourceTypes.datasetAsset) {
+        return input;
+      }
+      if (
+        input.asset.assetId === normalizedAssetId
+        && input.asset.versionId === normalizedVersionId
+        && (!normalizedDisplayName || normalizedDisplayName === input.title)
+      ) {
+        return input;
+      }
+      return Object.freeze({
+        ...input,
+        title: normalizedDisplayName ?? input.title,
+        asset: Object.freeze({
+          ...input.asset,
+          assetId: normalizedAssetId,
+          versionId: normalizedVersionId,
+        }),
       });
     });
   }
@@ -972,6 +1199,15 @@ export function applyWorkflowCanvasAction(
     return Object.freeze({ draft: result.draft, changed: result.changed });
   }
 
+  if (action.kind === "set-step-agent-asset") {
+    const result = setWorkflowStepAgentAssetSelection(draft, action.stepId, {
+      assetId: action.assetId,
+      versionId: action.versionId,
+      name: action.displayName,
+    });
+    return Object.freeze({ draft: result.draft, changed: result.changed });
+  }
+
   if (action.kind === "add-step-dependency") {
     const result = addWorkflowStepDependency(draft, action.stepId, action.dependsOnStepId);
     return Object.freeze({ draft: result.draft, changed: result.changed });
@@ -979,6 +1215,19 @@ export function applyWorkflowCanvasAction(
 
   if (action.kind === "remove-step-dependency") {
     const result = removeWorkflowStepDependency(draft, action.stepId, action.dependsOnStepId);
+    return Object.freeze({ draft: result.draft, changed: result.changed });
+  }
+
+  if (action.kind === "set-step-if-then-branch-target") {
+    const normalizedTargetStepId = normalizeOptional(action.targetStepId);
+    const stepIds = normalizedTargetStepId ? Object.freeze([normalizedTargetStepId]) : undefined;
+    const result = setWorkflowStepIfThenConfig(
+      draft,
+      action.stepId,
+      action.branchKey === WorkflowCanvasBranchKeys.then
+        ? { thenStepIds: stepIds }
+        : { elseStepIds: stepIds },
+    );
     return Object.freeze({ draft: result.draft, changed: result.changed });
   }
 

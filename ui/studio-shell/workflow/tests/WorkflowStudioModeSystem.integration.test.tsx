@@ -21,7 +21,6 @@ import {
   buildWorkflowStepTypeDefinitionKey,
   moveWorkflowStepUp,
   removeWorkflowStep,
-  setWorkflowStepDelayConfig,
   setWorkflowStepIfThenConfig,
   setWorkflowStepManualApprovalConfig,
   setWorkflowStepAgentAssetSelection,
@@ -551,7 +550,7 @@ describe("WorkflowStudioModeSystem integration seams", () => {
     expect(createLink.props.href).toContain("returnTo=%2Fstudio-shell%2Fworkflow%2Fwizard");
   });
 
-  it("preserves wizard step ordering and step-level asset selection across mode switching", () => {
+  it("preserves wizard/canvas synchronization for branching, dataset inputs, and agent step assets", () => {
     const store = new WorkflowStudioModeStateStore();
     store.setSelectedMode(WorkflowStudioModeIds.wizard);
 
@@ -569,8 +568,7 @@ describe("WorkflowStudioModeSystem integration seams", () => {
     }).draft);
     const firstStepId = store.getState().sharedDraft.steps[0]?.id as string;
     const ifThenDefinition = workflowStepTypeDefinitions.find((definition) => definition.type === WorkflowDraftBuiltInStepTypes.ifThen);
-    const delayDefinition = workflowStepTypeDefinitions.find((definition) => definition.type === WorkflowDraftBuiltInStepTypes.delayWait);
-    if (!ifThenDefinition || !delayDefinition) {
+    if (!ifThenDefinition) {
       throw new Error("Expected built-in workflow step type definitions to be present.");
     }
     store.updateSharedDraft((draft) => setWorkflowStepType(
@@ -581,29 +579,45 @@ describe("WorkflowStudioModeSystem integration seams", () => {
     store.updateSharedDraft((draft) => setWorkflowStepIfThenConfig(draft, firstStepId, {
       conditionExpression: "score > 0.5",
       thenLabel: "approve",
+      thenStepIds: [secondStepId],
+      elseStepIds: [thirdStepId],
     }).draft);
-    store.updateSharedDraft((draft) => setWorkflowStepType(
-      draft,
-      firstStepId,
-      buildWorkflowStepTypeDefinitionKey(delayDefinition),
-    ).draft);
-    store.updateSharedDraft((draft) => setWorkflowStepDelayConfig(draft, firstStepId, {
-      durationSeconds: 20,
+    store.updateSharedDraft((draft) => upsertDatasetInputSelection(draft, {
+      assetId: "asset:dataset-canvas-sync",
+      versionId: "asset:dataset-canvas-sync:v1",
+      name: "Dataset sync",
     }).draft);
 
     expect(store.getState().sharedDraft.steps.map((step) => step.order)).toEqual([1, 2, 3]);
     expect(store.getState().sharedDraft.steps.find((step) => step.id === secondStepId)?.assetRef?.asset.assetId).toBe("asset:agent-selected");
-    expect(store.getState().sharedDraft.steps.find((step) => step.id === firstStepId)?.type).toBe(WorkflowDraftBuiltInStepTypes.delayWait);
+    expect(store.getState().sharedDraft.steps.find((step) => step.id === firstStepId)?.type).toBe(WorkflowDraftBuiltInStepTypes.ifThen);
+    expect((store.getState().sharedDraft.steps.find((step) => step.id === firstStepId)?.config as {
+      branches?: { then?: { stepIds?: ReadonlyArray<string> }; else?: { stepIds?: ReadonlyArray<string> } };
+    })?.branches?.then?.stepIds).toEqual([secondStepId]);
+    expect((store.getState().sharedDraft.steps.find((step) => step.id === firstStepId)?.config as {
+      branches?: { then?: { stepIds?: ReadonlyArray<string> }; else?: { stepIds?: ReadonlyArray<string> } };
+    })?.branches?.else?.stepIds).toEqual([thirdStepId]);
+    expect(store.getState().sharedDraft.inputs.find((input) => input.sourceType === "dataset-asset")).toBeDefined();
 
     store.setSelectedMode(WorkflowStudioModeIds.canvas);
     store.setSelectedMode(WorkflowStudioModeIds.wizard);
     expect(store.getState().sharedDraft.steps.map((step) => step.order)).toEqual([1, 2, 3]);
     expect(store.getState().sharedDraft.steps.find((step) => step.id === secondStepId)?.assetRef?.asset.assetId).toBe("asset:agent-selected");
-    expect(store.getState().sharedDraft.steps.find((step) => step.id === firstStepId)?.type).toBe(WorkflowDraftBuiltInStepTypes.delayWait);
-    expect((store.getState().sharedDraft.steps.find((step) => step.id === firstStepId)?.config as { durationSeconds?: number })?.durationSeconds).toBe(20);
+    expect(store.getState().sharedDraft.steps.find((step) => step.id === firstStepId)?.type).toBe(WorkflowDraftBuiltInStepTypes.ifThen);
+    expect((store.getState().sharedDraft.steps.find((step) => step.id === firstStepId)?.config as {
+      branches?: { then?: { stepIds?: ReadonlyArray<string> }; else?: { stepIds?: ReadonlyArray<string> } };
+    })?.branches?.then?.stepIds).toEqual([secondStepId]);
+    expect((store.getState().sharedDraft.steps.find((step) => step.id === firstStepId)?.config as {
+      branches?: { then?: { stepIds?: ReadonlyArray<string> }; else?: { stepIds?: ReadonlyArray<string> } };
+    })?.branches?.else?.stepIds).toEqual([thirdStepId]);
+    expect(store.getState().sharedDraft.inputs.find((input) => input.sourceType === "dataset-asset")?.id).toBeDefined();
 
     store.updateSharedDraft((draft) => removeWorkflowStep(draft, secondStepId).draft);
     expect(store.getState().sharedDraft.steps.map((step) => step.order)).toEqual([1, 2]);
+    const updatedIfThenConfig = store.getState().sharedDraft.steps.find((step) => step.id === firstStepId)?.config as {
+      branches?: { then?: { stepIds?: ReadonlyArray<string> } };
+    };
+    expect(updatedIfThenConfig.branches?.then?.stepIds ?? []).toHaveLength(0);
   });
 
   it("applies canvas step reorder and connection edits back into shared draft for wizard mode", () => {

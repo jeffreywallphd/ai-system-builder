@@ -346,3 +346,7 @@ Epic 4 selector integration is now active in Workflow Wizard inputs and steps:
 - Inputs: selector-backed dataset multi-select with inline create-new return.
 - Steps: selector-backed agent/assistant add + replace flows with ordered-step compatibility.
 - Shared shell/session/capability/return seams are reused without parallel selector pathways.
+
+Workflow Canvas integration now also reuses the same shared selector seams for dataset-linked input nodes and agent-linked step nodes:
+- Canvas selectors run through the same shared session store + adapter + shell contracts.
+- Confirmed canvas selections persist canonical references in `WorkflowDraft.inputs[].asset` and `WorkflowDraft.steps[].assetRef` (no canvas-only reference model).
