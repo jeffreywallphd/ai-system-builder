@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import type { Connection } from "@xyflow/react";
 import {
   WorkflowDraftBuiltInStepTypes,
   WorkflowDraftInputSourceTypes,
@@ -7,7 +8,10 @@ import {
 } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
 import {
   applyWorkflowCanvasAction,
+  applyWorkflowCanvasConnection,
+  applyWorkflowCanvasEdgeReconnect,
   deriveWorkflowCanvasViewModel,
+  resolveWorkflowCanvasEdgeRemovalAction,
   WorkflowCanvasGraphNodeKinds,
   WorkflowCanvasSectionIds,
   type WorkflowCanvasAction,
@@ -150,6 +154,7 @@ export default function WorkflowStudioCanvasModeSurface({
 }: WorkflowStudioCanvasModeSurfaceProps): JSX.Element {
   const [selectedNodeId, setSelectedNodeId] = useState<string | undefined>(undefined);
   const [paletteSearchValue, setPaletteSearchValue] = useState("");
+  const [canvasInteractionMessage, setCanvasInteractionMessage] = useState<string | undefined>(undefined);
   const viewModel = useMemo(
     () => deriveWorkflowCanvasViewModel(sharedDraft, draftValidationIssues),
     [draftValidationIssues, sharedDraft],
@@ -158,6 +163,10 @@ export default function WorkflowStudioCanvasModeSurface({
   const graphNodesById = useMemo(
     () => new Map(viewModel.graph.nodes.map((node) => [node.id, node])),
     [viewModel.graph.nodes],
+  );
+  const graphEdgesById = useMemo(
+    () => new Map(viewModel.graph.edges.map((edge) => [edge.id, edge])),
+    [viewModel.graph.edges],
   );
   const selectedNode = selectedNodeId ? graphNodesById.get(selectedNodeId) : undefined;
   const selectedItemNode = selectedNode?.kind === WorkflowCanvasGraphNodeKinds.item ? selectedNode : undefined;
@@ -177,8 +186,14 @@ export default function WorkflowStudioCanvasModeSurface({
     onUpdateSharedDraft?.(updater);
   };
 
-  const applyAction = (action: WorkflowCanvasAction): void => {
-    updateSharedDraft((draft) => applyWorkflowCanvasAction(draft, action).draft);
+  const applyAction = (action: WorkflowCanvasAction): { readonly changed: boolean } => {
+    let changed = false;
+    updateSharedDraft((draft) => {
+      const result = applyWorkflowCanvasAction(draft, action);
+      changed = result.changed;
+      return result.draft;
+    });
+    return Object.freeze({ changed });
   };
 
   const handleRemoveNode = (node: WorkflowCanvasGraphNodeViewModel): void => {
@@ -198,6 +213,110 @@ export default function WorkflowStudioCanvasModeSurface({
       return;
     }
     applyAction({ kind: "remove-output", outputId: node.entityId });
+  };
+
+  const handleStepNodeDragStop = (nodeId: string, position: { readonly x: number; readonly y: number }): void => {
+    const movedNode = graphNodesById.get(nodeId);
+    if (!movedNode || movedNode.kind !== WorkflowCanvasGraphNodeKinds.item || movedNode.sectionId !== WorkflowCanvasSectionIds.steps) {
+      return;
+    }
+
+    const currentStepOrder = sharedDraft.steps.map((step) => step.id);
+    const reorderedStepIds = viewModel.graph.nodes
+      .filter((node) => node.kind === WorkflowCanvasGraphNodeKinds.item && node.sectionId === WorkflowCanvasSectionIds.steps)
+      .map((node) => (
+        node.id === nodeId
+          ? Object.freeze({
+            id: node.entityId as string,
+            y: position.y,
+          })
+          : Object.freeze({
+            id: node.entityId as string,
+            y: node.position.y,
+          })
+      ))
+      .sort((left, right) => left.y - right.y)
+      .map((entry) => entry.id);
+
+    const noOrderChange = reorderedStepIds.length === currentStepOrder.length
+      && reorderedStepIds.every((stepId, index) => stepId === currentStepOrder[index]);
+    if (noOrderChange) {
+      return;
+    }
+
+    const result = applyAction({
+      kind: "reorder-steps",
+      orderedStepIds: Object.freeze(reorderedStepIds),
+    });
+    if (!result.changed) {
+      setCanvasInteractionMessage("Step reorder was rejected by workflow ordering guardrails.");
+      return;
+    }
+    setCanvasInteractionMessage(undefined);
+  };
+
+  const handleCreateConnection = (connection: Connection): void => {
+    if (!connection.source || !connection.target) {
+      return;
+    }
+    let changed = false;
+    updateSharedDraft((draft) => {
+      const result = applyWorkflowCanvasConnection(draft, viewModel.graph, {
+        sourceNodeId: connection.source as string,
+        targetNodeId: connection.target as string,
+      });
+      changed = result.changed;
+      return result.draft;
+    });
+    if (!changed) {
+      setCanvasInteractionMessage("Unsupported connection. Only Step->Step and Step->Output links are allowed.");
+      return;
+    }
+    setCanvasInteractionMessage(undefined);
+  };
+
+  const handleReconnectConnection = (edgeId: string, connection: Connection): void => {
+    if (!connection.source || !connection.target) {
+      return;
+    }
+    const edge = graphEdgesById.get(edgeId);
+    if (!edge) {
+      return;
+    }
+    let changed = false;
+    updateSharedDraft((draft) => {
+      const result = applyWorkflowCanvasEdgeReconnect(draft, viewModel.graph, {
+        edge,
+        nextConnection: {
+          sourceNodeId: connection.source as string,
+          targetNodeId: connection.target as string,
+        },
+      });
+      changed = result.changed;
+      return result.draft;
+    });
+    if (!changed) {
+      setCanvasInteractionMessage("Connection update was rejected by workflow guardrails.");
+      return;
+    }
+    setCanvasInteractionMessage(undefined);
+  };
+
+  const handleRemoveConnection = (edgeId: string): void => {
+    const edge = graphEdgesById.get(edgeId);
+    if (!edge) {
+      return;
+    }
+    const removeAction = resolveWorkflowCanvasEdgeRemovalAction(edge);
+    if (!removeAction) {
+      return;
+    }
+    const result = applyAction(removeAction);
+    if (!result.changed) {
+      setCanvasInteractionMessage("Connection removal could not be applied.");
+      return;
+    }
+    setCanvasInteractionMessage(undefined);
   };
 
   const renderNodeEditor = (node: WorkflowCanvasGraphNodeViewModel): JSX.Element | null => {
@@ -269,6 +388,7 @@ export default function WorkflowStudioCanvasModeSurface({
       }
       const selectedDefinition = workflowStepTypeDefinitions.find((definition) => definition.type === step.type && definition.kind === step.kind)
         ?? workflowStepTypeDefinitions[0];
+      const stepIndex = sharedDraft.steps.findIndex((entry) => entry.id === step.id);
       return (
         <div className="ui-stack ui-stack--2xs ui-workflow-canvas-node-form">
           <input
@@ -296,6 +416,50 @@ export default function WorkflowStudioCanvasModeSurface({
               onChange={(event) => updateSharedDraft((draft) => setWorkflowStepIfThenConfig(draft, step.id, { conditionExpression: event.target.value }).draft)}
             />
           ) : null}
+          <div className="ui-row ui-row--wrap">
+            <button
+              type="button"
+              className="ui-button ui-button--ghost ui-button--sm"
+              data-testid={`workflow-canvas-step-move-up-${step.id}`}
+              disabled={stepIndex <= 0}
+              onClick={() => {
+                if (stepIndex <= 0) {
+                  return;
+                }
+                const orderedStepIds = [...sharedDraft.steps.map((entry) => entry.id)];
+                [orderedStepIds[stepIndex - 1], orderedStepIds[stepIndex]] = [orderedStepIds[stepIndex], orderedStepIds[stepIndex - 1]];
+                const result = applyAction({ kind: "reorder-steps", orderedStepIds: Object.freeze(orderedStepIds) });
+                if (!result.changed) {
+                  setCanvasInteractionMessage("Step reorder was rejected by workflow ordering guardrails.");
+                  return;
+                }
+                setCanvasInteractionMessage(undefined);
+              }}
+            >
+              Move up
+            </button>
+            <button
+              type="button"
+              className="ui-button ui-button--ghost ui-button--sm"
+              data-testid={`workflow-canvas-step-move-down-${step.id}`}
+              disabled={stepIndex < 0 || stepIndex >= sharedDraft.steps.length - 1}
+              onClick={() => {
+                if (stepIndex < 0 || stepIndex >= sharedDraft.steps.length - 1) {
+                  return;
+                }
+                const orderedStepIds = [...sharedDraft.steps.map((entry) => entry.id)];
+                [orderedStepIds[stepIndex + 1], orderedStepIds[stepIndex]] = [orderedStepIds[stepIndex], orderedStepIds[stepIndex + 1]];
+                const result = applyAction({ kind: "reorder-steps", orderedStepIds: Object.freeze(orderedStepIds) });
+                if (!result.changed) {
+                  setCanvasInteractionMessage("Step reorder was rejected by workflow ordering guardrails.");
+                  return;
+                }
+                setCanvasInteractionMessage(undefined);
+              }}
+            >
+              Move down
+            </button>
+          </div>
         </div>
       );
     }
@@ -440,8 +604,17 @@ export default function WorkflowStudioCanvasModeSurface({
           onSelectNode={setSelectedNodeId}
           onClearSelection={() => setSelectedNodeId(undefined)}
           onRemoveNode={handleRemoveNode}
+          onStepNodeDragStop={handleStepNodeDragStop}
+          onCreateConnection={handleCreateConnection}
+          onReconnectConnection={handleReconnectConnection}
+          onRemoveConnection={handleRemoveConnection}
           renderNodeEditor={renderNodeEditor}
         />
+        {canvasInteractionMessage ? (
+          <p className="ui-text-small ui-text-secondary" data-testid="workflow-canvas-interaction-message">
+            {canvasInteractionMessage}
+          </p>
+        ) : null}
       </section>
 
       <div className="ui-workflow-studio-canvas__drawer-layout">

@@ -6,8 +6,11 @@ import {
   createEmptyWorkflowDraft,
 } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
 import {
+  applyWorkflowCanvasConnection,
+  applyWorkflowCanvasEdgeReconnect,
   applyWorkflowCanvasAction,
   deriveWorkflowCanvasViewModel,
+  resolveWorkflowCanvasEdgeRemovalAction,
   WorkflowCanvasGraphEdgeKinds,
   WorkflowCanvasGraphNodeKinds,
   WorkflowCanvasSectionIds,
@@ -240,5 +243,116 @@ describe("WorkflowStudioCanvasViewModel", () => {
     expect(draft.inputs[1]?.sourceType).toBe("static-value");
     expect(draft.steps).toHaveLength(1);
     expect(draft.steps[0]?.type).not.toBe(WorkflowDraftStepTypes.agentAssistant);
+  });
+
+  it("reorders step sequence from canvas actions and keeps canonical order contiguous", () => {
+    let draft = createEmptyWorkflowDraft();
+    draft = applyWorkflowCanvasAction(draft, { kind: "add-step" }).draft;
+    draft = applyWorkflowCanvasAction(draft, { kind: "add-step" }).draft;
+    draft = applyWorkflowCanvasAction(draft, { kind: "add-step" }).draft;
+
+    const stepIds = draft.steps.map((step) => step.id);
+    const reordered = [stepIds[2] as string, stepIds[0] as string, stepIds[1] as string];
+    draft = applyWorkflowCanvasAction(draft, {
+      kind: "reorder-steps",
+      orderedStepIds: reordered,
+    }).draft;
+
+    expect(draft.steps.map((step) => step.id)).toEqual(reordered);
+    expect(draft.steps.map((step) => step.order)).toEqual([1, 2, 3]);
+  });
+
+  it("creates, reconnects, and removes supported canvas edges via canonical draft mutations", () => {
+    let draft = createEmptyWorkflowDraft();
+    draft = applyWorkflowCanvasAction(draft, { kind: "add-step" }).draft;
+    draft = applyWorkflowCanvasAction(draft, { kind: "add-step" }).draft;
+    draft = applyWorkflowCanvasAction(draft, { kind: "add-output" }).draft;
+
+    const before = deriveWorkflowCanvasViewModel(draft, []);
+    const firstStepNode = before.graph.nodes.find((node) => (
+      node.kind === WorkflowCanvasGraphNodeKinds.item
+      && node.sectionId === WorkflowCanvasSectionIds.steps
+      && node.entityId === draft.steps[0]?.id
+    ));
+    const secondStepNode = before.graph.nodes.find((node) => (
+      node.kind === WorkflowCanvasGraphNodeKinds.item
+      && node.sectionId === WorkflowCanvasSectionIds.steps
+      && node.entityId === draft.steps[1]?.id
+    ));
+    const outputNode = before.graph.nodes.find((node) => (
+      node.kind === WorkflowCanvasGraphNodeKinds.item
+      && node.sectionId === WorkflowCanvasSectionIds.outputs
+      && node.entityId === draft.outputs[0]?.id
+    ));
+    if (!firstStepNode || !secondStepNode || !outputNode) {
+      throw new Error("Expected step and output graph nodes to exist.");
+    }
+
+    draft = applyWorkflowCanvasConnection(draft, before.graph, {
+      sourceNodeId: firstStepNode.id,
+      targetNodeId: secondStepNode.id,
+    }).draft;
+    expect(draft.steps[1]?.dependsOnStepIds).toContain(draft.steps[0]?.id);
+
+    draft = applyWorkflowCanvasConnection(draft, before.graph, {
+      sourceNodeId: secondStepNode.id,
+      targetNodeId: outputNode.id,
+    }).draft;
+    expect(draft.outputs[0]?.sourceStepId).toBe(draft.steps[1]?.id);
+
+    let withEdges = deriveWorkflowCanvasViewModel(draft, []);
+    const dependencyEdge = withEdges.graph.edges.find((edge) => edge.kind === WorkflowCanvasGraphEdgeKinds.stepDependency);
+    const outputSourceEdge = withEdges.graph.edges.find((edge) => edge.kind === WorkflowCanvasGraphEdgeKinds.outputSource);
+    if (!dependencyEdge || !outputSourceEdge) {
+      throw new Error("Expected editable dependency and output-source edges.");
+    }
+
+    draft = applyWorkflowCanvasEdgeReconnect(draft, withEdges.graph, {
+      edge: outputSourceEdge,
+      nextConnection: {
+        sourceNodeId: firstStepNode.id,
+        targetNodeId: outputNode.id,
+      },
+    }).draft;
+    expect(draft.outputs[0]?.sourceStepId).toBe(draft.steps[0]?.id);
+
+    withEdges = deriveWorkflowCanvasViewModel(draft, []);
+    const removableDependencyEdge = withEdges.graph.edges.find((edge) => edge.kind === WorkflowCanvasGraphEdgeKinds.stepDependency);
+    if (!removableDependencyEdge) {
+      throw new Error("Expected dependency edge for removal.");
+    }
+    const removeAction = resolveWorkflowCanvasEdgeRemovalAction(removableDependencyEdge);
+    if (!removeAction) {
+      throw new Error("Expected remove action for dependency edge.");
+    }
+    draft = applyWorkflowCanvasAction(draft, removeAction).draft;
+    expect(draft.steps[1]?.dependsOnStepIds ?? []).not.toContain(draft.steps[0]?.id);
+  });
+
+  it("rejects invalid canvas connection attempts and leaves canonical draft unchanged", () => {
+    let draft = createEmptyWorkflowDraft();
+    draft = applyWorkflowCanvasAction(draft, { kind: "add-trigger" }).draft;
+    draft = applyWorkflowCanvasAction(draft, { kind: "add-input-runtime-parameter" }).draft;
+    draft = applyWorkflowCanvasAction(draft, { kind: "add-step" }).draft;
+
+    const viewModel = deriveWorkflowCanvasViewModel(draft, []);
+    const triggerNode = viewModel.graph.nodes.find((node) => (
+      node.kind === WorkflowCanvasGraphNodeKinds.item
+      && node.sectionId === WorkflowCanvasSectionIds.triggers
+    ));
+    const stepNode = viewModel.graph.nodes.find((node) => (
+      node.kind === WorkflowCanvasGraphNodeKinds.item
+      && node.sectionId === WorkflowCanvasSectionIds.steps
+    ));
+    if (!triggerNode || !stepNode) {
+      throw new Error("Expected trigger and step graph nodes.");
+    }
+
+    const result = applyWorkflowCanvasConnection(draft, viewModel.graph, {
+      sourceNodeId: triggerNode.id,
+      targetNodeId: stepNode.id,
+    });
+    expect(result.changed).toBe(false);
+    expect(result.draft).toBe(draft);
   });
 });

@@ -2,18 +2,24 @@ import { useMemo } from "react";
 import {
   Background,
   Controls,
+  Handle,
   MarkerType,
+  Position,
   ReactFlow,
+  type Connection,
   type EdgeMouseHandler,
   type Edge,
   type Node,
   type NodeProps,
   type NodeMouseHandler,
+  type OnConnect,
 } from "@xyflow/react";
 import {
   WorkflowCanvasGraphEdgeKinds,
   WorkflowCanvasGraphNodeKinds,
+  WorkflowCanvasSectionIds,
   type WorkflowCanvasGraphEdgeKind,
+  type WorkflowCanvasGraphEdgeViewModel,
   type WorkflowCanvasGraphNodeViewModel,
   type WorkflowCanvasGraphViewModel,
 } from "../../../studio-shell/workflow/WorkflowStudioCanvasViewModel";
@@ -25,6 +31,10 @@ interface WorkflowStudioCanvasReactFlowProps {
   readonly onClearSelection?: () => void;
   readonly renderNodeEditor?: (node: WorkflowCanvasGraphNodeViewModel) => JSX.Element | null;
   readonly onRemoveNode?: (node: WorkflowCanvasGraphNodeViewModel) => void;
+  readonly onStepNodeDragStop?: (nodeId: string, position: { readonly x: number; readonly y: number }) => void;
+  readonly onCreateConnection?: (connection: Connection) => void;
+  readonly onReconnectConnection?: (edgeId: string, connection: Connection) => void;
+  readonly onRemoveConnection?: (edgeId: string) => void;
 }
 
 interface WorkflowStudioCanvasGraphNodeData {
@@ -34,6 +44,11 @@ interface WorkflowStudioCanvasGraphNodeData {
   readonly renderNodeEditor?: (node: WorkflowCanvasGraphNodeViewModel) => JSX.Element | null;
   readonly onRemoveNode?: (node: WorkflowCanvasGraphNodeViewModel) => void;
 }
+
+type WorkflowStudioCanvasReactFlowEdge = Edge<{
+  readonly editable: boolean;
+  readonly kind: WorkflowCanvasGraphEdgeKind;
+}>;
 
 function WorkflowSectionGraphNode({
   data,
@@ -106,6 +121,30 @@ function WorkflowItemGraphNode({
         </ul>
       ) : null}
       {issueCount > 0 ? <p className="ui-text-small ui-text-danger">{issueCount} issue(s)</p> : null}
+      {data.graphNode.sectionId === WorkflowCanvasSectionIds.steps ? (
+        <>
+          <Handle
+            type="target"
+            position={Position.Left}
+            className="ui-workflow-canvas-node__handle"
+            id={`target:${data.graphNode.id}`}
+          />
+          <Handle
+            type="source"
+            position={Position.Right}
+            className="ui-workflow-canvas-node__handle"
+            id={`source:${data.graphNode.id}`}
+          />
+        </>
+      ) : null}
+      {data.graphNode.sectionId === WorkflowCanvasSectionIds.outputs ? (
+        <Handle
+          type="target"
+          position={Position.Left}
+          className="ui-workflow-canvas-node__handle"
+          id={`target:${data.graphNode.id}`}
+        />
+      ) : null}
     </article>
   );
 }
@@ -122,9 +161,11 @@ function mapGraphNodeToReactFlowNode(
       x: node.position.x,
       y: node.position.y,
     },
-    draggable: false,
+    draggable: node.kind === WorkflowCanvasGraphNodeKinds.item && node.sectionId === WorkflowCanvasSectionIds.steps,
     selectable: true,
-    connectable: false,
+    connectable: node.kind === WorkflowCanvasGraphNodeKinds.item && (
+      node.sectionId === WorkflowCanvasSectionIds.steps || node.sectionId === WorkflowCanvasSectionIds.outputs
+    ),
     style: {
       width: 260,
       height: node.height,
@@ -146,24 +187,43 @@ function mapEdgeKindLabel(kind: WorkflowCanvasGraphEdgeKind): string {
   if (kind === WorkflowCanvasGraphEdgeKinds.sectionEntry) {
     return "entry";
   }
+  if (kind === WorkflowCanvasGraphEdgeKinds.stepDependency) {
+    return "depends-on";
+  }
+  if (kind === WorkflowCanvasGraphEdgeKinds.outputSource) {
+    return "output-source";
+  }
   return "sequence";
 }
 
 function mapGraphEdgeToReactFlowEdge(
-  edge: { readonly id: string; readonly kind: WorkflowCanvasGraphEdgeKind; readonly sourceNodeId: string; readonly targetNodeId: string },
-): Edge {
+  edge: WorkflowCanvasGraphEdgeViewModel,
+): WorkflowStudioCanvasReactFlowEdge {
+  const isEditableEdge = edge.editable;
   return {
     id: edge.id,
     source: edge.sourceNodeId,
     target: edge.targetNodeId,
     type: "smoothstep",
-    animated: edge.kind === WorkflowCanvasGraphEdgeKinds.sectionFlow,
     markerEnd: {
       type: MarkerType.ArrowClosed,
       width: 18,
       height: 18,
     },
     label: mapEdgeKindLabel(edge.kind),
+    deletable: isEditableEdge,
+    reconnectable: isEditableEdge,
+    selectable: isEditableEdge,
+    animated: edge.kind === WorkflowCanvasGraphEdgeKinds.sectionFlow || edge.kind === WorkflowCanvasGraphEdgeKinds.outputSource,
+    data: Object.freeze({
+      editable: isEditableEdge,
+      kind: edge.kind,
+    }),
+    style: edge.kind === WorkflowCanvasGraphEdgeKinds.stepDependency
+      ? Object.freeze({
+        strokeDasharray: "7 5",
+      })
+      : undefined,
   };
 }
 
@@ -179,6 +239,10 @@ export default function WorkflowStudioCanvasReactFlow({
   onClearSelection,
   renderNodeEditor,
   onRemoveNode,
+  onStepNodeDragStop,
+  onCreateConnection,
+  onReconnectConnection,
+  onRemoveConnection,
 }: WorkflowStudioCanvasReactFlowProps): JSX.Element {
   const nodes = useMemo(
     () => graph.nodes.map((node) => {
@@ -209,16 +273,50 @@ export default function WorkflowStudioCanvasReactFlow({
     [onSelectNode],
   );
 
-  const handleEdgeClick = useMemo<EdgeMouseHandler<Edge>>(
+  const handleEdgeClick = useMemo<EdgeMouseHandler<WorkflowStudioCanvasReactFlowEdge>>(
     () => () => {
       onClearSelection?.();
     },
     [onClearSelection],
   );
 
+  const handleNodeDragStop = useMemo<NodeMouseHandler<Node<WorkflowStudioCanvasGraphNodeData>>>(
+    () => (_event, node) => {
+      onStepNodeDragStop?.(node.id, {
+        x: node.position.x,
+        y: node.position.y,
+      });
+    },
+    [onStepNodeDragStop],
+  );
+
+  const handleConnect = useMemo<OnConnect>(
+    () => (connection) => {
+      onCreateConnection?.(connection);
+    },
+    [onCreateConnection],
+  );
+
+  const handleReconnect = useMemo(
+    () => (edge: WorkflowStudioCanvasReactFlowEdge, connection: Connection) => {
+      onReconnectConnection?.(edge.id, connection);
+    },
+    [onReconnectConnection],
+  );
+
+  const handleEdgeDoubleClick = useMemo<EdgeMouseHandler<WorkflowStudioCanvasReactFlowEdge>>(
+    () => (_event, edge) => {
+      if (edge.data?.editable !== true) {
+        return;
+      }
+      onRemoveConnection?.(edge.id);
+    },
+    [onRemoveConnection],
+  );
+
   return (
     <div className="ui-workflow-studio-canvas__surface ui-canvas-surface" data-testid="workflow-studio-canvas-reactflow">
-      <ReactFlow
+      <ReactFlow<Node<WorkflowStudioCanvasGraphNodeData>, WorkflowStudioCanvasReactFlowEdge>
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
@@ -231,8 +329,17 @@ export default function WorkflowStudioCanvasReactFlow({
         zoomOnScroll
         className="ui-rf-canvas ui-workflow-studio-canvas__reactflow"
         onNodeClick={handleNodeClick}
+        onNodeDragStop={handleNodeDragStop}
         onPaneClick={onClearSelection}
         onEdgeClick={handleEdgeClick}
+        onEdgeDoubleClick={handleEdgeDoubleClick}
+        onConnect={handleConnect}
+        onReconnect={handleReconnect}
+        onEdgesDelete={(edges) => {
+          for (const edge of edges) {
+            onRemoveConnection?.(edge.id);
+          }
+        }}
       >
         <Background gap={24} size={1} />
         <Controls showInteractive={false} />
