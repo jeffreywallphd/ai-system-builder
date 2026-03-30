@@ -477,4 +477,93 @@ describe("WorkflowStudioApplicationService", () => {
     expect(result.validation.ready).toBeTrue();
     expect(result.runtimeResult?.status === "completed" || result.runtimeResult?.status === "paused").toBeTrue();
   });
+
+  it("uses assembled execution context runtime inputs for manual launch when explicit runtime inputs are not provided", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => "generated");
+    const service = new WorkflowStudioApplicationService(studioShell);
+
+    const result = await service.runWorkflowDraftManual({
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-manual",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        }],
+        inputs: [{
+          id: "input-threshold",
+          type: "runtime-input",
+          sourceType: "runtime-parameter",
+          parameterKey: "threshold",
+          defaultValue: 0.8,
+          required: true,
+        }],
+        steps: [{
+          id: "step-if",
+          type: "if-then",
+          kind: "control-flow",
+          order: 1,
+          config: {
+            conditionExpression: "inputs.threshold >= 0.8",
+            thenStepIds: ["step-approve"],
+            elseStepIds: ["step-reject"],
+          },
+        }, {
+          id: "step-approve",
+          type: "action",
+          kind: "action",
+          order: 2,
+        }, {
+          id: "step-reject",
+          type: "action",
+          kind: "action",
+          order: 3,
+        }],
+      }),
+    });
+
+    expect(result.launchStatus).toBe("launched");
+    expect(result.validation.ready).toBeTrue();
+    const completedStepIds = result.runtimeResult?.traces
+      .filter((entry) => entry.status === "completed")
+      .map((entry) => entry.stepId);
+    expect(completedStepIds).toEqual(["step-if", "step-approve"]);
+  });
+
+  it("keeps manual run blocked when required runtime input cannot be resolved", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => "generated");
+    const service = new WorkflowStudioApplicationService(studioShell);
+
+    const result = await service.runWorkflowDraftManual({
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-manual",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        }],
+        inputs: [{
+          id: "input-prompt",
+          type: "runtime-input",
+          sourceType: "runtime-parameter",
+          parameterKey: "prompt",
+          required: true,
+        }],
+        steps: [{
+          id: "step-1",
+          type: "action",
+          kind: "action",
+          order: 1,
+        }],
+      }),
+    });
+
+    expect(result.launchStatus).toBe("blocked");
+    expect(result.validation.ready).toBeFalse();
+    expect(result.validation.blockingIssues.some((issue) => issue.code === "input-resolution-required-missing")).toBeTrue();
+  });
 });
