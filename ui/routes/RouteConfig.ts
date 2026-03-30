@@ -21,6 +21,7 @@ export const ROUTE_PATHS = Object.freeze({
   compose: "/compose",
   workflows: "/workflows",
   workflowEditor: "/workflows/:workflowId",
+  workflowConversation: "/run/workflow-chat/:sessionId",
   workflowContextWorkbench: "/workflows/:workflowId/context-workbench",
   tools: "/tools",
   toolRun: "/tools/:toolId",
@@ -104,6 +105,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteDefinition> = Object.freeze([
     key: "workflow-editor",
     path: ROUTE_PATHS.workflowEditor,
     title: "Workflow Editor",
+    showInNavigation: false,
+  }),
+  Object.freeze({
+    key: "workflow-conversation",
+    path: ROUTE_PATHS.workflowConversation,
+    title: "Workflow Conversation",
     showInNavigation: false,
   }),
   Object.freeze({

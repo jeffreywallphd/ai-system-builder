@@ -153,6 +153,7 @@ import { createModelManagementDependencies } from "./modelManagementDependencies
 import { BrowserDownloadModelLibrary } from "../../infrastructure/browser/models/BrowserDownloadModelLibrary";
 import { RuntimeDependencyIds, RuntimeDependencyOperationalStates, type IRuntimeDependencyOrchestrator } from "../../application/runtime/RuntimeDependencyOrchestrator";
 import { CanonicalAssetManagementService } from "../services/CanonicalAssetManagementService";
+import { WorkflowConversationSessionService } from "../workflow-conversation/WorkflowConversationSessionService";
 
 export function createUiDependencies(
   options: CreateUiDependenciesOptions = {}
@@ -466,11 +467,15 @@ export function createUiDependencies(
     new GenerateLocalMcpToolDraftUseCase(),
   );
   const mcpToolCallAuthoringService = new McpToolCallAuthoringService(mcpService);
+  const workflowConversationSessionService = new WorkflowConversationSessionService({
+    workflowService,
+  });
   const workflowStore = new WorkflowStore({
     workflowService,
     nodeService,
     mcpToolCallAuthoringService,
     workflowProjectionService,
+    conversationSessionService: workflowConversationSessionService,
   });
   const runtimeConsoleStore = new RuntimeConsoleStore({
     runtimeEventStore,
@@ -735,6 +740,7 @@ export function createUiDependencies(
     modelTrainingStore,
     executionHistoryService,
     canonicalAssetManagementService,
+    workflowConversationSessionService,
     workflowProjectionService,
     settingsStore,
   });
