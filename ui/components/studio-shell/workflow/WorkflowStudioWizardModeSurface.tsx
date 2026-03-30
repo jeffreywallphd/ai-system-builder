@@ -12,6 +12,7 @@ import WorkflowStudioStepSectionEditor from "./WorkflowStudioStepSectionEditor";
 import WorkflowStudioTriggerSectionEditor from "./WorkflowStudioTriggerSectionEditor";
 import type { WorkflowStudioHandoffStatus } from "../../../studio-shell/workflow/WorkflowStudioHandoffStatus";
 import WorkflowStudioHandoffStatusBanner from "./WorkflowStudioHandoffStatusBanner";
+import { listWorkflowOutputSummaries } from "../../../studio-shell/workflow/WorkflowWizardOutputs";
 
 export interface WorkflowStudioWizardModeSurfaceProps {
   readonly sharedDraft: WorkflowDraft;
@@ -50,6 +51,7 @@ export default function WorkflowStudioWizardModeSurface({
   const [readyActionAttempted, setReadyActionAttempted] = useState(false);
   const [readyActionConfirmed, setReadyActionConfirmed] = useState(false);
   const progress = deriveWorkflowWizardProgress(sharedDraft, draftValidationIssues);
+  const outputSummaries = useMemo(() => listWorkflowOutputSummaries(sharedDraft), [sharedDraft]);
 
   useEffect(() => {
     if (!progress.isWorkflowReady) {
@@ -245,6 +247,25 @@ export default function WorkflowStudioWizardModeSurface({
                 Prepare for Run
               </button>
             </div>
+            <div className="ui-stack ui-stack--2xs ui-workflow-wizard__output-overview" data-testid="workflow-wizard-output-overview">
+              <strong>Configured outputs</strong>
+              {outputSummaries.length > 0 ? (
+                <ul className="ui-stack ui-stack--2xs ui-workflow-wizard__output-summary-list">
+                  {outputSummaries.map((summary) => (
+                    <li key={summary.outputId} className="ui-workflow-wizard__output-summary-item">
+                      <div><strong>{summary.order}. {summary.displayLabel}</strong> <span className="ui-text-secondary">({summary.typeLabel})</span></div>
+                      {summary.detailLines.length > 0 ? (
+                        <div className="ui-text-small ui-text-secondary">{summary.detailLines.join(" · ")}</div>
+                      ) : (
+                        <div className="ui-text-small ui-text-secondary">No additional output details configured.</div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="ui-text-muted">No outputs configured yet.</p>
+              )}
+            </div>
           </section>
 
           <label className="ui-stack ui-stack--2xs">
@@ -283,6 +304,25 @@ export default function WorkflowStudioWizardModeSurface({
           ) : (
             <p className="ui-text-muted">No blocking issues detected.</p>
           )}
+          <div className="ui-stack ui-stack--2xs ui-workflow-wizard__output-overview" data-testid="workflow-wizard-readiness-output-summary">
+            <strong>Output review</strong>
+            {outputSummaries.length > 0 ? (
+              <ul className="ui-stack ui-stack--2xs ui-workflow-wizard__output-summary-list">
+                {outputSummaries.map((summary) => (
+                  <li key={summary.outputId} className="ui-workflow-wizard__output-summary-item">
+                    <div><strong>{summary.order}. {summary.displayLabel}</strong> <span className="ui-text-secondary">({summary.typeLabel})</span></div>
+                    {summary.detailLines.length > 0 ? (
+                      <div className="ui-text-small ui-text-secondary">{summary.detailLines.join(" · ")}</div>
+                    ) : (
+                      <div className="ui-text-small ui-text-secondary">No additional output details configured.</div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="ui-text-muted">No outputs configured yet.</p>
+            )}
+          </div>
         </div>
       </details>
     </div>

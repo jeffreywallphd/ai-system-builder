@@ -127,9 +127,12 @@ describe("WorkflowStudioDomain schema validation coverage", () => {
             sourceStepId: "step-rework",
             destination: {
               type: WorkflowDraftOutputDestinationTypes.systemEntry,
-              target: "ops/review-queue",
+              target: "system-record",
               options: {
-                entityName: "review-queue-record",
+                entityName: "review.queue.record",
+                recordCollection: "ops/review-queue",
+                writeMode: "upsert",
+                recordShape: "single-record",
               },
             },
           },
@@ -226,9 +229,12 @@ describe("WorkflowStudioDomain schema validation coverage", () => {
           sourceStepId: "step-unknown",
           destination: {
             type: WorkflowDraftOutputDestinationTypes.systemEntry,
-            target: "records/out",
+            target: "system-record",
             options: {
-              entityName: "records-out",
+              entityName: "records.out",
+              recordCollection: "records/out",
+              writeMode: "upsert",
+              recordShape: "single-record",
             },
           },
         },

@@ -1,5 +1,8 @@
 import {
   WorkflowDraftOutputDestinationTypes,
+  WorkflowDraftOutputFormats,
+  WorkflowDraftSystemOutputRecordShapes,
+  WorkflowDraftSystemOutputWriteModes,
   type WorkflowDraft,
   type WorkflowDraftOutput,
 } from "../../../domain/workflow-studio/WorkflowStudioDomain";
@@ -45,6 +48,14 @@ export interface WorkflowOutputAddManyResult {
   }>;
 }
 
+export interface WorkflowOutputSummaryItem {
+  readonly outputId: string;
+  readonly order: number;
+  readonly displayLabel: string;
+  readonly typeLabel: string;
+  readonly detailLines: ReadonlyArray<string>;
+}
+
 export const workflowOutputTypeRegistry = createDefaultWorkflowOutputTypeRegistry();
 export const workflowOutputTypeDefinitions: ReadonlyArray<WorkflowOutputTypeRegistryEntry> =
   workflowOutputTypeRegistry.list();
@@ -55,6 +66,9 @@ export const workflowOutputDestinationDefinitions = workflowOutputTypeDefinition
 export const workflowFileOutputFormats = Object.freeze([
   ...(workflowOutputTypeRegistry.get(WorkflowDraftOutputDestinationTypes.fileExport)?.supportedFormats ?? []),
 ]);
+
+export const workflowSystemOutputWriteModes = WorkflowDraftSystemOutputWriteModes;
+export const workflowSystemOutputRecordShapes = WorkflowDraftSystemOutputRecordShapes;
 
 function normalizeOutputOrdering(outputs: ReadonlyArray<WorkflowDraftOutput>): ReadonlyArray<WorkflowDraftOutput> {
   return Object.freeze(outputs.map((output, index) => Object.freeze({
@@ -486,7 +500,39 @@ export function setWorkflowOutputRecordDestinationConfig(
   outputId: string,
   destinationConfig: string,
 ): { readonly draft: WorkflowDraft; readonly changed: boolean } {
-  return setWorkflowOutputConfigurationValue(draft, outputId, "destinationConfig", destinationConfig);
+  return setWorkflowOutputConfigurationValue(draft, outputId, "recordCollection", destinationConfig);
+}
+
+export function setWorkflowOutputRecordCollection(
+  draft: WorkflowDraft,
+  outputId: string,
+  recordCollection: string,
+): { readonly draft: WorkflowDraft; readonly changed: boolean } {
+  return setWorkflowOutputConfigurationValue(draft, outputId, "recordCollection", recordCollection);
+}
+
+export function setWorkflowOutputRecordWriteMode(
+  draft: WorkflowDraft,
+  outputId: string,
+  writeMode: string,
+): { readonly draft: WorkflowDraft; readonly changed: boolean } {
+  return setWorkflowOutputConfigurationValue(draft, outputId, "writeMode", writeMode);
+}
+
+export function setWorkflowOutputRecordShape(
+  draft: WorkflowDraft,
+  outputId: string,
+  recordShape: string,
+): { readonly draft: WorkflowDraft; readonly changed: boolean } {
+  return setWorkflowOutputConfigurationValue(draft, outputId, "recordShape", recordShape);
+}
+
+export function setWorkflowOutputRecordIncludeExecutionMetadata(
+  draft: WorkflowDraft,
+  outputId: string,
+  includeExecutionMetadata: string,
+): { readonly draft: WorkflowDraft; readonly changed: boolean } {
+  return setWorkflowOutputConfigurationValue(draft, outputId, "includeExecutionMetadata", includeExecutionMetadata);
 }
 
 export function getWorkflowOutputValidationMessages(
@@ -522,6 +568,30 @@ export function getWorkflowOutputValidationMessages(
     const entityName = readDestinationOptionString(output, "entityName");
     if (!entityName) {
       messages.push("Database/System Record output requires an entity name.");
+    }
+    const recordCollection = readDestinationOptionString(output, "recordCollection");
+    if (recordCollection && !/^[a-z0-9][a-z0-9/_-]*$/.test(recordCollection)) {
+      messages.push("Database/System Record output requires a valid record collection path.");
+    }
+    const writeMode = readDestinationOptionString(output, "writeMode");
+    if (!writeMode || (
+      writeMode !== WorkflowDraftSystemOutputWriteModes.upsert
+      && writeMode !== WorkflowDraftSystemOutputWriteModes.append
+    )) {
+      messages.push("Database/System Record output requires a valid write mode.");
+    }
+    const recordShape = readDestinationOptionString(output, "recordShape");
+    if (!recordShape || (
+      recordShape !== WorkflowDraftSystemOutputRecordShapes.singleRecord
+      && recordShape !== WorkflowDraftSystemOutputRecordShapes.recordCollection
+    )) {
+      messages.push("Database/System Record output requires a valid record shape.");
+    }
+    if (
+      recordShape === WorkflowDraftSystemOutputRecordShapes.singleRecord
+      && output.format !== WorkflowDraftOutputFormats.json
+    ) {
+      messages.push("Database/System Record output with single-record shape requires JSON format.");
     }
   }
   if (destinationDefinition.destinationType === WorkflowDraftOutputDestinationTypes.promptResponseChat) {
@@ -580,12 +650,63 @@ export function setWorkflowOutputFieldValue(
   if (field.key === "entityName") {
     return setWorkflowOutputRecordEntityName(draft, outputId, value);
   }
-  if (field.key === "destinationConfig") {
-    return setWorkflowOutputRecordDestinationConfig(draft, outputId, value);
+  if (field.key === "destinationConfig" || field.key === "recordCollection") {
+    return setWorkflowOutputRecordCollection(draft, outputId, value);
+  }
+  if (field.key === "writeMode") {
+    return setWorkflowOutputRecordWriteMode(draft, outputId, value);
+  }
+  if (field.key === "recordShape") {
+    return setWorkflowOutputRecordShape(draft, outputId, value);
+  }
+  if (field.key === "includeExecutionMetadata") {
+    return setWorkflowOutputRecordIncludeExecutionMetadata(draft, outputId, value);
   }
   if (field.target === "configuration") {
     return setWorkflowOutputConfigurationValue(draft, outputId, field.key, value);
   }
   return Object.freeze({ draft, changed: false });
+}
+
+function resolveFieldSummaryValue(
+  output: WorkflowDraftOutput,
+  field: WorkflowOutputRegistryFieldMetadata,
+): string | undefined {
+  const raw = readWorkflowOutputFieldValue(output, field).trim();
+  if (!raw) {
+    return field.required ? "Not set" : undefined;
+  }
+  if (field.kind === "select" && field.options && field.options.length > 0) {
+    return field.options.find((option) => option.value === raw)?.label ?? raw;
+  }
+  return raw;
+}
+
+export function listWorkflowOutputSummaries(
+  draft: WorkflowDraft,
+): ReadonlyArray<WorkflowOutputSummaryItem> {
+  return Object.freeze(
+    [...draft.outputs]
+      .sort((left, right) => (left.order ?? Number.MAX_SAFE_INTEGER) - (right.order ?? Number.MAX_SAFE_INTEGER))
+      .map((output, index) => {
+        const definition = getWorkflowOutputDestinationDefinitionByType(output.destination.type);
+        const detailLines = definition.configurationFields
+          .map((field) => {
+            const value = resolveFieldSummaryValue(output, field);
+            if (value === undefined) {
+              return undefined;
+            }
+            return `${field.label}: ${value}`;
+          })
+          .filter((entry): entry is string => Boolean(entry));
+        return Object.freeze({
+          outputId: output.id,
+          order: output.order ?? (index + 1),
+          displayLabel: output.title?.trim() || `Output ${output.order ?? (index + 1)}`,
+          typeLabel: definition.label,
+          detailLines: Object.freeze(detailLines),
+        });
+      }),
+  );
 }
 

@@ -63,7 +63,7 @@ describe("WorkflowOutputSelector", () => {
     expect(html).toContain("Add outputs");
     expect(html).toContain("File export");
     expect(html).toContain("Web viewer");
-    expect(html).toContain("System entry");
+    expect(html).toContain("System record");
     expect(html).toContain("Prompt response chat");
     expect(html).toContain("Add all supported outputs");
   });

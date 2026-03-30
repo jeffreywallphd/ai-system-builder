@@ -2,6 +2,8 @@ import {
   getWorkflowDraftOutputDestinationDefinition,
   listWorkflowDraftOutputDestinationDefinitions,
   WorkflowDraftOutputDestinationTypes,
+  WorkflowDraftSystemOutputRecordShapes,
+  WorkflowDraftSystemOutputWriteModes,
   type WorkflowDraft,
   type WorkflowDraftOutputDestinationDefinition,
   type WorkflowDraftOutputDestinationType,
@@ -234,19 +236,72 @@ function toRegistryEntry(definition: WorkflowDraftOutputDestinationDefinition): 
       configurationFields: Object.freeze([
         Object.freeze({
           key: "entityName",
-          label: "Record/entity name",
+          label: "Record entity",
           target: WorkflowOutputRegistryFieldTargets.configuration,
           kind: WorkflowOutputRegistryFieldKinds.text,
           required: true,
-          placeholder: "customer-record",
+          placeholder: "customer.record",
         }),
         Object.freeze({
-          key: "destinationConfig",
-          label: "Destination config (placeholder)",
+          key: "recordCollection",
+          label: "Record collection",
           target: WorkflowOutputRegistryFieldTargets.configuration,
           kind: WorkflowOutputRegistryFieldKinds.text,
           required: false,
-          placeholder: "connection:primary-db",
+          placeholder: "records/customers",
+        }),
+        Object.freeze({
+          key: "writeMode",
+          label: "Write mode",
+          target: WorkflowOutputRegistryFieldTargets.configuration,
+          kind: WorkflowOutputRegistryFieldKinds.select,
+          required: true,
+          options: Object.freeze([
+            Object.freeze({
+              value: WorkflowDraftSystemOutputWriteModes.upsert,
+              label: "Upsert",
+              description: "Create missing records and update matching records.",
+            }),
+            Object.freeze({
+              value: WorkflowDraftSystemOutputWriteModes.append,
+              label: "Append only",
+              description: "Create new records without updating existing ones.",
+            }),
+          ]),
+        }),
+        Object.freeze({
+          key: "recordShape",
+          label: "Record shape",
+          target: WorkflowOutputRegistryFieldTargets.configuration,
+          kind: WorkflowOutputRegistryFieldKinds.select,
+          required: true,
+          options: Object.freeze([
+            Object.freeze({
+              value: WorkflowDraftSystemOutputRecordShapes.singleRecord,
+              label: "Single record",
+            }),
+            Object.freeze({
+              value: WorkflowDraftSystemOutputRecordShapes.recordCollection,
+              label: "Record collection",
+            }),
+          ]),
+        }),
+        Object.freeze({
+          key: "includeExecutionMetadata",
+          label: "Include execution metadata",
+          target: WorkflowOutputRegistryFieldTargets.configuration,
+          kind: WorkflowOutputRegistryFieldKinds.select,
+          required: true,
+          options: Object.freeze([
+            Object.freeze({
+              value: "true",
+              label: "Yes",
+            }),
+            Object.freeze({
+              value: "false",
+              label: "No",
+            }),
+          ]),
         }),
       ]),
     });

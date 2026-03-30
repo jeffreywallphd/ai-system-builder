@@ -26,6 +26,21 @@
   margin-top: var(--space-sm);
 }
 
+.ui-workflow-wizard__output-overview {
+  margin-top: var(--space-sm);
+}
+
+.ui-workflow-wizard__output-summary-list {
+  list-style: disc;
+  padding-left: var(--space-md);
+}
+
+.ui-workflow-wizard__output-summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
 .workflow-step-selector-option {
   justify-content: flex-start;
   align-items: flex-start;

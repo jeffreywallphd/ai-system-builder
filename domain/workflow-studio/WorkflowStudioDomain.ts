@@ -254,6 +254,22 @@ export const WorkflowDraftOutputDestinationTypes = Object.freeze({
 export type WorkflowDraftOutputDestinationType = typeof WorkflowDraftOutputDestinationTypes[keyof typeof WorkflowDraftOutputDestinationTypes]
   | (string & {});
 
+export const WorkflowDraftSystemOutputWriteModes = Object.freeze({
+  upsert: "upsert",
+  append: "append",
+});
+
+export type WorkflowDraftSystemOutputWriteMode =
+  typeof WorkflowDraftSystemOutputWriteModes[keyof typeof WorkflowDraftSystemOutputWriteModes];
+
+export const WorkflowDraftSystemOutputRecordShapes = Object.freeze({
+  singleRecord: "single-record",
+  recordCollection: "record-collection",
+});
+
+export type WorkflowDraftSystemOutputRecordShape =
+  typeof WorkflowDraftSystemOutputRecordShapes[keyof typeof WorkflowDraftSystemOutputRecordShapes];
+
 export interface WorkflowDraftOutputDestination {
   readonly type: WorkflowDraftOutputDestinationType;
   readonly target: string;
@@ -316,8 +332,8 @@ const WorkflowDraftOutputDestinationDefinitions: ReadonlyArray<WorkflowDraftOutp
   Object.freeze({
     destinationType: WorkflowDraftOutputDestinationTypes.systemEntry,
     outputType: WorkflowDraftOutputTypes.record,
-    label: "System entry",
-    description: "Persist workflow output into a system/entity-backed destination.",
+    label: "System record",
+    description: "Persist workflow output into an internal system/database record destination.",
     configSchemaId: "workflow.output.destination.system-entry.v1",
     supportedFormats: Object.freeze([
       WorkflowDraftOutputFormats.json,
@@ -328,7 +344,10 @@ const WorkflowDraftOutputDestinationDefinitions: ReadonlyArray<WorkflowDraftOutp
     defaultTarget: "system-record",
     defaultConfiguration: Object.freeze({
       entityName: "",
-      destinationConfig: "",
+      recordCollection: "",
+      writeMode: WorkflowDraftSystemOutputWriteModes.upsert,
+      recordShape: WorkflowDraftSystemOutputRecordShapes.singleRecord,
+      includeExecutionMetadata: "true",
     }),
   }),
   Object.freeze({
@@ -725,6 +744,12 @@ export const WorkflowValidationIssueCodes = Object.freeze({
   outputFileDestinationPathMissing: "output-file-destination-path-missing",
   outputViewerTitleMissing: "output-viewer-title-missing",
   outputSystemEntityMissing: "output-system-entity-missing",
+  outputSystemEntityMalformed: "output-system-entity-malformed",
+  outputSystemTargetInvalid: "output-system-target-invalid",
+  outputSystemRecordCollectionMalformed: "output-system-record-collection-malformed",
+  outputSystemWriteModeInvalid: "output-system-write-mode-invalid",
+  outputSystemRecordShapeInvalid: "output-system-record-shape-invalid",
+  outputSystemFormatIncompatible: "output-system-format-incompatible",
   outputPromptInputIdMissing: "output-prompt-input-id-missing",
   outputPromptInputNotFound: "output-prompt-input-not-found",
   outputPromptInputIncompatible: "output-prompt-input-incompatible",
@@ -2498,6 +2523,27 @@ function isPromptConversationScopeSupported(value: string): boolean {
   return value === "continue-session" || value === "new-session";
 }
 
+function isSystemOutputTargetSupported(value: string): boolean {
+  return value === "system-record" || value === "system-database";
+}
+
+function isSystemOutputEntityNameValid(value: string): boolean {
+  return /^[a-z][a-z0-9-]*(\.[a-z0-9-]+)*$/.test(value);
+}
+
+function isSystemOutputRecordCollectionValid(value: string): boolean {
+  return /^[a-z0-9][a-z0-9/_-]*$/.test(value);
+}
+
+function isSystemOutputWriteModeSupported(value: string): value is WorkflowDraftSystemOutputWriteMode {
+  return value === WorkflowDraftSystemOutputWriteModes.upsert || value === WorkflowDraftSystemOutputWriteModes.append;
+}
+
+function isSystemOutputRecordShapeSupported(value: string): value is WorkflowDraftSystemOutputRecordShape {
+  return value === WorkflowDraftSystemOutputRecordShapes.singleRecord
+    || value === WorkflowDraftSystemOutputRecordShapes.recordCollection;
+}
+
 function isPromptCompatibleInput(input: WorkflowDraftInput): boolean {
   if (input.sourceType === WorkflowDraftInputSourceTypes.runtimeParameter) {
     return !input.valueType
@@ -2588,11 +2634,30 @@ export function normalizeWorkflowDraftOutputConfiguration(
     } else {
       delete normalized.entityName;
     }
-    const destinationConfig = readOutputConfigurationString(merged, "destinationConfig");
-    if (destinationConfig !== undefined) {
-      normalized.destinationConfig = destinationConfig;
+    const recordCollection = readOutputConfigurationString(merged, "recordCollection")
+      ?? readOutputConfigurationString(merged, "destinationConfig");
+    if (recordCollection !== undefined) {
+      normalized.recordCollection = recordCollection;
     } else {
-      delete normalized.destinationConfig;
+      delete normalized.recordCollection;
+    }
+    const writeMode = readOutputConfigurationString(merged, "writeMode");
+    if (writeMode !== undefined) {
+      normalized.writeMode = writeMode;
+    } else {
+      normalized.writeMode = WorkflowDraftSystemOutputWriteModes.upsert;
+    }
+    const recordShape = readOutputConfigurationString(merged, "recordShape");
+    if (recordShape !== undefined) {
+      normalized.recordShape = recordShape;
+    } else {
+      normalized.recordShape = WorkflowDraftSystemOutputRecordShapes.singleRecord;
+    }
+    const includeExecutionMetadata = readOutputConfigurationString(merged, "includeExecutionMetadata");
+    if (includeExecutionMetadata !== undefined) {
+      normalized.includeExecutionMetadata = includeExecutionMetadata;
+    } else {
+      normalized.includeExecutionMetadata = "true";
     }
   }
 
@@ -3246,6 +3311,16 @@ export function validateWorkflowDraft(draft: WorkflowDraft | undefined): Workflo
       }
 
       if (normalized.destination.type === WorkflowDraftOutputDestinationTypes.systemEntry) {
+        if (!isSystemOutputTargetSupported(normalized.destination.target)) {
+          issues.push({
+            code: WorkflowValidationIssueCodes.outputSystemTargetInvalid,
+            section: WorkflowValidationSections.outputs,
+            severity: "error",
+            message: `System record output '${normalized.id}' requires destination target 'system-record' or 'system-database'.`,
+            path: `draft.outputs[${index}].destination.target`,
+          });
+        }
+
         const entityName = readDestinationOptionString(normalized, "entityName");
         if (!entityName) {
           issues.push({
@@ -3254,6 +3329,58 @@ export function validateWorkflowDraft(draft: WorkflowDraft | undefined): Workflo
             severity: "error",
             message: `System record output '${normalized.id}' requires destination options.entityName.`,
             path: `draft.outputs[${index}].destination.options.entityName`,
+          });
+        } else if (!isSystemOutputEntityNameValid(entityName)) {
+          issues.push({
+            code: WorkflowValidationIssueCodes.outputSystemEntityMalformed,
+            section: WorkflowValidationSections.outputs,
+            severity: "error",
+            message: `System record output '${normalized.id}' entity name '${entityName}' is invalid. Use lowercase dot-separated names like 'customer.record'.`,
+            path: `draft.outputs[${index}].destination.options.entityName`,
+          });
+        }
+
+        const recordCollection = readDestinationOptionString(normalized, "recordCollection");
+        if (recordCollection && !isSystemOutputRecordCollectionValid(recordCollection)) {
+          issues.push({
+            code: WorkflowValidationIssueCodes.outputSystemRecordCollectionMalformed,
+            section: WorkflowValidationSections.outputs,
+            severity: "error",
+            message: `System record output '${normalized.id}' record collection '${recordCollection}' is invalid. Use lowercase path-like values such as 'records/customers'.`,
+            path: `draft.outputs[${index}].destination.options.recordCollection`,
+          });
+        }
+
+        const writeMode = readDestinationOptionString(normalized, "writeMode");
+        if (!writeMode || !isSystemOutputWriteModeSupported(writeMode)) {
+          issues.push({
+            code: WorkflowValidationIssueCodes.outputSystemWriteModeInvalid,
+            section: WorkflowValidationSections.outputs,
+            severity: "error",
+            message: `System record output '${normalized.id}' requires destination options.writeMode to be 'upsert' or 'append'.`,
+            path: `draft.outputs[${index}].destination.options.writeMode`,
+          });
+        }
+
+        const recordShape = readDestinationOptionString(normalized, "recordShape");
+        if (!recordShape || !isSystemOutputRecordShapeSupported(recordShape)) {
+          issues.push({
+            code: WorkflowValidationIssueCodes.outputSystemRecordShapeInvalid,
+            section: WorkflowValidationSections.outputs,
+            severity: "error",
+            message: `System record output '${normalized.id}' requires destination options.recordShape to be 'single-record' or 'record-collection'.`,
+            path: `draft.outputs[${index}].destination.options.recordShape`,
+          });
+        } else if (
+          recordShape === WorkflowDraftSystemOutputRecordShapes.singleRecord
+          && normalized.format !== WorkflowDraftOutputFormats.json
+        ) {
+          issues.push({
+            code: WorkflowValidationIssueCodes.outputSystemFormatIncompatible,
+            section: WorkflowValidationSections.outputs,
+            severity: "error",
+            message: `System record output '${normalized.id}' with single-record shape requires format 'json'.`,
+            path: `draft.outputs[${index}].format`,
           });
         }
       }
