@@ -98,6 +98,28 @@ export interface WorkflowDraftStateTrigger extends WorkflowDraftTriggerBase {
 
 export type WorkflowDraftTrigger = WorkflowDraftUserTrigger | WorkflowDraftTemporalTrigger | WorkflowDraftStateTrigger;
 
+export type WorkflowDraftTriggerConfig =
+  | WorkflowDraftUserTriggerConfig
+  | WorkflowDraftTemporalTriggerConfig
+  | WorkflowDraftStateTriggerConfig;
+
+export interface WorkflowDraftTriggerCapabilityMetadata {
+  readonly supportsManualInvocation: boolean;
+  readonly supportsTemporalScheduling: boolean;
+  readonly supportsStateSubscription: boolean;
+}
+
+export interface WorkflowDraftTriggerDefinition<TConfig extends WorkflowDraftTriggerConfig = WorkflowDraftTriggerConfig> {
+  readonly kind: WorkflowDraftTriggerKind;
+  readonly type: WorkflowDraftTriggerType;
+  readonly label: string;
+  readonly description: string;
+  readonly configSchemaId: string;
+  readonly capabilities: WorkflowDraftTriggerCapabilityMetadata;
+  readonly defaultConfig: Readonly<TConfig>;
+  readonly validateConfig: (configRecord: Readonly<Record<string, unknown>>) => Readonly<TConfig>;
+}
+
 export const WorkflowDraftInputSourceTypes = Object.freeze({
   datasetAsset: "dataset-asset",
   runtimeParameter: "runtime-parameter",
@@ -750,48 +772,41 @@ function normalizeWorkflowDraftAssetReference(
   return Object.freeze({ assetId, versionId, taxonomy });
 }
 
-function normalizeUserTrigger(
-  item: WorkflowDraftSectionItemBase,
-  trigger: WorkflowDraftTrigger,
-): WorkflowDraftUserTrigger {
+function normalizeUserTriggerConfig(
+  triggerType: WorkflowDraftUserTrigger["type"],
+  configRecord: Readonly<Record<string, unknown>>,
+): WorkflowDraftUserTriggerConfig {
   if (
-    trigger.type !== WorkflowDraftTriggerTypes.userManual
-    && trigger.type !== WorkflowDraftTriggerTypes.userButtonClick
-    && trigger.type !== WorkflowDraftTriggerTypes.userInitiatedRun
+    triggerType !== WorkflowDraftTriggerTypes.userManual
+    && triggerType !== WorkflowDraftTriggerTypes.userButtonClick
+    && triggerType !== WorkflowDraftTriggerTypes.userInitiatedRun
   ) {
-    throw new Error(`Workflow draft trigger type '${trigger.type}' is not valid for kind '${WorkflowDraftTriggerKinds.user}'.`);
+    throw new Error(`Workflow draft trigger type '${triggerType}' is not valid for kind '${WorkflowDraftTriggerKinds.user}'.`);
   }
 
-  const configRecord = assertRecord(trigger.config ?? {}, "Workflow draft trigger config");
   const buttonId = normalizeOptional(typeof configRecord.buttonId === "string" ? configRecord.buttonId : undefined);
-  if (trigger.type === WorkflowDraftTriggerTypes.userButtonClick && !buttonId) {
+  if (triggerType === WorkflowDraftTriggerTypes.userButtonClick && !buttonId) {
     throw new Error("Workflow draft user button-click trigger requires config.buttonId.");
   }
 
   return Object.freeze({
-    ...item,
-    kind: WorkflowDraftTriggerKinds.user,
-    type: trigger.type,
-    config: Object.freeze({
-      buttonId,
-      requiresConfirmation: normalizeOptionalBoolean(configRecord.requiresConfirmation, "Workflow draft user trigger config.requiresConfirmation"),
-      allowedRoles: normalizeStringArray(configRecord.allowedRoles, "Workflow draft user trigger config.allowedRoles"),
-    }),
+    buttonId,
+    requiresConfirmation: normalizeOptionalBoolean(configRecord.requiresConfirmation, "Workflow draft user trigger config.requiresConfirmation"),
+    allowedRoles: normalizeStringArray(configRecord.allowedRoles, "Workflow draft user trigger config.allowedRoles"),
   });
 }
 
-function normalizeTemporalTrigger(
-  item: WorkflowDraftSectionItemBase,
-  trigger: WorkflowDraftTrigger,
-): WorkflowDraftTemporalTrigger {
+function normalizeTemporalTriggerConfig(
+  triggerType: WorkflowDraftTemporalTrigger["type"],
+  configRecord: Readonly<Record<string, unknown>>,
+): WorkflowDraftTemporalTriggerConfig {
   if (
-    trigger.type !== WorkflowDraftTriggerTypes.temporalSchedule
-    && trigger.type !== WorkflowDraftTriggerTypes.temporalRecurring
+    triggerType !== WorkflowDraftTriggerTypes.temporalSchedule
+    && triggerType !== WorkflowDraftTriggerTypes.temporalRecurring
   ) {
-    throw new Error(`Workflow draft trigger type '${trigger.type}' is not valid for kind '${WorkflowDraftTriggerKinds.temporal}'.`);
+    throw new Error(`Workflow draft trigger type '${triggerType}' is not valid for kind '${WorkflowDraftTriggerKinds.temporal}'.`);
   }
 
-  const configRecord = assertRecord(trigger.config ?? {}, "Workflow draft trigger config");
   const cronExpression = normalizeOptional(typeof configRecord.cronExpression === "string" ? configRecord.cronExpression : undefined);
   const every = normalizePositiveInteger(configRecord.every, "Workflow draft temporal trigger config.every");
   const unit = normalizeOptional(typeof configRecord.unit === "string" ? configRecord.unit : undefined);
@@ -802,41 +817,35 @@ function normalizeTemporalTrigger(
     throw new Error(`Workflow draft temporal trigger config.unit '${unit}' is not supported.`);
   }
 
-  if (trigger.type === WorkflowDraftTriggerTypes.temporalSchedule && !cronExpression) {
+  if (triggerType === WorkflowDraftTriggerTypes.temporalSchedule && !cronExpression) {
     throw new Error("Workflow draft temporal schedule trigger requires config.cronExpression.");
   }
-  if (trigger.type === WorkflowDraftTriggerTypes.temporalRecurring && (!every || !normalizedUnit)) {
+  if (triggerType === WorkflowDraftTriggerTypes.temporalRecurring && (!every || !normalizedUnit)) {
     throw new Error("Workflow draft temporal recurring trigger requires config.every and config.unit.");
   }
 
   return Object.freeze({
-    ...item,
-    kind: WorkflowDraftTriggerKinds.temporal,
-    type: trigger.type,
-    config: Object.freeze({
-      cronExpression,
-      every,
-      unit: normalizedUnit,
-      timezone: normalizeOptional(typeof configRecord.timezone === "string" ? configRecord.timezone : undefined),
-      startAt: normalizeOptional(typeof configRecord.startAt === "string" ? configRecord.startAt : undefined),
-      endAt: normalizeOptional(typeof configRecord.endAt === "string" ? configRecord.endAt : undefined),
-    }),
+    cronExpression,
+    every,
+    unit: normalizedUnit,
+    timezone: normalizeOptional(typeof configRecord.timezone === "string" ? configRecord.timezone : undefined),
+    startAt: normalizeOptional(typeof configRecord.startAt === "string" ? configRecord.startAt : undefined),
+    endAt: normalizeOptional(typeof configRecord.endAt === "string" ? configRecord.endAt : undefined),
   });
 }
 
-function normalizeStateTrigger(
-  item: WorkflowDraftSectionItemBase,
-  trigger: WorkflowDraftTrigger,
-): WorkflowDraftStateTrigger {
+function normalizeStateTriggerConfig(
+  triggerType: WorkflowDraftStateTrigger["type"],
+  configRecord: Readonly<Record<string, unknown>>,
+): WorkflowDraftStateTriggerConfig {
   if (
-    trigger.type !== WorkflowDraftTriggerTypes.stateDataAvailable
-    && trigger.type !== WorkflowDraftTriggerTypes.stateAssetStateChanged
-    && trigger.type !== WorkflowDraftTriggerTypes.stateSystemEvent
+    triggerType !== WorkflowDraftTriggerTypes.stateDataAvailable
+    && triggerType !== WorkflowDraftTriggerTypes.stateAssetStateChanged
+    && triggerType !== WorkflowDraftTriggerTypes.stateSystemEvent
   ) {
-    throw new Error(`Workflow draft trigger type '${trigger.type}' is not valid for kind '${WorkflowDraftTriggerKinds.state}'.`);
+    throw new Error(`Workflow draft trigger type '${triggerType}' is not valid for kind '${WorkflowDraftTriggerKinds.state}'.`);
   }
 
-  const configRecord = assertRecord(trigger.config ?? {}, "Workflow draft trigger config");
   const eventName = normalizeOptional(typeof configRecord.eventName === "string" ? configRecord.eventName : undefined);
   const stateKey = normalizeOptional(typeof configRecord.stateKey === "string" ? configRecord.stateKey : undefined);
   const stateValue = normalizeOptional(typeof configRecord.stateValue === "string" ? configRecord.stateValue : undefined);
@@ -848,24 +857,64 @@ function normalizeStateTrigger(
     )
     : undefined;
 
-  if (trigger.type === WorkflowDraftTriggerTypes.stateAssetStateChanged && !assetRecord) {
+  if (triggerType === WorkflowDraftTriggerTypes.stateAssetStateChanged && !assetRecord) {
     throw new Error("Workflow draft state asset-state-changed trigger requires config.asset.");
   }
-  if (trigger.type === WorkflowDraftTriggerTypes.stateSystemEvent && !eventName) {
+  if (triggerType === WorkflowDraftTriggerTypes.stateSystemEvent && !eventName) {
     throw new Error("Workflow draft state system-event trigger requires config.eventName.");
   }
 
   return Object.freeze({
+    eventName,
+    asset: assetRecord,
+    stateKey,
+    stateValue,
+    filter,
+  });
+}
+
+function normalizeUserTrigger(
+  item: WorkflowDraftSectionItemBase,
+  trigger: WorkflowDraftTrigger,
+): WorkflowDraftUserTrigger {
+  const triggerType = trigger.type as WorkflowDraftUserTrigger["type"];
+  const configRecord = assertRecord(trigger.config ?? {}, "Workflow draft trigger config");
+
+  return Object.freeze({
+    ...item,
+    kind: WorkflowDraftTriggerKinds.user,
+    type: triggerType,
+    config: normalizeUserTriggerConfig(triggerType, configRecord),
+  });
+}
+
+function normalizeTemporalTrigger(
+  item: WorkflowDraftSectionItemBase,
+  trigger: WorkflowDraftTrigger,
+): WorkflowDraftTemporalTrigger {
+  const triggerType = trigger.type as WorkflowDraftTemporalTrigger["type"];
+  const configRecord = assertRecord(trigger.config ?? {}, "Workflow draft trigger config");
+
+  return Object.freeze({
+    ...item,
+    kind: WorkflowDraftTriggerKinds.temporal,
+    type: triggerType,
+    config: normalizeTemporalTriggerConfig(triggerType, configRecord),
+  });
+}
+
+function normalizeStateTrigger(
+  item: WorkflowDraftSectionItemBase,
+  trigger: WorkflowDraftTrigger,
+): WorkflowDraftStateTrigger {
+  const triggerType = trigger.type as WorkflowDraftStateTrigger["type"];
+  const configRecord = assertRecord(trigger.config ?? {}, "Workflow draft trigger config");
+
+  return Object.freeze({
     ...item,
     kind: WorkflowDraftTriggerKinds.state,
-    type: trigger.type,
-    config: Object.freeze({
-      eventName,
-      asset: assetRecord,
-      stateKey,
-      stateValue,
-      filter,
-    }),
+    type: triggerType,
+    config: normalizeStateTriggerConfig(triggerType, configRecord),
   });
 }
 
@@ -1564,6 +1613,171 @@ function normalizeManualApprovalStepConfig(
     ),
     approvalMessage: prompt,
   });
+}
+
+const workflowDraftTriggerDefinitions: ReadonlyArray<WorkflowDraftTriggerDefinition> = Object.freeze([
+  Object.freeze({
+    kind: WorkflowDraftTriggerKinds.user,
+    type: WorkflowDraftTriggerTypes.userManual,
+    label: "Manual start",
+    description: "Workflow execution starts from an explicit manual user action.",
+    configSchemaId: "workflow.trigger.user.manual.v1",
+    capabilities: Object.freeze({
+      supportsManualInvocation: true,
+      supportsTemporalScheduling: false,
+      supportsStateSubscription: false,
+    }),
+    defaultConfig: Object.freeze<WorkflowDraftUserTriggerConfig>({}),
+    validateConfig: (configRecord) => normalizeUserTriggerConfig(WorkflowDraftTriggerTypes.userManual, configRecord),
+  }),
+  Object.freeze({
+    kind: WorkflowDraftTriggerKinds.user,
+    type: WorkflowDraftTriggerTypes.userButtonClick,
+    label: "Button click",
+    description: "Workflow execution starts from a configured UI/button action.",
+    configSchemaId: "workflow.trigger.user.button-click.v1",
+    capabilities: Object.freeze({
+      supportsManualInvocation: true,
+      supportsTemporalScheduling: false,
+      supportsStateSubscription: false,
+    }),
+    defaultConfig: Object.freeze<WorkflowDraftUserTriggerConfig>({
+      buttonId: "run-workflow",
+    }),
+    validateConfig: (configRecord) => normalizeUserTriggerConfig(WorkflowDraftTriggerTypes.userButtonClick, configRecord),
+  }),
+  Object.freeze({
+    kind: WorkflowDraftTriggerKinds.user,
+    type: WorkflowDraftTriggerTypes.userInitiatedRun,
+    label: "User initiated run",
+    description: "Workflow execution starts when a user submits a run request.",
+    configSchemaId: "workflow.trigger.user.initiated-run.v1",
+    capabilities: Object.freeze({
+      supportsManualInvocation: true,
+      supportsTemporalScheduling: false,
+      supportsStateSubscription: false,
+    }),
+    defaultConfig: Object.freeze<WorkflowDraftUserTriggerConfig>({}),
+    validateConfig: (configRecord) => normalizeUserTriggerConfig(WorkflowDraftTriggerTypes.userInitiatedRun, configRecord),
+  }),
+  Object.freeze({
+    kind: WorkflowDraftTriggerKinds.temporal,
+    type: WorkflowDraftTriggerTypes.temporalSchedule,
+    label: "Scheduled time",
+    description: "Workflow execution starts on a cron-like schedule expression.",
+    configSchemaId: "workflow.trigger.temporal.schedule.v1",
+    capabilities: Object.freeze({
+      supportsManualInvocation: false,
+      supportsTemporalScheduling: true,
+      supportsStateSubscription: false,
+    }),
+    defaultConfig: Object.freeze<WorkflowDraftTemporalTriggerConfig>({
+      cronExpression: "0 9 * * *",
+      timezone: "UTC",
+    }),
+    validateConfig: (configRecord) => normalizeTemporalTriggerConfig(WorkflowDraftTriggerTypes.temporalSchedule, configRecord),
+  }),
+  Object.freeze({
+    kind: WorkflowDraftTriggerKinds.temporal,
+    type: WorkflowDraftTriggerTypes.temporalRecurring,
+    label: "Recurring interval",
+    description: "Workflow execution starts on a recurring interval cadence.",
+    configSchemaId: "workflow.trigger.temporal.recurring.v1",
+    capabilities: Object.freeze({
+      supportsManualInvocation: false,
+      supportsTemporalScheduling: true,
+      supportsStateSubscription: false,
+    }),
+    defaultConfig: Object.freeze<WorkflowDraftTemporalTriggerConfig>({
+      every: 1,
+      unit: "days",
+      timezone: "UTC",
+    }),
+    validateConfig: (configRecord) => normalizeTemporalTriggerConfig(WorkflowDraftTriggerTypes.temporalRecurring, configRecord),
+  }),
+  Object.freeze({
+    kind: WorkflowDraftTriggerKinds.state,
+    type: WorkflowDraftTriggerTypes.stateDataAvailable,
+    label: "Data available",
+    description: "Workflow execution starts when new input data is available.",
+    configSchemaId: "workflow.trigger.state.data-available.v1",
+    capabilities: Object.freeze({
+      supportsManualInvocation: false,
+      supportsTemporalScheduling: false,
+      supportsStateSubscription: true,
+    }),
+    defaultConfig: Object.freeze<WorkflowDraftStateTriggerConfig>({
+      eventName: "data-available",
+    }),
+    validateConfig: (configRecord) => normalizeStateTriggerConfig(WorkflowDraftTriggerTypes.stateDataAvailable, configRecord),
+  }),
+  Object.freeze({
+    kind: WorkflowDraftTriggerKinds.state,
+    type: WorkflowDraftTriggerTypes.stateAssetStateChanged,
+    label: "Asset state changed",
+    description: "Workflow execution starts when a referenced asset changes state.",
+    configSchemaId: "workflow.trigger.state.asset-state-changed.v1",
+    capabilities: Object.freeze({
+      supportsManualInvocation: false,
+      supportsTemporalScheduling: false,
+      supportsStateSubscription: true,
+    }),
+    defaultConfig: Object.freeze<WorkflowDraftStateTriggerConfig>({
+      asset: Object.freeze({
+        assetId: "asset:source",
+      }),
+      stateKey: "status",
+      stateValue: "ready",
+    }),
+    validateConfig: (configRecord) => normalizeStateTriggerConfig(WorkflowDraftTriggerTypes.stateAssetStateChanged, configRecord),
+  }),
+  Object.freeze({
+    kind: WorkflowDraftTriggerKinds.state,
+    type: WorkflowDraftTriggerTypes.stateSystemEvent,
+    label: "System event",
+    description: "Workflow execution starts when a named system event is emitted.",
+    configSchemaId: "workflow.trigger.state.system-event.v1",
+    capabilities: Object.freeze({
+      supportsManualInvocation: false,
+      supportsTemporalScheduling: false,
+      supportsStateSubscription: true,
+    }),
+    defaultConfig: Object.freeze<WorkflowDraftStateTriggerConfig>({
+      eventName: "system-event",
+    }),
+    validateConfig: (configRecord) => normalizeStateTriggerConfig(WorkflowDraftTriggerTypes.stateSystemEvent, configRecord),
+  }),
+]);
+
+const workflowDraftTriggerDefinitionByType = new Map<WorkflowDraftTriggerType, WorkflowDraftTriggerDefinition>(
+  workflowDraftTriggerDefinitions.map((definition) => [definition.type, definition]),
+);
+
+export function listWorkflowDraftTriggerDefinitions(): ReadonlyArray<WorkflowDraftTriggerDefinition> {
+  return workflowDraftTriggerDefinitions;
+}
+
+export function getWorkflowDraftTriggerDefinition(type: string): WorkflowDraftTriggerDefinition | undefined {
+  const normalized = normalizeOptional(type);
+  if (!normalized) {
+    return undefined;
+  }
+  return workflowDraftTriggerDefinitionByType.get(normalized as WorkflowDraftTriggerType);
+}
+
+export function isWorkflowDraftTriggerType(value: string): value is WorkflowDraftTriggerType {
+  return workflowDraftTriggerDefinitionByType.has(value as WorkflowDraftTriggerType);
+}
+
+export function normalizeWorkflowDraftTriggerConfig(
+  triggerType: WorkflowDraftTriggerType,
+  configRecord: Readonly<Record<string, unknown>>,
+): Readonly<WorkflowDraftTriggerConfig> {
+  const definition = workflowDraftTriggerDefinitionByType.get(triggerType);
+  if (!definition) {
+    throw new Error(`Workflow draft trigger type '${triggerType}' is not supported.`);
+  }
+  return definition.validateConfig(configRecord);
 }
 
 const workflowDraftBuiltInStepDefinitions: ReadonlyArray<WorkflowDraftBuiltInStepDefinition> = Object.freeze([

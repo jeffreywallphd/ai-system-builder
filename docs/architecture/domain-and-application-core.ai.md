@@ -222,6 +222,18 @@ The studio shell now has a bounded inner-layer model and application orchestrati
   - domain validation now includes explicit built-in reference order checks (`built-in-step-reference-order-invalid`) for `if-then`, `loop-iteration`, and `manual-approval` outcome references,
   - workflow planning now has a dedicated canonical mapper `application/workflow-studio/WorkflowDraftExecutionPlanMapper.ts` (`mapWorkflowDraftToExecutionPlan`) that validates canonical drafts first and then emits deterministic execution-plan elements for action + built-in step types without introducing a parallel workflow model.
 
+## Direction 5 update: Workflow trigger domain model + registry contracts (stories 7.1-7.2)
+
+- Workflow triggers are now first-class canonical domain contracts in `domain/workflow-studio/WorkflowStudioDomain.ts` with stable identity (`id`), kind (`user`/`temporal`/`state`), stable type ids, and typed config payloads on the canonical workflow draft (`WorkflowDraft.triggers`).
+- Trigger configuration normalization/validation now has an explicit domain entry point (`normalizeWorkflowDraftTriggerConfig`) so trigger config correctness stays reusable across authoring, persistence rehydration, and later runtime mapping.
+- The domain now exposes trigger type definitions (`WorkflowDraftTriggerDefinition`) with stable ids, labels/descriptions, config schema ids, capability metadata, default config payloads, and validation hooks.
+- Seeded trigger definitions now cover the planned Epic 7 categories:
+  - user/manual: `manual`, `button-click`, `user-initiated-run`
+  - temporal: `schedule`, `recurring`
+  - state: `data-available`, `asset-state-changed`, `system-event`
+- Application-layer discovery now uses `application/workflow-studio/WorkflowTriggerTypeRegistry.ts` for listing/lookup/filtering, default config projection, and config validation delegation without introducing UI-local trigger catalogs or runtime-specific trigger behavior.
+- This keeps trigger semantics in inner layers and creates clean extension seams for future selector/config UI, persistence integration, and execution mapping stories.
+
 ## Direction 5 update: Studio shell persistence integration (story 1.11)
 
 - Studio shell now has a real SQLite-backed infrastructure adapter (`infrastructure/filesystem/studio-shell/SqliteStudioShellRepository.ts`) implementing `IStudioShellRepository` with migration-managed schema, indexed studio/session/draft/version storage, and full aggregate snapshot persistence.
