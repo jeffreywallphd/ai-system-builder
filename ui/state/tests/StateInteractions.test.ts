@@ -115,6 +115,33 @@ describe("ui/state interactions", () => {
     expect(store.getState().isExecuting).toBeFalse();
   });
 
+  it("creates a conversational session for eligible workflow executions", async () => {
+    const workflow = { id: "wf-chat", metadata: { name: "Chat workflow" }, nodes: [] } as any;
+    const store = new WorkflowStore({
+      workflowService: {
+        executeWorkflow: async () => ({
+          effectiveWorkflow: workflow,
+          result: {
+            executionId: "exec-chat",
+            status: "completed",
+            outputAssets: [],
+          },
+        }),
+      } as any,
+      nodeService: {} as any,
+      conversationSessionService: {
+        createFromExecution: () => ({ id: "session-chat-1" }),
+      } as any,
+      initialState: {
+        currentWorkflow: workflow,
+      },
+    });
+
+    const completion = await store.executeCurrentWorkflow();
+
+    expect(completion.conversationSessionId).toBe("session-chat-1");
+  });
+
   it("resets execution state when switching workflows without disturbing editor state shape", async () => {
     const nextWorkflow = { id: "wf-2" } as any;
     const executionStore = new WorkflowExecutionStore({

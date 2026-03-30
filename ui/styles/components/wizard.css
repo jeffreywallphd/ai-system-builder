@@ -26,6 +26,21 @@
   margin-top: var(--space-sm);
 }
 
+.ui-workflow-wizard__output-overview {
+  margin-top: var(--space-sm);
+}
+
+.ui-workflow-wizard__output-summary-list {
+  list-style: disc;
+  padding-left: var(--space-md);
+}
+
+.ui-workflow-wizard__output-summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
 .workflow-step-selector-option {
   justify-content: flex-start;
   align-items: flex-start;
@@ -47,6 +62,26 @@
 
 .workflow-step-checkbox-field {
   align-items: center;
+  gap: var(--space-xs);
+}
+
+.workflow-output-selector-option {
+  align-items: flex-start;
+}
+
+.workflow-output-selector-actions {
+  gap: var(--space-xs);
+}
+
+.workflow-output-list-row-header {
+  gap: var(--space-xs);
+}
+
+.workflow-output-list-row-actions {
+  gap: var(--space-xs);
+}
+
+.workflow-output-selected-editor-header {
   gap: var(--space-xs);
 }
 

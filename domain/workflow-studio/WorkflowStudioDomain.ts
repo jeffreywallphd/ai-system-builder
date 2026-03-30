@@ -248,10 +248,27 @@ export const WorkflowDraftOutputDestinationTypes = Object.freeze({
   fileExport: "file-export",
   webViewer: "web-viewer",
   systemEntry: "system-entry",
+  promptResponseChat: "prompt-response-chat",
 });
 
 export type WorkflowDraftOutputDestinationType = typeof WorkflowDraftOutputDestinationTypes[keyof typeof WorkflowDraftOutputDestinationTypes]
   | (string & {});
+
+export const WorkflowDraftSystemOutputWriteModes = Object.freeze({
+  upsert: "upsert",
+  append: "append",
+});
+
+export type WorkflowDraftSystemOutputWriteMode =
+  typeof WorkflowDraftSystemOutputWriteModes[keyof typeof WorkflowDraftSystemOutputWriteModes];
+
+export const WorkflowDraftSystemOutputRecordShapes = Object.freeze({
+  singleRecord: "single-record",
+  recordCollection: "record-collection",
+});
+
+export type WorkflowDraftSystemOutputRecordShape =
+  typeof WorkflowDraftSystemOutputRecordShapes[keyof typeof WorkflowDraftSystemOutputRecordShapes];
 
 export interface WorkflowDraftOutputDestination {
   readonly type: WorkflowDraftOutputDestinationType;
@@ -259,12 +276,122 @@ export interface WorkflowDraftOutputDestination {
   readonly options?: Readonly<Record<string, unknown>>;
 }
 
+export interface WorkflowDraftOutputDestinationDefinition {
+  readonly destinationType: WorkflowDraftOutputDestinationType;
+  readonly outputType: WorkflowDraftOutputType;
+  readonly label: string;
+  readonly description: string;
+  readonly configSchemaId: string;
+  readonly supportedFormats: ReadonlyArray<WorkflowDraftOutputFormat>;
+  readonly defaultFormat: WorkflowDraftOutputFormat;
+  readonly defaultTarget: string;
+  readonly defaultConfiguration?: Readonly<Record<string, unknown>>;
+}
+
+const WorkflowDraftOutputDestinationDefinitions: ReadonlyArray<WorkflowDraftOutputDestinationDefinition> = Object.freeze([
+  Object.freeze({
+    destinationType: WorkflowDraftOutputDestinationTypes.fileExport,
+    outputType: WorkflowDraftOutputTypes.document,
+    label: "File export",
+    description: "Persist workflow output to a file artifact destination.",
+    configSchemaId: "workflow.output.destination.file-export.v1",
+    supportedFormats: Object.freeze([
+      WorkflowDraftOutputFormats.pdf,
+      WorkflowDraftOutputFormats.json,
+      WorkflowDraftOutputFormats.jsonl,
+      WorkflowDraftOutputFormats.csv,
+      WorkflowDraftOutputFormats.markdown,
+      WorkflowDraftOutputFormats.html,
+    ]),
+    defaultFormat: WorkflowDraftOutputFormats.pdf,
+    defaultTarget: "file-download",
+    defaultConfiguration: Object.freeze({
+      deliveryMode: "download",
+      destinationPath: "",
+      fileName: "",
+    }),
+  }),
+  Object.freeze({
+    destinationType: WorkflowDraftOutputDestinationTypes.webViewer,
+    outputType: WorkflowDraftOutputTypes.document,
+    label: "Web viewer",
+    description: "Render workflow output directly inside the Studio viewer.",
+    configSchemaId: "workflow.output.destination.web-viewer.v1",
+    supportedFormats: Object.freeze([
+      WorkflowDraftOutputFormats.markdown,
+      WorkflowDraftOutputFormats.html,
+      WorkflowDraftOutputFormats.json,
+    ]),
+    defaultFormat: WorkflowDraftOutputFormats.markdown,
+    defaultTarget: "in-app-view",
+    defaultConfiguration: Object.freeze({
+      title: "",
+      presentationMode: "embedded",
+    }),
+  }),
+  Object.freeze({
+    destinationType: WorkflowDraftOutputDestinationTypes.systemEntry,
+    outputType: WorkflowDraftOutputTypes.record,
+    label: "System record",
+    description: "Persist workflow output into an internal system/database record destination.",
+    configSchemaId: "workflow.output.destination.system-entry.v1",
+    supportedFormats: Object.freeze([
+      WorkflowDraftOutputFormats.json,
+      WorkflowDraftOutputFormats.jsonl,
+      WorkflowDraftOutputFormats.csv,
+    ]),
+    defaultFormat: WorkflowDraftOutputFormats.json,
+    defaultTarget: "system-record",
+    defaultConfiguration: Object.freeze({
+      entityName: "",
+      recordCollection: "",
+      writeMode: WorkflowDraftSystemOutputWriteModes.upsert,
+      recordShape: WorkflowDraftSystemOutputRecordShapes.singleRecord,
+      includeExecutionMetadata: "true",
+    }),
+  }),
+  Object.freeze({
+    destinationType: WorkflowDraftOutputDestinationTypes.promptResponseChat,
+    outputType: WorkflowDraftOutputTypes.document,
+    label: "Prompt response chat",
+    description: "Start a conversational prompt-response output that can continue in chat mode.",
+    configSchemaId: "workflow.output.destination.prompt-response-chat.v1",
+    supportedFormats: Object.freeze([
+      WorkflowDraftOutputFormats.json,
+      WorkflowDraftOutputFormats.markdown,
+    ]),
+    defaultFormat: WorkflowDraftOutputFormats.json,
+    defaultTarget: "chat-session",
+    defaultConfiguration: Object.freeze({
+      title: "",
+      promptInputId: "",
+      responseField: "assistant-response",
+      conversationScope: "continue-session",
+      initialSystemPrompt: "",
+    }),
+  }),
+]);
+
+export function listWorkflowDraftOutputDestinationDefinitions(): ReadonlyArray<WorkflowDraftOutputDestinationDefinition> {
+  return WorkflowDraftOutputDestinationDefinitions;
+}
+
+export function getWorkflowDraftOutputDestinationDefinition(
+  destinationType: WorkflowDraftOutputDestinationType,
+): WorkflowDraftOutputDestinationDefinition | undefined {
+  return WorkflowDraftOutputDestinationDefinitions.find((entry) => entry.destinationType === destinationType);
+}
+
 export interface WorkflowDraftOutput extends WorkflowDraftSectionItemBase {
+  readonly order?: number;
   readonly outputType: WorkflowDraftOutputType;
   readonly format: WorkflowDraftOutputFormat;
   readonly destination: WorkflowDraftOutputDestination;
+  readonly configuration?: Readonly<Record<string, unknown>>;
   readonly sourceStepId?: string;
 }
+
+type NormalizedWorkflowDraftOutput = WorkflowDraftOutput & { readonly order: number };
 
 export const WorkflowDraftStepKinds = Object.freeze({
   action: "action",
@@ -608,10 +735,27 @@ export const WorkflowValidationIssueCodes = Object.freeze({
   builtInStepReferenceOrderInvalid: "built-in-step-reference-order-invalid",
   loopCollectionInputMissing: "loop-collection-input-missing",
   outputMalformed: "output-malformed",
+  outputDuplicateId: "output-duplicate-id",
+  outputOrderDuplicate: "output-order-duplicate",
+  outputOrderNonContiguous: "output-order-non-contiguous",
   outputSourceStepMissing: "output-source-step-missing",
   outputFileFormatInvalid: "output-file-format-invalid",
+  outputFileDeliveryModeInvalid: "output-file-delivery-mode-invalid",
+  outputFileDestinationPathMissing: "output-file-destination-path-missing",
   outputViewerTitleMissing: "output-viewer-title-missing",
   outputSystemEntityMissing: "output-system-entity-missing",
+  outputSystemEntityMalformed: "output-system-entity-malformed",
+  outputSystemTargetInvalid: "output-system-target-invalid",
+  outputSystemRecordCollectionMalformed: "output-system-record-collection-malformed",
+  outputSystemWriteModeInvalid: "output-system-write-mode-invalid",
+  outputSystemRecordShapeInvalid: "output-system-record-shape-invalid",
+  outputSystemFormatIncompatible: "output-system-format-incompatible",
+  outputPromptInputIdMissing: "output-prompt-input-id-missing",
+  outputPromptInputNotFound: "output-prompt-input-not-found",
+  outputPromptInputIncompatible: "output-prompt-input-incompatible",
+  outputPromptResponseFieldMissing: "output-prompt-response-field-missing",
+  outputPromptConversationScopeInvalid: "output-prompt-conversation-scope-invalid",
+  outputPromptFormatInvalid: "output-prompt-format-invalid",
 });
 
 export type WorkflowValidationIssueCode = typeof WorkflowValidationIssueCodes[keyof typeof WorkflowValidationIssueCodes];
@@ -2158,8 +2302,9 @@ function normalizeWorkflowDraftStepAssetReference(reference: WorkflowDraftStepAs
   });
 }
 
-function normalizeOutput(output: WorkflowDraftOutput): WorkflowDraftOutput {
+function normalizeOutput(output: WorkflowDraftOutput, fallbackOrder = 1): NormalizedWorkflowDraftOutput {
   const item = normalizeSectionItem(output, "Workflow draft output");
+  const order = normalizePositiveInteger(output.order, "Workflow draft output order");
   const outputType = normalizeRequired(output.outputType, "Workflow draft output outputType");
   const format = normalizeRequired(output.format, "Workflow draft output format");
   const destinationRecord = assertRecord(output.destination, "Workflow draft output destination");
@@ -2174,19 +2319,61 @@ function normalizeOutput(output: WorkflowDraftOutput): WorkflowDraftOutput {
   const destinationOptions = destinationRecord.options
     ? Object.freeze({ ...assertRecord(destinationRecord.options, "Workflow draft output destination options") })
     : undefined;
+  const configurationRecord = output.configuration
+    ? assertRecord(output.configuration, "Workflow draft output configuration")
+    : undefined;
+  const configuration = normalizeWorkflowDraftOutputConfiguration(
+    destinationType,
+    configurationRecord,
+    destinationOptions,
+    item.title,
+  );
+  const title = destinationType === WorkflowDraftOutputDestinationTypes.webViewer
+    || destinationType === WorkflowDraftOutputDestinationTypes.promptResponseChat
+    ? readOutputConfigurationString(configuration, "title")
+    : item.title;
   const sourceStepId = normalizeOptional(output.sourceStepId);
 
   return Object.freeze({
     ...item,
+    title,
+    order: order ?? fallbackOrder,
     outputType,
     format,
     destination: Object.freeze({
       type: destinationType,
       target: destinationTarget,
-      options: destinationOptions,
+      options: configuration,
     }),
+    configuration,
     sourceStepId,
   });
+}
+
+function normalizeOutputOrdering(
+  outputs: ReadonlyArray<NormalizedWorkflowDraftOutput>,
+): ReadonlyArray<NormalizedWorkflowDraftOutput> {
+  const normalized = [...outputs].sort((left, right) => {
+    if (left.order !== right.order) {
+      return left.order - right.order;
+    }
+    return left.id.localeCompare(right.id);
+  });
+
+  const seenOrder = new Set<number>();
+  const seenIds = new Set<string>();
+  for (const output of normalized) {
+    if (seenIds.has(output.id)) {
+      throw new Error(`Workflow draft output id '${output.id}' is duplicated.`);
+    }
+    if (seenOrder.has(output.order)) {
+      throw new Error(`Workflow draft output order '${output.order}' is duplicated.`);
+    }
+    seenIds.add(output.id);
+    seenOrder.add(output.order);
+  }
+
+  return Object.freeze(normalized);
 }
 
 function normalizeStepOrdering(steps: ReadonlyArray<WorkflowDraftStep>): ReadonlyArray<WorkflowDraftStep> {
@@ -2247,11 +2434,15 @@ export function normalizeWorkflowDraft(draft?: WorkflowDraft): WorkflowDraft {
     return createEmptyWorkflowDraft();
   }
 
+  const normalizedOutputs: ReadonlyArray<NormalizedWorkflowDraftOutput> = (draft.outputs ?? []).map(
+    (item, index) => normalizeOutput(item as WorkflowDraftOutput, index + 1),
+  );
+
   return Object.freeze({
     triggers: normalizeSectionItems("Workflow draft trigger", draft.triggers ?? [], (item) => normalizeTrigger(item as WorkflowDraftTrigger)),
     inputs: normalizeSectionItems("Workflow draft input", draft.inputs ?? [], (item) => normalizeInput(item as WorkflowDraftInput)),
     steps: normalizeStepOrdering((draft.steps ?? []).map((step) => normalizeStep(step))),
-    outputs: normalizeSectionItems("Workflow draft output", draft.outputs ?? [], (item) => normalizeOutput(item as WorkflowDraftOutput)),
+    outputs: normalizeOutputOrdering(normalizedOutputs),
   });
 }
 
@@ -2320,12 +2511,204 @@ function readDestinationOptionString(
   output: WorkflowDraftOutput,
   optionKey: string,
 ): string | undefined {
-  const candidate = output.destination.options?.[optionKey];
+  const candidate = output.configuration?.[optionKey] ?? output.destination.options?.[optionKey];
   if (typeof candidate !== "string") {
     return undefined;
   }
   const normalized = candidate.trim();
   return normalized ? normalized : undefined;
+}
+
+function isPromptConversationScopeSupported(value: string): boolean {
+  return value === "continue-session" || value === "new-session";
+}
+
+function isSystemOutputTargetSupported(value: string): boolean {
+  return value === "system-record" || value === "system-database";
+}
+
+function isSystemOutputEntityNameValid(value: string): boolean {
+  return /^[a-z][a-z0-9-]*(\.[a-z0-9-]+)*$/.test(value);
+}
+
+function isSystemOutputRecordCollectionValid(value: string): boolean {
+  return /^[a-z0-9][a-z0-9/_-]*$/.test(value);
+}
+
+function isSystemOutputWriteModeSupported(value: string): value is WorkflowDraftSystemOutputWriteMode {
+  return value === WorkflowDraftSystemOutputWriteModes.upsert || value === WorkflowDraftSystemOutputWriteModes.append;
+}
+
+function isSystemOutputRecordShapeSupported(value: string): value is WorkflowDraftSystemOutputRecordShape {
+  return value === WorkflowDraftSystemOutputRecordShapes.singleRecord
+    || value === WorkflowDraftSystemOutputRecordShapes.recordCollection;
+}
+
+function isPromptCompatibleInput(input: WorkflowDraftInput): boolean {
+  if (input.sourceType === WorkflowDraftInputSourceTypes.runtimeParameter) {
+    return !input.valueType
+      || input.valueType === WorkflowDraftInputValueTypes.string
+      || input.valueType === WorkflowDraftInputValueTypes.unknown;
+  }
+
+  if (input.sourceType === WorkflowDraftInputSourceTypes.staticValue) {
+    return typeof input.value === "string";
+  }
+
+  return false;
+}
+
+function readOutputConfigurationString(
+  configuration: Readonly<Record<string, unknown>> | undefined,
+  key: string,
+): string | undefined {
+  const candidate = configuration?.[key];
+  if (candidate === undefined) {
+    return undefined;
+  }
+  if (typeof candidate !== "string") {
+    throw new Error(`Workflow output configuration '${key}' must be a string when provided.`);
+  }
+  const normalized = candidate.trim();
+  return normalized ? normalized : undefined;
+}
+
+export function normalizeWorkflowDraftOutputConfiguration(
+  destinationType: WorkflowDraftOutputDestinationType,
+  configuration?: Readonly<Record<string, unknown>>,
+  legacyDestinationOptions?: Readonly<Record<string, unknown>>,
+  legacyTitle?: string,
+): Readonly<Record<string, unknown>> | undefined {
+  const merged = Object.freeze({
+    ...(legacyDestinationOptions ?? {}),
+    ...(configuration ?? {}),
+  });
+
+  const normalized: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(merged)) {
+    normalized[key] = value;
+  }
+
+  const titleFromLegacy = normalizeOptional(legacyTitle);
+
+  if (destinationType === WorkflowDraftOutputDestinationTypes.fileExport) {
+    const deliveryMode = readOutputConfigurationString(merged, "deliveryMode");
+    if (deliveryMode !== undefined) {
+      normalized.deliveryMode = deliveryMode;
+    } else {
+      delete normalized.deliveryMode;
+    }
+    const destinationPath = readOutputConfigurationString(merged, "destinationPath");
+    if (destinationPath !== undefined) {
+      normalized.destinationPath = destinationPath;
+    } else {
+      delete normalized.destinationPath;
+    }
+    const fileName = readOutputConfigurationString(merged, "fileName");
+    if (fileName !== undefined) {
+      normalized.fileName = fileName;
+    } else {
+      delete normalized.fileName;
+    }
+  }
+
+  if (destinationType === WorkflowDraftOutputDestinationTypes.webViewer) {
+    const title = titleFromLegacy ?? readOutputConfigurationString(merged, "title");
+    if (title !== undefined) {
+      normalized.title = title;
+    } else {
+      delete normalized.title;
+    }
+    const presentationMode = readOutputConfigurationString(merged, "presentationMode");
+    if (presentationMode !== undefined) {
+      normalized.presentationMode = presentationMode;
+    } else {
+      delete normalized.presentationMode;
+    }
+  }
+
+  if (destinationType === WorkflowDraftOutputDestinationTypes.systemEntry) {
+    const entityName = readOutputConfigurationString(merged, "entityName");
+    if (entityName !== undefined) {
+      normalized.entityName = entityName;
+    } else {
+      delete normalized.entityName;
+    }
+    const recordCollection = readOutputConfigurationString(merged, "recordCollection")
+      ?? readOutputConfigurationString(merged, "destinationConfig");
+    if (recordCollection !== undefined) {
+      normalized.recordCollection = recordCollection;
+    } else {
+      delete normalized.recordCollection;
+    }
+    const writeMode = readOutputConfigurationString(merged, "writeMode");
+    if (writeMode !== undefined) {
+      normalized.writeMode = writeMode;
+    } else {
+      normalized.writeMode = WorkflowDraftSystemOutputWriteModes.upsert;
+    }
+    const recordShape = readOutputConfigurationString(merged, "recordShape");
+    if (recordShape !== undefined) {
+      normalized.recordShape = recordShape;
+    } else {
+      normalized.recordShape = WorkflowDraftSystemOutputRecordShapes.singleRecord;
+    }
+    const includeExecutionMetadata = readOutputConfigurationString(merged, "includeExecutionMetadata");
+    if (includeExecutionMetadata !== undefined) {
+      normalized.includeExecutionMetadata = includeExecutionMetadata;
+    } else {
+      normalized.includeExecutionMetadata = "true";
+    }
+  }
+
+  if (destinationType === WorkflowDraftOutputDestinationTypes.promptResponseChat) {
+    const title = titleFromLegacy ?? readOutputConfigurationString(merged, "title");
+    if (title !== undefined) {
+      normalized.title = title;
+    } else {
+      delete normalized.title;
+    }
+
+    const promptInputId = readOutputConfigurationString(merged, "promptInputId");
+    if (promptInputId !== undefined) {
+      normalized.promptInputId = promptInputId;
+    } else {
+      delete normalized.promptInputId;
+    }
+
+    const responseField = readOutputConfigurationString(merged, "responseField");
+    if (responseField !== undefined) {
+      normalized.responseField = responseField;
+    } else {
+      delete normalized.responseField;
+    }
+
+    const conversationScope = readOutputConfigurationString(merged, "conversationScope");
+    if (conversationScope !== undefined) {
+      normalized.conversationScope = conversationScope;
+    } else {
+      delete normalized.conversationScope;
+    }
+
+    const initialSystemPrompt = readOutputConfigurationString(merged, "initialSystemPrompt");
+    if (initialSystemPrompt !== undefined) {
+      normalized.initialSystemPrompt = initialSystemPrompt;
+    } else {
+      delete normalized.initialSystemPrompt;
+    }
+  }
+
+  const keys = Object.keys(normalized);
+  if (keys.length === 0) {
+    return undefined;
+  }
+
+  keys.sort((left, right) => left.localeCompare(right));
+  const ordered: Record<string, unknown> = {};
+  for (const key of keys) {
+    ordered[key] = normalized[key];
+  }
+  return Object.freeze(ordered);
 }
 
 export function classifyWorkflowDraftAssetReferences(
@@ -2860,9 +3243,11 @@ export function validateWorkflowDraft(draft: WorkflowDraft | undefined): Workflo
   }
 
   const outputs = Array.isArray(raw.outputs) ? raw.outputs : [];
+  const normalizedOutputs: Array<{ readonly output: NormalizedWorkflowDraftOutput; readonly index: number }> = [];
   for (let index = 0; index < outputs.length; index += 1) {
     try {
-      const normalized = normalizeOutput(outputs[index] as WorkflowDraftOutput);
+      const normalized = normalizeOutput(outputs[index] as WorkflowDraftOutput, index + 1);
+      normalizedOutputs.push(Object.freeze({ output: normalized, index }));
       if (normalized.sourceStepId && !stepIds.has(normalized.sourceStepId)) {
         issues.push({
           code: WorkflowValidationIssueCodes.outputSourceStepMissing,
@@ -2874,14 +3259,10 @@ export function validateWorkflowDraft(draft: WorkflowDraft | undefined): Workflo
       }
 
       if (normalized.destination.type === WorkflowDraftOutputDestinationTypes.fileExport) {
-        const validFormats = new Set<string>([
-          WorkflowDraftOutputFormats.pdf,
-          WorkflowDraftOutputFormats.json,
-          WorkflowDraftOutputFormats.jsonl,
-          WorkflowDraftOutputFormats.csv,
-          WorkflowDraftOutputFormats.markdown,
-          WorkflowDraftOutputFormats.html,
-        ]);
+        const destinationDefinition = getWorkflowDraftOutputDestinationDefinition(
+          WorkflowDraftOutputDestinationTypes.fileExport,
+        );
+        const validFormats = new Set<string>(destinationDefinition?.supportedFormats ?? []);
         if (!validFormats.has(normalized.format)) {
           issues.push({
             code: WorkflowValidationIssueCodes.outputFileFormatInvalid,
@@ -2890,6 +3271,30 @@ export function validateWorkflowDraft(draft: WorkflowDraft | undefined): Workflo
             message: `File export output '${normalized.id}' format '${normalized.format}' is not supported.`,
             path: `draft.outputs[${index}].format`,
           });
+        }
+
+        const deliveryMode = readDestinationOptionString(normalized, "deliveryMode") ?? "download";
+        if (deliveryMode !== "download" && deliveryMode !== "workspace-file") {
+          issues.push({
+            code: WorkflowValidationIssueCodes.outputFileDeliveryModeInvalid,
+            section: WorkflowValidationSections.outputs,
+            severity: "error",
+            message: `File export output '${normalized.id}' requires destination options.deliveryMode to be 'download' or 'workspace-file'.`,
+            path: `draft.outputs[${index}].destination.options.deliveryMode`,
+          });
+        }
+
+        if (deliveryMode === "workspace-file") {
+          const destinationPath = readDestinationOptionString(normalized, "destinationPath");
+          if (!destinationPath) {
+            issues.push({
+              code: WorkflowValidationIssueCodes.outputFileDestinationPathMissing,
+              section: WorkflowValidationSections.outputs,
+              severity: "error",
+              message: `File export output '${normalized.id}' with workspace-file delivery requires destination options.destinationPath.`,
+              path: `draft.outputs[${index}].destination.options.destinationPath`,
+            });
+          }
         }
       }
 
@@ -2906,6 +3311,16 @@ export function validateWorkflowDraft(draft: WorkflowDraft | undefined): Workflo
       }
 
       if (normalized.destination.type === WorkflowDraftOutputDestinationTypes.systemEntry) {
+        if (!isSystemOutputTargetSupported(normalized.destination.target)) {
+          issues.push({
+            code: WorkflowValidationIssueCodes.outputSystemTargetInvalid,
+            section: WorkflowValidationSections.outputs,
+            severity: "error",
+            message: `System record output '${normalized.id}' requires destination target 'system-record' or 'system-database'.`,
+            path: `draft.outputs[${index}].destination.target`,
+          });
+        }
+
         const entityName = readDestinationOptionString(normalized, "entityName");
         if (!entityName) {
           issues.push({
@@ -2914,6 +3329,126 @@ export function validateWorkflowDraft(draft: WorkflowDraft | undefined): Workflo
             severity: "error",
             message: `System record output '${normalized.id}' requires destination options.entityName.`,
             path: `draft.outputs[${index}].destination.options.entityName`,
+          });
+        } else if (!isSystemOutputEntityNameValid(entityName)) {
+          issues.push({
+            code: WorkflowValidationIssueCodes.outputSystemEntityMalformed,
+            section: WorkflowValidationSections.outputs,
+            severity: "error",
+            message: `System record output '${normalized.id}' entity name '${entityName}' is invalid. Use lowercase dot-separated names like 'customer.record'.`,
+            path: `draft.outputs[${index}].destination.options.entityName`,
+          });
+        }
+
+        const recordCollection = readDestinationOptionString(normalized, "recordCollection");
+        if (recordCollection && !isSystemOutputRecordCollectionValid(recordCollection)) {
+          issues.push({
+            code: WorkflowValidationIssueCodes.outputSystemRecordCollectionMalformed,
+            section: WorkflowValidationSections.outputs,
+            severity: "error",
+            message: `System record output '${normalized.id}' record collection '${recordCollection}' is invalid. Use lowercase path-like values such as 'records/customers'.`,
+            path: `draft.outputs[${index}].destination.options.recordCollection`,
+          });
+        }
+
+        const writeMode = readDestinationOptionString(normalized, "writeMode");
+        if (!writeMode || !isSystemOutputWriteModeSupported(writeMode)) {
+          issues.push({
+            code: WorkflowValidationIssueCodes.outputSystemWriteModeInvalid,
+            section: WorkflowValidationSections.outputs,
+            severity: "error",
+            message: `System record output '${normalized.id}' requires destination options.writeMode to be 'upsert' or 'append'.`,
+            path: `draft.outputs[${index}].destination.options.writeMode`,
+          });
+        }
+
+        const recordShape = readDestinationOptionString(normalized, "recordShape");
+        if (!recordShape || !isSystemOutputRecordShapeSupported(recordShape)) {
+          issues.push({
+            code: WorkflowValidationIssueCodes.outputSystemRecordShapeInvalid,
+            section: WorkflowValidationSections.outputs,
+            severity: "error",
+            message: `System record output '${normalized.id}' requires destination options.recordShape to be 'single-record' or 'record-collection'.`,
+            path: `draft.outputs[${index}].destination.options.recordShape`,
+          });
+        } else if (
+          recordShape === WorkflowDraftSystemOutputRecordShapes.singleRecord
+          && normalized.format !== WorkflowDraftOutputFormats.json
+        ) {
+          issues.push({
+            code: WorkflowValidationIssueCodes.outputSystemFormatIncompatible,
+            section: WorkflowValidationSections.outputs,
+            severity: "error",
+            message: `System record output '${normalized.id}' with single-record shape requires format 'json'.`,
+            path: `draft.outputs[${index}].format`,
+          });
+        }
+      }
+
+      if (normalized.destination.type === WorkflowDraftOutputDestinationTypes.promptResponseChat) {
+        const destinationDefinition = getWorkflowDraftOutputDestinationDefinition(
+          WorkflowDraftOutputDestinationTypes.promptResponseChat,
+        );
+        const validFormats = new Set<string>(destinationDefinition?.supportedFormats ?? []);
+        if (!validFormats.has(normalized.format)) {
+          issues.push({
+            code: WorkflowValidationIssueCodes.outputPromptFormatInvalid,
+            section: WorkflowValidationSections.outputs,
+            severity: "error",
+            message: `Prompt response chat output '${normalized.id}' format '${normalized.format}' is not supported.`,
+            path: `draft.outputs[${index}].format`,
+          });
+        }
+
+        const promptInputId = readDestinationOptionString(normalized, "promptInputId");
+        if (!promptInputId) {
+          issues.push({
+            code: WorkflowValidationIssueCodes.outputPromptInputIdMissing,
+            section: WorkflowValidationSections.outputs,
+            severity: "error",
+            message: `Prompt response chat output '${normalized.id}' requires destination options.promptInputId.`,
+            path: `draft.outputs[${index}].destination.options.promptInputId`,
+          });
+        } else {
+          const linkedInput = normalizedInputs.find((input) => input.id === promptInputId);
+          if (!linkedInput) {
+            issues.push({
+              code: WorkflowValidationIssueCodes.outputPromptInputNotFound,
+              section: WorkflowValidationSections.crossSection,
+              severity: "error",
+              message: `Prompt response chat output '${normalized.id}' references unknown prompt input '${promptInputId}'.`,
+              path: `draft.outputs[${index}].destination.options.promptInputId`,
+            });
+          } else if (!isPromptCompatibleInput(linkedInput)) {
+            issues.push({
+              code: WorkflowValidationIssueCodes.outputPromptInputIncompatible,
+              section: WorkflowValidationSections.crossSection,
+              severity: "error",
+              message: `Prompt response chat output '${normalized.id}' requires prompt-compatible input '${promptInputId}'.`,
+              path: `draft.outputs[${index}].destination.options.promptInputId`,
+            });
+          }
+        }
+
+        const responseField = readDestinationOptionString(normalized, "responseField");
+        if (!responseField) {
+          issues.push({
+            code: WorkflowValidationIssueCodes.outputPromptResponseFieldMissing,
+            section: WorkflowValidationSections.outputs,
+            severity: "error",
+            message: `Prompt response chat output '${normalized.id}' requires destination options.responseField.`,
+            path: `draft.outputs[${index}].destination.options.responseField`,
+          });
+        }
+
+        const conversationScope = readDestinationOptionString(normalized, "conversationScope");
+        if (!conversationScope || !isPromptConversationScopeSupported(conversationScope)) {
+          issues.push({
+            code: WorkflowValidationIssueCodes.outputPromptConversationScopeInvalid,
+            section: WorkflowValidationSections.outputs,
+            severity: "error",
+            message: `Prompt response chat output '${normalized.id}' requires destination options.conversationScope to be 'continue-session' or 'new-session'.`,
+            path: `draft.outputs[${index}].destination.options.conversationScope`,
           });
         }
       }
@@ -2925,6 +3460,64 @@ export function validateWorkflowDraft(draft: WorkflowDraft | undefined): Workflo
         message: error instanceof Error ? error.message : "Workflow output is malformed.",
         path: `draft.outputs[${index}]`,
       });
+    }
+  }
+
+  const outputIdToIndexes = new Map<string, number[]>();
+  const outputOrderToIndexes = new Map<number, number[]>();
+  for (const entry of normalizedOutputs) {
+    const idIndexes = outputIdToIndexes.get(entry.output.id) ?? [];
+    idIndexes.push(entry.index);
+    outputIdToIndexes.set(entry.output.id, idIndexes);
+
+    const orderIndexes = outputOrderToIndexes.get(entry.output.order) ?? [];
+    orderIndexes.push(entry.index);
+    outputOrderToIndexes.set(entry.output.order, orderIndexes);
+  }
+
+  for (const [outputId, indexes] of outputIdToIndexes.entries()) {
+    if (indexes.length < 2) {
+      continue;
+    }
+    for (const index of indexes) {
+      issues.push({
+        code: WorkflowValidationIssueCodes.outputDuplicateId,
+        section: WorkflowValidationSections.outputs,
+        severity: "error",
+        message: `Workflow output id '${outputId}' is duplicated.`,
+        path: `draft.outputs[${index}].id`,
+      });
+    }
+  }
+
+  for (const [order, indexes] of outputOrderToIndexes.entries()) {
+    if (indexes.length < 2) {
+      continue;
+    }
+    for (const index of indexes) {
+      issues.push({
+        code: WorkflowValidationIssueCodes.outputOrderDuplicate,
+        section: WorkflowValidationSections.outputs,
+        severity: "error",
+        message: `Workflow output order '${order}' is duplicated.`,
+        path: `draft.outputs[${index}].order`,
+      });
+    }
+  }
+
+  const normalizedOutputOrders = normalizedOutputs
+    .map((entry) => entry.output.order)
+    .sort((left, right) => left - right);
+  for (let index = 0; index < normalizedOutputOrders.length; index += 1) {
+    if (normalizedOutputOrders[index] !== index + 1) {
+      issues.push({
+        code: WorkflowValidationIssueCodes.outputOrderNonContiguous,
+        section: WorkflowValidationSections.outputs,
+        severity: "error",
+        message: "Workflow output order values must be contiguous starting at 1.",
+        path: "draft.outputs",
+      });
+      break;
     }
   }
 

@@ -14,8 +14,10 @@ import {
   normalizeWorkflowDraft,
   normalizeWorkflowDraftTriggerConfig,
   listWorkflowDraftBuiltInStepDefinitions,
+  listWorkflowDraftOutputDestinationDefinitions,
   listWorkflowDraftTriggerDefinitions,
   getWorkflowDraftBuiltInStepDefinition,
+  getWorkflowDraftOutputDestinationDefinition,
   getWorkflowDraftTriggerDefinition,
   isWorkflowDraftBuiltInStep,
   isWorkflowDraftBuiltInStepType,
@@ -33,6 +35,8 @@ import {
   WorkflowDraftOutputDestinationTypes,
   WorkflowDraftOutputFormats,
   WorkflowDraftOutputTypes,
+  WorkflowDraftSystemOutputRecordShapes,
+  WorkflowDraftSystemOutputWriteModes,
   WorkflowDraftStepAssetKinds,
   WorkflowDraftStepKinds,
   WorkflowDraftStepTypes,
@@ -166,9 +170,12 @@ describe("WorkflowStudioDomain", () => {
         format: WorkflowDraftOutputFormats.json,
         destination: {
           type: WorkflowDraftOutputDestinationTypes.systemEntry,
-          target: "crm/customers",
+          target: "system-record",
           options: {
-            entityName: "customer-record",
+            entityName: "customer.record",
+            recordCollection: "crm/customers",
+            writeMode: WorkflowDraftSystemOutputWriteModes.upsert,
+            recordShape: WorkflowDraftSystemOutputRecordShapes.singleRecord,
           },
         },
       }],
@@ -329,9 +336,12 @@ describe("WorkflowStudioDomain", () => {
           sourceStepId: "step-agent",
           destination: {
             type: WorkflowDraftOutputDestinationTypes.systemEntry,
-            target: "records/outbound",
+            target: "system-record",
             options: {
-              entityName: "outbound-record",
+              entityName: "outbound.record",
+              recordCollection: "records/outbound",
+              writeMode: WorkflowDraftSystemOutputWriteModes.upsert,
+              recordShape: WorkflowDraftSystemOutputRecordShapes.singleRecord,
             },
           },
         }],
@@ -1382,9 +1392,12 @@ describe("WorkflowStudioDomain", () => {
           format: WorkflowDraftOutputFormats.json,
           destination: {
             type: WorkflowDraftOutputDestinationTypes.systemEntry,
-            target: "warehouse/reports",
+            target: "system-record",
             options: {
-              entityName: "report-record",
+              entityName: "report.record",
+              recordCollection: "warehouse/reports",
+              writeMode: WorkflowDraftSystemOutputWriteModes.upsert,
+              recordShape: WorkflowDraftSystemOutputRecordShapes.singleRecord,
             },
           },
         },
@@ -1393,6 +1406,59 @@ describe("WorkflowStudioDomain", () => {
 
     expect(normalized.outputs).toHaveLength(2);
     expect(normalized.outputs.map((output) => output.id)).toEqual(["output-file", "output-system"]);
+    expect(normalized.outputs.map((output) => output.order)).toEqual([1, 2]);
+  });
+
+  it("normalizes canonical output configuration and preserves compatibility aliases", () => {
+    const normalized = normalizeWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [],
+      outputs: [{
+        id: "output-view",
+        type: "workflow-output",
+        title: "  Viewer Title  ",
+        outputType: WorkflowDraftOutputTypes.document,
+        format: WorkflowDraftOutputFormats.markdown,
+        destination: {
+          type: WorkflowDraftOutputDestinationTypes.webViewer,
+          target: "session-panel",
+          options: {
+            presentationMode: "full-page",
+          },
+        },
+      }],
+    });
+
+    expect(normalized.outputs[0]).toMatchObject({
+      id: "output-view",
+      order: 1,
+      title: "Viewer Title",
+      configuration: {
+        title: "Viewer Title",
+        presentationMode: "full-page",
+      },
+      destination: {
+        options: {
+          title: "Viewer Title",
+          presentationMode: "full-page",
+        },
+      },
+    });
+  });
+
+  it("exposes canonical output destination definitions for selector/configuration flows", () => {
+    const definitions = listWorkflowDraftOutputDestinationDefinitions();
+    expect(definitions.map((entry) => entry.destinationType)).toEqual([
+      WorkflowDraftOutputDestinationTypes.fileExport,
+      WorkflowDraftOutputDestinationTypes.webViewer,
+      WorkflowDraftOutputDestinationTypes.systemEntry,
+      WorkflowDraftOutputDestinationTypes.promptResponseChat,
+    ]);
+    expect(definitions.every((entry) => entry.configSchemaId.startsWith("workflow.output.destination."))).toBeTrue();
+    expect(getWorkflowDraftOutputDestinationDefinition(WorkflowDraftOutputDestinationTypes.systemEntry)?.defaultFormat).toBe(
+      WorkflowDraftOutputFormats.json,
+    );
   });
 
   it("rejects malformed workflow output structures", () => {
@@ -1459,12 +1525,63 @@ describe("WorkflowStudioDomain", () => {
         format: WorkflowDraftOutputFormats.json,
         destination: {
           type: WorkflowDraftOutputDestinationTypes.systemEntry,
-          target: "records/customers",
+          target: "system-record",
         },
       }],
     });
     expect(systemEntryMissingEntity.valid).toBeFalse();
     expect(systemEntryMissingEntity.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.outputSystemEntityMissing)).toBeTrue();
+
+    const systemEntryInvalidConfiguration = validateWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [],
+      outputs: [{
+        id: "output-system-entry-invalid",
+        type: "workflow-output",
+        outputType: WorkflowDraftOutputTypes.record,
+        format: WorkflowDraftOutputFormats.jsonl,
+        destination: {
+          type: WorkflowDraftOutputDestinationTypes.systemEntry,
+          target: "records/customers",
+          options: {
+            entityName: "Customer Record",
+            recordCollection: "Records/Customers",
+            writeMode: "replace",
+            recordShape: "unknown-shape",
+          },
+        },
+      }],
+    });
+    expect(systemEntryInvalidConfiguration.valid).toBeFalse();
+    expect(systemEntryInvalidConfiguration.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.outputSystemTargetInvalid)).toBeTrue();
+    expect(systemEntryInvalidConfiguration.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.outputSystemEntityMalformed)).toBeTrue();
+    expect(systemEntryInvalidConfiguration.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.outputSystemRecordCollectionMalformed)).toBeTrue();
+    expect(systemEntryInvalidConfiguration.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.outputSystemWriteModeInvalid)).toBeTrue();
+    expect(systemEntryInvalidConfiguration.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.outputSystemRecordShapeInvalid)).toBeTrue();
+
+    const systemEntryFormatIncompatible = validateWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [],
+      outputs: [{
+        id: "output-system-entry-format",
+        type: "workflow-output",
+        outputType: WorkflowDraftOutputTypes.record,
+        format: WorkflowDraftOutputFormats.jsonl,
+        destination: {
+          type: WorkflowDraftOutputDestinationTypes.systemEntry,
+          target: "system-record",
+          options: {
+            entityName: "customer.record",
+            writeMode: "upsert",
+            recordShape: "single-record",
+          },
+        },
+      }],
+    });
+    expect(systemEntryFormatIncompatible.valid).toBeFalse();
+    expect(systemEntryFormatIncompatible.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.outputSystemFormatIncompatible)).toBeTrue();
 
     const fileExportInvalidFormat = validateWorkflowDraft({
       triggers: [],
@@ -1483,6 +1600,165 @@ describe("WorkflowStudioDomain", () => {
     });
     expect(fileExportInvalidFormat.valid).toBeFalse();
     expect(fileExportInvalidFormat.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.outputFileFormatInvalid)).toBeTrue();
+
+    const fileExportWorkspacePathMissing = validateWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [],
+      outputs: [{
+        id: "output-file-export-path",
+        type: "workflow-output",
+        outputType: WorkflowDraftOutputTypes.document,
+        format: WorkflowDraftOutputFormats.json,
+        destination: {
+          type: WorkflowDraftOutputDestinationTypes.fileExport,
+          target: "/tmp/export.json",
+          options: {
+            deliveryMode: "workspace-file",
+            destinationPath: "",
+          },
+        },
+      }],
+    });
+    expect(fileExportWorkspacePathMissing.valid).toBeFalse();
+    expect(fileExportWorkspacePathMissing.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.outputFileDestinationPathMissing)).toBeTrue();
+
+    const promptChatMissingLinkage = validateWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [],
+      outputs: [{
+        id: "output-chat",
+        type: "workflow-output",
+        outputType: WorkflowDraftOutputTypes.document,
+        format: WorkflowDraftOutputFormats.json,
+        destination: {
+          type: WorkflowDraftOutputDestinationTypes.promptResponseChat,
+          target: "chat-session",
+          options: {
+            title: "Conversation",
+            promptInputId: "",
+            responseField: "",
+            conversationScope: "invalid-scope",
+          },
+        },
+      }],
+    });
+    expect(promptChatMissingLinkage.valid).toBeFalse();
+    expect(promptChatMissingLinkage.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.outputPromptInputIdMissing)).toBeTrue();
+    expect(promptChatMissingLinkage.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.outputPromptResponseFieldMissing)).toBeTrue();
+    expect(promptChatMissingLinkage.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.outputPromptConversationScopeInvalid)).toBeTrue();
+
+    const promptChatUnknownInput = validateWorkflowDraft({
+      triggers: [],
+      inputs: [{
+        id: "input-dataset",
+        type: "dataset",
+        sourceType: WorkflowDraftInputSourceTypes.datasetAsset,
+        asset: { assetId: "asset:dataset-chat" },
+      }],
+      steps: [],
+      outputs: [{
+        id: "output-chat-missing-input",
+        type: "workflow-output",
+        outputType: WorkflowDraftOutputTypes.document,
+        format: WorkflowDraftOutputFormats.markdown,
+        destination: {
+          type: WorkflowDraftOutputDestinationTypes.promptResponseChat,
+          target: "chat-session",
+          options: {
+            title: "Conversation",
+            promptInputId: "input-missing",
+            responseField: "assistant-response",
+            conversationScope: "continue-session",
+          },
+        },
+      }],
+    });
+    expect(promptChatUnknownInput.valid).toBeFalse();
+    expect(promptChatUnknownInput.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.outputPromptInputNotFound)).toBeTrue();
+
+    const promptChatIncompatibleInput = validateWorkflowDraft({
+      triggers: [],
+      inputs: [{
+        id: "input-dataset",
+        type: "dataset",
+        sourceType: WorkflowDraftInputSourceTypes.datasetAsset,
+        asset: { assetId: "asset:dataset-chat" },
+      }],
+      steps: [],
+      outputs: [{
+        id: "output-chat-incompatible",
+        type: "workflow-output",
+        outputType: WorkflowDraftOutputTypes.document,
+        format: WorkflowDraftOutputFormats.json,
+        destination: {
+          type: WorkflowDraftOutputDestinationTypes.promptResponseChat,
+          target: "chat-session",
+          options: {
+            title: "Conversation",
+            promptInputId: "input-dataset",
+            responseField: "assistant-response",
+            conversationScope: "continue-session",
+          },
+        },
+      }],
+    });
+    expect(promptChatIncompatibleInput.valid).toBeFalse();
+    expect(promptChatIncompatibleInput.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.outputPromptInputIncompatible)).toBeTrue();
+  });
+
+  it("returns output validation issues for duplicate/non-contiguous output ordering", () => {
+    const duplicateOrder = validateWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [],
+      outputs: [
+        {
+          id: "output-a",
+          type: "workflow-output",
+          order: 1,
+          outputType: WorkflowDraftOutputTypes.document,
+          format: WorkflowDraftOutputFormats.json,
+          destination: {
+            type: WorkflowDraftOutputDestinationTypes.fileExport,
+            target: "/tmp/a.json",
+          },
+        },
+        {
+          id: "output-b",
+          type: "workflow-output",
+          order: 1,
+          outputType: WorkflowDraftOutputTypes.document,
+          format: WorkflowDraftOutputFormats.json,
+          destination: {
+            type: WorkflowDraftOutputDestinationTypes.fileExport,
+            target: "/tmp/b.json",
+          },
+        },
+      ],
+    });
+    expect(duplicateOrder.valid).toBeFalse();
+    expect(duplicateOrder.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.outputOrderDuplicate)).toBeTrue();
+
+    const nonContiguousOrder = validateWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [],
+      outputs: [{
+        id: "output-c",
+        type: "workflow-output",
+        order: 2,
+        outputType: WorkflowDraftOutputTypes.document,
+        format: WorkflowDraftOutputFormats.json,
+        destination: {
+          type: WorkflowDraftOutputDestinationTypes.fileExport,
+          target: "/tmp/c.json",
+        },
+      }],
+    });
+    expect(nonContiguousOrder.valid).toBeFalse();
+    expect(nonContiguousOrder.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.outputOrderNonContiguous)).toBeTrue();
   });
 
   it("validates a canonical workflow draft successfully", () => {
@@ -1520,9 +1796,12 @@ describe("WorkflowStudioDomain", () => {
         sourceStepId: "step-loop",
         destination: {
           type: WorkflowDraftOutputDestinationTypes.systemEntry,
-          target: "records/customers",
+          target: "system-record",
           options: {
-            entityName: "customer-record",
+            entityName: "customer.record",
+            recordCollection: "records/customers",
+            writeMode: WorkflowDraftSystemOutputWriteModes.upsert,
+            recordShape: WorkflowDraftSystemOutputRecordShapes.singleRecord,
           },
         },
       }],

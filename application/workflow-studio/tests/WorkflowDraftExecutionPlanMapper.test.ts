@@ -5,6 +5,9 @@ import {
   WorkflowDraftTriggerKinds,
   WorkflowDraftTriggerTypes,
   WorkflowDraftStepTypes,
+  WorkflowDraftOutputDestinationTypes,
+  WorkflowDraftOutputFormats,
+  WorkflowDraftOutputTypes,
   createEmptyWorkflowDraft,
 } from "../../../domain/workflow-studio/WorkflowStudioDomain";
 import {
@@ -122,6 +125,7 @@ describe("WorkflowDraftExecutionPlanMapper", () => {
       "built-in.manual-approval",
       "action-step",
     ]);
+    expect(plan.outputs).toEqual([]);
   });
 
   it("produces deterministic plan output for the same canonical workflow draft", () => {
@@ -136,6 +140,93 @@ describe("WorkflowDraftExecutionPlanMapper", () => {
     const first = mapWorkflowDraftToExecutionPlan(draft);
     const second = mapWorkflowDraftToExecutionPlan(draft);
     expect(first).toEqual(second);
+  });
+
+  it("maps canonical workflow outputs into ordered execution output plans", () => {
+    const plan = mapWorkflowDraftToExecutionPlan({
+      ...createEmptyWorkflowDraft(),
+      inputs: [
+        {
+          id: "input-prompt",
+          type: "runtime-input",
+          sourceType: "runtime-parameter",
+          parameterKey: "prompt",
+          valueType: "string",
+        },
+      ],
+      steps: [
+        {
+          id: "step-1",
+          type: "action",
+          kind: WorkflowDraftStepKinds.action,
+          order: 1,
+        },
+      ],
+      outputs: [
+        {
+          id: "output-chat",
+          type: "workflow-output",
+          order: 2,
+          outputType: WorkflowDraftOutputTypes.document,
+          format: WorkflowDraftOutputFormats.json,
+          sourceStepId: "step-1",
+          destination: {
+            type: WorkflowDraftOutputDestinationTypes.promptResponseChat,
+            target: "chat-session",
+            options: {
+              title: "Chat",
+              promptInputId: "input-prompt",
+              responseField: "assistant-response",
+              conversationScope: "continue-session",
+            },
+          },
+        },
+        {
+          id: "output-file",
+          type: "workflow-output",
+          order: 1,
+          outputType: WorkflowDraftOutputTypes.document,
+          format: WorkflowDraftOutputFormats.json,
+          destination: {
+            type: WorkflowDraftOutputDestinationTypes.fileExport,
+            target: "file-download",
+            options: {
+              deliveryMode: "download",
+              fileName: "report",
+            },
+          },
+        },
+      ],
+    });
+
+    expect(plan.outputs.map((output) => output.outputId)).toEqual(["output-file", "output-chat"]);
+    expect(plan.outputs.map((output) => output.order)).toEqual([1, 2]);
+    expect(plan.outputs[0]).toMatchObject({
+      outputId: "output-file",
+      destination: {
+        type: WorkflowDraftOutputDestinationTypes.fileExport,
+      },
+      runtime: {
+        outputHandlerType: WorkflowDraftOutputDestinationTypes.fileExport,
+        configSchemaId: "workflow.output.destination.file-export.v1",
+        supportsConversationalOutput: false,
+      },
+    });
+    expect(plan.outputs[1]).toMatchObject({
+      outputId: "output-chat",
+      sourceStepId: "step-1",
+      destination: {
+        type: WorkflowDraftOutputDestinationTypes.promptResponseChat,
+      },
+      runtime: {
+        outputHandlerType: WorkflowDraftOutputDestinationTypes.promptResponseChat,
+        supportsConversationalOutput: true,
+        conversational: {
+          promptInputLinkKey: "promptInputId",
+          responseFieldKey: "responseField",
+        },
+      },
+    });
   });
 
   it("fails planning for invalid built-in step references before execution-plan mapping succeeds", () => {
@@ -203,5 +294,96 @@ describe("WorkflowDraftExecutionPlanMapper", () => {
         },
       ],
     })).toThrow("trigger-malformed");
+  });
+
+  it("fails planning before runtime when output destination type is unsupported", () => {
+    expect(() => mapWorkflowDraftToExecutionPlan({
+      ...createEmptyWorkflowDraft(),
+      steps: [
+        {
+          id: "step-1",
+          type: "action",
+          kind: WorkflowDraftStepKinds.action,
+          order: 1,
+        },
+      ],
+      outputs: [
+        {
+          id: "output-unsupported",
+          type: "workflow-output",
+          outputType: WorkflowDraftOutputTypes.document,
+          format: WorkflowDraftOutputFormats.json,
+          destination: {
+            type: "unknown-output-type",
+            target: "unsupported",
+          },
+        },
+      ],
+    })).toThrow("output-plan-unsupported-type");
+  });
+
+  it("fails planning before runtime when output type and destination contract are incompatible", () => {
+    expect(() => mapWorkflowDraftToExecutionPlan({
+      ...createEmptyWorkflowDraft(),
+      steps: [
+        {
+          id: "step-1",
+          type: "action",
+          kind: WorkflowDraftStepKinds.action,
+          order: 1,
+        },
+      ],
+      outputs: [
+        {
+          id: "output-type-mismatch",
+          type: "workflow-output",
+          outputType: WorkflowDraftOutputTypes.record,
+          format: WorkflowDraftOutputFormats.json,
+          destination: {
+            type: WorkflowDraftOutputDestinationTypes.fileExport,
+            target: "file-download",
+          },
+        },
+      ],
+    })).toThrow("output-plan-output-type-mismatch");
+  });
+
+  it("fails planning for conversational outputs with missing required configuration", () => {
+    expect(() => mapWorkflowDraftToExecutionPlan({
+      ...createEmptyWorkflowDraft(),
+      inputs: [
+        {
+          id: "input-prompt",
+          type: "runtime-input",
+          sourceType: "runtime-parameter",
+          parameterKey: "prompt",
+          valueType: "string",
+        },
+      ],
+      steps: [
+        {
+          id: "step-1",
+          type: "action",
+          kind: WorkflowDraftStepKinds.action,
+          order: 1,
+        },
+      ],
+      outputs: [
+        {
+          id: "output-chat",
+          type: "workflow-output",
+          outputType: WorkflowDraftOutputTypes.document,
+          format: WorkflowDraftOutputFormats.json,
+          destination: {
+            type: WorkflowDraftOutputDestinationTypes.promptResponseChat,
+            target: "chat",
+            options: {
+              title: "Chat",
+              promptInputId: "input-prompt",
+            },
+          },
+        },
+      ],
+    })).toThrow("output-prompt-response-field-missing");
   });
 });

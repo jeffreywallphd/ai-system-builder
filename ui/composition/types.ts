@@ -24,6 +24,7 @@ import { UiSettingsStore } from "../settings/UiSettingsStore";
 import { ManagedServicesService } from "../services/ManagedServicesService";
 import { ExecutionHistoryService } from "../services/ExecutionHistoryService";
 import { CanonicalAssetManagementService } from "../services/CanonicalAssetManagementService";
+import { WorkflowConversationSessionService } from "../workflow-conversation/WorkflowConversationSessionService";
 
 export interface OperationalModeStatus {
   readonly configuredMode: string;
@@ -70,6 +71,7 @@ export interface UiDependencies {
   readonly modelTrainingStore: ModelTrainingStore;
   readonly executionHistoryService: ExecutionHistoryService;
   readonly canonicalAssetManagementService: CanonicalAssetManagementService;
+  readonly workflowConversationSessionService: WorkflowConversationSessionService;
   readonly workflowProjectionService: WorkflowProjectionService;
   readonly settingsStore: UiSettingsStore;
 }

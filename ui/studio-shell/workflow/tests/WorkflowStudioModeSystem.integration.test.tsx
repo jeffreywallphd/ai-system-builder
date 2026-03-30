@@ -615,31 +615,67 @@ describe("WorkflowStudioModeSystem integration seams", () => {
     });
 
     let boundary = renderBoundary();
-    const addFile = getElementByTestId(boundary, "workflow-output-add-file-export") as ReactElement<ButtonElementProps>;
-    const addViewer = getElementByTestId(boundary, "workflow-output-add-web-viewer") as ReactElement<ButtonElementProps>;
-    const addSystem = getElementByTestId(boundary, "workflow-output-add-system-entry") as ReactElement<ButtonElementProps>;
-    addFile.props.onClick?.();
-    addViewer.props.onClick?.();
-    addSystem.props.onClick?.();
+    const addAllOutputs = getElementByTestId(boundary, "workflow-output-selector-add-all") as ReactElement<ButtonElementProps>;
+    addAllOutputs.props.onClick?.();
 
-    expect(store.getState().sharedDraft.outputs).toHaveLength(3);
+    expect(store.getState().sharedDraft.outputs).toHaveLength(4);
     expect(store.getState().sharedDraft.outputs.map((output) => output.destination.type)).toEqual([
       WorkflowDraftOutputDestinationTypes.fileExport,
       WorkflowDraftOutputDestinationTypes.webViewer,
       WorkflowDraftOutputDestinationTypes.systemEntry,
+      WorkflowDraftOutputDestinationTypes.promptResponseChat,
     ]);
     expect(store.getState().isSharedDraftValid).toBe(false);
 
+    boundary = renderBoundary();
+    const selectViewerOutput = getElementByTestId(boundary, "workflow-output-select-1") as ReactElement<ButtonElementProps>;
+    selectViewerOutput.props.onClick?.();
     boundary = renderBoundary();
     const viewerTitle = getElementByTestId(boundary, "workflow-output-viewer-title-1") as ReactElement<InputElementProps>;
     viewerTitle.props.onChange?.({ target: { value: "Results Viewer" } });
     expect(store.getState().isSharedDraftValid).toBe(false);
 
     boundary = renderBoundary();
+    const selectSystemOutput = getElementByTestId(boundary, "workflow-output-select-2") as ReactElement<ButtonElementProps>;
+    selectSystemOutput.props.onClick?.();
+    boundary = renderBoundary();
     const systemEntity = getElementByTestId(boundary, "workflow-output-system-entity-2") as ReactElement<InputElementProps>;
-    systemEntity.props.onChange?.({ target: { value: "customer-record" } });
-    const systemConfig = getElementByTestId(boundary, "workflow-output-system-config-value-2") as ReactElement<InputElementProps>;
-    systemConfig.props.onChange?.({ target: { value: "connection:warehouse" } });
+    systemEntity.props.onChange?.({ target: { value: "customer.record" } });
+    const systemCollection = getElementByTestId(boundary, "workflow-output-system-record-collection-2") as ReactElement<InputElementProps>;
+    systemCollection.props.onChange?.({ target: { value: "records/customers" } });
+    const systemWriteMode = getElementByTestId(boundary, "workflow-output-system-write-mode-2") as ReactElement<SelectElementProps>;
+    systemWriteMode.props.onChange?.({ target: { value: "append" } });
+    const systemRecordShape = getElementByTestId(boundary, "workflow-output-system-record-shape-2") as ReactElement<SelectElementProps>;
+    systemRecordShape.props.onChange?.({ target: { value: "record-collection" } });
+    expect(store.getState().isSharedDraftValid).toBe(false);
+
+    boundary = renderBoundary();
+    const selectChatOutput = getElementByTestId(boundary, "workflow-output-select-3") as ReactElement<ButtonElementProps>;
+    selectChatOutput.props.onClick?.();
+    boundary = renderBoundary();
+    const chatTitle = getElementByTestId(boundary, "workflow-output-viewer-title-3") as ReactElement<InputElementProps>;
+    chatTitle.props.onChange?.({ target: { value: "Conversation Result" } });
+    const chatPromptInput = getElementByTestId(boundary, "workflow-output-chat-prompt-input-3") as ReactElement<InputElementProps>;
+    chatPromptInput.props.onChange?.({ target: { value: "input-user-prompt" } });
+    const chatResponseField = getElementByTestId(boundary, "workflow-output-chat-response-field-3") as ReactElement<InputElementProps>;
+    chatResponseField.props.onChange?.({ target: { value: "assistant-response" } });
+    const chatScope = getElementByTestId(boundary, "workflow-output-chat-scope-3") as ReactElement<SelectElementProps>;
+    chatScope.props.onChange?.({ target: { value: "continue-session" } });
+    expect(store.getState().isSharedDraftValid).toBe(false);
+
+    store.updateSharedDraft((draft) => ({
+      ...draft,
+      inputs: [
+        ...draft.inputs,
+        {
+          id: "input-user-prompt",
+          type: "runtime-parameter",
+          sourceType: "runtime-parameter",
+          parameterKey: "userPrompt",
+          valueType: "string",
+        },
+      ],
+    }));
     expect(store.getState().isSharedDraftValid).toBe(true);
 
     boundary = renderBoundary();
@@ -648,7 +684,9 @@ describe("WorkflowStudioModeSystem integration seams", () => {
     expect(store.getState().sharedDraft.outputs[0]?.destination.type).toBe(WorkflowDraftOutputDestinationTypes.systemEntry);
     expect(store.getState().sharedDraft.outputs[0]?.destination.options).toEqual(expect.objectContaining({
       entityName: "",
-      destinationConfig: "",
+      recordCollection: "",
+      writeMode: "upsert",
+      recordShape: "single-record",
     }));
     expect(store.getState().isSharedDraftValid).toBe(false);
 
@@ -658,15 +696,20 @@ describe("WorkflowStudioModeSystem integration seams", () => {
     expect(store.getState().isSharedDraftValid).toBe(true);
 
     boundary = renderBoundary();
+    const moveThirdUp = getElementByTestId(boundary, "workflow-output-move-up-2") as ReactElement<ButtonElementProps>;
+    moveThirdUp.props.onClick?.();
+    expect(store.getState().sharedDraft.outputs.map((output) => output.order)).toEqual([1, 2, 3, 4]);
+
+    boundary = renderBoundary();
     const removeSecond = getElementByTestId(boundary, "workflow-output-remove-1") as ReactElement<ButtonElementProps>;
     removeSecond.props.onClick?.();
-    expect(store.getState().sharedDraft.outputs).toHaveLength(2);
+    expect(store.getState().sharedDraft.outputs).toHaveLength(3);
 
     const baselineSerialized = store.getState().sharedDraftSerialized;
     store.setSelectedMode(WorkflowStudioModeIds.canvas);
     store.setSelectedMode(WorkflowStudioModeIds.wizard);
     expect(store.getState().sharedDraftSerialized).toBe(baselineSerialized);
-    expect(store.getState().sharedDraft.outputs).toHaveLength(2);
+    expect(store.getState().sharedDraft.outputs).toHaveLength(3);
   });
 
   it("renders wizard progression controls and terminal readiness actions from shared draft completeness", () => {
@@ -713,6 +756,10 @@ describe("WorkflowStudioModeSystem integration seams", () => {
     expect(markup).toContain('data-testid="workflow-wizard-next-page"');
     expect(markup).toContain('aria-current="page"');
     expect(markup).toContain('data-testid="workflow-wizard-terminal-actions"');
+    expect(markup).toContain('data-testid="workflow-wizard-output-overview"');
+    expect(markup).toContain('data-testid="workflow-wizard-readiness-output-summary"');
+    expect(markup).toContain("Result viewer");
+    expect(markup).toContain("Web viewer");
     expect(markup).toContain("Ready for next-stage handoff. Save the draft and continue to lifecycle/publish controls.");
     expect(markup).toContain("Prepare for Run");
   });
