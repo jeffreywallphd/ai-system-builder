@@ -377,3 +377,45 @@ body.ui-canvas-locked .ui-page--editor-canvas-locked .ui-canvas-shell {
 .ui-validation-overlay__item {
   pointer-events: auto;
 }
+
+.ui-workflow-studio-canvas {
+  min-height: 0;
+}
+
+.ui-workflow-studio-canvas__section-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-sm);
+}
+
+.ui-workflow-studio-canvas__surface {
+  min-height: clamp(28rem, 62vh, 56rem);
+}
+
+.ui-workflow-studio-canvas__reactflow {
+  width: 100%;
+  height: 100%;
+}
+
+.ui-workflow-canvas-node {
+  width: 260px;
+  min-height: 6.25rem;
+}
+
+.ui-workflow-canvas-node--section {
+  border-color: rgba(79, 156, 249, 0.36);
+  background:
+    linear-gradient(135deg, rgba(79, 156, 249, 0.14), rgba(79, 156, 249, 0.06)),
+    var(--color-bg-panel);
+}
+
+.ui-workflow-canvas-node--item {
+  border-color: var(--color-border-soft);
+  background: var(--color-bg-panel);
+}
+
+.ui-workflow-canvas-node__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -59,8 +59,177 @@ export interface WorkflowCanvasSectionViewModel {
 
 export interface WorkflowCanvasViewModel {
   readonly sections: ReadonlyArray<WorkflowCanvasSectionViewModel>;
+  readonly graph: WorkflowCanvasGraphViewModel;
   readonly totalNodeCount: number;
   readonly totalIssueCount: number;
+}
+
+export const WorkflowCanvasGraphNodeKinds = Object.freeze({
+  section: "section",
+  item: "item",
+});
+
+export type WorkflowCanvasGraphNodeKind =
+  typeof WorkflowCanvasGraphNodeKinds[keyof typeof WorkflowCanvasGraphNodeKinds];
+
+export const WorkflowCanvasGraphEdgeKinds = Object.freeze({
+  sectionFlow: "section-flow",
+  sectionEntry: "section-entry",
+  itemSequence: "item-sequence",
+});
+
+export type WorkflowCanvasGraphEdgeKind =
+  typeof WorkflowCanvasGraphEdgeKinds[keyof typeof WorkflowCanvasGraphEdgeKinds];
+
+export interface WorkflowCanvasGraphPosition {
+  readonly x: number;
+  readonly y: number;
+}
+
+export interface WorkflowCanvasGraphNodeViewModel {
+  readonly id: string;
+  readonly kind: WorkflowCanvasGraphNodeKind;
+  readonly sectionId: WorkflowCanvasSectionId;
+  readonly title: string;
+  readonly subtitle: string;
+  readonly detailLines: ReadonlyArray<string>;
+  readonly issueCount: number;
+  readonly position: WorkflowCanvasGraphPosition;
+}
+
+export interface WorkflowCanvasGraphEdgeViewModel {
+  readonly id: string;
+  readonly kind: WorkflowCanvasGraphEdgeKind;
+  readonly sourceNodeId: string;
+  readonly targetNodeId: string;
+}
+
+export interface WorkflowCanvasGraphLayoutViewModel {
+  readonly sectionColumnWidth: number;
+  readonly sectionNodeHeight: number;
+  readonly itemRowHeight: number;
+  readonly itemNodeOffsetY: number;
+}
+
+export interface WorkflowCanvasGraphViewModel {
+  readonly nodes: ReadonlyArray<WorkflowCanvasGraphNodeViewModel>;
+  readonly edges: ReadonlyArray<WorkflowCanvasGraphEdgeViewModel>;
+  readonly layout: WorkflowCanvasGraphLayoutViewModel;
+}
+
+const WorkflowCanvasGraphLayout = Object.freeze({
+  sectionColumnWidth: 360,
+  sectionNodeHeight: 120,
+  itemRowHeight: 176,
+  itemNodeOffsetY: 156,
+});
+
+function buildSectionGraphNodeId(sectionId: WorkflowCanvasSectionId): string {
+  return `section:${sectionId}`;
+}
+
+function buildItemGraphNodeId(node: WorkflowCanvasNodeViewModel): string {
+  return `item:${node.sectionId}:${node.id}`;
+}
+
+function buildGraphEdgeId(sourceNodeId: string, targetNodeId: string): string {
+  return `edge:${sourceNodeId}->${targetNodeId}`;
+}
+
+function deriveWorkflowCanvasGraphViewModel(
+  sections: ReadonlyArray<WorkflowCanvasSectionViewModel>,
+): WorkflowCanvasGraphViewModel {
+  const graphNodes: WorkflowCanvasGraphNodeViewModel[] = [];
+  const graphEdges: WorkflowCanvasGraphEdgeViewModel[] = [];
+  const sectionEntryNodeIds = new Map<WorkflowCanvasSectionId, string>();
+  const sectionExitNodeIds = new Map<WorkflowCanvasSectionId, string>();
+
+  sections.forEach((section, sectionIndex) => {
+    const sectionNodeId = buildSectionGraphNodeId(section.id);
+    graphNodes.push(Object.freeze({
+      id: sectionNodeId,
+      kind: WorkflowCanvasGraphNodeKinds.section,
+      sectionId: section.id,
+      title: section.title,
+      subtitle: section.summary,
+      detailLines: Object.freeze([`${section.nodes.length} node(s)`]),
+      issueCount: section.nodes.reduce((sum, node) => sum + node.issueMessages.length, 0),
+      position: Object.freeze({
+        x: sectionIndex * WorkflowCanvasGraphLayout.sectionColumnWidth,
+        y: 0,
+      }),
+    }));
+
+    if (section.nodes.length === 0) {
+      sectionEntryNodeIds.set(section.id, sectionNodeId);
+      sectionExitNodeIds.set(section.id, sectionNodeId);
+      return;
+    }
+
+    let previousItemNodeId: string | undefined;
+    section.nodes.forEach((node, nodeIndex) => {
+      const itemNodeId = buildItemGraphNodeId(node);
+      const issueCount = node.issueMessages.length;
+      graphNodes.push(Object.freeze({
+        id: itemNodeId,
+        kind: WorkflowCanvasGraphNodeKinds.item,
+        sectionId: section.id,
+        title: node.title,
+        subtitle: node.subtitle,
+        detailLines: node.detailLines,
+        issueCount,
+        position: Object.freeze({
+          x: sectionIndex * WorkflowCanvasGraphLayout.sectionColumnWidth,
+          y: WorkflowCanvasGraphLayout.itemNodeOffsetY + (nodeIndex * WorkflowCanvasGraphLayout.itemRowHeight),
+        }),
+      }));
+
+      if (nodeIndex === 0) {
+        graphEdges.push(Object.freeze({
+          id: buildGraphEdgeId(sectionNodeId, itemNodeId),
+          kind: WorkflowCanvasGraphEdgeKinds.sectionEntry,
+          sourceNodeId: sectionNodeId,
+          targetNodeId: itemNodeId,
+        }));
+        sectionEntryNodeIds.set(section.id, itemNodeId);
+      }
+
+      if (previousItemNodeId) {
+        graphEdges.push(Object.freeze({
+          id: buildGraphEdgeId(previousItemNodeId, itemNodeId),
+          kind: WorkflowCanvasGraphEdgeKinds.itemSequence,
+          sourceNodeId: previousItemNodeId,
+          targetNodeId: itemNodeId,
+        }));
+      }
+
+      previousItemNodeId = itemNodeId;
+      sectionExitNodeIds.set(section.id, itemNodeId);
+    });
+  });
+
+  for (let index = 0; index < sections.length - 1; index += 1) {
+    const currentSection = sections[index] as WorkflowCanvasSectionViewModel;
+    const nextSection = sections[index + 1] as WorkflowCanvasSectionViewModel;
+    const sourceNodeId = sectionExitNodeIds.get(currentSection.id);
+    const targetNodeId = sectionEntryNodeIds.get(nextSection.id);
+    if (!sourceNodeId || !targetNodeId) {
+      continue;
+    }
+
+    graphEdges.push(Object.freeze({
+      id: buildGraphEdgeId(sourceNodeId, targetNodeId),
+      kind: WorkflowCanvasGraphEdgeKinds.sectionFlow,
+      sourceNodeId,
+      targetNodeId,
+    }));
+  }
+
+  return Object.freeze({
+    nodes: Object.freeze(graphNodes),
+    edges: Object.freeze(graphEdges),
+    layout: WorkflowCanvasGraphLayout,
+  });
 }
 
 export type WorkflowCanvasAction =
@@ -292,9 +461,11 @@ export function deriveWorkflowCanvasViewModel(
       nodes: outputNodes,
     }),
   ]);
+  const graph = deriveWorkflowCanvasGraphViewModel(sections);
 
   return Object.freeze({
     sections,
+    graph,
     totalNodeCount: sections.reduce((sum, section) => sum + section.nodes.length, 0),
     totalIssueCount: sections.reduce((sum, section) => (
       sum + section.nodes.reduce((sectionSum, node) => sectionSum + node.issueMessages.length, 0)
