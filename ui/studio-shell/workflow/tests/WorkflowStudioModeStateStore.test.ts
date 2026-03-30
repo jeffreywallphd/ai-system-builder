@@ -173,6 +173,48 @@ describe("WorkflowStudioModeStateStore", () => {
     expect(store.getState().sharedDraft.outputs.map((entry) => entry.id)).toEqual(["out-1"]);
   });
 
+  it("handles malformed trigger payloads safely during snapshot synchronization", () => {
+    const store = new WorkflowStudioModeStateStore();
+    store.hydrateFromSerializedDraft(serializeWorkflowDraft({
+      ...createEmptyWorkflowDraft(),
+      triggers: [{
+        id: "trigger-safe",
+        kind: "user",
+        type: "manual",
+        config: {},
+      }],
+    }));
+
+    const previousSerialized = store.getState().sharedDraftSerialized;
+    const malformedTriggerPayload = JSON.stringify({
+      triggers: [{
+        id: "trigger-bad",
+        kind: "state",
+        type: "asset-state-changed",
+        config: {
+          stateKey: "status",
+        },
+      }],
+      inputs: [],
+      steps: [],
+      outputs: [],
+    });
+
+    store.synchronizeSharedDraftFromSnapshot({
+      serializedDraft: malformedTriggerPayload,
+      context: {
+        studioId: "workflow-studio",
+        sessionId: "session-1",
+        draftId: "draft-1",
+        revision: 1,
+      },
+    });
+
+    expect(store.getState().draftParseError).toBeDefined();
+    expect(store.getState().sharedDraftSerialized).toBe(previousSerialized);
+    expect(store.getState().sharedDraft.triggers.map((trigger) => trigger.id)).toEqual(["trigger-safe"]);
+  });
+
   it("preserves local draft edits across same-session mode-route snapshot refreshes", () => {
     const store = new WorkflowStudioModeStateStore();
     const serverDraft = serializeWorkflowDraft(createEmptyWorkflowDraft());

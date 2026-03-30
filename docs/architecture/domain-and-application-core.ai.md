@@ -256,6 +256,14 @@ The studio shell now has a bounded inner-layer model and application orchestrati
 - Application reuse now has a dedicated seam (`application/workflow-studio/WorkflowTriggerValidationPipeline.ts`) for single-trigger, type-config, and collection-level validation without introducing UI-owned trigger policy.
 - Forward compatibility for human-approval continuation semantics remains explicit: the shared pipeline allows both `workflow-start` and `workflow-continuation` invocation scopes by default.
 
+## Direction 5 update: Workflow trigger persistence/read-write + wizard selector integration (stories 7.7-7.8)
+
+- Canonical workflow draft persistence/read-write already carries trigger arrays (`WorkflowDraft.triggers`) through the same authoritative mappings (`mapWorkflowDraftToPersistenceRecord`, `mapWorkflowDraftFromPersistenceRecord`, `serializeWorkflowDraft`, `deserializeWorkflowDraft`) used by workflow Studio save/load/version paths.
+- SQLite-backed studio-shell integration now has explicit trigger round-trip coverage so manual/user, temporal, and state trigger definitions survive persisted draft reload without alternate trigger storage paths.
+- Invalid trigger payload handling remains safe and bounded at load/read seams: malformed trigger payloads surface draft-parse validation state in mode-store synchronization instead of corrupting existing shared draft state.
+- Wizard trigger selection is now registry-driven through a dedicated authoring seam (`ui/studio-shell/workflow/WorkflowWizardTriggers.ts`) backed by `WorkflowTriggerTypeRegistry`, so trigger-type discovery/default creation stays aligned with canonical trigger contracts.
+- Renderer trigger editing remains shared-draft-first and validation-projection-driven (`WorkflowStudioModeStateStore` + canonical draft validation) without duplicating trigger validation policy in UI logic.
+
 ## Direction 5 update: Studio shell persistence integration (story 1.11)
 
 - Studio shell now has a real SQLite-backed infrastructure adapter (`infrastructure/filesystem/studio-shell/SqliteStudioShellRepository.ts`) implementing `IStudioShellRepository` with migration-managed schema, indexed studio/session/draft/version storage, and full aggregate snapshot persistence.

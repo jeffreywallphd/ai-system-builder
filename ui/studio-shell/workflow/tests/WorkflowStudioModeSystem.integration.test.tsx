@@ -346,7 +346,7 @@ describe("WorkflowStudioModeSystem integration seams", () => {
     expect(store.getState().modeValidationIssues.some((issue) => issue.code === "draft-parse-error")).toBe(true);
   });
 
-  it("supports wizard trigger add/remove/configuration while persisting through shared draft state", () => {
+  it("supports wizard trigger add/remove/configuration from registry-backed trigger definitions", () => {
     const store = new WorkflowStudioModeStateStore();
     store.setSelectedMode(WorkflowStudioModeIds.wizard);
 
@@ -367,44 +367,46 @@ describe("WorkflowStudioModeSystem integration seams", () => {
     });
 
     let boundary = renderBoundary();
-    const addManualButton = getElementByTestId(boundary, "workflow-trigger-add-manual") as ReactElement<ButtonElementProps>;
-    addManualButton.props.onClick?.();
+    const initialMarkup = renderToStaticMarkup(boundary);
+    expect(initialMarkup).toContain("Manual");
+    expect(initialMarkup).toContain("Scheduled time");
+    expect(initialMarkup).toContain("System event");
+    const addTypeSelect = getElementByTestId(boundary, "workflow-trigger-add-type-select") as ReactElement<SelectElementProps>;
+    addTypeSelect.props.onChange?.({ target: { value: "manual" } });
+    const addTriggerButton = getElementByTestId(boundary, "workflow-trigger-add") as ReactElement<ButtonElementProps>;
+    addTriggerButton.props.onClick?.();
     expect(store.getState().sharedDraft.triggers).toHaveLength(1);
     expect(store.getState().sharedDraft.triggers[0]?.kind).toBe("user");
     expect(store.getState().sharedDraft.triggers[0]?.type).toBe("manual");
+    boundary = renderBoundary();
+    expect(renderToStaticMarkup(boundary)).toContain("Supports continuation semantics for intermediate resume/handoff flows.");
 
     boundary = renderBoundary();
     const triggerTypeSelect = getElementByTestId(boundary, "workflow-trigger-type-0") as ReactElement<SelectElementProps>;
-    triggerTypeSelect.props.onChange?.({ target: { value: "temporal" } });
+    triggerTypeSelect.props.onChange?.({ target: { value: "schedule" } });
     expect(store.getState().sharedDraft.triggers[0]?.kind).toBe("temporal");
+    expect(store.getState().sharedDraft.triggers[0]?.type).toBe("schedule");
 
     boundary = renderBoundary();
-    const temporalTimeInput = getElementByTestId(boundary, "workflow-trigger-temporal-time-0") as ReactElement<InputElementProps>;
-    temporalTimeInput.props.onChange?.({ target: { value: "" } });
-    expect(store.getState().isSharedDraftValid).toBe(false);
-
-    boundary = renderBoundary();
-    expect(renderToStaticMarkup(boundary)).toContain("Temporal trigger requires a valid time of day.");
-    temporalTimeInput.props.onChange?.({ target: { value: "14:30" } });
-    expect(store.getState().isSharedDraftValid).toBe(true);
+    const temporalCronInput = getElementByTestId(boundary, "workflow-trigger-temporal-cron-0") as ReactElement<InputElementProps>;
+    temporalCronInput.props.onChange?.({ target: { value: "15 14 * * *" } });
+    expect(store.getState().sharedDraft.triggers[0]?.config).toEqual(expect.objectContaining({
+      cronExpression: "15 14 * * *",
+    }));
 
     boundary = renderBoundary();
     const stateTypeSelect = getElementByTestId(boundary, "workflow-trigger-type-0") as ReactElement<SelectElementProps>;
-    stateTypeSelect.props.onChange?.({ target: { value: "state" } });
+    stateTypeSelect.props.onChange?.({ target: { value: "system-event" } });
     expect(store.getState().sharedDraft.triggers[0]?.kind).toBe("state");
+    expect(store.getState().sharedDraft.triggers[0]?.type).toBe("system-event");
 
     boundary = renderBoundary();
     const stateEventNameInput = getElementByTestId(boundary, "workflow-trigger-state-event-name-0") as ReactElement<InputElementProps>;
-    stateEventNameInput.props.onChange?.({ target: { value: "" } });
-    expect(store.getState().isSharedDraftValid).toBe(false);
-
-    boundary = renderBoundary();
-    stateEventNameInput.props.onChange?.({ target: { value: "new-data" } });
+    stateEventNameInput.props.onChange?.({ target: { value: "new-data-ready" } });
     const stateSourceInput = getElementByTestId(boundary, "workflow-trigger-state-source-0") as ReactElement<InputElementProps>;
     stateSourceInput.props.onChange?.({ target: { value: "source-alpha" } });
-    expect(store.getState().isSharedDraftValid).toBe(true);
     expect(store.getState().sharedDraft.triggers[0]?.config).toEqual(expect.objectContaining({
-      eventName: "new-data",
+      eventName: "new-data-ready",
       stateKey: "source-alpha",
     }));
 
