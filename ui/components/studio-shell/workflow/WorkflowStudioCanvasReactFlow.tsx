@@ -125,6 +125,10 @@ function mapGraphNodeToReactFlowNode(
     draggable: false,
     selectable: true,
     connectable: false,
+    style: {
+      width: 260,
+      height: node.height,
+    },
     data: {
       graphNode: node,
       selectedNodeId: undefined,

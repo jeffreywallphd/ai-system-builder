@@ -419,6 +419,7 @@ body.ui-canvas-locked .ui-page--editor-canvas-locked .ui-canvas-shell {
 .ui-workflow-canvas-node {
   width: 260px;
   min-height: 6.25rem;
+  overflow: auto;
 }
 
 .ui-workflow-canvas-node--section {
