@@ -4,7 +4,13 @@ import type { AssetDraft, AssetSession, Studio } from "../../../domain/studio-sh
 import type { AssetVersion } from "../../../domain/assets/AssetVersion";
 import { DefaultStudioShellApplicationService } from "../../studio-shell/DefaultStudioShellApplicationService";
 import { WorkflowStudioApplicationService } from "../WorkflowStudioApplicationService";
-import { createEmptyWorkflowDraft, serializeWorkflowDraft, WorkflowStudioIdentity } from "../../../domain/workflow-studio/WorkflowStudioDomain";
+import {
+  createEmptyWorkflowDraft,
+  serializeWorkflowDraft,
+  WorkflowDraftTriggerKinds,
+  WorkflowDraftTriggerTypes,
+  WorkflowStudioIdentity,
+} from "../../../domain/workflow-studio/WorkflowStudioDomain";
 
 class InMemoryStudioShellRepository implements IStudioShellRepository {
   private readonly studios = new Map<string, Studio>();
@@ -210,6 +216,23 @@ describe("WorkflowStudioApplicationService", () => {
 
     const content = serializeWorkflowDraft({
       ...createEmptyWorkflowDraft(),
+      triggers: [
+        {
+          id: "trigger-manual",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        },
+        {
+          id: "trigger-temporal",
+          kind: WorkflowDraftTriggerKinds.temporal,
+          type: WorkflowDraftTriggerTypes.temporalRecurring,
+          config: {
+            every: 2,
+            unit: "hours",
+          },
+        },
+      ],
       steps: [
         {
           id: "step-1",
@@ -255,6 +278,11 @@ describe("WorkflowStudioApplicationService", () => {
     const secondPlan = service.planWorkflowDraftExecution({ content });
 
     expect(firstPlan.schemaVersion).toBe("ai-loom.workflow-draft-execution-plan.v1");
+    expect(firstPlan.triggers.map((trigger) => trigger.triggerId)).toEqual([
+      "trigger-manual",
+      "trigger-temporal",
+    ]);
+    expect(firstPlan.triggers.map((trigger) => trigger.runtimeKind)).toEqual(["manual", "temporal"]);
     expect(firstPlan.elements.map((entry) => entry.elementType)).toEqual([
       "action-step",
       "built-in.if-then",

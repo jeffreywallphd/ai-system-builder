@@ -2,6 +2,8 @@ import { describe, expect, it } from "bun:test";
 import {
   WorkflowDraftBuiltInStepTypes,
   WorkflowDraftStepKinds,
+  WorkflowDraftTriggerKinds,
+  WorkflowDraftTriggerTypes,
   WorkflowDraftStepTypes,
   createEmptyWorkflowDraft,
 } from "../../../domain/workflow-studio/WorkflowStudioDomain";
@@ -14,6 +16,30 @@ describe("WorkflowDraftExecutionPlanMapper", () => {
   it("maps canonical built-in workflow steps into explicit execution-plan elements", () => {
     const plan = mapWorkflowDraftToExecutionPlan({
       ...createEmptyWorkflowDraft(),
+      triggers: [
+        {
+          id: "trigger-manual",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        },
+        {
+          id: "trigger-temporal",
+          kind: WorkflowDraftTriggerKinds.temporal,
+          type: WorkflowDraftTriggerTypes.temporalSchedule,
+          config: {
+            cronExpression: "0 9 * * *",
+          },
+        },
+        {
+          id: "trigger-state",
+          kind: WorkflowDraftTriggerKinds.state,
+          type: WorkflowDraftTriggerTypes.stateSystemEvent,
+          config: {
+            eventName: "system-updated",
+          },
+        },
+      ],
       steps: [
         {
           id: "step-1",
@@ -82,6 +108,11 @@ describe("WorkflowDraftExecutionPlanMapper", () => {
     });
 
     expect(plan.schemaVersion).toBe(WorkflowDraftExecutionPlanSchemaVersion);
+    expect(plan.triggers.map((trigger) => `${trigger.runtimeKind}:${trigger.triggerId}`)).toEqual([
+      "manual:trigger-manual",
+      "temporal:trigger-temporal",
+      "state:trigger-state",
+    ]);
     expect(plan.orderedStepIds).toEqual(["step-1", "step-2", "step-3", "step-4", "step-5", "step-6"]);
     expect(plan.elements.map((element) => element.elementType)).toEqual([
       "action-step",
@@ -150,5 +181,27 @@ describe("WorkflowDraftExecutionPlanMapper", () => {
         },
       ],
     })).toThrow("built-in-step-reference-order-invalid");
+  });
+
+  it("fails planning when canonical trigger definitions are invalid", () => {
+    expect(() => mapWorkflowDraftToExecutionPlan({
+      ...createEmptyWorkflowDraft(),
+      triggers: [
+        {
+          id: "trigger-invalid",
+          kind: WorkflowDraftTriggerKinds.state,
+          type: WorkflowDraftTriggerTypes.stateSystemEvent,
+          config: {},
+        },
+      ],
+      steps: [
+        {
+          id: "step-1",
+          type: "action",
+          kind: WorkflowDraftStepKinds.action,
+          order: 1,
+        },
+      ],
+    })).toThrow("trigger-malformed");
   });
 });
