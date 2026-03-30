@@ -36,6 +36,41 @@ export const WorkflowDraftTriggerTypes = Object.freeze({
 
 export type WorkflowDraftTriggerType = typeof WorkflowDraftTriggerTypes[keyof typeof WorkflowDraftTriggerTypes];
 
+export const WorkflowDraftUserTriggerScopes = Object.freeze({
+  workflowStart: "workflow-start",
+  workflowContinuation: "workflow-continuation",
+});
+
+export type WorkflowDraftUserTriggerScope =
+  typeof WorkflowDraftUserTriggerScopes[keyof typeof WorkflowDraftUserTriggerScopes];
+
+export const WorkflowDraftTemporalScheduleModes = Object.freeze({
+  oneTime: "one-time",
+  cron: "cron",
+  interval: "interval",
+});
+
+export type WorkflowDraftTemporalScheduleMode =
+  typeof WorkflowDraftTemporalScheduleModes[keyof typeof WorkflowDraftTemporalScheduleModes];
+
+export const WorkflowDraftStateEventSourceTypes = Object.freeze({
+  dataset: "dataset",
+  asset: "asset",
+  system: "system",
+});
+
+export type WorkflowDraftStateEventSourceType =
+  typeof WorkflowDraftStateEventSourceTypes[keyof typeof WorkflowDraftStateEventSourceTypes];
+
+export const WorkflowDraftStateEventCategories = Object.freeze({
+  dataIngested: "data-ingested",
+  assetUpdated: "asset-updated",
+  systemStateChanged: "system-state-changed",
+});
+
+export type WorkflowDraftStateEventCategory =
+  typeof WorkflowDraftStateEventCategories[keyof typeof WorkflowDraftStateEventCategories];
+
 export interface WorkflowDraftAssetReference {
   readonly assetId: string;
   readonly versionId?: string;
@@ -48,12 +83,17 @@ export interface WorkflowDraftTriggerBase extends WorkflowDraftSectionItemBase {
 }
 
 export interface WorkflowDraftUserTriggerConfig {
+  readonly invocationScope?: WorkflowDraftUserTriggerScope;
   readonly buttonId?: string;
   readonly requiresConfirmation?: boolean;
   readonly allowedRoles?: ReadonlyArray<string>;
+  readonly continuationStepId?: string;
+  readonly continuationTokenRef?: string;
 }
 
 export interface WorkflowDraftTemporalTriggerConfig {
+  readonly scheduleMode?: WorkflowDraftTemporalScheduleMode;
+  readonly runAt?: string;
   readonly cronExpression?: string;
   readonly every?: number;
   readonly unit?: "minutes" | "hours" | "days" | "weeks";
@@ -63,10 +103,14 @@ export interface WorkflowDraftTemporalTriggerConfig {
 }
 
 export interface WorkflowDraftStateTriggerConfig {
+  readonly sourceType?: WorkflowDraftStateEventSourceType;
+  readonly eventCategory?: WorkflowDraftStateEventCategory;
+  readonly subject?: string;
   readonly eventName?: string;
   readonly asset?: WorkflowDraftAssetReference;
   readonly stateKey?: string;
   readonly stateValue?: string;
+  readonly criteria?: Readonly<Record<string, unknown>>;
   readonly filter?: Readonly<Record<string, unknown>>;
 }
 
@@ -97,6 +141,29 @@ export interface WorkflowDraftStateTrigger extends WorkflowDraftTriggerBase {
 }
 
 export type WorkflowDraftTrigger = WorkflowDraftUserTrigger | WorkflowDraftTemporalTrigger | WorkflowDraftStateTrigger;
+
+export type WorkflowDraftTriggerConfig =
+  | WorkflowDraftUserTriggerConfig
+  | WorkflowDraftTemporalTriggerConfig
+  | WorkflowDraftStateTriggerConfig;
+
+export interface WorkflowDraftTriggerCapabilityMetadata {
+  readonly supportsManualInvocation: boolean;
+  readonly supportsTemporalScheduling: boolean;
+  readonly supportsStateSubscription: boolean;
+  readonly supportsIntermediateContinuation: boolean;
+}
+
+export interface WorkflowDraftTriggerDefinition<TConfig extends WorkflowDraftTriggerConfig = WorkflowDraftTriggerConfig> {
+  readonly kind: WorkflowDraftTriggerKind;
+  readonly type: WorkflowDraftTriggerType;
+  readonly label: string;
+  readonly description: string;
+  readonly configSchemaId: string;
+  readonly capabilities: WorkflowDraftTriggerCapabilityMetadata;
+  readonly defaultConfig: Readonly<TConfig>;
+  readonly validateConfig: (configRecord: Readonly<Record<string, unknown>>) => Readonly<TConfig>;
+}
 
 export const WorkflowDraftInputSourceTypes = Object.freeze({
   datasetAsset: "dataset-asset",
@@ -217,19 +284,82 @@ export const WorkflowDraftBuiltInStepTypes = Object.freeze({
   ifThen: "if-then",
   loopIteration: "loop-iteration",
   delayWait: "delay-wait",
+  manualApproval: "manual-approval",
 });
 
 export type WorkflowDraftBuiltInStepType = typeof WorkflowDraftBuiltInStepTypes[keyof typeof WorkflowDraftBuiltInStepTypes];
 
+export const WorkflowDraftBuiltInStepCategories = Object.freeze({
+  controlFlow: "control-flow",
+  temporal: "temporal",
+  humanInteraction: "human-interaction",
+  transformation: "transformation",
+});
+
+export type WorkflowDraftBuiltInStepCategory =
+  typeof WorkflowDraftBuiltInStepCategories[keyof typeof WorkflowDraftBuiltInStepCategories];
+
 export const WorkflowDraftLoopIterationModes = Object.freeze({
+  fixedCount: "fixed-count",
   collection: "collection",
   range: "range",
 });
 
 export type WorkflowDraftLoopIterationMode = typeof WorkflowDraftLoopIterationModes[keyof typeof WorkflowDraftLoopIterationModes];
 
+export const WorkflowDraftConditionKinds = Object.freeze({
+  expression: "expression",
+  comparison: "comparison",
+});
+
+export type WorkflowDraftConditionKind = typeof WorkflowDraftConditionKinds[keyof typeof WorkflowDraftConditionKinds];
+
+export const WorkflowDraftComparisonOperators = Object.freeze({
+  equals: "equals",
+  notEquals: "not-equals",
+  greaterThan: "greater-than",
+  greaterThanOrEqual: "greater-than-or-equal",
+  lessThan: "less-than",
+  lessThanOrEqual: "less-than-or-equal",
+  contains: "contains",
+  startsWith: "starts-with",
+  endsWith: "ends-with",
+  exists: "exists",
+  notExists: "not-exists",
+});
+
+export type WorkflowDraftComparisonOperator =
+  typeof WorkflowDraftComparisonOperators[keyof typeof WorkflowDraftComparisonOperators];
+
+export interface WorkflowDraftComparisonConditionDefinition {
+  readonly kind: typeof WorkflowDraftConditionKinds.comparison;
+  readonly leftOperand: string;
+  readonly operator: WorkflowDraftComparisonOperator;
+  readonly rightOperand?: unknown;
+}
+
+export interface WorkflowDraftExpressionConditionDefinition {
+  readonly kind: typeof WorkflowDraftConditionKinds.expression;
+  readonly expression: string;
+}
+
+export type WorkflowDraftConditionDefinition =
+  | WorkflowDraftExpressionConditionDefinition
+  | WorkflowDraftComparisonConditionDefinition;
+
+export interface WorkflowDraftIfThenBranchTarget {
+  readonly label?: string;
+  readonly stepIds?: ReadonlyArray<string>;
+}
+
 export interface WorkflowDraftIfThenStepConfig {
-  readonly conditionExpression: string;
+  readonly condition: WorkflowDraftConditionDefinition;
+  readonly branches: Readonly<{
+    readonly then: WorkflowDraftIfThenBranchTarget;
+    readonly else?: WorkflowDraftIfThenBranchTarget;
+  }>;
+  // Deprecated compatibility aliases retained for existing authoring flows.
+  readonly conditionExpression?: string;
   readonly thenLabel?: string;
   readonly elseLabel?: string;
   readonly thenStepIds?: ReadonlyArray<string>;
@@ -242,21 +372,108 @@ export interface WorkflowDraftLoopRangeConfig {
   readonly step?: number;
 }
 
+export interface WorkflowDraftLoopFixedCountSource {
+  readonly count: number;
+}
+
+export interface WorkflowDraftLoopCollectionSource {
+  readonly inputKey: string;
+  readonly itemAlias?: string;
+}
+
 export interface WorkflowDraftLoopIterationStepConfig {
+  readonly mode: WorkflowDraftLoopIterationMode;
+  readonly fixedCount?: WorkflowDraftLoopFixedCountSource;
+  readonly collection?: WorkflowDraftLoopCollectionSource;
+  readonly range?: WorkflowDraftLoopRangeConfig;
+  readonly exitCondition?: WorkflowDraftConditionDefinition;
+  readonly loopLabel?: string;
+  readonly bodyStepIds?: ReadonlyArray<string>;
+  readonly maxIterations?: number;
+  // Deprecated compatibility aliases retained for existing authoring flows.
   readonly repeatCount?: number;
   readonly loopConditionExpression?: string;
-  readonly loopLabel?: string;
   readonly iterationMode?: WorkflowDraftLoopIterationMode;
-  readonly bodyStepIds?: ReadonlyArray<string>;
   readonly itemAlias?: string;
   readonly collectionInputKey?: string;
-  readonly range?: WorkflowDraftLoopRangeConfig;
-  readonly maxIterations?: number;
+}
+
+export const WorkflowDraftDelayWaitModes = Object.freeze({
+  duration: "duration",
+  untilTime: "until-time",
+});
+
+export type WorkflowDraftDelayWaitMode = typeof WorkflowDraftDelayWaitModes[keyof typeof WorkflowDraftDelayWaitModes];
+
+export const WorkflowDraftDelayWaitDurationUnits = Object.freeze({
+  seconds: "seconds",
+  minutes: "minutes",
+  hours: "hours",
+});
+
+export type WorkflowDraftDelayWaitDurationUnit =
+  typeof WorkflowDraftDelayWaitDurationUnits[keyof typeof WorkflowDraftDelayWaitDurationUnits];
+
+export interface WorkflowDraftDelayWaitDuration {
+  readonly value: number;
+  readonly unit: WorkflowDraftDelayWaitDurationUnit;
+}
+
+export interface WorkflowDraftDelayWaitUntilTime {
+  readonly timestamp: string;
+  readonly timezone?: string;
 }
 
 export interface WorkflowDraftDelayWaitStepConfig {
-  readonly durationSeconds: number;
+  readonly mode: WorkflowDraftDelayWaitMode;
+  readonly duration?: WorkflowDraftDelayWaitDuration;
+  readonly until?: WorkflowDraftDelayWaitUntilTime;
   readonly note?: string;
+  // Deprecated compatibility aliases retained for existing authoring flows.
+  readonly durationSeconds?: number;
+  readonly waitUntil?: string;
+}
+
+export const WorkflowDraftManualInteractionModes = Object.freeze({
+  review: "review",
+  approval: "approval",
+});
+
+export type WorkflowDraftManualInteractionMode =
+  typeof WorkflowDraftManualInteractionModes[keyof typeof WorkflowDraftManualInteractionModes];
+
+export interface WorkflowDraftManualInteractionOutcomes {
+  readonly continue?: WorkflowDraftIfThenBranchTarget;
+  readonly approve?: WorkflowDraftIfThenBranchTarget;
+  readonly reject?: WorkflowDraftIfThenBranchTarget;
+}
+
+export interface WorkflowDraftManualApprovalStepConfig {
+  readonly prompt: string;
+  readonly interactionMode: WorkflowDraftManualInteractionMode;
+  readonly outcomes: WorkflowDraftManualInteractionOutcomes;
+  readonly requiredApproverRoles?: ReadonlyArray<string>;
+  readonly timeoutSeconds?: number;
+  readonly onTimeout?: "reject" | "continue" | "escalate";
+  readonly allowSelfApproval?: boolean;
+  // Deprecated compatibility alias retained for existing authoring flows.
+  readonly approvalMessage?: string;
+}
+
+export type WorkflowDraftBuiltInStepConfig =
+  | WorkflowDraftIfThenStepConfig
+  | WorkflowDraftLoopIterationStepConfig
+  | WorkflowDraftDelayWaitStepConfig
+  | WorkflowDraftManualApprovalStepConfig;
+
+export interface WorkflowDraftBuiltInStepDefinition<TConfig extends WorkflowDraftBuiltInStepConfig = WorkflowDraftBuiltInStepConfig> {
+  readonly type: WorkflowDraftBuiltInStepType;
+  readonly category: WorkflowDraftBuiltInStepCategory;
+  readonly label: string;
+  readonly description: string;
+  readonly configSchemaId: string;
+  readonly defaultConfig: Readonly<TConfig>;
+  readonly validateConfig: (configRecord: Readonly<Record<string, unknown>>) => Readonly<TConfig>;
 }
 
 export const WorkflowDraftStepAssetKinds = Object.freeze({
@@ -276,6 +493,12 @@ export interface WorkflowDraftStep extends WorkflowDraftSectionItemBase {
   readonly dependsOnStepIds?: ReadonlyArray<string>;
   readonly config?: Readonly<Record<string, unknown>>;
   readonly assetRef?: WorkflowDraftStepAssetReference;
+}
+
+export interface WorkflowDraftBuiltInStep extends WorkflowDraftStep {
+  readonly kind: typeof WorkflowDraftStepKinds.controlFlow;
+  readonly type: WorkflowDraftBuiltInStepType;
+  readonly config: WorkflowDraftBuiltInStepConfig;
 }
 
 export interface WorkflowDraft {
@@ -364,7 +587,12 @@ export const WorkflowValidationIssueCodes = Object.freeze({
   lifecycleExecutableNotReady: "lifecycle-executable-not-ready",
   draftMalformed: "draft-malformed",
   draftSectionMissing: "draft-section-missing",
+  triggerCollectionEmpty: "trigger-collection-empty",
   triggerMalformed: "trigger-malformed",
+  triggerDuplicateId: "trigger-duplicate-id",
+  triggerDuplicateDefinition: "trigger-duplicate-definition",
+  triggerContinuationStepMissing: "trigger-continuation-step-missing",
+  triggerScopeUnsupported: "trigger-scope-unsupported",
   inputMalformed: "input-malformed",
   inputDatasetAssetMalformed: "input-dataset-asset-malformed",
   inputDatasetAssetTaxonomyMismatch: "input-dataset-asset-taxonomy-mismatch",
@@ -377,6 +605,7 @@ export const WorkflowValidationIssueCodes = Object.freeze({
   stepDependencyCycle: "step-dependency-cycle",
   builtInStepReferenceMissing: "built-in-step-reference-missing",
   builtInStepReferenceSelf: "built-in-step-reference-self",
+  builtInStepReferenceOrderInvalid: "built-in-step-reference-order-invalid",
   loopCollectionInputMissing: "loop-collection-input-missing",
   outputMalformed: "output-malformed",
   outputSourceStepMissing: "output-source-step-missing",
@@ -570,6 +799,73 @@ function normalizeTriggerKind(value: string): WorkflowDraftTriggerKind {
   throw new Error(`Workflow draft trigger kind '${value}' is not supported.`);
 }
 
+function normalizeUserTriggerScope(value: unknown): WorkflowDraftUserTriggerScope {
+  const normalized = normalizeOptional(typeof value === "string" ? value : undefined);
+  if (!normalized) {
+    return WorkflowDraftUserTriggerScopes.workflowStart;
+  }
+  if (
+    normalized === WorkflowDraftUserTriggerScopes.workflowStart
+    || normalized === WorkflowDraftUserTriggerScopes.workflowContinuation
+  ) {
+    return normalized;
+  }
+  throw new Error(`Workflow draft user trigger config.invocationScope '${normalized}' is not supported.`);
+}
+
+function normalizeTemporalScheduleMode(value: unknown): WorkflowDraftTemporalScheduleMode | undefined {
+  const normalized = normalizeOptional(typeof value === "string" ? value : undefined);
+  if (!normalized) {
+    return undefined;
+  }
+  if (
+    normalized === WorkflowDraftTemporalScheduleModes.oneTime
+    || normalized === WorkflowDraftTemporalScheduleModes.cron
+    || normalized === WorkflowDraftTemporalScheduleModes.interval
+  ) {
+    return normalized;
+  }
+  throw new Error(`Workflow draft temporal trigger config.scheduleMode '${normalized}' is not supported.`);
+}
+
+function normalizeStateEventSourceType(value: unknown): WorkflowDraftStateEventSourceType | undefined {
+  const normalized = normalizeOptional(typeof value === "string" ? value : undefined);
+  if (!normalized) {
+    return undefined;
+  }
+  if (
+    normalized === WorkflowDraftStateEventSourceTypes.dataset
+    || normalized === WorkflowDraftStateEventSourceTypes.asset
+    || normalized === WorkflowDraftStateEventSourceTypes.system
+  ) {
+    return normalized;
+  }
+  throw new Error(`Workflow draft state trigger config.sourceType '${normalized}' is not supported.`);
+}
+
+function normalizeStateEventCategory(value: unknown): WorkflowDraftStateEventCategory | undefined {
+  const normalized = normalizeOptional(typeof value === "string" ? value : undefined);
+  if (!normalized) {
+    return undefined;
+  }
+  if (
+    normalized === WorkflowDraftStateEventCategories.dataIngested
+    || normalized === WorkflowDraftStateEventCategories.assetUpdated
+    || normalized === WorkflowDraftStateEventCategories.systemStateChanged
+  ) {
+    return normalized;
+  }
+  throw new Error(`Workflow draft state trigger config.eventCategory '${normalized}' is not supported.`);
+}
+
+function isLikelyCronExpression(value: string): boolean {
+  const fields = value.trim().split(/\s+/);
+  if (fields.length !== 5) {
+    return false;
+  }
+  return fields.every((field) => field.length > 0 && !field.includes(" "));
+}
+
 function normalizeWorkflowDraftAssetReference(
   reference: WorkflowDraftAssetReference,
   label: string,
@@ -593,49 +889,67 @@ function normalizeWorkflowDraftAssetReference(
   return Object.freeze({ assetId, versionId, taxonomy });
 }
 
-function normalizeUserTrigger(
-  item: WorkflowDraftSectionItemBase,
-  trigger: WorkflowDraftTrigger,
-): WorkflowDraftUserTrigger {
+function normalizeUserTriggerConfig(
+  triggerType: WorkflowDraftUserTrigger["type"],
+  configRecord: Readonly<Record<string, unknown>>,
+): WorkflowDraftUserTriggerConfig {
   if (
-    trigger.type !== WorkflowDraftTriggerTypes.userManual
-    && trigger.type !== WorkflowDraftTriggerTypes.userButtonClick
-    && trigger.type !== WorkflowDraftTriggerTypes.userInitiatedRun
+    triggerType !== WorkflowDraftTriggerTypes.userManual
+    && triggerType !== WorkflowDraftTriggerTypes.userButtonClick
+    && triggerType !== WorkflowDraftTriggerTypes.userInitiatedRun
   ) {
-    throw new Error(`Workflow draft trigger type '${trigger.type}' is not valid for kind '${WorkflowDraftTriggerKinds.user}'.`);
+    throw new Error(`Workflow draft trigger type '${triggerType}' is not valid for kind '${WorkflowDraftTriggerKinds.user}'.`);
   }
 
-  const configRecord = assertRecord(trigger.config ?? {}, "Workflow draft trigger config");
   const buttonId = normalizeOptional(typeof configRecord.buttonId === "string" ? configRecord.buttonId : undefined);
-  if (trigger.type === WorkflowDraftTriggerTypes.userButtonClick && !buttonId) {
+  if (triggerType === WorkflowDraftTriggerTypes.userButtonClick && !buttonId) {
     throw new Error("Workflow draft user button-click trigger requires config.buttonId.");
   }
 
+  const invocationScope = normalizeUserTriggerScope(configRecord.invocationScope);
+  const continuationStepId = normalizeOptional(
+    typeof configRecord.continuationStepId === "string" ? configRecord.continuationStepId : undefined,
+  );
+  const continuationTokenRef = normalizeOptional(
+    typeof configRecord.continuationTokenRef === "string" ? configRecord.continuationTokenRef : undefined,
+  );
+  if (invocationScope !== WorkflowDraftUserTriggerScopes.workflowContinuation && (continuationStepId || continuationTokenRef)) {
+    throw new Error(
+      "Workflow draft user trigger continuation fields require config.invocationScope to be 'workflow-continuation'.",
+    );
+  }
+
   return Object.freeze({
-    ...item,
-    kind: WorkflowDraftTriggerKinds.user,
-    type: trigger.type,
-    config: Object.freeze({
-      buttonId,
-      requiresConfirmation: normalizeOptionalBoolean(configRecord.requiresConfirmation, "Workflow draft user trigger config.requiresConfirmation"),
-      allowedRoles: normalizeStringArray(configRecord.allowedRoles, "Workflow draft user trigger config.allowedRoles"),
-    }),
+    invocationScope,
+    buttonId,
+    requiresConfirmation: normalizeOptionalBoolean(configRecord.requiresConfirmation, "Workflow draft user trigger config.requiresConfirmation"),
+    allowedRoles: normalizeStringArray(configRecord.allowedRoles, "Workflow draft user trigger config.allowedRoles"),
+    continuationStepId,
+    continuationTokenRef,
   });
 }
 
-function normalizeTemporalTrigger(
-  item: WorkflowDraftSectionItemBase,
-  trigger: WorkflowDraftTrigger,
-): WorkflowDraftTemporalTrigger {
+function normalizeTemporalTriggerConfig(
+  triggerType: WorkflowDraftTemporalTrigger["type"],
+  configRecord: Readonly<Record<string, unknown>>,
+): WorkflowDraftTemporalTriggerConfig {
   if (
-    trigger.type !== WorkflowDraftTriggerTypes.temporalSchedule
-    && trigger.type !== WorkflowDraftTriggerTypes.temporalRecurring
+    triggerType !== WorkflowDraftTriggerTypes.temporalSchedule
+    && triggerType !== WorkflowDraftTriggerTypes.temporalRecurring
   ) {
-    throw new Error(`Workflow draft trigger type '${trigger.type}' is not valid for kind '${WorkflowDraftTriggerKinds.temporal}'.`);
+    throw new Error(`Workflow draft trigger type '${triggerType}' is not valid for kind '${WorkflowDraftTriggerKinds.temporal}'.`);
   }
 
-  const configRecord = assertRecord(trigger.config ?? {}, "Workflow draft trigger config");
+  const scheduleMode = normalizeTemporalScheduleMode(configRecord.scheduleMode);
+  const runAt = normalizeOptional(typeof configRecord.runAt === "string" ? configRecord.runAt : undefined);
+  if (runAt && !isValidTimestamp(runAt)) {
+    throw new Error("Workflow draft temporal trigger config.runAt must be a valid timestamp when provided.");
+  }
+
   const cronExpression = normalizeOptional(typeof configRecord.cronExpression === "string" ? configRecord.cronExpression : undefined);
+  if (cronExpression && !isLikelyCronExpression(cronExpression)) {
+    throw new Error("Workflow draft temporal trigger config.cronExpression must be a valid five-field cron expression.");
+  }
   const every = normalizePositiveInteger(configRecord.every, "Workflow draft temporal trigger config.every");
   const unit = normalizeOptional(typeof configRecord.unit === "string" ? configRecord.unit : undefined);
   const normalizedUnit = unit && ["minutes", "hours", "days", "weeks"].includes(unit)
@@ -645,45 +959,75 @@ function normalizeTemporalTrigger(
     throw new Error(`Workflow draft temporal trigger config.unit '${unit}' is not supported.`);
   }
 
-  if (trigger.type === WorkflowDraftTriggerTypes.temporalSchedule && !cronExpression) {
-    throw new Error("Workflow draft temporal schedule trigger requires config.cronExpression.");
+  const startAt = normalizeOptional(typeof configRecord.startAt === "string" ? configRecord.startAt : undefined);
+  const endAt = normalizeOptional(typeof configRecord.endAt === "string" ? configRecord.endAt : undefined);
+  if (startAt && !isValidTimestamp(startAt)) {
+    throw new Error("Workflow draft temporal trigger config.startAt must be a valid timestamp when provided.");
   }
-  if (trigger.type === WorkflowDraftTriggerTypes.temporalRecurring && (!every || !normalizedUnit)) {
+  if (endAt && !isValidTimestamp(endAt)) {
+    throw new Error("Workflow draft temporal trigger config.endAt must be a valid timestamp when provided.");
+  }
+  if (startAt && endAt && Date.parse(startAt) > Date.parse(endAt)) {
+    throw new Error("Workflow draft temporal trigger config.startAt must be before config.endAt when both are provided.");
+  }
+
+  if (triggerType === WorkflowDraftTriggerTypes.temporalSchedule && !cronExpression && !runAt) {
+    throw new Error("Workflow draft temporal schedule trigger requires config.cronExpression or config.runAt.");
+  }
+  if (triggerType === WorkflowDraftTriggerTypes.temporalSchedule && cronExpression && runAt) {
+    throw new Error("Workflow draft temporal schedule trigger cannot define both config.cronExpression and config.runAt.");
+  }
+  if (triggerType === WorkflowDraftTriggerTypes.temporalRecurring && (!every || !normalizedUnit || runAt)) {
     throw new Error("Workflow draft temporal recurring trigger requires config.every and config.unit.");
   }
 
   return Object.freeze({
-    ...item,
-    kind: WorkflowDraftTriggerKinds.temporal,
-    type: trigger.type,
-    config: Object.freeze({
-      cronExpression,
-      every,
-      unit: normalizedUnit,
-      timezone: normalizeOptional(typeof configRecord.timezone === "string" ? configRecord.timezone : undefined),
-      startAt: normalizeOptional(typeof configRecord.startAt === "string" ? configRecord.startAt : undefined),
-      endAt: normalizeOptional(typeof configRecord.endAt === "string" ? configRecord.endAt : undefined),
-    }),
+    scheduleMode,
+    runAt,
+    cronExpression,
+    every,
+    unit: normalizedUnit,
+    timezone: normalizeOptional(typeof configRecord.timezone === "string" ? configRecord.timezone : undefined),
+    startAt,
+    endAt,
   });
 }
 
-function normalizeStateTrigger(
-  item: WorkflowDraftSectionItemBase,
-  trigger: WorkflowDraftTrigger,
-): WorkflowDraftStateTrigger {
+function normalizeStateTriggerConfig(
+  triggerType: WorkflowDraftStateTrigger["type"],
+  configRecord: Readonly<Record<string, unknown>>,
+): WorkflowDraftStateTriggerConfig {
   if (
-    trigger.type !== WorkflowDraftTriggerTypes.stateDataAvailable
-    && trigger.type !== WorkflowDraftTriggerTypes.stateAssetStateChanged
-    && trigger.type !== WorkflowDraftTriggerTypes.stateSystemEvent
+    triggerType !== WorkflowDraftTriggerTypes.stateDataAvailable
+    && triggerType !== WorkflowDraftTriggerTypes.stateAssetStateChanged
+    && triggerType !== WorkflowDraftTriggerTypes.stateSystemEvent
   ) {
-    throw new Error(`Workflow draft trigger type '${trigger.type}' is not valid for kind '${WorkflowDraftTriggerKinds.state}'.`);
+    throw new Error(`Workflow draft trigger type '${triggerType}' is not valid for kind '${WorkflowDraftTriggerKinds.state}'.`);
   }
 
-  const configRecord = assertRecord(trigger.config ?? {}, "Workflow draft trigger config");
   const eventName = normalizeOptional(typeof configRecord.eventName === "string" ? configRecord.eventName : undefined);
+  const subject = normalizeOptional(typeof configRecord.subject === "string" ? configRecord.subject : undefined);
   const stateKey = normalizeOptional(typeof configRecord.stateKey === "string" ? configRecord.stateKey : undefined);
   const stateValue = normalizeOptional(typeof configRecord.stateValue === "string" ? configRecord.stateValue : undefined);
-  const filter = configRecord.filter ? Object.freeze({ ...assertRecord(configRecord.filter, "Workflow draft state trigger config.filter") }) : undefined;
+  const filterRecord = configRecord.filter
+    ? assertRecord(configRecord.filter, "Workflow draft state trigger config.filter")
+    : undefined;
+  const criteriaRecord = configRecord.criteria
+    ? assertRecord(configRecord.criteria, "Workflow draft state trigger config.criteria")
+    : filterRecord;
+  const criteria = criteriaRecord ? Object.freeze({ ...criteriaRecord }) : undefined;
+  const sourceType = normalizeStateEventSourceType(configRecord.sourceType)
+    ?? (triggerType === WorkflowDraftTriggerTypes.stateAssetStateChanged
+      ? WorkflowDraftStateEventSourceTypes.asset
+      : (triggerType === WorkflowDraftTriggerTypes.stateSystemEvent
+        ? WorkflowDraftStateEventSourceTypes.system
+        : WorkflowDraftStateEventSourceTypes.dataset));
+  const eventCategory = normalizeStateEventCategory(configRecord.eventCategory)
+    ?? (triggerType === WorkflowDraftTriggerTypes.stateAssetStateChanged
+      ? WorkflowDraftStateEventCategories.assetUpdated
+      : (triggerType === WorkflowDraftTriggerTypes.stateSystemEvent
+        ? WorkflowDraftStateEventCategories.systemStateChanged
+        : WorkflowDraftStateEventCategories.dataIngested));
   const assetRecord = configRecord.asset
     ? normalizeWorkflowDraftAssetReference(
       assertRecord(configRecord.asset, "Workflow draft state trigger config.asset") as WorkflowDraftAssetReference,
@@ -691,24 +1035,76 @@ function normalizeStateTrigger(
     )
     : undefined;
 
-  if (trigger.type === WorkflowDraftTriggerTypes.stateAssetStateChanged && !assetRecord) {
+  if (triggerType === WorkflowDraftTriggerTypes.stateAssetStateChanged && !assetRecord) {
     throw new Error("Workflow draft state asset-state-changed trigger requires config.asset.");
   }
-  if (trigger.type === WorkflowDraftTriggerTypes.stateSystemEvent && !eventName) {
+  if (triggerType === WorkflowDraftTriggerTypes.stateSystemEvent && !eventName) {
     throw new Error("Workflow draft state system-event trigger requires config.eventName.");
   }
+  if (triggerType === WorkflowDraftTriggerTypes.stateDataAvailable && !eventName && !subject && !stateKey) {
+    throw new Error(
+      "Workflow draft state data-available trigger requires config.eventName, config.subject, or config.stateKey.",
+    );
+  }
+  if (sourceType === WorkflowDraftStateEventSourceTypes.asset && !assetRecord) {
+    throw new Error("Workflow draft state trigger config.sourceType 'asset' requires config.asset.");
+  }
+
+  return Object.freeze({
+    sourceType,
+    eventCategory,
+    subject,
+    eventName,
+    asset: assetRecord,
+    stateKey,
+    stateValue,
+    criteria,
+    filter: criteria,
+  });
+}
+
+function normalizeUserTrigger(
+  item: WorkflowDraftSectionItemBase,
+  trigger: WorkflowDraftTrigger,
+): WorkflowDraftUserTrigger {
+  const triggerType = trigger.type as WorkflowDraftUserTrigger["type"];
+  const configRecord = assertRecord(trigger.config ?? {}, "Workflow draft trigger config");
+
+  return Object.freeze({
+    ...item,
+    kind: WorkflowDraftTriggerKinds.user,
+    type: triggerType,
+    config: normalizeUserTriggerConfig(triggerType, configRecord),
+  });
+}
+
+function normalizeTemporalTrigger(
+  item: WorkflowDraftSectionItemBase,
+  trigger: WorkflowDraftTrigger,
+): WorkflowDraftTemporalTrigger {
+  const triggerType = trigger.type as WorkflowDraftTemporalTrigger["type"];
+  const configRecord = assertRecord(trigger.config ?? {}, "Workflow draft trigger config");
+
+  return Object.freeze({
+    ...item,
+    kind: WorkflowDraftTriggerKinds.temporal,
+    type: triggerType,
+    config: normalizeTemporalTriggerConfig(triggerType, configRecord),
+  });
+}
+
+function normalizeStateTrigger(
+  item: WorkflowDraftSectionItemBase,
+  trigger: WorkflowDraftTrigger,
+): WorkflowDraftStateTrigger {
+  const triggerType = trigger.type as WorkflowDraftStateTrigger["type"];
+  const configRecord = assertRecord(trigger.config ?? {}, "Workflow draft trigger config");
 
   return Object.freeze({
     ...item,
     kind: WorkflowDraftTriggerKinds.state,
-    type: trigger.type,
-    config: Object.freeze({
-      eventName,
-      asset: assetRecord,
-      stateKey,
-      stateValue,
-      filter,
-    }),
+    type: triggerType,
+    config: normalizeStateTriggerConfig(triggerType, configRecord),
   });
 }
 
@@ -912,38 +1308,156 @@ function normalizeStepConfig(
     throw new Error(`Workflow draft built-in control-flow step '${step.type}' requires config.`);
   }
 
-  switch (step.type) {
-    case WorkflowDraftBuiltInStepTypes.ifThen:
-      return normalizeIfThenStepConfig(configRecord);
-    case WorkflowDraftBuiltInStepTypes.loopIteration:
-      return normalizeLoopIterationStepConfig(configRecord);
-    case WorkflowDraftBuiltInStepTypes.delayWait:
-      return normalizeDelayWaitStepConfig(configRecord);
-    default:
-      return Object.freeze({ ...configRecord });
-  }
+  const normalizedBuiltInConfig = normalizeWorkflowDraftBuiltInStepConfig(step.type, configRecord);
+  return Object.freeze({ ...normalizedBuiltInConfig });
 }
 
 function isBuiltInControlFlowStepType(value: string): value is WorkflowDraftBuiltInStepType {
-  return value === WorkflowDraftBuiltInStepTypes.ifThen
-    || value === WorkflowDraftBuiltInStepTypes.loopIteration
-    || value === WorkflowDraftBuiltInStepTypes.delayWait;
+  return isWorkflowDraftBuiltInStepType(value);
+}
+
+function normalizeConditionDefinition(
+  raw: unknown,
+  label: string,
+): Readonly<WorkflowDraftConditionDefinition> {
+  const record = assertRecord(raw, label);
+  const kind = normalizeRequired(
+    typeof record.kind === "string" ? record.kind : "",
+    `${label}.kind`,
+  );
+
+  if (kind === WorkflowDraftConditionKinds.expression) {
+    const expression = normalizeRequired(
+      typeof record.expression === "string" ? record.expression : "",
+      `${label}.expression`,
+    );
+    return Object.freeze({
+      kind: WorkflowDraftConditionKinds.expression,
+      expression,
+    });
+  }
+
+  if (kind === WorkflowDraftConditionKinds.comparison) {
+    const leftOperand = normalizeRequired(
+      typeof record.leftOperand === "string" ? record.leftOperand : "",
+      `${label}.leftOperand`,
+    );
+    const operator = normalizeRequired(
+      typeof record.operator === "string" ? record.operator : "",
+      `${label}.operator`,
+    );
+    if (
+      operator !== WorkflowDraftComparisonOperators.equals
+      && operator !== WorkflowDraftComparisonOperators.notEquals
+      && operator !== WorkflowDraftComparisonOperators.greaterThan
+      && operator !== WorkflowDraftComparisonOperators.greaterThanOrEqual
+      && operator !== WorkflowDraftComparisonOperators.lessThan
+      && operator !== WorkflowDraftComparisonOperators.lessThanOrEqual
+      && operator !== WorkflowDraftComparisonOperators.contains
+      && operator !== WorkflowDraftComparisonOperators.startsWith
+      && operator !== WorkflowDraftComparisonOperators.endsWith
+      && operator !== WorkflowDraftComparisonOperators.exists
+      && operator !== WorkflowDraftComparisonOperators.notExists
+    ) {
+      throw new Error(`${label}.operator '${operator}' is not supported.`);
+    }
+    const rightOperand = record.rightOperand;
+    if (
+      rightOperand === undefined
+      && operator !== WorkflowDraftComparisonOperators.exists
+      && operator !== WorkflowDraftComparisonOperators.notExists
+    ) {
+      throw new Error(`${label}.rightOperand is required for operator '${operator}'.`);
+    }
+    return Object.freeze({
+      kind: WorkflowDraftConditionKinds.comparison,
+      leftOperand,
+      operator: operator as WorkflowDraftComparisonOperator,
+      rightOperand,
+    });
+  }
+
+  throw new Error(`${label}.kind '${kind}' is not supported.`);
+}
+
+function normalizeIfThenBranchTarget(
+  raw: unknown,
+  label: string,
+): Readonly<WorkflowDraftIfThenBranchTarget> {
+  const record = assertRecord(raw, label);
+  const branchLabel = normalizeOptional(typeof record.label === "string" ? record.label : undefined);
+  const stepIds = normalizeStringArray(record.stepIds, `${label}.stepIds`);
+  if (!branchLabel && !stepIds) {
+    throw new Error(`${label} requires label or stepIds.`);
+  }
+  return Object.freeze({
+    label: branchLabel,
+    stepIds,
+  });
 }
 
 function normalizeIfThenStepConfig(configRecord: Readonly<Record<string, unknown>>): Readonly<WorkflowDraftIfThenStepConfig> {
-  const conditionExpression = normalizeRequired(
-    typeof configRecord.conditionExpression === "string" ? configRecord.conditionExpression : "",
-    "Workflow draft if-then step config.conditionExpression",
+  const condition = configRecord.condition
+    ? normalizeConditionDefinition(configRecord.condition, "Workflow draft if-then step config.condition")
+    : Object.freeze({
+      kind: WorkflowDraftConditionKinds.expression,
+      expression: normalizeRequired(
+        typeof configRecord.conditionExpression === "string" ? configRecord.conditionExpression : "",
+        "Workflow draft if-then step config.conditionExpression",
+      ),
+    } as WorkflowDraftExpressionConditionDefinition);
+
+  const thenLabelLegacy = normalizeOptional(
+    typeof configRecord.thenLabel === "string" ? configRecord.thenLabel : undefined,
   );
-  const thenLabel = normalizeOptional(typeof configRecord.thenLabel === "string" ? configRecord.thenLabel : undefined);
-  const elseLabel = normalizeOptional(typeof configRecord.elseLabel === "string" ? configRecord.elseLabel : undefined);
-  const thenStepIds = normalizeStringArray(configRecord.thenStepIds, "Workflow draft if-then step config.thenStepIds");
-  const elseStepIds = normalizeStringArray(configRecord.elseStepIds, "Workflow draft if-then step config.elseStepIds");
+  const elseLabelLegacy = normalizeOptional(
+    typeof configRecord.elseLabel === "string" ? configRecord.elseLabel : undefined,
+  );
+  const thenStepIdsLegacy = normalizeStringArray(
+    configRecord.thenStepIds,
+    "Workflow draft if-then step config.thenStepIds",
+  );
+  const elseStepIdsLegacy = normalizeStringArray(
+    configRecord.elseStepIds,
+    "Workflow draft if-then step config.elseStepIds",
+  );
+
+  const branchesRecord = configRecord.branches
+    ? assertRecord(configRecord.branches, "Workflow draft if-then step config.branches")
+    : undefined;
+  const thenBranch = branchesRecord?.then
+    ? normalizeIfThenBranchTarget(branchesRecord.then, "Workflow draft if-then step config.branches.then")
+    : normalizeIfThenBranchTarget(
+      { label: thenLabelLegacy, stepIds: thenStepIdsLegacy },
+      "Workflow draft if-then step config.branches.then",
+    );
+  const elseBranch = branchesRecord?.else
+    ? normalizeIfThenBranchTarget(branchesRecord.else, "Workflow draft if-then step config.branches.else")
+    : (elseLabelLegacy || elseStepIdsLegacy
+      ? normalizeIfThenBranchTarget(
+        { label: elseLabelLegacy, stepIds: elseStepIdsLegacy },
+        "Workflow draft if-then step config.branches.else",
+      )
+      : undefined);
+
+  const thenStepIds = thenBranch.stepIds;
+  const elseStepIds = elseBranch?.stepIds;
   if (thenStepIds && elseStepIds && elseStepIds.some((stepId) => thenStepIds.includes(stepId))) {
     throw new Error("Workflow draft if-then step config elseStepIds cannot overlap thenStepIds.");
   }
 
+  const conditionExpression = condition.kind === WorkflowDraftConditionKinds.expression
+    ? condition.expression
+    : undefined;
+  const thenLabel = thenBranch.label;
+  const elseLabel = elseBranch?.label;
+
   return Object.freeze({
+    condition,
+    branches: Object.freeze({
+      then: thenBranch,
+      else: elseBranch,
+    }),
     conditionExpression,
     thenLabel,
     elseLabel,
@@ -955,33 +1469,31 @@ function normalizeIfThenStepConfig(configRecord: Readonly<Record<string, unknown
 function normalizeLoopIterationStepConfig(
   configRecord: Readonly<Record<string, unknown>>,
 ): Readonly<WorkflowDraftLoopIterationStepConfig> {
-  const repeatCount = normalizePositiveInteger(configRecord.repeatCount, "Workflow draft loop-iteration step config.repeatCount");
+  const repeatCount = normalizePositiveInteger(
+    configRecord.repeatCount,
+    "Workflow draft loop-iteration step config.repeatCount",
+  );
   const loopConditionExpression = normalizeOptional(
     typeof configRecord.loopConditionExpression === "string" ? configRecord.loopConditionExpression : undefined,
   );
   const loopLabel = normalizeOptional(typeof configRecord.loopLabel === "string" ? configRecord.loopLabel : undefined);
 
-  const iterationModeRaw = normalizeOptional(
-    typeof configRecord.iterationMode === "string" ? configRecord.iterationMode : undefined,
+  const modeRaw = normalizeOptional(
+    typeof configRecord.mode === "string"
+      ? configRecord.mode
+      : (typeof configRecord.iterationMode === "string" ? configRecord.iterationMode : undefined),
   );
   if (
-    iterationModeRaw
-    && iterationModeRaw !== WorkflowDraftLoopIterationModes.collection
-    && iterationModeRaw !== WorkflowDraftLoopIterationModes.range
+    modeRaw
+    && modeRaw !== WorkflowDraftLoopIterationModes.fixedCount
+    && modeRaw !== WorkflowDraftLoopIterationModes.collection
+    && modeRaw !== WorkflowDraftLoopIterationModes.range
   ) {
-    throw new Error(`Workflow draft loop-iteration step config.iterationMode '${iterationModeRaw}' is not supported.`);
+    throw new Error(`Workflow draft loop-iteration step config.mode '${modeRaw}' is not supported.`);
   }
-  const iterationMode = iterationModeRaw as WorkflowDraftLoopIterationMode | undefined;
-  const bodyStepIds = normalizeStringArray(configRecord.bodyStepIds, "Workflow draft loop-iteration step config.bodyStepIds");
-  const itemAlias = normalizeOptional(typeof configRecord.itemAlias === "string" ? configRecord.itemAlias : undefined);
-  const maxIterations = normalizePositiveInteger(configRecord.maxIterations, "Workflow draft loop-iteration step config.maxIterations");
-  const collectionInputKey = normalizeOptional(
-    typeof configRecord.collectionInputKey === "string" ? configRecord.collectionInputKey : undefined,
-  );
 
-  if (iterationMode === WorkflowDraftLoopIterationModes.collection && !collectionInputKey) {
-    throw new Error("Workflow draft loop-iteration collection mode requires config.collectionInputKey.");
-  }
+  const bodyStepIds = normalizeStringArray(configRecord.bodyStepIds, "Workflow draft loop-iteration step config.bodyStepIds");
+  const maxIterations = normalizePositiveInteger(configRecord.maxIterations, "Workflow draft loop-iteration step config.maxIterations");
 
   const rangeRecord = configRecord.range
     ? assertRecord(configRecord.range, "Workflow draft loop-iteration step config.range")
@@ -994,44 +1506,611 @@ function normalizeLoopIterationStepConfig(
     })
     : undefined;
 
-  if (iterationMode === WorkflowDraftLoopIterationModes.range && !range) {
-    throw new Error("Workflow draft loop-iteration range mode requires config.range.");
-  }
-  if (iterationMode === WorkflowDraftLoopIterationModes.range && range && range.start > range.end) {
+  if (range && range.start > range.end) {
     throw new Error("Workflow draft loop-iteration step config.range.start must be less than or equal to range.end.");
   }
-  if (!repeatCount && !loopConditionExpression && !iterationMode) {
-    throw new Error("Workflow draft loop-iteration step requires config.repeatCount or config.loopConditionExpression.");
+
+  const fixedCountRecord = configRecord.fixedCount
+    ? assertRecord(configRecord.fixedCount, "Workflow draft loop-iteration step config.fixedCount")
+    : undefined;
+  const fixedCountValue = fixedCountRecord
+    ? normalizePositiveInteger(
+      fixedCountRecord.count,
+      "Workflow draft loop-iteration step config.fixedCount.count",
+    )
+    : repeatCount;
+  if (fixedCountRecord && !fixedCountValue) {
+    throw new Error("Workflow draft loop-iteration step config.fixedCount.count must be a positive integer.");
+  }
+  const fixedCount = fixedCountValue
+    ? Object.freeze({
+      count: fixedCountValue,
+    })
+    : undefined;
+
+  const collectionRecord = configRecord.collection
+    ? assertRecord(configRecord.collection, "Workflow draft loop-iteration step config.collection")
+    : undefined;
+  const collectionInputKeyLegacy = normalizeOptional(
+    typeof configRecord.collectionInputKey === "string" ? configRecord.collectionInputKey : undefined,
+  );
+  const itemAliasLegacy = normalizeOptional(
+    typeof configRecord.itemAlias === "string" ? configRecord.itemAlias : undefined,
+  );
+  const collection = collectionRecord
+    ? Object.freeze({
+      inputKey: normalizeRequired(
+        typeof collectionRecord.inputKey === "string" ? collectionRecord.inputKey : "",
+        "Workflow draft loop-iteration step config.collection.inputKey",
+      ),
+      itemAlias: normalizeOptional(typeof collectionRecord.itemAlias === "string" ? collectionRecord.itemAlias : undefined),
+    })
+    : (collectionInputKeyLegacy
+      ? Object.freeze({
+        inputKey: collectionInputKeyLegacy,
+        itemAlias: itemAliasLegacy,
+      })
+      : undefined);
+
+  const exitCondition = configRecord.exitCondition
+    ? normalizeConditionDefinition(configRecord.exitCondition, "Workflow draft loop-iteration step config.exitCondition")
+    : (loopConditionExpression
+      ? Object.freeze({
+        kind: WorkflowDraftConditionKinds.expression,
+        expression: loopConditionExpression,
+      } as WorkflowDraftExpressionConditionDefinition)
+      : undefined);
+
+  const mode = (modeRaw as WorkflowDraftLoopIterationMode | undefined)
+    ?? (collection
+      ? WorkflowDraftLoopIterationModes.collection
+      : (range
+        ? WorkflowDraftLoopIterationModes.range
+        : (fixedCount
+          ? WorkflowDraftLoopIterationModes.fixedCount
+          : undefined)));
+
+  if (!mode) {
+    throw new Error(
+      "Workflow draft loop-iteration step requires config.mode/fixedCount/collection/range or legacy repeatCount.",
+    );
+  }
+  if (mode === WorkflowDraftLoopIterationModes.fixedCount && !fixedCount) {
+    throw new Error("Workflow draft loop-iteration fixed-count mode requires config.fixedCount.");
+  }
+  if (mode === WorkflowDraftLoopIterationModes.collection && !collection) {
+    throw new Error("Workflow draft loop-iteration collection mode requires config.collection.");
+  }
+  if (mode === WorkflowDraftLoopIterationModes.range && !range) {
+    throw new Error("Workflow draft loop-iteration range mode requires config.range.");
   }
 
+  const iterationMode = mode;
+  const collectionInputKey = collection?.inputKey;
+  const itemAlias = collection?.itemAlias;
+  const legacyRepeatCount = fixedCount?.count;
+  const legacyLoopConditionExpression = exitCondition?.kind === WorkflowDraftConditionKinds.expression
+    ? exitCondition.expression
+    : undefined;
+
   return Object.freeze({
-    repeatCount,
-    loopConditionExpression,
+    mode,
+    fixedCount,
+    collection,
+    range,
+    exitCondition,
     loopLabel,
-    iterationMode,
     bodyStepIds,
+    maxIterations,
+    // Deprecated aliases retained for compatibility.
+    repeatCount: legacyRepeatCount,
+    loopConditionExpression: legacyLoopConditionExpression,
+    iterationMode,
     itemAlias,
     collectionInputKey,
-    range,
-    maxIterations,
   });
 }
 
 function normalizeDelayWaitStepConfig(
   configRecord: Readonly<Record<string, unknown>>,
 ): Readonly<WorkflowDraftDelayWaitStepConfig> {
-  const durationSeconds = normalizePositiveInteger(
+  const modeRaw = normalizeOptional(typeof configRecord.mode === "string" ? configRecord.mode : undefined);
+  if (
+    modeRaw
+    && modeRaw !== WorkflowDraftDelayWaitModes.duration
+    && modeRaw !== WorkflowDraftDelayWaitModes.untilTime
+  ) {
+    throw new Error(`Workflow draft delay-wait step config.mode '${modeRaw}' is not supported.`);
+  }
+
+  const legacyDurationSeconds = normalizePositiveInteger(
     configRecord.durationSeconds,
     "Workflow draft delay-wait step config.durationSeconds",
   );
-  if (!durationSeconds) {
-    throw new Error("Workflow draft delay-wait step requires config.durationSeconds.");
+
+  const durationRecord = configRecord.duration
+    ? assertRecord(configRecord.duration, "Workflow draft delay-wait step config.duration")
+    : undefined;
+  const durationValue = durationRecord
+    ? normalizePositiveInteger(durationRecord.value, "Workflow draft delay-wait step config.duration.value")
+    : legacyDurationSeconds;
+  const durationUnitRaw = durationRecord
+    ? normalizeRequired(
+      typeof durationRecord.unit === "string" ? durationRecord.unit : "",
+      "Workflow draft delay-wait step config.duration.unit",
+    )
+    : (legacyDurationSeconds ? WorkflowDraftDelayWaitDurationUnits.seconds : undefined);
+  if (
+    durationUnitRaw
+    && durationUnitRaw !== WorkflowDraftDelayWaitDurationUnits.seconds
+    && durationUnitRaw !== WorkflowDraftDelayWaitDurationUnits.minutes
+    && durationUnitRaw !== WorkflowDraftDelayWaitDurationUnits.hours
+  ) {
+    throw new Error(`Workflow draft delay-wait step config.duration.unit '${durationUnitRaw}' is not supported.`);
   }
+  const duration = durationValue
+    ? Object.freeze({
+      value: durationValue,
+      unit: durationUnitRaw as WorkflowDraftDelayWaitDurationUnit,
+    })
+    : undefined;
+
+  const legacyWaitUntil = normalizeOptional(typeof configRecord.waitUntil === "string" ? configRecord.waitUntil : undefined);
+  const untilRecord = configRecord.until
+    ? assertRecord(configRecord.until, "Workflow draft delay-wait step config.until")
+    : undefined;
+  const untilTimestamp = normalizeOptional(
+    typeof untilRecord?.timestamp === "string"
+      ? untilRecord.timestamp
+      : legacyWaitUntil,
+  );
+  if (untilTimestamp && !isValidTimestamp(untilTimestamp)) {
+    throw new Error("Workflow draft delay-wait step config.until.timestamp must be a valid timestamp.");
+  }
+  const untilTimezone = normalizeOptional(
+    typeof untilRecord?.timezone === "string" ? untilRecord.timezone : undefined,
+  );
+  const until = untilTimestamp
+    ? Object.freeze({
+      timestamp: untilTimestamp,
+      timezone: untilTimezone,
+    })
+    : undefined;
+
+  const mode = (modeRaw as WorkflowDraftDelayWaitMode | undefined)
+    ?? (until ? WorkflowDraftDelayWaitModes.untilTime : (duration ? WorkflowDraftDelayWaitModes.duration : undefined));
+  if (!mode) {
+    throw new Error("Workflow draft delay-wait step requires config.mode with config.duration or config.until.");
+  }
+  if (mode === WorkflowDraftDelayWaitModes.duration && !duration) {
+    throw new Error("Workflow draft delay-wait duration mode requires config.duration or legacy durationSeconds.");
+  }
+  if (mode === WorkflowDraftDelayWaitModes.untilTime && !until) {
+    throw new Error("Workflow draft delay-wait until-time mode requires config.until.timestamp or legacy waitUntil.");
+  }
+  if (mode === WorkflowDraftDelayWaitModes.duration && until) {
+    throw new Error("Workflow draft delay-wait duration mode does not allow config.until.");
+  }
+  if (mode === WorkflowDraftDelayWaitModes.untilTime && duration) {
+    throw new Error("Workflow draft delay-wait until-time mode does not allow config.duration.");
+  }
+
+  const durationSeconds = duration
+    ? (duration.unit === WorkflowDraftDelayWaitDurationUnits.seconds
+      ? duration.value
+      : (duration.unit === WorkflowDraftDelayWaitDurationUnits.minutes
+        ? duration.value * 60
+        : duration.value * 3600))
+    : undefined;
   const note = normalizeOptional(typeof configRecord.note === "string" ? configRecord.note : undefined);
   return Object.freeze({
-    durationSeconds,
+    mode,
+    duration,
+    until,
     note,
+    durationSeconds,
+    waitUntil: until?.timestamp,
   });
+}
+
+function normalizeManualApprovalStepConfig(
+  configRecord: Readonly<Record<string, unknown>>,
+): Readonly<WorkflowDraftManualApprovalStepConfig> {
+  const prompt = normalizeOptional(
+    typeof configRecord.prompt === "string" ? configRecord.prompt : undefined,
+  ) ?? normalizeOptional(
+    typeof configRecord.approvalMessage === "string" ? configRecord.approvalMessage : undefined,
+  );
+  if (!prompt) {
+    throw new Error("Workflow draft manual-approval step requires config.prompt or legacy approvalMessage.");
+  }
+
+  const interactionModeRaw = normalizeOptional(
+    typeof configRecord.interactionMode === "string" ? configRecord.interactionMode : undefined,
+  );
+  if (
+    interactionModeRaw
+    && interactionModeRaw !== WorkflowDraftManualInteractionModes.review
+    && interactionModeRaw !== WorkflowDraftManualInteractionModes.approval
+  ) {
+    throw new Error(`Workflow draft manual-approval step config.interactionMode '${interactionModeRaw}' is not supported.`);
+  }
+
+  const outcomesRecord = configRecord.outcomes
+    ? assertRecord(configRecord.outcomes, "Workflow draft manual-approval step config.outcomes")
+    : undefined;
+  const continueOutcome = outcomesRecord?.continue
+    ? normalizeIfThenBranchTarget(
+      outcomesRecord.continue,
+      "Workflow draft manual-approval step config.outcomes.continue",
+    )
+    : undefined;
+  const approveOutcome = outcomesRecord?.approve
+    ? normalizeIfThenBranchTarget(
+      outcomesRecord.approve,
+      "Workflow draft manual-approval step config.outcomes.approve",
+    )
+    : undefined;
+  const rejectOutcome = outcomesRecord?.reject
+    ? normalizeIfThenBranchTarget(
+      outcomesRecord.reject,
+      "Workflow draft manual-approval step config.outcomes.reject",
+    )
+    : undefined;
+
+  const interactionMode = (interactionModeRaw as WorkflowDraftManualInteractionMode | undefined)
+    ?? WorkflowDraftManualInteractionModes.approval;
+
+  const requiredApproverRoles = normalizeStringArray(
+    configRecord.requiredApproverRoles,
+    "Workflow draft manual-approval step config.requiredApproverRoles",
+  );
+  const timeoutSeconds = normalizePositiveInteger(
+    configRecord.timeoutSeconds,
+    "Workflow draft manual-approval step config.timeoutSeconds",
+  );
+  const onTimeoutRaw = normalizeOptional(typeof configRecord.onTimeout === "string" ? configRecord.onTimeout : undefined);
+  if (onTimeoutRaw && onTimeoutRaw !== "reject" && onTimeoutRaw !== "continue" && onTimeoutRaw !== "escalate") {
+    throw new Error(`Workflow draft manual-approval step config.onTimeout '${onTimeoutRaw}' is not supported.`);
+  }
+
+  if (interactionMode === WorkflowDraftManualInteractionModes.review && (approveOutcome || rejectOutcome)) {
+    throw new Error("Workflow draft manual-approval review mode only allows config.outcomes.continue.");
+  }
+  if (interactionMode === WorkflowDraftManualInteractionModes.approval && continueOutcome) {
+    throw new Error("Workflow draft manual-approval approval mode does not allow config.outcomes.continue.");
+  }
+
+  const outcomes = interactionMode === WorkflowDraftManualInteractionModes.review
+    ? Object.freeze<WorkflowDraftManualInteractionOutcomes>({
+      continue: continueOutcome ?? Object.freeze({ label: "Continue" }),
+    })
+    : Object.freeze<WorkflowDraftManualInteractionOutcomes>({
+      approve: approveOutcome ?? Object.freeze({ label: "Approved" }),
+      reject: rejectOutcome ?? Object.freeze({ label: "Rejected" }),
+    });
+
+  return Object.freeze({
+    prompt,
+    interactionMode,
+    outcomes,
+    requiredApproverRoles,
+    timeoutSeconds,
+    onTimeout: onTimeoutRaw as WorkflowDraftManualApprovalStepConfig["onTimeout"] | undefined,
+    allowSelfApproval: normalizeOptionalBoolean(
+      configRecord.allowSelfApproval,
+      "Workflow draft manual-approval step config.allowSelfApproval",
+    ),
+    approvalMessage: prompt,
+  });
+}
+
+const workflowDraftTriggerDefinitions: ReadonlyArray<WorkflowDraftTriggerDefinition> = Object.freeze([
+  Object.freeze({
+    kind: WorkflowDraftTriggerKinds.user,
+    type: WorkflowDraftTriggerTypes.userManual,
+    label: "Manual start",
+    description: "Workflow execution starts from an explicit manual user action.",
+    configSchemaId: "workflow.trigger.user.manual.v1",
+    capabilities: Object.freeze({
+      supportsManualInvocation: true,
+      supportsTemporalScheduling: false,
+      supportsStateSubscription: false,
+      supportsIntermediateContinuation: true,
+    }),
+    defaultConfig: Object.freeze<WorkflowDraftUserTriggerConfig>({
+      invocationScope: WorkflowDraftUserTriggerScopes.workflowStart,
+    }),
+    validateConfig: (configRecord) => normalizeUserTriggerConfig(WorkflowDraftTriggerTypes.userManual, configRecord),
+  }),
+  Object.freeze({
+    kind: WorkflowDraftTriggerKinds.user,
+    type: WorkflowDraftTriggerTypes.userButtonClick,
+    label: "Button click",
+    description: "Workflow execution starts from a configured UI/button action.",
+    configSchemaId: "workflow.trigger.user.button-click.v1",
+    capabilities: Object.freeze({
+      supportsManualInvocation: true,
+      supportsTemporalScheduling: false,
+      supportsStateSubscription: false,
+      supportsIntermediateContinuation: false,
+    }),
+    defaultConfig: Object.freeze<WorkflowDraftUserTriggerConfig>({
+      invocationScope: WorkflowDraftUserTriggerScopes.workflowStart,
+      buttonId: "run-workflow",
+    }),
+    validateConfig: (configRecord) => normalizeUserTriggerConfig(WorkflowDraftTriggerTypes.userButtonClick, configRecord),
+  }),
+  Object.freeze({
+    kind: WorkflowDraftTriggerKinds.user,
+    type: WorkflowDraftTriggerTypes.userInitiatedRun,
+    label: "User initiated run",
+    description: "Workflow execution starts when a user submits a run request.",
+    configSchemaId: "workflow.trigger.user.initiated-run.v1",
+    capabilities: Object.freeze({
+      supportsManualInvocation: true,
+      supportsTemporalScheduling: false,
+      supportsStateSubscription: false,
+      supportsIntermediateContinuation: true,
+    }),
+    defaultConfig: Object.freeze<WorkflowDraftUserTriggerConfig>({
+      invocationScope: WorkflowDraftUserTriggerScopes.workflowStart,
+    }),
+    validateConfig: (configRecord) => normalizeUserTriggerConfig(WorkflowDraftTriggerTypes.userInitiatedRun, configRecord),
+  }),
+  Object.freeze({
+    kind: WorkflowDraftTriggerKinds.temporal,
+    type: WorkflowDraftTriggerTypes.temporalSchedule,
+    label: "Scheduled time",
+    description: "Workflow execution starts on a cron-like schedule expression.",
+    configSchemaId: "workflow.trigger.temporal.schedule.v1",
+    capabilities: Object.freeze({
+      supportsManualInvocation: false,
+      supportsTemporalScheduling: true,
+      supportsStateSubscription: false,
+      supportsIntermediateContinuation: false,
+    }),
+    defaultConfig: Object.freeze<WorkflowDraftTemporalTriggerConfig>({
+      scheduleMode: WorkflowDraftTemporalScheduleModes.cron,
+      cronExpression: "0 9 * * *",
+      timezone: "UTC",
+    }),
+    validateConfig: (configRecord) => normalizeTemporalTriggerConfig(WorkflowDraftTriggerTypes.temporalSchedule, configRecord),
+  }),
+  Object.freeze({
+    kind: WorkflowDraftTriggerKinds.temporal,
+    type: WorkflowDraftTriggerTypes.temporalRecurring,
+    label: "Recurring interval",
+    description: "Workflow execution starts on a recurring interval cadence.",
+    configSchemaId: "workflow.trigger.temporal.recurring.v1",
+    capabilities: Object.freeze({
+      supportsManualInvocation: false,
+      supportsTemporalScheduling: true,
+      supportsStateSubscription: false,
+      supportsIntermediateContinuation: false,
+    }),
+    defaultConfig: Object.freeze<WorkflowDraftTemporalTriggerConfig>({
+      scheduleMode: WorkflowDraftTemporalScheduleModes.interval,
+      every: 1,
+      unit: "days",
+      timezone: "UTC",
+    }),
+    validateConfig: (configRecord) => normalizeTemporalTriggerConfig(WorkflowDraftTriggerTypes.temporalRecurring, configRecord),
+  }),
+  Object.freeze({
+    kind: WorkflowDraftTriggerKinds.state,
+    type: WorkflowDraftTriggerTypes.stateDataAvailable,
+    label: "Data available",
+    description: "Workflow execution starts when new input data is available.",
+    configSchemaId: "workflow.trigger.state.data-available.v1",
+    capabilities: Object.freeze({
+      supportsManualInvocation: false,
+      supportsTemporalScheduling: false,
+      supportsStateSubscription: true,
+      supportsIntermediateContinuation: false,
+    }),
+    defaultConfig: Object.freeze<WorkflowDraftStateTriggerConfig>({
+      sourceType: WorkflowDraftStateEventSourceTypes.dataset,
+      eventCategory: WorkflowDraftStateEventCategories.dataIngested,
+      subject: "dataset",
+      eventName: "data-available",
+    }),
+    validateConfig: (configRecord) => normalizeStateTriggerConfig(WorkflowDraftTriggerTypes.stateDataAvailable, configRecord),
+  }),
+  Object.freeze({
+    kind: WorkflowDraftTriggerKinds.state,
+    type: WorkflowDraftTriggerTypes.stateAssetStateChanged,
+    label: "Asset state changed",
+    description: "Workflow execution starts when a referenced asset changes state.",
+    configSchemaId: "workflow.trigger.state.asset-state-changed.v1",
+    capabilities: Object.freeze({
+      supportsManualInvocation: false,
+      supportsTemporalScheduling: false,
+      supportsStateSubscription: true,
+      supportsIntermediateContinuation: false,
+    }),
+    defaultConfig: Object.freeze<WorkflowDraftStateTriggerConfig>({
+      sourceType: WorkflowDraftStateEventSourceTypes.asset,
+      eventCategory: WorkflowDraftStateEventCategories.assetUpdated,
+      subject: "asset",
+      asset: Object.freeze({
+        assetId: "asset:source",
+      }),
+      stateKey: "status",
+      stateValue: "ready",
+    }),
+    validateConfig: (configRecord) => normalizeStateTriggerConfig(WorkflowDraftTriggerTypes.stateAssetStateChanged, configRecord),
+  }),
+  Object.freeze({
+    kind: WorkflowDraftTriggerKinds.state,
+    type: WorkflowDraftTriggerTypes.stateSystemEvent,
+    label: "System event",
+    description: "Workflow execution starts when a named system event is emitted.",
+    configSchemaId: "workflow.trigger.state.system-event.v1",
+    capabilities: Object.freeze({
+      supportsManualInvocation: false,
+      supportsTemporalScheduling: false,
+      supportsStateSubscription: true,
+      supportsIntermediateContinuation: false,
+    }),
+    defaultConfig: Object.freeze<WorkflowDraftStateTriggerConfig>({
+      sourceType: WorkflowDraftStateEventSourceTypes.system,
+      eventCategory: WorkflowDraftStateEventCategories.systemStateChanged,
+      subject: "workflow",
+      eventName: "system-event",
+    }),
+    validateConfig: (configRecord) => normalizeStateTriggerConfig(WorkflowDraftTriggerTypes.stateSystemEvent, configRecord),
+  }),
+]);
+
+const workflowDraftTriggerDefinitionByType = new Map<WorkflowDraftTriggerType, WorkflowDraftTriggerDefinition>(
+  workflowDraftTriggerDefinitions.map((definition) => [definition.type, definition]),
+);
+
+export function listWorkflowDraftTriggerDefinitions(): ReadonlyArray<WorkflowDraftTriggerDefinition> {
+  return workflowDraftTriggerDefinitions;
+}
+
+export function getWorkflowDraftTriggerDefinition(type: string): WorkflowDraftTriggerDefinition | undefined {
+  const normalized = normalizeOptional(type);
+  if (!normalized) {
+    return undefined;
+  }
+  return workflowDraftTriggerDefinitionByType.get(normalized as WorkflowDraftTriggerType);
+}
+
+export function isWorkflowDraftTriggerType(value: string): value is WorkflowDraftTriggerType {
+  return workflowDraftTriggerDefinitionByType.has(value as WorkflowDraftTriggerType);
+}
+
+export function normalizeWorkflowDraftTriggerConfig(
+  triggerType: WorkflowDraftTriggerType,
+  configRecord: Readonly<Record<string, unknown>>,
+): Readonly<WorkflowDraftTriggerConfig> {
+  const definition = workflowDraftTriggerDefinitionByType.get(triggerType);
+  if (!definition) {
+    throw new Error(`Workflow draft trigger type '${triggerType}' is not supported.`);
+  }
+  return definition.validateConfig(configRecord);
+}
+
+const workflowDraftBuiltInStepDefinitions: ReadonlyArray<WorkflowDraftBuiltInStepDefinition> = Object.freeze([
+  Object.freeze({
+    type: WorkflowDraftBuiltInStepTypes.ifThen,
+    category: WorkflowDraftBuiltInStepCategories.controlFlow,
+    label: "If / Then branching",
+    description: "Evaluate an expression and route execution to then/else branches.",
+    configSchemaId: "workflow.builtin.if-then.v2",
+    defaultConfig: Object.freeze<WorkflowDraftIfThenStepConfig>({
+      condition: Object.freeze({
+        kind: WorkflowDraftConditionKinds.expression,
+        expression: "true",
+      }),
+      branches: Object.freeze({
+        then: Object.freeze({
+          label: "Then path",
+        }),
+        else: Object.freeze({
+          label: "Else path",
+        }),
+      }),
+      conditionExpression: "true",
+      thenLabel: "Then path",
+      elseLabel: "Else path",
+    }),
+    validateConfig: normalizeIfThenStepConfig,
+  }),
+  Object.freeze({
+    type: WorkflowDraftBuiltInStepTypes.loopIteration,
+    category: WorkflowDraftBuiltInStepCategories.controlFlow,
+    label: "Loop / Repeat",
+    description: "Repeat execution by count, condition, collection, or range.",
+    configSchemaId: "workflow.builtin.loop-iteration.v2",
+    defaultConfig: Object.freeze<WorkflowDraftLoopIterationStepConfig>({
+      mode: WorkflowDraftLoopIterationModes.fixedCount,
+      fixedCount: Object.freeze({
+        count: 1,
+      }),
+      repeatCount: 1,
+      iterationMode: WorkflowDraftLoopIterationModes.fixedCount,
+    }),
+    validateConfig: normalizeLoopIterationStepConfig,
+  }),
+  Object.freeze({
+    type: WorkflowDraftBuiltInStepTypes.delayWait,
+    category: WorkflowDraftBuiltInStepCategories.temporal,
+    label: "Delay / Wait",
+    description: "Pause workflow execution for a duration or until a specific time.",
+    configSchemaId: "workflow.builtin.delay-wait.v2",
+    defaultConfig: Object.freeze<WorkflowDraftDelayWaitStepConfig>({
+      mode: WorkflowDraftDelayWaitModes.duration,
+      duration: Object.freeze({
+        value: 60,
+        unit: WorkflowDraftDelayWaitDurationUnits.seconds,
+      }),
+      durationSeconds: 60,
+    }),
+    validateConfig: normalizeDelayWaitStepConfig,
+  }),
+  Object.freeze({
+    type: WorkflowDraftBuiltInStepTypes.manualApproval,
+    category: WorkflowDraftBuiltInStepCategories.humanInteraction,
+    label: "Manual / Approval",
+    description: "Pause for manual review or explicit approve/reject checkpoint decisions.",
+    configSchemaId: "workflow.builtin.manual-approval.v2",
+    defaultConfig: Object.freeze<WorkflowDraftManualApprovalStepConfig>({
+      prompt: "Awaiting manual approval.",
+      interactionMode: WorkflowDraftManualInteractionModes.approval,
+      outcomes: Object.freeze({
+        approve: Object.freeze({
+          label: "Approved",
+        }),
+        reject: Object.freeze({
+          label: "Rejected",
+        }),
+      }),
+      approvalMessage: "Awaiting manual approval.",
+      onTimeout: "reject",
+    }),
+    validateConfig: normalizeManualApprovalStepConfig,
+  }),
+]);
+
+const workflowDraftBuiltInStepDefinitionByType = new Map<WorkflowDraftBuiltInStepType, WorkflowDraftBuiltInStepDefinition>(
+  workflowDraftBuiltInStepDefinitions.map((definition) => [definition.type, definition]),
+);
+
+export function listWorkflowDraftBuiltInStepDefinitions(): ReadonlyArray<WorkflowDraftBuiltInStepDefinition> {
+  return workflowDraftBuiltInStepDefinitions;
+}
+
+export function getWorkflowDraftBuiltInStepDefinition(type: string): WorkflowDraftBuiltInStepDefinition | undefined {
+  const normalized = normalizeOptional(type);
+  if (!normalized) {
+    return undefined;
+  }
+  return workflowDraftBuiltInStepDefinitionByType.get(normalized as WorkflowDraftBuiltInStepType);
+}
+
+export function isWorkflowDraftBuiltInStepType(value: string): value is WorkflowDraftBuiltInStepType {
+  return workflowDraftBuiltInStepDefinitionByType.has(value as WorkflowDraftBuiltInStepType);
+}
+
+export function normalizeWorkflowDraftBuiltInStepConfig(
+  stepType: WorkflowDraftBuiltInStepType,
+  configRecord: Readonly<Record<string, unknown>>,
+): Readonly<WorkflowDraftBuiltInStepConfig> {
+  const definition = workflowDraftBuiltInStepDefinitionByType.get(stepType);
+  if (!definition) {
+    throw new Error(`Workflow draft built-in step type '${stepType}' is not supported.`);
+  }
+  return definition.validateConfig(configRecord);
+}
+
+export function isWorkflowDraftBuiltInStep(step: WorkflowDraftStep): step is WorkflowDraftBuiltInStep {
+  return step.kind === WorkflowDraftStepKinds.controlFlow
+    && isWorkflowDraftBuiltInStepType(step.type)
+    && Boolean(step.config);
 }
 
 function normalizeLoopRangeBoundary(value: unknown, label: string): number {
@@ -1290,6 +2369,154 @@ export function classifyWorkflowDraftAssetReferences(
   return Object.freeze(classifications);
 }
 
+export interface WorkflowDraftTriggerValidationContext {
+  readonly requireAtLeastOneTrigger?: boolean;
+  readonly stepIds?: ReadonlySet<string>;
+  readonly allowedUserTriggerScopes?: ReadonlyArray<WorkflowDraftUserTriggerScope>;
+}
+
+export interface WorkflowDraftTriggerValidationResult {
+  readonly valid: boolean;
+  readonly normalizedTriggers: ReadonlyArray<WorkflowDraftTrigger>;
+  readonly issues: ReadonlyArray<WorkflowValidationIssue>;
+}
+
+function buildTriggerDefinitionSignature(trigger: WorkflowDraftTrigger): string {
+  return stableStringify({
+    kind: trigger.kind,
+    type: trigger.type,
+    config: trigger.config ?? {},
+  });
+}
+
+function pushTriggerIssue(
+  issues: WorkflowValidationIssue[],
+  code: WorkflowValidationIssueCode,
+  message: string,
+  path: string,
+  section: WorkflowValidationSection = WorkflowValidationSections.triggers,
+): void {
+  issues.push({
+    code,
+    section,
+    severity: "error",
+    message,
+    path,
+  });
+}
+
+export function validateWorkflowDraftTriggers(
+  triggers: ReadonlyArray<unknown> | undefined,
+  context: WorkflowDraftTriggerValidationContext = {},
+): WorkflowDraftTriggerValidationResult {
+  const issues: WorkflowValidationIssue[] = [];
+  const normalizedTriggers: WorkflowDraftTrigger[] = [];
+  const rawTriggers = Array.isArray(triggers) ? triggers : [];
+  if ((context.requireAtLeastOneTrigger ?? false) && rawTriggers.length === 0) {
+    pushTriggerIssue(
+      issues,
+      WorkflowValidationIssueCodes.triggerCollectionEmpty,
+      "Workflow draft requires at least one trigger.",
+      "draft.triggers",
+    );
+  }
+
+  for (let index = 0; index < rawTriggers.length; index += 1) {
+    try {
+      const normalized = normalizeTrigger(rawTriggers[index] as WorkflowDraftTrigger);
+      normalizedTriggers.push(normalized);
+    } catch (error) {
+      pushTriggerIssue(
+        issues,
+        WorkflowValidationIssueCodes.triggerMalformed,
+        error instanceof Error ? error.message : "Workflow trigger is malformed.",
+        `draft.triggers[${index}]`,
+      );
+    }
+  }
+
+  const triggerIdToIndexes = new Map<string, number[]>();
+  normalizedTriggers.forEach((trigger, index) => {
+    const indexes = triggerIdToIndexes.get(trigger.id) ?? [];
+    indexes.push(index);
+    triggerIdToIndexes.set(trigger.id, indexes);
+  });
+  for (const [triggerId, indexes] of triggerIdToIndexes.entries()) {
+    if (indexes.length < 2) {
+      continue;
+    }
+    for (const index of indexes) {
+      pushTriggerIssue(
+        issues,
+        WorkflowValidationIssueCodes.triggerDuplicateId,
+        `Workflow trigger id '${triggerId}' is duplicated.`,
+        `draft.triggers[${index}].id`,
+      );
+    }
+  }
+
+  const triggerSignatureToIndexes = new Map<string, number[]>();
+  normalizedTriggers.forEach((trigger, index) => {
+    const signature = buildTriggerDefinitionSignature(trigger);
+    const indexes = triggerSignatureToIndexes.get(signature) ?? [];
+    indexes.push(index);
+    triggerSignatureToIndexes.set(signature, indexes);
+  });
+  for (const indexes of triggerSignatureToIndexes.values()) {
+    if (indexes.length < 2) {
+      continue;
+    }
+    for (const index of indexes) {
+      const trigger = normalizedTriggers[index]!;
+      pushTriggerIssue(
+        issues,
+        WorkflowValidationIssueCodes.triggerDuplicateDefinition,
+        `Workflow trigger '${trigger.id}' duplicates an existing '${trigger.type}' definition.`,
+        `draft.triggers[${index}]`,
+      );
+    }
+  }
+
+  const allowedUserTriggerScopes = new Set<WorkflowDraftUserTriggerScope>(
+    context.allowedUserTriggerScopes
+      ?? Object.values(WorkflowDraftUserTriggerScopes),
+  );
+  normalizedTriggers.forEach((trigger, index) => {
+    if (trigger.kind !== WorkflowDraftTriggerKinds.user) {
+      return;
+    }
+    const scope = trigger.config.invocationScope ?? WorkflowDraftUserTriggerScopes.workflowStart;
+    if (!allowedUserTriggerScopes.has(scope)) {
+      pushTriggerIssue(
+        issues,
+        WorkflowValidationIssueCodes.triggerScopeUnsupported,
+        `Workflow trigger '${trigger.id}' uses unsupported invocationScope '${scope}'.`,
+        `draft.triggers[${index}].config.invocationScope`,
+      );
+    }
+    if (
+      scope === WorkflowDraftUserTriggerScopes.workflowContinuation
+      && trigger.config.continuationStepId
+      && context.stepIds
+      && !context.stepIds.has(trigger.config.continuationStepId)
+    ) {
+      pushTriggerIssue(
+        issues,
+        WorkflowValidationIssueCodes.triggerContinuationStepMissing,
+        `Workflow continuation trigger '${trigger.id}' references unknown continuationStepId '${trigger.config.continuationStepId}'.`,
+        `draft.triggers[${index}].config.continuationStepId`,
+        WorkflowValidationSections.crossSection,
+      );
+    }
+  });
+
+  return Object.freeze({
+    valid: issues.length === 0,
+    normalizedTriggers: Object.freeze(normalizedTriggers),
+    issues: Object.freeze(issues),
+  });
+}
+
 export function validateWorkflowDraft(draft: WorkflowDraft | undefined): WorkflowValidationResult {
   const issues: WorkflowValidationIssue[] = [];
   if (!draft || typeof draft !== "object") {
@@ -1345,21 +2572,6 @@ export function validateWorkflowDraft(draft: WorkflowDraft | undefined): Workflo
       message: "Workflow draft requires an outputs array.",
       path: "draft.outputs",
     });
-  }
-
-  const triggers = Array.isArray(raw.triggers) ? raw.triggers : [];
-  for (let index = 0; index < triggers.length; index += 1) {
-    try {
-      normalizeTrigger(triggers[index] as WorkflowDraftTrigger);
-    } catch (error) {
-      issues.push({
-        code: WorkflowValidationIssueCodes.triggerMalformed,
-        section: WorkflowValidationSections.triggers,
-        severity: "error",
-        message: error instanceof Error ? error.message : "Workflow trigger is malformed.",
-        path: `draft.triggers[${index}]`,
-      });
-    }
   }
 
   const normalizedInputs: WorkflowDraftInput[] = [];
@@ -1430,6 +2642,18 @@ export function validateWorkflowDraft(draft: WorkflowDraft | undefined): Workflo
   }
 
   const stepIds = new Set<string>(normalizedSteps.map((step) => step.id));
+  const stepOrderById = new Map<string, number>(normalizedSteps.map((step) => [step.id, step.order]));
+  const triggerValidation = validateWorkflowDraftTriggers(
+    Array.isArray(raw.triggers) ? raw.triggers : [],
+    {
+      stepIds,
+      allowedUserTriggerScopes: Object.freeze([
+        WorkflowDraftUserTriggerScopes.workflowStart,
+        WorkflowDraftUserTriggerScopes.workflowContinuation,
+      ]),
+    },
+  );
+  issues.push(...triggerValidation.issues);
   const sortedOrders = [...normalizedSteps].map((step) => step.order).sort((left, right) => left - right);
   if (sortedOrders.some((order, index) => order !== index + 1)) {
     issues.push({
@@ -1499,7 +2723,9 @@ export function validateWorkflowDraft(draft: WorkflowDraft | undefined): Workflo
 
     if (step.type === WorkflowDraftBuiltInStepTypes.ifThen) {
       const config = step.config as WorkflowDraftIfThenStepConfig;
-      for (const referenced of [...(config.thenStepIds ?? []), ...(config.elseStepIds ?? [])]) {
+      const thenStepIds = config.branches.then.stepIds ?? config.thenStepIds ?? [];
+      const elseStepIds = config.branches.else?.stepIds ?? config.elseStepIds ?? [];
+      for (const referenced of [...thenStepIds, ...elseStepIds]) {
         if (referenced === step.id) {
           issues.push({
             code: WorkflowValidationIssueCodes.builtInStepReferenceSelf,
@@ -1516,6 +2742,16 @@ export function validateWorkflowDraft(draft: WorkflowDraft | undefined): Workflo
             section: WorkflowValidationSections.crossSection,
             severity: "error",
             message: `Built-in if-then step '${step.id}' references unknown step '${referenced}'.`,
+            path: `draft.steps.${step.id}.config`,
+          });
+          continue;
+        }
+        if ((stepOrderById.get(referenced) ?? 0) <= step.order) {
+          issues.push({
+            code: WorkflowValidationIssueCodes.builtInStepReferenceOrderInvalid,
+            section: WorkflowValidationSections.crossSection,
+            severity: "error",
+            message: `Built-in if-then step '${step.id}' can only reference downstream steps. Referenced step '${referenced}' must appear after order ${step.order}.`,
             path: `draft.steps.${step.id}.config`,
           });
         }
@@ -1543,21 +2779,72 @@ export function validateWorkflowDraft(draft: WorkflowDraft | undefined): Workflo
             message: `Built-in loop step '${step.id}' references unknown body step '${referenced}'.`,
             path: `draft.steps.${step.id}.config`,
           });
+          continue;
+        }
+        if ((stepOrderById.get(referenced) ?? 0) <= step.order) {
+          issues.push({
+            code: WorkflowValidationIssueCodes.builtInStepReferenceOrderInvalid,
+            section: WorkflowValidationSections.crossSection,
+            severity: "error",
+            message: `Built-in loop step '${step.id}' can only reference downstream body steps. Referenced step '${referenced}' must appear after order ${step.order}.`,
+            path: `draft.steps.${step.id}.config`,
+          });
         }
       }
 
+      const collectionInputKey = config.collection?.inputKey ?? config.collectionInputKey;
       if (
-        config.iterationMode === WorkflowDraftLoopIterationModes.collection
-        && config.collectionInputKey
-        && !inputIds.has(config.collectionInputKey)
+        config.mode === WorkflowDraftLoopIterationModes.collection
+        && collectionInputKey
+        && !inputIds.has(collectionInputKey)
       ) {
         issues.push({
           code: WorkflowValidationIssueCodes.loopCollectionInputMissing,
           section: WorkflowValidationSections.crossSection,
           severity: "error",
-          message: `Built-in loop step '${step.id}' collectionInputKey '${config.collectionInputKey}' does not match any workflow input id.`,
-          path: `draft.steps.${step.id}.config.collectionInputKey`,
+          message: `Built-in loop step '${step.id}' collection input '${collectionInputKey}' does not match any workflow input id.`,
+          path: `draft.steps.${step.id}.config.collection.inputKey`,
         });
+      }
+    }
+
+    if (step.type === WorkflowDraftBuiltInStepTypes.manualApproval) {
+      const config = step.config as WorkflowDraftManualApprovalStepConfig;
+      const referencedStepIds = [
+        ...(config.outcomes.continue?.stepIds ?? []),
+        ...(config.outcomes.approve?.stepIds ?? []),
+        ...(config.outcomes.reject?.stepIds ?? []),
+      ];
+      for (const referenced of referencedStepIds) {
+        if (referenced === step.id) {
+          issues.push({
+            code: WorkflowValidationIssueCodes.builtInStepReferenceSelf,
+            section: WorkflowValidationSections.crossSection,
+            severity: "error",
+            message: `Built-in manual step '${step.id}' cannot reference itself in outcomes.`,
+            path: `draft.steps.${step.id}.config`,
+          });
+          continue;
+        }
+        if (!stepIds.has(referenced)) {
+          issues.push({
+            code: WorkflowValidationIssueCodes.builtInStepReferenceMissing,
+            section: WorkflowValidationSections.crossSection,
+            severity: "error",
+            message: `Built-in manual step '${step.id}' references unknown outcome step '${referenced}'.`,
+            path: `draft.steps.${step.id}.config`,
+          });
+          continue;
+        }
+        if ((stepOrderById.get(referenced) ?? 0) <= step.order) {
+          issues.push({
+            code: WorkflowValidationIssueCodes.builtInStepReferenceOrderInvalid,
+            section: WorkflowValidationSections.crossSection,
+            severity: "error",
+            message: `Built-in manual step '${step.id}' can only reference downstream outcome steps. Referenced step '${referenced}' must appear after order ${step.order}.`,
+            path: `draft.steps.${step.id}.config`,
+          });
+        }
       }
     }
   }

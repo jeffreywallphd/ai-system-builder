@@ -1,13 +1,37 @@
+import { useEffect, useMemo, useState } from "react";
 import {
+  WorkflowDraftStateEventCategories,
+  WorkflowDraftStateEventSourceTypes,
+  WorkflowDraftTemporalScheduleModes,
   WorkflowDraftTriggerKinds,
   WorkflowDraftTriggerTypes,
+  WorkflowDraftUserTriggerScopes,
   type WorkflowDraft,
   type WorkflowDraftStateTrigger,
   type WorkflowDraftTemporalTrigger,
   type WorkflowDraftTrigger,
-  type WorkflowDraftTriggerType,
+  type WorkflowDraftUserTrigger,
   type WorkflowValidationIssue,
 } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+import {
+  addWorkflowTrigger,
+  canMoveWorkflowTrigger,
+  getWorkflowTriggerIssuesForIndex,
+  getWorkflowTriggerKindLabel,
+  getWorkflowTriggerSummary,
+  getWorkflowTriggerTypeDefinition,
+  getWorkflowTriggerValidationMessages,
+  moveWorkflowTriggerDown,
+  moveWorkflowTriggerUp,
+  removeWorkflowTrigger,
+  resolveWorkflowTriggerSelectionId,
+  setWorkflowTriggerStateConfig,
+  setWorkflowTriggerTemporalConfig,
+  setWorkflowTriggerTitle,
+  setWorkflowTriggerType,
+  setWorkflowTriggerUserConfig,
+  workflowTriggerTypeDefinitions,
+} from "../../../studio-shell/workflow/WorkflowWizardTriggers";
 import SectionBody from "./SectionBody";
 import SectionHeader from "./SectionHeader";
 import WizardSection from "./WizardSection";
@@ -18,218 +42,491 @@ interface WorkflowStudioTriggerSectionEditorProps {
   readonly onUpdateSharedDraft?: (updater: (draft: WorkflowDraft) => WorkflowDraft) => void;
 }
 
-type TriggerBlueprintKey = "manual" | "temporal" | "state";
-type TemporalRecurrence = "daily" | "weekdays" | "weekly";
-
-interface TriggerBlueprint {
-  readonly key: TriggerBlueprintKey;
-  readonly label: string;
-  readonly description: string;
-  readonly create: (id: string) => WorkflowDraftTrigger;
-}
-
-const triggerBlueprints: ReadonlyArray<TriggerBlueprint> = Object.freeze([
-  Object.freeze({
-    key: "manual",
-    label: "Manual/User Trigger",
-    description: "Run from user-driven actions such as a manual start button.",
-    create: (id: string): WorkflowDraftTrigger => Object.freeze({
-      id,
-      kind: WorkflowDraftTriggerKinds.user,
-      type: WorkflowDraftTriggerTypes.userManual,
-      config: Object.freeze({}),
-    }),
-  }),
-  Object.freeze({
-    key: "temporal",
-    label: "Temporal Trigger",
-    description: "Run on a simple recurring schedule with a selected time.",
-    create: (id: string): WorkflowDraftTrigger => Object.freeze({
-      id,
-      kind: WorkflowDraftTriggerKinds.temporal,
-      type: WorkflowDraftTriggerTypes.temporalSchedule,
-      config: Object.freeze({
-        cronExpression: "0 9 * * *",
-      }),
-      metadata: Object.freeze({
-        recurrence: "daily",
-      }),
-    }),
-  }),
-  Object.freeze({
-    key: "state",
-    label: "State Trigger",
-    description: "Run from workflow-relevant state or data events.",
-    create: (id: string): WorkflowDraftTrigger => Object.freeze({
-      id,
-      kind: WorkflowDraftTriggerKinds.state,
-      type: WorkflowDraftTriggerTypes.stateSystemEvent,
-      config: Object.freeze({
-        eventName: "new-data",
-      }),
-    }),
-  }),
-]);
-
 function buildSectionSummary(count: number, singular: string, plural: string): string {
   return count === 1 ? `1 ${singular}` : `${count} ${plural}`;
 }
 
-function resolveBlueprintForTrigger(trigger: WorkflowDraftTrigger): TriggerBlueprint {
-  if (trigger.kind === WorkflowDraftTriggerKinds.temporal) {
-    return triggerBlueprints[1];
-  }
-  if (trigger.kind === WorkflowDraftTriggerKinds.state) {
-    return triggerBlueprints[2];
-  }
-  return triggerBlueprints[0];
+function normalizeOptional(value: string): string | undefined {
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : undefined;
 }
 
-function resolveBlueprintByKey(key: TriggerBlueprintKey): TriggerBlueprint {
-  return triggerBlueprints.find((entry) => entry.key === key) ?? triggerBlueprints[0];
-}
-
-function buildNextTriggerId(triggers: ReadonlyArray<WorkflowDraftTrigger>): string {
-  const existing = new Set(triggers.map((trigger) => trigger.id));
-  let index = triggers.length + 1;
-  let candidate = `trigger-${index}`;
-  while (existing.has(candidate)) {
-    index += 1;
-    candidate = `trigger-${index}`;
-  }
-  return candidate;
-}
-
-function parseTimeFromCron(cronExpression?: string): string {
-  if (!cronExpression) {
-    return "";
-  }
-  const match = cronExpression.match(/^(\d{1,2}) (\d{1,2}) \* \* (\*|1-5|1)$/);
-  if (!match) {
-    return "";
-  }
-  const minute = Number(match[1]);
-  const hour = Number(match[2]);
-  if (Number.isNaN(minute) || Number.isNaN(hour) || minute < 0 || minute > 59 || hour < 0 || hour > 23) {
-    return "";
-  }
-  return `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
-}
-
-function parseRecurrenceFromCron(cronExpression?: string): TemporalRecurrence {
-  if (!cronExpression) {
-    return "daily";
-  }
-  const match = cronExpression.match(/^(\d{1,2}) (\d{1,2}) \* \* (\*|1-5|1)$/);
-  if (!match) {
-    return "daily";
-  }
-  const dayToken = match[3];
-  if (dayToken === "1-5") {
-    return "weekdays";
-  }
-  if (dayToken === "1") {
-    return "weekly";
-  }
-  return "daily";
-}
-
-function buildCronExpression(timeOfDay: string, recurrence: TemporalRecurrence): string | undefined {
-  const match = timeOfDay.match(/^([01]\d|2[0-3]):([0-5]\d)$/);
-  if (!match) {
+function parsePositiveInteger(value: string): number | undefined {
+  if (!value.trim()) {
     return undefined;
   }
-  const hour = Number(match[1]);
-  const minute = Number(match[2]);
-  const dayToken = recurrence === "weekdays" ? "1-5" : recurrence === "weekly" ? "1" : "*";
-  return `${minute} ${hour} * * ${dayToken}`;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }
 
-function buildTriggerValidationIssues(
-  trigger: WorkflowDraftTrigger,
-  draftIssues: ReadonlyArray<WorkflowValidationIssue>,
-): ReadonlyArray<string> {
-  const issues: string[] = [];
+function TriggerField({
+  label,
+  children,
+}: {
+  readonly label: string;
+  readonly children: JSX.Element;
+}): JSX.Element {
+  return (
+    <label className="ui-stack ui-stack--2xs">
+      <span className="ui-text-small">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function TriggerValidationSummary({
+  trigger,
+  messages,
+}: {
+  readonly trigger: WorkflowDraftTrigger;
+  readonly messages: ReadonlyArray<string>;
+}): JSX.Element {
+  if (messages.length === 0) {
+    return <p className="ui-text-muted">Trigger configuration valid.</p>;
+  }
+  return (
+    <ul className="ui-stack ui-stack--2xs" data-testid={`workflow-trigger-validation-${trigger.id}`}>
+      {messages.map((message) => (
+        <li key={`${trigger.id}:${message}`} className="ui-text-danger">{message}</li>
+      ))}
+    </ul>
+  );
+}
+
+function UserTriggerConfigEditor({
+  trigger,
+  triggerIndex,
+  disabled,
+  onPatch,
+}: {
+  readonly trigger: WorkflowDraftUserTrigger;
+  readonly triggerIndex: number;
+  readonly disabled: boolean;
+  readonly onPatch: (patch: Readonly<Record<string, unknown>>) => void;
+}): JSX.Element {
+  return (
+    <div className="ui-form-grid" data-testid={`workflow-trigger-user-config-${triggerIndex}`}>
+      <TriggerField label="Invocation scope">
+        <select
+          className="ui-select"
+          data-testid={`workflow-trigger-user-scope-${triggerIndex}`}
+          value={trigger.config.invocationScope ?? WorkflowDraftUserTriggerScopes.workflowStart}
+          disabled={disabled}
+          onChange={(event) => onPatch({ invocationScope: event.target.value })}
+        >
+          <option value={WorkflowDraftUserTriggerScopes.workflowStart}>Workflow start</option>
+          <option value={WorkflowDraftUserTriggerScopes.workflowContinuation}>Workflow continuation</option>
+        </select>
+      </TriggerField>
+
+      {trigger.type === WorkflowDraftTriggerTypes.userButtonClick ? (
+        <TriggerField label="Button id">
+          <input
+            className="ui-input"
+            data-testid={`workflow-trigger-user-button-id-${triggerIndex}`}
+            value={trigger.config.buttonId ?? ""}
+            disabled={disabled}
+            onChange={(event) => onPatch({
+              buttonId: normalizeOptional(event.target.value),
+            })}
+            placeholder="run-workflow"
+          />
+        </TriggerField>
+      ) : null}
+
+      <TriggerField label="Allowed roles (comma-separated)">
+        <input
+          className="ui-input"
+          data-testid={`workflow-trigger-user-allowed-roles-${triggerIndex}`}
+          value={(trigger.config.allowedRoles ?? []).join(", ")}
+          disabled={disabled}
+          onChange={(event) => {
+            const roles = event.target.value
+              .split(",")
+              .map((entry) => entry.trim())
+              .filter((entry) => entry.length > 0);
+            onPatch({
+              allowedRoles: roles.length > 0 ? Object.freeze(Array.from(new Set(roles))) : undefined,
+            });
+          }}
+          placeholder="operator, reviewer"
+        />
+      </TriggerField>
+
+      <label className="ui-row ui-row--start workflow-step-checkbox-field">
+        <input
+          className="ui-checkbox"
+          type="checkbox"
+          data-testid={`workflow-trigger-user-requires-confirmation-${triggerIndex}`}
+          checked={trigger.config.requiresConfirmation ?? false}
+          disabled={disabled}
+          onChange={(event) => onPatch({
+            requiresConfirmation: event.target.checked,
+          })}
+        />
+        <span className="ui-text-small">Require explicit confirmation</span>
+      </label>
+
+      {trigger.config.invocationScope === WorkflowDraftUserTriggerScopes.workflowContinuation ? (
+        <>
+          <TriggerField label="Continuation step id (optional)">
+            <input
+              className="ui-input"
+              data-testid={`workflow-trigger-user-continuation-step-${triggerIndex}`}
+              value={trigger.config.continuationStepId ?? ""}
+              disabled={disabled}
+              onChange={(event) => onPatch({
+                continuationStepId: normalizeOptional(event.target.value),
+              })}
+              placeholder="step-id"
+            />
+          </TriggerField>
+          <TriggerField label="Continuation token reference (optional)">
+            <input
+              className="ui-input"
+              data-testid={`workflow-trigger-user-continuation-token-${triggerIndex}`}
+              value={trigger.config.continuationTokenRef ?? ""}
+              disabled={disabled}
+              onChange={(event) => onPatch({
+                continuationTokenRef: normalizeOptional(event.target.value),
+              })}
+              placeholder="token-ref"
+            />
+          </TriggerField>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+function TemporalTriggerConfigEditor({
+  trigger,
+  triggerIndex,
+  disabled,
+  onPatch,
+}: {
+  readonly trigger: WorkflowDraftTemporalTrigger;
+  readonly triggerIndex: number;
+  readonly disabled: boolean;
+  readonly onPatch: (patch: Readonly<Record<string, unknown>>) => void;
+}): JSX.Element {
+  const isRecurring = trigger.type === WorkflowDraftTriggerTypes.temporalRecurring;
+  const scheduleMode = trigger.config.scheduleMode
+    ?? (isRecurring ? WorkflowDraftTemporalScheduleModes.interval : WorkflowDraftTemporalScheduleModes.cron);
+  const useOneTime = !isRecurring && scheduleMode === WorkflowDraftTemporalScheduleModes.oneTime;
+
+  return (
+    <div className="ui-form-grid" data-testid={`workflow-trigger-temporal-config-${triggerIndex}`}>
+      {!isRecurring ? (
+        <TriggerField label="Schedule mode">
+          <select
+            className="ui-select"
+            data-testid={`workflow-trigger-temporal-schedule-mode-${triggerIndex}`}
+            value={scheduleMode}
+            disabled={disabled}
+            onChange={(event) => {
+              const nextMode = event.target.value;
+              onPatch({
+                scheduleMode: nextMode,
+                runAt: nextMode === WorkflowDraftTemporalScheduleModes.oneTime ? trigger.config.runAt : undefined,
+                cronExpression: nextMode === WorkflowDraftTemporalScheduleModes.oneTime
+                  ? undefined
+                  : (trigger.config.cronExpression ?? "0 9 * * *"),
+              });
+            }}
+          >
+            <option value={WorkflowDraftTemporalScheduleModes.cron}>Cron schedule</option>
+            <option value={WorkflowDraftTemporalScheduleModes.oneTime}>One-time run</option>
+          </select>
+        </TriggerField>
+      ) : null}
+
+      {isRecurring ? (
+        <>
+          <TriggerField label="Every">
+            <input
+              className="ui-input"
+              type="number"
+              min={1}
+              step={1}
+              data-testid={`workflow-trigger-temporal-every-${triggerIndex}`}
+              value={String(trigger.config.every ?? "")}
+              disabled={disabled}
+              onChange={(event) => onPatch({
+                every: parsePositiveInteger(event.target.value),
+              })}
+            />
+          </TriggerField>
+          <TriggerField label="Unit">
+            <select
+              className="ui-select"
+              data-testid={`workflow-trigger-temporal-unit-${triggerIndex}`}
+              value={trigger.config.unit ?? "days"}
+              disabled={disabled}
+              onChange={(event) => onPatch({
+                unit: event.target.value,
+              })}
+            >
+              <option value="minutes">Minutes</option>
+              <option value="hours">Hours</option>
+              <option value="days">Days</option>
+              <option value="weeks">Weeks</option>
+            </select>
+          </TriggerField>
+        </>
+      ) : null}
+
+      {!isRecurring && !useOneTime ? (
+        <TriggerField label="Cron expression">
+          <input
+            className="ui-input"
+            data-testid={`workflow-trigger-temporal-cron-${triggerIndex}`}
+            value={trigger.config.cronExpression ?? ""}
+            disabled={disabled}
+            onChange={(event) => onPatch({
+              cronExpression: normalizeOptional(event.target.value),
+              runAt: undefined,
+            })}
+            placeholder="0 9 * * *"
+          />
+        </TriggerField>
+      ) : null}
+
+      {!isRecurring && useOneTime ? (
+        <TriggerField label="Run at (ISO timestamp)">
+          <input
+            className="ui-input"
+            data-testid={`workflow-trigger-temporal-run-at-${triggerIndex}`}
+            value={trigger.config.runAt ?? ""}
+            disabled={disabled}
+            onChange={(event) => onPatch({
+              runAt: normalizeOptional(event.target.value),
+              cronExpression: undefined,
+            })}
+            placeholder="2026-04-01T09:00:00.000Z"
+          />
+        </TriggerField>
+      ) : null}
+
+      <TriggerField label="Timezone (optional)">
+        <input
+          className="ui-input"
+          data-testid={`workflow-trigger-temporal-timezone-${triggerIndex}`}
+          value={trigger.config.timezone ?? ""}
+          disabled={disabled}
+          onChange={(event) => onPatch({
+            timezone: normalizeOptional(event.target.value),
+          })}
+          placeholder="UTC"
+        />
+      </TriggerField>
+
+      <TriggerField label="Start at (optional, ISO timestamp)">
+        <input
+          className="ui-input"
+          data-testid={`workflow-trigger-temporal-start-at-${triggerIndex}`}
+          value={trigger.config.startAt ?? ""}
+          disabled={disabled}
+          onChange={(event) => onPatch({
+            startAt: normalizeOptional(event.target.value),
+          })}
+          placeholder="2026-04-01T00:00:00.000Z"
+        />
+      </TriggerField>
+
+      <TriggerField label="End at (optional, ISO timestamp)">
+        <input
+          className="ui-input"
+          data-testid={`workflow-trigger-temporal-end-at-${triggerIndex}`}
+          value={trigger.config.endAt ?? ""}
+          disabled={disabled}
+          onChange={(event) => onPatch({
+            endAt: normalizeOptional(event.target.value),
+          })}
+          placeholder="2026-12-31T23:59:59.000Z"
+        />
+      </TriggerField>
+    </div>
+  );
+}
+
+function StateTriggerConfigEditor({
+  trigger,
+  triggerIndex,
+  disabled,
+  onPatch,
+}: {
+  readonly trigger: WorkflowDraftStateTrigger;
+  readonly triggerIndex: number;
+  readonly disabled: boolean;
+  readonly onPatch: (patch: Readonly<Record<string, unknown>>) => void;
+}): JSX.Element {
+  const isAssetSource = (trigger.config.sourceType ?? "") === WorkflowDraftStateEventSourceTypes.asset
+    || trigger.type === WorkflowDraftTriggerTypes.stateAssetStateChanged;
+
+  return (
+    <div className="ui-form-grid" data-testid={`workflow-trigger-state-config-${triggerIndex}`}>
+      <TriggerField label="Event source">
+        <select
+          className="ui-select"
+          data-testid={`workflow-trigger-state-source-type-${triggerIndex}`}
+          value={trigger.config.sourceType ?? WorkflowDraftStateEventSourceTypes.dataset}
+          disabled={disabled}
+          onChange={(event) => onPatch({
+            sourceType: event.target.value,
+          })}
+        >
+          <option value={WorkflowDraftStateEventSourceTypes.dataset}>Dataset</option>
+          <option value={WorkflowDraftStateEventSourceTypes.asset}>Asset</option>
+          <option value={WorkflowDraftStateEventSourceTypes.system}>System</option>
+        </select>
+      </TriggerField>
+
+      <TriggerField label="Event category">
+        <select
+          className="ui-select"
+          data-testid={`workflow-trigger-state-event-category-${triggerIndex}`}
+          value={trigger.config.eventCategory ?? WorkflowDraftStateEventCategories.dataIngested}
+          disabled={disabled}
+          onChange={(event) => onPatch({
+            eventCategory: event.target.value,
+          })}
+        >
+          <option value={WorkflowDraftStateEventCategories.dataIngested}>Data ingested</option>
+          <option value={WorkflowDraftStateEventCategories.assetUpdated}>Asset updated</option>
+          <option value={WorkflowDraftStateEventCategories.systemStateChanged}>System state changed</option>
+        </select>
+      </TriggerField>
+
+      <TriggerField label="Subject (optional)">
+        <input
+          className="ui-input"
+          data-testid={`workflow-trigger-state-subject-${triggerIndex}`}
+          value={trigger.config.subject ?? ""}
+          disabled={disabled}
+          onChange={(event) => onPatch({
+            subject: normalizeOptional(event.target.value),
+          })}
+          placeholder="dataset"
+        />
+      </TriggerField>
+
+      <TriggerField label="Event name">
+        <input
+          className="ui-input"
+          data-testid={`workflow-trigger-state-event-name-${triggerIndex}`}
+          value={trigger.config.eventName ?? ""}
+          disabled={disabled}
+          onChange={(event) => onPatch({
+            eventName: normalizeOptional(event.target.value),
+          })}
+          placeholder="system-event"
+        />
+      </TriggerField>
+
+      <TriggerField label="State key (optional)">
+        <input
+          className="ui-input"
+          data-testid={`workflow-trigger-state-key-${triggerIndex}`}
+          value={trigger.config.stateKey ?? ""}
+          disabled={disabled}
+          onChange={(event) => onPatch({
+            stateKey: normalizeOptional(event.target.value),
+          })}
+          placeholder="status"
+        />
+      </TriggerField>
+
+      <TriggerField label="State value (optional)">
+        <input
+          className="ui-input"
+          data-testid={`workflow-trigger-state-value-${triggerIndex}`}
+          value={trigger.config.stateValue ?? ""}
+          disabled={disabled}
+          onChange={(event) => onPatch({
+            stateValue: normalizeOptional(event.target.value),
+          })}
+          placeholder="ready"
+        />
+      </TriggerField>
+
+      {isAssetSource ? (
+        <>
+          <TriggerField label="Asset id">
+            <input
+              className="ui-input"
+              data-testid={`workflow-trigger-state-asset-id-${triggerIndex}`}
+              value={trigger.config.asset?.assetId ?? ""}
+              disabled={disabled}
+              onChange={(event) => onPatch({
+                asset: Object.freeze({
+                  ...(trigger.config.asset ?? {}),
+                  assetId: normalizeOptional(event.target.value),
+                }),
+              })}
+              placeholder="asset:source"
+            />
+          </TriggerField>
+          <TriggerField label="Asset version id (optional)">
+            <input
+              className="ui-input"
+              data-testid={`workflow-trigger-state-asset-version-id-${triggerIndex}`}
+              value={trigger.config.asset?.versionId ?? ""}
+              disabled={disabled}
+              onChange={(event) => onPatch({
+                asset: Object.freeze({
+                  ...(trigger.config.asset ?? {}),
+                  versionId: normalizeOptional(event.target.value),
+                }),
+              })}
+              placeholder="asset:source:v1"
+            />
+          </TriggerField>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+function TriggerTypeSpecificEditor({
+  trigger,
+  triggerIndex,
+  disabled,
+  onPatch,
+}: {
+  readonly trigger: WorkflowDraftTrigger;
+  readonly triggerIndex: number;
+  readonly disabled: boolean;
+  readonly onPatch: (patch: Readonly<Record<string, unknown>>) => void;
+}): JSX.Element {
+  if (trigger.kind === WorkflowDraftTriggerKinds.user) {
+    return (
+      <UserTriggerConfigEditor
+        trigger={trigger as WorkflowDraftUserTrigger}
+        triggerIndex={triggerIndex}
+        disabled={disabled}
+        onPatch={onPatch}
+      />
+    );
+  }
   if (trigger.kind === WorkflowDraftTriggerKinds.temporal) {
-    const temporalTrigger = trigger as WorkflowDraftTemporalTrigger;
-    if (temporalTrigger.type === WorkflowDraftTriggerTypes.temporalSchedule) {
-      if (!parseTimeFromCron(temporalTrigger.config.cronExpression)) {
-        issues.push("Temporal trigger requires a valid time of day.");
-      }
-    }
-    if (temporalTrigger.type === WorkflowDraftTriggerTypes.temporalRecurring) {
-      if (!temporalTrigger.config.every || temporalTrigger.config.every < 1) {
-        issues.push("Temporal recurring trigger requires a positive interval.");
-      }
-      if (!temporalTrigger.config.unit) {
-        issues.push("Temporal recurring trigger requires an interval unit.");
-      }
-    }
+    return (
+      <TemporalTriggerConfigEditor
+        trigger={trigger as WorkflowDraftTemporalTrigger}
+        triggerIndex={triggerIndex}
+        disabled={disabled}
+        onPatch={onPatch}
+      />
+    );
   }
-
-  if (trigger.kind === WorkflowDraftTriggerKinds.state) {
-    const stateTrigger = trigger as WorkflowDraftStateTrigger;
-    const supportedTypes: ReadonlyArray<WorkflowDraftTriggerType> = Object.freeze([
-      WorkflowDraftTriggerTypes.stateDataAvailable,
-      WorkflowDraftTriggerTypes.stateSystemEvent,
-      WorkflowDraftTriggerTypes.stateAssetStateChanged,
-    ]);
-    if (!supportedTypes.includes(stateTrigger.type)) {
-      issues.push("State trigger requires an event type.");
-    }
-
-    if (stateTrigger.type === WorkflowDraftTriggerTypes.stateSystemEvent && !stateTrigger.config.eventName?.trim()) {
-      issues.push("State trigger system-event type requires an event name.");
-    }
-
-    if (stateTrigger.type === WorkflowDraftTriggerTypes.stateAssetStateChanged && !stateTrigger.config.asset?.assetId?.trim()) {
-      issues.push("State trigger asset-state-changed type requires an asset reference.");
-    }
-  }
-
-  for (const issue of draftIssues) {
-    issues.push(issue.message);
-  }
-  return Object.freeze([...new Set(issues)]);
-}
-
-function buildStateConfigForType(
-  type: WorkflowDraftStateTrigger["type"],
-  current: WorkflowDraftStateTrigger["config"],
-): WorkflowDraftStateTrigger["config"] {
-  if (type === WorkflowDraftTriggerTypes.stateAssetStateChanged) {
-    return Object.freeze({
-      ...current,
-      asset: current.asset ?? Object.freeze({
-        assetId: "",
-      }),
-    });
-  }
-
-  if (type === WorkflowDraftTriggerTypes.stateSystemEvent) {
-    return Object.freeze({
-      ...current,
-      eventName: current.eventName ?? "",
-    });
-  }
-
-  return Object.freeze({
-    ...current,
-    asset: undefined,
-  });
-}
-
-function updateTriggerAtIndex(
-  draft: WorkflowDraft,
-  index: number,
-  updater: (trigger: WorkflowDraftTrigger) => WorkflowDraftTrigger,
-): WorkflowDraft {
-  return Object.freeze({
-    ...draft,
-    triggers: Object.freeze(draft.triggers.map((trigger, triggerIndex) => (
-      triggerIndex === index ? updater(trigger) : trigger
-    ))),
-  });
+  return (
+    <StateTriggerConfigEditor
+      trigger={trigger as WorkflowDraftStateTrigger}
+      triggerIndex={triggerIndex}
+      disabled={disabled}
+      onPatch={onPatch}
+    />
+  );
 }
 
 export default function WorkflowStudioTriggerSectionEditor({
@@ -237,482 +534,273 @@ export default function WorkflowStudioTriggerSectionEditor({
   draftValidationIssues,
   onUpdateSharedDraft,
 }: WorkflowStudioTriggerSectionEditorProps): JSX.Element {
+  const [newTriggerType, setNewTriggerType] = useState(
+    workflowTriggerTypeDefinitions[0]?.type ?? WorkflowDraftTriggerTypes.userManual,
+  );
+  const [selectedTriggerId, setSelectedTriggerId] = useState<string | undefined>(() => (
+    resolveWorkflowTriggerSelectionId(sharedDraft)
+  ));
+  const availableTypes = useMemo(() => workflowTriggerTypeDefinitions, []);
+  const stepIds = useMemo(
+    () => sharedDraft.steps.map((step) => step.id),
+    [sharedDraft.steps],
+  );
+
+  useEffect(() => {
+    const resolved = resolveWorkflowTriggerSelectionId(sharedDraft, selectedTriggerId);
+    if (resolved !== selectedTriggerId) {
+      setSelectedTriggerId(resolved);
+    }
+  }, [selectedTriggerId, sharedDraft]);
+
   const triggerRows = sharedDraft.triggers.map((trigger, index) => {
-    const triggerDraftIssues = draftValidationIssues.filter((issue) => issue.path?.startsWith(`draft.triggers[${index}]`));
-    const triggerValidationIssues = buildTriggerValidationIssues(trigger, triggerDraftIssues);
+    const draftIssueMessages = getWorkflowTriggerIssuesForIndex(draftValidationIssues, index);
+    const validationMessages = getWorkflowTriggerValidationMessages({
+      trigger,
+      draftIssueMessages,
+      stepIds,
+    });
     return Object.freeze({
       trigger,
       index,
-      blueprint: resolveBlueprintForTrigger(trigger),
-      validationIssues: triggerValidationIssues,
-      hasErrors: triggerValidationIssues.length > 0,
+      typeDefinition: getWorkflowTriggerTypeDefinition(trigger.type),
+      validationMessages,
+      hasErrors: validationMessages.length > 0,
+      summary: getWorkflowTriggerSummary(trigger),
     });
   });
 
   const sectionHasErrors = triggerRows.some((entry) => entry.hasErrors);
+  const selectedRow = triggerRows.find((row) => row.trigger.id === selectedTriggerId);
+  const selectedTrigger = selectedRow?.trigger;
+  const selectedIndex = selectedRow?.index ?? -1;
+  const selectedTypeDefinition = selectedRow?.typeDefinition;
 
   return (
     <WizardSection sectionId="workflow-wizard-trigger" validationState={sectionHasErrors ? "error" : "none"}>
       <SectionHeader
         title="Trigger Section"
-        description="Define what starts workflow execution. This section edits the shared workflow draft triggers array."
+        description="Configure workflow activation and continuation events. Trigger definitions and validation are shared with canonical workflow contracts."
       />
       <SectionBody>
         <div className="ui-text-small">{buildSectionSummary(sharedDraft.triggers.length, "trigger", "triggers")}</div>
-        <div className="ui-row ui-row--wrap" style={{ gap: "0.5rem" }}>
-          {triggerBlueprints.map((blueprint) => (
+
+        <div className="ui-card ui-card--padded ui-stack ui-stack--2xs">
+          <strong>Add trigger</strong>
+          <div className="ui-row ui-row--wrap">
+            <label className="ui-field">
+              <span className="ui-field__label">Trigger type</span>
+              <select
+                className="ui-select"
+                data-testid="workflow-trigger-add-type-select"
+                value={newTriggerType}
+                disabled={!onUpdateSharedDraft}
+                onChange={(event) => setNewTriggerType(event.target.value as WorkflowDraftTrigger["type"])}
+              >
+                {availableTypes.map((definition) => (
+                  <option key={definition.type} value={definition.type}>
+                    {definition.label} ({getWorkflowTriggerKindLabel(definition.kind)})
+                  </option>
+                ))}
+              </select>
+            </label>
             <button
-              key={blueprint.key}
               type="button"
-              className="ui-button ui-button--ghost ui-button--sm"
-              data-testid={`workflow-trigger-add-${blueprint.key}`}
+              className="ui-button ui-button--sm"
+              data-testid="workflow-trigger-add"
               disabled={!onUpdateSharedDraft}
               onClick={() => {
                 if (!onUpdateSharedDraft) {
                   return;
                 }
-                onUpdateSharedDraft((draft) => Object.freeze({
-                  ...draft,
-                  triggers: Object.freeze([
-                    ...draft.triggers,
-                    resolveBlueprintByKey(blueprint.key).create(buildNextTriggerId(draft.triggers)),
-                  ]),
-                }));
+                onUpdateSharedDraft((draft) => {
+                  const added = addWorkflowTrigger(draft, { type: newTriggerType });
+                  setSelectedTriggerId(added.triggerId);
+                  return added.draft;
+                });
               }}
             >
-              Add {blueprint.label}
+              Add trigger
             </button>
-          ))}
+          </div>
         </div>
 
-        {sharedDraft.triggers.length === 0 ? <p className="ui-text-muted">No triggers configured yet.</p> : null}
+        {triggerRows.length === 0 ? (
+          <div className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="workflow-trigger-empty-state">
+            <strong>No triggers configured yet.</strong>
+            <span className="ui-text-small ui-text-secondary">
+              Add at least one trigger to define workflow start or continuation behavior.
+            </span>
+          </div>
+        ) : (
+          <div className="ui-stack ui-stack--2xs" data-testid="workflow-trigger-list">
+            {triggerRows.map((row) => (
+              <article
+                key={row.trigger.id}
+                className="ui-card ui-card--padded ui-stack ui-stack--2xs"
+                data-testid={`workflow-trigger-row-${row.index}`}
+              >
+                <div className="ui-row ui-row--between ui-row--wrap" style={{ gap: "0.5rem" }}>
+                  <button
+                    type="button"
+                    className={`ui-button ui-button--sm ${selectedTriggerId === row.trigger.id ? "ui-button--primary" : "ui-button--ghost"}`}
+                    data-testid={`workflow-trigger-select-${row.index}`}
+                    onClick={() => setSelectedTriggerId(row.trigger.id)}
+                  >
+                    {row.trigger.title?.trim() || `Trigger ${row.index + 1}`}
+                  </button>
+                  <span className="ui-text-small ui-text-secondary">{row.summary}</span>
+                </div>
+                <div className="ui-text-small ui-text-secondary">{row.typeDefinition?.label ?? row.trigger.type}</div>
+                <div className="ui-row ui-row--wrap" style={{ gap: "0.5rem" }}>
+                  <button
+                    type="button"
+                    className="ui-button ui-button--ghost ui-button--sm"
+                    data-testid={`workflow-trigger-move-up-${row.index}`}
+                    disabled={!onUpdateSharedDraft || !canMoveWorkflowTrigger(sharedDraft, row.trigger.id, "up")}
+                    onClick={() => {
+                      if (!onUpdateSharedDraft) {
+                        return;
+                      }
+                      onUpdateSharedDraft((draft) => moveWorkflowTriggerUp(draft, row.trigger.id).draft);
+                    }}
+                  >
+                    Move up
+                  </button>
+                  <button
+                    type="button"
+                    className="ui-button ui-button--ghost ui-button--sm"
+                    data-testid={`workflow-trigger-move-down-${row.index}`}
+                    disabled={!onUpdateSharedDraft || !canMoveWorkflowTrigger(sharedDraft, row.trigger.id, "down")}
+                    onClick={() => {
+                      if (!onUpdateSharedDraft) {
+                        return;
+                      }
+                      onUpdateSharedDraft((draft) => moveWorkflowTriggerDown(draft, row.trigger.id).draft);
+                    }}
+                  >
+                    Move down
+                  </button>
+                  <button
+                    type="button"
+                    className="ui-button ui-button--ghost ui-button--sm"
+                    data-testid={`workflow-trigger-remove-${row.index}`}
+                    disabled={!onUpdateSharedDraft}
+                    onClick={() => {
+                      if (!onUpdateSharedDraft) {
+                        return;
+                      }
+                      onUpdateSharedDraft((draft) => removeWorkflowTrigger(draft, row.trigger.id).draft);
+                    }}
+                  >
+                    Remove
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
 
-        {sharedDraft.triggers.map((trigger, index) => {
-          const row = triggerRows[index] ?? Object.freeze({
-            trigger,
-            index,
-            blueprint: resolveBlueprintForTrigger(trigger),
-            validationIssues: Object.freeze([]),
-            hasErrors: false,
-          });
-          const temporalTrigger = trigger.kind === WorkflowDraftTriggerKinds.temporal ? trigger as WorkflowDraftTemporalTrigger : undefined;
-          const stateTrigger = trigger.kind === WorkflowDraftTriggerKinds.state ? trigger as WorkflowDraftStateTrigger : undefined;
-          const temporalTime = temporalTrigger ? parseTimeFromCron(temporalTrigger.config.cronExpression) : "";
-          const temporalRecurrence = temporalTrigger ? parseRecurrenceFromCron(temporalTrigger.config.cronExpression) : "daily";
-
-          return (
-            <div key={trigger.id} className="ui-card ui-card--padded ui-stack ui-stack--sm">
-              <div className="ui-row ui-row--between">
-                <strong>{trigger.title?.trim() ? trigger.title : `Trigger ${index + 1}`}</strong>
-                <button
-                  type="button"
-                  className="ui-button ui-button--ghost ui-button--sm"
-                  data-testid={`workflow-trigger-remove-${index}`}
+        {selectedTrigger ? (
+          <div className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="workflow-trigger-selected-editor">
+            <div className="ui-row ui-row--between ui-row--wrap" style={{ gap: "0.5rem" }}>
+              <strong>Editing {selectedTrigger.title?.trim() || `Trigger ${selectedIndex + 1}`}</strong>
+              <span className="ui-text-small ui-text-secondary">{selectedTypeDefinition?.configSchemaId}</span>
+            </div>
+            <div className="ui-form-grid">
+              <TriggerField label="Trigger type">
+                <select
+                  className="ui-select"
+                  data-testid={`workflow-trigger-type-${selectedIndex}`}
+                  value={selectedTrigger.type}
                   disabled={!onUpdateSharedDraft}
-                  onClick={() => {
+                  onChange={(event) => {
                     if (!onUpdateSharedDraft) {
                       return;
                     }
-                    onUpdateSharedDraft((draft) => Object.freeze({
-                      ...draft,
-                      triggers: Object.freeze(draft.triggers.filter((_, triggerIndex) => triggerIndex !== index)),
-                    }));
+                    onUpdateSharedDraft((draft) => setWorkflowTriggerType(
+                      draft,
+                      selectedTrigger.id,
+                      event.target.value as WorkflowDraftTrigger["type"],
+                    ).draft);
                   }}
                 >
-                  Remove
-                </button>
-              </div>
-
-              <div className="ui-text-muted">{row.blueprint.description}</div>
-
-              <div className="ui-form-grid">
-                <label className="ui-field">
-                  <span className="ui-field__label">Trigger type</span>
-                  <select
-                    className="ui-input"
-                    data-testid={`workflow-trigger-type-${index}`}
-                    value={row.blueprint.key}
-                    disabled={!onUpdateSharedDraft}
-                    onChange={(event) => {
-                      if (!onUpdateSharedDraft) {
-                        return;
-                      }
-                      const nextBlueprint = resolveBlueprintByKey(event.target.value as TriggerBlueprintKey);
-                      onUpdateSharedDraft((draft) => updateTriggerAtIndex(draft, index, (current) => {
-                        const replaced = nextBlueprint.create(current.id);
-                        return Object.freeze({
-                          ...replaced,
-                          id: current.id,
-                          title: current.title,
-                          description: current.description,
-                        });
-                      }));
-                    }}
-                  >
-                    {triggerBlueprints.map((blueprint) => (
-                      <option key={blueprint.key} value={blueprint.key}>{blueprint.label}</option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="ui-field">
-                  <span className="ui-field__label">Trigger name (optional)</span>
-                  <input
-                    className="ui-input"
-                    data-testid={`workflow-trigger-title-${index}`}
-                    value={trigger.title ?? ""}
-                    disabled={!onUpdateSharedDraft}
-                    onChange={(event) => {
-                      if (!onUpdateSharedDraft) {
-                        return;
-                      }
-                      onUpdateSharedDraft((draft) => updateTriggerAtIndex(draft, index, (current) => Object.freeze({
-                        ...current,
-                        title: event.target.value || undefined,
-                      })));
-                    }}
-                    placeholder="My trigger"
-                  />
-                </label>
-              </div>
-
-              {temporalTrigger ? (
-                <div className="ui-form-grid">
-                  <label className="ui-field">
-                    <span className="ui-field__label">Temporal mode</span>
-                    <select
-                      className="ui-input"
-                      data-testid={`workflow-trigger-temporal-mode-${index}`}
-                      value={temporalTrigger.type}
-                      disabled={!onUpdateSharedDraft}
-                      onChange={(event) => {
-                        if (!onUpdateSharedDraft) {
-                          return;
-                        }
-                        const nextType = event.target.value as WorkflowDraftTemporalTrigger["type"];
-                        onUpdateSharedDraft((draft) => updateTriggerAtIndex(draft, index, (current) => {
-                          const temporalCurrent = current as WorkflowDraftTemporalTrigger;
-                          if (nextType === WorkflowDraftTriggerTypes.temporalRecurring) {
-                            return Object.freeze({
-                              ...temporalCurrent,
-                              type: WorkflowDraftTriggerTypes.temporalRecurring,
-                              config: Object.freeze({
-                                every: temporalCurrent.config.every ?? 1,
-                                unit: temporalCurrent.config.unit ?? "days",
-                                timezone: temporalCurrent.config.timezone,
-                              }),
-                            });
-                          }
-
-                          return Object.freeze({
-                            ...temporalCurrent,
-                            type: WorkflowDraftTriggerTypes.temporalSchedule,
-                            config: Object.freeze({
-                              cronExpression: temporalCurrent.config.cronExpression ?? "0 9 * * *",
-                              timezone: temporalCurrent.config.timezone,
-                            }),
-                          });
-                        }));
-                      }}
-                    >
-                      <option value={WorkflowDraftTriggerTypes.temporalSchedule}>Schedule (time of day)</option>
-                      <option value={WorkflowDraftTriggerTypes.temporalRecurring}>Recurring interval</option>
-                    </select>
-                  </label>
-
-                  {temporalTrigger.type === WorkflowDraftTriggerTypes.temporalSchedule ? (
-                    <>
-                      <label className="ui-field">
-                        <span className="ui-field__label">Time of day</span>
-                        <input
-                          className="ui-input"
-                          type="time"
-                          data-testid={`workflow-trigger-temporal-time-${index}`}
-                          value={temporalTime}
-                          disabled={!onUpdateSharedDraft}
-                          onChange={(event) => {
-                            if (!onUpdateSharedDraft) {
-                              return;
-                            }
-                            onUpdateSharedDraft((draft) => updateTriggerAtIndex(draft, index, (current) => {
-                              const temporalCurrent = current as WorkflowDraftTemporalTrigger;
-                              const nextCronExpression = buildCronExpression(event.target.value, temporalRecurrence);
-                              return Object.freeze({
-                                ...temporalCurrent,
-                                type: WorkflowDraftTriggerTypes.temporalSchedule,
-                                config: Object.freeze({
-                                  ...temporalCurrent.config,
-                                  cronExpression: nextCronExpression,
-                                  every: undefined,
-                                  unit: undefined,
-                                }),
-                              });
-                            }));
-                          }}
-                        />
-                      </label>
-
-                      <label className="ui-field">
-                        <span className="ui-field__label">Recurrence</span>
-                        <select
-                          className="ui-input"
-                          data-testid={`workflow-trigger-temporal-recurrence-${index}`}
-                          value={temporalRecurrence}
-                          disabled={!onUpdateSharedDraft}
-                          onChange={(event) => {
-                            if (!onUpdateSharedDraft) {
-                              return;
-                            }
-                            const nextRecurrence = event.target.value as TemporalRecurrence;
-                            onUpdateSharedDraft((draft) => updateTriggerAtIndex(draft, index, (current) => {
-                              const temporalCurrent = current as WorkflowDraftTemporalTrigger;
-                              const timeOfDay = parseTimeFromCron(temporalCurrent.config.cronExpression) || "09:00";
-                              const nextCronExpression = buildCronExpression(timeOfDay, nextRecurrence);
-                              return Object.freeze({
-                                ...temporalCurrent,
-                                type: WorkflowDraftTriggerTypes.temporalSchedule,
-                                config: Object.freeze({
-                                  ...temporalCurrent.config,
-                                  cronExpression: nextCronExpression,
-                                  every: undefined,
-                                  unit: undefined,
-                                }),
-                                metadata: Object.freeze({
-                                  ...(temporalCurrent.metadata ?? {}),
-                                  recurrence: nextRecurrence,
-                                }),
-                              });
-                            }));
-                          }}
-                        >
-                          <option value="daily">Daily</option>
-                          <option value="weekdays">Weekdays</option>
-                          <option value="weekly">Weekly</option>
-                        </select>
-                      </label>
-                    </>
-                  ) : (
-                    <>
-                      <label className="ui-field">
-                        <span className="ui-field__label">Every</span>
-                        <input
-                          className="ui-input"
-                          type="number"
-                          min={1}
-                          step={1}
-                          data-testid={`workflow-trigger-temporal-every-${index}`}
-                          value={temporalTrigger.config.every ?? 1}
-                          disabled={!onUpdateSharedDraft}
-                          onChange={(event) => {
-                            if (!onUpdateSharedDraft) {
-                              return;
-                            }
-                            const parsedEvery = Number(event.target.value);
-                            onUpdateSharedDraft((draft) => updateTriggerAtIndex(draft, index, (current) => {
-                              const temporalCurrent = current as WorkflowDraftTemporalTrigger;
-                              return Object.freeze({
-                                ...temporalCurrent,
-                                type: WorkflowDraftTriggerTypes.temporalRecurring,
-                                config: Object.freeze({
-                                  ...temporalCurrent.config,
-                                  cronExpression: undefined,
-                                  every: Number.isInteger(parsedEvery) && parsedEvery > 0 ? parsedEvery : undefined,
-                                }),
-                              });
-                            }));
-                          }}
-                        />
-                      </label>
-
-                      <label className="ui-field">
-                        <span className="ui-field__label">Unit</span>
-                        <select
-                          className="ui-input"
-                          data-testid={`workflow-trigger-temporal-unit-${index}`}
-                          value={temporalTrigger.config.unit ?? "days"}
-                          disabled={!onUpdateSharedDraft}
-                          onChange={(event) => {
-                            if (!onUpdateSharedDraft) {
-                              return;
-                            }
-                            onUpdateSharedDraft((draft) => updateTriggerAtIndex(draft, index, (current) => {
-                              const temporalCurrent = current as WorkflowDraftTemporalTrigger;
-                              return Object.freeze({
-                                ...temporalCurrent,
-                                type: WorkflowDraftTriggerTypes.temporalRecurring,
-                                config: Object.freeze({
-                                  ...temporalCurrent.config,
-                                  cronExpression: undefined,
-                                  unit: event.target.value as WorkflowDraftTemporalTrigger["config"]["unit"],
-                                }),
-                              });
-                            }));
-                          }}
-                        >
-                          <option value="minutes">Minutes</option>
-                          <option value="hours">Hours</option>
-                          <option value="days">Days</option>
-                          <option value="weeks">Weeks</option>
-                        </select>
-                      </label>
-                    </>
-                  )}
-
-                  <label className="ui-field">
-                    <span className="ui-field__label">Timezone (optional)</span>
-                    <input
-                      className="ui-input"
-                      data-testid={`workflow-trigger-temporal-timezone-${index}`}
-                      value={temporalTrigger.config.timezone ?? ""}
-                      disabled={!onUpdateSharedDraft}
-                      onChange={(event) => {
-                        if (!onUpdateSharedDraft) {
-                          return;
-                        }
-                        onUpdateSharedDraft((draft) => updateTriggerAtIndex(draft, index, (current) => {
-                          const temporalCurrent = current as WorkflowDraftTemporalTrigger;
-                          return Object.freeze({
-                            ...temporalCurrent,
-                            config: Object.freeze({
-                              ...temporalCurrent.config,
-                              timezone: event.target.value || undefined,
-                            }),
-                          });
-                        }));
-                      }}
-                      placeholder="UTC"
-                    />
-                  </label>
-                </div>
-              ) : null}
-
-              {stateTrigger ? (
-                <div className="ui-form-grid">
-                  <label className="ui-field">
-                    <span className="ui-field__label">Event type</span>
-                    <select
-                      className="ui-input"
-                      data-testid={`workflow-trigger-state-type-${index}`}
-                      value={stateTrigger.type}
-                      disabled={!onUpdateSharedDraft}
-                      onChange={(event) => {
-                        if (!onUpdateSharedDraft) {
-                          return;
-                        }
-                        const nextType = event.target.value as WorkflowDraftStateTrigger["type"];
-                        onUpdateSharedDraft((draft) => updateTriggerAtIndex(draft, index, (current) => {
-                          const stateCurrent = current as WorkflowDraftStateTrigger;
-                          return Object.freeze({
-                            ...stateCurrent,
-                            type: nextType,
-                            config: buildStateConfigForType(nextType, stateCurrent.config),
-                          });
-                        }));
-                      }}
-                    >
-                      <option value={WorkflowDraftTriggerTypes.stateDataAvailable}>New data</option>
-                      <option value={WorkflowDraftTriggerTypes.stateSystemEvent}>System event</option>
-                      <option value={WorkflowDraftTriggerTypes.stateAssetStateChanged}>Asset state changed</option>
-                    </select>
-                  </label>
-
-                  <label className="ui-field">
-                    <span className="ui-field__label">Source reference (optional)</span>
-                    <input
-                      className="ui-input"
-                      data-testid={`workflow-trigger-state-source-${index}`}
-                      value={stateTrigger.config.stateKey ?? ""}
-                      disabled={!onUpdateSharedDraft}
-                      onChange={(event) => {
-                        if (!onUpdateSharedDraft) {
-                          return;
-                        }
-                        onUpdateSharedDraft((draft) => updateTriggerAtIndex(draft, index, (current) => {
-                          const stateCurrent = current as WorkflowDraftStateTrigger;
-                          return Object.freeze({
-                            ...stateCurrent,
-                            config: Object.freeze({
-                              ...stateCurrent.config,
-                              stateKey: event.target.value || undefined,
-                            }),
-                          });
-                        }));
-                      }}
-                      placeholder="source-reference"
-                    />
-                  </label>
-
-                  <label className="ui-field">
-                    <span className="ui-field__label">Event name</span>
-                    <input
-                      className="ui-input"
-                      data-testid={`workflow-trigger-state-event-name-${index}`}
-                      value={stateTrigger.config.eventName ?? ""}
-                      disabled={!onUpdateSharedDraft}
-                      onChange={(event) => {
-                        if (!onUpdateSharedDraft) {
-                          return;
-                        }
-                        onUpdateSharedDraft((draft) => updateTriggerAtIndex(draft, index, (current) => {
-                          const stateCurrent = current as WorkflowDraftStateTrigger;
-                          return Object.freeze({
-                            ...stateCurrent,
-                            config: Object.freeze({
-                              ...stateCurrent.config,
-                              eventName: event.target.value || undefined,
-                            }),
-                          });
-                        }));
-                      }}
-                      placeholder="new-data"
-                    />
-                  </label>
-
-                  {stateTrigger.type === WorkflowDraftTriggerTypes.stateAssetStateChanged ? (
-                    <label className="ui-field">
-                      <span className="ui-field__label">Asset reference</span>
-                      <input
-                        className="ui-input"
-                        data-testid={`workflow-trigger-state-asset-id-${index}`}
-                        value={stateTrigger.config.asset?.assetId ?? ""}
-                        disabled={!onUpdateSharedDraft}
-                        onChange={(event) => {
-                          if (!onUpdateSharedDraft) {
-                            return;
-                          }
-                          onUpdateSharedDraft((draft) => updateTriggerAtIndex(draft, index, (current) => {
-                            const stateCurrent = current as WorkflowDraftStateTrigger;
-                            return Object.freeze({
-                              ...stateCurrent,
-                              config: Object.freeze({
-                                ...stateCurrent.config,
-                                asset: Object.freeze({
-                                  ...(stateCurrent.config.asset ?? {}),
-                                  assetId: event.target.value,
-                                }),
-                              }),
-                            });
-                          }));
-                        }}
-                        placeholder="asset:source"
-                      />
-                    </label>
-                  ) : null}
-                </div>
-              ) : null}
-
-              {row.validationIssues.length > 0 ? (
-                <ul className="ui-stack ui-stack--2xs">
-                  {row.validationIssues.map((message) => (
-                    <li key={`${trigger.id}-${message}`} className="ui-text-danger">{message}</li>
+                  {availableTypes.map((definition) => (
+                    <option key={definition.type} value={definition.type}>
+                      {definition.label} ({getWorkflowTriggerKindLabel(definition.kind)})
+                    </option>
                   ))}
-                </ul>
-              ) : (
-                <p className="ui-text-muted">Trigger configuration valid.</p>
-              )}
+                </select>
+              </TriggerField>
+
+              <TriggerField label="Trigger name (optional)">
+                <input
+                  className="ui-input"
+                  data-testid={`workflow-trigger-title-${selectedIndex}`}
+                  value={selectedTrigger.title ?? ""}
+                  disabled={!onUpdateSharedDraft}
+                  onChange={(event) => {
+                    if (!onUpdateSharedDraft) {
+                      return;
+                    }
+                    onUpdateSharedDraft((draft) => setWorkflowTriggerTitle(
+                      draft,
+                      selectedTrigger.id,
+                      event.target.value,
+                    ).draft);
+                  }}
+                  placeholder="My trigger"
+                />
+              </TriggerField>
             </div>
-          );
-        })}
+
+            <div className="ui-text-small ui-text-secondary">
+              {selectedTypeDefinition?.description ?? "Configured trigger definition."}
+            </div>
+            {selectedTypeDefinition?.capabilities.supportsIntermediateContinuation ? (
+              <p className="ui-text-small">
+                Supports continuation semantics for intermediate resume and human-approval handoff flows.
+              </p>
+            ) : null}
+
+            <TriggerTypeSpecificEditor
+              trigger={selectedTrigger}
+              triggerIndex={selectedIndex}
+              disabled={!onUpdateSharedDraft}
+              onPatch={(patch) => {
+                if (!onUpdateSharedDraft) {
+                  return;
+                }
+                onUpdateSharedDraft((draft) => {
+                  if (selectedTrigger.kind === WorkflowDraftTriggerKinds.user) {
+                    return setWorkflowTriggerUserConfig(
+                      draft,
+                      selectedTrigger.id,
+                      patch as Partial<WorkflowDraftUserTrigger["config"]>,
+                    ).draft;
+                  }
+                  if (selectedTrigger.kind === WorkflowDraftTriggerKinds.temporal) {
+                    return setWorkflowTriggerTemporalConfig(
+                      draft,
+                      selectedTrigger.id,
+                      patch as Partial<WorkflowDraftTemporalTrigger["config"]>,
+                    ).draft;
+                  }
+                  return setWorkflowTriggerStateConfig(
+                    draft,
+                    selectedTrigger.id,
+                    patch as Partial<WorkflowDraftStateTrigger["config"]>,
+                  ).draft;
+                });
+              }}
+            />
+
+            <TriggerValidationSummary
+              trigger={selectedTrigger}
+              messages={selectedRow?.validationMessages ?? []}
+            />
+          </div>
+        ) : null}
       </SectionBody>
     </WizardSection>
   );

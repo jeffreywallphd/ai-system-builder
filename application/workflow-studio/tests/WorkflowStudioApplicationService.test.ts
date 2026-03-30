@@ -4,7 +4,13 @@ import type { AssetDraft, AssetSession, Studio } from "../../../domain/studio-sh
 import type { AssetVersion } from "../../../domain/assets/AssetVersion";
 import { DefaultStudioShellApplicationService } from "../../studio-shell/DefaultStudioShellApplicationService";
 import { WorkflowStudioApplicationService } from "../WorkflowStudioApplicationService";
-import { createEmptyWorkflowDraft, serializeWorkflowDraft, WorkflowStudioIdentity } from "../../../domain/workflow-studio/WorkflowStudioDomain";
+import {
+  createEmptyWorkflowDraft,
+  serializeWorkflowDraft,
+  WorkflowDraftTriggerKinds,
+  WorkflowDraftTriggerTypes,
+  WorkflowStudioIdentity,
+} from "../../../domain/workflow-studio/WorkflowStudioDomain";
 
 class InMemoryStudioShellRepository implements IStudioShellRepository {
   private readonly studios = new Map<string, Studio>();
@@ -201,5 +207,198 @@ describe("WorkflowStudioApplicationService", () => {
       draftId: created.draft.id,
       versionId: "workflow-version-taxonomy-mismatch",
     })).rejects.toThrow("input-malformed");
+  });
+
+  it("maps canonical workflow draft content into deterministic execution planning elements", () => {
+    const repository = new InMemoryStudioShellRepository();
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => "generated");
+    const service = new WorkflowStudioApplicationService(studioShell);
+
+    const content = serializeWorkflowDraft({
+      ...createEmptyWorkflowDraft(),
+      triggers: [
+        {
+          id: "trigger-manual",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        },
+        {
+          id: "trigger-temporal",
+          kind: WorkflowDraftTriggerKinds.temporal,
+          type: WorkflowDraftTriggerTypes.temporalRecurring,
+          config: {
+            every: 2,
+            unit: "hours",
+          },
+        },
+      ],
+      steps: [
+        {
+          id: "step-1",
+          type: "action",
+          kind: "action",
+          order: 1,
+        },
+        {
+          id: "step-2",
+          type: "if-then",
+          kind: "control-flow",
+          order: 2,
+          config: {
+            conditionExpression: "inputs.ok",
+            thenStepIds: ["step-3"],
+          },
+        },
+        {
+          id: "step-3",
+          type: "manual-approval",
+          kind: "control-flow",
+          order: 3,
+          config: {
+            prompt: "Approve",
+            interactionMode: "approval",
+            outcomes: {
+              approve: {
+                stepIds: ["step-4"],
+              },
+            },
+          },
+        },
+        {
+          id: "step-4",
+          type: "action",
+          kind: "action",
+          order: 4,
+        },
+      ],
+    });
+
+    const firstPlan = service.planWorkflowDraftExecution({ content });
+    const secondPlan = service.planWorkflowDraftExecution({ content });
+
+    expect(firstPlan.schemaVersion).toBe("ai-loom.workflow-draft-execution-plan.v1");
+    expect(firstPlan.triggers.map((trigger) => trigger.triggerId)).toEqual([
+      "trigger-manual",
+      "trigger-temporal",
+    ]);
+    expect(firstPlan.triggers.map((trigger) => trigger.runtimeKind)).toEqual(["manual", "temporal"]);
+    expect(firstPlan.elements.map((entry) => entry.elementType)).toEqual([
+      "action-step",
+      "built-in.if-then",
+      "built-in.manual-approval",
+      "action-step",
+    ]);
+    expect(firstPlan).toEqual(secondPlan);
+  });
+
+  it("rejects workflow execution planning for malformed or invalid canonical draft content", () => {
+    const repository = new InMemoryStudioShellRepository();
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => "generated");
+    const service = new WorkflowStudioApplicationService(studioShell);
+
+    expect(() => service.planWorkflowDraftExecution({
+      content: "{invalid-json}",
+    })).toThrow("Workflow draft content is malformed");
+
+    expect(() => service.planWorkflowDraftExecution({
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        steps: [
+          {
+            id: "step-manual",
+            type: "manual-approval",
+            kind: "control-flow",
+            order: 2,
+            config: {
+              prompt: "Approve",
+              interactionMode: "approval",
+              outcomes: {
+                approve: {
+                  stepIds: ["step-action"],
+                },
+              },
+            },
+          },
+          {
+            id: "step-action",
+            type: "action",
+            kind: "action",
+            order: 1,
+          },
+        ],
+      }),
+    })).toThrow("built-in-step-reference-order-invalid");
+  });
+
+  it("executes planned built-in workflow steps through runtime with deterministic outputs", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => "generated");
+    const service = new WorkflowStudioApplicationService(studioShell);
+
+    const result = await service.executeWorkflowDraft({
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        steps: [
+          {
+            id: "step-if",
+            type: "if-then",
+            kind: "control-flow",
+            order: 1,
+            config: {
+              conditionExpression: "inputs.score > 0.5",
+              thenStepIds: ["step-approve"],
+              elseStepIds: ["step-reject"],
+            },
+          },
+          {
+            id: "step-approve",
+            type: "manual-approval",
+            kind: "control-flow",
+            order: 2,
+            config: {
+              prompt: "Approve release",
+              interactionMode: "approval",
+              outcomes: {
+                approve: {
+                  stepIds: ["step-delay"],
+                },
+              },
+            },
+          },
+          {
+            id: "step-reject",
+            type: "action",
+            kind: "action",
+            order: 3,
+          },
+          {
+            id: "step-delay",
+            type: "delay-wait",
+            kind: "control-flow",
+            order: 4,
+            config: {
+              durationSeconds: 1,
+            },
+          },
+        ],
+      }),
+      inputs: {
+        score: 0.9,
+      },
+      manualDecisionsByStepId: {
+        "step-approve": {
+          outcome: "approve",
+        },
+      },
+    });
+
+    expect(result.status).toBe("completed");
+    expect(result.traces.filter((entry) => entry.status === "completed").map((entry) => entry.stepId)).toEqual([
+      "step-if",
+      "step-approve",
+      "step-delay",
+    ]);
+    expect(result.traces.some((entry) => entry.stepId === "step-reject" && entry.status === "skipped")).toBeTrue();
   });
 });

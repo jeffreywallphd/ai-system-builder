@@ -2,11 +2,15 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   WorkflowDraftBuiltInStepTypes,
+  WorkflowDraftDelayWaitModes,
+  WorkflowDraftLoopIterationModes,
+  WorkflowDraftManualInteractionModes,
   WorkflowDraftStepTypes,
   type WorkflowDraft,
   type WorkflowDraftDelayWaitStepConfig,
   type WorkflowDraftIfThenStepConfig,
   type WorkflowDraftLoopIterationStepConfig,
+  type WorkflowDraftManualApprovalStepConfig,
   type WorkflowValidationIssue,
 } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
 import { serializeWorkflowDraft } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
@@ -30,6 +34,7 @@ import { AssetSelectorReturnHandoffService } from "../../../studio-shell/asset-s
 import {
   addWorkflowStep,
   buildWorkflowStepTypeDefinitionKey,
+  canMoveWorkflowStep,
   clearWorkflowStepAgentAssetSelection,
   getWorkflowStepTypeDefinitionByKey,
   moveWorkflowStepDown,
@@ -40,9 +45,11 @@ import {
   setWorkflowStepDelayConfig,
   setWorkflowStepIfThenConfig,
   setWorkflowStepLoopConfig,
+  setWorkflowStepManualApprovalConfig,
   setWorkflowStepTitle,
   setWorkflowStepType,
   workflowStepTypeDefinitions,
+  WorkflowStepMoveDirections,
   WorkflowWizardStepSelectionKinds,
 } from "../../../studio-shell/workflow/WorkflowWizardSteps";
 import {
@@ -80,6 +87,36 @@ function buildAgentAssetLabel(asset: { readonly assetId: string; readonly versio
 
 function buildStepTypeBadgeLabel(selectionKind: string): string {
   return selectionKind === WorkflowWizardStepSelectionKinds.assetBacked ? "Asset-backed" : "Built-in";
+}
+
+function buildBuiltInCategoryLabel(category?: string): string {
+  if (category === "control-flow") {
+    return "Control flow";
+  }
+  if (category === "temporal") {
+    return "Temporal";
+  }
+  if (category === "human-interaction") {
+    return "Human interaction";
+  }
+  if (category === "transformation") {
+    return "Transformation";
+  }
+  return "Built-in";
+}
+
+function toDelimitedValues(values?: ReadonlyArray<string>): string {
+  return values?.join(", ") ?? "";
+}
+
+function parseDelimitedValues(raw: string): ReadonlyArray<string> | undefined {
+  const parsed = Array.from(new Set(
+    raw
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0),
+  ));
+  return parsed.length > 0 ? Object.freeze(parsed) : undefined;
 }
 
 function countCompletedStates(state: AssetSelectorSessionState): number {
@@ -201,6 +238,7 @@ export default function WorkflowStudioStepSectionEditor({
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [selectorOperation, setSelectorOperation] = useState<StepSelectorOperation | undefined>(undefined);
   const [selectorReturnTargetId, setSelectorReturnTargetId] = useState<string | undefined>(undefined);
+  const [insertionPosition, setInsertionPosition] = useState("end");
   const lastAppliedCompletedCount = useRef<number | undefined>(undefined);
 
   const stepValidationIssues = useMemo(
@@ -240,6 +278,15 @@ export default function WorkflowStudioStepSectionEditor({
     () => workflowStepTypeDefinitions.filter((definition) => definition.interactive),
     [],
   );
+  const addableAssetBackedDefinitions = useMemo(
+    () => addableDefinitions.filter((definition) => definition.selectionKind === WorkflowWizardStepSelectionKinds.assetBacked),
+    [addableDefinitions],
+  );
+  const addableBuiltInDefinitions = useMemo(
+    () => addableDefinitions.filter((definition) => definition.selectionKind === WorkflowWizardStepSelectionKinds.builtIn),
+    [addableDefinitions],
+  );
+  const insertionAfterStepId = insertionPosition !== "end" ? insertionPosition : undefined;
 
   const openSelector = (operation: StepSelectorOperation, seedSelection?: {
     readonly assetId: string;
@@ -334,6 +381,16 @@ export default function WorkflowStudioStepSectionEditor({
       active = false;
     };
   }, [queryRevision, searchTerm, selectorDataProvider, selectorRequest]);
+
+  useEffect(() => {
+    if (insertionPosition === "end") {
+      return;
+    }
+    const stillAvailable = sharedDraft.steps.some((step) => step.id === insertionPosition);
+    if (!stillAvailable) {
+      setInsertionPosition("end");
+    }
+  }, [insertionPosition, sharedDraft.steps]);
 
   useEffect(() => {
     const expectedOperation = selectorOperation ?? parseStepSelectorOperationFromSearch(location.search, sharedDraft);
@@ -477,7 +534,9 @@ export default function WorkflowStudioStepSectionEditor({
         }).draft;
       }
 
-      const added = addWorkflowStep(draft, defaultAgentAssistantStepDefinition);
+      const added = addWorkflowStep(draft, defaultAgentAssistantStepDefinition, {
+        afterStepId: insertionAfterStepId,
+      });
       return setWorkflowStepAgentAssetSelection(added.draft, added.stepId, {
         assetId: selectedAsset.assetId,
         versionId: selectedAsset.versionId,
@@ -487,7 +546,7 @@ export default function WorkflowStudioStepSectionEditor({
 
     closeSelector();
     setSelectorReturnTargetId(undefined);
-  }, [location.search, onUpdateSharedDraft, selectorOperation, selectorReturnTargetId, selectorState, sharedDraft]);
+  }, [insertionAfterStepId, location.search, onUpdateSharedDraft, selectorOperation, selectorReturnTargetId, selectorState, sharedDraft]);
 
   const stateForShell = selectorState ?? selectorSessionStore.getSession(selectorSessionKey);
 
@@ -500,30 +559,76 @@ export default function WorkflowStudioStepSectionEditor({
       <SectionBody>
         <div className="ui-text-small">{buildSectionSummary(sharedDraft.steps.length, "step", "steps")}</div>
 
-        <div className="ui-card ui-card--padded ui-stack ui-stack--2xs">
+        <div className="ui-card ui-card--padded ui-stack ui-stack--sm">
           <strong>Add step</strong>
-          <div className="ui-row ui-row--wrap" style={{ gap: "0.5rem" }}>
-            {addableDefinitions.map((definition) => (
+          <p className="ui-text-small ui-text-secondary">
+            Select either an asset-backed action or a built-in workflow-native action.
+          </p>
+          <label className="ui-stack ui-stack--2xs">
+            <span className="ui-text-small">Insertion point</span>
+            <select
+              className="ui-select"
+              value={insertionPosition}
+              onChange={(event) => setInsertionPosition(event.target.value)}
+              data-testid="workflow-step-insertion-position"
+            >
+              <option value="end">Append to end</option>
+              {sharedDraft.steps.map((step, index) => (
+                <option key={step.id} value={step.id}>
+                  After {index + 1}. {step.title?.trim() || step.id}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="ui-form-grid ui-form-grid--single">
+            {addableAssetBackedDefinitions.map((definition) => (
               <button
                 key={buildWorkflowStepTypeDefinitionKey(definition)}
                 type="button"
-                className="ui-button ui-button--sm"
+                className="ui-button ui-button--ghost workflow-step-selector-option"
                 data-testid={`workflow-step-add-${buildWorkflowStepTypeDefinitionKey(definition)}`}
                 disabled={!onUpdateSharedDraft}
                 onClick={() => {
                   if (!onUpdateSharedDraft) {
                     return;
                   }
-                  if (definition.type === WorkflowDraftStepTypes.agentAssistant) {
-                    openSelector(Object.freeze({ kind: "add" } as const));
-                    return;
-                  }
-                  onUpdateSharedDraft((draft) => addWorkflowStep(draft, definition).draft);
+                  openSelector(Object.freeze({ kind: "add" } as const));
                 }}
               >
-                {definition.label}
+                <span className="workflow-step-selector-option__header">
+                  <strong>{definition.label}</strong>
+                  <span className="ui-text-small ui-text-secondary">Asset-backed</span>
+                </span>
+                <span className="ui-text-small ui-text-secondary">{definition.summary}</span>
               </button>
             ))}
+            {addableBuiltInDefinitions.map((definition) => (
+              <button
+                key={buildWorkflowStepTypeDefinitionKey(definition)}
+                type="button"
+                className="ui-button ui-button--ghost workflow-step-selector-option"
+                data-testid={`workflow-step-add-${buildWorkflowStepTypeDefinitionKey(definition)}`}
+                disabled={!onUpdateSharedDraft}
+                onClick={() => {
+                  if (!onUpdateSharedDraft) {
+                    return;
+                  }
+                  onUpdateSharedDraft((draft) => addWorkflowStep(draft, definition, {
+                    afterStepId: insertionAfterStepId,
+                  }).draft);
+                }}
+              >
+                <span className="workflow-step-selector-option__header">
+                  <strong>{definition.label}</strong>
+                  <span className="ui-text-small ui-text-secondary">
+                    Built-in - {buildBuiltInCategoryLabel(definition.builtInCategory)}
+                  </span>
+                </span>
+                <span className="ui-text-small ui-text-secondary">{definition.summary}</span>
+              </button>
+            ))}
+          </div>
+          <div className="ui-row ui-row--wrap workflow-step-controls-row">
             {selectorOpen ? (
               <button
                 type="button"
@@ -652,10 +757,13 @@ export default function WorkflowStudioStepSectionEditor({
                   className="ui-card ui-card--padded ui-stack ui-stack--2xs"
                   data-testid={`workflow-step-row-${index}`}
                 >
-                  <div className="ui-row ui-row--between ui-row--wrap" style={{ gap: "0.5rem" }}>
+                  <div className="ui-row ui-row--between ui-row--wrap workflow-step-controls-row">
                     <strong>{step.title || `Step ${index + 1}`}</strong>
                     <span className="ui-text-small ui-text-secondary">
                       {buildStepTypeBadgeLabel(stepDefinition.selectionKind)} - {stepDefinition.label}
+                      {stepDefinition.selectionKind === WorkflowWizardStepSelectionKinds.builtIn
+                        ? ` (${buildBuiltInCategoryLabel(stepDefinition.builtInCategory)})`
+                        : ""}
                     </span>
                   </div>
 
@@ -682,7 +790,9 @@ export default function WorkflowStudioStepSectionEditor({
                           key={buildWorkflowStepTypeDefinitionKey(definition)}
                           value={buildWorkflowStepTypeDefinitionKey(definition)}
                         >
-                          {definition.label}
+                          {definition.selectionKind === WorkflowWizardStepSelectionKinds.builtIn
+                            ? `Built-in - ${definition.label}`
+                            : definition.label}
                         </option>
                       ))}
                     </select>
@@ -721,7 +831,7 @@ export default function WorkflowStudioStepSectionEditor({
                         ) : null}
                       </div>
 
-                      <div className="ui-row ui-row--wrap" style={{ gap: "0.5rem" }}>
+                      <div className="ui-row ui-row--wrap workflow-step-controls-row">
                         <button
                           type="button"
                           className="ui-button ui-button--ghost ui-button--sm"
@@ -765,111 +875,646 @@ export default function WorkflowStudioStepSectionEditor({
 
                   {step.type === WorkflowDraftBuiltInStepTypes.ifThen ? (
                     <div className="ui-stack ui-stack--2xs" data-testid={`workflow-step-if-config-${index}`}>
-                      <label className="ui-stack ui-stack--2xs">
-                        <span className="ui-text-small">Condition expression</span>
-                        <input
-                          className="ui-input"
-                          data-testid={`workflow-step-if-condition-${index}`}
-                          value={ifThenConfig.conditionExpression ?? ""}
-                          onChange={(event) => {
-                            if (!onUpdateSharedDraft) {
-                              return;
-                            }
-                            onUpdateSharedDraft((draft) => setWorkflowStepIfThenConfig(draft, step.id, {
-                              conditionExpression: event.target.value,
-                            }).draft);
-                          }}
-                        />
-                      </label>
-                      <label className="ui-stack ui-stack--2xs">
-                        <span className="ui-text-small">Then label (optional)</span>
-                        <input
-                          className="ui-input"
-                          data-testid={`workflow-step-if-then-label-${index}`}
-                          value={ifThenConfig.thenLabel ?? ""}
-                          onChange={(event) => {
-                            if (!onUpdateSharedDraft) {
-                              return;
-                            }
-                            onUpdateSharedDraft((draft) => setWorkflowStepIfThenConfig(draft, step.id, {
-                              thenLabel: event.target.value,
-                            }).draft);
-                          }}
-                        />
-                      </label>
-                      <label className="ui-stack ui-stack--2xs">
-                        <span className="ui-text-small">Else label (optional)</span>
-                        <input
-                          className="ui-input"
-                          data-testid={`workflow-step-if-else-label-${index}`}
-                          value={ifThenConfig.elseLabel ?? ""}
-                          onChange={(event) => {
-                            if (!onUpdateSharedDraft) {
-                              return;
-                            }
-                            onUpdateSharedDraft((draft) => setWorkflowStepIfThenConfig(draft, step.id, {
-                              elseLabel: event.target.value,
-                            }).draft);
-                          }}
-                        />
-                      </label>
+                      <div className="ui-form-grid ui-form-grid--single">
+                        <label className="ui-stack ui-stack--2xs">
+                          <span className="ui-text-small">Condition expression</span>
+                          <input
+                            className="ui-input"
+                            data-testid={`workflow-step-if-condition-${index}`}
+                            value={ifThenConfig.conditionExpression ?? ""}
+                            onChange={(event) => {
+                              if (!onUpdateSharedDraft) {
+                                return;
+                              }
+                              onUpdateSharedDraft((draft) => setWorkflowStepIfThenConfig(draft, step.id, {
+                                conditionExpression: event.target.value,
+                              }).draft);
+                            }}
+                          />
+                        </label>
+                        <label className="ui-stack ui-stack--2xs">
+                          <span className="ui-text-small">Then label (optional)</span>
+                          <input
+                            className="ui-input"
+                            data-testid={`workflow-step-if-then-label-${index}`}
+                            value={ifThenConfig.thenLabel ?? ""}
+                            onChange={(event) => {
+                              if (!onUpdateSharedDraft) {
+                                return;
+                              }
+                              onUpdateSharedDraft((draft) => setWorkflowStepIfThenConfig(draft, step.id, {
+                                thenLabel: event.target.value,
+                              }).draft);
+                            }}
+                          />
+                        </label>
+                        <label className="ui-stack ui-stack--2xs">
+                          <span className="ui-text-small">Then branch step IDs (comma-separated)</span>
+                          <input
+                            className="ui-input"
+                            data-testid={`workflow-step-if-then-step-ids-${index}`}
+                            value={toDelimitedValues(ifThenConfig.thenStepIds)}
+                            onChange={(event) => {
+                              if (!onUpdateSharedDraft) {
+                                return;
+                              }
+                              onUpdateSharedDraft((draft) => setWorkflowStepIfThenConfig(draft, step.id, {
+                                thenStepIds: parseDelimitedValues(event.target.value),
+                              }).draft);
+                            }}
+                          />
+                        </label>
+                        <label className="ui-stack ui-stack--2xs">
+                          <span className="ui-text-small">Else label (optional)</span>
+                          <input
+                            className="ui-input"
+                            data-testid={`workflow-step-if-else-label-${index}`}
+                            value={ifThenConfig.elseLabel ?? ""}
+                            onChange={(event) => {
+                              if (!onUpdateSharedDraft) {
+                                return;
+                              }
+                              onUpdateSharedDraft((draft) => setWorkflowStepIfThenConfig(draft, step.id, {
+                                elseLabel: event.target.value,
+                              }).draft);
+                            }}
+                          />
+                        </label>
+                        <label className="ui-stack ui-stack--2xs">
+                          <span className="ui-text-small">Else branch step IDs (comma-separated)</span>
+                          <input
+                            className="ui-input"
+                            data-testid={`workflow-step-if-else-step-ids-${index}`}
+                            value={toDelimitedValues(ifThenConfig.elseStepIds)}
+                            onChange={(event) => {
+                              if (!onUpdateSharedDraft) {
+                                return;
+                              }
+                              onUpdateSharedDraft((draft) => setWorkflowStepIfThenConfig(draft, step.id, {
+                                elseStepIds: parseDelimitedValues(event.target.value),
+                              }).draft);
+                            }}
+                          />
+                        </label>
+                      </div>
                     </div>
                   ) : null}
 
                   {step.type === WorkflowDraftBuiltInStepTypes.loopIteration ? (
                     <div className="ui-stack ui-stack--2xs" data-testid={`workflow-step-loop-config-${index}`}>
-                      <label className="ui-stack ui-stack--2xs">
-                        <span className="ui-text-small">Repeat count</span>
-                        <input
-                          className="ui-input"
-                          type="number"
-                          min={1}
-                          data-testid={`workflow-step-loop-repeat-${index}`}
-                          value={String(loopConfig.repeatCount ?? "")}
-                          onChange={(event) => {
-                            if (!onUpdateSharedDraft) {
-                              return;
-                            }
-                            const parsed = Number.parseInt(event.target.value, 10);
-                            onUpdateSharedDraft((draft) => setWorkflowStepLoopConfig(draft, step.id, {
-                              repeatCount: Number.isFinite(parsed) && parsed > 0 ? parsed : undefined,
-                            }).draft);
-                          }}
-                        />
-                      </label>
+                      <div className="ui-form-grid">
+                        <label className="ui-stack ui-stack--2xs">
+                          <span className="ui-text-small">Iteration mode</span>
+                          <select
+                            className="ui-select"
+                            data-testid={`workflow-step-loop-mode-${index}`}
+                            value={loopConfig.mode ?? WorkflowDraftLoopIterationModes.fixedCount}
+                            onChange={(event) => {
+                              if (!onUpdateSharedDraft) {
+                                return;
+                              }
+                              onUpdateSharedDraft((draft) => setWorkflowStepLoopConfig(draft, step.id, {
+                                mode: event.target.value as WorkflowDraftLoopIterationStepConfig["mode"],
+                              }).draft);
+                            }}
+                          >
+                            <option value={WorkflowDraftLoopIterationModes.fixedCount}>Fixed count</option>
+                            <option value={WorkflowDraftLoopIterationModes.collection}>Collection</option>
+                            <option value={WorkflowDraftLoopIterationModes.range}>Range</option>
+                          </select>
+                        </label>
+
+                        {loopConfig.mode === WorkflowDraftLoopIterationModes.fixedCount ? (
+                          <label className="ui-stack ui-stack--2xs">
+                            <span className="ui-text-small">Repeat count</span>
+                            <input
+                              className="ui-input"
+                              type="number"
+                              min={1}
+                              data-testid={`workflow-step-loop-repeat-${index}`}
+                              value={String(loopConfig.repeatCount ?? "")}
+                              onChange={(event) => {
+                                if (!onUpdateSharedDraft) {
+                                  return;
+                                }
+                                const parsed = Number.parseInt(event.target.value, 10);
+                                onUpdateSharedDraft((draft) => setWorkflowStepLoopConfig(draft, step.id, {
+                                  repeatCount: Number.isFinite(parsed) && parsed > 0 ? parsed : undefined,
+                                }).draft);
+                              }}
+                            />
+                          </label>
+                        ) : null}
+
+                        {loopConfig.mode === WorkflowDraftLoopIterationModes.collection ? (
+                          <>
+                            <label className="ui-stack ui-stack--2xs">
+                              <span className="ui-text-small">Collection input key</span>
+                              <input
+                                className="ui-input"
+                                data-testid={`workflow-step-loop-collection-input-${index}`}
+                                value={loopConfig.collectionInputKey ?? ""}
+                                onChange={(event) => {
+                                  if (!onUpdateSharedDraft) {
+                                    return;
+                                  }
+                                  onUpdateSharedDraft((draft) => setWorkflowStepLoopConfig(draft, step.id, {
+                                    collectionInputKey: event.target.value,
+                                  }).draft);
+                                }}
+                              />
+                            </label>
+                            <label className="ui-stack ui-stack--2xs">
+                              <span className="ui-text-small">Item alias (optional)</span>
+                              <input
+                                className="ui-input"
+                                data-testid={`workflow-step-loop-item-alias-${index}`}
+                                value={loopConfig.itemAlias ?? ""}
+                                onChange={(event) => {
+                                  if (!onUpdateSharedDraft) {
+                                    return;
+                                  }
+                                  onUpdateSharedDraft((draft) => setWorkflowStepLoopConfig(draft, step.id, {
+                                    itemAlias: event.target.value,
+                                  }).draft);
+                                }}
+                              />
+                            </label>
+                          </>
+                        ) : null}
+
+                        {loopConfig.mode === WorkflowDraftLoopIterationModes.range ? (
+                          <>
+                            <label className="ui-stack ui-stack--2xs">
+                              <span className="ui-text-small">Range start</span>
+                              <input
+                                className="ui-input"
+                                type="number"
+                                data-testid={`workflow-step-loop-range-start-${index}`}
+                                value={String(loopConfig.range?.start ?? "")}
+                                onChange={(event) => {
+                                  if (!onUpdateSharedDraft) {
+                                    return;
+                                  }
+                                  const parsed = Number.parseInt(event.target.value, 10);
+                                  onUpdateSharedDraft((draft) => setWorkflowStepLoopConfig(draft, step.id, {
+                                    rangeStart: Number.isFinite(parsed) ? parsed : undefined,
+                                  }).draft);
+                                }}
+                              />
+                            </label>
+                            <label className="ui-stack ui-stack--2xs">
+                              <span className="ui-text-small">Range end</span>
+                              <input
+                                className="ui-input"
+                                type="number"
+                                data-testid={`workflow-step-loop-range-end-${index}`}
+                                value={String(loopConfig.range?.end ?? "")}
+                                onChange={(event) => {
+                                  if (!onUpdateSharedDraft) {
+                                    return;
+                                  }
+                                  const parsed = Number.parseInt(event.target.value, 10);
+                                  onUpdateSharedDraft((draft) => setWorkflowStepLoopConfig(draft, step.id, {
+                                    rangeEnd: Number.isFinite(parsed) ? parsed : undefined,
+                                  }).draft);
+                                }}
+                              />
+                            </label>
+                            <label className="ui-stack ui-stack--2xs">
+                              <span className="ui-text-small">Range step (optional)</span>
+                              <input
+                                className="ui-input"
+                                type="number"
+                                min={1}
+                                data-testid={`workflow-step-loop-range-step-${index}`}
+                                value={String(loopConfig.range?.step ?? "")}
+                                onChange={(event) => {
+                                  if (!onUpdateSharedDraft) {
+                                    return;
+                                  }
+                                  const parsed = Number.parseInt(event.target.value, 10);
+                                  onUpdateSharedDraft((draft) => setWorkflowStepLoopConfig(draft, step.id, {
+                                    rangeStep: Number.isFinite(parsed) && parsed > 0 ? parsed : undefined,
+                                  }).draft);
+                                }}
+                              />
+                            </label>
+                          </>
+                        ) : null}
+
+                        <label className="ui-stack ui-stack--2xs">
+                          <span className="ui-text-small">Exit condition expression (optional)</span>
+                          <input
+                            className="ui-input"
+                            data-testid={`workflow-step-loop-condition-${index}`}
+                            value={loopConfig.loopConditionExpression ?? ""}
+                            onChange={(event) => {
+                              if (!onUpdateSharedDraft) {
+                                return;
+                              }
+                              onUpdateSharedDraft((draft) => setWorkflowStepLoopConfig(draft, step.id, {
+                                loopConditionExpression: event.target.value,
+                              }).draft);
+                            }}
+                          />
+                        </label>
+
+                        <label className="ui-stack ui-stack--2xs">
+                          <span className="ui-text-small">Loop label (optional)</span>
+                          <input
+                            className="ui-input"
+                            data-testid={`workflow-step-loop-label-${index}`}
+                            value={loopConfig.loopLabel ?? ""}
+                            onChange={(event) => {
+                              if (!onUpdateSharedDraft) {
+                                return;
+                              }
+                              onUpdateSharedDraft((draft) => setWorkflowStepLoopConfig(draft, step.id, {
+                                loopLabel: event.target.value,
+                              }).draft);
+                            }}
+                          />
+                        </label>
+
+                        <label className="ui-stack ui-stack--2xs">
+                          <span className="ui-text-small">Loop body step IDs (comma-separated)</span>
+                          <input
+                            className="ui-input"
+                            data-testid={`workflow-step-loop-body-step-ids-${index}`}
+                            value={toDelimitedValues(loopConfig.bodyStepIds)}
+                            onChange={(event) => {
+                              if (!onUpdateSharedDraft) {
+                                return;
+                              }
+                              onUpdateSharedDraft((draft) => setWorkflowStepLoopConfig(draft, step.id, {
+                                bodyStepIds: parseDelimitedValues(event.target.value),
+                              }).draft);
+                            }}
+                          />
+                        </label>
+
+                        <label className="ui-stack ui-stack--2xs">
+                          <span className="ui-text-small">Max iterations (optional)</span>
+                          <input
+                            className="ui-input"
+                            type="number"
+                            min={1}
+                            data-testid={`workflow-step-loop-max-iterations-${index}`}
+                            value={String(loopConfig.maxIterations ?? "")}
+                            onChange={(event) => {
+                              if (!onUpdateSharedDraft) {
+                                return;
+                              }
+                              const parsed = Number.parseInt(event.target.value, 10);
+                              onUpdateSharedDraft((draft) => setWorkflowStepLoopConfig(draft, step.id, {
+                                maxIterations: Number.isFinite(parsed) && parsed > 0 ? parsed : undefined,
+                              }).draft);
+                            }}
+                          />
+                        </label>
+                      </div>
                     </div>
                   ) : null}
 
                   {step.type === WorkflowDraftBuiltInStepTypes.delayWait ? (
                     <div className="ui-stack ui-stack--2xs" data-testid={`workflow-step-delay-config-${index}`}>
-                      <label className="ui-stack ui-stack--2xs">
-                        <span className="ui-text-small">Duration (seconds)</span>
-                        <input
-                          className="ui-input"
-                          type="number"
-                          min={1}
-                          data-testid={`workflow-step-delay-duration-${index}`}
-                          value={String(delayConfig.durationSeconds ?? "")}
-                          onChange={(event) => {
-                            if (!onUpdateSharedDraft) {
-                              return;
-                            }
-                            const parsed = Number.parseInt(event.target.value, 10);
-                            onUpdateSharedDraft((draft) => setWorkflowStepDelayConfig(draft, step.id, {
-                              durationSeconds: Number.isFinite(parsed) && parsed > 0 ? parsed : undefined,
-                            }).draft);
-                          }}
-                        />
-                      </label>
+                      <div className="ui-form-grid">
+                        <label className="ui-stack ui-stack--2xs">
+                          <span className="ui-text-small">Wait mode</span>
+                          <select
+                            className="ui-select"
+                            data-testid={`workflow-step-delay-mode-${index}`}
+                            value={delayConfig.mode ?? WorkflowDraftDelayWaitModes.duration}
+                            onChange={(event) => {
+                              if (!onUpdateSharedDraft) {
+                                return;
+                              }
+                              onUpdateSharedDraft((draft) => setWorkflowStepDelayConfig(draft, step.id, {
+                                mode: event.target.value as WorkflowDraftDelayWaitStepConfig["mode"],
+                              }).draft);
+                            }}
+                          >
+                            <option value={WorkflowDraftDelayWaitModes.duration}>Duration</option>
+                            <option value={WorkflowDraftDelayWaitModes.untilTime}>Until time</option>
+                          </select>
+                        </label>
+
+                        {delayConfig.mode === WorkflowDraftDelayWaitModes.duration ? (
+                          <label className="ui-stack ui-stack--2xs">
+                            <span className="ui-text-small">Duration (seconds)</span>
+                            <input
+                              className="ui-input"
+                              type="number"
+                              min={1}
+                              data-testid={`workflow-step-delay-duration-${index}`}
+                              value={String(delayConfig.durationSeconds ?? "")}
+                              onChange={(event) => {
+                                if (!onUpdateSharedDraft) {
+                                  return;
+                                }
+                                const parsed = Number.parseInt(event.target.value, 10);
+                                onUpdateSharedDraft((draft) => setWorkflowStepDelayConfig(draft, step.id, {
+                                  durationSeconds: Number.isFinite(parsed) && parsed > 0 ? parsed : undefined,
+                                }).draft);
+                              }}
+                            />
+                          </label>
+                        ) : null}
+
+                        {delayConfig.mode === WorkflowDraftDelayWaitModes.untilTime ? (
+                          <>
+                            <label className="ui-stack ui-stack--2xs">
+                              <span className="ui-text-small">Wait until (ISO timestamp)</span>
+                              <input
+                                className="ui-input"
+                                data-testid={`workflow-step-delay-wait-until-${index}`}
+                                value={delayConfig.waitUntil ?? ""}
+                                onChange={(event) => {
+                                  if (!onUpdateSharedDraft) {
+                                    return;
+                                  }
+                                  onUpdateSharedDraft((draft) => setWorkflowStepDelayConfig(draft, step.id, {
+                                    waitUntil: event.target.value,
+                                  }).draft);
+                                }}
+                              />
+                            </label>
+                            <label className="ui-stack ui-stack--2xs">
+                              <span className="ui-text-small">Timezone (optional)</span>
+                              <input
+                                className="ui-input"
+                                data-testid={`workflow-step-delay-timezone-${index}`}
+                                value={delayConfig.until?.timezone ?? ""}
+                                onChange={(event) => {
+                                  if (!onUpdateSharedDraft) {
+                                    return;
+                                  }
+                                  onUpdateSharedDraft((draft) => setWorkflowStepDelayConfig(draft, step.id, {
+                                    timezone: event.target.value,
+                                  }).draft);
+                                }}
+                              />
+                            </label>
+                          </>
+                        ) : null}
+
+                        <label className="ui-stack ui-stack--2xs">
+                          <span className="ui-text-small">Note (optional)</span>
+                          <input
+                            className="ui-input"
+                            data-testid={`workflow-step-delay-note-${index}`}
+                            value={delayConfig.note ?? ""}
+                            onChange={(event) => {
+                              if (!onUpdateSharedDraft) {
+                                return;
+                              }
+                              onUpdateSharedDraft((draft) => setWorkflowStepDelayConfig(draft, step.id, {
+                                note: event.target.value,
+                              }).draft);
+                            }}
+                          />
+                        </label>
+                      </div>
                     </div>
                   ) : null}
 
-                  <div className="ui-row ui-row--wrap" style={{ gap: "0.5rem" }}>
+                  {step.type === WorkflowDraftBuiltInStepTypes.manualApproval ? (
+                    <div className="ui-stack ui-stack--2xs" data-testid={`workflow-step-manual-config-${index}`}>
+                      {(() => {
+                        const manualConfig = (step.config ?? {}) as WorkflowDraftManualApprovalStepConfig;
+                        return (
+                          <div className="ui-form-grid">
+                            <label className="ui-stack ui-stack--2xs">
+                              <span className="ui-text-small">Prompt / instruction</span>
+                              <textarea
+                                className="ui-textarea"
+                                rows={3}
+                                data-testid={`workflow-step-manual-prompt-${index}`}
+                                value={manualConfig.prompt ?? ""}
+                                onChange={(event) => {
+                                  if (!onUpdateSharedDraft) {
+                                    return;
+                                  }
+                                  onUpdateSharedDraft((draft) => setWorkflowStepManualApprovalConfig(draft, step.id, {
+                                    prompt: event.target.value,
+                                  }).draft);
+                                }}
+                              />
+                            </label>
+
+                            <label className="ui-stack ui-stack--2xs">
+                              <span className="ui-text-small">Interaction mode</span>
+                              <select
+                                className="ui-select"
+                                data-testid={`workflow-step-manual-mode-${index}`}
+                                value={manualConfig.interactionMode ?? WorkflowDraftManualInteractionModes.approval}
+                                onChange={(event) => {
+                                  if (!onUpdateSharedDraft) {
+                                    return;
+                                  }
+                                  onUpdateSharedDraft((draft) => setWorkflowStepManualApprovalConfig(draft, step.id, {
+                                    interactionMode: event.target.value as WorkflowDraftManualApprovalStepConfig["interactionMode"],
+                                  }).draft);
+                                }}
+                              >
+                                <option value={WorkflowDraftManualInteractionModes.approval}>Approval</option>
+                                <option value={WorkflowDraftManualInteractionModes.review}>Review</option>
+                              </select>
+                            </label>
+
+                            {manualConfig.interactionMode === WorkflowDraftManualInteractionModes.review ? (
+                              <>
+                                <label className="ui-stack ui-stack--2xs">
+                                  <span className="ui-text-small">Continue outcome label</span>
+                                  <input
+                                    className="ui-input"
+                                    data-testid={`workflow-step-manual-continue-label-${index}`}
+                                    value={manualConfig.outcomes.continue?.label ?? ""}
+                                    onChange={(event) => {
+                                      if (!onUpdateSharedDraft) {
+                                        return;
+                                      }
+                                      onUpdateSharedDraft((draft) => setWorkflowStepManualApprovalConfig(draft, step.id, {
+                                        continueLabel: event.target.value,
+                                      }).draft);
+                                    }}
+                                  />
+                                </label>
+                                <label className="ui-stack ui-stack--2xs">
+                                  <span className="ui-text-small">Continue outcome step IDs (comma-separated)</span>
+                                  <input
+                                    className="ui-input"
+                                    data-testid={`workflow-step-manual-continue-step-ids-${index}`}
+                                    value={toDelimitedValues(manualConfig.outcomes.continue?.stepIds)}
+                                    onChange={(event) => {
+                                      if (!onUpdateSharedDraft) {
+                                        return;
+                                      }
+                                      onUpdateSharedDraft((draft) => setWorkflowStepManualApprovalConfig(draft, step.id, {
+                                        continueStepIds: parseDelimitedValues(event.target.value),
+                                      }).draft);
+                                    }}
+                                  />
+                                </label>
+                              </>
+                            ) : (
+                              <>
+                                <label className="ui-stack ui-stack--2xs">
+                                  <span className="ui-text-small">Approve outcome label</span>
+                                  <input
+                                    className="ui-input"
+                                    data-testid={`workflow-step-manual-approve-label-${index}`}
+                                    value={manualConfig.outcomes.approve?.label ?? ""}
+                                    onChange={(event) => {
+                                      if (!onUpdateSharedDraft) {
+                                        return;
+                                      }
+                                      onUpdateSharedDraft((draft) => setWorkflowStepManualApprovalConfig(draft, step.id, {
+                                        approveLabel: event.target.value,
+                                      }).draft);
+                                    }}
+                                  />
+                                </label>
+                                <label className="ui-stack ui-stack--2xs">
+                                  <span className="ui-text-small">Approve outcome step IDs (comma-separated)</span>
+                                  <input
+                                    className="ui-input"
+                                    data-testid={`workflow-step-manual-approve-step-ids-${index}`}
+                                    value={toDelimitedValues(manualConfig.outcomes.approve?.stepIds)}
+                                    onChange={(event) => {
+                                      if (!onUpdateSharedDraft) {
+                                        return;
+                                      }
+                                      onUpdateSharedDraft((draft) => setWorkflowStepManualApprovalConfig(draft, step.id, {
+                                        approveStepIds: parseDelimitedValues(event.target.value),
+                                      }).draft);
+                                    }}
+                                  />
+                                </label>
+                                <label className="ui-stack ui-stack--2xs">
+                                  <span className="ui-text-small">Reject outcome label</span>
+                                  <input
+                                    className="ui-input"
+                                    data-testid={`workflow-step-manual-reject-label-${index}`}
+                                    value={manualConfig.outcomes.reject?.label ?? ""}
+                                    onChange={(event) => {
+                                      if (!onUpdateSharedDraft) {
+                                        return;
+                                      }
+                                      onUpdateSharedDraft((draft) => setWorkflowStepManualApprovalConfig(draft, step.id, {
+                                        rejectLabel: event.target.value,
+                                      }).draft);
+                                    }}
+                                  />
+                                </label>
+                                <label className="ui-stack ui-stack--2xs">
+                                  <span className="ui-text-small">Reject outcome step IDs (comma-separated)</span>
+                                  <input
+                                    className="ui-input"
+                                    data-testid={`workflow-step-manual-reject-step-ids-${index}`}
+                                    value={toDelimitedValues(manualConfig.outcomes.reject?.stepIds)}
+                                    onChange={(event) => {
+                                      if (!onUpdateSharedDraft) {
+                                        return;
+                                      }
+                                      onUpdateSharedDraft((draft) => setWorkflowStepManualApprovalConfig(draft, step.id, {
+                                        rejectStepIds: parseDelimitedValues(event.target.value),
+                                      }).draft);
+                                    }}
+                                  />
+                                </label>
+                              </>
+                            )}
+
+                            <label className="ui-stack ui-stack--2xs">
+                              <span className="ui-text-small">Required approver roles (comma-separated)</span>
+                              <input
+                                className="ui-input"
+                                data-testid={`workflow-step-manual-roles-${index}`}
+                                value={toDelimitedValues(manualConfig.requiredApproverRoles)}
+                                onChange={(event) => {
+                                  if (!onUpdateSharedDraft) {
+                                    return;
+                                  }
+                                  onUpdateSharedDraft((draft) => setWorkflowStepManualApprovalConfig(draft, step.id, {
+                                    requiredApproverRoles: parseDelimitedValues(event.target.value),
+                                  }).draft);
+                                }}
+                              />
+                            </label>
+
+                            <label className="ui-stack ui-stack--2xs">
+                              <span className="ui-text-small">Timeout (seconds, optional)</span>
+                              <input
+                                className="ui-input"
+                                type="number"
+                                min={1}
+                                data-testid={`workflow-step-manual-timeout-${index}`}
+                                value={String(manualConfig.timeoutSeconds ?? "")}
+                                onChange={(event) => {
+                                  if (!onUpdateSharedDraft) {
+                                    return;
+                                  }
+                                  const parsed = Number.parseInt(event.target.value, 10);
+                                  onUpdateSharedDraft((draft) => setWorkflowStepManualApprovalConfig(draft, step.id, {
+                                    timeoutSeconds: Number.isFinite(parsed) && parsed > 0 ? parsed : undefined,
+                                  }).draft);
+                                }}
+                              />
+                            </label>
+
+                            <label className="ui-stack ui-stack--2xs">
+                              <span className="ui-text-small">On timeout</span>
+                              <select
+                                className="ui-select"
+                                data-testid={`workflow-step-manual-on-timeout-${index}`}
+                                value={manualConfig.onTimeout ?? ""}
+                                onChange={(event) => {
+                                  if (!onUpdateSharedDraft) {
+                                    return;
+                                  }
+                                  onUpdateSharedDraft((draft) => setWorkflowStepManualApprovalConfig(draft, step.id, {
+                                    onTimeout: event.target.value as "reject" | "continue" | "escalate" | "",
+                                  }).draft);
+                                }}
+                              >
+                                <option value="">None</option>
+                                <option value="reject">Reject</option>
+                                <option value="continue">Continue</option>
+                                <option value="escalate">Escalate</option>
+                              </select>
+                            </label>
+
+                            <label className="ui-row ui-row--start workflow-step-checkbox-field">
+                              <input
+                                className="ui-checkbox"
+                                type="checkbox"
+                                data-testid={`workflow-step-manual-allow-self-approval-${index}`}
+                                checked={manualConfig.allowSelfApproval ?? false}
+                                onChange={(event) => {
+                                  if (!onUpdateSharedDraft) {
+                                    return;
+                                  }
+                                  onUpdateSharedDraft((draft) => setWorkflowStepManualApprovalConfig(draft, step.id, {
+                                    allowSelfApproval: event.target.checked,
+                                  }).draft);
+                                }}
+                              />
+                              <span className="ui-text-small">Allow self approval</span>
+                            </label>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  ) : null}
+
+                  <div className="ui-row ui-row--wrap workflow-step-controls-row">
                     <button
                       type="button"
                       className="ui-button ui-button--ghost ui-button--sm"
                       data-testid={`workflow-step-move-up-${index}`}
-                      disabled={!onUpdateSharedDraft || index === 0}
+                      disabled={!onUpdateSharedDraft || !canMoveWorkflowStep(sharedDraft, step.id, WorkflowStepMoveDirections.up)}
                       onClick={() => {
                         if (!onUpdateSharedDraft) {
                           return;
@@ -883,7 +1528,7 @@ export default function WorkflowStudioStepSectionEditor({
                       type="button"
                       className="ui-button ui-button--ghost ui-button--sm"
                       data-testid={`workflow-step-move-down-${index}`}
-                      disabled={!onUpdateSharedDraft || index >= sharedDraft.steps.length - 1}
+                      disabled={!onUpdateSharedDraft || !canMoveWorkflowStep(sharedDraft, step.id, WorkflowStepMoveDirections.down)}
                       onClick={() => {
                         if (!onUpdateSharedDraft) {
                           return;

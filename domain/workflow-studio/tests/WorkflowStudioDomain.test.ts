@@ -12,6 +12,14 @@ import {
   mapWorkflowEntityFromPersistenceRecord,
   mapWorkflowEntityToPersistenceRecord,
   normalizeWorkflowDraft,
+  normalizeWorkflowDraftTriggerConfig,
+  listWorkflowDraftBuiltInStepDefinitions,
+  listWorkflowDraftTriggerDefinitions,
+  getWorkflowDraftBuiltInStepDefinition,
+  getWorkflowDraftTriggerDefinition,
+  isWorkflowDraftBuiltInStep,
+  isWorkflowDraftBuiltInStepType,
+  isWorkflowDraftTriggerType,
   serializeWorkflowEntity,
   serializeWorkflowDraft,
   serializeWorkflowDraftDocument,
@@ -20,6 +28,7 @@ import {
   validateWorkflowEntity,
   WorkflowDraftAssetReferenceKinds,
   WorkflowDraftBuiltInStepTypes,
+  WorkflowDraftBuiltInStepCategories,
   WorkflowDraftInputSourceTypes,
   WorkflowDraftOutputDestinationTypes,
   WorkflowDraftOutputFormats,
@@ -28,7 +37,9 @@ import {
   WorkflowDraftStepKinds,
   WorkflowDraftStepTypes,
   WorkflowDraftTriggerKinds,
+  WorkflowDraftTemporalScheduleModes,
   WorkflowDraftTriggerTypes,
+  WorkflowDraftUserTriggerScopes,
   WorkflowLifecycleStates,
   WorkflowValidationIssueCodes,
   WorkflowStudioIdentity,
@@ -197,6 +208,94 @@ describe("WorkflowStudioDomain", () => {
     expect(parsed).toEqual(draft);
   });
 
+  it("round-trips built-in workflow-native step persistence shapes", () => {
+    const draft = normalizeWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [
+        {
+          id: "step-branch",
+          type: WorkflowDraftBuiltInStepTypes.ifThen,
+          kind: WorkflowDraftStepKinds.controlFlow,
+          order: 1,
+          config: {
+            condition: {
+              kind: "expression",
+              expression: "inputs.score >= 0.8",
+            },
+            branches: {
+              then: {
+                label: "approve",
+              },
+              else: {
+                label: "review",
+              },
+            },
+          },
+        },
+        {
+          id: "step-loop",
+          type: WorkflowDraftBuiltInStepTypes.loopIteration,
+          kind: WorkflowDraftStepKinds.controlFlow,
+          order: 2,
+          config: {
+            mode: "fixed-count",
+            fixedCount: {
+              count: 2,
+            },
+          },
+        },
+        {
+          id: "step-delay",
+          type: WorkflowDraftBuiltInStepTypes.delayWait,
+          kind: WorkflowDraftStepKinds.controlFlow,
+          order: 3,
+          config: {
+            mode: "until-time",
+            until: {
+              timestamp: "2026-04-01T10:00:00.000Z",
+              timezone: "America/New_York",
+            },
+            note: "Wait for review window",
+          },
+        },
+        {
+          id: "step-approval",
+          type: WorkflowDraftBuiltInStepTypes.manualApproval,
+          kind: WorkflowDraftStepKinds.controlFlow,
+          order: 4,
+          config: {
+            prompt: "Manager sign-off required",
+            interactionMode: "approval",
+            outcomes: {
+              approve: {
+                label: "ship",
+              },
+              reject: {
+                label: "hold",
+              },
+            },
+            requiredApproverRoles: ["manager"],
+            timeoutSeconds: 900,
+            onTimeout: "escalate",
+          },
+        },
+      ],
+      outputs: [],
+    });
+
+    const serialized = serializeWorkflowDraftDocument(draft);
+    const parsed = deserializeWorkflowDraftDocument(serialized);
+
+    expect(parsed).toEqual(draft);
+    expect(parsed.steps.map((step) => step.type)).toEqual([
+      WorkflowDraftBuiltInStepTypes.ifThen,
+      WorkflowDraftBuiltInStepTypes.loopIteration,
+      WorkflowDraftBuiltInStepTypes.delayWait,
+      WorkflowDraftBuiltInStepTypes.manualApproval,
+    ]);
+  });
+
   it("maps workflow entities to/from persistence records and preserves canonical fields", () => {
     const entity = createWorkflowEntity({
       id: "workflow-entity-serialization",
@@ -358,7 +457,7 @@ describe("WorkflowStudioDomain", () => {
       inputs: [],
       steps: [],
       outputs: [],
-    })).toThrow("requires config.cronExpression");
+    })).toThrow("requires config.cronExpression or config.runAt");
 
     expect(() => normalizeWorkflowDraft({
       triggers: [{
@@ -371,6 +470,173 @@ describe("WorkflowStudioDomain", () => {
       steps: [],
       outputs: [],
     })).toThrow("requires config.eventName");
+  });
+
+  it("exposes canonical trigger contracts with stable discovery metadata", () => {
+    const definitions = listWorkflowDraftTriggerDefinitions();
+    expect(definitions.map((entry) => entry.type)).toEqual([
+      WorkflowDraftTriggerTypes.userManual,
+      WorkflowDraftTriggerTypes.userButtonClick,
+      WorkflowDraftTriggerTypes.userInitiatedRun,
+      WorkflowDraftTriggerTypes.temporalSchedule,
+      WorkflowDraftTriggerTypes.temporalRecurring,
+      WorkflowDraftTriggerTypes.stateDataAvailable,
+      WorkflowDraftTriggerTypes.stateAssetStateChanged,
+      WorkflowDraftTriggerTypes.stateSystemEvent,
+    ]);
+    expect(definitions.map((entry) => entry.kind)).toEqual([
+      WorkflowDraftTriggerKinds.user,
+      WorkflowDraftTriggerKinds.user,
+      WorkflowDraftTriggerKinds.user,
+      WorkflowDraftTriggerKinds.temporal,
+      WorkflowDraftTriggerKinds.temporal,
+      WorkflowDraftTriggerKinds.state,
+      WorkflowDraftTriggerKinds.state,
+      WorkflowDraftTriggerKinds.state,
+    ]);
+    expect(definitions.every((entry) => entry.configSchemaId.startsWith("workflow.trigger."))).toBeTrue();
+    expect(getWorkflowDraftTriggerDefinition(WorkflowDraftTriggerTypes.temporalRecurring)?.label).toBe("Recurring interval");
+    expect(getWorkflowDraftTriggerDefinition("unknown-trigger")).toBeUndefined();
+    expect(isWorkflowDraftTriggerType(WorkflowDraftTriggerTypes.stateSystemEvent)).toBeTrue();
+    expect(isWorkflowDraftTriggerType("unknown-trigger")).toBeFalse();
+  });
+
+  it("validates trigger config payloads through canonical trigger contract entry points", () => {
+    expect(normalizeWorkflowDraftTriggerConfig(WorkflowDraftTriggerTypes.userButtonClick, {
+      buttonId: "run-now",
+      allowedRoles: ["operator", "operator", "owner"],
+    })).toMatchObject({
+      invocationScope: WorkflowDraftUserTriggerScopes.workflowStart,
+      buttonId: "run-now",
+      allowedRoles: ["operator", "owner"],
+    });
+
+    expect(normalizeWorkflowDraftTriggerConfig(WorkflowDraftTriggerTypes.userManual, {
+      invocationScope: WorkflowDraftUserTriggerScopes.workflowContinuation,
+      continuationStepId: "step-approval",
+      continuationTokenRef: "token.approval",
+    })).toMatchObject({
+      invocationScope: WorkflowDraftUserTriggerScopes.workflowContinuation,
+      continuationStepId: "step-approval",
+      continuationTokenRef: "token.approval",
+    });
+
+    expect(normalizeWorkflowDraftTriggerConfig(WorkflowDraftTriggerTypes.temporalRecurring, {
+      scheduleMode: WorkflowDraftTemporalScheduleModes.interval,
+      every: 3,
+      unit: "hours",
+      timezone: "UTC",
+    })).toMatchObject({
+      scheduleMode: WorkflowDraftTemporalScheduleModes.interval,
+      every: 3,
+      unit: "hours",
+      timezone: "UTC",
+    });
+
+    expect(normalizeWorkflowDraftTriggerConfig(WorkflowDraftTriggerTypes.temporalSchedule, {
+      scheduleMode: WorkflowDraftTemporalScheduleModes.oneTime,
+      runAt: "2026-04-01T09:00:00.000Z",
+      timezone: "UTC",
+    })).toMatchObject({
+      scheduleMode: WorkflowDraftTemporalScheduleModes.oneTime,
+      runAt: "2026-04-01T09:00:00.000Z",
+      timezone: "UTC",
+    });
+
+    expect(normalizeWorkflowDraftTriggerConfig(WorkflowDraftTriggerTypes.stateAssetStateChanged, {
+      sourceType: "asset",
+      eventCategory: "asset-updated",
+      subject: "dataset",
+      asset: {
+        assetId: "asset:dataset-1",
+      },
+      stateKey: "status",
+      stateValue: "ready",
+      criteria: {
+        tenant: "alpha",
+      },
+    })).toMatchObject({
+      sourceType: "asset",
+      eventCategory: "asset-updated",
+      subject: "dataset",
+      asset: {
+        assetId: "asset:dataset-1",
+      },
+      stateKey: "status",
+      stateValue: "ready",
+      criteria: {
+        tenant: "alpha",
+      },
+      filter: {
+        tenant: "alpha",
+      },
+    });
+
+    expect(() => normalizeWorkflowDraftTriggerConfig(WorkflowDraftTriggerTypes.userButtonClick, {})).toThrow("config.buttonId");
+    expect(() => normalizeWorkflowDraftTriggerConfig(WorkflowDraftTriggerTypes.userManual, {
+      continuationStepId: "step-only",
+    })).toThrow("config.invocationScope");
+    expect(() => normalizeWorkflowDraftTriggerConfig(WorkflowDraftTriggerTypes.temporalSchedule, {})).toThrow("config.cronExpression or config.runAt");
+    expect(() => normalizeWorkflowDraftTriggerConfig(WorkflowDraftTriggerTypes.temporalSchedule, {
+      cronExpression: "* *",
+    })).toThrow("five-field cron expression");
+    expect(() => normalizeWorkflowDraftTriggerConfig(WorkflowDraftTriggerTypes.temporalSchedule, {
+      runAt: "not-a-time",
+    })).toThrow("config.runAt");
+    expect(() => normalizeWorkflowDraftTriggerConfig(WorkflowDraftTriggerTypes.temporalRecurring, {
+      every: 2,
+      unit: "hours",
+      runAt: "2026-04-01T09:00:00.000Z",
+    })).toThrow("config.every and config.unit");
+    expect(() => normalizeWorkflowDraftTriggerConfig(WorkflowDraftTriggerTypes.temporalRecurring, {
+      every: 1,
+      unit: "days",
+      startAt: "2026-04-02T00:00:00.000Z",
+      endAt: "2026-04-01T00:00:00.000Z",
+    })).toThrow("config.startAt");
+    expect(() => normalizeWorkflowDraftTriggerConfig(WorkflowDraftTriggerTypes.stateSystemEvent, {})).toThrow("config.eventName");
+    expect(() => normalizeWorkflowDraftTriggerConfig(WorkflowDraftTriggerTypes.stateDataAvailable, {}))
+      .toThrow("config.eventName, config.subject, or config.stateKey");
+    expect(() => normalizeWorkflowDraftTriggerConfig(WorkflowDraftTriggerTypes.stateAssetStateChanged, {
+      sourceType: "asset",
+      stateKey: "status",
+    })).toThrow("config.asset");
+  });
+
+  it("runs workflow-level trigger validation for duplicate definitions and continuation references", () => {
+    const result = validateWorkflowDraft({
+      triggers: [
+        {
+          id: "trigger-1",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        },
+        {
+          id: "trigger-1",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        },
+        {
+          id: "trigger-continuation",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {
+            invocationScope: WorkflowDraftUserTriggerScopes.workflowContinuation,
+            continuationStepId: "step-missing",
+          },
+        },
+      ],
+      inputs: [],
+      steps: [{ id: "step-existing", type: "action", kind: WorkflowDraftStepKinds.action, order: 1 }],
+      outputs: [],
+    });
+
+    expect(result.valid).toBeFalse();
+    expect(result.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.triggerDuplicateId)).toBeTrue();
+    expect(result.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.triggerDuplicateDefinition)).toBeTrue();
+    expect(result.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.triggerContinuationStepMissing)).toBeTrue();
   });
 
   it("accepts one or more canonical workflow inputs with dataset-backed asset references", () => {
@@ -517,7 +783,7 @@ describe("WorkflowStudioDomain", () => {
     });
   });
 
-  it("accepts built-in control-flow step variants for if/then branching and loop iteration", () => {
+  it("accepts built-in workflow-native step variants for control flow, temporal, and human interaction", () => {
     const normalized = normalizeWorkflowDraft({
       triggers: [],
       inputs: [],
@@ -528,9 +794,20 @@ describe("WorkflowStudioDomain", () => {
           kind: WorkflowDraftStepKinds.controlFlow,
           order: 1,
           config: {
-            conditionExpression: "qualityScore >= 0.9",
-            thenLabel: "high confidence",
-            elseLabel: "needs review",
+            condition: {
+              kind: "comparison",
+              leftOperand: "inputs.qualityScore",
+              operator: "greater-than-or-equal",
+              rightOperand: 0.9,
+            },
+            branches: {
+              then: {
+                label: "high confidence",
+              },
+              else: {
+                label: "needs review",
+              },
+            },
           },
         },
         {
@@ -539,7 +816,11 @@ describe("WorkflowStudioDomain", () => {
           kind: WorkflowDraftStepKinds.controlFlow,
           order: 2,
           config: {
-            repeatCount: 3,
+            mode: "fixed-count",
+            fixedCount: {
+              count: 3,
+            },
+            loopLabel: "retry",
           },
         },
         {
@@ -548,7 +829,32 @@ describe("WorkflowStudioDomain", () => {
           kind: WorkflowDraftStepKinds.controlFlow,
           order: 3,
           config: {
+            mode: "duration",
+            duration: {
+              value: 30,
+              unit: "seconds",
+            },
             durationSeconds: 30,
+          },
+        },
+        {
+          id: "step-approval",
+          type: WorkflowDraftBuiltInStepTypes.manualApproval,
+          kind: WorkflowDraftStepKinds.controlFlow,
+          order: 4,
+          config: {
+            prompt: "Approve release candidate",
+            interactionMode: "approval",
+            outcomes: {
+              approve: {
+                label: "approved",
+              },
+              reject: {
+                label: "rejected",
+              },
+            },
+            requiredApproverRoles: ["qa", "ops"],
+            onTimeout: "escalate",
           },
         },
       ],
@@ -560,9 +866,20 @@ describe("WorkflowStudioDomain", () => {
       kind: WorkflowDraftStepKinds.controlFlow,
       type: WorkflowDraftBuiltInStepTypes.ifThen,
       config: {
-        conditionExpression: "qualityScore >= 0.9",
-        thenLabel: "high confidence",
-        elseLabel: "needs review",
+        condition: {
+          kind: "comparison",
+          leftOperand: "inputs.qualityScore",
+          operator: "greater-than-or-equal",
+          rightOperand: 0.9,
+        },
+        branches: {
+          then: {
+            label: "high confidence",
+          },
+          else: {
+            label: "needs review",
+          },
+        },
       },
     });
     expect(normalized.steps[1]).toMatchObject({
@@ -570,7 +887,12 @@ describe("WorkflowStudioDomain", () => {
       kind: WorkflowDraftStepKinds.controlFlow,
       type: WorkflowDraftBuiltInStepTypes.loopIteration,
       config: {
+        mode: "fixed-count",
+        fixedCount: {
+          count: 3,
+        },
         repeatCount: 3,
+        iterationMode: "fixed-count",
       },
     });
     expect(normalized.steps[2]).toMatchObject({
@@ -578,9 +900,149 @@ describe("WorkflowStudioDomain", () => {
       kind: WorkflowDraftStepKinds.controlFlow,
       type: WorkflowDraftBuiltInStepTypes.delayWait,
       config: {
+        mode: "duration",
+        duration: {
+          value: 30,
+          unit: "seconds",
+        },
         durationSeconds: 30,
       },
     });
+    expect(normalized.steps[3]).toMatchObject({
+      id: "step-approval",
+      kind: WorkflowDraftStepKinds.controlFlow,
+      type: WorkflowDraftBuiltInStepTypes.manualApproval,
+      config: {
+        prompt: "Approve release candidate",
+        interactionMode: "approval",
+        outcomes: {
+          approve: {
+            label: "approved",
+          },
+          reject: {
+            label: "rejected",
+          },
+        },
+        requiredApproverRoles: ["qa", "ops"],
+        onTimeout: "escalate",
+      },
+    });
+  });
+
+  it("normalizes delay wait-until mode and manual review continuation mode", () => {
+    const normalized = normalizeWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [
+        {
+          id: "step-delay-until",
+          type: WorkflowDraftBuiltInStepTypes.delayWait,
+          kind: WorkflowDraftStepKinds.controlFlow,
+          order: 1,
+          config: {
+            mode: "until-time",
+            until: {
+              timestamp: "2026-05-01T09:30:00.000Z",
+              timezone: "UTC",
+            },
+          },
+        },
+        {
+          id: "step-review",
+          type: WorkflowDraftBuiltInStepTypes.manualApproval,
+          kind: WorkflowDraftStepKinds.controlFlow,
+          order: 2,
+          config: {
+            prompt: "Manual reviewer check",
+            interactionMode: "review",
+            outcomes: {
+              continue: {
+                label: "continue",
+              },
+            },
+            onTimeout: "continue",
+          },
+        },
+      ],
+      outputs: [],
+    });
+
+    expect(normalized.steps[0]).toMatchObject({
+      type: WorkflowDraftBuiltInStepTypes.delayWait,
+      config: {
+        mode: "until-time",
+        until: {
+          timestamp: "2026-05-01T09:30:00.000Z",
+          timezone: "UTC",
+        },
+        waitUntil: "2026-05-01T09:30:00.000Z",
+      },
+    });
+    expect(normalized.steps[1]).toMatchObject({
+      type: WorkflowDraftBuiltInStepTypes.manualApproval,
+      config: {
+        prompt: "Manual reviewer check",
+        interactionMode: "review",
+        outcomes: {
+          continue: {
+            label: "continue",
+          },
+        },
+        onTimeout: "continue",
+      },
+    });
+  });
+
+  it("exposes canonical built-in step taxonomy/contracts with stable discovery metadata", () => {
+    const definitions = listWorkflowDraftBuiltInStepDefinitions();
+    expect(definitions.map((entry) => entry.type)).toEqual([
+      WorkflowDraftBuiltInStepTypes.ifThen,
+      WorkflowDraftBuiltInStepTypes.loopIteration,
+      WorkflowDraftBuiltInStepTypes.delayWait,
+      WorkflowDraftBuiltInStepTypes.manualApproval,
+    ]);
+    expect(definitions.map((entry) => entry.category)).toEqual([
+      WorkflowDraftBuiltInStepCategories.controlFlow,
+      WorkflowDraftBuiltInStepCategories.controlFlow,
+      WorkflowDraftBuiltInStepCategories.temporal,
+      WorkflowDraftBuiltInStepCategories.humanInteraction,
+    ]);
+    expect(definitions.every((entry) => entry.configSchemaId.startsWith("workflow.builtin."))).toBeTrue();
+    expect(getWorkflowDraftBuiltInStepDefinition(WorkflowDraftBuiltInStepTypes.manualApproval)?.label).toBe("Manual / Approval");
+    expect(getWorkflowDraftBuiltInStepDefinition("unknown-built-in")).toBeUndefined();
+    expect(isWorkflowDraftBuiltInStepType(WorkflowDraftBuiltInStepTypes.manualApproval)).toBeTrue();
+    expect(isWorkflowDraftBuiltInStepType("unknown-built-in")).toBeFalse();
+  });
+
+  it("supports built-in step type guards for persistence-safe workflow draft representations", () => {
+    const normalized = normalizeWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [{
+        id: "step-built-in",
+        type: WorkflowDraftBuiltInStepTypes.manualApproval,
+        kind: WorkflowDraftStepKinds.controlFlow,
+        order: 1,
+        config: {
+          prompt: "Approve",
+          interactionMode: "approval",
+          outcomes: {
+            approve: {
+              label: "approved",
+            },
+            reject: {
+              label: "rejected",
+            },
+          },
+          onTimeout: "reject",
+        },
+      }],
+      outputs: [],
+    });
+
+    const step = normalized.steps[0];
+    expect(step).toBeDefined();
+    expect(isWorkflowDraftBuiltInStep(step!)).toBeTrue();
   });
 
   it("supports agent-assistant asset-backed workflow steps with canonical asset references", () => {
@@ -757,7 +1219,43 @@ describe("WorkflowStudioDomain", () => {
         },
       }],
       outputs: [],
-    })).toThrow("requires config.repeatCount or config.loopConditionExpression");
+    })).toThrow("requires config.mode/fixedCount/collection/range or legacy repeatCount");
+
+    expect(() => normalizeWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [{
+        id: "step-invalid-if-branches",
+        type: WorkflowDraftBuiltInStepTypes.ifThen,
+        kind: WorkflowDraftStepKinds.controlFlow,
+        order: 1,
+        config: {
+          condition: {
+            kind: "expression",
+            expression: "score > 0",
+          },
+          branches: {
+            then: {},
+          },
+        },
+      }],
+      outputs: [],
+    })).toThrow("branches.then requires label or stepIds");
+
+    expect(() => normalizeWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [{
+        id: "step-invalid-loop-mode-source",
+        type: WorkflowDraftBuiltInStepTypes.loopIteration,
+        kind: WorkflowDraftStepKinds.controlFlow,
+        order: 1,
+        config: {
+          mode: "collection",
+        },
+      }],
+      outputs: [],
+    })).toThrow("collection mode requires config.collection");
 
     expect(() => normalizeWorkflowDraft({
       triggers: [],
@@ -788,6 +1286,43 @@ describe("WorkflowStudioDomain", () => {
       }],
       outputs: [],
     })).toThrow("durationSeconds");
+
+    expect(() => normalizeWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [{
+        id: "step-invalid-approval",
+        type: WorkflowDraftBuiltInStepTypes.manualApproval,
+        kind: WorkflowDraftStepKinds.controlFlow,
+        order: 1,
+        config: {
+          prompt: "Awaiting decision",
+          onTimeout: "skip",
+        },
+      }],
+      outputs: [],
+    })).toThrow("onTimeout");
+
+    expect(() => normalizeWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [{
+        id: "step-invalid-review-outcome",
+        type: WorkflowDraftBuiltInStepTypes.manualApproval,
+        kind: WorkflowDraftStepKinds.controlFlow,
+        order: 1,
+        config: {
+          prompt: "Manual review",
+          interactionMode: "review",
+          outcomes: {
+            reject: {
+              label: "stop",
+            },
+          },
+        },
+      }],
+      outputs: [],
+    })).toThrow("review mode only allows");
   });
 
   it("accepts canonical output entries with type, format, and destination", () => {
@@ -1046,6 +1581,65 @@ describe("WorkflowStudioDomain", () => {
     expect(result.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.stepAssetReferenceMalformed)).toBeTrue();
     expect(result.issues.some((issue) => issue.code === WorkflowValidationIssueCodes.outputSourceStepMissing)).toBeTrue();
     expect(result.issues.every((issue) => typeof issue.code === "string" && typeof issue.section === "string")).toBeTrue();
+  });
+
+  it("rejects built-in branch/body/outcome references that point to non-downstream steps", () => {
+    const result = validateWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [
+        {
+          id: "step-if",
+          type: WorkflowDraftBuiltInStepTypes.ifThen,
+          kind: WorkflowDraftStepKinds.controlFlow,
+          order: 1,
+          config: {
+            conditionExpression: "inputs.score > 0",
+            thenStepIds: ["step-target"],
+          },
+        },
+        {
+          id: "step-loop",
+          type: WorkflowDraftBuiltInStepTypes.loopIteration,
+          kind: WorkflowDraftStepKinds.controlFlow,
+          order: 2,
+          config: {
+            repeatCount: 2,
+            bodyStepIds: ["step-if"],
+          },
+        },
+        {
+          id: "step-target",
+          type: "action",
+          kind: WorkflowDraftStepKinds.action,
+          order: 3,
+        },
+        {
+          id: "step-manual",
+          type: WorkflowDraftBuiltInStepTypes.manualApproval,
+          kind: WorkflowDraftStepKinds.controlFlow,
+          order: 4,
+          config: {
+            prompt: "Approve",
+            interactionMode: "approval",
+            outcomes: {
+              approve: {
+                stepIds: ["step-target"],
+              },
+            },
+          },
+        },
+      ],
+      outputs: [],
+    });
+
+    expect(result.valid).toBeFalse();
+    const orderIssues = result.issues.filter(
+      (issue) => issue.code === WorkflowValidationIssueCodes.builtInStepReferenceOrderInvalid,
+    );
+    expect(orderIssues.length).toBe(2);
+    expect(orderIssues.some((issue) => issue.message.includes("step-loop"))).toBeTrue();
+    expect(orderIssues.some((issue) => issue.message.includes("step-manual"))).toBeTrue();
   });
 
   it("validates lifecycle states and executable readiness on canonical workflow entities", () => {

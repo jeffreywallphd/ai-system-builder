@@ -18,6 +18,15 @@ import {
   validateWorkflowDraft,
   WorkflowStudioIdentity,
 } from "../../domain/workflow-studio/WorkflowStudioDomain";
+import {
+  mapWorkflowDraftToExecutionPlan,
+  type WorkflowDraftExecutionPlan,
+} from "./WorkflowDraftExecutionPlanMapper";
+import {
+  WorkflowDraftExecutionRuntime,
+  type WorkflowDraftRuntimeExecutionResult,
+  type WorkflowDraftRuntimeManualDecision,
+} from "./WorkflowDraftExecutionRuntime";
 
 export interface EnsureWorkflowStudioResult {
   readonly initialized: boolean;
@@ -46,11 +55,26 @@ export interface PublishWorkflowDraftCommand {
   readonly createdBy?: string;
 }
 
+export interface PlanWorkflowDraftExecutionCommand {
+  readonly content: string;
+}
+
+export interface ExecuteWorkflowDraftCommand extends PlanWorkflowDraftExecutionCommand {
+  readonly inputs?: Readonly<Record<string, unknown>>;
+  readonly manualDecisionsByStepId?: Readonly<Record<string, WorkflowDraftRuntimeManualDecision | undefined>>;
+  readonly maxLoopIterations?: number;
+}
+
 export class WorkflowStudioApplicationService {
+  private readonly runtimeExecutor: WorkflowDraftExecutionRuntime;
+
   constructor(
     private readonly studioShellService: StudioShellApplicationService,
     private readonly contractResolver: Pick<IAssetContractResolver, "resolveContractForTaxonomy"> = new CompositionAssetContractResolver(),
-  ) {}
+    runtimeExecutor: WorkflowDraftExecutionRuntime = new WorkflowDraftExecutionRuntime(),
+  ) {
+    this.runtimeExecutor = runtimeExecutor;
+  }
 
   public async ensureStudioInitialized(
     studioId: string = WorkflowStudioIdentity.defaultStudioId,
@@ -162,5 +186,39 @@ export class WorkflowStudioApplicationService {
       versionLabel: command.versionLabel,
       createdBy: command.createdBy,
     });
+  }
+
+  public planWorkflowDraftExecution(command: PlanWorkflowDraftExecutionCommand): WorkflowDraftExecutionPlan {
+    let canonicalDraft;
+    try {
+      canonicalDraft = deserializeWorkflowDraft(command.content);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "Workflow draft content is not valid JSON.";
+      throw new StudioShellInvalidRequestError(`Workflow draft content is malformed: ${detail}`);
+    }
+
+    try {
+      return mapWorkflowDraftToExecutionPlan(canonicalDraft);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "workflow-draft-execution-plan-failed";
+      throw new StudioShellInvalidRequestError(`Workflow draft execution planning failed: ${detail}`);
+    }
+  }
+
+  public async executeWorkflowDraft(
+    command: ExecuteWorkflowDraftCommand,
+  ): Promise<WorkflowDraftRuntimeExecutionResult> {
+    const plan = this.planWorkflowDraftExecution(command);
+    try {
+      return await this.runtimeExecutor.execute({
+        plan,
+        inputs: command.inputs,
+        manualDecisionsByStepId: command.manualDecisionsByStepId,
+        maxLoopIterations: command.maxLoopIterations,
+      });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "workflow-draft-runtime-execution-failed";
+      throw new StudioShellInvalidRequestError(`Workflow draft runtime execution failed: ${detail}`);
+    }
   }
 }

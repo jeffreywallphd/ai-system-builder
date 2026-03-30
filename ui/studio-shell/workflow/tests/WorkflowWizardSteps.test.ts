@@ -1,6 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import {
+  WorkflowDraftDelayWaitModes,
   WorkflowDraftBuiltInStepTypes,
+  WorkflowDraftLoopIterationModes,
+  WorkflowDraftManualInteractionModes,
   WorkflowDraftStepTypes,
   createEmptyWorkflowDraft,
   validateWorkflowDraft,
@@ -9,6 +12,7 @@ import {
   addWorkflowStep,
   buildWorkflowStepAgentAssistantSelectionPayload,
   buildWorkflowStepTypeDefinitionKey,
+  canMoveWorkflowStep,
   clearWorkflowStepAgentAssetSelection,
   loadAgentAssistantAssetCandidates,
   moveWorkflowStepDown,
@@ -19,8 +23,10 @@ import {
   setWorkflowStepDelayConfig,
   setWorkflowStepIfThenConfig,
   setWorkflowStepLoopConfig,
+  setWorkflowStepManualApprovalConfig,
   setWorkflowStepType,
   workflowStepTypeDefinitions,
+  WorkflowStepMoveDirections,
 } from "../WorkflowWizardSteps";
 
 function findDefinition(type: string): string {
@@ -56,6 +62,15 @@ describe("WorkflowWizardSteps", () => {
     expect(removed.draft.steps.map((step) => step.order)).toEqual([1, 2]);
   });
 
+  it("supports insertion after an existing step when adding new steps", () => {
+    const first = addWorkflowStep(createEmptyWorkflowDraft());
+    const second = addWorkflowStep(first.draft);
+    const inserted = addWorkflowStep(second.draft, workflowStepTypeDefinitions[0]!, { afterStepId: first.stepId });
+
+    expect(inserted.draft.steps.map((step) => step.id)).toEqual([first.stepId, inserted.stepId, second.stepId]);
+    expect(inserted.draft.steps.map((step) => step.order)).toEqual([1, 2, 3]);
+  });
+
   it("supports selecting built-in step types and updating type-specific configs", () => {
     const withStep = addWorkflowStep(createEmptyWorkflowDraft()).draft;
     const stepId = withStep.steps[0]?.id as string;
@@ -77,10 +92,153 @@ describe("WorkflowWizardSteps", () => {
     expect((configuredLoop.draft.steps[0]?.config as { repeatCount?: number }).repeatCount).toBe(3);
 
     const delay = setWorkflowStepType(configuredLoop.draft, stepId, findDefinition(WorkflowDraftBuiltInStepTypes.delayWait));
-    const configuredDelay = setWorkflowStepDelayConfig(delay.draft, stepId, { durationSeconds: 45 });
+    const configuredDelay = setWorkflowStepDelayConfig(delay.draft, stepId, {
+      mode: WorkflowDraftDelayWaitModes.duration,
+      durationSeconds: 45,
+    });
     expect((configuredDelay.draft.steps[0]?.config as { durationSeconds?: number }).durationSeconds).toBe(45);
 
-    expect(validateWorkflowDraft(configuredDelay.draft).valid).toBeTrue();
+    const manual = setWorkflowStepType(configuredDelay.draft, stepId, findDefinition(WorkflowDraftBuiltInStepTypes.manualApproval));
+    expect(manual.draft.steps[0]?.type).toBe(WorkflowDraftBuiltInStepTypes.manualApproval);
+    expect(validateWorkflowDraft(manual.draft).valid).toBeTrue();
+  });
+
+  it("supports richer built-in configuration editing for if/loop/delay/manual steps", () => {
+    const withStep = addWorkflowStep(createEmptyWorkflowDraft()).draft;
+    const stepId = withStep.steps[0]?.id as string;
+
+    const asIfThen = setWorkflowStepType(withStep, stepId, findDefinition(WorkflowDraftBuiltInStepTypes.ifThen)).draft;
+    const configuredIfThen = setWorkflowStepIfThenConfig(asIfThen, stepId, {
+      conditionExpression: "score > 0.9",
+      thenLabel: "approve-path",
+      thenStepIds: Object.freeze(["step-2", "step-3"]),
+      elseLabel: "reject-path",
+      elseStepIds: Object.freeze(["step-4"]),
+    }).draft.steps[0]?.config as {
+      thenStepIds?: ReadonlyArray<string>;
+      elseStepIds?: ReadonlyArray<string>;
+    };
+    expect(configuredIfThen.thenStepIds).toEqual(["step-2", "step-3"]);
+    expect(configuredIfThen.elseStepIds).toEqual(["step-4"]);
+
+    const asLoop = setWorkflowStepType(asIfThen, stepId, findDefinition(WorkflowDraftBuiltInStepTypes.loopIteration)).draft;
+    const loopDraft = setWorkflowStepLoopConfig(asLoop, stepId, {
+      mode: WorkflowDraftLoopIterationModes.collection,
+      collectionInputKey: "input-datasets",
+      itemAlias: "row",
+      bodyStepIds: Object.freeze(["step-a", "step-b"]),
+      maxIterations: 5,
+      loopConditionExpression: "row.valid === true",
+      loopLabel: "Loop rows",
+    }).draft;
+    const loopConfig = loopDraft.steps[0]?.config as {
+      mode?: string;
+      collectionInputKey?: string;
+      itemAlias?: string;
+      bodyStepIds?: ReadonlyArray<string>;
+      maxIterations?: number;
+      loopConditionExpression?: string;
+    };
+    expect(loopConfig.mode).toBe("collection");
+    expect(loopConfig.collectionInputKey).toBe("input-datasets");
+    expect(loopConfig.itemAlias).toBe("row");
+    expect(loopConfig.bodyStepIds).toEqual(["step-a", "step-b"]);
+    expect(loopConfig.maxIterations).toBe(5);
+    expect(loopConfig.loopConditionExpression).toBe("row.valid === true");
+
+    const asDelay = setWorkflowStepType(loopDraft, stepId, findDefinition(WorkflowDraftBuiltInStepTypes.delayWait)).draft;
+    const delayDraft = setWorkflowStepDelayConfig(asDelay, stepId, {
+      mode: WorkflowDraftDelayWaitModes.untilTime,
+      waitUntil: "2026-04-02T15:45:00.000Z",
+      timezone: "America/New_York",
+      note: "Await reviewer availability",
+    }).draft;
+    const delayConfig = delayDraft.steps[0]?.config as {
+      mode?: string;
+      waitUntil?: string;
+      until?: { readonly timezone?: string };
+      note?: string;
+    };
+    expect(delayConfig.mode).toBe("until-time");
+    expect(delayConfig.waitUntil).toBe("2026-04-02T15:45:00.000Z");
+    expect(delayConfig.until?.timezone).toBe("America/New_York");
+    expect(delayConfig.note).toBe("Await reviewer availability");
+
+    const asManual = setWorkflowStepType(delayDraft, stepId, findDefinition(WorkflowDraftBuiltInStepTypes.manualApproval)).draft;
+    const manualDraft = setWorkflowStepManualApprovalConfig(asManual, stepId, {
+      prompt: "Review this workflow output",
+      interactionMode: WorkflowDraftManualInteractionModes.review,
+      continueLabel: "continue-review",
+      continueStepIds: Object.freeze(["step-next"]),
+      requiredApproverRoles: Object.freeze(["ops", "qa"]),
+      timeoutSeconds: 120,
+      onTimeout: "continue",
+      allowSelfApproval: true,
+    }).draft;
+    const manualConfig = manualDraft.steps[0]?.config as {
+      prompt?: string;
+      interactionMode?: string;
+      outcomes?: { readonly continue?: { readonly label?: string; readonly stepIds?: ReadonlyArray<string> } };
+      requiredApproverRoles?: ReadonlyArray<string>;
+      timeoutSeconds?: number;
+      onTimeout?: string;
+      allowSelfApproval?: boolean;
+    };
+    expect(manualConfig.prompt).toBe("Review this workflow output");
+    expect(manualConfig.interactionMode).toBe("review");
+    expect(manualConfig.outcomes?.continue?.label).toBe("continue-review");
+    expect(manualConfig.outcomes?.continue?.stepIds).toEqual(["step-next"]);
+    expect(manualConfig.requiredApproverRoles).toEqual(["ops", "qa"]);
+    expect(manualConfig.timeoutSeconds).toBe(120);
+    expect(manualConfig.onTimeout).toBe("continue");
+    expect(manualConfig.allowSelfApproval).toBeTrue();
+  });
+
+  it("blocks reordering operations that would place control-flow branch/body targets before their parent step", () => {
+    const base = createEmptyWorkflowDraft();
+    const branch = addWorkflowStep(base, workflowStepTypeDefinitions.find((entry) => entry.type === WorkflowDraftBuiltInStepTypes.ifThen)!);
+    const branchStep = addWorkflowStep(branch.draft);
+    const trailing = addWorkflowStep(branchStep.draft);
+    const branchId = branch.stepId;
+    const branchStepId = branchStep.stepId;
+
+    const configured = setWorkflowStepIfThenConfig(trailing.draft, branchId, {
+      thenStepIds: Object.freeze([branchStepId]),
+    }).draft;
+
+    expect(canMoveWorkflowStep(configured, branchStepId, WorkflowStepMoveDirections.up)).toBeFalse();
+    expect(moveWorkflowStepUp(configured, branchStepId).changed).toBeFalse();
+    expect(canMoveWorkflowStep(configured, branchId, WorkflowStepMoveDirections.down)).toBeFalse();
+    expect(moveWorkflowStepDown(configured, branchId).changed).toBeFalse();
+  });
+
+  it("removes deleted step ids from built-in branch/outcome references", () => {
+    const branch = addWorkflowStep(createEmptyWorkflowDraft(), workflowStepTypeDefinitions.find((entry) => entry.type === WorkflowDraftBuiltInStepTypes.ifThen)!);
+    const branchChild = addWorkflowStep(branch.draft);
+    const loop = addWorkflowStep(branchChild.draft, workflowStepTypeDefinitions.find((entry) => entry.type === WorkflowDraftBuiltInStepTypes.loopIteration)!);
+    const loopChild = addWorkflowStep(loop.draft);
+    const manual = addWorkflowStep(loopChild.draft, workflowStepTypeDefinitions.find((entry) => entry.type === WorkflowDraftBuiltInStepTypes.manualApproval)!);
+    const manualChild = addWorkflowStep(manual.draft);
+
+    const withBranch = setWorkflowStepIfThenConfig(manualChild.draft, branch.stepId, {
+      thenStepIds: Object.freeze([branchChild.stepId]),
+    }).draft;
+    const withLoop = setWorkflowStepLoopConfig(withBranch, loop.stepId, {
+      bodyStepIds: Object.freeze([loopChild.stepId]),
+    }).draft;
+    const withManual = setWorkflowStepManualApprovalConfig(withLoop, manual.stepId, {
+      approveStepIds: Object.freeze([manualChild.stepId]),
+      rejectStepIds: Object.freeze([loopChild.stepId]),
+    }).draft;
+
+    const removed = removeWorkflowStep(withManual, loopChild.stepId);
+    expect(removed.changed).toBeTrue();
+    const loopConfig = removed.draft.steps.find((step) => step.id === loop.stepId)?.config as { bodyStepIds?: ReadonlyArray<string> };
+    const manualConfig = removed.draft.steps.find((step) => step.id === manual.stepId)?.config as {
+      outcomes?: { approve?: { stepIds?: ReadonlyArray<string> }; reject?: { stepIds?: ReadonlyArray<string> } };
+    };
+    expect(loopConfig.bodyStepIds).toBeUndefined();
+    expect(manualConfig.outcomes?.reject?.stepIds).toBeUndefined();
   });
 
   it("supports selecting, replacing, and clearing agent/assistant assets per step", () => {

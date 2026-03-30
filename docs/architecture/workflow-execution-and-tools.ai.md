@@ -60,6 +60,21 @@ Workflow -> `ExecuteWorkflowUseCase` -> one-unit `ExecutionPlan` -> `UnifiedExec
   - async external run tracking has explicit in-flight bounds and terminal cleanup to avoid runaway map growth under bursty external traffic,
   - docs (`.md` + `.ai.md`) now explicitly distinguish implemented vs bounded vs future external-runtime behavior for stories 7.1–7.24.
 
+## Workflow Studio draft planning seam
+- Workflow Studio now has a canonical draft-to-plan mapper in `application/workflow-studio/WorkflowDraftExecutionPlanMapper.ts`.
+- `mapWorkflowDraftToExecutionPlan(...)` validates canonical draft integrity first (`validateWorkflowDraft`) and then emits deterministic ordered execution-plan elements for action steps and built-ins (`if-then`, `loop-iteration`, `delay-wait`, `manual-approval`).
+- This mapper is planning-only: it creates explicit runtime-ready plan elements without adding a second runtime executor or speculative graph model.
+- Stories 6.11–6.12 now extend that same seam into runtime + persistence behavior without introducing alternate draft models:
+  - `application/workflow-studio/WorkflowDraftExecutionRuntime.ts` executes mapped built-in plan elements deterministically (branch, loop, delay, manual-approval) and records explicit completed/skipped/failed/paused step traces.
+  - `WorkflowStudioApplicationService.executeWorkflowDraft(...)` now routes canonical draft content through `deserialize -> plan mapper -> runtime executor` on the same workflow-studio contracts.
+  - Built-in workflow drafts continue to persist as canonical serialized draft content and now have explicit persistence/rehydration coverage for built-in type/config/order round-trip in SQLite-backed studio-shell flows.
+- Trigger execution readiness mapping is now explicit but bounded through `application/workflow-studio/WorkflowTriggerRuntimeMapper.ts`, which projects canonical trigger definitions/config (manual/user, temporal, state) into runtime-facing descriptors without introducing a scheduler engine or trigger-side execution path.
+- State runtime descriptors now include explicit event semantics (`sourceType`, `eventCategory`, `subject`, and optional criteria/filter metadata) so runtime mapping is planning-ready without adding an event-bus execution engine.
+- Trigger correctness now uses a shared validation pipeline (`validateWorkflowDraftTriggers` and `application/workflow-studio/WorkflowTriggerValidationPipeline.ts`) for per-trigger config validation plus workflow-level trigger checks before runtime mapping.
+- Stories 7.11â€“7.12 now route trigger semantics through the same draft execution-plan seam: `mapWorkflowDraftToExecutionPlan(...)` carries trigger execution metadata produced by `application/workflow-studio/WorkflowDraftTriggerExecutionPlanner.ts` (manual/user invocation semantics, temporal schedule metadata, state-event metadata).
+- Trigger planning consumes canonical validated draft triggers and fails safely when unsupported/invalid trigger semantics reach planning (no silent trigger dropping).
+- Execution-plan trigger semantics remain continuation-ready (`workflow-start` + `workflow-continuation`), so future human-approval resume/intermediate continuation behavior is not blocked by start-only assumptions.
+
 ## Runtime orchestration update
 - Delegated workflow execution selection can now consult the shared runtime dependency orchestrator before choosing a delegated strategy.
 - When the delegated workflow runtime gate is unavailable, selection falls back to a compatible interpreted strategy instead of pretending delegated execution is still ready.

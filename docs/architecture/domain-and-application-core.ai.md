@@ -205,6 +205,79 @@ The studio shell now has a bounded inner-layer model and application orchestrati
 - Workflow asset-backed references now carry taxonomy metadata on canonical asset refs (`WorkflowDraftAssetReference.taxonomy`) and are validated against shared taxonomy expectations for dataset-backed inputs and agent-assistant steps.
 - Workflow draft validation now emits deterministic taxonomy/asset-reference issues for mismatched dataset taxonomy and malformed asset-backed step identities, while keeping canonical validation in the domain layer and publish enforcement in `application/workflow-studio/WorkflowStudioApplicationService.ts`.
 
+## Direction 5 update: Workflow built-in step taxonomy + registry foundation (stories 6.1-6.2)
+
+- Workflow-native built-in steps are now first-class inner-layer contracts in `domain/workflow-studio/WorkflowStudioDomain.ts` with canonical categories (`control-flow`, `temporal`, `human-interaction`, reserved `transformation`) and stable built-in step identities.
+- Built-in step contracts now carry canonical discovery metadata (type/category/label/description/config schema id/default config) plus a shared domain validation entry point (`normalizeWorkflowDraftBuiltInStepConfig`), keeping semantics out of UI-local lists/forms.
+- The initial built-ins are explicitly modeled and discoverable: `if-then`, `loop-iteration`, `delay-wait`, and `manual-approval`.
+- Application discovery is now exposed through `application/workflow-studio/BuiltInWorkflowStepRegistry.ts`, giving wizard/canvas-facing layers a stable built-in step registry without hardcoded page-local definitions.
+- Story 6.3 now defines `if-then` as a canonical conditional primitive with explicit condition strategy contracts (`expression` or `comparison`) and explicit branch targets (`then` / optional `else` labels + step references) validated in the same domain normalization path.
+- Story 6.4 now defines `loop-iteration` as a canonical loop primitive with explicit mode/source contracts (`fixed-count`, `collection`, `range`) plus bounded body/max-iteration/exit-condition fields; cross-section checks still validate collection input references against canonical workflow inputs.
+- Story 6.5 now defines `delay-wait` as a canonical temporal primitive with explicit timing modes (`duration` with structured value/unit, or `until-time` with timestamp/timezone), compatibility aliases (`durationSeconds`, `waitUntil`), and deterministic malformed-config rejection through the same built-in normalization path.
+- Story 6.6 now defines `manual-approval` as a canonical human-interaction primitive with explicit interaction modes (`review` or `approval`), structured continuation/decision outcomes, required prompt semantics, timeout behavior policy (`reject`/`continue`/`escalate`), and compatibility aliasing for legacy `approvalMessage` flows.
+- Stories 6.7-6.8 keep renderer authoring aligned to those contracts: wizard step selection is registry-backed and mixed with asset-backed options, and wizard built-in editors only write canonical draft config fields that continue to validate through `normalizeWorkflowDraftBuiltInStepConfig` / `validateWorkflowDraft`.
+- Stories 6.9-6.10 now add canonical control-flow authoring and planning seams on top of that base:
+  - step authoring operations in `ui/studio-shell/workflow/WorkflowWizardSteps.ts` now preserve control-flow integrity during insert/reorder/remove (forward-only branch/body/outcome references, move blocking when a reorder would invalidate control-flow placement, and reference cleanup on removal),
+  - planning remains canonical-first through `mapWorkflowDraftToExecutionPlan(...)`, and stories 6.11-6.12 now add runtime execution over that same plan seam (`WorkflowDraftExecutionRuntime`) plus explicit built-in persistence/rehydration round-trip coverage across studio-shell SQLite paths,
+  - domain validation now includes explicit built-in reference order checks (`built-in-step-reference-order-invalid`) for `if-then`, `loop-iteration`, and `manual-approval` outcome references,
+  - workflow planning now has a dedicated canonical mapper `application/workflow-studio/WorkflowDraftExecutionPlanMapper.ts` (`mapWorkflowDraftToExecutionPlan`) that validates canonical drafts first and then emits deterministic execution-plan elements for action + built-in step types without introducing a parallel workflow model.
+
+## Direction 5 update: Workflow trigger domain model + concrete manual/temporal types (stories 7.1-7.4)
+
+- Workflow triggers are now first-class canonical domain contracts in `domain/workflow-studio/WorkflowStudioDomain.ts` with stable identity (`id`), kind (`user`/`temporal`/`state`), stable type ids, and typed config payloads on the canonical workflow draft (`WorkflowDraft.triggers`).
+- Trigger configuration normalization/validation now has an explicit domain entry point (`normalizeWorkflowDraftTriggerConfig`) so trigger config correctness stays reusable across authoring, persistence rehydration, and later runtime mapping.
+- The domain now exposes trigger type definitions (`WorkflowDraftTriggerDefinition`) with stable ids, labels/descriptions, config schema ids, capability metadata, default config payloads, and validation hooks.
+- Seeded trigger definitions cover planned Epic 7 categories, with manual/user and temporal now implemented as concrete first trigger families:
+  - user/manual: `manual`, `button-click`, `user-initiated-run`
+  - temporal: `schedule`, `recurring`
+  - state: `data-available`, `asset-state-changed`, `system-event`
+- Manual trigger config now includes explicit invocation scope semantics (`workflow-start` and `workflow-continuation`) so user-driven starts are supported now while preserving forward compatibility for intermediate continuation/human-approval style resumption.
+- Temporal trigger config now supports pragmatic scheduling semantics with structured validation:
+  - one-time execution (`runAt`),
+  - cron-like schedule execution (`cronExpression`),
+  - recurring interval execution (`every` + `unit`),
+  - optional scheduling bounds (`startAt`/`endAt`) with timestamp/order validation.
+- Application-layer discovery now uses `application/workflow-studio/WorkflowTriggerTypeRegistry.ts` for listing/lookup/filtering, default config projection, and config validation delegation without introducing UI-local trigger catalogs or runtime-specific trigger behavior.
+- Runtime-alignment readiness is now explicit through `application/workflow-studio/WorkflowTriggerRuntimeMapper.ts`, which maps canonical trigger contracts into runtime-facing descriptors without introducing a scheduler engine or UI-owned trigger logic.
+- This keeps trigger semantics in inner layers and creates clean extension seams for future selector/config UI, persistence integration, and execution mapping stories.
+
+## Direction 5 update: Workflow state trigger implementation + shared trigger validation pipeline (stories 7.5-7.6)
+
+- State trigger config now carries explicit event semantics (`sourceType`, `eventCategory`, `subject`) while preserving compatibility fields (`eventName`, `stateKey`, `stateValue`, `asset`, `filter`) for existing authoring/runtime surfaces.
+- State trigger defaults now map to concrete initial scenarios:
+  - `data-available` defaults to dataset/data-ingestion semantics.
+  - `asset-state-changed` defaults to asset-update semantics with explicit asset scope.
+  - `system-event` defaults to system-state-change semantics.
+- Trigger validation now has a shared canonical pipeline entry (`validateWorkflowDraftTriggers`) that performs:
+  - per-trigger normalization/validation routed by trigger kind/type,
+  - structured malformed-trigger issue reporting,
+  - workflow-level trigger checks (duplicate ids, duplicate trigger definitions, continuation-step reference checks).
+- `validateWorkflowDraft` now routes trigger checks through that shared pipeline instead of inline ad hoc trigger checks.
+- Application reuse now has a dedicated seam (`application/workflow-studio/WorkflowTriggerValidationPipeline.ts`) for single-trigger, type-config, and collection-level validation without introducing UI-owned trigger policy.
+- Forward compatibility for human-approval continuation semantics remains explicit: the shared pipeline allows both `workflow-start` and `workflow-continuation` invocation scopes by default.
+
+## Direction 5 update: Workflow trigger persistence/read-write + wizard selector integration (stories 7.7-7.8)
+
+- Canonical workflow draft persistence/read-write already carries trigger arrays (`WorkflowDraft.triggers`) through the same authoritative mappings (`mapWorkflowDraftToPersistenceRecord`, `mapWorkflowDraftFromPersistenceRecord`, `serializeWorkflowDraft`, `deserializeWorkflowDraft`) used by workflow Studio save/load/version paths.
+- SQLite-backed studio-shell integration now has explicit trigger round-trip coverage so manual/user, temporal, and state trigger definitions survive persisted draft reload without alternate trigger storage paths.
+- Invalid trigger payload handling remains safe and bounded at load/read seams: malformed trigger payloads surface draft-parse validation state in mode-store synchronization instead of corrupting existing shared draft state.
+- Wizard trigger selection is now registry-driven through a dedicated authoring seam (`ui/studio-shell/workflow/WorkflowWizardTriggers.ts`) backed by `WorkflowTriggerTypeRegistry`, so trigger-type discovery/default creation stays aligned with canonical trigger contracts.
+- Renderer trigger editing remains shared-draft-first and validation-projection-driven (`WorkflowStudioModeStateStore` + canonical draft validation) without duplicating trigger validation policy in UI logic.
+
+## Direction 5 update: Workflow trigger execution-planning alignment + coverage (stories 7.11-7.12)
+
+- Trigger runtime mapping is now integrated into the canonical execution-plan seam: `application/workflow-studio/WorkflowDraftExecutionPlanMapper.ts` now carries trigger execution semantics mapped through `application/workflow-studio/WorkflowDraftTriggerExecutionPlanner.ts`.
+- Execution trigger semantics are explicit and type-preserving for all implemented trigger families:
+  - manual/user -> user-invocation semantics (including `workflow-start` and `workflow-continuation` scope metadata),
+  - temporal -> schedule semantics (`scheduleMode`, cron/runAt/interval/time-window metadata),
+  - state -> state-event semantics (`sourceType`, `eventCategory`, subject/event/filter criteria metadata).
+- Planning remains architecture-clean and source-of-truth aligned:
+  - canonical draft triggers are the only trigger source,
+  - shared trigger normalization/validation gates planning before mapping,
+  - UI continues to avoid runtime trigger-mapping ownership.
+- Unsupported/invalid trigger semantics now fail safely on planning paths (clear planning failures) rather than being silently dropped.
+- Trigger-focused coverage now includes execution-planning seam tests plus regression coverage over domain validation, persistence round-trip, and wizard trigger authoring paths, and docs now reflect that completed trigger flow.
+
 ## Direction 5 update: Studio shell persistence integration (story 1.11)
 
 - Studio shell now has a real SQLite-backed infrastructure adapter (`infrastructure/filesystem/studio-shell/SqliteStudioShellRepository.ts`) implementing `IStudioShellRepository` with migration-managed schema, indexed studio/session/draft/version storage, and full aggregate snapshot persistence.
@@ -573,7 +646,7 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
 - Workflow draft input contracts now use canonical source typing (`sourceType`) with dataset-asset references (`assetId` + optional `versionId`) plus bounded runtime/static source variants, enabling multiple input entries per draft without UI-local schema forks.
 - Workflow draft step contracts now use an explicit canonical base step model with stable step identity (`id`), explicit ordering (`order`), and clear step classification (`kind` + `type`) while preserving deterministic ordering/uniqueness validation.
 - Workflow draft step contracts now include an explicit asset-backed step substructure (`assetRef`) with canonical asset references (`assetId` + optional `versionId`) and implemented agent/assistant-backed step support (`assetKind=agent-assistant`) without introducing a parallel step model.
-- Workflow draft step contracts now include canonical built-in control-flow step variants (`if-then`, `loop-iteration`) under the same base step model (`kind=control-flow`) with typed configuration payloads and deterministic structural validation.
+- Workflow draft step contracts now include canonical built-in step variants (`if-then`, `loop-iteration`, `delay-wait`, `manual-approval`) under the same base step model (`kind=control-flow`) with typed configuration payloads and deterministic structural validation.
 - Workflow draft output contracts now include a canonical structured output model (`outputType`, `format`, `destination`) supporting one-or-more outputs per draft without introducing output-specific parallel schemas.
 - A bounded application orchestrator (`application/workflow-studio/WorkflowStudioApplicationService.ts`) reuses `StudioShellApplicationService` for initialize/create/publish lifecycle instead of introducing workflow-specific create/update/publish infrastructure.
 - Publish gating now reuses shared composite enforcement (`assertCompositeStudioDraftPublishConsistency`) so workflow semantic-role and behavior invariants plus taxonomy-driven contract derivability remain backend/application-authoritative.

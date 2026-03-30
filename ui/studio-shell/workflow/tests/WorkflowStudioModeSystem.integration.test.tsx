@@ -22,6 +22,7 @@ import {
   removeWorkflowStep,
   setWorkflowStepDelayConfig,
   setWorkflowStepIfThenConfig,
+  setWorkflowStepManualApprovalConfig,
   setWorkflowStepAgentAssetSelection,
   setWorkflowStepType,
   workflowStepTypeDefinitions,
@@ -345,7 +346,7 @@ describe("WorkflowStudioModeSystem integration seams", () => {
     expect(store.getState().modeValidationIssues.some((issue) => issue.code === "draft-parse-error")).toBe(true);
   });
 
-  it("supports wizard trigger add/remove/configuration while persisting through shared draft state", () => {
+  it("supports multi-trigger add/select/edit/reorder/remove with type-specific config forms", () => {
     const store = new WorkflowStudioModeStateStore();
     store.setSelectedMode(WorkflowStudioModeIds.wizard);
 
@@ -366,55 +367,102 @@ describe("WorkflowStudioModeSystem integration seams", () => {
     });
 
     let boundary = renderBoundary();
-    const addManualButton = getElementByTestId(boundary, "workflow-trigger-add-manual") as ReactElement<ButtonElementProps>;
-    addManualButton.props.onClick?.();
+    const initialMarkup = renderToStaticMarkup(boundary);
+    expect(initialMarkup).toContain("Manual");
+    expect(initialMarkup).toContain("Scheduled time");
+    expect(initialMarkup).toContain("System event");
+
+    const addTypeSelect = getElementByTestId(boundary, "workflow-trigger-add-type-select") as ReactElement<SelectElementProps>;
+    addTypeSelect.props.onChange?.({ target: { value: "manual" } });
+    const addTriggerButton = getElementByTestId(boundary, "workflow-trigger-add") as ReactElement<ButtonElementProps>;
+    addTriggerButton.props.onClick?.();
     expect(store.getState().sharedDraft.triggers).toHaveLength(1);
     expect(store.getState().sharedDraft.triggers[0]?.kind).toBe("user");
     expect(store.getState().sharedDraft.triggers[0]?.type).toBe("manual");
 
     boundary = renderBoundary();
-    const triggerTypeSelect = getElementByTestId(boundary, "workflow-trigger-type-0") as ReactElement<SelectElementProps>;
-    triggerTypeSelect.props.onChange?.({ target: { value: "temporal" } });
-    expect(store.getState().sharedDraft.triggers[0]?.kind).toBe("temporal");
+    const addSecondTypeSelect = getElementByTestId(boundary, "workflow-trigger-add-type-select") as ReactElement<SelectElementProps>;
+    addSecondTypeSelect.props.onChange?.({ target: { value: "recurring" } });
+    const addSecondTriggerButton = getElementByTestId(boundary, "workflow-trigger-add") as ReactElement<ButtonElementProps>;
+    addSecondTriggerButton.props.onClick?.();
+    expect(store.getState().sharedDraft.triggers).toHaveLength(2);
+    expect(store.getState().sharedDraft.triggers[1]?.type).toBe("recurring");
 
     boundary = renderBoundary();
-    const temporalTimeInput = getElementByTestId(boundary, "workflow-trigger-temporal-time-0") as ReactElement<InputElementProps>;
-    temporalTimeInput.props.onChange?.({ target: { value: "" } });
+    const selectSecond = getElementByTestId(boundary, "workflow-trigger-select-1") as ReactElement<ButtonElementProps>;
+    selectSecond.props.onClick?.();
+    const recurringEvery = getElementByTestId(boundary, "workflow-trigger-temporal-every-1") as ReactElement<InputElementProps>;
+    recurringEvery.props.onChange?.({ target: { value: "3" } });
+    const recurringUnit = getElementByTestId(boundary, "workflow-trigger-temporal-unit-1") as ReactElement<SelectElementProps>;
+    recurringUnit.props.onChange?.({ target: { value: "hours" } });
+    expect(store.getState().sharedDraft.triggers[1]?.config).toEqual(expect.objectContaining({
+      every: 3,
+      unit: "hours",
+    }));
+
+    boundary = renderBoundary();
+    expect(renderToStaticMarkup(boundary)).toContain(
+      "Supports continuation semantics for intermediate resume and human-approval handoff flows.",
+    );
+    const selectFirst = getElementByTestId(boundary, "workflow-trigger-select-0") as ReactElement<ButtonElementProps>;
+    selectFirst.props.onClick?.();
+    const userScopeSelect = getElementByTestId(boundary, "workflow-trigger-user-scope-0") as ReactElement<SelectElementProps>;
+    userScopeSelect.props.onChange?.({ target: { value: "workflow-continuation" } });
+    const continuationStep = getElementByTestId(boundary, "workflow-trigger-user-continuation-step-0") as ReactElement<InputElementProps>;
+    continuationStep.props.onChange?.({ target: { value: "missing-step-id" } });
     expect(store.getState().isSharedDraftValid).toBe(false);
 
     boundary = renderBoundary();
-    expect(renderToStaticMarkup(boundary)).toContain("Temporal trigger requires a valid time of day.");
-    temporalTimeInput.props.onChange?.({ target: { value: "14:30" } });
-    expect(store.getState().isSharedDraftValid).toBe(true);
+    const validationMarkup = renderToStaticMarkup(boundary);
+    expect(validationMarkup).toContain("references unknown continuationStepId");
+
+    boundary = renderBoundary();
+    const triggerTypeSelect = getElementByTestId(boundary, "workflow-trigger-type-0") as ReactElement<SelectElementProps>;
+    triggerTypeSelect.props.onChange?.({ target: { value: "schedule" } });
+    expect(store.getState().sharedDraft.triggers[0]?.kind).toBe("temporal");
+    expect(store.getState().sharedDraft.triggers[0]?.type).toBe("schedule");
+
+    boundary = renderBoundary();
+    const temporalCronInput = getElementByTestId(boundary, "workflow-trigger-temporal-cron-0") as ReactElement<InputElementProps>;
+    temporalCronInput.props.onChange?.({ target: { value: "15 14 * * *" } });
+    expect(store.getState().sharedDraft.triggers[0]?.config).toEqual(expect.objectContaining({
+      cronExpression: "15 14 * * *",
+    }));
 
     boundary = renderBoundary();
     const stateTypeSelect = getElementByTestId(boundary, "workflow-trigger-type-0") as ReactElement<SelectElementProps>;
-    stateTypeSelect.props.onChange?.({ target: { value: "state" } });
+    stateTypeSelect.props.onChange?.({ target: { value: "system-event" } });
     expect(store.getState().sharedDraft.triggers[0]?.kind).toBe("state");
+    expect(store.getState().sharedDraft.triggers[0]?.type).toBe("system-event");
 
     boundary = renderBoundary();
     const stateEventNameInput = getElementByTestId(boundary, "workflow-trigger-state-event-name-0") as ReactElement<InputElementProps>;
-    stateEventNameInput.props.onChange?.({ target: { value: "" } });
-    expect(store.getState().isSharedDraftValid).toBe(false);
-
-    boundary = renderBoundary();
-    stateEventNameInput.props.onChange?.({ target: { value: "new-data" } });
-    const stateSourceInput = getElementByTestId(boundary, "workflow-trigger-state-source-0") as ReactElement<InputElementProps>;
-    stateSourceInput.props.onChange?.({ target: { value: "source-alpha" } });
-    expect(store.getState().isSharedDraftValid).toBe(true);
+    stateEventNameInput.props.onChange?.({ target: { value: "new-data-ready" } });
+    const stateKeyInput = getElementByTestId(boundary, "workflow-trigger-state-key-0") as ReactElement<InputElementProps>;
+    stateKeyInput.props.onChange?.({ target: { value: "source-alpha" } });
     expect(store.getState().sharedDraft.triggers[0]?.config).toEqual(expect.objectContaining({
-      eventName: "new-data",
+      eventName: "new-data-ready",
       stateKey: "source-alpha",
     }));
+
+    boundary = renderBoundary();
+    const moveDownFirst = getElementByTestId(boundary, "workflow-trigger-move-down-0") as ReactElement<ButtonElementProps>;
+    moveDownFirst.props.onClick?.();
+    expect(store.getState().sharedDraft.triggers[1]?.type).toBe("system-event");
 
     const baselineSerialized = store.getState().sharedDraftSerialized;
     store.setSelectedMode(WorkflowStudioModeIds.canvas);
     store.setSelectedMode(WorkflowStudioModeIds.wizard);
     expect(store.getState().sharedDraftSerialized).toBe(baselineSerialized);
+    expect(store.getState().sharedDraft.triggers).toHaveLength(2);
 
     boundary = renderBoundary();
-    const removeButton = getElementByTestId(boundary, "workflow-trigger-remove-0") as ReactElement<ButtonElementProps>;
-    removeButton.props.onClick?.();
+    const removeSecondButton = getElementByTestId(boundary, "workflow-trigger-remove-1") as ReactElement<ButtonElementProps>;
+    removeSecondButton.props.onClick?.();
+    expect(store.getState().sharedDraft.triggers).toHaveLength(1);
+    boundary = renderBoundary();
+    const removeFirstButton = getElementByTestId(boundary, "workflow-trigger-remove-0") as ReactElement<ButtonElementProps>;
+    removeFirstButton.props.onClick?.();
     expect(store.getState().sharedDraft.triggers).toHaveLength(0);
   });
 
@@ -499,6 +547,51 @@ describe("WorkflowStudioModeSystem integration seams", () => {
 
     store.updateSharedDraft((draft) => removeWorkflowStep(draft, secondStepId).draft);
     expect(store.getState().sharedDraft.steps.map((step) => step.order)).toEqual([1, 2]);
+  });
+
+  it("renders mixed asset-backed and built-in step choices and surfaces built-in validation feedback", () => {
+    const store = new WorkflowStudioModeStateStore();
+    store.setSelectedMode(WorkflowStudioModeIds.wizard);
+
+    const renderBoundary = () => WorkflowStudioDraftAuthoringBoundary({
+      isWorkflowStudio: true,
+      content: store.getState().sharedDraftSerialized,
+      onChangeContent: (nextContent) => store.hydrateFromSerializedDraft(nextContent),
+      workflowModeContext: {
+        selectedModeId: store.getState().selectedModeId,
+        selectedWizardPageId: "steps",
+        sharedDraft: store.getState().sharedDraft,
+        sharedDraftSerialized: store.getState().sharedDraftSerialized,
+        draftEditorContent: store.getState().draftEditorContent,
+        modeValidationIssues: store.getState().modeValidationIssues,
+        draftValidationIssues: store.getState().draftValidationIssues,
+        updateSharedDraft: (updater) => store.updateSharedDraft(updater),
+      },
+    });
+
+    let boundary = renderBoundary();
+    const initialMarkup = renderToStaticMarkup(boundary);
+    expect(initialMarkup).toContain("Agent/assistant action");
+    expect(initialMarkup).toContain("Manual / Approval");
+
+    const addManual = getElementByTestId(
+      boundary,
+      "workflow-step-add-built-in:control-flow:manual-approval",
+    ) as ReactElement<ButtonElementProps>;
+    addManual.props.onClick?.();
+    expect(store.getState().sharedDraft.steps[0]?.type).toBe(WorkflowDraftBuiltInStepTypes.manualApproval);
+
+    store.updateSharedDraft((draft) => setWorkflowStepManualApprovalConfig(
+      draft,
+      store.getState().sharedDraft.steps[0]?.id as string,
+      { prompt: "" },
+    ).draft);
+    expect(store.getState().isSharedDraftValid).toBe(false);
+
+    boundary = renderBoundary();
+    const withManualMarkup = renderToStaticMarkup(boundary);
+    expect(withManualMarkup).toContain('data-testid="workflow-step-manual-config-0"');
+    expect(withManualMarkup).toContain("requires config.prompt or legacy approvalMessage");
   });
 
   it("supports wizard output add/remove/type/configuration with clean type switching and shared mode persistence", () => {
