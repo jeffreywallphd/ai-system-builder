@@ -34,6 +34,7 @@ import { AssetSelectorReturnHandoffService } from "../../../studio-shell/asset-s
 import {
   addWorkflowStep,
   buildWorkflowStepTypeDefinitionKey,
+  canMoveWorkflowStep,
   clearWorkflowStepAgentAssetSelection,
   getWorkflowStepTypeDefinitionByKey,
   moveWorkflowStepDown,
@@ -48,6 +49,7 @@ import {
   setWorkflowStepTitle,
   setWorkflowStepType,
   workflowStepTypeDefinitions,
+  WorkflowStepMoveDirections,
   WorkflowWizardStepSelectionKinds,
 } from "../../../studio-shell/workflow/WorkflowWizardSteps";
 import {
@@ -236,6 +238,7 @@ export default function WorkflowStudioStepSectionEditor({
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [selectorOperation, setSelectorOperation] = useState<StepSelectorOperation | undefined>(undefined);
   const [selectorReturnTargetId, setSelectorReturnTargetId] = useState<string | undefined>(undefined);
+  const [insertionPosition, setInsertionPosition] = useState("end");
   const lastAppliedCompletedCount = useRef<number | undefined>(undefined);
 
   const stepValidationIssues = useMemo(
@@ -283,6 +286,7 @@ export default function WorkflowStudioStepSectionEditor({
     () => addableDefinitions.filter((definition) => definition.selectionKind === WorkflowWizardStepSelectionKinds.builtIn),
     [addableDefinitions],
   );
+  const insertionAfterStepId = insertionPosition !== "end" ? insertionPosition : undefined;
 
   const openSelector = (operation: StepSelectorOperation, seedSelection?: {
     readonly assetId: string;
@@ -377,6 +381,16 @@ export default function WorkflowStudioStepSectionEditor({
       active = false;
     };
   }, [queryRevision, searchTerm, selectorDataProvider, selectorRequest]);
+
+  useEffect(() => {
+    if (insertionPosition === "end") {
+      return;
+    }
+    const stillAvailable = sharedDraft.steps.some((step) => step.id === insertionPosition);
+    if (!stillAvailable) {
+      setInsertionPosition("end");
+    }
+  }, [insertionPosition, sharedDraft.steps]);
 
   useEffect(() => {
     const expectedOperation = selectorOperation ?? parseStepSelectorOperationFromSearch(location.search, sharedDraft);
@@ -520,7 +534,9 @@ export default function WorkflowStudioStepSectionEditor({
         }).draft;
       }
 
-      const added = addWorkflowStep(draft, defaultAgentAssistantStepDefinition);
+      const added = addWorkflowStep(draft, defaultAgentAssistantStepDefinition, {
+        afterStepId: insertionAfterStepId,
+      });
       return setWorkflowStepAgentAssetSelection(added.draft, added.stepId, {
         assetId: selectedAsset.assetId,
         versionId: selectedAsset.versionId,
@@ -530,7 +546,7 @@ export default function WorkflowStudioStepSectionEditor({
 
     closeSelector();
     setSelectorReturnTargetId(undefined);
-  }, [location.search, onUpdateSharedDraft, selectorOperation, selectorReturnTargetId, selectorState, sharedDraft]);
+  }, [insertionAfterStepId, location.search, onUpdateSharedDraft, selectorOperation, selectorReturnTargetId, selectorState, sharedDraft]);
 
   const stateForShell = selectorState ?? selectorSessionStore.getSession(selectorSessionKey);
 
@@ -548,6 +564,22 @@ export default function WorkflowStudioStepSectionEditor({
           <p className="ui-text-small ui-text-secondary">
             Select either an asset-backed action or a built-in workflow-native action.
           </p>
+          <label className="ui-stack ui-stack--2xs">
+            <span className="ui-text-small">Insertion point</span>
+            <select
+              className="ui-select"
+              value={insertionPosition}
+              onChange={(event) => setInsertionPosition(event.target.value)}
+              data-testid="workflow-step-insertion-position"
+            >
+              <option value="end">Append to end</option>
+              {sharedDraft.steps.map((step, index) => (
+                <option key={step.id} value={step.id}>
+                  After {index + 1}. {step.title?.trim() || step.id}
+                </option>
+              ))}
+            </select>
+          </label>
           <div className="ui-form-grid ui-form-grid--single">
             {addableAssetBackedDefinitions.map((definition) => (
               <button
@@ -581,7 +613,9 @@ export default function WorkflowStudioStepSectionEditor({
                   if (!onUpdateSharedDraft) {
                     return;
                   }
-                  onUpdateSharedDraft((draft) => addWorkflowStep(draft, definition).draft);
+                  onUpdateSharedDraft((draft) => addWorkflowStep(draft, definition, {
+                    afterStepId: insertionAfterStepId,
+                  }).draft);
                 }}
               >
                 <span className="workflow-step-selector-option__header">
@@ -1480,7 +1514,7 @@ export default function WorkflowStudioStepSectionEditor({
                       type="button"
                       className="ui-button ui-button--ghost ui-button--sm"
                       data-testid={`workflow-step-move-up-${index}`}
-                      disabled={!onUpdateSharedDraft || index === 0}
+                      disabled={!onUpdateSharedDraft || !canMoveWorkflowStep(sharedDraft, step.id, WorkflowStepMoveDirections.up)}
                       onClick={() => {
                         if (!onUpdateSharedDraft) {
                           return;
@@ -1494,7 +1528,7 @@ export default function WorkflowStudioStepSectionEditor({
                       type="button"
                       className="ui-button ui-button--ghost ui-button--sm"
                       data-testid={`workflow-step-move-down-${index}`}
-                      disabled={!onUpdateSharedDraft || index >= sharedDraft.steps.length - 1}
+                      disabled={!onUpdateSharedDraft || !canMoveWorkflowStep(sharedDraft, step.id, WorkflowStepMoveDirections.down)}
                       onClick={() => {
                         if (!onUpdateSharedDraft) {
                           return;

@@ -18,6 +18,10 @@ import {
   validateWorkflowDraft,
   WorkflowStudioIdentity,
 } from "../../domain/workflow-studio/WorkflowStudioDomain";
+import {
+  mapWorkflowDraftToExecutionPlan,
+  type WorkflowDraftExecutionPlan,
+} from "./WorkflowDraftExecutionPlanMapper";
 
 export interface EnsureWorkflowStudioResult {
   readonly initialized: boolean;
@@ -44,6 +48,10 @@ export interface PublishWorkflowDraftCommand {
   readonly versionId?: string;
   readonly versionLabel?: string;
   readonly createdBy?: string;
+}
+
+export interface PlanWorkflowDraftExecutionCommand {
+  readonly content: string;
 }
 
 export class WorkflowStudioApplicationService {
@@ -162,5 +170,22 @@ export class WorkflowStudioApplicationService {
       versionLabel: command.versionLabel,
       createdBy: command.createdBy,
     });
+  }
+
+  public planWorkflowDraftExecution(command: PlanWorkflowDraftExecutionCommand): WorkflowDraftExecutionPlan {
+    let canonicalDraft;
+    try {
+      canonicalDraft = deserializeWorkflowDraft(command.content);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "Workflow draft content is not valid JSON.";
+      throw new StudioShellInvalidRequestError(`Workflow draft content is malformed: ${detail}`);
+    }
+
+    try {
+      return mapWorkflowDraftToExecutionPlan(canonicalDraft);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "workflow-draft-execution-plan-failed";
+      throw new StudioShellInvalidRequestError(`Workflow draft execution planning failed: ${detail}`);
+    }
   }
 }

@@ -19,6 +19,7 @@ describe("WorkflowStudioStepSectionEditor", () => {
 
     expect(html).toContain("Steps Section");
     expect(html).toContain("Add step");
+    expect(html).toContain("Insertion point");
     expect(html).toContain("Agent/assistant action");
     expect(html).toContain("Built-in");
     expect(html).toContain("Manual / Approval");
