@@ -89,6 +89,7 @@ function WorkflowItemGraphNode({
         "ui-stack",
         "ui-stack--2xs",
         selected ? "ui-workflow-canvas-node--selected" : "",
+        issueCount > 0 ? "ui-workflow-canvas-node--invalid" : "",
         data.graphNode.stepType === "if-then" ? "ui-workflow-canvas-node--branching" : "",
       ].filter(Boolean).join(" ")}
       data-testid={`workflow-canvas-node-${data.graphNode.sectionId}-${data.graphNode.entityId ?? data.graphNode.id}`}

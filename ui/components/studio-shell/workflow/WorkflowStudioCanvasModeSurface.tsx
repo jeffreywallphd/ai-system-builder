@@ -16,9 +16,9 @@ import {
 import AssetSelectorShell from "../asset-selector/AssetSelectorShell";
 import {
   applyWorkflowCanvasAction,
-  applyWorkflowCanvasConnection,
   applyWorkflowCanvasEdgeReconnect,
   deriveWorkflowCanvasViewModel,
+  resolveWorkflowCanvasConnectionAction,
   resolveWorkflowCanvasEdgeRemovalAction,
   WorkflowCanvasGraphNodeKinds,
   WorkflowCanvasSectionIds,
@@ -286,6 +286,32 @@ export default function WorkflowStudioCanvasModeSurface({
   const leftDrawerOpen = drawerState?.left?.isOpen ?? true;
   const rightDrawerOpen = drawerState?.right?.isOpen ?? true;
   const normalizedPaletteSearch = paletteSearchValue.trim().toLowerCase();
+  const validationIssueSummaryBySection = useMemo(() => {
+    const summary = new Map<WorkflowCanvasSectionId, number>();
+    for (const issue of draftValidationIssues) {
+      const path = issue.path ?? "";
+      if (path.startsWith("draft.triggers[")) {
+        summary.set(WorkflowCanvasSectionIds.triggers, (summary.get(WorkflowCanvasSectionIds.triggers) ?? 0) + 1);
+        continue;
+      }
+      if (path.startsWith("draft.inputs[")) {
+        summary.set(WorkflowCanvasSectionIds.inputs, (summary.get(WorkflowCanvasSectionIds.inputs) ?? 0) + 1);
+        continue;
+      }
+      if (path.startsWith("draft.steps[")) {
+        summary.set(WorkflowCanvasSectionIds.steps, (summary.get(WorkflowCanvasSectionIds.steps) ?? 0) + 1);
+        continue;
+      }
+      if (path.startsWith("draft.outputs[")) {
+        summary.set(WorkflowCanvasSectionIds.outputs, (summary.get(WorkflowCanvasSectionIds.outputs) ?? 0) + 1);
+      }
+    }
+    return summary;
+  }, [draftValidationIssues]);
+  const topDraftValidationIssues = useMemo(
+    () => draftValidationIssues.slice(0, 8),
+    [draftValidationIssues],
+  );
 
   useEffect(() => {
     if (selectedNodeId && !graphNodesById.has(selectedNodeId)) {
@@ -516,19 +542,22 @@ export default function WorkflowStudioCanvasModeSurface({
     if (!connection.source || !connection.target) {
       return;
     }
-    let changed = false;
-    updateSharedDraft((draft) => {
-      const result = applyWorkflowCanvasConnection(draft, viewModel.graph, {
-        sourceNodeId: connection.source as string,
-        targetNodeId: connection.target as string,
-        sourceHandleId: connection.sourceHandle ?? undefined,
-        targetHandleId: connection.targetHandle ?? undefined,
-      });
-      changed = result.changed;
-      return result.draft;
-    });
-    if (!changed) {
-      setCanvasInteractionMessage("Unsupported connection. Use Step->Step, If/Then branch handles, or Step->Output links.");
+    const request = {
+      sourceNodeId: connection.source as string,
+      targetNodeId: connection.target as string,
+      sourceHandleId: connection.sourceHandle ?? undefined,
+      targetHandleId: connection.targetHandle ?? undefined,
+    };
+    const resolution = resolveWorkflowCanvasConnectionAction(viewModel.graph, request);
+    if (!resolution.valid || !resolution.action) {
+      setCanvasInteractionMessage(
+        resolution.reason ?? "Unsupported connection. Use Step->Step, If/Then branch handles, or Step->Output links.",
+      );
+      return;
+    }
+    const result = applyAction(resolution.action);
+    if (!result.changed) {
+      setCanvasInteractionMessage("Connection could not be applied to the canonical workflow draft.");
       return;
     }
     setCanvasInteractionMessage(undefined);
@@ -1104,10 +1133,54 @@ export default function WorkflowStudioCanvasModeSurface({
       <section className="ui-workflow-studio-canvas__canvas-shell ui-stack ui-stack--2xs" data-testid="workflow-studio-canvas-summary">
         <header className="ui-row ui-row--between ui-row--wrap ui-workflow-studio-canvas__canvas-header">
           <strong>Workflow Canvas</strong>
-          <span className="ui-text-small ui-text-secondary">
-            Nodes: {viewModel.totalNodeCount} | Validation issues: {viewModel.totalIssueCount}
-          </span>
+          <div className="ui-row ui-row--wrap ui-row--end">
+            <span className={`ui-badge ${viewModel.totalIssueCount > 0 ? "ui-badge--warning" : "ui-badge--success"}`}>
+              {viewModel.totalIssueCount > 0 ? `${viewModel.totalIssueCount} validation issue(s)` : "No validation issues"}
+            </span>
+            <span className="ui-badge ui-badge--neutral">Nodes: {viewModel.totalNodeCount}</span>
+          </div>
         </header>
+        {viewModel.totalNodeCount === 0 ? (
+          <div className="ui-card ui-card--padded ui-workflow-canvas-empty-state" data-testid="workflow-canvas-empty-state">
+            <strong>Canvas is empty</strong>
+            <p className="ui-text-small ui-text-secondary">
+              Add trigger, input, step, and output nodes from the Nodes drawer to start authoring this workflow.
+            </p>
+          </div>
+        ) : null}
+        {topDraftValidationIssues.length > 0 ? (
+          <section className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid="workflow-canvas-validation-panel">
+            <div className="ui-row ui-row--between ui-row--wrap">
+              <strong>Canvas validation feedback</strong>
+              <span className="ui-badge ui-badge--warning">{draftValidationIssues.length} issue(s)</span>
+            </div>
+            <div className="ui-row ui-row--wrap">
+              {workflowCanvasPaletteSections.map((section) => {
+                const count = validationIssueSummaryBySection.get(section.id) ?? 0;
+                if (count === 0) {
+                  return null;
+                }
+                return (
+                  <span key={`canvas-issue-summary-${section.id}`} className="ui-badge ui-badge--neutral">
+                    {section.title}: {count}
+                  </span>
+                );
+              })}
+            </div>
+            <ul className="ui-stack ui-stack--2xs ui-workflow-canvas-validation-list">
+              {topDraftValidationIssues.map((issue, index) => (
+                <li key={`workflow-canvas-issue-${index}`} className="ui-text-small ui-text-secondary">
+                  {issue.message}
+                </li>
+              ))}
+            </ul>
+            {draftValidationIssues.length > topDraftValidationIssues.length ? (
+              <p className="ui-text-small ui-text-secondary">
+                Showing first {topDraftValidationIssues.length} issues.
+              </p>
+            ) : null}
+          </section>
+        ) : null}
         <WorkflowStudioCanvasReactFlow
           graph={viewModel.graph}
           selectedNodeId={selectedNodeId}

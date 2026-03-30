@@ -598,6 +598,7 @@ export interface WorkflowCanvasConnectionRequest {
 export interface WorkflowCanvasConnectionResolution {
   readonly valid: boolean;
   readonly action?: WorkflowCanvasAction;
+  readonly reason?: string;
 }
 
 export interface WorkflowCanvasEdgeUpdateRequest {
@@ -608,6 +609,13 @@ export interface WorkflowCanvasEdgeUpdateRequest {
 function normalizeOptional(value?: string): string | undefined {
   const normalized = value?.trim();
   return normalized && normalized.length > 0 ? normalized : undefined;
+}
+
+function invalidConnectionResolution(reason: string): WorkflowCanvasConnectionResolution {
+  return Object.freeze({
+    valid: false,
+    reason,
+  });
 }
 
 function isCanonicalAssetIdentity(value?: string): boolean {
@@ -886,14 +894,14 @@ export function resolveWorkflowCanvasConnectionAction(
   const sourceNode = getGraphNodeById(graph, request.sourceNodeId);
   const targetNode = getGraphNodeById(graph, request.targetNodeId);
   if (!sourceNode || !targetNode) {
-    return Object.freeze({ valid: false });
+    return invalidConnectionResolution("Connection endpoint could not be resolved in the current canvas view.");
   }
 
   if (sourceNode.kind !== WorkflowCanvasGraphNodeKinds.item || targetNode.kind !== WorkflowCanvasGraphNodeKinds.item) {
-    return Object.freeze({ valid: false });
+    return invalidConnectionResolution("Only item nodes support editable connections.");
   }
   if (!sourceNode.entityId || !targetNode.entityId) {
-    return Object.freeze({ valid: false });
+    return invalidConnectionResolution("Connection endpoint is missing canonical entity identity.");
   }
 
   if (
@@ -904,7 +912,7 @@ export function resolveWorkflowCanvasConnectionAction(
     const branchKey = parseWorkflowCanvasBranchKeyFromHandleId(request.sourceHandleId);
     if (branchKey) {
       if (sourceNode.stepType !== WorkflowDraftBuiltInStepTypes.ifThen) {
-        return Object.freeze({ valid: false });
+        return invalidConnectionResolution("Only if-then steps expose branch handles.");
       }
       return Object.freeze({
         valid: true,
@@ -940,7 +948,9 @@ export function resolveWorkflowCanvasConnectionAction(
     });
   }
 
-  return Object.freeze({ valid: false });
+  return invalidConnectionResolution(
+    "Unsupported connection. Use Step->Step, If/Then branch handles, or Step->Output links.",
+  );
 }
 
 export function resolveWorkflowCanvasEdgeRemovalAction(

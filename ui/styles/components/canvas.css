@@ -416,6 +416,15 @@ body.ui-canvas-locked .ui-page--editor-canvas-locked .ui-canvas-shell {
   height: 100%;
 }
 
+.ui-workflow-canvas-empty-state {
+  border-color: var(--color-border-soft);
+}
+
+.ui-workflow-canvas-validation-list {
+  margin: 0;
+  padding-left: var(--space-md);
+}
+
 .ui-workflow-canvas-node {
   width: 260px;
   min-height: 6.25rem;
@@ -446,6 +455,13 @@ body.ui-canvas-locked .ui-page--editor-canvas-locked .ui-canvas-shell {
   box-shadow:
     var(--shadow-panel),
     0 0 0 1px rgba(79, 156, 249, 0.2);
+}
+
+.ui-workflow-canvas-node--invalid {
+  border-color: rgba(255, 107, 107, 0.62);
+  box-shadow:
+    var(--shadow-panel),
+    0 0 0 1px rgba(255, 107, 107, 0.25);
 }
 
 .ui-workflow-canvas-node__title {

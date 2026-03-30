@@ -64,6 +64,7 @@ describe("WorkflowStudioDraftAuthoringBoundary", () => {
     expect(html).toContain('data-testid="workflow-studio-canvas-mode-surface"');
     expect(html).toContain('data-testid="workflow-studio-canvas-reactflow"');
     expect(html).toContain('data-testid="workflow-studio-canvas-graph-details"');
+    expect(html).toContain('data-testid="workflow-canvas-empty-state"');
     expect(html).not.toContain("Canvas layout container");
     expect(html).not.toContain('data-testid="workflow-studio-wizard-mode-layout"');
     expect(html).not.toContain('data-testid="workflow-studio-wizard-mode-surface"');
@@ -125,6 +126,7 @@ describe("WorkflowStudioDraftAuthoringBoundary", () => {
 
     expect(html).toContain("Workflow mode validation: 1 issue(s) detected.");
     expect(html).toContain("Shared workflow draft validation: 1 canonical issue(s) detected.");
+    expect(html).toContain('data-testid="workflow-canvas-validation-panel"');
   });
 
   it("renders canvas branching and asset selector controls from canonical draft state", () => {

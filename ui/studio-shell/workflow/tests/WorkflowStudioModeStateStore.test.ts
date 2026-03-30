@@ -255,6 +255,46 @@ describe("WorkflowStudioModeStateStore", () => {
     expect(store.getState().sharedDraft.steps.map((step) => step.id)).toEqual(["local-step"]);
   });
 
+  it("marks local edits as saved when backend snapshot matches canonical shared draft", () => {
+    const store = new WorkflowStudioModeStateStore();
+    const initialServerDraft = serializeWorkflowDraft(createEmptyWorkflowDraft());
+
+    store.synchronizeSharedDraftFromSnapshot({
+      serializedDraft: initialServerDraft,
+      context: {
+        studioId: "workflow-studio",
+        sessionId: "session-1",
+        draftId: "draft-1",
+        revision: 1,
+      },
+    });
+
+    const editedDraft = serializeWorkflowDraft({
+      ...createEmptyWorkflowDraft(),
+      triggers: [{
+        id: "trigger-1",
+        kind: "user",
+        type: "manual",
+        config: {},
+      }],
+    });
+    store.hydrateFromSerializedDraft(editedDraft);
+    expect(store.getState().hasLocalDraftEdits).toBe(true);
+
+    store.synchronizeSharedDraftFromSnapshot({
+      serializedDraft: editedDraft,
+      context: {
+        studioId: "workflow-studio",
+        sessionId: "session-1",
+        draftId: "draft-1",
+        revision: 2,
+      },
+    });
+
+    expect(store.getState().hasLocalDraftEdits).toBe(false);
+    expect(store.getState().draftParseError).toBeUndefined();
+  });
+
   it("re-hydrates from backend draft when draft session identity changes", () => {
     const store = new WorkflowStudioModeStateStore();
 

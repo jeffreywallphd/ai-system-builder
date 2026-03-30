@@ -10,6 +10,7 @@ import {
   applyWorkflowCanvasEdgeReconnect,
   applyWorkflowCanvasAction,
   deriveWorkflowCanvasViewModel,
+  resolveWorkflowCanvasConnectionAction,
   resolveWorkflowCanvasEdgeRemovalAction,
   WorkflowCanvasGraphEdgeKinds,
   WorkflowCanvasGraphNodeKinds,
@@ -452,11 +453,45 @@ describe("WorkflowStudioCanvasViewModel", () => {
       throw new Error("Expected trigger and step graph nodes.");
     }
 
-    const result = applyWorkflowCanvasConnection(draft, viewModel.graph, {
+    const request = {
       sourceNodeId: triggerNode.id,
       targetNodeId: stepNode.id,
-    });
+    };
+    const resolution = resolveWorkflowCanvasConnectionAction(viewModel.graph, request);
+    expect(resolution.valid).toBe(false);
+    expect(resolution.reason).toContain("Unsupported connection");
+
+    const result = applyWorkflowCanvasConnection(draft, viewModel.graph, request);
     expect(result.changed).toBe(false);
     expect(result.draft).toBe(draft);
+  });
+
+  it("projects validation issue counts into the canvas summary and node issues", () => {
+    const draft = Object.freeze({
+      ...createEmptyWorkflowDraft(),
+      steps: Object.freeze([
+        Object.freeze({
+          id: "step-2",
+          type: "action",
+          kind: WorkflowDraftStepKinds.action,
+          order: 2,
+          title: "Out of order step",
+        }),
+      ]),
+    });
+
+    const viewModel = deriveWorkflowCanvasViewModel(draft, [{
+      code: "step-order-non-contiguous",
+      section: "steps",
+      severity: "error",
+      message: "Step order must be contiguous.",
+      path: "draft.steps[0].order",
+    }]);
+
+    expect(viewModel.totalIssueCount).toBe(1);
+    const stepNode = viewModel.sections
+      .find((section) => section.id === WorkflowCanvasSectionIds.steps)
+      ?.nodes[0];
+    expect(stepNode?.issueMessages).toEqual(["Step order must be contiguous."]);
   });
 });
