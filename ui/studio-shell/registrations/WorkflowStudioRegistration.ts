@@ -22,7 +22,7 @@ export const workflowStudioRegistration: CompositeStudioRegistration = Object.fr
     drawers: Object.freeze({
       left: Object.freeze({
         label: "Nodes",
-        defaultOpen: true,
+        defaultOpen: false,
       }),
       right: Object.freeze({
         label: "Inspector",
