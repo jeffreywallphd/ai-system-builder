@@ -426,4 +426,55 @@ describe("WorkflowStudioApplicationService", () => {
     ]);
     expect(result.traces.some((entry) => entry.stepId === "step-reject" && entry.status === "skipped")).toBeTrue();
   });
+
+  it("blocks manual run when canonical pre-execution validation fails", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => "generated");
+    const service = new WorkflowStudioApplicationService(studioShell);
+
+    const result = await service.runWorkflowDraftManual({
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-temporal",
+          kind: WorkflowDraftTriggerKinds.temporal,
+          type: WorkflowDraftTriggerTypes.temporalSchedule,
+          config: {},
+        }],
+        steps: [],
+      }),
+    });
+
+    expect(result.launchStatus).toBe("blocked");
+    expect(result.validation.ready).toBeFalse();
+    expect(result.validation.blockingIssues.length).toBeGreaterThan(0);
+  });
+
+  it("launches manual run when canonical pre-execution validation succeeds", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => "generated");
+    const service = new WorkflowStudioApplicationService(studioShell);
+
+    const result = await service.runWorkflowDraftManual({
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-manual",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        }],
+        steps: [{
+          id: "step-1",
+          type: "action",
+          kind: "action",
+          order: 1,
+        }],
+      }),
+    });
+
+    expect(result.launchStatus).toBe("launched");
+    expect(result.validation.ready).toBeTrue();
+    expect(result.runtimeResult?.status === "completed" || result.runtimeResult?.status === "paused").toBeTrue();
+  });
 });

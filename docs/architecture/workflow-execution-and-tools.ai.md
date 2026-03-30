@@ -78,6 +78,10 @@ Workflow -> `ExecuteWorkflowUseCase` -> one-unit `ExecutionPlan` -> `UnifiedExec
 - Trigger planning consumes canonical validated draft triggers and fails safely when unsupported/invalid trigger semantics reach planning (no silent trigger dropping).
 - Execution-plan trigger semantics remain continuation-ready (`workflow-start` + `workflow-continuation`), so future human-approval resume/intermediate continuation behavior is not blocked by start-only assumptions.
 
+- Pre-execution readiness validation is now a first-class canonical seam (`application/workflow-studio/WorkflowPreExecutionValidationPipeline.ts`) and runs before manual launch: authored workflow validation, pre-execution asset-version reference checks, and translation readiness are returned in one structured boundary result.
+- Manual Workflow Studio run now uses that same canonical flow through desktop/backend contracts (`StudioShellBackendApi.runWorkflowDraft` -> `WorkflowStudioApplicationService.runWorkflowDraftManual`) instead of UI-local execution logic: validate readiness -> translate canonical plan -> launch through runtime executor.
+- Workflow Studio launch feedback is now backend-authoritative (validation summary/issues + launch status projection), while wizard/canvas remain shared-draft authoring surfaces only.
+
 ## Runtime orchestration update
 - Delegated workflow execution selection can now consult the shared runtime dependency orchestrator before choosing a delegated strategy.
 - When the delegated workflow runtime gate is unavailable, selection falls back to a compatible interpreted strategy instead of pretending delegated execution is still ready.

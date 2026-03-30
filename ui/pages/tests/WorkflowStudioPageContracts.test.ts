@@ -27,6 +27,7 @@ describe("WorkflowStudioPage contracts", () => {
     expect(registrationSource).toContain("drawers: Object.freeze(");
     expect(registrationSource).toContain('label: "Nodes"');
     expect(registrationSource).toContain('label: "Inspector"');
+    expect(registrationSource).toContain('kind: "run-workflow-draft"');
 
     expect(shellSource).toContain("WorkflowStudioDraftAuthoringBoundary");
     expect(shellSource).toContain("workflowModeRoute");

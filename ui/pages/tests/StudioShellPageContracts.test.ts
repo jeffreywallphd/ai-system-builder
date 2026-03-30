@@ -38,6 +38,7 @@ describe("StudioShellPage contracts", () => {
     expect(source).toContain('data-testid="studio-shell-authoring-toolbar"');
     expect(source).toContain('data-testid="studio-shell-workflow-draft-status"');
     expect(source).toContain('data-testid="studio-shell-workflow-draft-status-badge"');
+    expect(source).toContain('data-testid="studio-shell-workflow-run-feedback"');
     expect(source).toContain('data-testid="studio-shell-left-drawer-toggle"');
     expect(source).toContain('data-testid="studio-shell-right-drawer-toggle"');
     expect(source).toContain("runToolbarAction(");
@@ -52,6 +53,7 @@ describe("StudioShellPage contracts", () => {
     expect(source).toContain("service.transitionLifecycle");
     expect(source).toContain("service.publishVersion");
     expect(source).toContain("service.validateDraft");
+    expect(source).toContain("service.runWorkflowDraft");
     expect(source.indexOf("Asset draft authoring")).toBeLessThan(source.indexOf("ui-studio-shell__grid"));
   });
 });

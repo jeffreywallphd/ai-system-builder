@@ -1,6 +1,7 @@
 import type { AssetDraftLifecycleStatus, AssetMetadata, AssetMetadataPatch } from "../../../domain/studio-shell/StudioShellDomain";
 import type { IStudioShellRepository } from "../../../application/ports/interfaces/IStudioShellRepository";
 import { DefaultStudioShellApplicationService } from "../../../application/studio-shell/DefaultStudioShellApplicationService";
+import { WorkflowStudioApplicationService } from "../../../application/workflow-studio/WorkflowStudioApplicationService";
 import {
   buildStudioShellValidationIssues,
   tryReadTaxonomyFromVersionMetadata,
@@ -63,11 +64,85 @@ export interface ValidateStudioShellDraftRequest {
   readonly draftId: string;
 }
 
+export interface RunWorkflowStudioDraftRequest {
+  readonly studioId: string;
+  readonly draftId?: string;
+  readonly content: string;
+  readonly inputValues?: Readonly<Record<string, unknown>>;
+  readonly triggerActivation?: {
+    readonly triggerId: string;
+    readonly activationType?: string;
+    readonly payload?: Readonly<Record<string, unknown>>;
+  };
+  readonly metadata?: Readonly<Record<string, unknown>>;
+  readonly manualDecisionsByStepId?: Readonly<Record<string, { readonly outcome: "continue" | "approve" | "reject" } | undefined>>;
+  readonly maxLoopIterations?: number;
+}
+
+export interface WorkflowExecutionValidationIssueReadModel {
+  readonly code: string;
+  readonly stage: string;
+  readonly severity: "error" | "warning";
+  readonly category: string;
+  readonly blocking: boolean;
+  readonly message: string;
+  readonly path?: string;
+}
+
+export interface WorkflowExecutionReadinessReadModel {
+  readonly ready: boolean;
+  readonly authoredValidation: {
+    readonly ready: boolean;
+    readonly blockingIssueCount: number;
+    readonly warningIssueCount: number;
+  };
+  readonly preExecutionValidation: {
+    readonly ready: boolean;
+    readonly blockingIssueCount: number;
+    readonly warningIssueCount: number;
+  };
+  readonly translationValidation: {
+    readonly ready: boolean;
+    readonly blockingIssueCount: number;
+    readonly warningIssueCount: number;
+  };
+  readonly issues: ReadonlyArray<WorkflowExecutionValidationIssueReadModel>;
+  readonly blockingIssueCount: number;
+  readonly warningIssueCount: number;
+}
+
+export interface RunWorkflowStudioDraftReadModel {
+  readonly launchStatus: "blocked" | "launched" | "failed";
+  readonly validation: WorkflowExecutionReadinessReadModel;
+  readonly planSummary?: {
+    readonly stepCount: number;
+    readonly triggerCount: number;
+    readonly outputCount: number;
+    readonly orderedStepIds: ReadonlyArray<string>;
+  };
+  readonly runtime?: {
+    readonly status: "completed" | "failed" | "paused";
+    readonly traceCount: number;
+    readonly issueCount: number;
+    readonly pausedAtStepId?: string;
+  };
+  readonly failureMessage?: string;
+}
+
 export class StudioShellBackendApi {
   private readonly service: DefaultStudioShellApplicationService;
+  private readonly workflowStudioService: WorkflowStudioApplicationService;
 
   constructor(private readonly repository: IStudioShellRepository) {
     this.service = new DefaultStudioShellApplicationService(repository);
+    this.workflowStudioService = new WorkflowStudioApplicationService(
+      this.service,
+      undefined,
+      undefined,
+      {
+        hasAssetVersionReference: async (versionId: string) => Boolean(await this.repository.getAssetVersion(versionId)),
+      },
+    );
   }
 
   public async initializeStudio(studioId: string, name: string): Promise<StudioShellApiResponse<StudioShellSnapshotReadModel>> {
@@ -136,6 +211,86 @@ export class StudioShellBackendApi {
         throw new StudioShellInvalidRequestError(`Draft '${request.draftId}' is not the active draft for studio '${request.studioId}'.`);
       }
       return snapshot.validationIssues;
+    });
+  }
+
+  public async runWorkflowDraft(request: RunWorkflowStudioDraftRequest): Promise<StudioShellApiResponse<RunWorkflowStudioDraftReadModel>> {
+    return this.wrap(async () => {
+      if (!request.content?.trim()) {
+        throw new StudioShellInvalidRequestError("Workflow draft content is required for manual workflow execution.");
+      }
+
+      if (request.draftId?.trim()) {
+        const snapshot = await this.requireSnapshot(request.studioId);
+        if (snapshot.draft?.draftId !== request.draftId) {
+          throw new StudioShellInvalidRequestError(
+            `Draft '${request.draftId}' is not the active draft for studio '${request.studioId}'.`,
+          );
+        }
+      }
+
+      const runResult = await this.workflowStudioService.runWorkflowDraftManual({
+        content: request.content,
+        context: {
+          inputValues: request.inputValues ?? {},
+          triggerActivation: request.triggerActivation,
+          metadata: request.metadata,
+        },
+        manualDecisionsByStepId: request.manualDecisionsByStepId,
+        maxLoopIterations: request.maxLoopIterations,
+      });
+
+      const issues = runResult.validation.issues.map((issue) => Object.freeze({
+        code: issue.code,
+        stage: issue.stage,
+        severity: issue.severity,
+        category: issue.category,
+        blocking: issue.blocking,
+        message: issue.message,
+        path: issue.path,
+      }));
+
+      return Object.freeze({
+        launchStatus: runResult.launchStatus,
+        validation: Object.freeze({
+          ready: runResult.validation.ready,
+          authoredValidation: Object.freeze({
+            ready: runResult.validation.authoredValidation.ready,
+            blockingIssueCount: runResult.validation.authoredValidation.blockingIssueCount,
+            warningIssueCount: runResult.validation.authoredValidation.warningIssueCount,
+          }),
+          preExecutionValidation: Object.freeze({
+            ready: runResult.validation.preExecutionValidation.ready,
+            blockingIssueCount: runResult.validation.preExecutionValidation.blockingIssueCount,
+            warningIssueCount: runResult.validation.preExecutionValidation.warningIssueCount,
+          }),
+          translationValidation: Object.freeze({
+            ready: runResult.validation.translationValidation.ready,
+            blockingIssueCount: runResult.validation.translationValidation.blockingIssueCount,
+            warningIssueCount: runResult.validation.translationValidation.warningIssueCount,
+          }),
+          issues: Object.freeze(issues),
+          blockingIssueCount: runResult.validation.blockingIssues.length,
+          warningIssueCount: runResult.validation.warningIssues.length,
+        }),
+        planSummary: runResult.validation.plan
+          ? Object.freeze({
+            stepCount: runResult.validation.plan.orderedStepIds.length,
+            triggerCount: runResult.validation.plan.triggers.length,
+            outputCount: runResult.validation.plan.outputs.length,
+            orderedStepIds: Object.freeze([...runResult.validation.plan.orderedStepIds]),
+          })
+          : undefined,
+        runtime: runResult.runtimeResult
+          ? Object.freeze({
+            status: runResult.runtimeResult.status,
+            traceCount: runResult.runtimeResult.traces.length,
+            issueCount: runResult.runtimeResult.issues.length,
+            pausedAtStepId: runResult.runtimeResult.pausedAt?.stepId,
+          })
+          : undefined,
+        failureMessage: runResult.failureMessage,
+      });
     });
   }
 

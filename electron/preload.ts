@@ -149,6 +149,9 @@ contextBridge.exposeInMainWorld("aiLoomDesktop", {
     validateDraft(requestJson: string) {
       return ipcRenderer.invoke("ai-loom-desktop-studio-shell:validate-draft", requestJson) as Promise<string>;
     },
+    runWorkflowDraft(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:run-workflow-draft", requestJson) as Promise<string>;
+    },
     listSystemChildComponents(requestJson: string) {
       return ipcRenderer.invoke("ai-loom-desktop-studio-shell:system-components:list", requestJson) as Promise<string>;
     },
