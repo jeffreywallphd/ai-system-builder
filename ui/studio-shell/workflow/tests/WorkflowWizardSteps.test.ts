@@ -80,7 +80,9 @@ describe("WorkflowWizardSteps", () => {
     const configuredDelay = setWorkflowStepDelayConfig(delay.draft, stepId, { durationSeconds: 45 });
     expect((configuredDelay.draft.steps[0]?.config as { durationSeconds?: number }).durationSeconds).toBe(45);
 
-    expect(validateWorkflowDraft(configuredDelay.draft).valid).toBeTrue();
+    const manual = setWorkflowStepType(configuredDelay.draft, stepId, findDefinition(WorkflowDraftBuiltInStepTypes.manualApproval));
+    expect(manual.draft.steps[0]?.type).toBe(WorkflowDraftBuiltInStepTypes.manualApproval);
+    expect(validateWorkflowDraft(manual.draft).valid).toBeTrue();
   });
 
   it("supports selecting, replacing, and clearing agent/assistant assets per step", () => {

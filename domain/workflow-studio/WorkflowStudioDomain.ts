@@ -217,9 +217,20 @@ export const WorkflowDraftBuiltInStepTypes = Object.freeze({
   ifThen: "if-then",
   loopIteration: "loop-iteration",
   delayWait: "delay-wait",
+  manualApproval: "manual-approval",
 });
 
 export type WorkflowDraftBuiltInStepType = typeof WorkflowDraftBuiltInStepTypes[keyof typeof WorkflowDraftBuiltInStepTypes];
+
+export const WorkflowDraftBuiltInStepCategories = Object.freeze({
+  controlFlow: "control-flow",
+  temporal: "temporal",
+  humanInteraction: "human-interaction",
+  transformation: "transformation",
+});
+
+export type WorkflowDraftBuiltInStepCategory =
+  typeof WorkflowDraftBuiltInStepCategories[keyof typeof WorkflowDraftBuiltInStepCategories];
 
 export const WorkflowDraftLoopIterationModes = Object.freeze({
   collection: "collection",
@@ -259,6 +270,30 @@ export interface WorkflowDraftDelayWaitStepConfig {
   readonly note?: string;
 }
 
+export interface WorkflowDraftManualApprovalStepConfig {
+  readonly approvalMessage?: string;
+  readonly requiredApproverRoles?: ReadonlyArray<string>;
+  readonly timeoutSeconds?: number;
+  readonly onTimeout?: "reject" | "continue" | "escalate";
+  readonly allowSelfApproval?: boolean;
+}
+
+export type WorkflowDraftBuiltInStepConfig =
+  | WorkflowDraftIfThenStepConfig
+  | WorkflowDraftLoopIterationStepConfig
+  | WorkflowDraftDelayWaitStepConfig
+  | WorkflowDraftManualApprovalStepConfig;
+
+export interface WorkflowDraftBuiltInStepDefinition<TConfig extends WorkflowDraftBuiltInStepConfig = WorkflowDraftBuiltInStepConfig> {
+  readonly type: WorkflowDraftBuiltInStepType;
+  readonly category: WorkflowDraftBuiltInStepCategory;
+  readonly label: string;
+  readonly description: string;
+  readonly configSchemaId: string;
+  readonly defaultConfig: Readonly<TConfig>;
+  readonly validateConfig: (configRecord: Readonly<Record<string, unknown>>) => Readonly<TConfig>;
+}
+
 export const WorkflowDraftStepAssetKinds = Object.freeze({
   agentAssistant: "agent-assistant",
 });
@@ -276,6 +311,12 @@ export interface WorkflowDraftStep extends WorkflowDraftSectionItemBase {
   readonly dependsOnStepIds?: ReadonlyArray<string>;
   readonly config?: Readonly<Record<string, unknown>>;
   readonly assetRef?: WorkflowDraftStepAssetReference;
+}
+
+export interface WorkflowDraftBuiltInStep extends WorkflowDraftStep {
+  readonly kind: typeof WorkflowDraftStepKinds.controlFlow;
+  readonly type: WorkflowDraftBuiltInStepType;
+  readonly config: WorkflowDraftBuiltInStepConfig;
 }
 
 export interface WorkflowDraft {
@@ -912,22 +953,12 @@ function normalizeStepConfig(
     throw new Error(`Workflow draft built-in control-flow step '${step.type}' requires config.`);
   }
 
-  switch (step.type) {
-    case WorkflowDraftBuiltInStepTypes.ifThen:
-      return normalizeIfThenStepConfig(configRecord);
-    case WorkflowDraftBuiltInStepTypes.loopIteration:
-      return normalizeLoopIterationStepConfig(configRecord);
-    case WorkflowDraftBuiltInStepTypes.delayWait:
-      return normalizeDelayWaitStepConfig(configRecord);
-    default:
-      return Object.freeze({ ...configRecord });
-  }
+  const normalizedBuiltInConfig = normalizeWorkflowDraftBuiltInStepConfig(step.type, configRecord);
+  return Object.freeze({ ...normalizedBuiltInConfig });
 }
 
 function isBuiltInControlFlowStepType(value: string): value is WorkflowDraftBuiltInStepType {
-  return value === WorkflowDraftBuiltInStepTypes.ifThen
-    || value === WorkflowDraftBuiltInStepTypes.loopIteration
-    || value === WorkflowDraftBuiltInStepTypes.delayWait;
+  return isWorkflowDraftBuiltInStepType(value);
 }
 
 function normalizeIfThenStepConfig(configRecord: Readonly<Record<string, unknown>>): Readonly<WorkflowDraftIfThenStepConfig> {
@@ -1032,6 +1063,122 @@ function normalizeDelayWaitStepConfig(
     durationSeconds,
     note,
   });
+}
+
+function normalizeManualApprovalStepConfig(
+  configRecord: Readonly<Record<string, unknown>>,
+): Readonly<WorkflowDraftManualApprovalStepConfig> {
+  const approvalMessage = normalizeOptional(
+    typeof configRecord.approvalMessage === "string" ? configRecord.approvalMessage : undefined,
+  );
+  const requiredApproverRoles = normalizeStringArray(
+    configRecord.requiredApproverRoles,
+    "Workflow draft manual-approval step config.requiredApproverRoles",
+  );
+  const timeoutSeconds = normalizePositiveInteger(
+    configRecord.timeoutSeconds,
+    "Workflow draft manual-approval step config.timeoutSeconds",
+  );
+  const onTimeoutRaw = normalizeOptional(typeof configRecord.onTimeout === "string" ? configRecord.onTimeout : undefined);
+  if (onTimeoutRaw && onTimeoutRaw !== "reject" && onTimeoutRaw !== "continue" && onTimeoutRaw !== "escalate") {
+    throw new Error(`Workflow draft manual-approval step config.onTimeout '${onTimeoutRaw}' is not supported.`);
+  }
+
+  return Object.freeze({
+    approvalMessage,
+    requiredApproverRoles,
+    timeoutSeconds,
+    onTimeout: onTimeoutRaw as WorkflowDraftManualApprovalStepConfig["onTimeout"] | undefined,
+    allowSelfApproval: normalizeOptionalBoolean(
+      configRecord.allowSelfApproval,
+      "Workflow draft manual-approval step config.allowSelfApproval",
+    ),
+  });
+}
+
+const workflowDraftBuiltInStepDefinitions: ReadonlyArray<WorkflowDraftBuiltInStepDefinition> = Object.freeze([
+  Object.freeze({
+    type: WorkflowDraftBuiltInStepTypes.ifThen,
+    category: WorkflowDraftBuiltInStepCategories.controlFlow,
+    label: "If / Then branching",
+    description: "Evaluate an expression and route execution to then/else branches.",
+    configSchemaId: "workflow.builtin.if-then.v1",
+    defaultConfig: Object.freeze<WorkflowDraftIfThenStepConfig>({
+      conditionExpression: "true",
+    }),
+    validateConfig: normalizeIfThenStepConfig,
+  }),
+  Object.freeze({
+    type: WorkflowDraftBuiltInStepTypes.loopIteration,
+    category: WorkflowDraftBuiltInStepCategories.controlFlow,
+    label: "Loop / Repeat",
+    description: "Repeat execution by count, condition, collection, or range.",
+    configSchemaId: "workflow.builtin.loop-iteration.v1",
+    defaultConfig: Object.freeze<WorkflowDraftLoopIterationStepConfig>({
+      repeatCount: 1,
+    }),
+    validateConfig: normalizeLoopIterationStepConfig,
+  }),
+  Object.freeze({
+    type: WorkflowDraftBuiltInStepTypes.delayWait,
+    category: WorkflowDraftBuiltInStepCategories.temporal,
+    label: "Delay / Wait",
+    description: "Pause workflow execution for a bounded duration.",
+    configSchemaId: "workflow.builtin.delay-wait.v1",
+    defaultConfig: Object.freeze<WorkflowDraftDelayWaitStepConfig>({
+      durationSeconds: 60,
+    }),
+    validateConfig: normalizeDelayWaitStepConfig,
+  }),
+  Object.freeze({
+    type: WorkflowDraftBuiltInStepTypes.manualApproval,
+    category: WorkflowDraftBuiltInStepCategories.humanInteraction,
+    label: "Manual / Approval",
+    description: "Require a human approval checkpoint before continuing.",
+    configSchemaId: "workflow.builtin.manual-approval.v1",
+    defaultConfig: Object.freeze<WorkflowDraftManualApprovalStepConfig>({
+      approvalMessage: "Awaiting manual approval.",
+      onTimeout: "reject",
+    }),
+    validateConfig: normalizeManualApprovalStepConfig,
+  }),
+]);
+
+const workflowDraftBuiltInStepDefinitionByType = new Map<WorkflowDraftBuiltInStepType, WorkflowDraftBuiltInStepDefinition>(
+  workflowDraftBuiltInStepDefinitions.map((definition) => [definition.type, definition]),
+);
+
+export function listWorkflowDraftBuiltInStepDefinitions(): ReadonlyArray<WorkflowDraftBuiltInStepDefinition> {
+  return workflowDraftBuiltInStepDefinitions;
+}
+
+export function getWorkflowDraftBuiltInStepDefinition(type: string): WorkflowDraftBuiltInStepDefinition | undefined {
+  const normalized = normalizeOptional(type);
+  if (!normalized) {
+    return undefined;
+  }
+  return workflowDraftBuiltInStepDefinitionByType.get(normalized as WorkflowDraftBuiltInStepType);
+}
+
+export function isWorkflowDraftBuiltInStepType(value: string): value is WorkflowDraftBuiltInStepType {
+  return workflowDraftBuiltInStepDefinitionByType.has(value as WorkflowDraftBuiltInStepType);
+}
+
+export function normalizeWorkflowDraftBuiltInStepConfig(
+  stepType: WorkflowDraftBuiltInStepType,
+  configRecord: Readonly<Record<string, unknown>>,
+): Readonly<WorkflowDraftBuiltInStepConfig> {
+  const definition = workflowDraftBuiltInStepDefinitionByType.get(stepType);
+  if (!definition) {
+    throw new Error(`Workflow draft built-in step type '${stepType}' is not supported.`);
+  }
+  return definition.validateConfig(configRecord);
+}
+
+export function isWorkflowDraftBuiltInStep(step: WorkflowDraftStep): step is WorkflowDraftBuiltInStep {
+  return step.kind === WorkflowDraftStepKinds.controlFlow
+    && isWorkflowDraftBuiltInStepType(step.type)
+    && Boolean(step.config);
 }
 
 function normalizeLoopRangeBoundary(value: unknown, label: string): number {
