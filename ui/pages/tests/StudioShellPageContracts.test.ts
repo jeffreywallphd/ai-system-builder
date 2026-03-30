@@ -25,6 +25,10 @@ describe("StudioShellPage contracts", () => {
     expect(source).toContain("studioRegistration");
     expect(source).toContain("shellTitle");
     expect(source).toContain("toolbarActions");
+    expect(source).toContain("toolbarActionsToRender");
+    expect(source).toContain("workflowModeToggleAction");
+    expect(source).toContain("shouldShowLeftDrawerToggle");
+    expect(source).toContain('label: workflowModeState.selectedModeId === "canvas" ? "Wizard" : "Canvas"');
     expect(source).toContain('data-testid="studio-shell-authoring-toolbar"');
     expect(source).toContain('data-testid="studio-shell-left-drawer-toggle"');
     expect(source).toContain('data-testid="studio-shell-right-drawer-toggle"');

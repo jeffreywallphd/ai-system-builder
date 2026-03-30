@@ -123,20 +123,15 @@ describe("WorkflowStudioCanvasViewModel", () => {
 
     const viewModel = deriveWorkflowCanvasViewModel(draft, []);
     const stepNodes = viewModel.graph.nodes.filter((node) => node.sectionId === WorkflowCanvasSectionIds.steps);
-    expect(stepNodes.map((node) => node.position.y)).toEqual([0, 156, 332]);
+    expect(stepNodes[0]?.position.y).toBe(0);
     expect(stepNodes[0]?.kind).toBe(WorkflowCanvasGraphNodeKinds.section);
     expect(stepNodes[1]?.kind).toBe(WorkflowCanvasGraphNodeKinds.item);
     expect(stepNodes[2]?.kind).toBe(WorkflowCanvasGraphNodeKinds.item);
-    const sectionNodeHeight = viewModel.graph.layout.sectionNodeHeight;
-    const itemNodeHeight = viewModel.graph.layout.itemNodeHeight;
     const gap = viewModel.graph.layout.nodeVerticalGap;
-    const nodeHeights = stepNodes.map((node) => (
-      node.kind === WorkflowCanvasGraphNodeKinds.section ? sectionNodeHeight : itemNodeHeight
-    ));
     for (let index = 1; index < stepNodes.length; index += 1) {
       const previous = stepNodes[index - 1];
       const current = stepNodes[index];
-      const previousHeight = nodeHeights[index - 1] as number;
+      const previousHeight = previous?.height ?? 0;
       expect(current?.position.y).toBeGreaterThanOrEqual((previous?.position.y ?? 0) + previousHeight + gap);
     }
     expect(viewModel.graph.edges.some((edge) => edge.kind === WorkflowCanvasGraphEdgeKinds.itemSequence)).toBe(true);
@@ -145,6 +140,41 @@ describe("WorkflowStudioCanvasViewModel", () => {
       && edge.id.includes("triggers")
       && edge.id.includes("inputs")
     ))).toBe(true);
+  });
+
+  it("calculates node heights and keeps section item spacing non-overlapping", () => {
+    const draft = Object.freeze({
+      ...createEmptyWorkflowDraft(),
+      steps: Object.freeze([
+        Object.freeze({
+          id: "step-1",
+          type: "action",
+          kind: WorkflowDraftStepKinds.action,
+          order: 1,
+          title: "Step with long details",
+        }),
+        Object.freeze({
+          id: "step-2",
+          type: "action",
+          kind: WorkflowDraftStepKinds.action,
+          order: 2,
+          title: "Next step",
+        }),
+      ]),
+    });
+
+    const viewModel = deriveWorkflowCanvasViewModel(draft, []);
+    const stepNodes = viewModel.graph.nodes.filter((node) => (
+      node.sectionId === WorkflowCanvasSectionIds.steps
+      && node.kind === WorkflowCanvasGraphNodeKinds.item
+    ));
+
+    expect(stepNodes).toHaveLength(2);
+    const firstNode = stepNodes[0]!;
+    const secondNode = stepNodes[1]!;
+    const gap = viewModel.graph.layout.nodeVerticalGap;
+    expect(firstNode.height).toBeGreaterThanOrEqual(viewModel.graph.layout.itemNodeHeight);
+    expect(secondNode.position.y).toBeGreaterThanOrEqual(firstNode.position.y + firstNode.height + gap);
   });
 
   it("applies canvas actions against one shared canonical draft model", () => {

@@ -581,7 +581,42 @@ export default function StudioShellPage({
   const workflowDraftContent = workflowModeState?.sharedDraftSerialized ?? content;
   const hasWorkflowDraftParseError = isWorkflowStudio && Boolean(workflowModeState?.draftParseError);
   const toolbarActions = studioRegistration?.shell?.toolbar?.actions ?? [];
-  const hasToolbar = toolbarActions.length > 0 || Boolean(leftDrawerConfiguration) || Boolean(rightDrawerConfiguration);
+  const workflowModeToolbarActions = toolbarActions.filter(
+    (action): action is Extract<StudioShellToolbarAction, { kind: "set-workflow-mode" }> => (
+      action.kind === StudioShellToolbarActionKinds.setWorkflowMode
+    ),
+  );
+  const nonWorkflowModeToolbarActions = toolbarActions.filter(
+    (action): action is Exclude<StudioShellToolbarAction, { kind: "set-workflow-mode" }> => (
+      action.kind !== StudioShellToolbarActionKinds.setWorkflowMode
+    ),
+  );
+  const wizardModeToolbarAction = workflowModeToolbarActions.find((action) => action.modeId === "wizard");
+  const canvasModeToolbarAction = workflowModeToolbarActions.find((action) => action.modeId === "canvas");
+  const workflowModeToggleAction = isWorkflowStudio
+    && workflowModeState
+    && wizardModeToolbarAction
+    && canvasModeToolbarAction
+    ? Object.freeze({
+      ...(workflowModeState.selectedModeId === "canvas" ? wizardModeToolbarAction : canvasModeToolbarAction),
+      label: workflowModeState.selectedModeId === "canvas" ? "Wizard" : "Canvas",
+    } satisfies StudioShellToolbarAction)
+    : undefined;
+  const toolbarActionsToRender = workflowModeToggleAction
+    ? Object.freeze(
+      [...nonWorkflowModeToolbarActions, workflowModeToggleAction].sort((left, right) => {
+        const leftOrder = left.order ?? Number.MAX_SAFE_INTEGER;
+        const rightOrder = right.order ?? Number.MAX_SAFE_INTEGER;
+        if (leftOrder !== rightOrder) {
+          return leftOrder - rightOrder;
+        }
+        return left.id.localeCompare(right.id);
+      }),
+    )
+    : toolbarActions;
+  const shouldShowLeftDrawerToggle = Boolean(leftDrawerConfiguration)
+    && (!isWorkflowStudio || workflowModeState?.selectedModeId === "canvas");
+  const hasToolbar = toolbarActionsToRender.length > 0 || shouldShowLeftDrawerToggle || Boolean(rightDrawerConfiguration);
 
   const saveDraftFromAuthoring = (): void => {
     if (!sessionId) {
@@ -794,7 +829,7 @@ export default function StudioShellPage({
         {hasToolbar ? (
           <div className="ui-toolbar ui-toolbar--panel ui-studio-shell__authoring-toolbar" data-testid="studio-shell-authoring-toolbar">
             <div className="ui-toolbar__group">
-              {leftDrawerConfiguration ? (
+              {shouldShowLeftDrawerToggle && leftDrawerConfiguration ? (
                 <button
                   type="button"
                   className={getDrawerToggleButtonClassName(isLeftDrawerOpen)}
@@ -804,7 +839,7 @@ export default function StudioShellPage({
                   {leftDrawerConfiguration.label}
                 </button>
               ) : null}
-              {toolbarActions.map((action) => (
+              {toolbarActionsToRender.map((action) => (
                 <button
                   key={action.id}
                   type="button"
