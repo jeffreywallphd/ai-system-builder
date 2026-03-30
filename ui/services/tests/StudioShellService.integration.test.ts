@@ -9,6 +9,15 @@ import { SystemRuntimeBackendApi } from "../../../infrastructure/api/system-runt
 import { SqliteStudioShellRepository } from "../../../infrastructure/filesystem/studio-shell/SqliteStudioShellRepository";
 import { SqliteSystemRuntimeExecutionStore } from "../../../infrastructure/filesystem/system-runtime/SqliteSystemRuntimeExecutionStore";
 import { AssetDraftLifecycleStatuses } from "../../../domain/studio-shell/StudioShellDomain";
+import {
+  WorkflowDraftOutputDestinationTypes,
+  WorkflowDraftOutputFormats,
+  WorkflowDraftOutputTypes,
+  WorkflowDraftTriggerKinds,
+  WorkflowDraftTriggerTypes,
+  createEmptyWorkflowDraft,
+  serializeWorkflowDraft,
+} from "../../../domain/workflow-studio/WorkflowStudioDomain";
 import { StudioShellService } from "../StudioShellService";
 import { CompositionAssetContractResolver } from "../../../application/contracts/CompositionAssetContractResolver";
 
@@ -60,6 +69,9 @@ function installBridge(
     },
     validateDraft(requestJson: string) {
       return api.validateDraft(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
+    },
+    runWorkflowDraft(requestJson: string) {
+      return api.runWorkflowDraft(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
     },
     listSystemChildComponents(requestJson: string) {
       if (!systemApi) {
@@ -1735,6 +1747,93 @@ describe("StudioShellService integration", () => {
     expect(reloadedSnapshot.data?.versions.map((entry) => entry.versionId)).toEqual(["asset:studio-shell-main:v1"]);
 
     reopenedRepository.dispose();
+  });
+
+  it("blocks workflow manual execution when pre-execution validation fails", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-workflow-run-validation-"));
+    createdRoots.push(root);
+    const databasePath = path.join(root, "workflow-run.sqlite");
+    const repository = new SqliteStudioShellRepository(databasePath);
+    const backendApi = new StudioShellBackendApi(repository);
+    installBridge(backendApi);
+
+    const service = new StudioShellService();
+    const result = await service.runWorkflowDraft({
+      studioId: "studio-workflows",
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-temporal",
+          kind: WorkflowDraftTriggerKinds.temporal,
+          type: WorkflowDraftTriggerTypes.temporalSchedule,
+          config: {},
+        }],
+        steps: [],
+      }),
+    });
+
+    expect(result.ok).toBeTrue();
+    expect(result.data?.launchStatus).toBe("blocked");
+    expect(result.data?.validation.ready).toBeFalse();
+    expect((result.data?.validation.blockingIssueCount ?? 0) > 0).toBeTrue();
+    expect(result.data?.validation.issues.some((issue) => issue.code === "trigger-malformed")).toBeTrue();
+
+    repository.dispose();
+  });
+
+  it("launches workflow manual execution when canonical validation and translation succeed", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-workflow-run-success-"));
+    createdRoots.push(root);
+    const databasePath = path.join(root, "workflow-run-success.sqlite");
+    const repository = new SqliteStudioShellRepository(databasePath);
+    const backendApi = new StudioShellBackendApi(repository);
+    installBridge(backendApi);
+
+    const service = new StudioShellService();
+    const result = await service.runWorkflowDraft({
+      studioId: "studio-workflows",
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-manual",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        }],
+        steps: [{
+          id: "step-1",
+          type: "action",
+          kind: "action",
+          order: 1,
+        }],
+        outputs: [{
+          id: "output-1",
+          type: "workflow-output",
+          order: 1,
+          outputType: WorkflowDraftOutputTypes.document,
+          format: WorkflowDraftOutputFormats.json,
+          sourceStepId: "step-1",
+          destination: {
+            type: WorkflowDraftOutputDestinationTypes.webViewer,
+            target: "preview",
+            options: {
+              title: "Preview",
+            },
+          },
+        }],
+      }),
+      inputValues: {
+        prompt: "hello",
+      },
+    });
+
+    expect(result.ok).toBeTrue();
+    expect(result.data?.launchStatus).toBe("launched");
+    expect(result.data?.validation.ready).toBeTrue();
+    expect(result.data?.planSummary?.stepCount).toBe(1);
+    expect(result.data?.runtime?.status === "completed" || result.data?.runtime?.status === "paused").toBeTrue();
+
+    repository.dispose();
   });
 
   it("starts a system execution from System Studio through service -> bridge -> runtime backend and reads status/trace/result", async () => {

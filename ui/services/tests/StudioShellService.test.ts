@@ -15,6 +15,7 @@ describe("StudioShellService", () => {
     expect(source).toContain("transitionLifecycle(");
     expect(source).toContain("publishVersion(");
     expect(source).toContain("validateDraft(");
+    expect(source).toContain("runWorkflowDraft(");
     expect(source).toContain("listSystemChildComponents(");
     expect(source).toContain("addSystemChildComponent(");
     expect(source).toContain("removeSystemChildComponent(");

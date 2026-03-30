@@ -1,5 +1,14 @@
 import { describe, expect, it } from "bun:test";
 import { AssetDraftLifecycleStatuses } from "../../../../domain/studio-shell/StudioShellDomain";
+import {
+  WorkflowDraftOutputDestinationTypes,
+  WorkflowDraftOutputFormats,
+  WorkflowDraftOutputTypes,
+  WorkflowDraftTriggerKinds,
+  WorkflowDraftTriggerTypes,
+  createEmptyWorkflowDraft,
+  serializeWorkflowDraft,
+} from "../../../../domain/workflow-studio/WorkflowStudioDomain";
 import { StudioShellBackendApi } from "../StudioShellBackendApi";
 import { InMemoryStudioShellRepository } from "../../../studio-shell/InMemoryStudioShellRepository";
 
@@ -283,6 +292,77 @@ describe("StudioShellBackendApi", () => {
     });
     expect(published.ok).toBeTrue();
     expect(published.data?.draft?.lifecycleStatus).toBe(AssetDraftLifecycleStatuses.published);
+  });
+
+  it("blocks manual workflow launch when execution readiness validation fails", async () => {
+    const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
+
+    const run = await api.runWorkflowDraft({
+      studioId: "studio-workflows",
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-temporal",
+          kind: WorkflowDraftTriggerKinds.temporal,
+          type: WorkflowDraftTriggerTypes.temporalSchedule,
+          config: {},
+        }],
+        steps: [],
+      }),
+    });
+
+    expect(run.ok).toBeTrue();
+    expect(run.data?.launchStatus).toBe("blocked");
+    expect(run.data?.validation.ready).toBeFalse();
+    expect((run.data?.validation.blockingIssueCount ?? 0) > 0).toBeTrue();
+    expect(run.data?.validation.issues.some((issue) => issue.code === "trigger-malformed")).toBeTrue();
+  });
+
+  it("launches manual workflow execution when validation and translation pass", async () => {
+    const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
+
+    const run = await api.runWorkflowDraft({
+      studioId: "studio-workflows",
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-manual",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        }],
+        steps: [{
+          id: "step-1",
+          type: "action",
+          kind: "action",
+          order: 1,
+        }],
+        outputs: [{
+          id: "output-1",
+          type: "workflow-output",
+          order: 1,
+          outputType: WorkflowDraftOutputTypes.document,
+          format: WorkflowDraftOutputFormats.json,
+          sourceStepId: "step-1",
+          destination: {
+            type: WorkflowDraftOutputDestinationTypes.webViewer,
+            target: "preview",
+            options: {
+              title: "Viewer",
+            },
+          },
+        }],
+      }),
+      inputValues: {
+        prompt: "hello",
+      },
+    });
+
+    expect(run.ok).toBeTrue();
+    expect(run.data?.launchStatus).toBe("launched");
+    expect(run.data?.validation.ready).toBeTrue();
+    expect(run.data?.planSummary?.stepCount).toBe(1);
+    expect(run.data?.runtime?.status === "completed" || run.data?.runtime?.status === "paused").toBeTrue();
   });
 
   it("surfaces version-aware dependency mismatch validation for composite drafts", async () => {

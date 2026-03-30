@@ -62,6 +62,13 @@ export const workflowStudioRegistration: CompositeStudioRegistration = Object.fr
           order: 40,
         },
         {
+          id: "workflow-studio-toolbar-run-workflow",
+          kind: "run-workflow-draft",
+          label: "Run Workflow",
+          tone: "primary",
+          order: 45,
+        },
+        {
           id: "workflow-studio-toolbar-refresh",
           kind: "refresh-snapshot",
           label: "Refresh Snapshot",

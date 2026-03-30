@@ -27,6 +27,12 @@ import {
   type WorkflowDraftRuntimeExecutionResult,
   type WorkflowDraftRuntimeManualDecision,
 } from "./WorkflowDraftExecutionRuntime";
+import {
+  validateWorkflowForExecutionReadiness,
+  type WorkflowExecutionAssetReferenceResolver,
+  type WorkflowPreExecutionValidationResult,
+} from "./WorkflowPreExecutionValidationPipeline";
+import type { WorkflowExecutionPlanTranslationRequest } from "./WorkflowExecutionAlignmentContracts";
 
 export interface EnsureWorkflowStudioResult {
   readonly initialized: boolean;
@@ -65,15 +71,36 @@ export interface ExecuteWorkflowDraftCommand extends PlanWorkflowDraftExecutionC
   readonly maxLoopIterations?: number;
 }
 
+export interface ValidateWorkflowDraftExecutionReadinessCommand extends PlanWorkflowDraftExecutionCommand {
+  readonly request?: WorkflowExecutionPlanTranslationRequest["request"];
+  readonly context?: WorkflowExecutionPlanTranslationRequest["context"];
+}
+
+export interface RunWorkflowDraftManualCommand extends ValidateWorkflowDraftExecutionReadinessCommand {
+  readonly inputs?: Readonly<Record<string, unknown>>;
+  readonly manualDecisionsByStepId?: Readonly<Record<string, WorkflowDraftRuntimeManualDecision | undefined>>;
+  readonly maxLoopIterations?: number;
+}
+
+export interface RunWorkflowDraftManualResult {
+  readonly launchStatus: "blocked" | "launched" | "failed";
+  readonly validation: WorkflowPreExecutionValidationResult;
+  readonly runtimeResult?: WorkflowDraftRuntimeExecutionResult;
+  readonly failureMessage?: string;
+}
+
 export class WorkflowStudioApplicationService {
   private readonly runtimeExecutor: WorkflowDraftExecutionRuntime;
+  private readonly assetReferenceResolver?: WorkflowExecutionAssetReferenceResolver;
 
   constructor(
     private readonly studioShellService: StudioShellApplicationService,
     private readonly contractResolver: Pick<IAssetContractResolver, "resolveContractForTaxonomy"> = new CompositionAssetContractResolver(),
     runtimeExecutor: WorkflowDraftExecutionRuntime = new WorkflowDraftExecutionRuntime(),
+    assetReferenceResolver?: WorkflowExecutionAssetReferenceResolver,
   ) {
     this.runtimeExecutor = runtimeExecutor;
+    this.assetReferenceResolver = assetReferenceResolver;
   }
 
   public async ensureStudioInitialized(
@@ -205,20 +232,83 @@ export class WorkflowStudioApplicationService {
     }
   }
 
-  public async executeWorkflowDraft(
-    command: ExecuteWorkflowDraftCommand,
-  ): Promise<WorkflowDraftRuntimeExecutionResult> {
-    const plan = this.planWorkflowDraftExecution(command);
+  public async validateWorkflowDraftExecutionReadiness(
+    command: ValidateWorkflowDraftExecutionReadinessCommand,
+  ): Promise<WorkflowPreExecutionValidationResult> {
+    let canonicalDraft;
     try {
-      return await this.runtimeExecutor.execute({
-        plan,
+      canonicalDraft = deserializeWorkflowDraft(command.content);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "Workflow draft content is not valid JSON.";
+      throw new StudioShellInvalidRequestError(`Workflow draft content is malformed: ${detail}`);
+    }
+
+    return validateWorkflowForExecutionReadiness({
+      draft: canonicalDraft,
+      request: command.request,
+      context: command.context,
+      assetReferenceResolver: this.assetReferenceResolver,
+    });
+  }
+
+  public async runWorkflowDraftManual(
+    command: RunWorkflowDraftManualCommand,
+  ): Promise<RunWorkflowDraftManualResult> {
+    const validation = await this.validateWorkflowDraftExecutionReadiness({
+      content: command.content,
+      request: command.request,
+      context: command.context,
+    });
+
+    if (!validation.ready || !validation.plan) {
+      return Object.freeze({
+        launchStatus: "blocked",
+        validation,
+      });
+    }
+
+    try {
+      const runtimeResult = await this.runtimeExecutor.execute({
+        plan: validation.plan,
         inputs: command.inputs,
         manualDecisionsByStepId: command.manualDecisionsByStepId,
         maxLoopIterations: command.maxLoopIterations,
       });
+      return Object.freeze({
+        launchStatus: "launched",
+        validation,
+        runtimeResult,
+      });
     } catch (error) {
-      const detail = error instanceof Error ? error.message : "workflow-draft-runtime-execution-failed";
-      throw new StudioShellInvalidRequestError(`Workflow draft runtime execution failed: ${detail}`);
+      const failureMessage = error instanceof Error ? error.message : "workflow-draft-runtime-execution-failed";
+      return Object.freeze({
+        launchStatus: "failed",
+        validation,
+        failureMessage,
+      });
     }
+  }
+
+  public async executeWorkflowDraft(
+    command: ExecuteWorkflowDraftCommand,
+  ): Promise<WorkflowDraftRuntimeExecutionResult> {
+    const result = await this.runWorkflowDraftManual(command);
+    if (result.launchStatus === "launched" && result.runtimeResult) {
+      return result.runtimeResult;
+    }
+
+    if (result.launchStatus === "blocked") {
+      const codeSummary = result.validation.blockingIssues
+        .slice(0, 5)
+        .map((issue) => issue.code)
+        .join(", ");
+      throw new StudioShellInvalidRequestError(
+        `Workflow draft runtime execution blocked by validation: ${codeSummary || "workflow-execution-validation-failed"}.`,
+      );
+    }
+
+    throw new StudioShellInvalidRequestError(
+      `Workflow draft runtime execution failed: ${result.failureMessage ?? "workflow-draft-runtime-execution-failed"}`,
+    );
   }
 }
