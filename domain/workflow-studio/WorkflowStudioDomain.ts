@@ -331,17 +331,66 @@ export interface WorkflowDraftLoopIterationStepConfig {
   readonly collectionInputKey?: string;
 }
 
+export const WorkflowDraftDelayWaitModes = Object.freeze({
+  duration: "duration",
+  untilTime: "until-time",
+});
+
+export type WorkflowDraftDelayWaitMode = typeof WorkflowDraftDelayWaitModes[keyof typeof WorkflowDraftDelayWaitModes];
+
+export const WorkflowDraftDelayWaitDurationUnits = Object.freeze({
+  seconds: "seconds",
+  minutes: "minutes",
+  hours: "hours",
+});
+
+export type WorkflowDraftDelayWaitDurationUnit =
+  typeof WorkflowDraftDelayWaitDurationUnits[keyof typeof WorkflowDraftDelayWaitDurationUnits];
+
+export interface WorkflowDraftDelayWaitDuration {
+  readonly value: number;
+  readonly unit: WorkflowDraftDelayWaitDurationUnit;
+}
+
+export interface WorkflowDraftDelayWaitUntilTime {
+  readonly timestamp: string;
+  readonly timezone?: string;
+}
+
 export interface WorkflowDraftDelayWaitStepConfig {
-  readonly durationSeconds: number;
+  readonly mode: WorkflowDraftDelayWaitMode;
+  readonly duration?: WorkflowDraftDelayWaitDuration;
+  readonly until?: WorkflowDraftDelayWaitUntilTime;
   readonly note?: string;
+  // Deprecated compatibility aliases retained for existing authoring flows.
+  readonly durationSeconds?: number;
+  readonly waitUntil?: string;
+}
+
+export const WorkflowDraftManualInteractionModes = Object.freeze({
+  review: "review",
+  approval: "approval",
+});
+
+export type WorkflowDraftManualInteractionMode =
+  typeof WorkflowDraftManualInteractionModes[keyof typeof WorkflowDraftManualInteractionModes];
+
+export interface WorkflowDraftManualInteractionOutcomes {
+  readonly continue?: WorkflowDraftIfThenBranchTarget;
+  readonly approve?: WorkflowDraftIfThenBranchTarget;
+  readonly reject?: WorkflowDraftIfThenBranchTarget;
 }
 
 export interface WorkflowDraftManualApprovalStepConfig {
-  readonly approvalMessage?: string;
+  readonly prompt: string;
+  readonly interactionMode: WorkflowDraftManualInteractionMode;
+  readonly outcomes: WorkflowDraftManualInteractionOutcomes;
   readonly requiredApproverRoles?: ReadonlyArray<string>;
   readonly timeoutSeconds?: number;
   readonly onTimeout?: "reject" | "continue" | "escalate";
   readonly allowSelfApproval?: boolean;
+  // Deprecated compatibility alias retained for existing authoring flows.
+  readonly approvalMessage?: string;
 }
 
 export type WorkflowDraftBuiltInStepConfig =
@@ -1325,26 +1374,153 @@ function normalizeLoopIterationStepConfig(
 function normalizeDelayWaitStepConfig(
   configRecord: Readonly<Record<string, unknown>>,
 ): Readonly<WorkflowDraftDelayWaitStepConfig> {
-  const durationSeconds = normalizePositiveInteger(
+  const modeRaw = normalizeOptional(typeof configRecord.mode === "string" ? configRecord.mode : undefined);
+  if (
+    modeRaw
+    && modeRaw !== WorkflowDraftDelayWaitModes.duration
+    && modeRaw !== WorkflowDraftDelayWaitModes.untilTime
+  ) {
+    throw new Error(`Workflow draft delay-wait step config.mode '${modeRaw}' is not supported.`);
+  }
+
+  const legacyDurationSeconds = normalizePositiveInteger(
     configRecord.durationSeconds,
     "Workflow draft delay-wait step config.durationSeconds",
   );
-  if (!durationSeconds) {
-    throw new Error("Workflow draft delay-wait step requires config.durationSeconds.");
+
+  const durationRecord = configRecord.duration
+    ? assertRecord(configRecord.duration, "Workflow draft delay-wait step config.duration")
+    : undefined;
+  const durationValue = durationRecord
+    ? normalizePositiveInteger(durationRecord.value, "Workflow draft delay-wait step config.duration.value")
+    : legacyDurationSeconds;
+  const durationUnitRaw = durationRecord
+    ? normalizeRequired(
+      typeof durationRecord.unit === "string" ? durationRecord.unit : "",
+      "Workflow draft delay-wait step config.duration.unit",
+    )
+    : (legacyDurationSeconds ? WorkflowDraftDelayWaitDurationUnits.seconds : undefined);
+  if (
+    durationUnitRaw
+    && durationUnitRaw !== WorkflowDraftDelayWaitDurationUnits.seconds
+    && durationUnitRaw !== WorkflowDraftDelayWaitDurationUnits.minutes
+    && durationUnitRaw !== WorkflowDraftDelayWaitDurationUnits.hours
+  ) {
+    throw new Error(`Workflow draft delay-wait step config.duration.unit '${durationUnitRaw}' is not supported.`);
   }
+  const duration = durationValue
+    ? Object.freeze({
+      value: durationValue,
+      unit: durationUnitRaw as WorkflowDraftDelayWaitDurationUnit,
+    })
+    : undefined;
+
+  const legacyWaitUntil = normalizeOptional(typeof configRecord.waitUntil === "string" ? configRecord.waitUntil : undefined);
+  const untilRecord = configRecord.until
+    ? assertRecord(configRecord.until, "Workflow draft delay-wait step config.until")
+    : undefined;
+  const untilTimestamp = normalizeOptional(
+    typeof untilRecord?.timestamp === "string"
+      ? untilRecord.timestamp
+      : legacyWaitUntil,
+  );
+  if (untilTimestamp && !isValidTimestamp(untilTimestamp)) {
+    throw new Error("Workflow draft delay-wait step config.until.timestamp must be a valid timestamp.");
+  }
+  const untilTimezone = normalizeOptional(
+    typeof untilRecord?.timezone === "string" ? untilRecord.timezone : undefined,
+  );
+  const until = untilTimestamp
+    ? Object.freeze({
+      timestamp: untilTimestamp,
+      timezone: untilTimezone,
+    })
+    : undefined;
+
+  const mode = (modeRaw as WorkflowDraftDelayWaitMode | undefined)
+    ?? (until ? WorkflowDraftDelayWaitModes.untilTime : (duration ? WorkflowDraftDelayWaitModes.duration : undefined));
+  if (!mode) {
+    throw new Error("Workflow draft delay-wait step requires config.mode with config.duration or config.until.");
+  }
+  if (mode === WorkflowDraftDelayWaitModes.duration && !duration) {
+    throw new Error("Workflow draft delay-wait duration mode requires config.duration or legacy durationSeconds.");
+  }
+  if (mode === WorkflowDraftDelayWaitModes.untilTime && !until) {
+    throw new Error("Workflow draft delay-wait until-time mode requires config.until.timestamp or legacy waitUntil.");
+  }
+  if (mode === WorkflowDraftDelayWaitModes.duration && until) {
+    throw new Error("Workflow draft delay-wait duration mode does not allow config.until.");
+  }
+  if (mode === WorkflowDraftDelayWaitModes.untilTime && duration) {
+    throw new Error("Workflow draft delay-wait until-time mode does not allow config.duration.");
+  }
+
+  const durationSeconds = duration
+    ? (duration.unit === WorkflowDraftDelayWaitDurationUnits.seconds
+      ? duration.value
+      : (duration.unit === WorkflowDraftDelayWaitDurationUnits.minutes
+        ? duration.value * 60
+        : duration.value * 3600))
+    : undefined;
   const note = normalizeOptional(typeof configRecord.note === "string" ? configRecord.note : undefined);
   return Object.freeze({
-    durationSeconds,
+    mode,
+    duration,
+    until,
     note,
+    durationSeconds,
+    waitUntil: until?.timestamp,
   });
 }
 
 function normalizeManualApprovalStepConfig(
   configRecord: Readonly<Record<string, unknown>>,
 ): Readonly<WorkflowDraftManualApprovalStepConfig> {
-  const approvalMessage = normalizeOptional(
+  const prompt = normalizeOptional(
+    typeof configRecord.prompt === "string" ? configRecord.prompt : undefined,
+  ) ?? normalizeOptional(
     typeof configRecord.approvalMessage === "string" ? configRecord.approvalMessage : undefined,
   );
+  if (!prompt) {
+    throw new Error("Workflow draft manual-approval step requires config.prompt or legacy approvalMessage.");
+  }
+
+  const interactionModeRaw = normalizeOptional(
+    typeof configRecord.interactionMode === "string" ? configRecord.interactionMode : undefined,
+  );
+  if (
+    interactionModeRaw
+    && interactionModeRaw !== WorkflowDraftManualInteractionModes.review
+    && interactionModeRaw !== WorkflowDraftManualInteractionModes.approval
+  ) {
+    throw new Error(`Workflow draft manual-approval step config.interactionMode '${interactionModeRaw}' is not supported.`);
+  }
+
+  const outcomesRecord = configRecord.outcomes
+    ? assertRecord(configRecord.outcomes, "Workflow draft manual-approval step config.outcomes")
+    : undefined;
+  const continueOutcome = outcomesRecord?.continue
+    ? normalizeIfThenBranchTarget(
+      outcomesRecord.continue,
+      "Workflow draft manual-approval step config.outcomes.continue",
+    )
+    : undefined;
+  const approveOutcome = outcomesRecord?.approve
+    ? normalizeIfThenBranchTarget(
+      outcomesRecord.approve,
+      "Workflow draft manual-approval step config.outcomes.approve",
+    )
+    : undefined;
+  const rejectOutcome = outcomesRecord?.reject
+    ? normalizeIfThenBranchTarget(
+      outcomesRecord.reject,
+      "Workflow draft manual-approval step config.outcomes.reject",
+    )
+    : undefined;
+
+  const interactionMode = (interactionModeRaw as WorkflowDraftManualInteractionMode | undefined)
+    ?? WorkflowDraftManualInteractionModes.approval;
+
   const requiredApproverRoles = normalizeStringArray(
     configRecord.requiredApproverRoles,
     "Workflow draft manual-approval step config.requiredApproverRoles",
@@ -1358,8 +1534,26 @@ function normalizeManualApprovalStepConfig(
     throw new Error(`Workflow draft manual-approval step config.onTimeout '${onTimeoutRaw}' is not supported.`);
   }
 
+  if (interactionMode === WorkflowDraftManualInteractionModes.review && (approveOutcome || rejectOutcome)) {
+    throw new Error("Workflow draft manual-approval review mode only allows config.outcomes.continue.");
+  }
+  if (interactionMode === WorkflowDraftManualInteractionModes.approval && continueOutcome) {
+    throw new Error("Workflow draft manual-approval approval mode does not allow config.outcomes.continue.");
+  }
+
+  const outcomes = interactionMode === WorkflowDraftManualInteractionModes.review
+    ? Object.freeze<WorkflowDraftManualInteractionOutcomes>({
+      continue: continueOutcome ?? Object.freeze({ label: "Continue" }),
+    })
+    : Object.freeze<WorkflowDraftManualInteractionOutcomes>({
+      approve: approveOutcome ?? Object.freeze({ label: "Approved" }),
+      reject: rejectOutcome ?? Object.freeze({ label: "Rejected" }),
+    });
+
   return Object.freeze({
-    approvalMessage,
+    prompt,
+    interactionMode,
+    outcomes,
     requiredApproverRoles,
     timeoutSeconds,
     onTimeout: onTimeoutRaw as WorkflowDraftManualApprovalStepConfig["onTimeout"] | undefined,
@@ -1367,6 +1561,7 @@ function normalizeManualApprovalStepConfig(
       configRecord.allowSelfApproval,
       "Workflow draft manual-approval step config.allowSelfApproval",
     ),
+    approvalMessage: prompt,
   });
 }
 
@@ -1416,9 +1611,14 @@ const workflowDraftBuiltInStepDefinitions: ReadonlyArray<WorkflowDraftBuiltInSte
     type: WorkflowDraftBuiltInStepTypes.delayWait,
     category: WorkflowDraftBuiltInStepCategories.temporal,
     label: "Delay / Wait",
-    description: "Pause workflow execution for a bounded duration.",
-    configSchemaId: "workflow.builtin.delay-wait.v1",
+    description: "Pause workflow execution for a duration or until a specific time.",
+    configSchemaId: "workflow.builtin.delay-wait.v2",
     defaultConfig: Object.freeze<WorkflowDraftDelayWaitStepConfig>({
+      mode: WorkflowDraftDelayWaitModes.duration,
+      duration: Object.freeze({
+        value: 60,
+        unit: WorkflowDraftDelayWaitDurationUnits.seconds,
+      }),
       durationSeconds: 60,
     }),
     validateConfig: normalizeDelayWaitStepConfig,
@@ -1427,9 +1627,19 @@ const workflowDraftBuiltInStepDefinitions: ReadonlyArray<WorkflowDraftBuiltInSte
     type: WorkflowDraftBuiltInStepTypes.manualApproval,
     category: WorkflowDraftBuiltInStepCategories.humanInteraction,
     label: "Manual / Approval",
-    description: "Require a human approval checkpoint before continuing.",
-    configSchemaId: "workflow.builtin.manual-approval.v1",
+    description: "Pause for manual review or explicit approve/reject checkpoint decisions.",
+    configSchemaId: "workflow.builtin.manual-approval.v2",
     defaultConfig: Object.freeze<WorkflowDraftManualApprovalStepConfig>({
+      prompt: "Awaiting manual approval.",
+      interactionMode: WorkflowDraftManualInteractionModes.approval,
+      outcomes: Object.freeze({
+        approve: Object.freeze({
+          label: "Approved",
+        }),
+        reject: Object.freeze({
+          label: "Rejected",
+        }),
+      }),
       approvalMessage: "Awaiting manual approval.",
       onTimeout: "reject",
     }),

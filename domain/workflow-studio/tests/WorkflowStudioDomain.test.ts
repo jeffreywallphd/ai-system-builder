@@ -240,12 +240,35 @@ describe("WorkflowStudioDomain", () => {
           },
         },
         {
-          id: "step-approval",
-          type: WorkflowDraftBuiltInStepTypes.manualApproval,
+          id: "step-delay",
+          type: WorkflowDraftBuiltInStepTypes.delayWait,
           kind: WorkflowDraftStepKinds.controlFlow,
           order: 3,
           config: {
-            approvalMessage: "Manager sign-off required",
+            mode: "until-time",
+            until: {
+              timestamp: "2026-04-01T10:00:00.000Z",
+              timezone: "America/New_York",
+            },
+            note: "Wait for review window",
+          },
+        },
+        {
+          id: "step-approval",
+          type: WorkflowDraftBuiltInStepTypes.manualApproval,
+          kind: WorkflowDraftStepKinds.controlFlow,
+          order: 4,
+          config: {
+            prompt: "Manager sign-off required",
+            interactionMode: "approval",
+            outcomes: {
+              approve: {
+                label: "ship",
+              },
+              reject: {
+                label: "hold",
+              },
+            },
             requiredApproverRoles: ["manager"],
             timeoutSeconds: 900,
             onTimeout: "escalate",
@@ -262,6 +285,7 @@ describe("WorkflowStudioDomain", () => {
     expect(parsed.steps.map((step) => step.type)).toEqual([
       WorkflowDraftBuiltInStepTypes.ifThen,
       WorkflowDraftBuiltInStepTypes.loopIteration,
+      WorkflowDraftBuiltInStepTypes.delayWait,
       WorkflowDraftBuiltInStepTypes.manualApproval,
     ]);
   });
@@ -632,6 +656,11 @@ describe("WorkflowStudioDomain", () => {
           kind: WorkflowDraftStepKinds.controlFlow,
           order: 3,
           config: {
+            mode: "duration",
+            duration: {
+              value: 30,
+              unit: "seconds",
+            },
             durationSeconds: 30,
           },
         },
@@ -641,7 +670,16 @@ describe("WorkflowStudioDomain", () => {
           kind: WorkflowDraftStepKinds.controlFlow,
           order: 4,
           config: {
-            approvalMessage: "Approve release candidate",
+            prompt: "Approve release candidate",
+            interactionMode: "approval",
+            outcomes: {
+              approve: {
+                label: "approved",
+              },
+              reject: {
+                label: "rejected",
+              },
+            },
             requiredApproverRoles: ["qa", "ops"],
             onTimeout: "escalate",
           },
@@ -689,6 +727,11 @@ describe("WorkflowStudioDomain", () => {
       kind: WorkflowDraftStepKinds.controlFlow,
       type: WorkflowDraftBuiltInStepTypes.delayWait,
       config: {
+        mode: "duration",
+        duration: {
+          value: 30,
+          unit: "seconds",
+        },
         durationSeconds: 30,
       },
     });
@@ -697,9 +740,82 @@ describe("WorkflowStudioDomain", () => {
       kind: WorkflowDraftStepKinds.controlFlow,
       type: WorkflowDraftBuiltInStepTypes.manualApproval,
       config: {
-        approvalMessage: "Approve release candidate",
+        prompt: "Approve release candidate",
+        interactionMode: "approval",
+        outcomes: {
+          approve: {
+            label: "approved",
+          },
+          reject: {
+            label: "rejected",
+          },
+        },
         requiredApproverRoles: ["qa", "ops"],
         onTimeout: "escalate",
+      },
+    });
+  });
+
+  it("normalizes delay wait-until mode and manual review continuation mode", () => {
+    const normalized = normalizeWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [
+        {
+          id: "step-delay-until",
+          type: WorkflowDraftBuiltInStepTypes.delayWait,
+          kind: WorkflowDraftStepKinds.controlFlow,
+          order: 1,
+          config: {
+            mode: "until-time",
+            until: {
+              timestamp: "2026-05-01T09:30:00.000Z",
+              timezone: "UTC",
+            },
+          },
+        },
+        {
+          id: "step-review",
+          type: WorkflowDraftBuiltInStepTypes.manualApproval,
+          kind: WorkflowDraftStepKinds.controlFlow,
+          order: 2,
+          config: {
+            prompt: "Manual reviewer check",
+            interactionMode: "review",
+            outcomes: {
+              continue: {
+                label: "continue",
+              },
+            },
+            onTimeout: "continue",
+          },
+        },
+      ],
+      outputs: [],
+    });
+
+    expect(normalized.steps[0]).toMatchObject({
+      type: WorkflowDraftBuiltInStepTypes.delayWait,
+      config: {
+        mode: "until-time",
+        until: {
+          timestamp: "2026-05-01T09:30:00.000Z",
+          timezone: "UTC",
+        },
+        waitUntil: "2026-05-01T09:30:00.000Z",
+      },
+    });
+    expect(normalized.steps[1]).toMatchObject({
+      type: WorkflowDraftBuiltInStepTypes.manualApproval,
+      config: {
+        prompt: "Manual reviewer check",
+        interactionMode: "review",
+        outcomes: {
+          continue: {
+            label: "continue",
+          },
+        },
+        onTimeout: "continue",
       },
     });
   });
@@ -735,7 +851,16 @@ describe("WorkflowStudioDomain", () => {
         kind: WorkflowDraftStepKinds.controlFlow,
         order: 1,
         config: {
-          approvalMessage: "Approve",
+          prompt: "Approve",
+          interactionMode: "approval",
+          outcomes: {
+            approve: {
+              label: "approved",
+            },
+            reject: {
+              label: "rejected",
+            },
+          },
           onTimeout: "reject",
         },
       }],
@@ -998,11 +1123,33 @@ describe("WorkflowStudioDomain", () => {
         kind: WorkflowDraftStepKinds.controlFlow,
         order: 1,
         config: {
+          prompt: "Awaiting decision",
           onTimeout: "skip",
         },
       }],
       outputs: [],
     })).toThrow("onTimeout");
+
+    expect(() => normalizeWorkflowDraft({
+      triggers: [],
+      inputs: [],
+      steps: [{
+        id: "step-invalid-review-outcome",
+        type: WorkflowDraftBuiltInStepTypes.manualApproval,
+        kind: WorkflowDraftStepKinds.controlFlow,
+        order: 1,
+        config: {
+          prompt: "Manual review",
+          interactionMode: "review",
+          outcomes: {
+            reject: {
+              label: "stop",
+            },
+          },
+        },
+      }],
+      outputs: [],
+    })).toThrow("review mode only allows");
   });
 
   it("accepts canonical output entries with type, format, and destination", () => {

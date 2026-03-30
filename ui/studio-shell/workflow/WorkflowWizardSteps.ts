@@ -534,8 +534,14 @@ export function setWorkflowStepDelayConfig(
     }
 
     const existing = (currentStep.config ?? {}) as WorkflowDraftDelayWaitStepConfig;
+    const resolvedDurationSeconds = patch.durationSeconds ?? existing.durationSeconds ?? 60;
     const nextConfig: WorkflowDraftDelayWaitStepConfig = Object.freeze({
-      durationSeconds: patch.durationSeconds ?? existing.durationSeconds ?? 60,
+      mode: "duration",
+      duration: Object.freeze({
+        value: resolvedDurationSeconds,
+        unit: "seconds",
+      }),
+      durationSeconds: resolvedDurationSeconds,
       note: patch.note !== undefined ? normalizeOptional(patch.note) : existing.note,
     });
 
