@@ -117,6 +117,9 @@ This gives the codebase one real production seam for synchronous workflow runs, 
 - Trigger runtime-readiness mapping is now explicit but bounded through `application/workflow-studio/WorkflowTriggerRuntimeMapper.ts`, which projects canonical trigger contracts/config (manual/user, temporal, state) into runtime-facing descriptors without adding a scheduler engine or trigger-owned execution path.
 - State runtime descriptors now include explicit event semantics (`sourceType`, `eventCategory`, `subject`, plus optional criteria/filter metadata) so runtime mapping is planning-ready without introducing an event-bus execution engine.
 - Trigger correctness now routes through a shared validation pipeline (`validateWorkflowDraftTriggers` and `application/workflow-studio/WorkflowTriggerValidationPipeline.ts`) that supports per-trigger config validation and workflow-level trigger checks before runtime mapping.
+- Stories 7.11-7.12 now route trigger mapping through the same execution-plan seam: `mapWorkflowDraftToExecutionPlan(...)` includes trigger execution semantics produced by `application/workflow-studio/WorkflowDraftTriggerExecutionPlanner.ts` (manual/user invocation, temporal scheduling metadata, state-event metadata).
+- Trigger planning consumes canonical validated draft content and fails safely when unsupported/invalid trigger semantics reach planning (no silent trigger drops).
+- Execution-plan trigger semantics remain continuation-ready (manual trigger scope includes both `workflow-start` and `workflow-continuation`) so future human-approval resume/intermediate continuation behavior is not blocked by start-only assumptions.
 
 Direction 5 Epic 6 stories 6.17–6.18 now keep system-runtime execution read integration bounded and version-aware:
 - runtime executions are projected into registry system-detail read models as recent execution summaries (status/result/timestamps plus bounded trace-reference counts),

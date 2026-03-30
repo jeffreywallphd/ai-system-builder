@@ -11,11 +11,16 @@ import {
   type WorkflowDraftManualApprovalStepConfig,
   type WorkflowDraftStep,
 } from "../../domain/workflow-studio/WorkflowStudioDomain";
+import {
+  mapWorkflowDraftTriggersToExecutionTriggerPlan,
+  type WorkflowExecutionTriggerPlan,
+} from "./WorkflowDraftTriggerExecutionPlanner";
 
 export const WorkflowDraftExecutionPlanSchemaVersion = "ai-loom.workflow-draft-execution-plan.v1";
 
 export interface WorkflowDraftExecutionPlan {
   readonly schemaVersion: typeof WorkflowDraftExecutionPlanSchemaVersion;
+  readonly triggers: ReadonlyArray<WorkflowExecutionTriggerPlan>;
   readonly orderedStepIds: ReadonlyArray<string>;
   readonly elements: ReadonlyArray<WorkflowDraftExecutionPlanElement>;
 }
@@ -207,6 +212,7 @@ export function mapWorkflowDraftToExecutionPlan(
   const orderedSteps = [...normalizedDraft.steps].sort((left, right) => left.order - right.order);
   return Object.freeze({
     schemaVersion: WorkflowDraftExecutionPlanSchemaVersion,
+    triggers: mapWorkflowDraftTriggersToExecutionTriggerPlan(normalizedDraft),
     orderedStepIds: Object.freeze(orderedSteps.map((step) => step.id)),
     elements: Object.freeze(orderedSteps.map((step) => toPlanElement(step))),
   });
