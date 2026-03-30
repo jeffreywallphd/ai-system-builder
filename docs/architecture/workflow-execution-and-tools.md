@@ -110,6 +110,10 @@ This gives the codebase one real production seam for synchronous workflow runs, 
 - Workflow Studio now has a canonical draft-to-plan mapper in `application/workflow-studio/WorkflowDraftExecutionPlanMapper.ts`.
 - `mapWorkflowDraftToExecutionPlan(...)` validates canonical draft integrity first (`validateWorkflowDraft`) and then emits deterministic ordered execution-plan elements for action steps and built-ins (`if-then`, `loop-iteration`, `delay-wait`, `manual-approval`).
 - This mapper is planning-only: it creates explicit runtime-ready plan elements without adding a second runtime executor or speculative graph model.
+- Stories 6.11-6.12 now extend that same seam into runtime + persistence behavior without introducing alternate workflow-draft representations:
+  - `application/workflow-studio/WorkflowDraftExecutionRuntime.ts` executes mapped built-in plan elements deterministically (conditional branch, loop/iteration, delay/wait, manual approval) and emits explicit completed/skipped/failed/paused step traces.
+  - `WorkflowStudioApplicationService.executeWorkflowDraft(...)` now routes canonical draft content through `deserialize -> plan mapper -> runtime executor` on the same workflow-studio contracts.
+  - Built-in workflow drafts continue to persist as canonical serialized draft content and now have explicit SQLite-backed persistence/rehydration round-trip coverage for built-in type/config/order.
 
 Direction 5 Epic 6 stories 6.17–6.18 now keep system-runtime execution read integration bounded and version-aware:
 - runtime executions are projected into registry system-detail read models as recent execution summaries (status/result/timestamps plus bounded trace-reference counts),
