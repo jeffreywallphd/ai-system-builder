@@ -63,6 +63,8 @@ Workflow -> `ExecuteWorkflowUseCase` -> one-unit `ExecutionPlan` -> `UnifiedExec
 ## Workflow Studio draft planning seam
 - Workflow Studio now has a canonical draft-to-plan mapper in `application/workflow-studio/WorkflowDraftExecutionPlanMapper.ts`.
 - `mapWorkflowDraftToExecutionPlan(...)` validates canonical draft integrity first (`validateWorkflowDraft`) and then emits deterministic ordered execution-plan elements for action steps and built-ins (`if-then`, `loop-iteration`, `delay-wait`, `manual-approval`) plus normalized ordered output plans.
+- Execution alignment contracts are now explicit in `application/workflow-studio/WorkflowExecutionAlignmentContracts.ts` (execution request/context, trigger handoff, step sequencing metadata, input/output bindings, and validation-boundary result contracts).
+- Workflow-to-execution translation now runs through `application/workflow-studio/WorkflowDefinitionExecutionPlanTranslator.ts`; `WorkflowDraftExecutionPlanMapper.ts` is a compatibility export seam over that translator so canonical workflow-draft semantics stay single-sourced.
 - Output planning now fails before runtime when output contracts are unsupported or incompatible with execution planning (for example unknown destination types, output-type mismatches, or unsupported formats), instead of silently deferring these failures to runtime.
 - This mapper is planning-only: it creates explicit runtime-ready plan elements without adding a second runtime executor or speculative graph model.
 - Stories 6.11–6.12 now extend that same seam into runtime + persistence behavior without introducing alternate draft models:
