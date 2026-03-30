@@ -7,6 +7,9 @@ import { WorkflowStudioApplicationService } from "../WorkflowStudioApplicationSe
 import {
   createEmptyWorkflowDraft,
   serializeWorkflowDraft,
+  WorkflowDraftOutputDestinationTypes,
+  WorkflowDraftOutputFormats,
+  WorkflowDraftOutputTypes,
   WorkflowDraftTriggerKinds,
   WorkflowDraftTriggerTypes,
   WorkflowStudioIdentity,
@@ -272,6 +275,19 @@ describe("WorkflowStudioApplicationService", () => {
           order: 4,
         },
       ],
+      outputs: [
+        {
+          id: "output-file",
+          type: "workflow-output",
+          order: 1,
+          outputType: WorkflowDraftOutputTypes.document,
+          format: WorkflowDraftOutputFormats.json,
+          destination: {
+            type: WorkflowDraftOutputDestinationTypes.fileExport,
+            target: "file-download",
+          },
+        },
+      ],
     });
 
     const firstPlan = service.planWorkflowDraftExecution({ content });
@@ -288,6 +304,15 @@ describe("WorkflowStudioApplicationService", () => {
       "built-in.if-then",
       "built-in.manual-approval",
       "action-step",
+    ]);
+    expect(firstPlan.outputs).toMatchObject([
+      {
+        outputId: "output-file",
+        order: 1,
+        destination: {
+          type: WorkflowDraftOutputDestinationTypes.fileExport,
+        },
+      },
     ]);
     expect(firstPlan).toEqual(secondPlan);
   });
