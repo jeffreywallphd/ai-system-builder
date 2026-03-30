@@ -20,6 +20,8 @@ describe("WorkflowStudioStepSectionEditor", () => {
     expect(html).toContain("Steps Section");
     expect(html).toContain("Add step");
     expect(html).toContain("Agent/assistant action");
+    expect(html).toContain("Built-in");
+    expect(html).toContain("Manual / Approval");
   });
 
   it("threads canonical selector target metadata through launch and return handling", () => {

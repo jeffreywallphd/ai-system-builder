@@ -26,6 +26,30 @@
   margin-top: var(--space-sm);
 }
 
+.workflow-step-selector-option {
+  justify-content: flex-start;
+  align-items: flex-start;
+  text-align: left;
+  min-height: auto;
+}
+
+.workflow-step-selector-option__header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.workflow-step-controls-row {
+  gap: var(--space-xs);
+}
+
+.workflow-step-checkbox-field {
+  align-items: center;
+  gap: var(--space-xs);
+}
+
 .ui-linear-wizard__shell {
   display: flex;
   flex-direction: column;
