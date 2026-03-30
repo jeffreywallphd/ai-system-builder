@@ -12,6 +12,7 @@ import { NodeService } from "../services/NodeService";
 import { McpToolCallAuthoringService } from "../services/McpToolCallAuthoringService";
 import { WorkflowService } from "../services/WorkflowService";
 import { WorkflowProjectionService } from "../../application/projection/WorkflowProjectionService";
+import { WorkflowConversationSessionService } from "../workflow-conversation/WorkflowConversationSessionService";
 import {
   WorkflowExecutionStore,
   type IWorkflowExecutionState,
@@ -55,9 +56,14 @@ export interface IWorkflowStoreOptions {
   readonly workflowService: WorkflowService;
   readonly nodeService: NodeService;
   readonly mcpToolCallAuthoringService?: McpToolCallAuthoringService;
+  readonly conversationSessionService?: WorkflowConversationSessionService;
   readonly initialState?: Partial<IWorkflowStoreState>;
   readonly executionStore?: WorkflowExecutionStore;
   readonly workflowProjectionService?: WorkflowProjectionService;
+}
+
+export interface WorkflowExecutionCompletion {
+  readonly conversationSessionId?: string;
 }
 
 const defaultEditorState: IWorkflowEditorState = Object.freeze({
@@ -89,6 +95,7 @@ export class WorkflowStore {
   private readonly workflowService: WorkflowService;
   private readonly nodeService: NodeService;
   private readonly mcpToolCallAuthoringService?: McpToolCallAuthoringService;
+  private readonly conversationSessionService?: WorkflowConversationSessionService;
   private readonly executionStore: WorkflowExecutionStore;
   private readonly workflowProjectionService: WorkflowProjectionService;
   private readonly autoSaveController: AutoSaveController;
@@ -101,6 +108,7 @@ export class WorkflowStore {
     this.workflowService = options.workflowService;
     this.nodeService = options.nodeService;
     this.mcpToolCallAuthoringService = options.mcpToolCallAuthoringService;
+    this.conversationSessionService = options.conversationSessionService;
 
     const initialState = options.initialState ?? {};
     this.executionStore =
@@ -333,7 +341,7 @@ export class WorkflowStore {
   public async executeCurrentWorkflow(
     request?: Omit<IExecuteWorkflowRequest, "workflow">,
     onEvent?: (event: IWorkflowExecutionEvent) => void
-  ): Promise<void> {
+  ): Promise<WorkflowExecutionCompletion> {
     const workflow = this.requireCurrentWorkflow();
 
     this.setEditorState({
@@ -357,6 +365,15 @@ export class WorkflowStore {
         currentWorkflow: result.effectiveWorkflow,
       });
       this.executionStore.completeExecution(result.result.outputAssets);
+      const conversationSession = this.conversationSessionService?.createFromExecution({
+        workflow: result.effectiveWorkflow,
+        request,
+        result,
+        nodeOutputs: this.executionStore.getState().nodeExecutionOutputs,
+      });
+      return Object.freeze({
+        conversationSessionId: conversationSession?.id,
+      });
     } catch (error: unknown) {
       this.executionStore.failExecution();
       this.setEditorState({

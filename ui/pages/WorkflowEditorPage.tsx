@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { generatePath, useParams } from "react-router-dom";
+import { generatePath, useNavigate, useParams } from "react-router-dom";
 import NodePalette from "../components/nodes/NodePalette";
 import NodeInspector from "../components/nodes/NodeInspector";
 import NodePropertyEditor from "../components/nodes/NodePropertyEditor";
@@ -127,6 +127,7 @@ export default function WorkflowEditorPage({
   const nodeStore = nodeStoreProp ?? injectedNodeStore;
 
   const { workflowId } = useParams<{ workflowId: string }>();
+  const navigate = useNavigate();
 
   const [workflowState, setWorkflowState] =
     useState<IWorkflowStoreState>(fallbackWorkflowState);
@@ -529,6 +530,17 @@ export default function WorkflowEditorPage({
     setIsCanvasLocked((current) => !current);
   };
 
+  const executeAndOpenConversationIfEligible = async (): Promise<void> => {
+    const completion = await workflowStore.executeCurrentWorkflow();
+    if (!completion.conversationSessionId) {
+      return;
+    }
+
+    navigate(generatePath(ROUTE_PATHS.workflowConversation, {
+      sessionId: completion.conversationSessionId,
+    }));
+  };
+
   return (
     <section
       className={`ui-page ui-page--editor${
@@ -609,7 +621,7 @@ export default function WorkflowEditorPage({
               isOutputOpen={isOutputOpen}
               onToggleCanvasLock={toggleCanvasLock}
               onExecuteWorkflow={() => {
-                void workflowStore.executeCurrentWorkflow();
+                void executeAndOpenConversationIfEligible();
               }}
               onOpenMenu={() => {
                 setIsLeftMenuOpen((value) => !value);
@@ -830,7 +842,7 @@ export default function WorkflowEditorPage({
                         workflowStore.validateCurrentWorkflow();
                       }}
                       onExecuteWorkflow={() => {
-                        void workflowStore.executeCurrentWorkflow();
+                        void executeAndOpenConversationIfEligible();
                       }}
                     />
 
