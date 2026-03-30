@@ -66,6 +66,12 @@ describe("WorkflowTriggerTypeRegistry", () => {
       scheduleMode: WorkflowDraftTemporalScheduleModes.cron,
       cronExpression: "0 9 * * *",
     });
+    expect(registry.createDefaultConfig(WorkflowDraftTriggerTypes.stateDataAvailable)).toMatchObject({
+      sourceType: "dataset",
+      eventCategory: "data-ingested",
+      subject: "dataset",
+      eventName: "data-available",
+    });
 
     const triggers = registry.list().map((entry, index) => Object.freeze({
       id: `trigger-${index + 1}`,

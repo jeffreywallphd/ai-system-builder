@@ -53,6 +53,24 @@ export const WorkflowDraftTemporalScheduleModes = Object.freeze({
 export type WorkflowDraftTemporalScheduleMode =
   typeof WorkflowDraftTemporalScheduleModes[keyof typeof WorkflowDraftTemporalScheduleModes];
 
+export const WorkflowDraftStateEventSourceTypes = Object.freeze({
+  dataset: "dataset",
+  asset: "asset",
+  system: "system",
+});
+
+export type WorkflowDraftStateEventSourceType =
+  typeof WorkflowDraftStateEventSourceTypes[keyof typeof WorkflowDraftStateEventSourceTypes];
+
+export const WorkflowDraftStateEventCategories = Object.freeze({
+  dataIngested: "data-ingested",
+  assetUpdated: "asset-updated",
+  systemStateChanged: "system-state-changed",
+});
+
+export type WorkflowDraftStateEventCategory =
+  typeof WorkflowDraftStateEventCategories[keyof typeof WorkflowDraftStateEventCategories];
+
 export interface WorkflowDraftAssetReference {
   readonly assetId: string;
   readonly versionId?: string;
@@ -85,10 +103,14 @@ export interface WorkflowDraftTemporalTriggerConfig {
 }
 
 export interface WorkflowDraftStateTriggerConfig {
+  readonly sourceType?: WorkflowDraftStateEventSourceType;
+  readonly eventCategory?: WorkflowDraftStateEventCategory;
+  readonly subject?: string;
   readonly eventName?: string;
   readonly asset?: WorkflowDraftAssetReference;
   readonly stateKey?: string;
   readonly stateValue?: string;
+  readonly criteria?: Readonly<Record<string, unknown>>;
   readonly filter?: Readonly<Record<string, unknown>>;
 }
 
@@ -565,7 +587,12 @@ export const WorkflowValidationIssueCodes = Object.freeze({
   lifecycleExecutableNotReady: "lifecycle-executable-not-ready",
   draftMalformed: "draft-malformed",
   draftSectionMissing: "draft-section-missing",
+  triggerCollectionEmpty: "trigger-collection-empty",
   triggerMalformed: "trigger-malformed",
+  triggerDuplicateId: "trigger-duplicate-id",
+  triggerDuplicateDefinition: "trigger-duplicate-definition",
+  triggerContinuationStepMissing: "trigger-continuation-step-missing",
+  triggerScopeUnsupported: "trigger-scope-unsupported",
   inputMalformed: "input-malformed",
   inputDatasetAssetMalformed: "input-dataset-asset-malformed",
   inputDatasetAssetTaxonomyMismatch: "input-dataset-asset-taxonomy-mismatch",
@@ -801,6 +828,36 @@ function normalizeTemporalScheduleMode(value: unknown): WorkflowDraftTemporalSch
   throw new Error(`Workflow draft temporal trigger config.scheduleMode '${normalized}' is not supported.`);
 }
 
+function normalizeStateEventSourceType(value: unknown): WorkflowDraftStateEventSourceType | undefined {
+  const normalized = normalizeOptional(typeof value === "string" ? value : undefined);
+  if (!normalized) {
+    return undefined;
+  }
+  if (
+    normalized === WorkflowDraftStateEventSourceTypes.dataset
+    || normalized === WorkflowDraftStateEventSourceTypes.asset
+    || normalized === WorkflowDraftStateEventSourceTypes.system
+  ) {
+    return normalized;
+  }
+  throw new Error(`Workflow draft state trigger config.sourceType '${normalized}' is not supported.`);
+}
+
+function normalizeStateEventCategory(value: unknown): WorkflowDraftStateEventCategory | undefined {
+  const normalized = normalizeOptional(typeof value === "string" ? value : undefined);
+  if (!normalized) {
+    return undefined;
+  }
+  if (
+    normalized === WorkflowDraftStateEventCategories.dataIngested
+    || normalized === WorkflowDraftStateEventCategories.assetUpdated
+    || normalized === WorkflowDraftStateEventCategories.systemStateChanged
+  ) {
+    return normalized;
+  }
+  throw new Error(`Workflow draft state trigger config.eventCategory '${normalized}' is not supported.`);
+}
+
 function isLikelyCronExpression(value: string): boolean {
   const fields = value.trim().split(/\s+/);
   if (fields.length !== 5) {
@@ -949,9 +1006,28 @@ function normalizeStateTriggerConfig(
   }
 
   const eventName = normalizeOptional(typeof configRecord.eventName === "string" ? configRecord.eventName : undefined);
+  const subject = normalizeOptional(typeof configRecord.subject === "string" ? configRecord.subject : undefined);
   const stateKey = normalizeOptional(typeof configRecord.stateKey === "string" ? configRecord.stateKey : undefined);
   const stateValue = normalizeOptional(typeof configRecord.stateValue === "string" ? configRecord.stateValue : undefined);
-  const filter = configRecord.filter ? Object.freeze({ ...assertRecord(configRecord.filter, "Workflow draft state trigger config.filter") }) : undefined;
+  const filterRecord = configRecord.filter
+    ? assertRecord(configRecord.filter, "Workflow draft state trigger config.filter")
+    : undefined;
+  const criteriaRecord = configRecord.criteria
+    ? assertRecord(configRecord.criteria, "Workflow draft state trigger config.criteria")
+    : filterRecord;
+  const criteria = criteriaRecord ? Object.freeze({ ...criteriaRecord }) : undefined;
+  const sourceType = normalizeStateEventSourceType(configRecord.sourceType)
+    ?? (triggerType === WorkflowDraftTriggerTypes.stateAssetStateChanged
+      ? WorkflowDraftStateEventSourceTypes.asset
+      : (triggerType === WorkflowDraftTriggerTypes.stateSystemEvent
+        ? WorkflowDraftStateEventSourceTypes.system
+        : WorkflowDraftStateEventSourceTypes.dataset));
+  const eventCategory = normalizeStateEventCategory(configRecord.eventCategory)
+    ?? (triggerType === WorkflowDraftTriggerTypes.stateAssetStateChanged
+      ? WorkflowDraftStateEventCategories.assetUpdated
+      : (triggerType === WorkflowDraftTriggerTypes.stateSystemEvent
+        ? WorkflowDraftStateEventCategories.systemStateChanged
+        : WorkflowDraftStateEventCategories.dataIngested));
   const assetRecord = configRecord.asset
     ? normalizeWorkflowDraftAssetReference(
       assertRecord(configRecord.asset, "Workflow draft state trigger config.asset") as WorkflowDraftAssetReference,
@@ -965,13 +1041,25 @@ function normalizeStateTriggerConfig(
   if (triggerType === WorkflowDraftTriggerTypes.stateSystemEvent && !eventName) {
     throw new Error("Workflow draft state system-event trigger requires config.eventName.");
   }
+  if (triggerType === WorkflowDraftTriggerTypes.stateDataAvailable && !eventName && !subject && !stateKey) {
+    throw new Error(
+      "Workflow draft state data-available trigger requires config.eventName, config.subject, or config.stateKey.",
+    );
+  }
+  if (sourceType === WorkflowDraftStateEventSourceTypes.asset && !assetRecord) {
+    throw new Error("Workflow draft state trigger config.sourceType 'asset' requires config.asset.");
+  }
 
   return Object.freeze({
+    sourceType,
+    eventCategory,
+    subject,
     eventName,
     asset: assetRecord,
     stateKey,
     stateValue,
-    filter,
+    criteria,
+    filter: criteria,
   });
 }
 
@@ -1822,6 +1910,9 @@ const workflowDraftTriggerDefinitions: ReadonlyArray<WorkflowDraftTriggerDefinit
       supportsIntermediateContinuation: false,
     }),
     defaultConfig: Object.freeze<WorkflowDraftStateTriggerConfig>({
+      sourceType: WorkflowDraftStateEventSourceTypes.dataset,
+      eventCategory: WorkflowDraftStateEventCategories.dataIngested,
+      subject: "dataset",
       eventName: "data-available",
     }),
     validateConfig: (configRecord) => normalizeStateTriggerConfig(WorkflowDraftTriggerTypes.stateDataAvailable, configRecord),
@@ -1839,6 +1930,9 @@ const workflowDraftTriggerDefinitions: ReadonlyArray<WorkflowDraftTriggerDefinit
       supportsIntermediateContinuation: false,
     }),
     defaultConfig: Object.freeze<WorkflowDraftStateTriggerConfig>({
+      sourceType: WorkflowDraftStateEventSourceTypes.asset,
+      eventCategory: WorkflowDraftStateEventCategories.assetUpdated,
+      subject: "asset",
       asset: Object.freeze({
         assetId: "asset:source",
       }),
@@ -1860,6 +1954,9 @@ const workflowDraftTriggerDefinitions: ReadonlyArray<WorkflowDraftTriggerDefinit
       supportsIntermediateContinuation: false,
     }),
     defaultConfig: Object.freeze<WorkflowDraftStateTriggerConfig>({
+      sourceType: WorkflowDraftStateEventSourceTypes.system,
+      eventCategory: WorkflowDraftStateEventCategories.systemStateChanged,
+      subject: "workflow",
       eventName: "system-event",
     }),
     validateConfig: (configRecord) => normalizeStateTriggerConfig(WorkflowDraftTriggerTypes.stateSystemEvent, configRecord),
@@ -2272,6 +2369,154 @@ export function classifyWorkflowDraftAssetReferences(
   return Object.freeze(classifications);
 }
 
+export interface WorkflowDraftTriggerValidationContext {
+  readonly requireAtLeastOneTrigger?: boolean;
+  readonly stepIds?: ReadonlySet<string>;
+  readonly allowedUserTriggerScopes?: ReadonlyArray<WorkflowDraftUserTriggerScope>;
+}
+
+export interface WorkflowDraftTriggerValidationResult {
+  readonly valid: boolean;
+  readonly normalizedTriggers: ReadonlyArray<WorkflowDraftTrigger>;
+  readonly issues: ReadonlyArray<WorkflowValidationIssue>;
+}
+
+function buildTriggerDefinitionSignature(trigger: WorkflowDraftTrigger): string {
+  return stableStringify({
+    kind: trigger.kind,
+    type: trigger.type,
+    config: trigger.config ?? {},
+  });
+}
+
+function pushTriggerIssue(
+  issues: WorkflowValidationIssue[],
+  code: WorkflowValidationIssueCode,
+  message: string,
+  path: string,
+  section: WorkflowValidationSection = WorkflowValidationSections.triggers,
+): void {
+  issues.push({
+    code,
+    section,
+    severity: "error",
+    message,
+    path,
+  });
+}
+
+export function validateWorkflowDraftTriggers(
+  triggers: ReadonlyArray<unknown> | undefined,
+  context: WorkflowDraftTriggerValidationContext = {},
+): WorkflowDraftTriggerValidationResult {
+  const issues: WorkflowValidationIssue[] = [];
+  const normalizedTriggers: WorkflowDraftTrigger[] = [];
+  const rawTriggers = Array.isArray(triggers) ? triggers : [];
+  if ((context.requireAtLeastOneTrigger ?? false) && rawTriggers.length === 0) {
+    pushTriggerIssue(
+      issues,
+      WorkflowValidationIssueCodes.triggerCollectionEmpty,
+      "Workflow draft requires at least one trigger.",
+      "draft.triggers",
+    );
+  }
+
+  for (let index = 0; index < rawTriggers.length; index += 1) {
+    try {
+      const normalized = normalizeTrigger(rawTriggers[index] as WorkflowDraftTrigger);
+      normalizedTriggers.push(normalized);
+    } catch (error) {
+      pushTriggerIssue(
+        issues,
+        WorkflowValidationIssueCodes.triggerMalformed,
+        error instanceof Error ? error.message : "Workflow trigger is malformed.",
+        `draft.triggers[${index}]`,
+      );
+    }
+  }
+
+  const triggerIdToIndexes = new Map<string, number[]>();
+  normalizedTriggers.forEach((trigger, index) => {
+    const indexes = triggerIdToIndexes.get(trigger.id) ?? [];
+    indexes.push(index);
+    triggerIdToIndexes.set(trigger.id, indexes);
+  });
+  for (const [triggerId, indexes] of triggerIdToIndexes.entries()) {
+    if (indexes.length < 2) {
+      continue;
+    }
+    for (const index of indexes) {
+      pushTriggerIssue(
+        issues,
+        WorkflowValidationIssueCodes.triggerDuplicateId,
+        `Workflow trigger id '${triggerId}' is duplicated.`,
+        `draft.triggers[${index}].id`,
+      );
+    }
+  }
+
+  const triggerSignatureToIndexes = new Map<string, number[]>();
+  normalizedTriggers.forEach((trigger, index) => {
+    const signature = buildTriggerDefinitionSignature(trigger);
+    const indexes = triggerSignatureToIndexes.get(signature) ?? [];
+    indexes.push(index);
+    triggerSignatureToIndexes.set(signature, indexes);
+  });
+  for (const indexes of triggerSignatureToIndexes.values()) {
+    if (indexes.length < 2) {
+      continue;
+    }
+    for (const index of indexes) {
+      const trigger = normalizedTriggers[index]!;
+      pushTriggerIssue(
+        issues,
+        WorkflowValidationIssueCodes.triggerDuplicateDefinition,
+        `Workflow trigger '${trigger.id}' duplicates an existing '${trigger.type}' definition.`,
+        `draft.triggers[${index}]`,
+      );
+    }
+  }
+
+  const allowedUserTriggerScopes = new Set<WorkflowDraftUserTriggerScope>(
+    context.allowedUserTriggerScopes
+      ?? Object.values(WorkflowDraftUserTriggerScopes),
+  );
+  normalizedTriggers.forEach((trigger, index) => {
+    if (trigger.kind !== WorkflowDraftTriggerKinds.user) {
+      return;
+    }
+    const scope = trigger.config.invocationScope ?? WorkflowDraftUserTriggerScopes.workflowStart;
+    if (!allowedUserTriggerScopes.has(scope)) {
+      pushTriggerIssue(
+        issues,
+        WorkflowValidationIssueCodes.triggerScopeUnsupported,
+        `Workflow trigger '${trigger.id}' uses unsupported invocationScope '${scope}'.`,
+        `draft.triggers[${index}].config.invocationScope`,
+      );
+    }
+    if (
+      scope === WorkflowDraftUserTriggerScopes.workflowContinuation
+      && trigger.config.continuationStepId
+      && context.stepIds
+      && !context.stepIds.has(trigger.config.continuationStepId)
+    ) {
+      pushTriggerIssue(
+        issues,
+        WorkflowValidationIssueCodes.triggerContinuationStepMissing,
+        `Workflow continuation trigger '${trigger.id}' references unknown continuationStepId '${trigger.config.continuationStepId}'.`,
+        `draft.triggers[${index}].config.continuationStepId`,
+        WorkflowValidationSections.crossSection,
+      );
+    }
+  });
+
+  return Object.freeze({
+    valid: issues.length === 0,
+    normalizedTriggers: Object.freeze(normalizedTriggers),
+    issues: Object.freeze(issues),
+  });
+}
+
 export function validateWorkflowDraft(draft: WorkflowDraft | undefined): WorkflowValidationResult {
   const issues: WorkflowValidationIssue[] = [];
   if (!draft || typeof draft !== "object") {
@@ -2327,21 +2572,6 @@ export function validateWorkflowDraft(draft: WorkflowDraft | undefined): Workflo
       message: "Workflow draft requires an outputs array.",
       path: "draft.outputs",
     });
-  }
-
-  const triggers = Array.isArray(raw.triggers) ? raw.triggers : [];
-  for (let index = 0; index < triggers.length; index += 1) {
-    try {
-      normalizeTrigger(triggers[index] as WorkflowDraftTrigger);
-    } catch (error) {
-      issues.push({
-        code: WorkflowValidationIssueCodes.triggerMalformed,
-        section: WorkflowValidationSections.triggers,
-        severity: "error",
-        message: error instanceof Error ? error.message : "Workflow trigger is malformed.",
-        path: `draft.triggers[${index}]`,
-      });
-    }
   }
 
   const normalizedInputs: WorkflowDraftInput[] = [];
@@ -2413,6 +2643,17 @@ export function validateWorkflowDraft(draft: WorkflowDraft | undefined): Workflo
 
   const stepIds = new Set<string>(normalizedSteps.map((step) => step.id));
   const stepOrderById = new Map<string, number>(normalizedSteps.map((step) => [step.id, step.order]));
+  const triggerValidation = validateWorkflowDraftTriggers(
+    Array.isArray(raw.triggers) ? raw.triggers : [],
+    {
+      stepIds,
+      allowedUserTriggerScopes: Object.freeze([
+        WorkflowDraftUserTriggerScopes.workflowStart,
+        WorkflowDraftUserTriggerScopes.workflowContinuation,
+      ]),
+    },
+  );
+  issues.push(...triggerValidation.issues);
   const sortedOrders = [...normalizedSteps].map((step) => step.order).sort((left, right) => left - right);
   if (sortedOrders.some((order, index) => order !== index + 1)) {
     issues.push({

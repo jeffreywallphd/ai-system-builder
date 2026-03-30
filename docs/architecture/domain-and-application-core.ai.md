@@ -241,6 +241,21 @@ The studio shell now has a bounded inner-layer model and application orchestrati
 - Runtime-alignment readiness is now explicit through `application/workflow-studio/WorkflowTriggerRuntimeMapper.ts`, which maps canonical trigger contracts into runtime-facing descriptors without introducing a scheduler engine or UI-owned trigger logic.
 - This keeps trigger semantics in inner layers and creates clean extension seams for future selector/config UI, persistence integration, and execution mapping stories.
 
+## Direction 5 update: Workflow state trigger implementation + shared trigger validation pipeline (stories 7.5-7.6)
+
+- State trigger config now carries explicit event semantics (`sourceType`, `eventCategory`, `subject`) while preserving compatibility fields (`eventName`, `stateKey`, `stateValue`, `asset`, `filter`) for existing authoring/runtime surfaces.
+- State trigger defaults now map to concrete initial scenarios:
+  - `data-available` defaults to dataset/data-ingestion semantics.
+  - `asset-state-changed` defaults to asset-update semantics with explicit asset scope.
+  - `system-event` defaults to system-state-change semantics.
+- Trigger validation now has a shared canonical pipeline entry (`validateWorkflowDraftTriggers`) that performs:
+  - per-trigger normalization/validation routed by trigger kind/type,
+  - structured malformed-trigger issue reporting,
+  - workflow-level trigger checks (duplicate ids, duplicate trigger definitions, continuation-step reference checks).
+- `validateWorkflowDraft` now routes trigger checks through that shared pipeline instead of inline ad hoc trigger checks.
+- Application reuse now has a dedicated seam (`application/workflow-studio/WorkflowTriggerValidationPipeline.ts`) for single-trigger, type-config, and collection-level validation without introducing UI-owned trigger policy.
+- Forward compatibility for human-approval continuation semantics remains explicit: the shared pipeline allows both `workflow-start` and `workflow-continuation` invocation scopes by default.
+
 ## Direction 5 update: Studio shell persistence integration (story 1.11)
 
 - Studio shell now has a real SQLite-backed infrastructure adapter (`infrastructure/filesystem/studio-shell/SqliteStudioShellRepository.ts`) implementing `IStudioShellRepository` with migration-managed schema, indexed studio/session/draft/version storage, and full aggregate snapshot persistence.

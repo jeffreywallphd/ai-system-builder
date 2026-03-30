@@ -112,6 +112,47 @@ describe("WorkflowTriggerRuntimeMapper", () => {
     });
   });
 
+  it("maps state triggers with source/category/criteria metadata", () => {
+    const descriptor = mapWorkflowDraftTriggerToRuntimeDescriptor({
+      id: "trigger-state",
+      kind: WorkflowDraftTriggerKinds.state,
+      type: WorkflowDraftTriggerTypes.stateAssetStateChanged,
+      config: {
+        sourceType: "asset",
+        eventCategory: "asset-updated",
+        subject: "dataset",
+        eventName: "dataset-updated",
+        asset: {
+          assetId: "asset:dataset-training",
+          versionId: "asset:dataset-training:v3",
+        },
+        stateKey: "status",
+        stateValue: "ready",
+        criteria: {
+          tenant: "alpha",
+        },
+      },
+    });
+
+    expect(descriptor.runtimeKind).toBe("state");
+    expect(descriptor).toMatchObject({
+      sourceType: "asset",
+      eventCategory: "asset-updated",
+      subject: "dataset",
+      eventName: "dataset-updated",
+      assetId: "asset:dataset-training",
+      assetVersionId: "asset:dataset-training:v3",
+      stateKey: "status",
+      stateValue: "ready",
+      criteria: {
+        tenant: "alpha",
+      },
+      filter: {
+        tenant: "alpha",
+      },
+    });
+  });
+
   it("fails safely when trigger config cannot map to runtime descriptor", () => {
     expect(() => mapWorkflowDraftTriggerToRuntimeDescriptor({
       id: "trigger-invalid",

@@ -1,12 +1,12 @@
 import {
   getWorkflowDraftTriggerDefinition,
   listWorkflowDraftTriggerDefinitions,
-  normalizeWorkflowDraftTriggerConfig,
   type WorkflowDraftTriggerConfig,
   type WorkflowDraftTriggerDefinition,
   type WorkflowDraftTriggerKind,
   type WorkflowDraftTriggerType,
 } from "../../domain/workflow-studio/WorkflowStudioDomain";
+import { validateWorkflowTriggerTypeConfig } from "./WorkflowTriggerValidationPipeline";
 
 export interface WorkflowTriggerTypeRegistryEntry {
   readonly kind: WorkflowDraftTriggerKind;
@@ -91,10 +91,17 @@ export class WorkflowTriggerTypeRegistry {
     if (!this.byType.has(type)) {
       throw new Error(`Workflow trigger type '${type}' is not registered.`);
     }
-    return normalizeWorkflowDraftTriggerConfig(
+    const definition = this.byType.get(type)!;
+    const validation = validateWorkflowTriggerTypeConfig({
+      id: "__trigger-config-validation__",
+      kind: definition.kind,
       type,
-      assertRecord(config, `Workflow trigger type '${type}' config`),
-    );
+      config: assertRecord(config, `Workflow trigger type '${type}' config`),
+    });
+    if (!validation.valid) {
+      throw new Error(validation.issues[0]?.message ?? `Workflow trigger type '${type}' config is invalid.`);
+    }
+    return Object.freeze({ ...(validation.normalizedTriggers[0]?.config ?? {}) }) as Readonly<WorkflowDraftTriggerConfig>;
   }
 }
 
