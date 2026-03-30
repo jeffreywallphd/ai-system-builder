@@ -270,7 +270,7 @@ export class WorkflowStudioApplicationService {
     try {
       const runtimeResult = await this.runtimeExecutor.execute({
         plan: validation.plan,
-        inputs: command.inputs,
+        inputs: command.inputs ?? validation.plan.executionContext.resolvedRuntimeInputs,
         manualDecisionsByStepId: command.manualDecisionsByStepId,
         maxLoopIterations: command.maxLoopIterations,
       });

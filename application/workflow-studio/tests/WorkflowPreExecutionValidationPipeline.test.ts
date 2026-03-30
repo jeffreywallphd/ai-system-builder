@@ -219,4 +219,38 @@ describe("WorkflowPreExecutionValidationPipeline", () => {
     expect(result.blockingIssues).toHaveLength(0);
     expect(result.plan?.orderedStepIds).toEqual(["step-1"]);
   });
+
+  it("surfaces unresolved optional runtime inputs as non-blocking pre-execution warnings", async () => {
+    const result = await validateWorkflowForExecutionReadiness({
+      draft: {
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-manual",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        }],
+        inputs: [{
+          id: "input-optional",
+          type: "runtime-input",
+          sourceType: "runtime-parameter",
+          parameterKey: "optionalPrompt",
+          required: false,
+        }],
+        steps: [{
+          id: "step-1",
+          type: "action",
+          kind: WorkflowDraftStepKinds.action,
+          order: 1,
+        }],
+      },
+    });
+
+    expect(result.ready).toBeTrue();
+    expect(result.warningIssues.some((issue) => issue.code === "input-resolution-optional-unresolved")).toBeTrue();
+    expect(result.plan?.executionContext.unresolvedInputs).toEqual([expect.objectContaining({
+      inputId: "input-optional",
+      required: false,
+    })]);
+  });
 });

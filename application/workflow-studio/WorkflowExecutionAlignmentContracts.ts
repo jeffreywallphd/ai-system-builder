@@ -35,8 +35,52 @@ export interface WorkflowExecutionTriggerActivationPayload {
 
 export interface WorkflowExecutionContext {
   readonly inputValues: Readonly<Record<string, unknown>>;
+  readonly resolvedRuntimeInputs: Readonly<Record<string, unknown>>;
+  readonly resolvedInputValues: Readonly<Record<string, unknown>>;
+  readonly resolvedInputBindings: Readonly<Record<string, unknown>>;
+  readonly resolvedInputs: ReadonlyArray<WorkflowExecutionResolvedInputValue>;
+  readonly unresolvedInputs: ReadonlyArray<WorkflowExecutionUnresolvedInput>;
+  readonly selectedAssets: Readonly<{
+    readonly datasets: ReadonlyArray<WorkflowExecutionResolvedDatasetAsset>;
+  }>;
   readonly triggerActivation?: WorkflowExecutionTriggerActivationPayload;
+  readonly triggerPayload?: Readonly<Record<string, unknown>>;
   readonly metadata?: Readonly<Record<string, unknown>>;
+  readonly sessionContext?: Readonly<Record<string, unknown>>;
+}
+
+export interface WorkflowExecutionResolvedDatasetAsset {
+  readonly inputId: string;
+  readonly assetId: string;
+  readonly versionId?: string;
+  readonly format?: "jsonl" | "json" | "csv" | "parquet";
+  readonly selection?: Readonly<Record<string, unknown>>;
+}
+
+export interface WorkflowExecutionResolvedInputValue {
+  readonly inputId: string;
+  readonly sourceType: WorkflowDraftInputSourceType;
+  readonly required: boolean;
+  readonly valueType?: WorkflowDraftInputValueType;
+  readonly bindingKey: string;
+  readonly resolved: boolean;
+  readonly resolutionSource:
+    | "runtime-parameter"
+    | "runtime-default"
+    | "trigger-activation"
+    | "dataset-asset"
+    | "static-value";
+  readonly value: unknown;
+}
+
+export interface WorkflowExecutionUnresolvedInput {
+  readonly inputId: string;
+  readonly sourceType: WorkflowDraftInputSourceType;
+  readonly required: boolean;
+  readonly valueType?: WorkflowDraftInputValueType;
+  readonly bindingKey: string;
+  readonly reasonCode: "required-input-missing" | "runtime-parameter-unresolved";
+  readonly message: string;
 }
 
 export interface WorkflowExecutionInputBinding {
@@ -75,14 +119,43 @@ export interface WorkflowExecutionStepSequencingMetadata {
   readonly order: number;
   readonly dependsOnStepIds: ReadonlyArray<string>;
   readonly controlFlow?: Readonly<{
-    readonly branchStepIds?: Readonly<{
-      readonly then: ReadonlyArray<string>;
-      readonly else: ReadonlyArray<string>;
+      readonly branchStepIds?: Readonly<{
+        readonly then: ReadonlyArray<string>;
+        readonly else: ReadonlyArray<string>;
+      }>;
+      readonly conditionalRouteStepIds?: ReadonlyArray<string>;
+      readonly loopBodyStepIds?: ReadonlyArray<string>;
+      readonly manualOutcomeStepIds?: Readonly<Record<string, ReadonlyArray<string>>>;
     }>;
-    readonly loopBodyStepIds?: ReadonlyArray<string>;
-    readonly manualOutcomeStepIds?: Readonly<Record<string, ReadonlyArray<string>>>;
-  }>;
 }
+
+export interface WorkflowExecutionControlFlowBranchMapping {
+  readonly mappingType: "branch";
+  readonly stepId: string;
+  readonly conditionKind: "expression" | "comparison";
+  readonly thenStepIds: ReadonlyArray<string>;
+  readonly elseStepIds: ReadonlyArray<string>;
+}
+
+export interface WorkflowExecutionControlFlowLoopMapping {
+  readonly mappingType: "loop";
+  readonly stepId: string;
+  readonly mode: "fixed-count" | "collection" | "range";
+  readonly bodyStepIds: ReadonlyArray<string>;
+  readonly maxIterations?: number;
+}
+
+export interface WorkflowExecutionControlFlowManualMapping {
+  readonly mappingType: "manual-routing";
+  readonly stepId: string;
+  readonly interactionMode: "approval" | "review" | "confirmation";
+  readonly outcomes: Readonly<Record<string, ReadonlyArray<string>>>;
+}
+
+export type WorkflowExecutionControlFlowMapping =
+  | WorkflowExecutionControlFlowBranchMapping
+  | WorkflowExecutionControlFlowLoopMapping
+  | WorkflowExecutionControlFlowManualMapping;
 
 export interface WorkflowExecutionOutputBinding {
   readonly outputId: string;
@@ -147,18 +220,33 @@ export function normalizeWorkflowExecutionContext(
   context?: WorkflowExecutionPlanTranslationRequest["context"],
 ): WorkflowExecutionContext {
   const triggerId = readTrimmedString(context?.triggerActivation?.triggerId);
+  const triggerPayload = context?.triggerActivation?.payload
+    ? Object.freeze({ ...context.triggerActivation.payload })
+    : undefined;
+  const metadata = context?.metadata ? Object.freeze({ ...context.metadata }) : undefined;
+  const sessionContext = metadata && typeof metadata.session === "object" && metadata.session
+    ? Object.freeze({ ...(metadata.session as Record<string, unknown>) })
+    : undefined;
   return Object.freeze({
     inputValues: Object.freeze({ ...(context?.inputValues ?? {}) }),
+    resolvedRuntimeInputs: Object.freeze({}),
+    resolvedInputValues: Object.freeze({}),
+    resolvedInputBindings: Object.freeze({}),
+    resolvedInputs: Object.freeze([]),
+    unresolvedInputs: Object.freeze([]),
+    selectedAssets: Object.freeze({
+      datasets: Object.freeze([]),
+    }),
     triggerActivation: triggerId
       ? Object.freeze({
         triggerId,
         activationType: readTrimmedString(context?.triggerActivation?.activationType),
-        payload: context?.triggerActivation?.payload
-          ? Object.freeze({ ...context.triggerActivation.payload })
-          : undefined,
+        payload: triggerPayload,
       })
       : undefined,
-    metadata: context?.metadata ? Object.freeze({ ...context.metadata }) : undefined,
+    triggerPayload,
+    metadata,
+    sessionContext,
   });
 }
 
@@ -193,15 +281,17 @@ export function createTranslationFailureResult<TPlan>(input: {
 
 export function createTranslationSuccessResult<TPlan>(
   plan: TPlan,
+  issues: ReadonlyArray<WorkflowExecutionTranslationIssue> = Object.freeze([]),
 ): WorkflowExecutionPlanTranslationResult<TPlan> {
+  const normalizedIssues = Object.freeze([...issues]);
   return Object.freeze({
     success: true,
     plan,
-    issues: Object.freeze([]),
+    issues: normalizedIssues,
     validationBoundary: Object.freeze({
       stage: WorkflowExecutionValidationStages.preExecution,
       ready: true,
-      issues: Object.freeze([]),
+      issues: normalizedIssues,
     }),
   });
 }

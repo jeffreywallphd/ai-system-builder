@@ -29,6 +29,7 @@ import {
   normalizeWorkflowExecutionContext,
   normalizeWorkflowExecutionRequest,
   WorkflowExecutionValidationStages,
+  type WorkflowExecutionControlFlowMapping,
   type WorkflowExecutionOutputBinding,
   type WorkflowExecutionPlanTranslationRequest,
   type WorkflowExecutionPlanTranslationResult,
@@ -37,6 +38,7 @@ import {
   type WorkflowExecutionTriggerDescriptor,
   type WorkflowExecutionTriggerHandoff,
 } from "./WorkflowExecutionAlignmentContracts";
+import { assembleWorkflowExecutionContext } from "./WorkflowExecutionContextAssemblyService";
 
 export const WorkflowDraftExecutionPlanSchemaVersion = "ai-loom.workflow-draft-execution-plan.v1";
 
@@ -51,6 +53,7 @@ export interface WorkflowDraftExecutionPlan {
   readonly inputBindings: ReadonlyArray<ReturnType<typeof mapWorkflowInputToExecutionBinding>>;
   readonly orderedStepIds: ReadonlyArray<string>;
   readonly stepSequencing: ReadonlyArray<WorkflowExecutionStepSequencingMetadata>;
+  readonly controlFlowMappings: ReadonlyArray<WorkflowExecutionControlFlowMapping>;
   readonly elements: ReadonlyArray<WorkflowDraftExecutionPlanElement>;
   readonly outputs: ReadonlyArray<WorkflowDraftExecutionOutputPlan>;
   readonly outputBindings: ReadonlyArray<WorkflowExecutionOutputBinding>;
@@ -287,6 +290,10 @@ function toStepSequencing(step: WorkflowDraftStep): WorkflowExecutionStepSequenc
           then: Object.freeze([...(config.branches.then.stepIds ?? [])]),
           else: Object.freeze([...(config.branches.else?.stepIds ?? [])]),
         }),
+        conditionalRouteStepIds: Object.freeze([
+          ...(config.branches.then.stepIds ?? []),
+          ...(config.branches.else?.stepIds ?? []),
+        ]),
       }),
     });
   }
@@ -322,6 +329,59 @@ function toStepSequencing(step: WorkflowDraftStep): WorkflowExecutionStepSequenc
   }
 
   return base;
+}
+
+function toControlFlowMapping(step: WorkflowDraftStep): WorkflowExecutionControlFlowMapping | undefined {
+  if (step.kind !== WorkflowDraftStepKinds.controlFlow || !step.config) {
+    return undefined;
+  }
+
+  if (step.type === WorkflowDraftBuiltInStepTypes.ifThen) {
+    const config = normalizeWorkflowDraftBuiltInStepConfig(
+      WorkflowDraftBuiltInStepTypes.ifThen,
+      step.config as Readonly<Record<string, unknown>>,
+    ) as WorkflowDraftIfThenStepConfig;
+    return Object.freeze({
+      mappingType: "branch",
+      stepId: step.id,
+      conditionKind: config.condition.kind,
+      thenStepIds: Object.freeze([...(config.branches.then.stepIds ?? [])]),
+      elseStepIds: Object.freeze([...(config.branches.else?.stepIds ?? [])]),
+    });
+  }
+
+  if (step.type === WorkflowDraftBuiltInStepTypes.loopIteration) {
+    const config = normalizeWorkflowDraftBuiltInStepConfig(
+      WorkflowDraftBuiltInStepTypes.loopIteration,
+      step.config as Readonly<Record<string, unknown>>,
+    ) as WorkflowDraftLoopIterationStepConfig;
+    return Object.freeze({
+      mappingType: "loop",
+      stepId: step.id,
+      mode: config.mode,
+      bodyStepIds: Object.freeze([...(config.bodyStepIds ?? [])]),
+      maxIterations: config.maxIterations,
+    });
+  }
+
+  if (step.type === WorkflowDraftBuiltInStepTypes.manualApproval) {
+    const config = normalizeWorkflowDraftBuiltInStepConfig(
+      WorkflowDraftBuiltInStepTypes.manualApproval,
+      step.config as Readonly<Record<string, unknown>>,
+    ) as WorkflowDraftManualApprovalStepConfig;
+    return Object.freeze({
+      mappingType: "manual-routing",
+      stepId: step.id,
+      interactionMode: config.interactionMode,
+      outcomes: Object.freeze({
+        continue: Object.freeze([...(config.outcomes.continue?.stepIds ?? [])]),
+        approve: Object.freeze([...(config.outcomes.approve?.stepIds ?? [])]),
+        reject: Object.freeze([...(config.outcomes.reject?.stepIds ?? [])]),
+      }),
+    });
+  }
+
+  return undefined;
 }
 
 function toPlanElement(step: WorkflowDraftStep): WorkflowDraftExecutionPlanElement {
@@ -457,33 +517,61 @@ export function translateWorkflowDefinitionToExecutionPlan(
     });
   }
 
-  const orderedSteps = [...normalizedDraft.steps].sort((left, right) => left.order - right.order);
-  const orderedOutputs = [...normalizedDraft.outputs].sort((left, right) => left.order - right.order);
+  const orderedSteps = [...normalizedDraft.steps].sort((left, right) => {
+    if (left.order !== right.order) {
+      return left.order - right.order;
+    }
+    return left.id.localeCompare(right.id);
+  });
+  const orderedOutputs = [...normalizedDraft.outputs].sort((left, right) => {
+    if ((left.order ?? 0) !== (right.order ?? 0)) {
+      return (left.order ?? 0) - (right.order ?? 0);
+    }
+    return left.id.localeCompare(right.id);
+  });
 
   try {
     const triggerPlans = mapWorkflowDraftTriggersToExecutionTriggerPlan(normalizedDraft);
     const inputBindings = Object.freeze(normalizedDraft.inputs.map((input) => mapWorkflowInputToExecutionBinding(input)));
+    const assembledContext = assembleWorkflowExecutionContext({
+      inputBindings,
+      context: normalizedContext,
+    });
+    const assemblyBlockingIssues = assembledContext.issues.filter((issue) => issue.severity === "error");
+    if (assemblyBlockingIssues.length > 0) {
+      return createTranslationFailureResult({
+        issues: Object.freeze([...assembledContext.issues]),
+        stage: WorkflowExecutionValidationStages.preExecution,
+      });
+    }
+
     const stepSequencing = Object.freeze(orderedSteps.map((step) => toStepSequencing(step)));
+    const controlFlowMappings = Object.freeze(
+      orderedSteps
+        .map((step) => toControlFlowMapping(step))
+        .filter((mapping): mapping is WorkflowExecutionControlFlowMapping => Boolean(mapping)),
+    );
     const outputBindings = Object.freeze(orderedOutputs.map((output) => toOutputBinding(output)));
 
     const plan: WorkflowDraftExecutionPlan = Object.freeze({
       schemaVersion: WorkflowDraftExecutionPlanSchemaVersion,
       executionRequest: normalizedRequest,
-      executionContext: normalizedContext,
+      executionContext: assembledContext.context,
       triggerHandoff: buildTriggerHandoff({
         triggers: triggerPlans,
-        activation: normalizedContext.triggerActivation,
+        activation: assembledContext.context.triggerActivation,
       }),
       triggers: triggerPlans,
       inputBindings,
       orderedStepIds: Object.freeze(orderedSteps.map((step) => step.id)),
       stepSequencing,
+      controlFlowMappings,
       elements: Object.freeze(orderedSteps.map((step) => toPlanElement(step))),
       outputs: Object.freeze(orderedOutputs.map((output) => toExecutionOutputPlan(output))),
       outputBindings,
     });
 
-    return createTranslationSuccessResult(plan);
+    return createTranslationSuccessResult(plan, assembledContext.issues);
   } catch (error) {
     return createTranslationFailureResult({
       issues: Object.freeze([Object.freeze({
