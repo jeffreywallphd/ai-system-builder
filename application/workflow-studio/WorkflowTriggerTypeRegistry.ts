@@ -15,6 +15,7 @@ export interface WorkflowTriggerTypeRegistryEntry {
   readonly description: string;
   readonly configSchemaId: string;
   readonly capabilities: WorkflowDraftTriggerDefinition["capabilities"];
+  readonly defaultConfig: Readonly<WorkflowDraftTriggerConfig>;
   readonly validationEntryPoint: "normalizeWorkflowDraftTriggerConfig";
 }
 
@@ -33,6 +34,7 @@ function toRegistryEntry(definition: WorkflowDraftTriggerDefinition): WorkflowTr
     description: definition.description,
     configSchemaId: definition.configSchemaId,
     capabilities: definition.capabilities,
+    defaultConfig: Object.freeze({ ...definition.defaultConfig }) as Readonly<WorkflowDraftTriggerConfig>,
     validationEntryPoint: "normalizeWorkflowDraftTriggerConfig",
   });
 }

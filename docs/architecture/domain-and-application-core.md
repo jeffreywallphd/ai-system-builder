@@ -226,16 +226,23 @@ The studio shell now has a bounded inner-layer model and application orchestrati
   - domain validation now includes explicit built-in reference order checks (`built-in-step-reference-order-invalid`) for `if-then`, `loop-iteration`, and `manual-approval` outcome references,
   - workflow planning now has a dedicated canonical mapper `application/workflow-studio/WorkflowDraftExecutionPlanMapper.ts` (`mapWorkflowDraftToExecutionPlan`) that validates canonical drafts first and then emits deterministic execution-plan elements for action + built-in step types without introducing a parallel workflow model.
 
-## Direction 5 update: Workflow trigger domain model + registry contracts (stories 7.1-7.2)
+## Direction 5 update: Workflow trigger domain model + concrete manual/temporal types (stories 7.1-7.4)
 
 - Workflow triggers are now modeled as first-class canonical domain contracts in `domain/workflow-studio/WorkflowStudioDomain.ts` with stable identity (`id`), kind (`user`/`temporal`/`state`), type identifiers, and typed configuration payloads that remain part of the canonical workflow draft (`WorkflowDraft.triggers`).
 - Trigger configuration validation is now exposed through an explicit domain entry point (`normalizeWorkflowDraftTriggerConfig`) so trigger-config correctness remains reusable across authoring, persistence rehydration, and future runtime mapping.
 - The domain now publishes trigger type definitions (`WorkflowDraftTriggerDefinition`) with stable type ids, labels/descriptions, config schema ids, capability metadata, and default config payloads for each initial trigger category/type.
-- Initial seeded trigger definitions are explicit and discoverable for planned Epic 7 categories:
+- Initial seeded trigger definitions are explicit and discoverable for planned Epic 7 categories, with manual/user and temporal now implemented as concrete first trigger families:
   - user/manual: `manual`, `button-click`, `user-initiated-run`
   - temporal: `schedule`, `recurring`
   - state: `data-available`, `asset-state-changed`, `system-event`
+- Manual trigger config now includes explicit invocation-scope semantics (`workflow-start`, `workflow-continuation`) so user-driven starts work now while preserving forward compatibility for intermediate continuation and future human-approval resume semantics.
+- Temporal trigger config now supports pragmatic schedule semantics with explicit validation:
+  - one-time execution (`runAt`)
+  - cron-like schedule execution (`cronExpression`)
+  - recurring interval execution (`every` + `unit`)
+  - optional execution window bounds (`startAt`/`endAt`) with timestamp and ordering checks.
 - Application-layer discovery now uses `application/workflow-studio/WorkflowTriggerTypeRegistry.ts`, which provides stable trigger listing/lookup/filtering, default-config projection, and config-validation delegation without adding UI-local trigger catalogs or runtime-specific trigger behavior.
+- Runtime mapping readiness is now explicit through `application/workflow-studio/WorkflowTriggerRuntimeMapper.ts`, which projects canonical trigger contracts into runtime-facing descriptors without introducing a scheduler engine or UI-owned trigger logic.
 - This keeps trigger semantics in inner layers and provides extension seams for future selector/configuration UI, persistence wiring, and execution-time trigger mapping.
 
 ## Direction 5 update: Studio shell persistence integration (story 1.11)
