@@ -75,6 +75,8 @@ describe("PipelineInspectionService", () => {
     expect(inspection.stages.length).toBe(3);
     expect(inspection.assets.length).toBeGreaterThan(0);
     expect(inspection.stages[0]?.previewData?.kind).toBe("records");
+    expect(inspection.stages[0]?.preview?.version).toBe("1.0.0");
+    expect(inspection.stages[0]?.preview?.kind).toBe("records");
     expect(inspection.stages[0]?.previewData && "items" in inspection.stages[0].previewData
       ? inspection.stages[0].previewData.items.length
       : 0).toBe(1);

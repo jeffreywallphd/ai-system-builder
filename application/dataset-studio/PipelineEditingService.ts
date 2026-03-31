@@ -25,6 +25,7 @@ import {
   StageAssetCompositionService,
   type StageCompositionDefinition,
 } from "./StageAssetCompositionService";
+import { PipelineValidationService } from "./PipelineValidationService";
 import {
   parseFeatureEngineeringStageConfigFromStageOptions,
   toFeatureEngineeringStageOptions,
@@ -167,6 +168,7 @@ function sanitizeBranchingStageIds(
 export class PipelineEditingService {
   private readonly stageRegistry: PipelineStageRegistry;
   private readonly compositionService: StageAssetCompositionService;
+  private readonly validationService: PipelineValidationService;
 
   constructor(input?: {
     readonly stageRegistry?: PipelineStageRegistry;
@@ -174,6 +176,10 @@ export class PipelineEditingService {
   }) {
     this.stageRegistry = input?.stageRegistry ?? new PipelineStageRegistry();
     this.compositionService = new StageAssetCompositionService(input?.stageCompositions);
+    this.validationService = new PipelineValidationService({
+      stageRegistry: this.stageRegistry,
+      stageCompositions: this.compositionService.listDefinitions(),
+    });
   }
 
   public addStage(
@@ -451,17 +457,16 @@ export class PipelineEditingService {
 
   private regenerate(definition: PipelineDefinition): PipelineEditResult {
     try {
-      const pipelineGraph = buildPipelineGraph({
-        stageInstances: definition.stageInstances,
-        stageRegistry: this.stageRegistry,
-        stageCompositions: this.compositionService.listDefinitions(),
+      const pipelineGraph = this.validationService.validate({
+        definition,
         transitions: toTransitions(definition.transitions),
         explicitBranchingStageIds: definition.explicitBranchingStageIds,
+        context: "pipeline-edit",
       });
-      const reactFlowGraph = buildReactFlowGraph(pipelineGraph);
+      const reactFlowGraph = buildReactFlowGraph(pipelineGraph.graph);
       return Object.freeze({
         definition,
-        pipelineGraph,
+        pipelineGraph: pipelineGraph.graph,
         reactFlowGraph,
       });
     } catch (error) {

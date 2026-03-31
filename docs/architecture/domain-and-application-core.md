@@ -1638,3 +1638,27 @@ Explicitly later than this scope:
 - Inspection integration now emits feature/annotation-specific metadata through existing inspection contracts (`PipelineInspectionService`), including before/after field visibility for feature stages and annotation mode/count/manual-needed status for labeling stages.
 - Editing integration remains on the existing 17.6 seam and now adds stage-configuration updates with stage-specific safe normalization for feature-engineering and labeling configurations (`PipelineEditingService.updateStageConfiguration(...)`).
 - Mid-level pipeline packages now include feature-engineering participation in tabular analytics flows and updated labeling option contracts for document/image preparation paths while reusing the same composition, graph, and inspection infrastructure.
+
+## Direction 5 extension update: Mid-level template registry + composition hardening (stories 17.13-17.14)
+
+- Mid-level pipeline templates now have explicit domain contracts in `domain/dataset-studio/MidLevelPipelineTemplateDomain.ts` with zod-backed validation for:
+  - template identity/category/use-case metadata,
+  - default + optional stage declarations,
+  - default stage configuration maps,
+  - wizard guidance/progressive-disclosure metadata,
+  - editing + preview capability descriptors,
+  - instantiation options (optional-stage enable/disable, stage-order, config overrides).
+- A dedicated mid-level template registry + instantiation seam now exists in `application/dataset-studio/MidLevelPipelineTemplateService.ts`, covering:
+  - discoverable default templates (`General`, `Analytics`, `Document`, `Image` preparation),
+  - deterministic instantiation into canonical `PipelineDefinition` + `PipelineGraph` + `PipelineReactFlowGraph`,
+  - reuse of existing 17.x pipeline-definition packages + stage composition mappings (no parallel pipeline model).
+- Validation hardening now includes an explicit end-to-end seam in `application/dataset-studio/PipelineValidationService.ts` with typed validation errors for:
+  - invalid pipeline definitions/stage instances/transitions,
+  - invalid template instantiations,
+  - invalid edited pipelines.
+- Serialization/reload hardening now has a dedicated seam in `application/dataset-studio/PipelineSerializationService.ts` for:
+  - persisted mid-level pipeline documents (versioned envelope),
+  - round-trip definition/graph serialization,
+  - deterministic graph reconstruction checks on rehydrate,
+  - React Flow reconstruction from persisted canonical graph.
+- Inspection preview contracts now expose a normalized preview envelope (`version/kind/truncated/totalCount/payload`) in `domain/dataset-studio/PipelineInspectionDomain.ts` and `application/dataset-studio/PipelineInspectionService.ts` while preserving legacy preview payload access.

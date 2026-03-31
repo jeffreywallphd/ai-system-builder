@@ -67,11 +67,20 @@ export type PipelinePreviewData =
   | TextItemsPreviewData
   | ImageMetadataPreviewData;
 
+export interface PipelinePreviewEnvelope {
+  readonly version: "1.0.0";
+  readonly kind: PipelinePreviewData["kind"];
+  readonly totalCount: number;
+  readonly truncated: boolean;
+  readonly payload: PipelinePreviewData;
+}
+
 export interface AssetInspectionResult {
   readonly stageId: PipelineStageId;
   readonly assetId: string;
   readonly assetNodeId: string;
   readonly status: PipelineExecutionStatus;
+  readonly preview?: PipelinePreviewEnvelope;
   readonly previewData?: PipelinePreviewData;
   readonly metadata: InspectionMetadata;
 }
@@ -79,6 +88,7 @@ export interface AssetInspectionResult {
 export interface StageInspectionResult {
   readonly stageId: PipelineStageId;
   readonly status: PipelineExecutionStatus;
+  readonly preview?: PipelinePreviewEnvelope;
   readonly previewData?: PipelinePreviewData;
   readonly metadata: InspectionMetadata;
   readonly assets: ReadonlyArray<AssetInspectionResult>;
@@ -177,6 +187,19 @@ export const PipelinePreviewDataSchema = z.discriminatedUnion("kind", [
   ImageMetadataPreviewDataSchema,
 ]);
 
+export const PipelinePreviewEnvelopeSchema = z.object({
+  version: z.literal("1.0.0"),
+  kind: z.enum([
+    CanonicalDataShapeKinds.records,
+    CanonicalDataShapeKinds.table,
+    CanonicalDataShapeKinds.textItems,
+    CanonicalDataShapeKinds.imageMetadataRecords,
+  ]),
+  totalCount: z.number().int().min(0),
+  truncated: z.boolean(),
+  payload: PipelinePreviewDataSchema,
+});
+
 export const PipelineNodeInspectionMetadataSchema = z.object({
   status: ExecutionStatusSchema,
   metadata: InspectionMetadataSchema,
@@ -188,6 +211,7 @@ export const AssetInspectionResultSchema = z.object({
   assetId: z.string().trim().min(1),
   assetNodeId: z.string().trim().min(1),
   status: ExecutionStatusSchema,
+  preview: PipelinePreviewEnvelopeSchema.optional(),
   previewData: PipelinePreviewDataSchema.optional(),
   metadata: InspectionMetadataSchema,
 });
@@ -195,6 +219,7 @@ export const AssetInspectionResultSchema = z.object({
 export const StageInspectionResultSchema = z.object({
   stageId: StageIdSchema,
   status: ExecutionStatusSchema,
+  preview: PipelinePreviewEnvelopeSchema.optional(),
   previewData: PipelinePreviewDataSchema.optional(),
   metadata: InspectionMetadataSchema,
   assets: z.array(AssetInspectionResultSchema),

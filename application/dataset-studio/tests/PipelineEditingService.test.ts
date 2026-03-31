@@ -142,4 +142,11 @@ describe("PipelineEditingService", () => {
     expect(labelingStage?.config.options.annotationTarget).toBe("record");
     expect(updated.pipelineGraph.nodes.some((node) => node.id === "stage:Labeling")).toBeTrue();
   });
+
+  it("rejects edits that create invalid stage compatibility/orderings", () => {
+    const service = new PipelineEditingService();
+    const base = createBaseDefinition();
+
+    expect(() => service.reorderStage(base, PipelineStageIds.Transformation, 1)).toThrow();
+  });
 });
