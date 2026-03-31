@@ -1446,3 +1446,14 @@ Explicitly later than this scope:
   - `UnifiedIngestionRoutingService` now resolves low-level ingestion assets through the stage mapping seam,
   - routing still does not execute assets directly; execution remains in `UnifiedIngestionOrchestrationService` and existing ingestor/converter seams.
 
+
+## Direction 5 extension update: Wizard flow engine + default pipeline templates (stories 15E.3-15E.4)
+
+- Dataset Studio now has a stage-oriented wizard flow state-machine seam in `application/dataset-studio/WizardFlowEngine.ts` backed by canonical flow contracts in `domain/dataset-studio/StageFlowDefinition.ts`.
+- Wizard state is application-owned (current/completed/skipped stages + per-stage configuration/output), UI-independent, and supports forward/back transitions, conditional branching, and auto-skip behavior.
+- Stage-flow contracts now support dynamic insertion/removal/reordering and transition validation against stage data contracts to prevent invalid stage hops.
+- Default pipeline templates are now modeled in `domain/dataset-studio/PipelineTemplateDomain.ts` and served through `application/dataset-studio/TemplateService.ts` with:
+  - template listing and UI-ready descriptors,
+  - template instantiation with partial customization (stage config overrides, skip list, reorder list),
+  - validation against stage definition contracts and stage-to-asset mapping (`StageAssetMappingService`).
+- Stage-to-asset mapping now includes template-stage coverage (source/raw-storage/extraction/chunking/cleaning/transformation/aggregation/prepared-storage) while preserving orchestration-only behavior (no asset execution in template/wizard seams).

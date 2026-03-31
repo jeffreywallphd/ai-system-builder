@@ -16,6 +16,18 @@ describe("StageAssetMappingService", () => {
     }
   });
 
+  it("resolves static stage mappings for template-only stage kinds", () => {
+    const service = new StageAssetMappingService();
+    const result = service.resolveStage({
+      stageKind: DatasetPipelineStageKinds.preparedStorage,
+    });
+
+    expect(result.status).toBe("resolved");
+    if (result.status === "resolved") {
+      expect(result.assets[0]?.assetId).toBe("unified-ingestion");
+    }
+  });
+
   it("resolves conditional ingestion mappings by detected source kind", () => {
     const service = new StageAssetMappingService();
     const result = service.resolveStage({

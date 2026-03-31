@@ -1,10 +1,18 @@
 import { CanonicalDataShapeKinds, type CanonicalDataShapeKind } from "./CanonicalDataShapes";
 
 export const DatasetPipelineStageKinds = Object.freeze({
+  source: "source",
   sourceSelection: "source-selection",
   ingestion: "ingestion",
+  rawStorage: "raw-storage",
+  extraction: "extraction",
+  chunking: "chunking",
   profiling: "profiling",
   normalization: "normalization",
+  cleaning: "cleaning",
+  transformation: "transformation",
+  aggregation: "aggregation",
+  preparedStorage: "prepared-storage",
   preview: "preview",
 } as const);
 
