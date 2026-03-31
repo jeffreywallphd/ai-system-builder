@@ -3,6 +3,7 @@ import type { IStudioShellRepository } from "../../ports/interfaces/IStudioShell
 import type { AssetDraft, AssetSession, Studio } from "../../../domain/studio-shell/StudioShellDomain";
 import type { AssetVersion } from "../../../domain/assets/AssetVersion";
 import { DefaultStudioShellApplicationService } from "../../studio-shell/DefaultStudioShellApplicationService";
+import { WorkflowExecutionTriggerSourceKinds } from "../WorkflowExecutionAlignmentContracts";
 import { WorkflowStudioApplicationService } from "../WorkflowStudioApplicationService";
 import {
   createEmptyWorkflowDraft,
@@ -565,5 +566,129 @@ describe("WorkflowStudioApplicationService", () => {
     expect(result.launchStatus).toBe("blocked");
     expect(result.validation.ready).toBeFalse();
     expect(result.validation.blockingIssues.some((issue) => issue.code === "input-resolution-required-missing")).toBeTrue();
+  });
+
+  it("routes manual/user trigger entry through the canonical validation/translation/runtime pipeline", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => "generated");
+    const service = new WorkflowStudioApplicationService(studioShell);
+
+    const result = await service.runWorkflowDraftTriggered({
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-manual",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        }],
+        inputs: [{
+          id: "input-prompt",
+          type: "runtime-input",
+          sourceType: "runtime-parameter",
+          parameterKey: "prompt",
+          required: true,
+        }],
+        steps: [{
+          id: "step-1",
+          type: "action",
+          kind: "action",
+          order: 1,
+        }],
+      }),
+      trigger: {
+        sourceKind: WorkflowExecutionTriggerSourceKinds.manualUser,
+        triggerId: "trigger-manual",
+        payload: {
+          prompt: "manual trigger payload",
+        },
+      },
+    });
+
+    expect(result.launchStatus).toBe("launched");
+    expect(result.validation.ready).toBeTrue();
+    expect(result.validation.plan?.executionContext.resolvedInputValues).toEqual({
+      "input-prompt": "manual trigger payload",
+    });
+  });
+
+  it("supports temporal and state trigger entries while preserving validation blocking behavior", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => "generated");
+    const service = new WorkflowStudioApplicationService(studioShell);
+
+    const temporalBlocked = await service.runWorkflowDraftTriggered({
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-temporal",
+          kind: WorkflowDraftTriggerKinds.temporal,
+          type: WorkflowDraftTriggerTypes.temporalSchedule,
+          config: {
+            runAt: "2027-01-01T00:00:00.000Z",
+          },
+        }],
+        inputs: [{
+          id: "input-required",
+          type: "runtime-input",
+          sourceType: "runtime-parameter",
+          parameterKey: "requiredValue",
+          required: true,
+        }],
+        steps: [{
+          id: "step-1",
+          type: "action",
+          kind: "action",
+          order: 1,
+        }],
+      }),
+      trigger: {
+        sourceKind: WorkflowExecutionTriggerSourceKinds.temporal,
+        triggerId: "trigger-temporal",
+      },
+    });
+    expect(temporalBlocked.launchStatus).toBe("blocked");
+    expect(temporalBlocked.validation.blockingIssues.some((issue) => issue.code === "input-resolution-required-missing")).toBeTrue();
+
+    const stateLaunched = await service.runWorkflowDraftTriggered({
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-state",
+          kind: WorkflowDraftTriggerKinds.state,
+          type: WorkflowDraftTriggerTypes.stateSystemEvent,
+          config: {
+            sourceType: "system",
+            eventCategory: "system-state-changed",
+            eventName: "customer-updated",
+          },
+        }],
+        inputs: [{
+          id: "input-customer-id",
+          type: "runtime-input",
+          sourceType: "runtime-parameter",
+          parameterKey: "customerId",
+          required: true,
+        }],
+        steps: [{
+          id: "step-1",
+          type: "action",
+          kind: "action",
+          order: 1,
+        }],
+      }),
+      trigger: {
+        sourceKind: WorkflowExecutionTriggerSourceKinds.stateData,
+        triggerId: "trigger-state",
+        payload: {
+          customerId: "customer-42",
+        },
+      },
+    });
+    expect(stateLaunched.launchStatus).toBe("launched");
+    expect(stateLaunched.validation.ready).toBeTrue();
+    expect(stateLaunched.validation.plan?.executionContext.resolvedInputValues).toEqual({
+      "input-customer-id": "customer-42",
+    });
   });
 });

@@ -6,6 +6,7 @@ describe("StudioShellService", () => {
     const source = readSource("ui/services/StudioShellService.ts");
 
     expect(source).toContain("resolveDesktopStudioShellBridge");
+    expect(source).toContain("resolveBrowserStudioShellBridgeFallback");
     expect(source).toContain("initializeStudio(");
     expect(source).toContain("loadSnapshot(");
     expect(source).toContain("startSession(");

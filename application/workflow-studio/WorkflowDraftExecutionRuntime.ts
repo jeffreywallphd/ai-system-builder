@@ -3,6 +3,7 @@ import {
   type WorkflowDraftConditionDefinition,
 } from "../../domain/workflow-studio/WorkflowStudioDomain";
 import type {
+  WorkflowExecutionAssetStepBinding,
   WorkflowDraftActionExecutionPlanElement,
   WorkflowDraftDelayExecutionPlanElement,
   WorkflowDraftExecutionPlan,
@@ -66,6 +67,18 @@ export interface WorkflowDraftRuntimeExecutionRequest {
   readonly maxLoopIterations?: number;
   readonly actionExecutor?: (
     element: WorkflowDraftActionExecutionPlanElement,
+    context: {
+      readonly inputs: Readonly<Record<string, unknown>>;
+      readonly stepOutputs: Readonly<Record<string, unknown>>;
+      readonly loop?: {
+        readonly loopStepId: string;
+        readonly iteration: number;
+        readonly item?: unknown;
+      };
+    },
+  ) => Promise<unknown> | unknown;
+  readonly assetStepExecutor?: (
+    binding: WorkflowExecutionAssetStepBinding,
     context: {
       readonly inputs: Readonly<Record<string, unknown>>;
       readonly stepOutputs: Readonly<Record<string, unknown>>;
@@ -277,6 +290,9 @@ function normalizeRangeIterations(range: WorkflowDraftLoopExecutionPlanElement["
 export class WorkflowDraftExecutionRuntime {
   public async execute(request: WorkflowDraftRuntimeExecutionRequest): Promise<WorkflowDraftRuntimeExecutionResult> {
     const elementsById = new Map(request.plan.elements.map((element) => [element.stepId, element] as const));
+    const assetStepBindingsByStepId = new Map(
+      (request.plan.assetStepBindings ?? []).map((binding) => [binding.stepId, binding] as const),
+    );
     const controlledTargetStepIds = collectControlledTargetStepIds(request.plan);
     const traces: WorkflowDraftRuntimeStepTraceEntry[] = [];
     const stepOutputs = new Map<string, unknown>();
@@ -369,6 +385,21 @@ export class WorkflowDraftExecutionRuntime {
       element: WorkflowDraftActionExecutionPlanElement,
       loop?: RuntimeLoopScope,
     ): Promise<unknown> => {
+      if (element.stepKind === "asset-backed") {
+        const binding = assetStepBindingsByStepId.get(element.stepId);
+        if (!binding) {
+          throw new Error(`asset-step-binding-missing:${element.stepId}`);
+        }
+        if (!request.assetStepExecutor) {
+          throw new Error(`asset-step-executor-unavailable:${element.stepId}:${binding.invocationKind}`);
+        }
+        return request.assetStepExecutor(binding, {
+          inputs: request.inputs ?? Object.freeze({}),
+          stepOutputs: Object.freeze(Object.fromEntries(stepOutputs.entries())),
+          loop,
+        });
+      }
+
       if (request.actionExecutor) {
         return request.actionExecutor(element, {
           inputs: request.inputs ?? Object.freeze({}),

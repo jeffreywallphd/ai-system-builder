@@ -238,4 +238,81 @@ describe("WorkflowDraftExecutionRuntime", () => {
       stepId: "step-manual",
     }));
   });
+
+  it("invokes asset-backed action steps through the aligned asset-step execution seam", async () => {
+    const runtime = new WorkflowDraftExecutionRuntime();
+    const plan = mapWorkflowDraftToExecutionPlan({
+      ...createEmptyWorkflowDraft(),
+      inputs: [{
+        id: "input-prompt",
+        type: "runtime-input",
+        sourceType: "runtime-parameter",
+        parameterKey: "prompt",
+        required: true,
+      }],
+      steps: [{
+        id: "step-agent",
+        type: "agent-assistant",
+        kind: WorkflowDraftStepKinds.assetBacked,
+        order: 1,
+        config: {
+          mode: "analysis",
+        },
+        assetRef: {
+          assetKind: "agent-assistant",
+          asset: {
+            assetId: "asset:agent:analyst",
+          },
+        },
+      }],
+    });
+
+    const result = await runtime.execute({
+      plan,
+      inputs: {
+        prompt: "Analyze churn drivers",
+      },
+      assetStepExecutor: (binding, context) => Object.freeze({
+        invokedStepId: binding.stepId,
+        invokedAssetId: binding.asset.assetId,
+        resolvedPrompt: binding.inputBinding.resolvedInputValues["input-prompt"],
+        runtimePrompt: context.inputs.prompt,
+      }),
+    });
+
+    expect(result.status).toBe(WorkflowDraftRuntimeExecutionStatusKinds.completed);
+    expect(result.stepOutputs["step-agent"]).toEqual({
+      invokedStepId: "step-agent",
+      invokedAssetId: "asset:agent:analyst",
+      resolvedPrompt: "Analyze churn drivers",
+      runtimePrompt: "Analyze churn drivers",
+    });
+  });
+
+  it("fails asset-backed step execution clearly when no asset-step runtime invoker is configured", async () => {
+    const runtime = new WorkflowDraftExecutionRuntime();
+    const plan = mapWorkflowDraftToExecutionPlan({
+      ...createEmptyWorkflowDraft(),
+      steps: [{
+        id: "step-agent",
+        type: "agent-assistant",
+        kind: WorkflowDraftStepKinds.assetBacked,
+        order: 1,
+        assetRef: {
+          assetKind: "agent-assistant",
+          asset: {
+            assetId: "asset:agent:analyst",
+          },
+        },
+      }],
+    });
+
+    const result = await runtime.execute({ plan });
+    expect(result.status).toBe(WorkflowDraftRuntimeExecutionStatusKinds.failed);
+    expect(result.issues).toContainEqual(expect.objectContaining({
+      code: "workflow-runtime-step-failed",
+      stepId: "step-agent",
+      message: expect.stringContaining("asset-step-executor-unavailable"),
+    }));
+  });
 });

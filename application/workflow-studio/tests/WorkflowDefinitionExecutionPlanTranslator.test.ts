@@ -364,6 +364,39 @@ describe("WorkflowDefinitionExecutionPlanTranslator", () => {
     })]);
   });
 
+  it("blocks translation when trigger activation references a missing trigger id", () => {
+    const result = translateWorkflowDefinitionToExecutionPlan({
+      context: {
+        triggerActivation: {
+          triggerId: "trigger-missing",
+          sourceKind: "manual-user",
+          activationType: "manual",
+        },
+      },
+      draft: {
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-manual",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        }],
+        steps: [{
+          id: "step-1",
+          type: "action",
+          kind: WorkflowDraftStepKinds.action,
+          order: 1,
+        }],
+      },
+    });
+
+    expect(result.success).toBeFalse();
+    expect(result.issues).toContainEqual(expect.objectContaining({
+      code: "trigger-activation-not-found",
+      severity: "error",
+    }));
+  });
+
   it("translates ordered steps with control-flow metadata, triggers, asset-backed steps, and outputs", () => {
     const plan = mapWorkflowDraftToExecutionPlan({
       ...createEmptyWorkflowDraft(),

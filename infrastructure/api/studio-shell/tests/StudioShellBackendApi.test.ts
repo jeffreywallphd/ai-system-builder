@@ -365,6 +365,86 @@ describe("StudioShellBackendApi", () => {
     expect(run.data?.runtime?.status === "completed" || run.data?.runtime?.status === "paused").toBeTrue();
   });
 
+  it("supports trigger-aware entry for temporal and state workflow activations", async () => {
+    const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
+
+    const temporalRun = await api.runWorkflowDraft({
+      studioId: "studio-workflows",
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-temporal",
+          kind: WorkflowDraftTriggerKinds.temporal,
+          type: WorkflowDraftTriggerTypes.temporalSchedule,
+          config: {
+            runAt: "2027-01-01T00:00:00.000Z",
+          },
+        }],
+        inputs: [{
+          id: "input-key",
+          type: "runtime-input",
+          sourceType: "runtime-parameter",
+          parameterKey: "key",
+          required: true,
+        }],
+        steps: [{
+          id: "step-1",
+          type: "action",
+          kind: "action",
+          order: 1,
+        }],
+      }),
+      triggerEntry: {
+        sourceKind: "temporal",
+        triggerId: "trigger-temporal",
+      },
+    });
+    expect(temporalRun.ok).toBeTrue();
+    expect(temporalRun.data?.launchStatus).toBe("blocked");
+    expect(temporalRun.data?.validation.issues.some((issue) => issue.code === "input-resolution-required-missing")).toBeTrue();
+
+    const stateRun = await api.runWorkflowDraft({
+      studioId: "studio-workflows",
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-state",
+          kind: WorkflowDraftTriggerKinds.state,
+          type: WorkflowDraftTriggerTypes.stateSystemEvent,
+          config: {
+            sourceType: "system",
+            eventCategory: "system-state-changed",
+            eventName: "customer-updated",
+          },
+        }],
+        inputs: [{
+          id: "input-customer-id",
+          type: "runtime-input",
+          sourceType: "runtime-parameter",
+          parameterKey: "customerId",
+          required: true,
+        }],
+        steps: [{
+          id: "step-1",
+          type: "action",
+          kind: "action",
+          order: 1,
+        }],
+      }),
+      triggerEntry: {
+        sourceKind: "state-data",
+        triggerId: "trigger-state",
+        payload: {
+          customerId: "customer-7",
+        },
+      },
+    });
+
+    expect(stateRun.ok).toBeTrue();
+    expect(stateRun.data?.launchStatus).toBe("launched");
+    expect(stateRun.data?.validation.ready).toBeTrue();
+  });
+
   it("surfaces version-aware dependency mismatch validation for composite drafts", async () => {
     const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
 
