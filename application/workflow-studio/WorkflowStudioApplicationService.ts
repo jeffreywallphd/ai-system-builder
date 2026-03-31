@@ -27,6 +27,7 @@ import {
   type WorkflowDraftRuntimeExecutionResult,
   type WorkflowDraftRuntimeManualDecision,
 } from "./WorkflowDraftExecutionRuntime";
+import type { WorkflowExecutionOutputDeliveryHandler } from "./WorkflowExecutionOutputDeliveryService";
 import {
   validateWorkflowForExecutionReadiness,
   type WorkflowExecutionAssetReferenceResolver,
@@ -109,8 +110,57 @@ export interface WorkflowAssetStepRuntimeInvoker {
   ) => Promise<unknown> | unknown;
 }
 
+export interface WorkflowOutputRuntimeDeliveryHandler {
+  readonly deliver: WorkflowExecutionOutputDeliveryHandler["deliver"];
+}
+
+export const WorkflowExecutionLifecycleStates = Object.freeze({
+  queued: "queued",
+  running: "running",
+  completed: "completed",
+  failed: "failed",
+});
+
+export type WorkflowExecutionLifecycleState =
+  typeof WorkflowExecutionLifecycleStates[keyof typeof WorkflowExecutionLifecycleStates];
+
+export const WorkflowExecutionFailureKinds = Object.freeze({
+  validationFailure: "validation-failure",
+  translationFailure: "translation-failure",
+  unsupportedConfiguration: "unsupported-configuration",
+  runtimeFailure: "runtime-failure",
+  outputDeliveryFailure: "output-delivery-failure",
+  launchFailure: "launch-failure",
+});
+
+export type WorkflowExecutionFailureKind =
+  typeof WorkflowExecutionFailureKinds[keyof typeof WorkflowExecutionFailureKinds];
+
+export interface WorkflowExecutionFailureDetail {
+  readonly kind: WorkflowExecutionFailureKind;
+  readonly code: string;
+  readonly message: string;
+  readonly stage: "validation" | "translation" | "runtime" | "output-delivery" | "launch";
+  readonly issueCodes?: ReadonlyArray<string>;
+}
+
+export interface WorkflowExecutionStateTransition {
+  readonly state: WorkflowExecutionLifecycleState;
+  readonly occurredAt: string;
+  readonly message: string;
+}
+
+export interface WorkflowExecutionStatusReport {
+  readonly executionId: string;
+  readonly state: WorkflowExecutionLifecycleState;
+  readonly launchAccepted: boolean;
+  readonly transitions: ReadonlyArray<WorkflowExecutionStateTransition>;
+  readonly failure?: WorkflowExecutionFailureDetail;
+}
+
 export interface RunWorkflowDraftManualResult {
   readonly launchStatus: "blocked" | "launched" | "failed";
+  readonly executionStatus: WorkflowExecutionStatusReport;
   readonly validation: WorkflowPreExecutionValidationResult;
   readonly runtimeResult?: WorkflowDraftRuntimeExecutionResult;
   readonly failureMessage?: string;
@@ -120,6 +170,9 @@ export class WorkflowStudioApplicationService {
   private readonly runtimeExecutor: WorkflowDraftExecutionRuntime;
   private readonly assetReferenceResolver?: WorkflowExecutionAssetReferenceResolver;
   private readonly assetStepRuntimeInvoker?: WorkflowAssetStepRuntimeInvoker;
+  private readonly outputDeliveryHandler?: WorkflowOutputRuntimeDeliveryHandler;
+  private readonly executionIdFactory: () => string;
+  private readonly now: () => Date;
 
   constructor(
     private readonly studioShellService: StudioShellApplicationService,
@@ -127,10 +180,70 @@ export class WorkflowStudioApplicationService {
     runtimeExecutor: WorkflowDraftExecutionRuntime = new WorkflowDraftExecutionRuntime(),
     assetReferenceResolver?: WorkflowExecutionAssetReferenceResolver,
     assetStepRuntimeInvoker?: WorkflowAssetStepRuntimeInvoker,
+    outputDeliveryHandler?: WorkflowOutputRuntimeDeliveryHandler,
+    executionIdFactory: () => string = () =>
+      `workflow-exec:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 10)}`,
+    now: () => Date = () => new Date(),
   ) {
     this.runtimeExecutor = runtimeExecutor;
     this.assetReferenceResolver = assetReferenceResolver;
     this.assetStepRuntimeInvoker = assetStepRuntimeInvoker;
+    this.outputDeliveryHandler = outputDeliveryHandler;
+    this.executionIdFactory = executionIdFactory;
+    this.now = now;
+  }
+
+  private classifyValidationFailure(
+    validation: WorkflowPreExecutionValidationResult,
+  ): WorkflowExecutionFailureDetail {
+    const blockingIssueCodes = validation.blockingIssues.map((issue) => issue.code);
+    const firstCode = blockingIssueCodes[0] ?? "workflow-execution-validation-failed";
+    if (blockingIssueCodes.some((code) => code.includes("unsupported"))) {
+      return Object.freeze({
+        kind: WorkflowExecutionFailureKinds.unsupportedConfiguration,
+        code: firstCode,
+        message: "Workflow execution is blocked by unsupported output/configuration semantics.",
+        stage: "translation",
+        issueCodes: Object.freeze(blockingIssueCodes),
+      });
+    }
+    if (validation.translationValidation.ready === false) {
+      return Object.freeze({
+        kind: WorkflowExecutionFailureKinds.translationFailure,
+        code: firstCode,
+        message: "Workflow execution planning/translation failed before runtime launch.",
+        stage: "translation",
+        issueCodes: Object.freeze(blockingIssueCodes),
+      });
+    }
+    return Object.freeze({
+      kind: WorkflowExecutionFailureKinds.validationFailure,
+      code: firstCode,
+      message: "Workflow execution validation failed before launch.",
+      stage: "validation",
+      issueCodes: Object.freeze(blockingIssueCodes),
+    });
+  }
+
+  private classifyRuntimeFailure(runtimeResult: WorkflowDraftRuntimeExecutionResult): WorkflowExecutionFailureDetail {
+    const issueCodes = runtimeResult.issues.map((issue) => issue.code);
+    const outputDeliveryIssue = runtimeResult.outputDelivery.issues[0];
+    if (outputDeliveryIssue) {
+      return Object.freeze({
+        kind: WorkflowExecutionFailureKinds.outputDeliveryFailure,
+        code: outputDeliveryIssue.code,
+        message: outputDeliveryIssue.message,
+        stage: "output-delivery",
+        issueCodes: Object.freeze(issueCodes),
+      });
+    }
+    return Object.freeze({
+      kind: WorkflowExecutionFailureKinds.runtimeFailure,
+      code: issueCodes[0] ?? "workflow-runtime-execution-failed",
+      message: runtimeResult.issues[0]?.message ?? "Workflow runtime execution failed.",
+      stage: "runtime",
+      issueCodes: Object.freeze(issueCodes),
+    });
   }
 
   public async ensureStudioInitialized(
@@ -299,6 +412,31 @@ export class WorkflowStudioApplicationService {
   public async runWorkflowDraftTriggered(
     command: RunWorkflowDraftTriggeredCommand,
   ): Promise<RunWorkflowDraftManualResult> {
+    const executionId = this.executionIdFactory();
+    const transitions: WorkflowExecutionStateTransition[] = [];
+    const pushTransition = (
+      state: WorkflowExecutionLifecycleState,
+      message: string,
+    ) => {
+      transitions.push(Object.freeze({
+        state,
+        message,
+        occurredAt: this.now().toISOString(),
+      }));
+    };
+    const toStatus = (
+      state: WorkflowExecutionLifecycleState,
+      launchAccepted: boolean,
+      failure?: WorkflowExecutionFailureDetail,
+    ): WorkflowExecutionStatusReport => Object.freeze({
+      executionId,
+      state,
+      launchAccepted,
+      transitions: Object.freeze([...transitions]),
+      failure,
+    });
+    pushTransition(WorkflowExecutionLifecycleStates.queued, "Execution request accepted and queued.");
+
     const context = applyTriggerExecutionEntryToContext({
       context: command.context,
       entry: command.trigger,
@@ -310,12 +448,16 @@ export class WorkflowStudioApplicationService {
     });
 
     if (!validation.ready || !validation.plan) {
+      const failure = this.classifyValidationFailure(validation);
+      pushTransition(WorkflowExecutionLifecycleStates.failed, failure.message);
       return Object.freeze({
         launchStatus: "blocked",
+        executionStatus: toStatus(WorkflowExecutionLifecycleStates.failed, false, failure),
         validation,
       });
     }
 
+    pushTransition(WorkflowExecutionLifecycleStates.running, "Execution plan launched in runtime.");
     try {
       const runtimeResult = await this.runtimeExecutor.execute({
         plan: validation.plan,
@@ -325,16 +467,50 @@ export class WorkflowStudioApplicationService {
         assetStepExecutor: this.assetStepRuntimeInvoker
           ? (binding, runtimeContext) => this.assetStepRuntimeInvoker!.invoke(binding, runtimeContext)
           : undefined,
+        outputDeliveryHandler: this.outputDeliveryHandler
+          ? {
+            deliver: (outputPlan, payload, request) => this.outputDeliveryHandler!.deliver(outputPlan, payload, request),
+          }
+          : undefined,
       });
+      if (runtimeResult.status === "failed") {
+        const failure = this.classifyRuntimeFailure(runtimeResult);
+        pushTransition(WorkflowExecutionLifecycleStates.failed, failure.message);
+        return Object.freeze({
+          launchStatus: "failed",
+          executionStatus: toStatus(WorkflowExecutionLifecycleStates.failed, true, failure),
+          validation,
+          runtimeResult,
+          failureMessage: failure.message,
+        });
+      }
+      if (runtimeResult.status === "paused") {
+        return Object.freeze({
+          launchStatus: "launched",
+          executionStatus: toStatus(WorkflowExecutionLifecycleStates.running, true),
+          validation,
+          runtimeResult,
+        });
+      }
+      pushTransition(WorkflowExecutionLifecycleStates.completed, "Execution completed successfully.");
       return Object.freeze({
         launchStatus: "launched",
+        executionStatus: toStatus(WorkflowExecutionLifecycleStates.completed, true),
         validation,
         runtimeResult,
       });
     } catch (error) {
       const failureMessage = error instanceof Error ? error.message : "workflow-draft-runtime-execution-failed";
+      const failure = Object.freeze({
+        kind: WorkflowExecutionFailureKinds.launchFailure,
+        code: "workflow-draft-runtime-execution-failed",
+        message: failureMessage,
+        stage: "launch",
+      } satisfies WorkflowExecutionFailureDetail);
+      pushTransition(WorkflowExecutionLifecycleStates.failed, failure.message);
       return Object.freeze({
         launchStatus: "failed",
+        executionStatus: toStatus(WorkflowExecutionLifecycleStates.failed, true, failure),
         validation,
         failureMessage,
       });

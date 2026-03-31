@@ -124,6 +124,29 @@ export interface WorkflowExecutionReadinessReadModel {
 
 export interface RunWorkflowStudioDraftReadModel {
   readonly launchStatus: "blocked" | "launched" | "failed";
+  readonly execution: {
+    readonly executionId: string;
+    readonly state: "queued" | "running" | "completed" | "failed";
+    readonly launchAccepted: boolean;
+    readonly transitions: ReadonlyArray<{
+      readonly state: "queued" | "running" | "completed" | "failed";
+      readonly occurredAt: string;
+      readonly message: string;
+    }>;
+    readonly failure?: {
+      readonly kind:
+        | "validation-failure"
+        | "translation-failure"
+        | "unsupported-configuration"
+        | "runtime-failure"
+        | "output-delivery-failure"
+        | "launch-failure";
+      readonly code: string;
+      readonly message: string;
+      readonly stage: "validation" | "translation" | "runtime" | "output-delivery" | "launch";
+      readonly issueCodes?: ReadonlyArray<string>;
+    };
+  };
   readonly validation: WorkflowExecutionReadinessReadModel;
   readonly planSummary?: {
     readonly stepCount: number;
@@ -136,6 +159,11 @@ export interface RunWorkflowStudioDraftReadModel {
     readonly traceCount: number;
     readonly issueCount: number;
     readonly pausedAtStepId?: string;
+    readonly outputDelivery?: {
+      readonly deliveredCount: number;
+      readonly failedCount: number;
+      readonly issueCount: number;
+    };
   };
   readonly failureMessage?: string;
 }
@@ -285,6 +313,27 @@ export class StudioShellBackendApi {
 
       return Object.freeze({
         launchStatus: runResult.launchStatus,
+        execution: Object.freeze({
+          executionId: runResult.executionStatus.executionId,
+          state: runResult.executionStatus.state,
+          launchAccepted: runResult.executionStatus.launchAccepted,
+          transitions: Object.freeze(runResult.executionStatus.transitions.map((transition) => Object.freeze({
+            state: transition.state,
+            occurredAt: transition.occurredAt,
+            message: transition.message,
+          }))),
+          failure: runResult.executionStatus.failure
+            ? Object.freeze({
+              kind: runResult.executionStatus.failure.kind,
+              code: runResult.executionStatus.failure.code,
+              message: runResult.executionStatus.failure.message,
+              stage: runResult.executionStatus.failure.stage,
+              issueCodes: runResult.executionStatus.failure.issueCodes
+                ? Object.freeze([...runResult.executionStatus.failure.issueCodes])
+                : undefined,
+            })
+            : undefined,
+        }),
         validation: Object.freeze({
           ready: runResult.validation.ready,
           authoredValidation: Object.freeze({
@@ -320,6 +369,11 @@ export class StudioShellBackendApi {
             traceCount: runResult.runtimeResult.traces.length,
             issueCount: runResult.runtimeResult.issues.length,
             pausedAtStepId: runResult.runtimeResult.pausedAt?.stepId,
+            outputDelivery: Object.freeze({
+              deliveredCount: runResult.runtimeResult.outputDelivery.results.filter((entry) => entry.status === "delivered").length,
+              failedCount: runResult.runtimeResult.outputDelivery.results.filter((entry) => entry.status === "failed").length,
+              issueCount: runResult.runtimeResult.outputDelivery.issues.length,
+            }),
           })
           : undefined,
         failureMessage: runResult.failureMessage,

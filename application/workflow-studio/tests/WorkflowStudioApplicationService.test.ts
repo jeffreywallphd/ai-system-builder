@@ -447,6 +447,10 @@ describe("WorkflowStudioApplicationService", () => {
     });
 
     expect(result.launchStatus).toBe("blocked");
+    expect(result.executionStatus.state).toBe("failed");
+    expect(result.executionStatus.launchAccepted).toBeFalse();
+    expect(result.executionStatus.transitions.map((entry) => entry.state)).toEqual(["queued", "failed"]);
+    expect(result.executionStatus.failure?.kind).toBe("validation-failure");
     expect(result.validation.ready).toBeFalse();
     expect(result.validation.blockingIssues.length).toBeGreaterThan(0);
   });
@@ -475,6 +479,10 @@ describe("WorkflowStudioApplicationService", () => {
     });
 
     expect(result.launchStatus).toBe("launched");
+    expect(result.executionStatus.state === "completed" || result.executionStatus.state === "running").toBeTrue();
+    expect(result.executionStatus.launchAccepted).toBeTrue();
+    expect(result.executionStatus.transitions[0]?.state).toBe("queued");
+    expect(result.executionStatus.transitions[1]?.state).toBe("running");
     expect(result.validation.ready).toBeTrue();
     expect(result.runtimeResult?.status === "completed" || result.runtimeResult?.status === "paused").toBeTrue();
   });
@@ -526,6 +534,7 @@ describe("WorkflowStudioApplicationService", () => {
     });
 
     expect(result.launchStatus).toBe("launched");
+    expect(result.executionStatus.launchAccepted).toBeTrue();
     expect(result.validation.ready).toBeTrue();
     const completedStepIds = result.runtimeResult?.traces
       .filter((entry) => entry.status === "completed")
@@ -564,6 +573,7 @@ describe("WorkflowStudioApplicationService", () => {
     });
 
     expect(result.launchStatus).toBe("blocked");
+    expect(result.executionStatus.failure?.kind).toBe("validation-failure");
     expect(result.validation.ready).toBeFalse();
     expect(result.validation.blockingIssues.some((issue) => issue.code === "input-resolution-required-missing")).toBeTrue();
   });
@@ -606,6 +616,7 @@ describe("WorkflowStudioApplicationService", () => {
     });
 
     expect(result.launchStatus).toBe("launched");
+    expect(result.executionStatus.state).toBe("completed");
     expect(result.validation.ready).toBeTrue();
     expect(result.validation.plan?.executionContext.resolvedInputValues).toEqual({
       "input-prompt": "manual trigger payload",
@@ -648,6 +659,7 @@ describe("WorkflowStudioApplicationService", () => {
       },
     });
     expect(temporalBlocked.launchStatus).toBe("blocked");
+    expect(temporalBlocked.executionStatus.failure?.kind).toBe("validation-failure");
     expect(temporalBlocked.validation.blockingIssues.some((issue) => issue.code === "input-resolution-required-missing")).toBeTrue();
 
     const stateLaunched = await service.runWorkflowDraftTriggered({
@@ -686,9 +698,153 @@ describe("WorkflowStudioApplicationService", () => {
       },
     });
     expect(stateLaunched.launchStatus).toBe("launched");
+    expect(stateLaunched.executionStatus.state).toBe("completed");
     expect(stateLaunched.validation.ready).toBeTrue();
     expect(stateLaunched.validation.plan?.executionContext.resolvedInputValues).toEqual({
       "input-customer-id": "customer-42",
     });
+  });
+
+  it("reports unsupported configuration failure when output translation cannot bind destination type", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => "generated");
+    const service = new WorkflowStudioApplicationService(studioShell);
+
+    const result = await service.runWorkflowDraftManual({
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-manual",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        }],
+        steps: [{
+          id: "step-1",
+          type: "action",
+          kind: "action",
+          order: 1,
+        }],
+        outputs: [{
+          id: "output-unsupported",
+          type: "workflow-output",
+          order: 1,
+          outputType: WorkflowDraftOutputTypes.document,
+          format: WorkflowDraftOutputFormats.json,
+          sourceStepId: "step-1",
+          destination: {
+            type: "unsupported-output-target",
+            target: "unsupported",
+          },
+        }],
+      }),
+    });
+
+    expect(result.launchStatus).toBe("blocked");
+    expect(result.executionStatus.state).toBe("failed");
+    expect(result.executionStatus.failure?.kind).toBe("unsupported-configuration");
+    expect(result.executionStatus.failure?.stage).toBe("translation");
+  });
+
+  it("reports translation/planning failures separately from validation failures", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => "generated");
+    const service = new WorkflowStudioApplicationService(studioShell);
+
+    const result = await service.runWorkflowDraftManual({
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-manual",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        }],
+        steps: [{
+          id: "step-if",
+          type: "if-then",
+          kind: "control-flow",
+          order: 1,
+          config: {
+            conditionExpression: "inputs.ready",
+            thenStepIds: ["step-missing"],
+          },
+        }],
+      }),
+    });
+
+    expect(result.launchStatus).toBe("blocked");
+    expect(result.executionStatus.failure?.kind).toBe("translation-failure");
+    expect(result.executionStatus.failure?.stage).toBe("translation");
+  });
+
+  it("reports runtime and output-delivery failures through structured execution status", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => "generated");
+    const service = new WorkflowStudioApplicationService(studioShell);
+
+    const runtimeFailure = await service.runWorkflowDraftManual({
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-manual",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        }],
+        steps: [{
+          id: "step-1",
+          type: "agent-assistant",
+          kind: "asset-backed",
+          order: 1,
+          assetRef: {
+            assetKind: "agent-assistant",
+            asset: {
+              assetId: "asset:agent-missing-runtime",
+            },
+          },
+        }],
+      }),
+    });
+    expect(runtimeFailure.launchStatus).toBe("failed");
+    expect(runtimeFailure.executionStatus.failure?.kind).toBe("runtime-failure");
+    expect(runtimeFailure.executionStatus.failure?.stage).toBe("runtime");
+
+    const outputFailure = await service.runWorkflowDraftManual({
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-manual",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        }],
+        steps: [{
+          id: "step-1",
+          type: "action",
+          kind: "action",
+          order: 1,
+        }],
+        outputs: [{
+          id: "output-file",
+          type: "workflow-output",
+          order: 1,
+          outputType: WorkflowDraftOutputTypes.document,
+          format: WorkflowDraftOutputFormats.json,
+          sourceStepId: "step-1",
+          destination: {
+            type: WorkflowDraftOutputDestinationTypes.fileExport,
+            target: "workspace-file",
+            options: {
+              deliveryMode: "workspace-file",
+            },
+          },
+        }],
+      }),
+    });
+
+    expect(outputFailure.launchStatus).toBe("failed");
+    expect(outputFailure.executionStatus.failure?.kind).toBe("output-delivery-failure");
+    expect(outputFailure.executionStatus.failure?.stage).toBe("output-delivery");
   });
 });

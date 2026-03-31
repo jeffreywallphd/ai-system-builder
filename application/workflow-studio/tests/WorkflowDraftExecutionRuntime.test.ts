@@ -1,6 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import {
   WorkflowDraftBuiltInStepTypes,
+  WorkflowDraftOutputDestinationTypes,
+  WorkflowDraftOutputFormats,
+  WorkflowDraftOutputTypes,
   WorkflowDraftStepKinds,
   createEmptyWorkflowDraft,
 } from "../../../domain/workflow-studio/WorkflowStudioDomain";
@@ -111,6 +114,8 @@ describe("WorkflowDraftExecutionRuntime", () => {
     expect(result.status).toBe(WorkflowDraftRuntimeExecutionStatusKinds.completed);
     expect(result.issues.some((issue) => issue.code === "workflow-runtime-step-failed")).toBeFalse();
     expect(sleepCalls).toEqual([]);
+    expect(result.outputDelivery.results).toEqual([]);
+    expect(result.outputDelivery.issues).toEqual([]);
 
     const completedStepIds = result.traces
       .filter((entry) => entry.status === "completed")
@@ -156,6 +161,7 @@ describe("WorkflowDraftExecutionRuntime", () => {
 
     expect(result.status).toBe(WorkflowDraftRuntimeExecutionStatusKinds.completed);
     expect(sleepCalls).toEqual([30000]);
+    expect(result.outputDelivery.results).toEqual([]);
   });
 
   it("pauses runtime execution when manual decision input is not available", async () => {
@@ -192,6 +198,7 @@ describe("WorkflowDraftExecutionRuntime", () => {
     expect(result.status).toBe(WorkflowDraftRuntimeExecutionStatusKinds.paused);
     expect(result.pausedAt?.stepId).toBe("step-manual");
     expect(result.traces.some((entry) => entry.stepId === "step-manual" && entry.status === "paused")).toBeTrue();
+    expect(result.outputDelivery.results).toEqual([]);
   });
 
   it("fails with an explicit issue when manual outcome is invalid", async () => {
@@ -237,6 +244,7 @@ describe("WorkflowDraftExecutionRuntime", () => {
       code: "manual-outcome-unsupported",
       stepId: "step-manual",
     }));
+    expect(result.outputDelivery.results).toEqual([]);
   });
 
   it("invokes asset-backed action steps through the aligned asset-step execution seam", async () => {
@@ -287,6 +295,7 @@ describe("WorkflowDraftExecutionRuntime", () => {
       resolvedPrompt: "Analyze churn drivers",
       runtimePrompt: "Analyze churn drivers",
     });
+    expect(result.outputDelivery.results).toEqual([]);
   });
 
   it("fails asset-backed step execution clearly when no asset-step runtime invoker is configured", async () => {
@@ -313,6 +322,127 @@ describe("WorkflowDraftExecutionRuntime", () => {
       code: "workflow-runtime-step-failed",
       stepId: "step-agent",
       message: expect.stringContaining("asset-step-executor-unavailable"),
+    }));
+    expect(result.outputDelivery.results).toEqual([]);
+  });
+
+  it("delivers workflow outputs for viewer/file/system destinations from execution-plan bindings", async () => {
+    const runtime = new WorkflowDraftExecutionRuntime();
+    const plan = mapWorkflowDraftToExecutionPlan({
+      ...createEmptyWorkflowDraft(),
+      steps: [{
+        id: "step-1",
+        type: "action",
+        kind: WorkflowDraftStepKinds.action,
+        order: 1,
+      }],
+      outputs: [
+        {
+          id: "output-viewer",
+          type: "workflow-output",
+          order: 1,
+          outputType: WorkflowDraftOutputTypes.document,
+          format: WorkflowDraftOutputFormats.markdown,
+          sourceStepId: "step-1",
+          destination: {
+            type: WorkflowDraftOutputDestinationTypes.webViewer,
+            target: "in-app-view",
+            options: {
+              title: "Viewer",
+              presentationMode: "embedded",
+            },
+          },
+        },
+        {
+          id: "output-file",
+          type: "workflow-output",
+          order: 2,
+          outputType: WorkflowDraftOutputTypes.document,
+          format: WorkflowDraftOutputFormats.json,
+          sourceStepId: "step-1",
+          destination: {
+            type: WorkflowDraftOutputDestinationTypes.fileExport,
+            target: "file-download",
+            options: {
+              deliveryMode: "download",
+            },
+          },
+        },
+        {
+          id: "output-system",
+          type: "workflow-output",
+          order: 3,
+          outputType: WorkflowDraftOutputTypes.record,
+          format: WorkflowDraftOutputFormats.json,
+          sourceStepId: "step-1",
+          destination: {
+            type: WorkflowDraftOutputDestinationTypes.systemEntry,
+            target: "system-record",
+            options: {
+              entityName: "customer.record",
+              writeMode: "upsert",
+              recordShape: "single-record",
+              includeExecutionMetadata: "true",
+            },
+          },
+        },
+      ],
+    });
+
+    const result = await runtime.execute({
+      plan,
+      actionExecutor: () => Object.freeze({ recordId: "record-1" }),
+    });
+
+    expect(result.status).toBe(WorkflowDraftRuntimeExecutionStatusKinds.completed);
+    expect(result.outputDelivery.results.map((entry) => entry.outputId)).toEqual([
+      "output-viewer",
+      "output-file",
+      "output-system",
+    ]);
+    expect(result.outputDelivery.issues).toEqual([]);
+  });
+
+  it("fails execution with structured output-delivery issue when delivery configuration is incomplete", async () => {
+    const runtime = new WorkflowDraftExecutionRuntime();
+    const plan = mapWorkflowDraftToExecutionPlan({
+      ...createEmptyWorkflowDraft(),
+      steps: [{
+        id: "step-1",
+        type: "action",
+        kind: WorkflowDraftStepKinds.action,
+        order: 1,
+      }],
+      outputs: [{
+        id: "output-file",
+        type: "workflow-output",
+        order: 1,
+        outputType: WorkflowDraftOutputTypes.document,
+        format: WorkflowDraftOutputFormats.json,
+        sourceStepId: "step-1",
+        destination: {
+          type: WorkflowDraftOutputDestinationTypes.fileExport,
+          target: "workspace-file",
+          options: {
+            deliveryMode: "workspace-file",
+          },
+        },
+      }],
+    });
+
+    const result = await runtime.execute({
+      plan,
+      actionExecutor: () => Object.freeze({ ok: true }),
+    });
+
+    expect(result.status).toBe(WorkflowDraftRuntimeExecutionStatusKinds.failed);
+    expect(result.outputDelivery.issues).toContainEqual(expect.objectContaining({
+      code: "output-delivery-config-missing",
+      outputId: "output-file",
+    }));
+    expect(result.issues).toContainEqual(expect.objectContaining({
+      code: "output-delivery-config-missing",
+      stepId: "output-file",
     }));
   });
 });

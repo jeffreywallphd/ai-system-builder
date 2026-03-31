@@ -2,6 +2,12 @@ import {
   WorkflowDraftComparisonOperators,
   type WorkflowDraftConditionDefinition,
 } from "../../domain/workflow-studio/WorkflowStudioDomain";
+import {
+  deliverWorkflowExecutionOutputs,
+  type WorkflowExecutionOutputDeliveryHandler,
+  type WorkflowExecutionOutputDeliveryIssue,
+  type WorkflowExecutionOutputDeliveryResult,
+} from "./WorkflowExecutionOutputDeliveryService";
 import type {
   WorkflowExecutionAssetStepBinding,
   WorkflowDraftActionExecutionPlanElement,
@@ -53,6 +59,10 @@ export interface WorkflowDraftRuntimeExecutionResult {
   readonly traces: ReadonlyArray<WorkflowDraftRuntimeStepTraceEntry>;
   readonly stepOutputs: Readonly<Record<string, unknown>>;
   readonly issues: ReadonlyArray<WorkflowDraftRuntimeExecutionIssue>;
+  readonly outputDelivery: Readonly<{
+    readonly results: ReadonlyArray<WorkflowExecutionOutputDeliveryResult>;
+    readonly issues: ReadonlyArray<WorkflowExecutionOutputDeliveryIssue>;
+  }>;
   readonly pausedAt?: WorkflowDraftRuntimeManualPause;
 }
 
@@ -89,6 +99,7 @@ export interface WorkflowDraftRuntimeExecutionRequest {
       };
     },
   ) => Promise<unknown> | unknown;
+  readonly outputDeliveryHandler?: WorkflowExecutionOutputDeliveryHandler;
   readonly sleep?: (milliseconds: number) => Promise<void>;
   readonly now?: () => Date;
 }
@@ -769,6 +780,10 @@ export class WorkflowDraftExecutionRuntime {
             traces: Object.freeze([...traces]),
             stepOutputs: Object.freeze(Object.fromEntries(stepOutputs.entries())),
             issues: Object.freeze([...issues]),
+            outputDelivery: Object.freeze({
+              results: Object.freeze([]),
+              issues: Object.freeze([]),
+            }),
             pausedAt,
           });
         }
@@ -778,6 +793,10 @@ export class WorkflowDraftExecutionRuntime {
           traces: Object.freeze([...traces]),
           stepOutputs: Object.freeze(Object.fromEntries(stepOutputs.entries())),
           issues: Object.freeze([...issues]),
+          outputDelivery: Object.freeze({
+            results: Object.freeze([]),
+            issues: Object.freeze([]),
+          }),
         });
       }
     }
@@ -802,11 +821,50 @@ export class WorkflowDraftExecutionRuntime {
       });
     }
 
+    const outputDelivery = await deliverWorkflowExecutionOutputs(
+      {
+        plan: request.plan,
+        stepOutputs: Object.freeze(Object.fromEntries(stepOutputs.entries())),
+        traces: Object.freeze(
+          traces.map((trace) => Object.freeze({
+            sequence: trace.sequence,
+            stepId: trace.stepId,
+            status: trace.status,
+          })),
+        ),
+      },
+      request.outputDeliveryHandler,
+    );
+    if (outputDelivery.issues.length > 0) {
+      const mergedIssues = Object.freeze([
+        ...issues,
+        ...outputDelivery.issues.map((issue) => Object.freeze({
+          code: issue.code,
+          stepId: issue.outputId,
+          message: issue.message,
+        })),
+      ]);
+      return Object.freeze({
+        status: WorkflowDraftRuntimeExecutionStatusKinds.failed,
+        traces: Object.freeze([...traces]),
+        stepOutputs: Object.freeze(Object.fromEntries(stepOutputs.entries())),
+        issues: mergedIssues,
+        outputDelivery: Object.freeze({
+          results: Object.freeze([...outputDelivery.results]),
+          issues: Object.freeze([...outputDelivery.issues]),
+        }),
+      });
+    }
+
     return Object.freeze({
       status: WorkflowDraftRuntimeExecutionStatusKinds.completed,
       traces: Object.freeze([...traces]),
       stepOutputs: Object.freeze(Object.fromEntries(stepOutputs.entries())),
       issues: Object.freeze([...issues]),
+      outputDelivery: Object.freeze({
+        results: Object.freeze([...outputDelivery.results]),
+        issues: Object.freeze([...outputDelivery.issues]),
+      }),
     });
   }
 }
