@@ -1417,3 +1417,14 @@ Explicitly later than this scope:
   - normalized output aggregation,
   - structured batch-level issues for empty/partial/fail-fast scenarios.
 
+## Direction 5 update: Unified ingestion lineage + metadata tracking (story 15.13)
+
+- Unified ingestion contracts now include bounded, versioned lineage + metadata envelopes in `domain/dataset-studio/UnifiedIngestionDomain.ts`:
+  - per-item execution metadata (source identity, detection summary, route summary, conversion summary, normalization counts, optional preview summary, processing timestamps),
+  - per-item lineage record with explicit stage timeline (`source-registration`, `configuration`, `source-read`, `detection`, `routing`, `ingestion`, `conversion`, `normalization`, `preview`) and stage-level status (`succeeded`/`failed`/`degraded`/`skipped`),
+  - batch-level aggregate metadata and lineage summary contracts (counts + item lineage references).
+- Unified orchestration now captures lineage + metadata across success, partial, degraded, and failure paths in `application/dataset-studio/UnifiedIngestionOrchestrationService.ts` without introducing a parallel provenance subsystem.
+- Batch orchestration now preserves per-item lineage/metadata and emits batch aggregate metadata/lineage in `application/dataset-studio/UnifiedIngestionBatchOrchestrationService.ts`, including partial-failure and fail-fast visibility.
+- Unified asset wrapper contracts expose lineage/metadata for single and batch execution surfaces through `application/dataset-studio/UnifiedIngestionAsset.ts`.
+- Dataset Studio unified preview/batch inspection now surfaces high-signal metadata first with expandable lineage details in `ui/components/assets/DatasetStudioDraftPreviewPanel.tsx`.
+

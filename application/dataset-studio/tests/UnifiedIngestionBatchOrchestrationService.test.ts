@@ -44,6 +44,9 @@ describe("UnifiedIngestionBatchOrchestrationService", () => {
     expect(result.normalizedOutputs.length).toBe(2);
     expect(result.summary.sourceKindDistribution.csv).toBe(1);
     expect(result.summary.sourceKindDistribution.json).toBe(1);
+    expect(result.items.every((item) => item.lineage)).toBeTrue();
+    expect(result.metadata.outputs.normalizedOutputCount).toBe(2);
+    expect(result.lineage.itemLineages.length).toBe(2);
   });
 
   it("reports partial success for mixed success/failure batches", async () => {
@@ -70,6 +73,7 @@ describe("UnifiedIngestionBatchOrchestrationService", () => {
     expect(result.summary.failed).toBe(1);
     expect(result.summary.partialSuccess).toBeTrue();
     expect(result.issues.some((issue) => issue.code === "batch-partial-failure")).toBeTrue();
+    expect(result.items.some((item) => item.status === "failed" && item.lineage)).toBeTrue();
   });
 
   it("skips remaining items under fail-fast policy", async () => {
@@ -96,6 +100,7 @@ describe("UnifiedIngestionBatchOrchestrationService", () => {
     expect(result.summary.skipped).toBe(1);
     expect(result.items.some((item) => item.status === "skipped")).toBeTrue();
     expect(result.issues.some((issue) => issue.code === "batch-item-skipped")).toBeTrue();
+    expect(result.metadata.counts.skipped).toBe(1);
   });
 
   it("returns a structured invalid-batch result for empty source input", async () => {
@@ -111,5 +116,6 @@ describe("UnifiedIngestionBatchOrchestrationService", () => {
     expect(result.summary.empty).toBeTrue();
     expect(result.summary.totalItems).toBe(0);
     expect(result.issues[0]?.code).toBe("invalid-batch-input");
+    expect(result.lineage.itemLineages).toHaveLength(0);
   });
 });

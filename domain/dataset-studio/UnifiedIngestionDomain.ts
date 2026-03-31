@@ -199,6 +199,168 @@ export interface UnifiedIngestionIssue {
 }
 
 export const UnifiedIngestionNormalizationVersion = "1.0.0";
+export const UnifiedIngestionLineageVersion = "1.0.0";
+
+export const UnifiedIngestionLineageStageKinds = Object.freeze({
+  sourceRegistration: "source-registration",
+  configuration: "configuration",
+  sourceRead: "source-read",
+  detection: "detection",
+  routing: "routing",
+  ingestion: "ingestion",
+  conversion: "conversion",
+  normalization: "normalization",
+  preview: "preview",
+} as const);
+
+export type UnifiedIngestionLineageStageKind =
+  typeof UnifiedIngestionLineageStageKinds[keyof typeof UnifiedIngestionLineageStageKinds];
+
+export const UnifiedIngestionLineageStageStatuses = Object.freeze({
+  succeeded: "succeeded",
+  failed: "failed",
+  degraded: "degraded",
+  skipped: "skipped",
+} as const);
+
+export type UnifiedIngestionLineageStageStatus =
+  typeof UnifiedIngestionLineageStageStatuses[keyof typeof UnifiedIngestionLineageStageStatuses];
+
+export interface UnifiedIngestionExecutionMetadata {
+  readonly contractVersion: typeof UnifiedIngestionContractVersion;
+  readonly metadataVersion: "1.0.0";
+  readonly source: {
+    readonly sourceId: string;
+    readonly reference: string;
+    readonly referenceKind: UnifiedIngestionReferenceKind;
+    readonly displayName?: string;
+    readonly extension?: string;
+    readonly mimeType?: string;
+    readonly sizeInBytes?: number;
+    readonly sourceAssetId?: string;
+    readonly sourceVersionId?: string;
+    readonly groupId?: string;
+  };
+  readonly detection?: {
+    readonly detectedKind: UnifiedIngestionSourceKind;
+    readonly confidence: UnifiedIngestionDetectionConfidenceLevel;
+    readonly candidateScores: Readonly<Record<UnifiedIngestionSourceKind, number>>;
+    readonly evidenceCount: number;
+    readonly normalizedMetadata: UnifiedIngestionNormalizedSourceMetadata;
+  };
+  readonly route?: {
+    readonly status: UnifiedIngestionRouteResult["status"];
+    readonly handlerKind?: UnifiedIngestionRouteHandlerKind;
+    readonly assetId?: string;
+    readonly assetVersion?: string;
+    readonly sourceKind: UnifiedIngestionSourceKind;
+    readonly policy?: UnifiedIngestionRoutePolicyKind;
+    readonly fallbackUsed: boolean;
+  };
+  readonly conversion?: {
+    readonly operation: string;
+    readonly inputBoundary: string;
+    readonly outputKind?: CanonicalDataShapeKind;
+  };
+  readonly normalization?: {
+    readonly normalizationVersion: typeof UnifiedIngestionNormalizationVersion;
+    readonly outputTarget: UnifiedIngestionOutputTargetKind;
+    readonly canonicalOutputKind: CanonicalDataShapeKind;
+    readonly totalCount: number;
+    readonly isEmpty: boolean;
+    readonly recordCount?: number;
+    readonly textItemCount?: number;
+    readonly imageItemCount?: number;
+  };
+  readonly preview?: {
+    readonly degraded: boolean;
+    readonly totalCount: number;
+    readonly sampleCount: number;
+    readonly truncated: boolean;
+    readonly outputKind: CanonicalDataShapeKind;
+  };
+  readonly processing: {
+    readonly startedAt: string;
+    readonly completedAt: string;
+    readonly configurationMode: UnifiedIngestionConfigMode;
+    readonly outputTarget: UnifiedIngestionOutputTargetKind;
+    readonly stageCount: number;
+    readonly warningCount: number;
+    readonly errorCount: number;
+    readonly fallbackCount: number;
+  };
+}
+
+export interface UnifiedIngestionLineageStageRecord {
+  readonly stage: UnifiedIngestionLineageStageKind;
+  readonly status: UnifiedIngestionLineageStageStatus;
+  readonly startedAt: string;
+  readonly completedAt: string;
+  readonly issues?: ReadonlyArray<UnifiedIngestionIssue>;
+  readonly details?: Readonly<Record<string, unknown>>;
+}
+
+export interface UnifiedIngestionLineageRecord {
+  readonly contractVersion: typeof UnifiedIngestionContractVersion;
+  readonly lineageVersion: typeof UnifiedIngestionLineageVersion;
+  readonly lineageId: string;
+  readonly capturedAt: string;
+  readonly source: {
+    readonly sourceId: string;
+    readonly reference: string;
+    readonly referenceKind: UnifiedIngestionReferenceKind;
+    readonly displayName?: string;
+    readonly sourceAssetId?: string;
+    readonly sourceVersionId?: string;
+  };
+  readonly stages: ReadonlyArray<UnifiedIngestionLineageStageRecord>;
+  readonly detection?: UnifiedIngestionExecutionMetadata["detection"];
+  readonly route?: UnifiedIngestionExecutionMetadata["route"];
+  readonly conversion?: UnifiedIngestionExecutionMetadata["conversion"];
+  readonly normalization?: UnifiedIngestionExecutionMetadata["normalization"];
+  readonly preview?: UnifiedIngestionExecutionMetadata["preview"];
+}
+
+export interface UnifiedIngestionBatchExecutionMetadata {
+  readonly contractVersion: typeof UnifiedIngestionContractVersion;
+  readonly metadataVersion: "1.0.0";
+  readonly processing: {
+    readonly startedAt: string;
+    readonly completedAt: string;
+    readonly outputTarget: UnifiedIngestionOutputTargetKind;
+    readonly configurationMode: UnifiedIngestionConfigMode;
+    readonly continueOnError: boolean;
+    readonly requestedConcurrency: number;
+  };
+  readonly counts: {
+    readonly totalItems: number;
+    readonly succeeded: number;
+    readonly failed: number;
+    readonly skipped: number;
+    readonly partialSuccess: boolean;
+    readonly empty: boolean;
+  };
+  readonly outputs: {
+    readonly normalizedOutputCount: number;
+    readonly totalRecordCount: number;
+    readonly totalTextItemCount: number;
+    readonly totalImageItemCount: number;
+  };
+}
+
+export interface UnifiedIngestionBatchLineageRecord {
+  readonly contractVersion: typeof UnifiedIngestionContractVersion;
+  readonly lineageVersion: typeof UnifiedIngestionLineageVersion;
+  readonly lineageId: string;
+  readonly capturedAt: string;
+  readonly itemLineages: ReadonlyArray<UnifiedIngestionLineageRecord>;
+  readonly summary: {
+    readonly totalItems: number;
+    readonly succeeded: number;
+    readonly failed: number;
+    readonly skipped: number;
+  };
+}
 
 export interface UnifiedIngestionNormalizedOutput {
   readonly contractVersion: typeof UnifiedIngestionContractVersion;
@@ -236,6 +398,8 @@ export interface UnifiedIngestionExecutionSuccess {
   readonly source: UnifiedIngestionSourceReference;
   readonly detection: UnifiedIngestionDetectionResult;
   readonly outputTarget: UnifiedIngestionOutputTargetKind;
+  readonly metadata: UnifiedIngestionExecutionMetadata;
+  readonly lineage: UnifiedIngestionLineageRecord;
   readonly issues: ReadonlyArray<UnifiedIngestionIssue>;
 }
 
@@ -244,6 +408,8 @@ export interface UnifiedIngestionExecutionFailure {
   readonly ok: false;
   readonly source: UnifiedIngestionSourceReference;
   readonly detection?: UnifiedIngestionDetectionResult;
+  readonly metadata: UnifiedIngestionExecutionMetadata;
+  readonly lineage: UnifiedIngestionLineageRecord;
   readonly issues: ReadonlyArray<UnifiedIngestionIssue>;
 }
 

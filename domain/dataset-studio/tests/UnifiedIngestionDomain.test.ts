@@ -1,5 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
+  UnifiedIngestionLineageStageKinds,
+  UnifiedIngestionLineageStageStatuses,
   UnifiedIngestionOutputTargetKinds,
   UnifiedIngestionReferenceKinds,
   createUnifiedIngestionInputCollection,
@@ -60,5 +62,19 @@ describe("UnifiedIngestionDomain contracts", () => {
     expect(() => createUnifiedIngestionInputCollection({ sources: Object.freeze([]) })).toThrow(
       "at least one source",
     );
+  });
+
+  it("keeps lineage stage contracts stable and serializable", () => {
+    const lineageStage = Object.freeze({
+      stage: UnifiedIngestionLineageStageKinds.detection,
+      status: UnifiedIngestionLineageStageStatuses.succeeded,
+      startedAt: "2026-03-31T10:00:00.000Z",
+      completedAt: "2026-03-31T10:00:00.500Z",
+      details: Object.freeze({ detectedKind: "json", confidence: "high" }),
+    });
+
+    const serialized = JSON.stringify(lineageStage);
+    expect(serialized).toContain("\"stage\":\"detection\"");
+    expect(serialized).toContain("\"status\":\"succeeded\"");
   });
 });
