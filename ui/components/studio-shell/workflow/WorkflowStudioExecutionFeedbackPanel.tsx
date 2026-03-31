@@ -129,7 +129,7 @@ export default function WorkflowStudioExecutionFeedbackPanel({
                     <ul className="ui-stack ui-stack--2xs">
                       {runFeedback.result.runtime.outputDelivery.results.slice(0, 5).map((entry) => (
                         <li key={`${entry.outputId}-${entry.target}`}>
-                          {entry.outputId}: {entry.destinationType} -> {entry.target} ({entry.status})
+                          {entry.outputId}: {entry.destinationType} {"->"} {entry.target} ({entry.status})
                         </li>
                       ))}
                     </ul>
