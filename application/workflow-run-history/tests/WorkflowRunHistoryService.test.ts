@@ -43,6 +43,16 @@ describe("WorkflowRunHistoryService", () => {
     expect(completed.timestamps.endedAt).toBe("2026-03-30T16:01:00.000Z");
     expect(completed.output?.outputCount).toBe(2);
     expect(completed.correlation.workflowExecutionId).toBe("workflow-exec:1");
+    expect(completed.stepRunStats?.totalCount).toBe(0);
+
+    const detail = await service.getRunDetail("run:workflow-1");
+    expect(detail?.executionContext?.executionInput).toEqual(expect.objectContaining({
+      parameters: expect.objectContaining({
+        triggerSource: "manual",
+      }),
+    }));
+    expect(detail?.outputs?.outputCount).toBe(2);
+    expect(detail?.outputs?.resultMessages).toBeUndefined();
 
     const listed = await service.listRunSummaries({ workflowId: "workflow:1" });
     expect(listed).toHaveLength(1);
@@ -75,6 +85,72 @@ describe("WorkflowRunHistoryService", () => {
     expect(failed.status).toBe(WorkflowRunStatuses.failed);
     expect(failed.errorMessage).toBe("Runtime dependency unavailable.");
     expect(failed.timestamps.endedAt).toBe("2026-03-30T17:00:10.000Z");
+  });
+
+  it("records step-level lifecycle updates tied to the parent workflow run detail", async () => {
+    const repository = new InMemoryWorkflowRunSummaryRepository();
+    const timestamps = [
+      new Date("2026-03-30T18:00:00.000Z"),
+      new Date("2026-03-30T18:00:01.000Z"),
+      new Date("2026-03-30T18:00:02.000Z"),
+      new Date("2026-03-30T18:00:05.000Z"),
+    ];
+    const service = new WorkflowRunHistoryService(repository, () => timestamps.shift() ?? new Date("2026-03-30T18:00:10.000Z"));
+    const workflow = {
+      id: "workflow:steps",
+      metadata: { name: "Workflow Steps" },
+      nodes: [
+        { id: "node-a", title: "First", definition: { title: "Prompt", type: "prompt", executionKind: "generator" } },
+        { id: "node-b", title: "Second", definition: { title: "Store", type: "store", executionKind: "sink" } },
+      ],
+      toGraph: () => ({
+        topologicalSort: () => [{ id: "node-a" }, { id: "node-b" }],
+      }),
+    } as never;
+
+    await service.recordRunStarted({
+      runId: "run:steps",
+      input: {
+        workflow,
+      } as never,
+    });
+
+    await service.recordStepEvent({
+      runId: "run:steps",
+      workflow,
+      event: {
+        kind: "node-started",
+        nodeId: "node-a",
+      },
+    });
+    await service.recordStepEvent({
+      runId: "run:steps",
+      workflow,
+      event: {
+        kind: "node-completed",
+        nodeId: "node-a",
+        message: "ok",
+      },
+    });
+
+    const completed = await service.recordRunCompleted({
+      runId: "run:steps",
+      result: {
+        executionId: "workflow-exec:steps",
+        status: "completed",
+        outputAssets: [] as never,
+      },
+    });
+
+    expect(completed.stepRunStats?.totalCount).toBe(1);
+    expect(completed.stepRunStats?.completedCount).toBe(1);
+
+    const detail = await service.getRunDetail("run:steps");
+    expect(detail?.stepRuns).toHaveLength(1);
+    expect(detail?.stepRuns[0]?.stepId).toBe("node-a");
+    expect(detail?.stepRuns[0]?.stepIndex).toBe(0);
+    expect(detail?.stepRuns[0]?.status).toBe("completed");
+    expect(detail?.summary.runId).toBe("run:steps");
   });
 
   it("returns deterministic not-found errors when terminal updates are attempted before start", async () => {

@@ -81,11 +81,20 @@ describe("WorkflowExecutionUnitHandler", () => {
           waitForCompletion: async () => ({ executionId: "unused", status: "completed", outputAssets: [] }),
           cancel: async () => undefined,
         }),
-        execute: async () => ({
-          executionId: "workflow-exec-2",
-          status: "completed",
-          outputAssets: [],
-        }),
+        execute: async (_input, onEvent) => {
+          onEvent?.({
+            executionId: "workflow-exec-2",
+            kind: "node-completed",
+            status: "running",
+            nodeId: "node-1",
+            message: "node finished",
+          });
+          return {
+            executionId: "workflow-exec-2",
+            status: "completed",
+            outputAssets: [],
+          };
+        },
       },
       undefined,
       {
@@ -96,6 +105,10 @@ describe("WorkflowExecutionUnitHandler", () => {
         async recordRunCompleted(request) {
           historyEvents.push({ kind: "completed", runId: request.runId, status: request.result.status });
           return {} as never;
+        },
+        async recordStepEvent(request) {
+          historyEvents.push({ kind: "step-event", runId: request.runId, status: request.event.kind });
+          return undefined;
         },
       } as never,
     );
@@ -120,6 +133,7 @@ describe("WorkflowExecutionUnitHandler", () => {
     expect(result.status).toBe(ExecutionStatuses.completed);
     expect(historyEvents).toEqual([
       { kind: "started", runId: "workflow-plan-run-2", status: WorkflowRunStatuses.running },
+      { kind: "step-event", runId: "workflow-plan-run-2", status: "node-completed" },
       { kind: "completed", runId: "workflow-plan-run-2", status: "completed" },
     ]);
   });

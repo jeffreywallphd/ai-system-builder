@@ -62,6 +62,8 @@ export interface DesktopWorkflowRunSummaryBridge {
   saveWorkflowRunSummary(summaryJson: string): Promise<void>;
   loadWorkflowRunSummary(runId: string): Promise<string | null>;
   listWorkflowRunSummaries(queryJson?: string): Promise<ReadonlyArray<string>>;
+  saveWorkflowRunDetail?(detailJson: string): Promise<void>;
+  loadWorkflowRunDetail?(runId: string): Promise<string | null>;
 }
 
 export interface DesktopModelFileBridge {

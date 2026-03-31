@@ -1,6 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import {
+  createWorkflowRunDetailRecord,
+  createWorkflowStepRunStats,
   createWorkflowRunSummaryRecord,
+  normalizeWorkflowRunDetailRecord,
   normalizeWorkflowRunSummaryRecord,
   WorkflowRunStatuses,
   WorkflowRunTriggerSources,
@@ -8,7 +11,7 @@ import {
 } from "../WorkflowRunHistoryDomain";
 
 describe("WorkflowRunHistoryDomain", () => {
-  it("creates canonical workflow run summary records with correlation, output, and step placeholders", () => {
+  it("creates canonical workflow run summary records with correlation, output, and step stats", () => {
     const record = createWorkflowRunSummaryRecord({
       runId: " workflow-run:1 ",
       status: WorkflowRunStatuses.completed,
@@ -32,15 +35,20 @@ describe("WorkflowRunHistoryDomain", () => {
       output: {
         outputAssetIds: ["asset:out-1", "asset:out-1", "asset:out-2"],
       },
-      stepRuns: [{
+      stepRunStats: createWorkflowStepRunStats([{
         stepRunId: " step-run:1 ",
         stepId: " step:fetch ",
+        stepIndex: 0,
+        attempt: 1,
         stepName: " Fetch source records ",
         stepType: "action",
         status: WorkflowStepRunStatuses.completed,
-        startedAt: "2026-03-30T13:00:10.000Z",
-        endedAt: "2026-03-30T13:00:40.000Z",
-      }],
+        timestamps: {
+          startedAt: "2026-03-30T13:00:10.000Z",
+          endedAt: "2026-03-30T13:00:40.000Z",
+          updatedAt: "2026-03-30T13:00:40.000Z",
+        },
+      }]),
     });
 
     expect(record.runId).toBe("workflow-run:1");
@@ -51,7 +59,56 @@ describe("WorkflowRunHistoryDomain", () => {
     expect(record.correlation.executionRunId).toBe("execution-run:1");
     expect(record.output?.outputAssetIds).toEqual(["asset:out-1", "asset:out-2"]);
     expect(record.output?.outputCount).toBe(2);
-    expect(record.stepRuns?.[0]?.stepRunId).toBe("step-run:1");
+    expect(record.stepRunStats?.completedCount).toBe(1);
+  });
+
+  it("normalizes workflow run detail records with structured execution context and outputs", () => {
+    const detail = normalizeWorkflowRunDetailRecord(createWorkflowRunDetailRecord({
+      runId: "run:detail-1",
+      summary: createWorkflowRunSummaryRecord({
+        runId: "run:detail-1",
+        status: WorkflowRunStatuses.completed,
+        triggerSource: WorkflowRunTriggerSources.manual,
+        workflow: {
+          workflowId: "workflow:detail",
+          workflowName: "Workflow Detail",
+        },
+        correlation: {
+          executionRunId: "execution-run:detail",
+        },
+        timestamps: {
+          startedAt: "2026-03-30T13:00:00.000Z",
+          endedAt: "2026-03-30T13:01:00.000Z",
+          updatedAt: "2026-03-30T13:01:00.000Z",
+        },
+      }),
+      stepRuns: [{
+        stepRunId: "run:detail-1:step-1:1",
+        stepId: "step-1",
+        stepIndex: 0,
+        attempt: 1,
+        status: WorkflowStepRunStatuses.completed,
+        timestamps: {
+          startedAt: "2026-03-30T13:00:10.000Z",
+          endedAt: "2026-03-30T13:00:20.000Z",
+          updatedAt: "2026-03-30T13:00:20.000Z",
+        },
+      }],
+      executionContext: {
+        executionInput: { input: "x" },
+        resolvedTriggerContext: { triggerSource: "manual" },
+      },
+      outputs: {
+        outputAssetIds: ["asset:out"],
+        outputCount: 1,
+        outputValues: { status: "completed" },
+      },
+    }));
+
+    expect(detail.summary.stepRunStats?.completedCount).toBe(1);
+    expect(detail.executionContext?.executionInput).toEqual({ input: "x" });
+    expect(detail.outputs?.outputAssetIds).toEqual(["asset:out"]);
+    expect(detail.stepRuns[0]?.durationMs).toBe(10000);
   });
 
   it("normalizes records and defaults unknown trigger sources for forward-compatible ingestion", () => {

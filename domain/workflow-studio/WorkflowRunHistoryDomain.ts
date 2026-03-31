@@ -6,6 +6,33 @@ function normalizeRequired(value: string, label: string): string {
   return normalized;
 }
 
+function deepFreeze<T>(value: T): T {
+  if (value === null || typeof value !== "object") {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      deepFreeze(entry);
+    }
+    return Object.freeze(value) as T;
+  }
+
+  for (const key of Object.keys(value as Record<string, unknown>)) {
+    deepFreeze((value as Record<string, unknown>)[key]);
+  }
+  return Object.freeze(value);
+}
+
+function normalizeStructuredValue(value: unknown, label: string): unknown {
+  try {
+    return deepFreeze(JSON.parse(JSON.stringify(value)));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "unknown serialization error";
+    throw new Error(`${label} must be JSON-serializable (${message}).`);
+  }
+}
+
 function normalizeOptional(value?: string): string | undefined {
   const normalized = value?.trim();
   return normalized ? normalized : undefined;
@@ -128,22 +155,63 @@ export interface WorkflowRunOutputReference {
   readonly outputCount: number;
 }
 
+function normalizeNonNegativeInteger(value: number, label: string): number {
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error(`${label} must be a non-negative integer.`);
+  }
+  return value;
+}
+
+function normalizePositiveInteger(value: number, label: string): number {
+  if (!Number.isInteger(value) || value < 1) {
+    throw new Error(`${label} must be a positive integer.`);
+  }
+  return value;
+}
+
+export interface WorkflowRunErrorSummary {
+  readonly code?: string;
+  readonly message: string;
+  readonly detail?: string;
+}
+
+export interface WorkflowStepRunTimestamps {
+  readonly startedAt?: string;
+  readonly endedAt?: string;
+  readonly updatedAt: string;
+}
+
 export interface WorkflowStepRunRecord {
   readonly stepRunId: string;
   readonly stepId: string;
+  readonly stepIndex: number;
+  readonly attempt: number;
   readonly stepName?: string;
   readonly stepType?: string;
+  readonly actionType?: string;
   readonly status: WorkflowStepRunStatus;
-  readonly startedAt?: string;
-  readonly endedAt?: string;
-  readonly errorMessage?: string;
+  readonly timestamps: WorkflowStepRunTimestamps;
+  readonly durationMs?: number;
+  readonly summary?: string;
+  readonly error?: WorkflowRunErrorSummary;
   readonly output?: WorkflowRunOutputReference;
+  readonly metadata?: unknown;
 }
 
 export interface WorkflowRunTimestamps {
   readonly startedAt: string;
   readonly endedAt?: string;
   readonly updatedAt: string;
+}
+
+export interface WorkflowStepRunStats {
+  readonly totalCount: number;
+  readonly pendingCount: number;
+  readonly runningCount: number;
+  readonly completedCount: number;
+  readonly failedCount: number;
+  readonly cancelledCount: number;
+  readonly skippedCount: number;
 }
 
 export interface WorkflowRunSummaryRecord {
@@ -155,7 +223,28 @@ export interface WorkflowRunSummaryRecord {
   readonly timestamps: WorkflowRunTimestamps;
   readonly output?: WorkflowRunOutputReference;
   readonly errorMessage?: string;
-  readonly stepRuns?: ReadonlyArray<WorkflowStepRunRecord>;
+  readonly stepRunStats?: WorkflowStepRunStats;
+}
+
+export interface WorkflowRunExecutionContextRecord {
+  readonly executionInput?: unknown;
+  readonly resolvedTriggerContext?: unknown;
+  readonly runtimeContext?: unknown;
+}
+
+export interface WorkflowRunOutputRecord {
+  readonly outputAssetIds: ReadonlyArray<string>;
+  readonly outputCount: number;
+  readonly resultMessages?: ReadonlyArray<string>;
+  readonly outputValues?: unknown;
+}
+
+export interface WorkflowRunDetailRecord {
+  readonly runId: string;
+  readonly summary: WorkflowRunSummaryRecord;
+  readonly stepRuns: ReadonlyArray<WorkflowStepRunRecord>;
+  readonly executionContext?: WorkflowRunExecutionContextRecord;
+  readonly outputs?: WorkflowRunOutputRecord;
 }
 
 export interface CreateWorkflowRunSummaryInput {
@@ -174,7 +263,15 @@ export interface CreateWorkflowRunSummaryInput {
     readonly outputCount?: number;
   };
   readonly errorMessage?: string;
+  readonly stepRunStats?: WorkflowStepRunStats;
+}
+
+export interface CreateWorkflowRunDetailInput {
+  readonly runId: string;
+  readonly summary: WorkflowRunSummaryRecord;
   readonly stepRuns?: ReadonlyArray<WorkflowStepRunRecord>;
+  readonly executionContext?: WorkflowRunExecutionContextRecord;
+  readonly outputs?: WorkflowRunOutputRecord;
 }
 
 function normalizeOutputReference(
@@ -201,24 +298,58 @@ function normalizeOutputReference(
   } satisfies WorkflowRunOutputReference);
 }
 
-function normalizeStepRunRecord(stepRun: WorkflowStepRunRecord): WorkflowStepRunRecord {
-  const startedAt = stepRun.startedAt ? normalizeIsoTimestamp(stepRun.startedAt, "Workflow step run startedAt") : undefined;
-  const endedAt = stepRun.endedAt ? normalizeIsoTimestamp(stepRun.endedAt, "Workflow step run endedAt") : undefined;
+export function normalizeWorkflowStepRunRecord(stepRun: WorkflowStepRunRecord): WorkflowStepRunRecord {
+  const startedAt = stepRun.timestamps.startedAt
+    ? normalizeIsoTimestamp(stepRun.timestamps.startedAt, "Workflow step run startedAt")
+    : undefined;
+  const endedAt = stepRun.timestamps.endedAt
+    ? normalizeIsoTimestamp(stepRun.timestamps.endedAt, "Workflow step run endedAt")
+    : undefined;
+  const updatedAt = normalizeIsoTimestamp(stepRun.timestamps.updatedAt, "Workflow step run updatedAt");
 
   if (startedAt && endedAt && Date.parse(endedAt) < Date.parse(startedAt)) {
     throw new Error("Workflow step run endedAt must be at or after startedAt.");
   }
+  if (startedAt && Date.parse(updatedAt) < Date.parse(startedAt)) {
+    throw new Error("Workflow step run updatedAt must be at or after startedAt.");
+  }
+
+  const durationMs = stepRun.durationMs
+    ?? (startedAt && endedAt ? Date.parse(endedAt) - Date.parse(startedAt) : undefined);
+  if (durationMs !== undefined && (!Number.isFinite(durationMs) || durationMs < 0)) {
+    throw new Error("Workflow step run durationMs must be a non-negative finite number.");
+  }
+
+  const errorMessage = normalizeOptional(stepRun.error?.message);
+  const error = errorMessage
+    ? Object.freeze({
+      code: normalizeOptional(stepRun.error?.code),
+      message: errorMessage,
+      detail: normalizeOptional(stepRun.error?.detail),
+    } satisfies WorkflowRunErrorSummary)
+    : undefined;
 
   return Object.freeze({
     stepRunId: normalizeRequired(stepRun.stepRunId, "Workflow step run id"),
     stepId: normalizeRequired(stepRun.stepId, "Workflow step id"),
+    stepIndex: normalizeNonNegativeInteger(stepRun.stepIndex, "Workflow step run stepIndex"),
+    attempt: normalizePositiveInteger(stepRun.attempt, "Workflow step run attempt"),
     stepName: normalizeOptional(stepRun.stepName),
     stepType: normalizeOptional(stepRun.stepType),
+    actionType: normalizeOptional(stepRun.actionType),
     status: normalizeStepRunStatus(stepRun.status),
-    startedAt,
-    endedAt,
-    errorMessage: normalizeOptional(stepRun.errorMessage),
+    timestamps: Object.freeze({
+      startedAt,
+      endedAt,
+      updatedAt,
+    } satisfies WorkflowStepRunTimestamps),
+    durationMs,
+    summary: normalizeOptional(stepRun.summary),
+    error,
     output: normalizeOutputReference(stepRun.output),
+    metadata: stepRun.metadata === undefined
+      ? undefined
+      : normalizeStructuredValue(stepRun.metadata, "Workflow step run metadata"),
   } satisfies WorkflowStepRunRecord);
 }
 
@@ -246,6 +377,80 @@ function normalizeCorrelation(correlation: WorkflowRunCorrelationIds): WorkflowR
   } satisfies WorkflowRunCorrelationIds);
 }
 
+function normalizeStepRunStats(stats: WorkflowStepRunStats): WorkflowStepRunStats {
+  const normalized = Object.freeze({
+    totalCount: stats.totalCount,
+    pendingCount: stats.pendingCount,
+    runningCount: stats.runningCount,
+    completedCount: stats.completedCount,
+    failedCount: stats.failedCount,
+    cancelledCount: stats.cancelledCount,
+    skippedCount: stats.skippedCount,
+  } satisfies WorkflowStepRunStats);
+
+  const fields = [
+    normalized.totalCount,
+    normalized.pendingCount,
+    normalized.runningCount,
+    normalized.completedCount,
+    normalized.failedCount,
+    normalized.cancelledCount,
+    normalized.skippedCount,
+  ];
+  if (!fields.every((value) => Number.isInteger(value) && value >= 0)) {
+    throw new Error("Workflow step run stats fields must be non-negative integers.");
+  }
+  const totalWithoutPending = normalized.runningCount
+    + normalized.completedCount
+    + normalized.failedCount
+    + normalized.cancelledCount
+    + normalized.skippedCount
+    + normalized.pendingCount;
+  if (normalized.totalCount !== totalWithoutPending) {
+    throw new Error("Workflow step run stats totalCount must match the sum of status counts.");
+  }
+  return normalized;
+}
+
+export function createWorkflowStepRunStats(stepRuns: ReadonlyArray<WorkflowStepRunRecord>): WorkflowStepRunStats {
+  const counts = {
+    totalCount: stepRuns.length,
+    pendingCount: 0,
+    runningCount: 0,
+    completedCount: 0,
+    failedCount: 0,
+    cancelledCount: 0,
+    skippedCount: 0,
+  };
+
+  for (const stepRun of stepRuns) {
+    switch (stepRun.status) {
+      case WorkflowStepRunStatuses.pending:
+        counts.pendingCount += 1;
+        break;
+      case WorkflowStepRunStatuses.running:
+        counts.runningCount += 1;
+        break;
+      case WorkflowStepRunStatuses.completed:
+        counts.completedCount += 1;
+        break;
+      case WorkflowStepRunStatuses.failed:
+        counts.failedCount += 1;
+        break;
+      case WorkflowStepRunStatuses.cancelled:
+        counts.cancelledCount += 1;
+        break;
+      case WorkflowStepRunStatuses.skipped:
+        counts.skippedCount += 1;
+        break;
+      default:
+        break;
+    }
+  }
+
+  return normalizeStepRunStats(counts);
+}
+
 export function createWorkflowRunSummaryRecord(input: CreateWorkflowRunSummaryInput): WorkflowRunSummaryRecord {
   const startedAt = normalizeIsoTimestamp(input.timestamps.startedAt, "Workflow run startedAt");
   const endedAt = input.timestamps.endedAt
@@ -270,7 +475,9 @@ export function createWorkflowRunSummaryRecord(input: CreateWorkflowRunSummaryIn
     throw new Error(`Workflow run status '${status}' cannot include endedAt.`);
   }
 
-  const stepRuns = input.stepRuns?.map((stepRun) => normalizeStepRunRecord(stepRun));
+  const stepRunStats = input.stepRunStats
+    ? normalizeStepRunStats(input.stepRunStats)
+    : undefined;
 
   return Object.freeze({
     runId: normalizeRequired(input.runId, "Workflow run id"),
@@ -285,8 +492,98 @@ export function createWorkflowRunSummaryRecord(input: CreateWorkflowRunSummaryIn
     } satisfies WorkflowRunTimestamps),
     output: normalizeOutputReference(input.output),
     errorMessage: normalizeOptional(input.errorMessage),
-    stepRuns: stepRuns ? Object.freeze(stepRuns) : undefined,
+    stepRunStats,
   } satisfies WorkflowRunSummaryRecord);
+}
+
+function normalizeResultMessages(messages?: ReadonlyArray<string>): ReadonlyArray<string> | undefined {
+  if (!messages) {
+    return undefined;
+  }
+
+  const normalized = messages
+    .map((message) => message.trim())
+    .filter((message) => message.length > 0);
+  return normalized.length > 0 ? Object.freeze(normalized) : undefined;
+}
+
+function normalizeExecutionContext(
+  context?: WorkflowRunExecutionContextRecord,
+): WorkflowRunExecutionContextRecord | undefined {
+  if (!context) {
+    return undefined;
+  }
+
+  const executionInput = context.executionInput === undefined
+    ? undefined
+    : normalizeStructuredValue(context.executionInput, "Workflow execution input context");
+  const resolvedTriggerContext = context.resolvedTriggerContext === undefined
+    ? undefined
+    : normalizeStructuredValue(context.resolvedTriggerContext, "Workflow resolved trigger context");
+  const runtimeContext = context.runtimeContext === undefined
+    ? undefined
+    : normalizeStructuredValue(context.runtimeContext, "Workflow runtime context");
+
+  if (executionInput === undefined && resolvedTriggerContext === undefined && runtimeContext === undefined) {
+    return undefined;
+  }
+
+  return Object.freeze({
+    executionInput,
+    resolvedTriggerContext,
+    runtimeContext,
+  } satisfies WorkflowRunExecutionContextRecord);
+}
+
+function normalizeOutputRecord(
+  output?: WorkflowRunOutputRecord,
+): WorkflowRunOutputRecord | undefined {
+  if (!output) {
+    return undefined;
+  }
+
+  const outputAssetIds = normalizeStringList(output.outputAssetIds);
+  const outputCount = output.outputCount ?? outputAssetIds.length;
+
+  if (!Number.isInteger(outputCount) || outputCount < outputAssetIds.length || outputCount < 0) {
+    throw new Error("Workflow run output record outputCount must be a non-negative integer greater than or equal to outputAssetIds length.");
+  }
+
+  const outputValues = output.outputValues === undefined
+    ? undefined
+    : normalizeStructuredValue(output.outputValues, "Workflow run output values");
+  const resultMessages = normalizeResultMessages(output.resultMessages);
+
+  if (outputCount === 0 && outputValues === undefined && !resultMessages) {
+    return undefined;
+  }
+
+  return Object.freeze({
+    outputAssetIds,
+    outputCount,
+    resultMessages,
+    outputValues,
+  } satisfies WorkflowRunOutputRecord);
+}
+
+export function createWorkflowRunDetailRecord(input: CreateWorkflowRunDetailInput): WorkflowRunDetailRecord {
+  const runId = normalizeRequired(input.runId, "Workflow run detail id");
+  const summary = normalizeWorkflowRunSummaryRecord(input.summary);
+  if (summary.runId !== runId) {
+    throw new Error("Workflow run detail runId must match summary runId.");
+  }
+
+  const stepRuns = Object.freeze((input.stepRuns ?? []).map((stepRun) => normalizeWorkflowStepRunRecord(stepRun)));
+  return Object.freeze({
+    runId,
+    summary: Object.freeze({
+      ...summary,
+      stepRunStats: createWorkflowStepRunStats(stepRuns),
+    }),
+    stepRuns,
+    executionContext: normalizeExecutionContext(input.executionContext),
+    outputs: normalizeOutputRecord(input.outputs),
+  } satisfies WorkflowRunDetailRecord);
 }
 
 export interface WorkflowRunSummaryListQuery {
@@ -308,6 +605,16 @@ export function normalizeWorkflowRunSummaryRecord(record: WorkflowRunSummaryReco
     timestamps: record.timestamps,
     output: record.output,
     errorMessage: record.errorMessage,
+    stepRunStats: record.stepRunStats,
+  });
+}
+
+export function normalizeWorkflowRunDetailRecord(record: WorkflowRunDetailRecord): WorkflowRunDetailRecord {
+  return createWorkflowRunDetailRecord({
+    runId: record.runId,
+    summary: record.summary,
     stepRuns: record.stepRuns,
+    executionContext: record.executionContext,
+    outputs: record.outputs,
   });
 }

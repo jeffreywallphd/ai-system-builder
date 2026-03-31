@@ -190,6 +190,11 @@ export class WorkflowExecutionUnitHandler implements IExecutionUnitHandler {
       subscribe: typeof workflowHandle.subscribe === "function"
         ? async (listener: (event: IExecutionEngineEvent) => void) => {
             const unsubscribe = await workflowHandle.subscribe?.((workflowEvent) => {
+              void this.workflowRunHistoryService?.recordStepEvent({
+                runId: request.runId,
+                workflow: input.workflow,
+                event: workflowEvent,
+              });
               listener(toExecutionEvent(request, workflowEvent));
             });
             return typeof unsubscribe === "function" ? unsubscribe : () => undefined;
@@ -205,6 +210,11 @@ export class WorkflowExecutionUnitHandler implements IExecutionUnitHandler {
   ): Promise<IWorkflowExecutionResult> {
     try {
       return await this.workflowExecutor.execute(input, (workflowEvent) => {
+        void this.workflowRunHistoryService?.recordStepEvent({
+          runId: request.runId,
+          workflow: input.workflow,
+          event: workflowEvent,
+        });
         onEvent?.(toExecutionEvent(request, workflowEvent));
       });
     } catch (error) {

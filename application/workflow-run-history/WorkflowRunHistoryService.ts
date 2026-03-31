@@ -1,10 +1,21 @@
 import type { IWorkflowExecutionInput, IWorkflowExecutionResult } from "../ports/interfaces/IWorkflowExecutor";
 import type { IWorkflowRunSummaryRepository } from "../ports/interfaces/IWorkflowRunSummaryRepository";
 import {
+  createWorkflowRunDetailRecord,
+  createWorkflowStepRunStats,
   createWorkflowRunSummaryRecord,
+  normalizeWorkflowStepRunRecord,
+  normalizeWorkflowRunDetailRecord,
   normalizeWorkflowRunSummaryRecord,
+  WorkflowStepRunStatuses,
   WorkflowRunStatuses,
   WorkflowRunTriggerSources,
+  type WorkflowRunDetailRecord,
+  type WorkflowRunErrorSummary,
+  type WorkflowStepRunRecord,
+  type WorkflowStepRunStatus,
+  type WorkflowRunExecutionContextRecord,
+  type WorkflowRunOutputRecord,
   type WorkflowRunSummaryListQuery,
   type WorkflowRunSummaryRecord,
   type WorkflowRunTriggerSource,
@@ -67,6 +78,96 @@ export interface RecordWorkflowRunFailureRequest {
   readonly errorMessage: string;
 }
 
+export interface RecordWorkflowStepEventRequest {
+  readonly runId: string;
+  readonly workflow: IWorkflowExecutionInput["workflow"];
+  readonly event: {
+    readonly kind: string;
+    readonly nodeId?: string;
+    readonly message?: string;
+    readonly payload?: Readonly<Record<string, unknown>>;
+  };
+}
+
+function cloneJsonSafe(value: unknown): unknown {
+  return value === undefined
+    ? undefined
+    : JSON.parse(JSON.stringify(value));
+}
+
+function extractExecutionContext(input: IWorkflowExecutionInput): WorkflowRunExecutionContextRecord | undefined {
+  const executionInput = cloneJsonSafe({
+    target: input.target,
+    parameters: input.parameters,
+    executionMetadata: input.executionMetadata,
+    propertyOverrides: input.propertyOverrides,
+    inputAssetIds: (input.inputAssets ?? []).map((asset) => asset.id),
+  });
+
+  const triggerMetadata = (input.parameters ?? {}) as Record<string, unknown>;
+  const resolvedTriggerContext = cloneJsonSafe({
+    triggerSource: typeof triggerMetadata.triggerSource === "string" ? triggerMetadata.triggerSource : undefined,
+    triggerEventId: typeof triggerMetadata.triggerEventId === "string" ? triggerMetadata.triggerEventId : undefined,
+    triggerActivation: triggerMetadata.triggerActivation,
+    triggerContext: triggerMetadata.triggerContext,
+  });
+
+  const runtimeContext = cloneJsonSafe(input.executionMetadata);
+  if (!executionInput && !resolvedTriggerContext && !runtimeContext) {
+    return undefined;
+  }
+
+  return Object.freeze({
+    executionInput,
+    resolvedTriggerContext,
+    runtimeContext,
+  });
+}
+
+function extractOutputRecord(result: IWorkflowExecutionResult): WorkflowRunOutputRecord {
+  const outputAssetIds = result.outputAssets
+    .map((asset) => asset.id)
+    .filter((id): id is string => typeof id === "string");
+
+  return Object.freeze({
+    outputAssetIds,
+    outputCount: outputAssetIds.length,
+    resultMessages: result.messages,
+    outputValues: cloneJsonSafe({
+      status: result.status,
+      executionId: result.executionId,
+      errorMessage: result.errorMessage,
+    }),
+  });
+}
+
+function normalizeStepEventStatus(kind: string): WorkflowStepRunStatus | undefined {
+  switch (kind) {
+    case "node-started":
+      return WorkflowStepRunStatuses.running;
+    case "node-progress":
+      return WorkflowStepRunStatuses.running;
+    case "node-completed":
+      return WorkflowStepRunStatuses.completed;
+    case "node-failed":
+      return WorkflowStepRunStatuses.failed;
+    default:
+      return undefined;
+  }
+}
+
+function toStructuredError(message?: string, payload?: Readonly<Record<string, unknown>>): WorkflowRunErrorSummary | undefined {
+  const normalized = message?.trim();
+  if (!normalized) {
+    return undefined;
+  }
+  return Object.freeze({
+    code: typeof payload?.code === "string" ? payload.code : undefined,
+    message: normalized,
+    detail: typeof payload?.detail === "string" ? payload.detail : undefined,
+  });
+}
+
 export class WorkflowRunHistoryService {
   constructor(
     private readonly repository: IWorkflowRunSummaryRepository,
@@ -77,7 +178,7 @@ export class WorkflowRunHistoryService {
     const runId = normalizeRequired(request.runId, "Workflow run id");
     const startedAt = this.now().toISOString();
 
-    const record = createWorkflowRunSummaryRecord({
+    const summary = createWorkflowRunSummaryRecord({
       runId,
       status: WorkflowRunStatuses.running,
       triggerSource: resolveTriggerSource(request.input),
@@ -105,22 +206,38 @@ export class WorkflowRunHistoryService {
         startedAt,
         updatedAt: startedAt,
       },
+      stepRunStats: createWorkflowStepRunStats([]),
     });
 
-    return this.tryRepository("record-start:upsert", () => this.repository.upsert(record));
+    await this.tryRepository("record-start:upsert-summary", () => this.repository.upsert(summary));
+    const detail = createWorkflowRunDetailRecord({
+      runId,
+      summary,
+      stepRuns: [],
+      executionContext: extractExecutionContext(request.input),
+    });
+    await this.tryRepository("record-start:upsert-detail", () => this.repository.upsertDetail(detail));
+    return summary;
   }
 
   public async recordRunCompleted(request: RecordWorkflowRunCompletionRequest): Promise<WorkflowRunSummaryRecord> {
     const runId = normalizeRequired(request.runId, "Workflow run id");
-    const existing = await this.tryRepository("record-complete:load-existing", () => this.repository.getByRunId(runId));
+    const existingDetail = await this.tryRepository("record-complete:load-existing-detail", () => this.repository.getDetailByRunId(runId));
+    const existing = existingDetail?.summary
+      ?? await this.tryRepository("record-complete:load-existing", () => this.repository.getByRunId(runId));
     if (!existing) {
       throw new WorkflowRunHistoryNotFoundError(runId);
     }
 
     const endedAt = this.now().toISOString();
-    const outputAssetIds = request.result.outputAssets.map((asset) => asset.id).filter((id) => typeof id === "string");
+    const stepRuns = this.finalizeOpenStepRuns(
+      existingDetail?.stepRuns ?? [],
+      request.result.status === WorkflowRunStatuses.cancelled ? WorkflowStepRunStatuses.cancelled : undefined,
+      endedAt,
+    );
+    const outputRecord = extractOutputRecord(request.result);
 
-    const updated = createWorkflowRunSummaryRecord({
+    const summary = createWorkflowRunSummaryRecord({
       runId: existing.runId,
       status: request.result.status,
       triggerSource: existing.triggerSource,
@@ -135,25 +252,42 @@ export class WorkflowRunHistoryService {
         updatedAt: endedAt,
       },
       output: {
-        outputAssetIds,
-        outputCount: outputAssetIds.length,
+        outputAssetIds: outputRecord.outputAssetIds,
+        outputCount: outputRecord.outputCount,
       },
       errorMessage: request.result.errorMessage,
-      stepRuns: existing.stepRuns,
+      stepRunStats: createWorkflowStepRunStats(stepRuns),
     });
 
-    return this.tryRepository("record-complete:upsert", () => this.repository.upsert(updated));
+    await this.tryRepository("record-complete:upsert-summary", () => this.repository.upsert(summary));
+    const detail = createWorkflowRunDetailRecord({
+      runId,
+      summary,
+      stepRuns,
+      executionContext: existingDetail?.executionContext,
+      outputs: outputRecord,
+    });
+    await this.tryRepository("record-complete:upsert-detail", () => this.repository.upsertDetail(detail));
+    return summary;
   }
 
   public async recordRunFailed(request: RecordWorkflowRunFailureRequest): Promise<WorkflowRunSummaryRecord> {
     const runId = normalizeRequired(request.runId, "Workflow run id");
-    const existing = await this.tryRepository("record-failed:load-existing", () => this.repository.getByRunId(runId));
+    const existingDetail = await this.tryRepository("record-failed:load-existing-detail", () => this.repository.getDetailByRunId(runId));
+    const existing = existingDetail?.summary
+      ?? await this.tryRepository("record-failed:load-existing", () => this.repository.getByRunId(runId));
     if (!existing) {
       throw new WorkflowRunHistoryNotFoundError(runId);
     }
 
     const endedAt = this.now().toISOString();
-    const failed = createWorkflowRunSummaryRecord({
+    const stepRuns = this.finalizeOpenStepRuns(
+      existingDetail?.stepRuns ?? [],
+      WorkflowStepRunStatuses.cancelled,
+      endedAt,
+    );
+
+    const summary = createWorkflowRunSummaryRecord({
       runId: existing.runId,
       status: WorkflowRunStatuses.failed,
       triggerSource: existing.triggerSource,
@@ -166,10 +300,19 @@ export class WorkflowRunHistoryService {
       },
       output: existing.output,
       errorMessage: normalizeRequired(request.errorMessage, "Workflow run failure message"),
-      stepRuns: existing.stepRuns,
+      stepRunStats: createWorkflowStepRunStats(stepRuns),
     });
 
-    return this.tryRepository("record-failed:upsert", () => this.repository.upsert(failed));
+    await this.tryRepository("record-failed:upsert-summary", () => this.repository.upsert(summary));
+    const detail = createWorkflowRunDetailRecord({
+      runId,
+      summary,
+      stepRuns,
+      executionContext: existingDetail?.executionContext,
+      outputs: existingDetail?.outputs,
+    });
+    await this.tryRepository("record-failed:upsert-detail", () => this.repository.upsertDetail(detail));
+    return summary;
   }
 
   public async getRunSummary(runId: string): Promise<WorkflowRunSummaryRecord | undefined> {
@@ -184,11 +327,171 @@ export class WorkflowRunHistoryService {
     });
   }
 
+  public async getRunDetail(runId: string): Promise<WorkflowRunDetailRecord | undefined> {
+    const normalized = normalizeRequired(runId, "Workflow run id");
+    return this.tryRepository("get-detail", async () => {
+      const detail = await this.repository.getDetailByRunId(normalized);
+      return detail ? normalizeWorkflowRunDetailRecord(detail) : undefined;
+    });
+  }
+
+  public async recordStepEvent(request: RecordWorkflowStepEventRequest): Promise<WorkflowRunDetailRecord | undefined> {
+    const runId = normalizeRequired(request.runId, "Workflow run id");
+    const nodeId = request.event.nodeId?.trim();
+    if (!nodeId) {
+      return this.getRunDetail(runId);
+    }
+
+    const status = normalizeStepEventStatus(request.event.kind);
+    if (!status) {
+      return this.getRunDetail(runId);
+    }
+
+    const existing = await this.tryRepository("record-step:load-existing-detail", () => this.repository.getDetailByRunId(runId));
+    if (!existing) {
+      return undefined;
+    }
+
+    const nowIso = this.now().toISOString();
+    const stepRuns = [...existing.stepRuns];
+    const stepIndex = this.resolveStepIndex(request.workflow, nodeId);
+    const stepMetadata = this.resolveStepMetadata(request.workflow, nodeId);
+    const activeIndex = stepRuns.findIndex((stepRun) =>
+      stepRun.stepId === nodeId
+      && (stepRun.status === WorkflowStepRunStatuses.pending || stepRun.status === WorkflowStepRunStatuses.running),
+    );
+    const attempt = activeIndex >= 0
+      ? stepRuns[activeIndex]!.attempt
+      : stepRuns.filter((stepRun) => stepRun.stepId === nodeId).length + 1;
+    const nextStatus = status;
+    const current = activeIndex >= 0 ? stepRuns[activeIndex] : undefined;
+    const startedAt = current?.timestamps.startedAt
+      ?? (nextStatus === WorkflowStepRunStatuses.running || nextStatus === WorkflowStepRunStatuses.completed || nextStatus === WorkflowStepRunStatuses.failed
+        ? nowIso
+        : undefined);
+    const endedAt = nextStatus === WorkflowStepRunStatuses.completed || nextStatus === WorkflowStepRunStatuses.failed
+      ? nowIso
+      : undefined;
+
+    const nextStepRun = this.normalizeStepRun({
+      stepRunId: `${runId}:${nodeId}:${attempt}`,
+      stepId: nodeId,
+      stepIndex,
+      attempt,
+      stepName: stepMetadata.stepName,
+      stepType: stepMetadata.stepType,
+      actionType: stepMetadata.actionType,
+      status: nextStatus,
+      timestamps: {
+        startedAt,
+        endedAt,
+        updatedAt: nowIso,
+      },
+      summary: request.event.message,
+      error: nextStatus === WorkflowStepRunStatuses.failed
+        ? toStructuredError(request.event.message, request.event.payload)
+        : undefined,
+      metadata: request.event.payload,
+    });
+
+    if (activeIndex >= 0) {
+      stepRuns[activeIndex] = nextStepRun;
+    } else {
+      stepRuns.push(nextStepRun);
+    }
+    stepRuns.sort((left, right) => {
+      const indexDelta = left.stepIndex - right.stepIndex;
+      if (indexDelta !== 0) {
+        return indexDelta;
+      }
+      return left.attempt - right.attempt;
+    });
+
+    const summary = createWorkflowRunSummaryRecord({
+      ...existing.summary,
+      timestamps: {
+        startedAt: existing.summary.timestamps.startedAt,
+        endedAt: existing.summary.timestamps.endedAt,
+        updatedAt: nowIso,
+      },
+      stepRunStats: createWorkflowStepRunStats(stepRuns),
+    });
+    const detail = createWorkflowRunDetailRecord({
+      runId,
+      summary,
+      stepRuns,
+      executionContext: existing.executionContext,
+      outputs: existing.outputs,
+    });
+    await this.tryRepository("record-step:upsert-detail", () => this.repository.upsertDetail(detail));
+    await this.tryRepository("record-step:upsert-summary", () => this.repository.upsert(summary));
+    return detail;
+  }
+
   private async tryRepository<T>(operation: string, action: () => Promise<T>): Promise<T> {
     try {
       return await action();
     } catch (error) {
       throw toWorkflowRunHistoryError(operation, error);
     }
+  }
+
+  private finalizeOpenStepRuns(
+    stepRuns: ReadonlyArray<WorkflowStepRunRecord>,
+    terminalStatus: WorkflowStepRunStatus | undefined,
+    terminalTime: string,
+  ): ReadonlyArray<WorkflowStepRunRecord> {
+    return Object.freeze(stepRuns.map((stepRun) => {
+      if (stepRun.status !== WorkflowStepRunStatuses.pending && stepRun.status !== WorkflowStepRunStatuses.running) {
+        return stepRun;
+      }
+
+      const status = terminalStatus ?? stepRun.status;
+      return this.normalizeStepRun({
+        ...stepRun,
+        status,
+        timestamps: {
+          startedAt: stepRun.timestamps.startedAt,
+          endedAt: status === WorkflowStepRunStatuses.pending || status === WorkflowStepRunStatuses.running
+            ? undefined
+            : terminalTime,
+          updatedAt: terminalTime,
+        },
+        summary: stepRun.summary,
+      });
+    }));
+  }
+
+  private resolveStepIndex(workflow: IWorkflowExecutionInput["workflow"], nodeId: string): number {
+    const indexByNodeId = new Map<string, number>();
+    for (const [index, node] of workflow.nodes.entries()) {
+      indexByNodeId.set(node.id, index);
+    }
+
+    const sortedNodes = workflow.toGraph().topologicalSort();
+    for (const [index, node] of sortedNodes.entries()) {
+      indexByNodeId.set(node.id, index);
+    }
+
+    return indexByNodeId.get(nodeId) ?? indexByNodeId.size;
+  }
+
+  private resolveStepMetadata(
+    workflow: IWorkflowExecutionInput["workflow"],
+    nodeId: string,
+  ): { readonly stepName?: string; readonly stepType?: string; readonly actionType?: string } {
+    const node = workflow.nodes.find((entry) => entry.id === nodeId);
+    if (!node) {
+      return {};
+    }
+    return Object.freeze({
+      stepName: node.title || node.definition.title,
+      stepType: node.definition.type,
+      actionType: node.definition.executionKind,
+    });
+  }
+
+  private normalizeStepRun(stepRun: WorkflowStepRunRecord): WorkflowStepRunRecord {
+    return normalizeWorkflowStepRunRecord(stepRun);
   }
 }

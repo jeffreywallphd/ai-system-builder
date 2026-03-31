@@ -1,24 +1,77 @@
 import type { IWorkflowRunSummaryRepository } from "../../application/ports/interfaces/IWorkflowRunSummaryRepository";
 import type {
+  WorkflowRunDetailRecord,
   WorkflowRunSummaryListQuery,
   WorkflowRunSummaryRecord,
 } from "../../domain/workflow-studio/WorkflowRunHistoryDomain";
 import {
+  createWorkflowRunDetailRecord,
+  createWorkflowStepRunStats,
   normalizeWorkflowRunSummaryRecord,
+  normalizeWorkflowRunDetailRecord,
 } from "../../domain/workflow-studio/WorkflowRunHistoryDomain";
 
 export class InMemoryWorkflowRunSummaryRepository implements IWorkflowRunSummaryRepository {
   private readonly records = new Map<string, WorkflowRunSummaryRecord>();
+  private readonly details = new Map<string, WorkflowRunDetailRecord>();
 
   public async upsert(record: WorkflowRunSummaryRecord): Promise<WorkflowRunSummaryRecord> {
     const normalized = normalizeWorkflowRunSummaryRecord(record);
     this.records.set(normalized.runId, normalized);
+    const existingDetail = this.details.get(normalized.runId);
+    if (existingDetail) {
+      this.details.set(
+        normalized.runId,
+        createWorkflowRunDetailRecord({
+          runId: normalized.runId,
+          summary: normalized,
+          stepRuns: existingDetail.stepRuns,
+          executionContext: existingDetail.executionContext,
+          outputs: existingDetail.outputs,
+        }),
+      );
+    }
+    return normalized;
+  }
+
+  public async upsertDetail(record: WorkflowRunDetailRecord): Promise<WorkflowRunDetailRecord> {
+    const normalized = normalizeWorkflowRunDetailRecord(record);
+    this.details.set(normalized.runId, normalized);
+    this.records.set(normalized.runId, normalized.summary);
     return normalized;
   }
 
   public async getByRunId(runId: string): Promise<WorkflowRunSummaryRecord | undefined> {
     const normalizedRunId = runId.trim();
-    return normalizedRunId ? this.records.get(normalizedRunId) : undefined;
+    if (!normalizedRunId) {
+      return undefined;
+    }
+    return this.records.get(normalizedRunId) ?? this.details.get(normalizedRunId)?.summary;
+  }
+
+  public async getDetailByRunId(runId: string): Promise<WorkflowRunDetailRecord | undefined> {
+    const normalizedRunId = runId.trim();
+    if (!normalizedRunId) {
+      return undefined;
+    }
+    const detail = this.details.get(normalizedRunId);
+    if (detail) {
+      return normalizeWorkflowRunDetailRecord(detail);
+    }
+
+    const summary = this.records.get(normalizedRunId);
+    if (!summary) {
+      return undefined;
+    }
+
+    return createWorkflowRunDetailRecord({
+      runId: summary.runId,
+      summary: normalizeWorkflowRunSummaryRecord({
+        ...summary,
+        stepRunStats: summary.stepRunStats ?? createWorkflowStepRunStats([]),
+      }),
+      stepRuns: [],
+    });
   }
 
   public async list(query?: WorkflowRunSummaryListQuery): Promise<ReadonlyArray<WorkflowRunSummaryRecord>> {
