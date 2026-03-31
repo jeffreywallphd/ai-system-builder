@@ -17,6 +17,7 @@ describe("StudioShellService", () => {
     expect(source).toContain("publishVersion(");
     expect(source).toContain("validateDraft(");
     expect(source).toContain("getPersistedWorkflow(");
+    expect(source).toContain("duplicatePersistedWorkflow(");
     expect(source).toContain("assessWorkflowExecutionReadiness(");
     expect(source).toContain("runWorkflowDraft(");
     expect(source).toContain("listSystemChildComponents(");

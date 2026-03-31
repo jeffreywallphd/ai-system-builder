@@ -152,6 +152,9 @@ contextBridge.exposeInMainWorld("aiLoomDesktop", {
     getPersistedWorkflow(workflowId: string) {
       return ipcRenderer.invoke("ai-loom-desktop-studio-shell:get-persisted-workflow", workflowId) as Promise<string>;
     },
+    duplicatePersistedWorkflow(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:duplicate-persisted-workflow", requestJson) as Promise<string>;
+    },
     assessWorkflowExecutionReadiness(requestJson: string) {
       return ipcRenderer.invoke("ai-loom-desktop-studio-shell:workflow-execution-readiness", requestJson) as Promise<string>;
     },

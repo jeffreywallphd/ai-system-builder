@@ -43,6 +43,7 @@ describe("WorkflowStudioPage contracts", () => {
     expect(shellSource).toContain("restoreFromReturnSearch");
     expect(shellSource).toContain("workflowEntryRoute");
     expect(shellSource).toContain("service.getPersistedWorkflow");
+    expect(shellSource).toContain("service.duplicatePersistedWorkflow");
     expect(shellSource).toContain("WorkflowStudioEntryPaths");
     expect(shellSource).toContain("setHandoffStatus");
     expect(shellSource).toContain("clearHandoffStatus");

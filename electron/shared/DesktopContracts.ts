@@ -114,6 +114,7 @@ export interface DesktopStudioShellBridge {
   publishVersion(requestJson: string): Promise<string>;
   validateDraft(requestJson: string): Promise<string>;
   getPersistedWorkflow(workflowId: string): Promise<string>;
+  duplicatePersistedWorkflow(requestJson: string): Promise<string>;
   assessWorkflowExecutionReadiness(requestJson: string): Promise<string>;
   runWorkflowDraft(requestJson: string): Promise<string>;
   listSystemChildComponents(requestJson: string): Promise<string>;

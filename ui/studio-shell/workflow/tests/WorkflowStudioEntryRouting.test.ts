@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   buildWorkflowStudioCreateNewPath,
+  buildWorkflowStudioDuplicatePath,
   buildWorkflowStudioOpenExistingPath,
   buildWorkflowStudioResumeDraftPath,
   resolveWorkflowStudioEntryRoute,
@@ -19,6 +20,10 @@ describe("WorkflowStudioEntryRouting", () => {
     const resumeEntry = resolveWorkflowStudioEntryRoute("?workflowEntry=resume-draft&workflowId=workflow:2");
     expect(resumeEntry.resolvedEntryPath).toBe(WorkflowStudioEntryPaths.resumeDraft);
     expect(resumeEntry.workflowId).toBe("workflow:2");
+
+    const duplicateEntry = resolveWorkflowStudioEntryRoute("?workflowEntry=duplicate&workflowId=workflow:3");
+    expect(duplicateEntry.resolvedEntryPath).toBe(WorkflowStudioEntryPaths.duplicate);
+    expect(duplicateEntry.workflowId).toBe("workflow:3");
   });
 
   it("derives open/resume from workflow id and draft status when explicit entry is omitted", () => {
@@ -43,5 +48,7 @@ describe("WorkflowStudioEntryRouting", () => {
     expect(buildWorkflowStudioOpenExistingPath("workflow:open")).toContain("workflowId=workflow%3Aopen");
     expect(buildWorkflowStudioResumeDraftPath("workflow:draft")).toContain("workflowEntry=resume-draft");
     expect(buildWorkflowStudioResumeDraftPath("workflow:draft")).toContain("workflowStatus=draft");
+    expect(buildWorkflowStudioDuplicatePath("workflow:copy-source")).toContain("workflowEntry=duplicate");
+    expect(buildWorkflowStudioDuplicatePath("workflow:copy-source")).toContain("workflowId=workflow%3Acopy-source");
   });
 });

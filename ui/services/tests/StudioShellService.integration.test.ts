@@ -73,6 +73,9 @@ function installBridge(
     getPersistedWorkflow(workflowId: string) {
       return api.getPersistedWorkflow(workflowId).then((response) => JSON.stringify(response));
     },
+    duplicatePersistedWorkflow(requestJson: string) {
+      return api.duplicatePersistedWorkflow(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
+    },
     assessWorkflowExecutionReadiness(requestJson: string) {
       return api.assessWorkflowExecutionReadiness(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
     },

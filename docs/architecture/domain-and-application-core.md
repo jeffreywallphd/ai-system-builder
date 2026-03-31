@@ -235,6 +235,13 @@ The studio shell now has a bounded inner-layer model and application orchestrati
 - Workflow Studio initialization for new/open/resume remains service-backed (`StudioShellService` -> `StudioShellBackendApi`) and uses existing draft/session orchestration (`startSession`, `createDraft`, shared workflow mode store synchronization) instead of UI-local reconstruction paths.
 - Persisted workflow retrieval for open/resume is now an explicit backend contract (`StudioShellBackendApi.getPersistedWorkflow`) exposed through existing desktop/browser studio-shell bridge seams, with typed not-found/invalid-entry handling.
 
+## Direction 5 update: Workflow duplication + lightweight revision metadata hardening (stories 11.7-11.8)
+
+- Persisted workflow duplication is now exposed as an explicit backend contract (`StudioShellBackendApi.duplicatePersistedWorkflow`) and reused by Workflow Studio entry routing (`workflowEntry=duplicate`) plus Explore workflow actions, so duplication flows through existing application/repository seams instead of UI-local copy logic.
+- Duplication stays canonical and non-mutating: duplicate records inherit workflow definition + metadata, reset identity/timestamps/revision (`persistenceRevision=1`, `workflowRevision=1`), remain in `draft` status, and persist lineage through `revision.duplicatedFromWorkflowId`.
+- Duplicate id allocation is now application-owned in `DuplicatePersistedWorkflowUseCase` when no explicit id is supplied (`<source>:copy`, then `:copy-<n>`), with conflict/not-found behavior preserved through existing typed persistence errors.
+- Persisted workflow rehydration now validates canonical revision/timestamp/payload consistency (`normalizePersistedWorkflowRecord`) in both SQLite and in-memory repositories, so malformed persisted revision/version metadata fails fast on load instead of silently round-tripping.
+
 ## Direction 5 update: Workflow built-in step taxonomy + registry foundation (stories 6.1-6.2)
 
 - Workflow-native built-in steps are now a first-class inner-layer concept in `domain/workflow-studio/WorkflowStudioDomain.ts` with canonical step taxonomy categories (`control-flow`, `temporal`, `human-interaction`, reserved `transformation`) and stable built-in step identities.

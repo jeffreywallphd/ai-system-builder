@@ -3,6 +3,7 @@ import type { ExploreAssetSummary } from "../../../application/asset-registry/Ex
 import { AssetActionExecutionService, AssetIntentActionTypes } from "../../routes/AssetIntentActions";
 import { ROUTE_PATHS } from "../../routes/RouteConfig";
 import {
+  buildWorkflowStudioDuplicatePath,
   buildWorkflowStudioOpenExistingPath,
   buildWorkflowStudioResumeDraftPath,
 } from "../../studio-shell/workflow/WorkflowStudioEntryRouting";
@@ -49,6 +50,9 @@ export function ExploreAssetList({ assets, isLoading, error, registryContextQuer
             ? buildWorkflowStudioResumeDraftPath(asset.id.assetId)
             : buildWorkflowStudioOpenExistingPath(asset.id.assetId))
           : undefined;
+        const workflowDuplicatePath = isPersistedWorkflow
+          ? buildWorkflowStudioDuplicatePath(asset.id.assetId)
+          : undefined;
         const actionContext = {
           asset: {
             assetId: asset.id.assetId,
@@ -81,6 +85,11 @@ export function ExploreAssetList({ assets, isLoading, error, registryContextQuer
                   {workflowOpenPath ? (
                     <Link className="ui-button ui-button--ghost ui-button--small" to={workflowOpenPath}>
                       {asset.status === "draft" ? "Resume draft" : "Open workflow"}
+                    </Link>
+                  ) : null}
+                  {workflowDuplicatePath ? (
+                    <Link className="ui-button ui-button--ghost ui-button--small" to={workflowDuplicatePath}>
+                      Duplicate
                     </Link>
                   ) : null}
                   {runAction ? <Link className="ui-button ui-button--ghost ui-button--small" to={runAction.launchPath}>Run here</Link> : null}

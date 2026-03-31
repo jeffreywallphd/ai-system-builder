@@ -16,6 +16,7 @@ describe("RegistryPage", () => {
     expect(source).toContain("useSearchParams");
     expect(source).toContain("registryContextQuery");
     expect(source).toContain("Create new workflow");
-    expect(readSource("ui/components/registry/AssetListItem.tsx")).toContain("View details");
+    expect(readSource("ui/components/explore/ExploreAssetList.tsx")).toContain("Duplicate");
+    expect(readSource("ui/components/explore/ExploreAssetList.tsx")).toContain("buildWorkflowStudioDuplicatePath");
   });
 });

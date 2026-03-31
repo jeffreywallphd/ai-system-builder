@@ -8,11 +8,10 @@ import type {
   PersistedWorkflowRecord,
   PersistedWorkflowSummary,
 } from "../../domain/workflow-studio/WorkflowPersistenceDomain";
-import { toPersistedWorkflowSummary } from "../../domain/workflow-studio/WorkflowPersistenceDomain";
 import {
-  deserializeWorkflowEntity,
-  serializeWorkflowEntity,
-} from "../../domain/workflow-studio/WorkflowStudioDomain";
+  normalizePersistedWorkflowRecord,
+  toPersistedWorkflowSummary,
+} from "../../domain/workflow-studio/WorkflowPersistenceDomain";
 import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "./sqlite/SqliteCompat";
 
 interface WorkflowRow {
@@ -238,24 +237,17 @@ export class SqliteWorkflowPersistenceRepository implements IWorkflowPersistence
   }
 
   private normalizeRecord(record: PersistedWorkflowRecord): PersistedWorkflowRecord {
-    const normalizedId = record.id?.trim();
-    if (!normalizedId) {
-      throw new Error("Persisted workflow id is required.");
-    }
-
-    // Enforce canonical workflow entity serialization compatibility.
-    const definition = deserializeWorkflowEntity(serializeWorkflowEntity(record.definition));
-    return Object.freeze({
-      ...record,
-      id: normalizedId,
-      name: record.name.trim(),
-      definition,
-    });
+    return normalizePersistedWorkflowRecord(record);
   }
 
   private parseRecord(serialized: string): PersistedWorkflowRecord {
-    const parsed = JSON.parse(serialized) as PersistedWorkflowRecord;
-    return this.normalizeRecord(parsed);
+    try {
+      const parsed = JSON.parse(serialized) as PersistedWorkflowRecord;
+      return this.normalizeRecord(parsed);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "unknown parse error";
+      throw new Error(`Persisted workflow record could not be parsed: ${message}`);
+    }
   }
 
   private buildSearchText(record: PersistedWorkflowRecord): string {

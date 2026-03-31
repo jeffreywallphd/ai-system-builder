@@ -233,16 +233,77 @@ describe("Workflow persistence use cases", () => {
 
     const duplicated = await duplicate.execute({
       sourceWorkflowId: "workflow:persistence:source",
-      duplicatedWorkflowId: "workflow:persistence:copy",
       duplicatedWorkflowName: "Source Workflow Copy",
     });
 
-    expect(duplicated.id).toBe("workflow:persistence:copy");
+    expect(duplicated.id).toBe("workflow:persistence:source:copy");
     expect(duplicated.name).toBe("Source Workflow Copy");
     expect(duplicated.status).toBe("draft");
+    expect(duplicated.revision.versionLabel).toBeUndefined();
     expect(duplicated.revision.duplicatedFromWorkflowId).toBe("workflow:persistence:source");
     expect(duplicated.revision.persistenceRevision).toBe(1);
     expect(duplicated.revision.workflowRevision).toBe(1);
+  });
+
+  it("allocates stable duplicate ids when automatic copy ids are already taken", async () => {
+    const repository = new InMemoryWorkflowPersistenceRepository();
+    const create = new CreatePersistedWorkflowUseCase(repository, () => new Date("2026-03-30T10:00:00.000Z"));
+    const duplicate = new DuplicatePersistedWorkflowUseCase(repository, () => new Date("2026-03-30T10:10:00.000Z"));
+
+    await create.execute({
+      id: "workflow:persistence:auto-id",
+      name: "Auto Id Source",
+      draft: createValidDraft(),
+    });
+
+    const first = await duplicate.execute({
+      sourceWorkflowId: "workflow:persistence:auto-id",
+    });
+    const second = await duplicate.execute({
+      sourceWorkflowId: "workflow:persistence:auto-id",
+    });
+
+    expect(first.id).toBe("workflow:persistence:auto-id:copy");
+    expect(second.id).toBe("workflow:persistence:auto-id:copy-2");
+  });
+
+  it("allows duplicated workflows to be edited independently without mutating the source workflow", async () => {
+    const repository = new InMemoryWorkflowPersistenceRepository();
+    const create = new CreatePersistedWorkflowUseCase(repository, () => new Date("2026-03-30T10:00:00.000Z"));
+    const duplicate = new DuplicatePersistedWorkflowUseCase(repository, () => new Date("2026-03-30T10:10:00.000Z"));
+    const update = new UpdatePersistedWorkflowUseCase(repository, () => new Date("2026-03-30T10:15:00.000Z"));
+    const get = new GetPersistedWorkflowUseCase(repository);
+
+    await create.execute({
+      id: "workflow:persistence:independent-source",
+      name: "Independent Source",
+      draft: createValidDraft(),
+      metadata: { tags: ["source"] },
+    });
+
+    const copy = await duplicate.execute({
+      sourceWorkflowId: "workflow:persistence:independent-source",
+      duplicatedWorkflowName: "Independent Source Copy",
+    });
+
+    await update.execute({
+      id: copy.id,
+      changes: {
+        name: "Independent Source Copy Updated",
+        metadata: { tags: ["copy-updated"] },
+        draft: createValidDraft(),
+      },
+    });
+
+    const source = await get.execute("workflow:persistence:independent-source");
+    const updatedCopy = await get.execute(copy.id);
+
+    expect(source?.name).toBe("Independent Source");
+    expect(source?.metadata.tags).toEqual(["source"]);
+    expect(source?.revision.persistenceRevision).toBe(1);
+    expect(updatedCopy?.name).toBe("Independent Source Copy Updated");
+    expect(updatedCopy?.metadata.tags).toEqual(["copy-updated"]);
+    expect(updatedCopy?.revision.persistenceRevision).toBe(2);
   });
 
   it("enforces validation and explicit errors for invalid/missing requests and missing records", async () => {

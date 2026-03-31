@@ -451,6 +451,10 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   ipcMain.handle("ai-loom-desktop-studio-shell:get-persisted-workflow", async (_event, workflowId: string) => {
     return JSON.stringify(await studioShellBackendApi.getPersistedWorkflow(workflowId));
   });
+  ipcMain.handle("ai-loom-desktop-studio-shell:duplicate-persisted-workflow", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["duplicatePersistedWorkflow"]>[0];
+    return JSON.stringify(await studioShellBackendApi.duplicatePersistedWorkflow(request));
+  });
   ipcMain.handle("ai-loom-desktop-studio-shell:workflow-execution-readiness", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["assessWorkflowExecutionReadiness"]>[0];
     return JSON.stringify(await studioShellBackendApi.assessWorkflowExecutionReadiness(request));

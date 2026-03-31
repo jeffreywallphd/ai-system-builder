@@ -7,6 +7,7 @@ import type {
 } from "../../application/studio-shell/contracts";
 import type {
   AssessWorkflowStudioExecutionReadinessRequest,
+  DuplicatePersistedWorkflowRequest,
   RunWorkflowStudioDraftReadModel,
   RunWorkflowStudioDraftRequest,
   StudioShellApiResponse,
@@ -91,6 +92,13 @@ export class StudioShellService {
 
   public async getPersistedWorkflow(workflowId: string): Promise<StudioShellApiResponse<PersistedWorkflowReadModel>> {
     const raw = await this.requireBridge().getPersistedWorkflow(workflowId);
+    return JSON.parse(raw) as StudioShellApiResponse<PersistedWorkflowReadModel>;
+  }
+
+  public async duplicatePersistedWorkflow(
+    request: DuplicatePersistedWorkflowRequest,
+  ): Promise<StudioShellApiResponse<PersistedWorkflowReadModel>> {
+    const raw = await this.requireBridge().duplicatePersistedWorkflow(JSON.stringify(request));
     return JSON.parse(raw) as StudioShellApiResponse<PersistedWorkflowReadModel>;
   }
 
