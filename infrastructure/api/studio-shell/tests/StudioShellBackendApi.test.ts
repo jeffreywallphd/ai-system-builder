@@ -1068,6 +1068,50 @@ describe("StudioShellBackendApi", () => {
     }));
   });
 
+  it("returns run observability metadata and persists manual launch records when run-history repository is available", async () => {
+    const workflowRunRepository = new InMemoryWorkflowRunSummaryRepository();
+    const api = new StudioShellBackendApi(
+      new InMemoryStudioShellRepository(),
+      undefined,
+      workflowRunRepository,
+    );
+
+    const run = await api.runWorkflowDraft({
+      studioId: "studio-workflows",
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-manual",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        }],
+        steps: [{
+          id: "step-1",
+          type: "action",
+          kind: "action",
+          order: 1,
+        }],
+      }),
+      inputValues: {
+        customerId: "customer-42",
+      },
+    });
+
+    expect(run.ok).toBeTrue();
+    expect(run.data?.run?.runId).toBeDefined();
+    expect(run.data?.run?.workflowId).toContain("workflow:");
+
+    const persisted = await workflowRunRepository.getDetailByRunId(run.data!.run!.runId);
+    expect(persisted).toBeDefined();
+    expect(persisted?.summary.correlation.workflowExecutionId).toBe(run.data?.execution.executionId);
+    expect((persisted?.executionContext?.executionInput as Record<string, unknown>)?.parameters).toEqual(expect.objectContaining({
+      inputValues: {
+        customerId: "customer-42",
+      },
+    }));
+  });
+
   it("supports trigger-aware entry for temporal and state workflow activations", async () => {
     const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
 

@@ -486,3 +486,7 @@ Audit schema now records administrative approval transitions plus decision denia
   - rerun and edit-and-rerun launch new execution instances from persisted historical execution context (never by mutating historical runs);
   - derived runs persist explicit lineage metadata (`parentRunId`, `rerunMode`, optional `rerunReason`) so related-run queries and UI projections stay deterministic;
   - edit-and-rerun starts from historical context, applies bounded user overrides before launch, and persists the final merged execution context on the new run detail record.
+- Epic 12 stories 12.11-12.12 now harden observability as a first-class workflow path on the same canonical contracts:
+  - workflow list/detail/completion surfaces now expose direct run-history/run-detail entry points instead of isolated observability-only navigation;
+  - manual workflow launch results now return persisted run identity when run-history storage is available, enabling immediate completion-surface links to the exact run detail;
+  - rerun/edit-and-rerun affordances now enforce terminal-state and historical-context prerequisites with explicit unsupported-state UX.

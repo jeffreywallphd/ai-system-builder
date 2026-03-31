@@ -179,6 +179,12 @@ export default function BuildPage(): JSX.Element {
                         >
                           {workflow.status === "draft" ? "Resume in Workflow Studio" : "Open in Workflow Studio"}
                         </Link>
+                        <Link
+                          className="ui-button ui-button--ghost ui-button--small"
+                          to={persistedWorkflowEntryService.buildWorkflowRunHistoryPath(workflow)}
+                        >
+                          View run history
+                        </Link>
                       </div>
                     </div>
                   </article>

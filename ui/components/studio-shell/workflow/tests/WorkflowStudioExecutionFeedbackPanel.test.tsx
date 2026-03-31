@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { MemoryRouter } from "react-router-dom";
 import type { WorkflowStudioRunFeedback } from "../WorkflowStudioExecutionFeedbackPanel";
 import WorkflowStudioExecutionFeedbackPanel from "../WorkflowStudioExecutionFeedbackPanel";
 
@@ -158,6 +159,62 @@ describe("WorkflowStudioExecutionFeedbackPanel", () => {
     expect(html).toContain("Ready to run");
     expect(html).toContain("Result handoff: 1 delivered, 0 failed.");
     expect(html).toContain("output-1: web-viewer -&gt; preview (delivered)");
+  });
+
+  it("renders observability links when run detail and history paths are available", () => {
+    const runFeedback: WorkflowStudioRunFeedback = Object.freeze({
+      status: "launched",
+      message: "Workflow launch started successfully.",
+      result: Object.freeze({
+        launchStatus: "launched",
+        run: Object.freeze({
+          runId: "run:workflow:1",
+          workflowId: "workflow:persisted:1",
+          status: "completed",
+        }),
+        execution: Object.freeze({
+          executionId: "exec-3",
+          state: "completed",
+          launchAccepted: true,
+          transitions: Object.freeze([]),
+        }),
+        validation: Object.freeze({
+          ready: true,
+          authoredValidation: Object.freeze({
+            ready: true,
+            blockingIssueCount: 0,
+            warningIssueCount: 0,
+          }),
+          preExecutionValidation: Object.freeze({
+            ready: true,
+            blockingIssueCount: 0,
+            warningIssueCount: 0,
+          }),
+          translationValidation: Object.freeze({
+            ready: true,
+            blockingIssueCount: 0,
+            warningIssueCount: 0,
+          }),
+          issues: Object.freeze([]),
+          blockingIssueCount: 0,
+          warningIssueCount: 0,
+        }),
+      }),
+    });
+
+    const html = renderToStaticMarkup(
+      <MemoryRouter>
+        <WorkflowStudioExecutionFeedbackPanel
+          readiness={runFeedback.result?.validation}
+          runFeedback={runFeedback}
+          runDetailPath="/studio-shell/workflow/runs/run%3Aworkflow%3A1"
+          runHistoryPath="/studio-shell/workflow/runs?workflowId=workflow%3Apersisted%3A1"
+        />
+      </MemoryRouter>,
+    );
+
+    expect(html).toContain("View current run");
+    expect(html).toContain("View run history");
   });
 });
 

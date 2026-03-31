@@ -9,6 +9,8 @@ describe("RunPage", () => {
     expect(source).toContain("Run a saved workflow");
     expect(source).toContain("buildRunWorkflowPath");
     expect(source).toContain("buildWorkflowStudioOpenPath");
+    expect(source).toContain("buildWorkflowRunHistoryPath");
+    expect(source).toContain("View run history");
     expect(source).toContain('data-testid="run-persisted-workflow-list"');
   });
 });

@@ -125,6 +125,10 @@ Workflow -> `ExecuteWorkflowUseCase` -> one-unit `ExecutionPlan` -> `UnifiedExec
   - rerun and edit-and-rerun launch new execution instances from persisted historical execution context (not by mutating historical records);
   - reruns persist lineage metadata on the new run (`parentRunId`, `rerunMode`, optional `rerunReason`) so run relationships remain queryable in list/detail read models;
   - edited reruns reuse historical context as the starting point, allow bounded input/config overrides before launch, and persist the final merged execution context on the derived run detail record.
+- Epic 12 stories 12.11-12.12 now harden observability as a first-class workflow path (still on the same backend/service contracts):
+  - workflow list/detail/completion surfaces now expose direct run-history/run-detail entry points instead of isolated observability-only navigation;
+  - manual launch results now return persisted run identity when run-history storage is available, enabling immediate navigation from completion feedback into the exact run detail;
+  - run-history/detail rerun affordances now enforce terminal-state + historical-context guardrails (unsupported scenarios are explicit UX states, not silent failures).
 
 ## What is not migrated yet
 - Broader MCP tool/discovery orchestration, scheduling, and distributed execution are still outside this slice even though plan-backed workflow runs, dataset generation runs, model-preparation runs, truthful local model-training runs, and narrow MCP server-operation runs are now durable.

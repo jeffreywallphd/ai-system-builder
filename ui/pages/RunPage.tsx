@@ -148,6 +148,9 @@ export default function RunPage(): JSX.Element {
                       <Link className="ui-button ui-button--ghost ui-button--small" to={persistedWorkflowEntryService.buildWorkflowStudioOpenPath(workflow)}>
                         Open in Workflow Studio
                       </Link>
+                      <Link className="ui-button ui-button--ghost ui-button--small" to={persistedWorkflowEntryService.buildWorkflowRunHistoryPath(workflow)}>
+                        View run history
+                      </Link>
                     </div>
                   </div>
                 </article>

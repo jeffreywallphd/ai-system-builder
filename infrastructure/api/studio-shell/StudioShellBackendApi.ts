@@ -194,6 +194,11 @@ export interface WorkflowExecutionOutputDeliveryResultReadModel {
 
 export interface RunWorkflowStudioDraftReadModel {
   readonly launchStatus: "blocked" | "launched" | "failed";
+  readonly run?: {
+    readonly runId: string;
+    readonly workflowId: string;
+    readonly status: WorkflowRunStatus;
+  };
   readonly execution: {
     readonly executionId: string;
     readonly state: "queued" | "running" | "completed" | "failed";
@@ -600,8 +605,93 @@ export class StudioShellBackendApi {
         path: issue.path,
       }));
 
+      let runRecord: RunWorkflowStudioDraftReadModel["run"];
+      if (this.workflowRunSummaryRepository) {
+        let snapshot: StudioShellSnapshotReadModel | undefined;
+        try {
+          snapshot = await this.requireSnapshot(request.studioId);
+        } catch {
+          snapshot = undefined;
+        }
+        const workflowId = snapshot.draft?.assetId?.trim() || `workflow:${runResult.executionStatus.executionId}`;
+        const workflowName = snapshot.draft?.metadata.title?.trim() || "Workflow Draft";
+        const definitionVersionIdRaw = snapshot.draft?.lastPublishedVersionId?.trim();
+        const definitionVersionId = definitionVersionIdRaw?.startsWith("version:")
+          ? definitionVersionIdRaw
+          : undefined;
+        const runId = this.createWorkflowRunId(workflowId);
+        const stepRuns = this.toWorkflowStepRuns(runResult);
+        const status = this.toWorkflowRunStatus(runResult);
+        const startedAt = runResult.executionStatus.transitions[0]?.occurredAt ?? this.now().toISOString();
+        const terminalTransition = runResult.executionStatus.transitions[runResult.executionStatus.transitions.length - 1];
+        const endedAt = status === WorkflowRunStatuses.running ? undefined : terminalTransition?.occurredAt ?? this.now().toISOString();
+        const diagnostics = this.toWorkflowExecutionDiagnostics(runResult, stepRuns);
+        const summary = createWorkflowRunSummaryRecord({
+          runId,
+          status,
+          triggerSource: this.toWorkflowRunTriggerSource(mappedTriggerEntry.sourceKind),
+          workflow: {
+            workflowId,
+            workflowName,
+            definitionAssetId: snapshot.draft?.assetId,
+            definitionVersionId,
+          },
+          correlation: {
+            executionRunId: runId,
+            workflowExecutionId: runResult.executionStatus.executionId,
+            triggerEventId: this.toOptionalString(request.triggerActivation?.triggerId ?? request.triggerEntry?.triggerId),
+          },
+          timestamps: {
+            startedAt,
+            endedAt,
+            updatedAt: endedAt ?? terminalTransition?.occurredAt ?? startedAt,
+          },
+          errorMessage: runResult.failureMessage ?? runResult.executionStatus.failure?.message,
+          output: this.toWorkflowRunOutputs(runResult),
+          stepRunStats: createWorkflowStepRunStats(stepRuns),
+          diagnostics,
+        });
+        const detail = createWorkflowRunDetailRecord({
+          runId,
+          summary,
+          stepRuns,
+          diagnostics,
+          executionContext: {
+            executionInput: {
+              target: {},
+              parameters: {
+                inputValues: request.inputValues ?? {},
+                triggerSource: this.toWorkflowRunTriggerSource(mappedTriggerEntry.sourceKind),
+                triggerActivation: request.triggerActivation,
+              },
+              executionMetadata: request.metadata ?? {},
+              propertyOverrides: {},
+            },
+            resolvedTriggerContext: {
+              trigger: mappedTriggerEntry,
+              activation: request.triggerActivation,
+            },
+            runtimeContext: runResult.runtimeResult
+              ? {
+                status: runResult.runtimeResult.status,
+                traceCount: runResult.runtimeResult.traces.length,
+                issueCount: runResult.runtimeResult.issues.length,
+              }
+              : undefined,
+          },
+          outputs: this.toWorkflowRunOutputs(runResult),
+        });
+        await this.workflowRunSummaryRepository.upsertDetail(detail);
+        runRecord = Object.freeze({
+          runId,
+          workflowId,
+          status,
+        });
+      }
+
       return Object.freeze({
         launchStatus: runResult.launchStatus,
+        run: runRecord,
         execution: Object.freeze({
           executionId: runResult.executionStatus.executionId,
           state: runResult.executionStatus.state,
@@ -822,14 +912,14 @@ export class StudioShellBackendApi {
       });
 
       const rerunRunId = this.createRerunRunId(sourceDetail.summary.workflow.workflowId);
-      const rerunStepRuns = this.toRerunStepRuns(runResult);
-      const diagnostics = this.toRerunDiagnostics(runResult, rerunStepRuns);
+      const rerunStepRuns = this.toWorkflowStepRuns(runResult);
+      const diagnostics = this.toWorkflowExecutionDiagnostics(runResult, rerunStepRuns);
       const startedAt = runResult.executionStatus.transitions[0]?.occurredAt ?? this.now().toISOString();
       const terminalAt = runResult.executionStatus.state === WorkflowRunStatuses.running
         ? undefined
         : runResult.executionStatus.transitions[runResult.executionStatus.transitions.length - 1]?.occurredAt
           ?? this.now().toISOString();
-      const status = this.toRerunWorkflowStatus(runResult);
+      const status = this.toWorkflowRunStatus(runResult);
 
       const summary = createWorkflowRunSummaryRecord({
         runId: rerunRunId,
@@ -880,7 +970,7 @@ export class StudioShellBackendApi {
             })
             : undefined,
         } satisfies WorkflowRunExecutionContextRecord),
-        outputs: this.toRerunOutputs(runResult),
+        outputs: this.toWorkflowRunOutputs(runResult),
       });
 
       await this.workflowRunSummaryRepository.upsertDetail(detail);
@@ -1063,6 +1153,11 @@ export class StudioShellBackendApi {
     return `run:${normalized}:rerun:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 8)}`;
   }
 
+  private createWorkflowRunId(workflowId: string): string {
+    const normalized = workflowId.trim().replace(/[^a-zA-Z0-9:_-]/g, "-");
+    return `run:${normalized}:manual:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 8)}`;
+  }
+
   private assertRecord(value: unknown, message: string): Readonly<Record<string, unknown>> {
     if (!value || typeof value !== "object" || Array.isArray(value)) {
       throw new StudioShellInvalidRequestError(message);
@@ -1135,7 +1230,7 @@ export class StudioShellBackendApi {
     return Object.freeze(inferred);
   }
 
-  private toRerunWorkflowStatus(runResult: RunWorkflowDraftManualResult): WorkflowRunStatus {
+  private toWorkflowRunStatus(runResult: RunWorkflowDraftManualResult): WorkflowRunStatus {
     if (runResult.executionStatus.state === WorkflowRunStatuses.completed) {
       return WorkflowRunStatuses.completed;
     }
@@ -1145,7 +1240,7 @@ export class StudioShellBackendApi {
     return WorkflowRunStatuses.failed;
   }
 
-  private toRerunStepRuns(runResult: RunWorkflowDraftManualResult): ReadonlyArray<WorkflowStepRunRecord> {
+  private toWorkflowStepRuns(runResult: RunWorkflowDraftManualResult): ReadonlyArray<WorkflowStepRunRecord> {
     if (!runResult.runtimeResult) {
       return Object.freeze([]);
     }
@@ -1191,18 +1286,64 @@ export class StudioShellBackendApi {
     }));
   }
 
-  private toRerunDiagnostics(
+  private toWorkflowExecutionDiagnostics(
     runResult: RunWorkflowDraftManualResult,
     stepRuns: ReadonlyArray<WorkflowStepRunRecord>,
   ): ReadonlyArray<WorkflowRunDiagnosticRecord> | undefined {
+    const validationDiagnostics: WorkflowRunDiagnosticRecord[] = runResult.validation.issues
+      .filter((issue) => issue.blocking || issue.severity === "warning")
+      .map((issue) => Object.freeze({
+        category: issue.category === "dependency"
+          ? "dependency"
+          : issue.category === "output-delivery"
+            ? "output-delivery"
+            : issue.category === "configuration"
+              ? "configuration"
+              : "validation",
+        severity: issue.severity === "warning" ? "warning" : "error",
+        scope: "workflow",
+        code: issue.code,
+        summary: issue.message,
+      } satisfies WorkflowRunDiagnosticRecord));
+
+    const runtimeDiagnostics: WorkflowRunDiagnosticRecord[] = runResult.runtimeResult
+      ? runResult.runtimeResult.issues.map((issue) => Object.freeze({
+        category: "runtime",
+        severity: "error",
+        scope: issue.stepId ? "step" : "workflow",
+        code: issue.code,
+        summary: issue.message,
+        location: issue.stepId
+          ? Object.freeze({
+            stepId: issue.stepId,
+          })
+          : undefined,
+      } satisfies WorkflowRunDiagnosticRecord))
+      : [];
+
+    const outputDiagnostics: WorkflowRunDiagnosticRecord[] = runResult.runtimeResult
+      ? runResult.runtimeResult.outputDelivery.issues.map((issue) => Object.freeze({
+        category: "output-delivery",
+        severity: "error",
+        scope: "workflow",
+        code: issue.code,
+        summary: issue.message,
+      } satisfies WorkflowRunDiagnosticRecord))
+      : [];
+
     return deriveWorkflowRunDiagnostics({
-      status: this.toRerunWorkflowStatus(runResult),
+      status: this.toWorkflowRunStatus(runResult),
       errorMessage: runResult.failureMessage ?? runResult.executionStatus.failure?.message,
       stepRuns,
+      existingDiagnostics: Object.freeze([
+        ...validationDiagnostics,
+        ...runtimeDiagnostics,
+        ...outputDiagnostics,
+      ]),
     });
   }
 
-  private toRerunOutputs(runResult: RunWorkflowDraftManualResult): WorkflowRunOutputRecord | undefined {
+  private toWorkflowRunOutputs(runResult: RunWorkflowDraftManualResult): WorkflowRunOutputRecord | undefined {
     if (!runResult.runtimeResult) {
       return undefined;
     }
@@ -1217,6 +1358,17 @@ export class StudioShellBackendApi {
       resultMessages: Object.freeze(runResult.runtimeResult.issues.map((issue) => issue.message)),
       outputValues: runResult.runtimeResult.stepOutputs,
     } satisfies WorkflowRunOutputRecord);
+  }
+
+  private toWorkflowRunTriggerSource(sourceKind?: WorkflowExecutionTriggerSourceKind): WorkflowRunTriggerSource {
+    switch (sourceKind) {
+      case WorkflowExecutionTriggerSourceKinds.temporal:
+        return "schedule";
+      case WorkflowExecutionTriggerSourceKinds.stateData:
+        return "event";
+      default:
+        return "manual";
+    }
   }
 
   public async duplicatePersistedWorkflow(
