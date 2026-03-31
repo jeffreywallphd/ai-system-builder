@@ -1248,8 +1248,9 @@ Explicitly later than this scope:
 - Data Studio now has a reusable source-input abstraction in `application/dataset-studio/SourceLocatorInputAbstraction.ts` with zod-validated request contracts for:
   - single local file references,
   - multiple explicit local file references,
-  - local directory references with `fast-glob` scanning,
+  - local directory references with scanner-backed glob scanning,
   - remote file placeholders (descriptor-only extension seam for future connector work).
+- Directory scanning now runs through an explicit scanner seam (`ISourceDirectoryScanner`) with a `fast-glob` adapter loaded only at scan-time, so browser-hosted renderer bundles do not eagerly import Node-only glob internals.
 - Source resolution now yields normalized source descriptors with bounded metadata suitable for ingestion contracts and preview surfaces:
   - stable source id,
   - original and normalized reference,
