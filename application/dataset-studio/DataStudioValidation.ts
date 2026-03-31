@@ -2,6 +2,10 @@ import type { DataPreviewModel } from "../data-studio/DataPreviewEngine";
 import type { CanonicalDataShape, CanonicalDataShapeKind, CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
 import type { DataAssetBase } from "../../domain/dataset-studio/DataAssetBase";
 import {
+  DataAssetConfigFieldKinds,
+  type DataAssetConfigSchema,
+} from "./DataAssetConfiguration";
+import {
   DataConverterDiagnosticSeverities,
   createDataConverterDiagnostic,
   type DataConverterDiagnostic,
@@ -464,6 +468,125 @@ export function validateDataAssetConfig(asset: DataAssetBase): ReadonlyArray<Dat
       message: "Data asset should declare at least one composable input shape kind.",
       path: "composableInputShapeKinds",
     });
+  }
+
+  return Object.freeze(issues);
+}
+
+function isObjectRecord(value: CanonicalRecordValue): value is Readonly<Record<string, CanonicalRecordValue>> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+export function validateDataAssetConfigValues(
+  config: Readonly<Record<string, CanonicalRecordValue>>,
+  schema: DataAssetConfigSchema,
+): ReadonlyArray<DataStudioValidationIssue> {
+  const issues: DataStudioValidationIssue[] = [];
+  const fieldsByKey = new Map(schema.fields.map((field) => [field.key, field] as const));
+
+  for (const field of schema.fields) {
+    const value = config[field.key];
+    const path = `config.values.${field.key}`;
+    if (field.required && (value === undefined || value === null || value === "")) {
+      pushIssue(issues, {
+        code: "data-asset-config-required-missing",
+        section: DataStudioValidationSections.dataAssetConfig,
+        severity: DataStudioValidationIssueSeverities.error,
+        message: `Configuration field '${field.label}' is required.`,
+        path,
+      });
+      continue;
+    }
+
+    if (value === undefined) {
+      continue;
+    }
+
+    if (field.kind === DataAssetConfigFieldKinds.string && typeof value !== "string") {
+      pushIssue(issues, {
+        code: "data-asset-config-type-string-expected",
+        section: DataStudioValidationSections.dataAssetConfig,
+        severity: DataStudioValidationIssueSeverities.error,
+        message: `Configuration field '${field.label}' must be a string.`,
+        path,
+      });
+    }
+
+    if (field.kind === DataAssetConfigFieldKinds.number && typeof value !== "number") {
+      pushIssue(issues, {
+        code: "data-asset-config-type-number-expected",
+        section: DataStudioValidationSections.dataAssetConfig,
+        severity: DataStudioValidationIssueSeverities.error,
+        message: `Configuration field '${field.label}' must be a number.`,
+        path,
+      });
+    }
+
+    if (field.kind === DataAssetConfigFieldKinds.boolean && typeof value !== "boolean") {
+      pushIssue(issues, {
+        code: "data-asset-config-type-boolean-expected",
+        section: DataStudioValidationSections.dataAssetConfig,
+        severity: DataStudioValidationIssueSeverities.error,
+        message: `Configuration field '${field.label}' must be a boolean.`,
+        path,
+      });
+    }
+
+    if (field.kind === DataAssetConfigFieldKinds.select) {
+      const allowed = new Set((field.options ?? []).map((option) => option.value));
+      if (typeof value !== "string" || !allowed.has(value)) {
+        pushIssue(issues, {
+          code: "data-asset-config-select-option-invalid",
+          section: DataStudioValidationSections.dataAssetConfig,
+          severity: DataStudioValidationIssueSeverities.error,
+          message: `Configuration field '${field.label}' must match one of the allowed options.`,
+          path,
+        });
+      }
+    }
+
+    if (field.kind === DataAssetConfigFieldKinds.json && !isObjectRecord(value)) {
+      pushIssue(issues, {
+        code: "data-asset-config-type-json-expected",
+        section: DataStudioValidationSections.dataAssetConfig,
+        severity: DataStudioValidationIssueSeverities.error,
+        message: `Configuration field '${field.label}' must be a JSON object.`,
+        path,
+      });
+    }
+
+    if (field.kind === DataAssetConfigFieldKinds.number && typeof value === "number") {
+      if (typeof field.min === "number" && value < field.min) {
+        pushIssue(issues, {
+          code: "data-asset-config-number-min-violated",
+          section: DataStudioValidationSections.dataAssetConfig,
+          severity: DataStudioValidationIssueSeverities.error,
+          message: `Configuration field '${field.label}' must be >= ${field.min}.`,
+          path,
+        });
+      }
+      if (typeof field.max === "number" && value > field.max) {
+        pushIssue(issues, {
+          code: "data-asset-config-number-max-violated",
+          section: DataStudioValidationSections.dataAssetConfig,
+          severity: DataStudioValidationIssueSeverities.error,
+          message: `Configuration field '${field.label}' must be <= ${field.max}.`,
+          path,
+        });
+      }
+    }
+  }
+
+  for (const key of Object.keys(config)) {
+    if (!fieldsByKey.has(key)) {
+      pushIssue(issues, {
+        code: "data-asset-config-key-unsupported",
+        section: DataStudioValidationSections.dataAssetConfig,
+        severity: DataStudioValidationIssueSeverities.warning,
+        message: `Configuration key '${key}' is not defined in the config schema.`,
+        path: `config.values.${key}`,
+      });
+    }
   }
 
   return Object.freeze(issues);
