@@ -172,6 +172,17 @@ function toDefaultsRecord(): Readonly<Record<string, CanonicalRecordValue>> {
 const DefaultStageAssetMappings: ReadonlyArray<StageAssetMappingDefinition> = Object.freeze([
   Object.freeze({
     type: "static",
+    stageKind: DatasetPipelineStageKinds.source,
+    assets: Object.freeze([
+      Object.freeze({
+        assetId: DatasetIngestionStageAssetIds.unified,
+        assetVersion: "1.0.0",
+        configDefaults: toDefaultsRecord(),
+      }),
+    ]),
+  }),
+  Object.freeze({
+    type: "static",
     stageKind: DatasetPipelineStageKinds.sourceSelection,
     assets: Object.freeze([
       Object.freeze({
@@ -355,6 +366,36 @@ const DefaultStageAssetMappings: ReadonlyArray<StageAssetMappingDefinition> = Ob
   }),
   Object.freeze({
     type: "static",
+    stageKind: DatasetPipelineStageKinds.rawStorage,
+    assets: Object.freeze([
+      Object.freeze({
+        assetId: DatasetIngestionStageAssetIds.unified,
+        assetVersion: "1.0.0",
+      }),
+    ]),
+  }),
+  Object.freeze({
+    type: "static",
+    stageKind: DatasetPipelineStageKinds.extraction,
+    assets: Object.freeze([
+      Object.freeze({
+        assetId: DatasetIngestionStageAssetIds.unified,
+        assetVersion: "1.0.0",
+      }),
+    ]),
+  }),
+  Object.freeze({
+    type: "static",
+    stageKind: DatasetPipelineStageKinds.chunking,
+    assets: Object.freeze([
+      Object.freeze({
+        assetId: DatasetIngestionStageAssetIds.unified,
+        assetVersion: "1.0.0",
+      }),
+    ]),
+  }),
+  Object.freeze({
+    type: "static",
     stageKind: DatasetPipelineStageKinds.profiling,
     assets: Object.freeze([
       Object.freeze({
@@ -366,6 +407,46 @@ const DefaultStageAssetMappings: ReadonlyArray<StageAssetMappingDefinition> = Ob
   Object.freeze({
     type: "static",
     stageKind: DatasetPipelineStageKinds.normalization,
+    assets: Object.freeze([
+      Object.freeze({
+        assetId: DatasetIngestionStageAssetIds.unified,
+        assetVersion: "1.0.0",
+      }),
+    ]),
+  }),
+  Object.freeze({
+    type: "static",
+    stageKind: DatasetPipelineStageKinds.cleaning,
+    assets: Object.freeze([
+      Object.freeze({
+        assetId: DatasetIngestionStageAssetIds.unified,
+        assetVersion: "1.0.0",
+      }),
+    ]),
+  }),
+  Object.freeze({
+    type: "static",
+    stageKind: DatasetPipelineStageKinds.transformation,
+    assets: Object.freeze([
+      Object.freeze({
+        assetId: DatasetIngestionStageAssetIds.unified,
+        assetVersion: "1.0.0",
+      }),
+    ]),
+  }),
+  Object.freeze({
+    type: "static",
+    stageKind: DatasetPipelineStageKinds.aggregation,
+    assets: Object.freeze([
+      Object.freeze({
+        assetId: DatasetIngestionStageAssetIds.unified,
+        assetVersion: "1.0.0",
+      }),
+    ]),
+  }),
+  Object.freeze({
+    type: "static",
+    stageKind: DatasetPipelineStageKinds.preparedStorage,
     assets: Object.freeze([
       Object.freeze({
         assetId: DatasetIngestionStageAssetIds.unified,
