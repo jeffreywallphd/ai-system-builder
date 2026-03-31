@@ -78,6 +78,7 @@ export type UnifiedIngestionIssueSeverity = typeof UnifiedIngestionIssueSeveriti
 export const UnifiedIngestionIssueCodes = Object.freeze({
   invalidConfiguration: "invalid-configuration",
   invalidSourceReference: "invalid-source-reference",
+  invalidBatchInput: "invalid-batch-input",
   unsupportedSourceType: "unsupported-source-type",
   detectionConflict: "detection-conflict",
   detectionFailed: "detection-failed",
@@ -90,6 +91,8 @@ export const UnifiedIngestionIssueCodes = Object.freeze({
   previewGenerationFailed: "preview-generation-failed",
   emptyNormalizedOutput: "empty-normalized-output",
   partialNormalizedOutput: "partial-normalized-output",
+  batchItemSkipped: "batch-item-skipped",
+  batchPartialFailure: "batch-partial-failure",
 } as const);
 
 export type UnifiedIngestionIssueCode = typeof UnifiedIngestionIssueCodes[keyof typeof UnifiedIngestionIssueCodes];

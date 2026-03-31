@@ -6,6 +6,7 @@ import {
   type CanonicalRecordValue,
 } from "../../domain/dataset-studio/CanonicalDataShapes";
 import {
+  DataAssetDiscoverabilityScopes,
   DataAssetRegistry,
   DataAssetRegistrySpecializations,
   type DataAssetRegistryEntry,
@@ -350,6 +351,11 @@ export function registerDataStudioSampleAssets(
       previewModes: ["sample-records"],
       executionModes: ["execute", "preview"],
     },
+    discoverability: {
+      scope: DataAssetDiscoverabilityScopes.advanced,
+      defaultEntryPoint: false,
+      inspectable: true,
+    },
     configSchema: csvIngestorSchema,
     assetFactory: (config) => createCsvIngestorDataAsset(config),
   });
@@ -399,6 +405,11 @@ export function registerDataStudioSampleAssets(
       previewModes: ["unified-route-preview"],
       executionModes: ["unified-execute-v1", "unified-preview-v1"],
     },
+    discoverability: {
+      scope: DataAssetDiscoverabilityScopes.default,
+      defaultEntryPoint: true,
+      inspectable: true,
+    },
     configSchema: unifiedIngestionSchema,
     assetFactory: (config) => createUnifiedIngestionDataAsset(config),
   });
@@ -421,6 +432,11 @@ export function registerDataStudioSampleAssets(
       keyConfigKeys: ["flatten", "maxDepth"],
       previewModes: ["sample-records"],
       executionModes: ["execute", "preview"],
+    },
+    discoverability: {
+      scope: DataAssetDiscoverabilityScopes.advanced,
+      defaultEntryPoint: false,
+      inspectable: true,
     },
     configSchema: jsonIngestorSchema,
     assetFactory: (config) => createJsonIngestorDataAsset(config),
@@ -448,6 +464,11 @@ export function registerDataStudioSampleAssets(
       previewModes: ["page-excerpts", "metadata-summary"],
       executionModes: ["execute", "preview"],
     },
+    discoverability: {
+      scope: DataAssetDiscoverabilityScopes.advanced,
+      defaultEntryPoint: false,
+      inspectable: true,
+    },
     configSchema: documentPdfIngestorSchema,
     assetFactory: (config) => createDocumentPdfIngestorDataAsset(config),
   });
@@ -473,6 +494,11 @@ export function registerDataStudioSampleAssets(
       keyConfigKeys: ["extractExif", "generatePreviewMetadata", "normalizeOrientation", "includeFileStats"],
       previewModes: ["image-metadata-summary"],
       executionModes: ["execute", "preview"],
+    },
+    discoverability: {
+      scope: DataAssetDiscoverabilityScopes.advanced,
+      defaultEntryPoint: false,
+      inspectable: true,
     },
     configSchema: imageIngestorSchema,
     assetFactory: (config) => createImageIngestorDataAsset(config),
@@ -508,6 +534,11 @@ export function registerDataStudioSampleAssets(
       keyConfigKeys: ["continueOnError", "maxItems", "previewItemLimit", "concurrency", "strategy", "selectedIngestor"],
       previewModes: ["batch-summary", "per-item-sample", "partial-failure-warnings"],
       executionModes: ["execute-batch", "preview-batch"],
+    },
+    discoverability: {
+      scope: DataAssetDiscoverabilityScopes.internal,
+      defaultEntryPoint: false,
+      inspectable: true,
     },
     configSchema: batchIngestionSchema,
     assetFactory: (config) => createBatchIngestionDataAsset(config),

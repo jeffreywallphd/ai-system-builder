@@ -1406,3 +1406,14 @@ Explicitly later than this scope:
   - no low-level ingestor or third-party adapter leakage in wrapper-facing contracts.
 - Dataset Studio preview paths now consume this wrapper surface, keeping UI/application callers on asset-level contracts instead of direct low-level orchestration invocation.
 
+## Direction 5 update: Unified-first ingestor discoverability + batch orchestration contracts (stories 15.11-15.12)
+
+- Data-asset registry descriptors now include centralized discoverability metadata (`scope`, `defaultEntryPoint`, `inspectable`) so ingestion visibility policy is data-driven rather than UI-conditional.
+- Ingestion catalog querying now supports visibility modes (`default`, `advanced`) and defaults to unified ingestion as the primary entrypoint while preserving advanced/internal inspectability for low-level ingestors.
+- Unified ingestion batch orchestration now exists as a dedicated application seam (`UnifiedIngestionBatchOrchestrationService`) that processes multiple sources by invoking existing per-item unified ingestion orchestration (no parallel source-specific stack).
+- Unified wrapper contracts now include batch entrypoints (`previewBatch`, `executeBatch`) and batch results with:
+  - per-item status/detection/route metadata,
+  - aggregate summaries (total/succeeded/failed/skipped/partial-success),
+  - normalized output aggregation,
+  - structured batch-level issues for empty/partial/fail-fast scenarios.
+
