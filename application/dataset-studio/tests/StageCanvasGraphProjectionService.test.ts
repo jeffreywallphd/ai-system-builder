@@ -28,10 +28,12 @@ describe("StageCanvasGraphProjectionService", () => {
 
     const sourceGroup = graph.groups.find((group) => group.stageId === "source");
     expect(sourceGroup?.metadata.configuration.sourceKind).toBe("json");
+    expect(sourceGroup?.metadata.inspection?.stageId).toBe("source");
 
     const sourceNodes = graph.nodes.filter((node) => node.stageId === "source");
     expect(sourceNodes.length).toBeGreaterThan(0);
     expect(sourceNodes[0]?.groupId).toBe(sourceGroup?.id);
+    expect(sourceNodes[0]?.metadata.inspectionStatus).toBe(sourceGroup?.metadata.inspection?.status);
   });
 
   it("projects template-instantiated and saved flows", () => {

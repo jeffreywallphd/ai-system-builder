@@ -23,6 +23,7 @@ export default function DatasetStageAuthoringPanel(props: DatasetStageAuthoringP
   const [selectedStageId, setSelectedStageId] = useState<string | undefined>(snapshot.currentStageId);
   const [errorMessage, setErrorMessage] = useState<string | undefined>(undefined);
   const [configurationInput, setConfigurationInput] = useState<string>("{}");
+  const [pipelineSnapshotJson, setPipelineSnapshotJson] = useState<string>("");
   const [selectedOptionalStageKind, setSelectedOptionalStageKind] = useState<DatasetPipelineStageKind | "">("");
 
   const graph = adapter.getCanvasGraph();
@@ -127,7 +128,22 @@ export default function DatasetStageAuthoringPanel(props: DatasetStageAuthoringP
                       <div className="ui-meta-label">Asset nodes</div>
                       <div className="ui-meta-value">{selectedGroup.metadata.summary.assetNodeCount}</div>
                     </div>
+                    <div className="ui-meta-item">
+                      <div className="ui-meta-label">Inspection status</div>
+                      <div className="ui-meta-value">{selectedGroup.metadata.inspection?.status ?? "no-output"}</div>
+                    </div>
+                    <div className="ui-meta-item">
+                      <div className="ui-meta-label">Preview</div>
+                      <div className="ui-meta-value">{selectedGroup.metadata.inspection?.preview.availability ?? "unavailable"}</div>
+                    </div>
                   </div>
+
+                  {selectedGroup.metadata.inspection ? (
+                    <section className="ui-card ui-card--padded ui-stack ui-stack--2xs">
+                      <strong>{selectedGroup.metadata.inspection.summary.title}</strong>
+                      <span className="ui-subtle">{selectedGroup.metadata.inspection.summary.detail}</span>
+                    </section>
+                  ) : null}
 
                   <label className="ui-field">
                     <span className="ui-field__label">Stage configuration (JSON)</span>
@@ -242,6 +258,47 @@ export default function DatasetStageAuthoringPanel(props: DatasetStageAuthoringP
                 >
                   Insert optional stage
                 </button>
+              </section>
+
+              <section className="ui-stack ui-stack--2xs">
+                <strong>Pipeline persistence snapshot</strong>
+                <div className="ui-row ui-row--wrap">
+                  <button
+                    type="button"
+                    className="ui-button ui-button--ghost ui-button--sm"
+                    onClick={() => {
+                      setPipelineSnapshotJson(adapter.exportPersistedPipelineJson());
+                      setErrorMessage(undefined);
+                    }}
+                  >
+                    Save snapshot
+                  </button>
+                  <button
+                    type="button"
+                    className="ui-button ui-button--ghost ui-button--sm"
+                    disabled={!pipelineSnapshotJson.trim()}
+                    onClick={() => {
+                      try {
+                        adapter.importPersistedPipeline(pipelineSnapshotJson);
+                        setErrorMessage(undefined);
+                        refresh();
+                      } catch (error) {
+                        setErrorMessage(error instanceof Error ? error.message : String(error));
+                      }
+                    }}
+                  >
+                    Reload snapshot
+                  </button>
+                </div>
+                <label className="ui-field">
+                  <span className="ui-field__label">Snapshot JSON</span>
+                  <textarea
+                    className="ui-textarea ui-text-mono"
+                    rows={8}
+                    value={pipelineSnapshotJson}
+                    onChange={(event) => setPipelineSnapshotJson(event.currentTarget.value)}
+                  />
+                </label>
               </section>
 
               {errorMessage ? (

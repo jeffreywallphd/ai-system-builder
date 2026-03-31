@@ -58,6 +58,49 @@ function StageFallbackRenderer(props: { readonly stage: DatasetStageWizardStageV
   );
 }
 
+function StageInspectionSummary(props: { readonly stage: DatasetStageWizardStageViewModel }): JSX.Element {
+  const inspection = props.stage.inspection;
+  return (
+    <section className="ui-card ui-card--padded ui-stack ui-stack--2xs" data-testid={`dataset-stage-inspection-${props.stage.id}`}>
+      <strong>{inspection.summary.title}</strong>
+      <span className="ui-subtle">{inspection.summary.detail}</span>
+      <div className="ui-meta-grid">
+        <div className="ui-meta-item">
+          <div className="ui-meta-label">Inspection status</div>
+          <div className="ui-meta-value">{inspection.status}</div>
+        </div>
+        <div className="ui-meta-item">
+          <div className="ui-meta-label">Contract</div>
+          <div className="ui-meta-value">{inspection.contract.kind}</div>
+        </div>
+        <div className="ui-meta-item">
+          <div className="ui-meta-label">Preview</div>
+          <div className="ui-meta-value">{inspection.preview.availability}</div>
+        </div>
+        <div className="ui-meta-item">
+          <div className="ui-meta-label">Preview reference</div>
+          <div className="ui-meta-value">{inspection.preview.reference ?? "-"}</div>
+        </div>
+      </div>
+      {inspection.summary.fields.length > 0 ? (
+        <ul className="ui-stack ui-stack--3xs">
+          {inspection.summary.fields.map((field) => (
+            <li key={`${props.stage.id}:${field.label}`}>
+              <strong>{field.label}</strong>: <span className="ui-text-mono">{field.value}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {inspection.preview.availability === "unavailable" ? (
+        <span className="ui-subtle">{inspection.preview.fallbackSummary ?? "No preview available."}</span>
+      ) : null}
+      <span className="ui-subtle">
+        Upstream: {inspection.upstreamMetadata.upstreamStageIds.join(", ") || "-"} | Pipeline: {inspection.upstreamMetadata.pipelineId ?? "-"}
+      </span>
+    </section>
+  );
+}
+
 function StageSourceRenderer(props: {
   readonly stage: DatasetStageWizardStageViewModel;
   readonly onApply: (configuration: Readonly<Record<string, CanonicalRecordValue>>) => void;
@@ -141,6 +184,10 @@ export default function DatasetStageWizardPanel(props: DatasetStageWizardPanelPr
 
   const snapshot = props.snapshot ?? localSnapshot;
   const currentStage = snapshot.currentStage;
+  const priorInspectableStages = snapshot.stages.filter((stage) => (
+    stage.id !== currentStage?.id
+    && (stage.status === "completed" || stage.status === "skipped")
+  ));
 
   const updateSnapshot = () => {
     const next = adapter.getSnapshot();
@@ -200,10 +247,21 @@ export default function DatasetStageWizardPanel(props: DatasetStageWizardPanelPr
               {currentStage.kind !== "source" && currentStage.kind !== "source-selection" && currentStage.kind !== "ingestion" ? (
                 <StageFallbackRenderer stage={currentStage} />
               ) : null}
+
+              <StageInspectionSummary stage={currentStage} />
             </>
           ) : (
             <span className="ui-subtle">No active stage.</span>
           )}
+
+          {priorInspectableStages.length > 0 ? (
+            <section className="ui-stack ui-stack--2xs">
+              <strong>Completed stage outputs</strong>
+              {priorInspectableStages.map((stage) => (
+                <StageInspectionSummary key={`prior-${stage.id}`} stage={stage} />
+              ))}
+            </section>
+          ) : null}
 
           <button
             type="button"

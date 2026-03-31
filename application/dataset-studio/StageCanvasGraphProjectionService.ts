@@ -4,6 +4,10 @@ import type { DatasetPipelineStageDefinition, DatasetPipelineStageExecutionMode 
 import type { PipelineTemplateInstance } from "./TemplateService";
 import type { StageRuntimeTracking } from "./StageMetadataContracts";
 import { StageAssetMappingService } from "./StageAssetMappingService";
+import {
+  StageOutputInspectionService,
+  type StageOutputInspectionModel,
+} from "./StageOutputInspectionService";
 import type { WizardFlowEngine } from "./WizardFlowEngine";
 import type {
   UnifiedIngestionOutputTargetKind,
@@ -34,6 +38,7 @@ export interface StageCanvasStageGroupMetadata {
   readonly configuration: Readonly<Record<string, CanonicalRecordValue>>;
   readonly output: Readonly<Record<string, CanonicalRecordValue>>;
   readonly runtimeTracking?: StageRuntimeTracking;
+  readonly inspection?: StageOutputInspectionModel;
 }
 
 export interface StageCanvasGroupViewModel {
@@ -63,6 +68,8 @@ export interface StageCanvasAssetNodeViewModel {
     readonly inspectable: boolean;
     readonly inspectionReference?: string;
     readonly summaryReference?: string;
+    readonly inspectionAvailability?: string;
+    readonly inspectionStatus?: string;
     readonly lineageId?: string;
     readonly pipelineId?: string;
   };
@@ -174,15 +181,27 @@ function resolveStageMappingHints(
 
 export class StageCanvasGraphProjectionService {
   private readonly mappingService: StageAssetMappingService;
+  private readonly inspectionService: StageOutputInspectionService;
 
-  constructor(mappingService: StageAssetMappingService = new StageAssetMappingService()) {
+  constructor(
+    mappingService: StageAssetMappingService = new StageAssetMappingService(),
+    inspectionService: StageOutputInspectionService = new StageOutputInspectionService(),
+  ) {
     this.mappingService = mappingService;
+    this.inspectionService = inspectionService;
   }
 
   public project(request: StageCanvasProjectionRequest): StageCanvasGraphModel {
     const groups: StageCanvasGroupViewModel[] = [];
     const nodes: StageCanvasAssetNodeViewModel[] = [];
     const edges: StageCanvasGraphEdgeViewModel[] = [];
+    const inspectionByStageId: Readonly<Record<string, StageOutputInspectionModel>> = request.state
+      ? this.inspectionService.inspectFlow({
+        stageFlow: request.stageFlow,
+        state: request.state,
+        stageRuntimeTracking: request.stageRuntimeTracking,
+      })
+      : Object.freeze({});
 
     const stageNodesByStageId = new Map<string, ReadonlyArray<StageCanvasAssetNodeViewModel>>();
 
@@ -222,6 +241,8 @@ export class StageCanvasGraphProjectionService {
             inspectable: tracking?.metadata.inspectability.inspectable ?? true,
             inspectionReference: tracking?.metadata.inspectability.inspectionReference,
             summaryReference: tracking?.metadata.inspectability.summaryReference,
+            inspectionAvailability: inspectionByStageId[stage.id]?.preview.availability,
+            inspectionStatus: inspectionByStageId[stage.id]?.status,
             lineageId: tracking?.metadata.lineageHooks.lineageId,
             pipelineId: tracking?.metadata.lineageHooks.pipelineId,
           }),
@@ -254,6 +275,7 @@ export class StageCanvasGraphProjectionService {
           configuration: normalizeRecord(request.state?.stageConfiguration[stage.id]),
           output: normalizeRecord(request.state?.stageOutputs[stage.id]),
           runtimeTracking: request.stageRuntimeTracking?.[stage.id],
+          inspection: inspectionByStageId[stage.id],
         }),
       });
 

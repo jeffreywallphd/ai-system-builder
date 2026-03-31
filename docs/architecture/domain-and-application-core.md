@@ -1527,3 +1527,21 @@ Explicitly later than this scope:
   - compatibility validation against stage-flow + stage-asset mapping seams,
   - post-edit graph regeneration.
 - Wizard/canvas synchronization remains centered on `WizardFlowEngine` state; adapter surfaces consume/edit the same underlying stage-flow/runtime contracts instead of duplicating state logic in React components.
+
+## Direction 5 extension update: Intermediate output inspection + pipeline persistence (stories 15E.13-15E.14)
+
+- Stage output inspection now has an application-owned adapter seam in `application/dataset-studio/StageOutputInspectionService.ts` that normalizes inspectable stage outputs into one UI-ready contract:
+  - output summary,
+  - stage contract/type summary,
+  - preview availability/reference with structured fallback summary,
+  - propagated upstream metadata (detected type/storage/lineage/pipeline/upstream-stage ids),
+  - inspectability status handling for skipped, auto-configured, and no-output states.
+- Inspection normalization is reused across Wizard and Canvas projection paths through shared `WizardFlowEngine` state + `StageRuntimeTracking` metadata (no React-owned inspection derivation).
+- Stage pipeline persistence now has a versioned application seam in `application/dataset-studio/StagePipelinePersistenceService.ts` that captures:
+  - pipeline identity/metadata,
+  - full stage flow definition,
+  - wizard runtime state (including stage config/output/status tracking context),
+  - stage runtime-tracking metadata and navigation history,
+  - stage-to-asset mapping references and graph reconstruction metadata.
+- Persistence reload/rehydration now reconstructs `WizardFlowEngine` from the same canonical stage/runtime contracts used for live-created flows, so Wizard and Canvas continue to share one source of truth after reload.
+- Persistence decoding now includes a bounded compatibility path for legacy unversioned payloads while rejecting unsupported future versions deterministically.
