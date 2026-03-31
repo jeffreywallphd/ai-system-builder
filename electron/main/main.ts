@@ -64,6 +64,7 @@ import type { TriggerAgentLaunchRequest } from "../../application/agents/Trigger
 import { StudioShellBackendApi } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
 import { RegistryBackendApi } from "../../infrastructure/api/registry/RegistryBackendApi";
 import { SqliteStudioShellRepository } from "../../infrastructure/filesystem/studio-shell/SqliteStudioShellRepository";
+import { SqliteWorkflowPersistenceRepository } from "../../infrastructure/filesystem/SqliteWorkflowPersistenceRepository";
 import type { CreateAssetDraftCommand, PublishAssetDraftVersionCommand, TransitionAssetDraftLifecycleCommand, UpdateAssetDraftCommand, UpdateAssetDraftDependenciesCommand } from "../../application/studio-shell/contracts";
 import { RegistryQueryService } from "../../application/asset-registry/RegistryQueryService";
 import { CrossStudioRegistryQueryService } from "../../application/asset-registry/CrossStudioRegistryQueryService";
@@ -95,6 +96,7 @@ let agentRepository: SqliteAgentRepository | undefined;
 let agentSessionRepository: SqliteAgentExecutionSessionRepository | undefined;
 let serviceSupervisor: DesktopServiceSupervisor | undefined;
 let studioShellRepository: SqliteStudioShellRepository | undefined;
+let workflowPersistenceRepository: SqliteWorkflowPersistenceRepository | undefined;
 let bootstrapContext: DesktopBootstrapContext | undefined;
 
 function toFileEntry(filePath: string) {
@@ -297,7 +299,10 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   });
   const agentStudioBackendApi = new AgentStudioBackendApi(agentRepository, agentSessionRepository, agentRunner);
   studioShellRepository = new SqliteStudioShellRepository(path.join(storagePaths.storageDirectory, "studio-shell", "studio-shell.sqlite"));
-  const studioShellBackendApi = new StudioShellBackendApi(studioShellRepository);
+  workflowPersistenceRepository = new SqliteWorkflowPersistenceRepository(
+    path.join(storagePaths.storageDirectory, "workflow-studio", "workflow-persistence.sqlite"),
+  );
+  const studioShellBackendApi = new StudioShellBackendApi(studioShellRepository, workflowPersistenceRepository);
   const systemStudioBackendApi = new SystemStudioBackendApi(studioShellRepository);
   const runtimeExecutionStore = new SqliteSystemRuntimeExecutionStore(path.join(storagePaths.assetsDirectory, "system-runtime.sqlite"));
   const runtimeExecutionAuditRepository = new SqliteExecutionAuditRepository(path.join(storagePaths.assetsDirectory, "system-runtime-audit.sqlite"));
@@ -806,4 +811,5 @@ app.on("before-quit", async () => {
   executionRunRepository?.dispose();
   agentRepository?.dispose();
   studioShellRepository?.dispose();
+  workflowPersistenceRepository?.dispose();
 });

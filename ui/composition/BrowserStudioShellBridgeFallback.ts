@@ -3,6 +3,7 @@ import { InMemoryStudioShellRepository } from "../../infrastructure/studio-shell
 import { StudioShellBackendApi } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
 import { SystemStudioBackendApi } from "../../infrastructure/api/system-studio/SystemStudioBackendApi";
 import { SystemRuntimeBackendApi } from "../../infrastructure/api/system-runtime/SystemRuntimeBackendApi";
+import { InMemoryWorkflowPersistenceRepository } from "../../infrastructure/workflows/InMemoryWorkflowPersistenceRepository";
 
 let fallbackBridge: DesktopStudioShellBridge | undefined;
 
@@ -12,7 +13,8 @@ export function resolveBrowserStudioShellBridgeFallback(): DesktopStudioShellBri
   }
 
   const repository = new InMemoryStudioShellRepository();
-  const studioApi = new StudioShellBackendApi(repository);
+  const workflowPersistenceRepository = new InMemoryWorkflowPersistenceRepository();
+  const studioApi = new StudioShellBackendApi(repository, workflowPersistenceRepository);
   const systemApi = new SystemStudioBackendApi(repository);
   const runtimeApi = new SystemRuntimeBackendApi(repository);
 
