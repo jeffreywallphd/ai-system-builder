@@ -31,6 +31,10 @@ export default defineConfig(({ mode }) => {
                 "infrastructure/execution/createExecutionInfrastructure.browser.ts",
               ),
             },
+            {
+              find: "csv-parse/sync",
+              replacement: "csv-parse/browser/esm/sync",
+            },
           ]
         : [],
     },

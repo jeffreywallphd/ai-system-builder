@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import type {
   RunWorkflowStudioDraftReadModel,
   WorkflowExecutionReadinessReadModel,
@@ -13,6 +14,8 @@ interface WorkflowStudioExecutionFeedbackPanelProps {
   readonly readiness?: WorkflowExecutionReadinessReadModel;
   readonly isReadinessPending?: boolean;
   readonly runFeedback?: WorkflowStudioRunFeedback;
+  readonly runHistoryPath?: string;
+  readonly runDetailPath?: string;
 }
 
 function getBadgeTone(status: "success" | "warning" | "danger" | "neutral"): string {
@@ -32,6 +35,8 @@ export default function WorkflowStudioExecutionFeedbackPanel({
   readiness,
   isReadinessPending = false,
   runFeedback,
+  runHistoryPath,
+  runDetailPath,
 }: WorkflowStudioExecutionFeedbackPanelProps): JSX.Element {
   const readinessState = isReadinessPending
     ? Object.freeze({
@@ -133,6 +138,20 @@ export default function WorkflowStudioExecutionFeedbackPanel({
                         </li>
                       ))}
                     </ul>
+                  ) : null}
+                </div>
+              ) : null}
+              {(runDetailPath || runHistoryPath) ? (
+                <div className="ui-row ui-row--wrap">
+                  {runDetailPath ? (
+                    <Link className="ui-button ui-button--primary ui-button--sm" to={runDetailPath}>
+                      View current run
+                    </Link>
+                  ) : null}
+                  {runHistoryPath ? (
+                    <Link className="ui-button ui-button--ghost ui-button--sm" to={runHistoryPath}>
+                      View run history
+                    </Link>
                   ) : null}
                 </div>
               ) : null}

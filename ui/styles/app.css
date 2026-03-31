@@ -17,6 +17,7 @@
 @import "./components/context-library.css";
 @import "./components/wizard.css";
 @import "./components/asset-selector.css";
+@import "./components/workflow-runs.css";
 
 @import "./layout/container.css";
 @import "./layout/grid.css";

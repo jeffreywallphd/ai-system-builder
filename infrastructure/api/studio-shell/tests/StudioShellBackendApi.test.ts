@@ -12,11 +12,332 @@ import {
 import { StudioShellBackendApi } from "../StudioShellBackendApi";
 import { InMemoryStudioShellRepository } from "../../../studio-shell/InMemoryStudioShellRepository";
 import { InMemoryWorkflowPersistenceRepository } from "../../../workflows/InMemoryWorkflowPersistenceRepository";
+import { InMemoryWorkflowRunSummaryRepository } from "../../../workflows/InMemoryWorkflowRunSummaryRepository";
 import { GetPersistedWorkflowUseCase } from "../../../../application/workflow-persistence/GetPersistedWorkflowUseCase";
 import type { IWorkflowPersistenceRepository } from "../../../../application/ports/interfaces/IWorkflowPersistenceRepository";
 import type { PersistedWorkflowRecord } from "../../../../domain/workflow-studio/WorkflowPersistenceDomain";
+import {
+  createWorkflowRunDetailRecord,
+  createWorkflowRunSummaryRecord,
+  WorkflowRunStatuses,
+  WorkflowRunTriggerSources,
+} from "../../../../domain/workflow-studio/WorkflowRunHistoryDomain";
 
 describe("StudioShellBackendApi", () => {
+  it("lists workflow run summaries and projects structured run detail for workflow studio observability", async () => {
+    const workflowRunRepository = new InMemoryWorkflowRunSummaryRepository();
+    const summary = createWorkflowRunSummaryRecord({
+      runId: "run:workflow:1",
+      status: WorkflowRunStatuses.failed,
+      triggerSource: WorkflowRunTriggerSources.manual,
+      workflow: {
+        workflowId: "asset:workflow-1",
+        workflowName: "Workflow One",
+      },
+      correlation: {
+        executionRunId: "run:workflow:1",
+        workflowExecutionId: "workflow-exec:1",
+      },
+      timestamps: {
+        startedAt: "2026-03-31T12:00:00.000Z",
+        endedAt: "2026-03-31T12:00:05.000Z",
+        updatedAt: "2026-03-31T12:00:05.000Z",
+      },
+      errorMessage: "Run failed at step node-a",
+      output: {
+        outputAssetIds: ["asset:out-1"],
+        outputCount: 1,
+      },
+    });
+    await workflowRunRepository.upsertDetail(createWorkflowRunDetailRecord({
+      runId: summary.runId,
+      summary,
+      stepRuns: [{
+        stepRunId: "run:workflow:1:node-a:1",
+        stepId: "node-a",
+        stepIndex: 0,
+        attempt: 1,
+        stepName: "First step",
+        status: "failed",
+        timestamps: {
+          startedAt: "2026-03-31T12:00:01.000Z",
+          endedAt: "2026-03-31T12:00:03.000Z",
+          updatedAt: "2026-03-31T12:00:03.000Z",
+        },
+        error: {
+          code: "runtime-error",
+          message: "Tool runtime failed",
+          detail: "Connection reset",
+        },
+      }],
+      executionContext: {
+        resolvedTriggerContext: {
+          triggerSource: "manual",
+          triggerEventId: "evt-1",
+        },
+      },
+      outputs: {
+        outputAssetIds: ["asset:out-1"],
+        outputCount: 1,
+        outputValues: {
+          status: "completed",
+          answer: "ok",
+        },
+      },
+    }));
+
+    const api = new StudioShellBackendApi(
+      new InMemoryStudioShellRepository(),
+      undefined,
+      workflowRunRepository,
+    );
+
+    const listed = await api.listWorkflowRuns({
+      workflowId: "asset:workflow-1",
+    });
+    expect(listed.ok).toBeTrue();
+    expect(listed.data).toHaveLength(1);
+    expect(listed.data?.[0]).toEqual(expect.objectContaining({
+      runId: "run:workflow:1",
+      status: WorkflowRunStatuses.failed,
+      durationMs: 5000,
+    }));
+    expect(listed.data?.[0]?.primaryDiagnostic?.summary).toBe("Run failed at step node-a");
+    expect(listed.data?.[0]?.failureLocation?.scope).toBe("step");
+    expect(listed.data?.[0]?.failureLocation?.stepId).toBe("node-a");
+
+    const detail = await api.getWorkflowRunDetail("run:workflow:1");
+    expect(detail.ok).toBeTrue();
+    expect(detail.data?.summary.workflowId).toBe("asset:workflow-1");
+    expect(detail.data?.executionContext?.resolvedTriggerContext).toEqual({
+      triggerSource: "manual",
+      triggerEventId: "evt-1",
+    });
+    expect(detail.data?.outputs?.outputValues).toEqual({
+      status: "completed",
+      answer: "ok",
+    });
+    expect(detail.data?.diagnostics?.some((entry) => entry.scope === "step" && entry.location?.stepId === "node-a")).toBeTrue();
+  });
+
+  it("starts rerun from historical execution context and persists run lineage metadata", async () => {
+    const workflowRunRepository = new InMemoryWorkflowRunSummaryRepository();
+    const workflowPersistenceRepository = new InMemoryWorkflowPersistenceRepository();
+    const studioRepository = new InMemoryStudioShellRepository();
+    const api = new StudioShellBackendApi(
+      studioRepository,
+      workflowPersistenceRepository,
+      workflowRunRepository,
+    );
+
+    const initialized = await api.initializeStudio("studio-workflows", "Workflow Studio");
+    const sessionId = initialized.data!.activeSessionId!;
+    const created = await api.createDraft({
+      studioId: "studio-workflows",
+      sessionId,
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-manual",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        }],
+        steps: [{
+          id: "step-1",
+          type: "action",
+          kind: "action",
+          order: 1,
+        }],
+      }),
+      metadata: {
+        title: "workflow-rerun-source",
+        tags: ["workflow", "rerun"],
+        taxonomy: {
+          structuralKind: "composite",
+          semanticRole: "workflow",
+          behaviorKind: "deterministic",
+        },
+        contract: {
+          version: "1.0.0",
+          input: { kind: "json-schema" },
+          output: { kind: "json-schema" },
+        },
+        provenance: {
+          sourceType: "generated",
+          sourceLabel: "workflow-studio",
+        },
+      },
+    });
+    const workflowId = created.data!.draft!.assetId;
+
+    await workflowRunRepository.upsertDetail(createWorkflowRunDetailRecord({
+      runId: "run:source-rerun",
+      summary: createWorkflowRunSummaryRecord({
+        runId: "run:source-rerun",
+        status: WorkflowRunStatuses.completed,
+        triggerSource: WorkflowRunTriggerSources.manual,
+        workflow: {
+          workflowId,
+          workflowName: "workflow-rerun-source",
+        },
+        correlation: {
+          executionRunId: "run:source-rerun",
+        },
+        timestamps: {
+          startedAt: "2026-03-31T12:00:00.000Z",
+          endedAt: "2026-03-31T12:00:03.000Z",
+          updatedAt: "2026-03-31T12:00:03.000Z",
+        },
+      }),
+      executionContext: {
+        executionInput: {
+          parameters: {
+            inputValues: {
+              prompt: "historical",
+            },
+          },
+          executionMetadata: {
+            actorId: "user:test",
+          },
+        },
+        resolvedTriggerContext: {
+          triggerSource: "manual",
+        },
+      },
+    }));
+
+    const rerun = await api.startWorkflowRunRerun({
+      sourceRunId: "run:source-rerun",
+      mode: "as-is",
+    });
+
+    expect(rerun.ok).toBeTrue();
+    expect(rerun.data?.mode).toBe("as-is");
+    expect(rerun.data?.sourceRunId).toBe("run:source-rerun");
+    expect(rerun.data?.runId).toBeDefined();
+
+    const rerunDetail = await workflowRunRepository.getDetailByRunId(rerun.data!.runId);
+    expect(rerunDetail?.summary.correlation.parentRunId).toBe("run:source-rerun");
+    expect(rerunDetail?.summary.correlation.rerunMode).toBe("as-is");
+    expect(rerunDetail?.executionContext?.executionInput).toEqual(expect.objectContaining({
+      parameters: expect.objectContaining({
+        parentRunId: "run:source-rerun",
+        rerunMode: "as-is",
+      }),
+    }));
+  });
+
+  it("supports edited rerun overrides and preserves edited lineage reason", async () => {
+    const workflowRunRepository = new InMemoryWorkflowRunSummaryRepository();
+    const workflowPersistenceRepository = new InMemoryWorkflowPersistenceRepository();
+    const studioRepository = new InMemoryStudioShellRepository();
+    const api = new StudioShellBackendApi(
+      studioRepository,
+      workflowPersistenceRepository,
+      workflowRunRepository,
+    );
+
+    const initialized = await api.initializeStudio("studio-workflows", "Workflow Studio");
+    const sessionId = initialized.data!.activeSessionId!;
+    const created = await api.createDraft({
+      studioId: "studio-workflows",
+      sessionId,
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-manual",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        }],
+        steps: [{
+          id: "step-1",
+          type: "action",
+          kind: "action",
+          order: 1,
+        }],
+      }),
+      metadata: {
+        title: "workflow-rerun-edit",
+        tags: ["workflow", "rerun"],
+        taxonomy: {
+          structuralKind: "composite",
+          semanticRole: "workflow",
+          behaviorKind: "deterministic",
+        },
+        contract: {
+          version: "1.0.0",
+          input: { kind: "json-schema" },
+          output: { kind: "json-schema" },
+        },
+        provenance: {
+          sourceType: "generated",
+          sourceLabel: "workflow-studio",
+        },
+      },
+    });
+    const workflowId = created.data!.draft!.assetId;
+
+    await workflowRunRepository.upsertDetail(createWorkflowRunDetailRecord({
+      runId: "run:source-edit-rerun",
+      summary: createWorkflowRunSummaryRecord({
+        runId: "run:source-edit-rerun",
+        status: WorkflowRunStatuses.completed,
+        triggerSource: WorkflowRunTriggerSources.manual,
+        workflow: {
+          workflowId,
+          workflowName: "workflow-rerun-edit",
+        },
+        correlation: {
+          executionRunId: "run:source-edit-rerun",
+        },
+        timestamps: {
+          startedAt: "2026-03-31T12:10:00.000Z",
+          endedAt: "2026-03-31T12:10:02.000Z",
+          updatedAt: "2026-03-31T12:10:02.000Z",
+        },
+      }),
+      executionContext: {
+        executionInput: {
+          parameters: {
+            inputValues: {
+              prompt: "original",
+            },
+          },
+        },
+      },
+    }));
+
+    const rerun = await api.startWorkflowRunRerun({
+      sourceRunId: "run:source-edit-rerun",
+      mode: "edited",
+      rerunReason: "Adjusted prompt payload",
+      overrides: {
+        parameters: {
+          inputValues: {
+            prompt: "edited",
+          },
+        },
+      },
+    });
+
+    expect(rerun.ok).toBeTrue();
+    expect(rerun.data?.mode).toBe("edited");
+
+    const rerunDetail = await workflowRunRepository.getDetailByRunId(rerun.data!.runId);
+    expect(rerunDetail?.summary.correlation.rerunMode).toBe("edited");
+    expect(rerunDetail?.summary.correlation.rerunReason).toBe("Adjusted prompt payload");
+    expect((rerunDetail?.executionContext?.executionInput as Record<string, unknown>)?.parameters).toEqual(expect.objectContaining({
+      inputValues: {
+        prompt: "edited",
+      },
+      parentRunId: "run:source-edit-rerun",
+      rerunMode: "edited",
+      rerunReason: "Adjusted prompt payload",
+    }));
+  });
+
   it("projects the same validation issue structure for atomic model/dataset/tool drafts", async () => {
     const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
     const drafts: Array<{ studioId: string; semanticRole: "model" | "dataset" | "tool"; behaviorKind: "none" | "conditional" }> = [
@@ -744,6 +1065,50 @@ describe("StudioShellBackendApi", () => {
       destinationType: WorkflowDraftOutputDestinationTypes.webViewer,
       target: "preview",
       status: "delivered",
+    }));
+  });
+
+  it("returns run observability metadata and persists manual launch records when run-history repository is available", async () => {
+    const workflowRunRepository = new InMemoryWorkflowRunSummaryRepository();
+    const api = new StudioShellBackendApi(
+      new InMemoryStudioShellRepository(),
+      undefined,
+      workflowRunRepository,
+    );
+
+    const run = await api.runWorkflowDraft({
+      studioId: "studio-workflows",
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-manual",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        }],
+        steps: [{
+          id: "step-1",
+          type: "action",
+          kind: "action",
+          order: 1,
+        }],
+      }),
+      inputValues: {
+        customerId: "customer-42",
+      },
+    });
+
+    expect(run.ok).toBeTrue();
+    expect(run.data?.run?.runId).toBeDefined();
+    expect(run.data?.run?.workflowId).toContain("workflow:");
+
+    const persisted = await workflowRunRepository.getDetailByRunId(run.data!.run!.runId);
+    expect(persisted).toBeDefined();
+    expect(persisted?.summary.correlation.workflowExecutionId).toBe(run.data?.execution.executionId);
+    expect((persisted?.executionContext?.executionInput as Record<string, unknown>)?.parameters).toEqual(expect.objectContaining({
+      inputValues: {
+        customerId: "customer-42",
+      },
     }));
   });
 

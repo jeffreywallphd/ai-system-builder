@@ -46,6 +46,9 @@ describe("StudioShellPage contracts", () => {
     expect(source).toContain('data-testid="studio-shell-workflow-draft-status"');
     expect(source).toContain('data-testid="studio-shell-workflow-draft-status-badge"');
     expect(source).toContain('data-testid="studio-shell-workflow-run-feedback"');
+    expect(source).toContain("buildWorkflowStudioRunHistoryPath");
+    expect(source).toContain("buildWorkflowStudioRunDetailPath");
+    expect(source).toContain("View run history");
     expect(source).toContain('data-testid="studio-shell-left-drawer-toggle"');
     expect(source).toContain('data-testid="studio-shell-right-drawer-toggle"');
     expect(source).toContain("runToolbarAction(");

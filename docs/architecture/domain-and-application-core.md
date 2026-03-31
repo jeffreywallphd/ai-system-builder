@@ -1058,3 +1058,284 @@ Explicitly later than this scope:
   - bounded/partial by design: local catalog implementation is in-memory/local-reference oriented in this slice; repository abstraction boundaries are preserved for later remote/LAN catalog adapters.
   - future work: distributed/LAN package sharing, remote repository synchronization, and distributed execution/deployment behaviors are design considerations preserved by current abstraction boundaries, not current product behavior.
 
+## Direction 5 update: Data Studio canonical-shape + converter foundation (stories 13.1-13.2)
+
+- Data Studio now has a bounded canonical data-shape contract in `domain/dataset-studio/CanonicalDataShapes.ts` for:
+  - record collections,
+  - table projections,
+  - document-derived text-item collections,
+  - image-derived structured metadata records.
+- Canonical shape metadata now includes bounded provenance/lineage/transformation-ready envelopes (source hints, asset/version lineage refs, converter metadata, preview attributes) so later preview/lineage/transform flows can reuse one inner-layer contract.
+- A reusable conversion core now exists in `application/dataset-studio/DataConverterCore.ts` with explicit contracts and typed failures for core conversions:
+  - file-like payloads -> canonical records,
+  - canonical records -> canonical table,
+  - document text -> canonical text items,
+  - image metadata payloads -> canonical image metadata records.
+- Scope remains intentionally bounded in this slice:
+  - no ingestion asset execution pipeline was added,
+  - no parallel data taxonomy or parallel asset identity model was introduced,
+  - conversion logic remains deterministic and composable for future ingestion/preparation assets.
+
+
+## Direction 5 update: Data Studio converter contracts + source locator abstraction (stories 13.3-13.4)
+
+- Data converter operations now have explicit request/result contracts in `application/dataset-studio/DataConverterContracts.ts` with:
+  - operation-scoped request unions,
+  - converter context metadata (`requestId`/`operationId`/pipeline lineage hints),
+  - structured diagnostics (`code`/`severity`/`path`/details),
+  - explicit operation boundary metadata (raw/resolved/canonical input boundary -> canonical output kind) for preview/lineage/pipeline composition.
+- Data conversion orchestration in `application/dataset-studio/DataConverterCore.ts` now keeps existing 13.1/13.2 conversion behavior while adding:
+  - a contract-first `convert(...)` operation entrypoint,
+  - structured success/failure envelopes,
+  - typed source-resolution failure handling for pre-conversion boundaries.
+- Data source resolution is now a separate reusable abstraction in `application/dataset-studio/DataSourceLocator.ts`:
+  - normalized source-reference contracts (`in-memory`, `local-file`, `url`),
+  - standardized resolved source model consumed by converter contracts,
+  - loader-backed resolution seam (`IDataSourcePayloadLoader`) so source lookup stays separate from conversion semantics.
+- Scope remains bounded:
+  - no parallel data taxonomy/asset identity model was introduced,
+  - converter logic still projects into canonical data-shape contracts from 13.1,
+  - source locator remains a small reusable boundary without introducing ingestion-pipeline orchestration in this slice.
+
+## Direction 5 update: Data Studio preview engine + data asset base abstraction (stories 13.5-13.6)
+
+- Data Studio now has a reusable preview engine in `application/data-studio/DataPreviewEngine.ts` that maps canonical data-shape outputs into deterministic preview models:
+  - `records`, `table`, `text-items`, and `image-metadata-records` are supported directly from the canonical shape contract,
+  - previews are sampled/partial by bounded options (`maxItems`, `maxColumns`, `maxTextLength`) rather than full data exploration behavior,
+  - preview metadata and diagnostics are preserved in one model so application services and UI surfaces can reuse the same preview truth.
+- UI rendering adapters for the preview model now exist in `ui/components/assets/DataPreviewSurface.tsx`:
+  - rendering is model-driven (canonical shape -> preview model -> UI) rather than ad hoc per-screen branching,
+  - diagnostics and metadata are surfaced alongside sampled content for authoring-time inspection.
+- Data assets now have a shared domain abstraction in `domain/dataset-studio/DataAssetBase.ts`:
+  - extends the existing asset architecture (`domain/assets/Asset`) instead of introducing a parallel asset hierarchy,
+  - standardizes explicit input/output contracts, bounded config surface, preview capability, version metadata, inspectability, and composability checks.
+- A thin concrete canonical adapter `domain/dataset-studio/CanonicalDataAsset.ts` plus application integration in `application/dataset-studio/DataAssetFactory.ts` now provide a minimal end-to-end bridge from converter results to data-asset instances and preview generation.
+- Scope remains intentionally bounded:
+  - no ingestion-suite/pipeline-builder runtime stack was introduced,
+  - no parallel taxonomy/identity/contract model was introduced,
+  - abstractions remain focused on reusable data preview + data-asset foundation for later ingestion/pipeline stories.
+
+## Direction 5 update: Data asset execution framework + lineage metadata model (stories 13.7-13.8)
+
+- Data Studio now has an internal data-layer execution seam in `application/dataset-studio/DataAssetExecutionFramework.ts`:
+  - explicit execution request/context/result contracts for dataset assets,
+  - bounded execution input modes (`source-reference`, `resolved-source`, `converter-request`, `converter-result`, and canonical-shape),
+  - lifecycle-oriented execution flow (validation -> resolve/convert -> preview -> packaged result),
+  - standardized execution outputs for preview, diagnostics, downstream composition, and lineage handoff.
+- Execution integrates existing 13.1-13.6 foundations directly:
+  - conversion and source resolution via `DataConverterCore` + source-locator-backed conversion paths,
+  - canonical data-shape output reuse from `domain/dataset-studio/CanonicalDataShapes.ts`,
+  - preview generation via `application/data-studio/DataPreviewEngine.ts`,
+  - data-asset compatibility checks against `domain/dataset-studio/DataAssetBase.ts`.
+- Data lineage metadata is now first-class in `domain/dataset-studio/DataLineageMetadata.ts`:
+  - typed lineage references (inputs/intermediates/outputs),
+  - execution-step provenance with status/timestamps/diagnostics,
+  - producer + execution markers and serializable metadata envelopes.
+- Data asset creation now has an execution-result bridge (`DataAssetFactory.createFromExecutionResult`) so execution outputs can be projected into canonical data assets without introducing a separate taxonomy or registry path.
+- Scope remains intentionally bounded:
+  - lineage is modeled as metadata/provenance attached to execution results and assets, not a standalone graph engine,
+  - no lineage visualization/editor UI or distributed orchestration pipeline was introduced in this slice.
+
+## Direction 5 update: Data Studio validation/error model + preview-panel integration seam (stories 13.9-13.10)
+
+- Data Studio now has a focused validation/error framework in `application/dataset-studio/DataStudioValidation.ts` that standardizes:
+  - issue sections across canonical-shape, converter-request/result, source-reference/resolved-source, data-asset-config, execution-request, and preview-model boundaries,
+  - warning vs error severities with path-level issue reporting,
+  - deterministic mapping from validation issues -> converter diagnostics for existing execution/preview contracts.
+- Converter/source/execution flows now consume that same framework:
+  - `DataConverterCore` performs contract-level request/result validation and emits structured diagnostics before/after conversion,
+  - `DataSourceLocator` validates source inputs + resolved outputs and returns typed locator failures with diagnostics,
+  - `DataAssetExecutionFramework` validates execution requests/output/preview and now returns explicit `validationIssues` plus structured `failure` metadata (`validation` vs `runtime`) in execution results.
+- Scope remains bounded and architecture-aligned:
+  - no parallel data taxonomy or parallel execution stack was introduced,
+  - validation remains explicit/result-driven (not exception-first control flow),
+  - data-layer diagnostics stay inspectable and reusable for UI surfaces.
+
+## Direction 5 update: Data asset registry + schema-driven config contracts (stories 13.11-13.12)
+
+- Data Studio now has an explicit registry seam in `application/dataset-studio/DataAssetRegistry.ts` for deterministic registration/discovery/loading of data assets without creating a parallel taxonomy or global plugin runtime.
+- Registry entries now expose bounded discovery metadata for UI/application composition:
+  - asset identity (`assetId`, `versionId`, `name`),
+  - taxonomy-aligned role metadata (`taxonomy` + bounded `specialization` tags for converter/preview/ingestion/transformation intent),
+  - contract references (input/output shape descriptors + contract version),
+  - output/composability metadata (`outputShapeKind`, `composableInputShapeKinds`),
+  - capability metadata (`configurable`, `previewable`, `executable`),
+  - schema-driven config contracts (`DataAssetConfigSchema`) for reusable authoring surfaces.
+- Data asset config schema contracts are now centralized in `application/dataset-studio/DataAssetConfiguration.ts`:
+  - typed field kinds and options,
+  - deterministic schema normalization/default resolution,
+  - bounded schema inference from existing `DataAssetBase.config` values when explicit schema is not provided.
+- Data Studio validation now includes schema-aware config validation in `application/dataset-studio/DataStudioValidation.ts` (`validateDataAssetConfigValues`) so field-level config diagnostics use the same validation framework as execution/preview flows.
+- Scope remains intentionally bounded:
+  - no remote marketplace/auto-discovery/plugin-packaging architecture was introduced,
+  - registry loading is explicit registration + optional config-aware asset factory functions,
+  - taxonomy/asset identity remain anchored to existing shared asset + dataset foundations.
+
+## Direction 5 update: Data asset versioning + metadata integration (story 13.13)
+
+- Data Studio now has an explicit data-asset versioning seam in `domain/dataset-studio/DataAssetVersioning.ts`:
+  - normalized version descriptors (`semantic`, `label`, `unversioned`),
+  - compatibility-oriented comparability checks for deterministic latest-version resolution,
+  - explicit validation helpers for strict version metadata fields (`schemaVersion`, `contractVersion`, `publishedVersionId`) while allowing label versions for asset ids where needed.
+- Data asset inspection in `domain/dataset-studio/DataAssetBase.ts` now exposes a structured metadata snapshot:
+  - identity (`assetId`, optional `versionId`, category),
+  - display metadata (name/description/tags),
+  - version descriptor,
+  - input/output contract references + contract version,
+  - capability metadata (configurable/previewable/executable),
+  - composability and dependency metadata.
+- Registry integration in `application/dataset-studio/DataAssetRegistry.ts` now consumes that inspection metadata directly and resolves latest version by version precedence instead of registration order.
+- Dataset Studio preview UI now includes version labeling in the asset selector and fixes a TSX generic parsing defect that caused runtime `Readonly is not defined` errors in browser mode (`ui/components/assets/DatasetStudioDraftPreviewPanel.tsx`).
+- Scope remains intentionally bounded:
+  - no package-manager/plugin lifecycle framework,
+  - no remote compatibility negotiation or migration engine beyond local version metadata validation and matching.
+
+## Direction 5 update: Data Studio sample-asset test harness (story 13.14)
+
+- Data Studio now includes a reusable sample-asset harness in `application/dataset-studio/DataStudioSampleAssets.ts` with representative assets across conversion, preview, transformation, and ingestion:
+  - records converter sample,
+  - document text-items sample,
+  - image metadata records sample,
+  - CSV ingestor sample,
+  - JSON ingestor sample.
+- The harness registers assets through the existing `DataAssetRegistry` with schema-driven configuration, specialization metadata, and versioned metadata descriptors.
+- End-to-end harness coverage is now implemented in `application/dataset-studio/tests/DataStudioSampleAssetsHarness.test.ts` and validates:
+  - source reference resolution + converter operations,
+  - canonical shape outputs and preview generation,
+  - execution framework and lineage capture,
+  - schema-driven config validation behavior,
+  - registry discovery and metadata/version surfacing.
+- Additional focused coverage now includes `domain/dataset-studio/tests/DataAssetVersioning.test.ts` and updated `DataAssetBase`/registry tests for versioning + metadata behavior.
+- Scope remains intentionally bounded:
+  - harness assets are deterministic and in-memory,
+  - no separate testing runtime or production ingestion pipeline was introduced.
+
+## Direction 5 update: CSV + JSON ingestor assets (stories 14.1-14.2)
+
+- Data Studio now has first-class ingestion assets for CSV and JSON in:
+  - `application/dataset-studio/CsvIngestorAsset.ts`
+  - `application/dataset-studio/JsonIngestorAsset.ts`
+- Each ingestor asset now includes:
+  - explicit input/output contract descriptors aligned to canonical records output,
+  - schema-driven config contracts (UI-usable `DataAssetConfigSchema` + zod runtime validation),
+  - deterministic execute and preview operations with bounded sampling and inferred field schema/type summaries.
+- CSV ingestion now uses `csv-parse` and supports bounded config controls:
+  - delimiter, header mode (`true`/`false`/`auto`), encoding, skip-empty-lines, optional lowercase header normalization.
+- JSON ingestion now supports object/array ingestion plus bounded flattening:
+  - single-object wrapping into one-record output,
+  - optional dot-notation flattening with optional max-depth limits.
+- `DataConverterCore` `source-to-records` flow now reuses these ingestor assets so execution framework and previews remain converter-first and canonical-shape aligned.
+- Data Studio registry/sample harness and preview-panel selection now include ingestion-specialized CSV/JSON assets with schema-driven config forms.
+- Scope remains intentionally bounded:
+  - no separate ingestion orchestration runtime was introduced,
+  - ingestion remains a composable converter-adjacent asset seam producing canonical records for downstream conversion and preview.
+## Direction update: Dataset Studio document/image ingestion assets (stories 14.3-14.4)
+
+- Dataset Studio now includes first-class ingestion assets for document/PDF and image sources in `application/dataset-studio`:
+  - `DocumentPdfIngestorAsset` ingests PDF/text sources into canonical `text-items`, preserves page-aware structure, emits preview summaries, and exposes an explicit OCR extension strategy seam for image-only/scanned documents.
+  - `ImageIngestorAsset` ingests PNG/JPEG/WEBP sources into canonical `image-metadata-records`, extracts dimensions/format/orientation/file stats plus optional EXIF highlights, and emits preview-friendly metadata summaries.
+- Both assets follow the same asset-contract/config/versioning pattern used by existing CSV/JSON ingestors:
+  - zod-backed config validation,
+  - structured diagnostics for invalid config/source/type/parse failures,
+  - canonical output-shape compatibility with existing preview/execution seams.
+- Registry discoverability for ingestion assets now includes:
+  - `document-pdf-ingestor`,
+  - `image-ingestor-v1`,
+  alongside existing `csv-ingestor` and `json-ingestor` entries in `registerDataStudioSampleAssets`.
+
+## Direction 5 update: Batch ingestion framework + source locator input abstraction (stories 14.5-14.6)
+
+- Data Studio now has a reusable source-input abstraction in `application/dataset-studio/SourceLocatorInputAbstraction.ts` with zod-validated request contracts for:
+  - single local file references,
+  - multiple explicit local file references,
+  - local directory references with scanner-backed glob scanning,
+  - remote file placeholders (descriptor-only extension seam for future connector work).
+- Directory scanning now runs through an explicit scanner seam (`ISourceDirectoryScanner`) with a `fast-glob` adapter loaded only at scan-time, so browser-hosted renderer bundles do not eagerly import Node-only glob internals.
+- Local filesystem dependencies in source-locator and batch payload reads now resolve through lazy Node runtime loading (inside execution methods) instead of module-top imports, so browser-mode UI composition can import ingestion contracts without triggering Vite `node:fs` externalization failures.
+- Source resolution now yields normalized source descriptors with bounded metadata suitable for ingestion contracts and preview surfaces:
+  - stable source id,
+  - original and normalized reference,
+  - source kind/type,
+  - display name,
+  - extension/media-type hints,
+  - size (local files when cheaply available),
+  - optional grouping metadata.
+- Source inspection/preview is now a first-class bounded seam:
+  - total matched files,
+  - previewed subset,
+  - extension summary counts,
+  - structured per-reference issues (`invalid_config`, `invalid_reference`, `unreadable_path`, `unsupported_extension`, `unsupported_kind`).
+- Data Studio now has a batch ingestion orchestration seam in `application/dataset-studio/BatchIngestionFramework.ts` that composes existing ingestors instead of duplicating ingest logic:
+  - CSV/JSON via existing converter ingestion path (`DataConverterCore` -> `CsvIngestorAsset` / `JsonIngestorAsset`),
+  - document/PDF via `DocumentPdfIngestorAsset`,
+  - image via `ImageIngestorAsset`.
+- Batch execution now supports a bounded strategy/config surface:
+  - strategy: routed by source metadata or explicit selected ingestor,
+  - shared ingestor config (`csv`/`json`/`documentPdf`/`image`),
+  - `continueOnError` (default true),
+  - optional `maxItems`,
+  - bounded `previewItemLimit`,
+  - optional bounded `concurrency`.
+- Batch results are now structured for canonical aggregation + partial-failure handling:
+  - batch item/success/failure counts,
+  - per-item success/failure envelopes,
+  - per-item structured errors and diagnostics,
+  - canonical output collection keyed by source id + ingestor,
+  - bounded aggregated preview payload with shape summary.
+- Scope remains intentionally bounded:
+  - no remote connector/MCP execution path is implemented in this slice,
+  - remote source support is currently placeholder descriptor normalization only,
+  - orchestration remains application-layer and composes existing ingestion assets/contracts.
+
+## Direction 5 update: Data Studio canonical ingestion normalization + contracts (stories 14.7-14.8)
+
+- Data Studio ingestion now has a shared normalization/contract seam in `application/dataset-studio`:
+  - `IngestionContracts.ts` provides reusable zod-backed ingestion contract fragments for execution context, payload primitives, and structured validation issue mapping.
+  - `IngestionCanonicalNormalization.ts` provides reusable canonical-output normalization and standardized ingestion result envelopes.
+- CSV and JSON ingestion now emits canonical normalized records outputs alongside legacy parsed-record payloads for compatibility.
+- Document/PDF and image ingestion now normalizes canonical outputs through the shared seam so source/provenance metadata is preserved consistently (source reference/id hints, media/file metadata, batch/group context, and lineage when source asset ids are present).
+- Batch ingestion now exports strategy/config contract schemas and propagates normalized context metadata into ingestion execution while preserving canonical output + preview aggregation behavior.
+- Converter integration remains converter-first and now preserves source identity/reference metadata in converter output attributes for downstream preview/lineage compatibility.
+
+## Direction 5 update: Ingestor preview contract + structured ingestion error layer (stories 14.9-14.10)
+
+- Ingestion contracts now include a first-class structured issue model in `application/dataset-studio/IngestionContracts.ts`:
+  - stable categories (`invalid-configuration`, `unsupported-source-type`, `unreadable-source`, `parse-extraction-failure`, `preview-failure`, `batch-partial-failure`, etc.),
+  - severity and recoverability semantics,
+  - source-association metadata (source id/reference, batch item metadata, file hints),
+  - reusable zod-to-ingestion-issue mapping and exception-to-issue translation helpers.
+- Ingestion preview is now a shared contract surface in `application/dataset-studio/IngestionCanonicalNormalization.ts`:
+  - reusable `IngestionPreviewEnvelope`,
+  - summary metadata (`totalCount`, `sampleCount`, `truncated`, and batch aggregate counts),
+  - canonical preview payload reuse via `DataPreviewEngine`,
+  - structured warning/error propagation for bounded previews.
+- CSV, JSON, document/PDF, and image ingestors now emit:
+  - bounded preview outputs with normalized preview envelopes,
+  - consistent structured failure issues for config/source/parse failures,
+  - preview-time warning behavior (for example truncation and partial metadata availability).
+- Batch ingestion now propagates item-level structured normalized issues and exposes normalized batch preview envelopes with mixed-outcome/truncation warnings, preserving item-level error inspectability without leaking low-level exceptions.
+
+## Direction 5 update: Ingestion registry/discovery integration (stories 14.11-14.12)
+
+- Data Studio ingestion assets are now registered through one shared `DataAssetRegistry` catalog (`application/dataset-studio/DataStudioAssetRegistryCatalog.ts`) instead of panel-local ad hoc registration paths.
+- Registry descriptors for ingestion assets now expose inspectability/discovery metadata in addition to existing identity/version/contracts/config metadata:
+  - explicit category (`data-ingestion`),
+  - supported source kinds/extensions/media types,
+  - key config keys,
+  - preview and execution mode labels.
+- Registered ingestion set now includes CSV, JSON, document/PDF, image, and batch-ingestion framework assets through `registerDataStudioSampleAssets`.
+- Category + specialization registry filtering is now first-class for ingestion discovery (`category` query + existing specialization/capability filters), keeping discovery backend/application owned rather than UI-owned.
+
+## Direction 5 update: Advanced ingestion configuration mode + logging/lineage hooks (stories 14.13-14.14)
+
+- Ingestion config schemas now carry contract-level field visibility metadata (`simple` vs `advanced`) through `application/dataset-studio/DataAssetConfiguration.ts`, so UI mode split is schema-driven rather than screen-local duplication.
+- CSV/JSON/document/image/batch ingestion schema fields now declare simple/advanced visibility directly in asset-owned config contract definitions.
+- Ingestion normalization envelopes now include structured logging + lineage hooks (`log`, `lineage`) with bounded metadata for:
+  - producer asset/version,
+  - preview vs execute mode,
+  - source references,
+  - config summary,
+  - output summary,
+  - warning/error counts.
+- Batch ingestion now emits batch-level + per-item logging metadata and lineage hooks with parent/child execution linkage hints while preserving existing bounded orchestration scope.
+- Data asset execution framework results now include ingestion-oriented logging/lineage metadata in addition to existing lineage diagnostics, keeping preview/full execution traceability machine-readable for downstream registry/inspection surfaces.

@@ -44,6 +44,10 @@ import {
   type WorkflowStudioEntryRouteResolution,
 } from "../studio-shell/workflow/WorkflowStudioEntryRouting";
 import {
+  buildWorkflowStudioRunDetailPath,
+  buildWorkflowStudioRunHistoryPath,
+} from "../studio-shell/workflow/WorkflowStudioRunRouting";
+import {
   buildWorkflowStudioWizardPagePath,
   type WorkflowStudioWizardPageId,
   type WorkflowStudioWizardPageRouteResolution,
@@ -964,6 +968,22 @@ export default function StudioShellPage({
         : hasWorkflowUnsavedChanges
           ? "Workflow draft or metadata edits are unsaved. Save before leaving Workflow Studio to persist changes."
           : "Workflow draft and metadata are synchronized with persisted storage.";
+  const workflowRunHistoryPath = snapshot?.draft?.assetId
+    ? buildWorkflowStudioRunHistoryPath({
+      workflowId: snapshot.draft.assetId,
+      workflowStatus: snapshot.draft.lifecycleStatus === AssetDraftLifecycleStatuses.draft
+        ? "draft"
+        : "saved",
+    })
+    : undefined;
+  const workflowLatestRunDetailPath = workflowRunFeedback?.result?.run?.runId && snapshot?.draft?.assetId
+    ? buildWorkflowStudioRunDetailPath(workflowRunFeedback.result.run.runId, {
+      workflowId: snapshot.draft.assetId,
+      workflowStatus: snapshot.draft.lifecycleStatus === AssetDraftLifecycleStatuses.draft
+        ? "draft"
+        : "saved",
+    })
+    : undefined;
   const toolbarActions = studioRegistration?.shell?.toolbar?.actions ?? [];
   const workflowModeToolbarActions = toolbarActions.filter(
     (action): action is Extract<StudioShellToolbarAction, { kind: "set-workflow-mode" }> => (
@@ -1467,6 +1487,13 @@ export default function StudioShellPage({
             <p className={hasWorkflowDraftParseError || workflowSaveError ? "ui-text-small ui-text-danger" : "ui-text-small ui-text-secondary"}>
               {workflowDraftStatusDetail}
             </p>
+            {workflowRunHistoryPath ? (
+              <div className="ui-row ui-row--wrap">
+                <Link className="ui-button ui-button--ghost ui-button--sm" to={workflowRunHistoryPath}>
+                  View run history
+                </Link>
+              </div>
+            ) : null}
           </div>
         ) : null}
 
@@ -1475,6 +1502,8 @@ export default function StudioShellPage({
             readiness={workflowExecutionReadiness}
             isReadinessPending={isWorkflowReadinessPending}
             runFeedback={workflowRunFeedback}
+            runHistoryPath={workflowRunHistoryPath}
+            runDetailPath={workflowLatestRunDetailPath}
           />
         ) : null}
 

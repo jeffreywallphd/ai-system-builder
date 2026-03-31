@@ -100,6 +100,8 @@ export default function AppRouter({
           { path: ROUTE_PATHS.registry, element: <RegistryPage /> },
           { path: ROUTE_PATHS.registryAssetDetail, element: <AssetDetailPage /> },
           { path: ROUTE_PATHS.workflowStudio, element: <WorkflowStudioPage /> },
+          { path: ROUTE_PATHS.workflowStudioRuns, element: <WorkflowStudioPage /> },
+          { path: ROUTE_PATHS.workflowStudioRunDetail, element: <WorkflowStudioPage /> },
           { path: ROUTE_PATHS.workflowStudioMode, element: <WorkflowStudioPage /> },
           { path: ROUTE_PATHS.workflowStudioWizardPage, element: <WorkflowStudioPage /> },
           { path: ROUTE_PATHS.contextBundleStudio, element: <ContextBundleStudioPage /> },

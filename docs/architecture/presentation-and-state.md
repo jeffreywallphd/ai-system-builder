@@ -112,6 +112,14 @@ The workflow editor still uses a dedicated presentation projection (`ui/presente
 
 Durable execution history now follows the same pattern through application-layer list/detail projections (`ExecutionRunProjectionService` and `ExecutionRunDetailProjectionService`), a thin renderer `ExecutionHistoryService`, and reusable `ui/components/execution/ExecutionHistoryPanel.tsx` / `ExecutionRunDetailPanel.tsx` surfaces. Workflow editor history, dataset-generation history, model-training history, and runtime-backed MCP server-operation history all consume those projected summaries/details instead of reconstructing plan semantics in page components or decoding feature-specific artifacts in the UI.
 
+Workflow Studio run-history list/detail follows the same boundary style: `WorkflowStudioRunHistoryPanel` renders workflow-scoped run summaries and detail sections, while data is loaded through `StudioShellService` (`listWorkflowRuns`, `getWorkflowRunDetail`) from backend-owned run-history projections instead of UI-layer repository access.
+The panel now keeps disclosure bounded in that same seam: run-level summary first, expandable step-by-step inspection second, and structured diagnostics/failure-location cues rendered from backend read models rather than UI-side parsing/inference.
+The same panel now also hosts rerun UX on those backend contracts: `Rerun as-is` and `Edit and rerun` both route through `StudioShellService.startWorkflowRunRerun`, start from canonical persisted execution context, and navigate to the newly created derived run detail.
+Edit-and-rerun stays structured and user-facing (target/parameters/execution-metadata/property-overrides fields) rather than exposing raw log parsing or debug-only controls.
+Observability entry points now also appear on adjacent workflow surfaces (persisted workflow list cards, workflow draft status, and workflow execution feedback), so run history/run detail navigation is embedded in the normal build -> run -> inspect loop rather than hidden behind one panel.
+Workflow execution feedback now links directly to the current run detail and workflow run history when backend run-history persistence returns a durable run id.
+Run-history rerun controls now surface explicit unsupported-state UX for non-terminal runs or missing structured historical execution input context.
+
 Related-run lineage navigation now also flows through this same seam: the renderer asks `ExecutionHistoryService` for related-run clusters, and the execution detail panel can jump directly between runs in the same flow/plan grouping without introducing feature-specific linkage logic in page components.
 
 That keeps display wording, badge tone, fallback wording, progress summaries, and truthfulness summaries out of the page/component tree while still leaving execution business logic in the application/infrastructure layers.
@@ -260,6 +268,26 @@ Current Direction 5 UI status:
 - Direction 5 stories 6.15â€“6.16 now keep runtime monitoring/result UX inside the existing System Studio run-trigger extension: `SystemRuntimeRunPanel` composes bounded API-driven monitoring/result sections (`ExecutionMonitorPanel`, `ExecutionResultPanel`) to render execution status/progress/node+nested state, bounded trace/log and recovery indicators, plus execution output/node+nested summaries and diagnostics from `getSystemExecutionStatus/getSystemExecutionTrace/getSystemExecutionResult` without renderer-side runtime model reimplementation.
 - Still intentionally out of scope in renderer: speculative rich visual graph tooling and runtime execution-binding authoring beyond current structural composition/editing + shared shell lifecycle/publish flows.
 
+- Data Studio preview UI now includes a reusable `DataPreviewPanel` surface (`ui/components/assets/DataPreviewPanel.tsx`) that is fed by data-layer execution results (preview model + diagnostics + validation issues + lineage summary) rather than UI-local data parsing/render branching.
+- Dataset Studio integrates this through a registration-bounded extension (`dataset-studio-data-preview-panel` in `DatasetStudioRegistration.ts`) using a thin draft-content adapter (`DatasetStudioDraftPreviewPanel.tsx`) that executes existing converter/execution seams and renders empty/loading/error/ready states without introducing a parallel page architecture.
+- Dataset Studio preview authoring now includes a reusable schema-driven `AssetConfigurationPanel` (`ui/components/assets/AssetConfigurationPanel.tsx`) consumed by the same draft adapter surface (`DatasetStudioDraftPreviewPanel.tsx`) so configuration editing is not a bespoke asset-specific form.
+- Configuration controls are rendered from registered data-asset config schema contracts (`DataAssetConfigSchema`) resolved through the data-layer registry seam (`application/dataset-studio/DataAssetRegistry.ts`) and applied back into execution requests via existing execution-framework orchestration.
+- Field-level config diagnostics now project from the shared Data Studio validation framework (`validateDataAssetConfigValues` in `DataStudioValidation.ts`) instead of UI-local validation rules.
+- The Dataset Studio panel keeps lifecycle behavior bounded and architecture-aligned:
+  - deterministic defaults from schema + asset config,
+  - local edit/apply/reset controls in one reusable panel,
+  - apply-triggered execution/preview refresh through `DefaultDataAssetExecutionFramework`,
+  - empty/loading/error/ready states rendered through existing preview panel patterns.
+
+- Dataset Studio ingestion authoring now uses shared registry discovery metadata in the same preview panel:
+  - ingestion asset selection is registry-driven (CSV/JSON/document/PDF/image/batch),
+  - source input mode controls (`in-memory`, `local-file`, `local-directory`) are rendered through shared field/form classes,
+  - schema-driven config remains in `AssetConfigurationPanel`,
+  - preview rendering reuses `DataPreviewPanel` / `DataPreviewSurface`,
+  - structured ingestion warnings/errors render from normalized ingestion issue contracts instead of raw exception text.
+- Dataset Studio ingestion configuration now defaults to a simple mode in `AssetConfigurationPanel` and reveals advanced fields only through an explicit mode toggle, driven by config-schema visibility metadata (`simple`/`advanced`) rather than UI-local field lists.
+- Dataset Studio source-input authoring now also includes a bounded advanced-source toggle for directory patterns and optional source filtering limits, while keeping default source entry minimal for common flows.
+
 Direction 5 Epic 11 final hardening status (stories 11.23-11.24):
 - UX consistency hardening now has shared policy/regression seams in `ui/routes/UxConsistencyPolicy.ts` and `ui/routes/IntentUxRegressionSuite.ts`, focused on intent-first terminology, taxonomy suppression in primary UX, and cross-surface route/origin continuity across Build/Explore/Run plus shell-adjacent surfaces.
 - Legacy UX cleanup is now explicitly policy-driven through `LegacyUxCleanupPlanner` in `ui/routes/LegacyNavigationSunset.ts`, keeping compatibility behavior tied to existing sunset controls instead of ad hoc route handling.
@@ -283,3 +311,9 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - Workflow metadata editing (name/summary/tags) remains in the same unsaved/save-state contract as draft content and persists through the same save orchestration path into persistence/read-model surfaces.
 - Browser-hosted development now keeps Explore workflow-persistence reuse flows available by resolving registry queries through a bounded browser fallback bridge when desktop registry contracts are unavailable, using the same in-memory workflow-persistence fallback repository as Studio Shell.
 - Automated coverage now includes persistence contracts and SQLite adapter list-query behavior, persisted workflow discovery filtering for Explore/Build/Run entry cards, and existing studio/runtime integration coverage across create/open/resume/duplicate/readiness/run flows.
+
+## Direction 5 UX update: Main menu Data entry
+
+- The global header command palette/navigation menu now includes a first-class `Data` entry (`ui/routes/CommandPalette.ts`) that routes to Dataset Studio (`/studio-shell/dataset`).
+- Top-level menu order is now: `Build`, `Run`, `Explore`, `Data`, `Manage`.
+- This extends existing shell navigation patterns without adding a parallel navigation system.

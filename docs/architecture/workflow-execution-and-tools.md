@@ -459,3 +459,34 @@ Audit schema now records administrative approval transitions plus decision denia
 - Desktop IPC now exposes a coherent studio-ready operation set on the existing `ai-loom-desktop-agents:*` channel family (`launch`, `trigger-launch`, `list-sessions`, `get-session`, `control-run`, `studio-snapshot`) without introducing a parallel runtime path.
 - Desktop host bootstrap now wires launch/trigger-launch to a real `AgentRunnerService` path (deterministic planner + tool capability orchestration + asset-backed memory store + session persistence), so launch endpoints are execution-backed rather than transport-declared unsupported operations.
 
+
+## Workflow run history foundation (Epic 12 stories 12.1-12.4)
+- Workflow observability now has a canonical workflow-run-history contract in `domain/workflow-studio/WorkflowRunHistoryDomain.ts`:
+  - top-level run summary identity/status/trigger/timestamps
+  - correlation ids linking workflow-run summaries to durable execution-run records (`executionRunId`, optional `workflowExecutionId`, optional `executionFlowId`)
+  - explicit workflow-definition references and output references
+  - explicit run-detail records (`WorkflowRunDetailRecord`) carrying step-run execution records, execution context, and structured output records.
+- Application orchestration now records workflow-run summary lifecycle through `application/workflow-run-history/WorkflowRunHistoryService.ts` and lists summaries through `ListWorkflowRunSummariesUseCase`.
+- Workflow execution integration remains on the existing execution backbone: `infrastructure/execution/WorkflowExecutionUnitHandler.ts` records run start/terminal summary lifecycle and now streams node/step runtime events into run-detail step-run updates (`recordStepEvent`) without introducing a second runtime path.
+- Run detail now distinguishes list-facing summary and inspection-facing detail:
+  - summary: `WorkflowRunSummaryRecord` + `stepRunStats`
+  - detail: `WorkflowRunDetailRecord` with ordered step runs (status/timestamps/duration/error summary), structured execution input/trigger/runtime context, and structured top-level outputs.
+- Persistence is now adapter-based and host-aware:
+  - desktop/Node durability: `SqliteWorkflowRunSummaryRepository` (summary + detail tables with schema migration)
+  - desktop renderer bridge path: `DesktopBridgeWorkflowRunSummaryRepository` + preload/IPC bridge methods for both summary and detail records
+  - browser fallback: `LocalStorageWorkflowRunSummaryRepository` (separate summary/detail storage keys)
+  - in-memory fallback for constrained environments.
+- Epic 12 stories 12.5-12.6 now expose these same canonical run-history records in Workflow Studio through the shared studio-shell backend/service bridge:
+  - workflow run list view with summary-first status/recency/duration/trigger fields and client-side sort/filter controls;
+  - route-addressable run detail view (`/studio-shell/workflow/runs/:runId`) showing workflow-level metadata, execution summary, structured trigger context, and top-level outputs.
+- Epic 12 stories 12.7-12.8 now extend that same canonical run-history surface (without introducing a separate observability subsystem):
+  - run detail includes ordered step inspection with expandable per-step status/timing/input-output/error summaries sourced directly from persisted `stepRuns`;
+  - run summaries/details now include structured diagnostics (category/severity/scope/location/summary/detail/remediation), and run list/detail present failure-location cues from those diagnostics.
+- Epic 12 stories 12.9-12.10 now extend that same canonical run-history surface for iteration loops:
+  - rerun and edit-and-rerun launch new execution instances from persisted historical execution context (never by mutating historical runs);
+  - derived runs persist explicit lineage metadata (`parentRunId`, `rerunMode`, optional `rerunReason`) so related-run queries and UI projections stay deterministic;
+  - edit-and-rerun starts from historical context, applies bounded user overrides before launch, and persists the final merged execution context on the new run detail record.
+- Epic 12 stories 12.11-12.12 now harden observability as a first-class workflow path on the same canonical contracts:
+  - workflow list/detail/completion surfaces now expose direct run-history/run-detail entry points instead of isolated observability-only navigation;
+  - manual workflow launch results now return persisted run identity when run-history storage is available, enabling immediate completion-surface links to the exact run detail;
+  - rerun/edit-and-rerun affordances now enforce terminal-state and historical-context prerequisites with explicit unsupported-state UX.

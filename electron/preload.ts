@@ -66,6 +66,23 @@ contextBridge.exposeInMainWorld("aiLoomDesktop", {
       return ipcRenderer.invoke("ai-loom-desktop-execution-runs:list", criteriaJson) as Promise<ReadonlyArray<string>>;
     },
   },
+  workflowRunSummaries: {
+    saveWorkflowRunSummary(summaryJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-workflow-runs:save", summaryJson);
+    },
+    loadWorkflowRunSummary(runId: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-workflow-runs:load", runId) as Promise<string | null>;
+    },
+    listWorkflowRunSummaries(queryJson?: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-workflow-runs:list", queryJson) as Promise<ReadonlyArray<string>>;
+    },
+    saveWorkflowRunDetail(detailJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-workflow-runs:save-detail", detailJson);
+    },
+    loadWorkflowRunDetail(runId: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-workflow-runs:load-detail", runId) as Promise<string | null>;
+    },
+  },
   modelFiles: {
     exists(path: string) {
       return ipcRenderer.sendSync("ai-loom-desktop-model-files:exists", path) as boolean;
@@ -160,6 +177,15 @@ contextBridge.exposeInMainWorld("aiLoomDesktop", {
     },
     runWorkflowDraft(requestJson: string) {
       return ipcRenderer.invoke("ai-loom-desktop-studio-shell:run-workflow-draft", requestJson) as Promise<string>;
+    },
+    listWorkflowRuns(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:workflow-runs:list", requestJson) as Promise<string>;
+    },
+    getWorkflowRunDetail(runId: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:workflow-runs:get-detail", runId) as Promise<string>;
+    },
+    startWorkflowRunRerun(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:workflow-runs:start-rerun", requestJson) as Promise<string>;
     },
     listSystemChildComponents(requestJson: string) {
       return ipcRenderer.invoke("ai-loom-desktop-studio-shell:system-components:list", requestJson) as Promise<string>;

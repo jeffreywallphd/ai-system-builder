@@ -58,6 +58,14 @@ export interface DesktopExecutionRunBridge {
   listExecutionRuns(criteriaJson?: string): Promise<ReadonlyArray<string>>;
 }
 
+export interface DesktopWorkflowRunSummaryBridge {
+  saveWorkflowRunSummary(summaryJson: string): Promise<void>;
+  loadWorkflowRunSummary(runId: string): Promise<string | null>;
+  listWorkflowRunSummaries(queryJson?: string): Promise<ReadonlyArray<string>>;
+  saveWorkflowRunDetail?(detailJson: string): Promise<void>;
+  loadWorkflowRunDetail?(runId: string): Promise<string | null>;
+}
+
 export interface DesktopModelFileBridge {
   exists(path: string): boolean;
   stat(path: string): { readonly path: string; readonly kind: "file" | "directory"; readonly size?: number; readonly modifiedAt?: string };
@@ -117,6 +125,9 @@ export interface DesktopStudioShellBridge {
   duplicatePersistedWorkflow(requestJson: string): Promise<string>;
   assessWorkflowExecutionReadiness(requestJson: string): Promise<string>;
   runWorkflowDraft(requestJson: string): Promise<string>;
+  listWorkflowRuns(requestJson: string): Promise<string>;
+  getWorkflowRunDetail(runId: string): Promise<string>;
+  startWorkflowRunRerun(requestJson: string): Promise<string>;
   listSystemChildComponents(requestJson: string): Promise<string>;
   addSystemChildComponent(requestJson: string): Promise<string>;
   removeSystemChildComponent(requestJson: string): Promise<string>;
@@ -157,6 +168,7 @@ export interface DesktopBridge {
   readonly secrets?: DesktopMcpSecretBridge;
   readonly workflows: DesktopWorkflowBridge;
   readonly executionRuns: DesktopExecutionRunBridge;
+  readonly workflowRunSummaries?: DesktopWorkflowRunSummaryBridge;
   readonly modelFiles: DesktopModelFileBridge;
   readonly canonicalAssets: DesktopCanonicalAssetBridge;
   readonly agents?: DesktopAgentAuthoringBridge;

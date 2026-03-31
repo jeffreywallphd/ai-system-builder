@@ -6,6 +6,7 @@ import {
   WorkflowStudioIdentity,
 } from "../../../domain/workflow-studio/WorkflowStudioDomain";
 import WorkflowStudioModePanel from "../../components/studio-shell/workflow/WorkflowStudioModePanel";
+import WorkflowStudioRunHistoryPanel from "../../components/studio-shell/workflow/WorkflowStudioRunHistoryPanel";
 import type { CompositeStudioRegistration } from "../StudioShellExtensions";
 import { createCompositeStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
 
@@ -101,6 +102,17 @@ export const workflowStudioRegistration: CompositeStudioRegistration = Object.fr
       render: ({ workflowModeState }) => (workflowModeState
         ? createElement(WorkflowStudioModePanel, { workflowModeState })
         : "Workflow mode state is unavailable for this studio session."),
+    },
+    {
+      id: "workflow-studio-run-history",
+      slot: "session-context",
+      title: "Workflow run history",
+      subtitle: "Durable run summaries and structured run detail for the active workflow definition.",
+      order: 15,
+      render: ({ snapshot }) => createElement(WorkflowStudioRunHistoryPanel, {
+        workflowId: snapshot?.draft?.assetId,
+        workflowName: snapshot?.draft?.metadata.title,
+      }),
     },
     {
       id: "workflow-studio-metadata-summary",

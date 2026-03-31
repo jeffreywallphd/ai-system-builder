@@ -1,6 +1,8 @@
 import { createDatasetStudioTaxonomy, DatasetStudioIdentity } from "../../../domain/dataset-studio/DatasetStudioDomain";
+import { createElement } from "react";
 import type { AtomicStudioRegistration } from "../StudioShellExtensions";
 import { createAtomicStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
+import DatasetStudioDraftPreviewPanel from "../../components/assets/DatasetStudioDraftPreviewPanel";
 
 export const datasetStudioRegistration: AtomicStudioRegistration = Object.freeze({
   studioType: DatasetStudioIdentity.studioType,
@@ -51,6 +53,19 @@ export const datasetStudioRegistration: AtomicStudioRegistration = Object.freeze
           `Provenance source: ${snapshot?.draft?.metadata.provenance?.sourceLabel ?? "-"}`,
         ]);
       },
+    },
+    {
+      id: "dataset-studio-data-preview-panel",
+      slot: "draft-authoring",
+      title: "Data preview panel",
+      subtitle: "Preview of draft content through data converter + execution contracts.",
+      order: 20,
+      render: ({ snapshot }) => createElement(DatasetStudioDraftPreviewPanel, {
+        draftId: snapshot?.draft?.draftId,
+        draftAssetId: snapshot?.draft?.assetId,
+        draftTitle: snapshot?.draft?.metadata.title,
+        draftContent: snapshot?.draft?.content,
+      }),
     },
   ]),
 });

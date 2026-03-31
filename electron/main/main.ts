@@ -64,8 +64,10 @@ import type { TriggerAgentLaunchRequest } from "../../application/agents/Trigger
 import { StudioShellBackendApi } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
 import { RegistryBackendApi } from "../../infrastructure/api/registry/RegistryBackendApi";
 import { ListPersistedWorkflowsUseCase } from "../../application/workflow-persistence/ListPersistedWorkflowsUseCase";
+import { ListWorkflowRunSummariesUseCase } from "../../application/workflow-run-history/ListWorkflowRunSummariesUseCase";
 import { SqliteStudioShellRepository } from "../../infrastructure/filesystem/studio-shell/SqliteStudioShellRepository";
 import { SqliteWorkflowPersistenceRepository } from "../../infrastructure/filesystem/SqliteWorkflowPersistenceRepository";
+import { SqliteWorkflowRunSummaryRepository } from "../../infrastructure/filesystem/SqliteWorkflowRunSummaryRepository";
 import type { CreateAssetDraftCommand, PublishAssetDraftVersionCommand, TransitionAssetDraftLifecycleCommand, UpdateAssetDraftCommand, UpdateAssetDraftDependenciesCommand } from "../../application/studio-shell/contracts";
 import { RegistryQueryService } from "../../application/asset-registry/RegistryQueryService";
 import { CrossStudioRegistryQueryService } from "../../application/asset-registry/CrossStudioRegistryQueryService";
@@ -91,6 +93,8 @@ let workflowPersistence: DesktopWorkflowPersistence | undefined;
 let executionRunRepository: SqliteExecutionRunRepository | undefined;
 let getExecutionRunUseCase: GetExecutionRunUseCase | undefined;
 let listExecutionRunsUseCase: ReturnType<typeof createExecutionHistoryInfrastructure>["listExecutionRunsUseCase"] | undefined;
+let workflowRunSummaryRepository: SqliteWorkflowRunSummaryRepository | undefined;
+let listWorkflowRunSummariesUseCase: ListWorkflowRunSummariesUseCase | undefined;
 let canonicalAssetSystemRepository: SqliteAssetSystemRepository | undefined;
 let canonicalProjectionSink: InMemoryAssetLineageGraphProjectionSink | undefined;
 let agentRepository: SqliteAgentRepository | undefined;
@@ -291,6 +295,8 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   executionRunRepository = createExecutionRunRepository({
     sqliteDatabasePath: storagePaths.databasePath,
   }) as SqliteExecutionRunRepository;
+  workflowRunSummaryRepository = new SqliteWorkflowRunSummaryRepository(storagePaths.databasePath);
+  listWorkflowRunSummariesUseCase = new ListWorkflowRunSummariesUseCase(workflowRunSummaryRepository);
   agentRepository = new SqliteAgentRepository(path.join(storagePaths.storageDirectory, "agents", "agents.sqlite"));
   agentSessionRepository = new SqliteAgentExecutionSessionRepository(path.join(storagePaths.storageDirectory, "agents", "agent-sessions.sqlite"));
   const agentRunnerAssetSystemRepository = new SqliteAssetSystemRepository(path.join(storagePaths.assetsDirectory, "asset-system.sqlite"));
@@ -303,7 +309,11 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   workflowPersistenceRepository = new SqliteWorkflowPersistenceRepository(
     path.join(storagePaths.storageDirectory, "workflow-studio", "workflow-persistence.sqlite"),
   );
-  const studioShellBackendApi = new StudioShellBackendApi(studioShellRepository, workflowPersistenceRepository);
+  const studioShellBackendApi = new StudioShellBackendApi(
+    studioShellRepository,
+    workflowPersistenceRepository,
+    workflowRunSummaryRepository,
+  );
   const systemStudioBackendApi = new SystemStudioBackendApi(studioShellRepository);
   const runtimeExecutionStore = new SqliteSystemRuntimeExecutionStore(path.join(storagePaths.assetsDirectory, "system-runtime.sqlite"));
   const runtimeExecutionAuditRepository = new SqliteExecutionAuditRepository(path.join(storagePaths.assetsDirectory, "system-runtime-audit.sqlite"));
@@ -349,6 +359,31 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     const criteria = criteriaJson ? JSON.parse(criteriaJson) : undefined;
     const runs = await listExecutionRunsUseCase?.execute(criteria);
     return (runs ?? []).map((run) => JSON.stringify(run));
+  });
+  ipcMain.handle("ai-loom-desktop-workflow-runs:save", async (_event, summaryJson: string) => {
+    if (!workflowRunSummaryRepository) {
+      return;
+    }
+    await workflowRunSummaryRepository.upsert(JSON.parse(summaryJson));
+  });
+  ipcMain.handle("ai-loom-desktop-workflow-runs:load", async (_event, runId: string) => {
+    const summary = await workflowRunSummaryRepository?.getByRunId(runId);
+    return summary ? JSON.stringify(summary) : null;
+  });
+  ipcMain.handle("ai-loom-desktop-workflow-runs:save-detail", async (_event, detailJson: string) => {
+    if (!workflowRunSummaryRepository) {
+      return;
+    }
+    await workflowRunSummaryRepository.upsertDetail(JSON.parse(detailJson));
+  });
+  ipcMain.handle("ai-loom-desktop-workflow-runs:load-detail", async (_event, runId: string) => {
+    const detail = await workflowRunSummaryRepository?.getDetailByRunId(runId);
+    return detail ? JSON.stringify(detail) : null;
+  });
+  ipcMain.handle("ai-loom-desktop-workflow-runs:list", async (_event, queryJson?: string) => {
+    const query = queryJson ? JSON.parse(queryJson) : undefined;
+    const summaries = await listWorkflowRunSummariesUseCase?.execute(query);
+    return (summaries ?? []).map((summary) => JSON.stringify(summary));
   });
   ipcMain.handle("ai-loom-desktop-agents:create", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as CreateAgentRequest;
@@ -462,6 +497,17 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   ipcMain.handle("ai-loom-desktop-studio-shell:run-workflow-draft", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["runWorkflowDraft"]>[0];
     return JSON.stringify(await studioShellBackendApi.runWorkflowDraft(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:workflow-runs:list", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["listWorkflowRuns"]>[0];
+    return JSON.stringify(await studioShellBackendApi.listWorkflowRuns(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:workflow-runs:get-detail", async (_event, runId: string) => {
+    return JSON.stringify(await studioShellBackendApi.getWorkflowRunDetail(runId));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:workflow-runs:start-rerun", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["startWorkflowRunRerun"]>[0];
+    return JSON.stringify(await studioShellBackendApi.startWorkflowRunRerun(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:system-components:list", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["listChildComponents"]>[0];
@@ -818,6 +864,7 @@ app.on("before-quit", async () => {
   await serviceSupervisor?.stop();
   storageDatabase?.dispose();
   executionRunRepository?.dispose();
+  workflowRunSummaryRepository?.dispose();
   agentRepository?.dispose();
   studioShellRepository?.dispose();
   workflowPersistenceRepository?.dispose();
