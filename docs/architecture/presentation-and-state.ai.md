@@ -170,3 +170,9 @@ Intent UX documentation alignment checklist (implemented scope):
 - Primary route switching is now command-palette-driven in the app shell header; the legacy header link strip is removed, and Home remains accessible through the AI Loom Studio logo link.
 - Partially implemented / bounded: legacy route compatibility remains available behind sunset mode for staged rollout; legacy screens are redirected/hidden by policy rather than fully deleted.
 - Future work (not implemented here): full removal of legacy feature-flag compatibility paths after rollout criteria are complete.
+
+Workflow persistence reuse hardening (stories 11.11-11.12):
+- Build and Run entry surfaces now include persisted-workflow reuse cards driven by shared Explore/registry query seams (`PersistedWorkflowEntryService`) instead of workflow-only side channels.
+- Run interface routing now supports a workflow context (`context=workflow` + workflow id/status) and resolves into canonical Workflow Studio open/resume entry paths for run-oriented handoff.
+- Workflow persistence error mapping now distinguishes persistence adapter failures (`persistence-failed`) from not-found/conflict/invalid-request outcomes, and persisted-workflow loading now rejects malformed serialized workflow definitions with safe invalid-request responses.
+- Explore library aggregation now tolerates persisted-workflow listing failures by degrading to registry-backed assets instead of failing the entire mixed-asset listing flow.

@@ -29,7 +29,7 @@ export interface UxRunRequest {
   readonly action: UxRunActionKind;
   readonly context: UxRunContext;
   readonly target: {
-    readonly kind: "asset" | "system" | "tool" | "general";
+    readonly kind: "asset" | "workflow" | "system" | "tool" | "general";
     readonly assetId?: string;
     readonly versionId?: string;
   };
@@ -113,11 +113,14 @@ export class DefaultUxRuntimeRequestMapper implements UxRuntimeRequestMapper {
     return Object.freeze({
       contextKind: input.target.kind === "system"
         ? RunContextKinds.system
+        : input.target.kind === "workflow"
+          ? RunContextKinds.workflow
         : input.target.kind === "tool"
           ? RunContextKinds.tool
           : input.target.kind === "asset"
             ? RunContextKinds.asset
             : RunContextKinds.general,
+      workflowId: input.target.kind === "workflow" ? input.target.assetId : undefined,
       assetId: input.target.assetId,
       versionId: input.target.versionId,
       source: input.context.source === "system" ? "detail" : input.context.source,

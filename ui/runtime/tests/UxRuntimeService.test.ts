@@ -16,6 +16,18 @@ describe("UxRuntimeService", () => {
     expect(launchPath).toContain("buildFlowSessionId=build-flow-1");
   });
 
+  it("maps workflow-target runs into workflow run context paths", () => {
+    const service = new UxRuntimeService();
+    const launchPath = service.resolveRunSurfacePath({
+      action: UxRunActionKinds.run,
+      target: { kind: "workflow", assetId: "workflow:persisted:2", versionId: "v2" },
+      context: { source: "explore", originPath: "/explore", originLabel: "Explore" },
+    });
+
+    expect(launchPath).toContain("context=workflow");
+    expect(launchPath).toContain("workflowId=workflow%3Apersisted%3A2");
+  });
+
   it("adapts runtime status/result into UX-facing snapshot models", async () => {
     const service = new UxRuntimeService();
     const snapshot = await service.readSystemRunSnapshot("exec-1", {

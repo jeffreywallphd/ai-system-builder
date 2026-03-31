@@ -202,4 +202,21 @@ describe("ExploreAssetQueryService", () => {
     });
     expect(tagSearch.assets.map((entry) => entry.id.assetId)).toEqual(["workflow:persisted-draft"]);
   });
+
+  it("falls back to registry-only results when persisted workflow listing fails", async () => {
+    const fallbackService = new ExploreAssetQueryService({
+      async listAllAssets() {
+        return seedAssets;
+      },
+    }, {
+      async listPersistedWorkflows() {
+        throw new Error("persistence unavailable");
+      },
+    });
+
+    const library = await fallbackService.listLibrary();
+    expect(library.totalCount).toBe(3);
+    expect(library.assets.some((entry) => entry.id.assetId === "workflow:persisted-draft")).toBeFalse();
+    expect(library.assets.some((entry) => entry.id.assetId === "asset:workflow")).toBeTrue();
+  });
 });
