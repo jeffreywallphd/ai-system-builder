@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { listTransformationAssets } from "../TransformationAssetCatalog";
 import {
+  AggregationAsset,
   DataClassificationAsset,
   DataProfilingAsset,
   DataValidationAsset,
@@ -23,6 +24,7 @@ describe("TransformationAssetCatalog", () => {
     expect(assets.some((entry) => entry.descriptor.id === MissingValueHandlingAsset.assetId)).toBeTrue();
     expect(assets.some((entry) => entry.descriptor.id === DeduplicationAsset.assetId)).toBeTrue();
     expect(assets.some((entry) => entry.descriptor.id === FilteringAsset.assetId)).toBeTrue();
+    expect(assets.some((entry) => entry.descriptor.id === AggregationAsset.assetId)).toBeTrue();
     expect(assets.some((entry) => entry.descriptor.id === DataValidationAsset.assetId)).toBeTrue();
     expect(assets.some((entry) => entry.descriptor.id === FieldMappingAsset.assetId)).toBeTrue();
   });

@@ -4,6 +4,7 @@ import {
   createCanonicalTableShape,
 } from "../../../domain/dataset-studio/CanonicalDataShapes";
 import {
+  AggregationAsset,
   DataClassificationAsset,
   DataProfilingAsset,
   DataValidationAsset,
@@ -142,6 +143,7 @@ describe("Transformation assets", () => {
     expect(entries.some((entry) => entry.descriptor.id === MissingValueHandlingAsset.assetId)).toBeTrue();
     expect(entries.some((entry) => entry.descriptor.id === DeduplicationAsset.assetId)).toBeTrue();
     expect(entries.some((entry) => entry.descriptor.id === FilteringAsset.assetId)).toBeTrue();
+    expect(entries.some((entry) => entry.descriptor.id === AggregationAsset.assetId)).toBeTrue();
     expect(entries.some((entry) => entry.descriptor.id === DataValidationAsset.assetId)).toBeTrue();
     expect(entries.some((entry) => entry.descriptor.id === FieldMappingAsset.assetId)).toBeTrue();
 
@@ -163,7 +165,7 @@ describe("Transformation assets", () => {
     );
 
     expect(pipelineResult.outputs).toHaveLength(1);
-    expect(pipelineResult.finalOutput.metadata.assetId).toBe(SchemaInferenceAsset.assetId);
-    expect((pipelineResult.finalOutput as Awaited<ReturnType<SchemaInferenceAsset["execute"]>>).schema.fields.length).toBeGreaterThan(0);
+    expect(pipelineResult.finalOutput?.metadata.assetId).toBe(SchemaInferenceAsset.assetId);
+    expect((pipelineResult.finalOutput as Awaited<ReturnType<SchemaInferenceAsset["execute"]>> | undefined)?.schema.fields.length).toBeGreaterThan(0);
   });
 });

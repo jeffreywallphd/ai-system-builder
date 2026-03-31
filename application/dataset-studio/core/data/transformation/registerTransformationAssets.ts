@@ -1,3 +1,4 @@
+import { AggregationAsset } from "./assets/AggregationAsset";
 import { DataClassificationAsset } from "./assets/DataClassificationAsset";
 import { DataProfilingAsset } from "./assets/DataProfilingAsset";
 import { DataValidationAsset } from "./assets/DataValidationAsset";
@@ -27,6 +28,7 @@ export function registerTransformationAssets(
   const missingValueHandlingEntry = registry.register(new MissingValueHandlingAsset());
   const deduplicationEntry = registry.register(new DeduplicationAsset());
   const filteringEntry = registry.register(new FilteringAsset());
+  const aggregationEntry = registry.register(new AggregationAsset());
   const dataValidationEntry = registry.register(new DataValidationAsset());
   const fieldMappingEntry = registry.register(new FieldMappingAsset());
   return Object.freeze({
@@ -39,6 +41,7 @@ export function registerTransformationAssets(
       missingValueHandlingEntry,
       deduplicationEntry,
       filteringEntry,
+      aggregationEntry,
       dataValidationEntry,
       fieldMappingEntry,
     ]),
