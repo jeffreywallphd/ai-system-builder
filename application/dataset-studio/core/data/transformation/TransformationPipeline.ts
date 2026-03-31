@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type {
   ITransformationAsset,
+  TransformationAssetPreviewContract,
   ITransformationConfig,
   ITransformationInput,
   ITransformationOutput,
@@ -14,6 +15,7 @@ import {
   type TransformationDataSummary,
   type TransformationPipelineErrorDetails,
 } from "./TransformationPipelineUtils";
+import { buildTransformationPipelinePreviewContract } from "./TransformationPreviewService";
 
 export const TransformationPipelineFailureModes = Object.freeze({
   stopOnError: "stop-on-error",
@@ -87,8 +89,43 @@ export interface TransformationPipelinePreviewStep {
   readonly assetVersion: string;
   readonly status: "succeeded" | "failed";
   readonly summary?: TransformationPipelineStepOutputSummary;
+  readonly preview?: TransformationAssetPreviewContract;
   readonly warningMessages: ReadonlyArray<string>;
   readonly error?: TransformationPipelineErrorDetails;
+}
+
+export interface TransformationPipelinePreviewContract {
+  readonly contractVersion: "1.0.0";
+  readonly generatedAt: string;
+  readonly pipelineId?: string;
+  readonly status: "succeeded" | "failed";
+  readonly failureMode: TransformationPipelineFailureMode;
+  readonly inputSummary: TransformationDataSummary;
+  readonly outputSummary?: TransformationDataSummary;
+  readonly finalPreviewData?: ITransformationInput["data"];
+  readonly steps: ReadonlyArray<{
+    readonly stepId: string;
+    readonly assetId: string;
+    readonly assetVersion: string;
+    readonly status: "succeeded" | "failed";
+    readonly summary?: TransformationAssetPreviewContract["summary"];
+    readonly warnings: TransformationAssetPreviewContract["warnings"];
+    readonly errors: TransformationAssetPreviewContract["errors"];
+    readonly preview?: TransformationAssetPreviewContract;
+  }>;
+  readonly summary: {
+    readonly stepCount: number;
+    readonly succeededStepCount: number;
+    readonly failedStepCount: number;
+    readonly warningCount: number;
+    readonly errorCount: number;
+    readonly totalChangedRows: number;
+    readonly totalAddedRows: number;
+    readonly totalRemovedRows: number;
+    readonly changedFields: ReadonlyArray<string>;
+  };
+  readonly warnings: TransformationAssetPreviewContract["warnings"];
+  readonly errors: TransformationAssetPreviewContract["errors"];
 }
 
 export interface TransformationPipelinePreviewResult {
@@ -99,6 +136,7 @@ export interface TransformationPipelinePreviewResult {
   readonly outputSummary?: TransformationDataSummary;
   readonly steps: ReadonlyArray<TransformationPipelinePreviewStep>;
   readonly finalPreviewData?: ITransformationInput["data"];
+  readonly normalized: TransformationPipelinePreviewContract;
   readonly error?: TransformationPipelineErrorDetails;
 }
 
@@ -317,6 +355,7 @@ async function previewResolvedPipeline(
         assetVersion: step.asset.version,
         status: "succeeded",
         summary,
+        preview: preview.normalized,
         warningMessages: Object.freeze([]),
       }));
       nextInput = Object.freeze({ data: preview.output.data });
@@ -339,7 +378,7 @@ async function previewResolvedPipeline(
 
   const finalPreviewData = samplePipelineData(nextInput.data, options?.sampleSize);
 
-  return Object.freeze({
+  const previewResultBase = Object.freeze({
     status: pipelineError ? "failed" : "succeeded",
     pipelineId: options?.pipelineId,
     failureMode,
@@ -347,7 +386,14 @@ async function previewResolvedPipeline(
     outputSummary: summarizeTransformationData(nextInput.data),
     steps: Object.freeze(stepPreviews),
     finalPreviewData,
+    normalized: {} as TransformationPipelinePreviewContract,
     error: pipelineError,
+  });
+
+  const normalized = buildTransformationPipelinePreviewContract(previewResultBase);
+  return Object.freeze({
+    ...previewResultBase,
+    normalized,
   });
 }
 

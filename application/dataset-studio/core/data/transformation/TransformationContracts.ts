@@ -28,9 +28,70 @@ export interface ITransformationOutput {
   };
 }
 
+export const TransformationPreviewIssueSeverities = Object.freeze({
+  info: "info",
+  warning: "warning",
+  error: "error",
+} as const);
+
+export type TransformationPreviewIssueSeverity =
+  typeof TransformationPreviewIssueSeverities[keyof typeof TransformationPreviewIssueSeverities];
+
+export interface TransformationPreviewIssue {
+  readonly severity: TransformationPreviewIssueSeverity;
+  readonly code: string;
+  readonly message: string;
+  readonly path?: string;
+}
+
+export interface TransformationPreviewChangeSummary {
+  readonly inputRowCount: number;
+  readonly outputRowCount: number;
+  readonly sampledInputRowCount: number;
+  readonly sampledOutputRowCount: number;
+  readonly changedRowCount: number;
+  readonly addedRowCount: number;
+  readonly removedRowCount: number;
+  readonly changedFieldCount: number;
+  readonly changedFields: ReadonlyArray<string>;
+}
+
+export interface TransformationPreviewRowSample {
+  readonly rowId: string;
+  readonly fields: Readonly<Record<string, unknown>>;
+}
+
+export interface TransformationPreviewDiffPatch {
+  readonly kind: "json";
+  readonly changes: ReadonlyArray<string>;
+  readonly truncated: boolean;
+}
+
+export interface TransformationAssetPreviewContract {
+  readonly contractVersion: "1.0.0";
+  readonly generatedAt: string;
+  readonly asset: {
+    readonly assetId: string;
+    readonly assetVersion: string;
+  };
+  readonly summary: TransformationPreviewChangeSummary;
+  readonly samples: {
+    readonly inputRows: ReadonlyArray<TransformationPreviewRowSample>;
+    readonly outputRows: ReadonlyArray<TransformationPreviewRowSample>;
+  };
+  readonly diffs?: {
+    readonly structuredPatch?: TransformationPreviewDiffPatch;
+  };
+  readonly diagnostics: ReadonlyArray<Readonly<Record<string, unknown>>>;
+  readonly warnings: ReadonlyArray<TransformationPreviewIssue>;
+  readonly errors: ReadonlyArray<TransformationPreviewIssue>;
+  readonly extensions?: Readonly<Record<string, unknown>>;
+}
+
 export interface ITransformationPreview<TOutput extends ITransformationOutput = ITransformationOutput> {
   readonly output: TOutput;
   readonly sample: TransformationInputData;
+  readonly normalized: TransformationAssetPreviewContract;
 }
 
 export interface ITransformationAsset<

@@ -8,6 +8,7 @@ import {
   type ITransformationPreview,
 } from "./TransformationContracts";
 import { sampleTransformationInputData } from "./TransformationSampling";
+import { buildTransformationAssetPreviewContract } from "./TransformationPreviewService";
 
 export class TransformationAssetExecutionError extends Error {
   public readonly assetId: string;
@@ -80,6 +81,10 @@ export abstract class BaseTransformationAsset<
     return Object.freeze({
       output,
       sample: sampledInput.data,
+      normalized: buildTransformationAssetPreviewContract({
+        input: sampledInput,
+        output,
+      }),
     });
   }
 
