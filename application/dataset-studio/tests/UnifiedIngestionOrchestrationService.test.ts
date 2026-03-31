@@ -106,6 +106,8 @@ describe("UnifiedIngestionOrchestrationService", () => {
       expect(result.route.assetId).toBe("csv-ingestor");
       expect(result.conversion.operation).toBe("source-to-records");
       expect(result.metadata.source.sourceId).toBe("source-1");
+      expect(result.metadata.processing.pipelineId).toBe("dataset-unified-ingestion");
+      expect(result.metadata.processing.orderedStageIds).toContain("ingestion");
       expect(result.lineage.stages.some((stage) => stage.stage === "detection")).toBeTrue();
       expect(converterCalls).toEqual(["source-to-records"]);
     }
