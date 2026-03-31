@@ -1323,3 +1323,23 @@ Explicitly later than this scope:
   - warning/error counts.
 - Batch ingestion now emits batch-level + per-item logging metadata and lineage hooks with parent/child execution linkage hints while preserving existing bounded orchestration scope.
 - Data asset execution framework results now include ingestion-oriented logging/lineage metadata in addition to existing lineage diagnostics, keeping preview/full execution traceability machine-readable for downstream registry/inspection surfaces.
+
+## Direction 5 update: Unified ingestion model + source detection foundation (stories 15.1-15.2)
+
+- Dataset Studio now has a unified ingestion domain contract in `domain/dataset-studio/UnifiedIngestionDomain.ts` with:
+  - source kinds (`csv`, `json`, `document`, `image`, `unknown`),
+  - versioned source-reference collections that support single-source now and multi-source expansion,
+  - simple/advanced configuration modes,
+  - output targets aligned to canonical shape kinds (`records`, `text-items`, `image-metadata-records`),
+  - structured detection/result/preview/error contracts.
+- Source detection now follows clean boundaries:
+  - domain-level interfaces/contracts in `domain/dataset-studio/UnifiedIngestionDomain.ts`,
+  - application orchestration in `application/dataset-studio/UnifiedSourceTypeDetectionService.ts`,
+  - infrastructure `file-type` wrapper in `infrastructure/dataset-studio/FileTypeSignatureSniffer.ts`.
+- Detection is deterministic and explainable with layered signals:
+  - explicit metadata,
+  - extension + MIME heuristics,
+  - optional signature probing,
+  - bounded content sniffing (JSON/CSV/PDF/image signatures),
+  - structured evidence + candidate scores + confidence output.
+- Batch ingestion routed mode now delegates routing decisions to this detector, improving missing-extension and conflicting-signal cases without adding a parallel ingestion runtime.
