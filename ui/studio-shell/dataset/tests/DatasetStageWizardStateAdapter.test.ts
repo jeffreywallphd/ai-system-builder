@@ -2,28 +2,40 @@ import { describe, expect, it } from "bun:test";
 import { DatasetStageWizardStateAdapter } from "../DatasetStageWizardStateAdapter";
 
 describe("DatasetStageWizardStateAdapter", () => {
-  it("creates a stage-based wizard snapshot with current/completed/pending statuses", () => {
+  it("keeps wizard and canvas projections synchronized after stage edits", () => {
     const adapter = new DatasetStageWizardStateAdapter({ templateId: "elt-default" });
-    const initial = adapter.getSnapshot();
 
-    expect(initial.currentStageId).toBe("source");
-    expect(initial.currentStage?.status).toBe("current");
-    expect(initial.stages.length).toBeGreaterThan(0);
+    const beforeWizard = adapter.getSnapshot();
+    const beforeCanvas = adapter.getCanvasGraph();
+    expect(beforeCanvas.metadata.stageCount).toBe(beforeWizard.stages.length);
+
+    const configResult = adapter.updateStageConfiguration(
+      beforeWizard.currentStageId,
+      Object.freeze({ sourceKind: "json" }),
+    );
+    expect(configResult.ok).toBeTrue();
 
     adapter.goNext();
-    const afterNext = adapter.getSnapshot();
-    expect(afterNext.currentStageId).toBe("ingestion");
-    expect(afterNext.stages.find((stage) => stage.id === "source")?.status).toBe("completed");
+
+    const afterWizard = adapter.getSnapshot();
+    const afterCanvas = adapter.regenerateGraph();
+    expect(afterCanvas.metadata.currentStageId).toBe(afterWizard.currentStageId);
+
+    const sourceStage = afterCanvas.groups.find((group) => group.stageId === beforeWizard.currentStageId);
+    expect(sourceStage?.metadata.configuration.sourceKind).toBe("json");
   });
 
-  it("updates stage configuration through the wizard state adapter", () => {
-    const adapter = new DatasetStageWizardStateAdapter({ templateId: "elt-default" });
-    adapter.updateStageConfiguration("source", Object.freeze({
-      sourceKind: "json",
-      sourceReference: "in-memory://dataset-source",
-    }));
+  it("surfaces invalid edits and preserves valid graph composition", () => {
+    const adapter = new DatasetStageWizardStateAdapter({ templateId: "document-default" });
 
-    const snapshot = adapter.getSnapshot();
-    expect(snapshot.stages.find((stage) => stage.id === "source")?.configuration.sourceKind).toBe("json");
+    const invalid = adapter.removeOptionalStage("source");
+    expect(invalid.ok).toBeFalse();
+
+    const valid = adapter.removeOptionalStage("extraction");
+    expect(valid.ok).toBeTrue();
+
+    const graph = adapter.getCanvasGraph();
+    expect(graph.groups.some((group) => group.stageId === "extraction")).toBeFalse();
+    expect(graph.nodes.every((node) => node.stageId !== "extraction")).toBeTrue();
   });
 });

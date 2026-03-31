@@ -1515,3 +1515,15 @@ Explicitly later than this scope:
 - Stage metadata propagation now supports detected data type, storage references, normalization hints, preview/inspection references, and lineage hooks from typed stage outputs and legacy-compatible stage output records.
 - Downstream stages now receive propagated upstream metadata through engine-managed tracking instead of stage-specific implementation coupling.
 - Wizard stage UI snapshots now include stage-category/status-marker/lineage metadata in addition to existing stage contract summaries for inspectable renderer surfaces.
+
+## Direction 5 extension update: Stage-aware dataset canvas projection + editing services (stories 15E.11-15E.12)
+
+- Application-layer stage-canvas projection now lives in `application/dataset-studio/StageCanvasGraphProjectionService.ts` and translates canonical stage-flow/runtime contracts into canvas graph read models (stage groups + asset nodes + flow edges) while preserving ordering/dependency semantics.
+- Projection contracts remain application translators: no UI data shape leakage into `domain/dataset-studio/*` and no second stage graph source-of-truth.
+- Stage-level editing orchestration now lives in `application/dataset-studio/StageCanvasEditingService.ts` with explicit validation/error contracts for:
+  - stage configuration updates,
+  - stage reorder constraints,
+  - optional-stage insertion/removal constraints,
+  - compatibility validation against stage-flow + stage-asset mapping seams,
+  - post-edit graph regeneration.
+- Wizard/canvas synchronization remains centered on `WizardFlowEngine` state; adapter surfaces consume/edit the same underlying stage-flow/runtime contracts instead of duplicating state logic in React components.
