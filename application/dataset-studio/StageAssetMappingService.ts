@@ -546,8 +546,18 @@ const DefaultStageAssetMappings: ReadonlyArray<StageAssetMappingDefinition> = Ob
     stageKind: DatasetPipelineStageKinds.aggregation,
     assets: Object.freeze([
       Object.freeze({
-        assetId: DatasetIngestionStageAssetIds.unified,
+        assetId: DatasetTransformationStageAssetIds.aggregation,
         assetVersion: "1.0.0",
+        configDefaults: Object.freeze({
+          groupByFields: Object.freeze(["group"]),
+          aggregations: Object.freeze([
+            Object.freeze({
+              operation: "count",
+              outputField: "row_count",
+            }),
+          ]),
+          nullHandlingMode: "exclude",
+        }),
       }),
     ]),
   }),

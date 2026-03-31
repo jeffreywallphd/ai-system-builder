@@ -82,6 +82,7 @@ export const DatasetTransformationStageAssetIds = Object.freeze({
   filtering: "filtering",
   dataValidation: "data-validation",
   fieldMapping: "field-mapping",
+  aggregation: "aggregation",
 } as const);
 
 const AllCanonicalShapeKinds = Object.freeze(

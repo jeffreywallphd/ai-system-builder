@@ -109,6 +109,19 @@ describe("StageAssetMappingService", () => {
     }
   });
 
+  it("resolves aggregation stage to the aggregation transformation asset", () => {
+    const service = new StageAssetMappingService();
+    const result = service.resolveStage({
+      stageKind: DatasetPipelineStageKinds.aggregation,
+    });
+
+    expect(result.status).toBe("resolved");
+    if (result.status === "resolved") {
+      expect(result.assets[0]?.assetId).toBe("aggregation");
+      expect(result.assets[0]?.configDefaults?.nullHandlingMode).toBe("exclude");
+    }
+  });
+
   it("resolves raw-storage stage to storage asset defaults and metadata hooks", () => {
     const service = new StageAssetMappingService();
     const result = service.resolveStage({
