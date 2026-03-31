@@ -8,6 +8,12 @@ import {
   type DataSourceReference,
   type ResolvedDataSource,
 } from "./DataConverterContracts";
+import {
+  hasErrorIssues,
+  toDataConverterDiagnostics,
+  validateDataSourceReference,
+  validateResolvedDataSource,
+} from "./DataStudioValidation";
 
 export const DataSourceLocatorErrorCodes = Object.freeze({
   invalidReference: "invalid_reference",
@@ -94,8 +100,14 @@ export class DefaultDataSourceLocator implements IDataSourceLocator {
 
   public async resolve(request: DataSourceLocatorResolutionRequest): Promise<ResolvedDataSource> {
     const source = request.source;
+    const sourceIssues = validateDataSourceReference(source);
+    if (hasErrorIssues(sourceIssues)) {
+      const diagnostics = toDataConverterDiagnostics(sourceIssues);
+      throw new DataSourceLocatorError(DataSourceLocatorErrorCodes.invalidReference, diagnostics[0]?.message ?? "Invalid source reference.", diagnostics);
+    }
+
     if (source.kind === DataSourceReferenceKinds.inMemory) {
-      return freezeResolved({
+      const resolved = freezeResolved({
         kind: source.kind,
         reference: "in-memory",
         payload: source.payload,
@@ -105,6 +117,12 @@ export class DefaultDataSourceLocator implements IDataSourceLocator {
         sourceAssetId: normalizeOptional(source.sourceAssetId),
         sourceVersionId: normalizeOptional(source.sourceVersionId),
       });
+      const resolvedIssues = validateResolvedDataSource(resolved);
+      if (hasErrorIssues(resolvedIssues)) {
+        const diagnostics = toDataConverterDiagnostics(resolvedIssues);
+        throw new DataSourceLocatorError(DataSourceLocatorErrorCodes.sourceUnavailable, diagnostics[0]?.message ?? "Resolved source is invalid.", diagnostics);
+      }
+      return resolved;
     }
 
     if (source.kind === DataSourceReferenceKinds.localFile) {
@@ -118,7 +136,7 @@ export class DefaultDataSourceLocator implements IDataSourceLocator {
       }
 
       const payload = source.payload ?? await this.loadFromLocalPath(path);
-      return freezeResolved({
+      const resolved = freezeResolved({
         kind: source.kind,
         reference: path,
         payload,
@@ -128,6 +146,12 @@ export class DefaultDataSourceLocator implements IDataSourceLocator {
         sourceAssetId: normalizeOptional(source.sourceAssetId),
         sourceVersionId: normalizeOptional(source.sourceVersionId),
       });
+      const resolvedIssues = validateResolvedDataSource(resolved);
+      if (hasErrorIssues(resolvedIssues)) {
+        const diagnostics = toDataConverterDiagnostics(resolvedIssues);
+        throw new DataSourceLocatorError(DataSourceLocatorErrorCodes.sourceUnavailable, diagnostics[0]?.message ?? "Resolved source is invalid.", diagnostics);
+      }
+      return resolved;
     }
 
     if (source.kind === DataSourceReferenceKinds.url) {
@@ -141,7 +165,7 @@ export class DefaultDataSourceLocator implements IDataSourceLocator {
       }
 
       const payload = source.payload ?? await this.loadFromUrl(url);
-      return freezeResolved({
+      const resolved = freezeResolved({
         kind: source.kind,
         reference: url,
         payload,
@@ -151,6 +175,12 @@ export class DefaultDataSourceLocator implements IDataSourceLocator {
         sourceAssetId: normalizeOptional(source.sourceAssetId),
         sourceVersionId: normalizeOptional(source.sourceVersionId),
       });
+      const resolvedIssues = validateResolvedDataSource(resolved);
+      if (hasErrorIssues(resolvedIssues)) {
+        const diagnostics = toDataConverterDiagnostics(resolvedIssues);
+        throw new DataSourceLocatorError(DataSourceLocatorErrorCodes.sourceUnavailable, diagnostics[0]?.message ?? "Resolved source is invalid.", diagnostics);
+      }
+      return resolved;
     }
 
     const unknown = source as { readonly kind?: string };

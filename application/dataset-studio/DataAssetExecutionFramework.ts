@@ -30,6 +30,18 @@ import {
   type DataSourceReference,
   type ResolvedDataSource,
 } from "./DataConverterContracts";
+import {
+  DataStudioFailureKinds,
+  createDataStudioFailure,
+  summarizeIssueCountByShapeKind,
+  toDataConverterDiagnostics,
+  type DataStudioFailure,
+  type DataStudioValidationIssue,
+  validateCanonicalDataShape,
+  validateDataAssetExecutionRequest,
+  validateDataConverterResult,
+  validateDataPreviewModel,
+} from "./DataStudioValidation";
 
 export const DataAssetExecutionErrorCodes = Object.freeze({
   invalidRequest: "invalid_request",
@@ -107,6 +119,8 @@ export interface DataAssetExecutionResult {
   readonly output?: CanonicalDataShape;
   readonly preview: DataPreviewModel;
   readonly diagnostics: ReadonlyArray<DataConverterDiagnostic>;
+  readonly validationIssues: ReadonlyArray<DataStudioValidationIssue>;
+  readonly failure?: DataStudioFailure;
   readonly converterResult?: DataConverterResult;
   readonly lineage: DataLineageMetadata;
 }
@@ -192,9 +206,13 @@ export class DefaultDataAssetExecutionFramework {
     const steps: DataLineageExecutionStep[] = [];
     const inputReferences: DataLineageReference[] = [];
     const outputReferences: DataLineageReference[] = [];
+    const validationIssues: DataStudioValidationIssue[] = [];
 
     const validationStepStartedAt = nowIso(this.now);
     const validationDiagnostics: DataConverterDiagnostic[] = [];
+    const requestIssues = validateDataAssetExecutionRequest(request);
+    validationIssues.push(...requestIssues);
+    validationDiagnostics.push(...toDataConverterDiagnostics(requestIssues));
     if (!request.input && !request.asset.supportsPreview) {
       validationDiagnostics.push(createFailureDiagnostic(
         DataAssetExecutionErrorCodes.previewUnsupported,
@@ -205,13 +223,15 @@ export class DefaultDataAssetExecutionFramework {
     steps.push(createDataLineageExecutionStep({
       stepId: "step-validate",
       kind: DataLineageStepKinds.validate,
-      status: validationDiagnostics.length > 0 ? DataLineageStepStatuses.failed : DataLineageStepStatuses.completed,
+      status: validationDiagnostics.some((diagnostic) => diagnostic.severity === DataConverterDiagnosticSeverities.error)
+        ? DataLineageStepStatuses.failed
+        : DataLineageStepStatuses.completed,
       startedAt: validationStepStartedAt,
       completedAt: nowIso(this.now),
       diagnostics: toLineageDiagnostics(validationDiagnostics),
     }));
 
-    if (validationDiagnostics.length > 0) {
+    if (validationDiagnostics.some((diagnostic) => diagnostic.severity === DataConverterDiagnosticSeverities.error)) {
       const completedAt = nowIso(this.now);
       return this.createFailureResult({
         request,
@@ -226,18 +246,45 @@ export class DefaultDataAssetExecutionFramework {
         outputReferences,
         steps,
         notes,
+        validationIssues: Object.freeze(validationIssues),
+        failure: createDataStudioFailure({
+          kind: DataStudioFailureKinds.validation,
+          code: validationDiagnostics[0]?.code ?? DataAssetExecutionErrorCodes.invalidRequest,
+          message: validationDiagnostics[0]?.message ?? "Execution validation failed.",
+          section: validationIssues[0]?.section ?? "execution-request",
+          issues: validationIssues,
+          diagnostics: validationDiagnostics,
+        }),
       });
     }
 
     try {
       const resolvedInput = await this.resolveInput(request, operationContext, inputReferences, steps, notes);
       const diagnostics = [...resolvedInput.diagnostics];
+      if (resolvedInput.converterResult) {
+        const converterResultIssues = validateDataConverterResult(resolvedInput.converterResult);
+        validationIssues.push(...converterResultIssues);
+        diagnostics.push(...toDataConverterDiagnostics(converterResultIssues));
+      }
+
+      const outputShapeIssues = validateCanonicalDataShape(resolvedInput.output);
+      validationIssues.push(...outputShapeIssues);
+      diagnostics.push(...toDataConverterDiagnostics(outputShapeIssues));
+      notes.push(`Output shape summary: ${JSON.stringify(summarizeIssueCountByShapeKind(resolvedInput.output))}`);
+
       const expectedShapeKind = request.asset.toCanonicalDataShape().kind;
       if (resolvedInput.output.kind !== expectedShapeKind) {
         diagnostics.push(createFailureDiagnostic(
           DataAssetExecutionErrorCodes.outputShapeMismatch,
           `Execution output kind '${resolvedInput.output.kind}' does not match data asset '${request.asset.id}' output kind '${expectedShapeKind}'.`,
         ));
+        validationIssues.push(Object.freeze({
+          code: DataAssetExecutionErrorCodes.outputShapeMismatch,
+          section: "execution-request",
+          severity: "error",
+          message: `Execution output kind '${resolvedInput.output.kind}' does not match expected kind '${expectedShapeKind}'.`,
+          path: "output.kind",
+        }));
       }
 
       if (diagnostics.some((diagnostic) => diagnostic.severity === DataConverterDiagnosticSeverities.error)) {
@@ -255,6 +302,15 @@ export class DefaultDataAssetExecutionFramework {
           outputReferences,
           steps,
           notes,
+          validationIssues: Object.freeze(validationIssues),
+          failure: createDataStudioFailure({
+            kind: DataStudioFailureKinds.validation,
+            code: diagnostics[0]?.code ?? DataAssetExecutionErrorCodes.executionFailed,
+            message: diagnostics[0]?.message ?? "Data asset execution failed validation.",
+            section: validationIssues[0]?.section ?? "execution-request",
+            issues: validationIssues,
+            diagnostics: diagnostics,
+          }),
         });
       }
 
@@ -262,6 +318,35 @@ export class DefaultDataAssetExecutionFramework {
       const preview = resolvedInput.converterResult
         ? this.previewEngine.buildFromConverterResult(resolvedInput.converterResult, request.previewOptions)
         : this.previewEngine.buildFromCanonicalShape(resolvedInput.output, request.previewOptions, Object.freeze(diagnostics));
+      const previewIssues = validateDataPreviewModel(preview);
+      validationIssues.push(...previewIssues);
+      diagnostics.push(...toDataConverterDiagnostics(previewIssues));
+      if (diagnostics.some((diagnostic) => diagnostic.severity === DataConverterDiagnosticSeverities.error)) {
+        const completedAt = nowIso(this.now);
+        return this.createFailureResult({
+          request,
+          executionId,
+          operationContext,
+          startedAt,
+          completedAt,
+          diagnostics: Object.freeze(diagnostics),
+          message: diagnostics[0]?.message ?? "Data preview validation failed.",
+          converterResult: resolvedInput.converterResult,
+          inputReferences,
+          outputReferences,
+          steps,
+          notes,
+          validationIssues: Object.freeze(validationIssues),
+          failure: createDataStudioFailure({
+            kind: DataStudioFailureKinds.validation,
+            code: diagnostics[0]?.code ?? DataAssetExecutionErrorCodes.executionFailed,
+            message: diagnostics[0]?.message ?? "Data preview validation failed.",
+            section: validationIssues[0]?.section ?? "preview-model",
+            issues: validationIssues,
+            diagnostics: diagnostics,
+          }),
+        });
+      }
       const previewReference = createDataLineageReference({
         referenceId: "preview-1",
         kind: DataLineageReferenceKinds.preview,
@@ -338,6 +423,7 @@ export class DefaultDataAssetExecutionFramework {
         output: resolvedInput.output,
         preview,
         diagnostics: Object.freeze(diagnostics),
+        validationIssues: Object.freeze(validationIssues),
         converterResult: resolvedInput.converterResult,
         lineage,
       } satisfies DataAssetExecutionResult);
@@ -360,6 +446,15 @@ export class DefaultDataAssetExecutionFramework {
         outputReferences,
         steps,
         notes,
+        validationIssues: Object.freeze(validationIssues),
+        failure: createDataStudioFailure({
+          kind: DataStudioFailureKinds.runtime,
+          code: diagnostic.code,
+          message: diagnostic.message,
+          section: "execution-request",
+          issues: validationIssues,
+          diagnostics: Object.freeze([diagnostic]),
+        }),
       });
     }
   }
@@ -594,6 +689,8 @@ export class DefaultDataAssetExecutionFramework {
     readonly outputReferences: ReadonlyArray<DataLineageReference>;
     readonly steps: ReadonlyArray<DataLineageExecutionStep>;
     readonly notes: ReadonlyArray<string>;
+    readonly validationIssues: ReadonlyArray<DataStudioValidationIssue>;
+    readonly failure: DataStudioFailure;
   }): DataAssetExecutionResult {
     const preview = input.converterResult
       ? this.previewEngine.buildFromConverterResult(input.converterResult)
@@ -638,6 +735,8 @@ export class DefaultDataAssetExecutionFramework {
       }),
       preview,
       diagnostics: input.diagnostics,
+      validationIssues: input.validationIssues,
+      failure: input.failure,
       converterResult: input.converterResult,
       lineage,
     } satisfies DataAssetExecutionResult);

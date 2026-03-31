@@ -15,5 +15,7 @@ describe("DatasetStudioPage contracts", () => {
     expect(registrationSource).toContain('slot: "draft-authoring"');
     expect(registrationSource).toContain('slot: "metadata"');
     expect(registrationSource).toContain("createDatasetStudioTaxonomy()");
+    expect(registrationSource).toContain("DatasetStudioDraftPreviewPanel");
+    expect(registrationSource).toContain('id: "dataset-studio-data-preview-panel"');
   });
 });
