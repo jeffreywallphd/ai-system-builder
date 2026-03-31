@@ -53,6 +53,7 @@ describe("DataAssetRegistry", () => {
 
     expect(entry.descriptor.assetId).toBe("dataset-a");
     expect(entry.descriptor.versionId).toBe("v1");
+    expect(entry.descriptor.version.scheme).toBe("label");
     expect(entry.descriptor.specialization).toBe("converter");
     expect(entry.descriptor.configSchema.schemaId).toBe("dataset-a.schema");
     expect(registry.get({ assetId: "dataset-a", versionId: "v1" })?.descriptor.assetId).toBe("dataset-a");
@@ -118,5 +119,21 @@ describe("DataAssetRegistry", () => {
       versionId: "v1",
       configOverride: { delimiter: "|" },
     })).toThrow("does not support config-based loading");
+  });
+
+  it("resolves latest by semantic version precedence when versionId is omitted", () => {
+    const registry = new DataAssetRegistry();
+    registry.register({
+      asset: createAsset({ id: "dataset-versioned", version: "1.2.0" }),
+    });
+    registry.register({
+      asset: createAsset({ id: "dataset-versioned", version: "1.10.0" }),
+    });
+    registry.register({
+      asset: createAsset({ id: "dataset-versioned", version: "v1" }),
+    });
+
+    const resolved = registry.resolveAsset({ assetId: "dataset-versioned" });
+    expect(resolved?.version).toBe("1.10.0");
   });
 });
