@@ -1,7 +1,9 @@
 import {
+  DatasetPipelineStageKinds,
+} from "../../domain/dataset-studio/StagePipelineDomain";
+import {
   UnifiedIngestionOutputTargetKinds,
   UnifiedIngestionRouteFailureCodes,
-  UnifiedIngestionRouteHandlerKinds,
   UnifiedIngestionRoutePolicyKinds,
   UnifiedIngestionSourceKinds,
   UnifiedIngestionStrategyKinds,
@@ -13,10 +15,7 @@ import {
   type UnifiedIngestionRouteResult,
   type UnifiedIngestionSourceKind,
 } from "../../domain/dataset-studio/UnifiedIngestionDomain";
-import { CsvIngestorAsset } from "./CsvIngestorAsset";
-import { DocumentPdfIngestorAsset } from "./DocumentPdfIngestorAsset";
-import { ImageIngestorAsset } from "./ImageIngestorAsset";
-import { JsonIngestorAsset } from "./JsonIngestorAsset";
+import { StageAssetMappingService } from "./StageAssetMappingService";
 
 export interface UnifiedIngestionRouteDescriptor {
   readonly sourceKind: Exclude<UnifiedIngestionSourceKind, "unknown">;
@@ -24,33 +23,6 @@ export interface UnifiedIngestionRouteDescriptor {
   readonly assetId: string;
   readonly assetVersion?: string;
 }
-
-const DefaultUnifiedIngestionRouteDescriptors: ReadonlyArray<UnifiedIngestionRouteDescriptor> = Object.freeze([
-  Object.freeze({
-    sourceKind: UnifiedIngestionSourceKinds.csv,
-    handlerKind: UnifiedIngestionRouteHandlerKinds.csv,
-    assetId: CsvIngestorAsset.assetId,
-    assetVersion: CsvIngestorAsset.assetVersion,
-  }),
-  Object.freeze({
-    sourceKind: UnifiedIngestionSourceKinds.json,
-    handlerKind: UnifiedIngestionRouteHandlerKinds.json,
-    assetId: JsonIngestorAsset.assetId,
-    assetVersion: JsonIngestorAsset.assetVersion,
-  }),
-  Object.freeze({
-    sourceKind: UnifiedIngestionSourceKinds.document,
-    handlerKind: UnifiedIngestionRouteHandlerKinds.document,
-    assetId: DocumentPdfIngestorAsset.assetId,
-    assetVersion: DocumentPdfIngestorAsset.assetVersion,
-  }),
-  Object.freeze({
-    sourceKind: UnifiedIngestionSourceKinds.image,
-    handlerKind: UnifiedIngestionRouteHandlerKinds.image,
-    assetId: ImageIngestorAsset.assetId,
-    assetVersion: ImageIngestorAsset.assetVersion,
-  }),
-]);
 
 function buildResolvedRoute(
   sourceKind: UnifiedIngestionSourceKind,
@@ -87,20 +59,73 @@ function buildUnsupportedRoute(
 }
 
 export class UnifiedIngestionRoutingService implements IUnifiedIngestionRouter {
-  private readonly descriptorsBySourceKind: Readonly<Record<Exclude<UnifiedIngestionSourceKind, "unknown">, UnifiedIngestionRouteDescriptor | undefined>>;
+  private readonly descriptorsBySourceKind: Readonly<Record<Exclude<UnifiedIngestionSourceKind, "unknown">, UnifiedIngestionRouteDescriptor | undefined>> | undefined;
+  private readonly stageAssetMappingService: StageAssetMappingService;
 
   constructor(
-    descriptors: ReadonlyArray<UnifiedIngestionRouteDescriptor> = DefaultUnifiedIngestionRouteDescriptors,
+    descriptors?: ReadonlyArray<UnifiedIngestionRouteDescriptor>,
+    stageAssetMappingService: StageAssetMappingService = new StageAssetMappingService(),
   ) {
-    this.descriptorsBySourceKind = Object.freeze({
-      csv: descriptors.find((entry) => entry.sourceKind === UnifiedIngestionSourceKinds.csv),
-      json: descriptors.find((entry) => entry.sourceKind === UnifiedIngestionSourceKinds.json),
-      document: descriptors.find((entry) => entry.sourceKind === UnifiedIngestionSourceKinds.document),
-      image: descriptors.find((entry) => entry.sourceKind === UnifiedIngestionSourceKinds.image),
-    });
+    this.stageAssetMappingService = stageAssetMappingService;
+    if (descriptors) {
+      this.descriptorsBySourceKind = Object.freeze({
+        csv: descriptors.find((entry) => entry.sourceKind === UnifiedIngestionSourceKinds.csv),
+        json: descriptors.find((entry) => entry.sourceKind === UnifiedIngestionSourceKinds.json),
+        document: descriptors.find((entry) => entry.sourceKind === UnifiedIngestionSourceKinds.document),
+        image: descriptors.find((entry) => entry.sourceKind === UnifiedIngestionSourceKinds.image),
+      });
+      return;
+    }
+
+    this.descriptorsBySourceKind = undefined;
   }
 
   public route(request: UnifiedIngestionRouteRequest): UnifiedIngestionRouteResult {
+    if (!this.descriptorsBySourceKind) {
+      const result = this.stageAssetMappingService.resolveStage({
+        stageKind: DatasetPipelineStageKinds.ingestion,
+        detectedSourceKind: request.detection.detectedKind,
+        strategy: request.configuration?.mode === "advanced"
+          ? request.configuration.strategy ?? UnifiedIngestionStrategyKinds.auto
+          : UnifiedIngestionStrategyKinds.auto,
+        outputTarget: request.configuration?.outputTarget ?? UnifiedIngestionOutputTargetKinds.records,
+      });
+
+      if (result.status === "unsupported") {
+        return buildUnsupportedRoute(
+          request.detection.detectedKind,
+          result.failureCode,
+          result.fallbackUsed,
+          result.reason,
+        );
+      }
+
+      const resolvedAsset = result.assets[0];
+      if (!resolvedAsset?.handlerKind) {
+        return buildUnsupportedRoute(
+          request.detection.detectedKind,
+          UnifiedIngestionRouteFailureCodes.missingRouteMapping,
+          false,
+          `Stage mapping for '${DatasetPipelineStageKinds.ingestion}' did not provide a handlerKind.`,
+        );
+      }
+
+      return buildResolvedRoute(
+        request.detection.detectedKind,
+        {
+          sourceKind: request.detection.detectedKind === UnifiedIngestionSourceKinds.unknown
+            ? UnifiedIngestionSourceKinds.json
+            : request.detection.detectedKind,
+          handlerKind: resolvedAsset.handlerKind,
+          assetId: resolvedAsset.assetId,
+          assetVersion: resolvedAsset.assetVersion,
+        },
+        result.policy ?? UnifiedIngestionRoutePolicyKinds.detectedKind,
+        Boolean(result.fallbackUsed),
+        result.reason ?? `Stage mapping resolved asset '${resolvedAsset.assetId}'.`,
+      );
+    }
+
     if (request.configuration?.mode === "advanced") {
       const strategy = request.configuration.strategy ?? UnifiedIngestionStrategyKinds.auto;
       if (strategy !== UnifiedIngestionStrategyKinds.auto) {

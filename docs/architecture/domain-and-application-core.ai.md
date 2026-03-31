@@ -1428,3 +1428,21 @@ Explicitly later than this scope:
 - Unified asset wrapper contracts expose lineage/metadata for single and batch execution surfaces through `application/dataset-studio/UnifiedIngestionAsset.ts`.
 - Dataset Studio unified preview/batch inspection now surfaces high-signal metadata first with expandable lineage details in `ui/components/assets/DatasetStudioDraftPreviewPanel.tsx`.
 
+## Direction 5 extension update: Stage-based ingestion pipeline model + stage-asset mapping (stories 15E.1-15E.2)
+
+- Dataset Studio now has a canonical stage-pipeline domain contract in `domain/dataset-studio/StagePipelineDomain.ts`:
+  - explicit high-level stage kinds (`source-selection`, `ingestion`, `profiling`, `normalization`, `preview`),
+  - ordered stage definitions with unique ids/order,
+  - stage-level data-shape contracts (canonical shape kinds),
+  - stage-to-underlying-asset references (wrappers, not replacement definitions),
+  - explicit execution policy (`required` / `optional` / `conditional`).
+- Unified ingestion execution metadata now includes stage-pipeline inspectability (`pipelineId`, ordered stage ids) while preserving existing lineage/event contracts and execution behavior.
+- Stage-to-asset resolution now has a dedicated application seam in `application/dataset-studio/StageAssetMappingService.ts`:
+  - static stage mappings (for example source-selection/profiling/normalization/preview),
+  - conditional stage mappings for ingestion (detected source kind, advanced strategy override, output-target fallback),
+  - optional config-default payloads and typed policy/fallback metadata,
+  - zod-backed mapping-definition validation.
+- Unified routing integration remains orchestration-only:
+  - `UnifiedIngestionRoutingService` now resolves low-level ingestion assets through the stage mapping seam,
+  - routing still does not execute assets directly; execution remains in `UnifiedIngestionOrchestrationService` and existing ingestor/converter seams.
+

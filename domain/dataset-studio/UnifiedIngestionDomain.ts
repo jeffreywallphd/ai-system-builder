@@ -285,6 +285,8 @@ export interface UnifiedIngestionExecutionMetadata {
     readonly configurationMode: UnifiedIngestionConfigMode;
     readonly outputTarget: UnifiedIngestionOutputTargetKind;
     readonly stageCount: number;
+    readonly pipelineId?: string;
+    readonly orderedStageIds?: ReadonlyArray<string>;
     readonly warningCount: number;
     readonly errorCount: number;
     readonly fallbackCount: number;

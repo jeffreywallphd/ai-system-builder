@@ -1,5 +1,6 @@
 /// <reference types="node" />
 import type { CanonicalDataShape } from "../../domain/dataset-studio/CanonicalDataShapes";
+import { createUnifiedIngestionStagePipelineDefinition } from "../../domain/dataset-studio/StagePipelineDomain";
 import {
   UnifiedIngestionContractVersion,
   UnifiedIngestionIssueCodes,
@@ -254,6 +255,8 @@ function buildExecutionMetadata(input: {
   readonly conversion?: UnifiedIngestionSuccessResult["conversion"];
   readonly normalized?: UnifiedIngestionNormalizedOutput;
   readonly preview?: UnifiedIngestionPreviewSuccessResult;
+  readonly pipelineId?: string;
+  readonly orderedStageIds?: ReadonlyArray<string>;
 }): UnifiedIngestionExecutionMetadata {
   const counts = summarizeShapeCounts(input.normalized?.normalizedPayload);
   const warningCount = input.issues.filter((issue) => issue.severity === UnifiedIngestionIssueSeverities.warning).length;
@@ -317,6 +320,8 @@ function buildExecutionMetadata(input: {
       configurationMode: input.configuration.mode,
       outputTarget: input.configuration.outputTarget,
       stageCount: input.stages.length,
+      pipelineId: input.pipelineId,
+      orderedStageIds: input.orderedStageIds,
       warningCount,
       errorCount,
       fallbackCount: input.fallbacks.length,
@@ -363,6 +368,8 @@ export class UnifiedIngestionOrchestrationService {
   private readonly imageIngestor: ImageIngestorAsset;
   private readonly normalizationPipeline: UnifiedIngestionNormalizationPipeline;
   private readonly previewService: UnifiedIngestionPreviewService;
+  private readonly stagePipeline = createUnifiedIngestionStagePipelineDefinition();
+  private readonly orderedStageIds = Object.freeze(this.stagePipeline.stages.map((stage) => stage.id));
 
   constructor(options?: {
     readonly detector?: IUnifiedIngestionSourceTypeDetector;
@@ -414,6 +421,8 @@ export class UnifiedIngestionOrchestrationService {
       stages: input.stages,
       detection: input.detection,
       route: input.route,
+      pipelineId: this.stagePipeline.pipelineId,
+      orderedStageIds: this.orderedStageIds,
     });
     const lineage = buildLineageRecord({
       lineageId: input.lineageId,
@@ -797,6 +806,8 @@ export class UnifiedIngestionOrchestrationService {
         inputBoundary: conversion.result.contract.inputBoundary,
       }),
       normalized: normalization.normalized,
+      pipelineId: this.stagePipeline.pipelineId,
+      orderedStageIds: this.orderedStageIds,
     });
     const lineage = buildLineageRecord({
       lineageId,
@@ -902,6 +913,8 @@ export class UnifiedIngestionOrchestrationService {
       conversion: ingestion.conversion,
       normalized: ingestion.normalized,
       preview,
+      pipelineId: this.stagePipeline.pipelineId,
+      orderedStageIds: this.orderedStageIds,
     });
     const lineage = buildLineageRecord({
       lineageId: ingestion.lineage.lineageId,
