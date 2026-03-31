@@ -1096,3 +1096,21 @@ Explicitly later than this scope:
   - no parallel data taxonomy/asset identity model was introduced,
   - converter logic still projects into canonical data-shape contracts from 13.1,
   - source locator remains a small reusable boundary without introducing ingestion-pipeline orchestration in this slice.
+
+## Direction 5 update: Data Studio preview engine + data asset base abstraction (stories 13.5-13.6)
+
+- Data Studio now has a reusable preview engine in `application/data-studio/DataPreviewEngine.ts` that maps canonical data-shape outputs into deterministic preview models:
+  - `records`, `table`, `text-items`, and `image-metadata-records` are supported directly from the canonical shape contract,
+  - previews are sampled/partial by bounded options (`maxItems`, `maxColumns`, `maxTextLength`) rather than full data exploration behavior,
+  - preview metadata and diagnostics are preserved in one model so application services and UI surfaces can reuse the same preview truth.
+- UI rendering adapters for the preview model now exist in `ui/components/assets/DataPreviewSurface.tsx`:
+  - rendering is model-driven (canonical shape -> preview model -> UI) rather than ad hoc per-screen branching,
+  - diagnostics and metadata are surfaced alongside sampled content for authoring-time inspection.
+- Data assets now have a shared domain abstraction in `domain/dataset-studio/DataAssetBase.ts`:
+  - extends the existing asset architecture (`domain/assets/Asset`) instead of introducing a parallel asset hierarchy,
+  - standardizes explicit input/output contracts, bounded config surface, preview capability, version metadata, inspectability, and composability checks.
+- A thin concrete canonical adapter `domain/dataset-studio/CanonicalDataAsset.ts` plus application integration in `application/dataset-studio/DataAssetFactory.ts` now provide a minimal end-to-end bridge from converter results to data-asset instances and preview generation.
+- Scope remains intentionally bounded:
+  - no ingestion-suite/pipeline-builder runtime stack was introduced,
+  - no parallel taxonomy/identity/contract model was introduced,
+  - abstractions remain focused on reusable data preview + data-asset foundation for later ingestion/pipeline stories.
