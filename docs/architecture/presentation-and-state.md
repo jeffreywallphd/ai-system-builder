@@ -337,3 +337,14 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - Unified ingestion now supports directory/file batch preview through batch wrapper entrypoints (`previewBatch`/`executeBatch`) while still reusing per-item unified single-ingestion orchestration.
 - Batch preview UX remains concise by default (aggregate counts and badges) and uses expandable per-item status details for route/detection inspection and failed-item visibility.
 
+## Direction 5 UI extension update: Stage-based Dataset Studio wizard shell (story 15E.10)
+
+- Dataset Studio draft authoring now includes a stage-based wizard panel (`ui/components/assets/DatasetStageWizardPanel.tsx`) rendered through the existing registration-based shell extension path (`DatasetStudioRegistration`).
+- Wizard UI state/orchestration stays out of React components through a dedicated adapter seam (`ui/studio-shell/dataset/DatasetStageWizardStateAdapter.ts`) that wraps `WizardFlowEngine` for snapshot/read/update/navigation behavior.
+- Stage progress/navigation UI is now reusable in `ui/components/wizard/StageWizardProgressNavigator.tsx`, with explicit current/completed/skipped/pending/disabled stage cues.
+- Stage rendering uses progressive disclosure:
+  - simple stage-specific config renderers for source/ingestion stages,
+  - fallback stage summary renderer for non-customized stages,
+  - optional advanced metadata disclosure for inspectability/lineage-focused details.
+- Styling reuses existing wizard/card/field classes and extends shared wizard styles (`ui/styles/components/wizard.css`) with reusable stage-wizard classes (no stage-specific element selectors).
+

@@ -27,6 +27,14 @@ import {
   toStageRecordFromUnifiedIngestionOutput,
   type RawStorageStageOutput,
 } from "./StageIntegrationContracts";
+import {
+  createStageContractFromDefinition,
+  createStageMetadataFromDefinition,
+  createStageMetadataPropagationPayload,
+  mergePropagationPayloads,
+  withStageStatusMarker,
+  type StageRuntimeTracking,
+} from "./StageMetadataContracts";
 import type { IntentContext, IntentService } from "./IntentService";
 import type { PipelineTemplateInstantiationRequest, TemplateService } from "./TemplateService";
 import type { UnifiedIngestionResult } from "./UnifiedIngestionOrchestrationService";
@@ -83,6 +91,10 @@ export interface WizardFlowUiStage {
     readonly acceptedInputShapeKinds: ReadonlyArray<string>;
     readonly producedOutputShapeKinds: ReadonlyArray<string>;
     readonly assetReferences: ReadonlyArray<DatasetPipelineStageDefinition["assetReferences"][number]>;
+    readonly stageCategory: string;
+    readonly statusMarker: string;
+    readonly lineageId?: string;
+    readonly pipelineId?: string;
   };
 }
 
@@ -137,6 +149,7 @@ export class WizardFlowEngine {
   private navigationHistory: ReadonlyArray<string>;
   private readonly intentDefaults: Readonly<Record<string, Readonly<Record<string, CanonicalRecordValue>>>>;
   private readonly templateDefaults: Readonly<Record<string, Readonly<Record<string, CanonicalRecordValue>>>>;
+  private stageRuntimeTracking: Readonly<Record<string, StageRuntimeTracking>>;
 
   constructor(options: WizardFlowEngineOptions) {
     const initial = this.resolveInitial(options);
@@ -156,6 +169,12 @@ export class WizardFlowEngine {
     this.beforeTransition = options.beforeTransition;
     this.intentDefaults = initial.intentDefaults ?? Object.freeze({});
     this.templateDefaults = initial.templateDefaults ?? Object.freeze({});
+    this.stageRuntimeTracking = Object.freeze(
+      Object.fromEntries(this.stageFlow.stages.map((stage) => [stage.id, Object.freeze({
+        metadata: createStageMetadataFromDefinition(stage),
+        contract: createStageContractFromDefinition(stage),
+      } satisfies StageRuntimeTracking)])),
+    );
 
     if (initial.intentContext) {
       this.state = Object.freeze({
@@ -171,6 +190,7 @@ export class WizardFlowEngine {
     }
 
     this.validateCurrentStageExists();
+    this.refreshStageRuntimeTrackingStatuses();
   }
 
   public getStageFlow(): StageFlowDefinition {
@@ -183,6 +203,10 @@ export class WizardFlowEngine {
 
   public getIntentContext(): StageFlowRuntimeState["intentContext"] {
     return this.state.intentContext;
+  }
+
+  public getStageRuntimeTracking(): Readonly<Record<string, StageRuntimeTracking>> {
+    return this.stageRuntimeTracking;
   }
 
   public setStageConfiguration(
@@ -199,7 +223,9 @@ export class WizardFlowEngine {
     output: Readonly<Record<string, CanonicalRecordValue>>,
   ): StageFlowRuntimeState {
     this.assertKnownStageId(stageId);
-    this.state = withStageOutput(this.state, stageId, freezeRecord(output));
+    const normalizedOutput = freezeRecord(output);
+    this.state = withStageOutput(this.state, stageId, normalizedOutput);
+    this.updateStageRuntimeTrackingFromOutput(stageId, normalizedOutput);
     return this.state;
   }
 
@@ -209,7 +235,9 @@ export class WizardFlowEngine {
   ): StageFlowRuntimeState {
     this.assertKnownStageId(stageId);
     const typed = createUnifiedIngestionStageOutputFromResult(result);
-    this.state = withStageOutput(this.state, stageId, toStageRecordFromUnifiedIngestionOutput(typed));
+    const output = toStageRecordFromUnifiedIngestionOutput(typed);
+    this.state = withStageOutput(this.state, stageId, output);
+    this.updateStageRuntimeTrackingFromOutput(stageId, output);
     return this.state;
   }
 
@@ -218,7 +246,9 @@ export class WizardFlowEngine {
     output: RawStorageStageOutput,
   ): StageFlowRuntimeState {
     this.assertKnownStageId(stageId);
-    this.state = withStageOutput(this.state, stageId, toStageRecordFromRawStorageOutput(output));
+    const stageRecord = toStageRecordFromRawStorageOutput(output);
+    this.state = withStageOutput(this.state, stageId, stageRecord);
+    this.updateStageRuntimeTrackingFromOutput(stageId, stageRecord);
     return this.state;
   }
 
@@ -231,12 +261,21 @@ export class WizardFlowEngine {
       ...this.state,
       skippedStageIds: dedupeOrdered([...this.state.skippedStageIds, stageId]),
     });
+    this.refreshStageRuntimeTrackingStatuses();
     return this.state;
   }
 
   public insertStage(stage: DatasetPipelineStageDefinition, order: number): StageFlowDefinition {
     this.stageFlow = insertStageInFlow(this.stageFlow, stage, order);
+    this.stageRuntimeTracking = Object.freeze({
+      ...this.stageRuntimeTracking,
+      [stage.id]: Object.freeze({
+        metadata: createStageMetadataFromDefinition(stage),
+        contract: createStageContractFromDefinition(stage),
+      }),
+    });
     this.validateCurrentStageExists();
+    this.refreshStageRuntimeTrackingStatuses();
     return this.stageFlow;
   }
 
@@ -256,13 +295,18 @@ export class WizardFlowEngine {
       autoConfiguredStageIds: this.state.autoConfiguredStageIds.filter((existing) => existing !== normalizedStageId),
       userOverriddenStageIds: this.state.userOverriddenStageIds.filter((existing) => existing !== normalizedStageId),
     });
+    const nextTracking = { ...this.stageRuntimeTracking };
+    delete nextTracking[normalizedStageId];
+    this.stageRuntimeTracking = Object.freeze(nextTracking);
     this.validateCurrentStageExists();
+    this.refreshStageRuntimeTrackingStatuses();
     return this.stageFlow;
   }
 
   public reorderStages(orderedStageIds: ReadonlyArray<string>): StageFlowDefinition {
     this.stageFlow = reorderFlowStages(this.stageFlow, orderedStageIds);
     this.validateCurrentStageExists();
+    this.refreshStageRuntimeTrackingStatuses();
     return this.stageFlow;
   }
 
@@ -278,6 +322,7 @@ export class WizardFlowEngine {
           ...resolution.autoCompletedStageIds,
         ]),
       });
+      this.refreshStageRuntimeTrackingStatuses();
       return Object.freeze({
         moved: false,
         reason: "No next stage is available from the current wizard state.",
@@ -306,6 +351,7 @@ export class WizardFlowEngine {
       ]),
       skippedStageIds: dedupeOrdered([...this.state.skippedStageIds, ...resolution.skippedStageIds]),
     });
+    this.refreshStageRuntimeTrackingStatuses();
 
     return Object.freeze({
       moved: true,
@@ -333,6 +379,7 @@ export class WizardFlowEngine {
       ...this.state,
       currentStageId: previousStageId,
     });
+    this.refreshStageRuntimeTrackingStatuses();
 
     return Object.freeze({
       moved: true,
@@ -370,6 +417,10 @@ export class WizardFlowEngine {
           acceptedInputShapeKinds: stage.dataContract.acceptedInputShapeKinds,
           producedOutputShapeKinds: stage.dataContract.producedOutputShapeKinds,
           assetReferences: stage.assetReferences,
+          stageCategory: this.stageRuntimeTracking[stage.id]?.metadata.stageCategory ?? "processing",
+          statusMarker: this.stageRuntimeTracking[stage.id]?.metadata.status.marker ?? "pending",
+          lineageId: this.stageRuntimeTracking[stage.id]?.propagated?.lineage.lineageId,
+          pipelineId: this.stageRuntimeTracking[stage.id]?.propagated?.lineage.pipelineId,
         }),
       }))),
     });
@@ -607,6 +658,110 @@ export class WizardFlowEngine {
         userOverriddenStageIds: dedupeOrdered([...this.state.userOverriddenStageIds, stageId]),
       });
     }
+  }
+
+  private updateStageRuntimeTrackingFromOutput(
+    sourceStageId: string,
+    output: Readonly<Record<string, CanonicalRecordValue>>,
+  ): void {
+    const sourceTracking = this.stageRuntimeTracking[sourceStageId];
+    if (!sourceTracking) {
+      return;
+    }
+
+    const payload = createStageMetadataPropagationPayload({
+      stageId: sourceStageId,
+      stageOutput: output,
+    });
+    if (!payload) {
+      return;
+    }
+
+    const stageIndex = this.stageFlow.stages.findIndex((stage) => stage.id === sourceStageId);
+    if (stageIndex < 0) {
+      return;
+    }
+
+    const nextTracking: Record<string, StageRuntimeTracking> = { ...this.stageRuntimeTracking };
+    for (const stage of this.stageFlow.stages.slice(stageIndex + 1)) {
+      const existing = nextTracking[stage.id];
+      if (!existing) {
+        continue;
+      }
+
+      const merged = mergePropagationPayloads(existing.propagated, {
+        ...payload,
+        lineage: {
+          ...payload.lineage,
+          upstreamStageIds: Array.from(new Set([...payload.lineage.upstreamStageIds, sourceStageId])),
+        },
+      });
+
+      nextTracking[stage.id] = Object.freeze({
+        ...existing,
+        metadata: {
+          ...existing.metadata,
+          lineageHooks: {
+            pipelineId: merged.lineage.pipelineId,
+            lineageId: merged.lineage.lineageId,
+            upstreamStageIds: merged.lineage.upstreamStageIds,
+          },
+          previewHooks: {
+            ...existing.metadata.previewHooks,
+            previewReference: merged.previewReference ?? existing.metadata.previewHooks.previewReference,
+          },
+          inspectability: {
+            ...existing.metadata.inspectability,
+            inspectionReference: merged.inspectionReference ?? existing.metadata.inspectability.inspectionReference,
+          },
+          sourceMetadata: {
+            detectedDataType: merged.detectedDataType ?? existing.metadata.sourceMetadata.detectedDataType,
+            sourceReference: merged.storageReference ?? existing.metadata.sourceMetadata.sourceReference,
+          },
+        },
+        propagated: merged,
+      });
+    }
+
+    this.stageRuntimeTracking = Object.freeze(nextTracking);
+    this.refreshStageRuntimeTrackingStatuses();
+  }
+
+  private refreshStageRuntimeTrackingStatuses(): void {
+    const completed = new Set(this.state.completedStageIds);
+    const skipped = new Set(this.state.skippedStageIds);
+    const currentStageId = this.state.currentStageId;
+    const stageOrder = this.stageFlow.stages.map((stage) => stage.id);
+    const currentIndex = stageOrder.findIndex((stageId) => stageId === currentStageId);
+
+    const nextTracking: Record<string, StageRuntimeTracking> = {};
+    for (const stage of this.stageFlow.stages) {
+      const existing = this.stageRuntimeTracking[stage.id] ?? Object.freeze({
+        metadata: createStageMetadataFromDefinition(stage),
+        contract: createStageContractFromDefinition(stage),
+      } satisfies StageRuntimeTracking);
+
+      let marker: "pending" | "current" | "completed" | "skipped" | "disabled" = "pending";
+      if (stage.id === currentStageId) {
+        marker = "current";
+      } else if (completed.has(stage.id)) {
+        marker = "completed";
+      } else if (skipped.has(stage.id)) {
+        marker = "skipped";
+      } else {
+        const stageIndex = stageOrder.findIndex((id) => id === stage.id);
+        if (currentIndex >= 0 && stageIndex > currentIndex + 1) {
+          marker = "disabled";
+        }
+      }
+
+      nextTracking[stage.id] = Object.freeze({
+        ...existing,
+        metadata: withStageStatusMarker(existing.metadata, marker),
+      });
+    }
+
+    this.stageRuntimeTracking = Object.freeze(nextTracking);
   }
 }
 
