@@ -115,6 +115,9 @@ Workflow -> `ExecuteWorkflowUseCase` -> one-unit `ExecutionPlan` -> `UnifiedExec
   - desktop renderer bridge path: `DesktopBridgeWorkflowRunSummaryRepository` + preload/IPC bridge methods for both summary and detail records
   - browser fallback: `LocalStorageWorkflowRunSummaryRepository` (separate summary/detail storage keys)
   - in-memory fallback for constrained environments.
+- Epic 12 stories 12.5-12.6 now expose these same canonical run-history records in Workflow Studio through the shared studio-shell backend/service bridge:
+  - workflow run list view with summary-first status/recency/duration/trigger fields and client-side sort/filter controls;
+  - route-addressable run detail view (`/studio-shell/workflow/runs/:runId`) showing workflow-level metadata, execution summary, structured trigger context, and top-level outputs.
 
 ## What is not migrated yet
 - Broader MCP tool/discovery orchestration, scheduling, and distributed execution are still outside this slice even though plan-backed workflow runs, dataset generation runs, model-preparation runs, truthful local model-training runs, and narrow MCP server-operation runs are now durable.

@@ -2,7 +2,11 @@ import type { DesktopStudioShellBridge } from "../../electron/shared/DesktopCont
 import { StudioShellBackendApi } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
 import { SystemStudioBackendApi } from "../../infrastructure/api/system-studio/SystemStudioBackendApi";
 import { SystemRuntimeBackendApi } from "../../infrastructure/api/system-runtime/SystemRuntimeBackendApi";
-import { resolveBrowserStudioShellRepository, resolveBrowserWorkflowPersistenceRepository } from "./BrowserFallbackRepositories";
+import {
+  resolveBrowserStudioShellRepository,
+  resolveBrowserWorkflowPersistenceRepository,
+  resolveBrowserWorkflowRunSummaryRepository,
+} from "./BrowserFallbackRepositories";
 
 let fallbackBridge: DesktopStudioShellBridge | undefined;
 
@@ -13,7 +17,8 @@ export function resolveBrowserStudioShellBridgeFallback(): DesktopStudioShellBri
 
   const repository = resolveBrowserStudioShellRepository();
   const workflowPersistenceRepository = resolveBrowserWorkflowPersistenceRepository();
-  const studioApi = new StudioShellBackendApi(repository, workflowPersistenceRepository);
+  const workflowRunSummaryRepository = resolveBrowserWorkflowRunSummaryRepository();
+  const studioApi = new StudioShellBackendApi(repository, workflowPersistenceRepository, workflowRunSummaryRepository);
   const systemApi = new SystemStudioBackendApi(repository);
   const runtimeApi = new SystemRuntimeBackendApi(repository);
 
@@ -31,6 +36,8 @@ export function resolveBrowserStudioShellBridgeFallback(): DesktopStudioShellBri
     duplicatePersistedWorkflow: (requestJson) => studioApi.duplicatePersistedWorkflow(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
     assessWorkflowExecutionReadiness: (requestJson) => studioApi.assessWorkflowExecutionReadiness(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
     runWorkflowDraft: (requestJson) => studioApi.runWorkflowDraft(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
+    listWorkflowRuns: (requestJson) => studioApi.listWorkflowRuns(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
+    getWorkflowRunDetail: (runId) => studioApi.getWorkflowRunDetail(runId).then((response) => JSON.stringify(response)),
     listSystemChildComponents: (requestJson) => systemApi.listChildComponents(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
     addSystemChildComponent: (requestJson) => systemApi.addChildComponent(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),
     removeSystemChildComponent: (requestJson) => systemApi.removeChildComponent(JSON.parse(requestJson)).then((response) => JSON.stringify(response)),

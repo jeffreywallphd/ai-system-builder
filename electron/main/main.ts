@@ -309,7 +309,11 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   workflowPersistenceRepository = new SqliteWorkflowPersistenceRepository(
     path.join(storagePaths.storageDirectory, "workflow-studio", "workflow-persistence.sqlite"),
   );
-  const studioShellBackendApi = new StudioShellBackendApi(studioShellRepository, workflowPersistenceRepository);
+  const studioShellBackendApi = new StudioShellBackendApi(
+    studioShellRepository,
+    workflowPersistenceRepository,
+    workflowRunSummaryRepository,
+  );
   const systemStudioBackendApi = new SystemStudioBackendApi(studioShellRepository);
   const runtimeExecutionStore = new SqliteSystemRuntimeExecutionStore(path.join(storagePaths.assetsDirectory, "system-runtime.sqlite"));
   const runtimeExecutionAuditRepository = new SqliteExecutionAuditRepository(path.join(storagePaths.assetsDirectory, "system-runtime-audit.sqlite"));
@@ -493,6 +497,13 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   ipcMain.handle("ai-loom-desktop-studio-shell:run-workflow-draft", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["runWorkflowDraft"]>[0];
     return JSON.stringify(await studioShellBackendApi.runWorkflowDraft(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:workflow-runs:list", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["listWorkflowRuns"]>[0];
+    return JSON.stringify(await studioShellBackendApi.listWorkflowRuns(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:workflow-runs:get-detail", async (_event, runId: string) => {
+    return JSON.stringify(await studioShellBackendApi.getWorkflowRunDetail(runId));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:system-components:list", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["listChildComponents"]>[0];
