@@ -3,6 +3,7 @@ import { DatasetPipelineStageKinds, type DatasetPipelineStageDefinition } from "
 import type { StageFlowDefinition, StageFlowRuntimeState } from "../../domain/dataset-studio/StageFlowDefinition";
 import { UnifiedIngestionSourceKinds } from "../../domain/dataset-studio/UnifiedIngestionDomain";
 import type { IntentContext } from "./IntentService";
+import { readUnifiedIngestionStageOutput } from "./StageIntegrationContracts";
 import { StageAssetMappingService } from "./StageAssetMappingService";
 
 export const StageExecutionDispositions = Object.freeze({
@@ -32,6 +33,14 @@ function freezeRecord(value: Readonly<Record<string, CanonicalRecordValue>>): Re
   return Object.freeze({ ...value });
 }
 
+function withoutUndefined(
+  value: Readonly<Record<string, CanonicalRecordValue | undefined>>,
+): Readonly<Record<string, CanonicalRecordValue>> {
+  const normalized = Object.entries(value)
+    .filter((entry): entry is [string, CanonicalRecordValue] => entry[1] !== undefined);
+  return Object.freeze(Object.fromEntries(normalized));
+}
+
 function toBoolean(value: CanonicalRecordValue | undefined): boolean {
   return value === true || value === "true" || value === 1;
 }
@@ -55,7 +64,9 @@ function hasAnyUpstreamOutput(stageFlow: StageFlowDefinition, stage: DatasetPipe
 
 function resolveIngestionSourceKind(state: StageFlowRuntimeState): string | undefined {
   const ingestionOutput = state.stageOutputs.ingestion ?? Object.freeze({});
-  return toString(ingestionOutput.detectedSourceKind)
+  const typed = readUnifiedIngestionStageOutput(ingestionOutput);
+  return typed?.detectedSourceKind
+    ?? toString(ingestionOutput.detectedSourceKind)
     ?? toString(ingestionOutput.sourceKind)
     ?? toString(state.stageConfiguration.source?.sourceKind);
 }
@@ -128,10 +139,22 @@ export class StageExecutionPolicy {
     }
 
     const schemaKnown = toBoolean(context.state.stageOutputs.ingestion?.schemaKnown)
+      || readUnifiedIngestionStageOutput(context.state.stageOutputs.ingestion)?.schemaKnown
       || toBoolean(context.state.stageOutputs.ingestion?.schemaDetected)
       || toBoolean(context.state.stageConfiguration.source?.schemaKnown);
     const normalizationDefaults = context.stage.kind === DatasetPipelineStageKinds.normalization && schemaKnown
       ? Object.freeze({ schemaMode: "known", useDetectedSchema: true } satisfies Record<string, CanonicalRecordValue>)
+      : Object.freeze({});
+
+    const typedIngestionOutput = readUnifiedIngestionStageOutput(context.state.stageOutputs.ingestion);
+    const rawStorageDefaults = context.stage.kind === DatasetPipelineStageKinds.rawStorage
+      ? withoutUndefined({
+        sourceId: typedIngestionOutput?.sourceId,
+        sourceReference: typedIngestionOutput?.sourceReference,
+        detectedSourceKind: typedIngestionOutput?.detectedSourceKind,
+        lineageId: typedIngestionOutput?.metadata?.lineageId,
+        pipelineId: typedIngestionOutput?.metadata?.pipelineId,
+      })
       : Object.freeze({});
 
     return freezeRecord({
@@ -139,6 +162,7 @@ export class StageExecutionPolicy {
       ...templateDefaults,
       ...intentDefaults,
       ...normalizationDefaults,
+      ...rawStorageDefaults,
     });
   }
 }

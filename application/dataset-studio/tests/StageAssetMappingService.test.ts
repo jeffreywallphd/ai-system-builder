@@ -28,6 +28,20 @@ describe("StageAssetMappingService", () => {
     }
   });
 
+  it("resolves raw-storage stage to storage asset defaults and metadata hooks", () => {
+    const service = new StageAssetMappingService();
+    const result = service.resolveStage({
+      stageKind: DatasetPipelineStageKinds.rawStorage,
+    });
+
+    expect(result.status).toBe("resolved");
+    if (result.status === "resolved") {
+      expect(result.assets[0]?.assetId).toBe("raw-storage-stage");
+      expect(result.assets[0]?.configDefaults?.persistRawPayload).toBeTrue();
+      expect(result.assets[0]?.metadataHooks?.traceabilityHook).toBe("ingestion-lineage");
+    }
+  });
+
   it("resolves conditional ingestion mappings by detected source kind", () => {
     const service = new StageAssetMappingService();
     const result = service.resolveStage({

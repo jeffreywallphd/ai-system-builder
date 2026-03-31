@@ -21,8 +21,15 @@ import {
   StageExecutionPolicy,
   type StageExecutionPolicyDecision,
 } from "./StageExecutionPolicy";
+import {
+  createUnifiedIngestionStageOutputFromResult,
+  toStageRecordFromRawStorageOutput,
+  toStageRecordFromUnifiedIngestionOutput,
+  type RawStorageStageOutput,
+} from "./StageIntegrationContracts";
 import type { IntentContext, IntentService } from "./IntentService";
 import type { PipelineTemplateInstantiationRequest, TemplateService } from "./TemplateService";
+import type { UnifiedIngestionResult } from "./UnifiedIngestionOrchestrationService";
 
 export interface WizardFlowTransition {
   readonly fromStageId: string;
@@ -193,6 +200,25 @@ export class WizardFlowEngine {
   ): StageFlowRuntimeState {
     this.assertKnownStageId(stageId);
     this.state = withStageOutput(this.state, stageId, freezeRecord(output));
+    return this.state;
+  }
+
+  public setUnifiedIngestionStageOutput(
+    stageId: string,
+    result: UnifiedIngestionResult,
+  ): StageFlowRuntimeState {
+    this.assertKnownStageId(stageId);
+    const typed = createUnifiedIngestionStageOutputFromResult(result);
+    this.state = withStageOutput(this.state, stageId, toStageRecordFromUnifiedIngestionOutput(typed));
+    return this.state;
+  }
+
+  public setRawStorageStageOutput(
+    stageId: string,
+    output: RawStorageStageOutput,
+  ): StageFlowRuntimeState {
+    this.assertKnownStageId(stageId);
+    this.state = withStageOutput(this.state, stageId, toStageRecordFromRawStorageOutput(output));
     return this.state;
   }
 

@@ -1472,3 +1472,19 @@ Explicitly later than this scope:
   - data-driven skip rules over unified-ingestion outputs,
   - auto-configuration merge from mapping defaults + template defaults + intent defaults + ingestion-derived normalization hints.
 - Wizard runtime state tracking now includes `autoConfiguredStageIds` and `userOverriddenStageIds` (plus existing skipped/completed tracking) to preserve deterministic navigation with dynamic stage behavior.
+
+## Direction 5 extension update: Unified ingestion stage contracts + raw storage integration (stories 15E.7-15E.8)
+
+- Stage-aware unified-ingestion output contracts are now explicit and zod-backed in `application/dataset-studio/StageIntegrationContracts.ts`.
+- Unified-ingestion stage outputs now support both:
+  - typed envelope projection from orchestration results, and
+  - backward-compatible parsing of legacy flat stage output records.
+- Wizard orchestration now supports typed stage output writes through:
+  - `WizardFlowEngine.setUnifiedIngestionStageOutput(...)`,
+  - `WizardFlowEngine.setRawStorageStageOutput(...)`.
+- Stage policy automation now consumes typed ingestion-stage output metadata when available and still supports legacy output fields for compatibility (`application/dataset-studio/StageExecutionPolicy.ts`).
+- Raw storage is now a first-class stage integration with:
+  - explicit stage asset id (`raw-storage-stage`) in `domain/dataset-studio/StagePipelineDomain.ts`,
+  - stage-to-asset mapping defaults + metadata hooks in `application/dataset-studio/StageAssetMappingService.ts`,
+  - reusable raw-storage persistence adapter seam and inspectable output/log/lineage contracts in `application/dataset-studio/RawStorageStageService.ts`.
+- Default template flows now include raw-storage as a first-class stage in ELT, document, and analytics templates (`domain/dataset-studio/PipelineTemplateDomain.ts`).
