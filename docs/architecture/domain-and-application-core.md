@@ -1242,3 +1242,45 @@ Explicitly later than this scope:
   - `document-pdf-ingestor`,
   - `image-ingestor-v1`,
   alongside existing `csv-ingestor` and `json-ingestor` entries in `registerDataStudioSampleAssets`.
+
+## Direction 5 update: Batch ingestion framework + source locator input abstraction (stories 14.5-14.6)
+
+- Data Studio now has a reusable source-input abstraction in `application/dataset-studio/SourceLocatorInputAbstraction.ts` with zod-validated request contracts for:
+  - single local file references,
+  - multiple explicit local file references,
+  - local directory references with `fast-glob` scanning,
+  - remote file placeholders (descriptor-only extension seam for future connector work).
+- Source resolution now yields normalized source descriptors with bounded metadata suitable for ingestion contracts and preview surfaces:
+  - stable source id,
+  - original and normalized reference,
+  - source kind/type,
+  - display name,
+  - extension/media-type hints,
+  - size (local files when cheaply available),
+  - optional grouping metadata.
+- Source inspection/preview is now a first-class bounded seam:
+  - total matched files,
+  - previewed subset,
+  - extension summary counts,
+  - structured per-reference issues (`invalid_config`, `invalid_reference`, `unreadable_path`, `unsupported_extension`, `unsupported_kind`).
+- Data Studio now has a batch ingestion orchestration seam in `application/dataset-studio/BatchIngestionFramework.ts` that composes existing ingestors instead of duplicating ingest logic:
+  - CSV/JSON via existing converter ingestion path (`DataConverterCore` -> `CsvIngestorAsset` / `JsonIngestorAsset`),
+  - document/PDF via `DocumentPdfIngestorAsset`,
+  - image via `ImageIngestorAsset`.
+- Batch execution now supports a bounded strategy/config surface:
+  - strategy: routed by source metadata or explicit selected ingestor,
+  - shared ingestor config (`csv`/`json`/`documentPdf`/`image`),
+  - `continueOnError` (default true),
+  - optional `maxItems`,
+  - bounded `previewItemLimit`,
+  - optional bounded `concurrency`.
+- Batch results are now structured for canonical aggregation + partial-failure handling:
+  - batch item/success/failure counts,
+  - per-item success/failure envelopes,
+  - per-item structured errors and diagnostics,
+  - canonical output collection keyed by source id + ingestor,
+  - bounded aggregated preview payload with shape summary.
+- Scope remains intentionally bounded:
+  - no remote connector/MCP execution path is implemented in this slice,
+  - remote source support is currently placeholder descriptor normalization only,
+  - orchestration remains application-layer and composes existing ingestion assets/contracts.
