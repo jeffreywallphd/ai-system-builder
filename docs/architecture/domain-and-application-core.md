@@ -1076,3 +1076,23 @@ Explicitly later than this scope:
   - no parallel data taxonomy or parallel asset identity model was introduced,
   - conversion logic remains deterministic and composable for future ingestion/preparation assets.
 
+
+## Direction 5 update: Data Studio converter contracts + source locator abstraction (stories 13.3-13.4)
+
+- Data converter operations now have explicit request/result contracts in `application/dataset-studio/DataConverterContracts.ts` with:
+  - operation-scoped request unions,
+  - converter context metadata (`requestId`/`operationId`/pipeline lineage hints),
+  - structured diagnostics (`code`/`severity`/`path`/details),
+  - explicit operation boundary metadata (raw/resolved/canonical input boundary -> canonical output kind) for preview/lineage/pipeline composition.
+- Data conversion orchestration in `application/dataset-studio/DataConverterCore.ts` now keeps existing 13.1/13.2 conversion behavior while adding:
+  - a contract-first `convert(...)` operation entrypoint,
+  - structured success/failure envelopes,
+  - typed source-resolution failure handling for pre-conversion boundaries.
+- Data source resolution is now a separate reusable abstraction in `application/dataset-studio/DataSourceLocator.ts`:
+  - normalized source-reference contracts (`in-memory`, `local-file`, `url`),
+  - standardized resolved source model consumed by converter contracts,
+  - loader-backed resolution seam (`IDataSourcePayloadLoader`) so source lookup stays separate from conversion semantics.
+- Scope remains bounded:
+  - no parallel data taxonomy/asset identity model was introduced,
+  - converter logic still projects into canonical data-shape contracts from 13.1,
+  - source locator remains a small reusable boundary without introducing ingestion-pipeline orchestration in this slice.

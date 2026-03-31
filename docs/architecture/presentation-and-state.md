@@ -291,3 +291,9 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - Workflow metadata editing (name/summary/tags) remains in the same unsaved/save-state contract as draft content and persists through the same save orchestration path into persistence/read-model surfaces.
 - Browser-hosted development now keeps Explore workflow-persistence reuse flows available by resolving registry queries through a bounded browser fallback bridge when desktop registry contracts are unavailable, using the same in-memory workflow-persistence fallback repository as Studio Shell.
 - Automated coverage now includes persistence contracts and SQLite adapter list-query behavior, persisted workflow discovery filtering for Explore/Build/Run entry cards, and existing studio/runtime integration coverage across create/open/resume/duplicate/readiness/run flows.
+
+## Direction 5 UX update: Main menu Data entry
+
+- The global header command palette/navigation menu now includes a first-class `Data` entry (`ui/routes/CommandPalette.ts`) that routes to Dataset Studio (`/studio-shell/dataset`).
+- Top-level menu order is now: `Build`, `Run`, `Explore`, `Data`, `Manage`.
+- This extends existing shell navigation patterns without adding a parallel navigation system.
