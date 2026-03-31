@@ -40,6 +40,10 @@ export interface ExploreAssetSummary {
     readonly creatorId?: string;
     readonly dependencyCount: number;
     readonly versionCount: number;
+    readonly persistenceRevision?: number;
+    readonly workflowRevision?: number;
+    readonly lastModifiedAt?: string;
+    readonly duplicatedFromWorkflowId?: string;
   };
 }
 
@@ -323,6 +327,10 @@ export class ExploreAssetQueryService {
         creatorId: summary.ownershipContext?.ownerId,
         dependencyCount: 0,
         versionCount: Math.max(summary.revision.persistenceRevision, 1),
+        persistenceRevision: summary.revision.persistenceRevision,
+        workflowRevision: summary.revision.workflowRevision,
+        lastModifiedAt: summary.timestamps.updatedAt,
+        duplicatedFromWorkflowId: summary.revision.duplicatedFromWorkflowId,
       }),
     });
   }

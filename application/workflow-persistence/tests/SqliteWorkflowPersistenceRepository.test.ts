@@ -108,9 +108,9 @@ describe("SqliteWorkflowPersistenceRepository", () => {
 
     const duplicated = await duplicate.execute({
       sourceWorkflowId: created.id,
-      duplicatedWorkflowId: "workflow:sqlite:1:copy",
       duplicatedWorkflowName: "SQLite Workflow Copy",
     });
+    expect(duplicated.id).toBe("workflow:sqlite:1:copy");
     expect(duplicated.revision.duplicatedFromWorkflowId).toBe(created.id);
     expect(duplicated.status).toBe(WorkflowPersistenceStatuses.draft);
 
@@ -126,7 +126,7 @@ describe("SqliteWorkflowPersistenceRepository", () => {
     repository.dispose();
   });
 
-  it("fails fast when persisted record JSON is malformed or has invalid canonical workflow entity payload", async () => {
+  it("fails fast when persisted record JSON is malformed or has invalid canonical workflow revision metadata", async () => {
     const root = mkdtempSync(path.join(tmpdir(), "loom-workflow-persistence-invalid-"));
     createdRoots.push(root);
     const databasePath = path.join(root, "workflow-persistence.sqlite");
@@ -143,6 +143,28 @@ describe("SqliteWorkflowPersistenceRepository", () => {
     const reopened = new SqliteWorkflowPersistenceRepository(databasePath);
     await expect(reopened.getById("workflow:sqlite:malformed")).rejects.toThrow();
     reopened.dispose();
+
+    const secondRoot = mkdtempSync(path.join(tmpdir(), "loom-workflow-persistence-invalid-revision-"));
+    createdRoots.push(secondRoot);
+    const secondDatabasePath = path.join(secondRoot, "workflow-persistence.sqlite");
+    const repositoryWithInvalidRevision = new SqliteWorkflowPersistenceRepository(secondDatabasePath);
+    await createBaselineRecord(repositoryWithInvalidRevision);
+    repositoryWithInvalidRevision.dispose();
+
+    const dbWithInvalidRevision = openSqliteCompatDatabase(secondDatabasePath);
+    const row = dbWithInvalidRevision.prepare("SELECT record_json FROM workflow_persistence_records WHERE workflow_id = ?")
+      .get("workflow:sqlite:malformed") as { record_json: string };
+    const parsed = JSON.parse(row.record_json) as {
+      revision: { persistenceRevision: number };
+    };
+    parsed.revision.persistenceRevision = 0;
+    dbWithInvalidRevision.prepare("UPDATE workflow_persistence_records SET record_json = ? WHERE workflow_id = ?")
+      .run(JSON.stringify(parsed), "workflow:sqlite:malformed");
+    dbWithInvalidRevision.close();
+
+    const reopenedWithInvalidRevision = new SqliteWorkflowPersistenceRepository(secondDatabasePath);
+    await expect(reopenedWithInvalidRevision.getById("workflow:sqlite:malformed")).rejects.toThrow();
+    reopenedWithInvalidRevision.dispose();
   });
 });
 

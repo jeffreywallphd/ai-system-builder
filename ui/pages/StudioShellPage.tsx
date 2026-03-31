@@ -563,16 +563,26 @@ export default function StudioShellPage({
         return;
       }
 
-      const persisted = await service.getPersistedWorkflow(targetWorkflowId);
-      if (!persisted.ok || !persisted.data) {
+      const persistedOrDuplicated = workflowEntryRoute.resolvedEntryPath === WorkflowStudioEntryPaths.duplicate
+        ? await service.duplicatePersistedWorkflow({
+          sourceWorkflowId: targetWorkflowId,
+        })
+        : await service.getPersistedWorkflow(targetWorkflowId);
+      if (!persistedOrDuplicated.ok || !persistedOrDuplicated.data) {
         if (!cancelled) {
-          setError(persisted.error?.message ?? `Persisted workflow '${targetWorkflowId}' could not be loaded.`);
+          const defaultMessage = workflowEntryRoute.resolvedEntryPath === WorkflowStudioEntryPaths.duplicate
+            ? `Persisted workflow '${targetWorkflowId}' could not be duplicated.`
+            : `Persisted workflow '${targetWorkflowId}' could not be loaded.`;
+          setError(persistedOrDuplicated.error?.message ?? defaultMessage);
           lastAppliedWorkflowEntryRef.current = signature;
         }
         return;
       }
 
-      if (workflowEntryRoute.resolvedEntryPath === WorkflowStudioEntryPaths.resumeDraft && persisted.data.status !== "draft") {
+      if (
+        workflowEntryRoute.resolvedEntryPath === WorkflowStudioEntryPaths.resumeDraft
+        && persistedOrDuplicated.data.status !== "draft"
+      ) {
         if (!cancelled) {
           setError(`Workflow '${targetWorkflowId}' is not a resumable draft.`);
           lastAppliedWorkflowEntryRef.current = signature;
@@ -589,7 +599,7 @@ export default function StudioShellPage({
         return;
       }
 
-      const created = await createDraftFromPersisted(startSession.data.activeSessionId, persisted.data);
+      const created = await createDraftFromPersisted(startSession.data.activeSessionId, persistedOrDuplicated.data);
       if (!created) {
         if (!cancelled) {
           lastAppliedWorkflowEntryRef.current = signature;

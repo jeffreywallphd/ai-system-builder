@@ -26,6 +26,7 @@ import {
 } from "../../../application/studio-shell/StudioShellApplicationErrors";
 import type { IWorkflowPersistenceRepository } from "../../../application/ports/interfaces/IWorkflowPersistenceRepository";
 import { CreatePersistedWorkflowUseCase } from "../../../application/workflow-persistence/CreatePersistedWorkflowUseCase";
+import { DuplicatePersistedWorkflowUseCase } from "../../../application/workflow-persistence/DuplicatePersistedWorkflowUseCase";
 import { GetPersistedWorkflowUseCase } from "../../../application/workflow-persistence/GetPersistedWorkflowUseCase";
 import { UpdatePersistedWorkflowUseCase } from "../../../application/workflow-persistence/UpdatePersistedWorkflowUseCase";
 import {
@@ -219,6 +220,7 @@ export interface PersistedWorkflowReadModel {
     readonly persistenceRevision: number;
     readonly workflowRevision: number;
     readonly versionLabel?: string;
+    readonly duplicatedFromWorkflowId?: string;
   };
   readonly timestamps: {
     readonly createdAt: string;
@@ -228,12 +230,26 @@ export interface PersistedWorkflowReadModel {
   readonly serializedDraft: string;
 }
 
+export interface DuplicatePersistedWorkflowRequest {
+  readonly sourceWorkflowId: string;
+  readonly duplicatedWorkflowId?: string;
+  readonly duplicatedWorkflowName?: string;
+  readonly ownershipContext?: {
+    readonly ownerId?: string;
+    readonly tenantId?: string;
+    readonly studioId?: string;
+    readonly sessionId?: string;
+  };
+  readonly versionLabel?: string;
+}
+
 export class StudioShellBackendApi {
   private readonly service: DefaultStudioShellApplicationService;
   private readonly workflowStudioService: WorkflowStudioApplicationService;
   private readonly createPersistedWorkflow?: CreatePersistedWorkflowUseCase;
   private readonly updatePersistedWorkflow?: UpdatePersistedWorkflowUseCase;
   private readonly getPersistedWorkflowUseCase?: GetPersistedWorkflowUseCase;
+  private readonly duplicatePersistedWorkflowUseCase?: DuplicatePersistedWorkflowUseCase;
 
   constructor(
     private readonly repository: IStudioShellRepository,
@@ -252,6 +268,7 @@ export class StudioShellBackendApi {
       this.createPersistedWorkflow = new CreatePersistedWorkflowUseCase(workflowPersistenceRepository);
       this.updatePersistedWorkflow = new UpdatePersistedWorkflowUseCase(workflowPersistenceRepository);
       this.getPersistedWorkflowUseCase = new GetPersistedWorkflowUseCase(workflowPersistenceRepository);
+      this.duplicatePersistedWorkflowUseCase = new DuplicatePersistedWorkflowUseCase(workflowPersistenceRepository);
     }
   }
 
@@ -550,6 +567,41 @@ export class StudioShellBackendApi {
           persistenceRevision: record.revision.persistenceRevision,
           workflowRevision: record.revision.workflowRevision,
           versionLabel: record.revision.versionLabel,
+          duplicatedFromWorkflowId: record.revision.duplicatedFromWorkflowId,
+        }),
+        timestamps: Object.freeze({
+          createdAt: record.timestamps.createdAt,
+          updatedAt: record.timestamps.updatedAt,
+          savedAt: record.timestamps.savedAt,
+        }),
+        serializedDraft: record.definition.serializedDraft,
+      });
+    });
+  }
+
+  public async duplicatePersistedWorkflow(
+    request: DuplicatePersistedWorkflowRequest,
+  ): Promise<StudioShellApiResponse<PersistedWorkflowReadModel>> {
+    return this.wrap(async () => {
+      if (!this.duplicatePersistedWorkflowUseCase) {
+        throw new StudioShellInvalidRequestError("Workflow persistence integration is unavailable.");
+      }
+
+      const record = await this.duplicatePersistedWorkflowUseCase.execute(request);
+      return Object.freeze({
+        id: record.id,
+        name: record.name,
+        status: record.status,
+        lifecycleState: record.lifecycleState,
+        metadata: Object.freeze({
+          summary: record.metadata.summary,
+          tags: Object.freeze([...record.metadata.tags]),
+        }),
+        revision: Object.freeze({
+          persistenceRevision: record.revision.persistenceRevision,
+          workflowRevision: record.revision.workflowRevision,
+          versionLabel: record.revision.versionLabel,
+          duplicatedFromWorkflowId: record.revision.duplicatedFromWorkflowId,
         }),
         timestamps: Object.freeze({
           createdAt: record.timestamps.createdAt,

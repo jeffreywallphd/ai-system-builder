@@ -56,6 +56,7 @@ describe("StudioShellPage contracts", () => {
     expect(source).toContain("service.publishVersion");
     expect(source).toContain("service.validateDraft");
     expect(source).toContain("service.getPersistedWorkflow");
+    expect(source).toContain("service.duplicatePersistedWorkflow");
     expect(source).toContain("service.assessWorkflowExecutionReadiness");
     expect(source).toContain("service.runWorkflowDraft");
     expect(source.indexOf("Asset draft authoring")).toBeLessThan(source.indexOf("ui-studio-shell__grid"));

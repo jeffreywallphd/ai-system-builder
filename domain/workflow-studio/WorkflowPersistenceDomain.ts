@@ -1,5 +1,7 @@
 import {
   createWorkflowEntity,
+  deserializeWorkflowEntity,
+  serializeWorkflowEntity,
   type WorkflowDraft,
   type WorkflowEntity,
   type WorkflowEntityMetadata,
@@ -172,6 +174,88 @@ export function createPersistedWorkflowRecord(input: CreatePersistedWorkflowInpu
       schemaVersion: "ai-loom.workflow-entity.v1",
     } satisfies WorkflowPersistencePayloadReference),
     definition: workflowEntity,
+  });
+}
+
+function normalizeTimestamp(value: string, label: string): string {
+  const normalized = normalizeRequired(value, label);
+  if (Number.isNaN(Date.parse(normalized))) {
+    throw new Error(`${label} must be a valid ISO timestamp.`);
+  }
+  return normalized;
+}
+
+export function normalizePersistedWorkflowRecord(record: PersistedWorkflowRecord): PersistedWorkflowRecord {
+  const normalizedId = normalizeRequired(record.id, "Persisted workflow id");
+  const normalizedName = normalizeRequired(record.name, "Persisted workflow name");
+  const normalizedDefinition = deserializeWorkflowEntity(serializeWorkflowEntity(record.definition));
+  if (normalizedDefinition.id !== normalizedId) {
+    throw new Error("Persisted workflow record id must match workflow definition id.");
+  }
+  if (normalizedDefinition.name !== normalizedName) {
+    throw new Error("Persisted workflow record name must match workflow definition name.");
+  }
+
+  const expectedStatus = determineStatus(normalizedDefinition.lifecycleState);
+  if (record.status !== expectedStatus) {
+    throw new Error("Persisted workflow status is inconsistent with workflow lifecycle state.");
+  }
+  if (record.lifecycleState !== normalizedDefinition.lifecycleState) {
+    throw new Error("Persisted workflow lifecycle state is inconsistent with workflow definition state.");
+  }
+
+  const createdAt = normalizeTimestamp(record.timestamps.createdAt, "Persisted workflow createdAt");
+  const updatedAt = normalizeTimestamp(record.timestamps.updatedAt, "Persisted workflow updatedAt");
+  if (Date.parse(updatedAt) < Date.parse(createdAt)) {
+    throw new Error("Persisted workflow updatedAt must be at or after createdAt.");
+  }
+
+  const savedAt = record.timestamps.savedAt
+    ? normalizeTimestamp(record.timestamps.savedAt, "Persisted workflow savedAt")
+    : undefined;
+  if (expectedStatus === WorkflowPersistenceStatuses.saved && !savedAt) {
+    throw new Error("Saved persisted workflows must include savedAt.");
+  }
+  if (expectedStatus === WorkflowPersistenceStatuses.draft && savedAt) {
+    throw new Error("Draft persisted workflows cannot include savedAt.");
+  }
+
+  assertPositiveInteger(record.revision.persistenceRevision, "Workflow persistence revision");
+  assertPositiveInteger(record.revision.workflowRevision, "Workflow definition revision");
+  if (record.revision.workflowRevision !== normalizedDefinition.draftRevision) {
+    throw new Error("Persisted workflow revision metadata is inconsistent with workflow definition draft revision.");
+  }
+
+  if (
+    record.payload.kind !== WorkflowPersistencePayloadKinds.workflowEntity
+    || record.payload.schemaVersion !== "ai-loom.workflow-entity.v1"
+  ) {
+    throw new Error("Persisted workflow payload reference is not supported.");
+  }
+
+  return Object.freeze({
+    id: normalizedId,
+    name: normalizedName,
+    metadata: normalizedDefinition.metadata,
+    status: expectedStatus,
+    lifecycleState: normalizedDefinition.lifecycleState,
+    ownershipContext: normalizeOwnershipContext(record.ownershipContext),
+    revision: Object.freeze({
+      persistenceRevision: record.revision.persistenceRevision,
+      workflowRevision: normalizedDefinition.draftRevision,
+      versionLabel: normalizeOptional(record.revision.versionLabel),
+      duplicatedFromWorkflowId: normalizeOptional(record.revision.duplicatedFromWorkflowId),
+    }),
+    timestamps: Object.freeze({
+      createdAt,
+      updatedAt,
+      savedAt,
+    }),
+    payload: Object.freeze({
+      kind: WorkflowPersistencePayloadKinds.workflowEntity,
+      schemaVersion: "ai-loom.workflow-entity.v1",
+    } satisfies WorkflowPersistencePayloadReference),
+    definition: normalizedDefinition,
   });
 }
 

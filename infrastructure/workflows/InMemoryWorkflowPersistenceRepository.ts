@@ -6,30 +6,33 @@ import type {
   PersistedWorkflowRecord,
   PersistedWorkflowSummary,
 } from "../../domain/workflow-studio/WorkflowPersistenceDomain";
-import { toPersistedWorkflowSummary } from "../../domain/workflow-studio/WorkflowPersistenceDomain";
+import {
+  normalizePersistedWorkflowRecord,
+  toPersistedWorkflowSummary,
+} from "../../domain/workflow-studio/WorkflowPersistenceDomain";
 
 export class InMemoryWorkflowPersistenceRepository implements IWorkflowPersistenceRepository {
   private readonly records = new Map<string, PersistedWorkflowRecord>();
 
   public async create(record: PersistedWorkflowRecord): Promise<PersistedWorkflowRecord> {
-    const id = record.id.trim();
+    const normalized = normalizePersistedWorkflowRecord(record);
+    const id = normalized.id;
     if (!id) {
       throw new Error("Persisted workflow id is required.");
     }
     if (this.records.has(id)) {
       throw new Error(`Persisted workflow '${id}' already exists.`);
     }
-    const normalized = Object.freeze({ ...record, id });
     this.records.set(id, normalized);
     return normalized;
   }
 
   public async update(record: PersistedWorkflowRecord): Promise<PersistedWorkflowRecord> {
-    const id = record.id.trim();
+    const normalized = normalizePersistedWorkflowRecord(record);
+    const id = normalized.id;
     if (!id || !this.records.has(id)) {
       throw new Error(`Persisted workflow '${id}' does not exist.`);
     }
-    const normalized = Object.freeze({ ...record, id });
     this.records.set(id, normalized);
     return normalized;
   }

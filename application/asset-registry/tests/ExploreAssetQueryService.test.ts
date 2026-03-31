@@ -110,6 +110,7 @@ describe("ExploreAssetQueryService", () => {
     id: "workflow:persisted-draft",
     name: "Draft Workflow",
     draft: createEmptyWorkflowDraft(),
+    now: new Date("2026-03-30T00:00:00.000Z"),
   });
   const service = new ExploreAssetQueryService({
     async listAllAssets() {
@@ -171,6 +172,9 @@ describe("ExploreAssetQueryService", () => {
     expect(result.assets).toHaveLength(1);
     expect(result.assets[0]?.id.assetId).toBe("workflow:persisted-draft");
     expect(result.assets[0]?.metadata.sourceType).toBe("workflow-persistence");
+    expect(result.assets[0]?.metadata.persistenceRevision).toBe(1);
+    expect(result.assets[0]?.metadata.workflowRevision).toBe(1);
+    expect(result.assets[0]?.metadata.lastModifiedAt).toBe("2026-03-30T00:00:00.000Z");
     expect(result.assets[0]?.taxonomy?.semanticRole).toBe("workflow");
     expect(result.assets[0]?.status).toBe("draft");
   });

@@ -6,6 +6,7 @@ export const WorkflowStudioEntryPaths = Object.freeze({
   new: "new",
   openExisting: "open-existing",
   resumeDraft: "resume-draft",
+  duplicate: "duplicate",
 });
 
 export type WorkflowStudioEntryPath = typeof WorkflowStudioEntryPaths[keyof typeof WorkflowStudioEntryPaths];
@@ -39,6 +40,9 @@ function resolveEntryPath(rawEntryPath: string | undefined): {
   }
   if (rawEntryPath === WorkflowStudioEntryPaths.resumeDraft) {
     return Object.freeze({ resolved: WorkflowStudioEntryPaths.resumeDraft });
+  }
+  if (rawEntryPath === WorkflowStudioEntryPaths.duplicate) {
+    return Object.freeze({ resolved: WorkflowStudioEntryPaths.duplicate });
   }
 
   return Object.freeze({
@@ -124,5 +128,12 @@ export function buildWorkflowStudioResumeDraftPath(workflowId: string): string {
     entryPath: WorkflowStudioEntryPaths.resumeDraft,
     workflowId,
     workflowStatus: "draft",
+  });
+}
+
+export function buildWorkflowStudioDuplicatePath(workflowId: string): string {
+  return buildWorkflowStudioEntryPath({
+    entryPath: WorkflowStudioEntryPaths.duplicate,
+    workflowId,
   });
 }

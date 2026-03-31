@@ -339,6 +339,88 @@ describe("StudioShellBackendApi", () => {
     expect(missing.error?.code).toBe("not-found");
   });
 
+  it("duplicates persisted workflow records with new identity, draft status, and lineage metadata", async () => {
+    const workflowPersistenceRepository = new InMemoryWorkflowPersistenceRepository();
+    const api = new StudioShellBackendApi(
+      new InMemoryStudioShellRepository(),
+      workflowPersistenceRepository,
+    );
+    const initialized = await api.initializeStudio("studio-workflows", "Workflow Studio");
+    const sessionId = initialized.data!.activeSessionId!;
+    const serialized = serializeWorkflowDraft({
+      ...createEmptyWorkflowDraft(),
+      steps: [{
+        id: "step-source",
+        type: "action",
+        kind: "action",
+        order: 1,
+      }],
+      outputs: [{
+        id: "output-source",
+        type: "workflow-output",
+        outputType: WorkflowDraftOutputTypes.document,
+        format: WorkflowDraftOutputFormats.json,
+        sourceStepId: "step-source",
+        destination: {
+          type: WorkflowDraftOutputDestinationTypes.fileExport,
+          target: "/tmp/source.json",
+        },
+      }],
+    });
+
+    const created = await api.createDraft({
+      studioId: "studio-workflows",
+      sessionId,
+      content: serialized,
+      metadata: {
+        title: "source-workflow",
+        tags: ["workflow", "source"],
+        taxonomy: {
+          structuralKind: "composite",
+          semanticRole: "workflow",
+          behaviorKind: "deterministic",
+        },
+        contract: {
+          version: "1.0.0",
+          input: { kind: "json-schema" },
+          output: { kind: "json-schema" },
+        },
+        provenance: {
+          sourceType: "generated",
+          sourceLabel: "workflow-studio",
+        },
+      },
+    });
+    expect(created.ok).toBeTrue();
+    const sourceWorkflowId = created.data!.draft!.assetId;
+
+    const duplicated = await api.duplicatePersistedWorkflow({
+      sourceWorkflowId,
+    });
+    expect(duplicated.ok).toBeTrue();
+    expect(duplicated.data?.id).toBe(`${sourceWorkflowId}:copy`);
+    expect(duplicated.data?.status).toBe("draft");
+    expect(duplicated.data?.revision.persistenceRevision).toBe(1);
+    expect(duplicated.data?.revision.workflowRevision).toBe(1);
+    expect(duplicated.data?.revision.duplicatedFromWorkflowId).toBe(sourceWorkflowId);
+    expect(duplicated.data?.serializedDraft).toBe(serialized);
+
+    const loadedSource = await api.getPersistedWorkflow(sourceWorkflowId);
+    expect(loadedSource.ok).toBeTrue();
+    expect(loadedSource.data?.id).toBe(sourceWorkflowId);
+    expect(loadedSource.data?.revision.duplicatedFromWorkflowId).toBeUndefined();
+
+    const loadedDuplicate = await api.getPersistedWorkflow(`${sourceWorkflowId}:copy`);
+    expect(loadedDuplicate.ok).toBeTrue();
+    expect(loadedDuplicate.data?.revision.duplicatedFromWorkflowId).toBe(sourceWorkflowId);
+
+    const duplicateMissing = await api.duplicatePersistedWorkflow({
+      sourceWorkflowId: "workflow:missing",
+    });
+    expect(duplicateMissing.ok).toBeFalse();
+    expect(duplicateMissing.error?.code).toBe("not-found");
+  });
+
   it("supports composite context-bundle drafts over the same shared validation/lifecycle/publish seams", async () => {
     const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
     const initialized = await api.initializeStudio("studio-context-bundles", "Context Bundle Studio");
