@@ -1,7 +1,20 @@
 import { describe, expect, it } from "bun:test";
 import { AssetDraftLifecycleStatuses } from "../../../../domain/studio-shell/StudioShellDomain";
+import {
+  WorkflowDraftOutputDestinationTypes,
+  WorkflowDraftOutputFormats,
+  WorkflowDraftOutputTypes,
+  WorkflowDraftTriggerKinds,
+  WorkflowDraftTriggerTypes,
+  createEmptyWorkflowDraft,
+  serializeWorkflowDraft,
+} from "../../../../domain/workflow-studio/WorkflowStudioDomain";
 import { StudioShellBackendApi } from "../StudioShellBackendApi";
 import { InMemoryStudioShellRepository } from "../../../studio-shell/InMemoryStudioShellRepository";
+import { InMemoryWorkflowPersistenceRepository } from "../../../workflows/InMemoryWorkflowPersistenceRepository";
+import { GetPersistedWorkflowUseCase } from "../../../../application/workflow-persistence/GetPersistedWorkflowUseCase";
+import type { IWorkflowPersistenceRepository } from "../../../../application/ports/interfaces/IWorkflowPersistenceRepository";
+import type { PersistedWorkflowRecord } from "../../../../domain/workflow-studio/WorkflowPersistenceDomain";
 
 describe("StudioShellBackendApi", () => {
   it("projects the same validation issue structure for atomic model/dataset/tool drafts", async () => {
@@ -174,6 +187,326 @@ describe("StudioShellBackendApi", () => {
     expect(published.data?.draft?.lifecycleStatus).toBe(AssetDraftLifecycleStatuses.published);
   });
 
+  it("synchronizes workflow studio draft create/update/lifecycle changes into workflow persistence contracts", async () => {
+    const workflowPersistenceRepository = new InMemoryWorkflowPersistenceRepository();
+    const api = new StudioShellBackendApi(
+      new InMemoryStudioShellRepository(),
+      workflowPersistenceRepository,
+    );
+    const getPersisted = new GetPersistedWorkflowUseCase(workflowPersistenceRepository);
+    const initialized = await api.initializeStudio("studio-workflows", "Workflow Studio");
+    const sessionId = initialized.data!.activeSessionId!;
+
+    const wizardDraft = serializeWorkflowDraft({
+      ...createEmptyWorkflowDraft(),
+      triggers: [{
+        id: "trigger-manual",
+        kind: WorkflowDraftTriggerKinds.user,
+        type: WorkflowDraftTriggerTypes.userManual,
+        config: {},
+      }],
+      steps: [{
+        id: "step-wizard",
+        type: "action",
+        kind: "action",
+        order: 1,
+      }],
+    });
+
+    const created = await api.createDraft({
+      studioId: "studio-workflows",
+      sessionId,
+      content: wizardDraft,
+      metadata: {
+        title: "workflow-draft",
+        tags: ["workflow", "wizard"],
+        taxonomy: {
+          structuralKind: "composite",
+          semanticRole: "workflow",
+          behaviorKind: "deterministic",
+        },
+        contract: {
+          version: "1.0.0",
+          input: { kind: "json-schema" },
+          output: { kind: "json-schema" },
+        },
+        provenance: {
+          creatorId: "user:workflow",
+          sourceType: "generated",
+          sourceLabel: "workflow-studio",
+        },
+      },
+    });
+    expect(created.ok).toBeTrue();
+    const workflowId = created.data!.draft!.assetId;
+
+    const persistedAfterCreate = await getPersisted.execute(workflowId);
+    expect(persistedAfterCreate?.status).toBe("draft");
+    expect(persistedAfterCreate?.definition.draft.steps.map((entry) => entry.id)).toEqual(["step-wizard"]);
+    expect(persistedAfterCreate?.ownershipContext?.ownerId).toBe("user:workflow");
+
+    const canvasDraft = serializeWorkflowDraft({
+      ...createEmptyWorkflowDraft(),
+      triggers: [{
+        id: "trigger-state",
+        kind: WorkflowDraftTriggerKinds.state,
+        type: WorkflowDraftTriggerTypes.stateSystemEvent,
+        config: {
+          sourceType: "system",
+          eventCategory: "system-state-changed",
+          eventName: "record-updated",
+        },
+      }],
+      steps: [{
+        id: "step-canvas",
+        type: "action",
+        kind: "action",
+        order: 1,
+      }],
+    });
+    await api.updateDraft({
+      studioId: "studio-workflows",
+      sessionId,
+      draftId: created.data!.draft!.draftId,
+      content: canvasDraft,
+      metadataPatch: {
+        title: "workflow-draft-renamed",
+        summary: "Workflow summary updated from studio save",
+        tags: ["workflow", "canvas"],
+      },
+    });
+    await api.transitionLifecycle({
+      studioId: "studio-workflows",
+      sessionId,
+      draftId: created.data!.draft!.draftId,
+      targetStatus: AssetDraftLifecycleStatuses.validated,
+    });
+
+    const persistedAfterUpdate = await getPersisted.execute(workflowId);
+    expect(persistedAfterUpdate?.status).toBe("saved");
+    expect(persistedAfterUpdate?.name).toBe("workflow-draft-renamed");
+    expect(persistedAfterUpdate?.metadata.summary).toBe("Workflow summary updated from studio save");
+    expect(persistedAfterUpdate?.revision.persistenceRevision).toBeGreaterThan(1);
+    expect(persistedAfterUpdate?.definition.draft.steps.map((entry) => entry.id)).toEqual(["step-canvas"]);
+    expect(persistedAfterUpdate?.metadata.tags).toEqual(["workflow", "canvas"]);
+  });
+
+  it("loads persisted workflow records through studio-shell backend for workflow studio entry initialization", async () => {
+    const workflowPersistenceRepository = new InMemoryWorkflowPersistenceRepository();
+    const api = new StudioShellBackendApi(
+      new InMemoryStudioShellRepository(),
+      workflowPersistenceRepository,
+    );
+    const initialized = await api.initializeStudio("studio-workflows", "Workflow Studio");
+    const sessionId = initialized.data!.activeSessionId!;
+    const serialized = serializeWorkflowDraft({
+      ...createEmptyWorkflowDraft(),
+      steps: [{
+        id: "step-existing",
+        type: "action",
+        kind: "action",
+        order: 1,
+      }],
+    });
+
+    const created = await api.createDraft({
+      studioId: "studio-workflows",
+      sessionId,
+      content: serialized,
+      metadata: {
+        title: "existing-workflow",
+        tags: ["workflow", "draft"],
+        taxonomy: {
+          structuralKind: "composite",
+          semanticRole: "workflow",
+          behaviorKind: "deterministic",
+        },
+        contract: {
+          version: "1.0.0",
+          input: { kind: "json-schema" },
+          output: { kind: "json-schema" },
+        },
+        provenance: {
+          sourceType: "generated",
+          sourceLabel: "workflow-studio",
+        },
+      },
+    });
+    expect(created.ok).toBeTrue();
+    const persistedWorkflowId = created.data!.draft!.assetId;
+
+    const loaded = await api.getPersistedWorkflow(persistedWorkflowId);
+    expect(loaded.ok).toBeTrue();
+    expect(loaded.data?.id).toBe(persistedWorkflowId);
+    expect(loaded.data?.serializedDraft).toBe(serialized);
+
+    const missing = await api.getPersistedWorkflow("workflow:missing");
+    expect(missing.ok).toBeFalse();
+    expect(missing.error?.code).toBe("not-found");
+  });
+
+  it("returns invalid-request for malformed persisted workflow definitions on open", async () => {
+    const malformedRepository: IWorkflowPersistenceRepository = {
+      async create(record) {
+        return record;
+      },
+      async update(record) {
+        return record;
+      },
+      async getById(): Promise<PersistedWorkflowRecord | undefined> {
+        return Object.freeze({
+          id: "workflow:malformed",
+          name: "Malformed Workflow",
+          status: "draft",
+          lifecycleState: "draft",
+          metadata: Object.freeze({ tags: Object.freeze([]) }),
+          ownershipContext: undefined,
+          revision: Object.freeze({
+            persistenceRevision: 1,
+            workflowRevision: 1,
+          }),
+          timestamps: Object.freeze({
+            createdAt: "2026-03-30T00:00:00.000Z",
+            updatedAt: "2026-03-30T00:00:00.000Z",
+          }),
+          payload: Object.freeze({
+            kind: "workflow-entity",
+            schemaVersion: "ai-loom.workflow-entity.v1",
+          }),
+          definition: Object.freeze({
+            id: "workflow:malformed",
+            name: "Malformed Workflow",
+            metadata: Object.freeze({ tags: Object.freeze([]) }),
+            draft: Object.freeze({ triggers: [], inputs: [], steps: [], outputs: [] }),
+            serializedDraft: "{ malformed-json",
+            draftRevision: 1,
+            lifecycleState: "draft",
+            createdAt: "2026-03-30T00:00:00.000Z",
+            updatedAt: "2026-03-30T00:00:00.000Z",
+          }),
+        } as unknown as PersistedWorkflowRecord);
+      },
+      async list() {
+        return [];
+      },
+      async duplicate(_sourceWorkflowId, duplicateRecord) {
+        return duplicateRecord;
+      },
+    };
+    const api = new StudioShellBackendApi(new InMemoryStudioShellRepository(), malformedRepository);
+
+    const response = await api.getPersistedWorkflow("workflow:malformed");
+    expect(response.ok).toBeFalse();
+    expect(response.error?.code).toBe("invalid-request");
+  });
+
+  it("maps persistence adapter failures to persistence-failed api errors", async () => {
+    const failingRepository: IWorkflowPersistenceRepository = {
+      async create(record) {
+        return record;
+      },
+      async update(record) {
+        return record;
+      },
+      async getById() {
+        throw new Error("disk unavailable");
+      },
+      async list() {
+        return [];
+      },
+      async duplicate(_sourceWorkflowId, duplicateRecord) {
+        return duplicateRecord;
+      },
+    };
+    const api = new StudioShellBackendApi(new InMemoryStudioShellRepository(), failingRepository);
+
+    const response = await api.getPersistedWorkflow("workflow:any");
+    expect(response.ok).toBeFalse();
+    expect(response.error?.code).toBe("persistence-failed");
+  });
+
+  it("duplicates persisted workflow records with new identity, draft status, and lineage metadata", async () => {
+    const workflowPersistenceRepository = new InMemoryWorkflowPersistenceRepository();
+    const api = new StudioShellBackendApi(
+      new InMemoryStudioShellRepository(),
+      workflowPersistenceRepository,
+    );
+    const initialized = await api.initializeStudio("studio-workflows", "Workflow Studio");
+    const sessionId = initialized.data!.activeSessionId!;
+    const serialized = serializeWorkflowDraft({
+      ...createEmptyWorkflowDraft(),
+      steps: [{
+        id: "step-source",
+        type: "action",
+        kind: "action",
+        order: 1,
+      }],
+      outputs: [{
+        id: "output-source",
+        type: "workflow-output",
+        outputType: WorkflowDraftOutputTypes.document,
+        format: WorkflowDraftOutputFormats.json,
+        sourceStepId: "step-source",
+        destination: {
+          type: WorkflowDraftOutputDestinationTypes.fileExport,
+          target: "/tmp/source.json",
+        },
+      }],
+    });
+
+    const created = await api.createDraft({
+      studioId: "studio-workflows",
+      sessionId,
+      content: serialized,
+      metadata: {
+        title: "source-workflow",
+        tags: ["workflow", "source"],
+        taxonomy: {
+          structuralKind: "composite",
+          semanticRole: "workflow",
+          behaviorKind: "deterministic",
+        },
+        contract: {
+          version: "1.0.0",
+          input: { kind: "json-schema" },
+          output: { kind: "json-schema" },
+        },
+        provenance: {
+          sourceType: "generated",
+          sourceLabel: "workflow-studio",
+        },
+      },
+    });
+    expect(created.ok).toBeTrue();
+    const sourceWorkflowId = created.data!.draft!.assetId;
+
+    const duplicated = await api.duplicatePersistedWorkflow({
+      sourceWorkflowId,
+    });
+    expect(duplicated.ok).toBeTrue();
+    expect(duplicated.data?.id).toBe(`${sourceWorkflowId}:copy`);
+    expect(duplicated.data?.status).toBe("draft");
+    expect(duplicated.data?.revision.persistenceRevision).toBe(1);
+    expect(duplicated.data?.revision.workflowRevision).toBe(1);
+    expect(duplicated.data?.revision.duplicatedFromWorkflowId).toBe(sourceWorkflowId);
+    expect(duplicated.data?.serializedDraft).toBe(serialized);
+
+    const loadedSource = await api.getPersistedWorkflow(sourceWorkflowId);
+    expect(loadedSource.ok).toBeTrue();
+    expect(loadedSource.data?.id).toBe(sourceWorkflowId);
+    expect(loadedSource.data?.revision.duplicatedFromWorkflowId).toBeUndefined();
+
+    const loadedDuplicate = await api.getPersistedWorkflow(`${sourceWorkflowId}:copy`);
+    expect(loadedDuplicate.ok).toBeTrue();
+    expect(loadedDuplicate.data?.revision.duplicatedFromWorkflowId).toBe(sourceWorkflowId);
+
+    const duplicateMissing = await api.duplicatePersistedWorkflow({
+      sourceWorkflowId: "workflow:missing",
+    });
+    expect(duplicateMissing.ok).toBeFalse();
+    expect(duplicateMissing.error?.code).toBe("not-found");
+  });
+
   it("supports composite context-bundle drafts over the same shared validation/lifecycle/publish seams", async () => {
     const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
     const initialized = await api.initializeStudio("studio-context-bundles", "Context Bundle Studio");
@@ -283,6 +616,262 @@ describe("StudioShellBackendApi", () => {
     });
     expect(published.ok).toBeTrue();
     expect(published.data?.draft?.lifecycleStatus).toBe(AssetDraftLifecycleStatuses.published);
+  });
+
+  it("blocks manual workflow launch when execution readiness validation fails", async () => {
+    const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
+
+    const run = await api.runWorkflowDraft({
+      studioId: "studio-workflows",
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-temporal",
+          kind: WorkflowDraftTriggerKinds.temporal,
+          type: WorkflowDraftTriggerTypes.temporalSchedule,
+          config: {},
+        }],
+        steps: [],
+      }),
+    });
+
+    expect(run.ok).toBeTrue();
+    expect(run.data?.launchStatus).toBe("blocked");
+    expect(run.data?.execution.state).toBe("failed");
+    expect(run.data?.execution.launchAccepted).toBeFalse();
+    expect(run.data?.execution.failure?.kind).toBe("validation-failure");
+    expect(run.data?.validation.ready).toBeFalse();
+    expect((run.data?.validation.blockingIssueCount ?? 0) > 0).toBeTrue();
+    expect(run.data?.validation.issues.some((issue) => issue.code === "trigger-malformed")).toBeTrue();
+  });
+
+  it("assesses workflow execution readiness without launching runtime execution", async () => {
+    const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
+
+    const blocked = await api.assessWorkflowExecutionReadiness({
+      studioId: "studio-workflows",
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-temporal",
+          kind: WorkflowDraftTriggerKinds.temporal,
+          type: WorkflowDraftTriggerTypes.temporalSchedule,
+          config: {},
+        }],
+        steps: [],
+      }),
+    });
+
+    expect(blocked.ok).toBeTrue();
+    expect(blocked.data?.ready).toBeFalse();
+    expect((blocked.data?.blockingIssueCount ?? 0) > 0).toBeTrue();
+    expect(blocked.data?.issues.some((issue) => issue.code === "trigger-malformed")).toBeTrue();
+
+    const ready = await api.assessWorkflowExecutionReadiness({
+      studioId: "studio-workflows",
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-manual",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        }],
+        steps: [{
+          id: "step-1",
+          type: "action",
+          kind: "action",
+          order: 1,
+        }],
+      }),
+    });
+
+    expect(ready.ok).toBeTrue();
+    expect(ready.data?.ready).toBeTrue();
+    expect(ready.data?.blockingIssueCount).toBe(0);
+  });
+
+  it("launches manual workflow execution when validation and translation pass", async () => {
+    const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
+
+    const run = await api.runWorkflowDraft({
+      studioId: "studio-workflows",
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-manual",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        }],
+        steps: [{
+          id: "step-1",
+          type: "action",
+          kind: "action",
+          order: 1,
+        }],
+        outputs: [{
+          id: "output-1",
+          type: "workflow-output",
+          order: 1,
+          outputType: WorkflowDraftOutputTypes.document,
+          format: WorkflowDraftOutputFormats.json,
+          sourceStepId: "step-1",
+          destination: {
+            type: WorkflowDraftOutputDestinationTypes.webViewer,
+            target: "preview",
+            options: {
+              title: "Viewer",
+            },
+          },
+        }],
+      }),
+      inputValues: {
+        prompt: "hello",
+      },
+    });
+
+    expect(run.ok).toBeTrue();
+    expect(run.data?.launchStatus).toBe("launched");
+    expect(run.data?.execution.state).toBe("completed");
+    expect(run.data?.execution.launchAccepted).toBeTrue();
+    expect(run.data?.validation.ready).toBeTrue();
+    expect(run.data?.planSummary?.stepCount).toBe(1);
+    expect(run.data?.runtime?.status === "completed" || run.data?.runtime?.status === "paused").toBeTrue();
+    expect((run.data?.runtime?.outputDelivery?.deliveredCount ?? 0) >= 1).toBeTrue();
+    expect(run.data?.runtime?.outputDelivery?.results[0]).toEqual(expect.objectContaining({
+      outputId: "output-1",
+      destinationType: WorkflowDraftOutputDestinationTypes.webViewer,
+      target: "preview",
+      status: "delivered",
+    }));
+  });
+
+  it("supports trigger-aware entry for temporal and state workflow activations", async () => {
+    const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
+
+    const temporalRun = await api.runWorkflowDraft({
+      studioId: "studio-workflows",
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-temporal",
+          kind: WorkflowDraftTriggerKinds.temporal,
+          type: WorkflowDraftTriggerTypes.temporalSchedule,
+          config: {
+            runAt: "2027-01-01T00:00:00.000Z",
+          },
+        }],
+        inputs: [{
+          id: "input-key",
+          type: "runtime-input",
+          sourceType: "runtime-parameter",
+          parameterKey: "key",
+          required: true,
+        }],
+        steps: [{
+          id: "step-1",
+          type: "action",
+          kind: "action",
+          order: 1,
+        }],
+      }),
+      triggerEntry: {
+        sourceKind: "temporal",
+        triggerId: "trigger-temporal",
+      },
+    });
+    expect(temporalRun.ok).toBeTrue();
+    expect(temporalRun.data?.launchStatus).toBe("blocked");
+    expect(temporalRun.data?.execution.failure?.kind).toBe("validation-failure");
+    expect(temporalRun.data?.validation.issues.some((issue) => issue.code === "input-resolution-required-missing")).toBeTrue();
+
+    const stateRun = await api.runWorkflowDraft({
+      studioId: "studio-workflows",
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-state",
+          kind: WorkflowDraftTriggerKinds.state,
+          type: WorkflowDraftTriggerTypes.stateSystemEvent,
+          config: {
+            sourceType: "system",
+            eventCategory: "system-state-changed",
+            eventName: "customer-updated",
+          },
+        }],
+        inputs: [{
+          id: "input-customer-id",
+          type: "runtime-input",
+          sourceType: "runtime-parameter",
+          parameterKey: "customerId",
+          required: true,
+        }],
+        steps: [{
+          id: "step-1",
+          type: "action",
+          kind: "action",
+          order: 1,
+        }],
+      }),
+      triggerEntry: {
+        sourceKind: "state-data",
+        triggerId: "trigger-state",
+        payload: {
+          customerId: "customer-7",
+        },
+      },
+    });
+
+    expect(stateRun.ok).toBeTrue();
+    expect(stateRun.data?.launchStatus).toBe("launched");
+    expect(stateRun.data?.execution.state).toBe("completed");
+    expect(stateRun.data?.validation.ready).toBeTrue();
+  });
+
+  it("reports output-delivery runtime failures with structured execution failure metadata", async () => {
+    const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
+
+    const run = await api.runWorkflowDraft({
+      studioId: "studio-workflows",
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-manual",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        }],
+        steps: [{
+          id: "step-1",
+          type: "action",
+          kind: "action",
+          order: 1,
+        }],
+        outputs: [{
+          id: "output-file",
+          type: "workflow-output",
+          order: 1,
+          outputType: WorkflowDraftOutputTypes.document,
+          format: WorkflowDraftOutputFormats.json,
+          sourceStepId: "step-1",
+          destination: {
+            type: WorkflowDraftOutputDestinationTypes.fileExport,
+            target: "workspace-file",
+            options: {
+              deliveryMode: "workspace-file",
+            },
+          },
+        }],
+      }),
+    });
+
+    expect(run.ok).toBeTrue();
+    expect(run.data?.launchStatus).toBe("failed");
+    expect(run.data?.execution.state).toBe("failed");
+    expect(run.data?.execution.failure?.kind).toBe("output-delivery-failure");
+    expect(run.data?.runtime?.status).toBe("failed");
+    expect((run.data?.runtime?.outputDelivery?.failedCount ?? 0) > 0).toBeTrue();
   });
 
   it("surfaces version-aware dependency mismatch validation for composite drafts", async () => {

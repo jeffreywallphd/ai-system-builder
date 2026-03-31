@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import type { ExploreAssetSummary, ExploreFacet, ExploreFilterSet } from "../../application/asset-registry/ExploreAssetQueryService";
 import { ExploreAssetList } from "../components/explore/ExploreAssetList";
 import { ExploreFilterPanel } from "../components/explore/ExploreFilterPanel";
 import { SearchBar } from "../components/registry/SearchBar";
 import { RegistryService } from "../services/RegistryService";
+import { buildWorkflowStudioCreateNewPath } from "../studio-shell/workflow/WorkflowStudioEntryRouting";
 
 const defaultFilterState: ExploreFilterSet = Object.freeze({
   kinds: Object.freeze([]),
@@ -118,6 +119,11 @@ export default function RegistryPage(): JSX.Element {
           <p className="ui-page__subtitle">
             Explore a unified asset library across atomic, composite, and system assets with intent-friendly metadata-first filtering.
           </p>
+          <div className="ui-row ui-row--wrap" style={{ gap: "0.5rem" }}>
+            <Link className="ui-button ui-button--primary ui-button--small" to={buildWorkflowStudioCreateNewPath()}>
+              Create new workflow
+            </Link>
+          </div>
         </div>
       </div>
 

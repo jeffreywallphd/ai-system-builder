@@ -6,9 +6,15 @@ import type {
   UpdateAssetDraftDependenciesCommand,
 } from "../../application/studio-shell/contracts";
 import type {
+  AssessWorkflowStudioExecutionReadinessRequest,
+  DuplicatePersistedWorkflowRequest,
+  RunWorkflowStudioDraftReadModel,
+  RunWorkflowStudioDraftRequest,
   StudioShellApiResponse,
   StudioShellSnapshotReadModel,
   StudioShellValidationIssue,
+  WorkflowExecutionReadinessReadModel,
+  PersistedWorkflowReadModel,
 } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
 import type {
   StartSystemRuntimeExecutionRequest,
@@ -31,14 +37,12 @@ import type {
   UpdateSystemParametersRequest,
 } from "../../infrastructure/api/system-studio/SystemStudioBackendApi";
 import { resolveDesktopStudioShellBridge } from "../composition/DesktopStudioShellBridgeAdapter";
+import { resolveBrowserStudioShellBridgeFallback } from "../composition/BrowserStudioShellBridgeFallback";
 
 export class StudioShellService {
   private requireBridge() {
     const bridge = resolveDesktopStudioShellBridge();
-    if (!bridge) {
-      throw new Error("Desktop Studio Shell bridge is unavailable in this runtime.");
-    }
-    return bridge;
+    return bridge ?? resolveBrowserStudioShellBridgeFallback();
   }
 
   public async initializeStudio(studioId: string, name: string): Promise<StudioShellApiResponse<StudioShellSnapshotReadModel>> {
@@ -84,6 +88,30 @@ export class StudioShellService {
   public async validateDraft(studioId: string, draftId: string): Promise<StudioShellApiResponse<ReadonlyArray<StudioShellValidationIssue>>> {
     const raw = await this.requireBridge().validateDraft(JSON.stringify({ studioId, draftId }));
     return JSON.parse(raw) as StudioShellApiResponse<ReadonlyArray<StudioShellValidationIssue>>;
+  }
+
+  public async getPersistedWorkflow(workflowId: string): Promise<StudioShellApiResponse<PersistedWorkflowReadModel>> {
+    const raw = await this.requireBridge().getPersistedWorkflow(workflowId);
+    return JSON.parse(raw) as StudioShellApiResponse<PersistedWorkflowReadModel>;
+  }
+
+  public async duplicatePersistedWorkflow(
+    request: DuplicatePersistedWorkflowRequest,
+  ): Promise<StudioShellApiResponse<PersistedWorkflowReadModel>> {
+    const raw = await this.requireBridge().duplicatePersistedWorkflow(JSON.stringify(request));
+    return JSON.parse(raw) as StudioShellApiResponse<PersistedWorkflowReadModel>;
+  }
+
+  public async assessWorkflowExecutionReadiness(
+    request: AssessWorkflowStudioExecutionReadinessRequest,
+  ): Promise<StudioShellApiResponse<WorkflowExecutionReadinessReadModel>> {
+    const raw = await this.requireBridge().assessWorkflowExecutionReadiness(JSON.stringify(request));
+    return JSON.parse(raw) as StudioShellApiResponse<WorkflowExecutionReadinessReadModel>;
+  }
+
+  public async runWorkflowDraft(request: RunWorkflowStudioDraftRequest): Promise<StudioShellApiResponse<RunWorkflowStudioDraftReadModel>> {
+    const raw = await this.requireBridge().runWorkflowDraft(JSON.stringify(request));
+    return JSON.parse(raw) as StudioShellApiResponse<RunWorkflowStudioDraftReadModel>;
   }
 
   public async listSystemChildComponents(request: ListSystemChildComponentsRequest): Promise<SystemStudioApiResponse<ReadonlyArray<SystemStudioChildComponentReadModel>>> {

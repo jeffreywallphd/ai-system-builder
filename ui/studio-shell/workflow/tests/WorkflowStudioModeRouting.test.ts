@@ -1,5 +1,8 @@
 import { describe, expect, it } from "bun:test";
-import { resolveWorkflowStudioModeRoute } from "../WorkflowStudioModeRouting";
+import {
+  buildWorkflowStudioModePath,
+  resolveWorkflowStudioModeRoute,
+} from "../WorkflowStudioModeRouting";
 import { DEFAULT_WORKFLOW_STUDIO_MODE_ID } from "../WorkflowStudioModes";
 
 describe("WorkflowStudioModeRouting", () => {
@@ -58,5 +61,10 @@ describe("WorkflowStudioModeRouting", () => {
     expect(resolution.requestedModeId).toBeUndefined();
     expect(resolution.invalidModeId).toBe("advanced");
     expect(resolution.source).toBe("route-param");
+  });
+
+  it("builds canonical mode paths for wizard and canvas routes", () => {
+    expect(buildWorkflowStudioModePath("wizard")).toBe("/studio-shell/workflow/wizard");
+    expect(buildWorkflowStudioModePath("canvas")).toBe("/studio-shell/workflow/canvas");
   });
 });

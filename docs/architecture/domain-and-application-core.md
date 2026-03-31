@@ -208,6 +208,58 @@ The studio shell now has a bounded inner-layer model and application orchestrati
 - Workflow asset-backed references now carry taxonomy metadata on canonical asset refs (`WorkflowDraftAssetReference.taxonomy`) and are validated against shared taxonomy expectations for dataset-backed inputs and agent-assistant steps.
 - Workflow draft validation now emits deterministic taxonomy/asset-reference issues for mismatched dataset taxonomy and malformed asset-backed step identities, while keeping canonical validation in the domain layer and publish enforcement in `application/workflow-studio/WorkflowStudioApplicationService.ts`.
 
+## Direction 5 update: Workflow persistence domain/application foundation (stories 11.1-11.2)
+
+- Workflow persistence now has a dedicated canonical domain contract in `domain/workflow-studio/WorkflowPersistenceDomain.ts` that wraps canonical `WorkflowEntity` payloads (no parallel workflow definition shape).
+- The persistence contract explicitly models:
+  - persisted identity/status (`draft`/`saved`) derived from workflow lifecycle state,
+  - metadata/timestamps,
+  - ownership/context metadata (`ownerId`, `tenantId`, `studioId`, `sessionId`),
+  - basic revision/version metadata (`persistenceRevision`, `workflowRevision`, optional `versionLabel`, optional duplicate source linkage),
+  - payload strategy metadata (`workflow-entity` + schema version).
+- The application-layer persistence boundary now has an explicit repository port (`application/ports/interfaces/IWorkflowPersistenceRepository.ts`) with create/update/get/list/duplicate contracts and bounded list-query semantics.
+- Application use cases for create/update/get/list/duplicate now live in `application/workflow-persistence/*` with typed request validation and explicit failure contracts (`WorkflowPersistenceInvalidRequestError`, `WorkflowPersistenceNotFoundError`, `WorkflowPersistenceConflictError`).
+
+## Direction 5 update: Workflow persistence infrastructure + studio draft synchronization (stories 11.3-11.4)
+
+- Workflow persistence now has a concrete SQLite infrastructure adapter (`infrastructure/filesystem/SqliteWorkflowPersistenceRepository.ts`) implementing the existing `IWorkflowPersistenceRepository` create/update/get/list/duplicate contract over canonical persisted workflow records.
+- Repository persistence keeps canonical `WorkflowEntity` payload compatibility enforced via `serializeWorkflowEntity`/`deserializeWorkflowEntity` at the infrastructure boundary, while preserving domain/application contract ownership of status/revision/timestamp semantics.
+- Studio-shell workflow draft mutations now synchronize into workflow persistence through existing application use cases (`CreatePersistedWorkflowUseCase`, `UpdatePersistedWorkflowUseCase`, `GetPersistedWorkflowUseCase`) inside `StudioShellBackendApi`, rather than UI-owned persistence logic.
+- Workflow draft synchronization maps workflow studio draft metadata/context into persistence ownership/version metadata and keeps lifecycle alignment (`draft` draft state, `saved` for validated/published transitions) under application orchestration.
+
+## Direction 5 update: Explore workflow discovery + workflow studio entry routing (stories 11.5-11.6)
+
+- Explore/library now treats persisted workflows as first-class assets through the existing explore-query seam (`application/asset-registry/ExploreAssetQueryService.ts`) by augmenting canonical registry results with workflow-persistence summaries when available.
+- Persisted workflow explore rows remain taxonomy-aligned (`composite/workflow/*`) and surface persistence status/source metadata for future metadata/version filtering without introducing a parallel workflow-browser architecture.
+- Workflow Studio entry now resolves explicit new/open/resume route intents through a dedicated route parser/builder seam (`ui/studio-shell/workflow/WorkflowStudioEntryRouting.ts`) layered on top of existing studio routing/search conventions.
+- Workflow Studio initialization for new/open/resume remains service-backed (`StudioShellService` -> `StudioShellBackendApi`) and uses existing draft/session orchestration (`startSession`, `createDraft`, shared workflow mode store synchronization) instead of UI-local reconstruction paths.
+- Persisted workflow retrieval for open/resume is now an explicit backend contract (`StudioShellBackendApi.getPersistedWorkflow`) exposed through existing desktop/browser studio-shell bridge seams, with typed not-found/invalid-entry handling.
+
+## Direction 5 update: Workflow duplication + lightweight revision metadata hardening (stories 11.7-11.8)
+
+- Persisted workflow duplication is now exposed as an explicit backend contract (`StudioShellBackendApi.duplicatePersistedWorkflow`) and reused by Workflow Studio entry routing (`workflowEntry=duplicate`) plus Explore workflow actions, so duplication flows through existing application/repository seams instead of UI-local copy logic.
+- Duplication stays canonical and non-mutating: duplicate records inherit workflow definition + metadata, reset identity/timestamps/revision (`persistenceRevision=1`, `workflowRevision=1`), remain in `draft` status, and persist lineage through `revision.duplicatedFromWorkflowId`.
+- Duplicate id allocation is now application-owned in `DuplicatePersistedWorkflowUseCase` when no explicit id is supplied (`<source>:copy`, then `:copy-<n>`), with conflict/not-found behavior preserved through existing typed persistence errors.
+- Persisted workflow rehydration now validates canonical revision/timestamp/payload consistency (`normalizePersistedWorkflowRecord`) in both SQLite and in-memory repositories, so malformed persisted revision/version metadata fails fast on load instead of silently round-tripping.
+
+## Direction 5 closeout: workflow persistence/reuse behavior contract (stories 11.13-11.14)
+
+- The persisted workflow model remains one canonical record contract (`PersistedWorkflowRecord`) over canonical workflow definitions: no parallel persistence shape for wizard vs canvas, and no UI-local persistence model.
+- Lifecycle semantics are intentionally lightweight and implemented as:
+  - `draft` persisted status for in-progress workflow authoring records,
+  - `saved` persisted status for validated/published workflow lifecycle states.
+- Repository and use-case behavior contracts remain `create`, `getById`, `update`, `list`, and `duplicate`, with query-time filtering by status/owner/studio/search/limit and deterministic typed error mapping for invalid requests, conflicts, not-found, and adapter failures.
+- Duplicate behavior remains lineage-preserving and non-mutating (`revision.duplicatedFromWorkflowId`), while resetting persistence/workflow revisions to first-write semantics for the duplicated record.
+- Workflow Studio initialization paths are service-backed and persistence-backed:
+  - `new` creates a new draft/session path,
+  - `open-existing` loads persisted workflow definitions via `getPersistedWorkflow`,
+  - `resume-draft` loads persisted draft definitions via the same retrieval contract.
+- Metadata editing and save-state behavior remain part of the same persistence path as shared draft content (name/summary/tags persist through the same save operation and update Explore/read-model projections).
+- Validation/error expectations stay backend-authoritative:
+  - malformed draft definitions and malformed persisted serialized payloads are rejected as invalid-request failures,
+  - missing workflow ids/records fail as not-found,
+  - persistence adapter faults fail as persistence-failed at backend API boundaries.
+
 ## Direction 5 update: Workflow built-in step taxonomy + registry foundation (stories 6.1-6.2)
 
 - Workflow-native built-in steps are now a first-class inner-layer concept in `domain/workflow-studio/WorkflowStudioDomain.ts` with canonical step taxonomy categories (`control-flow`, `temporal`, `human-interaction`, reserved `transformation`) and stable built-in step identities.

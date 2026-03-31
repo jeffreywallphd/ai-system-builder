@@ -1,4 +1,3 @@
-import { createHmac } from "node:crypto";
 import type {
   ExecutionCallbackDeliveryResult,
   ExecutionCallbackEventKind,
@@ -33,6 +32,30 @@ export interface ExecutionCallbackDispatcher {
     registration: ExecutionCallbackRegistration,
     payload: ExecutionCallbackPayload,
   ): Promise<ExecutionCallbackDeliveryResult>;
+}
+
+function toLowerHex(bytes: Uint8Array): string {
+  return Array.from(bytes)
+    .map((value) => value.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+async function createHmacSha256Hex(secret: string, body: string): Promise<string> {
+  const subtle = globalThis.crypto?.subtle;
+  if (subtle) {
+    const key = await subtle.importKey(
+      "raw",
+      new TextEncoder().encode(secret),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"],
+    );
+    const signature = await subtle.sign("HMAC", key, new TextEncoder().encode(body));
+    return toLowerHex(new Uint8Array(signature));
+  }
+
+  const { createHmac } = await import("node:crypto");
+  return createHmac("sha256", secret).update(body).digest("hex");
 }
 
 function isSecureTarget(targetUrl: string): boolean {
@@ -79,7 +102,7 @@ export class HttpExecutionCallbackDispatcher implements ExecutionCallbackDispatc
           ...registration.headers,
         };
         if (registration.secretToken) {
-          headers["x-ai-loom-callback-signature"] = createHmac("sha256", registration.secretToken).update(body).digest("hex");
+          headers["x-ai-loom-callback-signature"] = await createHmacSha256Hex(registration.secretToken, body);
         }
         const response = await fetch(registration.targetUrl, {
           method: "POST",

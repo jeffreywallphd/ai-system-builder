@@ -1,8 +1,22 @@
 ﻿import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import {
+  Link,
+  useBeforeUnload,
+  useBlocker,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 import { AssetDraftLifecycleStatuses, type AssetMetadataPatch } from "../../domain/studio-shell/StudioShellDomain";
-import type { StudioShellSnapshotReadModel, StudioShellValidationIssue } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
+import type {
+  PersistedWorkflowReadModel,
+  StudioShellSnapshotReadModel,
+  StudioShellValidationIssue,
+  WorkflowExecutionReadinessReadModel,
+} from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
 import WorkflowStudioDraftAuthoringBoundary from "../components/studio-shell/workflow/WorkflowStudioDraftAuthoringBoundary";
+import WorkflowStudioExecutionFeedbackPanel, {
+  type WorkflowStudioRunFeedback,
+} from "../components/studio-shell/workflow/WorkflowStudioExecutionFeedbackPanel";
 import { StudioShellService } from "../services/StudioShellService";
 import { StudioShellPanel } from "../components/studio-shell/StudioShellPanel";
 import { StudioShellValidationIssuesPanel } from "../components/studio-shell/StudioShellValidationIssuesPanel";
@@ -21,7 +35,14 @@ import {
   type WorkflowStudioModeState,
 } from "../studio-shell/workflow/WorkflowStudioModeStateStore";
 import type { WorkflowStudioModeId } from "../studio-shell/workflow/WorkflowStudioModes";
-import type { WorkflowStudioModeRouteResolution } from "../studio-shell/workflow/WorkflowStudioModeRouting";
+import {
+  buildWorkflowStudioModePath,
+  type WorkflowStudioModeRouteResolution,
+} from "../studio-shell/workflow/WorkflowStudioModeRouting";
+import {
+  WorkflowStudioEntryPaths,
+  type WorkflowStudioEntryRouteResolution,
+} from "../studio-shell/workflow/WorkflowStudioEntryRouting";
 import {
   buildWorkflowStudioWizardPagePath,
   type WorkflowStudioWizardPageId,
@@ -41,6 +62,7 @@ import {
   InlineAssetReturnStatuses,
   type InlineAssetCreationReturnTarget,
 } from "../routes/InlineAssetCreation";
+import { createWorkflowAssetMetadata } from "../../domain/workflow-studio/WorkflowStudioDomain";
 
 interface JsonParseResult<T> {
   readonly ok: boolean;
@@ -50,6 +72,12 @@ interface JsonParseResult<T> {
 interface DraftDependencyInput {
   readonly assetId: string;
   readonly versionId: string;
+}
+
+interface WorkflowCoreMetadataDraft {
+  readonly name: string;
+  readonly summary?: string;
+  readonly tags: ReadonlyArray<string>;
 }
 
 function parseJson<T>(value: string): JsonParseResult<T> {
@@ -97,6 +125,62 @@ function formatTags(tags?: ReadonlyArray<string>): string {
   return (tags ?? []).join(", ");
 }
 
+function toWorkflowCoreMetadataDraft(
+  metadataPatch: AssetMetadataPatch,
+  fallbackName: string,
+  fallbackTags: ReadonlyArray<string>,
+): WorkflowCoreMetadataDraft {
+  const normalizedName = (metadataPatch.title ?? fallbackName).trim();
+  const normalizedSummary = metadataPatch.summary === null
+    ? undefined
+    : metadataPatch.summary?.trim() || undefined;
+  const normalizedTags = parseTagsInput(formatTags(metadataPatch.tags ?? fallbackTags));
+
+  return Object.freeze({
+    name: normalizedName,
+    summary: normalizedSummary,
+    tags: normalizedTags,
+  });
+}
+
+function workflowCoreMetadataEquals(
+  left: WorkflowCoreMetadataDraft,
+  right: WorkflowCoreMetadataDraft,
+): boolean {
+  if (left.name !== right.name || left.summary !== right.summary) {
+    return false;
+  }
+  if (left.tags.length !== right.tags.length) {
+    return false;
+  }
+  for (let index = 0; index < left.tags.length; index += 1) {
+    if (left.tags[index] !== right.tags[index]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function buildMetadataPatchFromDraftMetadata(
+  metadata: NonNullable<StudioShellSnapshotReadModel["draft"]>["metadata"],
+): AssetMetadataPatch {
+  return Object.freeze({
+    title: metadata.title,
+    summary: metadata.summary,
+    tags: metadata.tags,
+    taxonomy: metadata.taxonomy,
+    contract: metadata.contract,
+    provenance: metadata.provenance,
+  });
+}
+
+function validateWorkflowCoreMetadataDraft(metadata: WorkflowCoreMetadataDraft): string | undefined {
+  if (!metadata.name.trim()) {
+    return "Workflow name is required.";
+  }
+  return undefined;
+}
+
 function getToolbarButtonClassName(action: StudioShellToolbarAction): string {
   if (action.tone === "primary") {
     return "ui-button ui-button--primary";
@@ -105,6 +189,12 @@ function getToolbarButtonClassName(action: StudioShellToolbarAction): string {
     return "ui-button ui-button--ghost";
   }
   return "ui-button";
+}
+
+function getDrawerToggleButtonClassName(isOpen: boolean): string {
+  return isOpen
+    ? "ui-button ui-button--primary"
+    : "ui-button ui-button--ghost";
 }
 
 function buildCreateMetadata(
@@ -129,11 +219,20 @@ function buildCreateMetadata(
   };
 }
 
+function isWorkflowStudioPath(pathname: string): boolean {
+  return pathname === ROUTE_PATHS.workflowStudio || pathname.startsWith("/studio-shell/workflow/");
+}
+
+function getWorkflowStudioUnsavedPrompt(): string {
+  return "You have unsaved workflow changes. Click OK to save before leaving, or Cancel to leave without saving.";
+}
+
 interface StudioShellPageProps {
   readonly studioRegistration?: StudioRegistration;
   readonly extensions?: ReadonlyArray<StudioShellExtensionContribution>;
   readonly workflowModeRoute?: WorkflowStudioModeRouteResolution;
   readonly workflowWizardPageRoute?: WorkflowStudioWizardPageRouteResolution;
+  readonly workflowEntryRoute?: WorkflowStudioEntryRouteResolution;
 }
 
 function renderExtensions(
@@ -162,6 +261,7 @@ export default function StudioShellPage({
   extensions = [],
   workflowModeRoute,
   workflowWizardPageRoute,
+  workflowEntryRoute,
 }: StudioShellPageProps): JSX.Element {
   const studioId = studioRegistration?.studioId ?? "studio-shell-main";
   const isWorkflowStudio = studioRegistration?.role === "workflow";
@@ -234,6 +334,15 @@ export default function StudioShellPage({
   const [metadataPatchJson, setMetadataPatchJson] = useState(() => JSON.stringify(initialMetadataPatch, null, 2));
   const [isMetadataJsonMode, setIsMetadataJsonMode] = useState(false);
   const [metadataJsonError, setMetadataJsonError] = useState<string | undefined>();
+  const initialWorkflowCoreMetadata = useMemo(
+    () => toWorkflowCoreMetadataDraft(initialMetadataPatch, defaultDraftTitle, defaultDraftTags),
+    [defaultDraftTags, defaultDraftTitle, initialMetadataPatch],
+  );
+  const [workflowMetadataBaseline, setWorkflowMetadataBaseline] = useState<WorkflowCoreMetadataDraft>(
+    initialWorkflowCoreMetadata,
+  );
+  const [isWorkflowSavePending, setIsWorkflowSavePending] = useState(false);
+  const [workflowSaveError, setWorkflowSaveError] = useState<string | undefined>();
   const [dependencies, setDependencies] = useState<ReadonlyArray<DraftDependencyInput>>(initialDependencies);
   const [dependenciesJson, setDependenciesJson] = useState(() => JSON.stringify(toDependencyReferences(initialDependencies), null, 2));
   const [isDependenciesJsonMode, setIsDependenciesJsonMode] = useState(false);
@@ -241,11 +350,32 @@ export default function StudioShellPage({
   const [workflowModeState, setWorkflowModeState] = useState<WorkflowStudioModeState | undefined>(
     () => workflowModeStore?.getState(),
   );
+  const [workflowRunFeedback, setWorkflowRunFeedback] = useState<WorkflowStudioRunFeedback | undefined>();
+  const [workflowExecutionReadiness, setWorkflowExecutionReadiness] = useState<WorkflowExecutionReadinessReadModel | undefined>();
+  const [isWorkflowReadinessPending, setIsWorkflowReadinessPending] = useState(false);
+  const leftDrawerConfiguration = studioRegistration?.shell?.drawers?.left;
+  const rightDrawerConfiguration = studioRegistration?.shell?.drawers?.right;
+  const [isLeftDrawerOpen, setIsLeftDrawerOpen] = useState(leftDrawerConfiguration?.defaultOpen ?? true);
+  const [isRightDrawerOpen, setIsRightDrawerOpen] = useState(rightDrawerConfiguration?.defaultOpen ?? true);
   const automationPrefillAppliedRef = useRef(false);
   const lastRestoredWorkflowReturnSearchRef = useRef<string | undefined>(undefined);
+  const lastAppliedWorkflowEntryRef = useRef<string | undefined>(undefined);
+  const lastWorkflowMetadataSyncKeyRef = useRef<string | undefined>(undefined);
+  const workflowCoreMetadataDraft = useMemo(
+    () => toWorkflowCoreMetadataDraft(metadataPatch, defaultDraftTitle, defaultDraftTags),
+    [defaultDraftTags, defaultDraftTitle, metadataPatch],
+  );
+  const hasWorkflowMetadataUnsavedChanges = isWorkflowStudio
+    && !workflowCoreMetadataEquals(workflowCoreMetadataDraft, workflowMetadataBaseline);
 
   const updateContent = (nextContent: string): void => {
     setContent(nextContent);
+    if (isWorkflowStudio) {
+      setWorkflowRunFeedback(undefined);
+      setWorkflowExecutionReadiness(undefined);
+      setIsWorkflowReadinessPending(false);
+      setWorkflowSaveError(undefined);
+    }
     workflowModeStore?.hydrateFromSerializedDraft(nextContent);
   };
 
@@ -266,6 +396,47 @@ export default function StudioShellPage({
 
     setContent(workflowModeState.draftEditorContent);
   }, [isWorkflowStudio, workflowModeState]);
+
+  useEffect(() => {
+    if (!isWorkflowStudio) {
+      return;
+    }
+
+    const sourceMetadataPatch = snapshot?.draft
+      ? buildMetadataPatchFromDraftMetadata(snapshot.draft.metadata)
+      : initialMetadataPatch;
+    const sourceWorkflowMetadata = toWorkflowCoreMetadataDraft(
+      sourceMetadataPatch,
+      defaultDraftTitle,
+      defaultDraftTags,
+    );
+    const syncKey = `${studioId}:${snapshot?.draft?.draftId ?? "new"}:${snapshot?.draft?.revision ?? 0}`;
+    const contextChanged = lastWorkflowMetadataSyncKeyRef.current !== syncKey;
+    const shouldSynchronize = contextChanged || !hasWorkflowMetadataUnsavedChanges;
+
+    if (shouldSynchronize) {
+      if (!workflowCoreMetadataEquals(workflowCoreMetadataDraft, sourceWorkflowMetadata)) {
+        setMetadataPatch(sourceMetadataPatch);
+        setMetadataPatchJson(JSON.stringify(sourceMetadataPatch, null, 2));
+      }
+      if (!workflowCoreMetadataEquals(workflowMetadataBaseline, sourceWorkflowMetadata)) {
+        setWorkflowMetadataBaseline(sourceWorkflowMetadata);
+      }
+      setWorkflowSaveError(undefined);
+    }
+
+    lastWorkflowMetadataSyncKeyRef.current = syncKey;
+  }, [
+    defaultDraftTags,
+    defaultDraftTitle,
+    hasWorkflowMetadataUnsavedChanges,
+    initialMetadataPatch,
+    isWorkflowStudio,
+    snapshot?.draft,
+    studioId,
+    workflowCoreMetadataDraft,
+    workflowMetadataBaseline,
+  ]);
 
   useEffect(() => {
     if (!workflowModeStore || !resolvedWorkflowModeId) {
@@ -376,12 +547,19 @@ export default function StudioShellPage({
     setMetadataPatchJson(JSON.stringify(initialMetadataPatch, null, 2));
     setIsMetadataJsonMode(false);
     setMetadataJsonError(undefined);
+    setWorkflowMetadataBaseline(initialWorkflowCoreMetadata);
+    setWorkflowSaveError(undefined);
+    setIsWorkflowSavePending(false);
+    lastWorkflowMetadataSyncKeyRef.current = undefined;
 
     setDependencies(initialDependencies);
     setDependenciesJson(JSON.stringify(toDependencyReferences(initialDependencies), null, 2));
     setIsDependenciesJsonMode(false);
     setDependenciesJsonError(undefined);
-  }, [initialDependencies, initialMetadataPatch]);
+    setWorkflowRunFeedback(undefined);
+    setWorkflowExecutionReadiness(undefined);
+    setIsWorkflowReadinessPending(false);
+  }, [initialDependencies, initialMetadataPatch, initialWorkflowCoreMetadata]);
 
   useEffect(() => {
     void refreshSnapshot();
@@ -390,6 +568,11 @@ export default function StudioShellPage({
   useEffect(() => {
     automationPrefillAppliedRef.current = false;
   }, [studioId, location.search]);
+
+  useEffect(() => {
+    setIsLeftDrawerOpen(leftDrawerConfiguration?.defaultOpen ?? true);
+    setIsRightDrawerOpen(rightDrawerConfiguration?.defaultOpen ?? true);
+  }, [leftDrawerConfiguration?.defaultOpen, rightDrawerConfiguration?.defaultOpen, studioId]);
 
   useEffect(() => {
     if (!shouldSeedAutomationIntent || !automationIntent || snapshot?.draft || automationPrefillAppliedRef.current) {
@@ -411,19 +594,189 @@ export default function StudioShellPage({
     automationPrefillAppliedRef.current = true;
   }, [automationIntent, content, defaultContent, isWorkflowStudio, shouldSeedAutomationIntent, snapshot?.draft]);
 
-  const runAndRefresh = async (action: () => Promise<{ ok: boolean; error?: { message: string } }>) => {
+  useEffect(() => {
+    if (!isWorkflowStudio || !workflowEntryRoute?.invalidEntryPath) {
+      return;
+    }
+    setError(`Unsupported workflow entry '${workflowEntryRoute.invalidEntryPath}'. Opened default Workflow Studio route instead.`);
+  }, [isWorkflowStudio, workflowEntryRoute?.invalidEntryPath]);
+
+  useEffect(() => {
+    if (!isWorkflowStudio || !workflowEntryRoute || !snapshot?.activeSessionId) {
+      return;
+    }
+
+    const signature = `${workflowEntryRoute.resolvedEntryPath}:${workflowEntryRoute.workflowId ?? ""}`;
+    if (lastAppliedWorkflowEntryRef.current === signature) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const createDraftFromPersisted = async (
+      sessionId: string,
+      persistedWorkflow: PersistedWorkflowReadModel,
+    ): Promise<boolean> => {
+      const response = await service.createDraft({
+        studioId,
+        sessionId,
+        assetId: persistedWorkflow.id,
+        content: persistedWorkflow.serializedDraft,
+        metadata: createWorkflowAssetMetadata({
+          title: persistedWorkflow.name,
+          summary: persistedWorkflow.metadata.summary,
+          tags: persistedWorkflow.metadata.tags,
+          sourceLabel: "workflow-persistence",
+        }),
+      });
+      if (!response.ok) {
+        if (!cancelled) {
+          setError(response.error?.message ?? "Failed to open persisted workflow in Workflow Studio.");
+        }
+        return false;
+      }
+      return true;
+    };
+
+    const applyWorkflowEntry = async (): Promise<void> => {
+      if (workflowEntryRoute.resolvedEntryPath === WorkflowStudioEntryPaths.default) {
+        lastAppliedWorkflowEntryRef.current = signature;
+        return;
+      }
+
+      if (workflowEntryRoute.resolvedEntryPath === WorkflowStudioEntryPaths.new) {
+        const startSession = await service.startSession(studioId);
+        if (!startSession.ok || !startSession.data?.activeSessionId) {
+          if (!cancelled) {
+            setError(startSession.error?.message ?? "Failed to create a new workflow authoring session.");
+          }
+          return;
+        }
+
+        const created = await service.createDraft({
+          studioId,
+          sessionId: startSession.data.activeSessionId,
+          content: defaultContent,
+          metadata: createWorkflowAssetMetadata({
+            title: defaultDraftTitle,
+            tags: defaultDraftTags,
+            sourceLabel: "workflow-studio",
+          }),
+        });
+        if (!created.ok) {
+          if (!cancelled) {
+            setError(created.error?.message ?? "Failed to initialize a new workflow draft.");
+          }
+          return;
+        }
+
+        await refreshSnapshot();
+        if (!cancelled) {
+          setError(undefined);
+          lastAppliedWorkflowEntryRef.current = signature;
+        }
+        return;
+      }
+
+      const targetWorkflowId = workflowEntryRoute.workflowId?.trim();
+      if (!targetWorkflowId) {
+        if (!cancelled) {
+          setError("Workflow entry requires a valid workflow id.");
+          lastAppliedWorkflowEntryRef.current = signature;
+        }
+        return;
+      }
+
+      const persistedOrDuplicated = workflowEntryRoute.resolvedEntryPath === WorkflowStudioEntryPaths.duplicate
+        ? await service.duplicatePersistedWorkflow({
+          sourceWorkflowId: targetWorkflowId,
+        })
+        : await service.getPersistedWorkflow(targetWorkflowId);
+      if (!persistedOrDuplicated.ok || !persistedOrDuplicated.data) {
+        if (!cancelled) {
+          const defaultMessage = workflowEntryRoute.resolvedEntryPath === WorkflowStudioEntryPaths.duplicate
+            ? `Persisted workflow '${targetWorkflowId}' could not be duplicated.`
+            : `Persisted workflow '${targetWorkflowId}' could not be loaded.`;
+          setError(persistedOrDuplicated.error?.message ?? defaultMessage);
+          lastAppliedWorkflowEntryRef.current = signature;
+        }
+        return;
+      }
+
+      if (
+        workflowEntryRoute.resolvedEntryPath === WorkflowStudioEntryPaths.resumeDraft
+        && persistedOrDuplicated.data.status !== "draft"
+      ) {
+        if (!cancelled) {
+          setError(`Workflow '${targetWorkflowId}' is not a resumable draft.`);
+          lastAppliedWorkflowEntryRef.current = signature;
+        }
+        return;
+      }
+
+      const startSession = await service.startSession(studioId);
+      if (!startSession.ok || !startSession.data?.activeSessionId) {
+        if (!cancelled) {
+          setError(startSession.error?.message ?? "Failed to start a workflow authoring session.");
+          lastAppliedWorkflowEntryRef.current = signature;
+        }
+        return;
+      }
+
+      const created = await createDraftFromPersisted(startSession.data.activeSessionId, persistedOrDuplicated.data);
+      if (!created) {
+        if (!cancelled) {
+          lastAppliedWorkflowEntryRef.current = signature;
+        }
+        return;
+      }
+
+      await refreshSnapshot();
+      if (!cancelled) {
+        setError(undefined);
+        lastAppliedWorkflowEntryRef.current = signature;
+      }
+    };
+
+    void applyWorkflowEntry();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    defaultContent,
+    defaultDraftTags,
+    defaultDraftTitle,
+    isWorkflowStudio,
+    snapshot?.activeSessionId,
+    studioId,
+    workflowEntryRoute,
+    service,
+  ]);
+
+  const runAndRefreshWithResult = async (
+    action: () => Promise<{ ok: boolean; error?: { message: string } }>,
+  ): Promise<{ readonly ok: boolean; readonly errorMessage?: string }> => {
     setIsBusy(true);
     try {
       const response = await action();
       if (!response.ok) {
-        setError(response.error?.message ?? "Studio shell operation failed.");
-        return;
+        const errorMessage = response.error?.message ?? "Studio shell operation failed.";
+        setError(errorMessage);
+        return Object.freeze({
+          ok: false,
+          errorMessage,
+        });
       }
       await refreshSnapshot();
       setError(undefined);
+      return Object.freeze({ ok: true });
     } finally {
       setIsBusy(false);
     }
+  };
+
+  const runAndRefresh = async (action: () => Promise<{ ok: boolean; error?: { message: string } }>) => {
+    await runAndRefreshWithResult(action);
   };
 
   const updateMetadataPatch = (updater: (current: AssetMetadataPatch) => AssetMetadataPatch): void => {
@@ -432,6 +785,9 @@ export default function StudioShellPage({
       setMetadataPatchJson(JSON.stringify(next, null, 2));
       return next;
     });
+    if (isWorkflowStudio) {
+      setWorkflowSaveError(undefined);
+    }
   };
 
   const updateDependenciesForm = (nextDependencies: ReadonlyArray<DraftDependencyInput>): void => {
@@ -440,6 +796,23 @@ export default function StudioShellPage({
   };
 
   const resolveMetadataPatchForSave = (): AssetMetadataPatch | undefined => {
+    if (isWorkflowStudio) {
+      const metadataValidationError = validateWorkflowCoreMetadataDraft(workflowCoreMetadataDraft);
+      if (metadataValidationError) {
+        setMetadataJsonError(metadataValidationError);
+        return undefined;
+      }
+      setMetadataJsonError(undefined);
+      return Object.freeze({
+        title: workflowCoreMetadataDraft.name,
+        summary: workflowCoreMetadataDraft.summary,
+        tags: workflowCoreMetadataDraft.tags,
+        taxonomy: metadataPatch.taxonomy,
+        contract: metadataPatch.contract,
+        provenance: metadataPatch.provenance,
+      });
+    }
+
     if (!isMetadataJsonMode) {
       return metadataPatch;
     }
@@ -562,39 +935,156 @@ export default function StudioShellPage({
   }, [inlineReturnPaths?.withAsset, navigate, selectorLaunchContext, snapshot?.draft?.assetId]);
   const workflowDraftContent = workflowModeState?.sharedDraftSerialized ?? content;
   const hasWorkflowDraftParseError = isWorkflowStudio && Boolean(workflowModeState?.draftParseError);
+  const hasWorkflowUnsavedChanges = isWorkflowStudio
+    && (Boolean(workflowModeState?.hasLocalDraftEdits) || hasWorkflowMetadataUnsavedChanges);
+  const workflowDraftStatusTone = hasWorkflowDraftParseError
+    ? "danger"
+    : isWorkflowSavePending
+      ? "neutral"
+      : workflowSaveError
+        ? "danger"
+        : hasWorkflowUnsavedChanges
+          ? "warning"
+          : "success";
+  const workflowDraftStatusLabel = hasWorkflowDraftParseError
+    ? "Draft parse error"
+    : isWorkflowSavePending
+      ? "Saving changes..."
+      : workflowSaveError
+        ? "Save failed"
+        : hasWorkflowUnsavedChanges
+          ? "Unsaved changes"
+          : "Saved";
+  const workflowDraftStatusDetail = hasWorkflowDraftParseError
+    ? "Workflow draft JSON has parse errors. Fix JSON before saving this draft."
+    : isWorkflowSavePending
+      ? "Saving workflow draft and metadata to studio persistence..."
+      : workflowSaveError
+        ? workflowSaveError
+        : hasWorkflowUnsavedChanges
+          ? "Workflow draft or metadata edits are unsaved. Save before leaving Workflow Studio to persist changes."
+          : "Workflow draft and metadata are synchronized with persisted storage.";
   const toolbarActions = studioRegistration?.shell?.toolbar?.actions ?? [];
+  const workflowModeToolbarActions = toolbarActions.filter(
+    (action): action is Extract<StudioShellToolbarAction, { kind: "set-workflow-mode" }> => (
+      action.kind === StudioShellToolbarActionKinds.setWorkflowMode
+    ),
+  );
+  const nonWorkflowModeToolbarActions = toolbarActions.filter(
+    (action): action is Exclude<StudioShellToolbarAction, { kind: "set-workflow-mode" }> => (
+      action.kind !== StudioShellToolbarActionKinds.setWorkflowMode
+    ),
+  );
+  const wizardModeToolbarAction = workflowModeToolbarActions.find((action) => action.modeId === "wizard");
+  const canvasModeToolbarAction = workflowModeToolbarActions.find((action) => action.modeId === "canvas");
+  const workflowModeToggleAction = isWorkflowStudio
+    && workflowModeState
+    && wizardModeToolbarAction
+    && canvasModeToolbarAction
+    ? Object.freeze({
+      ...(workflowModeState.selectedModeId === "canvas" ? wizardModeToolbarAction : canvasModeToolbarAction),
+      label: workflowModeState.selectedModeId === "canvas" ? "Wizard" : "Canvas",
+    } satisfies StudioShellToolbarAction)
+    : undefined;
+  const toolbarActionsToRender = workflowModeToggleAction
+    ? Object.freeze(
+      [...nonWorkflowModeToolbarActions, workflowModeToggleAction].sort((left, right) => {
+        const leftOrder = left.order ?? Number.MAX_SAFE_INTEGER;
+        const rightOrder = right.order ?? Number.MAX_SAFE_INTEGER;
+        if (leftOrder !== rightOrder) {
+          return leftOrder - rightOrder;
+        }
+        return left.id.localeCompare(right.id);
+      }),
+    )
+    : toolbarActions;
+  const saveToolbarAction = toolbarActionsToRender.find(
+    (action) => action.kind === StudioShellToolbarActionKinds.saveDraft,
+  );
+  const toolbarActionsWithoutSave = saveToolbarAction
+    ? toolbarActionsToRender.filter((action) => action.id !== saveToolbarAction.id)
+    : toolbarActionsToRender;
+  const toolbarActionsBeforeSave = workflowModeToggleAction
+    ? toolbarActionsWithoutSave.filter((action) => action.id !== workflowModeToggleAction.id)
+    : toolbarActionsWithoutSave;
+  const shouldShowLeftDrawerToggle = Boolean(leftDrawerConfiguration)
+    && (!isWorkflowStudio || workflowModeState?.selectedModeId === "canvas");
+  const hasToolbar = toolbarActionsToRender.length > 0 || shouldShowLeftDrawerToggle || Boolean(rightDrawerConfiguration);
 
-  const saveDraftFromAuthoring = (): void => {
+  const saveDraftFromAuthoringAsync = async (): Promise<boolean> => {
     if (!sessionId) {
-      return;
+      return false;
+    }
+
+    if (isWorkflowStudio) {
+      setIsWorkflowSavePending(true);
+      setWorkflowSaveError(undefined);
     }
 
     const resolvedMetadataPatch = resolveMetadataPatchForSave();
     if (!resolvedMetadataPatch) {
-      return;
+      if (isWorkflowStudio) {
+        setIsWorkflowSavePending(false);
+      }
+      return false;
     }
 
+    let saveResult: { readonly ok: boolean; readonly errorMessage?: string };
     if (!draftId) {
       const metadata = buildCreateMetadata(defaultDraftTitle, defaultDraftTags, resolvedMetadataPatch);
-      void runAndRefresh(() => service.createDraft({
+      saveResult = await runAndRefreshWithResult(() => service.createDraft({
         studioId,
         sessionId,
         content: workflowDraftContent,
         metadata,
       }));
-      return;
+    } else {
+      saveResult = await runAndRefreshWithResult(() => service.updateDraft({
+        studioId,
+        sessionId,
+        draftId,
+        content: workflowDraftContent,
+        metadataPatch: resolvedMetadataPatch,
+      }));
     }
 
-    void runAndRefresh(() => service.updateDraft({
-      studioId,
-      sessionId,
-      draftId,
-      content: workflowDraftContent,
-      metadataPatch: resolvedMetadataPatch,
-    }));
+    if (isWorkflowStudio) {
+      setIsWorkflowSavePending(false);
+      if (saveResult.ok) {
+        setWorkflowSaveError(undefined);
+        setWorkflowMetadataBaseline(workflowCoreMetadataDraft);
+      } else {
+        setWorkflowSaveError(saveResult.errorMessage ?? "Workflow save failed.");
+      }
+    }
+
+    return saveResult.ok;
+  };
+
+  const saveDraftFromAuthoring = (): void => {
+    void saveDraftFromAuthoringAsync();
   };
 
   const runValidationFromAuthoring = (): void => {
+    if (isWorkflowStudio) {
+      setIsWorkflowReadinessPending(true);
+      void (async () => {
+        const response = await service.assessWorkflowExecutionReadiness({
+          studioId,
+          draftId,
+          content: workflowDraftContent,
+        });
+        setIsWorkflowReadinessPending(false);
+        if (!response.ok || !response.data) {
+          setError(response.error?.message ?? "Failed to validate workflow execution readiness.");
+          return;
+        }
+        setWorkflowExecutionReadiness(response.data);
+        setError(undefined);
+      })();
+      return;
+    }
+
     if (!draftId) {
       return;
     }
@@ -608,6 +1098,71 @@ export default function StudioShellPage({
     });
   };
 
+  const runWorkflowFromAuthoring = (): void => {
+    if (!isWorkflowStudio || hasWorkflowDraftParseError) {
+      return;
+    }
+
+    setWorkflowRunFeedback({
+      status: "running",
+      message: "Running workflow validation and launch pipeline...",
+    });
+    setIsWorkflowReadinessPending(false);
+
+    void (async () => {
+      const response = await service.runWorkflowDraft({
+        studioId,
+        draftId,
+        content: workflowDraftContent,
+      });
+      if (!response.ok || !response.data) {
+        const message = response.error?.message ?? "Workflow launch failed.";
+        setWorkflowRunFeedback({
+          status: "failed",
+          message,
+        });
+        setError(message);
+        return;
+      }
+
+      if (response.data.launchStatus === "blocked") {
+        setWorkflowExecutionReadiness(response.data.validation);
+        setWorkflowRunFeedback({
+          status: "blocked",
+          message: "Workflow launch was blocked by pre-execution validation issues.",
+          result: response.data,
+        });
+        return;
+      }
+
+      if (response.data.launchStatus === "failed") {
+        setWorkflowExecutionReadiness(response.data.validation);
+        setWorkflowRunFeedback({
+          status: "failed",
+          message: response.data.failureMessage ?? "Workflow launch failed during execution startup.",
+          result: response.data,
+        });
+        return;
+      }
+
+      const runtimeStatus = response.data.runtime?.status ?? "completed";
+      setWorkflowExecutionReadiness(response.data.validation);
+      setWorkflowRunFeedback({
+        status: "launched",
+        message: `Workflow launch started successfully. Runtime status: ${runtimeStatus}.`,
+        result: response.data,
+      });
+      setError(undefined);
+    })();
+  };
+
+  const buildWorkflowStudioSearchWithoutModeParams = (): string => {
+    const nextSearchParams = new URLSearchParams(location.search);
+    nextSearchParams.delete("mode");
+    nextSearchParams.delete("wizardPage");
+    return nextSearchParams.toString().length > 0 ? `?${nextSearchParams.toString()}` : "";
+  };
+
   const setWorkflowModeFromToolbar = (modeId: WorkflowStudioModeId): void => {
     if (!isWorkflowStudio || !workflowModeStore) {
       return;
@@ -618,14 +1173,11 @@ export default function StudioShellPage({
       ? buildWorkflowStudioWizardPagePath(
         resolvedWorkflowWizardPageId ?? "trigger",
       )
-      : ROUTE_PATHS.workflowStudioMode.replace(":modeId", modeId);
-    const nextSearchParams = new URLSearchParams(location.search);
-    nextSearchParams.delete("mode");
-    nextSearchParams.delete("wizardPage");
+      : buildWorkflowStudioModePath(modeId);
     void navigate(
       {
         pathname: nextPathname,
-        search: nextSearchParams.toString().length > 0 ? `?${nextSearchParams.toString()}` : "",
+        search: buildWorkflowStudioSearchWithoutModeParams(),
         hash: location.hash,
       },
       { replace: true },
@@ -648,6 +1200,11 @@ export default function StudioShellPage({
       return;
     }
 
+    if (action.kind === StudioShellToolbarActionKinds.runWorkflowDraft) {
+      runWorkflowFromAuthoring();
+      return;
+    }
+
     setWorkflowModeFromToolbar(action.modeId);
   };
 
@@ -656,16 +1213,77 @@ export default function StudioShellPage({
       return isBusy;
     }
     if (action.kind === StudioShellToolbarActionKinds.saveDraft) {
-      return isBusy || !sessionId || hasWorkflowDraftParseError;
+      return isBusy || isWorkflowSavePending || !sessionId || hasWorkflowDraftParseError;
     }
     if (action.kind === StudioShellToolbarActionKinds.runValidation) {
+      if (isWorkflowStudio) {
+        return isBusy || hasWorkflowDraftParseError || isWorkflowReadinessPending;
+      }
       return isBusy || !draftId;
+    }
+    if (action.kind === StudioShellToolbarActionKinds.runWorkflowDraft) {
+      return isBusy
+        || !isWorkflowStudio
+        || hasWorkflowDraftParseError
+        || workflowRunFeedback?.status === "running"
+        || isWorkflowReadinessPending
+        || (workflowExecutionReadiness?.ready === false && workflowExecutionReadiness.blockingIssueCount > 0);
     }
     if (!isWorkflowStudio || !workflowModeState) {
       return true;
     }
     return workflowModeState.selectedModeId === action.modeId;
   };
+
+  const workflowUnsavedNavigationBlocker = useBlocker(({ currentLocation, nextLocation }) => {
+    if (!isWorkflowStudio || !hasWorkflowUnsavedChanges) {
+      return false;
+    }
+    if (!isWorkflowStudioPath(currentLocation.pathname)) {
+      return false;
+    }
+    if (isWorkflowStudioPath(nextLocation.pathname)) {
+      return false;
+    }
+    return currentLocation.pathname !== nextLocation.pathname
+      || currentLocation.search !== nextLocation.search
+      || currentLocation.hash !== nextLocation.hash;
+  });
+
+  useEffect(() => {
+    if (workflowUnsavedNavigationBlocker.state !== "blocked") {
+      return;
+    }
+
+    let cancelled = false;
+    const handleNavigationBlock = async (): Promise<void> => {
+      const shouldSave = window.confirm(getWorkflowStudioUnsavedPrompt());
+      if (cancelled) {
+        return;
+      }
+      if (shouldSave) {
+        const saved = await saveDraftFromAuthoringAsync();
+        if (cancelled || !saved) {
+          workflowUnsavedNavigationBlocker.reset();
+          return;
+        }
+      }
+      workflowUnsavedNavigationBlocker.proceed();
+    };
+
+    void handleNavigationBlock();
+    return () => {
+      cancelled = true;
+    };
+  }, [workflowUnsavedNavigationBlocker]);
+
+  useBeforeUnload((event) => {
+    if (!isWorkflowStudio || !hasWorkflowUnsavedChanges || !isWorkflowStudioPath(location.pathname)) {
+      return;
+    }
+    event.preventDefault();
+    event.returnValue = getWorkflowStudioUnsavedPrompt();
+  });
 
   const extensionContext: StudioShellExtensionContext = {
     studioId,
@@ -674,7 +1292,7 @@ export default function StudioShellPage({
     workflowModeState: workflowModeStore && workflowModeState
       ? {
         state: workflowModeState,
-        setSelectedMode: (modeId) => workflowModeStore.setSelectedMode(modeId),
+        setSelectedMode: (modeId) => setWorkflowModeFromToolbar(modeId),
       }
       : undefined,
     systemCompatibility,
@@ -768,10 +1386,41 @@ export default function StudioShellPage({
       </div>
 
       <div className="ui-studio-shell__authoring">
-        {toolbarActions.length > 0 ? (
+        {hasToolbar ? (
           <div className="ui-toolbar ui-toolbar--panel ui-studio-shell__authoring-toolbar" data-testid="studio-shell-authoring-toolbar">
             <div className="ui-toolbar__group">
-              {toolbarActions.map((action) => (
+              {!workflowModeToggleAction && shouldShowLeftDrawerToggle && leftDrawerConfiguration ? (
+                <button
+                  type="button"
+                  className={getDrawerToggleButtonClassName(isLeftDrawerOpen)}
+                  data-testid="studio-shell-left-drawer-toggle"
+                  onClick={() => setIsLeftDrawerOpen((current) => !current)}
+                >
+                  {leftDrawerConfiguration.label}
+                </button>
+              ) : null}
+              {workflowModeToggleAction ? (
+                <button
+                  key={workflowModeToggleAction.id}
+                  type="button"
+                  className={getToolbarButtonClassName(workflowModeToggleAction)}
+                  disabled={isToolbarActionDisabled(workflowModeToggleAction)}
+                  onClick={() => runToolbarAction(workflowModeToggleAction)}
+                >
+                  {workflowModeToggleAction.label}
+                </button>
+              ) : null}
+              {workflowModeToggleAction && shouldShowLeftDrawerToggle && leftDrawerConfiguration ? (
+                <button
+                  type="button"
+                  className={getDrawerToggleButtonClassName(isLeftDrawerOpen)}
+                  data-testid="studio-shell-left-drawer-toggle"
+                  onClick={() => setIsLeftDrawerOpen((current) => !current)}
+                >
+                  {leftDrawerConfiguration.label}
+                </button>
+              ) : null}
+              {toolbarActionsBeforeSave.map((action) => (
                 <button
                   key={action.id}
                   type="button"
@@ -782,8 +1431,51 @@ export default function StudioShellPage({
                   {action.label}
                 </button>
               ))}
+              {rightDrawerConfiguration ? (
+                <button
+                  type="button"
+                  className={getDrawerToggleButtonClassName(isRightDrawerOpen)}
+                  data-testid="studio-shell-right-drawer-toggle"
+                  onClick={() => setIsRightDrawerOpen((current) => !current)}
+                >
+                  {rightDrawerConfiguration.label}
+                </button>
+              ) : null}
+              {saveToolbarAction ? (
+                <button
+                  key={saveToolbarAction.id}
+                  type="button"
+                  className={getToolbarButtonClassName(saveToolbarAction)}
+                  disabled={isToolbarActionDisabled(saveToolbarAction)}
+                  onClick={() => runToolbarAction(saveToolbarAction)}
+                >
+                  {hasWorkflowUnsavedChanges ? `${saveToolbarAction.label} *` : saveToolbarAction.label}
+                </button>
+              ) : null}
             </div>
           </div>
+        ) : null}
+
+        {isWorkflowStudio && workflowModeState ? (
+          <div className="ui-card ui-card--padded ui-studio-shell__workflow-draft-status" data-testid="studio-shell-workflow-draft-status">
+            <div className="ui-row ui-row--between ui-row--wrap">
+              <strong>Workflow draft status</strong>
+              <span className={`ui-badge ui-badge--${workflowDraftStatusTone}`} data-testid="studio-shell-workflow-draft-status-badge">
+                {workflowDraftStatusLabel}
+              </span>
+            </div>
+            <p className={hasWorkflowDraftParseError || workflowSaveError ? "ui-text-small ui-text-danger" : "ui-text-small ui-text-secondary"}>
+              {workflowDraftStatusDetail}
+            </p>
+          </div>
+        ) : null}
+
+        {isWorkflowStudio ? (
+          <WorkflowStudioExecutionFeedbackPanel
+            readiness={workflowExecutionReadiness}
+            isReadinessPending={isWorkflowReadinessPending}
+            runFeedback={workflowRunFeedback}
+          />
         ) : null}
 
         <StudioShellPanel title="Asset draft authoring" subtitle="Thin authoring surface over studio-shell draft contracts.">
@@ -802,8 +1494,8 @@ export default function StudioShellPage({
                   void navigate(
                     {
                       pathname: buildWorkflowStudioWizardPagePath(pageId),
-                      search: "",
-                      hash: "",
+                      search: buildWorkflowStudioSearchWithoutModeParams(),
+                      hash: location.hash,
                     },
                     { replace: true },
                   );
@@ -818,16 +1510,33 @@ export default function StudioShellPage({
                 handoffStatus: workflowModeState.handoffStatus,
                 setHandoffStatus: (status) => workflowModeStore.setHandoffStatus(status),
                 clearHandoffStatus: () => workflowModeStore.clearHandoffStatus(),
+                canvasDrawers: {
+                  left: leftDrawerConfiguration
+                    ? {
+                      label: leftDrawerConfiguration.label,
+                      isOpen: isLeftDrawerOpen,
+                      onClose: () => setIsLeftDrawerOpen(false),
+                    }
+                    : undefined,
+                  right: rightDrawerConfiguration
+                    ? {
+                      label: rightDrawerConfiguration.label,
+                      isOpen: isRightDrawerOpen,
+                    }
+                    : undefined,
+                },
               }
               : undefined}
           />
           <div className="ui-stack ui-stack--xs" style={{ flexDirection: "row" }}>
             <button
               className="ui-button ui-button--primary"
-              disabled={isBusy || !sessionId || hasWorkflowDraftParseError}
+              disabled={isBusy || isWorkflowSavePending || !sessionId || hasWorkflowDraftParseError}
               onClick={saveDraftFromAuthoring}
             >
-              {draftId ? "Save Draft" : "Create Draft"}
+              {draftId
+                ? (hasWorkflowUnsavedChanges ? "Save Draft Changes" : "Save")
+                : "Create Draft"}
             </button>
           </div>
         </StudioShellPanel>
@@ -913,8 +1622,56 @@ export default function StudioShellPage({
         </StudioShellPanel>
         {renderExtensions(extensionRegistry, StudioShellExtensionSlots.sessionContext, extensionContext)}
 
-        <StudioShellPanel title="Taxonomy / contract / provenance" subtitle="Form-first metadata editing with optional advanced JSON.">
-          <div className="ui-form-json-toggle">
+        <StudioShellPanel
+          title={isWorkflowStudio ? "Workflow metadata" : "Taxonomy / contract / provenance"}
+          subtitle={isWorkflowStudio
+            ? "Edit workflow name and core metadata used across persistence and Explore."
+            : "Form-first metadata editing with optional advanced JSON."}
+        >
+          {isWorkflowStudio ? (
+            <div className="ui-stack ui-stack--sm">
+              <div className="ui-form-grid">
+                <label className="ui-field">
+                  <span className="ui-field__label">Workflow name</span>
+                  <input
+                    className="ui-input"
+                    value={metadataPatch.title ?? ""}
+                    onChange={(event) => updateMetadataPatch((current) => ({
+                      ...current,
+                      title: event.target.value,
+                    }))}
+                    placeholder="Workflow name"
+                  />
+                </label>
+                <label className="ui-field">
+                  <span className="ui-field__label">Tags</span>
+                  <input
+                    className="ui-input"
+                    value={formatTags(metadataPatch.tags)}
+                    onChange={(event) => updateMetadataPatch((current) => ({
+                      ...current,
+                      tags: parseTagsInput(event.target.value),
+                    }))}
+                    placeholder="workflow, orchestration"
+                  />
+                </label>
+              </div>
+              <label className="ui-field">
+                <span className="ui-field__label">Summary</span>
+                <textarea
+                  className="ui-textarea"
+                  rows={4}
+                  value={metadataPatch.summary === null ? "" : (metadataPatch.summary ?? "")}
+                  onChange={(event) => updateMetadataPatch((current) => ({
+                    ...current,
+                    summary: event.target.value || undefined,
+                  }))}
+                />
+              </label>
+            </div>
+          ) : (
+            <>
+              <div className="ui-form-json-toggle">
             <button
               type="button"
               className="ui-button ui-button--ghost ui-button--sm"
@@ -938,15 +1695,15 @@ export default function StudioShellPage({
             >
               {isMetadataJsonMode ? "Use Form Editor" : "Edit JSON"}
             </button>
-          </div>
+              </div>
 
-          {isMetadataJsonMode ? (
-            <label className="ui-stack ui-stack--2xs">
-              <span className="ui-text-small">Metadata patch JSON</span>
-              <textarea className="ui-textarea" rows={12} value={metadataPatchJson} onChange={(event) => setMetadataPatchJson(event.target.value)} />
-            </label>
-          ) : (
-            <div className="ui-stack ui-stack--sm">
+              {isMetadataJsonMode ? (
+                <label className="ui-stack ui-stack--2xs">
+                  <span className="ui-text-small">Metadata patch JSON</span>
+                  <textarea className="ui-textarea" rows={12} value={metadataPatchJson} onChange={(event) => setMetadataPatchJson(event.target.value)} />
+                </label>
+              ) : (
+                <div className="ui-stack ui-stack--sm">
               <div className="ui-form-grid">
                 <label className="ui-field">
                   <span className="ui-field__label">Title</span>
@@ -1167,7 +1924,9 @@ export default function StudioShellPage({
                   </label>
                 </div>
               </div>
-            </div>
+                </div>
+              )}
+            </>
           )}
           {metadataJsonError ? <p className="ui-text-muted">{metadataJsonError}</p> : null}
         </StudioShellPanel>

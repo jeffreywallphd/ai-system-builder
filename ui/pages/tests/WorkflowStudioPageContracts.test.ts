@@ -11,10 +11,12 @@ describe("WorkflowStudioPage contracts", () => {
     expect(pageSource).toContain("workflowStudioRegistration");
     expect(pageSource).toContain("resolveWorkflowStudioModeRoute");
     expect(pageSource).toContain("resolveWorkflowStudioWizardPageRoute");
+    expect(pageSource).toContain("resolveWorkflowStudioEntryRoute");
     expect(pageSource).toContain("useParams");
     expect(pageSource).toContain("useLocation");
     expect(pageSource).toContain("workflowModeRoute={workflowModeRoute}");
     expect(pageSource).toContain("workflowWizardPageRoute={workflowWizardPageRoute}");
+    expect(pageSource).toContain("workflowEntryRoute={workflowEntryRoute}");
     expect(pageSource).toContain("studioRegistration={workflowStudioRegistration}");
 
     expect(registrationSource).toContain("studioType: WorkflowStudioIdentity.studioType");
@@ -24,6 +26,10 @@ describe("WorkflowStudioPage contracts", () => {
     expect(registrationSource).toContain('slot: "draft-authoring"');
     expect(registrationSource).toContain('slot: "metadata"');
     expect(registrationSource).toContain('createWorkflowStudioTaxonomy("deterministic")');
+    expect(registrationSource).toContain("drawers: Object.freeze(");
+    expect(registrationSource).toContain('label: "Nodes"');
+    expect(registrationSource).toContain('label: "Inspector"');
+    expect(registrationSource).toContain('kind: "run-workflow-draft"');
 
     expect(shellSource).toContain("WorkflowStudioDraftAuthoringBoundary");
     expect(shellSource).toContain("workflowModeRoute");
@@ -35,7 +41,13 @@ describe("WorkflowStudioPage contracts", () => {
     expect(shellSource).toContain("synchronizeSharedDraftFromSnapshot");
     expect(shellSource).toContain("WorkflowStudioReturnRestorationService");
     expect(shellSource).toContain("restoreFromReturnSearch");
+    expect(shellSource).toContain("workflowEntryRoute");
+    expect(shellSource).toContain("service.getPersistedWorkflow");
+    expect(shellSource).toContain("service.duplicatePersistedWorkflow");
+    expect(shellSource).toContain("WorkflowStudioEntryPaths");
     expect(shellSource).toContain("setHandoffStatus");
     expect(shellSource).toContain("clearHandoffStatus");
+    expect(shellSource).toContain('data-testid="studio-shell-left-drawer-toggle"');
+    expect(shellSource).toContain('data-testid="studio-shell-right-drawer-toggle"');
   });
 });

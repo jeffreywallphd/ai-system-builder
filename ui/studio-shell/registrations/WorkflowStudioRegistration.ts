@@ -8,7 +8,6 @@ import {
 import WorkflowStudioModePanel from "../../components/studio-shell/workflow/WorkflowStudioModePanel";
 import type { CompositeStudioRegistration } from "../StudioShellExtensions";
 import { createCompositeStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
-import { DEFAULT_WORKFLOW_STUDIO_MODE_ID } from "../workflow/WorkflowStudioModes";
 
 export const workflowStudioRegistration: CompositeStudioRegistration = Object.freeze({
   studioType: WorkflowStudioIdentity.studioType,
@@ -20,6 +19,16 @@ export const workflowStudioRegistration: CompositeStudioRegistration = Object.fr
   shell: Object.freeze({
     title: WorkflowStudioIdentity.defaultStudioName,
     subtitle: "Shared composite shell for workflow orchestrator authoring with backend-authoritative lifecycle, validation, and publish/version flows.",
+    drawers: Object.freeze({
+      left: Object.freeze({
+        label: "Nodes",
+        defaultOpen: false,
+      }),
+      right: Object.freeze({
+        label: "Inspector",
+        defaultOpen: true,
+      }),
+    }),
     toolbar: Object.freeze({
       actions: Object.freeze([
         {
@@ -41,7 +50,7 @@ export const workflowStudioRegistration: CompositeStudioRegistration = Object.fr
         {
           id: "workflow-studio-toolbar-save",
           kind: "save-draft",
-          label: "Save Draft",
+          label: "Save",
           tone: "primary",
           order: 30,
         },
@@ -51,6 +60,13 @@ export const workflowStudioRegistration: CompositeStudioRegistration = Object.fr
           label: "Run Validation",
           tone: "default",
           order: 40,
+        },
+        {
+          id: "workflow-studio-toolbar-run-workflow",
+          kind: "run-workflow-draft",
+          label: "Run Workflow",
+          tone: "primary",
+          order: 45,
         },
         {
           id: "workflow-studio-toolbar-refresh",
@@ -85,20 +101,6 @@ export const workflowStudioRegistration: CompositeStudioRegistration = Object.fr
       render: ({ workflowModeState }) => (workflowModeState
         ? createElement(WorkflowStudioModePanel, { workflowModeState })
         : "Workflow mode state is unavailable for this studio session."),
-    },
-    {
-      id: "workflow-studio-draft-guidance",
-      slot: "draft-authoring",
-      title: "Workflow draft guidance",
-      subtitle: "Author orchestrator structure as a composite asset while keeping execution behavior in taxonomy metadata.",
-      order: 10,
-      render: ({ snapshot, workflowModeState }) => Object.freeze([
-        "Workflow assets are specialized composite orchestrators: structure/version in assets, execution patterns in behavior metadata.",
-        "Canonical draft sections: triggers, inputs, steps, outputs.",
-        "Allowed behavior kinds: deterministic, conditional, iterative.",
-        `Selected mode: ${workflowModeState?.state.selectedModeId ?? DEFAULT_WORKFLOW_STUDIO_MODE_ID}`,
-        `Draft asset id: ${snapshot?.draft?.assetId ?? "-"}`,
-      ]),
     },
     {
       id: "workflow-studio-metadata-summary",

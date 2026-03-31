@@ -321,7 +321,7 @@ Future selector-backed asset-type adoption guidance:
 ## Story 4.14: Workflow wizard focus and layout hardening
 - Wizard mode now prioritizes page authoring flow by rendering the active wizard page directly under page buttons in the primary wizard card (`WorkflowStudioWizardModeSurface`).
 - The per-section readiness label row was removed from the default surface to reduce redundant readiness copy in the main authoring path.
-- Guided progression controls remain immediately below the pages card with prominent primary Back/Next actions and increased button spacing to reduce accidental navigation clicks.
+- Wizard focus/progress details now render directly under the page buttons, while primary Back/Next actions sit on the page-nav rail and are also duplicated inline under the Trigger page content.
 - Workflow readiness details remain available but now sit at the bottom of the wizard stack as a collapsed disclosure (`details/summary`), so diagnostics are opt-in rather than always expanded.
 - These changes stay in renderer presentation seams and preserve existing selector/session/capability integration paths for workflow inputs and steps.
 
@@ -346,3 +346,7 @@ Epic 4 selector integration is now active in Workflow Wizard inputs and steps:
 - Inputs: selector-backed dataset multi-select with inline create-new return.
 - Steps: selector-backed agent/assistant add + replace flows with ordered-step compatibility.
 - Shared shell/session/capability/return seams are reused without parallel selector pathways.
+
+Workflow Canvas integration now also reuses the same shared selector seams for dataset-linked input nodes and agent-linked step nodes:
+- Canvas selectors run through the same shared session store + adapter + shell contracts.
+- Confirmed canvas selections persist canonical references in `WorkflowDraft.inputs[].asset` and `WorkflowDraft.steps[].assetRef` (no canvas-only reference model).

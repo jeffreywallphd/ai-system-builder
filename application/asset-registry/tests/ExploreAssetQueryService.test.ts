@@ -1,5 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import type { RegistryAsset } from "../../../domain/asset-registry/RegistryAsset";
+import { createPersistedWorkflowRecord } from "../../../domain/workflow-studio/WorkflowPersistenceDomain";
+import { createEmptyWorkflowDraft } from "../../../domain/workflow-studio/WorkflowStudioDomain";
 import { TaxonomyBehaviorKinds, TaxonomySemanticRoles, TaxonomyStructuralKinds } from "../../../domain/taxonomy/CompositionTaxonomy";
 import { ExploreAssetKinds, ExploreAssetQueryService } from "../ExploreAssetQueryService";
 
@@ -104,15 +106,29 @@ const seedAssets: ReadonlyArray<RegistryAsset> = Object.freeze([
 ]);
 
 describe("ExploreAssetQueryService", () => {
+  const persistedDraftWorkflow = createPersistedWorkflowRecord({
+    id: "workflow:persisted-draft",
+    name: "Draft Workflow",
+    draft: createEmptyWorkflowDraft(),
+    metadata: {
+      summary: "Draft workflow summary",
+      tags: ["workflow", "draft-tag"],
+    },
+    now: new Date("2026-03-30T00:00:00.000Z"),
+  });
   const service = new ExploreAssetQueryService({
     async listAllAssets() {
       return seedAssets;
+    },
+  }, {
+    async listPersistedWorkflows() {
+      return [persistedDraftWorkflow];
     },
   });
 
   it("builds a unified explore library across atomic/composite/system assets", async () => {
     const library = await service.listLibrary();
-    expect(library.totalCount).toBe(3);
+    expect(library.totalCount).toBe(4);
     expect(library.availableKinds).toEqual([ExploreAssetKinds.atomic, ExploreAssetKinds.composite, ExploreAssetKinds.system]);
     expect(library.assets.map((entry) => entry.assetKind)).toContain(ExploreAssetKinds.atomic);
     expect(library.assets.map((entry) => entry.assetKind)).toContain(ExploreAssetKinds.composite);
@@ -146,5 +162,61 @@ describe("ExploreAssetQueryService", () => {
 
     expect(result.assets).toHaveLength(2);
     expect(result.assets.map((entry) => entry.id.assetId)).toEqual(["asset:workflow", "asset:model"]);
+  });
+
+  it("includes persisted workflows as first-class explore assets with source/status facets", async () => {
+    const result = await service.search({
+      keyword: "draft workflow",
+      filters: {
+        sourceTypes: ["workflow-persistence"],
+        statuses: ["draft"],
+      },
+    });
+
+    expect(result.assets).toHaveLength(1);
+    expect(result.assets[0]?.id.assetId).toBe("workflow:persisted-draft");
+    expect(result.assets[0]?.metadata.sourceType).toBe("workflow-persistence");
+    expect(result.assets[0]?.metadata.summary).toBe("Draft workflow summary");
+    expect(result.assets[0]?.metadata.tags).toEqual(["workflow", "draft-tag"]);
+    expect(result.assets[0]?.metadata.persistenceRevision).toBe(1);
+    expect(result.assets[0]?.metadata.workflowRevision).toBe(1);
+    expect(result.assets[0]?.metadata.lastModifiedAt).toBe("2026-03-30T00:00:00.000Z");
+    expect(result.assets[0]?.taxonomy?.semanticRole).toBe("workflow");
+    expect(result.assets[0]?.status).toBe("draft");
+  });
+
+  it("matches persisted workflow metadata summary and tags in keyword search", async () => {
+    const summarySearch = await service.search({
+      keyword: "draft workflow summary",
+      filters: {
+        sourceTypes: ["workflow-persistence"],
+      },
+    });
+    expect(summarySearch.assets.map((entry) => entry.id.assetId)).toEqual(["workflow:persisted-draft"]);
+
+    const tagSearch = await service.search({
+      keyword: "draft-tag",
+      filters: {
+        sourceTypes: ["workflow-persistence"],
+      },
+    });
+    expect(tagSearch.assets.map((entry) => entry.id.assetId)).toEqual(["workflow:persisted-draft"]);
+  });
+
+  it("falls back to registry-only results when persisted workflow listing fails", async () => {
+    const fallbackService = new ExploreAssetQueryService({
+      async listAllAssets() {
+        return seedAssets;
+      },
+    }, {
+      async listPersistedWorkflows() {
+        throw new Error("persistence unavailable");
+      },
+    });
+
+    const library = await fallbackService.listLibrary();
+    expect(library.totalCount).toBe(3);
+    expect(library.assets.some((entry) => entry.id.assetId === "workflow:persisted-draft")).toBeFalse();
+    expect(library.assets.some((entry) => entry.id.assetId === "asset:workflow")).toBeTrue();
   });
 });

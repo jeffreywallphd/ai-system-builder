@@ -17,10 +17,10 @@ import { WorkflowStudioModeStateStore } from "../WorkflowStudioModeStateStore";
 import { WorkflowStudioModeIds } from "../WorkflowStudioModes";
 import {
   addWorkflowStep,
+  addWorkflowStepDependency,
   buildWorkflowStepTypeDefinitionKey,
   moveWorkflowStepUp,
   removeWorkflowStep,
-  setWorkflowStepDelayConfig,
   setWorkflowStepIfThenConfig,
   setWorkflowStepManualApprovalConfig,
   setWorkflowStepAgentAssetSelection,
@@ -273,6 +273,73 @@ describe("WorkflowStudioModeSystem integration seams", () => {
     expect(wizardMarkup).not.toContain("Outputs Section");
 
     store.setSelectedMode(WorkflowStudioModeIds.canvas);
+    const canvasBoundary = WorkflowStudioDraftAuthoringBoundary({
+      isWorkflowStudio: true,
+      content: store.getState().sharedDraftSerialized,
+      onChangeContent: (nextContent) => store.hydrateFromSerializedDraft(nextContent),
+      workflowModeContext: {
+        selectedModeId: store.getState().selectedModeId,
+        selectedWizardPageId: "trigger",
+        sharedDraft: store.getState().sharedDraft,
+        sharedDraftSerialized: store.getState().sharedDraftSerialized,
+        draftEditorContent: store.getState().draftEditorContent,
+        modeValidationIssues: store.getState().modeValidationIssues,
+        draftValidationIssues: store.getState().draftValidationIssues,
+      },
+    });
+
+    const canvasAddStepButton = getElementByTestId(
+      canvasBoundary,
+      "workflow-canvas-palette-add-step-agent-assistant",
+    ) as ReactElement<ButtonElementProps>;
+    canvasAddStepButton.props.onClick?.();
+    expect(store.getState().sharedDraft.steps).toHaveLength(2);
+
+    let refreshedCanvasBoundary = WorkflowStudioDraftAuthoringBoundary({
+      isWorkflowStudio: true,
+      content: store.getState().sharedDraftSerialized,
+      onChangeContent: (nextContent) => store.hydrateFromSerializedDraft(nextContent),
+      workflowModeContext: {
+        selectedModeId: store.getState().selectedModeId,
+        selectedWizardPageId: "trigger",
+        sharedDraft: store.getState().sharedDraft,
+        sharedDraftSerialized: store.getState().sharedDraftSerialized,
+        draftEditorContent: store.getState().draftEditorContent,
+        modeValidationIssues: store.getState().modeValidationIssues,
+        draftValidationIssues: store.getState().draftValidationIssues,
+        updateSharedDraft: (updater) => store.updateSharedDraft(updater),
+      },
+    });
+    const stepId = store.getState().sharedDraft.steps[0]?.id as string;
+    const stepTitleInput = getElementByTestId(
+      refreshedCanvasBoundary,
+      `workflow-canvas-step-title-${stepId}`,
+    ) as ReactElement<InputElementProps>;
+    stepTitleInput.props.onChange?.({ target: { value: "Canvas step edited" } });
+    expect(store.getState().sharedDraft.steps[0]?.title).toBe("Canvas step edited");
+
+    refreshedCanvasBoundary = WorkflowStudioDraftAuthoringBoundary({
+      isWorkflowStudio: true,
+      content: store.getState().sharedDraftSerialized,
+      onChangeContent: (nextContent) => store.hydrateFromSerializedDraft(nextContent),
+      workflowModeContext: {
+        selectedModeId: store.getState().selectedModeId,
+        selectedWizardPageId: "trigger",
+        sharedDraft: store.getState().sharedDraft,
+        sharedDraftSerialized: store.getState().sharedDraftSerialized,
+        draftEditorContent: store.getState().draftEditorContent,
+        modeValidationIssues: store.getState().modeValidationIssues,
+        draftValidationIssues: store.getState().draftValidationIssues,
+        updateSharedDraft: (updater) => store.updateSharedDraft(updater),
+      },
+    });
+    const removeStepButton = getElementByTestId(
+      refreshedCanvasBoundary,
+      `workflow-canvas-node-remove-steps-${stepId}`,
+    ) as ReactElement<ButtonElementProps>;
+    removeStepButton.props.onClick?.();
+    expect(store.getState().sharedDraft.steps).toHaveLength(1);
+
     const canvasSerialized = serializeWorkflowDraft({
       ...store.getState().sharedDraft,
       outputs: [
@@ -291,31 +358,20 @@ describe("WorkflowStudioModeSystem integration seams", () => {
       ],
     });
 
-    const canvasBoundary = WorkflowStudioDraftAuthoringBoundary({
-      isWorkflowStudio: true,
-      content: store.getState().sharedDraftSerialized,
-      onChangeContent: (nextContent) => store.hydrateFromSerializedDraft(nextContent),
-      workflowModeContext: {
-        selectedModeId: store.getState().selectedModeId,
-        selectedWizardPageId: "trigger",
-        sharedDraft: store.getState().sharedDraft,
-        sharedDraftSerialized: store.getState().sharedDraftSerialized,
-        draftEditorContent: store.getState().draftEditorContent,
-        modeValidationIssues: store.getState().modeValidationIssues,
-        draftValidationIssues: store.getState().draftValidationIssues,
-      },
-    });
-
-    const canvasTextarea = getTextarea(canvasBoundary);
+    const canvasTextarea = getTextarea(refreshedCanvasBoundary);
     canvasTextarea.props.onChange?.({ target: { value: canvasSerialized } });
     expect(store.getState().sharedDraft.outputs.map((entry) => entry.id)).toEqual(["output-1"]);
 
     const canvasMarkup = renderToStaticMarkup(canvasBoundary);
     expect(canvasMarkup).toContain('data-testid="workflow-studio-canvas-mode-layout"');
     expect(canvasMarkup).toContain('data-testid="workflow-studio-canvas-mode-surface"');
+    expect(canvasMarkup).toContain('data-testid="workflow-studio-canvas-reactflow"');
+    expect(canvasMarkup).toContain('data-testid="workflow-canvas-palette"');
+    expect(canvasMarkup).toContain('data-testid="workflow-canvas-inspector"');
+    expect(canvasMarkup).toContain("Add to Canvas");
 
     store.setSelectedMode(WorkflowStudioModeIds.wizard);
-    expect(store.getState().sharedDraft.steps.map((entry) => entry.id)).toEqual(["step-1"]);
+    expect(store.getState().sharedDraft.steps).toHaveLength(1);
     expect(store.getState().sharedDraft.outputs.map((entry) => entry.id)).toEqual(["output-1"]);
     expect(store.getState().isSharedDraftValid).toBe(true);
   });
@@ -494,7 +550,7 @@ describe("WorkflowStudioModeSystem integration seams", () => {
     expect(createLink.props.href).toContain("returnTo=%2Fstudio-shell%2Fworkflow%2Fwizard");
   });
 
-  it("preserves wizard step ordering and step-level asset selection across mode switching", () => {
+  it("preserves wizard/canvas synchronization for branching, dataset inputs, and agent step assets", () => {
     const store = new WorkflowStudioModeStateStore();
     store.setSelectedMode(WorkflowStudioModeIds.wizard);
 
@@ -512,8 +568,7 @@ describe("WorkflowStudioModeSystem integration seams", () => {
     }).draft);
     const firstStepId = store.getState().sharedDraft.steps[0]?.id as string;
     const ifThenDefinition = workflowStepTypeDefinitions.find((definition) => definition.type === WorkflowDraftBuiltInStepTypes.ifThen);
-    const delayDefinition = workflowStepTypeDefinitions.find((definition) => definition.type === WorkflowDraftBuiltInStepTypes.delayWait);
-    if (!ifThenDefinition || !delayDefinition) {
+    if (!ifThenDefinition) {
       throw new Error("Expected built-in workflow step type definitions to be present.");
     }
     store.updateSharedDraft((draft) => setWorkflowStepType(
@@ -524,29 +579,114 @@ describe("WorkflowStudioModeSystem integration seams", () => {
     store.updateSharedDraft((draft) => setWorkflowStepIfThenConfig(draft, firstStepId, {
       conditionExpression: "score > 0.5",
       thenLabel: "approve",
+      thenStepIds: [secondStepId],
+      elseStepIds: [thirdStepId],
     }).draft);
-    store.updateSharedDraft((draft) => setWorkflowStepType(
-      draft,
-      firstStepId,
-      buildWorkflowStepTypeDefinitionKey(delayDefinition),
-    ).draft);
-    store.updateSharedDraft((draft) => setWorkflowStepDelayConfig(draft, firstStepId, {
-      durationSeconds: 20,
+    store.updateSharedDraft((draft) => upsertDatasetInputSelection(draft, {
+      assetId: "asset:dataset-canvas-sync",
+      versionId: "asset:dataset-canvas-sync:v1",
+      name: "Dataset sync",
     }).draft);
 
     expect(store.getState().sharedDraft.steps.map((step) => step.order)).toEqual([1, 2, 3]);
     expect(store.getState().sharedDraft.steps.find((step) => step.id === secondStepId)?.assetRef?.asset.assetId).toBe("asset:agent-selected");
-    expect(store.getState().sharedDraft.steps.find((step) => step.id === firstStepId)?.type).toBe(WorkflowDraftBuiltInStepTypes.delayWait);
+    expect(store.getState().sharedDraft.steps.find((step) => step.id === firstStepId)?.type).toBe(WorkflowDraftBuiltInStepTypes.ifThen);
+    expect((store.getState().sharedDraft.steps.find((step) => step.id === firstStepId)?.config as {
+      branches?: { then?: { stepIds?: ReadonlyArray<string> }; else?: { stepIds?: ReadonlyArray<string> } };
+    })?.branches?.then?.stepIds).toEqual([secondStepId]);
+    expect((store.getState().sharedDraft.steps.find((step) => step.id === firstStepId)?.config as {
+      branches?: { then?: { stepIds?: ReadonlyArray<string> }; else?: { stepIds?: ReadonlyArray<string> } };
+    })?.branches?.else?.stepIds).toEqual([thirdStepId]);
+    expect(store.getState().sharedDraft.inputs.find((input) => input.sourceType === "dataset-asset")).toBeDefined();
 
     store.setSelectedMode(WorkflowStudioModeIds.canvas);
     store.setSelectedMode(WorkflowStudioModeIds.wizard);
     expect(store.getState().sharedDraft.steps.map((step) => step.order)).toEqual([1, 2, 3]);
     expect(store.getState().sharedDraft.steps.find((step) => step.id === secondStepId)?.assetRef?.asset.assetId).toBe("asset:agent-selected");
-    expect(store.getState().sharedDraft.steps.find((step) => step.id === firstStepId)?.type).toBe(WorkflowDraftBuiltInStepTypes.delayWait);
-    expect((store.getState().sharedDraft.steps.find((step) => step.id === firstStepId)?.config as { durationSeconds?: number })?.durationSeconds).toBe(20);
+    expect(store.getState().sharedDraft.steps.find((step) => step.id === firstStepId)?.type).toBe(WorkflowDraftBuiltInStepTypes.ifThen);
+    expect((store.getState().sharedDraft.steps.find((step) => step.id === firstStepId)?.config as {
+      branches?: { then?: { stepIds?: ReadonlyArray<string> }; else?: { stepIds?: ReadonlyArray<string> } };
+    })?.branches?.then?.stepIds).toEqual([secondStepId]);
+    expect((store.getState().sharedDraft.steps.find((step) => step.id === firstStepId)?.config as {
+      branches?: { then?: { stepIds?: ReadonlyArray<string> }; else?: { stepIds?: ReadonlyArray<string> } };
+    })?.branches?.else?.stepIds).toEqual([thirdStepId]);
+    expect(store.getState().sharedDraft.inputs.find((input) => input.sourceType === "dataset-asset")?.id).toBeDefined();
 
     store.updateSharedDraft((draft) => removeWorkflowStep(draft, secondStepId).draft);
     expect(store.getState().sharedDraft.steps.map((step) => step.order)).toEqual([1, 2]);
+    const updatedIfThenConfig = store.getState().sharedDraft.steps.find((step) => step.id === firstStepId)?.config as {
+      branches?: { then?: { stepIds?: ReadonlyArray<string> } };
+    };
+    expect(updatedIfThenConfig.branches?.then?.stepIds ?? []).toHaveLength(0);
+  });
+
+  it("applies canvas step reorder and connection edits back into shared draft for wizard mode", () => {
+    const store = new WorkflowStudioModeStateStore();
+    store.setSelectedMode(WorkflowStudioModeIds.canvas);
+
+    store.updateSharedDraft((draft) => addWorkflowStep(draft).draft);
+    store.updateSharedDraft((draft) => addWorkflowStep(draft).draft);
+    store.updateSharedDraft((draft) => addWorkflowStep(draft).draft);
+
+    const firstStepId = store.getState().sharedDraft.steps[0]?.id as string;
+    const secondStepId = store.getState().sharedDraft.steps[1]?.id as string;
+    const thirdStepId = store.getState().sharedDraft.steps[2]?.id as string;
+
+    const renderCanvasBoundary = () => WorkflowStudioDraftAuthoringBoundary({
+      isWorkflowStudio: true,
+      content: store.getState().sharedDraftSerialized,
+      onChangeContent: (nextContent) => store.hydrateFromSerializedDraft(nextContent),
+      workflowModeContext: {
+        selectedModeId: store.getState().selectedModeId,
+        selectedWizardPageId: "steps",
+        sharedDraft: store.getState().sharedDraft,
+        sharedDraftSerialized: store.getState().sharedDraftSerialized,
+        draftEditorContent: store.getState().draftEditorContent,
+        modeValidationIssues: store.getState().modeValidationIssues,
+        draftValidationIssues: store.getState().draftValidationIssues,
+        updateSharedDraft: (updater) => store.updateSharedDraft(updater),
+      },
+    });
+
+    let canvasBoundary = renderCanvasBoundary();
+    const moveThirdUp = getElementByTestId(
+      canvasBoundary,
+      `workflow-canvas-step-move-up-${thirdStepId}`,
+    ) as ReactElement<ButtonElementProps>;
+    moveThirdUp.props.onClick?.();
+
+    canvasBoundary = renderCanvasBoundary();
+    const moveThirdUpAgain = getElementByTestId(
+      canvasBoundary,
+      `workflow-canvas-step-move-up-${thirdStepId}`,
+    ) as ReactElement<ButtonElementProps>;
+    moveThirdUpAgain.props.onClick?.();
+
+    expect(store.getState().sharedDraft.steps.map((step) => step.id)).toEqual([thirdStepId, firstStepId, secondStepId]);
+    expect(store.getState().sharedDraft.steps.map((step) => step.order)).toEqual([1, 2, 3]);
+
+    store.updateSharedDraft((draft) => addWorkflowStepDependency(draft, secondStepId, firstStepId).draft);
+    expect(store.getState().sharedDraft.steps.find((step) => step.id === secondStepId)?.dependsOnStepIds).toContain(firstStepId);
+
+    store.setSelectedMode(WorkflowStudioModeIds.wizard);
+    const wizardBoundary = WorkflowStudioDraftAuthoringBoundary({
+      isWorkflowStudio: true,
+      content: store.getState().sharedDraftSerialized,
+      onChangeContent: (nextContent) => store.hydrateFromSerializedDraft(nextContent),
+      workflowModeContext: {
+        selectedModeId: store.getState().selectedModeId,
+        selectedWizardPageId: "steps",
+        sharedDraft: store.getState().sharedDraft,
+        sharedDraftSerialized: store.getState().sharedDraftSerialized,
+        draftEditorContent: store.getState().draftEditorContent,
+        modeValidationIssues: store.getState().modeValidationIssues,
+        draftValidationIssues: store.getState().draftValidationIssues,
+      },
+    });
+
+    renderToStaticMarkup(wizardBoundary);
+    expect(store.getState().sharedDraft.steps.map((step) => step.id)).toEqual([thirdStepId, firstStepId, secondStepId]);
+    expect(store.getState().sharedDraft.steps.find((step) => step.id === secondStepId)?.dependsOnStepIds).toContain(firstStepId);
   });
 
   it("renders mixed asset-backed and built-in step choices and surfaces built-in validation feedback", () => {
@@ -751,16 +891,17 @@ describe("WorkflowStudioModeSystem integration seams", () => {
 
     const markup = renderToStaticMarkup(wizardBoundary);
     expect(markup).toContain('data-testid="workflow-wizard-readiness-summary"');
-    expect(markup).toContain('data-testid="workflow-wizard-progression-controls"');
+    expect(markup).toContain('data-testid="workflow-wizard-page-progress"');
     expect(markup).toContain('data-testid="workflow-wizard-back-page"');
     expect(markup).toContain('data-testid="workflow-wizard-next-page"');
+    expect(markup).not.toContain('data-testid="workflow-wizard-progression-controls"');
     expect(markup).toContain('aria-current="page"');
     expect(markup).toContain('data-testid="workflow-wizard-terminal-actions"');
     expect(markup).toContain('data-testid="workflow-wizard-output-overview"');
     expect(markup).toContain('data-testid="workflow-wizard-readiness-output-summary"');
     expect(markup).toContain("Result viewer");
     expect(markup).toContain("Web viewer");
-    expect(markup).toContain("Ready for next-stage handoff. Save the draft and continue to lifecycle/publish controls.");
+    expect(markup).toContain("Ready for next-stage handoff. Save and continue to lifecycle/publish controls.");
     expect(markup).toContain("Prepare for Run");
   });
 });

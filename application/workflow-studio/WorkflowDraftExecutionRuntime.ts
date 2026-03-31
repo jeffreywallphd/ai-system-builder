@@ -2,7 +2,14 @@ import {
   WorkflowDraftComparisonOperators,
   type WorkflowDraftConditionDefinition,
 } from "../../domain/workflow-studio/WorkflowStudioDomain";
+import {
+  deliverWorkflowExecutionOutputs,
+  type WorkflowExecutionOutputDeliveryHandler,
+  type WorkflowExecutionOutputDeliveryIssue,
+  type WorkflowExecutionOutputDeliveryResult,
+} from "./WorkflowExecutionOutputDeliveryService";
 import type {
+  WorkflowExecutionAssetStepBinding,
   WorkflowDraftActionExecutionPlanElement,
   WorkflowDraftDelayExecutionPlanElement,
   WorkflowDraftExecutionPlan,
@@ -52,6 +59,10 @@ export interface WorkflowDraftRuntimeExecutionResult {
   readonly traces: ReadonlyArray<WorkflowDraftRuntimeStepTraceEntry>;
   readonly stepOutputs: Readonly<Record<string, unknown>>;
   readonly issues: ReadonlyArray<WorkflowDraftRuntimeExecutionIssue>;
+  readonly outputDelivery: Readonly<{
+    readonly results: ReadonlyArray<WorkflowExecutionOutputDeliveryResult>;
+    readonly issues: ReadonlyArray<WorkflowExecutionOutputDeliveryIssue>;
+  }>;
   readonly pausedAt?: WorkflowDraftRuntimeManualPause;
 }
 
@@ -76,6 +87,19 @@ export interface WorkflowDraftRuntimeExecutionRequest {
       };
     },
   ) => Promise<unknown> | unknown;
+  readonly assetStepExecutor?: (
+    binding: WorkflowExecutionAssetStepBinding,
+    context: {
+      readonly inputs: Readonly<Record<string, unknown>>;
+      readonly stepOutputs: Readonly<Record<string, unknown>>;
+      readonly loop?: {
+        readonly loopStepId: string;
+        readonly iteration: number;
+        readonly item?: unknown;
+      };
+    },
+  ) => Promise<unknown> | unknown;
+  readonly outputDeliveryHandler?: WorkflowExecutionOutputDeliveryHandler;
   readonly sleep?: (milliseconds: number) => Promise<void>;
   readonly now?: () => Date;
 }
@@ -277,6 +301,9 @@ function normalizeRangeIterations(range: WorkflowDraftLoopExecutionPlanElement["
 export class WorkflowDraftExecutionRuntime {
   public async execute(request: WorkflowDraftRuntimeExecutionRequest): Promise<WorkflowDraftRuntimeExecutionResult> {
     const elementsById = new Map(request.plan.elements.map((element) => [element.stepId, element] as const));
+    const assetStepBindingsByStepId = new Map(
+      (request.plan.assetStepBindings ?? []).map((binding) => [binding.stepId, binding] as const),
+    );
     const controlledTargetStepIds = collectControlledTargetStepIds(request.plan);
     const traces: WorkflowDraftRuntimeStepTraceEntry[] = [];
     const stepOutputs = new Map<string, unknown>();
@@ -369,6 +396,21 @@ export class WorkflowDraftExecutionRuntime {
       element: WorkflowDraftActionExecutionPlanElement,
       loop?: RuntimeLoopScope,
     ): Promise<unknown> => {
+      if (element.stepKind === "asset-backed") {
+        const binding = assetStepBindingsByStepId.get(element.stepId);
+        if (!binding) {
+          throw new Error(`asset-step-binding-missing:${element.stepId}`);
+        }
+        if (!request.assetStepExecutor) {
+          throw new Error(`asset-step-executor-unavailable:${element.stepId}:${binding.invocationKind}`);
+        }
+        return request.assetStepExecutor(binding, {
+          inputs: request.inputs ?? Object.freeze({}),
+          stepOutputs: Object.freeze(Object.fromEntries(stepOutputs.entries())),
+          loop,
+        });
+      }
+
       if (request.actionExecutor) {
         return request.actionExecutor(element, {
           inputs: request.inputs ?? Object.freeze({}),
@@ -738,6 +780,10 @@ export class WorkflowDraftExecutionRuntime {
             traces: Object.freeze([...traces]),
             stepOutputs: Object.freeze(Object.fromEntries(stepOutputs.entries())),
             issues: Object.freeze([...issues]),
+            outputDelivery: Object.freeze({
+              results: Object.freeze([]),
+              issues: Object.freeze([]),
+            }),
             pausedAt,
           });
         }
@@ -747,6 +793,10 @@ export class WorkflowDraftExecutionRuntime {
           traces: Object.freeze([...traces]),
           stepOutputs: Object.freeze(Object.fromEntries(stepOutputs.entries())),
           issues: Object.freeze([...issues]),
+          outputDelivery: Object.freeze({
+            results: Object.freeze([]),
+            issues: Object.freeze([]),
+          }),
         });
       }
     }
@@ -771,11 +821,50 @@ export class WorkflowDraftExecutionRuntime {
       });
     }
 
+    const outputDelivery = await deliverWorkflowExecutionOutputs(
+      {
+        plan: request.plan,
+        stepOutputs: Object.freeze(Object.fromEntries(stepOutputs.entries())),
+        traces: Object.freeze(
+          traces.map((trace) => Object.freeze({
+            sequence: trace.sequence,
+            stepId: trace.stepId,
+            status: trace.status,
+          })),
+        ),
+      },
+      request.outputDeliveryHandler,
+    );
+    if (outputDelivery.issues.length > 0) {
+      const mergedIssues = Object.freeze([
+        ...issues,
+        ...outputDelivery.issues.map((issue) => Object.freeze({
+          code: issue.code,
+          stepId: issue.outputId,
+          message: issue.message,
+        })),
+      ]);
+      return Object.freeze({
+        status: WorkflowDraftRuntimeExecutionStatusKinds.failed,
+        traces: Object.freeze([...traces]),
+        stepOutputs: Object.freeze(Object.fromEntries(stepOutputs.entries())),
+        issues: mergedIssues,
+        outputDelivery: Object.freeze({
+          results: Object.freeze([...outputDelivery.results]),
+          issues: Object.freeze([...outputDelivery.issues]),
+        }),
+      });
+    }
+
     return Object.freeze({
       status: WorkflowDraftRuntimeExecutionStatusKinds.completed,
       traces: Object.freeze([...traces]),
       stepOutputs: Object.freeze(Object.fromEntries(stepOutputs.entries())),
       issues: Object.freeze([...issues]),
+      outputDelivery: Object.freeze({
+        results: Object.freeze([...outputDelivery.results]),
+        issues: Object.freeze([...outputDelivery.issues]),
+      }),
     });
   }
 }

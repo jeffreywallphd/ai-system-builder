@@ -1,7 +1,9 @@
 import { ROUTE_PATHS } from "./RouteConfig";
+import { buildWorkflowStudioOpenExistingPath, buildWorkflowStudioResumeDraftPath } from "../studio-shell/workflow/WorkflowStudioEntryRouting";
 
 export const RunContextKinds = Object.freeze({
   asset: "asset",
+  workflow: "workflow",
   system: "system",
   tool: "tool",
   general: "general",
@@ -11,6 +13,8 @@ export type RunContextKind = typeof RunContextKinds[keyof typeof RunContextKinds
 
 export interface RunLaunchRequest {
   readonly contextKind?: RunContextKind;
+  readonly workflowId?: string;
+  readonly workflowStatus?: "draft" | "saved";
   readonly assetId?: string;
   readonly versionId?: string;
   readonly source?: "build" | "explore" | "detail" | "direct";
@@ -50,6 +54,8 @@ export class RunContextResolver {
       : RunContextKinds.general;
     return Object.freeze({
       contextKind: mappedContext,
+      workflowId: params.get("workflowId")?.trim() || undefined,
+      workflowStatus: params.get("workflowStatus")?.trim() as RunLaunchRequest["workflowStatus"] | undefined,
       assetId: params.get("assetId")?.trim() || undefined,
       versionId: params.get("versionId")?.trim() || undefined,
       source: (params.get("source")?.trim() as RunLaunchRequest["source"]) || undefined,
@@ -65,6 +71,12 @@ export class RunContextResolver {
     params.set("context", request.contextKind ?? RunContextKinds.general);
     if (request.assetId) {
       params.set("assetId", request.assetId);
+    }
+    if (request.workflowId) {
+      params.set("workflowId", request.workflowId);
+    }
+    if (request.workflowStatus) {
+      params.set("workflowStatus", request.workflowStatus);
     }
     if (request.versionId) {
       params.set("versionId", request.versionId);
@@ -108,6 +120,23 @@ export class RunInterfaceService {
   }
 
   private resolveSurface(request: RunLaunchRequest): RunSurfaceModel {
+    if (request.contextKind === RunContextKinds.workflow) {
+      const workflowId = request.workflowId?.trim() || request.assetId?.trim();
+      return Object.freeze({
+        title: "Run a workflow",
+        subtitle: workflowId
+          ? "Open the selected persisted workflow in Workflow Studio and run it through the existing workflow run path."
+          : "Select a persisted workflow to run it through the existing workflow run path.",
+        contextLabel: workflowId ? `for ${workflowId}` : "from anywhere in Build or Explore",
+        primaryActionLabel: "Open workflow runner",
+        primaryActionPath: workflowId
+          ? (request.workflowStatus === "draft"
+            ? buildWorkflowStudioResumeDraftPath(workflowId)
+            : buildWorkflowStudioOpenExistingPath(workflowId))
+          : ROUTE_PATHS.explore,
+      });
+    }
+
     const label = request.assetId ? `for ${request.assetId}` : "from anywhere in Build or Explore";
     if (request.contextKind === RunContextKinds.system) {
       return Object.freeze({

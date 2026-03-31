@@ -143,10 +143,15 @@ export class AssetActionExecutionService {
     }
 
     if (action === AssetIntentActionTypes.runHere || action === AssetIntentActionTypes.testHere) {
+      const semanticRole = context.asset.taxonomy?.semanticRole;
       const inlineRun = this.inlineRunLaunchService.launch({
         action: action === AssetIntentActionTypes.testHere ? UxRunActionKinds.test : UxRunActionKinds.run,
         target: {
-          kind: context.asset.taxonomy?.semanticRole === "system" ? "system" : "asset",
+          kind: semanticRole === "system"
+            ? "system"
+            : semanticRole === "workflow"
+              ? "workflow"
+              : "asset",
           assetId: context.asset.assetId,
           versionId: context.asset.versionId,
         },

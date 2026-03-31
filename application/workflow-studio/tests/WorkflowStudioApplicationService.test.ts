@@ -3,6 +3,7 @@ import type { IStudioShellRepository } from "../../ports/interfaces/IStudioShell
 import type { AssetDraft, AssetSession, Studio } from "../../../domain/studio-shell/StudioShellDomain";
 import type { AssetVersion } from "../../../domain/assets/AssetVersion";
 import { DefaultStudioShellApplicationService } from "../../studio-shell/DefaultStudioShellApplicationService";
+import { WorkflowExecutionTriggerSourceKinds } from "../WorkflowExecutionAlignmentContracts";
 import { WorkflowStudioApplicationService } from "../WorkflowStudioApplicationService";
 import {
   createEmptyWorkflowDraft,
@@ -425,5 +426,425 @@ describe("WorkflowStudioApplicationService", () => {
       "step-delay",
     ]);
     expect(result.traces.some((entry) => entry.stepId === "step-reject" && entry.status === "skipped")).toBeTrue();
+  });
+
+  it("blocks manual run when canonical pre-execution validation fails", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => "generated");
+    const service = new WorkflowStudioApplicationService(studioShell);
+
+    const result = await service.runWorkflowDraftManual({
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-temporal",
+          kind: WorkflowDraftTriggerKinds.temporal,
+          type: WorkflowDraftTriggerTypes.temporalSchedule,
+          config: {},
+        }],
+        steps: [],
+      }),
+    });
+
+    expect(result.launchStatus).toBe("blocked");
+    expect(result.executionStatus.state).toBe("failed");
+    expect(result.executionStatus.launchAccepted).toBeFalse();
+    expect(result.executionStatus.transitions.map((entry) => entry.state)).toEqual(["queued", "failed"]);
+    expect(result.executionStatus.failure?.kind).toBe("validation-failure");
+    expect(result.validation.ready).toBeFalse();
+    expect(result.validation.blockingIssues.length).toBeGreaterThan(0);
+  });
+
+  it("launches manual run when canonical pre-execution validation succeeds", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => "generated");
+    const service = new WorkflowStudioApplicationService(studioShell);
+
+    const result = await service.runWorkflowDraftManual({
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-manual",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        }],
+        steps: [{
+          id: "step-1",
+          type: "action",
+          kind: "action",
+          order: 1,
+        }],
+      }),
+    });
+
+    expect(result.launchStatus).toBe("launched");
+    expect(result.executionStatus.state === "completed" || result.executionStatus.state === "running").toBeTrue();
+    expect(result.executionStatus.launchAccepted).toBeTrue();
+    expect(result.executionStatus.transitions[0]?.state).toBe("queued");
+    expect(result.executionStatus.transitions[1]?.state).toBe("running");
+    expect(result.validation.ready).toBeTrue();
+    expect(result.runtimeResult?.status === "completed" || result.runtimeResult?.status === "paused").toBeTrue();
+  });
+
+  it("uses assembled execution context runtime inputs for manual launch when explicit runtime inputs are not provided", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => "generated");
+    const service = new WorkflowStudioApplicationService(studioShell);
+
+    const result = await service.runWorkflowDraftManual({
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-manual",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        }],
+        inputs: [{
+          id: "input-threshold",
+          type: "runtime-input",
+          sourceType: "runtime-parameter",
+          parameterKey: "threshold",
+          defaultValue: 0.8,
+          required: true,
+        }],
+        steps: [{
+          id: "step-if",
+          type: "if-then",
+          kind: "control-flow",
+          order: 1,
+          config: {
+            conditionExpression: "inputs.threshold >= 0.8",
+            thenStepIds: ["step-approve"],
+            elseStepIds: ["step-reject"],
+          },
+        }, {
+          id: "step-approve",
+          type: "action",
+          kind: "action",
+          order: 2,
+        }, {
+          id: "step-reject",
+          type: "action",
+          kind: "action",
+          order: 3,
+        }],
+      }),
+    });
+
+    expect(result.launchStatus).toBe("launched");
+    expect(result.executionStatus.launchAccepted).toBeTrue();
+    expect(result.validation.ready).toBeTrue();
+    const completedStepIds = result.runtimeResult?.traces
+      .filter((entry) => entry.status === "completed")
+      .map((entry) => entry.stepId);
+    expect(completedStepIds).toEqual(["step-if", "step-approve"]);
+  });
+
+  it("keeps manual run blocked when required runtime input cannot be resolved", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => "generated");
+    const service = new WorkflowStudioApplicationService(studioShell);
+
+    const result = await service.runWorkflowDraftManual({
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-manual",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        }],
+        inputs: [{
+          id: "input-prompt",
+          type: "runtime-input",
+          sourceType: "runtime-parameter",
+          parameterKey: "prompt",
+          required: true,
+        }],
+        steps: [{
+          id: "step-1",
+          type: "action",
+          kind: "action",
+          order: 1,
+        }],
+      }),
+    });
+
+    expect(result.launchStatus).toBe("blocked");
+    expect(result.executionStatus.failure?.kind).toBe("validation-failure");
+    expect(result.validation.ready).toBeFalse();
+    expect(result.validation.blockingIssues.some((issue) => issue.code === "input-resolution-required-missing")).toBeTrue();
+  });
+
+  it("routes manual/user trigger entry through the canonical validation/translation/runtime pipeline", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => "generated");
+    const service = new WorkflowStudioApplicationService(studioShell);
+
+    const result = await service.runWorkflowDraftTriggered({
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-manual",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        }],
+        inputs: [{
+          id: "input-prompt",
+          type: "runtime-input",
+          sourceType: "runtime-parameter",
+          parameterKey: "prompt",
+          required: true,
+        }],
+        steps: [{
+          id: "step-1",
+          type: "action",
+          kind: "action",
+          order: 1,
+        }],
+      }),
+      trigger: {
+        sourceKind: WorkflowExecutionTriggerSourceKinds.manualUser,
+        triggerId: "trigger-manual",
+        payload: {
+          prompt: "manual trigger payload",
+        },
+      },
+    });
+
+    expect(result.launchStatus).toBe("launched");
+    expect(result.executionStatus.state).toBe("completed");
+    expect(result.validation.ready).toBeTrue();
+    expect(result.validation.plan?.executionContext.resolvedInputValues).toEqual({
+      "input-prompt": "manual trigger payload",
+    });
+  });
+
+  it("supports temporal and state trigger entries while preserving validation blocking behavior", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => "generated");
+    const service = new WorkflowStudioApplicationService(studioShell);
+
+    const temporalBlocked = await service.runWorkflowDraftTriggered({
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-temporal",
+          kind: WorkflowDraftTriggerKinds.temporal,
+          type: WorkflowDraftTriggerTypes.temporalSchedule,
+          config: {
+            runAt: "2027-01-01T00:00:00.000Z",
+          },
+        }],
+        inputs: [{
+          id: "input-required",
+          type: "runtime-input",
+          sourceType: "runtime-parameter",
+          parameterKey: "requiredValue",
+          required: true,
+        }],
+        steps: [{
+          id: "step-1",
+          type: "action",
+          kind: "action",
+          order: 1,
+        }],
+      }),
+      trigger: {
+        sourceKind: WorkflowExecutionTriggerSourceKinds.temporal,
+        triggerId: "trigger-temporal",
+      },
+    });
+    expect(temporalBlocked.launchStatus).toBe("blocked");
+    expect(temporalBlocked.executionStatus.failure?.kind).toBe("validation-failure");
+    expect(temporalBlocked.validation.blockingIssues.some((issue) => issue.code === "input-resolution-required-missing")).toBeTrue();
+
+    const stateLaunched = await service.runWorkflowDraftTriggered({
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-state",
+          kind: WorkflowDraftTriggerKinds.state,
+          type: WorkflowDraftTriggerTypes.stateSystemEvent,
+          config: {
+            sourceType: "system",
+            eventCategory: "system-state-changed",
+            eventName: "customer-updated",
+          },
+        }],
+        inputs: [{
+          id: "input-customer-id",
+          type: "runtime-input",
+          sourceType: "runtime-parameter",
+          parameterKey: "customerId",
+          required: true,
+        }],
+        steps: [{
+          id: "step-1",
+          type: "action",
+          kind: "action",
+          order: 1,
+        }],
+      }),
+      trigger: {
+        sourceKind: WorkflowExecutionTriggerSourceKinds.stateData,
+        triggerId: "trigger-state",
+        payload: {
+          customerId: "customer-42",
+        },
+      },
+    });
+    expect(stateLaunched.launchStatus).toBe("launched");
+    expect(stateLaunched.executionStatus.state).toBe("completed");
+    expect(stateLaunched.validation.ready).toBeTrue();
+    expect(stateLaunched.validation.plan?.executionContext.resolvedInputValues).toEqual({
+      "input-customer-id": "customer-42",
+    });
+  });
+
+  it("reports unsupported configuration failure when output translation cannot bind destination type", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => "generated");
+    const service = new WorkflowStudioApplicationService(studioShell);
+
+    const result = await service.runWorkflowDraftManual({
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-manual",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        }],
+        steps: [{
+          id: "step-1",
+          type: "action",
+          kind: "action",
+          order: 1,
+        }],
+        outputs: [{
+          id: "output-unsupported",
+          type: "workflow-output",
+          order: 1,
+          outputType: WorkflowDraftOutputTypes.document,
+          format: WorkflowDraftOutputFormats.json,
+          sourceStepId: "step-1",
+          destination: {
+            type: "unsupported-output-target",
+            target: "unsupported",
+          },
+        }],
+      }),
+    });
+
+    expect(result.launchStatus).toBe("blocked");
+    expect(result.executionStatus.state).toBe("failed");
+    expect(result.executionStatus.failure?.kind).toBe("unsupported-configuration");
+    expect(result.executionStatus.failure?.stage).toBe("translation");
+  });
+
+  it("reports translation/planning failures separately from validation failures", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => "generated");
+    const service = new WorkflowStudioApplicationService(studioShell);
+
+    const result = await service.runWorkflowDraftManual({
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-manual",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        }],
+        steps: [{
+          id: "step-if",
+          type: "if-then",
+          kind: "control-flow",
+          order: 1,
+          config: {
+            conditionExpression: "inputs.ready",
+            thenStepIds: ["step-missing"],
+          },
+        }],
+      }),
+    });
+
+    expect(result.launchStatus).toBe("blocked");
+    expect(result.executionStatus.failure?.kind).toBe("translation-failure");
+    expect(result.executionStatus.failure?.stage).toBe("translation");
+  });
+
+  it("reports runtime and output-delivery failures through structured execution status", async () => {
+    const repository = new InMemoryStudioShellRepository();
+    const studioShell = new DefaultStudioShellApplicationService(repository, () => "generated");
+    const service = new WorkflowStudioApplicationService(studioShell);
+
+    const runtimeFailure = await service.runWorkflowDraftManual({
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-manual",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        }],
+        steps: [{
+          id: "step-1",
+          type: "agent-assistant",
+          kind: "asset-backed",
+          order: 1,
+          assetRef: {
+            assetKind: "agent-assistant",
+            asset: {
+              assetId: "asset:agent-missing-runtime",
+            },
+          },
+        }],
+      }),
+    });
+    expect(runtimeFailure.launchStatus).toBe("failed");
+    expect(runtimeFailure.executionStatus.failure?.kind).toBe("runtime-failure");
+    expect(runtimeFailure.executionStatus.failure?.stage).toBe("runtime");
+
+    const outputFailure = await service.runWorkflowDraftManual({
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-manual",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        }],
+        steps: [{
+          id: "step-1",
+          type: "action",
+          kind: "action",
+          order: 1,
+        }],
+        outputs: [{
+          id: "output-file",
+          type: "workflow-output",
+          order: 1,
+          outputType: WorkflowDraftOutputTypes.document,
+          format: WorkflowDraftOutputFormats.json,
+          sourceStepId: "step-1",
+          destination: {
+            type: WorkflowDraftOutputDestinationTypes.fileExport,
+            target: "workspace-file",
+            options: {
+              deliveryMode: "workspace-file",
+            },
+          },
+        }],
+      }),
+    });
+
+    expect(outputFailure.launchStatus).toBe("failed");
+    expect(outputFailure.executionStatus.failure?.kind).toBe("output-delivery-failure");
+    expect(outputFailure.executionStatus.failure?.stage).toBe("output-delivery");
   });
 });

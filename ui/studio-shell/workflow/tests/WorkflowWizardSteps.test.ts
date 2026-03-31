@@ -9,6 +9,7 @@ import {
   validateWorkflowDraft,
 } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
 import {
+  addWorkflowStepDependency,
   addWorkflowStep,
   buildWorkflowStepAgentAssistantSelectionPayload,
   buildWorkflowStepTypeDefinitionKey,
@@ -18,6 +19,8 @@ import {
   moveWorkflowStepDown,
   moveWorkflowStepUp,
   removeWorkflowStep,
+  removeWorkflowStepDependency,
+  reorderWorkflowSteps,
   resolveWorkflowStepTypeDefinition,
   setWorkflowStepAgentAssetSelection,
   setWorkflowStepDelayConfig,
@@ -69,6 +72,42 @@ describe("WorkflowWizardSteps", () => {
 
     expect(inserted.draft.steps.map((step) => step.id)).toEqual([first.stepId, inserted.stepId, second.stepId]);
     expect(inserted.draft.steps.map((step) => step.order)).toEqual([1, 2, 3]);
+  });
+
+  it("supports canonical step reorder and dependency add/remove guardrails", () => {
+    const first = addWorkflowStep(createEmptyWorkflowDraft());
+    const second = addWorkflowStep(first.draft);
+    const third = addWorkflowStep(second.draft);
+
+    const withDependency = addWorkflowStepDependency(third.draft, third.stepId, first.stepId);
+    expect(withDependency.changed).toBeTrue();
+    expect(withDependency.draft.steps.find((step) => step.id === third.stepId)?.dependsOnStepIds).toEqual([first.stepId]);
+
+    const invalidDependency = addWorkflowStepDependency(withDependency.draft, first.stepId, third.stepId);
+    expect(invalidDependency.changed).toBeFalse();
+
+    const blockedReorder = reorderWorkflowSteps(withDependency.draft, [
+      second.stepId,
+      third.stepId,
+      first.stepId,
+    ]);
+    expect(blockedReorder.changed).toBeFalse();
+
+    const validReorder = reorderWorkflowSteps(withDependency.draft, [
+      second.stepId,
+      first.stepId,
+      third.stepId,
+    ]);
+    expect(validReorder.changed).toBeTrue();
+    expect(validReorder.draft.steps.map((step) => step.id)).toEqual([
+      second.stepId,
+      first.stepId,
+      third.stepId,
+    ]);
+
+    const removedDependency = removeWorkflowStepDependency(validReorder.draft, third.stepId, first.stepId);
+    expect(removedDependency.changed).toBeTrue();
+    expect(removedDependency.draft.steps.find((step) => step.id === third.stepId)?.dependsOnStepIds).toBeUndefined();
   });
 
   it("supports selecting built-in step types and updating type-specific configs", () => {

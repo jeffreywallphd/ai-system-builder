@@ -28,6 +28,17 @@ export interface WorkflowStudioDraftAuthoringBoundaryProps {
     readonly handoffStatus?: WorkflowStudioHandoffStatus;
     readonly setHandoffStatus?: (status: WorkflowStudioHandoffStatus) => void;
     readonly clearHandoffStatus?: () => void;
+    readonly canvasDrawers?: {
+      readonly left?: {
+        readonly label: string;
+        readonly isOpen: boolean;
+        readonly onClose?: () => void;
+      };
+      readonly right?: {
+        readonly label: string;
+        readonly isOpen: boolean;
+      };
+    };
   };
   readonly invalidModeRouteId?: string;
   readonly invalidWizardPageRouteId?: string;
@@ -65,8 +76,13 @@ export default function WorkflowStudioDraftAuthoringBoundary({
       ) : (
         <WorkflowStudioCanvasModeLayout>
           <WorkflowStudioCanvasModeSurface
+            studioId={workflowModeContext.studioId}
+            sharedDraft={workflowModeContext.sharedDraft}
+            draftValidationIssues={workflowModeContext.draftValidationIssues}
+            onUpdateSharedDraft={workflowModeContext.updateSharedDraft}
             draftEditorContent={workflowModeContext.draftEditorContent}
             onChangeDraftEditorContent={onChangeContent}
+            drawerState={workflowModeContext.canvasDrawers}
           />
         </WorkflowStudioCanvasModeLayout>
       )}

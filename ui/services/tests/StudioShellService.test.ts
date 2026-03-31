@@ -6,6 +6,7 @@ describe("StudioShellService", () => {
     const source = readSource("ui/services/StudioShellService.ts");
 
     expect(source).toContain("resolveDesktopStudioShellBridge");
+    expect(source).toContain("resolveBrowserStudioShellBridgeFallback");
     expect(source).toContain("initializeStudio(");
     expect(source).toContain("loadSnapshot(");
     expect(source).toContain("startSession(");
@@ -15,6 +16,10 @@ describe("StudioShellService", () => {
     expect(source).toContain("transitionLifecycle(");
     expect(source).toContain("publishVersion(");
     expect(source).toContain("validateDraft(");
+    expect(source).toContain("getPersistedWorkflow(");
+    expect(source).toContain("duplicatePersistedWorkflow(");
+    expect(source).toContain("assessWorkflowExecutionReadiness(");
+    expect(source).toContain("runWorkflowDraft(");
     expect(source).toContain("listSystemChildComponents(");
     expect(source).toContain("addSystemChildComponent(");
     expect(source).toContain("removeSystemChildComponent(");

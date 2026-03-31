@@ -379,6 +379,53 @@ function moveStep(
   });
 }
 
+function areStepDependenciesBackwardCompatible(steps: ReadonlyArray<WorkflowDraftStep>): boolean {
+  const indexByStepId = new Map<string, number>();
+  for (let index = 0; index < steps.length; index += 1) {
+    indexByStepId.set(steps[index]!.id, index);
+  }
+
+  for (let index = 0; index < steps.length; index += 1) {
+    const step = steps[index] as WorkflowDraftStep;
+    for (const dependencyStepId of step.dependsOnStepIds ?? []) {
+      const dependencyIndex = indexByStepId.get(dependencyStepId);
+      if (dependencyIndex === undefined) {
+        continue;
+      }
+      if (dependencyIndex >= index) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
+function hasDependencyPath(
+  dependencyMap: ReadonlyMap<string, ReadonlyArray<string>>,
+  startStepId: string,
+  targetStepId: string,
+): boolean {
+  const pending: string[] = [startStepId];
+  const visited = new Set<string>();
+  while (pending.length > 0) {
+    const current = pending.pop() as string;
+    if (current === targetStepId) {
+      return true;
+    }
+    if (visited.has(current)) {
+      continue;
+    }
+    visited.add(current);
+    for (const next of dependencyMap.get(current) ?? []) {
+      if (!visited.has(next)) {
+        pending.push(next);
+      }
+    }
+  }
+  return false;
+}
+
 function resolveStepDefinitionByType(kind: WorkflowDraftStep["kind"], type: string): WorkflowStepTypeDefinition {
   return (workflowStepTypeDefinitions.find((definition) => definition.kind === kind && definition.type === type)
     ?? defaultStepTypeDefinition) as WorkflowStepTypeDefinition;
@@ -575,6 +622,103 @@ export function canMoveWorkflowStep(
 ): boolean {
   const offset = direction === WorkflowStepMoveDirections.up ? -1 : 1;
   return moveStep(draft, stepId, offset).changed;
+}
+
+export function reorderWorkflowSteps(
+  draft: WorkflowDraft,
+  orderedStepIds: ReadonlyArray<string>,
+): { readonly draft: WorkflowDraft; readonly changed: boolean } {
+  if (orderedStepIds.length !== draft.steps.length) {
+    return Object.freeze({ draft, changed: false });
+  }
+
+  const currentOrder = draft.steps.map((step) => step.id);
+  const currentIdSet = new Set(currentOrder);
+  const nextIdSet = new Set(orderedStepIds);
+  if (nextIdSet.size !== orderedStepIds.length || nextIdSet.size !== currentIdSet.size) {
+    return Object.freeze({ draft, changed: false });
+  }
+  for (const stepId of currentIdSet) {
+    if (!nextIdSet.has(stepId)) {
+      return Object.freeze({ draft, changed: false });
+    }
+  }
+
+  const byId = new Map(draft.steps.map((step) => [step.id, step]));
+  const reordered = orderedStepIds.map((stepId) => byId.get(stepId) as WorkflowDraftStep);
+  if (!areControlFlowReferencesForwardOnly(reordered) || !areStepDependenciesBackwardCompatible(reordered)) {
+    return Object.freeze({ draft, changed: false });
+  }
+
+  const unchanged = currentOrder.every((stepId, index) => stepId === orderedStepIds[index]);
+  if (unchanged) {
+    return Object.freeze({ draft, changed: false });
+  }
+
+  return Object.freeze({
+    draft: Object.freeze({
+      ...draft,
+      steps: normalizeStepOrdering(reordered),
+    }),
+    changed: true,
+  });
+}
+
+export function addWorkflowStepDependency(
+  draft: WorkflowDraft,
+  stepId: string,
+  dependsOnStepId: string,
+): { readonly draft: WorkflowDraft; readonly changed: boolean } {
+  if (stepId === dependsOnStepId) {
+    return Object.freeze({ draft, changed: false });
+  }
+
+  const indexByStepId = new Map(draft.steps.map((step, index) => [step.id, index]));
+  const stepIndex = indexByStepId.get(stepId);
+  const dependencyIndex = indexByStepId.get(dependsOnStepId);
+  if (stepIndex === undefined || dependencyIndex === undefined) {
+    return Object.freeze({ draft, changed: false });
+  }
+  if (dependencyIndex >= stepIndex) {
+    return Object.freeze({ draft, changed: false });
+  }
+
+  const dependencyMap = new Map(
+    draft.steps.map((step) => [step.id, step.dependsOnStepIds ?? Object.freeze([])]),
+  );
+  if (hasDependencyPath(dependencyMap, dependsOnStepId, stepId)) {
+    return Object.freeze({ draft, changed: false });
+  }
+
+  return updateStep(draft, stepId, (currentStep) => {
+    const nextDependencies = new Set(currentStep.dependsOnStepIds ?? []);
+    if (nextDependencies.has(dependsOnStepId)) {
+      return currentStep;
+    }
+    nextDependencies.add(dependsOnStepId);
+    return Object.freeze({
+      ...currentStep,
+      dependsOnStepIds: Object.freeze(Array.from(nextDependencies)),
+    });
+  });
+}
+
+export function removeWorkflowStepDependency(
+  draft: WorkflowDraft,
+  stepId: string,
+  dependsOnStepId: string,
+): { readonly draft: WorkflowDraft; readonly changed: boolean } {
+  return updateStep(draft, stepId, (currentStep) => {
+    const currentDependencies = currentStep.dependsOnStepIds ?? Object.freeze([]);
+    if (!currentDependencies.includes(dependsOnStepId)) {
+      return currentStep;
+    }
+    const nextDependencies = currentDependencies.filter((dependencyStepId) => dependencyStepId !== dependsOnStepId);
+    return Object.freeze({
+      ...currentStep,
+      dependsOnStepIds: nextDependencies.length > 0 ? Object.freeze(nextDependencies) : undefined,
+    });
+  });
 }
 
 export function setWorkflowStepType(

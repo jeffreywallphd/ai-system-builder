@@ -2,6 +2,11 @@ import { Link } from "react-router-dom";
 import type { ExploreAssetSummary } from "../../../application/asset-registry/ExploreAssetQueryService";
 import { AssetActionExecutionService, AssetIntentActionTypes } from "../../routes/AssetIntentActions";
 import { ROUTE_PATHS } from "../../routes/RouteConfig";
+import {
+  buildWorkflowStudioDuplicatePath,
+  buildWorkflowStudioOpenExistingPath,
+  buildWorkflowStudioResumeDraftPath,
+} from "../../studio-shell/workflow/WorkflowStudioEntryRouting";
 
 export interface ExploreAssetListProps {
   readonly assets: ReadonlyArray<ExploreAssetSummary>;
@@ -38,6 +43,16 @@ export function ExploreAssetList({ assets, isLoading, error, registryContextQuer
   return (
     <div className="ui-stack ui-stack--sm" data-testid="explore-asset-list">
       {assets.map((asset) => {
+        const isWorkflow = asset.taxonomy?.semanticRole === "workflow";
+        const isPersistedWorkflow = isWorkflow && asset.metadata.sourceType === "workflow-persistence";
+        const workflowOpenPath = isWorkflow
+          ? (asset.status === "draft"
+            ? buildWorkflowStudioResumeDraftPath(asset.id.assetId)
+            : buildWorkflowStudioOpenExistingPath(asset.id.assetId))
+          : undefined;
+        const workflowDuplicatePath = isPersistedWorkflow
+          ? buildWorkflowStudioDuplicatePath(asset.id.assetId)
+          : undefined;
         const actionContext = {
           asset: {
             assetId: asset.id.assetId,
@@ -58,20 +73,38 @@ export function ExploreAssetList({ assets, isLoading, error, registryContextQuer
                 <span className="ui-pill ui-pill--neutral">{asset.primaryLabel}</span>
               </div>
               <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>{asset.id.assetId}</p>
+              {asset.metadata.summary ? (
+                <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>{asset.metadata.summary}</p>
+              ) : null}
               <div className="ui-row ui-row--wrap" style={{ gap: "0.5rem" }}>
                 <span className="ui-pill ui-pill--neutral">{asset.assetKind}</span>
                 {asset.metadata.sourceType ? <span className="ui-pill ui-pill--neutral">source: {asset.metadata.sourceType}</span> : null}
                 <span className="ui-pill ui-pill--neutral">status: {asset.status}</span>
                 {asset.taxonomy?.semanticRole ? <span className="ui-pill ui-pill--neutral">taxonomy: {asset.taxonomy.semanticRole}</span> : null}
+                {(asset.metadata.tags ?? []).map((tag) => (
+                  <span key={`${asset.id.assetId}-tag-${tag}`} className="ui-pill ui-pill--neutral">tag: {tag}</span>
+                ))}
               </div>
               <div className="ui-row ui-row--wrap" style={{ justifyContent: "space-between", alignItems: "center", gap: "0.5rem" }}>
                 <span className="ui-text-small ui-text-secondary">{asset.metadata.dependencyCount} upstream dep(s) • {asset.metadata.versionCount} version(s)</span>
                 <div className="ui-row ui-row--wrap" style={{ gap: "0.5rem" }}>
+                  {workflowOpenPath ? (
+                    <Link className="ui-button ui-button--ghost ui-button--small" to={workflowOpenPath}>
+                      {asset.status === "draft" ? "Resume draft" : "Open workflow"}
+                    </Link>
+                  ) : null}
+                  {workflowDuplicatePath ? (
+                    <Link className="ui-button ui-button--ghost ui-button--small" to={workflowDuplicatePath}>
+                      Duplicate
+                    </Link>
+                  ) : null}
                   {runAction ? <Link className="ui-button ui-button--ghost ui-button--small" to={runAction.launchPath}>Run here</Link> : null}
                   {testAction ? <Link className="ui-button ui-button--ghost ui-button--small" to={testAction.launchPath}>Test here</Link> : null}
-                  <Link className="ui-button ui-button--ghost ui-button--small" to={buildDetailPath(asset.id.assetId, registryContextQuery)}>
-                    View details
-                  </Link>
+                  {!isPersistedWorkflow ? (
+                    <Link className="ui-button ui-button--ghost ui-button--small" to={buildDetailPath(asset.id.assetId, registryContextQuery)}>
+                      View details
+                    </Link>
+                  ) : null}
                 </div>
               </div>
             </div>

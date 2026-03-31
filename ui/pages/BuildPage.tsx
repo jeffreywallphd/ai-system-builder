@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { BuildEntryService, BuildIntents, type BuildIntent } from "../routes/BuildEntry";
+import { PersistedWorkflowEntryService, type PersistedWorkflowEntry } from "../routes/PersistedWorkflowEntryService";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 
 export interface BuildTemplateCard {
@@ -52,8 +53,12 @@ const buildTemplateCards: ReadonlyArray<BuildTemplateCard> = Object.freeze([
 export default function BuildPage(): JSX.Element {
   const navigate = useNavigate();
   const buildEntryService = useMemo(() => new BuildEntryService(), []);
+  const persistedWorkflowEntryService = useMemo(() => new PersistedWorkflowEntryService(), []);
   const model = useMemo(() => buildEntryService.getLandingModel(), [buildEntryService]);
   const [launchError, setLaunchError] = useState<string | undefined>();
+  const [persistedWorkflows, setPersistedWorkflows] = useState<ReadonlyArray<PersistedWorkflowEntry>>([]);
+  const [isPersistedWorkflowsLoading, setIsPersistedWorkflowsLoading] = useState(true);
+  const [persistedWorkflowsError, setPersistedWorkflowsError] = useState<string | undefined>();
 
   const onIntentSelected = (intent: BuildIntent) => {
     setLaunchError(undefined);
@@ -76,6 +81,31 @@ export default function BuildPage(): JSX.Element {
       setLaunchError(message);
     }
   };
+
+  useEffect(() => {
+    let active = true;
+    setIsPersistedWorkflowsLoading(true);
+    void persistedWorkflowEntryService
+      .listEntries(6)
+      .then((response) => {
+        if (!active) {
+          return;
+        }
+        if (!response.ok || !response.data) {
+          setPersistedWorkflows([]);
+          setPersistedWorkflowsError(response.error ?? "Failed to load persisted workflows.");
+          setIsPersistedWorkflowsLoading(false);
+          return;
+        }
+        setPersistedWorkflows(response.data);
+        setPersistedWorkflowsError(undefined);
+        setIsPersistedWorkflowsLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [persistedWorkflowEntryService]);
 
   return (
     <section className="ui-page ui-stack ui-stack--lg ui-build-landing" data-testid="build-landing-page">
@@ -119,6 +149,48 @@ export default function BuildPage(): JSX.Element {
               </div>
             </article>
           ))}
+        </div>
+      </section>
+
+      <section className="ui-stack ui-stack--md" aria-labelledby="build-persisted-workflow-heading">
+        <h2 id="build-persisted-workflow-heading" className="ui-build-landing__templates-title">Reuse a Saved Workflow</h2>
+        <div className="ui-card">
+          <div className="ui-card__body ui-stack ui-stack--sm">
+            {isPersistedWorkflowsLoading ? <p className="ui-text-secondary">Loading saved workflows...</p> : null}
+            {!isPersistedWorkflowsLoading && persistedWorkflowsError ? <p role="alert">{persistedWorkflowsError}</p> : null}
+            {!isPersistedWorkflowsLoading && !persistedWorkflowsError && persistedWorkflows.length === 0 ? (
+              <p className="ui-text-secondary">No persisted workflows are available yet. Start a new workflow from Build or Explore.</p>
+            ) : null}
+            {!isPersistedWorkflowsLoading && !persistedWorkflowsError && persistedWorkflows.length > 0 ? (
+              <div className="ui-stack ui-stack--xs" data-testid="build-persisted-workflow-list">
+                {persistedWorkflows.map((workflow) => (
+                  <article key={workflow.workflowId} className="ui-card ui-card--interactive">
+                    <div className="ui-card__body ui-stack ui-stack--2xs">
+                      <div className="ui-row ui-row--between ui-row--wrap">
+                        <strong>{workflow.displayName}</strong>
+                        <span className="ui-badge ui-badge--neutral">{workflow.status}</span>
+                      </div>
+                      <p className="ui-text-small ui-text-secondary">{workflow.workflowId}</p>
+                      {workflow.summary ? <p className="ui-text-small ui-text-secondary">{workflow.summary}</p> : null}
+                      <div className="ui-row ui-row--wrap">
+                        <Link
+                          className="ui-button ui-button--secondary ui-button--small"
+                          to={persistedWorkflowEntryService.buildWorkflowStudioOpenPath(workflow)}
+                        >
+                          {workflow.status === "draft" ? "Resume in Workflow Studio" : "Open in Workflow Studio"}
+                        </Link>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : null}
+            <div className="ui-row ui-row--wrap">
+              <Link className="ui-button ui-button--ghost ui-button--small" to={ROUTE_PATHS.explore}>
+                Browse more in Explore
+              </Link>
+            </div>
+          </div>
         </div>
       </section>
     </section>
