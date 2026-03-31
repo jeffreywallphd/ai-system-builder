@@ -7,10 +7,7 @@ import {
   type DataAssetRegistryEntry,
 } from "../../../application/dataset-studio/DataAssetRegistry";
 import {
-  DataAssetConfigFieldKinds,
-  createDataAssetConfigSchema,
   resolveDataAssetConfigDefaults,
-  type DataAssetConfigSchema,
 } from "../../../application/dataset-studio/DataAssetConfiguration";
 import {
   DefaultDataAssetExecutionFramework,
@@ -25,6 +22,14 @@ import {
   validateDataAssetConfigValues,
   type DataStudioValidationIssue,
 } from "../../../application/dataset-studio/DataStudioValidation";
+import {
+  CsvIngestorAsset,
+  createCsvIngestorConfigSchema,
+} from "../../../application/dataset-studio/CsvIngestorAsset";
+import {
+  JsonIngestorAsset,
+  createJsonIngestorConfigSchema,
+} from "../../../application/dataset-studio/JsonIngestorAsset";
 import AssetConfigurationPanel from "./AssetConfigurationPanel";
 import DataPreviewPanel from "./DataPreviewPanel";
 
@@ -35,30 +40,22 @@ export interface DatasetStudioDraftPreviewPanelProps {
   readonly draftContent?: string;
 }
 
-function toNumberOr(input: CanonicalRecordValue | undefined, fallback: number): number {
-  return typeof input === "number" && Number.isFinite(input)
-    ? input
-    : fallback;
-}
-
-function toBooleanOr(input: CanonicalRecordValue | undefined, fallback: boolean): boolean {
-  return typeof input === "boolean" ? input : fallback;
-}
-
-function toFormatHint(input: CanonicalRecordValue | undefined): "json" | "csv" | "tsv" | "text" {
-  if (input === "csv" || input === "tsv" || input === "text") {
-    return input;
-  }
-
-  return "json";
-}
-
 function toDelimiter(input: CanonicalRecordValue | undefined): "," | "\t" | ";" | "|" {
   if (input === "\t" || input === ";" || input === "|") {
     return input;
   }
 
   return ",";
+}
+
+function toHeader(input: CanonicalRecordValue | undefined): boolean | "auto" {
+  if (input === "true" || input === true) {
+    return true;
+  }
+  if (input === "false" || input === false) {
+    return false;
+  }
+  return "auto";
 }
 
 function createPreviewAsset(input: {
@@ -80,103 +77,49 @@ function createPreviewAsset(input: {
   });
 }
 
-function buildPreviewAssetSchema(assetId: string): DataAssetConfigSchema {
-  return createDataAssetConfigSchema({
-    schemaId: `data-asset.${assetId}.preview-config`,
-    version: "1.0.0",
-    fields: Object.freeze([
-      {
-        key: "formatHint",
-        label: "Input format",
-        kind: DataAssetConfigFieldKinds.select,
-        description: "How draft content should be parsed before canonical conversion.",
-        required: true,
-        defaultValue: "json",
-        options: Object.freeze([
-          { value: "json", label: "JSON" },
-          { value: "csv", label: "CSV" },
-          { value: "tsv", label: "TSV" },
-          { value: "text", label: "Text" },
-        ]),
-      },
-      {
-        key: "delimiter",
-        label: "Delimiter",
-        kind: DataAssetConfigFieldKinds.select,
-        required: true,
-        defaultValue: ",",
-        options: Object.freeze([
-          { value: ",", label: "Comma" },
-          { value: "\t", label: "Tab" },
-          { value: ";", label: "Semicolon" },
-          { value: "|", label: "Pipe" },
-        ]),
-      },
-      {
-        key: "hasHeaderRow",
-        label: "Header row",
-        kind: DataAssetConfigFieldKinds.boolean,
-        description: "Treat the first row as column headers for delimited sources.",
-        defaultValue: true,
-      },
-      {
-        key: "previewMaxItems",
-        label: "Preview max items",
-        kind: DataAssetConfigFieldKinds.number,
-        min: 1,
-        max: 200,
-        required: true,
-        defaultValue: 12,
-      },
-      {
-        key: "previewMaxColumns",
-        label: "Preview max columns",
-        kind: DataAssetConfigFieldKinds.number,
-        min: 1,
-        max: 80,
-        required: true,
-        defaultValue: 10,
-      },
-      {
-        key: "previewMaxTextLength",
-        label: "Preview max text length",
-        kind: DataAssetConfigFieldKinds.number,
-        min: 32,
-        max: 4000,
-        required: true,
-        defaultValue: 320,
-      },
-    ]),
-  });
-}
-
 function createRegistry(input: {
   readonly draftId?: string;
   readonly draftAssetId?: string;
   readonly draftTitle?: string;
 }): DataAssetRegistry {
   const registry = new DataAssetRegistry();
-  const assetId = input.draftAssetId ?? `dataset-preview-${input.draftId ?? "draft"}`;
-  const title = input.draftTitle ?? "Dataset Draft Preview";
-  const configSchema = buildPreviewAssetSchema(assetId);
-  const baseConfig = resolveDataAssetConfigDefaults(configSchema);
+  const suffix = input.draftAssetId ?? `dataset-preview-${input.draftId ?? "draft"}`;
+  registry.register({
+    asset: createPreviewAsset({
+      assetId: CsvIngestorAsset.assetId,
+      title: "CSV Ingestor",
+      config: resolveDataAssetConfigDefaults(createCsvIngestorConfigSchema(`${suffix}-csv`)),
+    }),
+    specialization: DataAssetRegistrySpecializations.ingestion,
+    display: {
+      title: "CSV Ingestor",
+      summary: "Schema-driven CSV ingestion and canonical records preview.",
+      tags: ["dataset", "preview", "csv", "ingestion"],
+    },
+    configSchema: createCsvIngestorConfigSchema(`${suffix}-csv`),
+    assetFactory: (config) => createPreviewAsset({
+      assetId: CsvIngestorAsset.assetId,
+      title: "CSV Ingestor",
+      config,
+    }),
+  });
 
   registry.register({
     asset: createPreviewAsset({
-      assetId,
-      title,
-      config: baseConfig,
+      assetId: JsonIngestorAsset.assetId,
+      title: "JSON Ingestor",
+      config: resolveDataAssetConfigDefaults(createJsonIngestorConfigSchema(`${suffix}-json`)),
     }),
-    specialization: DataAssetRegistrySpecializations.converter,
+    specialization: DataAssetRegistrySpecializations.ingestion,
     display: {
-      title,
-      summary: "Schema-driven converter execution for draft preview.",
-      tags: ["dataset", "preview", "converter"],
+      title: "JSON Ingestor",
+      summary: "Schema-driven JSON ingestion and canonical records preview.",
+      tags: ["dataset", "preview", "json", "ingestion"],
     },
-    configSchema,
+    configSchema: createJsonIngestorConfigSchema(`${suffix}-json`),
     assetFactory: (config) => createPreviewAsset({
-      assetId,
-      title,
+      assetId: JsonIngestorAsset.assetId,
+      title: "JSON Ingestor",
       config,
     }),
   });
@@ -269,6 +212,8 @@ export default function DatasetStudioDraftPreviewPanel({
           return;
         }
 
+        const header = toHeader(appliedConfig.header);
+
         const result = await executionFramework.execute({
           asset: resolvedAsset,
           input: {
@@ -276,17 +221,21 @@ export default function DatasetStudioDraftPreviewPanel({
             source: {
               kind: DataSourceReferenceKinds.inMemory,
               payload: content,
-              formatHint: toFormatHint(appliedConfig.formatHint),
+              formatHint: selectedAssetId === CsvIngestorAsset.assetId ? "csv" : "json",
             },
-            formatHint: toFormatHint(appliedConfig.formatHint),
+            formatHint: selectedAssetId === CsvIngestorAsset.assetId ? "csv" : "json",
             delimiter: toDelimiter(appliedConfig.delimiter),
-            hasHeaderRow: toBooleanOr(appliedConfig.hasHeaderRow, true),
+            header,
+            hasHeaderRow: header === "auto" ? undefined : header,
+            encoding: typeof appliedConfig.encoding === "string" ? appliedConfig.encoding : "utf-8",
+            skipEmptyLines: typeof appliedConfig.skipEmptyLines === "boolean" ? appliedConfig.skipEmptyLines : true,
+            normalizeHeadersToLowercase: typeof appliedConfig.normalizeHeadersToLowercase === "boolean"
+              ? appliedConfig.normalizeHeadersToLowercase
+              : false,
+            flatten: typeof appliedConfig.flatten === "boolean" ? appliedConfig.flatten : false,
+            maxDepth: typeof appliedConfig.maxDepth === "number" ? appliedConfig.maxDepth : undefined,
           },
-          previewOptions: {
-            maxItems: toNumberOr(appliedConfig.previewMaxItems, 12),
-            maxColumns: toNumberOr(appliedConfig.previewMaxColumns, 10),
-            maxTextLength: toNumberOr(appliedConfig.previewMaxTextLength, 320),
-          },
+          previewOptions: { maxItems: 25, maxColumns: 12, maxTextLength: 320 },
           requestedBy: "dataset-studio-preview-panel",
           context: {
             operationId: draftId ? `preview-${draftId}` : "preview-draft",

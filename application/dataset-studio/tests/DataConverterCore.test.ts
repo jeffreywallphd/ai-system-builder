@@ -36,6 +36,54 @@ describe("DataConverterCore", () => {
     expect(table.rows[0].sourceRecordId).toBe("record-1");
   });
 
+  it("ingests CSV with header auto-detection and configurable normalization", () => {
+    const converter = new DataConverterCore();
+    const result = converter.convert({
+      operation: DataConverterOperationKinds.sourceToRecords,
+      source: {
+        kind: DataSourceReferenceKinds.inMemory,
+        reference: "in-memory",
+        payload: " Name , Score \nAda,10\nLin,8",
+        formatHint: "csv",
+        diagnostics: Object.freeze([]),
+      },
+      header: "auto",
+      normalizeHeadersToLowercase: true,
+      skipEmptyLines: true,
+    });
+
+    expect(result.ok).toBeTrue();
+    if (!result.ok) {
+      throw new Error("Expected successful CSV ingestion.");
+    }
+    expect(result.output.kind).toBe("records");
+    expect(result.output.records[0]?.fields.name).toBe("Ada");
+    expect(result.output.records[0]?.fields.score).toBe("10");
+  });
+
+  it("ingests JSON with optional flattening", () => {
+    const converter = new DataConverterCore();
+    const result = converter.convert({
+      operation: DataConverterOperationKinds.sourceToRecords,
+      source: {
+        kind: DataSourceReferenceKinds.inMemory,
+        reference: "in-memory",
+        payload: JSON.stringify([{ user: { name: "Ada", profile: { level: 3 } } }]),
+        formatHint: "json",
+        diagnostics: Object.freeze([]),
+      },
+      flatten: true,
+      maxDepth: 4,
+    });
+
+    expect(result.ok).toBeTrue();
+    if (!result.ok) {
+      throw new Error("Expected successful JSON ingestion.");
+    }
+    expect(result.output.records[0]?.fields["user.name"]).toBe("Ada");
+    expect(result.output.records[0]?.fields["user.profile.level"]).toBe(3);
+  });
+
   it("converts documents into text items with line chunking", () => {
     const converter = new DataConverterCore();
     const textItems = converter.convertDocumentToTextItems({
@@ -132,6 +180,24 @@ describe("DataConverterCore", () => {
       expect(error instanceof DataConverterError).toBe(true);
       expect((error as DataConverterError).code).toBe("invalid_input");
     }
+  });
+
+  it("returns structured diagnostics for malformed CSV payloads", () => {
+    const converter = new DataConverterCore();
+    const result = converter.convert({
+      operation: DataConverterOperationKinds.sourceToRecords,
+      source: {
+        kind: DataSourceReferenceKinds.inMemory,
+        reference: "in-memory",
+        payload: "name,score\n\"unterminated,10",
+        formatHint: "csv",
+        diagnostics: Object.freeze([]),
+      },
+      header: true,
+    });
+
+    expect(result.ok).toBeFalse();
+    expect(result.diagnostics[0]?.code).toBe("parse_failed");
   });
 
   it("returns contract-level validation diagnostics for invalid requests", () => {

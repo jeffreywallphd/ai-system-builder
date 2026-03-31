@@ -76,6 +76,12 @@ export interface DataConverterSourceToRecordsRequest extends DataConverterReques
   readonly formatHint?: "json" | "csv" | "tsv" | "text";
   readonly delimiter?: "," | "\t" | ";" | "|";
   readonly hasHeaderRow?: boolean;
+  readonly header?: boolean | "auto";
+  readonly encoding?: string;
+  readonly skipEmptyLines?: boolean;
+  readonly normalizeHeadersToLowercase?: boolean;
+  readonly flatten?: boolean;
+  readonly maxDepth?: number;
 }
 
 export interface DataConverterRecordsToTableRequest extends DataConverterRequestBase {
