@@ -8,13 +8,13 @@ describe("DataStudio sample assets harness", () => {
   it("registers sample assets with metadata/version descriptors and config schemas", () => {
     const { entries, registry } = registerDataStudioSampleAssets();
 
-    expect(entries).toHaveLength(5);
+    expect(entries).toHaveLength(7);
     expect(entries.every((entry) => entry.descriptor.version.scheme === "semantic")).toBeTrue();
     expect(entries.every((entry) => entry.descriptor.contracts.contractVersion === "1.0.0")).toBeTrue();
     expect(entries.every((entry) => entry.descriptor.capabilities.previewable)).toBeTrue();
-    expect(registry.list({ executable: true })).toHaveLength(5);
+    expect(registry.list({ executable: true })).toHaveLength(7);
     expect(registry.list({ specialization: "ingestion" }).map((entry) => entry.descriptor.assetId))
-      .toEqual(["csv-ingestor", "json-ingestor"]);
+      .toEqual(["csv-ingestor", "image-ingestor-v1", "json-ingestor", "document-pdf-ingestor"]);
   });
 
   it("executes source-reference -> records flow with lineage + preview + source locator integration", async () => {
