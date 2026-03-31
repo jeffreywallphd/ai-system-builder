@@ -158,3 +158,23 @@ Not implemented in this slice:
   - bounded nested-system summaries,
   - bounded diagnostics summary + entries.
 - Serializer behavior is intentionally thin over existing runtime result truth and does not re-derive execution business logic.
+
+## Direction 5 extension update: Core transformation assets foundation (stories 16.1-16.2)
+
+- Dataset Studio now has a dedicated transformation-asset seam in `application/dataset-studio/core/data/transformation/*` with explicit contracts:
+  - `ITransformationAsset`
+  - `ITransformationInput`
+  - `ITransformationOutput`
+  - `ITransformationConfig`
+- Transformation assets are zod-validated end-to-end (input/config/output) and run through a shared base class (`BaseTransformationAsset`) with:
+  - config/input/output validation,
+  - async execution handling,
+  - preview sampling support over canonical records/table shapes,
+  - bounded execution error wrapping.
+- A dedicated transformation registry seam (`TransformationAssetRegistry` + `registerTransformationAssets`) now provides deterministic registration/lookup/listing for pipeline composition.
+- Initial transformation implementation now includes `SchemaInferenceAsset`:
+  - sample-based inference over canonical records/table inputs,
+  - strict/permissive mixed-type resolution,
+  - inferred field type + nullability + lightweight stats,
+  - categorical vs free-text heuristic for string fields,
+  - preview outputs that include inferred schema plus sampled rows.
