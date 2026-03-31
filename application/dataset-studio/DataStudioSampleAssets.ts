@@ -11,6 +11,16 @@ import {
   type DataAssetRegistryEntry,
 } from "./DataAssetRegistry";
 import {
+  CsvIngestorAsset,
+  createCsvIngestorConfigSchema,
+  createCsvIngestorDataAsset,
+} from "./CsvIngestorAsset";
+import {
+  JsonIngestorAsset,
+  createJsonIngestorConfigSchema,
+  createJsonIngestorDataAsset,
+} from "./JsonIngestorAsset";
+import {
   DataAssetConfigFieldKinds,
   createDataAssetConfigSchema,
   type DataAssetConfigSchema,
@@ -241,6 +251,8 @@ export function registerDataStudioSampleAssets(
   const recordsSchema = createRecordsConverterConfigSchema("sample-records-converter");
   const documentSchema = createDocumentConfigSchema("sample-document-text");
   const imageSchema = createImageConfigSchema("sample-image-metadata");
+  const csvIngestorSchema = createCsvIngestorConfigSchema(CsvIngestorAsset.assetId);
+  const jsonIngestorSchema = createJsonIngestorConfigSchema(JsonIngestorAsset.assetId);
 
   const recordsEntry = registry.register({
     asset: createRecordsConverterAsset({
@@ -289,8 +301,40 @@ export function registerDataStudioSampleAssets(
     assetFactory: (config) => createImageMetadataAsset(config),
   });
 
+  const csvIngestorEntry = registry.register({
+    asset: createCsvIngestorDataAsset({
+      delimiter: ",",
+      header: "auto",
+      encoding: "utf-8",
+      skipEmptyLines: true,
+      normalizeHeadersToLowercase: false,
+    }),
+    specialization: DataAssetRegistrySpecializations.ingestion,
+    display: {
+      title: "CSV Ingestor",
+      summary: "Ingests CSV and normalizes records for canonical conversion.",
+      tags: ["ingestion", "csv"],
+    },
+    configSchema: csvIngestorSchema,
+    assetFactory: (config) => createCsvIngestorDataAsset(config),
+  });
+
+  const jsonIngestorEntry = registry.register({
+    asset: createJsonIngestorDataAsset({
+      flatten: false,
+    }),
+    specialization: DataAssetRegistrySpecializations.ingestion,
+    display: {
+      title: "JSON Ingestor",
+      summary: "Ingests JSON object/array payloads into canonical records.",
+      tags: ["ingestion", "json"],
+    },
+    configSchema: jsonIngestorSchema,
+    assetFactory: (config) => createJsonIngestorDataAsset(config),
+  });
+
   return Object.freeze({
     registry,
-    entries: Object.freeze([recordsEntry, documentEntry, imageEntry]),
+    entries: Object.freeze([recordsEntry, documentEntry, imageEntry, csvIngestorEntry, jsonIngestorEntry]),
   });
 }

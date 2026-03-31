@@ -69,6 +69,12 @@ export type DataAssetExecutionInput =
     readonly formatHint?: "json" | "csv" | "tsv" | "text";
     readonly delimiter?: "," | "\t" | ";" | "|";
     readonly hasHeaderRow?: boolean;
+    readonly header?: boolean | "auto";
+    readonly encoding?: string;
+    readonly skipEmptyLines?: boolean;
+    readonly normalizeHeadersToLowercase?: boolean;
+    readonly flatten?: boolean;
+    readonly maxDepth?: number;
   }
   | {
     readonly kind: "resolved-source";
@@ -76,6 +82,12 @@ export type DataAssetExecutionInput =
     readonly formatHint?: "json" | "csv" | "tsv" | "text";
     readonly delimiter?: "," | "\t" | ";" | "|";
     readonly hasHeaderRow?: boolean;
+    readonly header?: boolean | "auto";
+    readonly encoding?: string;
+    readonly skipEmptyLines?: boolean;
+    readonly normalizeHeadersToLowercase?: boolean;
+    readonly flatten?: boolean;
+    readonly maxDepth?: number;
   }
   | {
     readonly kind: "converter-request";
@@ -515,6 +527,12 @@ export class DefaultDataAssetExecutionFramework {
         formatHint: input.formatHint,
         delimiter: input.delimiter,
         hasHeaderRow: input.hasHeaderRow,
+        header: input.header,
+        encoding: input.encoding,
+        skipEmptyLines: input.skipEmptyLines,
+        normalizeHeadersToLowercase: input.normalizeHeadersToLowercase,
+        flatten: input.flatten,
+        maxDepth: input.maxDepth,
       });
       steps.push(createDataLineageExecutionStep({
         stepId: "step-resolve-source",
@@ -544,6 +562,12 @@ export class DefaultDataAssetExecutionFramework {
         formatHint: input.formatHint,
         delimiter: input.delimiter,
         hasHeaderRow: input.hasHeaderRow,
+        header: input.header,
+        encoding: input.encoding,
+        skipEmptyLines: input.skipEmptyLines,
+        normalizeHeadersToLowercase: input.normalizeHeadersToLowercase,
+        flatten: input.flatten,
+        maxDepth: input.maxDepth,
       });
       steps.push(createDataLineageExecutionStep({
         stepId: "step-convert",

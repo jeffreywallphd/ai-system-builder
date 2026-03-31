@@ -1175,10 +1175,12 @@ Explicitly later than this scope:
 
 ## Direction 5 update: Data Studio sample-asset test harness (story 13.14)
 
-- Data Studio now includes a reusable sample-asset harness in `application/dataset-studio/DataStudioSampleAssets.ts` with three representative assets:
+- Data Studio now includes a reusable sample-asset harness in `application/dataset-studio/DataStudioSampleAssets.ts` with representative assets across conversion, preview, transformation, and ingestion:
   - records converter sample,
   - document text-items sample,
-  - image metadata records sample.
+  - image metadata records sample,
+  - CSV ingestor sample,
+  - JSON ingestor sample.
 - The harness registers assets through the existing `DataAssetRegistry` with schema-driven configuration, specialization metadata, and versioned metadata descriptors.
 - End-to-end harness coverage is now implemented in `application/dataset-studio/tests/DataStudioSampleAssetsHarness.test.ts` and validates:
   - source reference resolution + converter operations,
@@ -1190,3 +1192,24 @@ Explicitly later than this scope:
 - Scope remains intentionally bounded:
   - harness assets are deterministic and in-memory,
   - no separate testing runtime or production ingestion pipeline was introduced.
+
+## Direction 5 update: CSV + JSON ingestor assets (stories 14.1-14.2)
+
+- Data Studio now has first-class ingestion assets for CSV and JSON in:
+  - `application/dataset-studio/CsvIngestorAsset.ts`
+  - `application/dataset-studio/JsonIngestorAsset.ts`
+- Each ingestor now includes explicit contract descriptors, schema-driven config contracts (zod runtime validation + UI config schema), deterministic execute behavior, and bounded preview behavior with inferred field schema summaries.
+- CSV ingestion now uses `csv-parse` with bounded config options:
+  - delimiter,
+  - header mode (`true`/`false`/`auto`),
+  - encoding,
+  - skip-empty-lines,
+  - optional lowercase header normalization.
+- JSON ingestion now supports:
+  - object-array ingestion and single-object wrapping,
+  - optional dot-notation flattening with optional max-depth bounds.
+- `DataConverterCore` now routes `source-to-records` conversion through these ingestion assets so execution/preview flows stay canonical-shape aligned.
+- Data Studio sample registry + draft preview asset selection now include ingestion-specialized CSV/JSON assets with schema-driven config forms.
+- Scope remains bounded:
+  - no separate ingestion orchestration runtime,
+  - ingestion remains a composable records-boundary seam for downstream conversion/preview.

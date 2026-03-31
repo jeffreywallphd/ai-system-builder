@@ -35,6 +35,8 @@ import {
   type ResolvedDataSource,
 } from "./DataConverterContracts";
 import { DefaultDataSourceLocator, DataSourceLocatorError, type IDataSourceLocator } from "./DataSourceLocator";
+import { CsvIngestorAsset } from "./CsvIngestorAsset";
+import { JsonIngestorAsset } from "./JsonIngestorAsset";
 import {
   hasErrorIssues,
   toDataConverterDiagnostics,
@@ -173,31 +175,6 @@ function normalizeStringContent(content: string | Uint8Array): string {
   return new TextDecoder().decode(content).replace(/\r\n/g, "\n");
 }
 
-function parseDelimitedContent(content: string, delimiter: string, hasHeaderRow: boolean): ReadonlyArray<Readonly<Record<string, unknown>>> {
-  const lines = content.split("\n").map((line) => line.trim()).filter((line) => line.length > 0);
-  if (lines.length === 0) {
-    return Object.freeze([]);
-  }
-
-  const splitRow = (line: string) => line.split(delimiter).map((cell) => cell.trim());
-  const firstRow = splitRow(lines[0]);
-  const columns = hasHeaderRow
-    ? firstRow.map((value, index) => value || `column_${index + 1}`)
-    : firstRow.map((_, index) => `column_${index + 1}`);
-  const dataRows = hasHeaderRow ? lines.slice(1) : lines;
-
-  const parsed = dataRows.map((line) => {
-    const cells = splitRow(line);
-    const record: Record<string, unknown> = {};
-    columns.forEach((column, index) => {
-      record[column] = cells[index] ?? "";
-    });
-    return Object.freeze(record);
-  });
-
-  return Object.freeze(parsed);
-}
-
 function toRecordItems(records: ReadonlyArray<Readonly<Record<string, unknown>>>): ReadonlyArray<CanonicalRecordItem> {
   return Object.freeze(records.map((record, index) => {
     const fields = Object.fromEntries(
@@ -209,54 +186,6 @@ function toRecordItems(records: ReadonlyArray<Readonly<Record<string, unknown>>>
       fields: Object.freeze(fields),
     });
   }));
-}
-
-function parseStructuredContent(content: string): ReadonlyArray<Readonly<Record<string, unknown>>> {
-  const trimmed = content.trim();
-  if (!trimmed) {
-    return Object.freeze([]);
-  }
-
-  const looksLikeJson = trimmed.startsWith("{") || trimmed.startsWith("[");
-  if (!looksLikeJson) {
-    throw new DataConverterError(
-      DataConverterErrorCodes.unsupportedContent,
-      "String payload does not look like JSON or delimited text.",
-    );
-  }
-
-  try {
-    const parsed = JSON.parse(trimmed) as unknown;
-    if (Array.isArray(parsed)) {
-      const records = parsed.filter((entry) => entry && typeof entry === "object") as ReadonlyArray<Readonly<Record<string, unknown>>>;
-      if (records.length !== parsed.length) {
-        throw new DataConverterError(
-          DataConverterErrorCodes.parseFailed,
-          "JSON array payload must contain only object records.",
-        );
-      }
-      return Object.freeze(records.map((entry) => Object.freeze({ ...entry })));
-    }
-
-    if (parsed && typeof parsed === "object") {
-      return Object.freeze([Object.freeze(parsed as Readonly<Record<string, unknown>>)]);
-    }
-
-    throw new DataConverterError(
-      DataConverterErrorCodes.parseFailed,
-      "JSON payload must be an object or array of objects.",
-    );
-  } catch (error) {
-    if (error instanceof DataConverterError) {
-      throw error;
-    }
-
-    throw new DataConverterError(
-      DataConverterErrorCodes.parseFailed,
-      "Failed to parse JSON payload for record conversion.",
-      { cause: error instanceof Error ? error.message : String(error) },
-    );
-  }
 }
 
 function inferValueType(value: CanonicalRecordValue): "string" | "number" | "boolean" | "object" | "array" | "null" | "unknown" {
@@ -340,6 +269,8 @@ function buildFailureResult(
 export class DataConverterCore {
   private static readonly converterId = "dataset-studio-data-converter-core";
   private static readonly converterVersion = "1.0.0";
+  private readonly csvIngestor = new CsvIngestorAsset();
+  private readonly jsonIngestor = new JsonIngestorAsset();
 
   constructor(private readonly sourceLocator: IDataSourceLocator = new DefaultDataSourceLocator()) {}
 
@@ -429,6 +360,12 @@ export class DataConverterCore {
     readonly delimiter?: "," | "\t" | ";" | "|";
     readonly hasHeaderRow?: boolean;
     readonly formatHint?: "json" | "csv" | "tsv" | "text";
+    readonly header?: boolean | "auto";
+    readonly encoding?: string;
+    readonly skipEmptyLines?: boolean;
+    readonly normalizeHeadersToLowercase?: boolean;
+    readonly flatten?: boolean;
+    readonly maxDepth?: number;
   }): Promise<DataConverterResult> {
     const context = normalizeDataConverterContext(input.context);
     try {
@@ -440,6 +377,12 @@ export class DataConverterCore {
         delimiter: input.delimiter,
         hasHeaderRow: input.hasHeaderRow,
         formatHint: input.formatHint,
+        header: input.header,
+        encoding: input.encoding,
+        skipEmptyLines: input.skipEmptyLines,
+        normalizeHeadersToLowercase: input.normalizeHeadersToLowercase,
+        flatten: input.flatten,
+        maxDepth: input.maxDepth,
       });
     } catch (error) {
       if (error instanceof DataSourceLocatorError) {
@@ -489,6 +432,9 @@ export class DataConverterCore {
       formatHint: input.formatHint,
       delimiter: input.delimiter,
       hasHeaderRow: input.hasHeaderRow,
+      encoding: "utf-8",
+      skipEmptyLines: true,
+      header: input.hasHeaderRow,
     });
 
     const result = this.convert(request);
@@ -569,35 +515,111 @@ export class DataConverterCore {
     }
 
     let recordSource: ReadonlyArray<Readonly<Record<string, unknown>>>;
+    const diagnostics: DataConverterDiagnostic[] = [...source.diagnostics];
     const formatHint = (request.formatHint ?? source.formatHint)?.toLowerCase();
     const delimiter = request.delimiter ?? (formatHint === "tsv" ? "\t" : ",");
 
-    if (Array.isArray(source.payload)) {
-      recordSource = Object.freeze(source.payload.map((entry) => Object.freeze({ ...entry })));
-    } else if (source.payload instanceof Uint8Array) {
-      const normalizedText = normalizeStringContent(source.payload);
-      if (!normalizedText.trim()) {
-        throw new DataConverterError(DataConverterErrorCodes.invalidInput, "Resolved source content cannot be empty.");
+    if (
+      source.payload !== null
+      && typeof source.payload === "object"
+      && !Array.isArray(source.payload)
+      && !(source.payload instanceof Uint8Array)
+    ) {
+      const jsonResult = this.jsonIngestor.execute({
+        payload: Object.freeze({ ...source.payload }),
+        config: {
+          flatten: request.flatten ?? false,
+          maxDepth: request.maxDepth,
+        },
+      });
+      if (!jsonResult.ok) {
+        throw new DataConverterError(
+          DataConverterErrorCodes.parseFailed,
+          jsonResult.diagnostics[0]?.message ?? "JSON ingestion failed.",
+          { diagnostics: jsonResult.diagnostics },
+        );
       }
-      if (formatHint === "csv" || formatHint === "tsv" || formatHint === "text") {
-        recordSource = parseDelimitedContent(normalizedText, delimiter, request.hasHeaderRow ?? true);
-      } else {
-        recordSource = parseStructuredContent(normalizedText);
+      recordSource = jsonResult.records;
+    } else if (Array.isArray(source.payload)) {
+      const jsonResult = this.jsonIngestor.execute({
+        payload: source.payload,
+        config: {
+          flatten: request.flatten ?? false,
+          maxDepth: request.maxDepth,
+        },
+      });
+      if (!jsonResult.ok) {
+        throw new DataConverterError(
+          DataConverterErrorCodes.parseFailed,
+          jsonResult.diagnostics[0]?.message ?? "JSON ingestion failed.",
+          { diagnostics: jsonResult.diagnostics },
+        );
       }
-    } else if (typeof source.payload === "string") {
+      recordSource = jsonResult.records;
+    } else if (source.payload instanceof Uint8Array || typeof source.payload === "string") {
       const normalizedText = normalizeStringContent(source.payload);
       if (!normalizedText.trim()) {
         throw new DataConverterError(DataConverterErrorCodes.invalidInput, "Resolved source content cannot be empty.");
       }
       const looksLikeJson = normalizedText.trim().startsWith("{") || normalizedText.trim().startsWith("[");
-      const looksLikeDelimited = normalizedText.includes("\n") && normalizedText.includes(delimiter);
-      if (formatHint === "csv" || formatHint === "tsv" || formatHint === "text" || (!looksLikeJson && looksLikeDelimited)) {
-        recordSource = parseDelimitedContent(normalizedText, delimiter, request.hasHeaderRow ?? true);
+      const shouldTreatAsDelimited = formatHint === "csv"
+        || formatHint === "tsv"
+        || formatHint === "text"
+        || (!looksLikeJson && normalizedText.includes(delimiter));
+
+      if (shouldTreatAsDelimited) {
+        const csvResult = this.csvIngestor.execute({
+          payload: source.payload,
+          fileName: source.fileName,
+          sourceAssetId: source.sourceAssetId,
+          sourceVersionId: source.sourceVersionId,
+          config: {
+            delimiter,
+            header: request.header ?? request.hasHeaderRow ?? "auto",
+            encoding: request.encoding ?? "utf-8",
+            skipEmptyLines: request.skipEmptyLines ?? true,
+            normalizeHeadersToLowercase: request.normalizeHeadersToLowercase ?? false,
+          },
+        });
+        if (!csvResult.ok) {
+          throw new DataConverterError(
+            DataConverterErrorCodes.parseFailed,
+            csvResult.diagnostics[0]?.message ?? "CSV ingestion failed.",
+            { diagnostics: csvResult.diagnostics },
+          );
+        }
+        diagnostics.push(...csvResult.diagnostics.map((entry) => createDataConverterDiagnostic({
+          code: entry.code,
+          severity: DataConverterDiagnosticSeverities.warning,
+          message: entry.message,
+          path: entry.path,
+          details: entry.details,
+        })));
+        recordSource = csvResult.records;
       } else {
-        recordSource = parseStructuredContent(normalizedText);
+        const jsonResult = this.jsonIngestor.execute({
+          payload: source.payload,
+          config: {
+            flatten: request.flatten ?? false,
+            maxDepth: request.maxDepth,
+          },
+        });
+        if (!jsonResult.ok) {
+          throw new DataConverterError(
+            DataConverterErrorCodes.parseFailed,
+            jsonResult.diagnostics[0]?.message ?? "JSON ingestion failed.",
+            { diagnostics: jsonResult.diagnostics },
+          );
+        }
+        diagnostics.push(...jsonResult.diagnostics.map((entry) => createDataConverterDiagnostic({
+          code: entry.code,
+          severity: DataConverterDiagnosticSeverities.warning,
+          message: entry.message,
+          path: entry.path,
+          details: entry.details,
+        })));
+        recordSource = jsonResult.records;
       }
-    } else if (typeof source.payload === "object") {
-      recordSource = Object.freeze([Object.freeze({ ...source.payload })]);
     } else {
       throw new DataConverterError(DataConverterErrorCodes.unsupportedContent, "Unsupported resolved source payload type.");
     }
@@ -625,7 +647,7 @@ export class DataConverterCore {
       context,
       output,
       inputBoundary: DataConverterInputBoundaryKinds.resolvedSource,
-      diagnostics: source.diagnostics,
+      diagnostics: Object.freeze(diagnostics),
     });
   }
 
