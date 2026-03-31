@@ -1581,3 +1581,22 @@ Explicitly later than this scope:
   - validation enforces ordering/compatibility/required-stage constraints through existing stage registry + graph construction seams (no duplicated composition logic), with typed edit errors for deterministic callers.
   - replacement edits preserve compatible config keys via stage-to-asset composition mappings and reset incompatible configuration/metadata fields using explicit preservation reports.
   - serialized edited pipelines round-trip through version-safe definition serialization and rehydrate into graph/canvas projections.
+
+## Direction 5 extension update: Mid-level pipeline composition packages (stories 17.7-17.8)
+
+- Mid-level reusable pipeline-definition packages now live in `application/dataset-studio/MidLevelPipelineDefinitions.ts` with strongly typed contracts for:
+  - `TabularCleaningPipelineDefinition` (`Normalization -> Cleaning -> Transformation? -> Aggregation?`),
+  - `DocumentPreparationPipelineDefinition` (`Extraction -> Normalization -> Chunking -> Labeling? -> Enrichment?`).
+- Both pipeline packages now expose:
+  - validated stage-order constraints,
+  - reusable `PipelineDefinition` payloads,
+  - dedicated stage-composition mapping sets (`StageCompositionDefinition[]`) with stage-config to asset-config mapping,
+  - direct integration hooks for `PipelineGraphConstructionService`, `PipelineReactFlowGraph`, and `PipelineInspectionService`.
+- Tabular cleaning composition reuses existing transformation assets (`type-normalization`, `missing-value-handling`, `deduplication`, `field-mapping`, `data-validation`, `aggregation`) and is constrained to canonical `records`/`table` shapes.
+- Document preparation composition reuses existing ingestion/transformation assets and adds Node-first extraction/chunking runtime helpers:
+  - PDF/text extraction through `DocumentPdfIngestorAsset` (`unpdf` parser path),
+  - image OCR extraction via `tesseract.js` behind injectable `IImageOcrExtractor`,
+  - character/token chunking (`js-tiktoken` optional strategy) with configurable `chunkSize` + `chunkOverlap`.
+- Inspection integration now includes pipeline-specific metadata enrichment hooks:
+  - tabular row/sample schema snapshots plus numeric summary stats (via `simple-statistics` wrapper),
+  - document extracted text previews, chunk counts, character lengths, and optional token counts.
