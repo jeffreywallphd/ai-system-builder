@@ -8,6 +8,7 @@ import {
 } from "react-router-dom";
 import { AssetDraftLifecycleStatuses, type AssetMetadataPatch } from "../../domain/studio-shell/StudioShellDomain";
 import type {
+  PersistedWorkflowReadModel,
   StudioShellSnapshotReadModel,
   StudioShellValidationIssue,
   WorkflowExecutionReadinessReadModel,
@@ -39,6 +40,10 @@ import {
   type WorkflowStudioModeRouteResolution,
 } from "../studio-shell/workflow/WorkflowStudioModeRouting";
 import {
+  WorkflowStudioEntryPaths,
+  type WorkflowStudioEntryRouteResolution,
+} from "../studio-shell/workflow/WorkflowStudioEntryRouting";
+import {
   buildWorkflowStudioWizardPagePath,
   type WorkflowStudioWizardPageId,
   type WorkflowStudioWizardPageRouteResolution,
@@ -57,6 +62,7 @@ import {
   InlineAssetReturnStatuses,
   type InlineAssetCreationReturnTarget,
 } from "../routes/InlineAssetCreation";
+import { createWorkflowAssetMetadata } from "../../domain/workflow-studio/WorkflowStudioDomain";
 
 interface JsonParseResult<T> {
   readonly ok: boolean;
@@ -164,6 +170,7 @@ interface StudioShellPageProps {
   readonly extensions?: ReadonlyArray<StudioShellExtensionContribution>;
   readonly workflowModeRoute?: WorkflowStudioModeRouteResolution;
   readonly workflowWizardPageRoute?: WorkflowStudioWizardPageRouteResolution;
+  readonly workflowEntryRoute?: WorkflowStudioEntryRouteResolution;
 }
 
 function renderExtensions(
@@ -192,6 +199,7 @@ export default function StudioShellPage({
   extensions = [],
   workflowModeRoute,
   workflowWizardPageRoute,
+  workflowEntryRoute,
 }: StudioShellPageProps): JSX.Element {
   const studioId = studioRegistration?.studioId ?? "studio-shell-main";
   const isWorkflowStudio = studioRegistration?.role === "workflow";
@@ -280,6 +288,7 @@ export default function StudioShellPage({
   const [isRightDrawerOpen, setIsRightDrawerOpen] = useState(rightDrawerConfiguration?.defaultOpen ?? true);
   const automationPrefillAppliedRef = useRef(false);
   const lastRestoredWorkflowReturnSearchRef = useRef<string | undefined>(undefined);
+  const lastAppliedWorkflowEntryRef = useRef<string | undefined>(undefined);
 
   const updateContent = (nextContent: string): void => {
     setContent(nextContent);
@@ -460,6 +469,155 @@ export default function StudioShellPage({
     });
     automationPrefillAppliedRef.current = true;
   }, [automationIntent, content, defaultContent, isWorkflowStudio, shouldSeedAutomationIntent, snapshot?.draft]);
+
+  useEffect(() => {
+    if (!isWorkflowStudio || !workflowEntryRoute?.invalidEntryPath) {
+      return;
+    }
+    setError(`Unsupported workflow entry '${workflowEntryRoute.invalidEntryPath}'. Opened default Workflow Studio route instead.`);
+  }, [isWorkflowStudio, workflowEntryRoute?.invalidEntryPath]);
+
+  useEffect(() => {
+    if (!isWorkflowStudio || !workflowEntryRoute || !snapshot?.activeSessionId) {
+      return;
+    }
+
+    const signature = `${workflowEntryRoute.resolvedEntryPath}:${workflowEntryRoute.workflowId ?? ""}`;
+    if (lastAppliedWorkflowEntryRef.current === signature) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const createDraftFromPersisted = async (
+      sessionId: string,
+      persistedWorkflow: PersistedWorkflowReadModel,
+    ): Promise<boolean> => {
+      const response = await service.createDraft({
+        studioId,
+        sessionId,
+        assetId: persistedWorkflow.id,
+        content: persistedWorkflow.serializedDraft,
+        metadata: createWorkflowAssetMetadata({
+          title: persistedWorkflow.name,
+          summary: persistedWorkflow.metadata.summary,
+          tags: persistedWorkflow.metadata.tags,
+          sourceLabel: "workflow-persistence",
+        }),
+      });
+      if (!response.ok) {
+        if (!cancelled) {
+          setError(response.error?.message ?? "Failed to open persisted workflow in Workflow Studio.");
+        }
+        return false;
+      }
+      return true;
+    };
+
+    const applyWorkflowEntry = async (): Promise<void> => {
+      if (workflowEntryRoute.resolvedEntryPath === WorkflowStudioEntryPaths.default) {
+        lastAppliedWorkflowEntryRef.current = signature;
+        return;
+      }
+
+      if (workflowEntryRoute.resolvedEntryPath === WorkflowStudioEntryPaths.new) {
+        const startSession = await service.startSession(studioId);
+        if (!startSession.ok || !startSession.data?.activeSessionId) {
+          if (!cancelled) {
+            setError(startSession.error?.message ?? "Failed to create a new workflow authoring session.");
+          }
+          return;
+        }
+
+        const created = await service.createDraft({
+          studioId,
+          sessionId: startSession.data.activeSessionId,
+          content: defaultContent,
+          metadata: createWorkflowAssetMetadata({
+            title: defaultDraftTitle,
+            tags: defaultDraftTags,
+            sourceLabel: "workflow-studio",
+          }),
+        });
+        if (!created.ok) {
+          if (!cancelled) {
+            setError(created.error?.message ?? "Failed to initialize a new workflow draft.");
+          }
+          return;
+        }
+
+        await refreshSnapshot();
+        if (!cancelled) {
+          setError(undefined);
+          lastAppliedWorkflowEntryRef.current = signature;
+        }
+        return;
+      }
+
+      const targetWorkflowId = workflowEntryRoute.workflowId?.trim();
+      if (!targetWorkflowId) {
+        if (!cancelled) {
+          setError("Workflow entry requires a valid workflow id.");
+          lastAppliedWorkflowEntryRef.current = signature;
+        }
+        return;
+      }
+
+      const persisted = await service.getPersistedWorkflow(targetWorkflowId);
+      if (!persisted.ok || !persisted.data) {
+        if (!cancelled) {
+          setError(persisted.error?.message ?? `Persisted workflow '${targetWorkflowId}' could not be loaded.`);
+          lastAppliedWorkflowEntryRef.current = signature;
+        }
+        return;
+      }
+
+      if (workflowEntryRoute.resolvedEntryPath === WorkflowStudioEntryPaths.resumeDraft && persisted.data.status !== "draft") {
+        if (!cancelled) {
+          setError(`Workflow '${targetWorkflowId}' is not a resumable draft.`);
+          lastAppliedWorkflowEntryRef.current = signature;
+        }
+        return;
+      }
+
+      const startSession = await service.startSession(studioId);
+      if (!startSession.ok || !startSession.data?.activeSessionId) {
+        if (!cancelled) {
+          setError(startSession.error?.message ?? "Failed to start a workflow authoring session.");
+          lastAppliedWorkflowEntryRef.current = signature;
+        }
+        return;
+      }
+
+      const created = await createDraftFromPersisted(startSession.data.activeSessionId, persisted.data);
+      if (!created) {
+        if (!cancelled) {
+          lastAppliedWorkflowEntryRef.current = signature;
+        }
+        return;
+      }
+
+      await refreshSnapshot();
+      if (!cancelled) {
+        setError(undefined);
+        lastAppliedWorkflowEntryRef.current = signature;
+      }
+    };
+
+    void applyWorkflowEntry();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    defaultContent,
+    defaultDraftTags,
+    defaultDraftTitle,
+    isWorkflowStudio,
+    snapshot?.activeSessionId,
+    studioId,
+    workflowEntryRoute,
+    service,
+  ]);
 
   const runAndRefreshWithResult = async (
     action: () => Promise<{ ok: boolean; error?: { message: string } }>,

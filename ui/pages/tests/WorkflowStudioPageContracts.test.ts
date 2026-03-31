@@ -11,10 +11,12 @@ describe("WorkflowStudioPage contracts", () => {
     expect(pageSource).toContain("workflowStudioRegistration");
     expect(pageSource).toContain("resolveWorkflowStudioModeRoute");
     expect(pageSource).toContain("resolveWorkflowStudioWizardPageRoute");
+    expect(pageSource).toContain("resolveWorkflowStudioEntryRoute");
     expect(pageSource).toContain("useParams");
     expect(pageSource).toContain("useLocation");
     expect(pageSource).toContain("workflowModeRoute={workflowModeRoute}");
     expect(pageSource).toContain("workflowWizardPageRoute={workflowWizardPageRoute}");
+    expect(pageSource).toContain("workflowEntryRoute={workflowEntryRoute}");
     expect(pageSource).toContain("studioRegistration={workflowStudioRegistration}");
 
     expect(registrationSource).toContain("studioType: WorkflowStudioIdentity.studioType");
@@ -39,6 +41,9 @@ describe("WorkflowStudioPage contracts", () => {
     expect(shellSource).toContain("synchronizeSharedDraftFromSnapshot");
     expect(shellSource).toContain("WorkflowStudioReturnRestorationService");
     expect(shellSource).toContain("restoreFromReturnSearch");
+    expect(shellSource).toContain("workflowEntryRoute");
+    expect(shellSource).toContain("service.getPersistedWorkflow");
+    expect(shellSource).toContain("WorkflowStudioEntryPaths");
     expect(shellSource).toContain("setHandoffStatus");
     expect(shellSource).toContain("clearHandoffStatus");
     expect(shellSource).toContain('data-testid="studio-shell-left-drawer-toggle"');

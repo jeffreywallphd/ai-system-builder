@@ -23,6 +23,7 @@ export interface CreateAssetDraftCommand {
   readonly studioId: string;
   readonly sessionId: string;
   readonly draftId?: string;
+  readonly assetId?: string;
   readonly content: string;
   readonly metadata: AssetMetadata;
   readonly dependencies?: ReadonlyArray<AssetDraftDependencyReference>;

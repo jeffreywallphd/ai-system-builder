@@ -285,6 +285,60 @@ describe("StudioShellBackendApi", () => {
     expect(persistedAfterUpdate?.metadata.tags).toEqual(["workflow", "canvas"]);
   });
 
+  it("loads persisted workflow records through studio-shell backend for workflow studio entry initialization", async () => {
+    const workflowPersistenceRepository = new InMemoryWorkflowPersistenceRepository();
+    const api = new StudioShellBackendApi(
+      new InMemoryStudioShellRepository(),
+      workflowPersistenceRepository,
+    );
+    const initialized = await api.initializeStudio("studio-workflows", "Workflow Studio");
+    const sessionId = initialized.data!.activeSessionId!;
+    const serialized = serializeWorkflowDraft({
+      ...createEmptyWorkflowDraft(),
+      steps: [{
+        id: "step-existing",
+        type: "action",
+        kind: "action",
+        order: 1,
+      }],
+    });
+
+    const created = await api.createDraft({
+      studioId: "studio-workflows",
+      sessionId,
+      content: serialized,
+      metadata: {
+        title: "existing-workflow",
+        tags: ["workflow", "draft"],
+        taxonomy: {
+          structuralKind: "composite",
+          semanticRole: "workflow",
+          behaviorKind: "deterministic",
+        },
+        contract: {
+          version: "1.0.0",
+          input: { kind: "json-schema" },
+          output: { kind: "json-schema" },
+        },
+        provenance: {
+          sourceType: "generated",
+          sourceLabel: "workflow-studio",
+        },
+      },
+    });
+    expect(created.ok).toBeTrue();
+    const persistedWorkflowId = created.data!.draft!.assetId;
+
+    const loaded = await api.getPersistedWorkflow(persistedWorkflowId);
+    expect(loaded.ok).toBeTrue();
+    expect(loaded.data?.id).toBe(persistedWorkflowId);
+    expect(loaded.data?.serializedDraft).toBe(serialized);
+
+    const missing = await api.getPersistedWorkflow("workflow:missing");
+    expect(missing.ok).toBeFalse();
+    expect(missing.error?.code).toBe("not-found");
+  });
+
   it("supports composite context-bundle drafts over the same shared validation/lifecycle/publish seams", async () => {
     const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
     const initialized = await api.initializeStudio("studio-context-bundles", "Context Bundle Studio");

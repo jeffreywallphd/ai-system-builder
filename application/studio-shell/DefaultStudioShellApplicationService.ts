@@ -138,6 +138,7 @@ export class DefaultStudioShellApplicationService implements StudioShellApplicat
     try {
       draft = createAssetDraft({
         id: command.draftId?.trim() || this.createId("draft"),
+        assetId: command.assetId,
         studioId,
         session,
         content: command.content,

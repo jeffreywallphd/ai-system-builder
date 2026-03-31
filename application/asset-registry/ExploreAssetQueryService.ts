@@ -1,5 +1,7 @@
 import type { AssetContractDescriptor } from "../../domain/contracts/AssetContract";
 import type { RegistryAsset } from "../../domain/asset-registry/RegistryAsset";
+import type { PersistedWorkflowSummary } from "../../domain/workflow-studio/WorkflowPersistenceDomain";
+import { TaxonomyBehaviorKinds, TaxonomySemanticRoles, TaxonomyStructuralKinds } from "../../domain/taxonomy/CompositionTaxonomy";
 import type {
   CompositionTaxonomyDescriptor,
   TaxonomyBehaviorKind,
@@ -204,11 +206,19 @@ function structuralKindToExploreKind(kind?: TaxonomyStructuralKind): ExploreAsse
 }
 
 export class ExploreAssetQueryService {
-  constructor(private readonly crossStudioRegistryQueryService: Pick<CrossStudioRegistryQueryService, "listAllAssets">) {}
+  constructor(
+    private readonly crossStudioRegistryQueryService: Pick<CrossStudioRegistryQueryService, "listAllAssets">,
+    private readonly workflowPersistenceService?: {
+      listPersistedWorkflows(): Promise<ReadonlyArray<PersistedWorkflowSummary>>;
+    },
+  ) {}
 
   public async listLibrary(limit?: number): Promise<UnifiedExploreAssetLibrary> {
-    const assets = await this.crossStudioRegistryQueryService.listAllAssets(limit);
-    const mapped = this.toExploreAssets(assets);
+    const [assets, persistedWorkflows] = await Promise.all([
+      this.crossStudioRegistryQueryService.listAllAssets(limit),
+      this.workflowPersistenceService?.listPersistedWorkflows() ?? Promise.resolve(Object.freeze([])),
+    ]);
+    const mapped = this.toExploreAssets(assets, persistedWorkflows);
     const availableKinds = Object.freeze([...new Set(mapped.map((entry) => entry.assetKind))].sort());
 
     return Object.freeze({
@@ -237,8 +247,22 @@ export class ExploreAssetQueryService {
     });
   }
 
-  private toExploreAssets(assets: ReadonlyArray<RegistryAsset>): ReadonlyArray<ExploreAssetSummary> {
-    return Object.freeze(assets.map((asset) => this.toExploreAssetSummary(asset)).sort((a, b) =>
+  private toExploreAssets(
+    assets: ReadonlyArray<RegistryAsset>,
+    persistedWorkflows: ReadonlyArray<PersistedWorkflowSummary>,
+  ): ReadonlyArray<ExploreAssetSummary> {
+    const registrySummaries = assets.map((asset) => this.toExploreAssetSummary(asset));
+    const byAssetId = new Map<string, ExploreAssetSummary>();
+    for (const summary of registrySummaries) {
+      byAssetId.set(summary.id.assetId, summary);
+    }
+    for (const persisted of persistedWorkflows) {
+      if (byAssetId.has(persisted.id)) {
+        continue;
+      }
+      byAssetId.set(persisted.id, this.toPersistedWorkflowSummary(persisted));
+    }
+    return Object.freeze([...byAssetId.values()].sort((a, b) =>
       a.displayName.localeCompare(b.displayName) || a.id.assetId.localeCompare(b.id.assetId)));
   }
 
@@ -270,6 +294,35 @@ export class ExploreAssetQueryService {
         creatorId: asset.provenance.creatorId,
         dependencyCount: asset.dependencies.filter((entry) => entry.direction === "upstream").length,
         versionCount: Math.max(asset.versionHistory.length, asset.versionId ? 1 : 0),
+      }),
+    });
+  }
+
+  private toPersistedWorkflowSummary(summary: PersistedWorkflowSummary): ExploreAssetSummary {
+    const taxonomy: CompositionTaxonomyDescriptor = Object.freeze({
+      structuralKind: TaxonomyStructuralKinds.composite,
+      semanticRole: TaxonomySemanticRoles.workflow,
+      behaviorKind: TaxonomyBehaviorKinds.deterministic,
+    });
+
+    return Object.freeze({
+      id: Object.freeze({
+        assetId: summary.id,
+        versionId: summary.revision.versionLabel,
+      }),
+      displayName: summary.name,
+      assetKind: ExploreAssetKinds.composite,
+      primaryLabel: "workflow",
+      status: summary.status,
+      taxonomy,
+      metadata: Object.freeze({
+        semanticRole: taxonomy.semanticRole,
+        behaviorKind: taxonomy.behaviorKind,
+        sourceType: "workflow-persistence",
+        sourceLabel: summary.ownershipContext?.studioId ?? "workflow-studio",
+        creatorId: summary.ownershipContext?.ownerId,
+        dependencyCount: 0,
+        versionCount: Math.max(summary.revision.persistenceRevision, 1),
       }),
     });
   }

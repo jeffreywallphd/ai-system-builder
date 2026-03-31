@@ -224,6 +224,14 @@ The studio shell now has a bounded inner-layer model and application orchestrati
 - Studio-shell workflow draft mutations now synchronize into workflow persistence through existing application use cases (`CreatePersistedWorkflowUseCase`, `UpdatePersistedWorkflowUseCase`, `GetPersistedWorkflowUseCase`) inside `StudioShellBackendApi`, rather than UI-owned persistence logic.
 - Workflow draft synchronization maps workflow studio draft metadata/context into persistence ownership/version metadata and keeps lifecycle alignment (`draft` draft state, `saved` for validated/published transitions) under application orchestration.
 
+## Direction 5 update: Explore workflow discovery + workflow studio entry routing (stories 11.5-11.6)
+
+- Explore/library now treats persisted workflows as first-class assets through the existing explore-query seam (`application/asset-registry/ExploreAssetQueryService.ts`) by augmenting canonical registry results with workflow-persistence summaries when available.
+- Persisted workflow explore rows remain taxonomy-aligned (`composite/workflow/*`) and surface persistence status/source metadata for future metadata/version filtering without introducing a parallel workflow-browser architecture.
+- Workflow Studio entry now resolves explicit new/open/resume route intents through a dedicated route parser/builder seam (`ui/studio-shell/workflow/WorkflowStudioEntryRouting.ts`) layered on top of existing studio routing/search conventions.
+- Workflow Studio initialization for new/open/resume remains service-backed (`StudioShellService` -> `StudioShellBackendApi`) and uses existing draft/session orchestration (`startSession`, `createDraft`, shared workflow mode store synchronization) instead of UI-local reconstruction paths.
+- Persisted workflow retrieval for open/resume is now an explicit backend contract (`StudioShellBackendApi.getPersistedWorkflow`) exposed through existing desktop/browser studio-shell bridge seams, with typed not-found/invalid-entry handling.
+
 ## Direction 5 update: Workflow built-in step taxonomy + registry foundation (stories 6.1-6.2)
 
 - Workflow-native built-in steps are now first-class inner-layer contracts in `domain/workflow-studio/WorkflowStudioDomain.ts` with canonical categories (`control-flow`, `temporal`, `human-interaction`, reserved `transformation`) and stable built-in step identities.

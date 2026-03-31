@@ -1,5 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import type { RegistryAsset } from "../../../domain/asset-registry/RegistryAsset";
+import { createPersistedWorkflowRecord } from "../../../domain/workflow-studio/WorkflowPersistenceDomain";
+import { createEmptyWorkflowDraft } from "../../../domain/workflow-studio/WorkflowStudioDomain";
 import { TaxonomyBehaviorKinds, TaxonomySemanticRoles, TaxonomyStructuralKinds } from "../../../domain/taxonomy/CompositionTaxonomy";
 import { ExploreAssetKinds, ExploreAssetQueryService } from "../ExploreAssetQueryService";
 
@@ -104,15 +106,24 @@ const seedAssets: ReadonlyArray<RegistryAsset> = Object.freeze([
 ]);
 
 describe("ExploreAssetQueryService", () => {
+  const persistedDraftWorkflow = createPersistedWorkflowRecord({
+    id: "workflow:persisted-draft",
+    name: "Draft Workflow",
+    draft: createEmptyWorkflowDraft(),
+  });
   const service = new ExploreAssetQueryService({
     async listAllAssets() {
       return seedAssets;
+    },
+  }, {
+    async listPersistedWorkflows() {
+      return [persistedDraftWorkflow];
     },
   });
 
   it("builds a unified explore library across atomic/composite/system assets", async () => {
     const library = await service.listLibrary();
-    expect(library.totalCount).toBe(3);
+    expect(library.totalCount).toBe(4);
     expect(library.availableKinds).toEqual([ExploreAssetKinds.atomic, ExploreAssetKinds.composite, ExploreAssetKinds.system]);
     expect(library.assets.map((entry) => entry.assetKind)).toContain(ExploreAssetKinds.atomic);
     expect(library.assets.map((entry) => entry.assetKind)).toContain(ExploreAssetKinds.composite);
@@ -146,5 +157,21 @@ describe("ExploreAssetQueryService", () => {
 
     expect(result.assets).toHaveLength(2);
     expect(result.assets.map((entry) => entry.id.assetId)).toEqual(["asset:workflow", "asset:model"]);
+  });
+
+  it("includes persisted workflows as first-class explore assets with source/status facets", async () => {
+    const result = await service.search({
+      keyword: "draft workflow",
+      filters: {
+        sourceTypes: ["workflow-persistence"],
+        statuses: ["draft"],
+      },
+    });
+
+    expect(result.assets).toHaveLength(1);
+    expect(result.assets[0]?.id.assetId).toBe("workflow:persisted-draft");
+    expect(result.assets[0]?.metadata.sourceType).toBe("workflow-persistence");
+    expect(result.assets[0]?.taxonomy?.semanticRole).toBe("workflow");
+    expect(result.assets[0]?.status).toBe("draft");
   });
 });

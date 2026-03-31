@@ -206,12 +206,34 @@ export interface RunWorkflowStudioDraftReadModel {
   readonly failureMessage?: string;
 }
 
+export interface PersistedWorkflowReadModel {
+  readonly id: string;
+  readonly name: string;
+  readonly status: "draft" | "saved";
+  readonly lifecycleState: string;
+  readonly metadata: {
+    readonly summary?: string;
+    readonly tags: ReadonlyArray<string>;
+  };
+  readonly revision: {
+    readonly persistenceRevision: number;
+    readonly workflowRevision: number;
+    readonly versionLabel?: string;
+  };
+  readonly timestamps: {
+    readonly createdAt: string;
+    readonly updatedAt: string;
+    readonly savedAt?: string;
+  };
+  readonly serializedDraft: string;
+}
+
 export class StudioShellBackendApi {
   private readonly service: DefaultStudioShellApplicationService;
   private readonly workflowStudioService: WorkflowStudioApplicationService;
   private readonly createPersistedWorkflow?: CreatePersistedWorkflowUseCase;
   private readonly updatePersistedWorkflow?: UpdatePersistedWorkflowUseCase;
-  private readonly getPersistedWorkflow?: GetPersistedWorkflowUseCase;
+  private readonly getPersistedWorkflowUseCase?: GetPersistedWorkflowUseCase;
 
   constructor(
     private readonly repository: IStudioShellRepository,
@@ -229,7 +251,7 @@ export class StudioShellBackendApi {
     if (workflowPersistenceRepository) {
       this.createPersistedWorkflow = new CreatePersistedWorkflowUseCase(workflowPersistenceRepository);
       this.updatePersistedWorkflow = new UpdatePersistedWorkflowUseCase(workflowPersistenceRepository);
-      this.getPersistedWorkflow = new GetPersistedWorkflowUseCase(workflowPersistenceRepository);
+      this.getPersistedWorkflowUseCase = new GetPersistedWorkflowUseCase(workflowPersistenceRepository);
     }
   }
 
@@ -499,6 +521,46 @@ export class StudioShellBackendApi {
     });
   }
 
+  public async getPersistedWorkflow(
+    workflowId: string,
+  ): Promise<StudioShellApiResponse<PersistedWorkflowReadModel>> {
+    return this.wrap(async () => {
+      if (!this.getPersistedWorkflowUseCase) {
+        throw new StudioShellInvalidRequestError("Workflow persistence integration is unavailable.");
+      }
+
+      const record = await this.getPersistedWorkflowUseCase.execute(workflowId);
+      if (!record) {
+        throw new WorkflowPersistenceError(
+          WorkflowPersistenceErrorCodes.notFound,
+          `Persisted workflow '${workflowId.trim()}' was not found.`,
+        );
+      }
+
+      return Object.freeze({
+        id: record.id,
+        name: record.name,
+        status: record.status,
+        lifecycleState: record.lifecycleState,
+        metadata: Object.freeze({
+          summary: record.metadata.summary,
+          tags: Object.freeze([...record.metadata.tags]),
+        }),
+        revision: Object.freeze({
+          persistenceRevision: record.revision.persistenceRevision,
+          workflowRevision: record.revision.workflowRevision,
+          versionLabel: record.revision.versionLabel,
+        }),
+        timestamps: Object.freeze({
+          createdAt: record.timestamps.createdAt,
+          updatedAt: record.timestamps.updatedAt,
+          savedAt: record.timestamps.savedAt,
+        }),
+        serializedDraft: record.definition.serializedDraft,
+      });
+    });
+  }
+
   private async requireSnapshot(studioId: string): Promise<StudioShellSnapshotReadModel> {
     const studio = await this.repository.getStudio(studioId.trim());
     if (!studio) {
@@ -565,7 +627,7 @@ export class StudioShellBackendApi {
     studioId: string,
     explicitDraftId?: string,
   ): Promise<void> {
-    if (!this.createPersistedWorkflow || !this.updatePersistedWorkflow || !this.getPersistedWorkflow) {
+    if (!this.createPersistedWorkflow || !this.updatePersistedWorkflow || !this.getPersistedWorkflowUseCase) {
       return;
     }
 
@@ -605,7 +667,7 @@ export class StudioShellBackendApi {
       tags: draft.metadata.tags,
     });
 
-    const existing = await this.getPersistedWorkflow.execute(persistedWorkflowId);
+    const existing = await this.getPersistedWorkflowUseCase.execute(persistedWorkflowId);
     if (!existing) {
       await this.createPersistedWorkflow.execute({
         id: persistedWorkflowId,
