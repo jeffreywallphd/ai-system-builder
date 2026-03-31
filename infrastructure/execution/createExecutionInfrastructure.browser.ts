@@ -5,6 +5,7 @@ import { GetExecutionRunDetailUseCase } from "../../application/execution/GetExe
 import { ListExecutionRunsUseCase } from "../../application/execution/ListExecutionRunsUseCase";
 import { ListRelatedExecutionRunsUseCase } from "../../application/execution/ListRelatedExecutionRunsUseCase";
 import type { IExecutionRunRepository } from "../../application/ports/interfaces/IExecutionRunRepository";
+import type { IWorkflowRunSummaryRepository } from "../../application/ports/interfaces/IWorkflowRunSummaryRepository";
 import type { IMcpServerManager } from "../../application/ports/interfaces/IMcpServerManager";
 import type { IWorkflowExecutor } from "../../application/ports/interfaces/IWorkflowExecutor";
 import type { DatasetGenerationService } from "../../domain/tuning-datasets/interfaces/ITuningDatasetStudio";
@@ -18,6 +19,9 @@ import { ModelPreparationExecutionUnitHandler } from "./ModelPreparationExecutio
 import { ModelTrainingExecutionUnitHandler } from "./ModelTrainingExecutionUnitHandler";
 import { WorkflowExecutionUnitHandler } from "./WorkflowExecutionUnitHandler";
 import type { ExecutionAssetLineageRecorder } from "../../application/assets-system/ExecutionAssetLineageRecorder";
+import type { WorkflowRunHistoryService } from "../../application/workflow-run-history/WorkflowRunHistoryService";
+import { LocalStorageWorkflowRunSummaryRepository } from "../workflows/LocalStorageWorkflowRunSummaryRepository";
+import { InMemoryWorkflowRunSummaryRepository } from "../workflows/InMemoryWorkflowRunSummaryRepository";
 
 interface StorageLike {
   getItem(key: string): string | null;
@@ -41,6 +45,20 @@ export function createExecutionRunRepository(
   return new LocalStorageExecutionRunRepository(undefined, options.storage);
 }
 
+export interface CreateWorkflowRunSummaryRepositoryOptions {
+  readonly storage?: StorageLike;
+}
+
+export function createWorkflowRunSummaryRepository(
+  options: CreateWorkflowRunSummaryRepositoryOptions,
+): IWorkflowRunSummaryRepository {
+  if (options.storage) {
+    return new LocalStorageWorkflowRunSummaryRepository(undefined, options.storage);
+  }
+
+  return new InMemoryWorkflowRunSummaryRepository();
+}
+
 export interface CreateUnifiedExecutionInfrastructureOptions {
   readonly workflowExecutor: IWorkflowExecutor;
   readonly executionRunRepository?: IExecutionRunRepository;
@@ -48,12 +66,17 @@ export interface CreateUnifiedExecutionInfrastructureOptions {
   readonly modelTrainingRuntime?: IModelTrainingRuntime;
   readonly mcpServerManager?: IMcpServerManager;
   readonly executionAssetLineageRecorder?: ExecutionAssetLineageRecorder;
+  readonly workflowRunHistoryService?: WorkflowRunHistoryService;
 }
 
 export function createUnifiedExecutionInfrastructure(
   options: CreateUnifiedExecutionInfrastructureOptions,
 ): UnifiedExecutionEngine {
-  const handlers: IExecutionUnitHandler[] = [new WorkflowExecutionUnitHandler(options.workflowExecutor, options.executionAssetLineageRecorder)];
+  const handlers: IExecutionUnitHandler[] = [new WorkflowExecutionUnitHandler(
+    options.workflowExecutor,
+    options.executionAssetLineageRecorder,
+    options.workflowRunHistoryService,
+  )];
 
   if (options.datasetGenerationService) {
     handlers.push(new DatasetGenerationExecutionUnitHandler(options.datasetGenerationService, options.executionAssetLineageRecorder));
@@ -116,6 +139,7 @@ export function createExecutionApplicationInfrastructure(
     modelTrainingRuntime: options.modelTrainingRuntime,
     mcpServerManager: options.mcpServerManager,
     executionAssetLineageRecorder: options.executionAssetLineageRecorder,
+    workflowRunHistoryService: options.workflowRunHistoryService,
   });
   const history = createExecutionHistoryInfrastructure(options.executionRunRepository);
 
