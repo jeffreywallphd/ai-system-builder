@@ -83,26 +83,26 @@ const SupportedExtensionSchema = z
     return trimmed.startsWith(".") ? trimmed : `.${trimmed}`;
   });
 
-const LocalFileSourceInputSchema = z.object({
+export const LocalFileSourceInputSchema = z.object({
   kind: z.literal(SourceInputKinds.localFile),
   path: z.string().min(1),
   groupId: z.string().trim().min(1).optional(),
 });
 
-const LocalFilesSourceInputSchema = z.object({
+export const LocalFilesSourceInputSchema = z.object({
   kind: z.literal(SourceInputKinds.localFiles),
   paths: z.array(z.string().min(1)).min(1),
   groupId: z.string().trim().min(1).optional(),
 });
 
-const LocalDirectorySourceInputSchema = z.object({
+export const LocalDirectorySourceInputSchema = z.object({
   kind: z.literal(SourceInputKinds.localDirectory),
   path: z.string().min(1),
   patterns: z.array(z.string().min(1)).optional(),
   groupId: z.string().trim().min(1).optional(),
 });
 
-const RemoteFileSourceInputSchema = z.object({
+export const RemoteFileSourceInputSchema = z.object({
   kind: z.literal(SourceInputKinds.remoteFile),
   reference: z.string().min(1),
   displayName: z.string().trim().min(1).optional(),
@@ -111,14 +111,14 @@ const RemoteFileSourceInputSchema = z.object({
   groupId: z.string().trim().min(1).optional(),
 });
 
-const SourceLocatorInputSchema = z.discriminatedUnion("kind", [
+export const SourceLocatorInputSchema = z.discriminatedUnion("kind", [
   LocalFileSourceInputSchema,
   LocalFilesSourceInputSchema,
   LocalDirectorySourceInputSchema,
   RemoteFileSourceInputSchema,
 ]);
 
-const SourceLocatorConfigSchema = z.object({
+export const SourceLocatorConfigSchema = z.object({
   supportedExtensions: z.array(SupportedExtensionSchema).optional(),
   includeHidden: z.boolean().default(false),
   followSymbolicLinks: z.boolean().default(false),

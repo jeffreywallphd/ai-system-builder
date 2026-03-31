@@ -195,6 +195,7 @@ export type DataSourceReference =
 export interface ResolvedDataSource {
   readonly kind: DataSourceReferenceKind;
   readonly reference: string;
+  readonly sourceId?: string;
   readonly payload:
     | string
     | Uint8Array
@@ -205,6 +206,7 @@ export interface ResolvedDataSource {
   readonly formatHint?: "json" | "csv" | "tsv" | "text";
   readonly sourceAssetId?: string;
   readonly sourceVersionId?: string;
+  readonly groupId?: string;
   readonly diagnostics: ReadonlyArray<DataConverterDiagnostic>;
 }
 
