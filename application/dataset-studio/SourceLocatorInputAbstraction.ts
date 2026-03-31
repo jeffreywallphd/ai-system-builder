@@ -2,7 +2,6 @@
 import path from "node:path";
 import { promises as fs } from "node:fs";
 import { createHash } from "node:crypto";
-import fg from "fast-glob";
 import { z } from "zod";
 
 export const SourceInputKinds = Object.freeze({
@@ -133,6 +132,59 @@ export interface SourceLocatorRequest {
   readonly config?: Partial<SourceLocatorConfig>;
 }
 
+type FastGlobMatcher = (
+  patterns: ReadonlyArray<string>,
+  options: {
+    readonly cwd: string;
+    readonly onlyFiles: true;
+    readonly absolute: true;
+    readonly unique: true;
+    readonly dot: boolean;
+    readonly followSymbolicLinks: boolean;
+  },
+) => Promise<ReadonlyArray<string>>;
+
+async function resolveFastGlobMatcher(): Promise<FastGlobMatcher> {
+  const module = await import("fast-glob");
+  const candidate = "default" in module ? module.default : module;
+  if (typeof candidate !== "function") {
+    throw new Error("Unable to resolve fast-glob matcher.");
+  }
+  return candidate as FastGlobMatcher;
+}
+
+export interface ISourceDirectoryScanner {
+  scan(
+    directoryPath: string,
+    patterns: ReadonlyArray<string>,
+    options: {
+      readonly includeHidden: boolean;
+      readonly followSymbolicLinks: boolean;
+    },
+  ): Promise<ReadonlyArray<string>>;
+}
+
+class FastGlobSourceDirectoryScanner implements ISourceDirectoryScanner {
+  public async scan(
+    directoryPath: string,
+    patterns: ReadonlyArray<string>,
+    options: {
+      readonly includeHidden: boolean;
+      readonly followSymbolicLinks: boolean;
+    },
+  ): Promise<ReadonlyArray<string>> {
+    const scanDirectory = await resolveFastGlobMatcher();
+    return scanDirectory(patterns, {
+      cwd: directoryPath,
+      onlyFiles: true,
+      absolute: true,
+      unique: true,
+      dot: options.includeHidden,
+      followSymbolicLinks: options.followSymbolicLinks,
+    });
+  }
+}
+
 function normalizeOptional(value?: string): string | undefined {
   const normalized = value?.trim();
   return normalized ? normalized : undefined;
@@ -193,6 +245,12 @@ function shouldIncludeExtension(extension: string | undefined, config: SourceLoc
 }
 
 export class SourceLocatorInputAbstraction {
+  private readonly directoryScanner: ISourceDirectoryScanner;
+
+  constructor(options?: { readonly directoryScanner?: ISourceDirectoryScanner }) {
+    this.directoryScanner = options?.directoryScanner ?? new FastGlobSourceDirectoryScanner();
+  }
+
   public async resolve(request: SourceLocatorRequest): Promise<SourceLocatorResolutionResult> {
     const parsedInput = SourceLocatorInputSchema.safeParse(request.input);
     const parsedConfig = SourceLocatorConfigSchema.safeParse(request.config ?? {});
@@ -360,14 +418,23 @@ export class SourceLocatorInputAbstraction {
     }
 
     const scanPatterns = patterns && patterns.length > 0 ? patterns : ["**/*"];
-    const matches = await fg(scanPatterns, {
-      cwd: normalizedDirectory,
-      onlyFiles: true,
-      absolute: true,
-      unique: true,
-      dot: config.includeHidden,
-      followSymbolicLinks: config.followSymbolicLinks,
-    });
+    let matches: ReadonlyArray<string>;
+    try {
+      matches = await this.directoryScanner.scan(normalizedDirectory, scanPatterns, {
+        includeHidden: config.includeHidden,
+        followSymbolicLinks: config.followSymbolicLinks,
+      });
+    } catch (error) {
+      issues.push(Object.freeze({
+        code: SourceLocatorIssueCodes.unreadablePath,
+        message: `Unable to enumerate directory '${normalizedDirectory}'.`,
+        reference: normalizedDirectory,
+        details: Object.freeze({
+          cause: error instanceof Error ? error.message : String(error),
+        }),
+      }));
+      return Object.freeze([]);
+    }
 
     const descriptors: SourceDescriptor[] = [];
     for (const absoluteMatch of matches) {

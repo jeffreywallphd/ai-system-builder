@@ -5,6 +5,7 @@ import os from "node:os";
 import { promises as fs } from "node:fs";
 import {
   SourceInputKinds,
+  type ISourceDirectoryScanner,
   SourceLocatorInputAbstraction,
   SourceLocatorIssueCodes,
   SourceLocatorInputError,
@@ -38,9 +39,16 @@ describe("SourceLocatorInputAbstraction", () => {
     expect(result.issues).toHaveLength(0);
   });
 
-  it("scans local directories through fast-glob and supports extension filters", async () => {
+  it("scans local directories through the scanner seam and supports extension filters", async () => {
     const fixture = await createTempFixture();
-    const locator = new SourceLocatorInputAbstraction();
+    const directoryScanner: ISourceDirectoryScanner = {
+      scan: async (directoryPath) => Object.freeze([
+        path.join(directoryPath, "users.csv"),
+        path.join(directoryPath, "users.json"),
+        path.join(directoryPath, "notes.txt"),
+      ]),
+    };
+    const locator = new SourceLocatorInputAbstraction({ directoryScanner });
 
     const result = await locator.resolve({
       input: {
@@ -56,6 +64,26 @@ describe("SourceLocatorInputAbstraction", () => {
     expect(result.descriptors.every((entry) => entry.extension === ".csv" || entry.extension === ".json")).toBeTrue();
     expect(result.extensionSummary[".csv"]).toBe(1);
     expect(result.extensionSummary[".json"]).toBe(1);
+  });
+
+  it("returns structured issues when directory scanning fails", async () => {
+    const fixture = await createTempFixture();
+    const directoryScanner: ISourceDirectoryScanner = {
+      scan: async () => {
+        throw new Error("scanner unavailable");
+      },
+    };
+    const locator = new SourceLocatorInputAbstraction({ directoryScanner });
+
+    const result = await locator.resolve({
+      input: {
+        kind: SourceInputKinds.localDirectory,
+        path: fixture,
+      },
+    });
+
+    expect(result.descriptors).toHaveLength(0);
+    expect(result.issues[0]?.code).toBe(SourceLocatorIssueCodes.unreadablePath);
   });
 
   it("resolves multiple explicit local files and preserves grouped metadata", async () => {
