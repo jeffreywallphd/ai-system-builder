@@ -5,6 +5,7 @@ import { CanonicalDataAsset } from "../../domain/dataset-studio/CanonicalDataAss
 import { createCanonicalRecordsShape, type CanonicalRecordValue, type CanonicalRecordsShape } from "../../domain/dataset-studio/CanonicalDataShapes";
 import {
   DataAssetConfigFieldKinds,
+  DataAssetConfigFieldVisibilities,
   createDataAssetConfigSchema,
   type DataAssetConfigSchema,
 } from "./DataAssetConfiguration";
@@ -200,6 +201,10 @@ export class CsvIngestorAsset {
   });
 
   public execute(request: CsvIngestorExecutionRequest): CsvIngestorExecutionResult {
+    const assetIdentity = Object.freeze({
+      assetId: CsvIngestorAsset.assetId,
+      assetVersion: CsvIngestorAsset.assetVersion,
+    });
     const parsedRequest = CsvIngestorExecutionRequestSchema.safeParse(request);
     if (!parsedRequest.success) {
       const parsedContext = IngestionExecutionContextSchema.safeParse(request.context ?? {});
@@ -218,6 +223,8 @@ export class CsvIngestorAsset {
         normalized: buildIngestionFailureEnvelope({
           context: parsedContext.success ? parsedContext.data : IngestionExecutionContextSchema.parse({}),
           issues,
+          asset: assetIdentity,
+          configSummary: request.config,
         }),
       });
     }
@@ -252,6 +259,8 @@ export class CsvIngestorAsset {
         normalized: buildIngestionFailureEnvelope({
           context: ingestionContext,
           issues,
+          asset: assetIdentity,
+          configSummary: normalizedRequest.config,
         }),
       });
     }
@@ -283,6 +292,8 @@ export class CsvIngestorAsset {
         normalized: buildIngestionFailureEnvelope({
           context: ingestionContext,
           issues,
+          asset: assetIdentity,
+          configSummary: config,
         }),
       });
     }
@@ -305,6 +316,8 @@ export class CsvIngestorAsset {
         normalized: buildIngestionFailureEnvelope({
           context: ingestionContext,
           issues,
+          asset: assetIdentity,
+          configSummary: config,
         }),
       });
     }
@@ -345,6 +358,8 @@ export class CsvIngestorAsset {
           normalized: buildIngestionSuccessEnvelope({
             output,
             context: ingestionContext,
+            asset: assetIdentity,
+            configSummary: config,
           }),
           diagnostics: Object.freeze([]),
         });
@@ -385,6 +400,8 @@ export class CsvIngestorAsset {
         normalized: buildIngestionSuccessEnvelope({
           output,
           context: ingestionContext,
+          asset: assetIdentity,
+          configSummary: config,
         }),
         diagnostics: Object.freeze([]),
       });
@@ -411,6 +428,8 @@ export class CsvIngestorAsset {
         normalized: buildIngestionFailureEnvelope({
           context: ingestionContext,
           issues,
+          asset: assetIdentity,
+          configSummary: config,
         }),
       });
     }
@@ -448,6 +467,11 @@ export class CsvIngestorAsset {
       normalized: buildIngestionPreviewEnvelope({
         ingestor: CsvIngestorAsset.assetId,
         context: result.normalized.context,
+        asset: Object.freeze({
+          assetId: CsvIngestorAsset.assetId,
+          assetVersion: CsvIngestorAsset.assetVersion,
+        }),
+        configSummary: result.config as Readonly<Record<string, unknown>>,
         totalCount: result.records.length,
         sampleCount: sample.length,
         preview: result.normalized.preview,
@@ -468,6 +492,7 @@ export function createCsvIngestorConfigSchema(assetId: string): DataAssetConfigS
         key: "delimiter",
         label: "Delimiter",
         kind: DataAssetConfigFieldKinds.select,
+        visibility: DataAssetConfigFieldVisibilities.simple,
         required: true,
         defaultValue: ",",
         options: Object.freeze([
@@ -481,6 +506,7 @@ export function createCsvIngestorConfigSchema(assetId: string): DataAssetConfigS
         key: "header",
         label: "Header mode",
         kind: DataAssetConfigFieldKinds.select,
+        visibility: DataAssetConfigFieldVisibilities.simple,
         required: true,
         defaultValue: "auto",
         options: Object.freeze([
@@ -493,6 +519,7 @@ export function createCsvIngestorConfigSchema(assetId: string): DataAssetConfigS
         key: "encoding",
         label: "Encoding",
         kind: DataAssetConfigFieldKinds.string,
+        visibility: DataAssetConfigFieldVisibilities.advanced,
         required: true,
         defaultValue: "utf-8",
       },
@@ -500,12 +527,14 @@ export function createCsvIngestorConfigSchema(assetId: string): DataAssetConfigS
         key: "skipEmptyLines",
         label: "Skip empty lines",
         kind: DataAssetConfigFieldKinds.boolean,
+        visibility: DataAssetConfigFieldVisibilities.advanced,
         defaultValue: true,
       },
       {
         key: "normalizeHeadersToLowercase",
         label: "Lowercase headers",
         kind: DataAssetConfigFieldKinds.boolean,
+        visibility: DataAssetConfigFieldVisibilities.advanced,
         defaultValue: false,
       },
     ]),

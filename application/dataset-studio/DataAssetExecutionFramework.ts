@@ -42,6 +42,13 @@ import {
   validateDataConverterResult,
   validateDataPreviewModel,
 } from "./DataStudioValidation";
+import {
+  IngestionExecutionStatuses,
+  createIngestionLineageHook,
+  createIngestionLogRecord,
+  type IngestionLineageHook,
+  type IngestionLogRecord,
+} from "./IngestionContracts";
 
 export const DataAssetExecutionErrorCodes = Object.freeze({
   invalidRequest: "invalid_request",
@@ -135,6 +142,8 @@ export interface DataAssetExecutionResult {
   readonly failure?: DataStudioFailure;
   readonly converterResult?: DataConverterResult;
   readonly lineage: DataLineageMetadata;
+  readonly ingestionLineage: IngestionLineageHook;
+  readonly ingestionLog: IngestionLogRecord;
 }
 
 export interface DataAssetExecutionFrameworkOptions {
@@ -195,6 +204,92 @@ function createFailureDiagnostic(code: DataAssetExecutionErrorCode, message: str
     severity: DataConverterDiagnosticSeverities.error,
     message,
   });
+}
+
+function summarizeIngestionOutput(output: CanonicalDataShape): {
+  readonly shapeKind: string;
+  readonly totalCount: number;
+  readonly recordCount?: number;
+  readonly textItemCount?: number;
+  readonly imageItemCount?: number;
+} {
+  if (output.kind === "records") {
+    return Object.freeze({
+      shapeKind: output.kind,
+      totalCount: output.records.length,
+      recordCount: output.records.length,
+    });
+  }
+  if (output.kind === "table") {
+    return Object.freeze({
+      shapeKind: output.kind,
+      totalCount: output.rows.length,
+    });
+  }
+  if (output.kind === "text-items") {
+    return Object.freeze({
+      shapeKind: output.kind,
+      totalCount: output.items.length,
+      textItemCount: output.items.length,
+    });
+  }
+  return Object.freeze({
+    shapeKind: output.kind,
+    totalCount: output.items.length,
+    imageItemCount: output.items.length,
+  });
+}
+
+function toIngestionSourceReferences(input: DataAssetExecutionInput | undefined): ReadonlyArray<{
+  readonly sourceId?: string;
+  readonly sourceReference?: string;
+  readonly sourceType?: string;
+  readonly mediaType?: string;
+  readonly fileName?: string;
+}> {
+  if (!input) {
+    return Object.freeze([]);
+  }
+
+  if (input.kind === "source-reference") {
+    if (input.source.kind === "in-memory") {
+      return Object.freeze([Object.freeze({
+        sourceReference: "in-memory",
+        sourceType: input.source.kind,
+      })]);
+    }
+    if (input.source.kind === "local-file") {
+      return Object.freeze([Object.freeze({
+        sourceReference: input.source.path,
+        sourceType: input.source.kind,
+      })]);
+    }
+    return Object.freeze([Object.freeze({
+      sourceReference: input.source.url,
+      sourceType: input.source.kind,
+    })]);
+  }
+
+  if (input.kind === "resolved-source") {
+    return Object.freeze([Object.freeze({
+      sourceReference: input.source.reference,
+      sourceType: input.source.kind,
+      mediaType: input.source.contentType,
+      fileName: input.source.fileName,
+    })]);
+  }
+
+  if (input.kind === "converter-request" && input.request.operation === DataConverterOperationKinds.sourceToRecords) {
+    return Object.freeze([Object.freeze({
+      sourceReference: input.request.source.reference,
+      sourceType: input.request.source.kind,
+      mediaType: input.request.source.contentType,
+      fileName: input.request.source.fileName,
+      sourceId: input.request.source.sourceId,
+    })]);
+  }
+
+  return Object.freeze([]);
 }
 
 export class DefaultDataAssetExecutionFramework {
@@ -416,6 +511,38 @@ export class DefaultDataAssetExecutionFramework {
         diagnostics: toLineageDiagnostics(Object.freeze(diagnostics)),
         notes: Object.freeze(notes),
       });
+      const ingestionExecutionMode = request.input ? "execute" : "preview";
+      const ingestionSources = toIngestionSourceReferences(request.input);
+      const ingestionOutputSummary = summarizeIngestionOutput(resolvedInput.output);
+      const ingestionLineage = createIngestionLineageHook({
+        producer: Object.freeze({
+          assetId: request.asset.id,
+          assetVersion: request.asset.version,
+        }),
+        executionMode: ingestionExecutionMode,
+        executionId,
+        runId: operationContext.requestId ?? operationContext.operationId,
+        sources: ingestionSources,
+        output: ingestionOutputSummary,
+        configSummary: request.asset.config.values as Readonly<Record<string, unknown>>,
+      });
+      const ingestionLog = createIngestionLogRecord({
+        executionMode: ingestionExecutionMode,
+        status: IngestionExecutionStatuses.succeeded,
+        asset: Object.freeze({
+          assetId: request.asset.id,
+          assetVersion: request.asset.version,
+        }),
+        executionId,
+        runId: operationContext.requestId ?? operationContext.operationId,
+        sources: ingestionSources,
+        outputSummary: ingestionOutputSummary,
+        issues: Object.freeze([]),
+        configSummary: request.asset.config.values as Readonly<Record<string, unknown>>,
+        lineage: ingestionLineage,
+        timestamp: startedAt,
+        completedAt,
+      });
 
       return Object.freeze({
         ok: true,
@@ -438,6 +565,8 @@ export class DefaultDataAssetExecutionFramework {
         validationIssues: Object.freeze(validationIssues),
         converterResult: resolvedInput.converterResult,
         lineage,
+        ingestionLineage,
+        ingestionLog,
       } satisfies DataAssetExecutionResult);
     } catch (error) {
       const completedAt = nowIso(this.now);
@@ -741,6 +870,49 @@ export class DefaultDataAssetExecutionFramework {
       diagnostics: toLineageDiagnostics(input.diagnostics),
       notes: input.notes,
     });
+    const failedOutputSummary = input.converterResult?.ok
+      ? summarizeIngestionOutput(input.converterResult.output)
+      : Object.freeze({
+        shapeKind: "records",
+        totalCount: 0,
+        recordCount: 0,
+      });
+    const ingestionExecutionMode = input.request.input ? "execute" : "preview";
+    const ingestionSources = toIngestionSourceReferences(input.request.input);
+    const ingestionLineage = createIngestionLineageHook({
+      producer: Object.freeze({
+        assetId: input.request.asset.id,
+        assetVersion: input.request.asset.version,
+      }),
+      executionMode: ingestionExecutionMode,
+      executionId: input.executionId,
+      runId: input.operationContext.requestId ?? input.operationContext.operationId,
+      sources: ingestionSources,
+      output: failedOutputSummary,
+      configSummary: input.request.asset.config.values as Readonly<Record<string, unknown>>,
+    });
+    const ingestionLog = createIngestionLogRecord({
+      executionMode: ingestionExecutionMode,
+      status: IngestionExecutionStatuses.failed,
+      asset: Object.freeze({
+        assetId: input.request.asset.id,
+        assetVersion: input.request.asset.version,
+      }),
+      executionId: input.executionId,
+      runId: input.operationContext.requestId ?? input.operationContext.operationId,
+      sources: ingestionSources,
+      outputSummary: failedOutputSummary,
+      issues: Object.freeze(input.diagnostics.map((diagnostic) => Object.freeze({
+        code: diagnostic.code,
+        message: diagnostic.message,
+        category: "unknown-internal-failure",
+        severity: diagnostic.severity === DataConverterDiagnosticSeverities.error ? "error" : "warning",
+      }))),
+      configSummary: input.request.asset.config.values as Readonly<Record<string, unknown>>,
+      lineage: ingestionLineage,
+      timestamp: input.startedAt,
+      completedAt: input.completedAt,
+    });
 
     return Object.freeze({
       ok: false,
@@ -763,6 +935,8 @@ export class DefaultDataAssetExecutionFramework {
       failure: input.failure,
       converterResult: input.converterResult,
       lineage,
+      ingestionLineage,
+      ingestionLog,
     } satisfies DataAssetExecutionResult);
   }
 }

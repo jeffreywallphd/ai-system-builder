@@ -1323,3 +1323,17 @@ Explicitly later than this scope:
   - preview and execution mode labels.
 - Registered ingestion set now includes CSV, JSON, document/PDF, image, and batch-ingestion framework assets through `registerDataStudioSampleAssets`.
 - Category + specialization registry filtering is now first-class for ingestion discovery (`category` query + existing specialization/capability filters), keeping discovery backend/application owned rather than UI-owned.
+
+## Direction 5 update: Advanced ingestion configuration mode + logging/lineage hooks (stories 14.13-14.14)
+
+- Ingestion config schemas now carry contract-level field visibility metadata (`simple` vs `advanced`) through `application/dataset-studio/DataAssetConfiguration.ts`, so UI mode split is schema-driven rather than screen-local duplication.
+- CSV/JSON/document/image/batch ingestion schema fields now declare simple/advanced visibility directly in asset-owned config contract definitions.
+- Ingestion normalization envelopes now include structured logging + lineage hooks (`log`, `lineage`) with bounded metadata for:
+  - producer asset/version,
+  - preview vs execute mode,
+  - source references,
+  - config summary,
+  - output summary,
+  - warning/error counts.
+- Batch ingestion now emits batch-level + per-item logging metadata and lineage hooks with parent/child execution linkage hints while preserving existing bounded orchestration scope.
+- Data asset execution framework results now include ingestion-oriented logging/lineage metadata in addition to existing lineage diagnostics, keeping preview/full execution traceability machine-readable for downstream registry/inspection surfaces.

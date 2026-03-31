@@ -21,9 +21,14 @@ import type {
 import { buildIngestionPreviewEnvelope } from "./IngestionCanonicalNormalization";
 import {
   IngestionExecutionContextSchema,
+  IngestionExecutionStatuses,
   IngestionIssueCategories,
   IngestionIssueRecoverabilities,
+  createIngestionLineageHook,
+  createIngestionLogRecord,
   createIngestionIssue,
+  type IngestionLineageHook,
+  type IngestionLogRecord,
   type IngestionIssue,
 } from "./IngestionContracts";
 import {
@@ -51,6 +56,7 @@ import {
 } from "./SourceLocatorInputAbstraction";
 import {
   DataAssetConfigFieldKinds,
+  DataAssetConfigFieldVisibilities,
   createDataAssetConfigSchema,
   type DataAssetConfigSchema,
 } from "./DataAssetConfiguration";
@@ -140,6 +146,11 @@ export interface BatchIngestionResult {
   readonly issues: ReadonlyArray<SourceLocatorIssue>;
   readonly warnings: ReadonlyArray<IngestionIssue>;
   readonly preview: BatchIngestionPreviewPayload;
+  readonly lineage: IngestionLineageHook;
+  readonly logging: {
+    readonly batch: IngestionLogRecord;
+    readonly items: ReadonlyArray<IngestionLogRecord>;
+  };
 }
 
 export const BatchIngestionConfigSchema = z.object({
@@ -317,6 +328,26 @@ function detectRoutedIngestor(descriptor: SourceDescriptor): BatchIngestorKind |
   return undefined;
 }
 
+function toLineageSourceReference(descriptor: SourceDescriptor): {
+  readonly sourceId?: string;
+  readonly sourceReference?: string;
+  readonly sourceType?: string;
+  readonly mediaType?: string;
+  readonly fileName?: string;
+  readonly batchId?: string;
+  readonly batchItemId?: string;
+} {
+  return Object.freeze({
+    sourceId: descriptor.sourceId,
+    sourceReference: descriptor.normalizedReference,
+    sourceType: descriptor.kind,
+    mediaType: descriptor.mediaType,
+    fileName: descriptor.displayName,
+    batchId: "batch-ingestion",
+    batchItemId: descriptor.sourceId,
+  });
+}
+
 export class BatchIngestionFramework {
   private readonly sourceLocator: SourceLocatorInputAbstraction;
   private readonly converter: DataConverterCore;
@@ -440,6 +471,14 @@ export class BatchIngestionFramework {
           normalized: buildIngestionPreviewEnvelope({
             ingestor: "batch-ingestion-framework",
             context: previewContext,
+            asset: Object.freeze({
+              assetId: BatchIngestionAssetId,
+              assetVersion: BatchIngestionAssetVersion,
+            }),
+            configSummary: Object.freeze({
+              config: request.config ?? {},
+              strategy: request.strategy ?? { kind: BatchIngestionStrategyKinds.routed },
+            }),
             totalCount: 1,
             sampleCount: 1,
             sourceCount: 1,
@@ -452,6 +491,48 @@ export class BatchIngestionFramework {
             }),
             issues: Object.freeze([invalidConfigIssue]),
           }),
+        }),
+        lineage: createIngestionLineageHook({
+          producer: Object.freeze({
+            assetId: BatchIngestionAssetId,
+            assetVersion: BatchIngestionAssetVersion,
+          }),
+          executionMode: "preview",
+          sources: Object.freeze([]),
+          output: Object.freeze({
+            shapeKind: "records",
+            totalCount: 1,
+            sourceCount: 1,
+            successCount: 0,
+            failureCount: 1,
+          }),
+          configSummary: Object.freeze({
+            config: request.config ?? {},
+            strategy: request.strategy ?? { kind: BatchIngestionStrategyKinds.routed },
+          }),
+        }),
+        logging: Object.freeze({
+          batch: createIngestionLogRecord({
+            executionMode: "preview",
+            status: IngestionExecutionStatuses.failed,
+            asset: Object.freeze({
+              assetId: BatchIngestionAssetId,
+              assetVersion: BatchIngestionAssetVersion,
+            }),
+            issues: Object.freeze([invalidConfigIssue]),
+            outputSummary: Object.freeze({
+              shapeKind: "records",
+              totalCount: 1,
+              sourceCount: 1,
+              successCount: 0,
+              failureCount: 1,
+            }),
+            configSummary: Object.freeze({
+              config: request.config ?? {},
+              strategy: request.strategy ?? { kind: BatchIngestionStrategyKinds.routed },
+            }),
+          }),
+          items: Object.freeze([]),
         }),
       });
     }
@@ -601,11 +682,24 @@ export class BatchIngestionFramework {
       normalized: buildIngestionPreviewEnvelope({
         ingestor: "batch-ingestion-framework",
         context: previewContext,
+        asset: Object.freeze({
+          assetId: BatchIngestionAssetId,
+          assetVersion: BatchIngestionAssetVersion,
+        }),
+        configSummary: Object.freeze({
+          strategy: strategy.kind,
+          config,
+          sharedConfig,
+        }),
+        sourceReferences: Object.freeze(combinedItems.map((entry) => toLineageSourceReference(entry.source))),
         totalCount: combinedItems.length,
         sampleCount: previewItems.length,
         sourceCount: combinedItems.length,
         successCount: successItems.length,
         failureCount: failureItems.length,
+        childExecutionIds: Object.freeze(
+          combinedItems.map((item) => `batch-item-${item.source.sourceId}`),
+        ),
         preview: this.previewEngine.buildFromCanonicalShape({
           kind: "records",
           records: Object.freeze(previewItems.map((item, index) => Object.freeze({
@@ -629,6 +723,66 @@ export class BatchIngestionFramework {
       }),
     } satisfies BatchIngestionPreviewPayload);
 
+    const itemLogs = Object.freeze(combinedItems.map((item) => {
+      if (item.ok && item.normalized?.log) {
+        return item.normalized.log;
+      }
+      if (!item.ok && item.normalized?.log) {
+        return item.normalized.log;
+      }
+
+      const itemIssue = !item.ok
+        ? item.normalizedIssue ?? createIngestionIssue({
+          code: item.error.code,
+          message: item.error.message,
+          category: toBatchIssueCategory(item.error.code),
+          recoverability: toBatchIssueRecoverability(item.error.code),
+          source: {
+            sourceId: item.source.sourceId,
+            sourceReference: item.source.normalizedReference,
+            fileName: item.source.displayName,
+            batchId: "batch-ingestion",
+            batchItemId: item.source.sourceId,
+          },
+        })
+        : undefined;
+      return createIngestionLogRecord({
+        executionMode: request.previewOnly ? "preview" : "execute",
+        status: item.ok ? IngestionExecutionStatuses.succeeded : IngestionExecutionStatuses.failed,
+        asset: Object.freeze({
+          assetId: item.ingestor ? `${item.ingestor}-ingestor` : BatchIngestionAssetId,
+          assetVersion: "1.0.0",
+        }),
+        issues: itemIssue ? Object.freeze([itemIssue]) : Object.freeze([]),
+        outputSummary: item.ok
+          ? Object.freeze({
+            shapeKind: item.output.kind,
+            totalCount: item.output.kind === "records"
+              ? item.output.records.length
+              : item.output.kind === "table"
+                ? item.output.rows.length
+              : item.output.kind === "text-items"
+                ? item.output.items.length
+                : item.output.items.length,
+          })
+          : Object.freeze({
+            shapeKind: "records",
+            totalCount: 0,
+          }),
+        sources: Object.freeze([toLineageSourceReference(item.source)]),
+        configSummary: Object.freeze({
+          strategy: strategy.kind,
+          ingestor: item.ingestor,
+          previewOnly: request.previewOnly === true,
+        }),
+        executionId: `batch-item-${item.source.sourceId}`,
+        runId: "batch-ingestion",
+      });
+    }));
+
+    const lineage = preview.normalized.lineage;
+    const batchLog = preview.normalized.log;
+
     return Object.freeze({
       strategy: strategy.kind,
       itemCount: combinedItems.length,
@@ -639,6 +793,11 @@ export class BatchIngestionFramework {
       issues: Object.freeze(sourceIssues),
       warnings: Object.freeze(batchWarnings),
       preview,
+      lineage,
+      logging: Object.freeze({
+        batch: batchLog,
+        items: itemLogs,
+      }),
     } satisfies BatchIngestionResult);
   }
 
@@ -1002,18 +1161,21 @@ export function createBatchIngestionConfigSchema(assetId: string): DataAssetConf
         key: "continueOnError",
         label: "Continue on error",
         kind: DataAssetConfigFieldKinds.boolean,
+        visibility: DataAssetConfigFieldVisibilities.simple,
         defaultValue: true,
       },
       {
         key: "maxItems",
         label: "Max items",
         kind: DataAssetConfigFieldKinds.number,
+        visibility: DataAssetConfigFieldVisibilities.simple,
         min: 1,
       },
       {
         key: "previewItemLimit",
         label: "Preview item limit",
         kind: DataAssetConfigFieldKinds.number,
+        visibility: DataAssetConfigFieldVisibilities.advanced,
         defaultValue: 10,
         min: 1,
         max: 100,
@@ -1022,6 +1184,7 @@ export function createBatchIngestionConfigSchema(assetId: string): DataAssetConf
         key: "concurrency",
         label: "Concurrency",
         kind: DataAssetConfigFieldKinds.number,
+        visibility: DataAssetConfigFieldVisibilities.advanced,
         min: 1,
         max: 16,
       },
@@ -1029,6 +1192,7 @@ export function createBatchIngestionConfigSchema(assetId: string): DataAssetConf
         key: "strategy",
         label: "Strategy",
         kind: DataAssetConfigFieldKinds.select,
+        visibility: DataAssetConfigFieldVisibilities.simple,
         defaultValue: BatchIngestionStrategyKinds.routed,
         options: Object.freeze([
           { value: BatchIngestionStrategyKinds.routed, label: "Auto route by source type" },
@@ -1039,6 +1203,7 @@ export function createBatchIngestionConfigSchema(assetId: string): DataAssetConf
         key: "selectedIngestor",
         label: "Selected ingestor",
         kind: DataAssetConfigFieldKinds.select,
+        visibility: DataAssetConfigFieldVisibilities.advanced,
         defaultValue: BatchIngestorKinds.csv,
         options: Object.freeze([
           { value: BatchIngestorKinds.csv, label: "CSV" },

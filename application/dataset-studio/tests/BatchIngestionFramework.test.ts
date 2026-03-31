@@ -46,6 +46,8 @@ describe("BatchIngestionFramework", () => {
     expect(result.outputs.length).toBe(4);
     expect(result.outputs.every((entry) => entry.output.kind === "records")).toBeTrue();
     expect(result.preview.shapeSummary.records).toBe(4);
+    expect(result.logging.batch.asset.assetId).toBe("batch-ingestion-framework");
+    expect(result.lineage.producer.assetId).toBe("batch-ingestion-framework");
   });
 
   it("supports partial failures while continuing other items when continueOnError is true", async () => {
@@ -74,6 +76,7 @@ describe("BatchIngestionFramework", () => {
     expect(result.items.some((item) => !item.ok && item.error.code === BatchIngestionItemErrorCodes.unreadableFile)).toBeTrue();
     expect(result.items.some((item) => !item.ok && item.normalizedIssue?.category === "unreadable-source")).toBeTrue();
     expect(result.warnings.some((issue) => issue.code === "batch-partial-failure")).toBeTrue();
+    expect(result.logging.batch.status).toBe("partial");
   });
 
   it("supports fail-fast behavior when continueOnError is false", async () => {
@@ -112,6 +115,7 @@ describe("BatchIngestionFramework", () => {
     if (result.items[1] && !result.items[1].ok) {
       expect(result.items[1].error.code).toBe(BatchIngestionItemErrorCodes.failFastStopped);
     }
+    expect(result.logging.items.length).toBe(2);
   });
 
   it("applies shared ingestor configuration across batch items", async () => {
@@ -168,5 +172,7 @@ describe("BatchIngestionFramework", () => {
     expect(result.itemCount).toBe(2);
     expect(result.preview.normalized.ingestor).toBe("batch-ingestion-framework");
     expect(result.preview.normalized.summary.sampleCount).toBe(2);
+    expect(result.preview.normalized.log.preview).toBeTrue();
+    expect(result.logging.batch.preview).toBeTrue();
   });
 });

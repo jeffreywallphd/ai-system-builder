@@ -64,6 +64,9 @@ describe("Ingestion contracts + normalization", () => {
     expect(result.output.metadata.source?.fileName).toBe("users.csv");
     expect(result.output.metadata.attributes?.sourceReference).toBe("C:\\tmp\\users.csv");
     expect(result.normalized.preview.kind).toBe("records");
+    expect(result.normalized.log.asset.assetId).toBe(CsvIngestorAsset.assetId);
+    expect(result.normalized.log.preview).toBeFalse();
+    expect(result.normalized.lineage.producer.assetId).toBe(CsvIngestorAsset.assetId);
   });
 
   it("normalizes JSON into canonical records and applies default config", () => {
@@ -80,6 +83,8 @@ describe("Ingestion contracts + normalization", () => {
     expect(result.config.flatten).toBeFalse();
     expect(result.output.kind).toBe("records");
     expect(result.output.metadata.attributes?.sourceReference).toBe("in-memory://users.json");
+    expect(result.normalized.log.asset.assetId).toBe(JsonIngestorAsset.assetId);
+    expect(result.normalized.lineage.output.shapeKind).toBe("records");
   });
 
   it("rejects invalid CSV request contract with structured diagnostics", () => {
@@ -97,6 +102,7 @@ describe("Ingestion contracts + normalization", () => {
     expect(result.diagnostics[0]?.code).toBe(CsvIngestorErrorCodes.invalidConfig);
     expect(result.normalized.ok).toBeFalse();
     expect(result.normalized.issues[0]?.category).toBe("invalid-configuration");
+    expect(result.normalized.log.status).toBe("failed");
   });
 
   it("rejects invalid JSON request contract with structured diagnostics", () => {
@@ -113,6 +119,7 @@ describe("Ingestion contracts + normalization", () => {
     expect(result.diagnostics[0]?.code).toBe(JsonIngestorErrorCodes.invalidConfig);
     expect(result.normalized.ok).toBeFalse();
     expect(result.normalized.issues[0]?.category).toBe("invalid-configuration");
+    expect(result.normalized.log.status).toBe("failed");
   });
 
   it("preserves document source/extraction metadata in normalized output", async () => {
@@ -140,6 +147,8 @@ describe("Ingestion contracts + normalization", () => {
     expect(result.output.metadata.lineage?.[0]?.assetId).toBe("asset-doc");
     expect(result.output.metadata.attributes?.sourceReference).toBe("in-memory");
     expect(result.normalized.preview.kind).toBe("text-items");
+    expect(result.normalized.log.asset.assetId).toBe(DocumentPdfIngestorAsset.assetId);
+    expect(result.preview.normalized.log.preview).toBeFalse();
   });
 
   it("preserves image metadata and source lineage in normalized output", async () => {
@@ -168,6 +177,8 @@ describe("Ingestion contracts + normalization", () => {
     expect(result.output.metadata.lineage?.[0]?.assetId).toBe("asset-image");
     expect(result.output.metadata.attributes?.sourceReference).toBe("image-source");
     expect(result.normalized.preview.kind).toBe("image-metadata-records");
+    expect(result.normalized.log.asset.assetId).toBe(ImageIngestorAsset.assetId);
+    expect(result.preview.normalized.log.preview).toBeFalse();
   });
 
   it("emits consistent normalized preview envelopes across ingestors", async () => {
@@ -223,6 +234,9 @@ describe("Ingestion contracts + normalization", () => {
     expect(json.normalized.contractVersion).toBe("1.0.0");
     expect(doc.normalized.contractVersion).toBe("1.0.0");
     expect(image.normalized.contractVersion).toBe("1.0.0");
+    expect(csv.normalized.log.preview).toBeFalse();
+    expect(doc.normalized.log.preview).toBeFalse();
+    expect(image.normalized.log.preview).toBeFalse();
   });
 });
 

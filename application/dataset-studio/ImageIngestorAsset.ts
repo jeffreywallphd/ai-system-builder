@@ -6,6 +6,7 @@ import { DataSourceReferenceKinds, type DataSourceReference, type ResolvedDataSo
 import { DefaultDataSourceLocator, type IDataSourceLocator } from "./DataSourceLocator";
 import {
   DataAssetConfigFieldKinds,
+  DataAssetConfigFieldVisibilities,
   createDataAssetConfigSchema,
   type DataAssetConfigSchema,
 } from "./DataAssetConfiguration";
@@ -306,6 +307,10 @@ export class ImageIngestorAsset {
   }
 
   public async resolveAndExecute(request: ImageIngestorResolveRequest): Promise<ImageIngestorExecutionResult> {
+    const assetIdentity = Object.freeze({
+      assetId: ImageIngestorAsset.assetId,
+      assetVersion: ImageIngestorAsset.assetVersion,
+    });
     try {
       const source = await this.sourceLocator.resolve({ source: request.source });
       return this.execute({ source, config: request.config, imageId: request.imageId });
@@ -343,12 +348,18 @@ export class ImageIngestorAsset {
         normalized: buildIngestionFailureEnvelope({
           context,
           issues,
+          asset: assetIdentity,
+          configSummary: request.config,
         }),
       });
     }
   }
 
   public async execute(request: ImageIngestorExecutionRequest): Promise<ImageIngestorExecutionResult> {
+    const assetIdentity = Object.freeze({
+      assetId: ImageIngestorAsset.assetId,
+      assetVersion: ImageIngestorAsset.assetVersion,
+    });
     const parsedConfig = ImageIngestorConfigSchema.safeParse(request.config ?? {});
     if (!parsedConfig.success) {
       const parsedContext = IngestionExecutionContextSchema.safeParse(request.context ?? {});
@@ -366,6 +377,8 @@ export class ImageIngestorAsset {
         normalized: buildIngestionFailureEnvelope({
           context: parsedContext.success ? parsedContext.data : IngestionExecutionContextSchema.parse({}),
           issues,
+          asset: assetIdentity,
+          configSummary: request.config,
         }),
       });
     }
@@ -400,6 +413,8 @@ export class ImageIngestorAsset {
         normalized: buildIngestionFailureEnvelope({
           context: ingestionContext,
           issues,
+          asset: assetIdentity,
+          configSummary: config,
         }),
       });
     }
@@ -423,6 +438,8 @@ export class ImageIngestorAsset {
         normalized: buildIngestionFailureEnvelope({
           context: ingestionContext,
           issues,
+          asset: assetIdentity,
+          configSummary: config,
         }),
       });
     }
@@ -452,6 +469,8 @@ export class ImageIngestorAsset {
         normalized: buildIngestionFailureEnvelope({
           context: ingestionContext,
           issues,
+          asset: assetIdentity,
+          configSummary: config,
         }),
       });
     }
@@ -521,6 +540,8 @@ export class ImageIngestorAsset {
       normalized: buildIngestionPreviewEnvelope({
         ingestor: ImageIngestorAsset.assetId,
         context: ingestionContext,
+        asset: assetIdentity,
+        configSummary: config,
         totalCount: 1,
         sampleCount: 1,
         preview: buildIngestionSuccessEnvelope({
@@ -545,6 +566,8 @@ export class ImageIngestorAsset {
             },
           }),
           context: ingestionContext,
+          asset: assetIdentity,
+          configSummary: config,
         }).preview,
         sample: Object.freeze([Object.freeze({
           imageId,
@@ -586,6 +609,8 @@ export class ImageIngestorAsset {
       normalized: buildIngestionSuccessEnvelope({
         output: normalizedOutput,
         context: ingestionContext,
+        asset: assetIdentity,
+        configSummary: config,
       }),
       metadata: Object.freeze(metadataRecord),
       preview,
@@ -611,24 +636,28 @@ export function createImageIngestorConfigSchema(assetId: string): DataAssetConfi
         key: "extractExif",
         label: "Extract EXIF",
         kind: DataAssetConfigFieldKinds.boolean,
+        visibility: DataAssetConfigFieldVisibilities.simple,
         defaultValue: true,
       },
       {
         key: "generatePreviewMetadata",
         label: "Preview metadata",
         kind: DataAssetConfigFieldKinds.boolean,
+        visibility: DataAssetConfigFieldVisibilities.advanced,
         defaultValue: true,
       },
       {
         key: "normalizeOrientation",
         label: "Normalize orientation",
         kind: DataAssetConfigFieldKinds.boolean,
+        visibility: DataAssetConfigFieldVisibilities.advanced,
         defaultValue: true,
       },
       {
         key: "includeFileStats",
         label: "Include file stats",
         kind: DataAssetConfigFieldKinds.boolean,
+        visibility: DataAssetConfigFieldVisibilities.advanced,
         defaultValue: true,
       },
     ]),
