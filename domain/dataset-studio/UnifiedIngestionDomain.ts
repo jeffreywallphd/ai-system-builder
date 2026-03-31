@@ -70,6 +70,11 @@ export const UnifiedIngestionIssueCodes = Object.freeze({
   unsupportedSourceType: "unsupported-source-type",
   detectionConflict: "detection-conflict",
   detectionFailed: "detection-failed",
+  routingUnsupported: "routing-unsupported",
+  routingUnavailable: "routing-unavailable",
+  ingestionFailed: "ingestion-failed",
+  conversionFailed: "conversion-failed",
+  sourceReadFailed: "source-read-failed",
 } as const);
 
 export type UnifiedIngestionIssueCode = typeof UnifiedIngestionIssueCodes[keyof typeof UnifiedIngestionIssueCodes];
@@ -205,6 +210,63 @@ export interface IUnifiedIngestionFileSignatureSniffer {
 
 export interface IUnifiedIngestionSourceTypeDetector {
   detect(request: UnifiedIngestionDetectionRequest): Promise<UnifiedIngestionDetectionResult>;
+}
+
+export const UnifiedIngestionRoutePolicyKinds = Object.freeze({
+  detectedKind: "detected-kind",
+  outputTargetFallback: "output-target-fallback",
+} as const);
+
+export type UnifiedIngestionRoutePolicyKind =
+  typeof UnifiedIngestionRoutePolicyKinds[keyof typeof UnifiedIngestionRoutePolicyKinds];
+
+export const UnifiedIngestionRouteFailureCodes = Object.freeze({
+  unsupportedSourceKind: "unsupported-source-kind",
+  missingRouteMapping: "missing-route-mapping",
+} as const);
+
+export type UnifiedIngestionRouteFailureCode =
+  typeof UnifiedIngestionRouteFailureCodes[keyof typeof UnifiedIngestionRouteFailureCodes];
+
+export const UnifiedIngestionRouteHandlerKinds = Object.freeze({
+  csv: "csv",
+  json: "json",
+  document: "document",
+  image: "image",
+} as const);
+
+export type UnifiedIngestionRouteHandlerKind =
+  typeof UnifiedIngestionRouteHandlerKinds[keyof typeof UnifiedIngestionRouteHandlerKinds];
+
+export interface UnifiedIngestionRouteRequest {
+  readonly source: UnifiedIngestionSourceReference;
+  readonly detection: UnifiedIngestionDetectionResult;
+  readonly configuration?: UnifiedIngestionConfiguration;
+}
+
+export interface UnifiedIngestionRouteResolution {
+  readonly status: "resolved";
+  readonly sourceKind: UnifiedIngestionSourceKind;
+  readonly handlerKind: UnifiedIngestionRouteHandlerKind;
+  readonly assetId: string;
+  readonly assetVersion?: string;
+  readonly policy: UnifiedIngestionRoutePolicyKind;
+  readonly fallbackUsed: boolean;
+  readonly reason: string;
+}
+
+export interface UnifiedIngestionRouteFailure {
+  readonly status: "unsupported";
+  readonly sourceKind: UnifiedIngestionSourceKind;
+  readonly failureCode: UnifiedIngestionRouteFailureCode;
+  readonly fallbackUsed: boolean;
+  readonly reason: string;
+}
+
+export type UnifiedIngestionRouteResult = UnifiedIngestionRouteResolution | UnifiedIngestionRouteFailure;
+
+export interface IUnifiedIngestionRouter {
+  route(request: UnifiedIngestionRouteRequest): UnifiedIngestionRouteResult;
 }
 
 const UnifiedIngestionOutputTargets: ReadonlyArray<UnifiedIngestionOutputTargetDescriptor> = Object.freeze([
