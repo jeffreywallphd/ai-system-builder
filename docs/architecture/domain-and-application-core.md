@@ -1473,3 +1473,18 @@ Explicitly later than this scope:
   - template instantiation with partial customization (stage config overrides, skip list, reorder list),
   - validation against stage definition contracts and stage-to-asset mapping (`StageAssetMappingService`).
 - Stage-to-asset mapping now includes template-stage coverage (source/raw-storage/extraction/chunking/cleaning/transformation/aggregation/prepared-storage) while preserving orchestration-only behavior (no asset execution in template/wizard seams).
+
+## Direction 5 extension update: Intent-driven wizard configuration + stage policy automation (stories 15E.5-15E.6)
+
+- Dataset Studio now has an explicit intent model in `domain/dataset-studio/IntentDomain.ts` with intent id/name/description, associated pipeline templates, optional stage overrides, and optional stage blueprints for extensible/custom presets.
+- Intent resolution is now a dedicated application seam in `application/dataset-studio/IntentService.ts`:
+  - lists registered intents,
+  - resolves `intent -> template` mappings,
+  - applies intent-specific stage include/exclude/reorder adjustments,
+  - validates resulting flows against stage-flow contracts and stage-to-asset mappings.
+- Wizard flow initialization now supports intent-first orchestration in `application/dataset-studio/WizardFlowEngine.ts` by accepting `intentId`/`intentPreset` + `IntentService`, resolving template+intent adjustments before start, and persisting intent context in runtime wizard state.
+- Stage execution automation is now isolated in `application/dataset-studio/StageExecutionPolicy.ts`:
+  - stage decision outcomes: `execute`, `auto-complete`, `skip`,
+  - data-driven skip rules over unified-ingestion outputs,
+  - auto-configuration merge from mapping defaults + template defaults + intent defaults + ingestion-derived normalization hints.
+- Wizard runtime state tracking now includes `autoConfiguredStageIds` and `userOverriddenStageIds` (plus existing skipped/completed tracking) to preserve deterministic navigation with dynamic stage behavior.

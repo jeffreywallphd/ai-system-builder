@@ -29,14 +29,24 @@ export interface StageFlowRuntimeState {
   readonly currentStageId: string;
   readonly completedStageIds: ReadonlyArray<string>;
   readonly skippedStageIds: ReadonlyArray<string>;
+  readonly autoConfiguredStageIds: ReadonlyArray<string>;
+  readonly userOverriddenStageIds: ReadonlyArray<string>;
   readonly stageConfiguration: Readonly<Record<string, Readonly<Record<string, CanonicalRecordValue>>>>;
   readonly stageOutputs: Readonly<Record<string, Readonly<Record<string, CanonicalRecordValue>>>>;
+  readonly intentContext?: {
+    readonly id: string;
+    readonly name: string;
+    readonly description: string;
+    readonly templateId: string;
+  };
 }
 
 export interface StageFlowConditionContext {
   readonly currentStageId: string;
   readonly completedStageIds: ReadonlyArray<string>;
   readonly skippedStageIds: ReadonlyArray<string>;
+  readonly autoConfiguredStageIds: ReadonlyArray<string>;
+  readonly userOverriddenStageIds: ReadonlyArray<string>;
   readonly stageConfiguration: Readonly<Record<string, Readonly<Record<string, CanonicalRecordValue>>>>;
   readonly stageOutputs: Readonly<Record<string, Readonly<Record<string, CanonicalRecordValue>>>>;
 }
@@ -258,6 +268,8 @@ export function createInitialStageFlowRuntimeState(flow: StageFlowDefinition): S
     currentStageId: firstStage.id,
     completedStageIds: Object.freeze([]),
     skippedStageIds: Object.freeze([]),
+    autoConfiguredStageIds: Object.freeze([]),
+    userOverriddenStageIds: Object.freeze([]),
     stageConfiguration: Object.freeze({}),
     stageOutputs: Object.freeze({}),
   });

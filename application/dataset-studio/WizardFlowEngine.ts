@@ -1,4 +1,5 @@
 import type { CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
+import type { IntentDefinition } from "../../domain/dataset-studio/IntentDomain";
 import {
   areStageContractsCompatible,
   createInitialStageFlowRuntimeState,
@@ -15,6 +16,12 @@ import {
 } from "../../domain/dataset-studio/StageFlowDefinition";
 import type { DatasetPipelineStageDefinition } from "../../domain/dataset-studio/StagePipelineDomain";
 import type { PipelineTemplate } from "../../domain/dataset-studio/PipelineTemplateDomain";
+import {
+  StageExecutionDispositions,
+  StageExecutionPolicy,
+  type StageExecutionPolicyDecision,
+} from "./StageExecutionPolicy";
+import type { IntentContext, IntentService } from "./IntentService";
 import type { PipelineTemplateInstantiationRequest, TemplateService } from "./TemplateService";
 
 export interface WizardFlowTransition {
@@ -44,11 +51,15 @@ export interface WizardFlowEngineOptions {
   readonly template?: PipelineTemplate;
   readonly templateService?: TemplateService;
   readonly templateInstantiation?: PipelineTemplateInstantiationRequest;
+  readonly intentId?: string;
+  readonly intentPreset?: IntentDefinition;
+  readonly intentService?: IntentService;
   readonly conditionEvaluators?: Readonly<Record<string, WizardFlowConditionEvaluator>>;
   readonly autoSkipEvaluator?: (input: {
     readonly stage: DatasetPipelineStageDefinition;
     readonly state: StageFlowRuntimeState;
   }) => boolean;
+  readonly stageExecutionPolicy?: StageExecutionPolicy;
   readonly beforeTransition?: WizardFlowTransitionValidationHook;
 }
 
@@ -92,6 +103,8 @@ function toConditionContext(state: StageFlowRuntimeState): StageFlowConditionCon
     currentStageId: state.currentStageId,
     completedStageIds: state.completedStageIds,
     skippedStageIds: state.skippedStageIds,
+    autoConfiguredStageIds: state.autoConfiguredStageIds,
+    userOverriddenStageIds: state.userOverriddenStageIds,
     stageConfiguration: state.stageConfiguration,
     stageOutputs: state.stageOutputs,
   });
@@ -103,13 +116,20 @@ function freezeRecord(
   return Object.freeze({ ...value });
 }
 
+function hasValues(record: Readonly<Record<string, CanonicalRecordValue>>): boolean {
+  return Object.keys(record).length > 0;
+}
+
 export class WizardFlowEngine {
   private stageFlow: StageFlowDefinition;
   private state: StageFlowRuntimeState;
   private readonly conditionEvaluators: Readonly<Record<string, WizardFlowConditionEvaluator>>;
   private readonly autoSkipEvaluator?: WizardFlowEngineOptions["autoSkipEvaluator"];
+  private readonly stageExecutionPolicy?: StageExecutionPolicy;
   private readonly beforeTransition?: WizardFlowTransitionValidationHook;
   private navigationHistory: ReadonlyArray<string>;
+  private readonly intentDefaults: Readonly<Record<string, Readonly<Record<string, CanonicalRecordValue>>>>;
+  private readonly templateDefaults: Readonly<Record<string, Readonly<Record<string, CanonicalRecordValue>>>>;
 
   constructor(options: WizardFlowEngineOptions) {
     const initial = this.resolveInitial(options);
@@ -125,11 +145,21 @@ export class WizardFlowEngine {
     this.navigationHistory = Object.freeze([]);
     this.conditionEvaluators = options.conditionEvaluators ?? Object.freeze({});
     this.autoSkipEvaluator = options.autoSkipEvaluator;
+    this.stageExecutionPolicy = options.stageExecutionPolicy;
     this.beforeTransition = options.beforeTransition;
+    this.intentDefaults = initial.intentDefaults ?? Object.freeze({});
+    this.templateDefaults = initial.templateDefaults ?? Object.freeze({});
 
-    if (initial.template?.defaultStageConfiguration) {
-      for (const [stageId, config] of Object.entries(initial.template.defaultStageConfiguration)) {
-        this.state = withStageConfiguration(this.state, stageId, config);
+    if (initial.intentContext) {
+      this.state = Object.freeze({
+        ...this.state,
+        intentContext: initial.intentContext,
+      });
+    }
+
+    if (initial.defaultStageConfiguration) {
+      for (const [stageId, config] of Object.entries(initial.defaultStageConfiguration)) {
+        this.applyStageConfiguration(stageId, config, "auto");
       }
     }
 
@@ -144,12 +174,16 @@ export class WizardFlowEngine {
     return this.state;
   }
 
+  public getIntentContext(): StageFlowRuntimeState["intentContext"] {
+    return this.state.intentContext;
+  }
+
   public setStageConfiguration(
     stageId: string,
     configuration: Readonly<Record<string, CanonicalRecordValue>>,
   ): StageFlowRuntimeState {
     this.assertKnownStageId(stageId);
-    this.state = withStageConfiguration(this.state, stageId, freezeRecord(configuration));
+    this.applyStageConfiguration(stageId, configuration, "user");
     return this.state;
   }
 
@@ -193,6 +227,8 @@ export class WizardFlowEngine {
       currentStageId: nextCurrentStageId,
       completedStageIds: this.state.completedStageIds.filter((existing) => existing !== normalizedStageId),
       skippedStageIds: this.state.skippedStageIds.filter((existing) => existing !== normalizedStageId),
+      autoConfiguredStageIds: this.state.autoConfiguredStageIds.filter((existing) => existing !== normalizedStageId),
+      userOverriddenStageIds: this.state.userOverriddenStageIds.filter((existing) => existing !== normalizedStageId),
     });
     this.validateCurrentStageExists();
     return this.stageFlow;
@@ -211,7 +247,10 @@ export class WizardFlowEngine {
     if (!resolution.nextStage) {
       this.state = Object.freeze({
         ...this.state,
-        completedStageIds: completion,
+        completedStageIds: dedupeOrdered([
+          ...completion,
+          ...resolution.autoCompletedStageIds,
+        ]),
       });
       return Object.freeze({
         moved: false,
@@ -235,7 +274,10 @@ export class WizardFlowEngine {
     this.state = Object.freeze({
       ...this.state,
       currentStageId: resolution.nextStage.id,
-      completedStageIds: completion,
+      completedStageIds: dedupeOrdered([
+        ...completion,
+        ...resolution.autoCompletedStageIds,
+      ]),
       skippedStageIds: dedupeOrdered([...this.state.skippedStageIds, ...resolution.skippedStageIds]),
     });
 
@@ -310,15 +352,41 @@ export class WizardFlowEngine {
   private resolveInitial(options: WizardFlowEngineOptions): {
     readonly stageFlow: StageFlowDefinition;
     readonly state?: StageFlowRuntimeState;
-    readonly template?: PipelineTemplate;
+    readonly defaultStageConfiguration?: Readonly<Record<string, Readonly<Record<string, CanonicalRecordValue>>>>;
+    readonly templateDefaults?: Readonly<Record<string, Readonly<Record<string, CanonicalRecordValue>>>>;
+    readonly intentDefaults?: Readonly<Record<string, Readonly<Record<string, CanonicalRecordValue>>>>;
+    readonly intentContext?: IntentContext;
   } {
+    if (options.intentId || options.intentPreset) {
+      if (!options.intentService) {
+        throw new Error("WizardFlowEngine intent initialization requires an IntentService.");
+      }
+      const templateId = options.templateInstantiation?.templateId
+        ?? options.template?.id;
+      const resolution = options.intentService.resolve({
+        intentId: options.intentId,
+        intentPreset: options.intentPreset,
+        templateId,
+        orderedStageIds: options.templateInstantiation?.orderedStageIds,
+        skippedStageIds: options.templateInstantiation?.skippedStageIds,
+        stageConfigurationOverrides: options.templateInstantiation?.stageConfigurationOverrides,
+      });
+      return Object.freeze({
+        stageFlow: resolution.stageFlow,
+        defaultStageConfiguration: resolution.defaultStageConfiguration,
+        templateDefaults: resolution.templateStageConfigurationDefaults,
+        intentDefaults: resolution.intentStageConfigurationDefaults,
+        intentContext: resolution.intent,
+      });
+    }
     if (options.stageFlow) {
       return Object.freeze({ stageFlow: options.stageFlow });
     }
     if (options.template) {
       return Object.freeze({
         stageFlow: options.template.stageFlow,
-        template: options.template,
+        defaultStageConfiguration: options.template.defaultStageConfiguration,
+        templateDefaults: options.template.defaultStageConfiguration,
       });
     }
     if (options.templateService && options.templateInstantiation) {
@@ -326,10 +394,11 @@ export class WizardFlowEngine {
       return Object.freeze({
         stageFlow: instance.stageFlow,
         state: instance.state,
-        template: instance.template,
+        defaultStageConfiguration: instance.template.defaultStageConfiguration,
+        templateDefaults: instance.template.defaultStageConfiguration,
       });
     }
-    throw new Error("WizardFlowEngine requires a stageFlow, template, or template instantiation source.");
+    throw new Error("WizardFlowEngine requires a stageFlow, template, template instantiation source, or intent source.");
   }
 
   private getCurrentStage(): DatasetPipelineStageDefinition {
@@ -359,25 +428,6 @@ export class WizardFlowEngine {
     return evaluator(toConditionContext(this.state));
   }
 
-  private shouldAutoSkip(stage: DatasetPipelineStageDefinition): boolean {
-    if (this.state.skippedStageIds.includes(stage.id)) {
-      return true;
-    }
-    if (stage.executionPolicy.skipByDefault) {
-      return true;
-    }
-    if (stage.executionPolicy.mode === "conditional" && stage.executionPolicy.conditionId) {
-      return !this.isConditionMet(stage.executionPolicy.conditionId);
-    }
-    if (this.autoSkipEvaluator) {
-      return this.autoSkipEvaluator({
-        stage,
-        state: this.state,
-      });
-    }
-    return false;
-  }
-
   private selectConditionalTransition(fromStageId: string): StageFlowConditionalTransition | undefined {
     const transitions = this.stageFlow.conditionalTransitions
       .filter((transition) => transition.fromStageId === fromStageId)
@@ -396,6 +446,7 @@ export class WizardFlowEngine {
   private resolveForward(fromStageId: string): {
     readonly nextStage?: DatasetPipelineStageDefinition;
     readonly skippedStageIds: ReadonlyArray<string>;
+    readonly autoCompletedStageIds: ReadonlyArray<string>;
   } {
     const conditional = this.selectConditionalTransition(fromStageId);
     const fromIndex = this.stageFlow.stages.findIndex((stage) => stage.id === fromStageId);
@@ -404,6 +455,7 @@ export class WizardFlowEngine {
       : this.getLinearNextStage(fromStageId);
 
     const skippedStageIds: string[] = [];
+    const autoCompletedStageIds: string[] = [];
     if (conditional && cursor && fromIndex >= 0) {
       const toIndex = this.stageFlow.stages.findIndex((stage) => stage.id === cursor?.id);
       if (toIndex > fromIndex + 1) {
@@ -413,15 +465,122 @@ export class WizardFlowEngine {
         skippedStageIds.push(...bypassed);
       }
     }
-    while (cursor && this.shouldAutoSkip(cursor)) {
-      skippedStageIds.push(cursor.id);
-      cursor = this.getLinearNextStage(cursor.id);
+
+    while (cursor) {
+      const decision = this.resolveStageDecision(cursor);
+      if (hasValues(decision.autoConfiguration)) {
+        this.applyStageConfiguration(cursor.id, decision.autoConfiguration, "auto");
+      }
+
+      if (decision.disposition === StageExecutionDispositions.skip) {
+        skippedStageIds.push(cursor.id);
+        cursor = this.getLinearNextStage(cursor.id);
+        continue;
+      }
+      if (decision.disposition === StageExecutionDispositions.autoComplete) {
+        autoCompletedStageIds.push(cursor.id);
+        cursor = this.getLinearNextStage(cursor.id);
+        continue;
+      }
+      break;
     }
 
     return Object.freeze({
       nextStage: cursor,
       skippedStageIds: Object.freeze(skippedStageIds),
+      autoCompletedStageIds: Object.freeze(autoCompletedStageIds),
     });
+  }
+
+  private resolveStageDecision(stage: DatasetPipelineStageDefinition): StageExecutionPolicyDecision {
+    if (this.state.skippedStageIds.includes(stage.id)) {
+      return Object.freeze({
+        disposition: StageExecutionDispositions.skip,
+        reason: `Stage '${stage.id}' was already marked as skipped.`,
+        autoConfiguration: Object.freeze({}),
+      });
+    }
+    if (stage.executionPolicy.skipByDefault) {
+      return Object.freeze({
+        disposition: StageExecutionDispositions.skip,
+        reason: `Stage '${stage.id}' is configured to skip by default.`,
+        autoConfiguration: Object.freeze({}),
+      });
+    }
+    if (stage.executionPolicy.mode === "conditional" && stage.executionPolicy.conditionId) {
+      if (!this.isConditionMet(stage.executionPolicy.conditionId)) {
+        return Object.freeze({
+          disposition: StageExecutionDispositions.skip,
+          reason: `Stage '${stage.id}' condition '${stage.executionPolicy.conditionId}' was not met.`,
+          autoConfiguration: Object.freeze({}),
+        });
+      }
+    }
+
+    const policyDecision = this.stageExecutionPolicy?.evaluate({
+      stage,
+      stageFlow: this.stageFlow,
+      state: this.state,
+      intent: this.state.intentContext,
+      templateDefaults: this.templateDefaults,
+      intentDefaults: this.intentDefaults,
+    });
+
+    if (policyDecision) {
+      if (policyDecision.disposition === StageExecutionDispositions.execute && this.autoSkipEvaluator) {
+        const shouldSkip = this.autoSkipEvaluator({ stage, state: this.state });
+        if (shouldSkip) {
+          return Object.freeze({
+            disposition: StageExecutionDispositions.skip,
+            reason: `Stage '${stage.id}' was skipped by autoSkipEvaluator.`,
+            autoConfiguration: policyDecision.autoConfiguration,
+          });
+        }
+      }
+      return policyDecision;
+    }
+
+    if (this.autoSkipEvaluator) {
+      const shouldSkip = this.autoSkipEvaluator({
+        stage,
+        state: this.state,
+      });
+      if (shouldSkip) {
+        return Object.freeze({
+          disposition: StageExecutionDispositions.skip,
+          reason: `Stage '${stage.id}' was skipped by autoSkipEvaluator.`,
+          autoConfiguration: Object.freeze({}),
+        });
+      }
+    }
+
+    return Object.freeze({
+      disposition: StageExecutionDispositions.execute,
+      reason: `Stage '${stage.id}' should execute.`,
+      autoConfiguration: Object.freeze({}),
+    });
+  }
+
+  private applyStageConfiguration(
+    stageId: string,
+    configuration: Readonly<Record<string, CanonicalRecordValue>>,
+    source: "user" | "auto",
+  ): void {
+    const normalizedConfig = freezeRecord(configuration);
+    this.state = withStageConfiguration(this.state, stageId, normalizedConfig);
+    if (source === "auto" && hasValues(normalizedConfig)) {
+      this.state = Object.freeze({
+        ...this.state,
+        autoConfiguredStageIds: dedupeOrdered([...this.state.autoConfiguredStageIds, stageId]),
+      });
+      return;
+    }
+    if (source === "user") {
+      this.state = Object.freeze({
+        ...this.state,
+        userOverriddenStageIds: dedupeOrdered([...this.state.userOverriddenStageIds, stageId]),
+      });
+    }
   }
 }
 
