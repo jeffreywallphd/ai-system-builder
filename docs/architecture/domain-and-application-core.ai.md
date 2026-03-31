@@ -1097,3 +1097,24 @@ Explicitly later than this scope:
   - no ingestion-suite/pipeline-builder runtime stack was introduced,
   - no parallel taxonomy/identity/contract model was introduced,
   - abstractions remain focused on reusable data preview + data-asset foundation for later ingestion/pipeline stories.
+
+## Direction 5 update: Data asset execution framework + lineage metadata model (stories 13.7-13.8)
+
+- Data Studio now has an internal data-layer execution seam in `application/dataset-studio/DataAssetExecutionFramework.ts`:
+  - explicit execution request/context/result contracts for dataset assets,
+  - bounded execution input modes (`source-reference`, `resolved-source`, `converter-request`, `converter-result`, and canonical-shape),
+  - lifecycle-oriented execution flow (validation -> resolve/convert -> preview -> packaged result),
+  - standardized execution outputs for preview, diagnostics, downstream composition, and lineage handoff.
+- Execution integrates existing 13.1-13.6 foundations directly:
+  - conversion and source resolution via `DataConverterCore` + source-locator-backed conversion paths,
+  - canonical data-shape output reuse from `domain/dataset-studio/CanonicalDataShapes.ts`,
+  - preview generation via `application/data-studio/DataPreviewEngine.ts`,
+  - data-asset compatibility checks against `domain/dataset-studio/DataAssetBase.ts`.
+- Data lineage metadata is now first-class in `domain/dataset-studio/DataLineageMetadata.ts`:
+  - typed lineage references (inputs/intermediates/outputs),
+  - execution-step provenance with status/timestamps/diagnostics,
+  - producer + execution markers and serializable metadata envelopes.
+- Data asset creation now has an execution-result bridge (`DataAssetFactory.createFromExecutionResult`) so execution outputs can be projected into canonical data assets without introducing a separate taxonomy or registry path.
+- Scope remains intentionally bounded:
+  - lineage is modeled as metadata/provenance attached to execution results and assets, not a standalone graph engine,
+  - no lineage visualization/editor UI or distributed orchestration pipeline was introduced in this slice.
