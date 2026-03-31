@@ -11,7 +11,7 @@ export interface InlineRunAction {
 export interface InlineRunRequest {
   readonly action: UxRunActionKind;
   readonly target: {
-    readonly kind: "asset" | "system" | "tool" | "general";
+    readonly kind: "asset" | "workflow" | "system" | "tool" | "general";
     readonly assetId?: string;
     readonly versionId?: string;
   };

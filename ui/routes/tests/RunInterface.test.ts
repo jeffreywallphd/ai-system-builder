@@ -39,4 +39,23 @@ describe("RunInterfaceService", () => {
     const presentation = service.resolvePresentation("?context=asset&action=test&intent=Test+here");
     expect(presentation.surface.title).toBe("Test from context");
   });
+
+  it("resolves workflow-specific run surface and workflow runner handoff", () => {
+    const launchPath = service.resolveLaunchPath({
+      contextKind: RunContextKinds.workflow,
+      workflowId: "workflow:persisted:7",
+      workflowStatus: "saved",
+      source: "run",
+      actionKind: "run",
+    });
+
+    expect(launchPath).toContain("context=workflow");
+    expect(launchPath).toContain("workflowId=workflow%3Apersisted%3A7");
+    expect(launchPath).toContain("workflowStatus=saved");
+
+    const presentation = service.resolvePresentation(launchPath.split("?")[1] ? `?${launchPath.split("?")[1]}` : "");
+    expect(presentation.surface.title).toBe("Run a workflow");
+    expect(presentation.surface.primaryActionPath).toContain("/studio-shell/workflow");
+    expect(presentation.surface.primaryActionLabel).toBe("Open workflow runner");
+  });
 });

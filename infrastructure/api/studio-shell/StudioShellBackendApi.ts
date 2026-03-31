@@ -32,12 +32,20 @@ import { UpdatePersistedWorkflowUseCase } from "../../../application/workflow-pe
 import {
   WorkflowPersistenceError,
   WorkflowPersistenceErrorCodes,
+  WorkflowPersistenceInvalidRequestError,
 } from "../../../application/workflow-persistence/WorkflowPersistenceErrors";
 import { WorkflowLifecycleStates, deserializeWorkflowDraft } from "../../../domain/workflow-studio/WorkflowStudioDomain";
 import { WorkflowExecutionTriggerSourceKinds, type WorkflowExecutionTriggerSourceKind } from "../../../application/workflow-studio/WorkflowExecutionAlignmentContracts";
 
 export interface StudioShellApiError {
-  readonly code: "not-found" | "conflict" | "invalid-request" | "invalid-lifecycle-transition" | "validation-failed" | "internal";
+  readonly code:
+    | "not-found"
+    | "conflict"
+    | "invalid-request"
+    | "invalid-lifecycle-transition"
+    | "validation-failed"
+    | "persistence-failed"
+    | "internal";
   readonly message: string;
   readonly validationIssues?: ReadonlyArray<StudioShellValidationIssue>;
 }
@@ -553,6 +561,13 @@ export class StudioShellBackendApi {
           `Persisted workflow '${workflowId.trim()}' was not found.`,
         );
       }
+      try {
+        deserializeWorkflowDraft(record.definition.serializedDraft);
+      } catch {
+        throw new WorkflowPersistenceInvalidRequestError(
+          `Persisted workflow '${workflowId.trim()}' contains a malformed canonical workflow definition.`,
+        );
+      }
 
       return Object.freeze({
         id: record.id,
@@ -742,6 +757,7 @@ export class StudioShellBackendApi {
         lifecycleState,
         ownershipContext,
         versionLabel: draft.lastPublishedVersionId ?? existing.revision.versionLabel,
+        expectedPersistenceRevision: existing.revision.persistenceRevision,
       },
     });
   }
@@ -765,6 +781,12 @@ export class StudioShellBackendApi {
       if (error.code === WorkflowPersistenceErrorCodes.notFound) {
         return Object.freeze({
           code: "not-found",
+          message: error.message,
+        });
+      }
+      if (error.code === WorkflowPersistenceErrorCodes.persistenceFailure) {
+        return Object.freeze({
+          code: "persistence-failed",
           message: error.message,
         });
       }

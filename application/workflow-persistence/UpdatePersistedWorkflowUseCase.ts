@@ -11,7 +11,12 @@ import {
   type WorkflowPersistenceOwnershipContext,
 } from "../../domain/workflow-studio/WorkflowPersistenceDomain";
 import type { IWorkflowPersistenceRepository } from "../ports/interfaces/IWorkflowPersistenceRepository";
-import { WorkflowPersistenceInvalidRequestError, WorkflowPersistenceNotFoundError } from "./WorkflowPersistenceErrors";
+import {
+  WorkflowPersistenceConflictError,
+  WorkflowPersistenceInvalidRequestError,
+  WorkflowPersistenceNotFoundError,
+  toWorkflowPersistenceFailureError,
+} from "./WorkflowPersistenceErrors";
 import { assertWorkflowDraftValid, normalizeRequired } from "./WorkflowPersistenceValidation";
 
 function normalizeTags(tags?: ReadonlyArray<string>): ReadonlyArray<string> {
@@ -34,6 +39,7 @@ export interface UpdatePersistedWorkflowRequest {
     readonly lifecycleState?: WorkflowLifecycleState;
     readonly ownershipContext?: WorkflowPersistenceOwnershipContext;
     readonly versionLabel?: string;
+    readonly expectedPersistenceRevision?: number;
   };
 }
 
@@ -45,7 +51,7 @@ export class UpdatePersistedWorkflowUseCase {
 
   public async execute(request: UpdatePersistedWorkflowRequest): Promise<PersistedWorkflowRecord> {
     const id = normalizeRequired(request.id, "Persisted workflow id");
-    const current = await this.repository.getById(id);
+    const current = await this.tryRepository("update:load-existing", () => this.repository.getById(id));
     if (!current) {
       throw new WorkflowPersistenceNotFoundError(id);
     }
@@ -55,6 +61,22 @@ export class UpdatePersistedWorkflowUseCase {
     }
     if (request.changes.name !== undefined && !request.changes.name.trim()) {
       throw new WorkflowPersistenceInvalidRequestError("Persisted workflow name cannot be empty when provided.");
+    }
+    if (request.changes.expectedPersistenceRevision !== undefined) {
+      if (
+        !Number.isInteger(request.changes.expectedPersistenceRevision)
+        || request.changes.expectedPersistenceRevision < 1
+      ) {
+        throw new WorkflowPersistenceInvalidRequestError(
+          "Expected persisted workflow revision must be a positive integer when provided.",
+        );
+      }
+      if (current.revision.persistenceRevision !== request.changes.expectedPersistenceRevision) {
+        throw new WorkflowPersistenceConflictError(
+          id,
+          `Persisted workflow '${id}' is stale and cannot be updated. Expected revision ${request.changes.expectedPersistenceRevision}, current revision is ${current.revision.persistenceRevision}.`,
+        );
+      }
     }
 
     const now = this.now();
@@ -108,6 +130,14 @@ export class UpdatePersistedWorkflowUseCase {
       }),
     });
 
-    return this.repository.update(record);
+    return this.tryRepository("update:write-record", () => this.repository.update(record));
+  }
+
+  private async tryRepository<T>(operationLabel: string, action: () => Promise<T>): Promise<T> {
+    try {
+      return await action();
+    } catch (error) {
+      throw toWorkflowPersistenceFailureError(operationLabel, error);
+    }
   }
 }

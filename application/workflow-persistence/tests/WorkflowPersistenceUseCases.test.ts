@@ -25,6 +25,7 @@ import { ListPersistedWorkflowsUseCase } from "../ListPersistedWorkflowsUseCase"
 import { DuplicatePersistedWorkflowUseCase } from "../DuplicatePersistedWorkflowUseCase";
 import {
   WorkflowPersistenceConflictError,
+  WorkflowPersistenceFailureError,
   WorkflowPersistenceInvalidRequestError,
   WorkflowPersistenceNotFoundError,
 } from "../WorkflowPersistenceErrors";
@@ -343,6 +344,53 @@ describe("Workflow persistence use cases", () => {
       sourceWorkflowId: "workflow:persistence:missing",
       duplicatedWorkflowId: "workflow:persistence:copy-missing",
     })).rejects.toBeInstanceOf(WorkflowPersistenceNotFoundError);
+  });
+
+  it("rejects stale expected persistence revisions for update operations", async () => {
+    const repository = new InMemoryWorkflowPersistenceRepository();
+    const create = new CreatePersistedWorkflowUseCase(repository, () => new Date("2026-03-30T10:00:00.000Z"));
+    const update = new UpdatePersistedWorkflowUseCase(repository, () => new Date("2026-03-30T10:05:00.000Z"));
+
+    await create.execute({
+      id: "workflow:persistence:stale",
+      name: "Stale Revision Workflow",
+      draft: createValidDraft(),
+    });
+
+    await expect(update.execute({
+      id: "workflow:persistence:stale",
+      changes: {
+        name: "Renamed",
+        expectedPersistenceRevision: 99,
+      },
+    })).rejects.toBeInstanceOf(WorkflowPersistenceConflictError);
+  });
+
+  it("maps adapter failures into typed persistence failure errors", async () => {
+    const failingRepository: IWorkflowPersistenceRepository = {
+      async create(record) {
+        return record;
+      },
+      async update(record) {
+        return record;
+      },
+      async getById() {
+        throw new Error("db unavailable");
+      },
+      async list() {
+        throw new Error("db unavailable");
+      },
+      async duplicate() {
+        throw new Error("db unavailable");
+      },
+    };
+
+    await expect(new GetPersistedWorkflowUseCase(failingRepository).execute("workflow:1"))
+      .rejects.toBeInstanceOf(WorkflowPersistenceFailureError);
+    await expect(new ListPersistedWorkflowsUseCase(failingRepository).execute())
+      .rejects.toBeInstanceOf(WorkflowPersistenceFailureError);
+    await expect(new DuplicatePersistedWorkflowUseCase(failingRepository).execute({ sourceWorkflowId: "workflow:1" }))
+      .rejects.toBeInstanceOf(WorkflowPersistenceFailureError);
   });
 
   it("keeps canonical summary contract stable for list projections", async () => {

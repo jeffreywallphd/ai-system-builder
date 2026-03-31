@@ -5,7 +5,7 @@ import {
   type WorkflowPersistenceOwnershipContext,
 } from "../../domain/workflow-studio/WorkflowPersistenceDomain";
 import type { IWorkflowPersistenceRepository } from "../ports/interfaces/IWorkflowPersistenceRepository";
-import { WorkflowPersistenceConflictError } from "./WorkflowPersistenceErrors";
+import { WorkflowPersistenceConflictError, toWorkflowPersistenceFailureError } from "./WorkflowPersistenceErrors";
 import { assertWorkflowDraftValid, normalizeRequired } from "./WorkflowPersistenceValidation";
 import type { WorkflowDraft } from "../../domain/workflow-studio/WorkflowStudioDomain";
 
@@ -30,7 +30,7 @@ export class CreatePersistedWorkflowUseCase {
     const name = normalizeRequired(request.name, "Persisted workflow name");
     assertWorkflowDraftValid(request.draft, "Persisted workflow creation");
 
-    const existing = await this.repository.getById(id);
+    const existing = await this.tryRepository("create:lookup-existing", () => this.repository.getById(id));
     if (existing) {
       throw new WorkflowPersistenceConflictError(id);
     }
@@ -45,6 +45,14 @@ export class CreatePersistedWorkflowUseCase {
       versionLabel: request.versionLabel,
       now: this.now(),
     });
-    return this.repository.create(created);
+    return this.tryRepository("create:write-record", () => this.repository.create(created));
+  }
+
+  private async tryRepository<T>(operationLabel: string, action: () => Promise<T>): Promise<T> {
+    try {
+      return await action();
+    } catch (error) {
+      throw toWorkflowPersistenceFailureError(operationLabel, error);
+    }
   }
 }

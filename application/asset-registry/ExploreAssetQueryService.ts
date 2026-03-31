@@ -222,10 +222,8 @@ export class ExploreAssetQueryService {
   ) {}
 
   public async listLibrary(limit?: number): Promise<UnifiedExploreAssetLibrary> {
-    const [assets, persistedWorkflows] = await Promise.all([
-      this.crossStudioRegistryQueryService.listAllAssets(limit),
-      this.workflowPersistenceService?.listPersistedWorkflows() ?? Promise.resolve(Object.freeze([])),
-    ]);
+    const assets = await this.crossStudioRegistryQueryService.listAllAssets(limit);
+    const persistedWorkflows = await this.listPersistedWorkflowsSafely();
     const mapped = this.toExploreAssets(assets, persistedWorkflows);
     const availableKinds = Object.freeze([...new Set(mapped.map((entry) => entry.assetKind))].sort());
 
@@ -253,6 +251,18 @@ export class ExploreAssetQueryService {
       totalCount: sorted.length,
       facets: this.buildFacets(sorted),
     });
+  }
+
+  private async listPersistedWorkflowsSafely(): Promise<ReadonlyArray<PersistedWorkflowSummary>> {
+    if (!this.workflowPersistenceService) {
+      return Object.freeze([]);
+    }
+
+    try {
+      return await this.workflowPersistenceService.listPersistedWorkflows();
+    } catch {
+      return Object.freeze([]);
+    }
   }
 
   private toExploreAssets(

@@ -13,6 +13,8 @@ import { StudioShellBackendApi } from "../StudioShellBackendApi";
 import { InMemoryStudioShellRepository } from "../../../studio-shell/InMemoryStudioShellRepository";
 import { InMemoryWorkflowPersistenceRepository } from "../../../workflows/InMemoryWorkflowPersistenceRepository";
 import { GetPersistedWorkflowUseCase } from "../../../../application/workflow-persistence/GetPersistedWorkflowUseCase";
+import type { IWorkflowPersistenceRepository } from "../../../../application/ports/interfaces/IWorkflowPersistenceRepository";
+import type { PersistedWorkflowRecord } from "../../../../domain/workflow-studio/WorkflowPersistenceDomain";
 
 describe("StudioShellBackendApi", () => {
   it("projects the same validation issue structure for atomic model/dataset/tool drafts", async () => {
@@ -341,6 +343,86 @@ describe("StudioShellBackendApi", () => {
     const missing = await api.getPersistedWorkflow("workflow:missing");
     expect(missing.ok).toBeFalse();
     expect(missing.error?.code).toBe("not-found");
+  });
+
+  it("returns invalid-request for malformed persisted workflow definitions on open", async () => {
+    const malformedRepository: IWorkflowPersistenceRepository = {
+      async create(record) {
+        return record;
+      },
+      async update(record) {
+        return record;
+      },
+      async getById(): Promise<PersistedWorkflowRecord | undefined> {
+        return Object.freeze({
+          id: "workflow:malformed",
+          name: "Malformed Workflow",
+          status: "draft",
+          lifecycleState: "draft",
+          metadata: Object.freeze({ tags: Object.freeze([]) }),
+          ownershipContext: undefined,
+          revision: Object.freeze({
+            persistenceRevision: 1,
+            workflowRevision: 1,
+          }),
+          timestamps: Object.freeze({
+            createdAt: "2026-03-30T00:00:00.000Z",
+            updatedAt: "2026-03-30T00:00:00.000Z",
+          }),
+          payload: Object.freeze({
+            kind: "workflow-entity",
+            schemaVersion: "ai-loom.workflow-entity.v1",
+          }),
+          definition: Object.freeze({
+            id: "workflow:malformed",
+            name: "Malformed Workflow",
+            metadata: Object.freeze({ tags: Object.freeze([]) }),
+            draft: Object.freeze({ triggers: [], inputs: [], steps: [], outputs: [] }),
+            serializedDraft: "{ malformed-json",
+            draftRevision: 1,
+            lifecycleState: "draft",
+            createdAt: "2026-03-30T00:00:00.000Z",
+            updatedAt: "2026-03-30T00:00:00.000Z",
+          }),
+        } as unknown as PersistedWorkflowRecord);
+      },
+      async list() {
+        return [];
+      },
+      async duplicate(_sourceWorkflowId, duplicateRecord) {
+        return duplicateRecord;
+      },
+    };
+    const api = new StudioShellBackendApi(new InMemoryStudioShellRepository(), malformedRepository);
+
+    const response = await api.getPersistedWorkflow("workflow:malformed");
+    expect(response.ok).toBeFalse();
+    expect(response.error?.code).toBe("invalid-request");
+  });
+
+  it("maps persistence adapter failures to persistence-failed api errors", async () => {
+    const failingRepository: IWorkflowPersistenceRepository = {
+      async create(record) {
+        return record;
+      },
+      async update(record) {
+        return record;
+      },
+      async getById() {
+        throw new Error("disk unavailable");
+      },
+      async list() {
+        return [];
+      },
+      async duplicate(_sourceWorkflowId, duplicateRecord) {
+        return duplicateRecord;
+      },
+    };
+    const api = new StudioShellBackendApi(new InMemoryStudioShellRepository(), failingRepository);
+
+    const response = await api.getPersistedWorkflow("workflow:any");
+    expect(response.ok).toBeFalse();
+    expect(response.error?.code).toBe("persistence-failed");
   });
 
   it("duplicates persisted workflow records with new identity, draft status, and lineage metadata", async () => {

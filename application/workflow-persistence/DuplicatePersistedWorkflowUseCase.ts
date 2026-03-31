@@ -8,6 +8,7 @@ import type { IWorkflowPersistenceRepository } from "../ports/interfaces/IWorkfl
 import {
   WorkflowPersistenceConflictError,
   WorkflowPersistenceNotFoundError,
+  toWorkflowPersistenceFailureError,
 } from "./WorkflowPersistenceErrors";
 import { normalizeRequired } from "./WorkflowPersistenceValidation";
 
@@ -38,7 +39,7 @@ export class DuplicatePersistedWorkflowUseCase {
     }
 
     const baseCopyId = `${sourceWorkflowId}:copy`;
-    const first = await this.repository.getById(baseCopyId);
+    const first = await this.tryRepository("duplicate:lookup-generated-id", () => this.repository.getById(baseCopyId));
     if (!first) {
       return baseCopyId;
     }
@@ -46,7 +47,7 @@ export class DuplicatePersistedWorkflowUseCase {
     let attempt = 2;
     while (attempt < 10_000) {
       const candidate = `${sourceWorkflowId}:copy-${attempt}`;
-      const existing = await this.repository.getById(candidate);
+      const existing = await this.tryRepository("duplicate:lookup-generated-id", () => this.repository.getById(candidate));
       if (!existing) {
         return candidate;
       }
@@ -58,13 +59,16 @@ export class DuplicatePersistedWorkflowUseCase {
 
   public async execute(request: DuplicatePersistedWorkflowRequest): Promise<PersistedWorkflowRecord> {
     const sourceWorkflowId = normalizeRequired(request.sourceWorkflowId, "Source workflow id");
-    const source = await this.repository.getById(sourceWorkflowId);
+    const source = await this.tryRepository("duplicate:load-source", () => this.repository.getById(sourceWorkflowId));
     if (!source) {
       throw new WorkflowPersistenceNotFoundError(sourceWorkflowId);
     }
 
     const duplicatedWorkflowId = await this.resolveDuplicatedWorkflowId(sourceWorkflowId, request.duplicatedWorkflowId);
-    const existing = await this.repository.getById(duplicatedWorkflowId);
+    const existing = await this.tryRepository(
+      "duplicate:lookup-duplicate-target",
+      () => this.repository.getById(duplicatedWorkflowId),
+    );
     if (existing) {
       throw new WorkflowPersistenceConflictError(duplicatedWorkflowId);
     }
@@ -81,6 +85,14 @@ export class DuplicatePersistedWorkflowUseCase {
       now: this.now(),
     });
 
-    return this.repository.duplicate(source.id, duplicate);
+    return this.tryRepository("duplicate:write-record", () => this.repository.duplicate(source.id, duplicate));
+  }
+
+  private async tryRepository<T>(operationLabel: string, action: () => Promise<T>): Promise<T> {
+    try {
+      return await action();
+    } catch (error) {
+      throw toWorkflowPersistenceFailureError(operationLabel, error);
+    }
   }
 }
