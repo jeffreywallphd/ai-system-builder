@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import {
+  createCanonicalImageMetadataRecordsShape,
   createCanonicalRecordsShape,
   createCanonicalTextItemsShape,
 } from "../../../domain/dataset-studio/CanonicalDataShapes";
@@ -7,11 +8,14 @@ import { PipelineExecutionStatusKinds } from "../../../domain/dataset-studio/Pip
 import { PipelineStageIds } from "../../../domain/dataset-studio/PipelineStageDomain";
 import type { ResolvedDataSource } from "../DataConverterContracts";
 import {
+  createImagePreparationPipelineDefinition,
   chunkDocumentTextItems,
   createDocumentPreparationPipelineDefinition,
   createTabularCleaningPipelineDefinition,
   DocumentChunkingStrategyKinds,
   DocumentPreparationExtractionService,
+  ImagePreparationExtractionService,
+  SharpImageTransformationService,
   type IImageOcrExtractor,
 } from "../MidLevelPipelineDefinitions";
 
@@ -135,5 +139,86 @@ describe("MidLevelPipelineDefinitions", () => {
     const output = await service.extractToTextItems({ source, documentId: "doc-image" });
     expect(output.kind).toBe("text-items");
     expect(output.items[0]?.text).toBe("ocr text");
+  });
+
+  it("creates image preparation pipeline with optional OCR extraction and enrichment composition", () => {
+    const pipeline = createImagePreparationPipelineDefinition({
+      includeExtraction: true,
+      includeTransformation: true,
+      includeLabeling: true,
+      includeEnrichment: true,
+      extractionEmitShape: "text-items",
+      enrichment: {
+        strategy: "lookup",
+        outputFieldPrefix: "aug",
+        previewSampleSize: 10,
+      },
+    });
+
+    expect(pipeline.definition.stageInstances.map((stage) => stage.stageId)).toEqual([
+      PipelineStageIds.Extraction,
+      PipelineStageIds.Normalization,
+      PipelineStageIds.Transformation,
+      PipelineStageIds.Labeling,
+      PipelineStageIds.Enrichment,
+    ]);
+
+    const graph = pipeline.buildGraph();
+    const reactFlow = pipeline.buildReactFlowGraph();
+
+    expect(graph.nodes.some((node) => node.id === "stage:Extraction")).toBeTrue();
+    expect(graph.nodes.some((node) => node.id === "stage:Transformation")).toBeTrue();
+    expect(reactFlow.nodes.length).toBe(graph.nodes.length);
+  });
+
+  it("extracts image metadata records when OCR is disabled in image preparation extraction service", async () => {
+    const noOcrService = new ImagePreparationExtractionService({
+      imageIngestor: {
+        async execute() {
+          return Object.freeze({
+            ok: true,
+            output: createCanonicalImageMetadataRecordsShape({
+              items: Object.freeze([
+                Object.freeze({
+                  itemId: "image-1",
+                  imageId: "image-1",
+                  attributes: Object.freeze({
+                    width: 100,
+                    height: 100,
+                    format: "png",
+                  }),
+                }),
+              ]),
+            }),
+          });
+        },
+      } as unknown as any,
+      ocrExtractor: {
+        extractText: async () => "ocr text",
+      },
+    });
+
+    const output = await noOcrService.extract({
+      source: Object.freeze({
+        kind: "in-memory",
+        sourceId: "source-image",
+        reference: "file://image.png",
+        payload: new Uint8Array([1, 2, 3]),
+        fileName: "image.png",
+        contentType: "image/png",
+        diagnostics: Object.freeze([]),
+      }),
+      enableOcr: false,
+    });
+
+    expect(output.kind).toBe("image-metadata-records");
+  });
+
+  it("runs sharp transformation service as no-op when no transform options are provided", async () => {
+    const service = new SharpImageTransformationService();
+    const payload = new Uint8Array([1, 2, 3, 4]);
+    const result = await service.transform(payload, { targetFormat: "keep", grayscale: false });
+    expect(result.transformed).toBeFalse();
+    expect(result.payload).toEqual(payload);
   });
 });

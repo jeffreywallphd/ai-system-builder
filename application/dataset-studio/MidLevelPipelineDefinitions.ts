@@ -1,13 +1,22 @@
 import { getEncoding, type TiktokenEncoding } from "js-tiktoken";
 import { z } from "zod";
 import {
+  createCanonicalImageMetadataRecordsShape,
   createCanonicalTextItemsShape,
   isCanonicalDataShape,
   CanonicalDataShapeKinds,
   type CanonicalDataShape,
+  type CanonicalImageMetadataRecordsShape,
   type CanonicalRecordValue,
   type CanonicalTextItemsShape,
 } from "../../domain/dataset-studio/CanonicalDataShapes";
+import {
+  EnrichmentStrategyKinds,
+  createEnrichmentStageConfig,
+  parseEnrichmentStageConfigFromStageOptions,
+  toEnrichmentStageOptions,
+  type EnrichmentStageConfig,
+} from "../../domain/dataset-studio/EnrichmentStageDomain";
 import type { PipelineDefinition } from "../../domain/dataset-studio/PipelineDefinitionDomain";
 import { validatePipelineDefinition } from "../../domain/dataset-studio/PipelineDefinitionDomain";
 import {
@@ -27,6 +36,10 @@ import {
   DocumentPdfIngestorAsset,
   type DocumentPdfIngestorConfig,
 } from "./DocumentPdfIngestorAsset";
+import {
+  ImageIngestorAsset,
+  type ImageIngestorConfig,
+} from "./ImageIngestorAsset";
 import {
   buildPipelineGraph,
   type BuildPipelineGraphInput,
@@ -69,6 +82,22 @@ const DefaultDocumentStageOrder = Object.freeze([
   PipelineStageIds.Enrichment,
 ] as const);
 
+const ImageStageIds = Object.freeze([
+  PipelineStageIds.Extraction,
+  PipelineStageIds.Normalization,
+  PipelineStageIds.Transformation,
+  PipelineStageIds.Labeling,
+  PipelineStageIds.Enrichment,
+] as const);
+
+const DefaultImageStageOrder = Object.freeze([
+  PipelineStageIds.Extraction,
+  PipelineStageIds.Normalization,
+  PipelineStageIds.Transformation,
+  PipelineStageIds.Labeling,
+  PipelineStageIds.Enrichment,
+] as const);
+
 const TabularShapeSchema = z.enum([
   CanonicalDataShapeKinds.records,
   CanonicalDataShapeKinds.table,
@@ -107,6 +136,36 @@ export const DocumentPreparationPipelineOptionsSchema = z.object({
 });
 
 export type DocumentPreparationPipelineOptions = z.output<typeof DocumentPreparationPipelineOptionsSchema>;
+
+const ImageTransformOutputFormatSchema = z.enum(["keep", "jpeg", "png", "webp", "avif"]);
+
+export const ImagePreparationPipelineOptionsSchema = z.object({
+  stageOrder: z.array(z.nativeEnum(PipelineStageIds)).optional(),
+  includeExtraction: z.boolean().default(false),
+  includeTransformation: z.boolean().default(false),
+  includeLabeling: z.boolean().default(false),
+  includeEnrichment: z.boolean().default(false),
+  extractionEmitShape: z.enum([
+    CanonicalDataShapeKinds.textItems,
+    CanonicalDataShapeKinds.imageMetadataRecords,
+  ]).default(CanonicalDataShapeKinds.textItems),
+  ocrLanguage: z.string().trim().min(1).default("eng"),
+  transformResizeWidth: z.number().int().min(1).max(8192).optional(),
+  transformResizeHeight: z.number().int().min(1).max(8192).optional(),
+  transformGrayscale: z.boolean().default(false),
+  transformFormat: ImageTransformOutputFormatSchema.default("keep"),
+  normalizeExtractExif: z.boolean().default(true),
+  normalizeOrientation: z.boolean().default(true),
+  includeFileStats: z.boolean().default(true),
+  enrichment: z.object({
+    strategy: z.nativeEnum(EnrichmentStrategyKinds).default(EnrichmentStrategyKinds.metadataAugmentation),
+    outputFieldPrefix: z.string().trim().min(1).default("enriched"),
+    previewSampleSize: z.number().int().min(1).max(1000).default(25),
+  }).default({}),
+  stageConfigOverrides: z.record(z.nativeEnum(PipelineStageIds), z.record(z.any())).optional(),
+});
+
+export type ImagePreparationPipelineOptions = z.output<typeof ImagePreparationPipelineOptionsSchema>;
 
 export interface MidLevelPipelineDefinition {
   readonly pipelineAssetId: string;
@@ -228,6 +287,59 @@ function resolveDocumentStageOrder(options: DocumentPreparationPipelineOptions):
   return Object.freeze([...requested]);
 }
 
+function resolveImageStageOrder(options: ImagePreparationPipelineOptions): ReadonlyArray<PipelineStageId> {
+  const requested = options.stageOrder
+    ? options.stageOrder
+    : DefaultImageStageOrder.filter((stageId) => {
+      if (stageId === PipelineStageIds.Extraction) {
+        return options.includeExtraction;
+      }
+      if (stageId === PipelineStageIds.Transformation) {
+        return options.includeTransformation;
+      }
+      if (stageId === PipelineStageIds.Labeling) {
+        return options.includeLabeling;
+      }
+      if (stageId === PipelineStageIds.Enrichment) {
+        return options.includeEnrichment;
+      }
+      return true;
+    });
+
+  assertAllowedStages(requested, ImageStageIds, "ImagePreparationPipelineDefinition.stageOrder");
+  assertUniqueStageOrder(requested, "ImagePreparationPipelineDefinition.stageOrder");
+
+  if (!requested.includes(PipelineStageIds.Normalization)) {
+    throw new Error("Image preparation pipeline requires Normalization.");
+  }
+
+  const normalizationIndex = requested.indexOf(PipelineStageIds.Normalization);
+  const extractionIndex = requested.indexOf(PipelineStageIds.Extraction);
+  if (extractionIndex >= 0 && extractionIndex > normalizationIndex) {
+    throw new Error("Image preparation pipeline requires Extraction to run before Normalization.");
+  }
+
+  const transformationIndex = requested.indexOf(PipelineStageIds.Transformation);
+  if (transformationIndex >= 0 && transformationIndex <= normalizationIndex) {
+    throw new Error("Image preparation pipeline requires Transformation to run after Normalization.");
+  }
+
+  const labelingIndex = requested.indexOf(PipelineStageIds.Labeling);
+  if (labelingIndex >= 0 && transformationIndex >= 0 && labelingIndex <= transformationIndex) {
+    throw new Error("Image preparation pipeline requires Labeling to run after Transformation.");
+  }
+
+  const enrichmentIndex = requested.indexOf(PipelineStageIds.Enrichment);
+  if (enrichmentIndex >= 0) {
+    const pivot = labelingIndex >= 0 ? labelingIndex : transformationIndex >= 0 ? transformationIndex : normalizationIndex;
+    if (enrichmentIndex <= pivot) {
+      throw new Error("Image preparation pipeline requires Enrichment to run after prior processing stages.");
+    }
+  }
+
+  return Object.freeze([...requested]);
+}
+
 function mergeConfig(
   stageId: PipelineStageId,
   defaults: Readonly<Record<string, CanonicalRecordValue>>,
@@ -292,8 +404,15 @@ function toPipelineDefinition(input: {
       defaultOptions.emitRecordLevelTags = true;
     }
     if (stageId === PipelineStageIds.Enrichment) {
-      defaultOptions.enrichmentMode = "optional-hook";
-      defaultOptions.joinKey = "id";
+      const enrichmentDefaults = toEnrichmentStageOptions(createEnrichmentStageConfig({
+        strategy: EnrichmentStrategyKinds.metadataAugmentation,
+        metadataAugmentation: {
+          includeImageMetadata: true,
+          includeDocumentStats: true,
+          includeProfiling: true,
+        },
+      }));
+      Object.assign(defaultOptions, enrichmentDefaults);
     }
 
     const options = mergeConfig(
@@ -343,6 +462,124 @@ function toPipelineDefinition(input: {
     const next = instances[index + 1];
     if (!next) {
       throw new Error(`Unable to resolve pipeline transition for '${stage.stageId}'.`);
+    }
+    return Object.freeze({ fromStageId: stage.stageId, toStageId: next.stageId });
+  }));
+
+  return validatePipelineDefinition(Object.freeze({
+    stageInstances: Object.freeze(instances),
+    transitions,
+  }));
+}
+
+function toImagePipelineDefinition(input: {
+  readonly stageOrder: ReadonlyArray<PipelineStageId>;
+  readonly options: ImagePreparationPipelineOptions;
+}): PipelineDefinition {
+  const registry = new PipelineStageRegistry();
+  const enrichmentConfig = createEnrichmentStageConfig({
+    strategy: input.options.enrichment.strategy,
+    outputFieldPrefix: input.options.enrichment.outputFieldPrefix,
+    previewSampleSize: input.options.enrichment.previewSampleSize,
+    derivedFields: input.options.enrichment.strategy === EnrichmentStrategyKinds.derived
+      ? Object.freeze([
+        Object.freeze({
+          targetField: "derived.has_ocr_text",
+          expression: "ocrTextLength > 0",
+          sourceFields: Object.freeze(["ocrTextLength"]),
+          fallbackValue: false,
+        }),
+      ])
+      : undefined,
+    lookup: input.options.enrichment.strategy === EnrichmentStrategyKinds.lookup
+      ? Object.freeze({
+        inputKey: "imageId",
+        lookupKey: "imageId",
+        joinType: "left",
+        preserveUnmatched: true,
+      })
+      : undefined,
+    metadataAugmentation: input.options.enrichment.strategy === EnrichmentStrategyKinds.metadataAugmentation
+      ? Object.freeze({
+        includeImageMetadata: true,
+        includeDocumentStats: true,
+        includeProfiling: true,
+      })
+      : undefined,
+  });
+
+  const instances = input.stageOrder.map((stageId): PipelineStageInstance => {
+    const definition = registry.getDefinition(stageId);
+    const defaults: Record<string, CanonicalRecordValue> = {};
+
+    if (stageId === PipelineStageIds.Extraction) {
+      defaults.performOcr = true;
+      defaults.ocrLanguage = input.options.ocrLanguage;
+      defaults.extractionEmitShape = input.options.extractionEmitShape;
+    }
+    if (stageId === PipelineStageIds.Normalization) {
+      defaults.extractExif = input.options.normalizeExtractExif;
+      defaults.normalizeOrientation = input.options.normalizeOrientation;
+      defaults.includeFileStats = input.options.includeFileStats;
+      defaults.metadataShape = CanonicalDataShapeKinds.imageMetadataRecords;
+    }
+    if (stageId === PipelineStageIds.Transformation) {
+      defaults.resizeWidth = input.options.transformResizeWidth ?? null;
+      defaults.resizeHeight = input.options.transformResizeHeight ?? null;
+      defaults.grayscale = input.options.transformGrayscale;
+      defaults.targetFormat = input.options.transformFormat;
+      defaults.transformationEnabled = true;
+    }
+    if (stageId === PipelineStageIds.Labeling) {
+      defaults.labelingMode = "placeholder";
+      defaults.emitRecordLevelTags = true;
+      defaults.emitImageTags = true;
+    }
+    if (stageId === PipelineStageIds.Enrichment) {
+      Object.assign(defaults, toEnrichmentStageOptions(enrichmentConfig));
+    }
+
+    const options = mergeConfig(stageId, Object.freeze(defaults), input.options.stageConfigOverrides);
+    const overrideEnrichment = stageId === PipelineStageIds.Enrichment
+      ? parseEnrichmentStageConfigFromStageOptions(options)
+      : undefined;
+    const normalizedOptions = stageId === PipelineStageIds.Enrichment
+      ? Object.freeze({
+        ...options,
+        ...toEnrichmentStageOptions(overrideEnrichment as EnrichmentStageConfig),
+      })
+      : options;
+
+    const declaredInputType = stageId === PipelineStageIds.Extraction
+      ? CanonicalDataShapeKinds.imageMetadataRecords
+      : stageId === PipelineStageIds.Normalization
+        ? input.options.includeExtraction
+          ? input.options.extractionEmitShape
+          : CanonicalDataShapeKinds.imageMetadataRecords
+        : CanonicalDataShapeKinds.imageMetadataRecords;
+
+    const expectedOutputType = stageId === PipelineStageIds.Extraction
+      ? input.options.extractionEmitShape
+      : CanonicalDataShapeKinds.imageMetadataRecords;
+
+    return createPipelineStageInstance({
+      definition,
+      config: {
+        mode: PipelineStageConfigModes.advanced,
+        declaredInputType,
+        expectedOutputType,
+        options: normalizedOptions,
+      },
+      metadata: {
+        inspectable: true,
+      },
+    });
+  });
+
+  const transitions = Object.freeze(instances.slice(0, -1).map((stage, index) => {
+    const next = instances[index + 1];
+    if (!next) {
+      throw new Error(`Unable to resolve image pipeline transition for '${stage.stageId}'.`);
     }
     return Object.freeze({ fromStageId: stage.stageId, toStageId: next.stageId });
   }));
@@ -502,6 +739,192 @@ function createDocumentInspectionHooks(): PipelineInspectionHooks {
           }),
         });
       },
+    ]),
+  });
+}
+
+function createImageInspectionHooks(): PipelineInspectionHooks {
+  return Object.freeze({
+    stage: Object.freeze([
+      (context) => {
+        if (!isCanonicalDataShape(context.stageOutput)) {
+          return undefined;
+        }
+
+        if (context.stageOutput.kind === CanonicalDataShapeKinds.imageMetadataRecords) {
+          const dimensions = context.stageOutput.items
+            .slice(0, 3)
+            .map((item) => {
+              const width = typeof item.attributes?.width === "number" ? item.attributes.width : undefined;
+              const height = typeof item.attributes?.height === "number" ? item.attributes.height : undefined;
+              const format = typeof item.attributes?.format === "string" ? item.attributes.format : undefined;
+              return Object.freeze({
+                imageId: item.imageId ?? item.itemId,
+                width,
+                height,
+                format,
+              });
+            });
+
+          return Object.freeze({
+            summaryStats: Object.freeze({
+              imageCount: context.stageOutput.items.length,
+              imageMetadataPreview: Object.freeze(dimensions),
+            }),
+          });
+        }
+
+        if (context.stageOutput.kind === CanonicalDataShapeKinds.textItems) {
+          const preview = context.stageOutput.items.slice(0, 2).map((item) => item.text.slice(0, 180));
+          return Object.freeze({
+            summaryStats: Object.freeze({
+              ocrItemCount: context.stageOutput.items.length,
+              ocrTextPreview: Object.freeze(preview),
+            }),
+          });
+        }
+
+        return undefined;
+      },
+    ]),
+  });
+}
+
+function createComposableEnrichmentStageDefinition(
+  input: {
+    readonly idPrefix: string;
+    readonly defaultConfig?: Partial<EnrichmentStageConfig>;
+  },
+): StageCompositionDefinition {
+  const defaults = createEnrichmentStageConfig({
+    strategy: EnrichmentStrategyKinds.metadataAugmentation,
+    metadataAugmentation: {
+      includeImageMetadata: true,
+      includeDocumentStats: true,
+      includeProfiling: true,
+    },
+    ...(input.defaultConfig ?? {}),
+  });
+  const defaultsAsOptions = toEnrichmentStageOptions(defaults);
+
+  return Object.freeze({
+    stageId: PipelineStageIds.Enrichment,
+    inspectable: true,
+    groups: Object.freeze([
+      Object.freeze({
+        id: `${input.idPrefix}-enrichment-derived`,
+        executionOrder: 1,
+        executionMode: "sequential",
+        condition: Object.freeze({ optionEquals: Object.freeze({ enrichmentStrategy: EnrichmentStrategyKinds.derived }) }),
+        assets: Object.freeze([
+          Object.freeze({
+            assetId: DatasetTransformationStageAssetIds.fieldMapping,
+            version: "1.0.0",
+            role: "derived-field-compute",
+            configMapping: Object.freeze([
+              { stageConfigKey: "derivedFields", assetConfigKey: "derivedFields", defaultValue: defaultsAsOptions.derivedFields },
+              { stageConfigKey: "enrichedFieldPrefix", assetConfigKey: "outputFieldPrefix", defaultValue: defaults.outputFieldPrefix },
+            ]),
+          }),
+          Object.freeze({
+            assetId: DatasetTransformationStageAssetIds.fieldMapping,
+            version: "1.0.0",
+            role: "derived-merge",
+            configMapping: Object.freeze([
+              { stageConfigKey: "enrichedFieldPrefix", assetConfigKey: "outputFieldPrefix", defaultValue: defaults.outputFieldPrefix },
+            ]),
+          }),
+        ]),
+      }),
+      Object.freeze({
+        id: `${input.idPrefix}-enrichment-lookup`,
+        executionOrder: 1,
+        executionMode: "sequential",
+        condition: Object.freeze({ optionEquals: Object.freeze({ enrichmentStrategy: EnrichmentStrategyKinds.lookup }) }),
+        assets: Object.freeze([
+          Object.freeze({
+            assetId: DatasetIngestionStageAssetIds.unified,
+            version: "1.0.0",
+            role: "lookup-source",
+            configMapping: Object.freeze([
+              { stageConfigKey: "lookupSourceAssetId", assetConfigKey: "sourceAssetId" },
+              { stageConfigKey: "lookupSourceReference", assetConfigKey: "sourceReference" },
+              { stageConfigKey: "lookupInputKey", assetConfigKey: "inputKey", defaultValue: "id" },
+              { stageConfigKey: "lookupLookupKey", assetConfigKey: "lookupKey", defaultValue: "id" },
+              { stageConfigKey: "lookupJoinType", assetConfigKey: "joinType", defaultValue: "left" },
+              { stageConfigKey: "lookupSelectedFields", assetConfigKey: "selectedFields", defaultValue: Object.freeze([]) },
+              { stageConfigKey: "lookupPreserveUnmatched", assetConfigKey: "preserveUnmatched", defaultValue: true },
+            ]),
+          }),
+          Object.freeze({
+            assetId: DatasetTransformationStageAssetIds.fieldMapping,
+            version: "1.0.0",
+            role: "lookup-transform",
+            configMapping: Object.freeze([
+              { stageConfigKey: "lookupSelectedFields", assetConfigKey: "selectedFields", defaultValue: Object.freeze([]) },
+            ]),
+          }),
+          Object.freeze({
+            assetId: DatasetTransformationStageAssetIds.fieldMapping,
+            version: "1.0.0",
+            role: "lookup-merge",
+            configMapping: Object.freeze([
+              { stageConfigKey: "enrichedFieldPrefix", assetConfigKey: "outputFieldPrefix", defaultValue: defaults.outputFieldPrefix },
+            ]),
+          }),
+        ]),
+      }),
+      Object.freeze({
+        id: `${input.idPrefix}-enrichment-metadata`,
+        executionOrder: 1,
+        executionMode: "sequential",
+        condition: Object.freeze({ optionEquals: Object.freeze({ enrichmentStrategy: EnrichmentStrategyKinds.metadataAugmentation }) }),
+        assets: Object.freeze([
+          Object.freeze({
+            assetId: DatasetTransformationStageAssetIds.dataProfiling,
+            version: "1.0.0",
+            role: "metadata-profile",
+            configMapping: Object.freeze([
+              { stageConfigKey: "previewSampleSize", assetConfigKey: "sampleSize", defaultValue: defaults.previewSampleSize },
+              { stageConfigKey: "metadataIncludeProfiling", assetConfigKey: "enabled", defaultValue: true },
+            ]),
+          }),
+          Object.freeze({
+            assetId: DatasetIngestionStageAssetIds.image,
+            version: "1.0.0",
+            role: "image-metadata-augmentation",
+            condition: Object.freeze({ inputTypes: Object.freeze([CanonicalDataShapeKinds.imageMetadataRecords]) }),
+            configMapping: Object.freeze([
+              { stageConfigKey: "metadataIncludeImageMetadata", assetConfigKey: "extractExif", defaultValue: true },
+              { stageConfigKey: "metadataIncludeImageMetadata", assetConfigKey: "generatePreviewMetadata", defaultValue: true },
+            ]),
+          }),
+          Object.freeze({
+            assetId: DatasetTransformationStageAssetIds.fieldMapping,
+            version: "1.0.0",
+            role: "metadata-merge",
+            configMapping: Object.freeze([
+              { stageConfigKey: "metadataStaticFields", assetConfigKey: "staticFields", defaultValue: Object.freeze({}) },
+              { stageConfigKey: "enrichedFieldPrefix", assetConfigKey: "outputFieldPrefix", defaultValue: defaults.outputFieldPrefix },
+            ]),
+          }),
+        ]),
+      }),
+      Object.freeze({
+        id: `${input.idPrefix}-enrichment-fallback`,
+        executionOrder: 1,
+        executionMode: "sequential",
+        assets: Object.freeze([
+          Object.freeze({
+            assetId: DatasetTransformationStageAssetIds.fieldMapping,
+            version: "1.0.0",
+            role: "enrichment-fallback",
+            configMapping: Object.freeze([
+              { stageConfigKey: "enrichedFieldPrefix", assetConfigKey: "outputFieldPrefix", defaultValue: defaults.outputFieldPrefix },
+            ]),
+          }),
+        ]),
+      }),
     ]),
   });
 }
@@ -731,33 +1154,114 @@ export const DocumentPreparationStageCompositionDefinitions: ReadonlyArray<Stage
       }),
     ]),
   }),
+  createComposableEnrichmentStageDefinition({
+    idPrefix: "document",
+  }),
+]);
+
+export const ImagePreparationStageCompositionDefinitions: ReadonlyArray<StageCompositionDefinition> = Object.freeze([
   Object.freeze({
-    stageId: PipelineStageIds.Enrichment,
+    stageId: PipelineStageIds.Extraction,
     inspectable: true,
     groups: Object.freeze([
       Object.freeze({
-        id: "document-enrichment",
+        id: "image-extraction",
         executionOrder: 1,
         executionMode: "sequential",
         assets: Object.freeze([
           Object.freeze({
-            assetId: DatasetIngestionStageAssetIds.unified,
+            assetId: DatasetIngestionStageAssetIds.image,
             version: "1.0.0",
-            role: "enrichment-hook",
+            role: "image-ocr-extraction",
+            condition: Object.freeze({ optionEquals: Object.freeze({ performOcr: true }) }),
             configMapping: Object.freeze([
-              { stageConfigKey: "enrichmentMode", assetConfigKey: "enrichmentMode", defaultValue: "optional-hook" },
-              { stageConfigKey: "joinKey", assetConfigKey: "joinKey", defaultValue: "id" },
+              { stageConfigKey: "ocrLanguage", assetConfigKey: "ocrLanguage", defaultValue: "eng" },
+              { stageConfigKey: "extractionEmitShape", assetConfigKey: "emitShape", defaultValue: CanonicalDataShapeKinds.textItems },
             ]),
           }),
           Object.freeze({
-            assetId: DatasetTransformationStageAssetIds.fieldMapping,
+            assetId: DatasetIngestionStageAssetIds.image,
             version: "1.0.0",
-            role: "enrichment-transform",
-            configMapping: Object.freeze([]),
+            role: "image-structured-pass-through",
+            configMapping: Object.freeze([
+              { stageConfigKey: "performOcr", assetConfigKey: "performOcr", defaultValue: false },
+            ]),
           }),
         ]),
       }),
     ]),
+  }),
+  Object.freeze({
+    stageId: PipelineStageIds.Normalization,
+    inspectable: true,
+    groups: Object.freeze([
+      Object.freeze({
+        id: "image-normalization",
+        executionOrder: 1,
+        executionMode: "sequential",
+        assets: Object.freeze([
+          Object.freeze({
+            assetId: DatasetIngestionStageAssetIds.image,
+            version: "1.0.0",
+            role: "image-metadata-normalization",
+            configMapping: Object.freeze([
+              { stageConfigKey: "extractExif", assetConfigKey: "extractExif", defaultValue: true },
+              { stageConfigKey: "normalizeOrientation", assetConfigKey: "normalizeOrientation", defaultValue: true },
+              { stageConfigKey: "includeFileStats", assetConfigKey: "includeFileStats", defaultValue: true },
+            ]),
+          }),
+        ]),
+      }),
+    ]),
+  }),
+  Object.freeze({
+    stageId: PipelineStageIds.Transformation,
+    inspectable: true,
+    groups: Object.freeze([
+      Object.freeze({
+        id: "image-transformation",
+        executionOrder: 1,
+        executionMode: "sequential",
+        assets: Object.freeze([
+          Object.freeze({
+            assetId: DatasetIngestionStageAssetIds.image,
+            version: "1.0.0",
+            role: "sharp-image-transform",
+            configMapping: Object.freeze([
+              { stageConfigKey: "resizeWidth", assetConfigKey: "resizeWidth" },
+              { stageConfigKey: "resizeHeight", assetConfigKey: "resizeHeight" },
+              { stageConfigKey: "grayscale", assetConfigKey: "grayscale", defaultValue: false },
+              { stageConfigKey: "targetFormat", assetConfigKey: "targetFormat", defaultValue: "keep" },
+            ]),
+          }),
+        ]),
+      }),
+    ]),
+  }),
+  Object.freeze({
+    stageId: PipelineStageIds.Labeling,
+    inspectable: true,
+    groups: Object.freeze([
+      Object.freeze({
+        id: "image-labeling",
+        executionOrder: 1,
+        executionMode: "sequential",
+        assets: Object.freeze([
+          Object.freeze({
+            assetId: DatasetTransformationStageAssetIds.dataClassification,
+            version: "1.0.0",
+            role: "image-labeling-placeholder",
+            configMapping: Object.freeze([
+              { stageConfigKey: "labelingMode", assetConfigKey: "labelingMode", defaultValue: "placeholder" },
+              { stageConfigKey: "emitImageTags", assetConfigKey: "emitImageTags", defaultValue: true },
+            ]),
+          }),
+        ]),
+      }),
+    ]),
+  }),
+  createComposableEnrichmentStageDefinition({
+    idPrefix: "image",
   }),
 ]);
 
@@ -803,6 +1307,26 @@ export function createDocumentPreparationPipelineDefinition(
 }
 
 export const DocumentPreparationPipelineDefinition = createDocumentPreparationPipelineDefinition();
+
+export function createImagePreparationPipelineDefinition(
+  input?: Partial<ImagePreparationPipelineOptions>,
+): MidLevelPipelineDefinition {
+  const options = ImagePreparationPipelineOptionsSchema.parse(input ?? {});
+  const stageOrder = resolveImageStageOrder(options);
+  const definition = toImagePipelineDefinition({
+    stageOrder,
+    options,
+  });
+
+  return createPipelineDefinitionWrapper({
+    pipelineAssetId: "pipeline.image-preparation.v1",
+    definition,
+    stageCompositions: ImagePreparationStageCompositionDefinitions,
+    inspectionHooks: createImageInspectionHooks(),
+  });
+}
+
+export const ImagePreparationPipelineDefinition = createImagePreparationPipelineDefinition();
 
 export interface IImageOcrExtractor {
   extractText(request: {
@@ -933,6 +1457,187 @@ export class DocumentPreparationExtractionService {
     }
 
     return result.output;
+  }
+}
+
+export interface ImagePreparationExtractionRequest {
+  readonly source: ResolvedDataSource;
+  readonly imageId?: string;
+  readonly ocrLanguage?: string;
+  readonly enableOcr?: boolean;
+  readonly extractionEmitShape?: typeof CanonicalDataShapeKinds.textItems | typeof CanonicalDataShapeKinds.imageMetadataRecords;
+  readonly ingestorConfig?: Partial<ImageIngestorConfig>;
+}
+
+export class ImagePreparationExtractionService {
+  private readonly imageIngestor: ImageIngestorAsset;
+  private readonly ocrExtractor: IImageOcrExtractor;
+
+  constructor(input?: {
+    readonly imageIngestor?: ImageIngestorAsset;
+    readonly ocrExtractor?: IImageOcrExtractor;
+  }) {
+    this.imageIngestor = input?.imageIngestor ?? new ImageIngestorAsset();
+    this.ocrExtractor = input?.ocrExtractor ?? new TesseractImageOcrExtractor();
+  }
+
+  public async extract(
+    request: ImagePreparationExtractionRequest,
+  ): Promise<CanonicalTextItemsShape | CanonicalImageMetadataRecordsShape> {
+    const result = await this.imageIngestor.execute({
+      source: request.source,
+      imageId: request.imageId,
+      config: request.ingestorConfig,
+    });
+
+    if (!result.ok) {
+      throw new Error(result.diagnostics[0]?.message ?? "Image extraction failed.");
+    }
+
+    if (!request.enableOcr) {
+      return result.output;
+    }
+
+    const ocrText = await this.ocrExtractor.extractText({
+      payload: toUint8Array(request.source.payload),
+      language: request.ocrLanguage ?? "eng",
+    });
+    const emitShape = request.extractionEmitShape ?? CanonicalDataShapeKinds.textItems;
+
+    if (emitShape === CanonicalDataShapeKinds.imageMetadataRecords) {
+      const items = result.output.items.map((item) => Object.freeze({
+        ...item,
+        attributes: Object.freeze({
+          ...(item.attributes ?? {}),
+          ocrText,
+          ocrTextLength: ocrText.length,
+          ocrLanguage: request.ocrLanguage ?? "eng",
+        }),
+      }));
+
+      return createCanonicalImageMetadataRecordsShape({
+        items: Object.freeze(items),
+        metadata: {
+          ...result.output.metadata,
+          attributes: {
+            ...(result.output.metadata.attributes ?? {}),
+            extractionMode: "image-ocr",
+          },
+        },
+      });
+    }
+
+    if (!ocrText.trim()) {
+      return createCanonicalTextItemsShape({
+        items: Object.freeze([]),
+        metadata: {
+          source: {
+            fileName: request.source.fileName,
+            contentType: request.source.contentType,
+            format: "image-ocr",
+          },
+        },
+      });
+    }
+
+    return createCanonicalTextItemsShape({
+      items: Object.freeze([
+        Object.freeze({
+          itemId: `ocr-${request.imageId ?? request.source.fileName ?? "image"}-1`,
+          sourceDocumentId: request.imageId ?? request.source.fileName ?? "image",
+          text: ocrText,
+          metadata: Object.freeze({
+            extractionMode: "image-ocr",
+            sourceReference: request.source.reference,
+          }),
+        }),
+      ]),
+      metadata: {
+        source: {
+          fileName: request.source.fileName,
+          contentType: request.source.contentType,
+          format: "image-ocr",
+        },
+      },
+    });
+  }
+}
+
+export const SharpImageTransformationConfigSchema = z.object({
+  resizeWidth: z.number().int().min(1).max(8192).optional(),
+  resizeHeight: z.number().int().min(1).max(8192).optional(),
+  grayscale: z.boolean().default(false),
+  targetFormat: ImageTransformOutputFormatSchema.default("keep"),
+});
+
+export type SharpImageTransformationConfig = z.output<typeof SharpImageTransformationConfigSchema>;
+
+export interface SharpImageTransformationResult {
+  readonly payload: Uint8Array;
+  readonly width?: number;
+  readonly height?: number;
+  readonly format?: string;
+  readonly transformed: boolean;
+}
+
+export class SharpImageTransformationService {
+  public async transform(
+    payload: Uint8Array,
+    configInput?: Partial<SharpImageTransformationConfig>,
+  ): Promise<SharpImageTransformationResult> {
+    const config = SharpImageTransformationConfigSchema.parse(configInput ?? {});
+    const transformed = Boolean(config.resizeWidth || config.resizeHeight || config.grayscale || config.targetFormat !== "keep");
+
+    if (!transformed) {
+      return Object.freeze({
+        payload,
+        transformed: false,
+      });
+    }
+
+    const sharpRecord = await import("sharp") as Readonly<Record<string, unknown>>;
+    const sharpFactory = (sharpRecord.default ?? sharpRecord) as
+      | ((input: Uint8Array) => {
+        resize(width?: number, height?: number): unknown;
+        grayscale(value?: boolean): unknown;
+        toFormat(format: string): unknown;
+        toBuffer(opts?: Readonly<Record<string, unknown>>): Promise<{ data: Uint8Array; info?: { width?: number; height?: number; format?: string } } | Uint8Array>;
+      })
+      | undefined;
+
+    if (typeof sharpFactory !== "function") {
+      throw new Error("'sharp' API is unavailable.");
+    }
+
+    type SharpPipeline = {
+      resize(width?: number, height?: number): SharpPipeline;
+      grayscale(value?: boolean): SharpPipeline;
+      toFormat(format: string): SharpPipeline;
+      toBuffer(opts?: Readonly<Record<string, unknown>>): Promise<{ data: Uint8Array; info?: { width?: number; height?: number; format?: string } } | Uint8Array>;
+    };
+    let pipeline = sharpFactory(payload) as unknown as SharpPipeline;
+
+    if (config.resizeWidth || config.resizeHeight) {
+      pipeline = pipeline.resize(config.resizeWidth, config.resizeHeight);
+    }
+    if (config.grayscale) {
+      pipeline = pipeline.grayscale(true);
+    }
+    if (config.targetFormat !== "keep") {
+      pipeline = pipeline.toFormat(config.targetFormat);
+    }
+
+    const result = await pipeline.toBuffer({ resolveWithObject: true });
+    const data = result instanceof Uint8Array ? result : result.data;
+    const info = result instanceof Uint8Array ? undefined : result.info;
+
+    return Object.freeze({
+      payload: data,
+      width: info?.width,
+      height: info?.height,
+      format: info?.format,
+      transformed: true,
+    });
   }
 }
 

@@ -1600,3 +1600,26 @@ Explicitly later than this scope:
 - Inspection integration now includes pipeline-specific metadata enrichment hooks:
   - tabular row/sample schema snapshots plus numeric summary stats (via `simple-statistics` wrapper),
   - document extracted text previews, chunk counts, character lengths, and optional token counts.
+
+## Direction 5 extension update: Image preparation + reusable enrichment composition (stories 17.9-17.10)
+
+- Mid-level image preparation now has a reusable pipeline package in `application/dataset-studio/MidLevelPipelineDefinitions.ts`:
+  - `ImagePreparationPipelineDefinition` with optional `Extraction`, required `Normalization`, optional `Transformation`, optional `Labeling`, and optional `Enrichment`.
+  - deterministic stage-order validation plus direct `PipelineDefinition`/`PipelineGraph`/`PipelineReactFlowGraph`/inspection integration through existing 17.x seams.
+- Image preparation composition is Node-first and reuses existing ingestion/transformation contracts:
+  - image metadata ingestion/normalization through `ImageIngestorAsset` (`exifr` + `sharp` metadata path),
+  - optional OCR extraction through injectable `IImageOcrExtractor` (`tesseract.js` default implementation),
+  - optional image transformation through `SharpImageTransformationService` (resize/grayscale/format normalization via `sharp`),
+  - placeholder labeling through existing classification asset mapping (no ML runtime introduced).
+- Enrichment now has an explicit reusable domain contract in `domain/dataset-studio/EnrichmentStageDomain.ts`:
+  - `EnrichmentStageConfig`,
+  - strategy kinds: `derived`, `lookup`, `metadata-augmentation`,
+  - lookup join-type support (`left`, `inner`),
+  - zod-backed validation and typed stage-option mapping helpers.
+- Stage composition mappings now support richer enrichment composition patterns (lookup/transform/merge and strategy-based branching) while preserving existing 17.2 contracts:
+  - default enrichment composition in `StageAssetCompositionService` expanded to strategy-conditional multi-asset groups plus bounded fallback,
+  - reusable composable enrichment definitions consumed by both document and image mid-level pipelines.
+- Inspection integration remains on the shared 17.5 seam and now includes image-focused enrichment/preview metadata:
+  - image metadata previews (dimensions/format snapshots),
+  - OCR text previews when extraction emits text items,
+  - transform/enrichment summary stats surfaced through existing `PipelineInspectionService` hooks.
