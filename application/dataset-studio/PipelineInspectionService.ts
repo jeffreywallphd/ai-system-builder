@@ -18,6 +18,7 @@ import {
   type PipelineExecutionStatus,
   type PipelineInspectionResult,
   type PipelinePreviewData,
+  type PipelinePreviewEnvelope,
   type StageInspectionResult,
 } from "../../domain/dataset-studio/PipelineInspectionDomain";
 import {
@@ -216,6 +217,16 @@ function derivePreviewFromCanonicalShape(
     default:
       throw new Error(`Unsupported canonical preview shape '${(shape as { kind: string }).kind}'.`);
   }
+}
+
+function toPreviewEnvelope(previewData: PipelinePreviewData): PipelinePreviewEnvelope {
+  return Object.freeze({
+    version: "1.0.0",
+    kind: previewData.kind,
+    totalCount: previewData.totalCount,
+    truncated: previewData.truncated,
+    payload: previewData,
+  });
 }
 
 function sortStageNodes(nodes: ReadonlyArray<PipelineGraphNode>): ReadonlyArray<PipelineGraphStageNode> {
@@ -546,6 +557,7 @@ export class PipelineInspectionService {
     const previewData = isCanonicalDataShape(stageOutput)
       ? derivePreviewFromCanonicalShape(stageOutput, this.previewOptions)
       : undefined;
+    const preview = previewData ? toPreviewEnvelope(previewData) : undefined;
 
     const assets = sortAssetNodes(graph.nodes)
       .filter((assetNode) => assetNode.data.stageId === stageNode.data.stageId)
@@ -554,6 +566,7 @@ export class PipelineInspectionService {
     return Object.freeze({
       stageId: stageNode.data.stageId,
       status: stageStatus,
+      preview,
       previewData,
       metadata: stageMetadata,
       assets: Object.freeze(assets),
@@ -581,12 +594,14 @@ export class PipelineInspectionService {
     const previewData = isCanonicalDataShape(assetOutput)
       ? derivePreviewFromCanonicalShape(assetOutput, this.previewOptions)
       : undefined;
+    const preview = previewData ? toPreviewEnvelope(previewData) : undefined;
 
     return Object.freeze({
       stageId: assetNode.data.stageId,
       assetId: assetNode.data.assetId,
       assetNodeId: assetNode.id,
       status: assetStatus,
+      preview,
       previewData,
       metadata: assetMetadata,
     });
