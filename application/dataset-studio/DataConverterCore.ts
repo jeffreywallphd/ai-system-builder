@@ -4,6 +4,7 @@ import {
   createCanonicalTableShape,
   createCanonicalTextItemsShape,
   type CanonicalDataMetadata,
+  type CanonicalDataShape,
   type CanonicalImageMetadataRecordsShape,
   type CanonicalRecordItem,
   type CanonicalRecordValue,
@@ -11,11 +12,36 @@ import {
   type CanonicalTableShape,
   type CanonicalTextItemsShape,
 } from "../../domain/dataset-studio/CanonicalDataShapes";
+import {
+  DataConverterDiagnosticSeverities,
+  DataConverterInputBoundaryKinds,
+  DataConverterOperationKinds,
+  createDataConverterDiagnostic,
+  mergeDataConverterMetadata,
+  normalizeDataConverterContext,
+  type DataConverterContractMetadata,
+  type DataConverterDiagnostic,
+  type DataConverterFailureResult,
+  type DataConverterImageMetadataToRecordsRequest,
+  type DataConverterOperationContext,
+  type DataConverterRecordsToTableRequest,
+  type DataConverterRequest,
+  type DataConverterResult,
+  type DataConverterResultBase,
+  type DataConverterSourceToRecordsRequest,
+  type DataConverterSuccessResult,
+  type DataConverterDocumentToTextItemsRequest,
+  type DataSourceReference,
+  type ResolvedDataSource,
+} from "./DataConverterContracts";
+import { DefaultDataSourceLocator, DataSourceLocatorError, type IDataSourceLocator } from "./DataSourceLocator";
 
 export const DataConverterErrorCodes = Object.freeze({
   invalidInput: "invalid_input",
   unsupportedContent: "unsupported_content",
   parseFailed: "parse_failed",
+  invalidRequest: "invalid_request",
+  sourceResolutionFailed: "source_resolution_failed",
 } as const);
 
 export type DataConverterErrorCode = typeof DataConverterErrorCodes[keyof typeof DataConverterErrorCodes];
@@ -102,15 +128,19 @@ function toMetadata(input: {
   readonly sourceAssetId?: string;
   readonly sourceVersionId?: string;
   readonly converterId: string;
+  readonly converterVersion: string;
+  readonly operationId?: string;
+  readonly base?: Partial<CanonicalDataMetadata>;
 }): Partial<CanonicalDataMetadata> {
   const sourceAssetId = normalizeOptional(input.sourceAssetId);
   const sourceVersionId = normalizeOptional(input.sourceVersionId);
-  return Object.freeze({
-    schemaVersion: "1.0.0",
+  const base = Object.freeze({
+    ...input.base,
     source: Object.freeze({
-      fileName: normalizeOptional(input.fileName),
-      contentType: normalizeOptional(input.contentType),
-      format: normalizeOptional(input.format),
+      ...(input.base?.source ?? {}),
+      fileName: normalizeOptional(input.fileName) ?? input.base?.source?.fileName,
+      contentType: normalizeOptional(input.contentType) ?? input.base?.source?.contentType,
+      format: normalizeOptional(input.format) ?? input.base?.source?.format,
     }),
     lineage: sourceAssetId
       ? Object.freeze([Object.freeze({
@@ -118,11 +148,14 @@ function toMetadata(input: {
         versionId: sourceVersionId,
         relationship: "source" as const,
       })])
-      : undefined,
-    transformation: Object.freeze({
-      converterId: input.converterId,
-      converterVersion: "1.0.0",
-    }),
+      : input.base?.lineage,
+  });
+
+  return mergeDataConverterMetadata({
+    base,
+    converterId: input.converterId,
+    converterVersion: input.converterVersion,
+    operationId: input.operationId,
   });
 }
 
@@ -268,70 +301,303 @@ function toTableColumns(records: ReadonlyArray<CanonicalRecordItem>, includeColu
   }));
 }
 
+function buildContractMetadata(input: {
+  readonly operation: DataConverterContractMetadata["operation"];
+  readonly inputBoundary: DataConverterContractMetadata["inputBoundary"];
+  readonly outputShapeKind: DataConverterContractMetadata["outputShapeKind"];
+  readonly converterId: string;
+  readonly converterVersion: string;
+}): DataConverterContractMetadata {
+  return Object.freeze({
+    schemaVersion: "1.0.0",
+    converterId: input.converterId,
+    converterVersion: input.converterVersion,
+    operation: input.operation,
+    inputBoundary: input.inputBoundary,
+    outputShapeKind: input.outputShapeKind,
+  });
+}
+
+function buildFailureResult(
+  operation: DataConverterRequest["operation"],
+  context: DataConverterOperationContext,
+  diagnostics: ReadonlyArray<DataConverterDiagnostic>,
+): DataConverterFailureResult {
+  return Object.freeze({
+    ok: false,
+    operation,
+    context,
+    diagnostics,
+  });
+}
+
 export class DataConverterCore {
   private static readonly converterId = "dataset-studio-data-converter-core";
+  private static readonly converterVersion = "1.0.0";
+
+  constructor(private readonly sourceLocator: IDataSourceLocator = new DefaultDataSourceLocator()) {}
+
+  public convert(request: DataConverterRequest): DataConverterResult {
+    const context = normalizeDataConverterContext(request.context);
+
+    try {
+      switch (request.operation) {
+        case DataConverterOperationKinds.sourceToRecords:
+          return this.convertSourceToRecordsRequest(request, context);
+        case DataConverterOperationKinds.recordsToTable:
+          return this.convertRecordsToTableRequest(request, context);
+        case DataConverterOperationKinds.documentToTextItems:
+          return this.convertDocumentToTextItemsRequest(request, context);
+        case DataConverterOperationKinds.imageMetadataToRecords:
+          return this.convertImageMetadataToRecordsRequest(request, context);
+        default:
+          throw new DataConverterError(DataConverterErrorCodes.invalidRequest, `Unsupported data converter operation '${request.operation}'.`);
+      }
+    } catch (error) {
+      if (error instanceof DataConverterError) {
+        return buildFailureResult(
+          request.operation,
+          context,
+          Object.freeze([
+            createDataConverterDiagnostic({
+              code: error.code,
+              severity: DataConverterDiagnosticSeverities.error,
+              message: error.message,
+              details: error.details,
+            }),
+          ]),
+        );
+      }
+
+      return buildFailureResult(
+        request.operation,
+        context,
+        Object.freeze([
+          createDataConverterDiagnostic({
+            code: DataConverterErrorCodes.invalidRequest,
+            severity: DataConverterDiagnosticSeverities.error,
+            message: error instanceof Error ? error.message : String(error),
+          }),
+        ]),
+      );
+    }
+  }
+
+  public async resolveAndConvertSourceToRecords(input: {
+    readonly source: DataSourceReference;
+    readonly context?: DataConverterOperationContext;
+    readonly delimiter?: "," | "\t" | ";" | "|";
+    readonly hasHeaderRow?: boolean;
+    readonly formatHint?: "json" | "csv" | "tsv" | "text";
+  }): Promise<DataConverterResult> {
+    const context = normalizeDataConverterContext(input.context);
+    try {
+      const resolved = await this.sourceLocator.resolve({ source: input.source, context });
+      return this.convert({
+        operation: DataConverterOperationKinds.sourceToRecords,
+        context,
+        source: resolved,
+        delimiter: input.delimiter,
+        hasHeaderRow: input.hasHeaderRow,
+        formatHint: input.formatHint,
+      });
+    } catch (error) {
+      if (error instanceof DataSourceLocatorError) {
+        return buildFailureResult(
+          DataConverterOperationKinds.sourceToRecords,
+          context,
+          Object.freeze([
+            ...error.diagnostics,
+            createDataConverterDiagnostic({
+              code: DataConverterErrorCodes.sourceResolutionFailed,
+              severity: DataConverterDiagnosticSeverities.error,
+              message: error.message,
+              details: { locatorCode: error.code },
+            }),
+          ]),
+        );
+      }
+
+      return buildFailureResult(
+        DataConverterOperationKinds.sourceToRecords,
+        context,
+        Object.freeze([
+          createDataConverterDiagnostic({
+            code: DataConverterErrorCodes.sourceResolutionFailed,
+            severity: DataConverterDiagnosticSeverities.error,
+            message: error instanceof Error ? error.message : String(error),
+          }),
+        ]),
+      );
+    }
+  }
 
   public convertFileLikeSourceToRecords(input: FileLikeSourcePayload): CanonicalRecordsShape {
-    if (input.content === undefined || input.content === null) {
-      throw new DataConverterError(DataConverterErrorCodes.invalidInput, "File-like source content is required.");
+    const request: DataConverterSourceToRecordsRequest = Object.freeze({
+      operation: DataConverterOperationKinds.sourceToRecords,
+      source: Object.freeze({
+        kind: "in-memory",
+        reference: input.fileName ?? "legacy-file-like-source",
+        payload: input.content,
+        fileName: input.fileName,
+        contentType: input.contentType,
+        formatHint: input.formatHint,
+        sourceAssetId: input.sourceAssetId,
+        sourceVersionId: input.sourceVersionId,
+        diagnostics: Object.freeze([]),
+      }),
+      formatHint: input.formatHint,
+      delimiter: input.delimiter,
+      hasHeaderRow: input.hasHeaderRow,
+    });
+
+    const result = this.convert(request);
+    if (!result.ok) {
+      throw new DataConverterError(
+        (result.diagnostics[0]?.code as DataConverterErrorCode) ?? DataConverterErrorCodes.invalidRequest,
+        result.diagnostics[0]?.message ?? "File-like source conversion failed.",
+      );
+    }
+
+    return result.output;
+  }
+
+  public convertRecordsToTable(input: RecordsToTableInput): CanonicalTableShape {
+    const result = this.convert({
+      operation: DataConverterOperationKinds.recordsToTable,
+      records: input.records,
+      includeColumns: input.includeColumns,
+      metadata: input.metadata,
+    });
+
+    if (!result.ok) {
+      throw new DataConverterError(
+        (result.diagnostics[0]?.code as DataConverterErrorCode) ?? DataConverterErrorCodes.invalidRequest,
+        result.diagnostics[0]?.message ?? "Records-to-table conversion failed.",
+      );
+    }
+
+    return result.output;
+  }
+
+  public convertDocumentToTextItems(input: DocumentTextConversionInput): CanonicalTextItemsShape {
+    const result = this.convert({
+      operation: DataConverterOperationKinds.documentToTextItems,
+      documentId: input.documentId,
+      text: input.text,
+      chunking: input.chunking,
+      sourceAssetId: input.sourceAssetId,
+      sourceVersionId: input.sourceVersionId,
+    });
+
+    if (!result.ok) {
+      throw new DataConverterError(
+        (result.diagnostics[0]?.code as DataConverterErrorCode) ?? DataConverterErrorCodes.invalidRequest,
+        result.diagnostics[0]?.message ?? "Document text conversion failed.",
+      );
+    }
+
+    return result.output;
+  }
+
+  public convertImageMetadataToRecords(input: ImageMetadataConversionInput): CanonicalImageMetadataRecordsShape {
+    const result = this.convert({
+      operation: DataConverterOperationKinds.imageMetadataToRecords,
+      imageId: input.imageId,
+      metadata: input.metadata,
+      sourceAssetId: input.sourceAssetId,
+      sourceVersionId: input.sourceVersionId,
+    });
+
+    if (!result.ok) {
+      throw new DataConverterError(
+        (result.diagnostics[0]?.code as DataConverterErrorCode) ?? DataConverterErrorCodes.invalidRequest,
+        result.diagnostics[0]?.message ?? "Image metadata conversion failed.",
+      );
+    }
+
+    return result.output;
+  }
+
+  private convertSourceToRecordsRequest(
+    request: DataConverterSourceToRecordsRequest,
+    context: DataConverterOperationContext,
+  ): DataConverterResultBase<CanonicalRecordsShape> {
+    const source = request.source;
+    if (source.payload === undefined || source.payload === null) {
+      throw new DataConverterError(DataConverterErrorCodes.invalidInput, "Resolved source content is required.");
     }
 
     let recordSource: ReadonlyArray<Readonly<Record<string, unknown>>>;
-    const formatHint = input.formatHint?.toLowerCase();
-    const delimiter = input.delimiter ?? (formatHint === "tsv" ? "\t" : ",");
+    const formatHint = (request.formatHint ?? source.formatHint)?.toLowerCase();
+    const delimiter = request.delimiter ?? (formatHint === "tsv" ? "\t" : ",");
 
-    if (Array.isArray(input.content)) {
-      recordSource = Object.freeze(input.content.map((entry) => Object.freeze({ ...entry })));
-    } else if (input.content instanceof Uint8Array) {
-      const normalizedText = normalizeStringContent(input.content);
+    if (Array.isArray(source.payload)) {
+      recordSource = Object.freeze(source.payload.map((entry) => Object.freeze({ ...entry })));
+    } else if (source.payload instanceof Uint8Array) {
+      const normalizedText = normalizeStringContent(source.payload);
       if (!normalizedText.trim()) {
-        throw new DataConverterError(DataConverterErrorCodes.invalidInput, "File-like source content cannot be empty.");
+        throw new DataConverterError(DataConverterErrorCodes.invalidInput, "Resolved source content cannot be empty.");
       }
       if (formatHint === "csv" || formatHint === "tsv" || formatHint === "text") {
-        recordSource = parseDelimitedContent(normalizedText, delimiter, input.hasHeaderRow ?? true);
+        recordSource = parseDelimitedContent(normalizedText, delimiter, request.hasHeaderRow ?? true);
       } else {
         recordSource = parseStructuredContent(normalizedText);
       }
-    } else if (typeof input.content === "string") {
-      const normalizedText = normalizeStringContent(input.content);
+    } else if (typeof source.payload === "string") {
+      const normalizedText = normalizeStringContent(source.payload);
       if (!normalizedText.trim()) {
-        throw new DataConverterError(DataConverterErrorCodes.invalidInput, "File-like source content cannot be empty.");
+        throw new DataConverterError(DataConverterErrorCodes.invalidInput, "Resolved source content cannot be empty.");
       }
       const looksLikeJson = normalizedText.trim().startsWith("{") || normalizedText.trim().startsWith("[");
       const looksLikeDelimited = normalizedText.includes("\n") && normalizedText.includes(delimiter);
       if (formatHint === "csv" || formatHint === "tsv" || formatHint === "text" || (!looksLikeJson && looksLikeDelimited)) {
-        recordSource = parseDelimitedContent(normalizedText, delimiter, input.hasHeaderRow ?? true);
+        recordSource = parseDelimitedContent(normalizedText, delimiter, request.hasHeaderRow ?? true);
       } else {
         recordSource = parseStructuredContent(normalizedText);
       }
-    } else if (typeof input.content === "object") {
-      recordSource = Object.freeze([Object.freeze({ ...input.content })]);
+    } else if (typeof source.payload === "object") {
+      recordSource = Object.freeze([Object.freeze({ ...source.payload })]);
     } else {
-      throw new DataConverterError(DataConverterErrorCodes.unsupportedContent, "Unsupported file-like content type.");
-    }
-    if (recordSource.length === 0) {
-      throw new DataConverterError(DataConverterErrorCodes.invalidInput, "File-like source did not produce any records.");
+      throw new DataConverterError(DataConverterErrorCodes.unsupportedContent, "Unsupported resolved source payload type.");
     }
 
-    return createCanonicalRecordsShape({
+    if (recordSource.length === 0) {
+      throw new DataConverterError(DataConverterErrorCodes.invalidInput, "Resolved source did not produce any records.");
+    }
+
+    const output = createCanonicalRecordsShape({
       records: toRecordItems(recordSource),
       metadata: toMetadata({
-        fileName: input.fileName,
-        contentType: input.contentType,
+        fileName: source.fileName,
+        contentType: source.contentType,
         format: formatHint ?? "structured",
-        sourceAssetId: input.sourceAssetId,
-        sourceVersionId: input.sourceVersionId,
+        sourceAssetId: source.sourceAssetId,
+        sourceVersionId: source.sourceVersionId,
         converterId: DataConverterCore.converterId,
+        converterVersion: DataConverterCore.converterVersion,
+        operationId: context.operationId,
       }),
+    });
+
+    return this.buildSuccessResult({
+      operation: request.operation,
+      context,
+      output,
+      inputBoundary: DataConverterInputBoundaryKinds.resolvedSource,
+      diagnostics: source.diagnostics,
     });
   }
 
-  public convertRecordsToTable(input: RecordsToTableInput): CanonicalTableShape {
-    const records = Array.isArray(input.records)
-      ? input.records
-      : input.records.records;
+  private convertRecordsToTableRequest(
+    request: DataConverterRecordsToTableRequest,
+    context: DataConverterOperationContext,
+  ): DataConverterResultBase<CanonicalTableShape> {
+    const records = Array.isArray(request.records)
+      ? request.records
+      : request.records.records;
 
-    const columns = toTableColumns(records, input.includeColumns);
+    const columns = toTableColumns(records, request.includeColumns);
     const rows = Object.freeze(records.map((record, index) => {
       const cells = Object.fromEntries(columns.map((column) => [column.columnId, record.fields[column.columnId] ?? null]));
       return Object.freeze({
@@ -341,26 +607,36 @@ export class DataConverterCore {
       });
     }));
 
-    return createCanonicalTableShape({
+    const output = createCanonicalTableShape({
       columns,
       rows,
-      metadata: {
-        ...input.metadata,
-        transformation: Object.freeze({
-          converterId: DataConverterCore.converterId,
-          converterVersion: "1.0.0",
-        }),
-      },
+      metadata: toMetadata({
+        converterId: DataConverterCore.converterId,
+        converterVersion: DataConverterCore.converterVersion,
+        operationId: context.operationId,
+        base: request.metadata,
+      }),
+    });
+
+    return this.buildSuccessResult({
+      operation: request.operation,
+      context,
+      output,
+      inputBoundary: DataConverterInputBoundaryKinds.canonicalRecords,
+      diagnostics: Object.freeze([]),
     });
   }
 
-  public convertDocumentToTextItems(input: DocumentTextConversionInput): CanonicalTextItemsShape {
-    const normalizedText = input.text.replace(/\r\n/g, "\n");
+  private convertDocumentToTextItemsRequest(
+    request: DataConverterDocumentToTextItemsRequest,
+    context: DataConverterOperationContext,
+  ): DataConverterResultBase<CanonicalTextItemsShape> {
+    const normalizedText = request.text.replace(/\r\n/g, "\n");
     if (!normalizedText.trim()) {
       throw new DataConverterError(DataConverterErrorCodes.invalidInput, "Document text cannot be empty.");
     }
 
-    const mode = input.chunking?.mode ?? "paragraph";
+    const mode = request.chunking?.mode ?? "paragraph";
     const items: Array<{ text: string; startOffset: number; endOffset: number }> = [];
 
     if (mode === "line") {
@@ -374,8 +650,8 @@ export class DataConverterCore {
         offset = endOffset + 1;
       }
     } else if (mode === "fixed-size") {
-      const size = Math.max(1, input.chunking?.size ?? 500);
-      const overlap = Math.max(0, Math.min(size - 1, input.chunking?.overlap ?? 0));
+      const size = Math.max(1, request.chunking?.size ?? 500);
+      const overlap = Math.max(0, Math.min(size - 1, request.chunking?.overlap ?? 0));
       let cursor = 0;
       while (cursor < normalizedText.length) {
         const end = Math.min(normalizedText.length, cursor + size);
@@ -403,33 +679,46 @@ export class DataConverterCore {
       }
     }
 
-    return createCanonicalTextItemsShape({
+    const output = createCanonicalTextItemsShape({
       items: Object.freeze(items.map((item, index) => Object.freeze({
         itemId: `text-item-${index + 1}`,
         text: item.text,
-        sourceDocumentId: normalizeOptional(input.documentId),
+        sourceDocumentId: normalizeOptional(request.documentId),
         startOffset: item.startOffset,
         endOffset: item.endOffset,
       }))),
       metadata: toMetadata({
         format: "text",
-        sourceAssetId: input.sourceAssetId,
-        sourceVersionId: input.sourceVersionId,
+        sourceAssetId: request.sourceAssetId,
+        sourceVersionId: request.sourceVersionId,
         converterId: DataConverterCore.converterId,
+        converterVersion: DataConverterCore.converterVersion,
+        operationId: context.operationId,
       }),
+    });
+
+    return this.buildSuccessResult({
+      operation: request.operation,
+      context,
+      output,
+      inputBoundary: DataConverterInputBoundaryKinds.documentText,
+      diagnostics: Object.freeze([]),
     });
   }
 
-  public convertImageMetadataToRecords(input: ImageMetadataConversionInput): CanonicalImageMetadataRecordsShape {
-    if (!input.metadata || typeof input.metadata !== "object") {
+  private convertImageMetadataToRecordsRequest(
+    request: DataConverterImageMetadataToRecordsRequest,
+    context: DataConverterOperationContext,
+  ): DataConverterResultBase<CanonicalImageMetadataRecordsShape> {
+    if (!request.metadata || typeof request.metadata !== "object") {
       throw new DataConverterError(DataConverterErrorCodes.invalidInput, "Image metadata must be an object.");
     }
 
-    const regions = Array.isArray(input.metadata.regions)
-      ? input.metadata.regions.filter((entry) => entry && typeof entry === "object") as Array<Readonly<Record<string, unknown>>>
+    const regions = Array.isArray(request.metadata.regions)
+      ? request.metadata.regions.filter((entry) => entry && typeof entry === "object") as Array<Readonly<Record<string, unknown>>>
       : [];
 
-    const regionItems = (regions.length > 0 ? regions : [input.metadata]).map((entry, index) => {
+    const regionItems = (regions.length > 0 ? regions : [request.metadata]).map((entry, index) => {
       const x = typeof entry.x === "number" ? entry.x : undefined;
       const y = typeof entry.y === "number" ? entry.y : undefined;
       const width = typeof entry.width === "number" ? entry.width : undefined;
@@ -443,7 +732,7 @@ export class DataConverterCore {
 
       return Object.freeze({
         itemId: normalizeOptional(typeof entry.id === "string" ? entry.id : undefined) ?? `image-item-${index + 1}`,
-        imageId: normalizeOptional(input.imageId),
+        imageId: normalizeOptional(request.imageId),
         label: normalizeOptional(typeof entry.label === "string" ? entry.label : undefined),
         confidence,
         boundingBox:
@@ -454,14 +743,57 @@ export class DataConverterCore {
       });
     });
 
-    return createCanonicalImageMetadataRecordsShape({
+    const output = createCanonicalImageMetadataRecordsShape({
       items: Object.freeze(regionItems),
       metadata: toMetadata({
         format: "image-metadata",
-        sourceAssetId: input.sourceAssetId,
-        sourceVersionId: input.sourceVersionId,
+        sourceAssetId: request.sourceAssetId,
+        sourceVersionId: request.sourceVersionId,
         converterId: DataConverterCore.converterId,
+        converterVersion: DataConverterCore.converterVersion,
+        operationId: context.operationId,
       }),
+    });
+
+    return this.buildSuccessResult({
+      operation: request.operation,
+      context,
+      output,
+      inputBoundary: DataConverterInputBoundaryKinds.imageMetadata,
+      diagnostics: Object.freeze([]),
+    });
+  }
+
+  private buildSuccessResult<TShape extends CanonicalDataShape>(input: {
+    readonly operation: DataConverterRequest["operation"];
+    readonly context: DataConverterOperationContext;
+    readonly output: TShape;
+    readonly inputBoundary: DataConverterContractMetadata["inputBoundary"];
+    readonly diagnostics: ReadonlyArray<DataConverterDiagnostic>;
+  }): DataConverterResultBase<TShape> {
+    return Object.freeze({
+      ok: true,
+      operation: input.operation,
+      context: input.context,
+      contract: buildContractMetadata({
+        operation: input.operation,
+        inputBoundary: input.inputBoundary,
+        outputShapeKind: input.output.kind,
+        converterId: DataConverterCore.converterId,
+        converterVersion: DataConverterCore.converterVersion,
+      }),
+      metadata: input.output.metadata,
+      output: input.output,
+      diagnostics: input.diagnostics,
     });
   }
 }
+
+export type {
+  DataConverterOperationContext,
+  DataConverterRequest,
+  DataConverterResult,
+  DataConverterSuccessResult,
+  DataConverterFailureResult,
+  ResolvedDataSource,
+};

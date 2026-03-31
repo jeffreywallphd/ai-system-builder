@@ -71,6 +71,14 @@ export class CommandPaletteEntryResolver {
         action: Object.freeze({ kind: CommandPaletteActionKinds.navigate, launchPath: ROUTE_PATHS.build }),
       }),
       Object.freeze({
+        id: "nav:run",
+        label: "Run",
+        description: "Open Run.",
+        keywords: Object.freeze(["go", "open", "run", "test"]),
+        category: "navigation",
+        action: Object.freeze({ kind: CommandPaletteActionKinds.navigate, launchPath: ROUTE_PATHS.run }),
+      }),
+      Object.freeze({
         id: "nav:explore",
         label: "Explore",
         description: "Open Explore.",
@@ -79,12 +87,12 @@ export class CommandPaletteEntryResolver {
         action: Object.freeze({ kind: CommandPaletteActionKinds.navigate, launchPath: ROUTE_PATHS.explore }),
       }),
       Object.freeze({
-        id: "nav:run",
-        label: "Run",
-        description: "Open Run.",
-        keywords: Object.freeze(["go", "open", "run", "test"]),
+        id: "nav:data",
+        label: "Data",
+        description: "Open Data Studio.",
+        keywords: Object.freeze(["go", "open", "data", "dataset", "dataset studio"]),
         category: "navigation",
-        action: Object.freeze({ kind: CommandPaletteActionKinds.navigate, launchPath: ROUTE_PATHS.run }),
+        action: Object.freeze({ kind: CommandPaletteActionKinds.navigate, launchPath: ROUTE_PATHS.datasetStudio }),
       }),
       Object.freeze({
         id: "nav:manage",
@@ -104,7 +112,7 @@ export class CommandPaletteService {
   public resolveModel(_context: CommandPaletteContext, query: CommandPaletteQuery): CommandPaletteModel {
     const entries = this.resolver.resolveEntries();
     return Object.freeze({
-      placeholder: "Jump to Build, Explore, Run, or Manage",
+      placeholder: "Jump to Build, Run, Explore, Data, or Manage",
       entries: toScoredEntries(entries, query.searchText),
     });
   }

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { DataConverterCore, DataConverterError } from "../DataConverterCore";
+import { DataConverterOperationKinds, DataSourceReferenceKinds } from "../DataConverterContracts";
+import { DefaultDataSourceLocator, type IDataSourcePayloadLoader } from "../DataSourceLocator";
 
 describe("DataConverterCore", () => {
   it("converts file-like json payloads into canonical records", () => {
@@ -64,6 +66,61 @@ describe("DataConverterCore", () => {
     expect(shape.kind).toBe("image-metadata-records");
     expect(shape.items).toHaveLength(2);
     expect(shape.items[0].boundingBox?.width).toBe(120);
+  });
+
+  it("returns a structured result envelope for converter operations", () => {
+    const converter = new DataConverterCore();
+
+    const result = converter.convert({
+      operation: DataConverterOperationKinds.sourceToRecords,
+      context: { requestId: "req-1", operationId: "op-1" },
+      source: {
+        kind: DataSourceReferenceKinds.inMemory,
+        reference: "in-memory",
+        payload: JSON.stringify([{ name: "Ada" }]),
+        formatHint: "json",
+        diagnostics: Object.freeze([]),
+      },
+    });
+
+    expect(result.ok).toBeTrue();
+    if (!result.ok) {
+      throw new Error("Expected successful conversion envelope.");
+    }
+
+    expect(result.contract.operation).toBe(DataConverterOperationKinds.sourceToRecords);
+    expect(result.contract.inputBoundary).toBe("resolved-source");
+    expect(result.context.requestId).toBe("req-1");
+    expect(result.output.kind).toBe("records");
+  });
+
+  it("resolves local-file sources through the locator abstraction", async () => {
+    class Loader implements IDataSourcePayloadLoader {
+      async loadLocalFile(path: string): Promise<string> {
+        return path.endsWith("customers.csv") ? "name,score\nAda,10" : "";
+      }
+      async loadUrl(): Promise<string> {
+        throw new Error("unused");
+      }
+    }
+
+    const converter = new DataConverterCore(new DefaultDataSourceLocator(new Loader()));
+    const result = await converter.resolveAndConvertSourceToRecords({
+      source: {
+        kind: DataSourceReferenceKinds.localFile,
+        path: "C:\\tmp\\customers.csv",
+      },
+      context: { requestId: "req-local" },
+    });
+
+    expect(result.ok).toBeTrue();
+    if (!result.ok) {
+      throw new Error("Expected successful local-file conversion.");
+    }
+
+    expect(result.output.kind).toBe("records");
+    expect(result.output.records).toHaveLength(1);
+    expect(result.metadata.source?.fileName).toBe("customers.csv");
   });
 
   it("throws typed errors for invalid source payloads", () => {
