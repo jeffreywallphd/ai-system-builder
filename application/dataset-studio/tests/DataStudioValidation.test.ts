@@ -5,10 +5,12 @@ import {
   DataStudioValidationSections,
   hasErrorIssues,
   toDataConverterDiagnostics,
+  validateDataAssetConfigValues,
   validateCanonicalDataShape,
   validateDataAssetExecutionRequest,
   validateDataPreviewModel,
 } from "../DataStudioValidation";
+import { DataAssetConfigFieldKinds, createDataAssetConfigSchema } from "../DataAssetConfiguration";
 
 describe("DataStudioValidation", () => {
   it("validates canonical-shape contract boundaries", () => {
@@ -67,5 +69,42 @@ describe("DataStudioValidation", () => {
     const diagnostics = toDataConverterDiagnostics(issues);
     expect(diagnostics.length).toBe(issues.length);
     expect(diagnostics[0]?.details?.section).toBe(DataStudioValidationSections.previewModel);
+  });
+
+  it("validates schema-driven data-asset config values with field-level paths", () => {
+    const schema = createDataAssetConfigSchema({
+      schemaId: "dataset-preview.schema",
+      fields: [
+        {
+          key: "formatHint",
+          label: "Input format",
+          kind: DataAssetConfigFieldKinds.select,
+          required: true,
+          options: [
+            { value: "json", label: "JSON" },
+            { value: "csv", label: "CSV" },
+          ],
+        },
+        {
+          key: "previewMaxItems",
+          label: "Preview max items",
+          kind: DataAssetConfigFieldKinds.number,
+          min: 1,
+          max: 20,
+          required: true,
+        },
+      ],
+    });
+
+    const issues = validateDataAssetConfigValues({
+      formatHint: "yaml",
+      previewMaxItems: 0,
+      unknownField: true,
+    }, schema);
+
+    expect(issues.some((issue) => issue.code === "data-asset-config-select-option-invalid")).toBeTrue();
+    expect(issues.some((issue) => issue.code === "data-asset-config-number-min-violated")).toBeTrue();
+    expect(issues.some((issue) => issue.code === "data-asset-config-key-unsupported")).toBeTrue();
+    expect(issues.some((issue) => issue.path === "config.values.formatHint")).toBeTrue();
   });
 });

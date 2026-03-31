@@ -1133,3 +1133,23 @@ Explicitly later than this scope:
   - no parallel data taxonomy or parallel execution stack was introduced,
   - validation remains explicit/result-driven (not exception-first control flow),
   - data-layer diagnostics stay inspectable and reusable for UI surfaces.
+
+## Direction 5 update: Data asset registry + schema-driven config contracts (stories 13.11-13.12)
+
+- Data Studio now has an explicit registry seam in `application/dataset-studio/DataAssetRegistry.ts` for deterministic registration/discovery/loading of data assets without creating a parallel taxonomy or global plugin runtime.
+- Registry entries now expose bounded discovery metadata for UI/application composition:
+  - asset identity (`assetId`, `versionId`, `name`),
+  - taxonomy-aligned role metadata (`taxonomy` + bounded `specialization` tags for converter/preview/ingestion/transformation intent),
+  - contract references (input/output shape descriptors + contract version),
+  - output/composability metadata (`outputShapeKind`, `composableInputShapeKinds`),
+  - capability metadata (`configurable`, `previewable`, `executable`),
+  - schema-driven config contracts (`DataAssetConfigSchema`) for reusable authoring surfaces.
+- Data asset config schema contracts are now centralized in `application/dataset-studio/DataAssetConfiguration.ts`:
+  - typed field kinds and options,
+  - deterministic schema normalization/default resolution,
+  - bounded schema inference from existing `DataAssetBase.config` values when explicit schema is not provided.
+- Data Studio validation now includes schema-aware config validation in `application/dataset-studio/DataStudioValidation.ts` (`validateDataAssetConfigValues`) so field-level config diagnostics use the same validation framework as execution/preview flows.
+- Scope remains intentionally bounded:
+  - no remote marketplace/auto-discovery/plugin-packaging architecture was introduced,
+  - registry loading is explicit registration + optional config-aware asset factory functions,
+  - taxonomy/asset identity remain anchored to existing shared asset + dataset foundations.
