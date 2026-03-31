@@ -51,6 +51,7 @@ Workflow -> `ExecuteWorkflowUseCase` -> one-unit `ExecutionPlan` -> `UnifiedExec
   - external start/invocation paths now apply explicit external retry classification (retryable transport/internal failures only) with bounded attempts,
   - idempotent replay protection at external start boundary reuses execution identity for repeated idempotency-key requests instead of creating duplicate runs,
   - callback delivery retries are bounded by callback registration max-attempts and audited as retry-attempted/retry-exhausted outcomes,
+  - callback signature generation is runtime-compatible (Web Crypto primary, Node crypto fallback) so browser-hosted runtime contracts do not depend on top-level Node crypto imports,
   - external entrypoint rate limiting is evaluated centrally at runtime API boundaries (caller/tenant/source-operation windows), remains distinct from execution quotas, and returns structured `rate-limit-exceeded` errors.
 
 - Direction 5 Epic 7 stories 7.23–7.24 now align external-runtime performance safeguards + docs truth on the same seams:
