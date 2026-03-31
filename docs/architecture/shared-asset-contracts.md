@@ -201,3 +201,16 @@ Not implemented in this slice:
   - `cleaning -> missing-value-handling + deduplication + filtering`,
   - `transformation -> field-mapping + data-validation + filtering`,
   - `aggregation -> aggregation`.
+
+## Direction 5 extension update: Transformation preview + config UX contracts (stories 16.13-16.14)
+
+- Transformation preview now has one standardized contract seam for single assets and pipelines:
+  - single-asset previews return normalized contracts with row-count/change summaries, sampled input/output rows, structured diff snippets, warning/error arrays, and bounded asset-specific diagnostic extensions,
+  - pipeline previews now aggregate per-step normalized previews and expose concise top-level summaries plus deeper per-step inspection payloads for future Wizard/Canvas progressive disclosure.
+- Preview shaping is centralized through shared internal helpers (`TransformationPreviewService`, `TransformationPreviewContracts`, `TransformationDiffUtils`) so preview logic is consistent and not scattered across individual assets.
+- Transformation config UX contracts are now standardized and zod-aligned:
+  - reusable descriptor contracts for fields/sections/options/defaults/constraints/simple-vs-advanced visibility,
+  - descriptor generation is derived from executable zod config schemas with bounded UX overlays per asset, preserving runtime schema authority and preventing drift.
+- Pipeline/orchestration authoring compatibility now includes:
+  - pipeline step-level config UX descriptors tied to registered transformation assets,
+  - stage-to-asset compatibility helpers for dataset stage mapping so Wizard/Canvas authoring can consume one inspectable config-contract surface.
