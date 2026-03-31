@@ -2,6 +2,10 @@ import { AssetContractShapeKinds } from "../../domain/contracts/AssetContract";
 import { CanonicalDataAsset } from "../../domain/dataset-studio/CanonicalDataAsset";
 import { createCanonicalRecordsShape, type CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
 import {
+  UnifiedIngestionContractVersion,
+  type UnifiedIngestionConfiguration,
+  type UnifiedIngestionConfigMode,
+  type UnifiedIngestionSourceReference,
   UnifiedIngestionOutputTargetKinds,
   UnifiedIngestionSourceKinds,
   UnifiedIngestionStrategyKinds,
@@ -12,9 +16,100 @@ import {
   createDataAssetConfigSchema,
   type DataAssetConfigSchema,
 } from "./DataAssetConfiguration";
+import { resolveUnifiedIngestionConfiguration } from "./UnifiedIngestionConfiguration";
+import {
+  UnifiedIngestionOrchestrationService,
+  type UnifiedIngestionPreviewResult,
+  type UnifiedIngestionResult,
+} from "./UnifiedIngestionOrchestrationService";
 
 export const UnifiedIngestionAssetId = "unified-ingestion";
 export const UnifiedIngestionAssetVersion = "1.0.0";
+export const UnifiedIngestionAssetInputContractVersion = "1.0.0";
+export const UnifiedIngestionAssetOutputContractVersion = "1.0.0";
+
+export interface UnifiedIngestionAssetExecutionRequest {
+  readonly source: UnifiedIngestionSourceReference;
+  readonly payload?: string | Uint8Array;
+  readonly configuration?: UnifiedIngestionConfiguration;
+  readonly configurationMode?: UnifiedIngestionConfigMode;
+  readonly configurationValues?: Readonly<Record<string, CanonicalRecordValue>>;
+  readonly converterContext?: {
+    readonly operationId?: string;
+    readonly initiatedBy?: string;
+    readonly requestId?: string;
+    readonly pipelineId?: string;
+    readonly stageId?: string;
+    readonly lineageAssetId?: string;
+  };
+}
+
+export interface UnifiedIngestionAssetExecutionResult {
+  readonly contractVersion: typeof UnifiedIngestionContractVersion;
+  readonly inputContractVersion: typeof UnifiedIngestionAssetInputContractVersion;
+  readonly outputContractVersion: typeof UnifiedIngestionAssetOutputContractVersion;
+  readonly assetId: typeof UnifiedIngestionAssetId;
+  readonly assetVersion: typeof UnifiedIngestionAssetVersion;
+  readonly mode: "execute" | "preview";
+  readonly configuration: UnifiedIngestionConfiguration;
+  readonly result: UnifiedIngestionResult | UnifiedIngestionPreviewResult;
+}
+
+export class UnifiedIngestionAssetExecutionWrapper {
+  private readonly orchestration: UnifiedIngestionOrchestrationService;
+
+  constructor(options?: { readonly orchestration?: UnifiedIngestionOrchestrationService }) {
+    this.orchestration = options?.orchestration ?? new UnifiedIngestionOrchestrationService();
+  }
+
+  public async execute(request: UnifiedIngestionAssetExecutionRequest): Promise<UnifiedIngestionAssetExecutionResult> {
+    const configurationResolution = resolveUnifiedIngestionConfiguration({
+      mode: request.configurationMode,
+      values: request.configurationValues,
+      base: request.configuration,
+    });
+    const result = await this.orchestration.ingest({
+      source: request.source,
+      payload: request.payload,
+      configuration: configurationResolution.configuration,
+      converterContext: request.converterContext,
+    });
+    return Object.freeze({
+      contractVersion: UnifiedIngestionContractVersion,
+      inputContractVersion: UnifiedIngestionAssetInputContractVersion,
+      outputContractVersion: UnifiedIngestionAssetOutputContractVersion,
+      assetId: UnifiedIngestionAssetId,
+      assetVersion: UnifiedIngestionAssetVersion,
+      mode: "execute",
+      configuration: configurationResolution.configuration,
+      result,
+    });
+  }
+
+  public async preview(request: UnifiedIngestionAssetExecutionRequest): Promise<UnifiedIngestionAssetExecutionResult> {
+    const configurationResolution = resolveUnifiedIngestionConfiguration({
+      mode: request.configurationMode,
+      values: request.configurationValues,
+      base: request.configuration,
+    });
+    const result = await this.orchestration.ingestWithPreview({
+      source: request.source,
+      payload: request.payload,
+      configuration: configurationResolution.configuration,
+      converterContext: request.converterContext,
+    });
+    return Object.freeze({
+      contractVersion: UnifiedIngestionContractVersion,
+      inputContractVersion: UnifiedIngestionAssetInputContractVersion,
+      outputContractVersion: UnifiedIngestionAssetOutputContractVersion,
+      assetId: UnifiedIngestionAssetId,
+      assetVersion: UnifiedIngestionAssetVersion,
+      mode: "preview",
+      configuration: configurationResolution.configuration,
+      result,
+    });
+  }
+}
 
 export function createUnifiedIngestionConfigSchema(assetId: string): DataAssetConfigSchema {
   return createDataAssetConfigSchema({
@@ -158,11 +253,11 @@ export function createUnifiedIngestionDataAsset(
       version: "1.0.0",
       input: {
         kind: AssetContractShapeKinds.jsonSchema,
-        description: "Unified source reference with shared simple/advanced ingestion configuration.",
+        description: "Unified ingestion asset wrapper input contract v1.0.0 (source + configuration + optional payload).",
       },
       output: {
         kind: AssetContractShapeKinds.jsonSchema,
-        description: "Canonical output routed to records, text-items, or image-metadata-records.",
+        description: "Unified ingestion asset wrapper output contract v1.0.0 (canonical output + preview/error/fallback metadata).",
       },
     },
     config,

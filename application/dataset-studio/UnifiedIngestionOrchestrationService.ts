@@ -11,9 +11,18 @@ import {
   type UnifiedIngestionConfiguration,
   type UnifiedIngestionIssue,
   type UnifiedIngestionNormalizedOutput,
+  type UnifiedIngestionRouteResult,
   type UnifiedIngestionRouteResolution,
   type UnifiedIngestionSourceReference,
 } from "../../domain/dataset-studio/UnifiedIngestionDomain";
+import {
+  UnifiedIngestionExecutionStages,
+  classifyUnifiedIngestionFailure,
+  deriveUnifiedIngestionFallbackDecisions,
+  type UnifiedIngestionExecutionStage,
+  type UnifiedIngestionFailureClassification,
+  type UnifiedIngestionFallbackDecision,
+} from "./UnifiedIngestionFailurePolicy";
 import {
   DataConverterOperationKinds,
   type DataConverterOperationContext,
@@ -62,16 +71,24 @@ export interface UnifiedIngestionSuccessResult {
     readonly inputBoundary: DataConverterSuccessResult["contract"]["inputBoundary"];
   };
   readonly issues: ReadonlyArray<UnifiedIngestionIssue>;
+  readonly fallbacks: ReadonlyArray<UnifiedIngestionFallbackDecision>;
 }
 
 export interface UnifiedIngestionFailureResult {
   readonly contractVersion: typeof UnifiedIngestionContractVersion;
   readonly ok: false;
   readonly source: UnifiedIngestionSourceReference;
-  readonly stage: "configuration" | "source-read" | "detection" | "routing" | "ingestion" | "conversion" | "normalization" | "preview";
+  readonly stage: UnifiedIngestionExecutionStage;
   readonly detection?: Awaited<ReturnType<IUnifiedIngestionSourceTypeDetector["detect"]>>;
-  readonly route?: UnifiedIngestionRouteResolution;
+  readonly route?: UnifiedIngestionRouteResult;
   readonly issues: ReadonlyArray<UnifiedIngestionIssue>;
+  readonly failure: UnifiedIngestionFailureClassification;
+  readonly fallbacks: ReadonlyArray<UnifiedIngestionFallbackDecision>;
+  readonly partial: {
+    readonly detectionResolved: boolean;
+    readonly routeResolved: boolean;
+    readonly outputTarget?: UnifiedIngestionConfiguration["outputTarget"];
+  };
 }
 
 export type UnifiedIngestionResult = UnifiedIngestionSuccessResult | UnifiedIngestionFailureResult;
@@ -127,6 +144,16 @@ function mapRouteKindToOutputTarget(
   return UnifiedIngestionOutputTargetKinds.records;
 }
 
+function toErrorType(error: unknown): string {
+  if (error instanceof Error) {
+    return error.name;
+  }
+  if (typeof error === "string" && error.trim().length > 0) {
+    return "Error";
+  }
+  return "unknown";
+}
+
 export class UnifiedIngestionOrchestrationService {
   private readonly detector: IUnifiedIngestionSourceTypeDetector;
   private readonly router: IUnifiedIngestionRouter;
@@ -160,26 +187,60 @@ export class UnifiedIngestionOrchestrationService {
     this.previewService = options?.previewService ?? new UnifiedIngestionPreviewService();
   }
 
+  private buildFailureResult(input: {
+    readonly source: UnifiedIngestionSourceReference;
+    readonly stage: UnifiedIngestionExecutionStage;
+    readonly issues: ReadonlyArray<UnifiedIngestionIssue>;
+    readonly detection?: Awaited<ReturnType<IUnifiedIngestionSourceTypeDetector["detect"]>>;
+    readonly route?: UnifiedIngestionRouteResult;
+    readonly outputTarget?: UnifiedIngestionConfiguration["outputTarget"];
+  }): UnifiedIngestionFailureResult {
+    const fallbacks = deriveUnifiedIngestionFallbackDecisions({
+      detection: input.detection,
+      route: input.route,
+      includePartialMetadataFallback: Boolean(input.detection || input.route || input.outputTarget),
+    });
+    return Object.freeze({
+      contractVersion: UnifiedIngestionContractVersion,
+      ok: false,
+      source: input.source,
+      stage: input.stage,
+      detection: input.detection,
+      route: input.route,
+      issues: input.issues,
+      failure: classifyUnifiedIngestionFailure({
+        stage: input.stage,
+        issues: input.issues,
+      }),
+      fallbacks,
+      partial: Object.freeze({
+        detectionResolved: Boolean(input.detection),
+        routeResolved: Boolean(input.route),
+        outputTarget: input.outputTarget,
+      }),
+    });
+  }
+
   public async ingest(request: UnifiedIngestionRequest): Promise<UnifiedIngestionResult> {
     const resolvedConfiguration = resolveUnifiedIngestionConfiguration({
       mode: request.configuration?.mode,
       base: request.configuration,
     });
     if (resolvedConfiguration.issues.some((issue) => issue.severity === "error")) {
-      return Object.freeze({
-        contractVersion: UnifiedIngestionContractVersion,
-        ok: false,
+      const issues = Object.freeze(resolvedConfiguration.issues.map((issue) => buildIssue({
+        code: UnifiedIngestionIssueCodes.invalidConfiguration,
+        severity: issue.severity,
+        message: issue.message,
+        sourceId: request.source.sourceId,
+        details: issue.path
+          ? Object.freeze({ path: issue.path, code: issue.code })
+          : Object.freeze({ code: issue.code }),
+      })));
+      return this.buildFailureResult({
         source: request.source,
-        stage: "configuration",
-        issues: Object.freeze(resolvedConfiguration.issues.map((issue) => buildIssue({
-          code: UnifiedIngestionIssueCodes.invalidConfiguration,
-          severity: issue.severity,
-          message: issue.message,
-          sourceId: request.source.sourceId,
-          details: issue.path
-            ? Object.freeze({ path: issue.path, code: issue.code })
-            : Object.freeze({ code: issue.code }),
-        }))),
+        stage: UnifiedIngestionExecutionStages.configuration,
+        issues,
+        outputTarget: resolvedConfiguration.configuration.outputTarget,
       });
     }
     const configuration = resolvedConfiguration.configuration;
@@ -189,20 +250,19 @@ export class UnifiedIngestionOrchestrationService {
       try {
         payload = await this.readPayloadForSource(request.source);
       } catch (error) {
-        return Object.freeze({
-          contractVersion: UnifiedIngestionContractVersion,
-          ok: false,
+        return this.buildFailureResult({
           source: request.source,
-          stage: "source-read",
+          stage: UnifiedIngestionExecutionStages.sourceRead,
           issues: Object.freeze([buildIssue({
             code: UnifiedIngestionIssueCodes.sourceReadFailed,
             message: "Unified ingestion could not read source payload.",
             sourceId: request.source.sourceId,
             details: Object.freeze({
-              cause: error instanceof Error ? error.message : String(error),
+              errorType: toErrorType(error),
               reference: request.source.reference,
             }),
           })]),
+          outputTarget: configuration.outputTarget,
         });
       }
     }
@@ -218,19 +278,18 @@ export class UnifiedIngestionOrchestrationService {
           : undefined,
       });
     } catch (error) {
-      return Object.freeze({
-        contractVersion: UnifiedIngestionContractVersion,
-        ok: false,
+      return this.buildFailureResult({
         source: request.source,
-        stage: "detection",
+        stage: UnifiedIngestionExecutionStages.detection,
         issues: Object.freeze([buildIssue({
           code: UnifiedIngestionIssueCodes.detectionFailed,
           message: "Unified ingestion detection failed.",
           sourceId: request.source.sourceId,
           details: Object.freeze({
-            cause: error instanceof Error ? error.message : String(error),
+            errorType: toErrorType(error),
           }),
         })]),
+        outputTarget: configuration.outputTarget,
       });
     }
 
@@ -240,12 +299,11 @@ export class UnifiedIngestionOrchestrationService {
       configuration,
     });
     if (route.status !== "resolved") {
-      return Object.freeze({
-        contractVersion: UnifiedIngestionContractVersion,
-        ok: false,
+      return this.buildFailureResult({
         source: request.source,
-        stage: "routing",
+        stage: UnifiedIngestionExecutionStages.routing,
         detection,
+        route,
         issues: Object.freeze([buildIssue({
           code: route.failureCode === "missing-route-mapping"
             ? UnifiedIngestionIssueCodes.routingUnavailable
@@ -258,6 +316,7 @@ export class UnifiedIngestionOrchestrationService {
             fallbackUsed: route.fallbackUsed,
           }),
         })]),
+        outputTarget: configuration.outputTarget,
       });
     }
 
@@ -268,14 +327,13 @@ export class UnifiedIngestionOrchestrationService {
       configuration,
     });
     if (!ingestion.ok) {
-      return Object.freeze({
-        contractVersion: UnifiedIngestionContractVersion,
-        ok: false,
+      return this.buildFailureResult({
         source: request.source,
-        stage: "ingestion",
+        stage: UnifiedIngestionExecutionStages.ingestion,
         detection,
         route,
         issues: Object.freeze([ingestion.issue]),
+        outputTarget: configuration.outputTarget,
       });
     }
 
@@ -286,14 +344,13 @@ export class UnifiedIngestionOrchestrationService {
       ingestion,
     });
     if (!conversion.ok) {
-      return Object.freeze({
-        contractVersion: UnifiedIngestionContractVersion,
-        ok: false,
+      return this.buildFailureResult({
         source: request.source,
-        stage: "conversion",
+        stage: UnifiedIngestionExecutionStages.conversion,
         detection,
         route,
         issues: Object.freeze([conversion.issue]),
+        outputTarget: configuration.outputTarget,
       });
     }
 
@@ -307,16 +364,19 @@ export class UnifiedIngestionOrchestrationService {
       output: conversion.result.output,
     });
     if (!normalization.ok) {
-      return Object.freeze({
-        contractVersion: UnifiedIngestionContractVersion,
-        ok: false,
+      return this.buildFailureResult({
         source: request.source,
-        stage: "normalization",
+        stage: UnifiedIngestionExecutionStages.normalization,
         detection,
         route,
         issues: normalization.issues,
+        outputTarget,
       });
     }
+    const fallbacks = deriveUnifiedIngestionFallbackDecisions({
+      detection,
+      route,
+    });
     return Object.freeze({
       contractVersion: UnifiedIngestionContractVersion,
       ok: true,
@@ -331,6 +391,7 @@ export class UnifiedIngestionOrchestrationService {
         inputBoundary: conversion.result.contract.inputBoundary,
       }),
       issues: normalization.issues,
+      fallbacks,
     });
   }
 
@@ -351,19 +412,24 @@ export class UnifiedIngestionOrchestrationService {
       sampleLimit: resolvedConfiguration.configuration.previewSampleLimit,
     });
     if (!preview.ok) {
-      return Object.freeze({
-        contractVersion: UnifiedIngestionContractVersion,
-        ok: false,
+      return this.buildFailureResult({
         source: ingestion.source,
-        stage: "preview",
+        stage: UnifiedIngestionExecutionStages.preview,
         detection: ingestion.detection,
         route: ingestion.route,
         issues: preview.issues,
+        outputTarget: ingestion.outputTarget,
       });
     }
 
     return Object.freeze({
       ...ingestion,
+      fallbacks: Object.freeze([
+        ...ingestion.fallbacks,
+        ...deriveUnifiedIngestionFallbackDecisions({
+          previewDegraded: preview.degraded,
+        }),
+      ]),
       preview,
     });
   }

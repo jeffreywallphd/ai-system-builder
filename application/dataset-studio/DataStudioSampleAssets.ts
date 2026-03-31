@@ -397,7 +397,7 @@ export function registerDataStudioSampleAssets(
         "imageNormalizeOrientation",
       ],
       previewModes: ["unified-route-preview"],
-      executionModes: ["unified-execute"],
+      executionModes: ["unified-execute-v1", "unified-preview-v1"],
     },
     configSchema: unifiedIngestionSchema,
     assetFactory: (config) => createUnifiedIngestionDataAsset(config),

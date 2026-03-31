@@ -18,9 +18,8 @@ import { type IngestionIssue } from "../../../application/dataset-studio/Ingesti
 import { ImageIngestorAsset, toImageIngestorConfig } from "../../../application/dataset-studio/ImageIngestorAsset";
 import { JsonIngestorAsset } from "../../../application/dataset-studio/JsonIngestorAsset";
 import { resolveUnifiedIngestionConfiguration } from "../../../application/dataset-studio/UnifiedIngestionConfiguration";
-import { UnifiedIngestionOrchestrationService } from "../../../application/dataset-studio/UnifiedIngestionOrchestrationService";
-import { UnifiedIngestionAssetId } from "../../../application/dataset-studio/UnifiedIngestionAsset";
-import type { UnifiedIngestionPreviewSuccessResult } from "../../../application/dataset-studio/UnifiedIngestionPreviewService";
+import { UnifiedIngestionAssetExecutionWrapper, UnifiedIngestionAssetId } from "../../../application/dataset-studio/UnifiedIngestionAsset";
+import type { UnifiedIngestionPreviewSuccess } from "../../../application/dataset-studio/UnifiedIngestionOrchestrationService";
 import { SourceInputKinds } from "../../../application/dataset-studio/SourceLocatorInputAbstraction";
 import type { CanonicalRecordValue } from "../../../domain/dataset-studio/CanonicalDataShapes";
 import { UnifiedIngestionReferenceKinds } from "../../../domain/dataset-studio/UnifiedIngestionDomain";
@@ -162,7 +161,7 @@ export default function DatasetStudioDraftPreviewPanel({
   }), [registry]);
 
   const executionFramework = useMemo(() => new DefaultDataAssetExecutionFramework(), []);
-  const unifiedIngestionService = useMemo(() => new UnifiedIngestionOrchestrationService(), []);
+  const unifiedIngestionAsset = useMemo(() => new UnifiedIngestionAssetExecutionWrapper(), []);
   const documentIngestor = useMemo(() => new DocumentPdfIngestorAsset(), []);
   const imageIngestor = useMemo(() => new ImageIngestorAsset(), []);
   const batchFramework = useMemo(() => new BatchIngestionFramework(), []);
@@ -184,7 +183,7 @@ export default function DatasetStudioDraftPreviewPanel({
     [entries, selectedAssetId],
   );
   const [unifiedMode, setUnifiedMode] = useState<AssetConfigurationMode>("simple");
-  const [unifiedPreviewSummary, setUnifiedPreviewSummary] = useState<UnifiedIngestionPreviewSuccessResult | undefined>();
+  const [unifiedPreviewSummary, setUnifiedPreviewSummary] = useState<UnifiedIngestionPreviewSuccess["preview"] | undefined>();
 
   const supportedSourceModes = useMemo(() => resolveSourceModes(selectedEntry), [selectedEntry]);
   const [sourceMode, setSourceMode] = useState<SourceMode>(supportedSourceModes[0] ?? "in-memory");
@@ -332,7 +331,7 @@ export default function DatasetStudioDraftPreviewPanel({
             displayName: sourceMode === "local-file" ? normalizedReference.split(/[\\/]/).at(-1) : undefined,
             extension: sourceMode === "local-file" ? toExtensionFromReference(normalizedReference) : undefined,
           });
-          const ingestionResult = await unifiedIngestionService.ingestWithPreview({
+          const ingestionExecution = await unifiedIngestionAsset.preview({
             source: unifiedSource,
             payload: sourceMode === "in-memory" ? sourcePayload : undefined,
             configuration: configurationResolution.configuration,
@@ -341,6 +340,7 @@ export default function DatasetStudioDraftPreviewPanel({
               initiatedBy: "dataset-studio-ui",
             },
           });
+          const ingestionResult = ingestionExecution.result;
 
           if (disposed) {
             return;
@@ -675,7 +675,7 @@ export default function DatasetStudioDraftPreviewPanel({
     sourcePatterns,
     sourcePayload,
     sourceReference,
-    unifiedIngestionService,
+    unifiedIngestionAsset,
     unifiedMode,
   ]);
 
@@ -877,6 +877,12 @@ export default function DatasetStudioDraftPreviewPanel({
           <div className="ui-row ui-row--wrap">
             <span className="ui-badge ui-badge--neutral">{unifiedPreviewSummary.detectionSummary.confidence} confidence</span>
             <span className="ui-badge ui-badge--neutral">policy: {unifiedPreviewSummary.routeSummary.policy}</span>
+            {unifiedPreviewSummary.routeSummary.fallbackUsed ? (
+              <span className="ui-badge ui-badge--warning">fallback route</span>
+            ) : null}
+            {unifiedPreviewSummary.degraded ? (
+              <span className="ui-badge ui-badge--warning">degraded preview</span>
+            ) : null}
             {unifiedPreviewSummary.summary.truncated ? <span className="ui-badge ui-badge--warning">sampled</span> : null}
           </div>
           <span className="ui-subtle">Route asset: {unifiedPreviewSummary.routeSummary.assetId}</span>

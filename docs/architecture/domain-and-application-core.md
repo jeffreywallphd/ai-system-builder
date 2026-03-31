@@ -1405,3 +1405,20 @@ Explicitly later than this scope:
   - structured warning/error propagation.
 - Dataset Studio unified preview UI now consumes `ingestWithPreview(...)` results from the shared orchestration path and renders high-signal summary first with progressive diagnostics/sample details.
 
+## Direction 5 update: Unified ingestion failure policy + composable asset wrapper (stories 15.9-15.10)
+
+- Unified ingestion failure handling now routes through one centralized application policy seam in `application/dataset-studio/UnifiedIngestionFailurePolicy.ts` instead of ad hoc per-stage try/catch mapping.
+- Stage-aware failure contracts now include deterministic classification metadata (`stage`, `code`, `message`, `disposition=recoverable|terminal`) plus bounded partial context (`detectionResolved`, `routeResolved`, `outputTarget`) in `UnifiedIngestionOrchestrationService` results.
+- Fallback behavior is now explicit and inspectable:
+  - detection tie-break decisions,
+  - unknown-kind routing fallback decisions (and unavailable-fallback outcomes),
+  - degraded preview fallback decisions,
+  - partial-metadata fallback notes.
+- Preview generation no longer hard-fails the full unified path when preview rendering throws; `UnifiedIngestionPreviewService` returns a degraded preview payload with warning issues, preserving normalized output metadata for downstream orchestration/UI.
+- Unified ingestion now has a high-level composable execution wrapper in `application/dataset-studio/UnifiedIngestionAsset.ts`:
+  - stable asset identity/version (`unified-ingestion@1.0.0`),
+  - versioned wrapper contracts (`inputContractVersion`, `outputContractVersion`),
+  - wrapper entrypoints (`execute`, `preview`) that run through the same orchestration/configuration seams,
+  - no low-level ingestor or third-party adapter leakage in wrapper-facing contracts.
+- Dataset Studio preview paths now consume this wrapper surface, keeping UI/application callers on asset-level contracts instead of direct low-level orchestration invocation.
+

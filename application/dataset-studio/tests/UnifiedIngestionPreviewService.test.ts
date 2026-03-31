@@ -82,7 +82,7 @@ describe("UnifiedIngestionPreviewService", () => {
     }
   });
 
-  it("returns structured preview-generation failures", () => {
+  it("returns degraded preview payload when preview generation fails", () => {
     const service = new UnifiedIngestionPreviewService({
       previewEngine: {
         buildFromCanonicalShape: () => {
@@ -95,8 +95,10 @@ describe("UnifiedIngestionPreviewService", () => {
       normalized: createNormalizedOutput(1),
     });
 
-    expect(result.ok).toBeFalse();
-    if (!result.ok) {
+    expect(result.ok).toBeTrue();
+    if (result.ok) {
+      expect(result.degraded).toBeTrue();
+      expect(result.preview.kind).toBe("error");
       expect(result.issues.some((issue) => issue.code === "preview-generation-failed")).toBeTrue();
     }
   });
