@@ -1,12 +1,25 @@
 import { z } from "zod";
 import { AssetContractShapeKinds } from "../../domain/contracts/AssetContract";
 import { CanonicalDataAsset } from "../../domain/dataset-studio/CanonicalDataAsset";
-import { createCanonicalRecordsShape, type CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
+import { createCanonicalRecordsShape, type CanonicalRecordValue, type CanonicalRecordsShape } from "../../domain/dataset-studio/CanonicalDataShapes";
 import {
   DataAssetConfigFieldKinds,
   createDataAssetConfigSchema,
   type DataAssetConfigSchema,
 } from "./DataAssetConfiguration";
+import {
+  IngestionExecutionContextSchema,
+  Uint8ArraySchema,
+  toIngestionIssuesFromZodError,
+  type IngestionExecutionContext,
+} from "./IngestionContracts";
+import {
+  buildIngestionFailureEnvelope,
+  buildIngestionSuccessEnvelope,
+  normalizeRecordsOutput,
+  type IngestionFailureEnvelope,
+  type IngestionSuccessEnvelope,
+} from "./IngestionCanonicalNormalization";
 
 export const JsonIngestorErrorCodes = Object.freeze({
   invalidConfig: "json-ingestor-invalid-config",
@@ -42,17 +55,30 @@ export interface JsonIngestorExecutionRequest {
     | Readonly<Record<string, unknown>>
     | ReadonlyArray<Readonly<Record<string, unknown>>>;
   readonly config?: Partial<JsonIngestorConfig>;
+  readonly fileName?: string;
+  readonly contentType?: string;
+  readonly sourceReference?: string;
+  readonly sourceId?: string;
+  readonly batchId?: string;
+  readonly batchItemId?: string;
+  readonly groupId?: string;
+  readonly sourceAssetId?: string;
+  readonly sourceVersionId?: string;
+  readonly context?: Partial<IngestionExecutionContext>;
 }
 
 export interface JsonIngestorExecutionSuccess {
   readonly ok: true;
   readonly config: JsonIngestorConfig;
   readonly records: ReadonlyArray<Readonly<Record<string, unknown>>>;
+  readonly output: CanonicalRecordsShape;
+  readonly normalized: IngestionSuccessEnvelope<CanonicalRecordsShape>;
   readonly diagnostics: ReadonlyArray<JsonIngestorDiagnostic>;
 }
 
 export interface JsonIngestorExecutionFailure {
   readonly ok: false;
+  readonly normalized: IngestionFailureEnvelope;
   readonly diagnostics: ReadonlyArray<JsonIngestorDiagnostic>;
 }
 
@@ -64,6 +90,23 @@ export interface JsonIngestorPreviewResult {
   readonly totalCount: number;
   readonly sampleCount: number;
 }
+
+const JsonRecordSchema = z.record(z.string(), z.unknown());
+
+const JsonIngestorExecutionRequestSchema = z.object({
+  payload: z.union([z.string(), Uint8ArraySchema, JsonRecordSchema, z.array(JsonRecordSchema)]),
+  config: JsonIngestorConfigSchema.partial().optional(),
+  fileName: z.string().trim().min(1).optional(),
+  contentType: z.string().trim().min(1).optional(),
+  sourceReference: z.string().trim().min(1).optional(),
+  sourceId: z.string().trim().min(1).optional(),
+  batchId: z.string().trim().min(1).optional(),
+  batchItemId: z.string().trim().min(1).optional(),
+  groupId: z.string().trim().min(1).optional(),
+  sourceAssetId: z.string().trim().min(1).optional(),
+  sourceVersionId: z.string().trim().min(1).optional(),
+  context: IngestionExecutionContextSchema.partial().optional(),
+});
 
 function toPlainRecord(value: unknown): Readonly<Record<string, unknown>> | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -173,8 +216,41 @@ export class JsonIngestorAsset {
   });
 
   public execute(request: JsonIngestorExecutionRequest): JsonIngestorExecutionResult {
-    const parsedConfig = JsonIngestorConfigSchema.safeParse(request.config ?? {});
+    const parsedRequest = JsonIngestorExecutionRequestSchema.safeParse(request);
+    if (!parsedRequest.success) {
+      const issues = toIngestionIssuesFromZodError(parsedRequest.error, JsonIngestorErrorCodes.invalidConfig);
+      const parsedContext = IngestionExecutionContextSchema.safeParse(request.context ?? {});
+      return Object.freeze({
+        ok: false,
+        diagnostics: Object.freeze(issues.map((issue) => Object.freeze({
+          code: JsonIngestorErrorCodes.invalidConfig,
+          message: issue.message,
+          path: issue.path,
+        } satisfies JsonIngestorDiagnostic))),
+        normalized: buildIngestionFailureEnvelope({
+          context: parsedContext.success ? parsedContext.data : IngestionExecutionContextSchema.parse({}),
+          issues,
+        }),
+      });
+    }
+
+    const normalizedRequest = parsedRequest.data;
+    const ingestionContext = IngestionExecutionContextSchema.parse({
+      ...normalizedRequest.context,
+      sourceId: normalizedRequest.sourceId ?? normalizedRequest.context?.sourceId,
+      sourceReference: normalizedRequest.sourceReference ?? normalizedRequest.context?.sourceReference,
+      sourceAssetId: normalizedRequest.sourceAssetId ?? normalizedRequest.context?.sourceAssetId,
+      sourceVersionId: normalizedRequest.sourceVersionId ?? normalizedRequest.context?.sourceVersionId,
+      fileName: normalizedRequest.fileName ?? normalizedRequest.context?.fileName,
+      contentType: normalizedRequest.contentType ?? normalizedRequest.context?.contentType,
+      batchId: normalizedRequest.batchId ?? normalizedRequest.context?.batchId,
+      batchItemId: normalizedRequest.batchItemId ?? normalizedRequest.context?.batchItemId,
+      groupId: normalizedRequest.groupId ?? normalizedRequest.context?.groupId,
+    });
+
+    const parsedConfig = JsonIngestorConfigSchema.safeParse(normalizedRequest.config ?? {});
     if (!parsedConfig.success) {
+      const issues = toIngestionIssuesFromZodError(parsedConfig.error, JsonIngestorErrorCodes.invalidConfig);
       return Object.freeze({
         ok: false,
         diagnostics: Object.freeze(parsedConfig.error.issues.map((issue) => Object.freeze({
@@ -182,13 +258,25 @@ export class JsonIngestorAsset {
           message: issue.message,
           path: issue.path.join("."),
         } satisfies JsonIngestorDiagnostic))),
+        normalized: buildIngestionFailureEnvelope({
+          context: ingestionContext,
+          issues,
+        }),
       });
     }
 
     let normalized: unknown;
     try {
-      normalized = normalizePayload(request.payload);
+      normalized = normalizePayload(normalizedRequest.payload);
     } catch (error) {
+      const issues = Object.freeze([Object.freeze({
+        code: JsonIngestorErrorCodes.invalidJson,
+        message: "JSON parsing failed.",
+        severity: "error" as const,
+        details: Object.freeze({
+          cause: error instanceof Error ? error.message : String(error),
+        }),
+      })]);
       return Object.freeze({
         ok: false,
         diagnostics: Object.freeze([Object.freeze({
@@ -198,6 +286,10 @@ export class JsonIngestorAsset {
             cause: error instanceof Error ? error.message : String(error),
           }),
         } satisfies JsonIngestorDiagnostic)]),
+        normalized: buildIngestionFailureEnvelope({
+          context: ingestionContext,
+          issues,
+        }),
       });
     }
 
@@ -205,24 +297,42 @@ export class JsonIngestorAsset {
     if (Array.isArray(normalized)) {
       const objectRecords = normalized.map((entry) => toPlainRecord(entry));
       if (objectRecords.some((entry) => !entry)) {
+        const issues = Object.freeze([Object.freeze({
+          code: JsonIngestorErrorCodes.unsupportedShape,
+          message: "JSON arrays must contain only object entries.",
+          severity: "error" as const,
+        })]);
         return Object.freeze({
           ok: false,
           diagnostics: Object.freeze([Object.freeze({
             code: JsonIngestorErrorCodes.unsupportedShape,
             message: "JSON arrays must contain only object entries.",
           } satisfies JsonIngestorDiagnostic)]),
+          normalized: buildIngestionFailureEnvelope({
+            context: ingestionContext,
+            issues,
+          }),
         });
       }
       records = Object.freeze(objectRecords as ReadonlyArray<Readonly<Record<string, unknown>>>);
     } else {
       const single = toPlainRecord(normalized);
       if (!single) {
+        const issues = Object.freeze([Object.freeze({
+          code: JsonIngestorErrorCodes.unsupportedShape,
+          message: "JSON payload must be an object or array of objects.",
+          severity: "error" as const,
+        })]);
         return Object.freeze({
           ok: false,
           diagnostics: Object.freeze([Object.freeze({
             code: JsonIngestorErrorCodes.unsupportedShape,
             message: "JSON payload must be an object or array of objects.",
           } satisfies JsonIngestorDiagnostic)]),
+          normalized: buildIngestionFailureEnvelope({
+            context: ingestionContext,
+            issues,
+          }),
         });
       }
       records = Object.freeze([single]);
@@ -233,10 +343,23 @@ export class JsonIngestorAsset {
       ? Object.freeze(records.map((record) => flattenRecord(record, config.maxDepth)))
       : records;
 
+    const output = normalizeRecordsOutput({
+      records: normalizedRecords,
+      context: {
+        ...ingestionContext,
+        formatHint: "json",
+      },
+      recordIdPrefix: "json-record",
+    });
     return Object.freeze({
       ok: true,
       config,
       records: normalizedRecords,
+      output,
+      normalized: buildIngestionSuccessEnvelope({
+        output,
+        context: ingestionContext,
+      }),
       diagnostics: Object.freeze([]),
     });
   }

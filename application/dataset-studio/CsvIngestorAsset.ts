@@ -2,12 +2,25 @@ import { parse } from "csv-parse/sync";
 import { z } from "zod";
 import { AssetContractShapeKinds } from "../../domain/contracts/AssetContract";
 import { CanonicalDataAsset } from "../../domain/dataset-studio/CanonicalDataAsset";
-import { createCanonicalRecordsShape, type CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
+import { createCanonicalRecordsShape, type CanonicalRecordValue, type CanonicalRecordsShape } from "../../domain/dataset-studio/CanonicalDataShapes";
 import {
   DataAssetConfigFieldKinds,
   createDataAssetConfigSchema,
   type DataAssetConfigSchema,
 } from "./DataAssetConfiguration";
+import {
+  IngestionExecutionContextSchema,
+  Uint8ArraySchema,
+  toIngestionIssuesFromZodError,
+  type IngestionExecutionContext,
+} from "./IngestionContracts";
+import {
+  buildIngestionFailureEnvelope,
+  buildIngestionSuccessEnvelope,
+  normalizeRecordsOutput,
+  type IngestionFailureEnvelope,
+  type IngestionSuccessEnvelope,
+} from "./IngestionCanonicalNormalization";
 
 export const CsvIngestorErrorCodes = Object.freeze({
   invalidConfig: "csv-ingestor-invalid-config",
@@ -44,19 +57,29 @@ export interface CsvIngestorExecutionRequest {
   readonly payload: string | Uint8Array;
   readonly config?: Partial<CsvIngestorConfig>;
   readonly fileName?: string;
+  readonly contentType?: string;
+  readonly sourceReference?: string;
+  readonly sourceId?: string;
+  readonly batchId?: string;
+  readonly batchItemId?: string;
+  readonly groupId?: string;
   readonly sourceAssetId?: string;
   readonly sourceVersionId?: string;
+  readonly context?: Partial<IngestionExecutionContext>;
 }
 
 export interface CsvIngestorExecutionSuccess {
   readonly ok: true;
   readonly config: CsvIngestorConfig;
   readonly records: ReadonlyArray<Readonly<Record<string, unknown>>>;
+  readonly output: CanonicalRecordsShape;
+  readonly normalized: IngestionSuccessEnvelope<CanonicalRecordsShape>;
   readonly diagnostics: ReadonlyArray<CsvIngestorDiagnostic>;
 }
 
 export interface CsvIngestorExecutionFailure {
   readonly ok: false;
+  readonly normalized: IngestionFailureEnvelope;
   readonly diagnostics: ReadonlyArray<CsvIngestorDiagnostic>;
 }
 
@@ -68,6 +91,21 @@ export interface CsvIngestorPreviewResult {
   readonly totalCount: number;
   readonly sampleCount: number;
 }
+
+const CsvIngestorExecutionRequestSchema = z.object({
+  payload: z.union([z.string(), Uint8ArraySchema]),
+  config: CsvIngestorConfigSchema.partial().optional(),
+  fileName: z.string().trim().min(1).optional(),
+  contentType: z.string().trim().min(1).optional(),
+  sourceReference: z.string().trim().min(1).optional(),
+  sourceId: z.string().trim().min(1).optional(),
+  batchId: z.string().trim().min(1).optional(),
+  batchItemId: z.string().trim().min(1).optional(),
+  groupId: z.string().trim().min(1).optional(),
+  sourceAssetId: z.string().trim().min(1).optional(),
+  sourceVersionId: z.string().trim().min(1).optional(),
+  context: IngestionExecutionContextSchema.partial().optional(),
+});
 
 function decodePayload(payload: string | Uint8Array, encoding: string): string {
   if (typeof payload === "string") {
@@ -154,8 +192,41 @@ export class CsvIngestorAsset {
   });
 
   public execute(request: CsvIngestorExecutionRequest): CsvIngestorExecutionResult {
-    const parsedConfig = CsvIngestorConfigSchema.safeParse(request.config ?? {});
+    const parsedRequest = CsvIngestorExecutionRequestSchema.safeParse(request);
+    if (!parsedRequest.success) {
+      const issues = toIngestionIssuesFromZodError(parsedRequest.error, CsvIngestorErrorCodes.invalidConfig);
+      const parsedContext = IngestionExecutionContextSchema.safeParse(request.context ?? {});
+      return Object.freeze({
+        ok: false,
+        diagnostics: Object.freeze(issues.map((issue) => Object.freeze({
+          code: CsvIngestorErrorCodes.invalidConfig,
+          message: issue.message,
+          path: issue.path,
+        } satisfies CsvIngestorDiagnostic))),
+        normalized: buildIngestionFailureEnvelope({
+          context: parsedContext.success ? parsedContext.data : IngestionExecutionContextSchema.parse({}),
+          issues,
+        }),
+      });
+    }
+
+    const normalizedRequest = parsedRequest.data;
+    const ingestionContext = IngestionExecutionContextSchema.parse({
+      ...normalizedRequest.context,
+      sourceId: normalizedRequest.sourceId ?? normalizedRequest.context?.sourceId,
+      sourceReference: normalizedRequest.sourceReference ?? normalizedRequest.context?.sourceReference,
+      sourceAssetId: normalizedRequest.sourceAssetId ?? normalizedRequest.context?.sourceAssetId,
+      sourceVersionId: normalizedRequest.sourceVersionId ?? normalizedRequest.context?.sourceVersionId,
+      fileName: normalizedRequest.fileName ?? normalizedRequest.context?.fileName,
+      contentType: normalizedRequest.contentType ?? normalizedRequest.context?.contentType,
+      batchId: normalizedRequest.batchId ?? normalizedRequest.context?.batchId,
+      batchItemId: normalizedRequest.batchItemId ?? normalizedRequest.context?.batchItemId,
+      groupId: normalizedRequest.groupId ?? normalizedRequest.context?.groupId,
+    });
+
+    const parsedConfig = CsvIngestorConfigSchema.safeParse(normalizedRequest.config ?? {});
     if (!parsedConfig.success) {
+      const issues = toIngestionIssuesFromZodError(parsedConfig.error, CsvIngestorErrorCodes.invalidConfig);
       return Object.freeze({
         ok: false,
         diagnostics: Object.freeze(parsedConfig.error.issues.map((issue) => Object.freeze({
@@ -163,14 +234,27 @@ export class CsvIngestorAsset {
           message: issue.message,
           path: issue.path.join("."),
         } satisfies CsvIngestorDiagnostic))),
+        normalized: buildIngestionFailureEnvelope({
+          context: ingestionContext,
+          issues,
+        }),
       });
     }
 
     const config = parsedConfig.data;
     let normalizedContent: string;
     try {
-      normalizedContent = decodePayload(request.payload, config.encoding);
+      normalizedContent = decodePayload(normalizedRequest.payload, config.encoding);
     } catch (error) {
+      const issues = Object.freeze([Object.freeze({
+        code: CsvIngestorErrorCodes.invalidEncoding,
+        message: "CSV payload could not be decoded with the configured encoding.",
+        severity: "error" as const,
+        details: Object.freeze({
+          encoding: config.encoding,
+          cause: error instanceof Error ? error.message : String(error),
+        }),
+      })]);
       return Object.freeze({
         ok: false,
         diagnostics: Object.freeze([Object.freeze({
@@ -181,17 +265,30 @@ export class CsvIngestorAsset {
             cause: error instanceof Error ? error.message : String(error),
           }),
         } satisfies CsvIngestorDiagnostic)]),
+        normalized: buildIngestionFailureEnvelope({
+          context: ingestionContext,
+          issues,
+        }),
       });
     }
 
     const trimmed = normalizedContent.trim();
     if (!trimmed) {
+      const issues = Object.freeze([Object.freeze({
+        code: CsvIngestorErrorCodes.invalidCsv,
+        message: "CSV content is empty.",
+        severity: "error" as const,
+      })]);
       return Object.freeze({
         ok: false,
         diagnostics: Object.freeze([Object.freeze({
           code: CsvIngestorErrorCodes.invalidCsv,
           message: "CSV content is empty.",
         } satisfies CsvIngestorDiagnostic)]),
+        normalized: buildIngestionFailureEnvelope({
+          context: ingestionContext,
+          issues,
+        }),
       });
     }
 
@@ -215,10 +312,23 @@ export class CsvIngestorAsset {
           },
         }) as Array<Record<string, string>>;
 
+        const output = normalizeRecordsOutput({
+          records: Object.freeze(records.map((record) => Object.freeze({ ...record }))),
+          context: {
+            ...ingestionContext,
+            formatHint: "csv",
+          },
+          recordIdPrefix: "csv-record",
+        });
         return Object.freeze({
           ok: true,
           config,
           records: Object.freeze(records.map((record) => Object.freeze({ ...record }))),
+          output,
+          normalized: buildIngestionSuccessEnvelope({
+            output,
+            context: ingestionContext,
+          }),
           diagnostics: Object.freeze([]),
         });
       }
@@ -241,10 +351,24 @@ export class CsvIngestorAsset {
         return Object.freeze(record);
       });
 
+      const normalizedRecords = Object.freeze(records);
+      const output = normalizeRecordsOutput({
+        records: normalizedRecords,
+        context: {
+          ...ingestionContext,
+          formatHint: "csv",
+        },
+        recordIdPrefix: "csv-record",
+      });
       return Object.freeze({
         ok: true,
         config,
-        records: Object.freeze(records),
+        records: normalizedRecords,
+        output,
+        normalized: buildIngestionSuccessEnvelope({
+          output,
+          context: ingestionContext,
+        }),
         diagnostics: Object.freeze([]),
       });
     } catch (error) {
@@ -252,12 +376,21 @@ export class CsvIngestorAsset {
       const code = message.includes("header")
         ? CsvIngestorErrorCodes.missingHeaders
         : CsvIngestorErrorCodes.invalidCsv;
+      const issues = Object.freeze([Object.freeze({
+        code,
+        message,
+        severity: "error" as const,
+      })]);
       return Object.freeze({
         ok: false,
         diagnostics: Object.freeze([Object.freeze({
           code,
           message,
         } satisfies CsvIngestorDiagnostic)]),
+        normalized: buildIngestionFailureEnvelope({
+          context: ingestionContext,
+          issues,
+        }),
       });
     }
   }

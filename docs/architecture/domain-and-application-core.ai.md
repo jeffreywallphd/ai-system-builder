@@ -1268,3 +1268,13 @@ Explicitly later than this scope:
   - no remote connector/MCP execution path is implemented in this slice,
   - remote source support is currently placeholder descriptor normalization only,
   - orchestration remains application-layer and composes existing ingestion assets/contracts.
+
+## Direction 5 update: Data Studio canonical ingestion normalization + contracts (stories 14.7-14.8)
+
+- Data Studio ingestion now has a shared normalization/contract seam in `application/dataset-studio`:
+  - `IngestionContracts.ts` provides reusable zod-backed ingestion contract fragments for execution context, payload primitives, and structured validation issue mapping.
+  - `IngestionCanonicalNormalization.ts` provides reusable canonical-output normalization and standardized ingestion result envelopes.
+- CSV and JSON ingestion now emits canonical normalized records outputs alongside legacy parsed-record payloads for compatibility.
+- Document/PDF and image ingestion now normalizes canonical outputs through the shared seam so source/provenance metadata is preserved consistently (source reference/id hints, media/file metadata, batch/group context, and lineage when source asset ids are present).
+- Batch ingestion now exports strategy/config contract schemas and propagates normalized context metadata into ingestion execution while preserving canonical output + preview aggregation behavior.
+- Converter integration remains converter-first and now preserves source identity/reference metadata in converter output attributes for downstream preview/lineage compatibility.

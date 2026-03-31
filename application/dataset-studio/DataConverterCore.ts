@@ -133,6 +133,9 @@ function toMetadata(input: {
   readonly fileName?: string;
   readonly contentType?: string;
   readonly format?: string;
+  readonly sourceReference?: string;
+  readonly sourceId?: string;
+  readonly groupId?: string;
   readonly sourceAssetId?: string;
   readonly sourceVersionId?: string;
   readonly converterId: string;
@@ -142,6 +145,15 @@ function toMetadata(input: {
 }): Partial<CanonicalDataMetadata> {
   const sourceAssetId = normalizeOptional(input.sourceAssetId);
   const sourceVersionId = normalizeOptional(input.sourceVersionId);
+  const attributes = Object.fromEntries(
+    Object.entries({
+      ...(input.base?.attributes ?? {}),
+      sourceReference: normalizeOptional(input.sourceReference),
+      sourceId: normalizeOptional(input.sourceId),
+      groupId: normalizeOptional(input.groupId),
+    }).filter(([, value]) => value !== undefined),
+  ) as Readonly<Record<string, CanonicalRecordValue>>;
+
   const base = Object.freeze({
     ...input.base,
     source: Object.freeze({
@@ -150,6 +162,7 @@ function toMetadata(input: {
       contentType: normalizeOptional(input.contentType) ?? input.base?.source?.contentType,
       format: normalizeOptional(input.format) ?? input.base?.source?.format,
     }),
+    attributes: Object.freeze(attributes),
     lineage: sourceAssetId
       ? Object.freeze([Object.freeze({
         assetId: sourceAssetId,
@@ -634,6 +647,9 @@ export class DataConverterCore {
         fileName: source.fileName,
         contentType: source.contentType,
         format: formatHint ?? "structured",
+        sourceReference: source.reference,
+        sourceId: source.sourceId,
+        groupId: source.groupId,
         sourceAssetId: source.sourceAssetId,
         sourceVersionId: source.sourceVersionId,
         converterId: DataConverterCore.converterId,

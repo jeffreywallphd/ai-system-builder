@@ -11,6 +11,10 @@ import {
   DataConverterOperationKinds,
   type DataConverterDiagnostic,
 } from "./DataConverterContracts";
+import type {
+  IngestionFailureEnvelope,
+  IngestionSuccessEnvelope,
+} from "./IngestionCanonicalNormalization";
 import {
   CsvIngestorConfigSchema,
 } from "./CsvIngestorAsset";
@@ -72,6 +76,7 @@ export interface BatchIngestionItemSuccess {
   readonly source: SourceDescriptor;
   readonly ingestor: BatchIngestorKind;
   readonly output: CanonicalDataShape;
+  readonly normalized?: IngestionSuccessEnvelope<CanonicalDataShape>;
   readonly preview: DataPreviewModel;
   readonly diagnostics: ReadonlyArray<DataConverterDiagnostic>;
 }
@@ -80,6 +85,7 @@ export interface BatchIngestionItemFailure {
   readonly ok: false;
   readonly source: SourceDescriptor;
   readonly ingestor?: BatchIngestorKind;
+  readonly normalized?: IngestionFailureEnvelope;
   readonly error: BatchIngestionItemError;
   readonly diagnostics: ReadonlyArray<DataConverterDiagnostic>;
 }
@@ -117,21 +123,21 @@ export interface BatchIngestionResult {
   readonly preview: BatchIngestionPreviewPayload;
 }
 
-const BatchIngestionConfigSchema = z.object({
+export const BatchIngestionConfigSchema = z.object({
   continueOnError: z.boolean().default(true),
   maxItems: z.number().int().positive().optional(),
   previewItemLimit: z.number().int().positive().max(100).default(10),
   concurrency: z.number().int().positive().max(16).optional(),
 });
 
-const BatchIngestionSharedConfigSchema = z.object({
+export const BatchIngestionSharedConfigSchema = z.object({
   csv: CsvIngestorConfigSchema.partial().optional(),
   json: JsonIngestorConfigSchema.partial().optional(),
   documentPdf: DocumentPdfIngestorConfigSchema.partial().optional(),
   image: ImageIngestorConfigSchema.partial().optional(),
 });
 
-const BatchIngestionStrategySchema = z.discriminatedUnion("kind", [
+export const BatchIngestionStrategySchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal(BatchIngestionStrategyKinds.routed) }),
   z.object({
     kind: z.literal(BatchIngestionStrategyKinds.selected),
@@ -559,9 +565,11 @@ export class BatchIngestionFramework {
         source: {
           kind: "local-file",
           reference: descriptor.normalizedReference,
+          sourceId: descriptor.sourceId,
           payload,
           fileName: descriptor.displayName,
           contentType: descriptor.mediaType,
+          groupId: descriptor.groupId,
           formatHint: ingestor === BatchIngestorKinds.csv ? "csv" : "json",
           diagnostics: Object.freeze([]),
         },
@@ -591,6 +599,7 @@ export class BatchIngestionFramework {
         source: descriptor,
         ingestor,
         output: conversion.output,
+        normalized: undefined,
         preview,
         diagnostics: conversion.diagnostics,
       });
@@ -607,6 +616,16 @@ export class BatchIngestionFramework {
           diagnostics: Object.freeze([]),
         },
         config: sharedConfig.documentPdf,
+        context: {
+          executionMode: "execute",
+          sourceId: descriptor.sourceId,
+          sourceReference: descriptor.normalizedReference,
+          fileName: descriptor.displayName,
+          contentType: descriptor.mediaType,
+          groupId: descriptor.groupId,
+          batchId: "batch-ingestion",
+          batchItemId: descriptor.sourceId,
+        },
       });
 
       if (!documentResult.ok) {
@@ -633,6 +652,7 @@ export class BatchIngestionFramework {
         source: descriptor,
         ingestor,
         output: documentResult.output,
+        normalized: documentResult.normalized as IngestionSuccessEnvelope<CanonicalDataShape>,
         preview: this.previewEngine.buildFromCanonicalShape(documentResult.output, {
           maxItems: Math.max(1, previewItemLimit),
           maxColumns: 8,
@@ -652,6 +672,16 @@ export class BatchIngestionFramework {
         diagnostics: Object.freeze([]),
       },
       config: sharedConfig.image,
+      context: {
+        executionMode: "execute",
+        sourceId: descriptor.sourceId,
+        sourceReference: descriptor.normalizedReference,
+        fileName: descriptor.displayName,
+        contentType: descriptor.mediaType,
+        groupId: descriptor.groupId,
+        batchId: "batch-ingestion",
+        batchItemId: descriptor.sourceId,
+      },
     });
 
     if (!imageResult.ok) {
@@ -678,6 +708,7 @@ export class BatchIngestionFramework {
       source: descriptor,
       ingestor,
       output: imageResult.output,
+      normalized: imageResult.normalized as IngestionSuccessEnvelope<CanonicalDataShape>,
       preview: this.previewEngine.buildFromCanonicalShape(imageResult.output, {
         maxItems: Math.max(1, previewItemLimit),
         maxColumns: 8,
