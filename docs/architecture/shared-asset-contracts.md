@@ -185,9 +185,12 @@ Not implemented in this slice:
   - `MissingValueHandlingAsset` with deterministic missing-value strategy controls (leave, fill-default, fill-per-field, drop-row with any/all modes, and explicit empty/whitespace missing semantics),
   - `DeduplicationAsset` with deterministic duplicate grouping/retention across exact-all, exact-fields, and fuzzy-fields modes (field-scoped matching controls, keep-first/last/best behavior, duplicate-group metadata, and preview row/group summaries),
   - `DataValidationAsset` with deterministic row/field validation over required/type/enum/length/range/pattern rules plus configurable invalid-row handling (annotate-and-keep, drop-invalid, split-valid-invalid) and inspectable row-level issues,
+  - `DataClassificationAsset` with rule-based field/record tagging for semantic type guesses, practical PII likelihood tags (`pii.email/phone/name/address/identifier`), sensitivity tags (`sensitivity.low/medium/high`), and inspectable reason/confidence signals,
+  - `FilteringAsset` with deterministic record-level condition filtering across equality/set/range/string/null-empty operators with AND/OR grouping, include/exclude modes, and inspectable per-condition match counts,
   - framework-aligned preview outputs for transformation assets (summary + representative sampled rows/groups/issues) suitable for Wizard/Canvas inspection surfaces.
 - Transformation stage mapping now resolves stage-to-asset references for these capabilities:
   - `profiling -> data-profiling`,
+  - `classification -> data-classification`,
   - `normalization -> type-normalization`,
-  - `cleaning -> missing-value-handling + deduplication`,
-  - `transformation -> field-mapping + data-validation`.
+  - `cleaning -> missing-value-handling + deduplication + filtering`,
+  - `transformation -> field-mapping + data-validation + filtering`.

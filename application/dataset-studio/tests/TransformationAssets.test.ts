@@ -4,11 +4,13 @@ import {
   createCanonicalTableShape,
 } from "../../../domain/dataset-studio/CanonicalDataShapes";
 import {
+  DataClassificationAsset,
   DataProfilingAsset,
   DataValidationAsset,
   DeduplicationAsset,
   executeTransformationPipeline,
   FieldMappingAsset,
+  FilteringAsset,
   MissingValueHandlingAsset,
   registerTransformationAssets,
   SchemaInferenceAsset,
@@ -135,9 +137,11 @@ describe("Transformation assets", () => {
     expect(entries.length).toBeGreaterThanOrEqual(5);
     expect(entries.some((entry) => entry.descriptor.id === SchemaInferenceAsset.assetId)).toBeTrue();
     expect(entries.some((entry) => entry.descriptor.id === DataProfilingAsset.assetId)).toBeTrue();
+    expect(entries.some((entry) => entry.descriptor.id === DataClassificationAsset.assetId)).toBeTrue();
     expect(entries.some((entry) => entry.descriptor.id === TypeNormalizationAsset.assetId)).toBeTrue();
     expect(entries.some((entry) => entry.descriptor.id === MissingValueHandlingAsset.assetId)).toBeTrue();
     expect(entries.some((entry) => entry.descriptor.id === DeduplicationAsset.assetId)).toBeTrue();
+    expect(entries.some((entry) => entry.descriptor.id === FilteringAsset.assetId)).toBeTrue();
     expect(entries.some((entry) => entry.descriptor.id === DataValidationAsset.assetId)).toBeTrue();
     expect(entries.some((entry) => entry.descriptor.id === FieldMappingAsset.assetId)).toBeTrue();
 
