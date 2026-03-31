@@ -436,6 +436,16 @@ const DefaultStageAssetMappings: ReadonlyArray<StageAssetMappingDefinition> = Ob
   }),
   Object.freeze({
     type: "static",
+    stageKind: DatasetPipelineStageKinds.featureEngineering,
+    assets: Object.freeze([
+      Object.freeze({
+        assetId: DatasetIngestionStageAssetIds.unified,
+        assetVersion: "1.0.0",
+      }),
+    ]),
+  }),
+  Object.freeze({
+    type: "static",
     stageKind: DatasetPipelineStageKinds.aggregation,
     assets: Object.freeze([
       Object.freeze({

@@ -11,6 +11,7 @@ export const DatasetPipelineStageKinds = Object.freeze({
   normalization: "normalization",
   cleaning: "cleaning",
   transformation: "transformation",
+  featureEngineering: "feature-engineering",
   aggregation: "aggregation",
   preparedStorage: "prepared-storage",
   preview: "preview",
