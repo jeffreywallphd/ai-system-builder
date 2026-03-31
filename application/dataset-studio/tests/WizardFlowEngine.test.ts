@@ -257,5 +257,9 @@ describe("WizardFlowEngine", () => {
     expect(stageOutput?.detectedSourceKind).toBe("json");
     expect(stageOutput?.lineageId).toBe("lineage-1");
     expect(stageOutput?.pipelineId).toBe("dataset-unified-ingestion");
+
+    const tracking = engine.getStageRuntimeTracking();
+    expect(tracking.normalization?.propagated?.detectedDataType).toBe("json");
+    expect(tracking.normalization?.metadata.status.marker).toBe("pending");
   });
 });

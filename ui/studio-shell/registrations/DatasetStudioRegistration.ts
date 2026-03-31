@@ -3,6 +3,7 @@ import { createElement } from "react";
 import type { AtomicStudioRegistration } from "../StudioShellExtensions";
 import { createAtomicStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
 import DatasetStudioDraftPreviewPanel from "../../components/assets/DatasetStudioDraftPreviewPanel";
+import DatasetStageWizardPanel from "../../components/assets/DatasetStageWizardPanel";
 
 export const datasetStudioRegistration: AtomicStudioRegistration = Object.freeze({
   studioType: DatasetStudioIdentity.studioType,
@@ -53,6 +54,14 @@ export const datasetStudioRegistration: AtomicStudioRegistration = Object.freeze
           `Provenance source: ${snapshot?.draft?.metadata.provenance?.sourceLabel ?? "-"}`,
         ]);
       },
+    },
+    {
+      id: "dataset-studio-stage-wizard-panel",
+      slot: "draft-authoring",
+      title: "Stage wizard",
+      subtitle: "Stage-based Dataset Studio wizard powered by WizardFlowEngine.",
+      order: 15,
+      render: () => createElement(DatasetStageWizardPanel),
     },
     {
       id: "dataset-studio-data-preview-panel",

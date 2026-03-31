@@ -1504,3 +1504,14 @@ Explicitly later than this scope:
   - stage-to-asset mapping defaults + metadata hooks in `application/dataset-studio/StageAssetMappingService.ts`,
   - reusable raw-storage persistence adapter seam and inspectable output/log/lineage contracts in `application/dataset-studio/RawStorageStageService.ts`.
 - Default template flows now include raw-storage as a first-class stage in ELT, document, and analytics templates (`domain/dataset-studio/PipelineTemplateDomain.ts`).
+
+## Direction 5 extension update: Stage metadata/contracts + stage-based wizard state integration (stories 15E.9-15E.10)
+
+- Dataset Studio now has a dedicated stage metadata + contract seam in `application/dataset-studio/StageMetadataContracts.ts` with zod-backed validation for:
+  - stage metadata envelopes (identity/type/category/description/order/execution/inspectability/lineage/preview/source/status markers),
+  - stage input/output contracts (`simple` and `composite-mapped`),
+  - stage metadata propagation payloads for downstream stage access.
+- `WizardFlowEngine` now integrates this contract seam by maintaining stage runtime tracking (`metadata`, `contract`, propagated metadata) per stage, while preserving existing stage flow/runtime state and stage output behavior.
+- Stage metadata propagation now supports detected data type, storage references, normalization hints, preview/inspection references, and lineage hooks from typed stage outputs and legacy-compatible stage output records.
+- Downstream stages now receive propagated upstream metadata through engine-managed tracking instead of stage-specific implementation coupling.
+- Wizard stage UI snapshots now include stage-category/status-marker/lineage metadata in addition to existing stage contract summaries for inspectable renderer surfaces.
