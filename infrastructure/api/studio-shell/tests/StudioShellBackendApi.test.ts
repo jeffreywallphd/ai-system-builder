@@ -313,6 +313,9 @@ describe("StudioShellBackendApi", () => {
 
     expect(run.ok).toBeTrue();
     expect(run.data?.launchStatus).toBe("blocked");
+    expect(run.data?.execution.state).toBe("failed");
+    expect(run.data?.execution.launchAccepted).toBeFalse();
+    expect(run.data?.execution.failure?.kind).toBe("validation-failure");
     expect(run.data?.validation.ready).toBeFalse();
     expect((run.data?.validation.blockingIssueCount ?? 0) > 0).toBeTrue();
     expect(run.data?.validation.issues.some((issue) => issue.code === "trigger-malformed")).toBeTrue();
@@ -360,9 +363,12 @@ describe("StudioShellBackendApi", () => {
 
     expect(run.ok).toBeTrue();
     expect(run.data?.launchStatus).toBe("launched");
+    expect(run.data?.execution.state).toBe("completed");
+    expect(run.data?.execution.launchAccepted).toBeTrue();
     expect(run.data?.validation.ready).toBeTrue();
     expect(run.data?.planSummary?.stepCount).toBe(1);
     expect(run.data?.runtime?.status === "completed" || run.data?.runtime?.status === "paused").toBeTrue();
+    expect((run.data?.runtime?.outputDelivery?.deliveredCount ?? 0) >= 1).toBeTrue();
   });
 
   it("supports trigger-aware entry for temporal and state workflow activations", async () => {
@@ -401,6 +407,7 @@ describe("StudioShellBackendApi", () => {
     });
     expect(temporalRun.ok).toBeTrue();
     expect(temporalRun.data?.launchStatus).toBe("blocked");
+    expect(temporalRun.data?.execution.failure?.kind).toBe("validation-failure");
     expect(temporalRun.data?.validation.issues.some((issue) => issue.code === "input-resolution-required-missing")).toBeTrue();
 
     const stateRun = await api.runWorkflowDraft({
@@ -442,7 +449,53 @@ describe("StudioShellBackendApi", () => {
 
     expect(stateRun.ok).toBeTrue();
     expect(stateRun.data?.launchStatus).toBe("launched");
+    expect(stateRun.data?.execution.state).toBe("completed");
     expect(stateRun.data?.validation.ready).toBeTrue();
+  });
+
+  it("reports output-delivery runtime failures with structured execution failure metadata", async () => {
+    const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
+
+    const run = await api.runWorkflowDraft({
+      studioId: "studio-workflows",
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-manual",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        }],
+        steps: [{
+          id: "step-1",
+          type: "action",
+          kind: "action",
+          order: 1,
+        }],
+        outputs: [{
+          id: "output-file",
+          type: "workflow-output",
+          order: 1,
+          outputType: WorkflowDraftOutputTypes.document,
+          format: WorkflowDraftOutputFormats.json,
+          sourceStepId: "step-1",
+          destination: {
+            type: WorkflowDraftOutputDestinationTypes.fileExport,
+            target: "workspace-file",
+            options: {
+              deliveryMode: "workspace-file",
+            },
+          },
+        }],
+      }),
+    });
+
+    expect(run.ok).toBeTrue();
+    expect(run.data?.launchStatus).toBe("failed");
+    expect(run.data?.execution.state).toBe("failed");
+    expect(run.data?.execution.failure?.kind).toBe("output-delivery-failure");
+    expect(run.data?.runtime?.status).toBe("failed");
+    expect((run.data?.runtime?.outputDelivery?.failedCount ?? 0) > 0).toBeTrue();
   });
 
   it("surfaces version-aware dependency mismatch validation for composite drafts", async () => {

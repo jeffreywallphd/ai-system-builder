@@ -633,5 +633,165 @@ describe("WorkflowDefinitionExecutionPlanTranslator", () => {
     expect(result.validationBoundary.ready).toBe(false);
     expect(result.issues.some((issue) => issue.code === "built-in-step-reference-missing")).toBe(true);
   });
+
+  it("maps viewer/file/system outputs and preserves deterministic output identity/configuration ordering", () => {
+    const plan = mapWorkflowDraftToExecutionPlan({
+      ...createEmptyWorkflowDraft(),
+      steps: [{
+        id: "step-final",
+        type: "action",
+        kind: WorkflowDraftStepKinds.action,
+        order: 1,
+      }],
+      outputs: [
+        {
+          id: "output-viewer",
+          type: "workflow-output",
+          order: 1,
+          outputType: WorkflowDraftOutputTypes.document,
+          format: WorkflowDraftOutputFormats.markdown,
+          sourceStepId: "step-final",
+          destination: {
+            type: WorkflowDraftOutputDestinationTypes.webViewer,
+            target: "in-app-view",
+            options: {
+              title: "Result",
+              presentationMode: "embedded",
+            },
+          },
+        },
+        {
+          id: "output-file",
+          type: "workflow-output",
+          order: 2,
+          outputType: WorkflowDraftOutputTypes.document,
+          format: WorkflowDraftOutputFormats.json,
+          sourceStepId: "step-final",
+          destination: {
+            type: WorkflowDraftOutputDestinationTypes.fileExport,
+            target: "file-download",
+            options: {
+              deliveryMode: "download",
+              fileName: "report",
+            },
+          },
+        },
+        {
+          id: "output-system",
+          type: "workflow-output",
+          order: 3,
+          outputType: WorkflowDraftOutputTypes.record,
+          format: WorkflowDraftOutputFormats.json,
+          sourceStepId: "step-final",
+          destination: {
+            type: WorkflowDraftOutputDestinationTypes.systemEntry,
+            target: "system-record",
+            options: {
+              entityName: "customer.record",
+              writeMode: "upsert",
+              recordShape: "single-record",
+              includeExecutionMetadata: "true",
+            },
+          },
+        },
+      ],
+    });
+
+    expect(plan.outputs.map((entry) => entry.outputId)).toEqual([
+      "output-viewer",
+      "output-file",
+      "output-system",
+    ]);
+    expect(plan.outputs[0]).toMatchObject({
+      outputId: "output-viewer",
+      runtime: {
+        outputHandlerType: WorkflowDraftOutputDestinationTypes.webViewer,
+      },
+    });
+    expect(plan.outputs[1]).toMatchObject({
+      outputId: "output-file",
+      runtime: {
+        outputHandlerType: WorkflowDraftOutputDestinationTypes.fileExport,
+      },
+    });
+    expect(plan.outputs[2]).toMatchObject({
+      outputId: "output-system",
+      runtime: {
+        outputHandlerType: WorkflowDraftOutputDestinationTypes.systemEntry,
+      },
+    });
+    expect(plan.outputBindings).toEqual([
+      expect.objectContaining({ outputId: "output-viewer" }),
+      expect.objectContaining({ outputId: "output-file" }),
+      expect.objectContaining({ outputId: "output-system" }),
+    ]);
+  });
+
+  it("fails translation for unsupported output destination definitions", () => {
+    const result = translateWorkflowDefinitionToExecutionPlan({
+      draft: {
+        ...createEmptyWorkflowDraft(),
+        steps: [{
+          id: "step-1",
+          type: "action",
+          kind: WorkflowDraftStepKinds.action,
+          order: 1,
+        }],
+        outputs: [{
+          id: "output-unsupported",
+          type: "workflow-output",
+          order: 1,
+          outputType: WorkflowDraftOutputTypes.document,
+          format: WorkflowDraftOutputFormats.json,
+          sourceStepId: "step-1",
+          destination: {
+            type: "unsupported-output-target",
+            target: "unsupported",
+          },
+        }],
+      },
+    });
+
+    expect(result.success).toBeFalse();
+    expect(result.issues).toContainEqual(expect.objectContaining({
+      code: "output-plan-unsupported-type",
+      severity: "error",
+    }));
+  });
+
+  it("fails translation when output destination contract is incomplete", () => {
+    const result = translateWorkflowDefinitionToExecutionPlan({
+      draft: {
+        ...createEmptyWorkflowDraft(),
+        steps: [{
+          id: "step-1",
+          type: "action",
+          kind: WorkflowDraftStepKinds.action,
+          order: 1,
+        }],
+        outputs: [{
+          id: "output-viewer",
+          type: "workflow-output",
+          order: 1,
+          outputType: WorkflowDraftOutputTypes.document,
+          format: WorkflowDraftOutputFormats.markdown,
+          sourceStepId: "step-1",
+          destination: {
+            type: WorkflowDraftOutputDestinationTypes.webViewer,
+            target: "in-app-view",
+            options: {
+              presentationMode: "embedded",
+            },
+          },
+        }],
+      },
+    });
+
+    expect(result.success).toBeFalse();
+    expect(result.issues).toContainEqual(expect.objectContaining({
+      code: "output-plan-required-field-missing",
+      severity: "error",
+    }));
+  });
 });
 
