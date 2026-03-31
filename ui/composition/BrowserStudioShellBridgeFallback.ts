@@ -1,9 +1,8 @@
 import type { DesktopStudioShellBridge } from "../../electron/shared/DesktopContracts";
-import { InMemoryStudioShellRepository } from "../../infrastructure/studio-shell/InMemoryStudioShellRepository";
 import { StudioShellBackendApi } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
 import { SystemStudioBackendApi } from "../../infrastructure/api/system-studio/SystemStudioBackendApi";
 import { SystemRuntimeBackendApi } from "../../infrastructure/api/system-runtime/SystemRuntimeBackendApi";
-import { InMemoryWorkflowPersistenceRepository } from "../../infrastructure/workflows/InMemoryWorkflowPersistenceRepository";
+import { resolveBrowserStudioShellRepository, resolveBrowserWorkflowPersistenceRepository } from "./BrowserFallbackRepositories";
 
 let fallbackBridge: DesktopStudioShellBridge | undefined;
 
@@ -12,8 +11,8 @@ export function resolveBrowserStudioShellBridgeFallback(): DesktopStudioShellBri
     return fallbackBridge;
   }
 
-  const repository = new InMemoryStudioShellRepository();
-  const workflowPersistenceRepository = new InMemoryWorkflowPersistenceRepository();
+  const repository = resolveBrowserStudioShellRepository();
+  const workflowPersistenceRepository = resolveBrowserWorkflowPersistenceRepository();
   const studioApi = new StudioShellBackendApi(repository, workflowPersistenceRepository);
   const systemApi = new SystemStudioBackendApi(repository);
   const runtimeApi = new SystemRuntimeBackendApi(repository);
