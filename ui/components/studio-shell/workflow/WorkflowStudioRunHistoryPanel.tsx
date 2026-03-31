@@ -1,12 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import {
+  WorkflowRunDiagnosticScopes,
+  WorkflowRunDiagnosticSeverities,
   WorkflowRunStatuses,
   WorkflowRunTriggerSources,
   type WorkflowRunStatus,
+  type WorkflowRunDiagnosticRecord,
+  type WorkflowStepRunRecord,
 } from "../../../../domain/workflow-studio/WorkflowRunHistoryDomain";
 import type {
   WorkflowRunDetailReadModel,
+  WorkflowRunDiagnosticReadModel,
   WorkflowRunSummaryReadModel,
 } from "../../../../infrastructure/api/studio-shell/StudioShellBackendApi";
 import { StudioShellService } from "../../../services/StudioShellService";
@@ -52,6 +57,18 @@ export function applyWorkflowRunFiltersAndSort(
   return Object.freeze(withFilter);
 }
 
+export function orderStepRuns(stepRuns: ReadonlyArray<WorkflowStepRunRecord>): ReadonlyArray<WorkflowStepRunRecord> {
+  const sorted = [...stepRuns];
+  sorted.sort((left, right) => {
+    const indexDelta = left.stepIndex - right.stepIndex;
+    if (indexDelta !== 0) {
+      return indexDelta;
+    }
+    return left.attempt - right.attempt;
+  });
+  return Object.freeze(sorted);
+}
+
 function toStatusTone(status: WorkflowRunStatus): "success" | "danger" | "warning" | "neutral" {
   if (status === WorkflowRunStatuses.completed) {
     return "success";
@@ -63,6 +80,19 @@ function toStatusTone(status: WorkflowRunStatus): "success" | "danger" | "warnin
     return "warning";
   }
   return "neutral";
+}
+
+function toSeverityTone(severity: WorkflowRunDiagnosticReadModel["severity"]): "danger" | "warning" | "success" | "neutral" {
+  switch (severity) {
+    case WorkflowRunDiagnosticSeverities.error:
+      return "danger";
+    case WorkflowRunDiagnosticSeverities.warning:
+      return "warning";
+    case WorkflowRunDiagnosticSeverities.info:
+      return "neutral";
+    default:
+      return "neutral";
+  }
 }
 
 function formatTimestamp(value?: string): string {
@@ -140,6 +170,129 @@ function normalizeStatusLabel(status: WorkflowRunStatus): string {
     default:
       return status;
   }
+}
+
+function normalizeDiagnosticScope(scope?: WorkflowRunDiagnosticReadModel["scope"]): string {
+  if (scope === WorkflowRunDiagnosticScopes.step) {
+    return "Step";
+  }
+  return "Workflow";
+}
+
+function summarizeUnknown(value: unknown): string {
+  if (value === undefined || value === null) {
+    return "None";
+  }
+
+  if (typeof value === "string") {
+    return value.length > 120 ? `${value.slice(0, 117)}...` : value;
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      return "Empty list";
+    }
+    return `${value.length} item${value.length === 1 ? "" : "s"}`;
+  }
+
+  if (typeof value === "object") {
+    const keys = Object.keys(value as Record<string, unknown>);
+    if (keys.length === 0) {
+      return "Empty object";
+    }
+    return `Fields: ${keys.slice(0, 3).join(", ")}${keys.length > 3 ? "..." : ""}`;
+  }
+
+  return String(value);
+}
+
+export function summarizeStepInputs(stepRun: WorkflowStepRunRecord): string {
+  const metadata = (stepRun.metadata ?? {}) as Record<string, unknown>;
+  const inputCandidates = [metadata.input, metadata.inputs, metadata.executionInput, metadata.parameters];
+  const inputValue = inputCandidates.find((entry) => entry !== undefined);
+  return inputValue === undefined ? "No structured input summary captured." : summarizeUnknown(inputValue);
+}
+
+export function summarizeStepOutputs(stepRun: WorkflowStepRunRecord): string {
+  if (stepRun.output) {
+    return `${stepRun.output.outputCount} output${stepRun.output.outputCount === 1 ? "" : "s"} captured`;
+  }
+  const metadata = (stepRun.metadata ?? {}) as Record<string, unknown>;
+  const outputCandidates = [metadata.output, metadata.outputs, metadata.result, metadata.resultValue];
+  const outputValue = outputCandidates.find((entry) => entry !== undefined);
+  return outputValue === undefined ? "No structured output summary captured." : summarizeUnknown(outputValue);
+}
+
+export function formatFailureCue(run: WorkflowRunSummaryReadModel): string {
+  const location = run.failureLocation;
+  const summary = run.primaryDiagnostic?.summary;
+  const locationLabel = location?.scope === "step"
+    ? `Step ${location.stepIndex !== undefined ? location.stepIndex + 1 : "?"}${location.stepName ? ` (${location.stepName})` : ""}`
+    : location?.scope === "workflow"
+      ? "Workflow"
+      : undefined;
+
+  if (summary && locationLabel) {
+    return `${locationLabel}: ${summary}`;
+  }
+  if (summary) {
+    return summary;
+  }
+  if (run.errorMessage) {
+    return run.errorMessage;
+  }
+  if (run.isIncomplete) {
+    return "Run is incomplete and has partial failures.";
+  }
+  return "-";
+}
+
+function renderDiagnostics(
+  diagnostics?: ReadonlyArray<WorkflowRunDiagnosticReadModel | WorkflowRunDiagnosticRecord>,
+): JSX.Element {
+  if (!diagnostics || diagnostics.length === 0) {
+    return (
+      <p className="ui-text-secondary ui-text-small ui-workflow-run-history__text-block">
+        No structured diagnostics were recorded for this run.
+      </p>
+    );
+  }
+
+  return (
+    <div className="ui-workflow-run-history__diagnostics" data-testid="workflow-run-diagnostics-list">
+      {diagnostics.map((diagnostic, index) => (
+        <div className="ui-workflow-run-history__diagnostic" key={`${diagnostic.scope}:${diagnostic.code ?? index}:${diagnostic.summary}`}>
+          <div className="ui-row ui-row--between ui-row--wrap">
+            <div className="ui-chips">
+              <span className={`ui-badge ui-badge--${toSeverityTone(diagnostic.severity)}`}>
+                {diagnostic.severity}
+              </span>
+              <span className="ui-badge ui-badge--neutral">{diagnostic.category}</span>
+              <span className="ui-badge ui-badge--neutral">{normalizeDiagnosticScope(diagnostic.scope)}</span>
+            </div>
+            {diagnostic.location?.stepIndex !== undefined ? (
+              <span className="ui-text-secondary ui-text-small">
+                Step {diagnostic.location.stepIndex + 1}{diagnostic.location.stepName ? ` (${diagnostic.location.stepName})` : ""}
+              </span>
+            ) : null}
+          </div>
+          <p className="ui-workflow-run-history__text-block">{diagnostic.summary}</p>
+          {diagnostic.remediationHint ? (
+            <p className="ui-text-secondary ui-text-small ui-workflow-run-history__text-block">
+              Suggested next step: {diagnostic.remediationHint}
+            </p>
+          ) : null}
+          {diagnostic.technicalDetail ? (
+            <pre className="ui-run-history-json">{diagnostic.technicalDetail}</pre>
+          ) : null}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export default function WorkflowStudioRunHistoryPanel({
@@ -251,6 +404,10 @@ export default function WorkflowStudioRunHistoryPanel({
     return applyWorkflowRunFiltersAndSort(runs, statusFilter, sortOrder);
   }, [runs, sortOrder, statusFilter]);
 
+  const orderedStepRuns = useMemo(() => {
+    return orderStepRuns(selectedDetail?.stepRuns ?? []);
+  }, [selectedDetail?.stepRuns]);
+
   if (!workflowId) {
     return (
       <div className="ui-empty-state" data-testid="workflow-run-history-unavailable">
@@ -265,14 +422,14 @@ export default function WorkflowStudioRunHistoryPanel({
 
   return (
     <div className="ui-stack ui-stack--sm" data-testid="workflow-run-history-panel">
-      <div className="ui-row ui-row--between ui-row--wrap" style={{ gap: "var(--space-sm)" }}>
+      <div className="ui-row ui-row--between ui-row--wrap ui-workflow-run-history__header">
         <div>
-          <h3 style={{ margin: 0 }}>{heading}</h3>
-          <p className="ui-text-secondary ui-text-small" style={{ marginTop: "var(--space-2xs)" }}>
-            Durable run summaries and structured workflow-level run detail.
+          <h3 className="ui-workflow-run-history__title">{heading}</h3>
+          <p className="ui-text-secondary ui-text-small ui-workflow-run-history__subtitle">
+            Durable run summaries, step-by-step inspection, and structured failure diagnostics.
           </p>
         </div>
-        <div className="ui-row ui-row--wrap" style={{ gap: "var(--space-xs)" }}>
+        <div className="ui-row ui-row--wrap ui-workflow-run-history__actions">
           {isRunHistoryRoute ? (
             <Link className="ui-button ui-button--ghost ui-button--sm" to={ROUTE_PATHS.workflowStudio}>
               Back to workflow editor
@@ -359,6 +516,7 @@ export default function WorkflowStudioRunHistoryPanel({
             <span>Duration</span>
             <span>Trigger</span>
             <span>Workflow</span>
+            <span>Failure Cue</span>
             <span>Details</span>
           </div>
           {filteredRuns.map((run) => (
@@ -377,6 +535,9 @@ export default function WorkflowStudioRunHistoryPanel({
               <span>{formatDuration(run.durationMs)}</span>
               <span>{normalizeTriggerSourceLabel(run.triggerSource)}</span>
               <span>{run.workflowName}</span>
+              <span className={run.primaryDiagnostic || run.errorMessage || run.isIncomplete ? "ui-text-secondary ui-text-small" : ""}>
+                {formatFailureCue(run)}
+              </span>
               <span>
                 <Link className="ui-button ui-button--ghost ui-button--sm" to={buildWorkflowStudioRunDetailPath(run.runId)}>
                   View run
@@ -391,8 +552,8 @@ export default function WorkflowStudioRunHistoryPanel({
         <div className="ui-panel ui-panel--accent">
           <div className="ui-panel__header">
             <div>
-              <h4 className="ui-panel__title" style={{ margin: 0 }}>Run detail</h4>
-              <p className="ui-panel__subtitle" style={{ marginTop: "var(--space-2xs)" }}>{selectedRunId}</p>
+              <h4 className="ui-panel__title ui-workflow-run-history__panel-title">Run detail</h4>
+              <p className="ui-panel__subtitle ui-workflow-run-history__panel-subtitle">{selectedRunId}</p>
             </div>
             <Link className="ui-button ui-button--ghost ui-button--sm" to={buildWorkflowStudioRunHistoryPath()}>
               Back to run list
@@ -445,17 +606,118 @@ export default function WorkflowStudioRunHistoryPanel({
 
                 <div className="ui-stack ui-stack--2xs">
                   <strong>Execution summary</strong>
-                  <p className="ui-text-secondary ui-text-small" style={{ margin: 0 }}>
+                  <p className="ui-text-secondary ui-text-small ui-workflow-run-history__text-block">
                     Steps: {selectedDetail.summary.stepRunStats?.totalCount ?? 0} total,
                     {" "}{selectedDetail.summary.stepRunStats?.completedCount ?? 0} completed,
                     {" "}{selectedDetail.summary.stepRunStats?.failedCount ?? 0} failed,
                     {" "}{selectedDetail.summary.stepRunStats?.runningCount ?? 0} running.
                   </p>
                   {selectedDetail.summary.errorMessage ? (
-                    <p className="ui-text-danger ui-text-small" style={{ margin: 0 }}>
+                    <p className="ui-text-danger ui-text-small ui-workflow-run-history__text-block">
                       Final error: {selectedDetail.summary.errorMessage}
                     </p>
                   ) : null}
+                  {selectedDetail.failureLocation?.scope === "step" ? (
+                    <p className="ui-text-secondary ui-text-small ui-workflow-run-history__text-block">
+                      Failure location: Step {selectedDetail.failureLocation.stepIndex !== undefined ? selectedDetail.failureLocation.stepIndex + 1 : "?"}
+                      {selectedDetail.failureLocation.stepName ? ` (${selectedDetail.failureLocation.stepName})` : ""}
+                    </p>
+                  ) : selectedDetail.failureLocation?.scope === "workflow" ? (
+                    <p className="ui-text-secondary ui-text-small ui-workflow-run-history__text-block">Failure location: Workflow-level</p>
+                  ) : null}
+                </div>
+
+                <div className="ui-stack ui-stack--2xs" data-testid="workflow-run-detail-diagnostics">
+                  <strong>Failure diagnostics</strong>
+                  {renderDiagnostics(selectedDetail.diagnostics)}
+                </div>
+
+                <div className="ui-stack ui-stack--2xs" data-testid="workflow-run-detail-step-inspection">
+                  <strong>Step inspection</strong>
+                  {orderedStepRuns.length === 0 ? (
+                    <p className="ui-text-secondary ui-text-small ui-workflow-run-history__text-block">
+                      No step-level execution records were captured for this run.
+                    </p>
+                  ) : (
+                    <div className="ui-workflow-run-history__step-list">
+                      {orderedStepRuns.map((stepRun) => {
+                        const stepLabel = stepRun.stepName || stepRun.stepId;
+                        const stepStatusTone = toStatusTone(stepRun.status as WorkflowRunStatus);
+                        const stepDuration = stepRun.durationMs
+                          ?? (stepRun.timestamps.startedAt && stepRun.timestamps.endedAt
+                            ? Math.max(0, Date.parse(stepRun.timestamps.endedAt) - Date.parse(stepRun.timestamps.startedAt))
+                            : undefined);
+                        return (
+                          <details
+                            className="ui-workflow-run-history__step-item"
+                            key={stepRun.stepRunId}
+                            data-testid={`workflow-run-step-${stepRun.stepRunId}`}
+                          >
+                            <summary className="ui-workflow-run-history__step-summary">
+                              <span className="ui-workflow-run-history__step-title">
+                                Step {stepRun.stepIndex + 1}: {stepLabel}
+                              </span>
+                              <span className="ui-chips">
+                                <span className={`ui-badge ui-badge--${stepStatusTone}`}>{stepRun.status}</span>
+                                <span className="ui-badge ui-badge--neutral">Attempt {stepRun.attempt}</span>
+                                <span className="ui-badge ui-badge--neutral">{formatDuration(stepDuration)}</span>
+                              </span>
+                            </summary>
+                            <div className="ui-workflow-run-history__step-body">
+                              <div className="ui-meta-grid">
+                                <div className="ui-meta-item">
+                                  <span className="ui-meta-label">Step Id</span>
+                                  <span className="ui-meta-value">{stepRun.stepId}</span>
+                                </div>
+                                <div className="ui-meta-item">
+                                  <span className="ui-meta-label">Type</span>
+                                  <span className="ui-meta-value">{stepRun.stepType ?? "-"}</span>
+                                </div>
+                                <div className="ui-meta-item">
+                                  <span className="ui-meta-label">Action category</span>
+                                  <span className="ui-meta-value">{stepRun.actionType ?? "-"}</span>
+                                </div>
+                                <div className="ui-meta-item">
+                                  <span className="ui-meta-label">Updated</span>
+                                  <span className="ui-meta-value">{formatTimestamp(stepRun.timestamps.updatedAt)}</span>
+                                </div>
+                                <div className="ui-meta-item">
+                                  <span className="ui-meta-label">Started</span>
+                                  <span className="ui-meta-value">{formatTimestamp(stepRun.timestamps.startedAt)}</span>
+                                </div>
+                                <div className="ui-meta-item">
+                                  <span className="ui-meta-label">Ended</span>
+                                  <span className="ui-meta-value">{formatTimestamp(stepRun.timestamps.endedAt)}</span>
+                                </div>
+                              </div>
+                              <p className="ui-text-secondary ui-text-small ui-workflow-run-history__text-block">
+                                Inputs: {summarizeStepInputs(stepRun)}
+                              </p>
+                              <p className="ui-text-secondary ui-text-small ui-workflow-run-history__text-block">
+                                Outputs: {summarizeStepOutputs(stepRun)}
+                              </p>
+                              {stepRun.summary ? (
+                                <p className="ui-text-secondary ui-text-small ui-workflow-run-history__text-block">Summary: {stepRun.summary}</p>
+                              ) : null}
+                              {stepRun.error ? (
+                                <p className="ui-text-danger ui-text-small ui-workflow-run-history__text-block" data-testid={`workflow-run-step-error-${stepRun.stepRunId}`}>
+                                  Error: {stepRun.error.message}
+                                </p>
+                              ) : null}
+                              {stepRun.diagnostics && stepRun.diagnostics.length > 0 ? (
+                                renderDiagnostics(stepRun.diagnostics)
+                              ) : null}
+                              {stepRun.metadata !== undefined ? (
+                                <pre className="ui-run-history-json">
+                                  {formatStructuredJson(stepRun.metadata)}
+                                </pre>
+                              ) : null}
+                            </div>
+                          </details>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 <div className="ui-stack ui-stack--2xs">
@@ -465,7 +727,7 @@ export default function WorkflowStudioRunHistoryPanel({
                       {formatStructuredJson(selectedDetail.executionContext.resolvedTriggerContext)}
                     </pre>
                   ) : (
-                    <p className="ui-text-secondary ui-text-small" style={{ margin: 0 }}>
+                    <p className="ui-text-secondary ui-text-small ui-workflow-run-history__text-block">
                       No structured trigger context was captured for this run.
                     </p>
                   )}
@@ -475,7 +737,7 @@ export default function WorkflowStudioRunHistoryPanel({
                   <strong>Top-level outputs</strong>
                   {selectedDetail.outputs ? (
                     <>
-                      <p className="ui-text-secondary ui-text-small" style={{ margin: 0 }}>
+                      <p className="ui-text-secondary ui-text-small ui-workflow-run-history__text-block">
                         Output assets: {selectedDetail.outputs.outputAssetIds.length} (total outputs: {selectedDetail.outputs.outputCount})
                       </p>
                       {selectedDetail.outputs.outputValues !== undefined ? (
@@ -485,7 +747,7 @@ export default function WorkflowStudioRunHistoryPanel({
                       ) : null}
                     </>
                   ) : (
-                    <p className="ui-text-secondary ui-text-small" style={{ margin: 0 }}>
+                    <p className="ui-text-secondary ui-text-small ui-workflow-run-history__text-block">
                       No top-level outputs were captured for this run.
                     </p>
                   )}

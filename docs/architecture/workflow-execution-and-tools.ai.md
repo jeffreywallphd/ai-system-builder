@@ -118,6 +118,9 @@ Workflow -> `ExecuteWorkflowUseCase` -> one-unit `ExecutionPlan` -> `UnifiedExec
 - Epic 12 stories 12.5-12.6 now expose these same canonical run-history records in Workflow Studio through the shared studio-shell backend/service bridge:
   - workflow run list view with summary-first status/recency/duration/trigger fields and client-side sort/filter controls;
   - route-addressable run detail view (`/studio-shell/workflow/runs/:runId`) showing workflow-level metadata, execution summary, structured trigger context, and top-level outputs.
+- Epic 12 stories 12.7-12.8 now extend that same contract surface (no parallel observability model):
+  - run detail includes ordered step inspection with expandable per-step status/timing/input-output/error summaries sourced from persisted `stepRuns`;
+  - run summaries/details now carry structured diagnostics (category/severity/scope/location/summary/detail/remediation), and run list/detail render failure-location cues from those canonical diagnostics.
 
 ## What is not migrated yet
 - Broader MCP tool/discovery orchestration, scheduling, and distributed execution are still outside this slice even though plan-backed workflow runs, dataset generation runs, model-preparation runs, truthful local model-training runs, and narrow MCP server-operation runs are now durable.

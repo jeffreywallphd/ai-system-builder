@@ -4,6 +4,10 @@ import { renderToString } from "react-dom/server";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import {
   applyWorkflowRunFiltersAndSort,
+  formatFailureCue,
+  orderStepRuns,
+  summarizeStepInputs,
+  summarizeStepOutputs,
 } from "../WorkflowStudioRunHistoryPanel";
 import WorkflowStudioRunHistoryPanel from "../WorkflowStudioRunHistoryPanel";
 
@@ -142,6 +146,106 @@ describe("WorkflowStudioRunHistoryPanel", () => {
     ], "completed", "duration");
 
     expect(sorted.map((entry) => entry.runId)).toEqual(["run:a", "run:c"]);
+  });
+
+  it("orders step records in execution order", () => {
+    const ordered = orderStepRuns([
+      {
+        stepRunId: "run:1:step-2:2",
+        stepId: "step-2",
+        stepIndex: 1,
+        attempt: 2,
+        status: "completed",
+        timestamps: { updatedAt: "2026-03-31T12:00:03.000Z" },
+      },
+      {
+        stepRunId: "run:1:step-1:1",
+        stepId: "step-1",
+        stepIndex: 0,
+        attempt: 1,
+        status: "completed",
+        timestamps: { updatedAt: "2026-03-31T12:00:01.000Z" },
+      },
+      {
+        stepRunId: "run:1:step-2:1",
+        stepId: "step-2",
+        stepIndex: 1,
+        attempt: 1,
+        status: "failed",
+        timestamps: { updatedAt: "2026-03-31T12:00:02.000Z" },
+      },
+    ] as never);
+
+    expect(ordered.map((entry) => entry.stepRunId)).toEqual([
+      "run:1:step-1:1",
+      "run:1:step-2:1",
+      "run:1:step-2:2",
+    ]);
+  });
+
+  it("summarizes step input/output records from structured metadata", () => {
+    const inputSummary = summarizeStepInputs({
+      stepRunId: "run:1:step-1:1",
+      stepId: "step-1",
+      stepIndex: 0,
+      attempt: 1,
+      status: "completed",
+      timestamps: { updatedAt: "2026-03-31T12:00:01.000Z" },
+      metadata: {
+        input: {
+          customerId: "customer-7",
+          channel: "email",
+        },
+        result: {
+          delivered: true,
+        },
+      },
+    } as never);
+
+    const outputSummary = summarizeStepOutputs({
+      stepRunId: "run:1:step-1:1",
+      stepId: "step-1",
+      stepIndex: 0,
+      attempt: 1,
+      status: "completed",
+      timestamps: { updatedAt: "2026-03-31T12:00:01.000Z" },
+      output: {
+        outputAssetIds: ["asset:one", "asset:two"],
+        outputCount: 2,
+      },
+    } as never);
+
+    expect(inputSummary).toContain("Fields");
+    expect(outputSummary).toContain("2 outputs captured");
+  });
+
+  it("formats run failure cues from step location and diagnostics", () => {
+    const cue = formatFailureCue({
+      runId: "run:failed-1",
+      workflowId: "asset:workflow-1",
+      workflowName: "Workflow One",
+      status: "failed",
+      triggerSource: "manual",
+      startedAt: "2026-03-31T12:00:00.000Z",
+      endedAt: "2026-03-31T12:00:07.000Z",
+      updatedAt: "2026-03-31T12:00:07.000Z",
+      executionRunId: "run:failed-1",
+      primaryDiagnostic: {
+        category: "runtime",
+        severity: "error",
+        scope: "step",
+        summary: "Tool execution failed",
+      },
+      failureLocation: {
+        scope: "step",
+        stepId: "step-a",
+        stepIndex: 0,
+        stepName: "Draft message",
+      },
+    } as never);
+
+    expect(cue).toContain("Step 1");
+    expect(cue).toContain("Tool execution failed");
   });
 
   it("renders save guidance when no persisted workflow id is available", () => {

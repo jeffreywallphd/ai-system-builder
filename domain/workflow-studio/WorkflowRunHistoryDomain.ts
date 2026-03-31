@@ -101,6 +101,114 @@ function normalizeStepRunStatus(value: string): WorkflowStepRunStatus {
   }
 }
 
+function normalizeDiagnosticCategory(value: string): WorkflowRunDiagnosticCategory {
+  switch (value) {
+    case WorkflowRunDiagnosticCategories.validation:
+    case WorkflowRunDiagnosticCategories.configuration:
+    case WorkflowRunDiagnosticCategories.dependency:
+    case WorkflowRunDiagnosticCategories.runtime:
+    case WorkflowRunDiagnosticCategories.outputDelivery:
+    case WorkflowRunDiagnosticCategories.timeout:
+    case WorkflowRunDiagnosticCategories.unknown:
+      return value;
+    default:
+      return WorkflowRunDiagnosticCategories.unknown;
+  }
+}
+
+function normalizeDiagnosticSeverity(value: string): WorkflowRunDiagnosticSeverity {
+  switch (value) {
+    case WorkflowRunDiagnosticSeverities.info:
+    case WorkflowRunDiagnosticSeverities.warning:
+    case WorkflowRunDiagnosticSeverities.error:
+      return value;
+    default:
+      return WorkflowRunDiagnosticSeverities.error;
+  }
+}
+
+function normalizeDiagnosticScope(value: string): WorkflowRunDiagnosticScope {
+  switch (value) {
+    case WorkflowRunDiagnosticScopes.workflow:
+    case WorkflowRunDiagnosticScopes.step:
+      return value;
+    default:
+      return WorkflowRunDiagnosticScopes.workflow;
+  }
+}
+
+function normalizeDiagnosticLocation(
+  location?: WorkflowRunDiagnosticLocation,
+): WorkflowRunDiagnosticLocation | undefined {
+  if (!location) {
+    return undefined;
+  }
+
+  const stepId = normalizeOptional(location.stepId);
+  const stepRunId = normalizeOptional(location.stepRunId);
+  const stepName = normalizeOptional(location.stepName);
+  const stepIndex = location.stepIndex === undefined
+    ? undefined
+    : normalizeNonNegativeInteger(location.stepIndex, "Workflow diagnostic stepIndex");
+
+  if (stepId === undefined && stepRunId === undefined && stepName === undefined && stepIndex === undefined) {
+    return undefined;
+  }
+
+  return Object.freeze({
+    stepId,
+    stepRunId,
+    stepName,
+    stepIndex,
+  } satisfies WorkflowRunDiagnosticLocation);
+}
+
+function normalizeWorkflowRunDiagnostics(
+  diagnostics?: ReadonlyArray<WorkflowRunDiagnosticRecord>,
+): ReadonlyArray<WorkflowRunDiagnosticRecord> | undefined {
+  if (!diagnostics || diagnostics.length === 0) {
+    return undefined;
+  }
+
+  const normalized: WorkflowRunDiagnosticRecord[] = [];
+  const dedupeKeys = new Set<string>();
+
+  for (const diagnostic of diagnostics) {
+    const summary = normalizeOptional(diagnostic.summary);
+    if (!summary) {
+      continue;
+    }
+
+    const normalizedDiagnostic = Object.freeze({
+      category: normalizeDiagnosticCategory(diagnostic.category),
+      severity: normalizeDiagnosticSeverity(diagnostic.severity),
+      scope: normalizeDiagnosticScope(diagnostic.scope),
+      summary,
+      code: normalizeOptional(diagnostic.code),
+      technicalDetail: normalizeOptional(diagnostic.technicalDetail),
+      remediationHint: normalizeOptional(diagnostic.remediationHint),
+      location: normalizeDiagnosticLocation(diagnostic.location),
+      unknownState: diagnostic.unknownState === true ? true : undefined,
+    } satisfies WorkflowRunDiagnosticRecord);
+
+    const key = [
+      normalizedDiagnostic.scope,
+      normalizedDiagnostic.category,
+      normalizedDiagnostic.severity,
+      normalizedDiagnostic.code ?? "",
+      normalizedDiagnostic.summary,
+      normalizedDiagnostic.location?.stepId ?? "",
+      normalizedDiagnostic.location?.stepRunId ?? "",
+    ].join("|");
+    if (!dedupeKeys.has(key)) {
+      dedupeKeys.add(key);
+      normalized.push(normalizedDiagnostic);
+    }
+  }
+
+  return normalized.length > 0 ? Object.freeze(normalized) : undefined;
+}
+
 export const WorkflowRunStatuses = Object.freeze({
   queued: "queued",
   running: "running",
@@ -134,6 +242,55 @@ export const WorkflowStepRunStatuses = Object.freeze({
 
 export type WorkflowStepRunStatus =
   typeof WorkflowStepRunStatuses[keyof typeof WorkflowStepRunStatuses];
+
+export const WorkflowRunDiagnosticCategories = Object.freeze({
+  validation: "validation",
+  configuration: "configuration",
+  dependency: "dependency",
+  runtime: "runtime",
+  outputDelivery: "output-delivery",
+  timeout: "timeout",
+  unknown: "unknown",
+});
+
+export type WorkflowRunDiagnosticCategory =
+  typeof WorkflowRunDiagnosticCategories[keyof typeof WorkflowRunDiagnosticCategories];
+
+export const WorkflowRunDiagnosticSeverities = Object.freeze({
+  info: "info",
+  warning: "warning",
+  error: "error",
+});
+
+export type WorkflowRunDiagnosticSeverity =
+  typeof WorkflowRunDiagnosticSeverities[keyof typeof WorkflowRunDiagnosticSeverities];
+
+export const WorkflowRunDiagnosticScopes = Object.freeze({
+  workflow: "workflow",
+  step: "step",
+});
+
+export type WorkflowRunDiagnosticScope =
+  typeof WorkflowRunDiagnosticScopes[keyof typeof WorkflowRunDiagnosticScopes];
+
+export interface WorkflowRunDiagnosticLocation {
+  readonly stepId?: string;
+  readonly stepRunId?: string;
+  readonly stepName?: string;
+  readonly stepIndex?: number;
+}
+
+export interface WorkflowRunDiagnosticRecord {
+  readonly category: WorkflowRunDiagnosticCategory;
+  readonly severity: WorkflowRunDiagnosticSeverity;
+  readonly scope: WorkflowRunDiagnosticScope;
+  readonly summary: string;
+  readonly code?: string;
+  readonly technicalDetail?: string;
+  readonly remediationHint?: string;
+  readonly location?: WorkflowRunDiagnosticLocation;
+  readonly unknownState?: boolean;
+}
 
 export interface WorkflowRunCorrelationIds {
   readonly executionRunId: string;
@@ -195,6 +352,7 @@ export interface WorkflowStepRunRecord {
   readonly summary?: string;
   readonly error?: WorkflowRunErrorSummary;
   readonly output?: WorkflowRunOutputReference;
+  readonly diagnostics?: ReadonlyArray<WorkflowRunDiagnosticRecord>;
   readonly metadata?: unknown;
 }
 
@@ -224,6 +382,7 @@ export interface WorkflowRunSummaryRecord {
   readonly output?: WorkflowRunOutputReference;
   readonly errorMessage?: string;
   readonly stepRunStats?: WorkflowStepRunStats;
+  readonly diagnostics?: ReadonlyArray<WorkflowRunDiagnosticRecord>;
 }
 
 export interface WorkflowRunExecutionContextRecord {
@@ -243,6 +402,7 @@ export interface WorkflowRunDetailRecord {
   readonly runId: string;
   readonly summary: WorkflowRunSummaryRecord;
   readonly stepRuns: ReadonlyArray<WorkflowStepRunRecord>;
+  readonly diagnostics?: ReadonlyArray<WorkflowRunDiagnosticRecord>;
   readonly executionContext?: WorkflowRunExecutionContextRecord;
   readonly outputs?: WorkflowRunOutputRecord;
 }
@@ -264,12 +424,14 @@ export interface CreateWorkflowRunSummaryInput {
   };
   readonly errorMessage?: string;
   readonly stepRunStats?: WorkflowStepRunStats;
+  readonly diagnostics?: ReadonlyArray<WorkflowRunDiagnosticRecord>;
 }
 
 export interface CreateWorkflowRunDetailInput {
   readonly runId: string;
   readonly summary: WorkflowRunSummaryRecord;
   readonly stepRuns?: ReadonlyArray<WorkflowStepRunRecord>;
+  readonly diagnostics?: ReadonlyArray<WorkflowRunDiagnosticRecord>;
   readonly executionContext?: WorkflowRunExecutionContextRecord;
   readonly outputs?: WorkflowRunOutputRecord;
 }
@@ -347,6 +509,7 @@ export function normalizeWorkflowStepRunRecord(stepRun: WorkflowStepRunRecord): 
     summary: normalizeOptional(stepRun.summary),
     error,
     output: normalizeOutputReference(stepRun.output),
+    diagnostics: normalizeWorkflowRunDiagnostics(stepRun.diagnostics),
     metadata: stepRun.metadata === undefined
       ? undefined
       : normalizeStructuredValue(stepRun.metadata, "Workflow step run metadata"),
@@ -451,6 +614,109 @@ export function createWorkflowStepRunStats(stepRuns: ReadonlyArray<WorkflowStepR
   return normalizeStepRunStats(counts);
 }
 
+function classifyWorkflowDiagnosticCategory(code?: string, message?: string): WorkflowRunDiagnosticCategory {
+  const normalized = `${code ?? ""} ${message ?? ""}`.toLowerCase();
+  if (normalized.includes("validation")) {
+    return WorkflowRunDiagnosticCategories.validation;
+  }
+  if (normalized.includes("timeout") || normalized.includes("timed out")) {
+    return WorkflowRunDiagnosticCategories.timeout;
+  }
+  if (normalized.includes("output") && normalized.includes("delivery")) {
+    return WorkflowRunDiagnosticCategories.outputDelivery;
+  }
+  if (normalized.includes("dependency") || normalized.includes("unavailable") || normalized.includes("missing")) {
+    return WorkflowRunDiagnosticCategories.dependency;
+  }
+  if (normalized.includes("unsupported") || normalized.includes("configuration") || normalized.includes("config")) {
+    return WorkflowRunDiagnosticCategories.configuration;
+  }
+  if (normalized.trim().length === 0) {
+    return WorkflowRunDiagnosticCategories.unknown;
+  }
+  return WorkflowRunDiagnosticCategories.runtime;
+}
+
+function resolveWorkflowDiagnosticRemediationHint(category: WorkflowRunDiagnosticCategory): string {
+  switch (category) {
+    case WorkflowRunDiagnosticCategories.validation:
+      return "Review workflow inputs and step configuration, then rerun.";
+    case WorkflowRunDiagnosticCategories.configuration:
+      return "Review authored workflow and runtime configuration before rerun.";
+    case WorkflowRunDiagnosticCategories.dependency:
+      return "Verify referenced assets/services are available and version-compatible.";
+    case WorkflowRunDiagnosticCategories.outputDelivery:
+      return "Inspect output destination settings and delivery targets.";
+    case WorkflowRunDiagnosticCategories.timeout:
+      return "Increase timeout or reduce workload, then retry.";
+    case WorkflowRunDiagnosticCategories.runtime:
+      return "Inspect step diagnostics and runtime context, then retry.";
+    default:
+      return "Inspect technical details and runtime events, then retry.";
+  }
+}
+
+export function deriveWorkflowRunDiagnostics(input: {
+  readonly status: WorkflowRunStatus;
+  readonly errorMessage?: string;
+  readonly stepRuns?: ReadonlyArray<WorkflowStepRunRecord>;
+  readonly existingDiagnostics?: ReadonlyArray<WorkflowRunDiagnosticRecord>;
+}): ReadonlyArray<WorkflowRunDiagnosticRecord> | undefined {
+  const diagnostics: WorkflowRunDiagnosticRecord[] = [];
+
+  if (input.existingDiagnostics) {
+    diagnostics.push(...input.existingDiagnostics);
+  }
+
+  if (input.errorMessage?.trim()) {
+    const category = classifyWorkflowDiagnosticCategory(undefined, input.errorMessage);
+    diagnostics.push({
+      category,
+      severity: input.status === WorkflowRunStatuses.cancelled
+        ? WorkflowRunDiagnosticSeverities.warning
+        : WorkflowRunDiagnosticSeverities.error,
+      scope: WorkflowRunDiagnosticScopes.workflow,
+      summary: input.errorMessage,
+      remediationHint: resolveWorkflowDiagnosticRemediationHint(category),
+    });
+  }
+
+  for (const stepRun of input.stepRuns ?? []) {
+    if (stepRun.status !== WorkflowStepRunStatuses.failed || !stepRun.error?.message) {
+      continue;
+    }
+    const category = classifyWorkflowDiagnosticCategory(stepRun.error.code, stepRun.error.message);
+    diagnostics.push({
+      category,
+      severity: WorkflowRunDiagnosticSeverities.error,
+      scope: WorkflowRunDiagnosticScopes.step,
+      summary: stepRun.error.message,
+      code: stepRun.error.code,
+      technicalDetail: stepRun.error.detail,
+      remediationHint: resolveWorkflowDiagnosticRemediationHint(category),
+      location: {
+        stepId: stepRun.stepId,
+        stepRunId: stepRun.stepRunId,
+        stepName: stepRun.stepName,
+        stepIndex: stepRun.stepIndex,
+      },
+    });
+  }
+
+  if (input.status === WorkflowRunStatuses.failed && diagnostics.length === 0) {
+    diagnostics.push({
+      category: WorkflowRunDiagnosticCategories.unknown,
+      severity: WorkflowRunDiagnosticSeverities.error,
+      scope: WorkflowRunDiagnosticScopes.workflow,
+      summary: "Run failed without structured failure details.",
+      remediationHint: resolveWorkflowDiagnosticRemediationHint(WorkflowRunDiagnosticCategories.unknown),
+      unknownState: true,
+    });
+  }
+
+  return normalizeWorkflowRunDiagnostics(diagnostics);
+}
+
 export function createWorkflowRunSummaryRecord(input: CreateWorkflowRunSummaryInput): WorkflowRunSummaryRecord {
   const startedAt = normalizeIsoTimestamp(input.timestamps.startedAt, "Workflow run startedAt");
   const endedAt = input.timestamps.endedAt
@@ -478,6 +744,7 @@ export function createWorkflowRunSummaryRecord(input: CreateWorkflowRunSummaryIn
   const stepRunStats = input.stepRunStats
     ? normalizeStepRunStats(input.stepRunStats)
     : undefined;
+  const diagnostics = normalizeWorkflowRunDiagnostics(input.diagnostics);
 
   return Object.freeze({
     runId: normalizeRequired(input.runId, "Workflow run id"),
@@ -493,6 +760,7 @@ export function createWorkflowRunSummaryRecord(input: CreateWorkflowRunSummaryIn
     output: normalizeOutputReference(input.output),
     errorMessage: normalizeOptional(input.errorMessage),
     stepRunStats,
+    diagnostics,
   } satisfies WorkflowRunSummaryRecord);
 }
 
@@ -574,13 +842,23 @@ export function createWorkflowRunDetailRecord(input: CreateWorkflowRunDetailInpu
   }
 
   const stepRuns = Object.freeze((input.stepRuns ?? []).map((stepRun) => normalizeWorkflowStepRunRecord(stepRun)));
+  const diagnostics = input.diagnostics
+    ? normalizeWorkflowRunDiagnostics(input.diagnostics)
+    : deriveWorkflowRunDiagnostics({
+      status: summary.status,
+      errorMessage: summary.errorMessage,
+      stepRuns,
+      existingDiagnostics: summary.diagnostics,
+    });
   return Object.freeze({
     runId,
     summary: Object.freeze({
       ...summary,
       stepRunStats: createWorkflowStepRunStats(stepRuns),
+      diagnostics,
     }),
     stepRuns,
+    diagnostics,
     executionContext: normalizeExecutionContext(input.executionContext),
     outputs: normalizeOutputRecord(input.outputs),
   } satisfies WorkflowRunDetailRecord);
@@ -606,6 +884,7 @@ export function normalizeWorkflowRunSummaryRecord(record: WorkflowRunSummaryReco
     output: record.output,
     errorMessage: record.errorMessage,
     stepRunStats: record.stepRunStats,
+    diagnostics: record.diagnostics,
   });
 }
 
@@ -614,6 +893,7 @@ export function normalizeWorkflowRunDetailRecord(record: WorkflowRunDetailRecord
     runId: record.runId,
     summary: record.summary,
     stepRuns: record.stepRuns,
+    diagnostics: record.diagnostics,
     executionContext: record.executionContext,
     outputs: record.outputs,
   });

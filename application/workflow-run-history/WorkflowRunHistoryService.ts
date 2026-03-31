@@ -3,6 +3,7 @@ import type { IWorkflowRunSummaryRepository } from "../ports/interfaces/IWorkflo
 import {
   createWorkflowRunDetailRecord,
   createWorkflowStepRunStats,
+  deriveWorkflowRunDiagnostics,
   createWorkflowRunSummaryRecord,
   normalizeWorkflowStepRunRecord,
   normalizeWorkflowRunDetailRecord,
@@ -15,6 +16,7 @@ import {
   type WorkflowStepRunRecord,
   type WorkflowStepRunStatus,
   type WorkflowRunExecutionContextRecord,
+  type WorkflowRunDiagnosticRecord,
   type WorkflowRunOutputRecord,
   type WorkflowRunSummaryListQuery,
   type WorkflowRunSummaryRecord,
@@ -257,6 +259,11 @@ export class WorkflowRunHistoryService {
       },
       errorMessage: request.result.errorMessage,
       stepRunStats: createWorkflowStepRunStats(stepRuns),
+      diagnostics: deriveWorkflowRunDiagnostics({
+        status: request.result.status,
+        errorMessage: request.result.errorMessage,
+        stepRuns,
+      }),
     });
 
     await this.tryRepository("record-complete:upsert-summary", () => this.repository.upsert(summary));
@@ -264,6 +271,7 @@ export class WorkflowRunHistoryService {
       runId,
       summary,
       stepRuns,
+      diagnostics: summary.diagnostics,
       executionContext: existingDetail?.executionContext,
       outputs: outputRecord,
     });
@@ -301,6 +309,11 @@ export class WorkflowRunHistoryService {
       output: existing.output,
       errorMessage: normalizeRequired(request.errorMessage, "Workflow run failure message"),
       stepRunStats: createWorkflowStepRunStats(stepRuns),
+      diagnostics: deriveWorkflowRunDiagnostics({
+        status: WorkflowRunStatuses.failed,
+        errorMessage: request.errorMessage,
+        stepRuns,
+      }),
     });
 
     await this.tryRepository("record-failed:upsert-summary", () => this.repository.upsert(summary));
@@ -308,6 +321,7 @@ export class WorkflowRunHistoryService {
       runId,
       summary,
       stepRuns,
+      diagnostics: summary.diagnostics,
       executionContext: existingDetail?.executionContext,
       outputs: existingDetail?.outputs,
     });
@@ -391,6 +405,16 @@ export class WorkflowRunHistoryService {
       error: nextStatus === WorkflowStepRunStatuses.failed
         ? toStructuredError(request.event.message, request.event.payload)
         : undefined,
+      diagnostics: nextStatus === WorkflowStepRunStatuses.failed
+        ? this.toStepEventDiagnostics({
+          stepRunId: `${runId}:${nodeId}:${attempt}`,
+          stepId: nodeId,
+          stepIndex,
+          stepName: stepMetadata.stepName,
+          message: request.event.message,
+          payload: request.event.payload,
+        })
+        : undefined,
       metadata: request.event.payload,
     });
 
@@ -415,11 +439,17 @@ export class WorkflowRunHistoryService {
         updatedAt: nowIso,
       },
       stepRunStats: createWorkflowStepRunStats(stepRuns),
+      diagnostics: deriveWorkflowRunDiagnostics({
+        status: existing.summary.status,
+        errorMessage: existing.summary.errorMessage,
+        stepRuns,
+      }),
     });
     const detail = createWorkflowRunDetailRecord({
       runId,
       summary,
       stepRuns,
+      diagnostics: summary.diagnostics,
       executionContext: existing.executionContext,
       outputs: existing.outputs,
     });
@@ -493,5 +523,48 @@ export class WorkflowRunHistoryService {
 
   private normalizeStepRun(stepRun: WorkflowStepRunRecord): WorkflowStepRunRecord {
     return normalizeWorkflowStepRunRecord(stepRun);
+  }
+
+  private toStepEventDiagnostics(input: {
+    readonly stepRunId: string;
+    readonly stepId: string;
+    readonly stepIndex: number;
+    readonly stepName?: string;
+    readonly message?: string;
+    readonly payload?: Readonly<Record<string, unknown>>;
+  }): ReadonlyArray<WorkflowRunDiagnosticRecord> | undefined {
+    const message = input.message?.trim();
+    if (!message) {
+      return undefined;
+    }
+
+    const rawCode = typeof input.payload?.code === "string"
+      ? input.payload.code.toLowerCase()
+      : undefined;
+    const category = rawCode?.includes("validation")
+      ? "validation"
+      : rawCode?.includes("timeout")
+        ? "timeout"
+        : rawCode?.includes("dependency")
+          ? "dependency"
+          : rawCode?.includes("output")
+            ? "output-delivery"
+            : "runtime";
+
+    return Object.freeze([Object.freeze({
+      category,
+      severity: "error",
+      scope: "step",
+      summary: message,
+      code: typeof input.payload?.code === "string" ? input.payload.code : undefined,
+      technicalDetail: typeof input.payload?.detail === "string" ? input.payload.detail : undefined,
+      remediationHint: "Inspect this step configuration and runtime context, then rerun.",
+      location: {
+        stepId: input.stepId,
+        stepRunId: input.stepRunId,
+        stepName: input.stepName,
+        stepIndex: input.stepIndex,
+      },
+    } satisfies WorkflowRunDiagnosticRecord)]);
   }
 }
