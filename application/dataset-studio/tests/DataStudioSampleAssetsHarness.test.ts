@@ -24,7 +24,9 @@ describe("DataStudio sample assets harness", () => {
       ]);
     expect(registry.list({ category: "data-ingestion" })).toHaveLength(6);
     const csvEntry = entries.find((entry) => entry.descriptor.assetId === "csv-ingestor");
+    const unifiedEntry = entries.find((entry) => entry.descriptor.assetId === "unified-ingestion");
     expect(csvEntry?.descriptor.configSchema.fields.some((field) => field.visibility === "advanced")).toBeTrue();
+    expect(unifiedEntry?.descriptor.inspectability.executionModes).toEqual(["unified-execute-v1", "unified-preview-v1"]);
   });
 
   it("executes source-reference -> records flow with lineage + preview + source locator integration", async () => {

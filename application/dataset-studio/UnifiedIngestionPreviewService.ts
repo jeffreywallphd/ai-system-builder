@@ -19,6 +19,7 @@ export interface UnifiedIngestionPreviewSampleItem {
 export interface UnifiedIngestionPreviewSuccessResult {
   readonly contractVersion: typeof UnifiedIngestionContractVersion;
   readonly ok: true;
+  readonly degraded: boolean;
   readonly source: UnifiedIngestionSourceReference;
   readonly outputKind: UnifiedIngestionNormalizedOutput["canonicalOutputKind"];
   readonly preview: DataPreviewModel;
@@ -43,6 +44,7 @@ export interface UnifiedIngestionPreviewSuccessResult {
 export interface UnifiedIngestionPreviewFailureResult {
   readonly contractVersion: typeof UnifiedIngestionContractVersion;
   readonly ok: false;
+  readonly degraded: boolean;
   readonly source: UnifiedIngestionSourceReference;
   readonly issues: ReadonlyArray<UnifiedIngestionIssue>;
 }
@@ -133,6 +135,7 @@ export class UnifiedIngestionPreviewService {
       return Object.freeze({
         contractVersion: UnifiedIngestionContractVersion,
         ok: true,
+        degraded: false,
         source: request.source,
         outputKind: request.normalized.canonicalOutputKind,
         preview,
@@ -156,16 +159,55 @@ export class UnifiedIngestionPreviewService {
     } catch (error) {
       return Object.freeze({
         contractVersion: UnifiedIngestionContractVersion,
-        ok: false,
+        ok: true,
+        degraded: true,
         source: request.source,
+        outputKind: request.normalized.canonicalOutputKind,
+        preview: Object.freeze({
+          kind: "error",
+          message: "Preview generation was degraded.",
+          summary: Object.freeze({
+            totalCount: request.normalized.metadata.totalCount,
+            sampleCount: 0,
+            truncated: false,
+          }),
+          metadata: Object.freeze({
+            schemaVersion: "1.0.0",
+            sourceFileName: request.normalized.metadata.sourceReference,
+            sourceFormat: request.normalized.metadata.outputTarget,
+            lineageCount: 0,
+          }),
+          diagnostics: Object.freeze({
+            infoCount: 0,
+            warningCount: 1,
+            errorCount: 0,
+            diagnostics: Object.freeze([]),
+          }),
+        }),
+        summary: Object.freeze({
+          totalCount: request.normalized.metadata.totalCount,
+          sampleCount: 0,
+          truncated: false,
+          isEmpty: request.normalized.metadata.isEmpty,
+        }),
+        metadataSummary: Object.freeze({
+          outputTarget: request.normalized.metadata.outputTarget,
+          configurationMode: request.normalized.metadata.configurationMode,
+          sourceAssetId: request.normalized.metadata.sourceAssetId,
+          sourceVersionId: request.normalized.metadata.sourceVersionId,
+        }),
+        detectionSummary: request.normalized.detectionSummary,
+        routeSummary: request.normalized.routeSummary,
+        samples: Object.freeze([]),
         issues: Object.freeze([
           ...issues,
           buildIssue({
             code: UnifiedIngestionIssueCodes.previewGenerationFailed,
             sourceId: request.source.sourceId,
-            message: "Unified ingestion preview generation failed.",
+            severity: UnifiedIngestionIssueSeverities.warning,
+            message: "Unified ingestion preview generation failed; a degraded preview was returned.",
             details: Object.freeze({
-              cause: error instanceof Error ? error.message : String(error),
+              errorType: error instanceof Error ? error.name : typeof error,
             }),
           }),
         ]),

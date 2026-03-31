@@ -138,6 +138,8 @@ describe("UnifiedIngestionOrchestrationService", () => {
     if (!result.ok) {
       expect(result.stage).toBe("routing");
       expect(result.issues[0]?.code).toBe("routing-unsupported");
+      expect(result.failure.disposition).toBe("recoverable");
+      expect(result.partial.detectionResolved).toBeTrue();
     }
   });
 
@@ -190,6 +192,7 @@ describe("UnifiedIngestionOrchestrationService", () => {
     if (!result.ok) {
       expect(result.stage).toBe("conversion");
       expect(result.issues[0]?.code).toBe("conversion-failed");
+      expect(result.failure.disposition).toBe("terminal");
     }
   });
 
@@ -308,8 +311,169 @@ describe("UnifiedIngestionOrchestrationService", () => {
     expect(result.ok).toBeTrue();
     if (result.ok) {
       expect(result.preview.ok).toBeTrue();
+      expect(result.preview.degraded).toBeFalse();
       expect(result.preview.outputKind).toBe("records");
       expect(result.preview.summary.totalCount).toBe(1);
+    }
+  });
+
+  it("surfaces deterministic fallback metadata when unknown detection routes via output-target policy", async () => {
+    const service = new UnifiedIngestionOrchestrationService({
+      detector: Object.freeze({
+        detect: async () => createDetection("unknown"),
+      }) as never,
+    });
+
+    const result = await service.ingest({
+      source: createSource(),
+      payload: "{\"id\":1}",
+      configuration: Object.freeze({
+        mode: "simple",
+        outputTarget: UnifiedIngestionOutputTargetKinds.records,
+      }),
+    });
+
+    expect(result.ok).toBeTrue();
+    if (result.ok) {
+      expect(result.route.fallbackUsed).toBeTrue();
+      expect(result.fallbacks.some((decision) => decision.kind === "unknown-route-fallback")).toBeTrue();
+    }
+  });
+
+  it("surfaces detection tie-break fallback decisions when detector resolves conflicting signals", async () => {
+    const detector: IUnifiedIngestionSourceTypeDetector = Object.freeze({
+      detect: async () => Object.freeze({
+        ...createDetection("json"),
+        evidence: Object.freeze([
+          Object.freeze({
+            kind: "extension-heuristic" as const,
+            message: "File extension '.csv' maps to 'csv'.",
+            candidateKind: "csv" as const,
+            weight: 45,
+          }),
+          Object.freeze({
+            kind: "content-sniff" as const,
+            message: "Content sample is valid JSON.",
+            candidateKind: "json" as const,
+            weight: 50,
+          }),
+          Object.freeze({
+            kind: "conflict-resolution" as const,
+            message: "Conflicting detection signals were resolved by score priority.",
+            candidateKind: "json" as const,
+            weight: 5,
+            details: Object.freeze({ topScore: 55, secondScore: 50 }),
+          }),
+        ]),
+      }),
+    });
+    const service = new UnifiedIngestionOrchestrationService({
+      detector,
+      jsonIngestor: {
+        execute: () => Object.freeze({
+          ok: true,
+          records: Object.freeze([Object.freeze({ id: 1 })]),
+        }),
+      } as never,
+    });
+
+    const result = await service.ingest({
+      source: createSource(),
+      payload: "{\"id\":1}",
+      configuration: Object.freeze({
+        mode: "simple",
+        outputTarget: UnifiedIngestionOutputTargetKinds.records,
+      }),
+    });
+
+    expect(result.ok).toBeTrue();
+    if (result.ok) {
+      expect(result.fallbacks.some((decision) => decision.kind === "detection-tie-breaker")).toBeTrue();
+    }
+  });
+
+  it("degrades preview instead of failing the full ingestion result", async () => {
+    const service = new UnifiedIngestionOrchestrationService({
+      detector: Object.freeze({
+        detect: async () => createDetection("json"),
+      }) as never,
+      router: Object.freeze({
+        route: () => Object.freeze({
+          status: "resolved" as const,
+          sourceKind: "json" as const,
+          handlerKind: "json" as const,
+          assetId: "json-ingestor",
+          policy: "detected-kind" as const,
+          fallbackUsed: false,
+          reason: "json route",
+        }),
+      }) as never,
+      jsonIngestor: {
+        execute: () => Object.freeze({
+          ok: true,
+          records: Object.freeze([Object.freeze({ id: 1, name: "Ada" })]),
+        }),
+      } as never,
+      previewService: {
+        generate: () => Object.freeze({
+          contractVersion: "1.0.0",
+          ok: true,
+          degraded: true,
+          source: createSource(),
+          outputKind: "records",
+          preview: Object.freeze({
+            kind: "error",
+            message: "degraded",
+            summary: Object.freeze({ totalCount: 1, sampleCount: 0, truncated: false }),
+            metadata: Object.freeze({ schemaVersion: "1.0.0", lineageCount: 0 }),
+            diagnostics: Object.freeze({
+              infoCount: 0,
+              warningCount: 1,
+              errorCount: 0,
+              diagnostics: Object.freeze([]),
+            }),
+          }),
+          summary: Object.freeze({
+            totalCount: 1,
+            sampleCount: 0,
+            truncated: false,
+            isEmpty: false,
+          }),
+          metadataSummary: Object.freeze({
+            outputTarget: UnifiedIngestionOutputTargetKinds.records,
+            configurationMode: "simple",
+          }),
+          detectionSummary: Object.freeze({
+            detectedKind: "json",
+            confidence: "high",
+            evidenceCount: 1,
+          }),
+          routeSummary: Object.freeze({
+            handlerKind: "json",
+            assetId: "json-ingestor",
+            policy: "detected-kind",
+            fallbackUsed: false,
+          }),
+          samples: Object.freeze([]),
+          issues: Object.freeze([]),
+        }),
+      } as never,
+    });
+
+    const result = await service.ingestWithPreview({
+      source: createSource(),
+      payload: "{\"id\":1,\"name\":\"Ada\"}",
+      configuration: Object.freeze({
+        mode: "simple",
+        outputTarget: UnifiedIngestionOutputTargetKinds.records,
+      }),
+    });
+
+    expect(result.ok).toBeTrue();
+    if (result.ok) {
+      expect(result.preview.ok).toBeTrue();
+      expect(result.preview.degraded).toBeTrue();
+      expect(result.fallbacks.some((decision) => decision.kind === "degraded-preview")).toBeTrue();
     }
   });
 
