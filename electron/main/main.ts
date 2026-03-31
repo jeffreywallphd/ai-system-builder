@@ -442,6 +442,10 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     const request = JSON.parse(requestJson) as { studioId: string; draftId: string };
     return JSON.stringify(await studioShellBackendApi.validateDraft(request));
   });
+  ipcMain.handle("ai-loom-desktop-studio-shell:workflow-execution-readiness", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["assessWorkflowExecutionReadiness"]>[0];
+    return JSON.stringify(await studioShellBackendApi.assessWorkflowExecutionReadiness(request));
+  });
   ipcMain.handle("ai-loom-desktop-studio-shell:run-workflow-draft", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["runWorkflowDraft"]>[0];
     return JSON.stringify(await studioShellBackendApi.runWorkflowDraft(request));

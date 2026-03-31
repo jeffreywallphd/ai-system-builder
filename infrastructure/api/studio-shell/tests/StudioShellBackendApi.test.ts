@@ -321,6 +321,52 @@ describe("StudioShellBackendApi", () => {
     expect(run.data?.validation.issues.some((issue) => issue.code === "trigger-malformed")).toBeTrue();
   });
 
+  it("assesses workflow execution readiness without launching runtime execution", async () => {
+    const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
+
+    const blocked = await api.assessWorkflowExecutionReadiness({
+      studioId: "studio-workflows",
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-temporal",
+          kind: WorkflowDraftTriggerKinds.temporal,
+          type: WorkflowDraftTriggerTypes.temporalSchedule,
+          config: {},
+        }],
+        steps: [],
+      }),
+    });
+
+    expect(blocked.ok).toBeTrue();
+    expect(blocked.data?.ready).toBeFalse();
+    expect((blocked.data?.blockingIssueCount ?? 0) > 0).toBeTrue();
+    expect(blocked.data?.issues.some((issue) => issue.code === "trigger-malformed")).toBeTrue();
+
+    const ready = await api.assessWorkflowExecutionReadiness({
+      studioId: "studio-workflows",
+      content: serializeWorkflowDraft({
+        ...createEmptyWorkflowDraft(),
+        triggers: [{
+          id: "trigger-manual",
+          kind: WorkflowDraftTriggerKinds.user,
+          type: WorkflowDraftTriggerTypes.userManual,
+          config: {},
+        }],
+        steps: [{
+          id: "step-1",
+          type: "action",
+          kind: "action",
+          order: 1,
+        }],
+      }),
+    });
+
+    expect(ready.ok).toBeTrue();
+    expect(ready.data?.ready).toBeTrue();
+    expect(ready.data?.blockingIssueCount).toBe(0);
+  });
+
   it("launches manual workflow execution when validation and translation pass", async () => {
     const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
 
@@ -369,6 +415,12 @@ describe("StudioShellBackendApi", () => {
     expect(run.data?.planSummary?.stepCount).toBe(1);
     expect(run.data?.runtime?.status === "completed" || run.data?.runtime?.status === "paused").toBeTrue();
     expect((run.data?.runtime?.outputDelivery?.deliveredCount ?? 0) >= 1).toBeTrue();
+    expect(run.data?.runtime?.outputDelivery?.results[0]).toEqual(expect.objectContaining({
+      outputId: "output-1",
+      destinationType: WorkflowDraftOutputDestinationTypes.webViewer,
+      target: "preview",
+      status: "delivered",
+    }));
   });
 
   it("supports trigger-aware entry for temporal and state workflow activations", async () => {
