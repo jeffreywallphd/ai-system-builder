@@ -61,8 +61,10 @@ import {
 } from "./DataAssetConfiguration";
 import {
   UnifiedIngestionSourceKinds,
+  type IUnifiedIngestionRouter,
   type IUnifiedIngestionSourceTypeDetector,
 } from "../../domain/dataset-studio/UnifiedIngestionDomain";
+import { createUnifiedIngestionRoutingService } from "./UnifiedIngestionRoutingService";
 import { createUnifiedSourceTypeDetectionService } from "./UnifiedSourceTypeDetectionService";
 
 export const BatchIngestionStrategyKinds = Object.freeze({
@@ -333,6 +335,7 @@ export class BatchIngestionFramework {
   private readonly imageIngestor: ImageIngestorAsset;
   private readonly previewEngine: DataPreviewEngine;
   private readonly sourceTypeDetector: IUnifiedIngestionSourceTypeDetector;
+  private readonly ingestionRouter: IUnifiedIngestionRouter;
 
   constructor(options?: {
     readonly sourceLocator?: SourceLocatorInputAbstraction;
@@ -341,6 +344,7 @@ export class BatchIngestionFramework {
     readonly imageIngestor?: ImageIngestorAsset;
     readonly previewEngine?: DataPreviewEngine;
     readonly sourceTypeDetector?: IUnifiedIngestionSourceTypeDetector;
+    readonly ingestionRouter?: IUnifiedIngestionRouter;
   }) {
     this.sourceLocator = options?.sourceLocator ?? new SourceLocatorInputAbstraction();
     this.converter = options?.converter ?? new DataConverterCore();
@@ -348,6 +352,7 @@ export class BatchIngestionFramework {
     this.imageIngestor = options?.imageIngestor ?? new ImageIngestorAsset();
     this.previewEngine = options?.previewEngine ?? new DataPreviewEngine();
     this.sourceTypeDetector = options?.sourceTypeDetector ?? createUnifiedSourceTypeDetectionService();
+    this.ingestionRouter = options?.ingestionRouter ?? createUnifiedIngestionRoutingService();
   }
 
   public async executeBatch(request: ExecuteBatchIngestionRequest): Promise<BatchIngestionResult> {
@@ -1164,16 +1169,32 @@ export class BatchIngestionFramework {
       enableContentSniffing: true,
     });
 
-    if (detection.detectedKind === UnifiedIngestionSourceKinds.csv) {
+    const route = this.ingestionRouter.route({
+      source: detection.source,
+      detection,
+      configuration: Object.freeze({
+        mode: "simple",
+        outputTarget: detection.detectedKind === UnifiedIngestionSourceKinds.document
+          ? "canonical-text-items"
+          : detection.detectedKind === UnifiedIngestionSourceKinds.image
+            ? "canonical-image-metadata-records"
+            : "canonical-records",
+      }),
+    });
+
+    if (route.status !== "resolved") {
+      return undefined;
+    }
+    if (route.handlerKind === "csv") {
       return BatchIngestorKinds.csv;
     }
-    if (detection.detectedKind === UnifiedIngestionSourceKinds.json) {
+    if (route.handlerKind === "json") {
       return BatchIngestorKinds.json;
     }
-    if (detection.detectedKind === UnifiedIngestionSourceKinds.document) {
+    if (route.handlerKind === "document") {
       return BatchIngestorKinds.documentPdf;
     }
-    if (detection.detectedKind === UnifiedIngestionSourceKinds.image) {
+    if (route.handlerKind === "image") {
       return BatchIngestorKinds.image;
     }
     return undefined;

@@ -1343,3 +1343,19 @@ Explicitly later than this scope:
   - bounded content sniffing (JSON/CSV/PDF/image signatures),
   - structured evidence + candidate scores + confidence output.
 - Batch ingestion routed mode now delegates routing decisions to this detector, improving missing-extension and conflicting-signal cases without adding a parallel ingestion runtime.
+
+## Direction 5 update: Unified ingestion routing engine + converter integration (stories 15.3-15.4)
+
+- Unified ingestion now has a dedicated routing seam in `application/dataset-studio/UnifiedIngestionRoutingService.ts`:
+  - deterministic source-kind routing for `csv` / `json` / `document` / `image`,
+  - explicit unknown-kind fallback policy keyed by output target,
+  - structured route contracts (route request, resolved route metadata, unsupported-route failures) defined in `domain/dataset-studio/UnifiedIngestionDomain.ts`.
+- Unified ingestion orchestration is now explicit in `application/dataset-studio/UnifiedIngestionOrchestrationService.ts`:
+  - receives source + optional payload/config,
+  - runs source detection (15.2),
+  - resolves route (15.3),
+  - executes the selected low-level ingestor asset from Epic 14,
+  - normalizes through shared `DataConverterCore` operations (15.4),
+  - returns canonical-shape output with stage-aware structured failure contracts (`source-read`, `detection`, `routing`, `ingestion`, `conversion`).
+- Routing policy is centralized and extensible via route descriptors rather than embedded per-caller conditionals.
+- Batch ingestion routed mode now delegates route selection to the unified router so routing behavior stays consistent across ingestion surfaces.
