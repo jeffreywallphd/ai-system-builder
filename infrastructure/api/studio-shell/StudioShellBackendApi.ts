@@ -39,7 +39,9 @@ import {
 } from "../../../application/workflow-persistence/WorkflowPersistenceErrors";
 import { WorkflowLifecycleStates, deserializeWorkflowDraft } from "../../../domain/workflow-studio/WorkflowStudioDomain";
 import {
+  WorkflowRunDiagnosticScopes,
   type WorkflowRunDetailRecord,
+  type WorkflowRunDiagnosticRecord,
   type WorkflowRunStatus,
   type WorkflowRunSummaryRecord,
   type WorkflowRunTriggerSource,
@@ -267,6 +269,26 @@ export interface ListWorkflowStudioRunsRequest {
   readonly limit?: number;
 }
 
+export interface WorkflowRunFailureLocationReadModel {
+  readonly scope: "workflow" | "step";
+  readonly stepId?: string;
+  readonly stepRunId?: string;
+  readonly stepName?: string;
+  readonly stepIndex?: number;
+}
+
+export interface WorkflowRunDiagnosticReadModel {
+  readonly category: WorkflowRunDiagnosticRecord["category"];
+  readonly severity: WorkflowRunDiagnosticRecord["severity"];
+  readonly scope: WorkflowRunDiagnosticRecord["scope"];
+  readonly summary: string;
+  readonly code?: string;
+  readonly technicalDetail?: string;
+  readonly remediationHint?: string;
+  readonly unknownState?: boolean;
+  readonly location?: WorkflowRunDiagnosticRecord["location"];
+}
+
 export interface WorkflowRunSummaryReadModel {
   readonly runId: string;
   readonly workflowId: string;
@@ -285,12 +307,18 @@ export interface WorkflowRunSummaryReadModel {
   readonly triggerEventId?: string;
   readonly parentRunId?: string;
   readonly stepRunStats?: WorkflowRunSummaryRecord["stepRunStats"];
+  readonly diagnostics?: ReadonlyArray<WorkflowRunDiagnosticReadModel>;
+  readonly primaryDiagnostic?: WorkflowRunDiagnosticReadModel;
+  readonly failureLocation?: WorkflowRunFailureLocationReadModel;
+  readonly isIncomplete?: boolean;
 }
 
 export interface WorkflowRunDetailReadModel {
   readonly runId: string;
   readonly summary: WorkflowRunSummaryReadModel;
   readonly stepRuns: WorkflowRunDetailRecord["stepRuns"];
+  readonly diagnostics?: ReadonlyArray<WorkflowRunDiagnosticReadModel>;
+  readonly failureLocation?: WorkflowRunFailureLocationReadModel;
   readonly executionContext?: WorkflowRunDetailRecord["executionContext"];
   readonly outputs?: WorkflowRunDetailRecord["outputs"];
 }
@@ -699,6 +727,11 @@ export class StudioShellBackendApi {
     const durationMs = Number.isFinite(startedAtMs) && Number.isFinite(endedAtMs)
       ? Math.max(0, endedAtMs - startedAtMs)
       : undefined;
+    const diagnostics = this.toWorkflowRunDiagnosticReadModels(summary.diagnostics);
+    const failureLocation = this.resolveFailureLocation(diagnostics);
+    const hasStepFailures = (summary.stepRunStats?.failedCount ?? 0) > 0;
+    const isIncomplete = summary.status === "cancelled"
+      || (summary.status !== "failed" && hasStepFailures);
 
     return Object.freeze({
       runId: summary.runId,
@@ -718,14 +751,22 @@ export class StudioShellBackendApi {
       triggerEventId: summary.correlation.triggerEventId,
       parentRunId: summary.correlation.parentRunId,
       stepRunStats: summary.stepRunStats,
+      diagnostics,
+      primaryDiagnostic: diagnostics?.[0],
+      failureLocation,
+      isIncomplete,
     } satisfies WorkflowRunSummaryReadModel);
   }
 
   private toWorkflowRunDetailReadModel(detail: WorkflowRunDetailRecord): WorkflowRunDetailReadModel {
+    const diagnostics = this.toWorkflowRunDiagnosticReadModels(detail.diagnostics ?? detail.summary.diagnostics);
+    const failureLocation = this.resolveFailureLocation(diagnostics);
     return Object.freeze({
       runId: detail.runId,
       summary: this.toWorkflowRunSummaryReadModel(detail.summary),
       stepRuns: Object.freeze([...detail.stepRuns]),
+      diagnostics,
+      failureLocation,
       executionContext: detail.executionContext
         ? Object.freeze({
           executionInput: detail.executionContext.executionInput,
@@ -744,6 +785,51 @@ export class StudioShellBackendApi {
         })
         : undefined,
     } satisfies WorkflowRunDetailReadModel);
+  }
+
+  private toWorkflowRunDiagnosticReadModels(
+    diagnostics?: ReadonlyArray<WorkflowRunDiagnosticRecord>,
+  ): ReadonlyArray<WorkflowRunDiagnosticReadModel> | undefined {
+    if (!diagnostics || diagnostics.length === 0) {
+      return undefined;
+    }
+
+    return Object.freeze(diagnostics.map((diagnostic) => Object.freeze({
+      category: diagnostic.category,
+      severity: diagnostic.severity,
+      scope: diagnostic.scope,
+      summary: diagnostic.summary,
+      code: diagnostic.code,
+      technicalDetail: diagnostic.technicalDetail,
+      remediationHint: diagnostic.remediationHint,
+      unknownState: diagnostic.unknownState,
+      location: diagnostic.location
+        ? Object.freeze({ ...diagnostic.location })
+        : undefined,
+    } satisfies WorkflowRunDiagnosticReadModel)));
+  }
+
+  private resolveFailureLocation(
+    diagnostics?: ReadonlyArray<WorkflowRunDiagnosticReadModel>,
+  ): WorkflowRunFailureLocationReadModel | undefined {
+    if (!diagnostics || diagnostics.length === 0) {
+      return undefined;
+    }
+
+    const stepDiagnostic = diagnostics.find((diagnostic) => diagnostic.scope === WorkflowRunDiagnosticScopes.step && diagnostic.location?.stepId);
+    if (stepDiagnostic?.location) {
+      return Object.freeze({
+        scope: "step",
+        stepId: stepDiagnostic.location.stepId,
+        stepRunId: stepDiagnostic.location.stepRunId,
+        stepName: stepDiagnostic.location.stepName,
+        stepIndex: stepDiagnostic.location.stepIndex,
+      } satisfies WorkflowRunFailureLocationReadModel);
+    }
+
+    return Object.freeze({
+      scope: "workflow",
+    } satisfies WorkflowRunFailureLocationReadModel);
   }
 
   public async duplicatePersistedWorkflow(

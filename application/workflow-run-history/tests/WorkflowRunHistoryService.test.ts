@@ -44,6 +44,7 @@ describe("WorkflowRunHistoryService", () => {
     expect(completed.output?.outputCount).toBe(2);
     expect(completed.correlation.workflowExecutionId).toBe("workflow-exec:1");
     expect(completed.stepRunStats?.totalCount).toBe(0);
+    expect(completed.diagnostics).toBeUndefined();
 
     const detail = await service.getRunDetail("run:workflow-1");
     expect(detail?.executionContext?.executionInput).toEqual(expect.objectContaining({
@@ -85,6 +86,8 @@ describe("WorkflowRunHistoryService", () => {
     expect(failed.status).toBe(WorkflowRunStatuses.failed);
     expect(failed.errorMessage).toBe("Runtime dependency unavailable.");
     expect(failed.timestamps.endedAt).toBe("2026-03-30T17:00:10.000Z");
+    expect(failed.diagnostics?.[0]?.scope).toBe("workflow");
+    expect(failed.diagnostics?.[0]?.severity).toBe("error");
   });
 
   it("records step-level lifecycle updates tied to the parent workflow run detail", async () => {
@@ -150,7 +153,55 @@ describe("WorkflowRunHistoryService", () => {
     expect(detail?.stepRuns[0]?.stepId).toBe("node-a");
     expect(detail?.stepRuns[0]?.stepIndex).toBe(0);
     expect(detail?.stepRuns[0]?.status).toBe("completed");
+    expect(detail?.summary.diagnostics).toBeUndefined();
     expect(detail?.summary.runId).toBe("run:steps");
+  });
+
+  it("records structured step diagnostics when step events fail and exposes failure location", async () => {
+    const repository = new InMemoryWorkflowRunSummaryRepository();
+    const timestamps = [
+      new Date("2026-03-30T20:00:00.000Z"),
+      new Date("2026-03-30T20:00:01.000Z"),
+      new Date("2026-03-30T20:00:02.000Z"),
+    ];
+    const service = new WorkflowRunHistoryService(repository, () => timestamps.shift() ?? new Date("2026-03-30T20:00:03.000Z"));
+    const workflow = {
+      id: "workflow:failed-step",
+      metadata: { name: "Workflow Failed Step" },
+      nodes: [
+        { id: "node-a", title: "Step A", definition: { title: "Prompt", type: "prompt", executionKind: "generator" } },
+      ],
+      toGraph: () => ({
+        topologicalSort: () => [{ id: "node-a" }],
+      }),
+    } as never;
+
+    await service.recordRunStarted({
+      runId: "run:failed-step",
+      input: {
+        workflow,
+      } as never,
+    });
+
+    await service.recordStepEvent({
+      runId: "run:failed-step",
+      workflow,
+      event: {
+        kind: "node-failed",
+        nodeId: "node-a",
+        message: "Runtime call failed",
+        payload: {
+          code: "runtime-error",
+          detail: "Connection reset",
+        },
+      },
+    });
+
+    const detail = await service.getRunDetail("run:failed-step");
+    expect(detail?.stepRuns[0]?.diagnostics?.[0]?.scope).toBe("step");
+    expect(detail?.stepRuns[0]?.diagnostics?.[0]?.category).toBe("runtime");
+    expect(detail?.summary.diagnostics?.[0]?.scope).toBe("step");
+    expect(detail?.summary.diagnostics?.[0]?.location?.stepId).toBe("node-a");
   });
 
   it("returns deterministic not-found errors when terminal updates are attempted before start", async () => {

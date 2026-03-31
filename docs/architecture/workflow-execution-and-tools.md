@@ -479,3 +479,6 @@ Audit schema now records administrative approval transitions plus decision denia
 - Epic 12 stories 12.5-12.6 now expose these same canonical run-history records in Workflow Studio through the shared studio-shell backend/service bridge:
   - workflow run list view with summary-first status/recency/duration/trigger fields and client-side sort/filter controls;
   - route-addressable run detail view (`/studio-shell/workflow/runs/:runId`) showing workflow-level metadata, execution summary, structured trigger context, and top-level outputs.
+- Epic 12 stories 12.7-12.8 now extend that same canonical run-history surface (without introducing a separate observability subsystem):
+  - run detail includes ordered step inspection with expandable per-step status/timing/input-output/error summaries sourced directly from persisted `stepRuns`;
+  - run summaries/details now include structured diagnostics (category/severity/scope/location/summary/detail/remediation), and run list/detail present failure-location cues from those diagnostics.

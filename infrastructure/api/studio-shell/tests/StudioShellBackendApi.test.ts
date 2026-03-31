@@ -28,7 +28,7 @@ describe("StudioShellBackendApi", () => {
     const workflowRunRepository = new InMemoryWorkflowRunSummaryRepository();
     const summary = createWorkflowRunSummaryRecord({
       runId: "run:workflow:1",
-      status: WorkflowRunStatuses.completed,
+      status: WorkflowRunStatuses.failed,
       triggerSource: WorkflowRunTriggerSources.manual,
       workflow: {
         workflowId: "asset:workflow-1",
@@ -43,6 +43,7 @@ describe("StudioShellBackendApi", () => {
         endedAt: "2026-03-31T12:00:05.000Z",
         updatedAt: "2026-03-31T12:00:05.000Z",
       },
+      errorMessage: "Run failed at step node-a",
       output: {
         outputAssetIds: ["asset:out-1"],
         outputCount: 1,
@@ -51,6 +52,24 @@ describe("StudioShellBackendApi", () => {
     await workflowRunRepository.upsertDetail(createWorkflowRunDetailRecord({
       runId: summary.runId,
       summary,
+      stepRuns: [{
+        stepRunId: "run:workflow:1:node-a:1",
+        stepId: "node-a",
+        stepIndex: 0,
+        attempt: 1,
+        stepName: "First step",
+        status: "failed",
+        timestamps: {
+          startedAt: "2026-03-31T12:00:01.000Z",
+          endedAt: "2026-03-31T12:00:03.000Z",
+          updatedAt: "2026-03-31T12:00:03.000Z",
+        },
+        error: {
+          code: "runtime-error",
+          message: "Tool runtime failed",
+          detail: "Connection reset",
+        },
+      }],
       executionContext: {
         resolvedTriggerContext: {
           triggerSource: "manual",
@@ -80,9 +99,12 @@ describe("StudioShellBackendApi", () => {
     expect(listed.data).toHaveLength(1);
     expect(listed.data?.[0]).toEqual(expect.objectContaining({
       runId: "run:workflow:1",
-      status: WorkflowRunStatuses.completed,
+      status: WorkflowRunStatuses.failed,
       durationMs: 5000,
     }));
+    expect(listed.data?.[0]?.primaryDiagnostic?.summary).toBe("Run failed at step node-a");
+    expect(listed.data?.[0]?.failureLocation?.scope).toBe("step");
+    expect(listed.data?.[0]?.failureLocation?.stepId).toBe("node-a");
 
     const detail = await api.getWorkflowRunDetail("run:workflow:1");
     expect(detail.ok).toBeTrue();
@@ -95,6 +117,7 @@ describe("StudioShellBackendApi", () => {
       status: "completed",
       answer: "ok",
     });
+    expect(detail.data?.diagnostics?.some((entry) => entry.scope === "step" && entry.location?.stepId === "node-a")).toBeTrue();
   });
 
   it("projects the same validation issue structure for atomic model/dataset/tool drafts", async () => {
