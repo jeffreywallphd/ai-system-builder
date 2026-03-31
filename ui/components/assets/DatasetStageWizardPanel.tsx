@@ -1,10 +1,17 @@
 import { useMemo, useState } from "react";
 import type { CanonicalRecordValue } from "../../../domain/dataset-studio/CanonicalDataShapes";
-import { DatasetStageWizardStateAdapter, type DatasetStageWizardSnapshot, type DatasetStageWizardStageViewModel } from "../../studio-shell/dataset/DatasetStageWizardStateAdapter";
+import {
+  DatasetStageWizardStateAdapter,
+  type DatasetStageWizardSnapshot,
+  type DatasetStageWizardStageViewModel,
+} from "../../studio-shell/dataset/DatasetStageWizardStateAdapter";
 import StageWizardProgressNavigator from "../wizard/StageWizardProgressNavigator";
 
 export interface DatasetStageWizardPanelProps {
   readonly templateId?: string;
+  readonly adapter?: DatasetStageWizardStateAdapter;
+  readonly snapshot?: DatasetStageWizardSnapshot;
+  readonly onSnapshotChange?: (snapshot: DatasetStageWizardSnapshot) => void;
 }
 
 function renderStageConfigurationSummary(configuration: Readonly<Record<string, CanonicalRecordValue>>): JSX.Element {
@@ -123,21 +130,33 @@ function StageIngestionRenderer(props: {
 }
 
 export default function DatasetStageWizardPanel(props: DatasetStageWizardPanelProps): JSX.Element {
-  const adapter = useMemo(
+  const localAdapter = useMemo(
     () => new DatasetStageWizardStateAdapter({ templateId: props.templateId }),
     [props.templateId],
   );
-  const [snapshot, setSnapshot] = useState<DatasetStageWizardSnapshot>(() => adapter.getSnapshot());
+  const adapter = props.adapter ?? localAdapter;
+  const [localSnapshot, setLocalSnapshot] = useState<DatasetStageWizardSnapshot>(() => adapter.getSnapshot());
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [editError, setEditError] = useState<string | undefined>(undefined);
 
+  const snapshot = props.snapshot ?? localSnapshot;
   const currentStage = snapshot.currentStage;
 
-  const updateSnapshot = () => setSnapshot(adapter.getSnapshot());
+  const updateSnapshot = () => {
+    const next = adapter.getSnapshot();
+    setLocalSnapshot(next);
+    props.onSnapshotChange?.(next);
+  };
   const applyConfiguration = (configuration: Readonly<Record<string, CanonicalRecordValue>>) => {
     if (!currentStage) {
       return;
     }
-    adapter.updateStageConfiguration(currentStage.id, configuration);
+    const result = adapter.updateStageConfiguration(currentStage.id, configuration);
+    if (!result.ok) {
+      setEditError(result.issues[0]?.message ?? "Unable to apply stage configuration.");
+      return;
+    }
+    setEditError(undefined);
     updateSnapshot();
   };
 
@@ -218,12 +237,17 @@ export default function DatasetStageWizardPanel(props: DatasetStageWizardPanelPr
             </section>
           ) : null}
 
+          {editError ? (
+            <p className="ui-text-small ui-text-danger" data-testid="dataset-stage-wizard-edit-error">{editError}</p>
+          ) : null}
+
           <footer className="ui-row ui-row--between ui-row--wrap">
             <button
               type="button"
               className="ui-button ui-button--ghost"
               onClick={() => {
                 adapter.goBack();
+                setEditError(undefined);
                 updateSnapshot();
               }}
               disabled={!snapshot.canGoBack}
@@ -235,6 +259,7 @@ export default function DatasetStageWizardPanel(props: DatasetStageWizardPanelPr
               className="ui-button ui-button--primary"
               onClick={() => {
                 adapter.goNext();
+                setEditError(undefined);
                 updateSnapshot();
               }}
               disabled={!snapshot.canGoNext}

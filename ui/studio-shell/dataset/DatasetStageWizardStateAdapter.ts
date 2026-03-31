@@ -1,8 +1,17 @@
 import {
   StageExecutionPolicy,
 } from "../../../application/dataset-studio/StageExecutionPolicy";
+import {
+  StageCanvasEditingService,
+  type StageCanvasEditResult,
+} from "../../../application/dataset-studio/StageCanvasEditingService";
+import {
+  StageCanvasGraphProjectionService,
+  type StageCanvasGraphModel,
+} from "../../../application/dataset-studio/StageCanvasGraphProjectionService";
 import { TemplateService } from "../../../application/dataset-studio/TemplateService";
 import { WizardFlowEngine } from "../../../application/dataset-studio/WizardFlowEngine";
+import type { DatasetPipelineStageKind } from "../../../domain/dataset-studio/StagePipelineDomain";
 import type { CanonicalRecordValue } from "../../../domain/dataset-studio/CanonicalDataShapes";
 
 export type DatasetStageWizardStageStatus = "current" | "completed" | "skipped" | "pending" | "disabled";
@@ -75,17 +84,27 @@ function computeProgressPercent(stages: ReadonlyArray<DatasetStageWizardStageVie
 
 export class DatasetStageWizardStateAdapter {
   private readonly engine: WizardFlowEngine;
+  private readonly graphProjectionService: StageCanvasGraphProjectionService;
+  private readonly editingService: StageCanvasEditingService;
 
   constructor(options?: {
     readonly templateId?: string;
     readonly templateService?: TemplateService;
     readonly stageExecutionPolicy?: StageExecutionPolicy;
+    readonly graphProjectionService?: StageCanvasGraphProjectionService;
+    readonly editingService?: StageCanvasEditingService;
   }) {
     const templateService = options?.templateService ?? new TemplateService();
     const template = templateService.getTemplate(options?.templateId ?? "elt-default");
     this.engine = new WizardFlowEngine({
       template,
       stageExecutionPolicy: options?.stageExecutionPolicy ?? new StageExecutionPolicy(),
+    });
+
+    this.graphProjectionService = options?.graphProjectionService ?? new StageCanvasGraphProjectionService();
+    this.editingService = options?.editingService ?? new StageCanvasEditingService({
+      projectionService: this.graphProjectionService,
+      templateService,
     });
   }
 
@@ -130,6 +149,17 @@ export class DatasetStageWizardStateAdapter {
     });
   }
 
+  public getCanvasGraph(): StageCanvasGraphModel {
+    return this.graphProjectionService.projectFromWizard(this.engine);
+  }
+
+  public listAddableOptionalStages(): ReadonlyArray<{ readonly stageKind: DatasetPipelineStageKind; readonly name: string }> {
+    return Object.freeze(this.editingService.listAddableOptionalStages(this.engine).map((stage) => Object.freeze({
+      stageKind: stage.kind,
+      name: stage.name,
+    })));
+  }
+
   public goNext(): void {
     this.engine.goNext();
   }
@@ -141,7 +171,23 @@ export class DatasetStageWizardStateAdapter {
   public updateStageConfiguration(
     stageId: string,
     configuration: Readonly<Record<string, CanonicalRecordValue>>,
-  ): void {
-    this.engine.setStageConfiguration(stageId, configuration);
+  ): StageCanvasEditResult {
+    return this.editingService.updateStageConfiguration(this.engine, stageId, configuration);
+  }
+
+  public reorderStages(orderedStageIds: ReadonlyArray<string>): StageCanvasEditResult {
+    return this.editingService.reorderStages(this.engine, orderedStageIds);
+  }
+
+  public addOptionalStage(stageKind: DatasetPipelineStageKind): StageCanvasEditResult {
+    return this.editingService.addOptionalStage(this.engine, stageKind);
+  }
+
+  public removeOptionalStage(stageId: string): StageCanvasEditResult {
+    return this.editingService.removeOptionalStage(this.engine, stageId);
+  }
+
+  public regenerateGraph(): StageCanvasGraphModel {
+    return this.editingService.regenerateGraph(this.engine);
   }
 }
