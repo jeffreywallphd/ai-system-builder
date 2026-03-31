@@ -21,6 +21,7 @@ describe("TemplateService", () => {
       orderedStageIds: Object.freeze([
         "source",
         "ingestion",
+        "raw-storage",
         "cleaning",
         "profiling",
         "aggregation",
@@ -35,6 +36,7 @@ describe("TemplateService", () => {
     expect(instance.stageFlow.stages.map((stage) => stage.id)).toEqual([
       "source",
       "ingestion",
+      "raw-storage",
       "cleaning",
       "profiling",
       "aggregation",
@@ -62,5 +64,13 @@ describe("TemplateService", () => {
     });
 
     expect(() => service.validateTemplate(invalid)).toThrow("no valid stage-to-asset mapping");
+  });
+
+  it("includes raw-storage as a first-class stage in default templates", () => {
+    const service = new TemplateService();
+    const templates = service.listTemplates();
+    for (const template of templates) {
+      expect(template.stages.some((stage) => stage.stageKind === "raw-storage")).toBeTrue();
+    }
   });
 });

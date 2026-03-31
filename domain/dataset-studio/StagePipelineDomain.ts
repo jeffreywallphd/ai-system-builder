@@ -64,6 +64,7 @@ export interface DatasetPipelineDefinition {
 
 export const DatasetIngestionStageAssetIds = Object.freeze({
   unified: "unified-ingestion",
+  rawStorage: "raw-storage-stage",
   csv: "csv-ingestor",
   json: "json-ingestor",
   document: "document-pdf-ingestor",
@@ -202,6 +203,7 @@ export function createUnifiedIngestionStagePipelineDefinition(): DatasetPipeline
           producedOutputShapeKinds: AllCanonicalShapeKinds,
         }),
         assetReferences: Object.freeze([
+          Object.freeze({ assetId: DatasetIngestionStageAssetIds.unified }),
           Object.freeze({ assetId: DatasetIngestionStageAssetIds.csv }),
           Object.freeze({ assetId: DatasetIngestionStageAssetIds.json }),
           Object.freeze({ assetId: DatasetIngestionStageAssetIds.document }),
@@ -213,9 +215,27 @@ export function createUnifiedIngestionStagePipelineDefinition(): DatasetPipeline
         }),
       }),
       Object.freeze({
+        id: "raw-storage",
+        kind: DatasetPipelineStageKinds.rawStorage,
+        order: 3,
+        name: "Raw Storage",
+        description: "Persists original source references and raw payload storage pointers for traceability.",
+        dataContract: Object.freeze({
+          acceptedInputShapeKinds: AllCanonicalShapeKinds,
+          producedOutputShapeKinds: AllCanonicalShapeKinds,
+        }),
+        assetReferences: Object.freeze([
+          Object.freeze({ assetId: DatasetIngestionStageAssetIds.rawStorage }),
+        ]),
+        executionPolicy: Object.freeze({
+          mode: DatasetPipelineStageExecutionModes.optional,
+          skipByDefault: true,
+        }),
+      }),
+      Object.freeze({
         id: "profiling",
         kind: DatasetPipelineStageKinds.profiling,
-        order: 3,
+        order: 4,
         name: "Profiling",
         description: "Collects bounded profile and quality metadata on normalized outputs.",
         dataContract: Object.freeze({
@@ -233,7 +253,7 @@ export function createUnifiedIngestionStagePipelineDefinition(): DatasetPipeline
       Object.freeze({
         id: "normalization",
         kind: DatasetPipelineStageKinds.normalization,
-        order: 4,
+        order: 5,
         name: "Normalization",
         description: "Aligns routed output with canonical shape contracts.",
         dataContract: Object.freeze({
@@ -250,7 +270,7 @@ export function createUnifiedIngestionStagePipelineDefinition(): DatasetPipeline
       Object.freeze({
         id: "preview",
         kind: DatasetPipelineStageKinds.preview,
-        order: 5,
+        order: 6,
         name: "Preview",
         description: "Produces optional preview summaries for inspection surfaces.",
         dataContract: Object.freeze({

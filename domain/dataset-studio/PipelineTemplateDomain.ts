@@ -164,7 +164,14 @@ export function createDefaultPipelineTemplates(): ReadonlyArray<PipelineTemplate
     stages: Object.freeze([
       createStage({ id: "source", kind: DatasetPipelineStageKinds.source, order: 1, name: "Source", description: "Selects source systems and source metadata." }),
       createStage({ id: "ingestion", kind: DatasetPipelineStageKinds.ingestion, order: 2, name: "Ingestion", description: "Loads source payloads into the ingestion boundary." }),
-      createStage({ id: "raw-storage", kind: DatasetPipelineStageKinds.rawStorage, order: 3, name: "Raw Storage", description: "Persists raw payloads for replay and traceability." }),
+      createStage({
+        id: "raw-storage",
+        kind: DatasetPipelineStageKinds.rawStorage,
+        order: 3,
+        name: "Raw Storage",
+        description: "Persists raw payloads for replay and traceability.",
+        assetIds: Object.freeze([DatasetIngestionStageAssetIds.rawStorage]),
+      }),
       createStage({ id: "normalization", kind: DatasetPipelineStageKinds.normalization, order: 4, name: "Normalization", description: "Normalizes records to canonical schema contracts." }),
       createStage({ id: "cleaning", kind: DatasetPipelineStageKinds.cleaning, order: 5, name: "Cleaning", description: "Applies deterministic cleanup and quality rules." }),
       createStage({ id: "transformation", kind: DatasetPipelineStageKinds.transformation, order: 6, name: "Transformation", description: "Transforms cleansed data into prepared datasets." }),
@@ -180,17 +187,25 @@ export function createDefaultPipelineTemplates(): ReadonlyArray<PipelineTemplate
       createStage({ id: "source", kind: DatasetPipelineStageKinds.source, order: 1, name: "Source", description: "Selects document and image sources for extraction." }),
       createStage({ id: "ingestion", kind: DatasetPipelineStageKinds.ingestion, order: 2, name: "Ingestion", description: "Loads source payloads into the processing boundary." }),
       createStage({
+        id: "raw-storage",
+        kind: DatasetPipelineStageKinds.rawStorage,
+        order: 3,
+        name: "Raw Storage",
+        description: "Persists source references and raw content pointers for traceability.",
+        assetIds: Object.freeze([DatasetIngestionStageAssetIds.rawStorage]),
+      }),
+      createStage({
         id: "extraction",
         kind: DatasetPipelineStageKinds.extraction,
-        order: 3,
+        order: 4,
         name: "Extraction",
         description: "Extracts text/metadata from document or image sources.",
         executionMode: DatasetPipelineStageExecutionModes.conditional,
         conditionId: "requires-extraction",
       }),
-      createStage({ id: "chunking", kind: DatasetPipelineStageKinds.chunking, order: 4, name: "Chunking", description: "Chunks extracted text for retrieval and downstream transforms." }),
-      createStage({ id: "transformation", kind: DatasetPipelineStageKinds.transformation, order: 5, name: "Transformation", description: "Transforms chunked content into prepared structures." }),
-      createStage({ id: "prepared-storage", kind: DatasetPipelineStageKinds.preparedStorage, order: 6, name: "Prepared Storage", description: "Stores processed document outputs for retrieval and analytics." }),
+      createStage({ id: "chunking", kind: DatasetPipelineStageKinds.chunking, order: 5, name: "Chunking", description: "Chunks extracted text for retrieval and downstream transforms." }),
+      createStage({ id: "transformation", kind: DatasetPipelineStageKinds.transformation, order: 6, name: "Transformation", description: "Transforms chunked content into prepared structures." }),
+      createStage({ id: "prepared-storage", kind: DatasetPipelineStageKinds.preparedStorage, order: 7, name: "Prepared Storage", description: "Stores processed document outputs for retrieval and analytics." }),
     ]),
   });
 
@@ -201,10 +216,18 @@ export function createDefaultPipelineTemplates(): ReadonlyArray<PipelineTemplate
     stages: Object.freeze([
       createStage({ id: "source", kind: DatasetPipelineStageKinds.source, order: 1, name: "Source", description: "Selects data source systems for analytics processing." }),
       createStage({ id: "ingestion", kind: DatasetPipelineStageKinds.ingestion, order: 2, name: "Ingestion", description: "Loads source data for analytics processing." }),
-      createStage({ id: "profiling", kind: DatasetPipelineStageKinds.profiling, order: 3, name: "Profiling", description: "Builds quality and distribution profiles on loaded data." }),
-      createStage({ id: "cleaning", kind: DatasetPipelineStageKinds.cleaning, order: 4, name: "Cleaning", description: "Applies quality rules and missing-value handling." }),
-      createStage({ id: "aggregation", kind: DatasetPipelineStageKinds.aggregation, order: 5, name: "Aggregation", description: "Aggregates clean records into analytics-ready metrics." }),
-      createStage({ id: "prepared-storage", kind: DatasetPipelineStageKinds.preparedStorage, order: 6, name: "Prepared Storage", description: "Publishes analytics outputs to prepared storage." }),
+      createStage({
+        id: "raw-storage",
+        kind: DatasetPipelineStageKinds.rawStorage,
+        order: 3,
+        name: "Raw Storage",
+        description: "Persists source references and raw content pointers for traceability.",
+        assetIds: Object.freeze([DatasetIngestionStageAssetIds.rawStorage]),
+      }),
+      createStage({ id: "profiling", kind: DatasetPipelineStageKinds.profiling, order: 4, name: "Profiling", description: "Builds quality and distribution profiles on loaded data." }),
+      createStage({ id: "cleaning", kind: DatasetPipelineStageKinds.cleaning, order: 5, name: "Cleaning", description: "Applies quality rules and missing-value handling." }),
+      createStage({ id: "aggregation", kind: DatasetPipelineStageKinds.aggregation, order: 6, name: "Aggregation", description: "Aggregates clean records into analytics-ready metrics." }),
+      createStage({ id: "prepared-storage", kind: DatasetPipelineStageKinds.preparedStorage, order: 7, name: "Prepared Storage", description: "Publishes analytics outputs to prepared storage." }),
     ]),
   });
 

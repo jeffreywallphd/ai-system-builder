@@ -14,6 +14,7 @@ describe("StagePipelineDomain", () => {
     expect(pipeline.stages.map((stage) => stage.id)).toEqual([
       "source-selection",
       "ingestion",
+      "raw-storage",
       "profiling",
       "normalization",
       "preview",
@@ -129,5 +130,12 @@ describe("StagePipelineDomain", () => {
         }),
       ]),
     })).toThrow("duplicate stage order");
+  });
+
+  it("keeps raw-storage stage definitions valid in unified pipeline", () => {
+    const pipeline = createUnifiedIngestionStagePipelineDefinition();
+    const rawStorage = pipeline.stages.find((stage) => stage.kind === DatasetPipelineStageKinds.rawStorage);
+    expect(rawStorage).toBeDefined();
+    expect(rawStorage?.assetReferences[0]?.assetId).toBe("raw-storage-stage");
   });
 });

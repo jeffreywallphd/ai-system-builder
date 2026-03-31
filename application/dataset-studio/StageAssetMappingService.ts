@@ -25,6 +25,7 @@ export interface StageAssetMappingAsset {
   readonly assetVersion?: string;
   readonly handlerKind?: UnifiedIngestionRouteHandlerKind;
   readonly configDefaults?: Readonly<Record<string, CanonicalRecordValue>>;
+  readonly metadataHooks?: Readonly<Record<string, CanonicalRecordValue>>;
 }
 
 export interface StageAssetMappingStaticDefinition {
@@ -100,6 +101,7 @@ const StageAssetMappingAssetSchema = z.object({
   assetVersion: z.string().trim().min(1).optional(),
   handlerKind: RouteHandlerKindSchema.optional(),
   configDefaults: z.record(z.any()).optional(),
+  metadataHooks: z.record(z.any()).optional(),
 });
 
 const StageAssetMappingStaticDefinitionSchema = z.object({
@@ -154,6 +156,7 @@ function normalizeAsset(asset: StageAssetMappingAsset): StageAssetMappingAsset {
     assetVersion: normalizeOptional(asset.assetVersion),
     handlerKind: asset.handlerKind,
     configDefaults: asset.configDefaults,
+    metadataHooks: asset.metadataHooks,
   });
 }
 
@@ -369,8 +372,18 @@ const DefaultStageAssetMappings: ReadonlyArray<StageAssetMappingDefinition> = Ob
     stageKind: DatasetPipelineStageKinds.rawStorage,
     assets: Object.freeze([
       Object.freeze({
-        assetId: DatasetIngestionStageAssetIds.unified,
+        assetId: DatasetIngestionStageAssetIds.rawStorage,
         assetVersion: "1.0.0",
+        configDefaults: Object.freeze({
+          persistRawPayload: true,
+          persistSourceReference: true,
+          includeContentDigest: true,
+        }),
+        metadataHooks: Object.freeze({
+          traceabilityHook: "ingestion-lineage",
+          inspectable: true,
+          storageMode: "reference-first",
+        }),
       }),
     ]),
   }),
