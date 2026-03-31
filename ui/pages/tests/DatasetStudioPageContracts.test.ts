@@ -21,6 +21,7 @@ describe("DatasetStudioPage contracts", () => {
     expect(previewPanelSource).toContain("AssetConfigurationPanel");
     expect(previewPanelSource).toContain("getDataStudioAssetRegistry");
     expect(previewPanelSource).toContain("Source Input");
-    expect(previewPanelSource).toContain("Ingestion Asset");
+    expect(previewPanelSource).toContain("UnifiedIngestionAssetId");
+    expect(previewPanelSource).toContain("Inspect low-level ingestors");
   });
 });

@@ -4,6 +4,7 @@ import {
   UnifiedIngestionRouteHandlerKinds,
   UnifiedIngestionRoutePolicyKinds,
   UnifiedIngestionSourceKinds,
+  UnifiedIngestionStrategyKinds,
   type IUnifiedIngestionRouter,
   type UnifiedIngestionRouteFailure,
   type UnifiedIngestionRouteHandlerKind,
@@ -100,6 +101,28 @@ export class UnifiedIngestionRoutingService implements IUnifiedIngestionRouter {
   }
 
   public route(request: UnifiedIngestionRouteRequest): UnifiedIngestionRouteResult {
+    if (request.configuration?.mode === "advanced") {
+      const strategy = request.configuration.strategy ?? UnifiedIngestionStrategyKinds.auto;
+      if (strategy !== UnifiedIngestionStrategyKinds.auto) {
+        const pinnedDescriptor = this.descriptorsBySourceKind[strategy];
+        if (!pinnedDescriptor) {
+          return buildUnsupportedRoute(
+            request.detection.detectedKind,
+            UnifiedIngestionRouteFailureCodes.missingRouteMapping,
+            false,
+            `Advanced strategy '${strategy}' does not have a registered ingestor route.`,
+          );
+        }
+        return buildResolvedRoute(
+          request.detection.detectedKind,
+          pinnedDescriptor,
+          UnifiedIngestionRoutePolicyKinds.advancedStrategy,
+          false,
+          `Advanced strategy '${strategy}' selected '${pinnedDescriptor.assetId}'.`,
+        );
+      }
+    }
+
     const detectedKind = request.detection.detectedKind;
     if (detectedKind !== UnifiedIngestionSourceKinds.unknown) {
       const direct = this.descriptorsBySourceKind[detectedKind];

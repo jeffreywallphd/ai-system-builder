@@ -24,6 +24,7 @@ import { CsvIngestorAsset, type CsvIngestorExecutionResult } from "./CsvIngestor
 import { DocumentPdfIngestorAsset, type DocumentPdfIngestorExecutionResult } from "./DocumentPdfIngestorAsset";
 import { ImageIngestorAsset, type ImageIngestorExecutionResult } from "./ImageIngestorAsset";
 import { JsonIngestorAsset, type JsonIngestorExecutionResult } from "./JsonIngestorAsset";
+import { resolveUnifiedIngestionConfiguration } from "./UnifiedIngestionConfiguration";
 import { createUnifiedIngestionRoutingService } from "./UnifiedIngestionRoutingService";
 import { createUnifiedSourceTypeDetectionService } from "./UnifiedSourceTypeDetectionService";
 
@@ -58,7 +59,7 @@ export interface UnifiedIngestionFailureResult {
   readonly contractVersion: typeof UnifiedIngestionContractVersion;
   readonly ok: false;
   readonly source: UnifiedIngestionSourceReference;
-  readonly stage: "source-read" | "detection" | "routing" | "ingestion" | "conversion";
+  readonly stage: "configuration" | "source-read" | "detection" | "routing" | "ingestion" | "conversion";
   readonly detection?: Awaited<ReturnType<IUnifiedIngestionSourceTypeDetector["detect"]>>;
   readonly route?: UnifiedIngestionRouteResolution;
   readonly issues: ReadonlyArray<UnifiedIngestionIssue>;
@@ -139,6 +140,29 @@ export class UnifiedIngestionOrchestrationService {
   }
 
   public async ingest(request: UnifiedIngestionRequest): Promise<UnifiedIngestionResult> {
+    const resolvedConfiguration = resolveUnifiedIngestionConfiguration({
+      mode: request.configuration?.mode,
+      base: request.configuration,
+    });
+    if (resolvedConfiguration.issues.some((issue) => issue.severity === "error")) {
+      return Object.freeze({
+        contractVersion: UnifiedIngestionContractVersion,
+        ok: false,
+        source: request.source,
+        stage: "configuration",
+        issues: Object.freeze(resolvedConfiguration.issues.map((issue) => buildIssue({
+          code: UnifiedIngestionIssueCodes.invalidConfiguration,
+          severity: issue.severity,
+          message: issue.message,
+          sourceId: request.source.sourceId,
+          details: issue.path
+            ? Object.freeze({ path: issue.path, code: issue.code })
+            : Object.freeze({ code: issue.code }),
+        }))),
+      });
+    }
+    const configuration = resolvedConfiguration.configuration;
+
     let payload = request.payload;
     if (payload === undefined) {
       try {
@@ -167,9 +191,9 @@ export class UnifiedIngestionOrchestrationService {
       detection = await this.detector.detect({
         source: request.source,
         payload,
-        explicitSourceKind: request.configuration?.mode === "advanced" ? request.configuration.explicitSourceKind : undefined,
-        enableContentSniffing: request.configuration?.mode === "advanced"
-          ? request.configuration.enableContentSniffing
+        explicitSourceKind: configuration.mode === "advanced" ? configuration.explicitSourceKind : undefined,
+        enableContentSniffing: configuration.mode === "advanced"
+          ? configuration.enableContentSniffing
           : undefined,
       });
     } catch (error) {
@@ -192,7 +216,7 @@ export class UnifiedIngestionOrchestrationService {
     const route = this.router.route({
       source: request.source,
       detection,
-      configuration: request.configuration,
+      configuration,
     });
     if (route.status !== "resolved") {
       return Object.freeze({
@@ -220,7 +244,7 @@ export class UnifiedIngestionOrchestrationService {
       route,
       source: request.source,
       payload,
-      configuration: request.configuration,
+      configuration,
     });
     if (!ingestion.ok) {
       return Object.freeze({
@@ -252,7 +276,7 @@ export class UnifiedIngestionOrchestrationService {
       });
     }
 
-    const outputTarget = mapRouteKindToOutputTarget(route, request.configuration);
+    const outputTarget = mapRouteKindToOutputTarget(route, configuration);
     return Object.freeze({
       contractVersion: UnifiedIngestionContractVersion,
       ok: true,

@@ -37,6 +37,16 @@ export const UnifiedIngestionOutputTargetKinds = Object.freeze({
 export type UnifiedIngestionOutputTargetKind =
   typeof UnifiedIngestionOutputTargetKinds[keyof typeof UnifiedIngestionOutputTargetKinds];
 
+export const UnifiedIngestionStrategyKinds = Object.freeze({
+  auto: "auto",
+  csv: "csv",
+  json: "json",
+  document: "document",
+  image: "image",
+} as const);
+
+export type UnifiedIngestionStrategyKind = typeof UnifiedIngestionStrategyKinds[keyof typeof UnifiedIngestionStrategyKinds];
+
 export const UnifiedIngestionDetectionConfidenceLevels = Object.freeze({
   low: "low",
   medium: "medium",
@@ -66,6 +76,7 @@ export const UnifiedIngestionIssueSeverities = Object.freeze({
 export type UnifiedIngestionIssueSeverity = typeof UnifiedIngestionIssueSeverities[keyof typeof UnifiedIngestionIssueSeverities];
 
 export const UnifiedIngestionIssueCodes = Object.freeze({
+  invalidConfiguration: "invalid-configuration",
   invalidSourceReference: "invalid-source-reference",
   unsupportedSourceType: "unsupported-source-type",
   detectionConflict: "detection-conflict",
@@ -107,6 +118,7 @@ export interface UnifiedIngestionAdvancedConfiguration {
   readonly mode: typeof UnifiedIngestionConfigModes.advanced;
   readonly outputTarget: UnifiedIngestionOutputTargetKind;
   readonly explicitSourceKind?: Exclude<UnifiedIngestionSourceKind, "unknown">;
+  readonly strategy?: UnifiedIngestionStrategyKind;
   readonly delimiterHint?: string;
   readonly textEncoding?: string;
   readonly normalizeHeadersToLowercase?: boolean;
@@ -214,6 +226,7 @@ export interface IUnifiedIngestionSourceTypeDetector {
 
 export const UnifiedIngestionRoutePolicyKinds = Object.freeze({
   detectedKind: "detected-kind",
+  advancedStrategy: "advanced-strategy",
   outputTargetFallback: "output-target-fallback",
 } as const);
 
