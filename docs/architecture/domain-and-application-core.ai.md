@@ -1359,3 +1359,11 @@ Explicitly later than this scope:
   - returns canonical-shape output with stage-aware structured failure contracts (`source-read`, `detection`, `routing`, `ingestion`, `conversion`).
 - Routing policy is centralized and extensible via route descriptors rather than embedded per-caller conditionals.
 - Batch ingestion routed mode now delegates route selection to the unified router so routing behavior stays consistent across ingestion surfaces.
+
+## Direction 5 update: Unified ingestion simple/advanced configuration modes (stories 15.5-15.6)
+
+- Unified ingestion configuration now resolves through one shared application contract in `application/dataset-studio/UnifiedIngestionConfiguration.ts`, with centralized defaults and validation for both simple and advanced modes.
+- Simple mode remains the default surface with minimal required decisions and automatic detection/routing defaults.
+- Advanced mode now supports explicit detection override and strategy override (`auto`/`csv`/`json`/`document`/`image`) while still executing through the same orchestration service (`UnifiedIngestionOrchestrationService`) and routing seam.
+- Contradictory advanced combinations are rejected before execution so advanced overrides do not bypass canonical validation or produce silent route/output mismatches.
+

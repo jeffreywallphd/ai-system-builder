@@ -317,3 +317,10 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - The global header command palette/navigation menu now includes a first-class `Data` entry (`ui/routes/CommandPalette.ts`) that routes to Dataset Studio (`/studio-shell/dataset`).
 - Top-level menu order is now: `Build`, `Run`, `Explore`, `Data`, `Manage`.
 - This extends existing shell navigation patterns without adding a parallel navigation system.
+
+## Direction 5 UI update: Unified ingestion simple/advanced UX (stories 15.5-15.6)
+
+- Dataset Studio ingestion preview now defaults to the unified ingestion asset surface, with low-level ingestors hidden unless users explicitly opt in to inspect them.
+- The configuration panel keeps simple mode primary and exposes advanced options through the existing mode toggle pattern; mode changes preserve relevant values while reusing shared schema/config surfaces.
+- Detection and route summaries are rendered as bounded UI disclosures so advanced users can inspect routing decisions without exposing raw infrastructure internals or duplicating orchestration logic in UI components.
+

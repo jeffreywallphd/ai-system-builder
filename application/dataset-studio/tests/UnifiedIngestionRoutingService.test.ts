@@ -86,5 +86,25 @@ describe("UnifiedIngestionRoutingService", () => {
       expect(route.reason.includes("No low-level ingestor")).toBeTrue();
     }
   });
+
+  it("supports advanced strategy override without duplicating routing orchestration", () => {
+    const service = new UnifiedIngestionRoutingService();
+    const route = service.route({
+      source: createDetectionResult("unknown").source,
+      detection: createDetectionResult("unknown"),
+      configuration: Object.freeze({
+        mode: "advanced",
+        outputTarget: UnifiedIngestionOutputTargetKinds.records,
+        strategy: "json",
+      }),
+    });
+
+    expect(route.status).toBe("resolved");
+    if (route.status === "resolved") {
+      expect(route.handlerKind).toBe("json");
+      expect(route.policy).toBe("advanced-strategy");
+      expect(route.reason.includes("Advanced strategy")).toBeTrue();
+    }
+  });
 });
 

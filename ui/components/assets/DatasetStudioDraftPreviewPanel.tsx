@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { DataPreviewModel } from "../../../application/data-studio/DataPreviewEngine";
+import { DataPreviewEngine } from "../../../application/data-studio/DataPreviewEngine";
 import { BatchIngestionAssetId, BatchIngestionFramework, BatchIngestionStrategyKinds, BatchIngestorKinds } from "../../../application/dataset-studio/BatchIngestionFramework";
 import { resolveDataAssetConfigDefaults } from "../../../application/dataset-studio/DataAssetConfiguration";
 import { type DataAssetExecutionResult, DefaultDataAssetExecutionFramework } from "../../../application/dataset-studio/DataAssetExecutionFramework";
@@ -17,9 +18,14 @@ import { DocumentPdfIngestorAsset, toDocumentPdfIngestorConfig } from "../../../
 import { type IngestionIssue } from "../../../application/dataset-studio/IngestionContracts";
 import { ImageIngestorAsset, toImageIngestorConfig } from "../../../application/dataset-studio/ImageIngestorAsset";
 import { JsonIngestorAsset } from "../../../application/dataset-studio/JsonIngestorAsset";
+import { resolveUnifiedIngestionConfiguration } from "../../../application/dataset-studio/UnifiedIngestionConfiguration";
+import { UnifiedIngestionOrchestrationService } from "../../../application/dataset-studio/UnifiedIngestionOrchestrationService";
+import { UnifiedIngestionAssetId } from "../../../application/dataset-studio/UnifiedIngestionAsset";
 import { SourceInputKinds } from "../../../application/dataset-studio/SourceLocatorInputAbstraction";
 import type { CanonicalRecordValue } from "../../../domain/dataset-studio/CanonicalDataShapes";
+import { UnifiedIngestionReferenceKinds } from "../../../domain/dataset-studio/UnifiedIngestionDomain";
 import AssetConfigurationPanel from "./AssetConfigurationPanel";
+import type { AssetConfigurationMode } from "./AssetConfigurationPanel";
 import DataPreviewPanel from "./DataPreviewPanel";
 import DataPreviewSurface from "./DataPreviewSurface";
 
@@ -84,6 +90,36 @@ function splitPatterns(value: string): ReadonlyArray<string> {
   return Object.freeze(patterns.length > 0 ? patterns : ["**/*"]);
 }
 
+function toExtensionFromReference(reference: string): string | undefined {
+  const trimmed = reference.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  const index = trimmed.lastIndexOf(".");
+  if (index <= 0 || index === trimmed.length - 1) {
+    return undefined;
+  }
+  return trimmed.slice(index).toLowerCase();
+}
+
+function toUnifiedIngestionIssues(
+  issues: ReadonlyArray<{
+    readonly code: string;
+    readonly severity: "warning" | "error";
+    readonly message: string;
+    readonly details?: Readonly<Record<string, unknown>>;
+  }>,
+): ReadonlyArray<DataStudioValidationIssue> {
+  return Object.freeze(issues.map((issue) => Object.freeze({
+    code: issue.code,
+    section: DataStudioValidationSections.executionRequest,
+    severity: issue.severity,
+    message: issue.message,
+    path: typeof issue.details?.path === "string" ? issue.details.path : undefined,
+    details: issue.details,
+  } satisfies DataStudioValidationIssue)));
+}
+
 function renderIssueList(issues: ReadonlyArray<DataStudioValidationIssue>): JSX.Element | null {
   if (issues.length === 0) {
     return null;
@@ -126,15 +162,36 @@ export default function DatasetStudioDraftPreviewPanel({
   }), [registry]);
 
   const executionFramework = useMemo(() => new DefaultDataAssetExecutionFramework(), []);
+  const previewEngine = useMemo(() => new DataPreviewEngine(), []);
+  const unifiedIngestionService = useMemo(() => new UnifiedIngestionOrchestrationService(), []);
   const documentIngestor = useMemo(() => new DocumentPdfIngestorAsset(), []);
   const imageIngestor = useMemo(() => new ImageIngestorAsset(), []);
   const batchFramework = useMemo(() => new BatchIngestionFramework(), []);
 
-  const [selectedAssetId, setSelectedAssetId] = useState(entries[0]?.descriptor.assetId);
+  const [selectedAssetId, setSelectedAssetId] = useState(
+    entries.some((entry) => entry.descriptor.assetId === UnifiedIngestionAssetId)
+      ? UnifiedIngestionAssetId
+      : entries[0]?.descriptor.assetId,
+  );
+  const [showLowLevelIngestors, setShowLowLevelIngestors] = useState(false);
+  const visibleEntries = useMemo(
+    () => showLowLevelIngestors
+      ? entries
+      : entries.filter((entry) => entry.descriptor.assetId === UnifiedIngestionAssetId),
+    [entries, showLowLevelIngestors],
+  );
   const selectedEntry = useMemo(
     () => entries.find((entry) => entry.descriptor.assetId === selectedAssetId),
     [entries, selectedAssetId],
   );
+  const [unifiedMode, setUnifiedMode] = useState<AssetConfigurationMode>("simple");
+  const [unifiedDetectionSummary, setUnifiedDetectionSummary] = useState<{
+    readonly detectedKind: string;
+    readonly confidence: string;
+    readonly routePolicy?: string;
+    readonly routeAssetId?: string;
+    readonly routeHandler?: string;
+  } | undefined>();
 
   const supportedSourceModes = useMemo(() => resolveSourceModes(selectedEntry), [selectedEntry]);
   const [sourceMode, setSourceMode] = useState<SourceMode>(supportedSourceModes[0] ?? "in-memory");
@@ -152,6 +209,15 @@ export default function DatasetStudioDraftPreviewPanel({
   useEffect(() => {
     setSourceMode((current) => supportedSourceModes.includes(current) ? current : (supportedSourceModes[0] ?? "in-memory"));
   }, [supportedSourceModes]);
+
+  useEffect(() => {
+    if (!selectedEntry) {
+      return;
+    }
+    if (!showLowLevelIngestors && selectedEntry.descriptor.assetId !== UnifiedIngestionAssetId) {
+      setSelectedAssetId(UnifiedIngestionAssetId);
+    }
+  }, [selectedEntry, showLowLevelIngestors]);
 
   const schema = selectedEntry?.descriptor.configSchema;
   const [appliedConfig, setAppliedConfig] = useState<Readonly<Record<string, CanonicalRecordValue>>>(() =>
@@ -197,9 +263,130 @@ export default function DatasetStudioDraftPreviewPanel({
         if (hasErrorIssues(issues)) {
           setExecutionResult(undefined);
           setPreviewModel(undefined);
+          setUnifiedDetectionSummary(undefined);
           setPreviewIssues(Object.freeze([]));
           return;
         }
+
+        if (selectedAssetId === UnifiedIngestionAssetId) {
+          if (sourceMode === "local-directory") {
+            setExecutionResult(undefined);
+            setPreviewModel(undefined);
+            setUnifiedDetectionSummary(undefined);
+            setPreviewIssues(Object.freeze([Object.freeze({
+              code: "unified-ingestion-source-mode-invalid",
+              section: DataStudioValidationSections.executionRequest,
+              severity: "error",
+              message: "Unified ingestion supports in-memory or local-file source modes.",
+              path: "source.mode",
+            })]));
+            return;
+          }
+
+          const normalizedReference = sourceReference.trim();
+          if (sourceMode === "local-file" && !normalizedReference) {
+            setExecutionResult(undefined);
+            setPreviewModel(undefined);
+            setUnifiedDetectionSummary(undefined);
+            setPreviewIssues(Object.freeze([Object.freeze({
+              code: "unified-ingestion-source-path-missing",
+              section: DataStudioValidationSections.executionRequest,
+              severity: "error",
+              message: "Local-file source mode requires a source path.",
+              path: "source.path",
+            })]));
+            return;
+          }
+
+          if (sourceMode === "in-memory" && !String(sourcePayload).trim()) {
+            setExecutionResult(undefined);
+            setPreviewModel(undefined);
+            setUnifiedDetectionSummary(undefined);
+            setPreviewIssues(Object.freeze([Object.freeze({
+              code: "unified-ingestion-source-payload-missing",
+              section: DataStudioValidationSections.executionRequest,
+              severity: "error",
+              message: "In-memory source mode requires payload content.",
+              path: "source.payload",
+            })]));
+            return;
+          }
+
+          const configurationResolution = resolveUnifiedIngestionConfiguration({
+            mode: unifiedMode,
+            values: appliedConfig,
+          });
+          if (configurationResolution.issues.some((issue) => issue.severity === "error")) {
+            setExecutionResult(undefined);
+            setPreviewModel(undefined);
+            setUnifiedDetectionSummary(undefined);
+            setPreviewIssues(Object.freeze(configurationResolution.issues.map((issue) => Object.freeze({
+              code: issue.code,
+              section: DataStudioValidationSections.executionRequest,
+              severity: issue.severity,
+              message: issue.message,
+              path: issue.path,
+            }))));
+            return;
+          }
+
+          const unifiedSource = Object.freeze({
+            sourceId: "dataset-preview-source",
+            referenceKind: sourceMode === "local-file"
+              ? UnifiedIngestionReferenceKinds.localPath
+              : UnifiedIngestionReferenceKinds.inMemory,
+            reference: sourceMode === "local-file" ? normalizedReference : "in-memory://dataset-preview",
+            displayName: sourceMode === "local-file" ? normalizedReference.split(/[\\/]/).at(-1) : undefined,
+            extension: sourceMode === "local-file" ? toExtensionFromReference(normalizedReference) : undefined,
+          });
+          const ingestionResult = await unifiedIngestionService.ingest({
+            source: unifiedSource,
+            payload: sourceMode === "in-memory" ? sourcePayload : undefined,
+            configuration: configurationResolution.configuration,
+            converterContext: {
+              operationId: draftId ? `unified-ingestion-preview-${draftId}` : "unified-ingestion-preview",
+              initiatedBy: "dataset-studio-ui",
+            },
+          });
+
+          if (disposed) {
+            return;
+          }
+
+          if (!ingestionResult.ok) {
+            setExecutionResult(undefined);
+            setPreviewModel(undefined);
+            setUnifiedDetectionSummary(ingestionResult.detection
+              ? Object.freeze({
+                detectedKind: ingestionResult.detection.detectedKind,
+                confidence: ingestionResult.detection.confidence,
+              })
+              : undefined);
+            setPreviewIssues(toUnifiedIngestionIssues(ingestionResult.issues));
+            return;
+          }
+
+          const preview = previewEngine.buildFromCanonicalShape(ingestionResult.output, {
+            maxItems: typeof configurationResolution.configuration.previewSampleLimit === "number"
+              ? configurationResolution.configuration.previewSampleLimit
+              : 25,
+            maxColumns: 12,
+            maxTextLength: 320,
+          });
+          setExecutionResult(undefined);
+          setPreviewModel(preview);
+          setUnifiedDetectionSummary(Object.freeze({
+            detectedKind: ingestionResult.detection.detectedKind,
+            confidence: ingestionResult.detection.confidence,
+            routePolicy: ingestionResult.route.policy,
+            routeAssetId: ingestionResult.route.assetId,
+            routeHandler: ingestionResult.route.handlerKind,
+          }));
+          setPreviewIssues(toUnifiedIngestionIssues(ingestionResult.issues));
+          return;
+        }
+
+        setUnifiedDetectionSummary(undefined);
 
         if (selectedAssetId === CsvIngestorAsset.assetId || selectedAssetId === JsonIngestorAsset.assetId) {
           if (sourceMode === "local-directory") {
@@ -503,14 +690,19 @@ export default function DatasetStudioDraftPreviewPanel({
     draftId,
     executionFramework,
     imageIngestor,
+    previewEngine,
     registry,
     schema,
     selectedAssetId,
     selectedEntry,
+    sourceExtensions,
+    sourceMaxFiles,
     sourceMode,
     sourcePatterns,
     sourcePayload,
     sourceReference,
+    unifiedIngestionService,
+    unifiedMode,
   ]);
 
   const handleApplyConfig = (nextConfig: Readonly<Record<string, CanonicalRecordValue>>) => {
@@ -527,7 +719,7 @@ export default function DatasetStudioDraftPreviewPanel({
 
   return (
     <section className="ui-stack ui-stack--sm" data-testid="dataset-studio-draft-preview-panel">
-      {entries.length > 1 ? (
+      {visibleEntries.length > 1 ? (
         <label className="ui-field" data-testid="dataset-preview-asset-selector">
           <span className="ui-field__label">Ingestion Asset</span>
           <select
@@ -535,7 +727,7 @@ export default function DatasetStudioDraftPreviewPanel({
             value={selectedAssetId}
             onChange={(event) => setSelectedAssetId(event.currentTarget.value)}
           >
-            {entries.map((entry) => (
+            {visibleEntries.map((entry) => (
               <option key={`${entry.descriptor.assetId}:${entry.descriptor.versionId ?? "latest"}`} value={entry.descriptor.assetId}>
                 {entry.descriptor.display.title ?? entry.descriptor.name}
                 {entry.descriptor.versionId ? ` (${entry.descriptor.versionId})` : ""}
@@ -569,6 +761,18 @@ export default function DatasetStudioDraftPreviewPanel({
               </div>
             </div>
           </div>
+          {selectedAssetId === UnifiedIngestionAssetId ? (
+            <div className="ui-row ui-row--wrap">
+              <button
+                type="button"
+                className="ui-button ui-button--ghost"
+                onClick={() => setShowLowLevelIngestors((current) => !current)}
+                data-testid="dataset-preview-low-level-toggle"
+              >
+                {showLowLevelIngestors ? "Hide low-level ingestors" : "Inspect low-level ingestors"}
+              </button>
+            </div>
+          ) : null}
         </section>
       ) : null}
 
@@ -663,13 +867,36 @@ export default function DatasetStudioDraftPreviewPanel({
 
       <AssetConfigurationPanel
         title="Asset Configuration"
-        subtitle="Schema-driven ingestion configuration for the selected asset."
+        subtitle={selectedAssetId === UnifiedIngestionAssetId
+          ? "Simple mode is default. Switch to advanced mode to override detection/routing."
+          : "Schema-driven ingestion configuration for the selected asset."}
         schema={schema}
         initialConfig={appliedConfig}
         issues={panelIssues}
         isApplying={isLoading}
+        initialMode={selectedAssetId === UnifiedIngestionAssetId ? unifiedMode : "simple"}
+        onModeChange={selectedAssetId === UnifiedIngestionAssetId ? setUnifiedMode : undefined}
         onApply={handleApplyConfig}
       />
+
+      {selectedAssetId === UnifiedIngestionAssetId && unifiedDetectionSummary ? (
+        <section className="ui-card ui-card--padded ui-stack ui-stack--xs" data-testid="dataset-preview-unified-detection-summary">
+          <strong>Detected Source</strong>
+          <div className="ui-row ui-row--wrap">
+            <span className="ui-badge ui-badge--neutral">{unifiedDetectionSummary.detectedKind}</span>
+            <span className="ui-badge ui-badge--neutral">{unifiedDetectionSummary.confidence} confidence</span>
+            {unifiedDetectionSummary.routeHandler ? (
+              <span className="ui-badge ui-badge--neutral">handler: {unifiedDetectionSummary.routeHandler}</span>
+            ) : null}
+            {unifiedDetectionSummary.routePolicy ? (
+              <span className="ui-badge ui-badge--neutral">policy: {unifiedDetectionSummary.routePolicy}</span>
+            ) : null}
+          </div>
+          {unifiedDetectionSummary.routeAssetId ? (
+            <span className="ui-subtle">Route asset: {unifiedDetectionSummary.routeAssetId}</span>
+          ) : null}
+        </section>
+      ) : null}
 
       {executionResult ? (
         <DataPreviewPanel

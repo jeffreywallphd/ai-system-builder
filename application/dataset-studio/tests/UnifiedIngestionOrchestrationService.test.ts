@@ -251,4 +251,23 @@ describe("UnifiedIngestionOrchestrationService", () => {
       expect(result.conversion.operation).toBe("image-metadata-to-records");
     }
   });
+
+  it("rejects contradictory advanced configuration before routing/execution", async () => {
+    const service = new UnifiedIngestionOrchestrationService();
+    const result = await service.ingest({
+      source: createSource(),
+      payload: "{\"id\":1}",
+      configuration: Object.freeze({
+        mode: "advanced",
+        strategy: "document",
+        outputTarget: UnifiedIngestionOutputTargetKinds.records,
+      }),
+    });
+
+    expect(result.ok).toBeFalse();
+    if (!result.ok) {
+      expect(result.stage).toBe("configuration");
+      expect(result.issues[0]?.code).toBe("invalid-configuration");
+    }
+  });
 });
