@@ -1,5 +1,4 @@
 /// <reference types="node" />
-import { promises as fs } from "node:fs";
 import { z } from "zod";
 import { AssetContractShapeKinds } from "../../domain/contracts/AssetContract";
 import { CanonicalDataAsset } from "../../domain/dataset-studio/CanonicalDataAsset";
@@ -183,6 +182,11 @@ export const BatchIngestionStrategySchema = z.discriminatedUnion("kind", [
 type BatchIngestionConfig = z.output<typeof BatchIngestionConfigSchema>;
 type BatchIngestionSharedConfig = z.output<typeof BatchIngestionSharedConfigSchema>;
 type BatchIngestionStrategy = z.output<typeof BatchIngestionStrategySchema>;
+
+interface NodeFsPromisesRuntime {
+  readFile(path: string, encoding: "utf-8"): Promise<string>;
+  readFile(path: string): Promise<Uint8Array>;
+}
 
 export interface ExecuteBatchIngestionRequest {
   readonly sourceRequest?: SourceLocatorRequest;
@@ -1138,6 +1142,19 @@ export class BatchIngestionFramework {
   }
 
   private async readPayload(descriptor: SourceDescriptor): Promise<string | Uint8Array> {
+    let fsPromises: NodeFsPromisesRuntime;
+    try {
+      const fsModule = await import("node:fs");
+      if (!fsModule.promises) {
+        throw new Error("Node filesystem promises API is unavailable.");
+      }
+      fsPromises = fsModule.promises as NodeFsPromisesRuntime;
+    } catch (error) {
+      throw new Error(
+        `Local source execution requires a Node.js filesystem runtime (${error instanceof Error ? error.message : String(error)}).`,
+      );
+    }
+
     const extension = normalizeExtension(descriptor.extension);
     const binary = extension === ".pdf"
       || extension === ".png"
@@ -1145,10 +1162,10 @@ export class BatchIngestionFramework {
       || extension === ".jpeg"
       || extension === ".webp";
     if (binary) {
-      const content = await fs.readFile(descriptor.normalizedReference);
+      const content = await fsPromises.readFile(descriptor.normalizedReference);
       return new Uint8Array(content);
     }
-    return fs.readFile(descriptor.normalizedReference, "utf-8");
+    return fsPromises.readFile(descriptor.normalizedReference, "utf-8");
   }
 }
 

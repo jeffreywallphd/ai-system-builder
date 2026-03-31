@@ -149,5 +149,43 @@ describe("SourceLocatorInputAbstraction", () => {
       return true;
     });
   });
+
+  it("resolves remote references when node runtime is unavailable", async () => {
+    const locator = new SourceLocatorInputAbstraction({
+      nodeRuntimeLoader: async () => {
+        throw new Error("node runtime unavailable");
+      },
+    });
+
+    const result = await locator.resolve({
+      input: {
+        kind: SourceInputKinds.remoteFile,
+        reference: "https://example.com/samples/users.csv",
+      },
+    });
+
+    expect(result.descriptors).toHaveLength(1);
+    expect(result.descriptors[0]?.displayName).toBe("users.csv");
+    expect(result.issues).toHaveLength(0);
+  });
+
+  it("reports a structured issue for local files when node runtime is unavailable", async () => {
+    const locator = new SourceLocatorInputAbstraction({
+      nodeRuntimeLoader: async () => {
+        throw new Error("node runtime unavailable");
+      },
+    });
+
+    const result = await locator.resolve({
+      input: {
+        kind: SourceInputKinds.localFile,
+        path: "C:\\temp\\users.csv",
+      },
+    });
+
+    expect(result.descriptors).toHaveLength(0);
+    expect(result.issues[0]?.code).toBe(SourceLocatorIssueCodes.unreadablePath);
+    expect(result.issues[0]?.message).toContain("Node.js filesystem runtime");
+  });
 });
 
