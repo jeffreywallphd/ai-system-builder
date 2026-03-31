@@ -59,6 +59,11 @@ import {
   createDataAssetConfigSchema,
   type DataAssetConfigSchema,
 } from "./DataAssetConfiguration";
+import {
+  UnifiedIngestionSourceKinds,
+  type IUnifiedIngestionSourceTypeDetector,
+} from "../../domain/dataset-studio/UnifiedIngestionDomain";
+import { createUnifiedSourceTypeDetectionService } from "./UnifiedSourceTypeDetectionService";
 
 export const BatchIngestionStrategyKinds = Object.freeze({
   routed: "routed",
@@ -301,37 +306,6 @@ function isTextLikeForCsvJson(extension?: string): boolean {
   return extension === ".csv" || extension === ".json" || extension === ".tsv" || extension === ".txt";
 }
 
-function detectRoutedIngestor(descriptor: SourceDescriptor): BatchIngestorKind | undefined {
-  const extension = normalizeExtension(descriptor.extension);
-  const mediaType = descriptor.mediaType?.toLowerCase();
-
-  if (extension === ".csv" || extension === ".tsv" || mediaType === "text/csv") {
-    return BatchIngestorKinds.csv;
-  }
-  if (extension === ".json" || mediaType === "application/json") {
-    return BatchIngestorKinds.json;
-  }
-  if (
-    extension === ".pdf"
-    || extension === ".txt"
-    || extension === ".md"
-    || mediaType === "application/pdf"
-    || mediaType?.startsWith("text/")
-  ) {
-    return BatchIngestorKinds.documentPdf;
-  }
-  if (
-    extension === ".png"
-    || extension === ".jpg"
-    || extension === ".jpeg"
-    || extension === ".webp"
-    || mediaType?.startsWith("image/")
-  ) {
-    return BatchIngestorKinds.image;
-  }
-  return undefined;
-}
-
 function toLineageSourceReference(descriptor: SourceDescriptor): {
   readonly sourceId?: string;
   readonly sourceReference?: string;
@@ -358,6 +332,7 @@ export class BatchIngestionFramework {
   private readonly documentIngestor: DocumentPdfIngestorAsset;
   private readonly imageIngestor: ImageIngestorAsset;
   private readonly previewEngine: DataPreviewEngine;
+  private readonly sourceTypeDetector: IUnifiedIngestionSourceTypeDetector;
 
   constructor(options?: {
     readonly sourceLocator?: SourceLocatorInputAbstraction;
@@ -365,12 +340,14 @@ export class BatchIngestionFramework {
     readonly documentIngestor?: DocumentPdfIngestorAsset;
     readonly imageIngestor?: ImageIngestorAsset;
     readonly previewEngine?: DataPreviewEngine;
+    readonly sourceTypeDetector?: IUnifiedIngestionSourceTypeDetector;
   }) {
     this.sourceLocator = options?.sourceLocator ?? new SourceLocatorInputAbstraction();
     this.converter = options?.converter ?? new DataConverterCore();
     this.documentIngestor = options?.documentIngestor ?? new DocumentPdfIngestorAsset();
     this.imageIngestor = options?.imageIngestor ?? new ImageIngestorAsset();
     this.previewEngine = options?.previewEngine ?? new DataPreviewEngine();
+    this.sourceTypeDetector = options?.sourceTypeDetector ?? createUnifiedSourceTypeDetectionService();
   }
 
   public async executeBatch(request: ExecuteBatchIngestionRequest): Promise<BatchIngestionResult> {
@@ -891,7 +868,7 @@ export class BatchIngestionFramework {
 
     const ingestor = strategy.kind === BatchIngestionStrategyKinds.selected
       ? strategy.ingestor
-      : detectRoutedIngestor(descriptor);
+      : await this.detectRoutedIngestor(descriptor, payload);
 
     if (!ingestor) {
       const unsupportedIssue = createIngestionIssue({
@@ -1166,6 +1143,40 @@ export class BatchIngestionFramework {
       return new Uint8Array(content);
     }
     return fsPromises.readFile(descriptor.normalizedReference, "utf-8");
+  }
+
+  private async detectRoutedIngestor(
+    descriptor: SourceDescriptor,
+    payload: string | Uint8Array,
+  ): Promise<BatchIngestorKind | undefined> {
+    const detection = await this.sourceTypeDetector.detect({
+      source: {
+        sourceId: descriptor.sourceId,
+        referenceKind: descriptor.kind === SourceDescriptorKinds.localFile ? "local-path" : "remote-url",
+        reference: descriptor.normalizedReference,
+        displayName: descriptor.displayName,
+        extension: descriptor.extension,
+        mimeType: descriptor.mediaType,
+        sizeInBytes: descriptor.sizeInBytes,
+        groupId: descriptor.groupId,
+      },
+      payload,
+      enableContentSniffing: true,
+    });
+
+    if (detection.detectedKind === UnifiedIngestionSourceKinds.csv) {
+      return BatchIngestorKinds.csv;
+    }
+    if (detection.detectedKind === UnifiedIngestionSourceKinds.json) {
+      return BatchIngestorKinds.json;
+    }
+    if (detection.detectedKind === UnifiedIngestionSourceKinds.document) {
+      return BatchIngestorKinds.documentPdf;
+    }
+    if (detection.detectedKind === UnifiedIngestionSourceKinds.image) {
+      return BatchIngestorKinds.image;
+    }
+    return undefined;
   }
 }
 
