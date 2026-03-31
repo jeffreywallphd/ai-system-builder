@@ -4,7 +4,9 @@ import {
   createCanonicalTableShape,
 } from "../../../domain/dataset-studio/CanonicalDataShapes";
 import {
+  DataProfilingAsset,
   executeTransformationPipeline,
+  FieldMappingAsset,
   registerTransformationAssets,
   SchemaInferenceAsset,
   SchemaInferenceModes,
@@ -126,8 +128,10 @@ describe("Transformation assets", () => {
 
   it("registers schema inference in transformation registry and runs as a pipeline step", async () => {
     const { registry, entries } = registerTransformationAssets();
-    expect(entries).toHaveLength(1);
-    expect(entries[0]?.descriptor.id).toBe(SchemaInferenceAsset.assetId);
+    expect(entries.length).toBeGreaterThanOrEqual(3);
+    expect(entries.some((entry) => entry.descriptor.id === SchemaInferenceAsset.assetId)).toBeTrue();
+    expect(entries.some((entry) => entry.descriptor.id === DataProfilingAsset.assetId)).toBeTrue();
+    expect(entries.some((entry) => entry.descriptor.id === FieldMappingAsset.assetId)).toBeTrue();
 
     const resolved = registry.get({ id: SchemaInferenceAsset.assetId });
     expect(resolved).toBeDefined();

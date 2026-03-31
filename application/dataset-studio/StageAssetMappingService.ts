@@ -3,6 +3,7 @@ import type { CanonicalRecordValue } from "../../domain/dataset-studio/Canonical
 import {
   DatasetIngestionStageAssetIds,
   DatasetPipelineStageKinds,
+  DatasetTransformationStageAssetIds,
   type DatasetPipelineStageKind,
 } from "../../domain/dataset-studio/StagePipelineDomain";
 import {
@@ -412,8 +413,14 @@ const DefaultStageAssetMappings: ReadonlyArray<StageAssetMappingDefinition> = Ob
     stageKind: DatasetPipelineStageKinds.profiling,
     assets: Object.freeze([
       Object.freeze({
-        assetId: DatasetIngestionStageAssetIds.unified,
+        assetId: DatasetTransformationStageAssetIds.dataProfiling,
         assetVersion: "1.0.0",
+        configDefaults: Object.freeze({
+          sampleSize: 500,
+          computeNumericStats: true,
+          computeDistinctCounts: true,
+          maxSampleValuesPerField: 5,
+        }),
       }),
     ]),
   }),
@@ -442,8 +449,12 @@ const DefaultStageAssetMappings: ReadonlyArray<StageAssetMappingDefinition> = Ob
     stageKind: DatasetPipelineStageKinds.transformation,
     assets: Object.freeze([
       Object.freeze({
-        assetId: DatasetIngestionStageAssetIds.unified,
+        assetId: DatasetTransformationStageAssetIds.fieldMapping,
         assetVersion: "1.0.0",
+        configDefaults: Object.freeze({
+          preserveUnmapped: true,
+          dropEmptyTargets: false,
+        }),
       }),
     ]),
   }),

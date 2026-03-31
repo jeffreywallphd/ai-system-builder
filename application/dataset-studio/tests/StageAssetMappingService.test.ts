@@ -28,6 +28,32 @@ describe("StageAssetMappingService", () => {
     }
   });
 
+  it("resolves profiling stage to the data profiling transformation asset", () => {
+    const service = new StageAssetMappingService();
+    const result = service.resolveStage({
+      stageKind: DatasetPipelineStageKinds.profiling,
+    });
+
+    expect(result.status).toBe("resolved");
+    if (result.status === "resolved") {
+      expect(result.assets[0]?.assetId).toBe("data-profiling");
+      expect(result.assets[0]?.configDefaults?.sampleSize).toBe(500);
+    }
+  });
+
+  it("resolves transformation stage to the field mapping asset", () => {
+    const service = new StageAssetMappingService();
+    const result = service.resolveStage({
+      stageKind: DatasetPipelineStageKinds.transformation,
+    });
+
+    expect(result.status).toBe("resolved");
+    if (result.status === "resolved") {
+      expect(result.assets[0]?.assetId).toBe("field-mapping");
+      expect(result.assets[0]?.configDefaults?.preserveUnmapped).toBeTrue();
+    }
+  });
+
   it("resolves raw-storage stage to storage asset defaults and metadata hooks", () => {
     const service = new StageAssetMappingService();
     const result = service.resolveStage({

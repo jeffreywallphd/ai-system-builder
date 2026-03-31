@@ -1,4 +1,3 @@
-import { max, mean, min, standardDeviation } from "simple-statistics";
 import { z } from "zod";
 import type {
   CanonicalRecordValue,
@@ -6,6 +5,7 @@ import type {
   CanonicalTableShape,
 } from "../../../../../../domain/dataset-studio/CanonicalDataShapes";
 import { BaseTransformationAsset } from "../BaseTransformationAsset";
+import { summarizeNumericValues } from "../TransformationStatistics";
 import {
   TransformationInputSchema,
   type ITransformationInput,
@@ -277,6 +277,8 @@ function toFieldStats(
     .filter((value): value is number => value !== undefined);
   const stringValues = nonNullValues.filter((value): value is string => typeof value === "string");
   const lengths = stringValues.map((value) => value.length);
+  const numericSummary = summarizeNumericValues(numericValues, { singleValueStandardDeviationZero: true });
+  const lengthSummary = summarizeNumericValues(lengths);
   const distinctCount = new Set(normalized.map((value) => createDistinctKey(value))).size;
 
   return Object.freeze({
@@ -284,19 +286,13 @@ function toFieldStats(
     nonNullCount: nonNullValues.length,
     nullCount: values.length - nonNullValues.length,
     distinctCount,
-    mean: inferredType === SchemaInferenceFieldTypes.number && numericValues.length > 0 ? mean(numericValues) : undefined,
-    min: inferredType === SchemaInferenceFieldTypes.number && numericValues.length > 0 ? min(numericValues) : undefined,
-    max: inferredType === SchemaInferenceFieldTypes.number && numericValues.length > 0 ? max(numericValues) : undefined,
-    standardDeviation: inferredType === SchemaInferenceFieldTypes.number
-      ? numericValues.length > 1
-        ? standardDeviation(numericValues)
-        : numericValues.length === 1
-          ? 0
-          : undefined
-      : undefined,
-    averageLength: inferredType === SchemaInferenceFieldTypes.string && lengths.length > 0 ? mean(lengths) : undefined,
-    minLength: inferredType === SchemaInferenceFieldTypes.string && lengths.length > 0 ? min(lengths) : undefined,
-    maxLength: inferredType === SchemaInferenceFieldTypes.string && lengths.length > 0 ? max(lengths) : undefined,
+    mean: inferredType === SchemaInferenceFieldTypes.number ? numericSummary?.mean : undefined,
+    min: inferredType === SchemaInferenceFieldTypes.number ? numericSummary?.min : undefined,
+    max: inferredType === SchemaInferenceFieldTypes.number ? numericSummary?.max : undefined,
+    standardDeviation: inferredType === SchemaInferenceFieldTypes.number ? numericSummary?.standardDeviation : undefined,
+    averageLength: inferredType === SchemaInferenceFieldTypes.string ? lengthSummary?.mean : undefined,
+    minLength: inferredType === SchemaInferenceFieldTypes.string ? lengthSummary?.min : undefined,
+    maxLength: inferredType === SchemaInferenceFieldTypes.string ? lengthSummary?.max : undefined,
   });
 }
 

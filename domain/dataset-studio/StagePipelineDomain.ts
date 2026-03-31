@@ -71,6 +71,12 @@ export const DatasetIngestionStageAssetIds = Object.freeze({
   image: "image-ingestor-v1",
 } as const);
 
+export const DatasetTransformationStageAssetIds = Object.freeze({
+  schemaInference: "schema-inference",
+  dataProfiling: "data-profiling",
+  fieldMapping: "field-mapping",
+} as const);
+
 const AllCanonicalShapeKinds = Object.freeze(
   Object.values(CanonicalDataShapeKinds) as ReadonlyArray<CanonicalDataShapeKind>,
 );
@@ -243,7 +249,7 @@ export function createUnifiedIngestionStagePipelineDefinition(): DatasetPipeline
           producedOutputShapeKinds: AllCanonicalShapeKinds,
         }),
         assetReferences: Object.freeze([
-          Object.freeze({ assetId: DatasetIngestionStageAssetIds.unified }),
+          Object.freeze({ assetId: DatasetTransformationStageAssetIds.dataProfiling }),
         ]),
         executionPolicy: Object.freeze({
           mode: DatasetPipelineStageExecutionModes.optional,
