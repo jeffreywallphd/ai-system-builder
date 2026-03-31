@@ -1,4 +1,9 @@
-import type { AssetDraftLifecycleStatus, AssetMetadata, AssetMetadataPatch } from "../../../domain/studio-shell/StudioShellDomain";
+import {
+  AssetDraftLifecycleStatuses,
+  type AssetDraftLifecycleStatus,
+  type AssetMetadata,
+  type AssetMetadataPatch,
+} from "../../../domain/studio-shell/StudioShellDomain";
 import type { IStudioShellRepository } from "../../../application/ports/interfaces/IStudioShellRepository";
 import { DefaultStudioShellApplicationService } from "../../../application/studio-shell/DefaultStudioShellApplicationService";
 import { WorkflowStudioApplicationService } from "../../../application/workflow-studio/WorkflowStudioApplicationService";
@@ -19,6 +24,15 @@ import {
   StudioShellErrorCodes,
   StudioShellInvalidRequestError,
 } from "../../../application/studio-shell/StudioShellApplicationErrors";
+import type { IWorkflowPersistenceRepository } from "../../../application/ports/interfaces/IWorkflowPersistenceRepository";
+import { CreatePersistedWorkflowUseCase } from "../../../application/workflow-persistence/CreatePersistedWorkflowUseCase";
+import { GetPersistedWorkflowUseCase } from "../../../application/workflow-persistence/GetPersistedWorkflowUseCase";
+import { UpdatePersistedWorkflowUseCase } from "../../../application/workflow-persistence/UpdatePersistedWorkflowUseCase";
+import {
+  WorkflowPersistenceError,
+  WorkflowPersistenceErrorCodes,
+} from "../../../application/workflow-persistence/WorkflowPersistenceErrors";
+import { WorkflowLifecycleStates, deserializeWorkflowDraft } from "../../../domain/workflow-studio/WorkflowStudioDomain";
 import { WorkflowExecutionTriggerSourceKinds, type WorkflowExecutionTriggerSourceKind } from "../../../application/workflow-studio/WorkflowExecutionAlignmentContracts";
 
 export interface StudioShellApiError {
@@ -195,8 +209,14 @@ export interface RunWorkflowStudioDraftReadModel {
 export class StudioShellBackendApi {
   private readonly service: DefaultStudioShellApplicationService;
   private readonly workflowStudioService: WorkflowStudioApplicationService;
+  private readonly createPersistedWorkflow?: CreatePersistedWorkflowUseCase;
+  private readonly updatePersistedWorkflow?: UpdatePersistedWorkflowUseCase;
+  private readonly getPersistedWorkflow?: GetPersistedWorkflowUseCase;
 
-  constructor(private readonly repository: IStudioShellRepository) {
+  constructor(
+    private readonly repository: IStudioShellRepository,
+    workflowPersistenceRepository?: IWorkflowPersistenceRepository,
+  ) {
     this.service = new DefaultStudioShellApplicationService(repository);
     this.workflowStudioService = new WorkflowStudioApplicationService(
       this.service,
@@ -206,6 +226,11 @@ export class StudioShellBackendApi {
         hasAssetVersionReference: async (versionId: string) => Boolean(await this.repository.getAssetVersion(versionId)),
       },
     );
+    if (workflowPersistenceRepository) {
+      this.createPersistedWorkflow = new CreatePersistedWorkflowUseCase(workflowPersistenceRepository);
+      this.updatePersistedWorkflow = new UpdatePersistedWorkflowUseCase(workflowPersistenceRepository);
+      this.getPersistedWorkflow = new GetPersistedWorkflowUseCase(workflowPersistenceRepository);
+    }
   }
 
   public async initializeStudio(studioId: string, name: string): Promise<StudioShellApiResponse<StudioShellSnapshotReadModel>> {
@@ -235,6 +260,7 @@ export class StudioShellBackendApi {
   public async createDraft(command: CreateAssetDraftCommand): Promise<StudioShellApiResponse<StudioShellSnapshotReadModel>> {
     return this.wrap(async () => {
       await this.service.createAssetDraft(command);
+      await this.synchronizeWorkflowPersistenceFromStudioDraft(command.studioId);
       return this.requireSnapshot(command.studioId);
     });
   }
@@ -242,6 +268,7 @@ export class StudioShellBackendApi {
   public async updateDraft(command: UpdateAssetDraftCommand): Promise<StudioShellApiResponse<StudioShellSnapshotReadModel>> {
     return this.wrap(async () => {
       await this.service.updateAssetDraft(command);
+      await this.synchronizeWorkflowPersistenceFromStudioDraft(command.studioId, command.draftId);
       return this.requireSnapshot(command.studioId);
     });
   }
@@ -256,6 +283,7 @@ export class StudioShellBackendApi {
   public async transitionLifecycle(command: TransitionAssetDraftLifecycleCommand): Promise<StudioShellApiResponse<StudioShellSnapshotReadModel>> {
     return this.wrap(async () => {
       await this.service.transitionAssetDraftLifecycle(command);
+      await this.synchronizeWorkflowPersistenceFromStudioDraft(command.studioId, command.draftId);
       return this.requireSnapshot(command.studioId);
     });
   }
@@ -263,6 +291,7 @@ export class StudioShellBackendApi {
   public async publishVersion(command: PublishAssetDraftVersionCommand): Promise<StudioShellApiResponse<StudioShellSnapshotReadModel>> {
     return this.wrap(async () => {
       await this.service.publishAssetDraftVersion(command);
+      await this.synchronizeWorkflowPersistenceFromStudioDraft(command.studioId, command.draftId);
       return this.requireSnapshot(command.studioId);
     });
   }
@@ -532,6 +561,77 @@ export class StudioShellBackendApi {
     });
   }
 
+  private async synchronizeWorkflowPersistenceFromStudioDraft(
+    studioId: string,
+    explicitDraftId?: string,
+  ): Promise<void> {
+    if (!this.createPersistedWorkflow || !this.updatePersistedWorkflow || !this.getPersistedWorkflow) {
+      return;
+    }
+
+    const studio = await this.repository.getStudio(studioId.trim());
+    if (!studio) {
+      return;
+    }
+
+    const resolvedDraftId = explicitDraftId?.trim()
+      || (studio.activeSessionId ? (await this.repository.getSession(studio.activeSessionId))?.currentDraftId : undefined);
+    if (!resolvedDraftId) {
+      return;
+    }
+
+    const draft = await this.repository.getDraft(resolvedDraftId);
+    if (!draft) {
+      return;
+    }
+
+    const taxonomy = draft.metadata.taxonomy;
+    if (taxonomy?.structuralKind !== "composite" || taxonomy.semanticRole !== "workflow") {
+      return;
+    }
+
+    const canonicalDraft = deserializeWorkflowDraft(draft.content);
+    const persistedWorkflowId = draft.assetId;
+    const ownershipContext = Object.freeze({
+      ownerId: draft.metadata.provenance?.creatorId,
+      studioId: draft.studioId,
+      sessionId: draft.sessionId,
+    });
+    const lifecycleState = draft.lifecycleStatus === AssetDraftLifecycleStatuses.draft
+      ? WorkflowLifecycleStates.draft
+      : WorkflowLifecycleStates.saved;
+    const metadata = Object.freeze({
+      summary: draft.metadata.summary,
+      tags: draft.metadata.tags,
+    });
+
+    const existing = await this.getPersistedWorkflow.execute(persistedWorkflowId);
+    if (!existing) {
+      await this.createPersistedWorkflow.execute({
+        id: persistedWorkflowId,
+        name: draft.metadata.title,
+        draft: canonicalDraft,
+        lifecycleState,
+        metadata,
+        ownershipContext,
+        versionLabel: draft.lastPublishedVersionId,
+      });
+      return;
+    }
+
+    await this.updatePersistedWorkflow.execute({
+      id: persistedWorkflowId,
+      changes: {
+        name: draft.metadata.title,
+        metadata,
+        draft: canonicalDraft,
+        lifecycleState,
+        ownershipContext,
+        versionLabel: draft.lastPublishedVersionId ?? existing.revision.versionLabel,
+      },
+    });
+  }
+
   private async wrap<T>(action: () => Promise<T>): Promise<StudioShellApiResponse<T>> {
     try {
       return Object.freeze({ ok: true, data: await action() });
@@ -541,6 +641,25 @@ export class StudioShellBackendApi {
   }
 
   private toApiError(error: unknown): StudioShellApiError {
+    if (error instanceof WorkflowPersistenceError) {
+      if (error.code === WorkflowPersistenceErrorCodes.conflict) {
+        return Object.freeze({
+          code: "conflict",
+          message: error.message,
+        });
+      }
+      if (error.code === WorkflowPersistenceErrorCodes.notFound) {
+        return Object.freeze({
+          code: "not-found",
+          message: error.message,
+        });
+      }
+      return Object.freeze({
+        code: "invalid-request",
+        message: error.message,
+      });
+    }
+
     if (error instanceof StudioShellApplicationError) {
       const codeMap: Record<string, StudioShellApiError["code"]> = {
         [StudioShellErrorCodes.notFound]: "not-found",

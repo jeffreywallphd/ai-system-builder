@@ -11,6 +11,8 @@ import {
 } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
 import { StudioShellBackendApi } from "../StudioShellBackendApi";
 import { InMemoryStudioShellRepository } from "../../../studio-shell/InMemoryStudioShellRepository";
+import { InMemoryWorkflowPersistenceRepository } from "../../../workflows/InMemoryWorkflowPersistenceRepository";
+import { GetPersistedWorkflowUseCase } from "../../../../application/workflow-persistence/GetPersistedWorkflowUseCase";
 
 describe("StudioShellBackendApi", () => {
   it("projects the same validation issue structure for atomic model/dataset/tool drafts", async () => {
@@ -181,6 +183,106 @@ describe("StudioShellBackendApi", () => {
     });
     expect(published.ok).toBeTrue();
     expect(published.data?.draft?.lifecycleStatus).toBe(AssetDraftLifecycleStatuses.published);
+  });
+
+  it("synchronizes workflow studio draft create/update/lifecycle changes into workflow persistence contracts", async () => {
+    const workflowPersistenceRepository = new InMemoryWorkflowPersistenceRepository();
+    const api = new StudioShellBackendApi(
+      new InMemoryStudioShellRepository(),
+      workflowPersistenceRepository,
+    );
+    const getPersisted = new GetPersistedWorkflowUseCase(workflowPersistenceRepository);
+    const initialized = await api.initializeStudio("studio-workflows", "Workflow Studio");
+    const sessionId = initialized.data!.activeSessionId!;
+
+    const wizardDraft = serializeWorkflowDraft({
+      ...createEmptyWorkflowDraft(),
+      triggers: [{
+        id: "trigger-manual",
+        kind: WorkflowDraftTriggerKinds.user,
+        type: WorkflowDraftTriggerTypes.userManual,
+        config: {},
+      }],
+      steps: [{
+        id: "step-wizard",
+        type: "action",
+        kind: "action",
+        order: 1,
+      }],
+    });
+
+    const created = await api.createDraft({
+      studioId: "studio-workflows",
+      sessionId,
+      content: wizardDraft,
+      metadata: {
+        title: "workflow-draft",
+        tags: ["workflow", "wizard"],
+        taxonomy: {
+          structuralKind: "composite",
+          semanticRole: "workflow",
+          behaviorKind: "deterministic",
+        },
+        contract: {
+          version: "1.0.0",
+          input: { kind: "json-schema" },
+          output: { kind: "json-schema" },
+        },
+        provenance: {
+          creatorId: "user:workflow",
+          sourceType: "generated",
+          sourceLabel: "workflow-studio",
+        },
+      },
+    });
+    expect(created.ok).toBeTrue();
+    const workflowId = created.data!.draft!.assetId;
+
+    const persistedAfterCreate = await getPersisted.execute(workflowId);
+    expect(persistedAfterCreate?.status).toBe("draft");
+    expect(persistedAfterCreate?.definition.draft.steps.map((entry) => entry.id)).toEqual(["step-wizard"]);
+    expect(persistedAfterCreate?.ownershipContext?.ownerId).toBe("user:workflow");
+
+    const canvasDraft = serializeWorkflowDraft({
+      ...createEmptyWorkflowDraft(),
+      triggers: [{
+        id: "trigger-state",
+        kind: WorkflowDraftTriggerKinds.state,
+        type: WorkflowDraftTriggerTypes.stateSystemEvent,
+        config: {
+          sourceType: "system",
+          eventCategory: "system-state-changed",
+          eventName: "record-updated",
+        },
+      }],
+      steps: [{
+        id: "step-canvas",
+        type: "action",
+        kind: "action",
+        order: 1,
+      }],
+    });
+    await api.updateDraft({
+      studioId: "studio-workflows",
+      sessionId,
+      draftId: created.data!.draft!.draftId,
+      content: canvasDraft,
+      metadataPatch: {
+        tags: ["workflow", "canvas"],
+      },
+    });
+    await api.transitionLifecycle({
+      studioId: "studio-workflows",
+      sessionId,
+      draftId: created.data!.draft!.draftId,
+      targetStatus: AssetDraftLifecycleStatuses.validated,
+    });
+
+    const persistedAfterUpdate = await getPersisted.execute(workflowId);
+    expect(persistedAfterUpdate?.status).toBe("saved");
+    expect(persistedAfterUpdate?.revision.persistenceRevision).toBeGreaterThan(1);
+    expect(persistedAfterUpdate?.definition.draft.steps.map((entry) => entry.id)).toEqual(["step-canvas"]);
+    expect(persistedAfterUpdate?.metadata.tags).toEqual(["workflow", "canvas"]);
   });
 
   it("supports composite context-bundle drafts over the same shared validation/lifecycle/publish seams", async () => {

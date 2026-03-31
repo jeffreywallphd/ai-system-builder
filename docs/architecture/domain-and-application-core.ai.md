@@ -217,6 +217,13 @@ The studio shell now has a bounded inner-layer model and application orchestrati
 - The application-layer persistence boundary now has an explicit repository port (`application/ports/interfaces/IWorkflowPersistenceRepository.ts`) with create/update/get/list/duplicate contracts and bounded list-query semantics.
 - Application use cases for create/update/get/list/duplicate now live in `application/workflow-persistence/*` with typed request validation and explicit failure contracts (`WorkflowPersistenceInvalidRequestError`, `WorkflowPersistenceNotFoundError`, `WorkflowPersistenceConflictError`).
 
+## Direction 5 update: Workflow persistence infrastructure + studio draft synchronization (stories 11.3-11.4)
+
+- Workflow persistence now has a concrete SQLite infrastructure adapter (`infrastructure/filesystem/SqliteWorkflowPersistenceRepository.ts`) implementing the existing `IWorkflowPersistenceRepository` create/update/get/list/duplicate contract over canonical persisted workflow records.
+- Repository persistence keeps canonical `WorkflowEntity` payload compatibility enforced via `serializeWorkflowEntity`/`deserializeWorkflowEntity` at the infrastructure boundary, while preserving domain/application contract ownership of status/revision/timestamp semantics.
+- Studio-shell workflow draft mutations now synchronize into workflow persistence through existing application use cases (`CreatePersistedWorkflowUseCase`, `UpdatePersistedWorkflowUseCase`, `GetPersistedWorkflowUseCase`) inside `StudioShellBackendApi`, rather than UI-owned persistence logic.
+- Workflow draft synchronization maps workflow studio draft metadata/context into persistence ownership/version metadata and keeps lifecycle alignment (`draft` draft state, `saved` for validated/published transitions) under application orchestration.
+
 ## Direction 5 update: Workflow built-in step taxonomy + registry foundation (stories 6.1-6.2)
 
 - Workflow-native built-in steps are now first-class inner-layer contracts in `domain/workflow-studio/WorkflowStudioDomain.ts` with canonical categories (`control-flow`, `temporal`, `human-interaction`, reserved `transformation`) and stable built-in step identities.
