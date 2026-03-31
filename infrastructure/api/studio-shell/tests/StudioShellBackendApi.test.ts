@@ -12,11 +12,91 @@ import {
 import { StudioShellBackendApi } from "../StudioShellBackendApi";
 import { InMemoryStudioShellRepository } from "../../../studio-shell/InMemoryStudioShellRepository";
 import { InMemoryWorkflowPersistenceRepository } from "../../../workflows/InMemoryWorkflowPersistenceRepository";
+import { InMemoryWorkflowRunSummaryRepository } from "../../../workflows/InMemoryWorkflowRunSummaryRepository";
 import { GetPersistedWorkflowUseCase } from "../../../../application/workflow-persistence/GetPersistedWorkflowUseCase";
 import type { IWorkflowPersistenceRepository } from "../../../../application/ports/interfaces/IWorkflowPersistenceRepository";
 import type { PersistedWorkflowRecord } from "../../../../domain/workflow-studio/WorkflowPersistenceDomain";
+import {
+  createWorkflowRunDetailRecord,
+  createWorkflowRunSummaryRecord,
+  WorkflowRunStatuses,
+  WorkflowRunTriggerSources,
+} from "../../../../domain/workflow-studio/WorkflowRunHistoryDomain";
 
 describe("StudioShellBackendApi", () => {
+  it("lists workflow run summaries and projects structured run detail for workflow studio observability", async () => {
+    const workflowRunRepository = new InMemoryWorkflowRunSummaryRepository();
+    const summary = createWorkflowRunSummaryRecord({
+      runId: "run:workflow:1",
+      status: WorkflowRunStatuses.completed,
+      triggerSource: WorkflowRunTriggerSources.manual,
+      workflow: {
+        workflowId: "asset:workflow-1",
+        workflowName: "Workflow One",
+      },
+      correlation: {
+        executionRunId: "run:workflow:1",
+        workflowExecutionId: "workflow-exec:1",
+      },
+      timestamps: {
+        startedAt: "2026-03-31T12:00:00.000Z",
+        endedAt: "2026-03-31T12:00:05.000Z",
+        updatedAt: "2026-03-31T12:00:05.000Z",
+      },
+      output: {
+        outputAssetIds: ["asset:out-1"],
+        outputCount: 1,
+      },
+    });
+    await workflowRunRepository.upsertDetail(createWorkflowRunDetailRecord({
+      runId: summary.runId,
+      summary,
+      executionContext: {
+        resolvedTriggerContext: {
+          triggerSource: "manual",
+          triggerEventId: "evt-1",
+        },
+      },
+      outputs: {
+        outputAssetIds: ["asset:out-1"],
+        outputCount: 1,
+        outputValues: {
+          status: "completed",
+          answer: "ok",
+        },
+      },
+    }));
+
+    const api = new StudioShellBackendApi(
+      new InMemoryStudioShellRepository(),
+      undefined,
+      workflowRunRepository,
+    );
+
+    const listed = await api.listWorkflowRuns({
+      workflowId: "asset:workflow-1",
+    });
+    expect(listed.ok).toBeTrue();
+    expect(listed.data).toHaveLength(1);
+    expect(listed.data?.[0]).toEqual(expect.objectContaining({
+      runId: "run:workflow:1",
+      status: WorkflowRunStatuses.completed,
+      durationMs: 5000,
+    }));
+
+    const detail = await api.getWorkflowRunDetail("run:workflow:1");
+    expect(detail.ok).toBeTrue();
+    expect(detail.data?.summary.workflowId).toBe("asset:workflow-1");
+    expect(detail.data?.executionContext?.resolvedTriggerContext).toEqual({
+      triggerSource: "manual",
+      triggerEventId: "evt-1",
+    });
+    expect(detail.data?.outputs?.outputValues).toEqual({
+      status: "completed",
+      answer: "ok",
+    });
+  });
+
   it("projects the same validation issue structure for atomic model/dataset/tool drafts", async () => {
     const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
     const drafts: Array<{ studioId: string; semanticRole: "model" | "dataset" | "tool"; behaviorKind: "none" | "conditional" }> = [

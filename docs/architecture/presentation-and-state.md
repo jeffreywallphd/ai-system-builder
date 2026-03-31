@@ -112,6 +112,8 @@ The workflow editor still uses a dedicated presentation projection (`ui/presente
 
 Durable execution history now follows the same pattern through application-layer list/detail projections (`ExecutionRunProjectionService` and `ExecutionRunDetailProjectionService`), a thin renderer `ExecutionHistoryService`, and reusable `ui/components/execution/ExecutionHistoryPanel.tsx` / `ExecutionRunDetailPanel.tsx` surfaces. Workflow editor history, dataset-generation history, model-training history, and runtime-backed MCP server-operation history all consume those projected summaries/details instead of reconstructing plan semantics in page components or decoding feature-specific artifacts in the UI.
 
+Workflow Studio run-history list/detail follows the same boundary style: `WorkflowStudioRunHistoryPanel` renders workflow-scoped run summaries and detail sections, while data is loaded through `StudioShellService` (`listWorkflowRuns`, `getWorkflowRunDetail`) from backend-owned run-history projections instead of UI-layer repository access.
+
 Related-run lineage navigation now also flows through this same seam: the renderer asks `ExecutionHistoryService` for related-run clusters, and the execution detail panel can jump directly between runs in the same flow/plan grouping without introducing feature-specific linkage logic in page components.
 
 That keeps display wording, badge tone, fallback wording, progress summaries, and truthfulness summaries out of the page/component tree while still leaving execution business logic in the application/infrastructure layers.

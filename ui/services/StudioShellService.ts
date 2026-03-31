@@ -8,11 +8,14 @@ import type {
 import type {
   AssessWorkflowStudioExecutionReadinessRequest,
   DuplicatePersistedWorkflowRequest,
+  ListWorkflowStudioRunsRequest,
   RunWorkflowStudioDraftReadModel,
   RunWorkflowStudioDraftRequest,
   StudioShellApiResponse,
   StudioShellSnapshotReadModel,
   StudioShellValidationIssue,
+  WorkflowRunDetailReadModel,
+  WorkflowRunSummaryReadModel,
   WorkflowExecutionReadinessReadModel,
   PersistedWorkflowReadModel,
 } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
@@ -112,6 +115,18 @@ export class StudioShellService {
   public async runWorkflowDraft(request: RunWorkflowStudioDraftRequest): Promise<StudioShellApiResponse<RunWorkflowStudioDraftReadModel>> {
     const raw = await this.requireBridge().runWorkflowDraft(JSON.stringify(request));
     return JSON.parse(raw) as StudioShellApiResponse<RunWorkflowStudioDraftReadModel>;
+  }
+
+  public async listWorkflowRuns(
+    request: ListWorkflowStudioRunsRequest,
+  ): Promise<StudioShellApiResponse<ReadonlyArray<WorkflowRunSummaryReadModel>>> {
+    const raw = await this.requireBridge().listWorkflowRuns(JSON.stringify(request));
+    return JSON.parse(raw) as StudioShellApiResponse<ReadonlyArray<WorkflowRunSummaryReadModel>>;
+  }
+
+  public async getWorkflowRunDetail(runId: string): Promise<StudioShellApiResponse<WorkflowRunDetailReadModel>> {
+    const raw = await this.requireBridge().getWorkflowRunDetail(runId);
+    return JSON.parse(raw) as StudioShellApiResponse<WorkflowRunDetailReadModel>;
   }
 
   public async listSystemChildComponents(request: ListSystemChildComponentsRequest): Promise<SystemStudioApiResponse<ReadonlyArray<SystemStudioChildComponentReadModel>>> {

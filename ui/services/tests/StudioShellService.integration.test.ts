@@ -20,6 +20,13 @@ import {
 } from "../../../domain/workflow-studio/WorkflowStudioDomain";
 import { StudioShellService } from "../StudioShellService";
 import { CompositionAssetContractResolver } from "../../../application/contracts/CompositionAssetContractResolver";
+import { InMemoryWorkflowRunSummaryRepository } from "../../../infrastructure/workflows/InMemoryWorkflowRunSummaryRepository";
+import {
+  createWorkflowRunDetailRecord,
+  createWorkflowRunSummaryRecord,
+  WorkflowRunStatuses,
+  WorkflowRunTriggerSources,
+} from "../../../domain/workflow-studio/WorkflowRunHistoryDomain";
 
 const createdRoots: string[] = [];
 
@@ -81,6 +88,12 @@ function installBridge(
     },
     runWorkflowDraft(requestJson: string) {
       return api.runWorkflowDraft(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
+    },
+    listWorkflowRuns(requestJson: string) {
+      return api.listWorkflowRuns(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
+    },
+    getWorkflowRunDetail(runId: string) {
+      return api.getWorkflowRunDetail(runId).then((response) => JSON.stringify(response));
     },
     listSystemChildComponents(requestJson: string) {
       if (!systemApi) {
@@ -280,6 +293,66 @@ async function runLifecycleScenario(
 }
 
 describe("StudioShellService integration", () => {
+  it("lists workflow run summaries and loads run detail through the studio-shell bridge", async () => {
+    const workflowRunRepository = new InMemoryWorkflowRunSummaryRepository();
+    const summary = createWorkflowRunSummaryRecord({
+      runId: "run:workflow-service-1",
+      status: WorkflowRunStatuses.completed,
+      triggerSource: WorkflowRunTriggerSources.manual,
+      workflow: {
+        workflowId: "asset:workflow-service",
+        workflowName: "Service Workflow",
+      },
+      correlation: {
+        executionRunId: "run:workflow-service-1",
+      },
+      timestamps: {
+        startedAt: "2026-03-31T13:00:00.000Z",
+        endedAt: "2026-03-31T13:00:03.000Z",
+        updatedAt: "2026-03-31T13:00:03.000Z",
+      },
+    });
+    await workflowRunRepository.upsertDetail(createWorkflowRunDetailRecord({
+      runId: summary.runId,
+      summary,
+      executionContext: {
+        resolvedTriggerContext: {
+          triggerSource: "manual",
+        },
+      },
+      outputs: {
+        outputAssetIds: ["asset:service-output"],
+        outputCount: 1,
+        outputValues: {
+          status: "completed",
+        },
+      },
+    }));
+
+    const root = mkdtempSync(path.join(tmpdir(), "loom-workflow-runs-service-"));
+    createdRoots.push(root);
+    const backendApi = new StudioShellBackendApi(
+      new SqliteStudioShellRepository(path.join(root, "studio-shell.sqlite")),
+      undefined,
+      workflowRunRepository,
+    );
+    installBridge(backendApi);
+
+    const service = new StudioShellService();
+    const listed = await service.listWorkflowRuns({
+      workflowId: "asset:workflow-service",
+    });
+    expect(listed.ok).toBeTrue();
+    expect(listed.data?.[0]?.runId).toBe("run:workflow-service-1");
+
+    const detail = await service.getWorkflowRunDetail("run:workflow-service-1");
+    expect(detail.ok).toBeTrue();
+    expect(detail.data?.outputs?.outputCount).toBe(1);
+    expect(detail.data?.executionContext?.resolvedTriggerContext).toEqual({
+      triggerSource: "manual",
+    });
+  });
+
   it("uses browser fallback backend when desktop bridge is unavailable", async () => {
     const service = new StudioShellService();
     const run = await service.runWorkflowDraft({

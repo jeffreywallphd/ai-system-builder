@@ -25,16 +25,25 @@ import {
   StudioShellInvalidRequestError,
 } from "../../../application/studio-shell/StudioShellApplicationErrors";
 import type { IWorkflowPersistenceRepository } from "../../../application/ports/interfaces/IWorkflowPersistenceRepository";
+import type { IWorkflowRunSummaryRepository } from "../../../application/ports/interfaces/IWorkflowRunSummaryRepository";
 import { CreatePersistedWorkflowUseCase } from "../../../application/workflow-persistence/CreatePersistedWorkflowUseCase";
 import { DuplicatePersistedWorkflowUseCase } from "../../../application/workflow-persistence/DuplicatePersistedWorkflowUseCase";
 import { GetPersistedWorkflowUseCase } from "../../../application/workflow-persistence/GetPersistedWorkflowUseCase";
 import { UpdatePersistedWorkflowUseCase } from "../../../application/workflow-persistence/UpdatePersistedWorkflowUseCase";
+import { GetWorkflowRunDetailUseCase } from "../../../application/workflow-run-history/GetWorkflowRunDetailUseCase";
+import { ListWorkflowRunSummariesUseCase } from "../../../application/workflow-run-history/ListWorkflowRunSummariesUseCase";
 import {
   WorkflowPersistenceError,
   WorkflowPersistenceErrorCodes,
   WorkflowPersistenceInvalidRequestError,
 } from "../../../application/workflow-persistence/WorkflowPersistenceErrors";
 import { WorkflowLifecycleStates, deserializeWorkflowDraft } from "../../../domain/workflow-studio/WorkflowStudioDomain";
+import {
+  type WorkflowRunDetailRecord,
+  type WorkflowRunStatus,
+  type WorkflowRunSummaryRecord,
+  type WorkflowRunTriggerSource,
+} from "../../../domain/workflow-studio/WorkflowRunHistoryDomain";
 import { WorkflowExecutionTriggerSourceKinds, type WorkflowExecutionTriggerSourceKind } from "../../../application/workflow-studio/WorkflowExecutionAlignmentContracts";
 
 export interface StudioShellApiError {
@@ -251,6 +260,41 @@ export interface DuplicatePersistedWorkflowRequest {
   readonly versionLabel?: string;
 }
 
+export interface ListWorkflowStudioRunsRequest {
+  readonly workflowId: string;
+  readonly status?: WorkflowRunStatus;
+  readonly triggerSource?: WorkflowRunTriggerSource;
+  readonly limit?: number;
+}
+
+export interface WorkflowRunSummaryReadModel {
+  readonly runId: string;
+  readonly workflowId: string;
+  readonly workflowName: string;
+  readonly status: WorkflowRunStatus;
+  readonly triggerSource: WorkflowRunTriggerSource;
+  readonly startedAt: string;
+  readonly endedAt?: string;
+  readonly updatedAt: string;
+  readonly durationMs?: number;
+  readonly outputCount?: number;
+  readonly errorMessage?: string;
+  readonly executionRunId: string;
+  readonly workflowExecutionId?: string;
+  readonly executionFlowId?: string;
+  readonly triggerEventId?: string;
+  readonly parentRunId?: string;
+  readonly stepRunStats?: WorkflowRunSummaryRecord["stepRunStats"];
+}
+
+export interface WorkflowRunDetailReadModel {
+  readonly runId: string;
+  readonly summary: WorkflowRunSummaryReadModel;
+  readonly stepRuns: WorkflowRunDetailRecord["stepRuns"];
+  readonly executionContext?: WorkflowRunDetailRecord["executionContext"];
+  readonly outputs?: WorkflowRunDetailRecord["outputs"];
+}
+
 export class StudioShellBackendApi {
   private readonly service: DefaultStudioShellApplicationService;
   private readonly workflowStudioService: WorkflowStudioApplicationService;
@@ -258,10 +302,13 @@ export class StudioShellBackendApi {
   private readonly updatePersistedWorkflow?: UpdatePersistedWorkflowUseCase;
   private readonly getPersistedWorkflowUseCase?: GetPersistedWorkflowUseCase;
   private readonly duplicatePersistedWorkflowUseCase?: DuplicatePersistedWorkflowUseCase;
+  private readonly listWorkflowRunSummariesUseCase?: ListWorkflowRunSummariesUseCase;
+  private readonly getWorkflowRunDetailUseCase?: GetWorkflowRunDetailUseCase;
 
   constructor(
     private readonly repository: IStudioShellRepository,
     workflowPersistenceRepository?: IWorkflowPersistenceRepository,
+    workflowRunSummaryRepository?: IWorkflowRunSummaryRepository,
   ) {
     this.service = new DefaultStudioShellApplicationService(repository);
     this.workflowStudioService = new WorkflowStudioApplicationService(
@@ -277,6 +324,10 @@ export class StudioShellBackendApi {
       this.updatePersistedWorkflow = new UpdatePersistedWorkflowUseCase(workflowPersistenceRepository);
       this.getPersistedWorkflowUseCase = new GetPersistedWorkflowUseCase(workflowPersistenceRepository);
       this.duplicatePersistedWorkflowUseCase = new DuplicatePersistedWorkflowUseCase(workflowPersistenceRepository);
+    }
+    if (workflowRunSummaryRepository) {
+      this.listWorkflowRunSummariesUseCase = new ListWorkflowRunSummariesUseCase(workflowRunSummaryRepository);
+      this.getWorkflowRunDetailUseCase = new GetWorkflowRunDetailUseCase(workflowRunSummaryRepository);
     }
   }
 
@@ -546,6 +597,54 @@ export class StudioShellBackendApi {
     });
   }
 
+  public async listWorkflowRuns(
+    request: ListWorkflowStudioRunsRequest,
+  ): Promise<StudioShellApiResponse<ReadonlyArray<WorkflowRunSummaryReadModel>>> {
+    return this.wrap(async () => {
+      if (!this.listWorkflowRunSummariesUseCase) {
+        throw new StudioShellInvalidRequestError("Workflow run history integration is unavailable.");
+      }
+
+      const workflowId = request.workflowId?.trim();
+      if (!workflowId) {
+        throw new StudioShellInvalidRequestError("workflowId is required to list workflow runs.");
+      }
+
+      const summaries = await this.listWorkflowRunSummariesUseCase.execute({
+        workflowId,
+        status: request.status,
+        triggerSource: request.triggerSource,
+        limit: request.limit,
+      });
+      return Object.freeze(summaries.map((summary) => this.toWorkflowRunSummaryReadModel(summary)));
+    });
+  }
+
+  public async getWorkflowRunDetail(
+    runId: string,
+  ): Promise<StudioShellApiResponse<WorkflowRunDetailReadModel>> {
+    return this.wrap(async () => {
+      if (!this.getWorkflowRunDetailUseCase) {
+        throw new StudioShellInvalidRequestError("Workflow run history integration is unavailable.");
+      }
+
+      const normalizedRunId = runId?.trim();
+      if (!normalizedRunId) {
+        throw new StudioShellInvalidRequestError("Workflow run id is required.");
+      }
+
+      const detail = await this.getWorkflowRunDetailUseCase.execute(normalizedRunId);
+      if (!detail) {
+        throw new WorkflowPersistenceError(
+          WorkflowPersistenceErrorCodes.notFound,
+          `Workflow run '${normalizedRunId}' was not found.`,
+        );
+      }
+
+      return this.toWorkflowRunDetailReadModel(detail);
+    });
+  }
+
   public async getPersistedWorkflow(
     workflowId: string,
   ): Promise<StudioShellApiResponse<PersistedWorkflowReadModel>> {
@@ -592,6 +691,59 @@ export class StudioShellBackendApi {
         serializedDraft: record.definition.serializedDraft,
       });
     });
+  }
+
+  private toWorkflowRunSummaryReadModel(summary: WorkflowRunSummaryRecord): WorkflowRunSummaryReadModel {
+    const startedAtMs = Date.parse(summary.timestamps.startedAt);
+    const endedAtMs = summary.timestamps.endedAt ? Date.parse(summary.timestamps.endedAt) : Number.NaN;
+    const durationMs = Number.isFinite(startedAtMs) && Number.isFinite(endedAtMs)
+      ? Math.max(0, endedAtMs - startedAtMs)
+      : undefined;
+
+    return Object.freeze({
+      runId: summary.runId,
+      workflowId: summary.workflow.workflowId,
+      workflowName: summary.workflow.workflowName,
+      status: summary.status,
+      triggerSource: summary.triggerSource,
+      startedAt: summary.timestamps.startedAt,
+      endedAt: summary.timestamps.endedAt,
+      updatedAt: summary.timestamps.updatedAt,
+      durationMs,
+      outputCount: summary.output?.outputCount,
+      errorMessage: summary.errorMessage,
+      executionRunId: summary.correlation.executionRunId,
+      workflowExecutionId: summary.correlation.workflowExecutionId,
+      executionFlowId: summary.correlation.executionFlowId,
+      triggerEventId: summary.correlation.triggerEventId,
+      parentRunId: summary.correlation.parentRunId,
+      stepRunStats: summary.stepRunStats,
+    } satisfies WorkflowRunSummaryReadModel);
+  }
+
+  private toWorkflowRunDetailReadModel(detail: WorkflowRunDetailRecord): WorkflowRunDetailReadModel {
+    return Object.freeze({
+      runId: detail.runId,
+      summary: this.toWorkflowRunSummaryReadModel(detail.summary),
+      stepRuns: Object.freeze([...detail.stepRuns]),
+      executionContext: detail.executionContext
+        ? Object.freeze({
+          executionInput: detail.executionContext.executionInput,
+          resolvedTriggerContext: detail.executionContext.resolvedTriggerContext,
+          runtimeContext: detail.executionContext.runtimeContext,
+        })
+        : undefined,
+      outputs: detail.outputs
+        ? Object.freeze({
+          outputAssetIds: Object.freeze([...detail.outputs.outputAssetIds]),
+          outputCount: detail.outputs.outputCount,
+          resultMessages: detail.outputs.resultMessages
+            ? Object.freeze([...detail.outputs.resultMessages])
+            : undefined,
+          outputValues: detail.outputs.outputValues,
+        })
+        : undefined,
+    } satisfies WorkflowRunDetailReadModel);
   }
 
   public async duplicatePersistedWorkflow(

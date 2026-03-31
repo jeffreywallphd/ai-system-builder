@@ -23,7 +23,9 @@ describe("WorkflowStudioPage contracts", () => {
     expect(registrationSource).toContain('kind: "composite"');
     expect(registrationSource).toContain('role: "workflow"');
     expect(registrationSource).toContain("workflow-studio-mode-abstraction");
+    expect(registrationSource).toContain("workflow-studio-run-history");
     expect(registrationSource).toContain('slot: "draft-authoring"');
+    expect(registrationSource).toContain('slot: "session-context"');
     expect(registrationSource).toContain('slot: "metadata"');
     expect(registrationSource).toContain('createWorkflowStudioTaxonomy("deterministic")');
     expect(registrationSource).toContain("drawers: Object.freeze(");

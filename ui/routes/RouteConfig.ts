@@ -35,6 +35,8 @@ export const ROUTE_PATHS = Object.freeze({
   registry: "/studio-shell/registry",
   registryAssetDetail: "/studio-shell/registry/assets/:assetId",
   workflowStudio: "/studio-shell/workflow",
+  workflowStudioRuns: "/studio-shell/workflow/runs",
+  workflowStudioRunDetail: "/studio-shell/workflow/runs/:runId",
   workflowStudioMode: "/studio-shell/workflow/:modeId",
   workflowStudioWizardPage: "/studio-shell/workflow/wizard/:wizardPageId",
   contextBundleStudio: "/studio-shell/context-bundle",
@@ -189,6 +191,18 @@ export const APP_ROUTES: ReadonlyArray<AppRouteDefinition> = Object.freeze([
     key: "workflow-studio",
     path: ROUTE_PATHS.workflowStudio,
     title: "Workflow Studio",
+    showInNavigation: false,
+  }),
+  Object.freeze({
+    key: "workflow-studio-runs",
+    path: ROUTE_PATHS.workflowStudioRuns,
+    title: "Workflow Studio Runs",
+    showInNavigation: false,
+  }),
+  Object.freeze({
+    key: "workflow-studio-run-detail",
+    path: ROUTE_PATHS.workflowStudioRunDetail,
+    title: "Workflow Studio Run Detail",
     showInNavigation: false,
   }),
   Object.freeze({
