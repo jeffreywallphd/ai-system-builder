@@ -13,6 +13,7 @@ import type {
   IWorkflowExecutor,
 } from "../../application/ports/interfaces/IWorkflowExecutor";
 import type { ExecutionAssetLineageRecorder } from "../../application/assets-system/ExecutionAssetLineageRecorder";
+import type { WorkflowRunHistoryService } from "../../application/workflow-run-history/WorkflowRunHistoryService";
 import {
   createExecutionArtifact,
   toExecutionProvenance,
@@ -102,6 +103,7 @@ export class WorkflowExecutionUnitHandler implements IExecutionUnitHandler {
   constructor(
     workflowExecutor: IWorkflowExecutor,
     private readonly executionAssetLineageRecorder?: ExecutionAssetLineageRecorder,
+    private readonly workflowRunHistoryService?: WorkflowRunHistoryService,
   ) {
     this.workflowExecutor = workflowExecutor;
   }
@@ -120,12 +122,20 @@ export class WorkflowExecutionUnitHandler implements IExecutionUnitHandler {
       throw new Error(`Execution unit '${request.unit.id}' is missing workflow execution input.`);
     }
 
-    const workflowResult = await this.workflowExecutor.execute(input, (workflowEvent) => {
-      onEvent?.(toExecutionEvent(request, workflowEvent));
+    await this.workflowRunHistoryService?.recordRunStarted({
+      runId: request.runId,
+      executionFlowId: this.resolveExecutionFlowId(input),
+      input,
     });
+
+    const workflowResult = await this.runWorkflowExecution(request, input, onEvent);
 
     await this.executionAssetLineageRecorder?.recordWorkflowExecution({
       input,
+      result: workflowResult,
+    });
+    await this.workflowRunHistoryService?.recordRunCompleted({
+      runId: request.runId,
       result: workflowResult,
     });
 
@@ -142,14 +152,34 @@ export class WorkflowExecutionUnitHandler implements IExecutionUnitHandler {
       throw new Error(`Execution unit '${request.unit.id}' is missing workflow execution input.`);
     }
 
+    await this.workflowRunHistoryService?.recordRunStarted({
+      runId: request.runId,
+      executionFlowId: this.resolveExecutionFlowId(input),
+      input,
+    });
+
     const workflowHandle = await this.workflowExecutor.startExecution(input);
 
     return Object.freeze({
       unitId: request.unit.id,
       waitForCompletion: async () => {
-        const workflowResult = await workflowHandle.waitForCompletion();
+        let workflowResult: IWorkflowExecutionResult;
+        try {
+          workflowResult = await workflowHandle.waitForCompletion();
+        } catch (error) {
+          await this.workflowRunHistoryService?.recordRunFailed({
+            runId: request.runId,
+            errorMessage: error instanceof Error ? error.message : "Workflow execution failed.",
+          });
+          throw error;
+        }
+
         await this.executionAssetLineageRecorder?.recordWorkflowExecution({
           input,
+          result: workflowResult,
+        });
+        await this.workflowRunHistoryService?.recordRunCompleted({
+          runId: request.runId,
           result: workflowResult,
         });
         return toUnitResult(request.unit.id, workflowResult);
@@ -166,5 +196,33 @@ export class WorkflowExecutionUnitHandler implements IExecutionUnitHandler {
           }
         : undefined,
     });
+  }
+
+  private async runWorkflowExecution(
+    request: IExecutionUnitExecutionRequest,
+    input: IWorkflowExecutionInput,
+    onEvent?: (event: IExecutionEngineEvent) => void,
+  ): Promise<IWorkflowExecutionResult> {
+    try {
+      return await this.workflowExecutor.execute(input, (workflowEvent) => {
+        onEvent?.(toExecutionEvent(request, workflowEvent));
+      });
+    } catch (error) {
+      await this.workflowRunHistoryService?.recordRunFailed({
+        runId: request.runId,
+        errorMessage: error instanceof Error ? error.message : "Workflow execution failed.",
+      });
+      throw error;
+    }
+  }
+
+  private resolveExecutionFlowId(input: IWorkflowExecutionInput): string | undefined {
+    const fromParameters = typeof input.parameters?.executionFlowId === "string"
+      ? input.parameters.executionFlowId
+      : undefined;
+    const fromMetadata = typeof input.executionMetadata?.executionFlowId === "string"
+      ? input.executionMetadata.executionFlowId
+      : undefined;
+    return fromParameters ?? fromMetadata;
   }
 }

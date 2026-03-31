@@ -14,6 +14,7 @@ Electron is the desktop host boundary; the renderer accesses desktop capabilitie
 
 ## Storage modes to mention
 - Desktop canonical path: filesystem JSON + SQLite workflow index plus SQLite execution-run history with explicit schema versioning/migration via SQLite `user_version`
+- Workflow run observability summaries now share that same desktop SQLite durability path through preload/IPC bridge contracts (`ai-loom-desktop-workflow-runs:*`) backed by `SqliteWorkflowRunSummaryRepository`.
 - Desktop backend bridge now also includes thin agent-authoring IPC endpoints (`ai-loom-desktop-agents:*`) mapped to application use cases and structured validation errors.
 - Phase 8.1 now consolidates Studio-facing desktop agent transport through `AgentStudioBackendApi` and extends `ai-loom-desktop-agents:*` with runtime/session endpoints (`launch`, `trigger-launch`, `list-sessions`, `get-session`, `control-run`, `studio-snapshot`) while staying thin over Phase 6/7 use cases.
 - Phase 8.5/8.6 renderer flows consume those same host contracts directly: run controls call `control-run`, manual launches call `launch`, and backend-trigger launches call `trigger-launch`, with no renderer-owned scheduler/automation runtime.

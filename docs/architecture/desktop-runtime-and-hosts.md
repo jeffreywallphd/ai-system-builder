@@ -33,6 +33,7 @@ This makes Electron the host-level boundary where local capabilities become avai
 - key/value storage access
 - workflow persistence operations
 - execution-run history operations
+- workflow-run summary history operations
 - model-file operations
 - canonical asset operations
 - agent authoring/configuration operations (`create/update/get/list/delete/archive`, goal/policy/tool/memory/strategy configuration, and configuration validation)
@@ -61,6 +62,8 @@ In desktop mode, the main process creates `DesktopWorkflowPersistence`, which st
 - workflow summaries in a SQLite index
 
 The main process now also exposes a SQLite-backed execution-run repository through the preload bridge, using the desktop storage database as the durable structured source of truth for plan-backed execution history.
+
+Workflow-run summary history now follows the same desktop persistence posture through `SqliteWorkflowRunSummaryRepository` and preload bridge operations (`ai-loom-desktop-workflow-runs:*`) so workflow-observability list views can query top-level run metadata without decoding full execution-run payloads.
 
 That repository now uses explicit schema versioning and forward migrations via SQLite `user_version`, along with startup version checks. The intent is pragmatic rather than framework-heavy: repeated startup should be safe, legacy unversioned execution-run tables can be adopted and migrated in place, and newer unsupported schemas fail clearly instead of being used silently.
 
