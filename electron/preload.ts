@@ -76,6 +76,12 @@ contextBridge.exposeInMainWorld("aiLoomDesktop", {
     listWorkflowRunSummaries(queryJson?: string) {
       return ipcRenderer.invoke("ai-loom-desktop-workflow-runs:list", queryJson) as Promise<ReadonlyArray<string>>;
     },
+    saveWorkflowRunDetail(detailJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-workflow-runs:save-detail", detailJson);
+    },
+    loadWorkflowRunDetail(runId: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-workflow-runs:load-detail", runId) as Promise<string | null>;
+    },
   },
   modelFiles: {
     exists(path: string) {

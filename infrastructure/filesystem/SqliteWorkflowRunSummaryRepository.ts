@@ -2,17 +2,27 @@ import fs from "node:fs";
 import path from "node:path";
 import type { IWorkflowRunSummaryRepository } from "../../application/ports/interfaces/IWorkflowRunSummaryRepository";
 import type {
+  WorkflowRunDetailRecord,
   WorkflowRunSummaryListQuery,
   WorkflowRunSummaryRecord,
 } from "../../domain/workflow-studio/WorkflowRunHistoryDomain";
-import { normalizeWorkflowRunSummaryRecord } from "../../domain/workflow-studio/WorkflowRunHistoryDomain";
+import {
+  createWorkflowRunDetailRecord,
+  createWorkflowStepRunStats,
+  normalizeWorkflowRunSummaryRecord,
+  normalizeWorkflowRunDetailRecord,
+} from "../../domain/workflow-studio/WorkflowRunHistoryDomain";
 import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "./sqlite/SqliteCompat";
 
 interface WorkflowRunSummaryRow {
   readonly record_json: string;
 }
 
-const SCHEMA_VERSION = 1;
+interface WorkflowRunDetailRow {
+  readonly record_json: string;
+}
+
+const SCHEMA_VERSION = 2;
 const MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   [1, `
     CREATE TABLE IF NOT EXISTS workflow_run_summary_repository_migrations (
@@ -44,6 +54,21 @@ const MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
       ON workflow_run_summaries(status, started_at DESC);
     CREATE INDEX IF NOT EXISTS workflow_run_summary_trigger_started_idx
       ON workflow_run_summaries(trigger_source, started_at DESC);
+  `],
+  [2, `
+    CREATE TABLE IF NOT EXISTS workflow_run_details (
+      run_id TEXT PRIMARY KEY,
+      workflow_id TEXT NOT NULL,
+      status TEXT NOT NULL,
+      started_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      record_json TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS workflow_run_detail_workflow_started_idx
+      ON workflow_run_details(workflow_id, started_at DESC);
+    CREATE INDEX IF NOT EXISTS workflow_run_detail_status_started_idx
+      ON workflow_run_details(status, started_at DESC);
   `],
 ]);
 
@@ -110,6 +135,43 @@ export class SqliteWorkflowRunSummaryRepository implements IWorkflowRunSummaryRe
     return normalized;
   }
 
+  public async upsertDetail(record: WorkflowRunDetailRecord): Promise<WorkflowRunDetailRecord> {
+    const normalized = normalizeWorkflowRunDetailRecord(record);
+    await this.upsert(normalized.summary);
+
+    const result = this.getDatabase()
+      .prepare(`
+        INSERT INTO workflow_run_details (
+          run_id,
+          workflow_id,
+          status,
+          started_at,
+          updated_at,
+          record_json
+        ) VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(run_id) DO UPDATE SET
+          workflow_id = excluded.workflow_id,
+          status = excluded.status,
+          started_at = excluded.started_at,
+          updated_at = excluded.updated_at,
+          record_json = excluded.record_json
+      `)
+      .run(
+        normalized.runId,
+        normalized.summary.workflow.workflowId,
+        normalized.summary.status,
+        normalized.summary.timestamps.startedAt,
+        normalized.summary.timestamps.updatedAt,
+        JSON.stringify(normalized),
+      );
+
+    if (result.changes < 1) {
+      throw new Error(`Workflow run detail '${normalized.runId}' was not persisted.`);
+    }
+
+    return normalized;
+  }
+
   public async getByRunId(runId: string): Promise<WorkflowRunSummaryRecord | undefined> {
     const normalizedRunId = runId.trim();
     if (!normalizedRunId) {
@@ -121,6 +183,34 @@ export class SqliteWorkflowRunSummaryRepository implements IWorkflowRunSummaryRe
       .get(normalizedRunId) as WorkflowRunSummaryRow | undefined;
 
     return row ? this.parseRecord(row.record_json) : undefined;
+  }
+
+  public async getDetailByRunId(runId: string): Promise<WorkflowRunDetailRecord | undefined> {
+    const normalizedRunId = runId.trim();
+    if (!normalizedRunId) {
+      return undefined;
+    }
+
+    const detailRow = this.getDatabase()
+      .prepare("SELECT record_json FROM workflow_run_details WHERE run_id = ?")
+      .get(normalizedRunId) as WorkflowRunDetailRow | undefined;
+
+    if (detailRow) {
+      return this.parseDetail(detailRow.record_json);
+    }
+
+    const summary = await this.getByRunId(normalizedRunId);
+    if (!summary) {
+      return undefined;
+    }
+    return createWorkflowRunDetailRecord({
+      runId: summary.runId,
+      summary: normalizeWorkflowRunSummaryRecord({
+        ...summary,
+        stepRunStats: summary.stepRunStats ?? createWorkflowStepRunStats([]),
+      }),
+      stepRuns: [],
+    });
   }
 
   public async list(query?: WorkflowRunSummaryListQuery): Promise<ReadonlyArray<WorkflowRunSummaryRecord>> {
@@ -229,6 +319,15 @@ export class SqliteWorkflowRunSummaryRepository implements IWorkflowRunSummaryRe
     } catch (error) {
       const message = error instanceof Error ? error.message : "unknown parse error";
       throw new Error(`Workflow run summary record could not be parsed: ${message}`);
+    }
+  }
+
+  private parseDetail(serialized: string): WorkflowRunDetailRecord {
+    try {
+      return normalizeWorkflowRunDetailRecord(JSON.parse(serialized) as WorkflowRunDetailRecord);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "unknown parse error";
+      throw new Error(`Workflow run detail record could not be parsed: ${message}`);
     }
   }
 

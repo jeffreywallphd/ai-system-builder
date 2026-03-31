@@ -99,18 +99,21 @@ Workflow -> `ExecuteWorkflowUseCase` -> one-unit `ExecutionPlan` -> `UnifiedExec
 - Selection reasons now surface skipped delegated paths and orchestration detail so workflow provenance stays truthful about why fallback execution was chosen.
 - The unified execution engine preserves delegated/scaffolded/hybrid/unavailable provenance instead of replacing it with generic plan state.
 
-## Workflow run history foundation (Epic 12 stories 12.1-12.2)
+## Workflow run history foundation (Epic 12 stories 12.1-12.4)
 - Workflow observability now has a canonical workflow-run-history contract in `domain/workflow-studio/WorkflowRunHistoryDomain.ts`:
   - top-level run summary identity/status/trigger/timestamps
   - correlation ids linking workflow-run summaries to durable execution-run records (`executionRunId`, optional `workflowExecutionId`, optional `executionFlowId`)
   - explicit workflow-definition references and output references
-  - forward-compatible step-run placeholders for later step-detail stories.
+  - explicit run-detail records (`WorkflowRunDetailRecord`) carrying step-run execution records, execution context, and structured output records.
 - Application orchestration now records workflow-run summary lifecycle through `application/workflow-run-history/WorkflowRunHistoryService.ts` and lists summaries through `ListWorkflowRunSummariesUseCase`.
-- Workflow execution integration remains on the existing execution backbone: `infrastructure/execution/WorkflowExecutionUnitHandler.ts` now records run-summary start + terminal updates (completed/failed/cancelled) while still delegating execution truth to the existing workflow executor/runtime path.
+- Workflow execution integration remains on the existing execution backbone: `infrastructure/execution/WorkflowExecutionUnitHandler.ts` records run start/terminal summary lifecycle and now streams node/step runtime events into run-detail step-run updates (`recordStepEvent`) without introducing a second runtime path.
+- Run detail now distinguishes list-facing summary and inspection-facing detail:
+  - summary: `WorkflowRunSummaryRecord` + `stepRunStats`
+  - detail: `WorkflowRunDetailRecord` with ordered step runs (status/timestamps/duration/error summary), structured execution input/trigger/runtime context, and structured top-level outputs.
 - Persistence is now adapter-based and host-aware:
-  - desktop/Node durability: `SqliteWorkflowRunSummaryRepository`
-  - desktop renderer bridge path: `DesktopBridgeWorkflowRunSummaryRepository` + preload/IPC bridge methods
-  - browser fallback: `LocalStorageWorkflowRunSummaryRepository`
+  - desktop/Node durability: `SqliteWorkflowRunSummaryRepository` (summary + detail tables with schema migration)
+  - desktop renderer bridge path: `DesktopBridgeWorkflowRunSummaryRepository` + preload/IPC bridge methods for both summary and detail records
+  - browser fallback: `LocalStorageWorkflowRunSummaryRepository` (separate summary/detail storage keys)
   - in-memory fallback for constrained environments.
 
 ## What is not migrated yet

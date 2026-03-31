@@ -1,9 +1,15 @@
 import type { IWorkflowRunSummaryRepository } from "../../application/ports/interfaces/IWorkflowRunSummaryRepository";
 import type {
+  WorkflowRunDetailRecord,
   WorkflowRunSummaryListQuery,
   WorkflowRunSummaryRecord,
 } from "../../domain/workflow-studio/WorkflowRunHistoryDomain";
-import { normalizeWorkflowRunSummaryRecord } from "../../domain/workflow-studio/WorkflowRunHistoryDomain";
+import {
+  createWorkflowRunDetailRecord,
+  createWorkflowStepRunStats,
+  normalizeWorkflowRunSummaryRecord,
+  normalizeWorkflowRunDetailRecord,
+} from "../../domain/workflow-studio/WorkflowRunHistoryDomain";
 
 interface StorageLike {
   getItem(key: string): string | null;
@@ -12,11 +18,13 @@ interface StorageLike {
 }
 
 const STORAGE_KEY = "ai-loom.workflow-run-summaries.v1";
+const DETAIL_STORAGE_KEY = "ai-loom.workflow-run-details.v1";
 
 export class LocalStorageWorkflowRunSummaryRepository implements IWorkflowRunSummaryRepository {
   constructor(
     private readonly storageKey: string = STORAGE_KEY,
     private readonly storage: StorageLike | undefined = typeof localStorage !== "undefined" ? localStorage : undefined,
+    private readonly detailStorageKey: string = DETAIL_STORAGE_KEY,
   ) {}
 
   public async upsert(record: WorkflowRunSummaryRecord): Promise<WorkflowRunSummaryRecord> {
@@ -24,6 +32,30 @@ export class LocalStorageWorkflowRunSummaryRepository implements IWorkflowRunSum
     const current = this.loadAllMutable();
     current[normalized.runId] = normalized;
     this.saveAll(current);
+    const details = this.loadAllDetailsMutable();
+    const existing = details[normalized.runId];
+    if (existing) {
+      details[normalized.runId] = createWorkflowRunDetailRecord({
+        runId: normalized.runId,
+        summary: normalized,
+        stepRuns: existing.stepRuns,
+        executionContext: existing.executionContext,
+        outputs: existing.outputs,
+      });
+      this.saveAllDetails(details);
+    }
+    return normalized;
+  }
+
+  public async upsertDetail(record: WorkflowRunDetailRecord): Promise<WorkflowRunDetailRecord> {
+    const normalized = normalizeWorkflowRunDetailRecord(record);
+    const details = this.loadAllDetailsMutable();
+    details[normalized.runId] = normalized;
+    this.saveAllDetails(details);
+
+    const summaries = this.loadAllMutable();
+    summaries[normalized.runId] = normalized.summary;
+    this.saveAll(summaries);
     return normalized;
   }
 
@@ -36,6 +68,33 @@ export class LocalStorageWorkflowRunSummaryRepository implements IWorkflowRunSum
     const current = this.loadAllMutable();
     const found = current[normalizedRunId];
     return found ? normalizeWorkflowRunSummaryRecord(found) : undefined;
+  }
+
+  public async getDetailByRunId(runId: string): Promise<WorkflowRunDetailRecord | undefined> {
+    const normalizedRunId = runId.trim();
+    if (!normalizedRunId) {
+      return undefined;
+    }
+
+    const details = this.loadAllDetailsMutable();
+    const found = details[normalizedRunId];
+    if (found) {
+      return normalizeWorkflowRunDetailRecord(found);
+    }
+
+    const summary = await this.getByRunId(normalizedRunId);
+    if (!summary) {
+      return undefined;
+    }
+
+    return createWorkflowRunDetailRecord({
+      runId: summary.runId,
+      summary: normalizeWorkflowRunSummaryRecord({
+        ...summary,
+        stepRunStats: summary.stepRunStats ?? createWorkflowStepRunStats([]),
+      }),
+      stepRuns: [],
+    });
   }
 
   public async list(query?: WorkflowRunSummaryListQuery): Promise<ReadonlyArray<WorkflowRunSummaryRecord>> {
@@ -98,5 +157,32 @@ export class LocalStorageWorkflowRunSummaryRepository implements IWorkflowRunSum
       return;
     }
     this.storage.setItem(this.storageKey, JSON.stringify(records));
+  }
+
+  private loadAllDetailsMutable(): Record<string, WorkflowRunDetailRecord> {
+    if (!this.storage) {
+      return {};
+    }
+
+    const raw = this.storage.getItem(this.detailStorageKey);
+    if (!raw) {
+      return {};
+    }
+
+    try {
+      const parsed = JSON.parse(raw) as Record<string, WorkflowRunDetailRecord>;
+      return Object.fromEntries(
+        Object.entries(parsed).map(([runId, record]) => [runId, normalizeWorkflowRunDetailRecord(record)]),
+      );
+    } catch {
+      return {};
+    }
+  }
+
+  private saveAllDetails(records: Record<string, WorkflowRunDetailRecord>): void {
+    if (!this.storage) {
+      return;
+    }
+    this.storage.setItem(this.detailStorageKey, JSON.stringify(records));
   }
 }
