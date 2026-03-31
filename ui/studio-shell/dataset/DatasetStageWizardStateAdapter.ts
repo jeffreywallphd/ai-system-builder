@@ -9,6 +9,14 @@ import {
   StageCanvasGraphProjectionService,
   type StageCanvasGraphModel,
 } from "../../../application/dataset-studio/StageCanvasGraphProjectionService";
+import {
+  StagePipelinePersistenceService,
+  type PersistedStagePipelineDocument,
+} from "../../../application/dataset-studio/StagePipelinePersistenceService";
+import {
+  StageOutputInspectionService,
+  type StageOutputInspectionModel,
+} from "../../../application/dataset-studio/StageOutputInspectionService";
 import { TemplateService } from "../../../application/dataset-studio/TemplateService";
 import { WizardFlowEngine } from "../../../application/dataset-studio/WizardFlowEngine";
 import type { DatasetPipelineStageKind } from "../../../domain/dataset-studio/StagePipelineDomain";
@@ -35,6 +43,7 @@ export interface DatasetStageWizardStageViewModel {
     readonly lineageId?: string;
     readonly pipelineId?: string;
   };
+  readonly inspection: StageOutputInspectionModel;
 }
 
 export interface DatasetStageWizardSnapshot {
@@ -83,9 +92,12 @@ function computeProgressPercent(stages: ReadonlyArray<DatasetStageWizardStageVie
 }
 
 export class DatasetStageWizardStateAdapter {
-  private readonly engine: WizardFlowEngine;
+  private engine: WizardFlowEngine;
   private readonly graphProjectionService: StageCanvasGraphProjectionService;
   private readonly editingService: StageCanvasEditingService;
+  private readonly stageExecutionPolicy: StageExecutionPolicy;
+  private readonly inspectionService: StageOutputInspectionService;
+  private readonly persistenceService: StagePipelinePersistenceService;
 
   constructor(options?: {
     readonly templateId?: string;
@@ -93,13 +105,29 @@ export class DatasetStageWizardStateAdapter {
     readonly stageExecutionPolicy?: StageExecutionPolicy;
     readonly graphProjectionService?: StageCanvasGraphProjectionService;
     readonly editingService?: StageCanvasEditingService;
+    readonly inspectionService?: StageOutputInspectionService;
+    readonly persistenceService?: StagePipelinePersistenceService;
+    readonly persistedPipeline?: PersistedStagePipelineDocument | string | unknown;
   }) {
     const templateService = options?.templateService ?? new TemplateService();
-    const template = templateService.getTemplate(options?.templateId ?? "elt-default");
-    this.engine = new WizardFlowEngine({
-      template,
-      stageExecutionPolicy: options?.stageExecutionPolicy ?? new StageExecutionPolicy(),
-    });
+    this.stageExecutionPolicy = options?.stageExecutionPolicy ?? new StageExecutionPolicy();
+    this.inspectionService = options?.inspectionService ?? new StageOutputInspectionService();
+    this.persistenceService = options?.persistenceService ?? new StagePipelinePersistenceService();
+    const persisted = options?.persistedPipeline
+      ? this.toPersistedDocument(options.persistedPipeline)
+      : undefined;
+
+    if (persisted) {
+      this.engine = this.persistenceService.rehydrateWizardEngine(persisted, {
+        stageExecutionPolicy: this.stageExecutionPolicy,
+      });
+    } else {
+      const template = templateService.getTemplate(options?.templateId ?? "elt-default");
+      this.engine = new WizardFlowEngine({
+        template,
+        stageExecutionPolicy: this.stageExecutionPolicy,
+      });
+    }
 
     this.graphProjectionService = options?.graphProjectionService ?? new StageCanvasGraphProjectionService();
     this.editingService = options?.editingService ?? new StageCanvasEditingService({
@@ -111,6 +139,11 @@ export class DatasetStageWizardStateAdapter {
   public getSnapshot(): DatasetStageWizardSnapshot {
     const uiSnapshot = this.engine.toUiSnapshot();
     const stageOrder = uiSnapshot.stages.map((stage) => stage.id);
+    const inspectionByStageId = this.inspectionService.inspectFlow({
+      stageFlow: this.engine.getStageFlow(),
+      state: this.engine.getState(),
+      stageRuntimeTracking: this.engine.getStageRuntimeTracking(),
+    });
     const stages = Object.freeze(uiSnapshot.stages.map((stage) => {
       const isDisabled = toDisabledStatus(stageOrder, uiSnapshot.currentStageId, stage.id);
       return Object.freeze({
@@ -132,6 +165,7 @@ export class DatasetStageWizardStateAdapter {
           lineageId: stage.metadata.lineageId,
           pipelineId: stage.metadata.pipelineId,
         },
+        inspection: inspectionByStageId[stage.id],
       } satisfies DatasetStageWizardStageViewModel);
     }));
 
@@ -189,5 +223,34 @@ export class DatasetStageWizardStateAdapter {
 
   public regenerateGraph(): StageCanvasGraphModel {
     return this.editingService.regenerateGraph(this.engine);
+  }
+
+  public exportPersistedPipeline(): PersistedStagePipelineDocument {
+    return this.persistenceService.saveFromWizard({
+      engine: this.engine,
+    });
+  }
+
+  public exportPersistedPipelineJson(): string {
+    return this.persistenceService.serialize(this.exportPersistedPipeline());
+  }
+
+  public importPersistedPipeline(
+    persisted: PersistedStagePipelineDocument | string | unknown,
+  ): PersistedStagePipelineDocument {
+    const decoded = this.toPersistedDocument(persisted);
+    this.engine = this.persistenceService.rehydrateWizardEngine(decoded, {
+      stageExecutionPolicy: this.stageExecutionPolicy,
+    });
+    return decoded;
+  }
+
+  private toPersistedDocument(
+    persisted: PersistedStagePipelineDocument | string | unknown,
+  ): PersistedStagePipelineDocument {
+    if (typeof persisted === "string") {
+      return this.persistenceService.deserialize(persisted);
+    }
+    return this.persistenceService.decode(persisted);
   }
 }

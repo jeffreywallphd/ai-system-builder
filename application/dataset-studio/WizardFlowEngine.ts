@@ -32,6 +32,7 @@ import {
   createStageMetadataFromDefinition,
   createStageMetadataPropagationPayload,
   mergePropagationPayloads,
+  StageRuntimeTrackingSchema,
   withStageStatusMarker,
   type StageRuntimeTracking,
 } from "./StageMetadataContracts";
@@ -76,6 +77,9 @@ export interface WizardFlowEngineOptions {
   }) => boolean;
   readonly stageExecutionPolicy?: StageExecutionPolicy;
   readonly beforeTransition?: WizardFlowTransitionValidationHook;
+  readonly runtimeState?: StageFlowRuntimeState;
+  readonly stageRuntimeTracking?: Readonly<Record<string, StageRuntimeTracking>>;
+  readonly navigationHistory?: ReadonlyArray<string>;
 }
 
 export interface WizardFlowUiStage {
@@ -139,6 +143,13 @@ function hasValues(record: Readonly<Record<string, CanonicalRecordValue>>): bool
   return Object.keys(record).length > 0;
 }
 
+function normalizeNavigationHistory(value?: ReadonlyArray<string>): ReadonlyArray<string> {
+  if (!value || value.length === 0) {
+    return Object.freeze([]);
+  }
+  return Object.freeze(value.map((entry) => normalizeRequired(entry, "navigationHistory.entry")));
+}
+
 export class WizardFlowEngine {
   private stageFlow: StageFlowDefinition;
   private state: StageFlowRuntimeState;
@@ -161,20 +172,21 @@ export class WizardFlowEngine {
       stages: stageFlow.stages,
       conditionalTransitions: stageFlow.conditionalTransitions,
     });
-    this.state = initial.state ?? createInitialStageFlowRuntimeState(this.stageFlow);
-    this.navigationHistory = Object.freeze([]);
+    this.state = options.runtimeState ?? initial.state ?? createInitialStageFlowRuntimeState(this.stageFlow);
+    this.navigationHistory = normalizeNavigationHistory(options.navigationHistory);
     this.conditionEvaluators = options.conditionEvaluators ?? Object.freeze({});
     this.autoSkipEvaluator = options.autoSkipEvaluator;
     this.stageExecutionPolicy = options.stageExecutionPolicy;
     this.beforeTransition = options.beforeTransition;
     this.intentDefaults = initial.intentDefaults ?? Object.freeze({});
     this.templateDefaults = initial.templateDefaults ?? Object.freeze({});
-    this.stageRuntimeTracking = Object.freeze(
+    const defaultRuntimeTracking = Object.freeze(
       Object.fromEntries(this.stageFlow.stages.map((stage) => [stage.id, Object.freeze({
         metadata: createStageMetadataFromDefinition(stage),
         contract: createStageContractFromDefinition(stage),
       } satisfies StageRuntimeTracking)])),
     );
+    this.stageRuntimeTracking = this.mergeStageRuntimeTracking(defaultRuntimeTracking, options.stageRuntimeTracking);
 
     if (initial.intentContext) {
       this.state = Object.freeze({
@@ -190,6 +202,9 @@ export class WizardFlowEngine {
     }
 
     this.validateCurrentStageExists();
+    for (const stageId of this.navigationHistory) {
+      this.assertKnownStageId(stageId);
+    }
     this.refreshStageRuntimeTrackingStatuses();
   }
 
@@ -207,6 +222,10 @@ export class WizardFlowEngine {
 
   public getStageRuntimeTracking(): Readonly<Record<string, StageRuntimeTracking>> {
     return this.stageRuntimeTracking;
+  }
+
+  public getNavigationHistory(): ReadonlyArray<string> {
+    return this.navigationHistory;
   }
 
   public setStageConfiguration(
@@ -762,6 +781,28 @@ export class WizardFlowEngine {
     }
 
     this.stageRuntimeTracking = Object.freeze(nextTracking);
+  }
+
+  private mergeStageRuntimeTracking(
+    defaults: Readonly<Record<string, StageRuntimeTracking>>,
+    provided?: Readonly<Record<string, StageRuntimeTracking>>,
+  ): Readonly<Record<string, StageRuntimeTracking>> {
+    if (!provided) {
+      return defaults;
+    }
+    const merged: Record<string, StageRuntimeTracking> = { ...defaults };
+    for (const stage of this.stageFlow.stages) {
+      const candidate = provided[stage.id];
+      if (!candidate) {
+        continue;
+      }
+      const parsed = StageRuntimeTrackingSchema.safeParse(candidate);
+      if (!parsed.success) {
+        continue;
+      }
+      merged[stage.id] = parsed.data;
+    }
+    return Object.freeze(merged);
   }
 }
 
