@@ -1041,3 +1041,21 @@ Explicitly later than this scope:
   - bounded/partial by design: local catalog implementation is in-memory/local-reference oriented in this slice; repository abstraction boundaries are preserved for later remote/LAN catalog adapters.
   - future work: distributed/LAN package sharing, remote repository synchronization, and distributed execution/deployment behaviors are design considerations preserved by current abstraction boundaries, not current product behavior.
 
+## Direction 5 update: Data Studio canonical-shape + converter foundation (stories 13.1-13.2)
+
+- Data Studio now has a bounded canonical data-shape contract in `domain/dataset-studio/CanonicalDataShapes.ts` for:
+  - record collections,
+  - table projections,
+  - document-derived text-item collections,
+  - image-derived structured metadata records.
+- Canonical shape metadata now includes bounded provenance/lineage/transformation-ready envelopes (source hints, asset/version lineage refs, converter metadata, preview attributes) so later preview/lineage/transform flows can reuse one inner-layer contract.
+- A reusable conversion core now exists in `application/dataset-studio/DataConverterCore.ts` with explicit contracts and typed failures for core conversions:
+  - file-like payloads -> canonical records,
+  - canonical records -> canonical table,
+  - document text -> canonical text items,
+  - image metadata payloads -> canonical image metadata records.
+- Scope remains intentionally bounded in this slice:
+  - no ingestion asset execution pipeline was added,
+  - no parallel data taxonomy or parallel asset identity model was introduced,
+  - conversion logic remains deterministic and composable for future ingestion/preparation assets.
+
