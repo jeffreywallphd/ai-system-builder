@@ -205,6 +205,18 @@ The studio shell now has a bounded inner-layer model and application orchestrati
 - Workflow asset-backed references now carry taxonomy metadata on canonical asset refs (`WorkflowDraftAssetReference.taxonomy`) and are validated against shared taxonomy expectations for dataset-backed inputs and agent-assistant steps.
 - Workflow draft validation now emits deterministic taxonomy/asset-reference issues for mismatched dataset taxonomy and malformed asset-backed step identities, while keeping canonical validation in the domain layer and publish enforcement in `application/workflow-studio/WorkflowStudioApplicationService.ts`.
 
+## Direction 5 update: Workflow persistence domain/application foundation (stories 11.1-11.2)
+
+- Workflow persistence now has a dedicated canonical domain contract in `domain/workflow-studio/WorkflowPersistenceDomain.ts` that wraps canonical `WorkflowEntity` payloads (no parallel workflow definition shape).
+- The persistence contract explicitly models:
+  - persisted identity/status (`draft`/`saved`) derived from workflow lifecycle state,
+  - metadata/timestamps,
+  - ownership/context metadata (`ownerId`, `tenantId`, `studioId`, `sessionId`),
+  - basic revision/version metadata (`persistenceRevision`, `workflowRevision`, optional `versionLabel`, optional duplicate source linkage),
+  - payload strategy metadata (`workflow-entity` + schema version).
+- The application-layer persistence boundary now has an explicit repository port (`application/ports/interfaces/IWorkflowPersistenceRepository.ts`) with create/update/get/list/duplicate contracts and bounded list-query semantics.
+- Application use cases for create/update/get/list/duplicate now live in `application/workflow-persistence/*` with typed request validation and explicit failure contracts (`WorkflowPersistenceInvalidRequestError`, `WorkflowPersistenceNotFoundError`, `WorkflowPersistenceConflictError`).
+
 ## Direction 5 update: Workflow built-in step taxonomy + registry foundation (stories 6.1-6.2)
 
 - Workflow-native built-in steps are now first-class inner-layer contracts in `domain/workflow-studio/WorkflowStudioDomain.ts` with canonical categories (`control-flow`, `temporal`, `human-interaction`, reserved `transformation`) and stable built-in step identities.
